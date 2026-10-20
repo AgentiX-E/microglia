@@ -293,6 +293,11 @@ createLlmInterpreter({
 })
 ```
 
+A claim distilled by a model **inherits the trust of the event it came from**, not a model-wide floor:
+a lesson learned from an execution-verified correction (0.95) outranks one learned from a bare
+thumbs-down (0.45), because the evidence behind them differs. Without that inheritance an LLM-derived
+claim starts below the admission gate and can only ever be activated by corroboration.
+
 `payloadHint` is not cosmetic. Without a literal example of your payload shape, a model writes a
 plausible sentence and an empty payload; measured accuracy was **0% correct payloads with 100%
 correct statements** until the hint was added, and 96% after.
