@@ -19,15 +19,23 @@ export type PairedResult = {
   readonly lost: number;
   /** Treatment right, baseline wrong. */
   readonly gained: number;
+  /** Share of pairs on which the arms disagree, (lost + gained) / n. */
+  readonly discordance: number;
   /** Two-sided exact McNemar p-value. */
   readonly p: number;
   readonly deltaCI: Interval;
 };
 
+/**
+ * `resamples` is explicit because the protocol fixes it: the public-benchmark
+ * lane is specified at 10,000 bootstrap resamples, and a default that silently
+ * ran 2,000 would make two reports incomparable.
+ */
 export function comparePaired(
   baseline: readonly boolean[],
   treatment: readonly boolean[],
   seed = 12345,
+  resamples = 2000,
 ): PairedResult {
   if (baseline.length !== treatment.length) {
     throw new Error('Paired comparison requires equal-length outcomes');
@@ -46,7 +54,7 @@ export function comparePaired(
     if (!b && t) gained += 1;
   }
   const deltas = baseline.map((b, i) => (treatment[i] === true ? 1 : 0) - (b ? 1 : 0));
-  const deltaCI = bootstrapCI(deltas, undefined, 2000, mulberry32(seed));
+  const deltaCI = bootstrapCI(deltas, undefined, resamples, mulberry32(seed));
   return {
     n,
     baselineCorrect: baseCorrect,
@@ -56,6 +64,7 @@ export function comparePaired(
     delta: n === 0 ? 0 : (treatCorrect - baseCorrect) / n,
     lost,
     gained,
+    discordance: n === 0 ? 0 : (lost + gained) / n,
     p: mcnemarExact(lost, gained),
     deltaCI,
   };

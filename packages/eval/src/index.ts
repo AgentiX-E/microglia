@@ -8,6 +8,13 @@
 export { comparePaired, type PairedResult } from './stats.js';
 
 export {
+  assignFolds,
+  detectableDelta,
+  discordanceOf,
+  interleaveByKey,
+} from './protocol.js';
+
+export {
   DOMAINS,
   INTENTS,
   applyKnowledge,

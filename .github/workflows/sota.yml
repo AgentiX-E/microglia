@@ -1,16 +1,32 @@
 name: sota
 
-# The public-benchmark lane. It is deliberately not a merge gate: at the sample
-# sizes this repository can afford, a pass/fail threshold on accuracy would be
-# flaky, which is worse than no gate at all. It runs weekly and on demand, and it
-# fails if the benchmark *cannot run* — that is the signal worth acting on.
+# The public-benchmark lane.
+#
+# It is deliberately not a merge gate: accuracy at a few hundred questions is a
+# measurement, not a verdict, and a flaky pass/fail on it would train the project
+# to ignore red builds. What it *does* enforce is instrument validity — the pack
+# was non-empty, evaluation did not mutate knowledge, every question was evaluated
+# exactly once by a memory that never saw it, and the dataset executed. A run that
+# cannot support a claim fails here rather than publishing a number.
 on:
   workflow_dispatch:
     inputs:
       limit:
-        description: 'Questions to draw from BIRD Mini-Dev'
+        description: 'Questions to draw (0 = every usable question)'
         required: false
-        default: '60'
+        default: '0'
+      folds:
+        description: 'Cross-fitting folds'
+        required: false
+        default: '5'
+      max_calls:
+        description: 'Hard model-call budget'
+        required: false
+        default: '4000'
+      generalize:
+        description: 'Scope widening during distillation (false = ablation)'
+        required: false
+        default: 'true'
   schedule:
     - cron: '0 3 * * 1'
 
@@ -19,9 +35,9 @@ permissions:
 
 jobs:
   bird:
-    name: BIRD Mini-Dev (memory on/off)
+    name: BIRD Mini-Dev (cross-fitted, memory on/off)
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
 
@@ -49,10 +65,10 @@ jobs:
             exit 1
           fi
 
-      # The upstream dataset keeps its SQLite databases outside the Hugging Face
-      # repository (the file list is questions only), so the lane needs a pinned
-      # archive. Set the repository variable BIRD_ARCHIVE_URL to a release asset or
-      # mirror that contains mini_dev_sqlite.json and the *.sqlite databases.
+      # The upstream question repository keeps its SQLite databases elsewhere (the
+      # file list is questions only). The lane therefore assembles the benchmark
+      # from birdsql/bird_mini_dev and birdsql/bird-critic-1.0-sqlite, and says
+      # which files it found when it cannot.
       - name: Dataset inventory
         run: node scripts/hf-inventory.mjs birdsql/bird_mini_dev birdsql/bird-critic-1.0-sqlite
 
@@ -60,30 +76,59 @@ jobs:
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           BIRD_ARCHIVE_URL: ${{ vars.BIRD_ARCHIVE_URL }}
-          SOTA_LIMIT: ${{ github.event.inputs.limit || '60' }}
-          POC_MAX_CALLS: '400'
+          SOTA_LIMIT: ${{ github.event.inputs.limit || '0' }}
+          SOTA_FOLDS: ${{ github.event.inputs.folds || '5' }}
+          SOTA_GENERALIZE: ${{ github.event.inputs.generalize || 'true' }}
+          SOTA_RESAMPLES: '10000'
+          POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}
         run: pnpm poc:sota
 
       - name: Publish the result
+        if: always()
         run: |
           node -e "
+            const fs = require('node:fs');
+            if (!fs.existsSync('./poc/results/poc-sota-bird.json')) {
+              console.log('no artefact: the lane did not reach its first fold');
+              process.exit(0);
+            }
             const r = require('./poc/results/poc-sota-bird.json');
             const m = r.metrics;
-            const line = [
-              '### BIRD Mini-Dev',
+            const p = r.paired;
+            const lines = [
+              '### BIRD Mini-Dev — cross-fitted, k=' + r.config.folds,
               '',
-              '| Arm | Execution accuracy |',
-              '| --- | --- |',
-              '| no memory | ' + (m.accuracy_without_memory * 100).toFixed(2) + '% |',
-              '| with memory | ' + (m.accuracy_with_memory * 100).toFixed(2) + '% |',
+              '| Arm | Execution accuracy | n |',
+              '| --- | --- | --- |',
+              '| no memory | ' + (m.accuracy_without_memory * 100).toFixed(2) + '% | ' + p.n + ' |',
+              '| with memory | ' + (m.accuracy_with_memory * 100).toFixed(2) + '% | ' + p.n + ' |',
               '',
-              'Delta: ' + m.delta_pp.toFixed(2) + 'pp over n=' + r.n.eval + ' questions, parse rate ' +
-                (m.parse_rate * 100).toFixed(1) + '%, ' + m.knowledge_active + ' active rules.',
+              'Delta ' + p.delta_pp.toFixed(2) + 'pp [' + p.ci_low_pp.toFixed(2) + ', ' +
+                p.ci_high_pp.toFixed(2) + '], McNemar p=' + p.p_value.toFixed(4) +
+                ', gained ' + p.gained + ', lost ' + p.lost + '.',
+              'Minimum detectable difference at this n and discordance: ' +
+                p.min_detectable_pp.toFixed(2) + 'pp.',
               '',
-              r.advisory.gate + ' (95% interval about ±' + r.advisory.interval_half_width_pp + 'pp at this n).',
-            ].join('\n');
-            require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + '\n');
-            console.log(line);
+              'Parse ' + (m.parse_rate * 100).toFixed(1) + '%, exec ' +
+                (m.exec_rate * 100).toFixed(1) + '%, ' + m.knowledge_active_mean.toFixed(1) +
+                ' active rules per fold, ' + m.mean_pack_ids.toFixed(2) + ' rules per question, ' +
+                m.corrections_learned + ' corrections learned, ' + r.calls + ' calls (' +
+                r.tokens + ' tokens, ' + r.retries + ' retries).',
+              '',
+              '| Gate | Result | Actual |',
+              '| --- | --- | --- |',
+              ...r.gates.map((g) => '| ' + g.id + (g.blocking ? '' : ' (advisory)') + ' | ' +
+                (g.pass ? 'pass' : 'FAIL') + ' | ' + g.actual + ' |'),
+              '',
+              '| Fold | eval | active | no memory | with memory | delta |',
+              '| --- | --- | --- | --- | --- | --- |',
+              ...r.per_fold.map((f) => '| ' + f.fold + ' | ' + f.eval + ' | ' + f.active + ' | ' +
+                (f.without_memory * 100).toFixed(1) + '% | ' + (f.with_memory * 100).toFixed(1) +
+                '% | ' + f.delta_pp.toFixed(2) + 'pp |'),
+            ];
+            const text = lines.join('\n');
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, text + '\n');
+            console.log(text);
           "
 
       - name: Upload the artefact
