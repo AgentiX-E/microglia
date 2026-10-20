@@ -1,37 +1,37 @@
 {
   "id": "poc-sota-attribution",
   "source_artifact": "poc-sota-bird.json",
-  "source_generated_at": "2026-10-20T12:13:51.329Z",
+  "source_generated_at": "2026-10-20T16:05:47.543Z",
   "n": 352,
   "summary": {
-    "rules": 1110,
-    "injectedRules": 445,
-    "helpful": 27,
-    "harmful": 34,
-    "neutral": 384,
-    "harmfulShare": 0.09987515605493133,
+    "rules": 1098,
+    "injectedRules": 443,
+    "helpful": 35,
+    "harmful": 40,
+    "neutral": 368,
+    "harmfulShare": 0.09261576971214018,
     "top": [
       {
-        "fold": 1,
-        "id": "k_01hf7uaqrn_bbrr9",
-        "statement": "A query that orders lapTimes by a milliseconds column and joins drivers without per-driver aggregation does not answer a question asking for each driver's shortest lap time.",
-        "injected": 2,
+        "fold": 0,
+        "id": "k_01hf7uaqp1_f44gz",
+        "statement": "Counting cards that match a join condition requires COUNT(DISTINCT cards.id) to avoid duplicate rows from one-to-many joins.",
+        "injected": 4,
         "helped": 0,
         "hurt": 2,
         "net": -2
       },
       {
         "fold": 0,
-        "id": "k_01hf7uaqon_2xqcs",
-        "statement": "Counting patients in a single-table Examination query uses COUNT(*) rather than COUNT(DISTINCT e.ID) when each row represents one examination record.",
-        "injected": 5,
+        "id": "k_01hf7uaqqp_86xec",
+        "statement": "Using GROUP_CONCAT to aggregate patient IDs by sex does not satisfy a request to list and group patients by sex.",
+        "injected": 8,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
-        "fold": 0,
-        "id": "k_01hf7uaqqb_151a7",
+        "fold": 3,
+        "id": "k_01hf7uaqpn_2vh66",
         "statement": "Using GROUP_CONCAT to aggregate patient IDs by sex does not satisfy a request to list and group patients by sex.",
         "injected": 5,
         "helped": 0,
@@ -39,144 +39,72 @@
         "net": -1
       },
       {
-        "fold": 0,
-        "id": "k_01hf7uaqqc_d1vfw",
-        "statement": "A query that lists and groups patients by sex selects the patient ID and sex columns and groups by both sex and ID.",
-        "injected": 5,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 4,
-        "id": "k_01hf7uaqnn_70hsy",
-        "statement": "Filtering patients by birth year less than 18 does not identify underage patients; age must be computed as the difference between examination year and birth year.",
-        "injected": 4,
+        "fold": 3,
+        "id": "k_01hf7uaqmh_65nf4",
+        "statement": "When a question asks whether each expense was approved, the result should project only the approval column rather than additional descriptive columns.",
+        "injected": 3,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
         "fold": 2,
-        "id": "k_01hf7uaqpj_d4a33",
-        "statement": "The edited SQL selects account_id from trans joined to account, whereas the original selected client_id from trans joined to disp.",
-        "injected": 4,
+        "id": "k_01hf7uaqp8_6cjrj",
+        "statement": "A query answering 'which driver ranked first in the Canadian Grand Prix in 2007, give his reference name' selects forename, surname, and driverRef from drivers joined through results to races, filtered by race name, year, and rank = 1.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqqe_52m58",
+        "statement": "When a question asks for a list of names, the query uses SELECT DISTINCT to avoid duplicate names.",
+        "injected": 3,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
         "fold": 4,
-        "id": "k_01hf7uaqls_d69wp",
-        "statement": "In the european_football_2 schema, the season '2009/2010' corresponds to the 2010 season referenced in natural-language questions.",
-        "injected": 3,
+        "id": "k_01hf7uaqmh_65nf4",
+        "statement": "When a question asks for the oldest female client's district and then the account in that district with the highest average salary, the oldest female client is selected in a subquery and the outer query filters accounts by that district and orders by average salary descending.",
+        "injected": 2,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
         "fold": 1,
-        "id": "k_01hf7uaqm7_41mjt",
-        "statement": "Ranking heroes by height in descending order is expressed as RANK() OVER (ORDER BY height_cm DESC) AS HeightRank.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 4,
-        "id": "k_01hf7uaqma_008k7",
-        "statement": "The question asks for the top 4 teams by highest buildUpPlaySpeed, so ordering ascending and selecting only the speed column does not answer it.",
-        "injected": 3,
+        "id": "k_01hf7uaqmk_ajq8j",
+        "statement": "Including the dob column in the SELECT list of a youngest-driver query was removed in the accepted edit.",
+        "injected": 2,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
         "fold": 2,
-        "id": "k_01hf7uaqmf_fhcqb",
-        "statement": "Filtering district.A11 with MAX(A11) does not correspond to selecting the client with the highest average salary.",
-        "injected": 3,
+        "id": "k_01hf7uaqn5_e6phs",
+        "statement": "A completion rate expressed as a percentage requires multiplying the ratio by 100.",
+        "injected": 2,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
-        "fold": 1,
-        "id": "k_01hf7uaqng_04khd",
-        "statement": "The corrected query computes the percentage as CAST(COUNT(*) AS REAL) * 100 / (SELECT COUNT(*) FROM superhero) with the alignment filter applied via WHERE on an INNER JOIN.",
-        "injected": 3,
+        "fold": 3,
+        "id": "k_01hf7uaqni_0366y",
+        "statement": "A query answering 'comments left by users who edited the post' must relate the comment's author to the post's editor, not merely join comments and postHistory on the same post.",
+        "injected": 2,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
         "fold": 2,
-        "id": "k_01hf7uaqog_efakp",
+        "id": "k_01hf7uaqoe_7av5c",
         "statement": "A query counting players filtered by preferred_foot and attacking_work_rate can be written as SELECT COUNT(player_api_id) FROM Player_Attributes WHERE preferred_foot = 'left' AND attacking_work_rate = 'low'.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 0,
-        "id": "k_01hf7uaqq9_32y7g",
-        "statement": "For a query asking for an aggregate over districts filtered by the existence of related account rows, an INNER JOIN between district and account with the date filter in WHERE produces the same result as an EXISTS subquery when each district has at least one matching account.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 2,
-        "id": "k_01hf7uaqra_f4zba",
-        "statement": "A percentage comparison between two players' overall_rating on a given date is expressed using SUM(CASE WHEN ...) aggregations over a join of Player and Player_Attributes filtered by SUBSTR(date,1,10).",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 0,
-        "id": "k_01hf7uaqn7_dsksp",
-        "statement": "Joining connected to bond via bond_id does not reflect the toxicology schema's join path for relating atoms to bonds.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 2,
-        "id": "k_01hf7uaqne_2e5mh",
-        "statement": "The Laboratory table links to Patient via the ID column, so patient age can be computed by joining Patient and Laboratory on ID alone.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 4,
-        "id": "k_01hf7uaqns_frqev",
-        "statement": "For codebase_community questions asking which user performed an action on a post, the result includes both the user's DisplayName and the post's Title.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 4,
-        "id": "k_01hf7uaqoa_0zhn6",
-        "statement": "Grouping by user and post simultaneously does not satisfy a requirement that each user have only one post history per post; grouping must be by user alone with a distinct count over post history types.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 0,
-        "id": "k_01hf7uaqof_efakp",
-        "statement": "When a question asks about card rulings text, the query must join the rulings table to cards on uuid rather than filtering on a text column in the cards table.",
         "injected": 2,
         "helped": 0,
         "hurt": 1,
@@ -184,8 +112,80 @@
       },
       {
         "fold": 1,
-        "id": "k_01hf7uaqrb_aj0qe",
-        "statement": "Using OR of two inequalities (<= lower OR >= upper) is a less preferred expression of an abnormal range than NOT BETWEEN.",
+        "id": "k_01hf7uaqov_ej4cs",
+        "statement": "In the codebase_community schema, posts authored by a user are reached via postHistory.UserId rather than posts.OwnerUserId.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqp0_8ecyz",
+        "statement": "When a question asks about card rulings text, the query must join the rulings table to cards rather than filtering on a text column in the cards table.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqq7_9ptf4",
+        "statement": "When computing a loan growth rate for a male client, the disposition join must be filtered to type = 'OWNER' so that only owner-role dispositions are counted.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqqc_151a7",
+        "statement": "The query counting transactions with k_symbol 'SLUZBY', operation 'VYBER', and type 'VYDAJ' does not answer a question asking both how often an account requests a statement and the aim of a total debit of 3539.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqqf_a8kw8",
+        "statement": "When event_date values include a time component, date comparisons use date(SUBSTR(event_date, 1, 10)) to compare only the date portion.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqqi_3h3d0",
+        "statement": "For 'first time at highest value' questions, ordering by the metric descending and then by date ascending within a subquery yields the earliest date at the maximum value.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqqn_fhcwq",
+        "statement": "In the codebase_community schema, the post creation timestamp column is named 'CreationDate' on the posts table.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqqt_ara3k",
+        "statement": "For a count of users filtered by a condition on their posts, joining users to posts and counting user IDs yields the number of qualifying users.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqr0_9d5j4",
+        "statement": "A Korean version of a card exists only when a set_translations row has language 'Korean' and a non-null translation.",
         "injected": 2,
         "helped": 0,
         "hurt": 1,

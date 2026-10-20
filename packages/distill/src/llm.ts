@@ -16,12 +16,7 @@
  *     model.
  */
 import { MicrogliaError, dedupeKeyOf } from '@agentix-e/microglia-core';
-import type {
-  Json,
-  JsonObject,
-  KnowledgeKind,
-  KnowledgeScope,
-} from '@agentix-e/microglia-core';
+import type { Json, KnowledgeKind, KnowledgeScope } from '@agentix-e/microglia-core';
 import type { DistillCandidate as Candidate } from '@agentix-e/microglia-core';
 import type { Interpreter, InterpretContext } from './types.js';
 
@@ -114,20 +109,8 @@ export function parseDistillResponse(
   },
 ): readonly Candidate[] {
   const trust = base.trust ?? 0.6;
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(extractJson(raw));
-  } catch (error) {
-    throw new MicrogliaError('MG_E_INVALID_SIGNAL', 'LLM response is not JSON', {
-      cause: String(error),
-    });
-  }
-  if (typeof parsed !== 'object' || parsed === null || !Array.isArray((parsed as JsonObject)['candidates'])) {
-    throw new MicrogliaError('MG_E_INVALID_SIGNAL', 'LLM response has no candidates array');
-  }
-
   const out: Candidate[] = [];
-  for (const entry of (parsed as { candidates: unknown[] }).candidates) {
+  for (const entry of parseCandidates(raw)) {
     if (typeof entry !== 'object' || entry === null) continue;
     const record = entry as Record<string, unknown>;
     const kind = record['kind'];
@@ -187,14 +170,103 @@ function isJson(value: unknown): value is Json {
   return false;
 }
 
+/**
+ * Escape raw control characters inside JSON strings.
+ *
+ * Models write multi-line statements, and a literal newline inside a string makes
+ * `JSON.parse` reject an otherwise correct object. The scan is character-level and
+ * string-aware: a newline between tokens is legal whitespace and must be left
+ * alone, while the same character inside quotes has to become `\n`.
+ */
+export function repairJson(text: string): string {
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (const char of text) {
+    if (escaped) {
+      out += char;
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      out += char;
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      out += char;
+      continue;
+    }
+    if (inString && (char === '\n' || char === '\r' || char === '\t')) {
+      out += char === '\n' ? '\\n' : char === '\r' ? '\\r' : '\\t';
+      continue;
+    }
+    out += char;
+  }
+  return out;
+}
+
+/**
+ * Read the candidates array out of a model reply.
+ *
+ * Three shapes have been observed in practice: the documented
+ * `{"candidates": [...]}`, a bare array, and a single candidate object returned
+ * when the model decides one lesson is enough. A parser that insists on the first
+ * discards the other two as "not JSON", which on the public lane cost 26% of all
+ * corrections — a bias in the knowledge, not a formatting nuisance.
+ *
+ * Repair is attempted only after the strict parse fails, and only in two steps
+ * that cannot change a valid document: escape control characters inside strings,
+ * then drop trailing commas. Anything still unparseable is reported with the
+ * reply's opening characters, because "not JSON" alone cannot be acted on.
+ */
+export function parseCandidates(raw: string): unknown[] {
+  const text = extractJson(raw);
+  const attempts = [text, repairJson(text), repairJson(text).replace(/,\s*([}\]])/g, '$1')];
+  let lastError = '';
+  for (const attempt of attempts) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(attempt) as unknown;
+    } catch (error) {
+      lastError = String(error);
+      continue;
+    }
+    const list = asCandidateList(parsed);
+    if (list !== undefined) return list;
+    lastError = 'parsed, but holds no candidate object';
+  }
+  throw new MicrogliaError('MG_E_INVALID_SIGNAL', 'LLM response is not JSON', {
+    cause: lastError,
+    preview: text.slice(0, 160),
+  });
+}
+
+function asCandidateList(parsed: unknown): unknown[] | undefined {
+  if (Array.isArray(parsed)) return parsed;
+  if (parsed === null || typeof parsed !== 'object') return undefined;
+  const record = parsed as Record<string, unknown>;
+  const list = record['candidates'];
+  if (Array.isArray(list)) return list;
+  if (typeof record['kind'] === 'string' && typeof record['statement'] === 'string') return [record];
+  return undefined;
+}
+
 /** Models sometimes wrap JSON in prose or fences; extract the first object. */
 function extractJson(raw: string): string {
   const trimmed = raw.trim();
-  if (trimmed.startsWith('{')) return trimmed;
-  const start = trimmed.indexOf('{');
-  const end = trimmed.lastIndexOf('}');
-  if (start === -1 || end === -1 || end <= start) return trimmed;
-  return trimmed.slice(start, end + 1);
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) return trimmed;
+  // Either shape may be wrapped in prose or a fence. Slicing from the first `{`
+  // alone silently drops the brackets of a top-level array, which then fails to
+  // parse as the candidates it plainly is.
+  const object = trimmed.indexOf('{');
+  const array = trimmed.indexOf('[');
+  const start = object === -1 ? array : array === -1 ? object : Math.min(object, array);
+  if (start === -1) return trimmed;
+  const close = trimmed[start] === '{' ? '}' : ']';
+  const end = trimmed.lastIndexOf(close);
+  return end > start ? trimmed.slice(start, end + 1) : trimmed;
 }
 
 /**
