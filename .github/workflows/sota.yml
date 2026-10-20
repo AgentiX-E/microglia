@@ -27,6 +27,10 @@ on:
         description: 'Scope widening during distillation (false = ablation)'
         required: false
         default: 'true'
+      arms:
+        description: 'Control arms beyond none+full (narrow,wrong-scope,oracle)'
+        required: false
+        default: 'narrow,wrong-scope,oracle'
   schedule:
     - cron: '0 3 * * 1'
 
@@ -37,7 +41,7 @@ jobs:
   bird:
     name: BIRD Mini-Dev (cross-fitted, memory on/off)
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -79,6 +83,7 @@ jobs:
           SOTA_LIMIT: ${{ github.event.inputs.limit || '0' }}
           SOTA_FOLDS: ${{ github.event.inputs.folds || '5' }}
           SOTA_GENERALIZE: ${{ github.event.inputs.generalize || 'true' }}
+          SOTA_ARMS: ${{ github.event.inputs.arms || 'narrow,wrong-scope,oracle' }}
           SOTA_RESAMPLES: '10000'
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}
         run: pnpm poc:sota
@@ -120,11 +125,22 @@ jobs:
               ...r.gates.map((g) => '| ' + g.id + (g.blocking ? '' : ' (advisory)') + ' | ' +
                 (g.pass ? 'pass' : 'FAIL') + ' | ' + g.actual + ' |'),
               '',
+              '| Control arm | Accuracy | Delta vs none | 95% CI | p | rules/question |',
+              '| --- | --- | --- | --- | --- | --- |',
+              ...r.arms.map((a) => '| ' + a.arm + ' | ' + (a.accuracy * 100).toFixed(2) + '% | ' +
+                a.delta_pp.toFixed(2) + 'pp | [' + a.ci_low_pp.toFixed(2) + ', ' +
+                a.ci_high_pp.toFixed(2) + '] | ' + a.p_value.toFixed(4) + ' | ' +
+                a.mean_pack_ids.toFixed(2) + ' |'),
+              '',
               '| Fold | eval | active | no memory | with memory | delta |',
               '| --- | --- | --- | --- | --- | --- |',
               ...r.per_fold.map((f) => '| ' + f.fold + ' | ' + f.eval + ' | ' + f.active + ' | ' +
                 (f.without_memory * 100).toFixed(1) + '% | ' + (f.with_memory * 100).toFixed(1) +
                 '% | ' + f.delta_pp.toFixed(2) + 'pp |'),
+              '',
+              r.distill_failure_samples.length === 0
+                ? 'No distillation parse failures.'
+                : 'Distillation failures: ' + r.distill_failure_samples.join(' | '),
             ];
             const text = lines.join('\n');
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, text + '\n');

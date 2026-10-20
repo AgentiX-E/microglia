@@ -7,26 +7,34 @@
  * cannot — whether a pack learned from *this* database's corrections helps on
  * *held-out* questions about the same database.
  *
- * Protocol (v2, cross-fitted)
+ * Protocol (v3, cross-fitted with controls)
  *  1. Every usable question is assigned to exactly one of `k` folds, balanced and
  *     independent of file order (`assignFolds`). Each question is therefore
  *     evaluated exactly once, and evaluated only by a memory that never saw it.
  *  2. For fold f: a *fresh* memory learns from the k−1 other folds, distils, and
- *     is frozen; the held-out fold is then answered by two arms — no memory, then
- *     that pack. The two arms share the model, the prompt, and the schema.
+ *     is frozen; the held-out fold is then answered by every configured arm. The
+ *     arms share the model, the prompt skeleton, and the schema.
  *  3. The pack is fingerprinted before and after evaluation. Evaluation is
  *     read-only: a run that writes feedback while it is being measured cannot
  *     report a frozen pack.
  *  4. Per-question outcomes are pooled and analysed as a paired design (exact
- *     McNemar, bootstrap interval over questions). The minimum detectable
- *     difference is reported alongside the result, from the observed discordance,
- *     because at a few hundred questions a small effect is not distinguishable
- *     from noise.
+ *     McNemar, bootstrap interval over questions), arm by arm against the
+ *     no-memory arm.
  *
- * Why k-fold rather than one split: a single half split throws away half the
- * questions as evaluation data and spends the other half on a memory that is
- * discarded. Cross-fitting uses every question for both roles, which is worth
- * roughly a factor of two in detectable effect at the same number of model calls.
+ * Why controls rather than one comparison: a negative delta has four explanations,
+ * and they are separable in one run.
+ *
+ *  | Arm | What it varies | What a result means |
+ *  |---|---|---|
+ *  | none | nothing | the reference |
+ *  | full | the learned pack | the hypothesis |
+ *  | narrow | fewer characters, fewer rules | if narrow recovers, the harm is dilution |
+ *  | wrong-scope | another database's rules, same token cost | if wrong-scope hurts as much, the harm is length, not content |
+ *  | oracle | the gold SQL as the only "convention" | if even this does not move accuracy, the channel is broken |
+ *
+ * The oracle arm is a channel probe, not a result: it measures the ceiling of
+ * injecting text into this prompt, and a lane in which the ceiling is the floor
+ * cannot support any conclusion about knowledge.
  *
  * Requirements
  *  - `DEEPSEEK_API_KEY` for generation.
@@ -37,6 +45,7 @@
  * Environment
  *  - `SOTA_LIMIT`      questions to draw (0 = every usable question); default 0
  *  - `SOTA_FOLDS`      cross-fitting folds; default 5
+ *  - `SOTA_ARMS`       comma list of full,narrow,wrong-scope,oracle; default all
  *  - `SOTA_SEED`       bootstrap and memory seed; default 7
  *  - `SOTA_GENERALIZE` `false` to distil without scope widening (ablation)
  *  - `SOTA_RESAMPLES`  bootstrap resamples; default 10000, per the protocol
@@ -46,14 +55,15 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import {
-  MicrogliaError,
-  mulberry32,
-  steppingClock,
-} from '@agentix-e/microglia-core';
+import { MicrogliaError, mulberry32, steppingClock } from '@agentix-e/microglia-core';
 import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-memory';
 import { openMicroglia } from '@agentix-e/microglia-capture';
-import { createLlmInterpreter, ruleInterpreter, combineInterpreters } from '@agentix-e/microglia-distill';
+import {
+  combineInterpreters,
+  createLlmInterpreter,
+  ruleInterpreter,
+  type Interpreter,
+} from '@agentix-e/microglia-distill';
 import {
   assignFolds,
   comparePaired,
@@ -82,6 +92,27 @@ const PROMPT_VERSION = 'sql-prompt/2';
 /** Task name under which knowledge is scoped, and therefore recalled. */
 const TASK = 'sql.generate';
 
+type ArmName = 'none' | 'full' | 'narrow' | 'wrong-scope' | 'oracle';
+
+const OPTIONAL_ARMS: readonly Exclude<ArmName, 'none' | 'full'>[] = ['narrow', 'wrong-scope', 'oracle'];
+
+function parseArms(raw: string | undefined): Set<ArmName> {
+  const wanted = new Set<ArmName>(['none', 'full']);
+  for (const name of (raw ?? OPTIONAL_ARMS.join(',')).split(',')) {
+    const trimmed = name.trim();
+    if (trimmed === '') continue;
+    if (!OPTIONAL_ARMS.includes(trimmed as Exclude<ArmName, 'none' | 'full'>)) {
+      throw new MicrogliaError('MG_E_CONFIG', `Unknown arm '${trimmed}'`, {
+        known: OPTIONAL_ARMS.join(', '),
+      });
+    }
+    wanted.add(trimmed as ArmName);
+  }
+  return wanted;
+}
+
+const ARMS = parseArms(process.env['SOTA_ARMS']);
+
 function nonNegative(raw: string | undefined, fallback: number): number {
   if (raw === undefined || raw === '') return fallback;
   const value = Number(raw);
@@ -97,7 +128,7 @@ type BirdRow = {
   readonly difficulty: string;
 };
 
-/** One evaluated question, both arms, as the protocol requires. */
+/** One evaluated question, every arm, as the protocol requires. */
 type CaseOutcome = {
   readonly id: string;
   readonly questionId: number;
@@ -114,6 +145,9 @@ type CaseOutcome = {
   readonly packIds: number;
   readonly tokens: number;
   readonly latencyMs: number;
+  /** Optional arms, present only when configured. */
+  readonly arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
+  readonly armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>>;
 };
 
 let calls = 0;
@@ -125,12 +159,13 @@ type Reply = { readonly text: string; readonly tokens: number };
 /**
  * One model call, with the failure modes a long run actually meets.
  *
- * A 47-minute run makes thousands of calls; without a timeout a single stalled
+ * A two-hour run makes thousands of calls; without a timeout a single stalled
  * socket stops it, and without a retry a single 429 loses the run. Retries are
  * counted and reported, so "it worked" is not confused with "it worked first
- * time".
+ * time". `maxTokens` is a parameter because distillation emits structured JSON and
+ * truncating it is invisible: the parse fails and the correction is lost.
  */
-async function chat(prompt: string): Promise<Reply> {
+async function chat(prompt: string, maxTokens = 700): Promise<Reply> {
   const key = process.env['DEEPSEEK_API_KEY'];
   if (!key) throw new MicrogliaError('MG_E_CONFIG', 'DEEPSEEK_API_KEY is required');
   let last = '';
@@ -150,7 +185,7 @@ async function chat(prompt: string): Promise<Reply> {
           model: MODEL,
           messages: [{ role: 'user', content: prompt }],
           temperature: 0,
-          max_tokens: 700,
+          max_tokens: maxTokens,
         }),
         signal: AbortSignal.timeout(60_000),
       });
@@ -248,14 +283,6 @@ function parseRows(text: string): BirdRow[] {
 }
 
 /**
- * Assemble the benchmark from the artefacts that actually exist.
- *
- * The questions and the databases live in two different repositories, and neither
- * mirrors the other: `bird_mini_dev` holds the question bank, `bird-critic` holds
- * the eleven SQLite databases (as `<db>_template.sqlite`). A lane that expects one
- * archive cannot run; a lane that knows both can, with no manual setup.
- */
-/**
  * Locate a database inside an extracted Mini-Dev directory.
  *
  * BIRD has shipped two layouts (`mini_dev_sqlite/<db>.sqlite` and
@@ -276,6 +303,14 @@ function databaseIn(directory: string, dbId: string): string {
   });
 }
 
+/**
+ * Assemble the benchmark from the artefacts that actually exist.
+ *
+ * The questions and the databases live in two different repositories, and neither
+ * mirrors the other: `bird_mini_dev` holds the question bank, `bird-critic` holds
+ * the eleven SQLite databases (as `<db>_template.sqlite`). A lane that expects one
+ * archive cannot run; a lane that knows both can, with no manual setup.
+ */
 async function loadDataset(limit: number): Promise<Dataset> {
   const explicit = process.env['BIRD_DIR'];
   let rows: BirdRow[];
@@ -463,29 +498,26 @@ type Answer = {
 };
 
 /**
- * Answer one question, without writing anything.
+ * Answer one question under one condition, without writing anything.
  *
  * The evaluation arms are read-only by construction: no run is begun, no feedback
  * is recorded. An earlier version recorded a correction here, which meant the
  * store under measurement grew while it was measured.
  */
 async function answer(
-  host: Awaited<ReturnType<typeof openMicroglia>>,
   row: BirdRow,
   dataset: Dataset,
-  withMemory: boolean,
+  packText: string,
+  packIds: number,
 ): Promise<Answer> {
   const dbPath = dataset.dbPath(row.db_id);
   const ddl = ddlOf(dbPath);
-  const pack = withMemory
-    ? await host.recall({ task: TASK, text: row.question, scope: { domain: row.db_id } })
-    : undefined;
   const started = performance.now();
   let sql = '';
   let parseOk = false;
   let tokens = 0;
   try {
-    const reply = await chat(promptFor(row, ddl, pack?.rendered ?? ''));
+    const reply = await chat(promptFor(row, ddl, packText));
     tokens = reply.tokens;
     const extracted = extractSql(reply.text);
     sql = extracted ?? '';
@@ -501,7 +533,7 @@ async function answer(
     correct: predicted.ok && gold.ok && matches(predicted.rows, gold.rows),
     parseOk,
     execOk: predicted.ok,
-    packIds: pack?.ids.length ?? 0,
+    packIds,
     tokens,
     latencyMs: Math.round(performance.now() - started),
   };
@@ -578,6 +610,8 @@ type StoredItem = {
   readonly status: string;
   readonly trust: number;
   readonly statement: string;
+  /** The database the rule is scoped to, or null when it generalised out of one. */
+  readonly domain: string | null;
 };
 
 type FoldResult = {
@@ -592,7 +626,28 @@ type FoldResult = {
   readonly meanPackIds: number;
   readonly digest: string;
   readonly items: readonly StoredItem[];
+  readonly distillFailures: readonly string[];
 };
+
+/**
+ * Wrap an interpreter so a parse failure leaves a reason behind.
+ *
+ * Counting failures is not enough to fix them: the message distinguishes a
+ * truncated response (max_tokens) from a schema mismatch (the model answered in
+ * the wrong shape), and those need different repairs.
+ */
+function recording(inner: Interpreter, sink: string[]): Interpreter {
+  return async (context) => {
+    try {
+      return await inner(context);
+    } catch (error) {
+      if (sink.length < 5) {
+        sink.push((error instanceof Error ? error.message : String(error)).slice(0, 200));
+      }
+      throw error;
+    }
+  };
+}
 
 async function runFold(
   fold: number,
@@ -605,12 +660,18 @@ async function runFold(
   const learnRows = rows.filter((row) => foldOf.get(idOf(row)) !== fold);
 
   const store = await EmbeddedMemory.open(new MemoryJournal());
+  const distillFailures: string[] = [];
   const host = await openMicroglia({
     app: 'microglia-sota',
     namespace: 'bird',
     store,
     interpreter: combineInterpreters(
-      createLlmInterpreter({ llm: { complete: (prompt) => chat(prompt).then((reply) => reply.text) } }),
+      recording(
+        createLlmInterpreter({
+          llm: { complete: (prompt) => chat(prompt, 1400).then((reply) => reply.text) },
+        }),
+        distillFailures,
+      ),
       ruleInterpreter,
     ),
     budget: 1200,
@@ -618,17 +679,78 @@ async function runFold(
     random: mulberry32(SEED),
   });
 
-  // Arm A, on the held-out fold, before anything is learned from it.
-  const without: Answer[] = [];
-  for (const row of evalRows) without.push(await answer(host, row, dataset, false));
-
   const learning = await learn(host, learnRows, dataset);
   const distilled = await host.distill({ generalize: GENERALIZE });
   const frozen = await knowledgeDigest(store);
 
-  // Arm B, same questions, same prompt, only the pack differs.
-  const withPack: Answer[] = [];
-  for (const row of evalRows) withPack.push(await answer(host, row, dataset, true));
+  // The wrong-scope control must inject text, or it silently becomes a second
+  // no-memory arm. It therefore rotates to the next database that actually holds
+  // at least one active rule; with a single such database the control degenerates
+  // and `mean_pack_ids` in the artefact shows it.
+  const withRules = [...new Set(
+    (await store.listKnowledge({ namespace: 'bird', status: 'active' }))
+      .map((item) => item.scope.domain)
+      .filter((domain): domain is string => typeof domain === 'string'),
+  )].sort();
+  const databases = withRules.length > 0 ? withRules : [...new Set(rows.map((row) => row.db_id))].sort();
+  const nextDatabase = (dbId: string): string => {
+    const index = databases.indexOf(dbId);
+    if (index === -1) return databases[0] as string;
+    return databases[(index + 1) % databases.length] ?? dbId;
+  };
+
+  const cases: CaseOutcome[] = [];
+  for (const row of evalRows) {
+    const query = { task: TASK, text: row.question };
+    const pack = await host.recall({ ...query, scope: { domain: row.db_id } });
+    const base = await answer(row, dataset, '', 0);
+    const full = await answer(row, dataset, pack.rendered, pack.ids.length);
+
+    const arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>> = {};
+    const armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
+    if (ARMS.has('narrow')) {
+      const narrow = await host.recall({
+        ...query,
+        scope: { domain: row.db_id },
+        budget: 400,
+        limit: 3,
+      });
+      const result = await answer(row, dataset, narrow.rendered, narrow.ids.length);
+      arms.narrow = result.correct;
+      armPackIds.narrow = result.packIds;
+    }
+    if (ARMS.has('wrong-scope')) {
+      const wrong = await host.recall({ ...query, scope: { domain: nextDatabase(row.db_id) } });
+      const result = await answer(row, dataset, wrong.rendered, wrong.ids.length);
+      arms['wrong-scope'] = result.correct;
+      armPackIds['wrong-scope'] = result.packIds;
+    }
+    if (ARMS.has('oracle')) {
+      const result = await answer(row, dataset, `- ${row.SQL}`, 0);
+      arms.oracle = result.correct;
+      armPackIds.oracle = 0;
+    }
+
+    cases.push({
+      id: idOf(row),
+      questionId: row.question_id,
+      dbId: row.db_id,
+      fold,
+      difficulty: row.difficulty,
+      question: row.question,
+      goldSql: row.SQL,
+      predictedSql: full.sql,
+      correct: full.correct,
+      withoutMemoryCorrect: base.correct,
+      parseOk: full.parseOk,
+      execOk: full.execOk,
+      packIds: full.packIds,
+      tokens: full.tokens,
+      latencyMs: full.latencyMs,
+      arms,
+      armPackIds,
+    });
+  }
 
   const after = await knowledgeDigest(store);
   if (after.digest !== frozen.digest) {
@@ -643,30 +765,10 @@ async function runFold(
     status: item.status,
     trust: Number(item.trust.toFixed(4)),
     statement: item.statement,
+    domain: item.scope.domain ?? null,
   }));
   await host.close();
 
-  const cases: CaseOutcome[] = evalRows.map((row, index) => {
-    const a = without[index] as Answer;
-    const b = withPack[index] as Answer;
-    return {
-      id: idOf(row),
-      questionId: row.question_id,
-      dbId: row.db_id,
-      fold,
-      difficulty: row.difficulty,
-      question: row.question,
-      goldSql: row.SQL,
-      predictedSql: b.sql,
-      correct: b.correct,
-      withoutMemoryCorrect: a.correct,
-      parseOk: b.parseOk,
-      execOk: b.execOk,
-      packIds: b.packIds,
-      tokens: b.tokens,
-      latencyMs: b.latencyMs,
-    };
-  });
   const packIds = cases.reduce((sum, item) => sum + item.packIds, 0);
   process.stdout.write(
     `[sota] fold ${fold + 1}/${FOLDS}: eval=${cases.length} learn=${learnRows.length} ` +
@@ -684,6 +786,7 @@ async function runFold(
     meanPackIds: cases.length === 0 ? 0 : packIds / cases.length,
     digest: frozen.digest,
     items,
+    distillFailures,
   };
 }
 
@@ -696,6 +799,19 @@ function percentile(values: readonly number[], q: number): number {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] as number;
 }
+
+type ArmSummary = {
+  readonly arm: ArmName;
+  readonly n: number;
+  readonly accuracy: number;
+  readonly delta_pp: number;
+  readonly ci_low_pp: number;
+  readonly ci_high_pp: number;
+  readonly p_value: number;
+  readonly gained: number;
+  readonly lost: number;
+  readonly mean_pack_ids: number;
+};
 
 async function main(): Promise<void> {
   const dataset = await loadDataset(LIMIT);
@@ -741,13 +857,50 @@ async function main(): Promise<void> {
 
   const parseRate = rate(cases.map((item) => item.parseOk));
   const execRate = rate(cases.map((item) => item.execOk));
+  const learnTotal = folds.reduce((sum, fold) => sum + fold.learn, 0);
   const goldFailures = folds.reduce((sum, fold) => sum + fold.learning.goldFailed, 0);
-  const goldExecRate =
-    folds.reduce((sum, fold) => sum + fold.learn, 0) === 0
-      ? 1
-      : 1 - goldFailures / folds.reduce((sum, fold) => sum + fold.learn, 0);
+  const goldExecRate = learnTotal === 0 ? 1 : 1 - goldFailures / learnTotal;
   const detectable = detectableDelta(cases.length, paired.discordance);
 
+  const arms: ArmSummary[] = [
+    {
+      arm: 'full',
+      n: paired.n,
+      accuracy: paired.treatmentAccuracy,
+      delta_pp: paired.delta * 100,
+      ci_low_pp: paired.deltaCI.low * 100,
+      ci_high_pp: paired.deltaCI.high * 100,
+      p_value: paired.p,
+      gained: paired.gained,
+      lost: paired.lost,
+      mean_pack_ids: meanPackIds,
+    },
+  ];
+  for (const name of OPTIONAL_ARMS) {
+    const present = cases.filter((item) => item.arms[name] !== undefined);
+    if (present.length === 0) continue;
+    const comparison = comparePaired(
+      present.map((item) => item.withoutMemoryCorrect),
+      present.map((item) => item.arms[name] === true),
+      SEED,
+      RESAMPLES,
+    );
+    arms.push({
+      arm: name,
+      n: comparison.n,
+      accuracy: comparison.treatmentAccuracy,
+      delta_pp: comparison.delta * 100,
+      ci_low_pp: comparison.deltaCI.low * 100,
+      ci_high_pp: comparison.deltaCI.high * 100,
+      p_value: comparison.p,
+      gained: comparison.gained,
+      lost: comparison.lost,
+      mean_pack_ids:
+        present.reduce((sum, item) => sum + (item.armPackIds[name] ?? 0), 0) / present.length,
+    });
+  }
+
+  const oracle = arms.find((entry) => entry.arm === 'oracle');
   const gates = [
     {
       id: 'V1-pack-not-empty',
@@ -784,6 +937,16 @@ async function main(): Promise<void> {
       pass: detectable <= 0.06,
       blocking: false,
     },
+    {
+      id: 'V6-channel',
+      criterion: 'injecting the gold SQL as a convention moves accuracy by at least 10pp',
+      actual:
+        oracle === undefined
+          ? 'oracle arm not run'
+          : `${oracle.delta_pp.toFixed(2)}pp with oracle hint`,
+      pass: oracle === undefined ? true : oracle.delta_pp >= 10,
+      blocking: true,
+    },
   ];
 
   const assertions = {
@@ -801,7 +964,7 @@ async function main(): Promise<void> {
   );
   const artifact = {
     id: 'poc-sota-bird',
-    protocol: 'cross-fitted-kfold/2',
+    protocol: 'cross-fitted-kfold/3',
     dataset: 'BIRD Mini-Dev (sqlite)',
     source: dataset.source,
     model: MODEL,
@@ -813,6 +976,9 @@ async function main(): Promise<void> {
       generalize: GENERALIZE,
       resamples: RESAMPLES,
       budget_chars: 1200,
+      narrow_budget_chars: 400,
+      narrow_items: 3,
+      arms: [...ARMS],
       task: TASK,
     },
     n: {
@@ -851,6 +1017,7 @@ async function main(): Promise<void> {
       ci_high_pp: paired.deltaCI.high * 100,
       min_detectable_pp: detectable * 100,
     },
+    arms,
     gates,
     assertions,
     per_fold: folds.map((fold) => ({
@@ -859,18 +1026,14 @@ async function main(): Promise<void> {
       learn: fold.learn,
       edited: fold.learning.edited,
       active: fold.activeRules,
+      failed_distill: fold.failedDistill,
       mean_pack_ids: Number(fold.meanPackIds.toFixed(3)),
       without_memory: rate(fold.cases.map((item) => item.withoutMemoryCorrect)),
       with_memory: rate(fold.cases.map((item) => item.correct)),
       delta_pp: (rate(fold.cases.map((item) => item.correct)) -
         rate(fold.cases.map((item) => item.withoutMemoryCorrect))) * 100,
-      p_value: comparePaired(
-        fold.cases.map((item) => item.withoutMemoryCorrect),
-        fold.cases.map((item) => item.correct),
-        SEED,
-        2000,
-      ).p,
     })),
+    distill_failure_samples: [...new Set(folds.flatMap((fold) => fold.distillFailures))].slice(0, 8),
     per_case: cases,
     items,
     generated_at: new Date().toISOString(),
@@ -884,6 +1047,13 @@ async function main(): Promise<void> {
       `ci=[${(paired.deltaCI.low * 100).toFixed(2)}, ${(paired.deltaCI.high * 100).toFixed(2)}] ` +
       `p=${paired.p.toFixed(4)} min-detectable=${(detectable * 100).toFixed(2)}pp calls=${calls}\n`,
   );
+  for (const entry of arms.slice(1)) {
+    process.stdout.write(
+      `[sota] arm ${entry.arm}: ${(entry.accuracy * 100).toFixed(2)}% ` +
+        `delta=${entry.delta_pp.toFixed(2)}pp p=${entry.p_value.toFixed(4)} ` +
+        `pids=${entry.mean_pack_ids.toFixed(2)}\n`,
+    );
+  }
 
   const failed = gates.filter((gate) => gate.blocking && !gate.pass);
   if (failed.length > 0) {
