@@ -184,7 +184,10 @@ async function datasetDir(): Promise<string> {
   let fetched: { url: string; body: Buffer } | undefined;
   const attempted: string[] = [];
   const discovered = await archiveUrls();
-  for (const url of [...discovered.urls, ...DATASET_URLS]) {
+  // A maintainer-controlled mirror is checked first: the upstream archive moves,
+  // and a pinned URL in the environment is the only stable way to run this lane.
+  const pinned = process.env['BIRD_ARCHIVE_URL'];
+  for (const url of [...(pinned === undefined ? [] : [pinned]), ...discovered.urls, ...DATASET_URLS]) {
     attempted.push(url);
     process.stdout.write(`[sota] downloading ${url}\n`);
     try {
@@ -198,10 +201,12 @@ async function datasetDir(): Promise<string> {
     }
   }
   if (fetched === undefined) {
-    throw new MicrogliaError('MG_E_STORE_IO', 'No dataset archive could be downloaded', {
+    const held = discovered.siblings.length === 0 ? 'the repository API did not answer' : discovered.siblings.join(', ');
+    throw new MicrogliaError('MG_E_STORE_IO', `No dataset archive could be downloaded. The repository holds: ${held}`, {
       attempted,
-      available: discovered.siblings.length === 0 ? 'the repository API did not answer' : discovered.siblings.join(', '),
-      hint: 'Set BIRD_DIR to an extracted Mini-Dev directory. The archive lives on a host that moves; local data is the reliable path.',
+      hint:
+        'The upstream release keeps the SQLite databases outside the Hugging Face repository, so this lane needs a pinned archive. ' +
+        'Set BIRD_ARCHIVE_URL to an archive containing mini_dev_sqlite.json and the *.sqlite databases, or BIRD_DIR to an extracted copy.',
     });
   }
   writeFileSync(zip, fetched.body);
@@ -210,6 +215,14 @@ async function datasetDir(): Promise<string> {
   // releases, and a missing file should say so instead of silently producing an
   // empty run.
   await locate(CACHE, 'mini_dev_sqlite.json');
+  const databases = await indexDatabases(CACHE);
+  if (databases.size === 0) {
+    throw new MicrogliaError(
+      'MG_E_STORE_IO',
+      'The archive contains the questions but no SQLite databases',
+      { hint: 'Execution accuracy needs the databases. Point BIRD_ARCHIVE_URL at the complete package.' },
+    );
+  }
   return CACHE;
 }
 
