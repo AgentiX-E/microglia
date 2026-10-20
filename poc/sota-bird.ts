@@ -49,8 +49,19 @@ import { createLlmInterpreter, ruleInterpreter, combineInterpreters } from '@age
 
 const run = promisify(execFile);
 
-const DATASET_URL =
-  'https://huggingface.co/datasets/birdsql/bird_mini_dev/resolve/main/mini_dev_sqlite.zip';
+/**
+ * The dataset has moved more than once.
+ *
+ * Hugging Face stores the questions and the databases in different artefacts, and
+ * the archive name has changed between releases. The harness therefore tries the
+ * known locations in order and uses whichever answers, rather than pinning one URL
+ * and failing with a 404 the maintainer has to decode.
+ */
+const DATASET_URLS = [
+  'https://huggingface.co/datasets/birdsql/bird_mini_dev/resolve/main/minidev.zip',
+  'https://huggingface.co/datasets/birdsql/bird_mini_dev/resolve/main/mini_dev_sqlite.zip',
+];
+const DATASET_URL = DATASET_URLS[0] as string;
 const ROOT = new URL('..', import.meta.url).pathname;
 const CACHE = join(ROOT, '.cache', 'bird');
 const RESULTS = join(ROOT, 'poc', 'results');
@@ -104,53 +115,83 @@ async function chat(prompt: string): Promise<string> {
   return body.choices[0]?.message.content ?? '';
 }
 
+/** Recursive search: an archive may nest its contents one or two levels deep. */
+async function locate(root: string, name: string): Promise<string> {
+  const stack = [root];
+  while (stack.length > 0) {
+    const dir = stack.pop() as string;
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      if (entry.name === '__MACOSX') continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else if (entry.name === name) return full;
+    }
+  }
+  throw new MicrogliaError('MG_E_STORE_IO', `The dataset does not contain ${name}`, { root });
+}
+
+/** Every `*.sqlite` in the archive, keyed by its base name. */
+async function indexDatabases(root: string): Promise<Map<string, string>> {
+  const found = new Map<string, string>();
+  const stack = [root];
+  while (stack.length > 0) {
+    const dir = stack.pop() as string;
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      if (entry.name === '__MACOSX') continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) stack.push(full);
+      else if (entry.name.endsWith('.sqlite')) found.set(entry.name, full);
+    }
+  }
+  return found;
+}
+
 async function datasetDir(): Promise<string> {
   const explicit = process.env['BIRD_DIR'];
-  if (explicit) {
-    if (!existsSync(join(explicit, 'mini_dev_sqlite.json'))) {
-      throw new MicrogliaError('MG_E_CONFIG', `BIRD_DIR does not contain mini_dev_sqlite.json`, {
-        BIRD_DIR: explicit,
-      });
-    }
-    return explicit;
-  }
+  if (explicit) return explicit;
   const marker = join(CACHE, 'mini_dev_sqlite.json');
   if (existsSync(marker)) return CACHE;
   mkdirSync(CACHE, { recursive: true });
   const zip = join(CACHE, 'mini_dev_sqlite.zip');
-  process.stdout.write(`[sota] downloading ${DATASET_URL}\n`);
-  let response: Response;
-  try {
-    response = await fetch(DATASET_URL);
-  } catch (error) {
-    throw new MicrogliaError('MG_E_STORE_IO', 'Dataset host is unreachable from this network', {
-      url: DATASET_URL,
-      cause: String(error),
-      hint: 'Set BIRD_DIR to an extracted mini_dev_sqlite directory, or run this job where huggingface.co is reachable.',
-    });
-  }
-  if (!response.ok) {
-    throw new MicrogliaError('MG_E_STORE_IO', `Dataset download failed (${response.status})`, {
-      url: DATASET_URL,
-      hint: 'Set BIRD_DIR to an extracted mini_dev_sqlite directory, or run this job where the dataset is reachable.',
-    });
-  }
-  writeFileSync(zip, Buffer.from(await response.arrayBuffer()));
-  await run('unzip', ['-q', '-o', zip, '-d', CACHE]);
-  if (!existsSync(marker)) {
-    // The archive may nest one directory; flatten it rather than guessing.
-    const entries = await readdir(CACHE, { withFileTypes: true });
-    const nested = entries.find((entry) => entry.isDirectory() && entry.name !== '__MACOSX');
-    if (nested && existsSync(join(CACHE, nested.name, 'mini_dev_sqlite.json'))) {
-      for (const entry of await readdir(join(CACHE, nested.name))) {
-        await run('cp', ['-R', join(CACHE, nested.name, entry), CACHE]);
-      }
+  let fetched: { url: string; body: Buffer } | undefined;
+  const attempted: string[] = [];
+  for (const url of DATASET_URLS) {
+    attempted.push(url);
+    process.stdout.write(`[sota] downloading ${url}\n`);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      fetched = { url, body: Buffer.from(await response.arrayBuffer()) };
+      break;
+    } catch {
+      // A host-level failure (DNS, TLS) is reported once, after every candidate
+      // has been tried, with the list that was tried.
     }
   }
-  if (!existsSync(marker)) {
-    throw new MicrogliaError('MG_E_STORE_IO', 'Dataset archive did not contain mini_dev_sqlite.json');
+  if (fetched === undefined) {
+    throw new MicrogliaError('MG_E_STORE_IO', 'No dataset archive could be downloaded', {
+      attempted,
+      hint: 'Set BIRD_DIR to an extracted Mini-Dev directory. The archive lives on a host that moves; local data is the reliable path.',
+    });
   }
+  writeFileSync(zip, fetched.body);
+  await run('unzip', ['-q', '-o', zip, '-d', CACHE]);
+  // Locate rather than assume: the archive has been nested differently across
+  // releases, and a missing file should say so instead of silently producing an
+  // empty run.
+  await locate(CACHE, 'mini_dev_sqlite.json');
   return CACHE;
+}
+
+function databasePath(databases: ReadonlyMap<string, string>, dbId: string): string {
+  const path = databases.get(`${dbId}.sqlite`);
+  if (path === undefined) {
+    throw new MicrogliaError('MG_E_STORE_IO', `The dataset has no database for '${dbId}'`, {
+      dbId,
+      known: [...databases.keys()].sort().join(', '),
+    });
+  }
+  return path;
 }
 
 function ddlOf(dbPath: string): string {
@@ -227,7 +268,7 @@ async function evaluate(
 ): Promise<Outcome[]> {
   const out: Outcome[] = [];
   for (const row of rows) {
-    const dbPath = join(dir, 'mini_dev_sqlite', `${row.db_id}.sqlite`);
+    const dbPath = databasePath(databases, row.db_id);
     const ddl = ddlOf(dbPath);
     const pack = withMemory
       ? await host.recall({ task: 'sql.generate', text: row.question, scope: { domain: row.db_id } })
@@ -283,9 +324,9 @@ function percentile(values: readonly number[], q: number): number {
 
 async function main(): Promise<void> {
   const dir = await datasetDir();
-  const all = JSON.parse(
-    readFileSync(join(dir, 'mini_dev_sqlite.json'), 'utf8'),
-  ) as BirdRow[];
+  const questionsPath = await locate(dir, 'mini_dev_sqlite.json');
+  const databases = await indexDatabases(dir);
+  const all = JSON.parse(readFileSync(questionsPath, 'utf8')) as BirdRow[];
   const slice = all.filter((row) => row.difficulty !== 'simple').slice(0, LIMIT);
   const half = Math.floor(slice.length / 2);
   const learnRows = slice.slice(0, half);
@@ -310,7 +351,7 @@ async function main(): Promise<void> {
 
   // Learning pass, on a disjoint half, so the eval questions stay unseen.
   for (const row of learnRows) {
-    const dbPath = join(dir, 'mini_dev_sqlite', `${row.db_id}.sqlite`);
+    const dbPath = databasePath(databases, row.db_id);
     const ddl = ddlOf(dbPath);
     const sql = extractSql(await chat(promptFor(row, ddl, ''))) ?? '';
     const handle = host.begin({

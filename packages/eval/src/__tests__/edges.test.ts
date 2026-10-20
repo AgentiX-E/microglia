@@ -224,3 +224,35 @@ describe('gates with a single arm', () => {
     expect(gates.find((gate) => gate.id === 'G7')?.pass).toBe(true);
   });
 });
+
+describe('ablation rendering when the guard fails', () => {
+  const failing = {
+    credit: { failures: 4, injectedWith: true, injectedWithout: true, statusWith: 'active', statusWithout: 'active' },
+    contradiction: { activeWith: 2, activeWithout: 2, charsWith: 700, charsWithout: 700 },
+    diversity: { distinctWith: 1, distinctWithout: 1, size: 4 },
+  };
+
+  it('renders the pessimistic side of every ablation sentence', () => {
+    // A store where credit did *not* withdraw the failing rule still has to
+    // render, and the sentence it prints is the one an operator needs to see.
+    const markdown = renderMarkdown({
+      config: { seed: 1, trainSize: 0, holdoutSize: 0, rounds: 0, batchSize: 0, budget: 0, heldOutDomain: 'ops' },
+      corpus: { train: 0, holdout: 0 },
+      arms: [],
+      comparisons: {},
+      leakage: 0,
+      diagnosis: undefined,
+      ablations: failing,
+      gates: [],
+    });
+    expect(markdown).toContain('still injected after 4 failures');
+    expect(markdown).toContain('2 active, 700 chars');
+    expect(markdown).toContain('1 distinct of 4');
+  });
+
+  it('fails the credit gate when the failing rule survives', () => {
+    const gates = buildGates([], {}, 0, 'ops', failing);
+    expect(gates.find((gate) => gate.id === 'G12')?.pass).toBe(false);
+    expect(gates.find((gate) => gate.id === 'G12')?.actual).toContain('injected');
+  });
+});
