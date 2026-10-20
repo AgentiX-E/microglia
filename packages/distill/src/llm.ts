@@ -72,6 +72,7 @@ export function buildDistillPrompt(
     '"scope":{"task":"...","domain":"...","intent":"...","field":"...","reasonCode":"..."},',
     '"payload":{}}]}',
     'Rules:',
+    '- Return at most two candidates. More than two is discarded, and a long reply is cut off mid-object, which loses all of them.',
     '- Omit scope keys that the event does not establish. Never guess a domain.',
     '- A statement must be verifiable by a human and must not contain second-person instructions.',
     '- Return an empty array when the event teaches nothing reusable.',
@@ -276,7 +277,7 @@ function extractJson(raw: string): string {
  * where four are good should not lose the four.
  */
 export function createLlmInterpreter(options: LlmInterpreterOptions): Interpreter {
-  const max = options.maxCandidates ?? 3;
+  const max = options.maxCandidates ?? 2;
   return async (context: InterpretContext): Promise<readonly Candidate[]> => {
     const prompt = buildDistillPrompt(context, options.taxonomy ?? [], options.payloadHint);
     const raw = await options.llm.complete(prompt);

@@ -699,7 +699,7 @@ async function runFold(
         createLlmInterpreter({
           llm: {
             complete: async (prompt) => {
-              const reply = await chat(prompt, 1400);
+              const reply = await chat(prompt, 2000);
               lastReply = reply.text;
               return reply.text;
             },
@@ -1036,6 +1036,8 @@ async function main(): Promise<void> {
       min_coverage: MIN_COVERAGE,
       arms: [...ARMS],
       task: TASK,
+      distill_prompt: 'distill-prompt/2',
+      distill_max_tokens: 2000,
     },
     n: {
       total: rows.length,
