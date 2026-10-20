@@ -57,6 +57,7 @@ export {
   diceSimilarity,
   jaccardSimilarity,
   mmrSelect,
+  queryCoverage,
   tokenize,
 } from './similarity.js';
 

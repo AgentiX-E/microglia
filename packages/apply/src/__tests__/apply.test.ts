@@ -64,11 +64,12 @@ describe('rendering', () => {
     expect(tight.truncated).toBeGreaterThan(0);
   });
 
-  it('produces an empty, valid block when there is nothing to show', () => {
+  it('renders nothing at all when there is nothing to show', () => {
     const pack = emptyPack(300);
-    expect(pack.rendered).toContain('items="0"');
+    expect(pack.rendered).toBe('');
     expect(pack.ids).toEqual([]);
-    expect(pack.tokens).toBeGreaterThan(0);
+    expect(pack.tokens).toBe(0);
+    expect(pack.truncated).toBe(0);
   });
 
   it('hashes deterministically and reports the id set', () => {
@@ -123,7 +124,7 @@ describe('pack assembly', () => {
       { memory },
     );
     expect(pack.ids).toEqual([]);
-    expect(pack.rendered).toContain('items="0"');
+    expect(pack.rendered).toBe('');
     await memory.close();
   });
 });

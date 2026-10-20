@@ -137,6 +137,11 @@ Measured at 10k rules, 2 vCPU:
    one on lexical accident alone.
 3. **Select and bound.** MMR (`λ = 0.75`) drops paraphrases in favour of distinct claims, then the
    renderer fills the character budget and reports what it dropped.
+4. **Optionally gate.** `minCoverage` drops every candidate that mentions less than a stated share of
+   the question's content words, and an empty result renders as an empty string. This exists because a
+   scope match is not a topical match: on a public benchmark the pack neither helped nor hurt, and the
+   rules that were injected without any lexical overlap were the ones paying rent in tokens for
+   nothing.
 
 Measured contribution: at equal relevance, MMR raises the distinct claims in a four-slot pack from
 **1 to 4**.

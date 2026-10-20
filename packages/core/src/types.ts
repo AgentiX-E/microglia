@@ -256,4 +256,13 @@ export type RecallQuery = {
   readonly scope?: Omit<KnowledgeScope, 'task'>;
   readonly budget?: number;
   readonly limit?: number;
+  /**
+   * Minimum share of the query's content terms a rule must mention to be injected.
+   *
+   * Absent means "no gate", which is the behaviour every existing caller has.
+   * A host that has measured its own knowledge sets this so a weak match becomes
+   * no match: injecting a rule the question does not mention is how a pack of
+   * correct facts becomes prompt noise.
+   */
+  readonly minCoverage?: number;
 };

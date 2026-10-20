@@ -164,7 +164,7 @@ describe('recall and provenance', () => {
     const { mg } = await create();
     const pack = await mg.recall({ task: 'chart.recommend', text: 'anything' });
     expect(pack.ids).toEqual([]);
-    expect(pack.rendered).toContain('items="0"');
+    expect(pack.rendered).toBe('');
     await mg.close();
   });
 });

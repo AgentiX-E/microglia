@@ -5,7 +5,7 @@
  * three paraphrases of one rule consume the room that a second, distinct rule
  * needed — the same failure mode as a top-k retrieval with no diversity.
  */
-import { mmrSelect } from '@agentix-e/microglia-core';
+import { mmrSelect, queryCoverage } from '@agentix-e/microglia-core';
 import type { KnowledgeItem, KnowledgePack, RecallQuery } from '@agentix-e/microglia-core';
 import type { MemoryPort } from '@agentix-e/microglia-memory';
 import { makePack } from './render.js';
@@ -24,6 +24,11 @@ export type BuildPackOptions = {
    */
   readonly diversity?: number;
   readonly tag?: string;
+  /**
+   * Minimum share of the query's content terms a rule must mention. Defaults to
+   * the query's own `minCoverage`, and to no gate when neither is set.
+   */
+  readonly minCoverage?: number;
 };
 
 export async function buildPack(
@@ -37,8 +42,18 @@ export async function buildPack(
     limit: options.candidates ?? Math.max(limit * 3, 12),
   });
 
+  // A scope match is not a topical match: a store returns every active rule in the
+  // question's scope, including rules that share none of its words. Ranking those
+  // last is not enough — they are still injected, still paid for in tokens, and
+  // measured to move nothing. The coverage floor turns a weak match into no match.
+  const floor = options.minCoverage ?? query.minCoverage ?? 0;
+  const eligible =
+    floor <= 0
+      ? hits
+      : hits.filter((hit) => queryCoverage(query.text, hit.item.statement) >= floor);
+
   const selected = mmrSelect<KnowledgeItem>(
-    hits.map((hit) => ({ item: hit.item, relevance: hit.score, text: hit.item.statement })),
+    eligible.map((hit) => ({ item: hit.item, relevance: hit.score, text: hit.item.statement })),
     limit,
     1 - Math.min(1, Math.max(0, options.diversity ?? 0.25)),
   );

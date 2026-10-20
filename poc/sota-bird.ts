@@ -28,6 +28,7 @@
  *  |---|---|---|
  *  | none | nothing | the reference |
  *  | full | the learned pack | the hypothesis |
+ *  | gated | only rules that mention a third of the question | if the gate recovers the delta, the harm was injecting rules the question never mentioned |
  *  | duplicate | the same pack, twice | if duplication hurts, the harm is length, not content |
  *  | wrong-scope | another database's rules, same token cost | if wrong-scope hurts as much, any hint hurts; if not, the content is the problem |
  *  | oracle | the gold SQL as the only "convention" | if even this does not move accuracy, the channel is broken |
@@ -61,7 +62,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { MicrogliaError, mulberry32, steppingClock } from '@agentix-e/microglia-core';
+import { MicrogliaError, mulberry32, queryCoverage, steppingClock } from '@agentix-e/microglia-core';
 import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-memory';
 import { openMicroglia } from '@agentix-e/microglia-capture';
 import {
@@ -98,9 +99,17 @@ const PROMPT_VERSION = 'sql-prompt/2';
 /** Task name under which knowledge is scoped, and therefore recalled. */
 const TASK = 'sql.generate';
 
-type ArmName = 'none' | 'full' | 'duplicate' | 'wrong-scope' | 'oracle';
+type ArmName = 'none' | 'full' | 'gated' | 'duplicate' | 'wrong-scope' | 'oracle';
 
-const OPTIONAL_ARMS: readonly Exclude<ArmName, 'none' | 'full'>[] = ['duplicate', 'wrong-scope', 'oracle'];
+const OPTIONAL_ARMS: readonly Exclude<ArmName, 'none' | 'full'>[] = [
+  'gated',
+  'duplicate',
+  'wrong-scope',
+  'oracle',
+];
+
+/** The coverage floor the `gated` arm runs with, fixed before the run. */
+const MIN_COVERAGE = Math.min(1, Math.max(0, nonNegative(process.env['SOTA_MIN_COVERAGE'], 0.34)));
 
 function parseArms(raw: string | undefined): Set<ArmName> {
   const wanted = new Set<ArmName>(['none', 'full']);
@@ -149,6 +158,8 @@ type CaseOutcome = {
   readonly parseOk: boolean;
   readonly execOk: boolean;
   readonly packIds: number;
+  /** Coverage of the question by the full pack's best rule, in [0, 1]. */
+  readonly coverage: number;
   /** The rules the full arm actually injected, for per-rule attribution. */
   readonly packIdList: readonly string[];
   readonly tokens: number;
@@ -644,13 +655,14 @@ type FoldResult = {
  * truncated response (max_tokens) from a schema mismatch (the model answered in
  * the wrong shape), and those need different repairs.
  */
-function recording(inner: Interpreter, sink: string[]): Interpreter {
+function recording(inner: Interpreter, sink: string[], lastReply: () => string): Interpreter {
   return async (context) => {
     try {
       return await inner(context);
     } catch (error) {
       if (sink.length < 5) {
-        sink.push((error instanceof Error ? error.message : String(error)).slice(0, 200));
+        const message = error instanceof Error ? error.message : String(error);
+        sink.push(`${message} :: ${lastReply().slice(0, 160).replace(/\s+/g, ' ')}`);
       }
       throw error;
     }
@@ -669,6 +681,7 @@ async function runFold(
 
   const store = await EmbeddedMemory.open(new MemoryJournal());
   const distillFailures: string[] = [];
+  let lastReply = '';
   const host = await openMicroglia({
     app: 'microglia-sota',
     namespace: 'bird',
@@ -676,9 +689,16 @@ async function runFold(
     interpreter: combineInterpreters(
       recording(
         createLlmInterpreter({
-          llm: { complete: (prompt) => chat(prompt, 1400).then((reply) => reply.text) },
+          llm: {
+            complete: async (prompt) => {
+              const reply = await chat(prompt, 1400);
+              lastReply = reply.text;
+              return reply.text;
+            },
+          },
         }),
         distillFailures,
+        () => lastReply,
       ),
       ruleInterpreter,
     ),
@@ -716,6 +736,16 @@ async function runFold(
 
     const arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>> = {};
     const armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
+    if (ARMS.has('gated')) {
+      const gated = await host.recall({
+        ...query,
+        scope: { domain: row.db_id },
+        minCoverage: MIN_COVERAGE,
+      });
+      const result = await answer(row, dataset, gated.rendered, gated.ids.length);
+      arms.gated = result.correct;
+      armPackIds.gated = result.packIds;
+    }
     if (ARMS.has('duplicate')) {
       const twice = pack.rendered === '' ? '' : `${pack.rendered}\n${pack.rendered}`;
       const result = await answer(row, dataset, twice, pack.ids.length);
@@ -748,6 +778,7 @@ async function runFold(
       parseOk: full.parseOk,
       execOk: full.execOk,
       packIds: full.packIds,
+      coverage: Number(queryCoverage(row.question, pack.items[0]?.statement ?? '').toFixed(3)),
       packIdList: pack.ids,
       tokens: full.tokens,
       latencyMs: full.latencyMs,
@@ -994,6 +1025,7 @@ async function main(): Promise<void> {
       resamples: RESAMPLES,
       budget_chars: 1200,
       duplicate_multiplier: 2,
+      min_coverage: MIN_COVERAGE,
       arms: [...ARMS],
       task: TASK,
     },

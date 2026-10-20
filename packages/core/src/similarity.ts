@@ -39,6 +39,25 @@ export function diceSimilarity(a: string, b: string): number {
   return (2 * shared) / (left.size + right.size);
 }
 
+/**
+ * Share of the query's content terms that the document mentions, in [0, 1].
+ *
+ * Absolute rather than relative, which is what makes it a usable gate: BM25
+ * scores are only comparable inside one query, so a threshold on them cannot say
+ * "this rule is about the question". Coverage can. A rule that mentions none of
+ * the question's terms scores zero even when it shares the question's scope, and
+ * scope-matched rules are exactly the ones a store hands back without any lexical
+ * overlap at all.
+ */
+export function queryCoverage(query: string, document: string): number {
+  const wanted = new Set(tokenize(query));
+  if (wanted.size === 0) return 0;
+  const present = new Set(tokenize(document));
+  let shared = 0;
+  for (const token of wanted) if (present.has(token)) shared += 1;
+  return shared / wanted.size;
+}
+
 export function jaccardSimilarity(a: string, b: string): number {
   const left = new Set(tokenize(a));
   const right = new Set(tokenize(b));

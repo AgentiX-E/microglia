@@ -99,6 +99,32 @@ The result is a `KnowledgePack`:
 | `hash` | digest of `rendered`, recorded in the run's provenance |
 | `truncated` | how many candidates were dropped for the budget |
 
+#### Inject only what the question is about
+
+A scope match is not a topical match. A rule filed under the same domain is returned even when the
+question shares none of its words, and measured on a public benchmark, injecting those rules neither
+helped nor hurt — they were simply paid for in tokens. Set a coverage floor when you want the pack to
+earn its place:
+
+```ts
+const pack = await mg.recall({
+  task: 'chart.recommend',
+  text: question,
+  scope: { domain: 'sales' },
+  minCoverage: 0.34,           // the rule must mention a third of the question's content words
+});
+
+if (pack.ids.length === 0) {
+  // Nothing cleared the floor. Inject nothing: an empty pack renders as an empty string,
+  // so your prompt does not claim that a convention exists when it does not.
+}
+```
+
+`minCoverage` is absolute rather than relative — BM25 scores are only comparable inside one query, so
+a threshold on them cannot answer "is this rule about this question". Coverage can: it is the share of
+the question's content words (stopwords removed) that the rule mentions. Start with `0.3–0.4`, and
+raise it if your prompts are tight.
+
 ### 3.2 `begin` — the run record
 
 ```ts
