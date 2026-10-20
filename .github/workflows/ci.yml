@@ -36,6 +36,9 @@ jobs:
       - name: Typecheck and build
         run: pnpm build
 
+      - name: Typecheck the POC scripts
+        run: pnpm poc:typecheck
+
       - name: Tests with coverage gates
         run: pnpm test
 

@@ -389,6 +389,16 @@ async function evaluate(
   return out;
 }
 
+function rate(values: readonly boolean[]): number {
+  return values.length === 0 ? 0 : values.filter(Boolean).length / values.length;
+}
+
+function percentile(values: readonly number[], q: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))] as number;
+}
+
 async function main(): Promise<void> {
   const dataset = await loadDataset(LIMIT);
   const slice = dataset.rows;

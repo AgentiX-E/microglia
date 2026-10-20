@@ -21,7 +21,7 @@
     "test": "vitest run --coverage",
     "test:unit": "vitest run",
     "bench": "pnpm build && node packages/eval/dist/bench/run.js",
-    "check": "pnpm typecheck && pnpm test && pnpm audit:repo && pnpm bench",
+    "check": "pnpm typecheck && pnpm poc:typecheck && pnpm test && pnpm audit:repo && pnpm bench",
     "poc:llm-reader": "tsx poc/llm-reader.ts",
     "poc:llm-distill": "tsx poc/llm-distill.ts",
     "poc:embedding": "tsx poc/embedding.ts",
@@ -30,7 +30,8 @@
     "poc:sota": "tsx poc/sota-bird.ts",
     "poc:cortex": "node scripts/cortex-conformance.mjs",
     "audit:deps": "pnpm audit --prod",
-    "audit:repo": "node scripts/audit.mjs"
+    "audit:repo": "node scripts/audit.mjs",
+    "poc:typecheck": "tsc --noEmit --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck poc/*.ts"
   },
   "devDependencies": {
     "@agentix-e/microglia-apply": "workspace:*",
