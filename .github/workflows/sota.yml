@@ -49,9 +49,14 @@ jobs:
             exit 1
           fi
 
+      # The upstream dataset keeps its SQLite databases outside the Hugging Face
+      # repository (the file list is questions only), so the lane needs a pinned
+      # archive. Set the repository variable BIRD_ARCHIVE_URL to a release asset or
+      # mirror that contains mini_dev_sqlite.json and the *.sqlite databases.
       - name: Run the benchmark
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          BIRD_ARCHIVE_URL: ${{ vars.BIRD_ARCHIVE_URL }}
           SOTA_LIMIT: ${{ github.event.inputs.limit || '60' }}
           POC_MAX_CALLS: '400'
         run: pnpm poc:sota
