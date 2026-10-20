@@ -1,0 +1,196 @@
+{
+  "id": "poc-sota-attribution",
+  "source_artifact": "poc-sota-bird.json",
+  "source_generated_at": "2026-10-20T09:44:26.424Z",
+  "n": 352,
+  "summary": {
+    "rules": 1097,
+    "injectedRules": 0,
+    "helpful": 0,
+    "harmful": 0,
+    "neutral": 0,
+    "harmfulShare": 0,
+    "top": [
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqle_bhqma",
+        "statement": "When a question asks for the customer with the least total consumption over a year, the query must aggregate consumption per customer with SUM and group by customer before ordering and limiting.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqlf_bhqma",
+        "statement": "When a question asks for the customer with the least total consumption over a year, the query must aggregate consumption per customer with SUM and group by customer before ordering and limiting.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqlf_e0rvb",
+        "statement": "Ordering by a per-month consumption column without aggregating across months does not answer a question about a customer's least annual consumption.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqlg_dqyr9",
+        "statement": "The edited SQL removes the NULLIF guard around the denominator, so a zero outpatient count would cause a division-by-zero error.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqlg_e0rvb",
+        "statement": "Ordering by a per-month consumption column without aggregating across months does not answer a question about a customer's total yearly consumption.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqlh_asdkr",
+        "statement": "The accepted SQL casts the numerator to REAL before multiplying by 100 to force floating-point division.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqlh_dqyr9",
+        "statement": "The edited SQL removed the separate in-patient and outpatient count columns and the NULLIF guard, retaining only a single percentage expression.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqli_a0wp3",
+        "statement": "The edited SQL drops the descriptive column aliases (in_patient_male, out_patient_male, percentage) that the original query provided.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqli_asdkr",
+        "statement": "For a question asking which drivers are eliminated in the first qualifying period, selecting the driver with the maximum q1 time returns only one driver rather than the eliminated set.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqli_asdkr",
+        "statement": "For card_games queries asking to list cards, selecting DISTINCT T1.id from cards joined to legalities satisfies the request better than selecting all columns from cards.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqlj_2cx01",
+        "statement": "For card_games queries asking to list cards, selecting the distinct card id from the cards table joined to legalities on uuid satisfies the request.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqlj_a0wp3",
+        "statement": "In Formula 1 qualifying data, drivers eliminated in the first period are identified by ordering q1 times descending and taking the bottom-ranked drivers, not by selecting the maximum q1 time.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqlj_a0wp3",
+        "statement": "Card_games queries that list cards should return card identifiers rather than full card rows.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqlk_2cx01",
+        "statement": "Grouping by the foreign key column used in the join (matchData.away_team_api_id) rather than the selected display column (team_long_name) is a valid alternative when the display column is functionally dependent on that key.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqlk_2cx01",
+        "statement": "Using COUNT(DISTINCT account_id) is unnecessary when counting accounts joined to a single district per account, since each account appears once.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqlk_42hje",
+        "statement": "Card_games queries that list cards use DISTINCT on the card id to avoid duplicate rows from the legalities join.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqll_42hje",
+        "statement": "Expressing a win condition as a positive difference (away_team_goal - home_team_goal > 0) is equivalent to comparing the two goal columns directly.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqll_42hje",
+        "statement": "The district region value 'East Bohemia' is stored in the database as 'east Bohemia' with a lowercase initial letter.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqll_fx1yw",
+        "statement": "When counting atoms of a given element per molecule, joining atom and bond tables on molecule_id and grouping by molecule_id yields one count per molecule.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqlm_38490",
+        "statement": "Card_games queries that list cards use DISTINCT on the card id to avoid duplicate rows from the legalities join.",
+        "injected": 0,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      }
+    ]
+  }
+}

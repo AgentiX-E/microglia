@@ -8,6 +8,14 @@
 export { comparePaired, type PairedResult } from './stats.js';
 
 export {
+  attributeRules,
+  type AttributionCase,
+  type AttributionItem,
+  type AttributionSummary,
+  type RuleAttribution,
+} from './attribution.js';
+
+export {
   assignFolds,
   detectableDelta,
   discordanceOf,

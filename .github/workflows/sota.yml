@@ -88,6 +88,15 @@ jobs:
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}
         run: pnpm poc:sota
 
+      - name: Attribute the flips to rules
+        if: always()
+        run: |
+          if [ -f poc/results/poc-sota-bird.json ]; then
+            pnpm poc:attribute
+          else
+            echo "no artefact: nothing to attribute"
+          fi
+
       - name: Publish the result
         if: always()
         run: |
@@ -152,5 +161,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sota-bird
-          path: poc/results/poc-sota-bird.json
+          path: |
+            poc/results/poc-sota-bird.json
+            poc/results/poc-sota-attribution.json
           if-no-files-found: error

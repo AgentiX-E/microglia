@@ -2,7 +2,7 @@
   "name": "microglia",
   "version": "0.1.0",
   "private": true,
-  "description": "Microglia \u2014 a headless feedback flywheel SDK for agentic workflows",
+  "description": "Microglia — a headless feedback flywheel SDK for agentic workflows",
   "license": "MIT",
   "author": "Lambertyan",
   "type": "module",
@@ -31,7 +31,8 @@
     "poc:cortex": "node scripts/cortex-conformance.mjs",
     "audit:deps": "pnpm audit --prod",
     "audit:repo": "node scripts/audit.mjs",
-    "poc:typecheck": "tsc --noEmit --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck poc/*.ts"
+    "poc:typecheck": "tsc --noEmit --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck poc/*.ts",
+    "poc:attribute": "tsx poc/attribute.ts"
   },
   "devDependencies": {
     "@agentix-e/microglia-apply": "workspace:*",
