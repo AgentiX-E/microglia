@@ -270,6 +270,11 @@ const report = await mg.distill({ since, limit, generalize: true, resolveContrad
 | `contradicted` | active rules demoted by a conflicting claim |
 | `quarantined` | stored but not injected |
 | `rejectedUnsafe` | dropped by the injection screen |
+| `failed` | events whose interpreter threw (a model returning prose, a parser rejection) |
+
+An interpreter that throws is counted and skipped rather than aborting the batch: one unparseable
+model response should not discard the other two hundred lessons. Pass `strict: true` if you want the
+opposite — a batch that stops on the first bad response.
 
 Two interpreters ship:
 
