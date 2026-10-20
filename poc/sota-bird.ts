@@ -57,11 +57,39 @@ const run = promisify(execFile);
  * known locations in order and uses whichever answers, rather than pinning one URL
  * and failing with a 404 the maintainer has to decode.
  */
+const DATASET_REPO = 'https://huggingface.co/datasets/birdsql/bird_mini_dev';
+const DATASET_API = 'https://huggingface.co/api/datasets/birdsql/bird_mini_dev';
 const DATASET_URLS = [
-  'https://huggingface.co/datasets/birdsql/bird_mini_dev/resolve/main/minidev.zip',
-  'https://huggingface.co/datasets/birdsql/bird_mini_dev/resolve/main/mini_dev_sqlite.zip',
+  `${DATASET_REPO}/resolve/main/minidev.zip`,
+  `${DATASET_REPO}/resolve/main/mini_dev_sqlite.zip`,
 ];
 const DATASET_URL = DATASET_URLS[0] as string;
+
+/**
+ * Discover the archive rather than guess its name.
+ *
+ * The repository's file list is the only authority on what it holds, and the
+ * dataset has renamed its archive between releases. Asking the API first means the
+ * lane follows the dataset instead of a hard-coded string, and the failure message
+ * can print what *is* there.
+ */
+async function archiveUrls(): Promise<{ urls: string[]; siblings: string[] }> {
+  try {
+    const response = await fetch(DATASET_API);
+    if (response.ok) {
+      const body = (await response.json()) as { siblings?: { rfilename: string }[] };
+      const siblings = (body.siblings ?? []).map((entry) => entry.rfilename);
+      const zips = siblings
+        .filter((name) => /\.zip$/i.test(name))
+        .map((name) => `${DATASET_REPO}/resolve/main/${name}`);
+      if (zips.length > 0) return { urls: zips, siblings };
+      return { urls: [], siblings };
+    }
+  } catch {
+    // Fall through to the known names: a blocked API is not a blocked download.
+  }
+  return { urls: DATASET_URLS, siblings: [] };
+}
 const ROOT = new URL('..', import.meta.url).pathname;
 const CACHE = join(ROOT, '.cache', 'bird');
 const RESULTS = join(ROOT, 'poc', 'results');
@@ -155,7 +183,8 @@ async function datasetDir(): Promise<string> {
   const zip = join(CACHE, 'mini_dev_sqlite.zip');
   let fetched: { url: string; body: Buffer } | undefined;
   const attempted: string[] = [];
-  for (const url of DATASET_URLS) {
+  const discovered = await archiveUrls();
+  for (const url of [...discovered.urls, ...DATASET_URLS]) {
     attempted.push(url);
     process.stdout.write(`[sota] downloading ${url}\n`);
     try {
@@ -171,6 +200,7 @@ async function datasetDir(): Promise<string> {
   if (fetched === undefined) {
     throw new MicrogliaError('MG_E_STORE_IO', 'No dataset archive could be downloaded', {
       attempted,
+      available: discovered.siblings.length === 0 ? 'the repository API did not answer' : discovered.siblings.join(', '),
       hint: 'Set BIRD_DIR to an extracted Mini-Dev directory. The archive lives on a host that moves; local data is the reliable path.',
     });
   }
