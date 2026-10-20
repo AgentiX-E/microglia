@@ -39,8 +39,8 @@ jobs:
       - name: Tests with coverage gates
         run: pnpm test
 
-      - name: Repository audit
-        run: pnpm audit
+      - name: Repository audit (source rules, manifests, published dependencies)
+        run: pnpm audit:repo
 
       - name: Ablation study and gates
         run: pnpm bench

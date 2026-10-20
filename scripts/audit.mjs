@@ -91,6 +91,20 @@ for (const doc of ['README.md', 'docs/USER-GUIDE.md', 'docs/ARCHITECTURE.md', 'd
   if (!exists) fail('docs', `${doc} is missing`);
 }
 
+// What ships is what can hurt a consumer. The library declares no runtime
+// dependency at all, so this is a statement about the artefact rather than a
+// formality; dev-only advisories are reported separately in the audit document
+// with the toolchain migration that clears them.
+{
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  try {
+    await promisify(execFile)('pnpm', ['audit', '--prod'], { cwd: ROOT });
+  } catch (error) {
+    fail('dependencies', `published dependencies have advisories: ${String(error).slice(0, 200)}`);
+  }
+}
+
 if (failures.length > 0) {
   process.stderr.write(`audit failed (${failures.length})\n`);
   for (const failure of failures) process.stderr.write(`  - ${failure}\n`);
