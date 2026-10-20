@@ -112,3 +112,47 @@ describe('distillation branches', () => {
     await memory.close();
   });
 });
+
+describe('interpreter failure isolation', () => {
+  it('counts a throwing interpreter and still processes the rest of the batch', async () => {
+    const memory = await EmbeddedMemory.open(new MemoryJournal());
+    await memory.appendEvent(event('fb_1'));
+    await memory.appendEvent(event('fb_2'));
+
+    let call = 0;
+    const report = await distill({
+      memory,
+      policy: defaultPolicy,
+      clock: fixedClock(at),
+      random: mulberry32(4),
+      interpreter: (context) => {
+        call += 1;
+        // A model that answers with prose instead of JSON is the common case: one
+        // bad response must not discard the batch.
+        if (call === 1) throw new Error('LLM response is not JSON');
+        return [candidate(context.event.id)];
+      },
+    });
+    expect(report.failed).toBe(1);
+    expect(report.created).toBe(1);
+    await memory.close();
+  });
+
+  it('aborts when the host asked for strict mode', async () => {
+    const memory = await EmbeddedMemory.open(new MemoryJournal());
+    await memory.appendEvent(event('fb_1'));
+    await expect(
+      distill({
+        memory,
+        policy: defaultPolicy,
+        clock: fixedClock(at),
+        random: mulberry32(5),
+        strict: true,
+        interpreter: () => {
+          throw new Error('parser failed');
+        },
+      }),
+    ).rejects.toThrow(/parser failed/);
+    await memory.close();
+  });
+});

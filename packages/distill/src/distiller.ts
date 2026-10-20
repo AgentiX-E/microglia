@@ -47,12 +47,23 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
     quarantined: 0,
     rejectedUnsafe: 0,
     rejectedByHost: 0,
+    failed: 0,
   };
 
   for (const event of events) {
     const run = await options.memory.getRun(event.runId);
     const context: InterpretContext = { event, run };
-    const candidates = await options.interpreter(context);
+    let candidates: readonly DistillCandidate[];
+    try {
+      candidates = await options.interpreter(context);
+    } catch (error) {
+      // An interpreter is host code: a model call, a parser, a domain pack. One
+      // unparseable response is a fact to count, not a reason to lose the rest of
+      // the batch; a host that wants the old behaviour passes `strict`.
+      if (options.strict === true) throw error;
+      report.failed += 1;
+      continue;
+    }
     for (const raw of candidates) {
       report.candidates += 1;
       const candidate = sanitize(raw, options);

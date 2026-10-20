@@ -429,7 +429,7 @@ async function main(): Promise<void> {
       await handle.edit({ sql: row.SQL }, { note: 'execution mismatch' });
     }
   }
-  await host.distill({ limit: 200 });
+  const distilled = await host.distill({ limit: 200 });
 
   // Arm B: same questions, with the pack.
   const withMemory = await evaluate(host, evalRows, dataset, true);
@@ -457,6 +457,8 @@ async function main(): Promise<void> {
       latency_p95_ms: percentile(withMemory.map((outcome) => outcome.latencyMs), 0.95),
       knowledge_active: stats.active,
       knowledge_total: stats.knowledge,
+      distill_failed: distilled.failed,
+      distill_created: distilled.created,
     },
     advisory: {
       // At n=60 a 50% rate has a 95% interval of roughly ±13pp, so the accuracy

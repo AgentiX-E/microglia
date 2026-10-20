@@ -58,6 +58,12 @@ export type DistillOptions = {
    * two conflicting rules both stay active and both reach the prompt.
    */
   readonly resolveContradictions?: boolean;
+  /**
+   * Abort on the first interpreter failure instead of counting it. Default false:
+   * one unparseable model response should not discard the other two hundred
+   * lessons in the batch, and the count is reported either way.
+   */
+  readonly strict?: boolean;
 };
 
 export type DistillReport = {
@@ -71,6 +77,8 @@ export type DistillReport = {
   readonly quarantined: number;
   readonly rejectedUnsafe: number;
   readonly rejectedByHost: number;
+  /** Events whose interpreter threw. Non-strict runs count them and continue. */
+  readonly failed: number;
 };
 
 export type { Clock, DistillCandidate, FeedbackEvent, KnowledgeItem, Policy, RandomSource, RunRecord };
