@@ -28,9 +28,9 @@ on:
         required: false
         default: 'true'
       arms:
-        description: 'Control arms beyond none+full (narrow,wrong-scope,oracle)'
+        description: 'Control arms beyond none+full (duplicate,wrong-scope,oracle)'
         required: false
-        default: 'narrow,wrong-scope,oracle'
+        default: 'duplicate,wrong-scope,oracle'
   schedule:
     - cron: '0 3 * * 1'
 
@@ -83,7 +83,7 @@ jobs:
           SOTA_LIMIT: ${{ github.event.inputs.limit || '0' }}
           SOTA_FOLDS: ${{ github.event.inputs.folds || '5' }}
           SOTA_GENERALIZE: ${{ github.event.inputs.generalize || 'true' }}
-          SOTA_ARMS: ${{ github.event.inputs.arms || 'narrow,wrong-scope,oracle' }}
+          SOTA_ARMS: ${{ github.event.inputs.arms || 'duplicate,wrong-scope,oracle' }}
           SOTA_RESAMPLES: '10000'
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}
         run: pnpm poc:sota

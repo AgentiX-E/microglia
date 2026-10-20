@@ -28,9 +28,15 @@
  *  |---|---|---|
  *  | none | nothing | the reference |
  *  | full | the learned pack | the hypothesis |
- *  | narrow | fewer characters, fewer rules | if narrow recovers, the harm is dilution |
- *  | wrong-scope | another database's rules, same token cost | if wrong-scope hurts as much, the harm is length, not content |
+ *  | duplicate | the same pack, twice | if duplication hurts, the harm is length, not content |
+ *  | wrong-scope | another database's rules, same token cost | if wrong-scope hurts as much, any hint hurts; if not, the content is the problem |
  *  | oracle | the gold SQL as the only "convention" | if even this does not move accuracy, the channel is broken |
+ *
+ * A control that injects nothing is not a control, so every optional arm is held
+ * to `mean_pack_ids > 0` by gate V7. The first attempt at a dilution control used
+ * a 400-character budget and rendered an empty block on every question: the packs
+ * are already two rules deep, so the only honest dose is repetition, not fewer
+ * characters.
  *
  * The oracle arm is a channel probe, not a result: it measures the ceiling of
  * injecting text into this prompt, and a lane in which the ceiling is the floor
@@ -45,7 +51,7 @@
  * Environment
  *  - `SOTA_LIMIT`      questions to draw (0 = every usable question); default 0
  *  - `SOTA_FOLDS`      cross-fitting folds; default 5
- *  - `SOTA_ARMS`       comma list of full,narrow,wrong-scope,oracle; default all
+ *  - `SOTA_ARMS`       comma list of full,duplicate,wrong-scope,oracle; default all
  *  - `SOTA_SEED`       bootstrap and memory seed; default 7
  *  - `SOTA_GENERALIZE` `false` to distil without scope widening (ablation)
  *  - `SOTA_RESAMPLES`  bootstrap resamples; default 10000, per the protocol
@@ -92,9 +98,9 @@ const PROMPT_VERSION = 'sql-prompt/2';
 /** Task name under which knowledge is scoped, and therefore recalled. */
 const TASK = 'sql.generate';
 
-type ArmName = 'none' | 'full' | 'narrow' | 'wrong-scope' | 'oracle';
+type ArmName = 'none' | 'full' | 'duplicate' | 'wrong-scope' | 'oracle';
 
-const OPTIONAL_ARMS: readonly Exclude<ArmName, 'none' | 'full'>[] = ['narrow', 'wrong-scope', 'oracle'];
+const OPTIONAL_ARMS: readonly Exclude<ArmName, 'none' | 'full'>[] = ['duplicate', 'wrong-scope', 'oracle'];
 
 function parseArms(raw: string | undefined): Set<ArmName> {
   const wanted = new Set<ArmName>(['none', 'full']);
@@ -143,6 +149,8 @@ type CaseOutcome = {
   readonly parseOk: boolean;
   readonly execOk: boolean;
   readonly packIds: number;
+  /** The rules the full arm actually injected, for per-rule attribution. */
+  readonly packIdList: readonly string[];
   readonly tokens: number;
   readonly latencyMs: number;
   /** Optional arms, present only when configured. */
@@ -708,16 +716,11 @@ async function runFold(
 
     const arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>> = {};
     const armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
-    if (ARMS.has('narrow')) {
-      const narrow = await host.recall({
-        ...query,
-        scope: { domain: row.db_id },
-        budget: 400,
-        limit: 3,
-      });
-      const result = await answer(row, dataset, narrow.rendered, narrow.ids.length);
-      arms.narrow = result.correct;
-      armPackIds.narrow = result.packIds;
+    if (ARMS.has('duplicate')) {
+      const twice = pack.rendered === '' ? '' : `${pack.rendered}\n${pack.rendered}`;
+      const result = await answer(row, dataset, twice, pack.ids.length);
+      arms.duplicate = result.correct;
+      armPackIds.duplicate = result.packIds;
     }
     if (ARMS.has('wrong-scope')) {
       const wrong = await host.recall({ ...query, scope: { domain: nextDatabase(row.db_id) } });
@@ -745,6 +748,7 @@ async function runFold(
       parseOk: full.parseOk,
       execOk: full.execOk,
       packIds: full.packIds,
+      packIdList: pack.ids,
       tokens: full.tokens,
       latencyMs: full.latencyMs,
       arms,
@@ -938,7 +942,20 @@ async function main(): Promise<void> {
       blocking: false,
     },
     {
-      id: 'V6-channel',
+      id: 'V6-controls-inject',
+      criterion: 'every configured control arm injected at least one rule on average',
+      actual:
+        arms
+          .filter((entry) => entry.arm !== 'full' && entry.arm !== 'oracle')
+          .map((entry) => `${entry.arm}: ${entry.mean_pack_ids.toFixed(2)} rules/question`)
+          .join(', ') || 'no controls configured',
+      pass: arms
+        .filter((entry) => entry.arm !== 'full' && entry.arm !== 'oracle')
+        .every((entry) => entry.mean_pack_ids > 0),
+      blocking: true,
+    },
+    {
+      id: 'V7-channel',
       criterion: 'injecting the gold SQL as a convention moves accuracy by at least 10pp',
       actual:
         oracle === undefined
@@ -976,8 +993,7 @@ async function main(): Promise<void> {
       generalize: GENERALIZE,
       resamples: RESAMPLES,
       budget_chars: 1200,
-      narrow_budget_chars: 400,
-      narrow_items: 3,
+      duplicate_multiplier: 2,
       arms: [...ARMS],
       task: TASK,
     },
