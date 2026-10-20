@@ -88,11 +88,19 @@ corpus plus three micro-ablations, and refuses to pass if any of fifteen gates f
 | `poison` | untrusted claims injected | 100.00% | quarantine holds |
 | `narrow-budget` | pack fits one rule | 31.79% | the pack is the delivery mechanism |
 | `no-credit`, `no-contradiction` | module off | 100.00% | no effect on a clean corpus — see the micro-ablations |
+| **fact store** (competitor shape) | extract, dedupe, retrieve the closest sentence | **56.07%** | memory helps, but recall without governance stops at +24pp |
+| fact store, same poison | untrusted claims ingested | **19.64%** | worse than no memory at all |
 
 The micro-ablations measure the modules a clean corpus cannot exercise: credit assignment withdraws a
 rule that failed every time, contradiction resolution keeps one active rule where tolerance keeps
-two, and diversification more than doubles the distinct claims a pack carries. Every number is
-reproduced by `pnpm bench` and written to `bench/results/study.json`.
+two, and diversification more than doubles the distinct claims a pack carries.
+
+The fact-store row is the competitor comparison: an ADD/UPDATE/DELETE memory, implemented generously
+and run on the same corrections. It gains 24pp over no memory and loses everything under the poison
+that quarantine stops — which is the argument for the governance layer, measured rather than asserted.
+
+Every number is reproduced by `pnpm bench` and written to `bench/results/study.json`; seventeen gates
+must pass, or the build fails.
 
 Read the [user guide](docs/USER-GUIDE.md) for the integration contract, the
 [architecture](docs/ARCHITECTURE.md) for how the pieces fit, and the
@@ -116,9 +124,9 @@ pnpm check      # typecheck → tests with coverage gates → quality audit → 
 pnpm bench      # study only, writes bench/results/study.json
 ```
 
-Coverage is enforced at 95% on lines, statements, functions **and** branches. The four branches that
-remain uncovered are listed with their reason in the internal technical design; none is excluded
-with an ignore comment.
+Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
+100 / 99.42 / 100 / 100 over 376 tests; the seven branch arms that remain uncovered are listed with
+file, line, and reason in the internal technical design, and none is excluded with an ignore comment.
 
 ## Licence
 
