@@ -1,0 +1,58 @@
+name: cortex
+
+# Conformance against the real cortex build.
+#
+# The adapter carries a structural copy of cortex's `MemoryValue` because the
+# packages are not on npm yet. This lane removes that risk: it clones cortex,
+# builds it, and asserts that the adapter's projection matches what cortex's own
+# factory produces, field by field.
+#
+# ACTION ITEM (tracked in microglia-docs): once `@agentix-e/cortex-*` is
+# published, replace the clone-and-build with a normal dependency and switch the
+# adapter's structural copy back to `import type`.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 4 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    name: adapter vs cortex-core
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install microglia
+        run: pnpm install --frozen-lockfile
+
+      - name: Build microglia
+        run: pnpm build
+
+      - name: Clone cortex
+        run: git clone --depth 1 https://github.com/AgentiX-E/cortex.git "$RUNNER_TEMP/cortex"
+
+      - name: Install cortex
+        working-directory: ${{ runner.temp }}/cortex
+        run: pnpm install
+
+      - name: Build cortex
+        working-directory: ${{ runner.temp }}/cortex
+        run: pnpm build
+
+      - name: Conformance
+        env:
+          CORTEX_DIST: ${{ runner.temp }}/cortex/packages/cortex-core/dist/index.js
+        run: node scripts/cortex-conformance.mjs

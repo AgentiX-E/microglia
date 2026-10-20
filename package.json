@@ -28,7 +28,8 @@
     "poc:scale": "tsx poc/scale.ts",
     "poc:live": "pnpm poc:llm-reader && pnpm poc:llm-distill && pnpm poc:embedding && pnpm poc:scale",
     "audit": "node scripts/audit.mjs",
-    "poc:sota": "tsx poc/sota-bird.ts"
+    "poc:sota": "tsx poc/sota-bird.ts",
+    "poc:cortex": "node scripts/cortex-conformance.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
