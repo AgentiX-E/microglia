@@ -34,11 +34,15 @@ export {
   type ArmConfig,
   type ArmName,
   type ArmResult,
+  type CompetitorResult,
+  type Competitors,
   type DomainScore,
   type Gate,
   type RoundMetrics,
   type StudyConfig,
   type StudyResult,
 } from './study.js';
+
+export { FactStore, runFactStore, type Fact, type FactStoreOptions, type FactStoreResult } from './competitor.js';
 
 export { renderJson, renderMarkdown, summarise } from './report.js';

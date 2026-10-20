@@ -50,6 +50,7 @@ import {
   type CorpusItem,
 } from './scenario.js';
 import { comparePaired, type PairedResult } from './stats.js';
+import { runFactStore } from './competitor.js';
 import { pp, pct, pValue } from './format.js';
 import {
   contradictionAblation,
@@ -59,6 +60,22 @@ import {
   type CreditAblation,
   type DiversityAblation,
 } from './ablations.js';
+
+export type CompetitorResult = {
+  readonly name: string;
+  readonly accuracy: number;
+  readonly delta: number;
+  readonly p: number;
+  readonly facts: number;
+  readonly untrustedFacts: number;
+};
+
+export type Competitors = {
+  /** A similarity-based fact store with no admission, scope, or guard. */
+  readonly factStore: CompetitorResult;
+  /** The same store with untrusted corrections ingested alongside trusted ones. */
+  readonly factStorePoisoned: CompetitorResult;
+};
 
 export type Ablations = {
   readonly credit: CreditAblation;
@@ -207,6 +224,7 @@ export type StudyResult = {
   readonly corpus: { readonly train: number; readonly holdout: number };
   readonly arms: readonly ArmResult[];
   readonly ablations: Ablations;
+  readonly competitors: Competitors;
   readonly comparisons: Readonly<Record<string, PairedResult>>;
   readonly leakage: number;
   readonly diagnosis: Diagnosis | undefined;
@@ -608,12 +626,33 @@ export async function runStudy(config: StudyConfig = DEFAULT_CONFIG): Promise<St
     contradiction: await contradictionAblation(),
     diversity: await diversityAblation(),
   };
-  const gates = buildGates(arms, comparisons, leakage, config.heldOutDomain, ablations);
+  // A competitor-shaped baseline on the same feedback schedule: the question is
+  // not whether the loop works, but whether the governance around it is what makes
+  // it work.
+  const baselineCorrect = baseline?.holdout ?? [];
+  const toResult = (name: string, outcome: ReturnType<typeof runFactStore>): CompetitorResult => {
+    const paired = comparePaired([...baselineCorrect], [...outcome.correct]);
+    return {
+      name,
+      accuracy: outcome.accuracy,
+      delta: paired.delta,
+      p: paired.p,
+      facts: outcome.facts,
+      untrustedFacts: outcome.untrustedFacts,
+    };
+  };
+  const competitors: Competitors = {
+    factStore: toResult('fact-store', runFactStore(corpus, batches)),
+    factStorePoisoned: toResult('fact-store-poisoned', runFactStore(corpus, batches, { poisonEvery: 2 })),
+  };
+
+  const gates = buildGates(arms, comparisons, leakage, config.heldOutDomain, ablations, competitors);
   return {
     config,
     corpus: { train: train.length, holdout: holdout.length },
     arms,
     ablations,
+    competitors,
     comparisons,
     leakage,
     diagnosis,
@@ -627,6 +666,7 @@ export function buildGates(
   leakage: number,
   heldOutDomain: string,
   ablations?: Ablations,
+  competitors?: Competitors,
 ): readonly Gate[] {
   const full = arms.find((arm) => arm.name === 'full');
   const poison = arms.find((arm) => arm.name === 'poison');
@@ -721,6 +761,18 @@ export function buildGates(
       'diversification more than doubles the distinct claims a pack carries',
       `${ablations?.diversity.distinctWith ?? 0} vs ${ablations?.diversity.distinctWithout ?? 0} distinct`,
       ablations !== undefined && ablations.diversity.distinctWith >= 2 * ablations.diversity.distinctWithout,
+    ),
+    gate(
+      'G16',
+      'the governed loop beats a similarity fact store by >= 10pp on the same corrections',
+      pp((full?.finalAccuracy ?? 0) - (competitors?.factStore.accuracy ?? 0)),
+      (full?.finalAccuracy ?? 0) - (competitors?.factStore.accuracy ?? 0) >= 0.1,
+    ),
+    gate(
+      'G17',
+      'the same poison that quarantine stops damages the fact store',
+      `${pct(competitors?.factStore.accuracy ?? 0)} -> ${pct(competitors?.factStorePoisoned.accuracy ?? 0)}`,
+      (competitors?.factStorePoisoned.accuracy ?? 0) < (competitors?.factStore.accuracy ?? 0),
     ),
     gate(
       'G15',

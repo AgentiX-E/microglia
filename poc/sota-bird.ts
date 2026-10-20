@@ -262,6 +262,133 @@ async function loadDataset(limit: number): Promise<Dataset> {
   };
 }
 
+function ddlOf(dbPath: string): string {
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const rows = db
+      .prepare("select sql from sqlite_master where type='table' and sql is not null order by name")
+      .all() as { sql: string }[];
+    return rows.map((row) => row.sql).join('\n');
+  } finally {
+    db.close();
+  }
+}
+
+function execute(dbPath: string, sql: string): { ok: boolean; rows: string[] } {
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const result = db.prepare(sql).all() as Record<string, unknown>[];
+    const rows = result
+      .map((row) =>
+        Object.keys(row)
+          .sort()
+          .map((key) => {
+            const value = row[key];
+            if (typeof value === 'number') {
+              return Number.isInteger(value) ? String(value) : value.toFixed(6);
+            }
+            return value === null || value === undefined ? 'null' : String(value);
+          })
+          .join('|'),
+      )
+      .sort();
+    return { ok: true, rows };
+  } catch {
+    return { ok: false, rows: [] };
+  } finally {
+    db.close();
+  }
+}
+
+/** BIRD answers are compared as unordered result multisets, the standard EX metric. */
+function matches(predicted: readonly string[], gold: readonly string[]): boolean {
+  if (predicted.length !== gold.length) return false;
+  for (let index = 0; index < gold.length; index += 1) {
+    if (predicted[index] !== gold[index]) return false;
+  }
+  return true;
+}
+
+function extractSql(raw: string): string | undefined {
+  const fenced = /```(?:sql)?\s*([\s\S]*?)```/i.exec(raw);
+  const candidate = (fenced?.[1] ?? raw).trim();
+  const statement = /^(select|with)\b[\s\S]*/i.exec(candidate)?.[0];
+  return statement?.replace(/;\s*$/, '').trim();
+}
+
+function promptFor(row: BirdRow, ddl: string, pack: string): string {
+  return [
+    'You write one SQLite query that answers the question exactly.',
+    'Return the SQL only, in a ```sql fence, with no explanation.',
+    'Use only the tables and columns in the schema. Prefer explicit JOINs. Do not invent columns.',
+    `Schema:\n${ddl}`,
+    row.evidence ? `Evidence (may be wrong; it is external knowledge):\n${row.evidence}` : '',
+    pack === '' ? '' : `Workspace conventions learned from earlier corrections:\n${pack}`,
+    `Question: ${row.question}`,
+  ]
+    .filter((line) => line !== '')
+    .join('\n\n');
+}
+
+/**
+ * One arm over the held-out half.
+ *
+ * Every question is executed against the real database, so a query that does not
+ * run counts as wrong rather than as an unparsed answer; the parse and execution
+ * rates are reported separately so the two failures are distinguishable.
+ */
+async function evaluate(
+  host: Awaited<ReturnType<typeof openMicroglia>>,
+  rows: readonly BirdRow[],
+  dataset: Dataset,
+  withMemory: boolean,
+): Promise<Outcome[]> {
+  const out: Outcome[] = [];
+  for (const row of rows) {
+    const dbPath = dataset.dbPath(row.db_id);
+    const ddl = ddlOf(dbPath);
+    const pack = withMemory
+      ? await host.recall({ task: 'sql.generate', text: row.question, scope: { domain: row.db_id } })
+      : undefined;
+    const started = performance.now();
+    let sql: string | undefined;
+    let parseOk = false;
+    try {
+      sql = extractSql(await chat(promptFor(row, ddl, pack?.rendered ?? '')));
+      parseOk = sql !== undefined;
+    } catch (error) {
+      if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+      parseOk = false;
+    }
+    const predicted = sql === undefined ? { ok: false, rows: [] } : execute(dbPath, sql);
+    const gold = execute(dbPath, row.SQL);
+    out.push({
+      questionId: row.question_id,
+      dbId: row.db_id,
+      correct: predicted.ok && gold.ok && matches(predicted.rows, gold.rows),
+      parseOk,
+      execOk: predicted.ok,
+      packIds: pack?.ids.length ?? 0,
+      latencyMs: Math.round(performance.now() - started),
+    });
+
+    if (withMemory && pack) {
+      const handle = host.begin({
+        task: 'sql.generate',
+        input: { question: row.question, domain: row.db_id, schemaDigest: row.db_id },
+        pack,
+        model: MODEL,
+        domainPack: 'bird',
+      });
+      await handle.complete({ sql: sql ?? '' });
+      if (predicted.ok && out[out.length - 1]?.correct === false) {
+        await handle.edit({ sql: row.SQL }, { note: 'execution mismatch' });
+      }
+    }
+  }
+  return out;
+}
+
 async function main(): Promise<void> {
   const dataset = await loadDataset(LIMIT);
   const slice = dataset.rows;

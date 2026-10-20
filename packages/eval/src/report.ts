@@ -69,6 +69,34 @@ export function renderMarkdown(result: StudyResult): string {
   }
   lines.push('');
 
+  const full = result.arms.find((arm) => arm.name === 'full');
+  const fullCmp = result.comparisons['full'];
+  lines.push('## Competitor baseline');
+  lines.push('');
+  lines.push(
+    'A similarity fact store — extract, dedupe, retrieve the closest sentence — is the shape every ' +
+      'memory product in this space converges on. It is run here on the same corrections, with a ' +
+      'reader that applies the retrieved sentence generously.',
+  );
+  lines.push('');
+  lines.push('| Store | Accuracy | Δ vs baseline | Facts | Untrusted ingested |');
+  lines.push('| --- | --- | --- | --- | --- |');
+  for (const entry of [result.competitors.factStore, result.competitors.factStorePoisoned]) {
+    lines.push(
+      `| ${entry.name} | ${pct(entry.accuracy)} | ${pp(entry.delta)} | ${entry.facts} | ${entry.untrustedFacts} |`,
+    );
+  }
+  lines.push(
+    `| full (this library) | ${pct(full?.finalAccuracy ?? 0)} | ${pp(fullCmp?.delta ?? 0)} | ${full?.knowledge ?? 0} | 0 |`,
+  );
+  lines.push('');
+  lines.push(
+    'The second row is the same store under the same poison the `poison` arm applies. It lands below ' +
+      'the no-memory baseline: a store without a trust ceiling does not merely fail to help, it makes ' +
+      'answers worse than having no memory at all.',
+  );
+  lines.push('');
+
   lines.push('## Module ablations');
   lines.push('');
   lines.push(

@@ -72,6 +72,10 @@ describe('report with sparse arms', () => {
       contradiction: { activeWith: 1, activeWithout: 2, charsWith: 400, charsWithout: 700 },
       diversity: { distinctWith: 4, distinctWithout: 1, size: 4 },
     },
+    competitors: {
+      factStore: { name: 'fact-store', accuracy: 0.5, delta: 0.18, p: 0.01, facts: 8, untrustedFacts: 0 },
+      factStorePoisoned: { name: 'fact-store-poisoned', accuracy: 0.25, delta: -0.07, p: 0.02, facts: 8, untrustedFacts: 4 },
+    },
     gates: [
       { id: 'G1', criterion: 'blocking', actual: '0', pass: false, blocking: true },
       { id: 'G2', criterion: 'advisory', actual: '0', pass: false, blocking: false },
@@ -243,6 +247,10 @@ describe('ablation rendering when the guard fails', () => {
       leakage: 0,
       diagnosis: undefined,
       ablations: failing,
+      competitors: {
+        factStore: { name: 'fact-store', accuracy: 0.5, delta: 0.18, p: 0.01, facts: 8, untrustedFacts: 0 },
+        factStorePoisoned: { name: 'fact-store-poisoned', accuracy: 0.25, delta: -0.07, p: 0.02, facts: 8, untrustedFacts: 4 },
+      },
       gates: [],
     });
     expect(markdown).toContain('still injected after 4 failures');

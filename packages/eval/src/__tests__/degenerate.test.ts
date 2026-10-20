@@ -170,6 +170,10 @@ describe('report rendering of a regression', () => {
       },
       leakage: 0,
       diagnosis: undefined,
+      competitors: {
+        factStore: { name: 'fact-store', accuracy: 0.56, delta: 0.24, p: 0.001, facts: 16, untrustedFacts: 0 },
+        factStorePoisoned: { name: 'fact-store-poisoned', accuracy: 0.2, delta: -0.12, p: 0.003, facts: 16, untrustedFacts: 8 },
+      },
       ablations: ABLATIONS,
       gates: [{ id: 'G1', criterion: 'lift', actual: '-25.00pp', pass: false, blocking: true }],
     };
@@ -248,6 +252,10 @@ describe('gate summary', () => {
       comparisons: {},
       leakage: 0,
       diagnosis: undefined,
+      competitors: {
+        factStore: { name: 'fact-store', accuracy: 0.56, delta: 0.24, p: 0.001, facts: 16, untrustedFacts: 0 },
+        factStorePoisoned: { name: 'fact-store-poisoned', accuracy: 0.2, delta: -0.12, p: 0.003, facts: 16, untrustedFacts: 8 },
+      },
       ablations: ABLATIONS,
       gates: [{ id: 'G1', criterion: 'c', actual: '0', pass: true, blocking: true }],
     };
