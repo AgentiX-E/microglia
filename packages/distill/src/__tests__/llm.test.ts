@@ -96,3 +96,31 @@ describe('response parsing', () => {
     await expect(interpreter({ event, run })).rejects.toThrow('network');
   });
 });
+
+describe('trust inheritance', () => {
+  const base = {
+    namespace: 'acme',
+    task: 'sql.generate',
+    eventId: 'fb_1',
+    runId: 'run_1',
+    at: 1_700_000_000_000,
+  };
+  const response = JSON.stringify({
+    candidates: [{ kind: 'constraint', statement: 'Exclude cancelled orders from totals.' }],
+  });
+
+  it('gives the claim the trust of the event it came from', () => {
+    // A lesson distilled from an execution-verified correction is as trustworthy as
+    // that correction. Pinning it to the model floor made every LLM-derived claim
+    // unable to clear the admission gate: 27 lessons, none active, an empty pack.
+    const [candidate] = parseDistillResponse(response, { ...base, trust: 0.95 });
+    expect(candidate?.trust).toBe(0.95);
+    expect(candidate?.evidence.weight).toBe(0.95);
+  });
+
+  it('falls back to the model floor when the caller does not say', () => {
+    const [candidate] = parseDistillResponse(response, base);
+    expect(candidate?.trust).toBe(0.6);
+    expect(candidate?.evidence.weight).toBe(0.6);
+  });
+});

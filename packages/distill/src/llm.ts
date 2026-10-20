@@ -97,8 +97,23 @@ export function buildDistillPrompt(
  */
 export function parseDistillResponse(
   raw: string,
-  base: { namespace: string; task: string; eventId: string; runId: string; at: number },
+  base: {
+    namespace: string;
+    task: string;
+    eventId: string;
+    runId: string;
+    at: number;
+    /**
+     * Trust the resulting claim inherits. It defaults to the model floor (0.6), and
+     * a caller passes the event's own trust: a lesson distilled from an
+     * execution-verified correction is as trustworthy as that correction, and
+     * pinning it to the floor made every LLM-derived claim unable to activate on
+     * its own — 27 lessons, 0 active, an empty pack.
+     */
+    trust?: number;
+  },
 ): readonly Candidate[] {
+  const trust = base.trust ?? 0.6;
   let parsed: unknown;
   try {
     parsed = JSON.parse(extractJson(raw));
@@ -129,8 +144,8 @@ export function parseDistillResponse(
       scope,
       statement: statement.trim(),
       ...(payload === undefined ? {} : { payload }),
-      evidence: { feedbackId: base.eventId, runId: base.runId, at: base.at, weight: 0.6 },
-      trust: 0.6,
+      evidence: { feedbackId: base.eventId, runId: base.runId, at: base.at, weight: trust },
+      trust,
       dedupeKey: dedupeKeyOf({
         namespace: base.namespace,
         kind: kind as KnowledgeKind,
@@ -199,6 +214,7 @@ export function createLlmInterpreter(options: LlmInterpreterOptions): Interprete
       eventId: context.event.id,
       runId: context.event.runId,
       at: context.event.at,
+      trust: context.event.trust,
     });
     return parsed.slice(0, max);
   };

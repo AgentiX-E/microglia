@@ -449,6 +449,19 @@ async function main(): Promise<void> {
 
   const accuracyA = rate(withoutMemory.map((outcome) => outcome.correct));
   const accuracyB = rate(withMemory.map((outcome) => outcome.correct));
+  const meanPackIds =
+    withMemory.reduce((sum, outcome) => sum + outcome.packIds, 0) / Math.max(1, withMemory.length);
+
+  // An empty pack makes the comparison a measurement of run-to-run noise. The first
+  // attempt at this lane reported +6.67pp on an arm that never injected anything,
+  // which is exactly the number a careless harness would have published.
+  if (withMemory.length > 0 && meanPackIds === 0) {
+    throw new MicrogliaError(
+      'MG_E_CONFIG',
+      'The memory arm never injected knowledge, so the two arms are the same arm',
+      { facts: items.length, active: stats.active, distillFailed: distilled.failed },
+    );
+  }
   const artifact = {
     id: 'poc-sota-bird',
     dataset: 'BIRD Mini-Dev (sqlite)',
@@ -462,7 +475,7 @@ async function main(): Promise<void> {
       delta_pp: (accuracyB - accuracyA) * 100,
       parse_rate: rate(withMemory.map((outcome) => outcome.parseOk)),
       exec_rate: rate(withMemory.map((outcome) => outcome.execOk)),
-      mean_pack_ids: withMemory.reduce((sum, outcome) => sum + outcome.packIds, 0) / Math.max(1, withMemory.length),
+      mean_pack_ids: meanPackIds,
       latency_p50_ms: percentile(withMemory.map((outcome) => outcome.latencyMs), 0.5),
       latency_p95_ms: percentile(withMemory.map((outcome) => outcome.latencyMs), 0.95),
       knowledge_active: stats.active,
