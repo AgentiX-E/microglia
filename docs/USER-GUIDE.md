@@ -111,7 +111,7 @@ const pack = await mg.recall({
   task: 'chart.recommend',
   text: question,
   scope: { domain: 'sales' },
-  minCoverage: 0.34,           // the rule must mention a third of the question's content words
+  minCoverage: 0.01,           // the rule must mention at least one of the question's content words
 });
 
 if (pack.ids.length === 0) {
@@ -122,8 +122,12 @@ if (pack.ids.length === 0) {
 
 `minCoverage` is absolute rather than relative — BM25 scores are only comparable inside one query, so
 a threshold on them cannot answer "is this rule about this question". Coverage can: it is the share of
-the question's content words (stopwords removed) that the rule mentions. Start with `0.3–0.4`, and
-raise it if your prompts are tight.
+the question's content words (stopwords removed) that the rule mentions.
+
+Start at `0.01`, which means "at least one shared content word", and measure before raising it. On BIRD
+Mini-Dev the median pack covered 7.1% of its question and 47% of packs covered none of it, so a floor
+of `0.34` injected nothing at all on 352 questions. A floor of `0.15` keeps roughly the strongest
+quarter of packs.
 
 ### 3.2 `begin` — the run record
 

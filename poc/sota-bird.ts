@@ -108,8 +108,16 @@ const OPTIONAL_ARMS: readonly Exclude<ArmName, 'none' | 'full'>[] = [
   'oracle',
 ];
 
-/** The coverage floor the `gated` arm runs with, fixed before the run. */
-const MIN_COVERAGE = Math.min(1, Math.max(0, nonNegative(process.env['SOTA_MIN_COVERAGE'], 0.34)));
+/**
+ * The coverage floor the `gated` arm runs with, fixed before the run.
+ *
+ * `0.01` is "the rule mentions at least one of the question's content words",
+ * which is the weakest gate that still means something. A first attempt used
+ * 0.34 and rendered an empty pack on all 352 questions: measured on this dataset
+ * the median pack covers 7.1% of the question and 47% of packs cover none of it,
+ * so a third of the words is not a threshold, it is a filter on everything.
+ */
+const MIN_COVERAGE = Math.min(1, Math.max(0, nonNegative(process.env['SOTA_MIN_COVERAGE'], 0.01)));
 
 function parseArms(raw: string | undefined): Set<ArmName> {
   const wanted = new Set<ArmName>(['none', 'full']);
