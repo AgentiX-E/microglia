@@ -1,0 +1,33 @@
+{
+  "name": "@agentix-e/microglia-capture",
+  "version": "0.1.0",
+  "description": "Microglia capture \u2014 the host-facing SDK for feedback collection and recall",
+  "license": "MIT",
+  "author": "Lambertyan",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {
+    "@agentix-e/microglia-apply": "workspace:*",
+    "@agentix-e/microglia-core": "workspace:*",
+    "@agentix-e/microglia-distill": "workspace:*",
+    "@agentix-e/microglia-memory": "workspace:*"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}

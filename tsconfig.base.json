@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "baseUrl": ".",
+    "paths": {
+      "@agentix-e/microglia-core": ["packages/core/src/index.ts"],
+      "@agentix-e/microglia-memory": ["packages/memory/src/index.ts"],
+      "@agentix-e/microglia-nl2charts": ["packages/nl2charts/src/index.ts"],
+      "@agentix-e/microglia-distill": ["packages/distill/src/index.ts"],
+      "@agentix-e/microglia-apply": ["packages/apply/src/index.ts"],
+      "@agentix-e/microglia-capture": ["packages/capture/src/index.ts"],
+      "@agentix-e/microglia-cortex-adapter": ["packages/cortex-adapter/src/index.ts"],
+      "@agentix-e/microglia-eval": ["packages/eval/src/index.ts"]
+    }
+  }
+}

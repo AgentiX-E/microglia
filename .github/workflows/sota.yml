@@ -1,0 +1,87 @@
+name: sota
+
+# The public-benchmark lane. It is deliberately not a merge gate: at the sample
+# sizes this repository can afford, a pass/fail threshold on accuracy would be
+# flaky, which is worse than no gate at all. It runs weekly and on demand, and it
+# fails if the benchmark *cannot run* — that is the signal worth acting on.
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: 'Questions to draw from BIRD Mini-Dev'
+        required: false
+        default: '60'
+  schedule:
+    - cron: '0 3 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  bird:
+    name: BIRD Mini-Dev (memory on/off)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Require credentials
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "::error::DEEPSEEK_API_KEY is not configured for this repository"
+            exit 1
+          fi
+
+      - name: Run the benchmark
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          SOTA_LIMIT: ${{ github.event.inputs.limit || '60' }}
+          POC_MAX_CALLS: '400'
+        run: pnpm poc:sota
+
+      - name: Publish the result
+        run: |
+          node -e "
+            const r = require('./poc/results/poc-sota-bird.json');
+            const m = r.metrics;
+            const line = [
+              '### BIRD Mini-Dev',
+              '',
+              '| Arm | Execution accuracy |',
+              '| --- | --- |',
+              '| no memory | ' + (m.accuracy_without_memory * 100).toFixed(2) + '% |',
+              '| with memory | ' + (m.accuracy_with_memory * 100).toFixed(2) + '% |',
+              '',
+              'Delta: ' + m.delta_pp.toFixed(2) + 'pp over n=' + r.n.eval + ' questions, parse rate ' +
+                (m.parse_rate * 100).toFixed(1) + '%, ' + m.knowledge_active + ' active rules.',
+              '',
+              r.advisory.gate + ' (95% interval about ±' + r.advisory.interval_half_width_pp + 'pp at this n).',
+            ].join('\n');
+            require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + '\n');
+            console.log(line);
+          "
+
+      - name: Upload the artefact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sota-bird
+          path: poc/results/poc-sota-bird.json
+          if-no-files-found: error

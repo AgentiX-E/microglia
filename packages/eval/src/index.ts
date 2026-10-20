@@ -1,0 +1,44 @@
+/**
+ * `@agentix-e/microglia-eval` — measurement, not marketing.
+ *
+ * The package contains the paired statistics, the controlled workload, the
+ * ablation runner, and the gate definitions. A release that cannot reproduce
+ * these numbers from source has no business quoting them.
+ */
+export { comparePaired, type PairedResult } from './stats.js';
+
+export {
+  DOMAINS,
+  INTENTS,
+  applyKnowledge,
+  baselineMark,
+  buildCorpus,
+  goldMark,
+  specFor,
+  type CorpusItem,
+  type Query,
+} from './scenario.js';
+
+export {
+  ARMS,
+  DEFAULT_CONFIG,
+  TASK,
+  buildBatches,
+  buildGates,
+  evaluateHoldout,
+  knowledgePrecision,
+  measureLeakage,
+  scoreByDomain,
+  runArm,
+  runStudy,
+  type ArmConfig,
+  type ArmName,
+  type ArmResult,
+  type DomainScore,
+  type Gate,
+  type RoundMetrics,
+  type StudyConfig,
+  type StudyResult,
+} from './study.js';
+
+export { renderJson, renderMarkdown, summarise } from './report.js';

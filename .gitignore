@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.DS_Store
+.microglia/
+bench-artifacts/
+bench/results/*.md
+
+.env
+.env.*
+!.env.example
+
+# Dataset cache for the public benchmark lane
+.cache/

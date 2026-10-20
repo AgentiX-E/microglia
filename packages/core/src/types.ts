@@ -1,0 +1,259 @@
+/**
+ * Public type surface for Microglia.
+ *
+ * The schema strings are literal versions rather than free-form metadata: a
+ * persisted event is read by a future version of this library, and a version
+ * that cannot name the shape it is reading cannot migrate it. Bumping a schema
+ * string is therefore a breaking change with an explicit migration.
+ */
+
+export type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
+
+export type JsonObject = { [key: string]: Json };
+
+export type JsonPath = ReadonlyArray<string | number>;
+
+/** A single structural change between two JSON values. */
+export type CorrectionOp =
+  | { readonly op: 'set'; readonly path: JsonPath; readonly before: Json; readonly after: Json }
+  | { readonly op: 'remove'; readonly path: JsonPath; readonly before: Json }
+  | { readonly op: 'insert'; readonly path: JsonPath; readonly after: Json };
+
+export type ActorType = 'user' | 'system' | 'evaluator' | 'verifier';
+
+export type Actor = {
+  readonly type: ActorType;
+  /**
+   * A salted hash, never a raw identifier. Microglia is embedded in the host and
+   * must not become a second place where user identities are stored.
+   */
+  readonly idHash?: string;
+};
+
+export type FeedbackKind =
+  | 'rating'
+  | 'edit'
+  | 'preference'
+  | 'outcome'
+  | 'clarification'
+  | 'abstain';
+
+export type RatingValue = 'up' | 'down';
+
+export type FeedbackSignal =
+  | {
+      readonly type: 'rating';
+      readonly value: RatingValue;
+      readonly reasons: readonly string[];
+      readonly comment?: string;
+    }
+  | {
+      readonly type: 'edit';
+      readonly beforeHash: string;
+      readonly afterHash: string;
+      readonly ops: readonly CorrectionOp[];
+      /** Normalised edit distance in [0, 1]; 0 means "no change". */
+      readonly distance: number;
+      /** Canonical post-edit value, redacted, used as the learning target. */
+      readonly after: Json;
+    }
+  | {
+      readonly type: 'preference';
+      readonly chosenRunId: string;
+      readonly rejectedRunId: string;
+      readonly criterion?: string;
+    }
+  | {
+      readonly type: 'outcome';
+      readonly ok: boolean;
+      readonly code?: string;
+      readonly detail?: string;
+    }
+  | {
+      readonly type: 'clarification';
+      readonly question: string;
+      readonly answer: string;
+    }
+  | {
+      readonly type: 'abstain';
+      readonly reason: string;
+    };
+
+/**
+ * The generation-side context that makes a feedback event interpretable later.
+ *
+ * `knowledgeIds` is the load-bearing field: without it a correction cannot be
+ * credited to (or exonerated from) the knowledge that was in the prompt, and
+ * the flywheel degenerates into "append everything, measure nothing".
+ */
+export type RunProvenance = {
+  readonly model?: string;
+  readonly promptVersion?: string;
+  readonly appVersion?: string;
+  readonly domainPack?: string;
+  readonly schemaDigest?: string;
+  readonly knowledgeIds: readonly string[];
+  readonly retrievalHash?: string;
+  readonly metadata?: JsonObject;
+};
+
+export type FeedbackEvent = {
+  readonly schema: 'microglia.feedback/1';
+  readonly id: string;
+  readonly at: number;
+  readonly namespace: string;
+  readonly sessionId: string;
+  readonly runId: string;
+  readonly task: string;
+  readonly kind: FeedbackKind;
+  readonly actor: Actor;
+  /** Source trust in [0, 1], derived from the signal, not from the user. */
+  readonly trust: number;
+  readonly signal: FeedbackSignal;
+  readonly provenance: RunProvenance;
+  /** How many spans were redacted before persistence. Zero is the common case. */
+  readonly redactions: number;
+};
+
+export type RunRecord = {
+  readonly schema: 'microglia.run/1';
+  readonly id: string;
+  readonly at: number;
+  readonly namespace: string;
+  readonly sessionId: string;
+  readonly task: string;
+  readonly input: JsonObject;
+  readonly output: Json | undefined;
+  readonly provenance: RunProvenance;
+  readonly feedbackIds: readonly string[];
+};
+
+export type KnowledgeKind = 'constraint' | 'exemplar' | 'negative' | 'lexicon' | 'procedure';
+
+/**
+ * A scope is a conjunction of optional filters. Every present field must match.
+ *
+ * Scopes are deliberately coarse and human-auditable: a correction learned in
+ * `sales` must not silently govern `hr`, and a correction learned from one
+ * schema must not leak into another. Optional fields are omitted, never `null`,
+ * so a persisted record has one representation.
+ */
+export type KnowledgeScope = {
+  readonly task: string;
+  readonly domain?: string;
+  readonly schemaDigest?: string;
+  readonly intent?: string;
+  readonly field?: string;
+  readonly reasonCode?: string;
+};
+
+export type EvidenceRef = {
+  readonly feedbackId: string;
+  readonly runId: string;
+  readonly at: number;
+  /** Weighted by source trust and signal strength, in [0, 1]. */
+  readonly weight: number;
+};
+
+export type KnowledgeStatus = 'candidate' | 'active' | 'quarantined' | 'retired' | 'conflicted';
+
+export type KnowledgeItem = {
+  readonly schema: 'microglia.knowledge/1';
+  readonly id: string;
+  /** Tenancy boundary. Retrieval never crosses it; the leakage test asserts it. */
+  readonly namespace: string;
+  readonly kind: KnowledgeKind;
+  readonly scope: KnowledgeScope;
+  /** One sentence, declarative, self-contained. Rendered verbatim. */
+  readonly statement: string;
+  /** Machine-usable payload (e.g. exemplar input/output), if the kind needs one. */
+  readonly payload?: Json;
+  readonly evidence: readonly EvidenceRef[];
+  /** Sum of evidence weights; drives the saturating evidence score. */
+  readonly support: number;
+  /** Number of contradictory observations. */
+  readonly contradictions: number;
+  /** Fused confidence in [0, 1]. Recomputed by `scoreKnowledge`. */
+  readonly confidence: number;
+  /** Inherited source trust in [0, 1]. */
+  readonly trust: number;
+  readonly validFrom: number;
+  /** World-time end, `Infinity` while still asserted. */
+  readonly validUntil: number;
+  readonly systemFrom: number;
+  /** System-time end, `Infinity` while current. */
+  readonly systemUntil: number;
+  readonly status: KnowledgeStatus;
+  readonly statusReason?: string;
+  /** Number of runs in which this item was retrieved and injected. */
+  readonly applied: number;
+  /** Number of those runs whose observed outcome was positive. */
+  readonly succeeded: number;
+  readonly createdAt: number;
+  readonly updatedAt: number;
+};
+
+export type KnowledgePack = {
+  readonly items: readonly KnowledgeItem[];
+  readonly ids: readonly string[];
+  readonly rendered: string;
+  /** Rough token estimate (characters / 4), stated as an estimate everywhere. */
+  readonly tokens: number;
+  readonly hash: string;
+  readonly budget: number;
+  readonly truncated: number;
+};
+
+export type Policy = {
+  /** Confidence at or above which a candidate becomes active. */
+  readonly activationThreshold: number;
+  /** Confidence below which an active item is retired. */
+  readonly retirementThreshold: number;
+  /** Evidence weight required before a candidate may activate. */
+  readonly minSupport: number;
+  /** Contradictions tolerated before an item is marked conflicted. */
+  readonly maxContradictions: number;
+  /** Runs after which a failing item is retired. */
+  readonly minApplicationsForRetirement: number;
+  /** Success rate below which a sufficiently applied item is retired. */
+  readonly failureRateThreshold: number;
+  /** Trust required for a single observation to activate knowledge. */
+  readonly singleObservationTrust: number;
+  /** Observations below this trust are quarantined instead of admitted. */
+  readonly quarantineBelowTrust: number;
+  /** Penalty in log-odds applied per contradictory observation. */
+  readonly contradictionPenalty: number;
+  /** Prior successes and failures used by the smoothed empirical rate. */
+  readonly priorSuccess: number;
+  readonly priorFailure: number;
+  /** Characters of knowledge allowed in a pack by default. */
+  readonly defaultBudget: number;
+  /** Reject knowledge whose statement fails the injection screen. */
+  readonly rejectUnsafeKnowledge: boolean;
+};
+
+export type SignalStrength = {
+  readonly trust: number;
+  readonly weight: number;
+};
+
+export type DistillCandidate = {
+  readonly namespace: string;
+  readonly kind: KnowledgeKind;
+  readonly scope: KnowledgeScope;
+  readonly statement: string;
+  readonly payload?: Json;
+  readonly evidence: EvidenceRef;
+  readonly trust: number;
+  /** Stable identity of the claim, used to merge duplicates across runs. */
+  readonly dedupeKey: string;
+};
+
+export type RecallQuery = {
+  readonly task: string;
+  readonly text: string;
+  readonly namespace: string;
+  readonly scope?: Omit<KnowledgeScope, 'task'>;
+  readonly budget?: number;
+  readonly limit?: number;
+};

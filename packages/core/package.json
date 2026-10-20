@@ -1,0 +1,29 @@
+{
+  "name": "@agentix-e/microglia-core",
+  "version": "0.1.0",
+  "description": "Microglia core \u2014 feedback, correction, and knowledge contracts with zero I/O",
+  "license": "MIT",
+  "author": "Lambertyan",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {},
+  "devDependencies": {},
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}

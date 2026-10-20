@@ -1,0 +1,47 @@
+{
+  "id": "poc-scale",
+  "title": "CPU retrieval and memory cost at 1k / 5k / 10k items",
+  "ranAt": "2026-10-20T02:37:39.820Z",
+  "model": "none",
+  "n": 3,
+  "calls": 0,
+  "metrics": {
+    "items_1000_p95_ms": 1.912,
+    "items_5000_p95_ms": 2.18,
+    "items_10000_p95_ms": 3.099,
+    "items_10000_heap_mb": 13.9,
+    "items_10000_build_ms": 45,
+    "mean_tokens": 258.56
+  },
+  "notes": [
+    "Synthetic statements; the lexical index and scope scan are the same code paths as production.",
+    "Heap is the delta after build, measured without forcing GC between inserts.",
+    "Scope scanning is O(n); the result quantifies why a SQL index is a P1 item, not a redesign."
+  ],
+  "samples": [
+    {
+      "items": 1000,
+      "buildMs": 11,
+      "p50Ms": 1.253,
+      "p95Ms": 1.912,
+      "meanTokens": 260.12,
+      "heapMB": 2.9
+    },
+    {
+      "items": 5000,
+      "buildMs": 38,
+      "p50Ms": 1.488,
+      "p95Ms": 2.18,
+      "meanTokens": 257.78,
+      "heapMB": 18.7
+    },
+    {
+      "items": 10000,
+      "buildMs": 45,
+      "p50Ms": 1.917,
+      "p95Ms": 3.099,
+      "meanTokens": 257.78,
+      "heapMB": 13.9
+    }
+  ]
+}

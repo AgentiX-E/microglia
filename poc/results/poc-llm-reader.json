@@ -1,0 +1,47 @@
+{
+  "id": "poc-llm-reader",
+  "title": "LLM reader: generic vs house conventions, with an unguarded poison control",
+  "ranAt": "2026-10-20T02:32:52.915Z",
+  "model": "deepseek-chat",
+  "n": 70,
+  "calls": 152,
+  "metrics": {
+    "generic_baseline": 0.9047619047619048,
+    "generic_pack": 0.8809523809523809,
+    "generic_delta_pp": -2.3809523809523836,
+    "house_baseline": 0,
+    "house_pack": 0.8928571428571429,
+    "house_delta_pp": 89.28571428571429,
+    "house_override_rate": 0.8928571428571429,
+    "poison_accuracy": 1,
+    "clean_on_poison_subset": 1,
+    "poison_delta_pp": 0,
+    "json_valid_rate": 1,
+    "latency_p50_ms": 652.082,
+    "latency_p95_ms": 959.469,
+    "mean_tokens": 460.85714285714283
+  },
+  "notes": [
+    "Generic workload: the pack should be neutral because a strong model already knows the conventions.",
+    "House workload: gold follows synthetic organisational conventions that contradict the generic prior.",
+    "Poison control uses 12 house cases and an unquarantined conflicting rule.",
+    "Only the mark is scored; JSON validity is tracked separately."
+  ],
+  "samples": [
+    {
+      "question": "What share of budget comes from each account in finance?",
+      "gold": "bar",
+      "baseline": "pie"
+    },
+    {
+      "question": "What share of attrition comes from each level in hr?",
+      "gold": "bar",
+      "baseline": "pie"
+    },
+    {
+      "question": "What share of units comes from each region in sales?",
+      "gold": "bar",
+      "baseline": "pie"
+    }
+  ]
+}

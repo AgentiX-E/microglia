@@ -1,0 +1,47 @@
+{
+  "name": "microglia",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Microglia \u2014 a headless feedback flywheel SDK for agentic workflows",
+  "license": "MIT",
+  "author": "Lambertyan",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AgentiX-E/microglia.git"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "scripts": {
+    "build": "tsc -b packages/core packages/memory packages/nl2charts packages/distill packages/apply packages/capture packages/cortex-adapter packages/eval",
+    "clean": "tsc -b --clean packages/core packages/memory packages/nl2charts packages/distill packages/apply packages/capture packages/cortex-adapter packages/eval",
+    "typecheck": "tsc -b packages/core packages/memory packages/nl2charts packages/distill packages/apply packages/capture packages/cortex-adapter packages/eval",
+    "test": "vitest run --coverage",
+    "test:unit": "vitest run",
+    "bench": "pnpm build && node packages/eval/dist/bench/run.js",
+    "check": "pnpm typecheck && pnpm test && pnpm audit && pnpm bench",
+    "poc:llm-reader": "tsx poc/llm-reader.ts",
+    "poc:llm-distill": "tsx poc/llm-distill.ts",
+    "poc:embedding": "tsx poc/embedding.ts",
+    "poc:scale": "tsx poc/scale.ts",
+    "poc:live": "pnpm poc:llm-reader && pnpm poc:llm-distill && pnpm poc:embedding && pnpm poc:scale",
+    "audit": "node scripts/audit.mjs",
+    "poc:sota": "tsx poc/sota-bird.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "@vitest/coverage-v8": "^2.1.8",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "@agentix-e/microglia-core": "workspace:*",
+    "@agentix-e/microglia-memory": "workspace:*",
+    "@agentix-e/microglia-apply": "workspace:*",
+    "@agentix-e/microglia-distill": "workspace:*",
+    "@agentix-e/microglia-capture": "workspace:*",
+    "@agentix-e/microglia-nl2charts": "workspace:*",
+    "@agentix-e/microglia-eval": "workspace:*"
+  }
+}

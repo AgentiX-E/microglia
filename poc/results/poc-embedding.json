@@ -1,0 +1,41 @@
+{
+  "id": "poc-embedding",
+  "title": "Paraphrase retrieval: BM25 vs Zhipu embedding-3 vs rank fusion",
+  "ranAt": "2026-10-20T02:37:56.141Z",
+  "model": "embedding-3",
+  "n": 96,
+  "calls": 3,
+  "metrics": {
+    "light_bm25_recall1": 0.5833333333333334,
+    "light_bm25_mrr": 0.7916666666666666,
+    "light_dense_recall1": 0.5416666666666666,
+    "light_dense_mrr": 0.767361111111111,
+    "light_hybrid_recall1": 0.5833333333333334,
+    "light_hybrid_mrr": 0.7881944444444443,
+    "heavy_bm25_recall1": 0.20833333333333334,
+    "heavy_bm25_mrr": 0.37603785172293636,
+    "heavy_dense_recall1": 0.2916666666666667,
+    "heavy_dense_mrr": 0.5213115588115587,
+    "heavy_hybrid_recall1": 0.2916666666666667,
+    "heavy_hybrid_mrr": 0.4961895743145741,
+    "recall5_all": 0.5416666666666666,
+    "pool_size": 48
+  },
+  "notes": [
+    "Queries replace domain vocabulary with synonyms, so lexical overlap is reduced but not zero.",
+    "Rank fusion uses reciprocal-rank weights (1/(1+rank)) rather than raw score normalisation.",
+    "Embeddings are a stand-in for an on-device CPU/WebGPU encoder; no GPU is required by the product."
+  ],
+  "samples": [
+    {
+      "light": "Which chart should I use for change over time of volume?",
+      "heavy": "Which visual shows how quantity evolves across periods?",
+      "target": "rule_0"
+    },
+    {
+      "light": "Which chart should I use for side-by-side comparison of leaver rate?",
+      "heavy": "Which visual puts people leaving next to each other across groups?",
+      "target": "rule_1"
+    }
+  ]
+}

@@ -1,0 +1,80 @@
+name: poc-live
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'poc/llm-reader.ts'
+      - 'poc/llm-distill.ts'
+      - 'poc/embedding.ts'
+      - '.github/workflows/poc-live.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: live APIs (DeepSeek + Zhipu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      - name: Require credentials
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+        run: |
+          if [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "::error::DEEPSEEK_API_KEY is not configured for this repository"
+            exit 1
+          fi
+          if [ -z "$ZHIPU_API_KEY" ]; then
+            echo "::error::ZHIPU_API_KEY is not configured for this repository"
+            exit 1
+          fi
+
+      - name: LLM reader (generic vs house vs poison)
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          POC_MAX_CALLS: '400'
+        run: pnpm poc:llm-reader
+
+      - name: LLM distillation
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          POC_MAX_CALLS: '200'
+        run: pnpm poc:llm-distill
+
+      - name: Embedding retrieval
+        env:
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+          POC_MAX_CALLS: '120'
+        run: pnpm poc:embedding
+
+      - name: CPU scale
+        run: pnpm poc:scale
+
+      - name: Upload live evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: live-poc
+          path: poc/results
+          if-no-files-found: warn

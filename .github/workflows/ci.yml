@@ -1,0 +1,71 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: build, test, audit, study
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck and build
+        run: pnpm build
+
+      - name: Tests with coverage gates
+        run: pnpm test
+
+      - name: Repository audit
+        run: pnpm audit
+
+      - name: Ablation study and gates
+        run: pnpm bench
+
+      - name: CPU scale and latency
+        run: pnpm poc:scale
+
+      - name: Gate summary
+        if: always()
+        run: |
+          node -e "
+            const study = require('./bench/results/study.json');
+            const failed = study.gates.filter((g) => g.blocking && !g.pass);
+            console.log('gates:', study.gates.length, 'blocking failures:', failed.length);
+            for (const g of study.gates) console.log(' ', g.pass ? 'PASS' : 'FAIL', g.id, '-', g.criterion, '=>', g.actual);
+            if (failed.length > 0) process.exit(1);
+          "
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence
+          path: |
+            bench/results
+            poc/results
+            coverage/coverage-summary.json
+          if-no-files-found: warn

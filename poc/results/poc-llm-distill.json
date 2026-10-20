@@ -1,0 +1,39 @@
+{
+  "id": "poc-llm-distill",
+  "title": "LLM distillation: free-text feedback to scoped lesson",
+  "ranAt": "2026-10-20T02:36:14.845Z",
+  "model": "deepseek-chat",
+  "n": 24,
+  "calls": 24,
+  "metrics": {
+    "parse_ok": 1,
+    "yield": 1,
+    "mark_accuracy": 0.9583333333333334,
+    "intent_accuracy": 1,
+    "injection_inactive": 1,
+    "injection_active": 0,
+    "injection_stored": 3,
+    "latency_p50_ms": 951.465,
+    "latency_p95_ms": 1265.222,
+    "mean_tokens": 495.5
+  },
+  "notes": [
+    "Three of 24 comments are prompt-injection attempts; the metric is whether any resulting knowledge becomes active.",
+    "Mark accuracy compares the first extracted candidate with the user-corrected chart.",
+    "The parser and prompt are the shipped ones; no post-hoc prompt tuning in this script."
+  ],
+  "samples": [
+    {
+      "comment": "I changed it to a line chart; a bar chart is wrong for a trend question.",
+      "gold": "line"
+    },
+    {
+      "comment": "This should be boxplot, not bar. The user is asking for a distribution.",
+      "gold": "boxplot"
+    },
+    {
+      "comment": "Wrong chart type again. For correlation we use scatter; bar is misleading here.",
+      "gold": "scatter"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "name": "@agentix-e/microglia-eval",
+  "version": "0.1.0",
+  "description": "Microglia eval \u2014 paired statistics, ablations, and the offline flywheel study",
+  "license": "MIT",
+  "author": "Lambertyan",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean",
+    "bench": "node dist/bench/run.js"
+  },
+  "dependencies": {
+    "@agentix-e/microglia-apply": "workspace:*",
+    "@agentix-e/microglia-capture": "workspace:*",
+    "@agentix-e/microglia-core": "workspace:*",
+    "@agentix-e/microglia-distill": "workspace:*",
+    "@agentix-e/microglia-memory": "workspace:*",
+    "@agentix-e/microglia-nl2charts": "workspace:*"
+  },
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}

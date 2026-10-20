@@ -1,0 +1,122 @@
+{
+  "schema": "microglia.ci-runs/1",
+  "note": "Runs B and C of poc-live. Run A is local and lives in poc/results/poc-*.json. Documents quote all three because LLM POCs are stochastic.",
+  "runs": [
+    {
+      "runId": 39360812609,
+      "url": "https://github.com/AgentiX-E/microglia-docs/actions/runs/39360812609",
+      "commit": "287f074",
+      "workflow": "poc-live",
+      "provider": {
+        "llm": "deepseek-chat",
+        "embedding": "embedding-3"
+      },
+      "metrics": {
+        "poc_llm_reader": {
+          "generic_baseline": 0.9048,
+          "generic_pack": 0.9048,
+          "generic_delta_pp": 0,
+          "house_baseline": 0,
+          "house_pack": 0.7857,
+          "house_delta_pp": 78.5714,
+          "house_override_rate": 0.7857,
+          "poison_accuracy": 0.9167,
+          "clean_on_poison_subset": 1,
+          "poison_delta_pp": -8.3333,
+          "json_valid_rate": 1,
+          "latency_p50_ms": 858.279,
+          "latency_p95_ms": 1020.606,
+          "mean_tokens": 460.7143
+        },
+        "poc_llm_distill": {
+          "parse_ok": 1,
+          "yield": 0.9583,
+          "mark_accuracy": 0.9167,
+          "intent_accuracy": 0.9583,
+          "injection_inactive": 1,
+          "injection_active": 0,
+          "injection_stored": 3,
+          "latency_p50_ms": 1210.384,
+          "latency_p95_ms": 1509.595,
+          "mean_tokens": 491.5833
+        },
+        "poc_embedding": {
+          "light_bm25_recall1": 0.5833,
+          "light_dense_recall1": 0.5417,
+          "light_hybrid_recall1": 0.5833,
+          "heavy_bm25_recall1": 0.2083,
+          "heavy_dense_recall1": 0.2917,
+          "heavy_hybrid_recall1": 0.2708,
+          "heavy_dense_mrr": 0.5212,
+          "heavy_hybrid_mrr": 0.4858,
+          "recall5_all": 0.5417
+        },
+        "poc_scale": {
+          "items_1000_p95_ms": 3.099,
+          "items_5000_p95_ms": 2.708,
+          "items_10000_p95_ms": 2.631,
+          "items_10000_heap_mb": 14,
+          "items_10000_build_ms": 56
+        }
+      }
+    },
+    {
+      "runId": 39362965052,
+      "url": "https://github.com/AgentiX-E/microglia-docs/actions/runs/39362965052",
+      "commit": "86f271e",
+      "workflow": "poc-live",
+      "provider": {
+        "llm": "deepseek-chat",
+        "embedding": "embedding-3"
+      },
+      "metrics": {
+        "poc_llm_reader": {
+          "generic_baseline": 0.9048,
+          "generic_pack": 0.881,
+          "generic_delta_pp": -2.381,
+          "house_baseline": 0,
+          "house_pack": 0.75,
+          "house_delta_pp": 75,
+          "house_override_rate": 0.75,
+          "poison_accuracy": 1,
+          "clean_on_poison_subset": 1,
+          "poison_delta_pp": 0,
+          "json_valid_rate": 1,
+          "latency_p50_ms": 897.605,
+          "latency_p95_ms": 1199.199,
+          "mean_tokens": 460.8571
+        },
+        "poc_llm_distill": {
+          "parse_ok": 1,
+          "yield": 0.9583,
+          "mark_accuracy": 0.9167,
+          "intent_accuracy": 0.9583,
+          "injection_inactive": 1,
+          "injection_active": 0,
+          "injection_stored": 3,
+          "latency_p50_ms": 1275.8,
+          "latency_p95_ms": 1561.978,
+          "mean_tokens": 491
+        },
+        "poc_embedding": {
+          "light_bm25_recall1": 0.5833,
+          "light_dense_recall1": 0.5417,
+          "light_hybrid_recall1": 0.5833,
+          "heavy_bm25_recall1": 0.2083,
+          "heavy_dense_recall1": 0.2917,
+          "heavy_hybrid_recall1": 0.25,
+          "heavy_dense_mrr": 0.5213,
+          "heavy_hybrid_mrr": 0.4754,
+          "recall5_all": 0.5417
+        },
+        "poc_scale": {
+          "items_1000_p95_ms": 4.04,
+          "items_5000_p95_ms": 3.429,
+          "items_10000_p95_ms": 3.101,
+          "items_10000_heap_mb": 14,
+          "items_10000_build_ms": 73
+        }
+      }
+    }
+  ]
+}
