@@ -1103,6 +1103,12 @@ async function main(): Promise<void> {
   // ("the accepted answer is 10") is ignored while a rule ("report rounded to the
   // nearest ten") is followed, so the gate accepts either: it asks whether the
   // channel moves accuracy, not which phrasing we happened to prefer.
+  // A control that injects text without a pack (`stated`) is not a pack control:
+  // holding it to "rules per question" asks it for something it does not do, which
+  // is how this gate failed a run whose every other reading was sound.
+  const packControls = arms.filter(
+    (entry) => entry.arm === 'gated' || entry.arm === 'duplicate' || entry.arm === 'wrong-scope',
+  );
   const channel = arms.filter((entry) => entry.arm === 'oracle' || entry.arm === 'stated');
   const channelBest = channel.reduce<ArmSummary | undefined>(
     (best, entry) => (best === undefined || entry.delta_pp > best.delta_pp ? entry : best),
@@ -1146,15 +1152,12 @@ async function main(): Promise<void> {
     },
     {
       id: 'V6-controls-inject',
-      criterion: 'every configured control arm injected at least one rule on average',
+      criterion: 'every pack-based control arm injected at least one rule on average',
       actual:
-        arms
-          .filter((entry) => entry.arm !== 'full' && entry.arm !== 'oracle')
+        packControls
           .map((entry) => `${entry.arm}: ${entry.mean_pack_ids.toFixed(2)} rules/question`)
-          .join(', ') || 'no controls configured',
-      pass: arms
-        .filter((entry) => entry.arm !== 'full' && entry.arm !== 'oracle')
-        .every((entry) => entry.mean_pack_ids > 0),
+          .join(', ') || 'no pack-based controls configured',
+      pass: packControls.every((entry) => entry.mean_pack_ids > 0),
       blocking: true,
     },
     {
