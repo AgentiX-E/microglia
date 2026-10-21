@@ -107,8 +107,34 @@ const PROMPT_VERSION = 'sql-prompt/2';
  * that experiment; empty keeps the ordinary execution-accuracy lane.
  */
 const CONVENTION = (process.env['SOTA_CONVENTION'] ?? '').trim();
-const CONVENTION_SENTENCE =
-  'This workspace reports numeric answers in thousands, rounded to three decimals.';
+
+/**
+ * The two conventions the lane can impose, both of them transformations the schema
+ * cannot reveal.
+ *
+ * `thousands` scales a quantity, so it only means something for values large
+ * enough to survive the division — the first attempt applied it to counts and
+ * produced expected answers like 0.007.
+ * `round10` is a coarse-reporting rule that is defined for every numeric answer,
+ * which is what the subset needs in order to stay above twenty questions.
+ */
+const CONVENTIONS = {
+  thousands: {
+    sentence: 'This workspace reports numeric answers in thousands, rounded to three decimals.',
+    transform: (value: number): number => Math.round((value / 1000) * 1000) / 1000,
+    sql: (body: string): string => `SELECT ROUND((${body}) / 1000.0, 3)`,
+    applies: (value: number): boolean => Math.abs(value) >= 1000,
+  },
+  round10: {
+    sentence: 'This workspace reports every numeric answer rounded to the nearest ten.',
+    transform: (value: number): number => Math.round(value / 10) * 10,
+    sql: (body: string): string => `SELECT ROUND((${body}) / 10.0) * 10`,
+    applies: (): boolean => true,
+  },
+} as const;
+
+type ConventionName = keyof typeof CONVENTIONS;
+const ACTIVE = CONVENTION === '' ? undefined : CONVENTIONS[CONVENTION as ConventionName];
 
 type Task = {
   /** True when answers are judged under the house convention. */
@@ -197,6 +223,12 @@ type CaseOutcome = {
   readonly latencyMs: number;
   /** Optional arms, present only when configured. */
   readonly arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
+  /**
+   * The statement each control arm produced. Without it a failed control can only
+   * be described ("the oracle moved nothing"), not diagnosed ("the oracle wrote
+   * the un-scaled query").
+   */
+  readonly armSql: Partial<Record<Exclude<ArmName, 'none' | 'full'>, string>>;
   readonly armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>>;
 };
 
@@ -519,14 +551,11 @@ function scalarOf(dbPath: string, sql: string): number | undefined {
   }
 }
 
-function round3(value: number): number {
-  return Math.round(value * 1000) / 1000;
-}
-
-/** The correction a user would make: same query, reported in thousands. */
+/** The correction a user would make: the same query, reported the way this workspace reports. */
 function reportedSql(sql: string): string {
+  if (ACTIVE === undefined) return sql;
   const body = sql.replace(/;\s*$/, '').trim();
-  return `SELECT ROUND((${body}) / 1000.0, 3)`;
+  return ACTIVE.sql(body);
 }
 
 /** BIRD answers are compared as unordered multisets, the standard EX metric. */
@@ -564,7 +593,7 @@ function promptFor(row: BirdRow, ddl: string, pack: string, stated = false): str
     'Use only the tables and columns in the schema. Prefer explicit JOINs. Do not invent columns.',
     `Schema:\n${ddl}`,
     row.evidence ? `Evidence (may be wrong; it is external knowledge):\n${row.evidence}` : '',
-    stated && CONVENTION !== '' ? `Workspace convention:\n- ${CONVENTION_SENTENCE}` : '',
+    stated && ACTIVE !== undefined ? `Workspace convention:\n- ${ACTIVE.sentence}` : '',
     pack === '' ? '' : `Workspace conventions learned from earlier corrections:\n${pack}`,
     `Question: ${row.question}`,
   ]
@@ -628,11 +657,12 @@ async function answer(
   };
 }
 
-/** The convention's judgement: one numeric answer, rounded to three decimals. */
+/** The convention's judgement: one numeric answer, compared at the stated precision. */
 function judgeConvention(dbPath: string, sql: string, expected: number | undefined): boolean {
   if (expected === undefined || sql === '') return false;
   const value = scalarOf(dbPath, sql);
-  return value !== undefined && Math.abs(round3(value) - expected) < 1e-9;
+  if (value === undefined) return false;
+  return Math.abs(value - expected) < 1e-6;
 }
 
 function idOfRow(row: BirdRow): string {
@@ -824,6 +854,7 @@ async function runFold(
     const full = await answer(row, dataset, pack.rendered, pack.ids.length, task);
 
     const arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>> = {};
+    const armSql: Partial<Record<Exclude<ArmName, 'none' | 'full'>, string>> = {};
     const armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
     if (ARMS.has('gated')) {
       const gated = await host.recall({
@@ -833,33 +864,38 @@ async function runFold(
       });
       const result = await answer(row, dataset, gated.rendered, gated.ids.length, task);
       arms.gated = result.correct;
+      armSql.gated = result.sql;
       armPackIds.gated = result.packIds;
     }
     if (ARMS.has('duplicate')) {
       const twice = pack.rendered === '' ? '' : `${pack.rendered}\n${pack.rendered}`;
       const result = await answer(row, dataset, twice, pack.ids.length, task);
       arms.duplicate = result.correct;
+      armSql.duplicate = result.sql;
       armPackIds.duplicate = result.packIds;
     }
     if (ARMS.has('wrong-scope')) {
       const wrong = await host.recall({ ...query, scope: { domain: nextDatabase(row.db_id) } });
       const result = await answer(row, dataset, wrong.rendered, wrong.ids.length, task);
       arms['wrong-scope'] = result.correct;
+      armSql['wrong-scope'] = result.sql;
       armPackIds['wrong-scope'] = result.packIds;
     }
     if (ARMS.has('stated')) {
       const result = await answer(row, dataset, '', 0, task, true);
       arms.stated = result.correct;
+      armSql.stated = result.sql;
       armPackIds.stated = 0;
     }
     if (ARMS.has('oracle')) {
       // Under the convention the oracle is the expected value, not the gold SQL:
       // the question is whether a single stated fact changes the answer form.
       const hint = task.convention
-        ? `- The reported value for this question is ${task.expected.get(idOfRow(row)) ?? 'unknown'}.`
+        ? `- The answer this workspace accepts for this question is ${task.expected.get(idOfRow(row)) ?? 'unknown'}; it is the only accepted form.`
         : `- ${row.SQL}`;
       const result = await answer(row, dataset, hint, 0, task);
       arms.oracle = result.correct;
+      armSql.oracle = result.sql;
       armPackIds.oracle = 0;
     }
 
@@ -883,6 +919,7 @@ async function runFold(
       tokens: full.tokens,
       latencyMs: full.latencyMs,
       arms,
+      armSql,
       armPackIds,
     });
   }
@@ -949,9 +986,9 @@ type ArmSummary = {
 };
 
 async function main(): Promise<void> {
-  if (CONVENTION !== '' && CONVENTION !== 'thousands') {
+  if (CONVENTION !== '' && ACTIVE === undefined) {
     throw new MicrogliaError('MG_E_CONFIG', `Unknown convention '${CONVENTION}'`, {
-      known: 'thousands',
+      known: Object.keys(CONVENTIONS).join(', '),
     });
   }
   const dataset = await loadDataset(LIMIT);
@@ -961,21 +998,22 @@ async function main(): Promise<void> {
   // one-column numeric answer is the only place the convention is defined.
   const expected = new Map<string, number>();
   let rows = dataset.rows;
-  if (CONVENTION === 'thousands') {
+  if (ACTIVE !== undefined) {
     rows = dataset.rows.filter((row) => {
       const value = scalarOf(dataset.dbPath(row.db_id), row.SQL);
-      if (value === undefined) return false;
-      expected.set(idOf(row), round3(value / 1000));
+      if (value === undefined || !ACTIVE.applies(value)) return false;
+      expected.set(idOf(row), ACTIVE.transform(value));
       return true;
     });
     if (rows.length < 20) {
       throw new MicrogliaError('MG_E_CONFIG', 'Too few questions define the convention', {
         qualifying: rows.length,
         of: dataset.rows.length,
+        convention: CONVENTION,
       });
     }
   }
-  const task: Task = { convention: CONVENTION === 'thousands', expected };
+  const task: Task = { convention: ACTIVE !== undefined, expected };
 
   if (rows.length < FOLDS) {
     throw new MicrogliaError('MG_E_CONFIG', 'Not enough questions for the requested folds', {
@@ -1152,7 +1190,7 @@ async function main(): Promise<void> {
       duplicate_multiplier: 2,
       min_coverage: MIN_COVERAGE,
       arms: [...ARMS],
-      convention: CONVENTION === 'thousands' ? CONVENTION_SENTENCE : null,
+      convention: ACTIVE?.sentence ?? null,
       task: TASK,
       distill_prompt: 'distill-prompt/2',
       distill_max_tokens: 2000,
