@@ -1,195 +1,195 @@
 {
   "id": "poc-sota-attribution",
   "source_artifact": "poc-sota-bird.json",
-  "source_generated_at": "2026-10-20T16:05:47.543Z",
-  "n": 352,
+  "source_generated_at": "2026-10-21T05:58:05.580Z",
+  "n": 146,
   "summary": {
-    "rules": 1098,
-    "injectedRules": 443,
-    "helpful": 35,
-    "harmful": 40,
-    "neutral": 368,
-    "harmfulShare": 0.09261576971214018,
+    "rules": 960,
+    "injectedRules": 222,
+    "helpful": 14,
+    "harmful": 0,
+    "neutral": 208,
+    "harmfulShare": 0,
     "top": [
       {
-        "fold": 0,
-        "id": "k_01hf7uaqp1_f44gz",
-        "statement": "Counting cards that match a join condition requires COUNT(DISTINCT cards.id) to avoid duplicate rows from one-to-many joins.",
+        "fold": 2,
+        "id": "k_01hf7uaqcs_2k2m8",
+        "statement": "Percentage results are rounded to the nearest multiple of 10 by dividing by 10.0, applying ROUND, and multiplying by 10.",
         "injected": 4,
         "helped": 0,
-        "hurt": 2,
-        "net": -2
-      },
-      {
-        "fold": 0,
-        "id": "k_01hf7uaqqp_86xec",
-        "statement": "Using GROUP_CONCAT to aggregate patient IDs by sex does not satisfy a request to list and group patients by sex.",
-        "injected": 8,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
+        "hurt": 0,
+        "net": 0
       },
       {
         "fold": 3,
-        "id": "k_01hf7uaqpn_2vh66",
-        "statement": "Using GROUP_CONCAT to aggregate patient IDs by sex does not satisfy a request to list and group patients by sex.",
-        "injected": 5,
+        "id": "k_01hf7uaqf6_8hpd8",
+        "statement": "A count query answering 'how many' must return the exact count rather than a rounded or bucketed value.",
+        "injected": 4,
         "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqmh_65nf4",
-        "statement": "When a question asks whether each expense was approved, the result should project only the approval column rather than additional descriptive columns.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 2,
-        "id": "k_01hf7uaqp8_6cjrj",
-        "statement": "A query answering 'which driver ranked first in the Canadian Grand Prix in 2007, give his reference name' selects forename, surname, and driverRef from drivers joined through results to races, filtered by race name, year, and rank = 1.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqqe_52m58",
-        "statement": "When a question asks for a list of names, the query uses SELECT DISTINCT to avoid duplicate names.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
+        "hurt": 0,
+        "net": 0
       },
       {
         "fold": 4,
-        "id": "k_01hf7uaqmh_65nf4",
-        "statement": "When a question asks for the oldest female client's district and then the account in that district with the highest average salary, the oldest female client is selected in a subquery and the outer query filters accounts by that district and orders by average salary descending.",
-        "injected": 2,
+        "id": "k_01hf7uaqg0_bvg8q",
+        "statement": "When a question asks for a percentage of a subgroup among patients, the denominator must count only patients satisfying the same filter conditions as the numerator's population (e.g., PT >= 14), not all joined rows.",
+        "injected": 4,
         "helped": 0,
-        "hurt": 1,
-        "net": -1
+        "hurt": 0,
+        "net": 0
       },
       {
-        "fold": 1,
-        "id": "k_01hf7uaqmk_ajq8j",
-        "statement": "Including the dob column in the SELECT list of a youngest-driver query was removed in the accepted edit.",
-        "injected": 2,
+        "fold": 3,
+        "id": "k_01hf7uaqau_692xh",
+        "statement": "A question asking 'how many' superheroes satisfy a condition requires an exact count, not a rounded or bucketed count.",
+        "injected": 3,
         "helped": 0,
-        "hurt": 1,
-        "net": -1
+        "hurt": 0,
+        "net": 0
       },
       {
         "fold": 2,
-        "id": "k_01hf7uaqn5_e6phs",
-        "statement": "A completion rate expressed as a percentage requires multiplying the ratio by 100.",
-        "injected": 2,
+        "id": "k_01hf7uaqb2_egw03",
+        "statement": "A count of superheroes filtered by eye colour and superpower name is expressed with COUNT(DISTINCT s.id) joined through colour, hero_power, and superpower tables.",
+        "injected": 3,
         "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqni_0366y",
-        "statement": "A query answering 'comments left by users who edited the post' must relate the comment's author to the post's editor, not merely join comments and postHistory on the same post.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 2,
-        "id": "k_01hf7uaqoe_7av5c",
-        "statement": "A query counting players filtered by preferred_foot and attacking_work_rate can be written as SELECT COUNT(player_api_id) FROM Player_Attributes WHERE preferred_foot = 'left' AND attacking_work_rate = 'low'.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 1,
-        "id": "k_01hf7uaqov_ej4cs",
-        "statement": "In the codebase_community schema, posts authored by a user are reached via postHistory.UserId rather than posts.OwnerUserId.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 0,
-        "id": "k_01hf7uaqp0_8ecyz",
-        "statement": "When a question asks about card rulings text, the query must join the rulings table to cards rather than filtering on a text column in the cards table.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqq7_9ptf4",
-        "statement": "When computing a loan growth rate for a male client, the disposition join must be filtered to type = 'OWNER' so that only owner-role dispositions are counted.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqqc_151a7",
-        "statement": "The query counting transactions with k_symbol 'SLUZBY', operation 'VYBER', and type 'VYDAJ' does not answer a question asking both how often an account requests a statement and the aim of a total debit of 3539.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqqf_a8kw8",
-        "statement": "When event_date values include a time component, date comparisons use date(SUBSTR(event_date, 1, 10)) to compare only the date portion.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 2,
-        "id": "k_01hf7uaqqi_3h3d0",
-        "statement": "For 'first time at highest value' questions, ordering by the metric descending and then by date ascending within a subquery yields the earliest date at the maximum value.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
+        "hurt": 0,
+        "net": 0
       },
       {
         "fold": 4,
-        "id": "k_01hf7uaqqn_fhcwq",
-        "statement": "In the codebase_community schema, the post creation timestamp column is named 'CreationDate' on the posts table.",
-        "injected": 2,
+        "id": "k_01hf7uaqbr_1br16",
+        "statement": "For a 'highest value' question, the accepted pattern orders the joined rows by the target amount descending and uses LIMIT 1 rather than an equality subquery against MAX(amount).",
+        "injected": 3,
         "helped": 0,
-        "hurt": 1,
-        "net": -1
+        "hurt": 0,
+        "net": 0
       },
       {
         "fold": 0,
-        "id": "k_01hf7uaqqt_ara3k",
-        "statement": "For a count of users filtered by a condition on their posts, joining users to posts and counting user IDs yields the number of qualifying users.",
-        "injected": 2,
+        "id": "k_01hf7uaqdi_eq8er",
+        "statement": "A 'how many' question is answered by an exact count, not by a rounded or bucketed value.",
+        "injected": 3,
         "helped": 0,
-        "hurt": 1,
-        "net": -1
+        "hurt": 0,
+        "net": 0
       },
       {
         "fold": 0,
-        "id": "k_01hf7uaqr0_9d5j4",
-        "statement": "A Korean version of a card exists only when a set_translations row has language 'Korean' and a non-null translation.",
+        "id": "k_01hf7uaqel_17sp5",
+        "statement": "Computing the percentage of posts matching a condition by dividing by the total post count overcounts when the join to users can multiply or drop rows, so the denominator should be the count of users rather than posts.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqg4_9t6kj",
+        "statement": "Including '-', '+-', and '0' as values for a normal anti-SM result overcounts patients relative to restricting to 'negative' and '0'.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqg6_8dtwt",
+        "statement": "A normal IgG level is represented as the inclusive range 900 to 2000, expressed with BETWEEN rather than strict inequalities.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqar_4jwrn",
+        "statement": "A question asking 'how many' superheroes satisfy a condition requires the SQL to return an exact count, not a rounded or bucketed value.",
         "injected": 2,
         "helped": 0,
-        "hurt": 1,
-        "net": -1
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqb9_ehpcr",
+        "statement": "The ratio of outpatient to inpatient counts was computed as outpatient divided by inpatient, but the edit reversed the numerator and denominator to inpatient divided by outpatient.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqbf_1ngnb",
+        "statement": "In the thrombosis_prediction schema, counting female patients admitted in 1997 with Admission = '-' is expressed as a subquery filtered on STRFTIME('%Y', Description) = '1997', SEX = 'F', and Admission = '-'.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqbi_9dq53",
+        "statement": "When a question asks for the account with the lowest loan amount, ordering by amount ascending with LIMIT 1 and selecting the account_id yields the answer, rather than filtering with a MIN subquery.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqbm_bgdkt",
+        "statement": "Month filtering on a date column can be expressed with SUBSTR(date_col, 6, 2) compared against two-digit month strings.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqbq_1a5m1",
+        "statement": "The edited SQL selects account_id from the loan table and applies ROUND(.../10.0)*10 to it, which does not return the account identifier requested by the question.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqbu_b1yfw",
+        "statement": "The question asks for accounts with the lowest approved loan amount in 1997 and weekly issuance, which requires filtering loan status to approved and account frequency to 'POPLATEK TYDNE'.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqc0_7yqny",
+        "statement": "For a 'highest value' question, the accepted pattern orders the joined rows by the target amount descending and uses LIMIT 1 rather than an equality subquery against MAX(amount).",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqcm_43z78",
+        "statement": "Counting bonds rather than distinct molecules overcounts molecules that have multiple triple bonds when computing the percentage of carcinogenic molecules among triple-bond molecules.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqcn_895x0",
+        "statement": "Counting bonds rather than distinct molecules overcounts molecules that have multiple triple bonds when computing the percentage of carcinogenic molecules among triple-bond molecules.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
       }
     ]
   }
