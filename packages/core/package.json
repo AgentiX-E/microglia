@@ -11,7 +11,27 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "default": "./dist/index.js"
+    },
+    "./kernel": {
+      "types": "./dist/kernel/index.d.ts",
+      "default": "./dist/kernel/index.js"
+    },
+    "./memory": {
+      "types": "./dist/memory/index.d.ts",
+      "default": "./dist/memory/index.js"
+    },
+    "./distill": {
+      "types": "./dist/distill/index.d.ts",
+      "default": "./dist/distill/index.js"
+    },
+    "./apply": {
+      "types": "./dist/apply/index.d.ts",
+      "default": "./dist/apply/index.js"
+    },
+    "./capture": {
+      "types": "./dist/capture/index.d.ts",
+      "default": "./dist/capture/index.js"
     }
   },
   "files": [

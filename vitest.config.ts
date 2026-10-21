@@ -5,16 +5,19 @@ const here = (path: string): string => fileURLToPath(new URL(path, import.meta.u
 
 export default defineConfig({
   resolve: {
-    alias: {
-      '@agentix-e/microglia-core': here('./packages/core/src/index.ts'),
-      '@agentix-e/microglia-memory': here('./packages/memory/src/index.ts'),
-      '@agentix-e/microglia-nl2charts': here('./packages/nl2charts/src/index.ts'),
-      '@agentix-e/microglia-distill': here('./packages/distill/src/index.ts'),
-      '@agentix-e/microglia-apply': here('./packages/apply/src/index.ts'),
-      '@agentix-e/microglia-capture': here('./packages/capture/src/index.ts'),
-      '@agentix-e/microglia-cortex-adapter': here('./packages/cortex-adapter/src/index.ts'),
-      '@agentix-e/microglia-eval': here('./packages/eval/src/index.ts'),
-    },
+    // The library is one package with module subpaths. Longest key first: Vite
+    // rewrites by prefix, so `.../core/memory` has to win over `.../core`.
+    alias: [
+      { find: '@agentix-e/microglia-core/memory', replacement: here('./packages/core/src/memory/index.ts') },
+      { find: '@agentix-e/microglia-core/distill', replacement: here('./packages/core/src/distill/index.ts') },
+      { find: '@agentix-e/microglia-core/apply', replacement: here('./packages/core/src/apply/index.ts') },
+      { find: '@agentix-e/microglia-core/capture', replacement: here('./packages/core/src/capture/index.ts') },
+      { find: '@agentix-e/microglia-core/kernel', replacement: here('./packages/core/src/kernel/index.ts') },
+      { find: '@agentix-e/microglia-core', replacement: here('./packages/core/src/index.ts') },
+      { find: '@agentix-e/microglia-eval', replacement: here('./packages/eval/src/index.ts') },
+      { find: '@agentix-e/microglia-node', replacement: here('./packages/node/src/index.ts') },
+      { find: '@agentix-e/microglia-browser', replacement: here('./packages/browser/src/index.ts') },
+    ],
   },
   test: {
     include: ['packages/*/src/**/*.test.ts'],

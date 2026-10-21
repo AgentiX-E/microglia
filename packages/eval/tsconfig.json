@@ -5,14 +5,15 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/__tests__/**"],
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": [
+    "src/**/__tests__/**"
+  ],
   "references": [
-    { "path": "../core" },
-    { "path": "../memory" },
-    { "path": "../nl2charts" },
-    { "path": "../distill" },
-    { "path": "../apply" },
-    { "path": "../capture" }
+    {
+      "path": "../core"
+    }
   ]
 }

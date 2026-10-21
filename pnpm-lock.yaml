@@ -8,27 +8,12 @@ importers:
 
   .:
     devDependencies:
-      '@agentix-e/microglia-apply':
-        specifier: workspace:*
-        version: link:packages/apply
-      '@agentix-e/microglia-capture':
-        specifier: workspace:*
-        version: link:packages/capture
       '@agentix-e/microglia-core':
         specifier: workspace:*
         version: link:packages/core
-      '@agentix-e/microglia-distill':
-        specifier: workspace:*
-        version: link:packages/distill
       '@agentix-e/microglia-eval':
         specifier: workspace:*
         version: link:packages/eval
-      '@agentix-e/microglia-memory':
-        specifier: workspace:*
-        version: link:packages/memory
-      '@agentix-e/microglia-nl2charts':
-        specifier: workspace:*
-        version: link:packages/nl2charts
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.5
@@ -45,78 +30,9 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/node@22.20.5)(tsx@4.23.15)
 
-  packages/apply:
-    dependencies:
-      '@agentix-e/microglia-core':
-        specifier: workspace:*
-        version: link:../core
-      '@agentix-e/microglia-memory':
-        specifier: workspace:*
-        version: link:../memory
-
-  packages/capture:
-    dependencies:
-      '@agentix-e/microglia-apply':
-        specifier: workspace:*
-        version: link:../apply
-      '@agentix-e/microglia-core':
-        specifier: workspace:*
-        version: link:../core
-      '@agentix-e/microglia-distill':
-        specifier: workspace:*
-        version: link:../distill
-      '@agentix-e/microglia-memory':
-        specifier: workspace:*
-        version: link:../memory
-
   packages/core: {}
 
-  packages/cortex-adapter:
-    dependencies:
-      '@agentix-e/microglia-core':
-        specifier: workspace:*
-        version: link:../core
-      '@agentix-e/microglia-memory':
-        specifier: workspace:*
-        version: link:../memory
-
-  packages/distill:
-    dependencies:
-      '@agentix-e/microglia-core':
-        specifier: workspace:*
-        version: link:../core
-      '@agentix-e/microglia-memory':
-        specifier: workspace:*
-        version: link:../memory
-
   packages/eval:
-    dependencies:
-      '@agentix-e/microglia-apply':
-        specifier: workspace:*
-        version: link:../apply
-      '@agentix-e/microglia-capture':
-        specifier: workspace:*
-        version: link:../capture
-      '@agentix-e/microglia-core':
-        specifier: workspace:*
-        version: link:../core
-      '@agentix-e/microglia-distill':
-        specifier: workspace:*
-        version: link:../distill
-      '@agentix-e/microglia-memory':
-        specifier: workspace:*
-        version: link:../memory
-      '@agentix-e/microglia-nl2charts':
-        specifier: workspace:*
-        version: link:../nl2charts
-
-  packages/memory:
-    dependencies:
-      '@agentix-e/microglia-core':
-        specifier: workspace:*
-        version: link:../core
-
-  packages/nl2charts:
     dependencies:
       '@agentix-e/microglia-core':
         specifier: workspace:*

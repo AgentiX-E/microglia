@@ -13,8 +13,8 @@ import {
   defaultPolicy,
   type DistillCandidate,
 } from '@agentix-e/microglia-core';
-import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-memory';
-import { buildPack } from '@agentix-e/microglia-apply';
+import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
+import { buildPack } from '@agentix-e/microglia-core/apply';
 import { mean, percentile, writeResult } from './lib.js';
 
 const AT = 1_700_000_000_000;

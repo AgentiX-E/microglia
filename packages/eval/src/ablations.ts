@@ -14,15 +14,15 @@
  * artefact beside the arms, so every claim about a module traces back to the
  * experiment that produced it.
  */
-import { openMicroglia, type Microglia } from '@agentix-e/microglia-capture';
+import { openMicroglia, type Microglia } from '@agentix-e/microglia-core/capture';
 import {
   mmrSelect,
   steppingClock,
   mulberry32,
   type Json,
 } from '@agentix-e/microglia-core';
-import { chartEditDistance, chartInterpreter } from '@agentix-e/microglia-nl2charts';
-import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-memory';
+import { chartEditDistance, chartInterpreter } from './workload/index.js';
+import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
 
 const AT = 1_700_000_000_000;
 const TASK = 'chart.recommend';

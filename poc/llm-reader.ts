@@ -23,7 +23,7 @@ import {
   type Json,
   type KnowledgeItem,
 } from '@agentix-e/microglia-core';
-import { makePack } from '@agentix-e/microglia-apply';
+import { makePack } from '@agentix-e/microglia-core/apply';
 import {
   CHART_MARKS,
   domainByName,
@@ -32,7 +32,7 @@ import {
   type ChartConstraint,
   type ChartMark,
   type ChartSpec,
-} from '@agentix-e/microglia-nl2charts';
+} from '../packages/eval/src/workload/index.js';
 import { buildCorpus, specFor, type CorpusItem } from '@agentix-e/microglia-eval';
 import { callCount, chat, extractJson, mean, percentile, rate, writeResult } from './lib.js';
 

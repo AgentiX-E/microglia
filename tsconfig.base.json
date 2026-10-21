@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "lib": [
+      "ES2022"
+    ],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
@@ -21,14 +23,33 @@
     "forceConsistentCasingInFileNames": true,
     "baseUrl": ".",
     "paths": {
-      "@agentix-e/microglia-core": ["packages/core/src/index.ts"],
-      "@agentix-e/microglia-memory": ["packages/memory/src/index.ts"],
-      "@agentix-e/microglia-nl2charts": ["packages/nl2charts/src/index.ts"],
-      "@agentix-e/microglia-distill": ["packages/distill/src/index.ts"],
-      "@agentix-e/microglia-apply": ["packages/apply/src/index.ts"],
-      "@agentix-e/microglia-capture": ["packages/capture/src/index.ts"],
-      "@agentix-e/microglia-cortex-adapter": ["packages/cortex-adapter/src/index.ts"],
-      "@agentix-e/microglia-eval": ["packages/eval/src/index.ts"]
+      "@agentix-e/microglia-core": [
+        "packages/core/src/index.ts"
+      ],
+      "@agentix-e/microglia-core/kernel": [
+        "packages/core/src/kernel/index.ts"
+      ],
+      "@agentix-e/microglia-core/memory": [
+        "packages/core/src/memory/index.ts"
+      ],
+      "@agentix-e/microglia-core/distill": [
+        "packages/core/src/distill/index.ts"
+      ],
+      "@agentix-e/microglia-core/apply": [
+        "packages/core/src/apply/index.ts"
+      ],
+      "@agentix-e/microglia-core/capture": [
+        "packages/core/src/capture/index.ts"
+      ],
+      "@agentix-e/microglia-eval": [
+        "packages/eval/src/index.ts"
+      ],
+      "@agentix-e/microglia-node": [
+        "packages/node/src/index.ts"
+      ],
+      "@agentix-e/microglia-browser": [
+        "packages/browser/src/index.ts"
+      ]
     }
   }
 }

@@ -5,7 +5,7 @@ import {
   domainByName,
   validateChartSpec,
   type ChartConstraint,
-} from '@agentix-e/microglia-nl2charts';
+} from '../workload/index.js';
 import { applyKnowledge, baselineMark, buildCorpus, goldMark } from '../scenario.js';
 import { comparePaired } from '../stats.js';
 import { knowledgePrecision, runStudy, scoreByDomain } from '../study.js';

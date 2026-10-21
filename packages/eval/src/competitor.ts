@@ -14,7 +14,7 @@
  * retrieved sentence, which is the best case for a store that keeps sentences.
  */
 import { diceSimilarity, tokenize } from '@agentix-e/microglia-core';
-import type { ChartMark } from '@agentix-e/microglia-nl2charts';
+import type { ChartMark } from './workload/index.js';
 import type { CorpusItem } from './scenario.js';
 
 export type Fact = {

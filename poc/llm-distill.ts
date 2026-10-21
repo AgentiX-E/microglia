@@ -18,10 +18,10 @@ import {
   type FeedbackEvent,
   type RunRecord,
 } from '@agentix-e/microglia-core';
-import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-memory';
-import { buildDistillPrompt, distill, parseDistillResponse } from '@agentix-e/microglia-distill';
+import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
+import { buildDistillPrompt, distill, parseDistillResponse } from '@agentix-e/microglia-core/distill';
 import { buildCorpus, specFor, type CorpusItem } from '@agentix-e/microglia-eval';
-import type { ChartIntent, ChartMark } from '@agentix-e/microglia-nl2charts';
+import type { ChartIntent, ChartMark } from '../packages/eval/src/workload/index.js';
 import { callCount, chat, mean, percentile, rate, writeResult } from './lib.js';
 
 const AT = 1_700_000_000_000;

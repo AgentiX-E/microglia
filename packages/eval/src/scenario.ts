@@ -40,10 +40,10 @@ import {
   type ChartSpec,
   type DomainSchema,
   type FieldDef,
-} from '@agentix-e/microglia-nl2charts';
+} from './workload/index.js';
 import { MicrogliaError, type KnowledgePack } from '@agentix-e/microglia-core';
 
-export { DOMAINS } from '@agentix-e/microglia-nl2charts';
+export { DOMAINS } from './workload/index.js';
 
 export const INTENTS: readonly ChartIntent[] = [
   'trend',

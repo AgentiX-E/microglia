@@ -23,12 +23,7 @@
     "bench": "node dist/bench/run.js"
   },
   "dependencies": {
-    "@agentix-e/microglia-apply": "workspace:*",
-    "@agentix-e/microglia-capture": "workspace:*",
-    "@agentix-e/microglia-core": "workspace:*",
-    "@agentix-e/microglia-distill": "workspace:*",
-    "@agentix-e/microglia-memory": "workspace:*",
-    "@agentix-e/microglia-nl2charts": "workspace:*"
+    "@agentix-e/microglia-core": "workspace:*"
   },
   "engines": {
     "node": ">=20.11.0"

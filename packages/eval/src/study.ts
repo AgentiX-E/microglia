@@ -17,21 +17,21 @@
  * A separate measurement probes namespace leakage. Every number in the report
  * comes from these functions; none is typed in by hand.
  */
-import { emptyPack } from '@agentix-e/microglia-apply';
+import { emptyPack } from '@agentix-e/microglia-core/apply';
 import {
   Microglia as MicrogliaClass,
   openMicroglia,
   type Diagnosis,
   type Microglia,
-} from '@agentix-e/microglia-capture';
+} from '@agentix-e/microglia-core/capture';
 import {
   steppingClock,
   mulberry32,
   type Json,
   type KnowledgeItem,
 } from '@agentix-e/microglia-core';
-import { ruleInterpreter, type Interpreter } from '@agentix-e/microglia-distill';
-import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-memory';
+import { ruleInterpreter, type Interpreter } from '@agentix-e/microglia-core/distill';
+import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
 import {
   CHART_MARKS,
   chartEditDistance,
@@ -40,7 +40,7 @@ import {
   type ChartConstraint,
   type ChartIntent,
   type ChartMark,
-} from '@agentix-e/microglia-nl2charts';
+} from './workload/index.js';
 import {
   DOMAINS,
   INTENTS,

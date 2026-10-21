@@ -317,9 +317,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
-          "p50Ms": 0.005,
-          "p95Ms": 0.01
+          "meanTokens": 0,
+          "p50Ms": 0.001,
+          "p95Ms": 0.007
         },
         {
           "round": 1,
@@ -611,9 +611,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
+          "meanTokens": 0,
           "p50Ms": 0.001,
-          "p95Ms": 0.003
+          "p95Ms": 0.01
         },
         {
           "round": 2,
@@ -905,9 +905,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
+          "meanTokens": 0,
           "p50Ms": 0.001,
-          "p95Ms": 0.003
+          "p95Ms": 0.011
         },
         {
           "round": 3,
@@ -1199,9 +1199,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
+          "meanTokens": 0,
           "p50Ms": 0.001,
-          "p95Ms": 0.001
+          "p95Ms": 0.011
         },
         {
           "round": 4,
@@ -1493,9 +1493,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
+          "meanTokens": 0,
           "p50Ms": 0.001,
-          "p95Ms": 0.002
+          "p95Ms": 0.001
         },
         {
           "round": 5,
@@ -1787,9 +1787,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
-          "p50Ms": 0.002,
-          "p95Ms": 0.003
+          "meanTokens": 0,
+          "p50Ms": 0.001,
+          "p95Ms": 0.002
         },
         {
           "round": 6,
@@ -2081,9 +2081,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
+          "meanTokens": 0,
           "p50Ms": 0.001,
-          "p95Ms": 0.001
+          "p95Ms": 0.01
         }
       ],
       "holdout": [
@@ -2709,9 +2709,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
-          "p50Ms": 0.004,
-          "p95Ms": 0.007
+          "meanTokens": 0,
+          "p50Ms": 0.02,
+          "p95Ms": 0.034
         },
         {
           "round": 1,
@@ -3003,9 +3003,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.01,
-          "p95Ms": 0.018
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.023,
+          "p95Ms": 0.038
         },
         {
           "round": 2,
@@ -3297,9 +3297,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.01,
-          "p95Ms": 0.015
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.023,
+          "p95Ms": 0.035
         },
         {
           "round": 3,
@@ -3591,9 +3591,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.009,
-          "p95Ms": 0.012
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.021,
+          "p95Ms": 0.035
         },
         {
           "round": 4,
@@ -3885,9 +3885,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.008,
-          "p95Ms": 0.009
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.019,
+          "p95Ms": 0.023
         },
         {
           "round": 5,
@@ -4179,9 +4179,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.007,
-          "p95Ms": 0.007
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.019,
+          "p95Ms": 0.024
         },
         {
           "round": 6,
@@ -4473,9 +4473,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.007,
-          "p95Ms": 0.009
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.019,
+          "p95Ms": 0.023
         }
       ],
       "holdout": [
@@ -5101,9 +5101,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
-          "p50Ms": 0.003,
-          "p95Ms": 0.003
+          "meanTokens": 0,
+          "p50Ms": 0.006,
+          "p95Ms": 0.007
         },
         {
           "round": 1,
@@ -5395,9 +5395,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 4,
-          "meanTokens": 84.67857142857143,
-          "p50Ms": 0.007,
-          "p95Ms": 0.009
+          "meanTokens": 73.75,
+          "p50Ms": 0.019,
+          "p95Ms": 0.022
         },
         {
           "round": 2,
@@ -5689,9 +5689,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.007,
-          "p95Ms": 0.012
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.019,
+          "p95Ms": 0.023
         },
         {
           "round": 3,
@@ -5983,9 +5983,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.012,
-          "p95Ms": 0.014
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.019,
+          "p95Ms": 0.027
         },
         {
           "round": 4,
@@ -6277,9 +6277,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.012,
-          "p95Ms": 0.016
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.019,
+          "p95Ms": 0.021
         },
         {
           "round": 5,
@@ -6571,9 +6571,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.013,
-          "p95Ms": 0.017
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.017,
+          "p95Ms": 0.022
         },
         {
           "round": 6,
@@ -6865,9 +6865,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.012,
-          "p95Ms": 0.015
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.032,
+          "p95Ms": 0.054
         }
       ],
       "holdout": [
@@ -7493,9 +7493,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
-          "p50Ms": 0.003,
-          "p95Ms": 0.004
+          "meanTokens": 0,
+          "p50Ms": 0.006,
+          "p95Ms": 0.006
         },
         {
           "round": 1,
@@ -7787,9 +7787,9 @@
           "quarantined": 6,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.007,
-          "p95Ms": 0.009
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.014,
+          "p95Ms": 0.046
         },
         {
           "round": 2,
@@ -8081,9 +8081,9 @@
           "quarantined": 10,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.006,
-          "p95Ms": 0.011
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.014,
+          "p95Ms": 0.021
         },
         {
           "round": 3,
@@ -8375,9 +8375,9 @@
           "quarantined": 14,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.014,
+          "p95Ms": 0.02
         },
         {
           "round": 4,
@@ -8669,9 +8669,9 @@
           "quarantined": 14,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.008
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.014,
+          "p95Ms": 0.017
         },
         {
           "round": 5,
@@ -8963,9 +8963,9 @@
           "quarantined": 15,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.014,
+          "p95Ms": 0.016
         },
         {
           "round": 6,
@@ -9257,9 +9257,9 @@
           "quarantined": 15,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.014,
+          "p95Ms": 0.016
         }
       ],
       "holdout": [
@@ -9885,9 +9885,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
-          "p50Ms": 0.002,
-          "p95Ms": 0.002
+          "meanTokens": 0,
+          "p50Ms": 0.004,
+          "p95Ms": 0.005
         },
         {
           "round": 1,
@@ -10179,9 +10179,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 4,
-          "meanTokens": 84.32142857142857,
-          "p50Ms": 0.008,
-          "p95Ms": 0.009
+          "meanTokens": 73.39285714285714,
+          "p50Ms": 0.014,
+          "p95Ms": 0.016
         },
         {
           "round": 2,
@@ -10473,9 +10473,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 15,
-          "meanTokens": 114.5,
-          "p50Ms": 0.009,
-          "p95Ms": 0.022
+          "meanTokens": 106,
+          "p50Ms": 0.016,
+          "p95Ms": 0.032
         },
         {
           "round": 3,
@@ -10767,9 +10767,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 15,
-          "meanTokens": 120.5,
-          "p50Ms": 0.01,
-          "p95Ms": 0.021
+          "meanTokens": 112,
+          "p50Ms": 0.016,
+          "p95Ms": 0.032
         },
         {
           "round": 4,
@@ -11061,9 +11061,9 @@
           "quarantined": 0,
           "conflicted": 3,
           "retired": 21,
-          "meanTokens": 114.85714285714286,
-          "p50Ms": 0.006,
-          "p95Ms": 0.013
+          "meanTokens": 106.35714285714286,
+          "p50Ms": 0.016,
+          "p95Ms": 0.031
         },
         {
           "round": 5,
@@ -11355,9 +11355,9 @@
           "quarantined": 0,
           "conflicted": 5,
           "retired": 28,
-          "meanTokens": 114.85714285714286,
-          "p50Ms": 0.006,
-          "p95Ms": 0.013
+          "meanTokens": 106.35714285714286,
+          "p50Ms": 0.015,
+          "p95Ms": 0.031
         },
         {
           "round": 6,
@@ -11649,9 +11649,9 @@
           "quarantined": 0,
           "conflicted": 8,
           "retired": 33,
-          "meanTokens": 111.71428571428571,
-          "p50Ms": 0.006,
-          "p95Ms": 0.012
+          "meanTokens": 103.21428571428571,
+          "p50Ms": 0.015,
+          "p95Ms": 0.029
         }
       ],
       "holdout": [
@@ -12277,9 +12277,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
-          "p50Ms": 0.002,
-          "p95Ms": 0.002
+          "meanTokens": 0,
+          "p50Ms": 0.004,
+          "p95Ms": 0.005
         },
         {
           "round": 1,
@@ -12571,9 +12571,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 67.14285714285714,
-          "p50Ms": 0.003,
-          "p95Ms": 0.006
+          "meanTokens": 47.714285714285715,
+          "p50Ms": 0.006,
+          "p95Ms": 0.014
         },
         {
           "round": 2,
@@ -12865,9 +12865,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 75.39285714285714,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 59.607142857142854,
+          "p50Ms": 0.013,
+          "p95Ms": 0.014
         },
         {
           "round": 3,
@@ -13159,9 +13159,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 78.53571428571429,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 63.964285714285715,
+          "p50Ms": 0.013,
+          "p95Ms": 0.015
         },
         {
           "round": 4,
@@ -13453,9 +13453,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 78.53571428571429,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 63.964285714285715,
+          "p50Ms": 0.013,
+          "p95Ms": 0.014
         },
         {
           "round": 5,
@@ -13747,9 +13747,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 78.53571428571429,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 63.964285714285715,
+          "p50Ms": 0.013,
+          "p95Ms": 0.015
         },
         {
           "round": 6,
@@ -14041,9 +14041,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 78.53571428571429,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 63.964285714285715,
+          "p50Ms": 0.013,
+          "p95Ms": 0.014
         }
       ],
       "holdout": [
@@ -14669,9 +14669,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
-          "p50Ms": 0.002,
-          "p95Ms": 0.003
+          "meanTokens": 0,
+          "p50Ms": 0.004,
+          "p95Ms": 0.005
         },
         {
           "round": 1,
@@ -14963,9 +14963,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.005
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.014
         },
         {
           "round": 2,
@@ -15257,9 +15257,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.005
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.015
         },
         {
           "round": 3,
@@ -15551,9 +15551,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.005
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.014
         },
         {
           "round": 4,
@@ -15845,9 +15845,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.006,
-          "p95Ms": 0.006
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.013
         },
         {
           "round": 5,
@@ -16139,9 +16139,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.014
         },
         {
           "round": 6,
@@ -16433,9 +16433,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.013
         }
       ],
       "holdout": [
@@ -17061,9 +17061,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
-          "p50Ms": 0.002,
-          "p95Ms": 0.002
+          "meanTokens": 0,
+          "p50Ms": 0.004,
+          "p95Ms": 0.004
         },
         {
           "round": 1,
@@ -17355,9 +17355,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.013
         },
         {
           "round": 2,
@@ -17649,9 +17649,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.013
         },
         {
           "round": 3,
@@ -17943,9 +17943,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.006
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.013
         },
         {
           "round": 4,
@@ -18237,9 +18237,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.006,
-          "p95Ms": 0.006
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.013
         },
         {
           "round": 5,
@@ -18531,9 +18531,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.005,
-          "p95Ms": 0.007
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.013
         },
         {
           "round": 6,
@@ -18825,9 +18825,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 89.67857142857143,
-          "p50Ms": 0.006,
-          "p95Ms": 0.006
+          "meanTokens": 81.17857142857143,
+          "p50Ms": 0.012,
+          "p95Ms": 0.013
         }
       ],
       "holdout": [
@@ -19453,9 +19453,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 0,
-          "meanTokens": 34,
-          "p50Ms": 0.002,
-          "p95Ms": 0.002
+          "meanTokens": 0,
+          "p50Ms": 0.004,
+          "p95Ms": 0.004
         },
         {
           "round": 1,
@@ -19747,9 +19747,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 34,
-          "p50Ms": 0.004,
-          "p95Ms": 0.005
+          "meanTokens": 25.5,
+          "p50Ms": 0.01,
+          "p95Ms": 0.013
         },
         {
           "round": 2,
@@ -20041,9 +20041,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 34,
-          "p50Ms": 0.004,
-          "p95Ms": 0.005
+          "meanTokens": 25.5,
+          "p50Ms": 0.01,
+          "p95Ms": 0.012
         },
         {
           "round": 3,
@@ -20335,9 +20335,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 34,
-          "p50Ms": 0.004,
-          "p95Ms": 0.005
+          "meanTokens": 25.5,
+          "p50Ms": 0.01,
+          "p95Ms": 0.011
         },
         {
           "round": 4,
@@ -20629,9 +20629,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 34,
-          "p50Ms": 0.004,
-          "p95Ms": 0.005
+          "meanTokens": 25.5,
+          "p50Ms": 0.01,
+          "p95Ms": 0.012
         },
         {
           "round": 5,
@@ -20923,9 +20923,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 34,
-          "p50Ms": 0.004,
-          "p95Ms": 0.005
+          "meanTokens": 25.5,
+          "p50Ms": 0.01,
+          "p95Ms": 0.012
         },
         {
           "round": 6,
@@ -21217,9 +21217,9 @@
           "quarantined": 0,
           "conflicted": 0,
           "retired": 5,
-          "meanTokens": 34,
-          "p50Ms": 0.004,
-          "p95Ms": 0.005
+          "meanTokens": 25.5,
+          "p50Ms": 0.01,
+          "p95Ms": 0.011
         }
       ],
       "holdout": [
@@ -21590,6 +21590,7 @@
       "delta": 0.6821428571428572,
       "lost": 0,
       "gained": 191,
+      "discordance": 0.6821428571428572,
       "p": 6.372367644529894e-58,
       "deltaCI": {
         "low": 0.625,
@@ -21606,6 +21607,7 @@
       "delta": 0.6821428571428572,
       "lost": 0,
       "gained": 191,
+      "discordance": 0.6821428571428572,
       "p": 6.372367644529894e-58,
       "deltaCI": {
         "low": 0.625,
@@ -21622,6 +21624,7 @@
       "delta": 0.6821428571428572,
       "lost": 0,
       "gained": 191,
+      "discordance": 0.6821428571428572,
       "p": 6.372367644529894e-58,
       "deltaCI": {
         "low": 0.625,
@@ -21638,6 +21641,7 @@
       "delta": 0.5035714285714286,
       "lost": 0,
       "gained": 141,
+      "discordance": 0.5035714285714286,
       "p": 7.174648137343114e-43,
       "deltaCI": {
         "low": 0.44642857142857145,
@@ -21654,6 +21658,7 @@
       "delta": 0.5142857142857142,
       "lost": 0,
       "gained": 144,
+      "discordance": 0.5142857142857142,
       "p": 8.968310171678843e-44,
       "deltaCI": {
         "low": 0.45714285714285713,
@@ -21670,6 +21675,7 @@
       "delta": 0.6821428571428572,
       "lost": 0,
       "gained": 191,
+      "discordance": 0.6821428571428572,
       "p": 6.372367644529894e-58,
       "deltaCI": {
         "low": 0.625,
@@ -21686,6 +21692,7 @@
       "delta": 0.6821428571428572,
       "lost": 0,
       "gained": 191,
+      "discordance": 0.6821428571428572,
       "p": 6.372367644529894e-58,
       "deltaCI": {
         "low": 0.625,
@@ -21702,6 +21709,7 @@
       "delta": 0,
       "lost": 0,
       "gained": 0,
+      "discordance": 0,
       "p": 1,
       "deltaCI": {
         "low": 0,

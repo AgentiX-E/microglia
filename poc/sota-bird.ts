@@ -63,14 +63,14 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { MicrogliaError, mulberry32, queryCoverage, steppingClock } from '@agentix-e/microglia-core';
-import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-memory';
-import { openMicroglia } from '@agentix-e/microglia-capture';
+import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
+import { openMicroglia } from '@agentix-e/microglia-core/capture';
 import {
   combineInterpreters,
   createLlmInterpreter,
   ruleInterpreter,
   type Interpreter,
-} from '@agentix-e/microglia-distill';
+} from '@agentix-e/microglia-core/distill';
 import {
   assignFolds,
   comparePaired,
