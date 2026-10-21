@@ -32,6 +32,10 @@
     "./capture": {
       "types": "./dist/capture/index.d.ts",
       "default": "./dist/capture/index.js"
+    },
+    "./providers": {
+      "types": "./dist/providers/index.d.ts",
+      "default": "./dist/providers/index.js"
     }
   },
   "files": [

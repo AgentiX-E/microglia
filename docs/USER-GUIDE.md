@@ -23,8 +23,8 @@ every decision the library makes on your behalf. It is ordered by what you need 
 ## 1. The five-minute integration
 
 ```ts
-import { openMicroglia } from '@agentix-e/microglia-capture';
-import { EmbeddedMemory, JsonlJournal } from '@agentix-e/microglia-memory';
+import { openMicroglia } from '@agentix-e/microglia-core';
+import { EmbeddedMemory, JsonlJournal } from '@agentix-e/microglia-core/memory';
 
 const store = await EmbeddedMemory.open(new JsonlJournal({ dir: './.microglia' }));
 const mg = await openMicroglia({
@@ -67,10 +67,11 @@ Two consequences worth internalising:
 
 1. **The library never calls a model.** If you want free-text corrections turned into rules, you pass
    an interpreter that has your model client. There is a ready-made prompt builder and parser in
-   `@agentix-e/microglia-distill`.
-2. **The library never decides what a correction means in your domain.** That is a *domain pack*:
-   `@agentix-e/microglia-nl2charts` is the reference implementation for chart specs, and §14 shows
-   how to write your own in about eighty lines.
+   `@agentix-e/microglia-core/distill`.
+2. **The library never decides what a correction means in your domain.** That is a *domain pack* you
+   own: an interpreter plus, optionally, a semantic edit distance. §14 shows how to write one in about
+   eighty lines. The chart pack used by this repository's benchmark lives in
+   `packages/eval/src/workload` — a benchmark has to own the workload it scores.
 
 ## 3. The four calls, in the order a request makes them
 
@@ -309,11 +310,10 @@ opposite — a batch that stops on the first bad response.
 Two interpreters ship:
 
 ```ts
-import { ruleInterpreter, combineInterpreters, createLlmInterpreter } from '@agentix-e/microglia-distill';
-import { chartInterpreter, chartEditDistance } from '@agentix-e/microglia-nl2charts';
+import { ruleInterpreter, combineInterpreters, createLlmInterpreter } from '@agentix-e/microglia-core/distill';
 
 // Deterministic: ratings and clarifications become lessons with no model call.
-combineInterpreters(chartInterpreter, ruleInterpreter)
+combineInterpreters(myDomainInterpreter, ruleInterpreter)
 
 // Free text: your model turns a comment into a typed claim.
 createLlmInterpreter({
@@ -491,3 +491,79 @@ const forTenant = async (tenant: string) => {
 
 Separate directories *and* separate namespaces. Retrieval never crosses a namespace, and a test in
 this repository asserts it, but defence in depth is cheap here.
+
+## 15. Server and browser
+
+A single process needs `core` only. Once a browser has to capture feedback, the credentials and the
+journal belong on a server, and the library ships both halves.
+
+### 15.1 The server
+
+```ts
+import { createServer, listen, deepseekProvider } from '@agentix-e/microglia-node';
+
+const server = await createServer({
+  dir: './.microglia',            // one writer per directory
+  namespace: 'acme',              // the tenancy boundary
+  token: process.env.MICROGLIA_TOKEN,
+  llm: deepseekProvider({ apiKey: process.env.DEEPSEEK_API_KEY! }),
+});
+listen(server, 8080);
+```
+
+Five endpoints, each one call into the same facade you would have used in-process:
+
+| Route | Purpose |
+|---|---|
+| `POST /v1/feedback` | ingest one run and the reaction to it; returns `runId` and `eventId` |
+| `GET /v1/recall` | the pack for a query; same options as `recall`, as query parameters |
+| `POST /v1/distill` | fold accumulated evidence into knowledge |
+| `GET /v1/knowledge` | list rules with status, trust, and scope |
+| `GET /v1/health` | the doctor's diagnosis and the store counts |
+
+Two properties are deliberate. A request must carry `Authorization: Bearer <token>` when a token is
+configured, and a retry may carry `Idempotency-Key`: the same key returns the same ids instead of
+recording the correction twice. The key map is per process — a durable one belongs to your
+deployment, and the library says so rather than pretending otherwise.
+
+### 15.2 The browser
+
+```ts
+import { createClient, persistedOutbox } from '@agentix-e/microglia-browser';
+
+const mg = createClient({
+  endpoint: 'https://api.example.com',
+  token: await getToken(),
+  outbox: persistedOutbox(localStorage),
+});
+
+const pack = await mg.recall({ task: 'chart.recommend', text: question });
+await mg.feedback({
+  run: { task: 'chart.recommend', input: { question }, output: spec, packIds: pack.ids },
+  feedback: { type: 'edit', after: corrected },
+});
+```
+
+`feedback` writes to the outbox **before** it sends, so a tab that closes mid-correction still delivers
+it on the next visit: `pending()` says how many are waiting, `flush()` drains them. Recall is never
+queued — stale knowledge is worse than none.
+
+### 15.3 Providers: configuration or code
+
+Both forms resolve through the same registry, in this order: an instance you passed, then a factory
+registered under the name in your config, then an error naming what is registered.
+
+```ts
+import { registerProvider } from '@agentix-e/microglia-core/providers';
+
+// Programmatic: a gateway, a proxy, a local model.
+registerProvider('llm', 'gateway', (config) => new Gateway(String(config['endpoint'])));
+
+// Declarative: the same thing from a config file.
+createServer({ dir, namespace, llm: { id: 'gateway', endpoint: 'https://llm.internal' } });
+```
+
+`LlmProvider` is one method and `EmbeddingProvider` is one method; neither knows about retries or
+prompts, which is why a host can wrap its own transport (tracing, rate limits, caching) without forking
+the library.
+

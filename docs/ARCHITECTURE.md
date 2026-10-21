@@ -1,7 +1,7 @@
 # Architecture
 
-This document explains how the eight packages fit together, why the boundaries are where they are,
-and what each layer is allowed to know. It is the high-level view; the internal technical design (in
+This document explains how the three packages fit together, why the module boundaries inside `core`
+are where they are, and what each layer is allowed to know. It is the high-level view; the internal technical design (in
 the `microglia-docs` repository) carries the normative algorithms and the evidence.
 
 ## 1. The shape in one picture
@@ -29,18 +29,29 @@ the `microglia-docs` repository) carries the normative algorithms and the eviden
                               └─────┬─────┘
                                     │ uses
                               ┌─────▼─────┐
-                              │   core    │  domain model, policy, statistics, guards
-                              └───────────┘
+                              │  kernel   │  domain model, policy, statistics, guards
+                              └─────┬─────┘
                                     ▲
-                              ┌─────┴──────────┐
-                              │  nl2charts     │  reference domain pack (optional)
-                              │  cortex-adapter│  projection backend (optional)
-                              └────────────────┘
+                    ┌───────────────┴───────────────┐
+                    │                               │
+              ┌─────┴──────┐                 ┌──────┴─────┐
+              │    node    │                 │  browser   │
+              │ Hono, LLM  │◀── HTTP ────────│ client +   │
+              │ providers  │                 │ outbox     │
+              └────────────┘                 └────────────┘
 ```
 
-Dependencies point **downward only**. `core` imports nothing. `memory` imports `core`. `distill`
-imports `core`. `apply` imports `core` and the memory port. `capture` composes all of them.
-`nl2charts` and `cortex-adapter` are leaves that a host opts into.
+Everything inside the dashed boundary is one package (`@agentix-e/microglia-core`) with five modules;
+the two boxes below it are the only places a deployment differs.
+
+Dependencies point **downward only**. `kernel` imports nothing. `memory` imports `kernel`. `distill`
+imports `kernel` and the memory port. `apply` imports `kernel` and the port. `capture` composes all of
+them. `node` and `browser` sit outside the library's dependency graph: neither is imported by `core`,
+and `browser` never imports `node`.
+
+The modules are also subpath exports (`core/memory`, `core/distill`, …), so "one package" does not
+mean "one bundle": a host that only retrieves imports `core/apply` and `core/memory`, and the
+distiller never enters its graph.
 
 ## 2. Why these boundaries
 

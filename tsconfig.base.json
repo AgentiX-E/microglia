@@ -49,6 +49,9 @@
       ],
       "@agentix-e/microglia-browser": [
         "packages/browser/src/index.ts"
+      ],
+      "@agentix-e/microglia-core/providers": [
+        "packages/core/src/providers/index.ts"
       ]
     }
   }

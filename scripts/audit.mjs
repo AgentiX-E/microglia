@@ -26,6 +26,10 @@ async function* walk(dir) {
 const isCode = (path) => path.endsWith('.ts') || path.endsWith('.mjs');
 const isTest = (path) => path.includes('__tests__') || path.endsWith('.test.ts');
 
+const RUNTIME_ALLOWLIST = {
+  'packages/node/package.json': new Set(['hono', '@hono/node-server']),
+};
+
 const SECRET = /\b(sk-[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|ghp_[A-Za-z0-9]{20,})\b/;
 const CJK = /[\u4e00-\u9fff]/;
 const FORBIDDEN = [
@@ -67,8 +71,14 @@ for await (const path of walk(join(ROOT, 'packages'))) {
   if (manifest.engines?.node === undefined) fail('manifest', `${rel}: missing engines.node`);
   // Internal packages are the point of a monorepo; an external runtime
   // dependency is what would break the zero-install and browser guarantees.
+  //
+  // One package is allowed a named exception: the server speaks HTTP and nothing
+  // else, so it may depend on a router. The allowlist is exact — adding a second
+  // dependency to `node`, or any dependency to `core` or `browser`, is a decision
+  // that has to be written here rather than discovered in a lockfile.
+  const allowed = RUNTIME_ALLOWLIST[rel] ?? new Set();
   const external = Object.keys(manifest.dependencies ?? {}).filter(
-    (name) => !name.startsWith('@agentix-e/'),
+    (name) => !name.startsWith('@agentix-e/') && !allowed.has(name),
   );
   if (external.length > 0) {
     fail('manifest', `${rel}: external runtime dependency (${external.join(', ')})`);

@@ -8,8 +8,8 @@ the next request. It ships no UI, opens no socket, and requires no service. It r
 browser.
 
 ```ts
-import { openMicroglia } from '@agentix-e/microglia-capture';
-import { EmbeddedMemory, JsonlJournal } from '@agentix-e/microglia-memory';
+import { openMicroglia } from '@agentix-e/microglia-core';
+import { EmbeddedMemory, JsonlJournal } from '@agentix-e/microglia-core/memory';
 
 const store = await EmbeddedMemory.open(new JsonlJournal({ dir: './.microglia' }));
 const mg = await openMicroglia({ app: 'nl2charts', namespace: 'acme', store });
@@ -54,25 +54,83 @@ is strong enough to steer a prompt, and forgets it when it stops being true.
 
 | Package | Role | Runtime dependencies |
 |---|---|---|
-| `@agentix-e/microglia-core` | Domain model, admission policy, statistics, guards | none |
-| `@agentix-e/microglia-memory` | Embedded JSONL store, lexical index, port | none |
-| `@agentix-e/microglia-capture` | The host-facing SDK: `begin`, `feedback`, `distill`, `export` | core, memory, distill, apply |
-| `@agentix-e/microglia-distill` | Rule interpreter, LLM interpreter, generalisation | core |
-| `@agentix-e/microglia-apply` | Prompt pack construction, MMR, budget, rendering | core, memory |
-| `@agentix-e/microglia-nl2charts` | Reference domain pack: chart-type corrections | core |
-| `@agentix-e/microglia-cortex-adapter` | Projection into `@agentix-e/cortex-*` memory values | core |
-| `@agentix-e/microglia-eval` | Ablation study, gates, statistical harness | all of the above |
+| `@agentix-e/microglia-core` | The library: domain model, store, distillation, pack construction, facade, provider contracts | none |
+| `@agentix-e/microglia-node` | HTTP ingestion and recall on Hono, DeepSeek and Zhipu providers | core, `hono` |
+| `@agentix-e/microglia-browser` | Client with an offline outbox; talks to the node server | core |
 
-Import only what you need: `core` has zero dependencies and is browser-safe, so a front-end can
-build a pack without pulling the store or the distiller.
+`core` is the whole mechanism in one install and has **no runtime dependency**, so it bundles for the
+browser unchanged. Its modules are also reachable as subpaths, which is how a host that only needs
+retrieval keeps the distiller out of its bundle:
+
+```ts
+import { buildPack } from '@agentix-e/microglia-core/apply';   // retrieval only
+import { EmbeddedMemory } from '@agentix-e/microglia-core/memory';
+import { registerProvider } from '@agentix-e/microglia-core/providers';
+```
+
+| Subpath | Contents |
+|---|---|
+| `core` | `openMicroglia`, the run handle, feedback types, knowledge lifecycle |
+| `core/kernel` | contracts and pure algorithms (statistics, diff, guard, similarity) |
+| `core/memory` | `EmbeddedMemory`, `JsonlJournal`, lexical index, `MemoryPort` |
+| `core/distill` | rule interpreter, model interpreter, generalisation |
+| `core/apply` | pack construction, MMR, budget, rendering |
+| `core/capture` | the facade, run handle, feedback normalisation, export, doctor |
+| `core/providers` | `LlmProvider`, `EmbeddingProvider`, the registry |
 
 ## Install
 
 ```bash
-pnpm add @agentix-e/microglia-capture @agentix-e/microglia-memory
+pnpm add @agentix-e/microglia-core            # a host that is one process
+pnpm add @agentix-e/microglia-node           # a host that wants an HTTP boundary
+pnpm add @agentix-e/microglia-browser        # a front-end that talks to it
 ```
 
-Node 20 or newer. ESM only. No native modules, so it bundles for the browser unchanged.
+Node 20 or newer. ESM only. No native modules.
+
+## Three ways to run it
+
+**In one process.** `core` only: the facade reads a journal from disk, your code calls it.
+
+**Behind HTTP.** `@agentix-e/microglia-node` serves five endpoints — `POST /v1/feedback`,
+`GET /v1/recall`, `POST /v1/distill`, `GET /v1/knowledge`, `GET /v1/health` — so a browser never holds
+your model key or your store.
+
+```ts
+import { createServer } from '@agentix-e/microglia-node';
+import { deepseekProvider } from '@agentix-e/microglia-node';
+
+const server = await createServer({
+  dir: './.microglia',
+  namespace: 'acme',
+  token: process.env.MICROGLIA_TOKEN,
+  llm: deepseekProvider({ apiKey: process.env.DEEPSEEK_API_KEY! }),
+});
+```
+
+**In the tab.** `@agentix-e/microglia-browser` queues a correction before sending it, so a tab that
+closes mid-edit does not lose the only signal worth collecting:
+
+```ts
+import { createClient, persistedOutbox } from '@agentix-e/microglia-browser';
+
+const mg = createClient({
+  endpoint: 'https://api.example.com',
+  token,
+  outbox: persistedOutbox(localStorage),
+});
+
+const pack = await mg.recall({ task: 'chart.recommend', text: question });
+await mg.feedback({ run: { task, input, output, packIds: pack.ids }, feedback: { type: 'edit', after } });
+```
+
+**Providers are configuration or code.** Both are first class: pass an instance, or register a factory
+and name it in config.
+
+```ts
+registerProvider('llm', 'my-gateway', (config) => new MyGateway(config));
+createServer({ dir, namespace, llm: { id: 'my-gateway', endpoint: 'https://llm.internal' } });
+```
 
 ## Does it actually work?
 
@@ -109,8 +167,11 @@ Read the [user guide](docs/USER-GUIDE.md) for the integration contract, the
 ## Repository layout
 
 ```
-packages/     eight packages, layered core → memory → distill → apply → capture
-poc/          live-API experiments (DeepSeek, Zhipu) with recorded artefacts
+packages/core     the library, five modules behind subpath exports
+packages/node     Hono routes, vendor providers, server bootstrap
+packages/browser  fetch client and offline outbox
+packages/eval     the benchmark instrument (private, not published)
+poc/              live-API experiments with recorded artefacts
 bench/        the ablation study and its gate report
 scripts/      the quality audit that CI runs
 docs/         user guide, architecture, glossary
@@ -125,7 +186,7 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-100 / 99.42 / 100 / 100 over 376 tests; the seven branch arms that remain uncovered are listed with
+99.77 / 99.77 / 100 / 98.50 over 436 tests; the seven branch arms that remain uncovered are listed with
 file, line, and reason in the internal technical design, and none is excluded with an ignore comment.
 
 ## Licence

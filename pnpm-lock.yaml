@@ -8,12 +8,18 @@ importers:
 
   .:
     devDependencies:
+      '@agentix-e/microglia-browser':
+        specifier: workspace:*
+        version: link:packages/browser
       '@agentix-e/microglia-core':
         specifier: workspace:*
         version: link:packages/core
       '@agentix-e/microglia-eval':
         specifier: workspace:*
         version: link:packages/eval
+      '@agentix-e/microglia-node':
+        specifier: workspace:*
+        version: link:packages/node
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.5
@@ -30,6 +36,12 @@ importers:
         specifier: ^3.2.7
         version: 3.2.7(@types/node@22.20.5)(tsx@4.23.15)
 
+  packages/browser:
+    dependencies:
+      '@agentix-e/microglia-core':
+        specifier: workspace:*
+        version: link:../core
+
   packages/core: {}
 
   packages/eval:
@@ -37,6 +49,22 @@ importers:
       '@agentix-e/microglia-core':
         specifier: workspace:*
         version: link:../core
+
+  packages/node:
+    dependencies:
+      '@agentix-e/microglia-core':
+        specifier: workspace:*
+        version: link:../core
+      '@hono/node-server':
+        specifier: ^1.13.7
+        version: 1.19.17(hono@4.13.13)
+      hono:
+        specifier: ^4.13.13
+        version: 4.13.13
+    devDependencies:
+      '@agentix-e/microglia-browser':
+        specifier: workspace:*
+        version: link:../browser
 
 packages:
 
@@ -220,6 +248,12 @@ packages:
     engines: {node: '>=18'}
     cpu: [x64]
     os: [win32]
+
+  '@hono/node-server@1.19.17':
+    resolution: {integrity: sha512-dSneS5qhiauZWGDCeK4o695Xd9nUNjviSZCMQrj10eetr8Uln1ucn6bbphOM6UynAMMtNIzZNSpL9vnASJwrPQ==}
+    engines: {node: '>=18.14.1'}
+    peerDependencies:
+      hono: ^4
 
   '@isaacs/cliui@8.0.2':
     resolution: {integrity: sha512-O8jcjabXaleOG9DQ0+ARXWZBTfnP4WNAqzuiJK7ll44AmxGKv/J2M4TPjxjY3znBCfvBXFzucm1twdyFybFqEA==}
@@ -550,6 +584,10 @@ packages:
   has-flag@4.0.0:
     resolution: {integrity: sha512-EykJT/Q1KjTWctppgIAgfSO0tKVuZUjhgMr17kqTumMl6Afv3EISleU7qZUzoXDFTAHTDC4NOoG/ZxU3EvlMPQ==}
     engines: {node: '>=8'}
+
+  hono@4.13.13:
+    resolution: {integrity: sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==}
+    engines: {node: '>=16.9.0'}
 
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
@@ -939,6 +977,10 @@ snapshots:
   '@esbuild/win32-x64@0.28.2':
     optional: true
 
+  '@hono/node-server@1.19.17(hono@4.13.13)':
+    dependencies:
+      hono: 4.13.13
+
   '@isaacs/cliui@8.0.2':
     dependencies:
       string-width: 5.1.2
@@ -1244,6 +1286,8 @@ snapshots:
       path-scurry: 1.11.1
 
   has-flag@4.0.0: {}
+
+  hono@4.13.13: {}
 
   html-escaper@2.0.2: {}
 

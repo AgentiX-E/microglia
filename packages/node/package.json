@@ -1,0 +1,29 @@
+{
+  "name": "@agentix-e/microglia-node",
+  "version": "0.2.0",
+  "description": "HTTP ingestion and recall for Microglia, on Hono",
+  "license": "MIT",
+  "author": "Lambertyan",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@agentix-e/microglia-core": "workspace:*",
+    "@hono/node-server": "^1.13.7",
+    "hono": "^4.13.13"
+  },
+  "devDependencies": {
+    "@agentix-e/microglia-browser": "workspace:*"
+  }
+}

@@ -134,3 +134,20 @@ probe grid of every context they claim. Separates "learned a lot" from "learned 
 | "Prompt injection defence" | *injection screen*, *quarantine* | A screen plus a state, not a guarantee |
 | "Semantic search" | *lexical retrieval with an optional embedding channel* | BM25 is the default because it wins on the measured workloads |
 | "Hallucination" | *defect family*, *correction* | A correction is about a specific wrong output, not a model property |
+
+**Subpath export** — a named entry into one package (`@agentix-e/microglia-core/apply`). It lets a
+host import one module without importing the package's whole graph, which is what keeps "one
+install" from meaning "one bundle".
+
+**Provider** — a host-supplied model client: `LlmProvider` has one method (`complete`),
+`EmbeddingProvider` has one (`embed`). The library never constructs one, and has no default.
+
+**Provider registry** — the name-to-factory map a declaration resolves against. Resolution order is
+instance, then registered factory, then a named error; there is no silent fallback to an environment
+variable.
+
+**Outbox** — the browser's local queue of corrections not yet accepted by the server. Entries carry an
+idempotency key so a retry cannot record the same correction twice.
+
+**Idempotency key** — a client-chosen string that makes a retried write a no-op. The server's map is
+per process and the documentation says so: durability of the key store is the deployment's job.

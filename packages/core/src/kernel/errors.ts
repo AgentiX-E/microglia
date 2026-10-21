@@ -23,7 +23,11 @@ export type MicrogliaErrorCode =
   | 'MG_E_KNOWLEDGE_UNSAFE'
   | 'MG_E_BUDGET_EXCEEDED'
   | 'MG_E_NAMESPACE_MISMATCH'
-  | 'MG_E_PACK_STALE';
+  | 'MG_E_PACK_STALE'
+  // A host asked for a provider that neither an instance nor a registered factory
+  // supplies. Distinct from MG_E_CONFIG: the configuration is well formed, the
+  // name simply resolves to nothing.
+  | 'MG_E_PROVIDER_MISSING';
 
 export class MicrogliaError extends Error {
   public readonly code: MicrogliaErrorCode;

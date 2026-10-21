@@ -1,0 +1,24 @@
+{
+  "name": "@agentix-e/microglia-browser",
+  "version": "0.2.0",
+  "description": "Browser client for Microglia: feedback ingestion and recall",
+  "license": "MIT",
+  "author": "Lambertyan",
+  "type": "module",
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20.11.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "dependencies": {
+    "@agentix-e/microglia-core": "workspace:*"
+  }
+}
