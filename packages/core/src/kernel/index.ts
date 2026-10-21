@@ -30,6 +30,7 @@ export type {
   RunRecord,
   TaskRecord,
   TaskStatus,
+  Utility,
   SignalStrength,
 } from './types.js';
 

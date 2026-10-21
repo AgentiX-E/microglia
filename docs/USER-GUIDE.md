@@ -251,6 +251,38 @@ await run.edit(after, { trustCeiling: 0.2, actor: { type: 'external', idHash } }
 A ceiling of 0.2 sends the resulting knowledge to quarantine: it is stored, visible in `doctor()`,
 and never injected. Nothing is lost, and nothing is trusted.
 
+### 4.2 `curate` — merge duplicates, retire what is useless
+
+```ts
+const report = await mg.curate({ dryRun: true });
+// { scanned: 214, merged: 31, pruned: 0, overCap: 0, cappedTasks: 0, dryRun: true }
+```
+
+Curation does two things and refuses to guess about a third:
+
+| Action | Default | Why |
+|---|---|---|
+| Merge near-duplicates (same kind and scope, statement similarity ≥ 0.85) | on | One rule accumulates several phrasings; keeping all of them spends tokens on the same sentence |
+| Retire the lowest-utility items above a per-task cap | **off** | A rule with no observed outcome is unmeasured, not useless. Pass `prune: true` and a `maxItemsPerTask` to enable it |
+| Rewrite everything in one pass | never | Summarising the store is how a playbook collapses; a merge keeps one survivor and closes the others with a pointer |
+
+A merged or pruned item is not deleted: it becomes `retired` with `statusReason` `merged:<id>` or
+`pruned:low-utility`, and its `validUntil` is set, so a question about the past can still find it.
+
+**What "utility" means.** Every outcome that lands on a run citing an item increments that item's
+`utility.injected`, and `flippedUp` / `flippedDown` record which way it went. `curate` ranks by density
+`(flippedUp + 1) / (injected + 2)` — Laplace-smoothed so that an unmeasured rule sits at 0.5 rather than
+at zero, and only a population of measured rules can push one out.
+
+### 4.3 Wiring it together
+
+```
+recall → begin → complete → feedback → distill → curate
+```
+
+`curate` is cheap and deterministic: same store, same options, same decision. Run it after `distill`, or
+on a schedule your host controls — the library starts no timers.
+
 ## 5. Trust: why your edit counts less than an execution result
 
 Trust is derived from the *signal*, never from the person. A host cannot make every click

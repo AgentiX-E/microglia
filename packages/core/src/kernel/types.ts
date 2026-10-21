@@ -175,6 +175,20 @@ export type EvidenceRef = {
 
 export type KnowledgeStatus = 'candidate' | 'active' | 'quarantined' | 'retired' | 'conflicted';
 
+/**
+ * How an item has actually behaved when it was in the prompt.
+ *
+ * Without a denominator, credit is a numerator with no base and retirement has
+ * nothing to stand on: a rule cannot be shown to be useless if nobody counted how
+ * often it was given a chance. `injected` counts outcomes observed on runs that
+ * cited the item -- not every render, because a render is not a measurement.
+ */
+export type Utility = {
+  readonly injected: number;
+  readonly flippedUp: number;
+  readonly flippedDown: number;
+};
+
 export type TaskStatus = 'accepted' | 'abandoned' | 'escalated';
 
 /**
@@ -230,6 +244,8 @@ export type KnowledgeItem = {
   readonly applied: number;
   /** Number of those runs whose observed outcome was positive. */
   readonly succeeded: number;
+  /** Present once the item has been part of a run that reported an outcome. */
+  readonly utility?: Utility;
   readonly createdAt: number;
   readonly updatedAt: number;
 };

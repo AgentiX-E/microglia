@@ -304,6 +304,13 @@ export function applyOutcome(
     ...item,
     applied: item.applied + 1,
     succeeded: item.succeeded + (success ? 1 : 0),
+    // The denominator retirement needs: how often this item was given a chance,
+    // and how often the answer that cited it was accepted.
+    utility: {
+      injected: (item.utility?.injected ?? 0) + 1,
+      flippedUp: (item.utility?.flippedUp ?? 0) + (success ? 1 : 0),
+      flippedDown: (item.utility?.flippedDown ?? 0) + (success ? 0 : 1),
+    },
     updatedAt: now,
   };
   const decision = decideStatus(

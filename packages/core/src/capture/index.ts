@@ -14,6 +14,7 @@
  * capture, when to learn, and where the journal lives.
  */
 export { Microglia, creditOf, seededRandom } from './microglia.js';
+export { curateKnowledge, density, type CurationOptions, type CurationReport } from './curate.js';
 export { RunHandle, type RunHost } from './run.js';
 export { TaskHandle, type AttemptStart, type TaskHost, type TaskSummary } from './task.js';
 export { diagnose, type DoctorOptions } from './doctor.js';

@@ -37,6 +37,7 @@ import {
 import { diagnose } from './doctor.js';
 import { buildDataset, toJsonl } from './export.js';
 import { buildFeedbackEvent } from './normalize.js';
+import { curateKnowledge, type CurationOptions, type CurationReport } from './curate.js';
 import type {
   Diagnosis,
   ExportFormat,
@@ -175,6 +176,21 @@ export class Microglia implements RunHost {
     await this.store.appendEvent(event);
     if (this.creditEnabled) await this.credit(run, event, at);
     return event;
+  }
+
+  /**
+   * Curate the store: merge what is the same, optionally retire what is useless.
+   *
+   * Deterministic and dry-runnable, because a curated store has to be comparable
+   * with an uncurated one. Pruning is off unless asked: a rule with no observed
+   * outcome is unmeasured, not useless.
+   */
+  public curate(options: CurationOptions = {}): Promise<CurationReport> {
+    this.assertOpen();
+    return curateKnowledge(this.store, this.policy, this.clock.now(), {
+      namespace: this.namespace,
+      ...options,
+    });
   }
 
   public async distill(

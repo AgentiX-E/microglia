@@ -167,3 +167,16 @@ rule alone.
 
 **Task support** — the number of distinct tasks that endorse a claim. It is the denominator admission
 uses, and the reason a single long conversation cannot manufacture confidence.
+
+**Utility** — `{ injected, flippedUp, flippedDown }` on a knowledge item: how many outcomes landed on runs
+that cited it, and which way each went. The denominator that makes retirement a measurement rather than a
+guess.
+
+**Utility density** — `(flippedUp + 1) / (injected + 2)`, Laplace-smoothed. An unmeasured rule sits at 0.5,
+so silence is not treated as failure.
+
+**Curation** — the pass that merges near-duplicate statements and, only when asked, retires the
+lowest-density items above a cap. Deterministic, dry-runnable, and never a rewrite.
+
+**Merge closure** — a merged item is retired with `statusReason: merged:<id>` and a closed `validUntil`
+rather than deleted, so the audit trail and past-tense queries survive.
