@@ -9,3 +9,14 @@ export { createApp, statusFor, type AppOptions } from './app.js';
 export { createServer, listen, type Server, type ServerOptions } from './server.js';
 export { deepseekProvider, deepseekFactory, DEEPSEEK_BASE, type DeepSeekOptions } from './providers/deepseek.js';
 export { zhipuEmbeddings, zhipuFactory, ZHIPU_BASE, type ZhipuOptions } from './providers/zhipu.js';
+export {
+  CORTEX_FACT_TABLE,
+  CORTEX_MEMORY_TABLE,
+  CortexProjection,
+  tagsOf,
+  toCortexFact,
+  toCortexMemory,
+  type CortexFact,
+  type CortexMemoryValue,
+  type CortexStorage,
+} from './store/cortex.js';

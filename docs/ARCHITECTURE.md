@@ -226,7 +226,7 @@ for safety gates.
 | Teach a new domain | `Interpreter`, `editSemantics`, a payload type | your own, mirroring `nl2charts` |
 | Use a model for free text | `LlmPort` (`complete(prompt)`) | your own client |
 | Change admission behaviour | `Policy` overrides per host | `capture` |
-| Project into a cognitive memory | a mapper, as `cortex-adapter` does | your own |
+| Project into a cognitive memory | `CortexProjection` in `@agentix-e/microglia-node` | your own |
 
 Nothing else is extensible, on purpose. Every additional seam is a place where the guarantee about
 what reaches a prompt could be weakened.

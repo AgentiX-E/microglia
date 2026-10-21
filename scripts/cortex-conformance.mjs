@@ -16,7 +16,7 @@
 import { pathToFileURL } from 'node:url';
 
 const dist = process.env.CORTEX_DIST ?? '/tmp/cortex/packages/cortex-core/dist/index.js';
-const adapterPath = new URL('../packages/cortex-adapter/dist/index.js', import.meta.url).pathname;
+const adapterPath = new URL('../packages/node/dist/store/cortex.js', import.meta.url).pathname;
 
 const cortex = await import(pathToFileURL(dist).href);
 const adapter = await import(pathToFileURL(adapterPath).href);
