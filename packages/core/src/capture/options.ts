@@ -51,6 +51,12 @@ export type RunStart = {
   readonly task: string;
   readonly input: JsonObject;
   readonly sessionId?: string;
+  /** Set by `openTask().begin()`; absent for a host that never opens a task. */
+  readonly taskId?: string;
+  /** 1-based attempt number within the task. */
+  readonly attempt?: number;
+  /** The attempt this one revises. */
+  readonly parentRunId?: string;
   /** The pack that was (or will be) injected; its ids become the run's provenance. */
   readonly pack?: KnowledgePack;
   readonly model?: string;
@@ -59,6 +65,20 @@ export type RunStart = {
   readonly domainPack?: string;
   readonly schemaDigest?: string;
   readonly metadata?: JsonObject;
+};
+
+export type TaskOpen = {
+  readonly taskId: string;
+  /** The workflow step, in the host's vocabulary. */
+  readonly taskType: string;
+  readonly sessionId?: string;
+};
+
+export type TaskDecision = {
+  readonly status: 'accepted' | 'abandoned' | 'escalated';
+  /** Defaults to the last committed attempt. */
+  readonly finalRunId?: string;
+  readonly reasonCode?: string;
 };
 
 export type FeedbackInput =

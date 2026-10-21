@@ -46,6 +46,8 @@ export function statusFor(code: MicrogliaErrorCode): 400 | 401 | 409 | 413 | 500
     case 'MG_E_RUN_COMMITTED':
     case 'MG_E_NO_OUTPUT':
     case 'MG_E_PACK_STALE':
+    case 'MG_E_TASK_CONFLICT':
+    case 'MG_E_TASK_CLOSED':
       return 409;
     case 'MG_E_BUDGET_EXCEEDED':
       return 413;

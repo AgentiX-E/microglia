@@ -24,6 +24,11 @@ export type MicrogliaErrorCode =
   | 'MG_E_BUDGET_EXCEEDED'
   | 'MG_E_NAMESPACE_MISMATCH'
   | 'MG_E_PACK_STALE'
+  // A task instance refuses a reused or skipped attempt number; the host has a
+  // bookkeeping bug, and silently overwriting the slot would lose a generation.
+  | 'MG_E_TASK_CONFLICT'
+  // A write after the task's terminal decision. The task is closed, not broken.
+  | 'MG_E_TASK_CLOSED'
   // A host asked for a provider that neither an instance nor a registered factory
   // supplies. Distinct from MG_E_CONFIG: the configuration is well formed, the
   // name simply resolves to nothing.

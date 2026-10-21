@@ -151,3 +151,19 @@ idempotency key so a retry cannot record the same correction twice.
 
 **Idempotency key** — a client-chosen string that makes a retried write a no-op. The server's map is
 per process and the documentation says so: durability of the key store is the deployment's job.
+
+**Task instance** — the unit of intent: a `taskId` and `taskType` under which one or more attempts are
+opened and one terminal decision is taken. Distinct from a run, which is one generation.
+
+**Attempt** — one run inside a task, numbered from 1 and never reused. `parentRunId` points at the
+attempt it revises, so a chain can be walked without guessing.
+
+**Terminal decision** — `accepted`, `abandoned` or `escalated`, recorded once per task and written as an
+`outcome` event on the final attempt.
+
+**Evidence independence** — the rule that support is counted per task rather than per event. Six
+attempts of one task are one observation; six tasks are six. Without it, one persistent user can admit a
+rule alone.
+
+**Task support** — the number of distinct tasks that endorse a claim. It is the denominator admission
+uses, and the reason a single long conversation cannot manufacture confidence.

@@ -44,8 +44,10 @@ import type {
   FeedbackOptions,
   MicrogliaOptions,
   RunStart,
+  TaskOpen,
 } from './options.js';
 import { RunHandle, type RunHost } from './run.js';
+import { TaskHandle } from './task.js';
 
 const NAMESPACE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
 
@@ -97,6 +99,18 @@ export class Microglia implements RunHost {
   /** Convenience factory; identical to `new Microglia(options)`. */
   public static async open(options: MicrogliaOptions): Promise<Microglia> {
     return new Microglia(options);
+  }
+
+  /**
+   * Open a task instance.
+   *
+   * The task groups attempts, and its terminal decision becomes evidence for the
+   * last attempt. A host that does not need the grouping keeps calling `begin`
+   * directly, and its runs behave exactly as before.
+   */
+  public openTask(open: TaskOpen): TaskHandle {
+    this.assertOpen();
+    return new TaskHandle(this, open, this.clock.now());
   }
 
   public begin(start: RunStart): RunHandle {

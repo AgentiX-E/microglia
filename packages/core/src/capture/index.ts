@@ -15,6 +15,7 @@
  */
 export { Microglia, creditOf, seededRandom } from './microglia.js';
 export { RunHandle, type RunHost } from './run.js';
+export { TaskHandle, type AttemptStart, type TaskHost, type TaskSummary } from './task.js';
 export { diagnose, type DoctorOptions } from './doctor.js';
 export { buildDataset, toJsonl, type ExportOptions } from './export.js';
 export { buildFeedbackEvent, assertJsonOutput, type BuildEventArgs } from './normalize.js';
@@ -29,6 +30,8 @@ export type {
   FeedbackOptions,
   MicrogliaOptions,
   RunStart,
+  TaskDecision,
+  TaskOpen,
 } from './options.js';
 
 import { Microglia } from './microglia.js';

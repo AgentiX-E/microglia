@@ -97,9 +97,21 @@ export function specificity(scope: KnowledgeScope): number {
 
 export function scoreKnowledge(item: KnowledgeItem, policy: Policy, now = item.updatedAt): number {
   let logOdds = logit(BASE_PRIOR);
+  // One task, one observation. Six attempts of the same task by the same user are
+  // not six independent endorsements, and summing them let a single persistent
+  // user clear the activation threshold alone. The strongest observation within a
+  // task is kept, the weakest is dropped, and tasks are summed -- which is what
+  // "independent evidence" means for a store whose evidence is user actions.
+  // Evidence without a task falls back to its run id, so a host that never opened
+  // a task keeps the previous one-run-one-observation behaviour exactly.
+  const perTask = new Map<string, number>();
   for (const evidence of item.evidence) {
-    logOdds += evidence.weight * logit(clamp01(item.trust));
+    const key = evidence.taskId ?? `run:${evidence.runId}`;
+    const observed = perTask.get(key);
+    if (observed === undefined || evidence.weight > observed) perTask.set(key, evidence.weight);
   }
+  const odds = logit(clamp01(item.trust));
+  for (const weight of perTask.values()) logOdds += weight * odds;
   logOdds -= item.contradictions * policy.contradictionPenalty;
 
   // A memory that has not been tested is not credited as if it had succeeded.

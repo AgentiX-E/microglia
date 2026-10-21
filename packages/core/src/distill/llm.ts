@@ -99,6 +99,8 @@ export function parseDistillResponse(
     eventId: string;
     runId: string;
     at: number;
+    /** The task instance the evidence came from, when the host opened one. */
+    taskId?: string;
     /**
      * Trust the resulting claim inherits. It defaults to the model floor (0.6), and
      * a caller passes the event's own trust: a lesson distilled from an
@@ -128,7 +130,13 @@ export function parseDistillResponse(
       scope,
       statement: statement.trim(),
       ...(payload === undefined ? {} : { payload }),
-      evidence: { feedbackId: base.eventId, runId: base.runId, at: base.at, weight: trust },
+      evidence: {
+        feedbackId: base.eventId,
+        runId: base.runId,
+        at: base.at,
+        weight: trust,
+        ...(base.taskId === undefined ? {} : { taskId: base.taskId }),
+      },
       trust,
       dedupeKey: dedupeKeyOf({
         namespace: base.namespace,
@@ -288,6 +296,7 @@ export function createLlmInterpreter(options: LlmInterpreterOptions): Interprete
       runId: context.event.runId,
       at: context.event.at,
       trust: context.event.trust,
+      ...(context.event.taskId === undefined ? {} : { taskId: context.event.taskId }),
     });
     return parsed.slice(0, max);
   };

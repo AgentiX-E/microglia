@@ -69,6 +69,9 @@ export class RunHandle {
       namespace: this.host.namespace,
       sessionId: this.sessionId,
       task: this.start.task,
+      ...(this.start.taskId === undefined ? {} : { taskId: this.start.taskId }),
+      ...(this.start.attempt === undefined ? {} : { attempt: this.start.attempt }),
+      ...(this.start.parentRunId === undefined ? {} : { parentRunId: this.start.parentRunId }),
       input: redactJson(this.start.input) as JsonObject,
       output: this.output,
       provenance:

@@ -105,6 +105,8 @@ export type FeedbackEvent = {
   readonly sessionId: string;
   readonly runId: string;
   readonly task: string;
+  readonly taskId?: string;
+  readonly attempt?: number;
   readonly kind: FeedbackKind;
   readonly actor: Actor;
   /** Source trust in [0, 1], derived from the signal, not from the user. */
@@ -122,6 +124,12 @@ export type RunRecord = {
   readonly namespace: string;
   readonly sessionId: string;
   readonly task: string;
+  /** The task instance this run is an attempt of, when one was opened. */
+  readonly taskId?: string;
+  /** 1-based attempt number within the task. */
+  readonly attempt?: number;
+  /** The attempt this one revises, so a chain can be walked without guessing. */
+  readonly parentRunId?: string;
   readonly input: JsonObject;
   readonly output: Json | undefined;
   readonly provenance: RunProvenance;
@@ -153,9 +161,42 @@ export type EvidenceRef = {
   readonly at: number;
   /** Weighted by source trust and signal strength, in [0, 1]. */
   readonly weight: number;
+  /**
+   * The task instance this evidence came from, when the host opened one.
+   *
+   * Support is counted per task, not per event: eight attempts of one task are
+   * one observation by one user, and letting them count eight times is how a
+   * single persistent user admits a rule alone. Absent means "no task declared",
+   * and the run id stands in, which keeps callers that never opened a task on the
+   * previous behaviour.
+   */
+  readonly taskId?: string;
 };
 
 export type KnowledgeStatus = 'candidate' | 'active' | 'quarantined' | 'retired' | 'conflicted';
+
+export type TaskStatus = 'accepted' | 'abandoned' | 'escalated';
+
+/**
+ * A task instance: the unit of intent.
+ *
+ * A run is one generation; a task is the job the user was trying to get done. The
+ * distinction is what lets the store learn from "the third rewrite of attempt two
+ * was accepted" instead of only from adjacent edits.
+ */
+export type TaskRecord = {
+  readonly schema: 'microglia.task/1';
+  readonly taskId: string;
+  readonly taskType: string;
+  readonly namespace: string;
+  readonly sessionId?: string;
+  readonly attempts: number;
+  readonly status: TaskStatus;
+  readonly finalRunId?: string;
+  readonly reasonCode?: string;
+  readonly openedAt: number;
+  readonly closedAt: number;
+};
 
 export type KnowledgeItem = {
   readonly schema: 'microglia.knowledge/1';

@@ -55,6 +55,8 @@ export function buildFeedbackEvent(args: BuildEventArgs): FeedbackEvent {
     sessionId: run.sessionId,
     runId: run.id,
     task: run.task,
+    ...(run.taskId === undefined ? {} : { taskId: run.taskId }),
+    ...(run.attempt === undefined ? {} : { attempt: run.attempt }),
     kind: input.type,
     actor: args.actor,
     trust,

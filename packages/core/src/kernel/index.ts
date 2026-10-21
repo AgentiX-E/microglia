@@ -28,6 +28,8 @@ export type {
   RecallQuery,
   RunProvenance,
   RunRecord,
+  TaskRecord,
+  TaskStatus,
   SignalStrength,
 } from './types.js';
 

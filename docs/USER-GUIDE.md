@@ -130,7 +130,54 @@ Mini-Dev the median pack covered 7.1% of its question and 47% of packs covered n
 of `0.34` injected nothing at all on 352 questions. A floor of `0.15` keeps roughly the strongest
 quarter of packs.
 
-### 3.2 `begin` — the run record
+### 3.2 Tasks and attempts — when one answer is not the whole job
+
+A run is one generation. A task is what the user was trying to finish, and it
+often takes several generations: the first answer was wrong, the second was
+edited, the third was accepted. Opening a task is optional, and it is the
+difference between learning from adjacent edits and learning from "the third
+rewrite of attempt two was accepted".
+
+```ts
+const task = mg.openTask({
+  taskId: 'job-4711',          // yours, stable across attempts
+  taskType: 'chart.recommend', // the workflow step, in your vocabulary
+  sessionId: 'conv-88',        // optional
+});
+
+const first = task.begin({ attempt: 1, input: { question } });
+await first.complete(badSpec);
+
+const second = task.begin({
+  attempt: 2,
+  parentRunId: first.id,       // the attempt this one revises
+  input: { question },
+});
+await second.complete(betterSpec);
+
+const record = await task.complete({ status: 'accepted', finalRunId: second.id });
+// { taskId, taskType, attempts: 2, status: 'accepted', finalRunId, closedAt }
+```
+
+Three rules, enforced rather than documented:
+
+| Rule | Error |
+|---|---|
+| An attempt number is used once, in order (1, 2, 3 — no reuse, no skip) | `MG_E_TASK_CONFLICT` |
+| A terminal decision happens once | `MG_E_TASK_CLOSED` |
+| The decision judges an attempt that produced an output | `MG_E_NO_OUTPUT` |
+
+**Why this matters more than bookkeeping.** Evidence is counted per task, not per event. Six attempts
+of one task by one user are one observation; six tasks are six. Without that rule a single persistent
+user can clear the activation threshold alone — which is exactly what the previous release allowed.
+Opening tasks is how the library can tell the difference; if you never open one, each run is treated as
+its own task and the behaviour is unchanged.
+
+`task.complete` writes the decision as an `outcome` event on the final attempt, so `distill()` sees it
+like any other signal. Acceptance is positive evidence for whatever that attempt cited; `abandoned` and
+`escalated` are not, and `reasonCode` is preserved when you supply one.
+
+### 3.3 `begin` — the run record
 
 ```ts
 const run = mg.begin({
@@ -150,7 +197,7 @@ Everything you pass here lands in `RunRecord.provenance`, so a later "why did it
 lookup, not an investigation. `pack.ids` become `provenance.knowledgeIds`; that list is what credit
 assignment will later update.
 
-### 3.3 `complete` — the output
+### 3.4 `complete` — the output
 
 ```ts
 await run.complete(spec);          // spec must be plain JSON
@@ -160,7 +207,7 @@ await run.complete(spec);          // spec must be plain JSON
 cannot be diffed cannot be corrected. It is idempotent by rejection: a second call throws
 `MG_E_RUN_COMMITTED` rather than silently overwriting.
 
-### 3.4 Feedback — see the next section
+### 3.5 Feedback — see the next section
 
 ## 4. Every feedback kind
 
