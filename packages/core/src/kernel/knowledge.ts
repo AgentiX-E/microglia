@@ -16,9 +16,11 @@
  */
 import { contentKey } from './ids.js';
 import { clamp01, logit, sigmoid, smoothedRate } from './stats.js';
+import { TIER_RANK } from './types.js';
 import type {
   DistillCandidate,
   EvidenceRef,
+  ProvenanceTier,
   Json,
   KnowledgeItem,
   KnowledgeScope,
@@ -95,6 +97,18 @@ export function specificity(scope: KnowledgeScope): number {
   return count;
 }
 
+/**
+ * How many distinct tasks stand behind an item.
+ *
+ * The same grouping the score uses: a task contributes once, whatever its attempt
+ * count, and evidence without a task falls back to its run.
+ */
+export function distinctTasks(item: KnowledgeItem): number {
+  const seen = new Set<string>();
+  for (const evidence of item.evidence) seen.add(evidence.taskId ?? `run:${evidence.runId}`);
+  return seen.size;
+}
+
 export function scoreKnowledge(item: KnowledgeItem, policy: Policy, now = item.updatedAt): number {
   let logOdds = logit(BASE_PRIOR);
   // One task, one observation. Six attempts of the same task by the same user are
@@ -165,6 +179,13 @@ export function decideStatus(item: KnowledgeItem, policy: Policy, now: number): 
   if (item.status === 'active' && confidence < policy.retirementThreshold) {
     return { status: 'retired', reason: 'confidence-below-retirement', confidence };
   }
+  // A lesson that arrived as prose may be stored and may count as evidence, but it
+  // cannot activate on one task's word: text is the tier an articulate user can
+  // write, and the promotion gate is the difference between hearing someone and
+  // believing them.
+  if (item.tier === 'user-text' && distinctTasks(item) < 2) {
+    return { status: 'candidate', reason: 'needs-corroboration', confidence };
+  }
   if (confidence >= policy.activationThreshold && item.support >= policy.minSupport) {
     return { status: 'active', reason: 'confidence-cleared', confidence };
   }
@@ -203,6 +224,7 @@ export function createKnowledgeItem(
     createdAt: now,
     updatedAt: now,
     ...(candidate.payload === undefined ? {} : { payload: candidate.payload }),
+    ...(candidate.tier === undefined ? {} : { tier: candidate.tier }),
     ...(quarantined ? { statusReason: 'source-trust-below-quarantine' } : {}),
   };
   const confidence = scoreKnowledge(base, policy, now);
@@ -255,6 +277,11 @@ export function mergeEvidence(
     evidence,
     support,
     trust: Math.max(base.trust, candidate.trust),
+    // The strongest evidence tier wins: an outcome measured on the same claim
+    // promotes a lesson that arrived as prose.
+    ...(strongestTier(base.tier, candidate.tier) === undefined
+      ? {}
+      : { tier: strongestTier(base.tier, candidate.tier) as ProvenanceTier }),
     updatedAt: now,
     ...(candidate.payload === undefined ? {} : { payload: candidate.payload }),
   };
@@ -373,4 +400,13 @@ export function statementIdentity(
 /** True when the payload is small enough to render without a separate fetch. */
 export function isInlinePayload(payload: Json | undefined): boolean {
   return payload === undefined || JSON.stringify(payload).length <= 800;
+}
+
+function strongestTier(
+  left: ProvenanceTier | undefined,
+  right: ProvenanceTier | undefined,
+): ProvenanceTier | undefined {
+  if (left === undefined) return right;
+  if (right === undefined) return left;
+  return TIER_RANK[left] >= TIER_RANK[right] ? left : right;
 }

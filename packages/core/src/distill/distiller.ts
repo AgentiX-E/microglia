@@ -21,6 +21,7 @@ import {
   scoreKnowledge,
   decideStatus,
 } from '../kernel/index.js';
+import { tierFor } from '../kernel/index.js';
 import type { DistillCandidate, KnowledgeItem } from '../kernel/index.js';
 import {
   canGeneralize,
@@ -66,7 +67,7 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
     }
     for (const raw of candidates) {
       report.candidates += 1;
-      const candidate = sanitize(raw, options);
+      const candidate = sanitize({ ...raw, tier: raw.tier ?? tierFor(event.kind) }, options);
       if (!candidate) {
         report.rejectedUnsafe += 1;
         continue;

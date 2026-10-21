@@ -139,6 +139,23 @@ export type RunRecord = {
 export type KnowledgeKind = 'constraint' | 'exemplar' | 'negative' | 'lexicon' | 'procedure';
 
 /**
+ * How much structure a signal carries, which caps how far its lesson may travel.
+ *
+ * A free-text comment is a claim; an edit is a corrected artefact; an outcome is a
+ * measurement of one. The order matters because a store whose lessons come from
+ * text alone can be talked into anything by one articulate user -- `user-text` may
+ * be stored and may contribute evidence, but it cannot activate a rule on its own.
+ */
+export type ProvenanceTier = 'user-text' | 'structured-edit' | 'outcome' | 'host-asserted';
+
+export const TIER_RANK: Readonly<Record<ProvenanceTier, number>> = {
+  'user-text': 0,
+  'structured-edit': 1,
+  outcome: 2,
+  'host-asserted': 3,
+};
+
+/**
  * A scope is a conjunction of optional filters. Every present field must match.
  *
  * Scopes are deliberately coarse and human-auditable: a correction learned in
@@ -240,6 +257,8 @@ export type KnowledgeItem = {
   readonly systemUntil: number;
   readonly status: KnowledgeStatus;
   readonly statusReason?: string;
+  /** The strongest tier among the evidence that produced this item. */
+  readonly tier?: ProvenanceTier;
   /** Number of runs in which this item was retrieved and injected. */
   readonly applied: number;
   /** Number of those runs whose observed outcome was positive. */
@@ -304,6 +323,8 @@ export type DistillCandidate = {
   readonly trust: number;
   /** Stable identity of the claim, used to merge duplicates across runs. */
   readonly dedupeKey: string;
+  /** Set by the distiller from the event kind; absent means "not classified". */
+  readonly tier?: ProvenanceTier;
 };
 
 export type RecallQuery = {

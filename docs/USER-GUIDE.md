@@ -316,6 +316,32 @@ Thresholds (`Policy`, all overridable):
 | `minApplicationsForRetirement` | 3 | cited-and-failed count before forced retirement |
 | `defaultBudget` | 1200 | characters of knowledge per pack |
 
+### 5.1 Provenance tiers: why prose cannot promote itself
+
+Every signal carries a shape, and the shape decides how far its lesson may travel:
+
+| Tier | Comes from | May activate a rule alone? |
+|---|---|---|
+| `user-text` | a rating, a clarification, a preference, an abstention | **no** — stored, counted as evidence, not injected |
+| `structured-edit` | an edited output | yes |
+| `outcome` | an observed result (accepted, executed, failed) | yes |
+| `host-asserted` | reserved for a host that declares its own authority | yes |
+
+A `user-text` item stays a `candidate` with `statusReason: needs-corroboration` until a **second distinct
+task** says the same thing, or evidence of a stronger tier arrives on the same claim. The gate is what
+separates hearing someone from believing them: text is the one tier an articulate user can write, and a
+store that cannot tell prose from a measurement is a store where the loudest voice wins. `tier` is set from
+the event kind, so a host does not configure it; an item written before this field existed has no tier and
+keeps the old behaviour.
+
+```ts
+// One clarification: stored, visible in doctor(), never injected.
+await run.clarify('what does revenue mean here', 'net revenue, excluding tax');
+await mg.distill();     // item.tier === 'user-text', status === 'candidate'
+
+// A second task says the same: promoted.
+```
+
 ## 6. The knowledge lifecycle
 
 ```

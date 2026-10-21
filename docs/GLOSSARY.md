@@ -180,3 +180,10 @@ lowest-density items above a cap. Deterministic, dry-runnable, and never a rewri
 
 **Merge closure** — a merged item is retired with `statusReason: merged:<id>` and a closed `validUntil`
 rather than deleted, so the audit trail and past-tense queries survive.
+
+**Provenance tier** — the shape of a signal: `user-text`, `structured-edit`, `outcome`, `host-asserted`.
+Set from the event kind, never by configuration, and used to cap how far a lesson may travel.
+
+**Promotion gate** — the rule that a `user-text` item cannot activate on one task's word. It stays a
+candidate with `needs-corroboration` until a second distinct task, or evidence of a stronger tier, endorses
+the same claim.

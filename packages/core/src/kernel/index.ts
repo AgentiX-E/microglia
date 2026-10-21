@@ -28,6 +28,7 @@ export type {
   RecallQuery,
   RunProvenance,
   RunRecord,
+  ProvenanceTier,
   TaskRecord,
   TaskStatus,
   Utility,
@@ -35,6 +36,10 @@ export type {
 } from './types.js';
 
 export { MicrogliaError, isMicrogliaError, type MicrogliaErrorCode } from './errors.js';
+
+/** Value, not a type: the ordering the promotion gate compares tiers with. */
+export { TIER_RANK } from './types.js';
+export { tierFor } from './provenance.js';
 
 export {
   contentKey,
