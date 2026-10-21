@@ -27,8 +27,12 @@ on:
         description: 'Scope widening during distillation (false = ablation)'
         required: false
         default: 'true'
+      convention:
+        description: 'House convention (empty, or thousands)'
+        required: false
+        default: ''
       arms:
-        description: 'Control arms beyond none+full (gated,duplicate,wrong-scope,oracle)'
+        description: 'Control arms beyond none+full (gated,duplicate,wrong-scope,stated,oracle)'
         required: false
         default: 'gated,oracle'
   schedule:
@@ -84,6 +88,7 @@ jobs:
           SOTA_FOLDS: ${{ github.event.inputs.folds || '5' }}
           SOTA_GENERALIZE: ${{ github.event.inputs.generalize || 'true' }}
           SOTA_ARMS: ${{ github.event.inputs.arms || 'gated,oracle' }}
+          SOTA_CONVENTION: ${{ github.event.inputs.convention || '' }}
           SOTA_RESAMPLES: '10000'
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}
         run: pnpm poc:sota

@@ -96,15 +96,36 @@ const MAX_CALLS = nonNegative(process.env['POC_MAX_CALLS'], 4000);
 
 /** Bumped whenever the prompt text changes; a result without it is unreproducible. */
 const PROMPT_VERSION = 'sql-prompt/2';
+
+/**
+ * The house convention of the S2b protocol (roadmap): a workspace that reports
+ * numeric answers in thousands, rounded to three decimals.
+ *
+ * It is deliberately unreachable from the schema — no column says "divide by a
+ * thousand" — which is the property every measurement in this repository that
+ * moved accuracy has in common. `SOTA_CONVENTION=thousands` turns the lane into
+ * that experiment; empty keeps the ordinary execution-accuracy lane.
+ */
+const CONVENTION = (process.env['SOTA_CONVENTION'] ?? '').trim();
+const CONVENTION_SENTENCE =
+  'This workspace reports numeric answers in thousands, rounded to three decimals.';
+
+type Task = {
+  /** True when answers are judged under the house convention. */
+  readonly convention: boolean;
+  /** The expected reported value per case id, when the convention is on. */
+  readonly expected: ReadonlyMap<string, number>;
+};
 /** Task name under which knowledge is scoped, and therefore recalled. */
 const TASK = 'sql.generate';
 
-type ArmName = 'none' | 'full' | 'gated' | 'duplicate' | 'wrong-scope' | 'oracle';
+type ArmName = 'none' | 'full' | 'gated' | 'duplicate' | 'wrong-scope' | 'stated' | 'oracle';
 
 const OPTIONAL_ARMS: readonly Exclude<ArmName, 'none' | 'full'>[] = [
   'gated',
   'duplicate',
   'wrong-scope',
+  'stated',
   'oracle',
 ];
 
@@ -168,6 +189,8 @@ type CaseOutcome = {
   readonly packIds: number;
   /** Coverage of the question by the full pack's best rule, in [0, 1]. */
   readonly coverage: number;
+  /** The value the convention requires, when the convention is on. */
+  readonly expected: number | null;
   /** The rules the full arm actually injected, for per-rule attribution. */
   readonly packIdList: readonly string[];
   readonly tokens: number;
@@ -472,6 +495,40 @@ function execute(dbPath: string, sql: string): { ok: boolean; rows: string[] } {
   }
 }
 
+/**
+ * The single numeric value a query returns, or undefined.
+ *
+ * The convention is defined only on one-row, one-column numeric answers, so the
+ * subset is chosen by this function rather than by looking at outcomes.
+ */
+function scalarOf(dbPath: string, sql: string): number | undefined {
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const rows = db.prepare(sql).all() as Record<string, unknown>[];
+    if (rows.length !== 1) return undefined;
+    const row = rows[0];
+    if (row === undefined) return undefined;
+    const values = Object.values(row);
+    if (values.length !== 1) return undefined;
+    const value = values[0];
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+  } catch {
+    return undefined;
+  } finally {
+    db.close();
+  }
+}
+
+function round3(value: number): number {
+  return Math.round(value * 1000) / 1000;
+}
+
+/** The correction a user would make: same query, reported in thousands. */
+function reportedSql(sql: string): string {
+  const body = sql.replace(/;\s*$/, '').trim();
+  return `SELECT ROUND((${body}) / 1000.0, 3)`;
+}
+
 /** BIRD answers are compared as unordered multisets, the standard EX metric. */
 function matches(predicted: readonly string[], gold: readonly string[]): boolean {
   if (predicted.length !== gold.length) return false;
@@ -500,13 +557,14 @@ function extractSql(raw: string): string | undefined {
   return statement?.replace(/;[\s\n]*$/, '').trim();
 }
 
-function promptFor(row: BirdRow, ddl: string, pack: string): string {
+function promptFor(row: BirdRow, ddl: string, pack: string, stated = false): string {
   return [
     'You write one SQLite query that answers the question exactly.',
     'Return the SQL only, in a ```sql fence, with no explanation.',
     'Use only the tables and columns in the schema. Prefer explicit JOINs. Do not invent columns.',
     `Schema:\n${ddl}`,
     row.evidence ? `Evidence (may be wrong; it is external knowledge):\n${row.evidence}` : '',
+    stated && CONVENTION !== '' ? `Workspace convention:\n- ${CONVENTION_SENTENCE}` : '',
     pack === '' ? '' : `Workspace conventions learned from earlier corrections:\n${pack}`,
     `Question: ${row.question}`,
   ]
@@ -536,6 +594,8 @@ async function answer(
   dataset: Dataset,
   packText: string,
   packIds: number,
+  task: Task,
+  stated = false,
 ): Promise<Answer> {
   const dbPath = dataset.dbPath(row.db_id);
   const ddl = ddlOf(dbPath);
@@ -544,7 +604,7 @@ async function answer(
   let parseOk = false;
   let tokens = 0;
   try {
-    const reply = await chat(promptFor(row, ddl, packText));
+    const reply = await chat(promptFor(row, ddl, packText, stated));
     tokens = reply.tokens;
     const extracted = extractSql(reply.text);
     sql = extracted ?? '';
@@ -554,16 +614,29 @@ async function answer(
     parseOk = false;
   }
   const predicted = sql === '' ? { ok: false, rows: [] } : execute(dbPath, sql);
-  const gold = execute(dbPath, row.SQL);
+  const correct = task.convention
+    ? judgeConvention(dbPath, sql, task.expected.get(idOfRow(row)))
+    : predicted.ok && execute(dbPath, row.SQL).ok && matches(predicted.rows, execute(dbPath, row.SQL).rows);
   return {
     sql,
-    correct: predicted.ok && gold.ok && matches(predicted.rows, gold.rows),
+    correct,
     parseOk,
     execOk: predicted.ok,
     packIds,
     tokens,
     latencyMs: Math.round(performance.now() - started),
   };
+}
+
+/** The convention's judgement: one numeric answer, rounded to three decimals. */
+function judgeConvention(dbPath: string, sql: string, expected: number | undefined): boolean {
+  if (expected === undefined || sql === '') return false;
+  const value = scalarOf(dbPath, sql);
+  return value !== undefined && Math.abs(round3(value) - expected) < 1e-9;
+}
+
+function idOfRow(row: BirdRow): string {
+  return `${row.db_id}#${row.question_id}`;
 }
 
 type LearningPass = {
@@ -586,6 +659,7 @@ async function learn(
   host: Awaited<ReturnType<typeof openMicroglia>>,
   rows: readonly BirdRow[],
   dataset: Dataset,
+  task: Task,
 ): Promise<LearningPass> {
   let edited = 0;
   let goldFailed = 0;
@@ -601,14 +675,20 @@ async function learn(
       domainPack: 'bird',
     });
     await handle.complete({ sql });
-    const predicted = execute(dbPath, sql);
-    const gold = execute(dbPath, row.SQL);
-    if (!gold.ok) {
+    // The correction is what a user would type, not what the benchmark happens to
+    // hold: under the convention that is the same query reported in thousands.
+    const target = task.convention ? reportedSql(row.SQL) : row.SQL;
+    const expected = task.expected.get(idOfRow(row));
+    const satisfied = task.convention
+      ? judgeConvention(dbPath, sql, expected)
+      : execute(dbPath, row.SQL).ok && execute(dbPath, sql).ok &&
+        matches(execute(dbPath, sql).rows, execute(dbPath, row.SQL).rows);
+    if (task.convention && expected === undefined) {
       goldFailed += 1;
       continue;
     }
-    if (!predicted.ok || !matches(predicted.rows, gold.rows)) {
-      await handle.edit({ sql: row.SQL }, { note: 'execution mismatch' });
+    if (!satisfied) {
+      await handle.edit({ sql: target }, { note: 'execution mismatch' });
       edited += 1;
     }
   }
@@ -682,6 +762,7 @@ async function runFold(
   rows: readonly BirdRow[],
   foldOf: ReadonlyMap<string, number>,
   dataset: Dataset,
+  task: Task,
 ): Promise<FoldResult> {
   const idOf = (row: BirdRow): string => `${row.db_id}#${row.question_id}`;
   const evalRows = rows.filter((row) => foldOf.get(idOf(row)) === fold);
@@ -715,7 +796,7 @@ async function runFold(
     random: mulberry32(SEED),
   });
 
-  const learning = await learn(host, learnRows, dataset);
+  const learning = await learn(host, learnRows, dataset, task);
   const distilled = await host.distill({ generalize: GENERALIZE });
   const frozen = await knowledgeDigest(store);
 
@@ -739,8 +820,8 @@ async function runFold(
   for (const row of evalRows) {
     const query = { task: TASK, text: row.question };
     const pack = await host.recall({ ...query, scope: { domain: row.db_id } });
-    const base = await answer(row, dataset, '', 0);
-    const full = await answer(row, dataset, pack.rendered, pack.ids.length);
+    const base = await answer(row, dataset, '', 0, task);
+    const full = await answer(row, dataset, pack.rendered, pack.ids.length, task);
 
     const arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>> = {};
     const armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
@@ -750,24 +831,34 @@ async function runFold(
         scope: { domain: row.db_id },
         minCoverage: MIN_COVERAGE,
       });
-      const result = await answer(row, dataset, gated.rendered, gated.ids.length);
+      const result = await answer(row, dataset, gated.rendered, gated.ids.length, task);
       arms.gated = result.correct;
       armPackIds.gated = result.packIds;
     }
     if (ARMS.has('duplicate')) {
       const twice = pack.rendered === '' ? '' : `${pack.rendered}\n${pack.rendered}`;
-      const result = await answer(row, dataset, twice, pack.ids.length);
+      const result = await answer(row, dataset, twice, pack.ids.length, task);
       arms.duplicate = result.correct;
       armPackIds.duplicate = result.packIds;
     }
     if (ARMS.has('wrong-scope')) {
       const wrong = await host.recall({ ...query, scope: { domain: nextDatabase(row.db_id) } });
-      const result = await answer(row, dataset, wrong.rendered, wrong.ids.length);
+      const result = await answer(row, dataset, wrong.rendered, wrong.ids.length, task);
       arms['wrong-scope'] = result.correct;
       armPackIds['wrong-scope'] = result.packIds;
     }
+    if (ARMS.has('stated')) {
+      const result = await answer(row, dataset, '', 0, task, true);
+      arms.stated = result.correct;
+      armPackIds.stated = 0;
+    }
     if (ARMS.has('oracle')) {
-      const result = await answer(row, dataset, `- ${row.SQL}`, 0);
+      // Under the convention the oracle is the expected value, not the gold SQL:
+      // the question is whether a single stated fact changes the answer form.
+      const hint = task.convention
+        ? `- The reported value for this question is ${task.expected.get(idOfRow(row)) ?? 'unknown'}.`
+        : `- ${row.SQL}`;
+      const result = await answer(row, dataset, hint, 0, task);
       arms.oracle = result.correct;
       armPackIds.oracle = 0;
     }
@@ -787,6 +878,7 @@ async function runFold(
       execOk: full.execOk,
       packIds: full.packIds,
       coverage: Number(queryCoverage(row.question, pack.items[0]?.statement ?? '').toFixed(3)),
+      expected: task.expected.get(idOf(row)) ?? null,
       packIdList: pack.ids,
       tokens: full.tokens,
       latencyMs: full.latencyMs,
@@ -857,15 +949,40 @@ type ArmSummary = {
 };
 
 async function main(): Promise<void> {
+  if (CONVENTION !== '' && CONVENTION !== 'thousands') {
+    throw new MicrogliaError('MG_E_CONFIG', `Unknown convention '${CONVENTION}'`, {
+      known: 'thousands',
+    });
+  }
   const dataset = await loadDataset(LIMIT);
-  const rows = dataset.rows;
+  const idOf = (row: BirdRow): string => `${row.db_id}#${row.question_id}`;
+
+  // The subset is chosen by a rule that does not look at outcomes: a one-row,
+  // one-column numeric answer is the only place the convention is defined.
+  const expected = new Map<string, number>();
+  let rows = dataset.rows;
+  if (CONVENTION === 'thousands') {
+    rows = dataset.rows.filter((row) => {
+      const value = scalarOf(dataset.dbPath(row.db_id), row.SQL);
+      if (value === undefined) return false;
+      expected.set(idOf(row), round3(value / 1000));
+      return true;
+    });
+    if (rows.length < 20) {
+      throw new MicrogliaError('MG_E_CONFIG', 'Too few questions define the convention', {
+        qualifying: rows.length,
+        of: dataset.rows.length,
+      });
+    }
+  }
+  const task: Task = { convention: CONVENTION === 'thousands', expected };
+
   if (rows.length < FOLDS) {
     throw new MicrogliaError('MG_E_CONFIG', 'Not enough questions for the requested folds', {
       questions: rows.length,
       folds: FOLDS,
     });
   }
-  const idOf = (row: BirdRow): string => `${row.db_id}#${row.question_id}`;
   const foldOf = assignFolds(
     rows.map((row) => idOf(row)),
     FOLDS,
@@ -873,7 +990,7 @@ async function main(): Promise<void> {
 
   const folds: FoldResult[] = [];
   for (let fold = 0; fold < FOLDS; fold += 1) {
-    folds.push(await runFold(fold, rows, foldOf, dataset));
+    folds.push(await runFold(fold, rows, foldOf, dataset, task));
   }
 
   const cases = folds.flatMap((fold) => fold.cases);
@@ -1035,6 +1152,7 @@ async function main(): Promise<void> {
       duplicate_multiplier: 2,
       min_coverage: MIN_COVERAGE,
       arms: [...ARMS],
+      convention: CONVENTION === 'thousands' ? CONVENTION_SENTENCE : null,
       task: TASK,
       distill_prompt: 'distill-prompt/2',
       distill_max_tokens: 2000,
@@ -1044,6 +1162,8 @@ async function main(): Promise<void> {
       eval: cases.length,
       learn_mean: folds.reduce((sum, fold) => sum + fold.learn, 0) / Math.max(1, folds.length),
       databases: new Set(rows.map((row) => row.db_id)).size,
+      qualifying: rows.length,
+      reported: rows.length === 0 ? 0 : expected.size,
     },
     calls,
     retries,
