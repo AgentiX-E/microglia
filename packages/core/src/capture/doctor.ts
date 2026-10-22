@@ -73,6 +73,28 @@ export async function diagnose(options: DoctorOptions): Promise<Diagnosis> {
     });
   }
 
+  /**
+   * The promotion gate's failure mode.
+   *
+   * A `user-text` claim stays a candidate until a second distinct task endorses
+   * it, so a workspace can collect a hundred lessons that all look stored and
+   * none of which ever reaches a prompt. That is the same silent stillness this
+   * file exists to name, and it is invisible in every other count: `active` is 0,
+   * `quarantined` is 0, and the store keeps growing.
+   */
+  const awaiting = items.filter(
+    (item) => item.status === 'candidate' && item.statusReason === 'needs-corroboration',
+  );
+  if (awaiting.length > 0) {
+    issues.push({
+      code: 'MG_D_AWAITING_CORROBORATION',
+      severity: awaiting.length === items.length ? 'warn' : 'info',
+      detail:
+        'Prose lessons are waiting for a second distinct task; every one is stored and none can steer output',
+      ids: awaiting.map((item) => item.id),
+    });
+  }
+
   const conflicted = items.filter((item) => item.status === 'conflicted');
   if (conflicted.length > 0) {
     issues.push({

@@ -121,7 +121,8 @@ export type DiagnosisIssue = {
     | 'MG_D_ACTIVE_BELOW_THRESHOLD'
     | 'MG_D_NO_KNOWLEDGE'
     | 'MG_D_HIGH_QUARANTINE'
-    | 'MG_D_CONFLICTED';
+    | 'MG_D_CONFLICTED'
+    | 'MG_D_AWAITING_CORROBORATION';
   readonly severity: 'info' | 'warn' | 'error';
   readonly detail: string;
   readonly ids?: readonly string[];

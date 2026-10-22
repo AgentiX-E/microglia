@@ -330,3 +330,29 @@ describe('determinism', () => {
     expect(await build()).toBe(await build());
   });
 });
+
+describe('doctor: the promotion gate backlog', () => {
+  it('names the lessons that are stored but cannot steer output', async () => {
+    const store = await EmbeddedMemory.open(new MemoryJournal());
+    const mg = await openMicroglia({
+      app: 'test',
+      namespace: 'acme',
+      store,
+      clock: fixedClock(at),
+      random: mulberry32(2),
+    });
+    const run = mg.begin({ task: 'chart.recommend', input: { q: 'trend' } });
+    await run.complete({ mark: 'bar' });
+    await run.clarify('which mark for trend?', 'line');
+    await mg.distill();
+
+    const diagnosis = await mg.doctor();
+    const issue = diagnosis.issues.find((entry) => entry.code === 'MG_D_AWAITING_CORROBORATION');
+    expect(issue).toBeDefined();
+    expect(issue?.severity).toBe('warn');
+    expect(issue?.ids).toHaveLength(1);
+    // A warning, not an error: a single-user workspace legitimately sits here.
+    expect(diagnosis.ok).toBe(true);
+    await mg.close();
+  });
+});
