@@ -15,7 +15,14 @@ export {
   type L4Verdict,
   type PassAtKInput,
 } from './passk.js';
-export { reachableRecovery, reachableShare, scopePair, type Scoped } from './pairs.js';
+export {
+  pairVerdict,
+  reachableRecovery,
+  reachableShare,
+  scopePair,
+  type PairVerdict,
+  type Scoped,
+} from './pairs.js';
 export {
   CONVENTIONS,
   HELD_OUT,

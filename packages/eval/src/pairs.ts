@@ -52,3 +52,47 @@ export function reachableRecovery(options: {
   if (gained <= 0) return { reachable, ratio: 0 };
   return { reachable, ratio: Math.min(1, gained / headroom) };
 }
+
+/**
+ * The L2b question, as arithmetic: does observing the failure add anything?
+ *
+ * Two arms answer the same cases. `single` learns from the correction alone —
+ * the failure is never recorded. `pair` records attempt one as a failure and the
+ * correction on attempt two, so the store sees *which* rule was in the pack when
+ * the answer went wrong, not only what the right answer was.
+ *
+ * The verdict is deliberately not "pair > single". It reports both recoveries,
+ * their difference, and the reachable share they were computed over, because an
+ * improvement smaller than the design's own resolution is not an improvement —
+ * and a paired delta on an unreachable wall is a statement about the split.
+ */
+export type PairVerdict = {
+  readonly reachable: number;
+  readonly singleRecovery: number;
+  readonly pairRecovery: number;
+  /** `pairRecovery - singleRecovery`, the quantity a pair-contrast claim rests on. */
+  readonly delta: number;
+  readonly pairHelps: boolean;
+};
+
+export function pairVerdict(options: {
+  readonly training: readonly Scoped[];
+  readonly evaluated: readonly Scoped[];
+  readonly single: number;
+  readonly pair: number;
+  readonly baseline: number;
+  readonly oracle: number;
+  /** Smallest difference worth calling an improvement, in accuracy points. */
+  readonly bar: number;
+}): PairVerdict {
+  const single = reachableRecovery({ ...options, arm: options.single });
+  const pair = reachableRecovery({ ...options, arm: options.pair });
+  const delta = pair.ratio - single.ratio;
+  return {
+    reachable: single.reachable,
+    singleRecovery: single.ratio,
+    pairRecovery: pair.ratio,
+    delta,
+    pairHelps: delta >= options.bar && pair.reachable > 0,
+  };
+}
