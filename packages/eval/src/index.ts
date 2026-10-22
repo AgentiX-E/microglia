@@ -7,7 +7,14 @@
  */
 export { comparePaired, type PairedResult } from './stats.js';
 export { recoveryRatio, type RecoveryInput } from './recovery.js';
-export { compareToPublished, meanPassAtK, passAtK, type PassAtKInput } from './passk.js';
+export {
+  compareToPublished,
+  l4Verdict,
+  meanPassAtK,
+  passAtK,
+  type L4Verdict,
+  type PassAtKInput,
+} from './passk.js';
 export { reachableRecovery, reachableShare, scopePair, type Scoped } from './pairs.js';
 export {
   CONVENTIONS,

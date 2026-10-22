@@ -55,3 +55,40 @@ function combinations(n: number, k: number): number {
   for (let i = 0; i < k; i += 1) result = (result * (n - i)) / (i + 1);
   return result;
 }
+
+/** The two numbers a τ² lane is allowed to claim, in one place. */
+export type L4Verdict = {
+  readonly pass4: number;
+  readonly published: number;
+  readonly delta: number;
+  readonly tasks: number;
+  readonly meetsBar: boolean;
+  readonly coversSplit: boolean;
+};
+
+/**
+ * Judge an L4 run without running one.
+ *
+ * The gate has two clauses and they fail for different reasons: the effect can
+ * miss the bar while the split is fully covered, or the split can be short while
+ * the effect looks good. Collapsing them into one boolean is how a 12-task probe
+ * becomes a published "we beat ALTK-Evolve", so they stay separate here and the
+ * caller must report both.
+ */
+export function l4Verdict(options: {
+  readonly tasks: readonly PassAtKInput[];
+  readonly published: number;
+  readonly bar: number;
+  readonly minTasks?: number;
+}): L4Verdict {
+  const pass4 = meanPassAtK(options.tasks);
+  const compared = compareToPublished(pass4, options.published, options.bar);
+  return {
+    pass4,
+    published: options.published,
+    delta: compared.delta,
+    tasks: options.tasks.length,
+    meetsBar: compared.meets,
+    coversSplit: options.tasks.length >= (options.minTasks ?? 60),
+  };
+}
