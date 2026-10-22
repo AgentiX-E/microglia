@@ -7,6 +7,7 @@
  */
 export { comparePaired, type PairedResult } from './stats.js';
 export { recoveryRatio, type RecoveryInput } from './recovery.js';
+export { compareToPublished, meanPassAtK, passAtK, type PassAtKInput } from './passk.js';
 
 export {
   attributeRules,

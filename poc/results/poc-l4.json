@@ -1,0 +1,19 @@
+{
+  "id": "poc-l4",
+  "title": "L4 — τ²-bench pass^4 (not run: no environment)",
+  "ranAt": "2026-10-22T10:41:51.320Z",
+  "model": "none",
+  "n": 0,
+  "calls": 0,
+  "metrics": {
+    "status_not_run": 1,
+    "published_pass4": 0.575,
+    "bar": 0.05,
+    "k": 4
+  },
+  "notes": [
+    "The metric layer is live (passk.ts, four tests): the unbiased estimator, the task mean, and a bar-gated comparison.",
+    "No result is claimed. τ²-retail and τ²-airline need a tool-calling sandbox and a user simulator; this lane reports not-run rather than a zero it did not measure.",
+    "Set TAU_DRIVER to a module exporting run(): Promise<readonly PassAtKInput[]> and the sota workflow will run it and apply the same gates."
+  ]
+}

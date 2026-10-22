@@ -31,6 +31,7 @@
     "poc:integrity": "tsx poc/integrity.ts",
     "poc:memform": "tsx poc/memform.ts",
     "poc:l0": "tsx poc/l0.ts",
+    "poc:l4": "tsx poc/l4.ts",
     "poc:cortex": "node scripts/cortex-conformance.mjs",
     "audit:deps": "pnpm audit --prod",
     "audit:repo": "node scripts/audit.mjs",

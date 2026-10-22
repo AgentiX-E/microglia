@@ -166,6 +166,11 @@ p = 5.9e-213, 706 gained and none lost), and the domain that received no feedbac
 lane also prints the smallest effect its own sample could detect — 7.16pp — because an effect smaller
 than that would be indistinguishable from noise here.
 
+The τ²-bench lane (L4) ships its metric layer only: the unbiased `pass^k`, the task mean, and a
+comparison that meets a published number through a stated bar. It runs in the `sota` workflow behind a
+repository variable, and until the tool-calling environment exists it writes a `not-run` artefact rather
+than a zero it did not measure.
+
 `pnpm poc:integrity` runs the second instrument: 1,000 events replayed in five shuffled orders, plus a
 control that bypasses the sort the store relies on. Order invariance and replay determinism are 1.00,
 the control disagrees (which is what makes the 1.00 mean something), and a mid-stream schema rename
@@ -203,7 +208,7 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-99.84 / 97.65 / 100 / 99.84 over 552 tests; the branches that remain uncovered are listed with file,
+99.84 / 97.66 / 100 / 99.84 over 556 tests; the branches that remain uncovered are listed with file,
 line, and reason in the internal technical design, and none is excluded with an ignore comment.
 
 ## Licence

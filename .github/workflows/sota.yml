@@ -170,3 +170,40 @@ jobs:
             poc/results/poc-sota-bird.json
             poc/results/poc-sota-attribution.json
           if-no-files-found: error
+
+  # L4 — τ²-bench pass^4.
+  #
+  # Skipped until the environment exists: `TAU_DRIVER` names a module that runs the
+  # two arms and returns per-task trial counts, and the tool-calling sandbox has to
+  # come with it. A job that runs without either would publish a zero it did not
+  # measure, so the gate is a repository variable rather than a TODO.
+  l4:
+    name: 'L4 tau-bench pass^4'
+    if: vars.TAU_ENV_READY == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build
+      - name: L4 lane
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          TAU_DRIVER: ${{ vars.TAU_DRIVER }}
+          TAU_MODEL: ${{ vars.TAU_MODEL }}
+        run: pnpm poc:l4
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: l4-evidence
+          path: poc/results
