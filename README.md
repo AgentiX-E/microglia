@@ -167,13 +167,15 @@ lane also prints the smallest effect its own sample could detect — 7.16pp — 
 than that would be indistinguishable from noise here.
 
 `pnpm eval:pairs` runs the pair-contrast lane (L2b): the same corpus taught twice, once with the
-correction alone and once with the failed attempt recorded before the correction. Both arms land at
-**87.50%** against a 12.50% no-memory baseline over eight held-out questions, with 75% of them reachable
-from the teaching split and one convention that no correction could supply. The verdict is a null —
-**0.00pp**, below the 5pp bar — and the artefact says why it is *vacuous*: in a single teaching pass every
-correction is answered from an empty pack, so neither protocol had a cited rule to blame and the
-comparison could not have come out differently. That is reported as an instrument limit, not as an effect
-size.
+correction alone and once with the failed attempt recorded before the correction. Teaching runs in two
+rounds, and the second re-asks two questions whose convention has since been revised — so the correction
+retrieves a rule that is now wrong, and both arms actually correct a cited rule (2 of 2 revisions, 2 of 7
+corrections overall). Both arms land at **87.50%** against a 12.50% baseline over eight held-out
+questions, 75% of them reachable: delta **0.00pp**, below the 5pp bar, and the two stores end with
+**identical rule states**. The null is measured, not vacuous: a correction at a scope where an active rule
+disagrees already records a contradiction, which demotes the old rule — the recorded failure adds nothing
+to a decision that has been made. Its only unique contribution, a negative lesson, is one the deterministic
+reader has no channel for.
 
 The τ²-bench lane (L4) ships its metric layer only: the unbiased `pass^k`, the task mean, and a
 comparison that meets a published number through a stated bar. It runs in the `sota` workflow behind a
@@ -216,7 +218,7 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-99.85 / 97.75 / 100 / 99.85 over 593 tests; the branches that remain uncovered are listed with file,
+99.85 / 97.80 / 100 / 99.85 over 605 tests; the branches that remain uncovered are listed with file,
 line, and reason in the internal technical design, and none is excluded with an ignore comment.
 
 ## Licence

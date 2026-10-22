@@ -4,59 +4,63 @@
  * Every other lane has one attempt per question. A correction therefore arrives
  * with the right answer and nothing else: the store learns what to say, and never
  * learns *which rule was in the prompt* when the answer went wrong. A host that
- * records the failed attempt as a failed attempt, then opens a second attempt and
- * corrects that, gives the store a second, different signal — the rule that was
- * cited is blamed, and the task's history says the first answer was rejected.
+ * records the failed attempt as failed, then opens a second attempt and corrects
+ * that, gives the store a second signal — the rule that was cited is blamed.
  *
- * The lane runs both protocols over one corpus, one teaching budget and one
- * holdout:
+ * ## The condition the comparison needs
  *
- *   single   one attempt, completed, corrected. The correction is the only
- *            evidence the loop gets.
- *   pair     attempt one completed, then recorded as a failure (`wrong-mark`),
- *            then attempt two from the same pack, completed and corrected.
- *            `parentRunId` links the pair, so a reader can tell the attempts
- *            apart from two unrelated generations.
+ * Blame needs a culprit. A single cold teaching pass has none: it distils once at
+ * the end, so every correction is answered from an empty pack and both protocols
+ * see identical evidence. The first version of this lane measured exactly that
+ * and said so — a zero delta that could not have been anything else.
+ *
+ * So the lane teaches in **two rounds with a distillation between them**, and the
+ * second round re-asks the questions whose conventions the corpus has since
+ * revised (`REVISIONS`). Round one teaches `sales` that a comparison wants a line
+ * chart; round two asks the same question, and `sales` now wants a pie. The store
+ * still holds the line rule, the reader retrieves it, the answer is wrong, and
+ * the correction cites the rule that caused it. That is the moment the two
+ * protocols diverge:
+ *
+ *   single   one attempt, completed, corrected. The store is told the new answer.
+ *   pair     attempt one completed, recorded as a failure (`wrong-mark`), then
+ *            attempt two from the same pack, completed and corrected, with
+ *            `parentRunId` linking the pair. The store is told the new answer
+ *            *and* that the cited rule produced a wrong attempt.
  *
  * Attempt two is not allowed to re-recall. The store is not distilled between
  * attempts, so a second read would return the same pack; re-reading would only
- * add retrieval noise to the comparison, and the variable under test is the
- * *recorded failure*, not a second retrieval.
+ * add retrieval noise, and the variable under test is the recorded failure.
  *
  * ## What the numbers are allowed to say
  *
  * Accuracy on the holdout is not a result by itself: the corpus contains one
  * question whose convention no teaching case shares, so a share of the holdout is
- * fixed cost. The verdict therefore carries the reachable share beside both
- * recoveries, and a difference below the bar is not called an improvement — the
- * same discipline `pairVerdict` enforces.
+ * fixed cost. The verdict carries the reachable share beside both recoveries, and
+ * a difference below the bar is not called an improvement.
  *
- * A null result is a result. If the failure record adds nothing, the lane says
- * so; what it must never do is report a delta computed over cases it could not
- * have reached.
- *
- * ## The number that decides whether the verdict means anything
- *
- * The pair protocol can only differ from the single one through evidence about a
- * rule that was *cited* when the answer went wrong. A cold teaching pass distils
- * once, at the end, so every correction in it is answered from an empty pack and
- * cites nothing: both arms then see exactly the same evidence, and a zero delta
- * is arithmetic rather than a measurement.
- *
- * The lane therefore counts citations on corrected attempts and reports the count
- * as a gate. When it is zero the verdict is marked *vacuous* — the arms were
- * compared, and the comparison could not have come out any other way. Reporting
- * that is the difference between a null result and a null instrument.
+ * Two mechanism-level readouts travel with the accuracy: `cited` counts corrected
+ * attempts that retrieved a rule (the condition above), and `stale` counts active
+ * rules whose answer the domain has since revised. A pair arm that retires a
+ * stale rule the single arm keeps is a difference worth knowing about even when
+ * the holdout has not moved yet.
  */
 import { openMicroglia, type Microglia } from '@agentix-e/microglia-core/capture';
 import { ruleInterpreter, type Interpreter } from '@agentix-e/microglia-core/distill';
 import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
 import { mulberry32, steppingClock, type Json } from '@agentix-e/microglia-core';
-import { chartEditDistance, chartInterpreter, type ChartSpec } from '../workload/index.js';
+import {
+  chartEditDistance,
+  chartInterpreter,
+  type ChartConstraint,
+  type ChartMark,
+  type ChartSpec,
+} from '../workload/index.js';
 import { applyKnowledge, queryFeatures } from '../scenario.js';
 import {
   buildConventions,
   holdoutCases,
+  revisionCases,
   trainingSplit,
   unreachableCases,
   type ConventionCase,
@@ -75,14 +79,32 @@ const NAMESPACE = 'l2b';
 const SEED = 20261022;
 
 /**
- * The oracle is the gold *by construction*: the gold is the stated convention,
- * so the ceiling of this corpus is exactly 1.00. L2b's question is not whether
- * that ceiling is reachable — it is not, for one question — but how much of it
- * each protocol recovers.
+ * The oracle is the gold *by construction*: the gold is the stated convention, so
+ * the ceiling of this corpus is exactly 1.00. One question is unreachable by
+ * construction; how much of the rest each protocol recovers is the question.
  */
 const ORACLE = 1;
 
 export type L2bArm = 'single' | 'pair';
+
+/** One teaching round: a batch of questions, followed by a distillation. */
+export type TeachingRound = {
+  readonly id: string;
+  readonly cases: readonly ConventionCase[];
+};
+
+export type RoundReport = {
+  readonly round: string;
+  readonly cases: number;
+  readonly corrections: number;
+  readonly cited: number;
+};
+
+/** One rule as the store holds it: scope, answer, status. Comparable across arms. */
+export type RuleState = {
+  readonly rule: string;
+  readonly status: string;
+};
 
 export type ArmReport = {
   readonly arm: L2bArm;
@@ -97,10 +119,15 @@ export type ArmReport = {
   readonly corrections: number;
   /** Corrected attempts that cited at least one rule: the lever the pair needs. */
   readonly correctedWithCitation: number;
+  /** Active rules whose answer the domain has since revised. Lower is better. */
+  readonly stale: number;
   readonly knowledge: number;
   readonly active: number;
   /** Negative lessons the store holds: what the pair arm adds. */
   readonly negative: number;
+  readonly rounds: readonly RoundReport[];
+  /** Every constraint the store holds, in a stable order, for a cross-arm diff. */
+  readonly rules: readonly RuleState[];
 };
 
 export type L2bGate = {
@@ -111,10 +138,11 @@ export type L2bGate = {
   /**
    * Whether a failure stops the lane.
    *
-   * A non-blocking gate is evidence about the instrument rather than a
-   * regression: the lever gate reports a comparison that could not have come out
-   * the other way, and a lane that turned that into a red build would be hiding a
-   * design limit behind a passing gate.
+   * Every gate here blocks. "Non-blocking" was the honest answer while the lane
+   * could not exercise its own lever; now that the revision round guarantees a
+   * culprit, an unexercised lever is a broken instrument and belongs in red. The
+   * field stays explicit so a future gap can be marked as one without inventing a
+   * second gate shape.
    */
   readonly blocking: boolean;
 };
@@ -126,16 +154,73 @@ export type WallCase = {
   readonly pair: boolean;
 };
 
+export type RuleDiff = {
+  readonly rule: string;
+  readonly single: string;
+  readonly pair: string;
+};
+
 export type L2bReport = {
-  readonly cases: { readonly teach: number; readonly holdout: number; readonly unreachable: number };
+  readonly cases: {
+    readonly teach: number;
+    readonly revision: number;
+    readonly holdout: number;
+    readonly unreachable: number;
+  };
   readonly reachable: number;
   readonly baseline: number;
   readonly oracle: number;
   readonly arms: readonly ArmReport[];
   readonly verdict: PairVerdict;
   readonly wall: readonly WallCase[];
+  /**
+   * Rules the two stores hold differently.
+   *
+   * A zero delta is only explained when this is empty: two protocols can agree on
+   * the holdout while leaving different stores behind, and that difference is what
+   * would show up the next time a question is asked. An empty diff plus a zero
+   * delta says the failure record changed nothing measurable at all.
+   */
+  readonly storeDiff: readonly RuleDiff[];
   readonly gates: readonly L2bGate[];
 };
+
+/** Everything both arms must share for the comparison to be paired. */
+export type LaneSetup = {
+  readonly schedule: readonly TeachingRound[];
+  readonly holdout: readonly ConventionCase[];
+  readonly wall: ReadonlySet<string>;
+  /** The convention in force per scope key, i.e. what a current store should hold. */
+  readonly due: ReadonlyMap<string, ChartMark>;
+};
+
+function scopeKeyOf(entry: { readonly domain: string; readonly intent: string }): string {
+  return `${entry.domain}\u0000${entry.intent}`;
+}
+
+/**
+ * The schedule both arms run: teach, distil, revise, distil, then evaluate.
+ *
+ * The rounds are built from the corpus rather than from a counter, so a schedule
+ * cannot silently skip the revision — the round that makes the comparison
+ * non-vacuous.
+ */
+export function teachingSchedule(cases: readonly ConventionCase[]): readonly TeachingRound[] {
+  return [
+    { id: 'base', cases: trainingSplit(cases) },
+    { id: 'revision', cases: revisionCases(cases) },
+  ];
+}
+
+export function laneSetup(cases: readonly ConventionCase[] = buildConventions()): LaneSetup {
+  const holdout = holdoutCases(cases);
+  return {
+    schedule: teachingSchedule(cases),
+    holdout,
+    wall: new Set(unreachableCases(cases).map((entry) => entry.id)),
+    due: new Map(holdout.map((entry) => [scopeKeyOf(entry), entry.goldMark])),
+  };
+}
 
 /** The two interpreters the study composes, in the same order. */
 const combined: Interpreter = async (context) => [
@@ -210,7 +295,7 @@ export async function teachCase(
     attempt: 1,
     input: featuresFor(item),
     pack,
-    promptVersion: 'l2b-v1',
+    promptVersion: 'l2b-v2',
     domainPack: 'nl2charts',
     schemaDigest: item.domain,
   });
@@ -241,7 +326,7 @@ export async function teachCase(
     attempt: 2,
     input: featuresFor(item),
     pack,
-    promptVersion: 'l2b-v1',
+    promptVersion: 'l2b-v2',
     domainPack: 'nl2charts',
     schemaDigest: item.domain,
     parentRunId: first.id,
@@ -303,35 +388,141 @@ export function shareOf(
   return total === 0 ? 0 : hits / total;
 }
 
-/** Teach, distil once, then read the holdout. */
-export async function runPairArm(
-  arm: L2bArm,
-  teaching: readonly ConventionCase[],
-  holdout: readonly ConventionCase[],
-  wallIds: ReadonlySet<string>,
-): Promise<ArmReport> {
+/**
+ * Active rules whose answer the domain has since revised.
+ *
+ * The mechanism readout: a protocol that blames the cited rule should stop
+ * applying it, and this counts what the store would still hand a prompt. It is
+ * reported beside accuracy because the two can disagree — a stale rule that loses
+ * the confidence tie-break costs nothing today and everything the moment the new
+ * rule is edited.
+ */
+export function staleActive(
+  items: readonly {
+    readonly status: string;
+    readonly kind: string;
+    readonly scope: { readonly domain?: string; readonly intent?: string };
+    readonly payload?: Json;
+  }[],
+  due: ReadonlyMap<string, ChartMark>,
+): number {
+  let stale = 0;
+  for (const item of items) {
+    if (item.status !== 'active') continue;
+    // A negative lesson carries `{ code }`, not a chart constraint: reading `then`
+    // off it would throw, and counting it as a stale rule would be a lie.
+    if (item.kind !== 'constraint') continue;
+    const { domain, intent } = item.scope;
+    if (domain === undefined || intent === undefined) continue;
+    const payload = item.payload as ChartConstraint | undefined;
+    if (payload?.then === undefined) continue;
+    const expected = due.get(scopeKeyOf({ domain, intent }));
+    if (expected !== undefined && payload.then.mark !== expected) stale += 1;
+  }
+  return stale;
+}
+
+/**
+ * The constraints a store holds, as comparable rows.
+ *
+ * Sorted so two arms can be diffed without caring about insertion order, and
+ * keyed by scope plus answer rather than by id: ids carry timestamps, and a diff
+ * on ids would report the same two rules as different.
+ */
+export function ruleStates(
+  items: readonly {
+    readonly status: string;
+    readonly kind: string;
+    readonly scope: { readonly domain?: string; readonly intent?: string };
+    readonly payload?: Json;
+  }[],
+): readonly RuleState[] {
+  const rows: RuleState[] = [];
+  for (const item of items) {
+    if (item.kind !== 'constraint') continue;
+    const payload = item.payload as ChartConstraint | undefined;
+    // A constraint with no chart in it is not a rule a prompt could act on; the
+    // negative lessons the pair arm writes are excluded above by kind, and this
+    // guard covers a malformed constraint rather than trusting the store.
+    if (payload?.then === undefined) continue;
+    const domain = item.scope.domain ?? '*';
+    const intent = item.scope.intent ?? '*';
+    rows.push({ rule: `${domain}/${intent}=${payload.then.mark}`, status: item.status });
+  }
+  return rows.sort(compareRows);
+}
+
+/**
+ * Order rows by claim, then by status.
+ *
+ * Two items can hold the same scope and answer with different statuses — a
+ * demoted copy and a live one — so the comparator has to define an order for
+ * equal claims rather than lean on the sort being stable.
+ */
+function compareRows(a: RuleState, b: RuleState): number {
+  const left = `${a.rule}\u0000${a.status}`;
+  const right = `${b.rule}\u0000${b.status}`;
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
+/**
+ * Rules the two arms hold differently, including rules only one of them has.
+ *
+ * A rule present in one store and absent from the other is the strongest form of
+ * difference, so absence is a value ('absent') rather than a skipped row.
+ */
+export function diffRuleStates(
+  single: readonly RuleState[],
+  pair: readonly RuleState[],
+): readonly RuleDiff[] {
+  const left = new Map(single.map((row) => [row.rule, row.status]));
+  const right = new Map(pair.map((row) => [row.rule, row.status]));
+  const names = [...new Set([...left.keys(), ...right.keys()])].sort();
+  const diffs: RuleDiff[] = [];
+  for (const rule of names) {
+    const a = left.get(rule) ?? 'absent';
+    const b = right.get(rule) ?? 'absent';
+    if (a !== b) diffs.push({ rule, single: a, pair: b });
+  }
+  return diffs;
+}
+
+/** Teach every round, distil between rounds, then read the holdout. */
+export async function runPairArm(arm: L2bArm, setup: LaneSetup): Promise<ArmReport> {
   const mg = await openLane();
+  const rounds: RoundReport[] = [];
   const outcomes: TeachingOutcome[] = [];
-  for (const item of teaching) outcomes.push(await teachCase(mg, item, arm));
-  const runs = outcomes.reduce((total, outcome) => total + outcome.runs, 0);
-  const corrections = outcomes.reduce((total, outcome) => total + outcome.corrections, 0);
-  const correctedWithCitation = citedCorrections(outcomes);
-  await mg.distill({ generalize: true });
-  const correct = await predictAll(mg, holdout);
+  for (const round of setup.schedule) {
+    const roundOutcomes: TeachingOutcome[] = [];
+    for (const item of round.cases) roundOutcomes.push(await teachCase(mg, item, arm));
+    outcomes.push(...roundOutcomes);
+    rounds.push({
+      round: round.id,
+      cases: round.cases.length,
+      corrections: roundOutcomes.reduce((total, outcome) => total + outcome.corrections, 0),
+      cited: citedCorrections(roundOutcomes),
+    });
+    await mg.distill({ generalize: true });
+  }
+  const correct = await predictAll(mg, setup.holdout);
 
   const items = await mg.store.listKnowledge({ namespace: NAMESPACE, status: 'all' });
   const report: ArmReport = {
     arm,
     holdout: correct,
-    accuracy: shareOf(holdout, correct, () => true),
-    reachableAccuracy: shareOf(holdout, correct, (item) => !wallIds.has(item.id)),
-    wallAccuracy: shareOf(holdout, correct, (item) => wallIds.has(item.id)),
-    runs,
-    corrections,
-    correctedWithCitation,
+    accuracy: shareOf(setup.holdout, correct, () => true),
+    reachableAccuracy: shareOf(setup.holdout, correct, (item) => !setup.wall.has(item.id)),
+    wallAccuracy: shareOf(setup.holdout, correct, (item) => setup.wall.has(item.id)),
+    runs: outcomes.reduce((total, outcome) => total + outcome.runs, 0),
+    corrections: outcomes.reduce((total, outcome) => total + outcome.corrections, 0),
+    correctedWithCitation: citedCorrections(outcomes),
+    stale: staleActive(items, setup.due),
     knowledge: items.length,
     active: items.filter((item) => item.status === 'active').length,
     negative: items.filter((item) => item.kind === 'negative').length,
+    rounds,
+    rules: ruleStates(items),
   };
   await mg.close();
   return report;
@@ -348,23 +539,35 @@ function armOf(arms: readonly ArmReport[], name: L2bArm): ArmReport {
  *
  * None of them asks "did the pair win": that is the verdict, and it may honestly
  * be no. They ask whether the instrument is measuring what it claims — headroom
- * exists, the wall is a wall, the split has both mass and a wall, and the
- * mechanism under test actually fired.
+ * exists, the wall is a wall, the split has both mass and a wall, the failure was
+ * recorded, and the revision round actually produced a culprit.
  */
 export function buildL2bGates(report: {
   readonly arms: readonly ArmReport[];
   readonly reachable: number;
   readonly baseline: number;
+  readonly revision: number;
 }): readonly L2bGate[] {
   const single = armOf(report.arms, 'single');
   const pair = armOf(report.arms, 'pair');
-  const gate = (
-    id: string,
-    criterion: string,
-    actual: string,
-    pass: boolean,
-    blocking = true,
-  ): L2bGate => ({ id, criterion, actual, pass, blocking });
+  /**
+   * Corrections the revision round produced.
+   *
+   * Summed over every round named `revision` rather than read from the first
+   * match: a schedule that grew a second revision round should add up, not
+   * silently report the first one.
+   */
+  const revisionCorrections = (arm: ArmReport): number =>
+    arm.rounds
+      .filter((round) => round.round === 'revision')
+      .reduce((total, round) => total + round.corrections, 0);
+  const gate = (id: string, criterion: string, actual: string, pass: boolean): L2bGate => ({
+    id,
+    criterion,
+    actual,
+    pass,
+    blocking: true,
+  });
   return [
     gate(
       'l2b-corpus-has-headroom',
@@ -391,11 +594,18 @@ export function buildL2bGates(report: {
       pair.negative > 0 && pair.runs > single.runs,
     ),
     gate(
+      'l2b-revision-has-a-culprit',
+      'every revision question was answered wrongly from a rule, so blame had a target',
+      `${revisionCorrections(single)}/${report.revision} single, ${revisionCorrections(pair)}/${report.revision} pair`,
+      revisionCorrections(single) === report.revision &&
+        revisionCorrections(pair) === report.revision &&
+        report.revision > 0,
+    ),
+    gate(
       'l2b-lever-exercised',
       'corrected attempts cited a rule, so the failure record had something to blame',
       `${single.correctedWithCitation}/${single.corrections} single, ${pair.correctedWithCitation}/${pair.corrections} pair`,
-      single.correctedWithCitation > 0 || pair.correctedWithCitation > 0,
-      false,
+      single.correctedWithCitation > 0 && pair.correctedWithCitation > 0,
     ),
   ];
 }
@@ -405,24 +615,19 @@ function pct(value: number): string {
 }
 
 /** The whole lane: both arms, the verdict, and the gates. */
-export async function runL2b(): Promise<L2bReport> {
-  const cases = buildConventions();
-  const teaching = trainingSplit(cases);
-  const holdout = holdoutCases(cases);
-  const wall = unreachableCases(cases);
-  const wallIds = new Set(wall.map((entry) => entry.id));
-
-  const arms: ArmReport[] = [
-    await runPairArm('single', teaching, holdout, wallIds),
-    await runPairArm('pair', teaching, holdout, wallIds),
-  ];
+export async function runL2b(
+  cases: readonly ConventionCase[] = buildConventions(),
+): Promise<L2bReport> {
+  const setup = laneSetup(cases);
+  const arms: ArmReport[] = [await runPairArm('single', setup), await runPairArm('pair', setup)];
   const single = armOf(arms, 'single');
   const pair = armOf(arms, 'pair');
-  const baseline = shareOf(holdout, baselineCorrect(holdout), () => true);
-  const reachable = reachableShare(teaching, holdout);
+  const baseline = shareOf(setup.holdout, baselineCorrect(setup.holdout), () => true);
+  const taught = setup.schedule.flatMap((round) => round.cases);
+  const reachable = reachableShare(taught, setup.holdout);
   const verdict = pairVerdict({
-    training: teaching,
-    evaluated: holdout,
+    training: taught,
+    evaluated: setup.holdout,
     single: single.accuracy,
     pair: pair.accuracy,
     baseline,
@@ -430,24 +635,40 @@ export async function runL2b(): Promise<L2bReport> {
     bar: L2B_BAR,
   });
 
-  const wallReport: WallCase[] = wall.map((entry) => {
-    const index = holdout.findIndex((candidate) => candidate.id === entry.id);
-    return {
-      id: entry.id,
-      gold: entry.goldMark,
-      single: single.holdout[index] === true,
-      pair: pair.holdout[index] === true,
-    };
-  });
+  // The wall is a subset of the holdout by construction, so the report is built by
+  // walking the holdout once: no id lookup that could miss, and no `?? ''`.
+  const wallReport: WallCase[] = setup.holdout.flatMap((entry, index) =>
+    setup.wall.has(entry.id)
+      ? [
+          {
+            id: entry.id,
+            gold: entry.goldMark,
+            single: single.holdout[index] === true,
+            pair: pair.holdout[index] === true,
+          },
+        ]
+      : [],
+  );
 
   return {
-    cases: { teach: teaching.length, holdout: holdout.length, unreachable: wall.length },
+    cases: {
+      teach: trainingSplit(cases).length,
+      revision: revisionCases(cases).length,
+      holdout: setup.holdout.length,
+      unreachable: setup.wall.size,
+    },
     reachable,
     baseline,
     oracle: ORACLE,
     arms,
     verdict,
     wall: wallReport,
-    gates: buildL2bGates({ arms, reachable, baseline }),
+    storeDiff: diffRuleStates(single.rules, pair.rules),
+    gates: buildL2bGates({
+      arms,
+      reachable,
+      baseline,
+      revision: revisionCases(cases).length,
+    }),
   };
 }

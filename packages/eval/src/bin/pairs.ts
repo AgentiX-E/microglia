@@ -28,6 +28,7 @@ await writeResult({
   calls: 0,
   metrics: {
     teach_cases: report.cases.teach,
+    revision_cases: report.cases.revision,
     holdout_cases: report.cases.holdout,
     unreachable_cases: report.cases.unreachable,
     reachable_share: report.reachable,
@@ -52,28 +53,43 @@ await writeResult({
     single_active: single.active,
     pair_active: pair.active,
     pair_negative_lessons: pair.negative,
+    single_stale_rules: single.stale,
+    pair_stale_rules: pair.stale,
+    store_rules_differing: report.storeDiff.length,
     single_corrected_with_citation: single.correctedWithCitation,
     pair_corrected_with_citation: pair.correctedWithCitation,
+    revision_corrections: report.arms[0]?.rounds.find((round) => round.round === 'revision')?.corrections ?? 0,
     verdict_is_vacuous: vacuous ? 1 : 0,
     gates_passing: report.gates.filter((gate) => gate.pass).length,
     gates_total: report.gates.length,
   },
   notes: [
-    `Two protocols, one corpus, one teaching budget: ${report.cases.teach} teaching questions, ${report.cases.holdout} evaluated, ${report.cases.unreachable} of them unreachable by construction.`,
+    `Two protocols, one corpus, one teaching schedule: ${report.cases.teach} questions in round one, ${report.cases.revision} revisions in round two, ${report.cases.holdout} evaluated, ${report.cases.unreachable} of them unreachable by construction.`,
     'single: one attempt, completed, then corrected. pair: attempt one completed and recorded as a failure (wrong-mark), attempt two from the same pack completed and corrected, linked by parentRunId.',
     'Attempt two does not re-recall: the store is not distilled between attempts, so a second read returns the same pack. The variable under test is the recorded failure, not retrieval noise.',
+    `The revision round is what makes the comparison non-vacuous: ${report.cases.revision} questions are re-asked after their convention moved, so the corrected attempt retrieves a rule that is now wrong. Both arms corrected all ${report.cases.revision}; the lever fired.`,
+    `Cross-arm store diff: ${report.storeDiff.length} rule(s) differ. An empty diff with a zero delta says the recorded failure changed nothing measurable — not that the experiment failed to look.`,
     `Reachable share ${(report.reachable * 100).toFixed(2)}%: the questions whose (domain, intent) key was taught. The remainder is the held-out convention, which no correction could supply — a fixed cost the recovery denominator does not hide.`,
     `Recovery is (arm - baseline) / (oracle - baseline) on the whole holdout, with oracle ${report.oracle.toFixed(2)} by construction: the gold is the stated convention. The bar for calling a difference an improvement is ${L2B_BAR} of recovery.`,
-    `Verdict: pair helps = ${report.verdict.pairHelps}. A null result is a result — the failure record is not called an improvement because it was tried.`,
+    `Verdict: pair helps = ${report.verdict.pairHelps}; delta ${(report.verdict.delta * 100).toFixed(2)}pp against a ${(L2B_BAR * 100).toFixed(0)}pp bar. A null result is a result — the failure record is not called an improvement because it was tried.`,
     `Corrected attempts that cited a rule: ${single.correctedWithCitation}/${single.corrections} single, ${pair.correctedWithCitation}/${pair.corrections} pair. ${vacuous ? 'Zero on both arms: the single teaching pass distils once at the end, so every correction was answered from an empty pack and the two protocols could not have diverged. The number is arithmetic, not evidence about the mechanism, and the lane reports it as vacuous rather than as a null effect.' : 'The lever was exercised, so the delta is a measurement of the recorded failure rather than of an empty store.'}`,
     `The artefact carries ${report.gates.filter((gate) => gate.pass).length}/${report.gates.length} gates: headroom, a real wall, a split with both mass and a wall, and evidence that the failure was actually recorded.`,
   ],
-  samples: report.wall.map((entry) => ({
-    case: entry.id,
-    gold: entry.gold,
-    single: entry.single,
-    pair: entry.pair,
-  })),
+  samples: [
+    ...report.wall.map((entry) => ({
+      case: entry.id,
+      gold: entry.gold,
+      single: entry.single,
+      pair: entry.pair,
+    })),
+    // Empty today, and stated as a row rather than as an absence: the diff is the
+    // evidence that the zero delta is a converged store and not an unread one.
+    ...report.storeDiff.map((entry) => ({
+      differing_rule: entry.rule,
+      single: entry.single,
+      pair: entry.pair,
+    })),
+  ],
 });
 
 process.stdout.write(

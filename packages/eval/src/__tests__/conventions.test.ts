@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   CONVENTIONS,
   HELD_OUT,
+  REVISIONS,
   buildConventions,
   holdoutCases,
+  revisionCases,
   trainingSplit,
   unreachableCases,
 } from '../conventions.js';
@@ -45,6 +47,21 @@ describe('the pair-contrast corpus', () => {
     // recovery denominator would be zero: this is the property the split exists
     // for, stated as a number rather than as an intention.
     expect(reachableShare(trainingSplit(cases).map(scopeOf), holdoutCases(cases).map(scopeOf))).toBe(0.75);
+  });
+
+  it('revises a convention in place, and judges later questions by the revision', () => {
+    const cases = buildConventions();
+    expect(revisionCases(cases).map((entry) => entry.id)).toEqual([
+      'cv_sales_comparisonr',
+      'cv_finance_comparisonr',
+    ]);
+    for (const entry of revisionCases(cases)) {
+      expect(entry.goldMark).toBe(REVISIONS[entry.domain]);
+      expect(entry.intent).toBe('comparison');
+    }
+    // A revision is a corpus property, so the holdout of the same scope must ask
+    // the revised answer: otherwise following the revision would score as wrong.
+    expect(holdoutCases(cases).find((entry) => entry.id === 'cvho_sales_comparison')?.goldMark).toBe('pie');
   });
 
   it('keeps the control honest: trend agrees with the policy everywhere', () => {
