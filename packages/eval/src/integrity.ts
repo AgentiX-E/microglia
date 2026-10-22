@@ -208,6 +208,14 @@ class EventOrderView implements MemoryPort {
     return this.inner.search(query, now);
   }
 
+  public forget(
+    selector: Parameters<MemoryPort['forget']>[0],
+    policy: Parameters<MemoryPort['forget']>[1],
+    at: number,
+  ): ReturnType<MemoryPort['forget']> {
+    return this.inner.forget(selector, policy, at);
+  }
+
   public stats(): ReturnType<MemoryPort['stats']> {
     return this.inner.stats();
   }

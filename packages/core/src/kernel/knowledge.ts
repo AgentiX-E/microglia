@@ -397,9 +397,55 @@ export function statementIdentity(
   return dedupeKeyOf({ namespace, kind: kind as DistillCandidate['kind'], scope, statement });
 }
 
+/**
+ * The item as it stands once some of its evidence has been erased.
+ *
+ * Erasure is not a filter on a query: the evidence is gone, so the claim it
+ * supported has to be re-derived from what is left. Support is the mass of the
+ * surviving observations, the provenance tier is the strongest tier that
+ * survived (`tiers` maps a feedback id to the tier of the event behind it), and
+ * the admission decision runs again -- which is the only way an item promoted by
+ * an erased outcome can fall back to `needs-corroboration` instead of keeping a
+ * promotion it no longer has evidence for.
+ */
+export function withoutEvidence(
+  item: KnowledgeItem,
+  dropped: ReadonlySet<string>,
+  tiers: ReadonlyMap<string, ProvenanceTier>,
+  policy: Policy,
+  now: number,
+): KnowledgeItem {
+  const evidence = item.evidence.filter((entry) => !dropped.has(entry.feedbackId));
+  const surviving = new Set(evidence.map((entry) => entry.feedbackId));
+  const kept: ProvenanceTier[] = [];
+  for (const [feedbackId, tier] of tiers) if (surviving.has(feedbackId)) kept.push(tier);
+  // An evidence ref whose event is no longer in the store (a compacted or
+  // partial journal) carries no tier; the item then keeps the one it had, because
+  // erasure must not demote a claim on the grounds that its record is missing.
+  const tier = kept.length === 0 ? item.tier : strongestOf(kept);
+  const next: KnowledgeItem = {
+    ...item,
+    evidence,
+    support: evidence.reduce((sum, entry) => sum + entry.weight, 0),
+    ...(tier === undefined ? {} : { tier }),
+    updatedAt: now,
+  };
+  const decision = decideStatus({ ...next, confidence: scoreKnowledge(next, policy, now) }, policy, now);
+  return {
+    ...next,
+    confidence: decision.confidence,
+    status: decision.status,
+    statusReason: decision.reason,
+  };
+}
+
 /** True when the payload is small enough to render without a separate fetch. */
 export function isInlinePayload(payload: Json | undefined): boolean {
   return payload === undefined || JSON.stringify(payload).length <= 800;
+}
+
+function strongestOf(tiers: readonly ProvenanceTier[]): ProvenanceTier {
+  return tiers.reduce((left, right) => (TIER_RANK[left] >= TIER_RANK[right] ? left : right));
 }
 
 function strongestTier(

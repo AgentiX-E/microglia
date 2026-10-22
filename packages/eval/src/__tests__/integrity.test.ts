@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DistillCandidate, FeedbackEvent, KnowledgeItem, RunRecord } from '@agentix-e/microglia-core';
-import { mulberry32 } from '@agentix-e/microglia-core';
+import { defaultPolicy, mulberry32 } from '@agentix-e/microglia-core';
 import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
 import {
   replayStore,
@@ -224,6 +224,11 @@ describe('the mutation control', () => {
     const query = { namespace: 'acme', task: 'chart.recommend', text: 'trend line chart' } as const;
     expect(await view.search(query)).toEqual(await inner.search(query));
     expect(await view.stats()).toEqual(await inner.stats());
+    // Erasure is delegated too: a control that could not delete would be a
+    // different store, not the same store read in another order.
+    const erased = await view.forget({ taskId: 't_missing' }, defaultPolicy, AT + 60_000);
+    expect(erased).toMatchObject({ events: 0, runs: 0, knowledge: 0 });
+
     await view.close();
     // Closing twice is a no-op on the inner store, and the view must not turn it
     // into an error of its own.

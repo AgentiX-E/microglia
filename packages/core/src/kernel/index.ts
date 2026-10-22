@@ -11,6 +11,9 @@ export type {
   ActorType,
   CorrectionOp,
   DistillCandidate,
+  ErasureReport,
+  ErasureSelector,
+  ErasureTombstone,
   EvidenceRef,
   FeedbackEvent,
   FeedbackKind,
@@ -51,6 +54,8 @@ export {
 export { fixedClock, steppingClock, systemClock, type Clock } from './clock.js';
 
 export { canonicalize, hashJson, hashText, jsonEqual } from './hash.js';
+
+export { withoutEvidence } from './knowledge.js';
 
 export {
   applyOps,

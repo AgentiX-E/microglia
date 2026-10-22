@@ -559,6 +559,38 @@ Run `distill()` on a timer (60s is plenty), at session end, or after N feedback 
 and idempotent: re-running it over the same events creates nothing new, because evidence is deduped
 by feedback id.
 
+### 10.3 Erasure
+
+A store of other people's corrections without a delete is not shippable, so `forget()` is part of the
+contract rather than an extension point:
+
+```ts
+await mg.forget({ ids: ['k_01j9z3k4m2_7f3a9c'] });   // this claim, whatever its evidence
+await mg.forget({ taskId: 't_7' });                   // everything one task produced
+await mg.forget({ actorHash: 'sha256:…' });           // everything one person contributed
+```
+
+Three rules, each with a reason:
+
+1. **At least one selector is required.** An empty request is a wipe, and a wipe should have to be asked
+   for.
+2. **The namespace is never yours to pass.** `mg.forget` scopes the request to its own namespace, because
+   an `actorHash` alone would otherwise erase that person in every tenant the store holds.
+3. **Erasing evidence re-derives the claim.** An item that cited an erased event loses that reference and
+   is re-scored: support is recomputed from what survives, the provenance tier is the strongest tier that
+   survived, and admission runs again. An item whose last evidence was erased is removed. This is the part
+   that matters — a rule promoted by an execution result that has been erased must fall back behind the
+   promotion gate, or the erasure left the promotion behind.
+
+What is written instead of the data is a **tombstone** in `erasures.jsonl`: the selector, the time, and
+the record ids. Never a statement, never a payload — a record of what was erased would defeat the erasure
+it documents. The three journals are then rewritten without the erased rows, so a reopen sees the erasure
+rather than replaying it away.
+
+Measured (POC-28b, 1,000 events): 10 items erased by id, 10 task instances erased by task, 170 events
+and 4 claims removed by the cascade, 86 claims re-scored, and **0** erased records retrievable or cited
+afterwards.
+
 ## 11. Failure modes and what they mean
 
 | Error code | Cause | Fix |

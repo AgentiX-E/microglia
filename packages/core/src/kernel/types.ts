@@ -203,6 +203,59 @@ export type EvidenceRef = {
   readonly taskId?: string;
 };
 
+/**
+ * Which records an erasure request covers.
+ *
+ * A host with deletion obligations is asked for a person, not for a row: it knows
+ * an actor id or a task id, rarely the internal ids of the knowledge an erasure
+ * produced. Selecting by all three is how the request survives that asymmetry.
+ * At least one field is required; an empty selector would be a wipe.
+ */
+export type ErasureSelector = {
+  /**
+   * Tenant scope. The facade always sets it, because an `actorId` alone would
+   * otherwise erase that person in every namespace the store happens to hold.
+   */
+  readonly namespace?: string;
+  readonly ids?: readonly string[];
+  readonly taskId?: string;
+  /**
+   * The salted hash the event carries, never a raw identifier: the library does
+   * not hold identities, so it cannot be asked to erase by one it never saw.
+   */
+  readonly actorHash?: string;
+};
+
+export type ErasureReport = {
+  readonly events: number;
+  readonly runs: number;
+  /** Items removed because no evidence survived. */
+  readonly knowledge: number;
+  /** Items kept, with the erased evidence removed and the claim re-scored. */
+  readonly rescored: number;
+  readonly tombstone: string;
+};
+
+/**
+ * What was erased, and nothing about what it said.
+ *
+ * The tombstone is the audit trail of a deletion: it records that a selector was
+ * applied at a time and how many records it covered. It never carries a statement
+ * or a payload, because a record of the erased data would defeat the erasure.
+ */
+export type ErasureTombstone = {
+  readonly schema: 'microglia.erasure/1';
+  readonly id: string;
+  readonly at: number;
+  readonly namespace?: string;
+  readonly selector: ErasureSelector;
+  readonly erased: {
+    readonly events: readonly string[];
+    readonly runs: readonly string[];
+    readonly knowledge: readonly string[];
+  };
+};
+
 export type KnowledgeStatus = 'candidate' | 'active' | 'quarantined' | 'retired' | 'conflicted';
 
 /**

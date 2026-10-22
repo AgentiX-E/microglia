@@ -11,7 +11,7 @@
  * `compact()` a filter rather than a replay engine.
  */
 import { MicrogliaError } from '../kernel/index.js';
-import type { FeedbackEvent, KnowledgeItem, RunRecord } from '../kernel/index.js';
+import type { ErasureTombstone, FeedbackEvent, KnowledgeItem, RunRecord } from '../kernel/index.js';
 import { mkdir, open, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
@@ -26,13 +26,24 @@ export interface Journal {
   appendEvent(event: FeedbackEvent): Promise<void>;
   appendRun(run: RunRecord): Promise<void>;
   writeKnowledge(item: KnowledgeItem): Promise<void>;
+  /**
+   * Replace the stored log with exactly this snapshot.
+   *
+   * Erasure is the one operation a delta cannot express: a deleted row has no
+   * patch. Rewriting is therefore part of the journal contract rather than a
+   * host concern, and `load()` must return the rewritten state afterwards.
+   */
+  rewrite(snapshot: JournalSnapshot): Promise<void>;
+  /** Record that an erasure happened, never what it contained. */
+  appendErasure(tombstone: ErasureTombstone): Promise<void>;
   close(): Promise<void>;
 }
 
 export class MemoryJournal implements Journal {
-  private readonly events: FeedbackEvent[] = [];
-  private readonly runs: RunRecord[] = [];
-  private readonly knowledge = new Map<string, KnowledgeItem>();
+  private events: FeedbackEvent[] = [];
+  private runs: RunRecord[] = [];
+  private knowledge = new Map<string, KnowledgeItem>();
+  private readonly erasures: ErasureTombstone[] = [];
 
   public load(): Promise<JournalSnapshot> {
     return Promise.resolve({
@@ -54,6 +65,20 @@ export class MemoryJournal implements Journal {
 
   public writeKnowledge(item: KnowledgeItem): Promise<void> {
     this.knowledge.set(item.id, item);
+    return Promise.resolve();
+  }
+
+  public rewrite(snapshot: JournalSnapshot): Promise<void> {
+    this.events = [...snapshot.events];
+    this.runs = [...snapshot.runs];
+    this.knowledge = new Map(snapshot.knowledge.map((item) => [item.id, item]));
+    return Promise.resolve();
+  }
+
+  public appendErasure(tombstone: ErasureTombstone): Promise<void> {
+    // Held in memory for the same reason the log is: a test can assert the
+    // tombstone exists without a directory on disk.
+    this.erasures.push(tombstone);
     return Promise.resolve();
   }
 
@@ -112,6 +137,14 @@ export class JsonlJournal implements Journal {
     return this.enqueue('knowledge.jsonl', item);
   }
 
+  public rewrite(snapshot: JournalSnapshot): Promise<void> {
+    return this.enqueueRewrite(snapshot);
+  }
+
+  public appendErasure(tombstone: ErasureTombstone): Promise<void> {
+    return this.enqueue('erasures.jsonl', tombstone);
+  }
+
   public async close(): Promise<void> {
     await this.queue;
     this.opened = false;
@@ -133,6 +166,27 @@ export class JsonlJournal implements Journal {
       }
     });
     return this.queue;
+  }
+
+  private enqueueRewrite(snapshot: JournalSnapshot): Promise<void> {
+    this.queue = this.queue.then(async () => {
+      if (!this.opened) {
+        throw new MicrogliaError('MG_E_NOT_OPEN', 'Journal is not open');
+      }
+      await this.replace(journalPath(this.dir, 'events'), snapshot.events);
+      await this.replace(journalPath(this.dir, 'runs'), snapshot.runs);
+      await this.replace(journalPath(this.dir, 'knowledge'), snapshot.knowledge);
+    });
+    return this.queue;
+  }
+
+  private async replace(target: string, rows: readonly unknown[]): Promise<void> {
+    const temp = `${target}.tmp`;
+    // One file at a time, each renamed into place: a crash between the two
+    // leaves a store that has erased the events but not the knowledge, which
+    // the next `forget` re-derives from the same selector rather than losing data.
+    await writeFile(temp, rows.map((row) => JSON.stringify(row)).join('\n') + (rows.length === 0 ? '' : '\n'), 'utf8');
+    await rename(temp, target);
   }
 
   private async rewriteKnowledge(items: readonly KnowledgeItem[]): Promise<void> {

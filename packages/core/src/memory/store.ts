@@ -9,13 +9,21 @@
 import {
   MicrogliaError,
   bm25Score,
+  contentKey,
   scopeMatches,
   specificity,
+  tierFor,
   tokenize,
+  withoutEvidence,
 } from '../kernel/index.js';
 import type {
+  ErasureReport,
+  ErasureSelector,
+  ErasureTombstone,
   FeedbackEvent,
   KnowledgeItem,
+  Policy,
+  ProvenanceTier,
   RecallQuery,
   RunRecord,
 } from '../kernel/index.js';
@@ -36,7 +44,7 @@ export class EmbeddedMemory implements MemoryPort {
   private readonly events = new Map<string, FeedbackEvent>();
   private readonly runs = new Map<string, RunRecord>();
   private readonly knowledge = new Map<string, KnowledgeItem>();
-  private readonly index = new LexicalIndex();
+  private index = new LexicalIndex();
   private closed = false;
 
   private constructor(journal: Journal) {
@@ -187,6 +195,116 @@ export class EmbeddedMemory implements MemoryPort {
     // against an injected clock. Search is therefore a pure function of stored
     // state, and replaying the same store returns the same pack.
     return Promise.resolve(hits.slice(0, limit));
+  }
+
+  /**
+   * Erase by selector, then re-derive every claim that cited the erased events.
+   *
+   * Three things happen, in this order, and the order is the design: the events
+   * and runs go, the claims that cited them are rebuilt from the evidence that
+   * survives (losing their tier if the promotion rested on an erased outcome),
+   * and a tombstone records that a selector was applied. The tombstone never
+   * carries a statement or a payload — a record of the erased data would defeat
+   * the erasure it documents.
+   */
+  public async forget(
+    selector: ErasureSelector,
+    policy: Policy,
+    at: number,
+  ): Promise<ErasureReport> {
+    this.assertOpen();
+    const explicit = new Set(selector.ids ?? []);
+    if (
+      explicit.size === 0 &&
+      selector.taskId === undefined &&
+      selector.actorHash === undefined
+    ) {
+      throw new MicrogliaError('MG_E_CONFIG', 'forget requires ids, taskId or actorHash');
+    }
+    const inScope = (namespace: string): boolean =>
+      selector.namespace === undefined || selector.namespace === namespace;
+
+    const erasedEvents = [...this.events.values()].filter(
+      (event) =>
+        inScope(event.namespace) &&
+        (explicit.has(event.id) ||
+          (selector.taskId !== undefined && event.taskId === selector.taskId) ||
+          (selector.actorHash !== undefined && event.actor.idHash === selector.actorHash)),
+    );
+    const eventIds = new Set(erasedEvents.map((event) => event.id));
+    const erasedRuns = [...this.runs.values()].filter(
+      (run) =>
+        inScope(run.namespace) &&
+        (explicit.has(run.id) ||
+          (selector.taskId !== undefined && run.taskId === selector.taskId)),
+    );
+
+    // The tier of each *surviving* event, so a claim that keeps an outcome keeps
+    // the promotion that outcome earned, and one whose outcome was erased does not.
+    const tiers = new Map<string, ProvenanceTier>();
+    for (const event of this.events.values()) {
+      if (!eventIds.has(event.id)) tiers.set(event.id, tierFor(event.kind));
+    }
+
+    const removedKnowledge: string[] = [];
+    let rescored = 0;
+    for (const item of [...this.knowledge.values()]) {
+      const cited = item.evidence.some((entry) => eventIds.has(entry.feedbackId));
+      if (!inScope(item.namespace)) continue;
+      if (!explicit.has(item.id) && !cited) continue;
+      if (explicit.has(item.id)) {
+        removedKnowledge.push(item.id);
+        this.knowledge.delete(item.id);
+        this.index.remove(item.id);
+        continue;
+      }
+      const next = withoutEvidence(item, eventIds, tiers, policy, at);
+      if (next.evidence.length === 0) {
+        removedKnowledge.push(item.id);
+        this.knowledge.delete(item.id);
+        this.index.remove(item.id);
+        continue;
+      }
+      await this.journal.writeKnowledge(next);
+      this.indexKnowledge(next);
+      rescored += 1;
+    }
+
+    for (const event of erasedEvents) this.events.delete(event.id);
+    for (const run of erasedRuns) this.runs.delete(run.id);
+
+    await this.journal.rewrite({
+      events: [...this.events.values()],
+      runs: [...this.runs.values()],
+      knowledge: [...this.knowledge.values()],
+    });
+
+    const tombstone: ErasureTombstone = {
+      schema: 'microglia.erasure/1',
+      id: contentKey(
+        `erasure|${at}|${[...eventIds].sort().join(',')}|${erasedRuns
+          .map((run) => run.id)
+          .sort()
+          .join(',')}|${removedKnowledge.sort().join(',')}`,
+      ),
+      at,
+      ...(selector.namespace === undefined ? {} : { namespace: selector.namespace }),
+      selector,
+      erased: {
+        events: erasedEvents.map((event) => event.id),
+        runs: erasedRuns.map((run) => run.id),
+        knowledge: removedKnowledge,
+      },
+    };
+    await this.journal.appendErasure(tombstone);
+
+    return {
+      events: erasedEvents.length,
+      runs: erasedRuns.length,
+      knowledge: removedKnowledge.length,
+      rescored,
+      tombstone: tombstone.id,
+    };
   }
 
   public stats(): Promise<MemoryStats> {

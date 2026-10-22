@@ -1,7 +1,7 @@
 {
   "id": "poc-integrity",
-  "title": "POC-28 — replay invariants: order, determinism, and schema drift",
-  "ranAt": "2026-10-22T00:56:50.292Z",
+  "title": "POC-28 — replay invariants (order, determinism, schema drift) and erasure",
+  "ranAt": "2026-10-22T01:18:24.190Z",
   "model": "none",
   "n": 1000,
   "calls": 0,
@@ -14,16 +14,22 @@
     "instrument_sensitive": 1,
     "stale_schema_injected": 0,
     "old_digest_retrievable": 4,
+    "erased_items": 10,
+    "erased_events": 170,
+    "erased_knowledge_cascade": 4,
+    "erased_rescored": 86,
+    "events_remaining": 830,
+    "resurrected_after_erasure": 0,
     "active_items": 28,
     "candidate_items": 13,
     "retired_items": 15,
-    "gates_passed": 5
+    "gates_passed": 10
   },
   "notes": [
     "Interpreter: deterministic chart interpreter over run input; 1000 events, 60 task instances, digest renamed at event 600.",
     "Order invariance replays the same events in five shuffled journal orders; the store sorts on read, so a pass means the sort is load-bearing rather than incidental.",
     "The control replays through a view that returns events newest-first. It must disagree, or the harness cannot detect order dependence and the reported 1.00 is vacuous.",
-    "Erasure (forget, D20) is the remaining rung of this lane: it is not implemented yet, so no post-erasure recall is claimed here.",
+    "Erasure (D20) is measured here rather than asserted: ten items by id, then ten task instances by task. Nothing erased may be retrievable, and the pack may not cite it.",
     "No model calls: distillation is the deterministic rule path, so the lane costs nothing to re-run (deepseek-chat is not used)."
   ],
   "samples": [
@@ -56,6 +62,36 @@
       "pass": true,
       "actual": 4,
       "criterion": "> 0"
+    },
+    {
+      "id": "erased-by-id",
+      "pass": true,
+      "actual": 10,
+      "criterion": "= 10"
+    },
+    {
+      "id": "erasure-unreachable",
+      "pass": true,
+      "actual": 0,
+      "criterion": "= 0"
+    },
+    {
+      "id": "erasure-not-cited",
+      "pass": true,
+      "actual": 0,
+      "criterion": "= 0"
+    },
+    {
+      "id": "erasure-cascade",
+      "pass": true,
+      "actual": 170,
+      "criterion": "> 0"
+    },
+    {
+      "id": "erasure-bounded",
+      "pass": true,
+      "actual": 830,
+      "criterion": "= 830"
     }
   ]
 }

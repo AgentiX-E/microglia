@@ -17,6 +17,8 @@ import {
 } from '../kernel/index.js';
 import type {
   Clock,
+  ErasureReport,
+  ErasureSelector,
   FeedbackEvent,
   FeedbackSignal,
   Json,
@@ -194,6 +196,23 @@ export class Microglia implements RunHost {
       namespace: this.namespace,
       ...options,
     });
+  }
+
+  /**
+   * Erase the records a selector covers, then re-derive what cited them.
+   *
+   * The namespace is not a parameter: it is the facade's, always. An `actorHash`
+   * alone would otherwise erase that person in every tenant the store holds, and
+   * a deletion request that reaches further than the request did is a worse bug
+   * than the data it was meant to remove.
+   */
+  public forget(selector: ErasureSelector = {}): Promise<ErasureReport> {
+    this.assertOpen();
+    return this.store.forget(
+      { ...selector, namespace: this.namespace },
+      this.policy,
+      this.clock.now(),
+    );
   }
 
   public async distill(

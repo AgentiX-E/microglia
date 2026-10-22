@@ -7,9 +7,12 @@
  * choosing a vendor for the host.
  */
 import type {
+  ErasureReport,
+  ErasureSelector,
   FeedbackEvent,
   KnowledgeItem,
   KnowledgeStatus,
+  Policy,
   RecallQuery,
   RunRecord,
 } from '../kernel/index.js';
@@ -56,6 +59,17 @@ export interface MemoryPort {
 
   /** Active knowledge only, namespace-scoped, ranked, and scope-filtered. */
   search(query: RecallQuery, now?: number): Promise<readonly SearchHit[]>;
+
+  /**
+   * Erase the records a selector covers, and re-derive what cited them.
+   *
+   * Required rather than optional: a store that cannot delete is not shippable
+   * to a host with deletion obligations, and an optional method is a promise the
+   * default implementation keeps and a replacement quietly drops. The policy is a
+   * parameter because re-scoring a claim whose evidence was erased is an
+   * admission decision, and the store does not own one.
+   */
+  forget(selector: ErasureSelector, policy: Policy, at: number): Promise<ErasureReport>;
 
   stats(): Promise<MemoryStats>;
   close(): Promise<void>;

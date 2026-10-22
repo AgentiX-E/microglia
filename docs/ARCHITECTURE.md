@@ -191,6 +191,7 @@ and never activated on confidence alone without support.
 | Silent schema drift | Journal refuses an unknown `schema` on open; a new digest excludes old items from injection | `memory/store.ts`, `kernel/knowledge.ts` |
 | Inflated applicability | Widened scope is the meet of the endorsers'; three distinct tasks required | `distill/generalize.ts` |
 | Order-dependent learning | Sorted reads, id tie-breaks, canonical evidence order | `memory/store.ts`, `capture/curate.ts` |
+| Data retained past its consent | `forget()` erases by id, task or actor hash, re-derives the claims that cited them, and rewrites the journal | `memory/store.ts`, `memory/journal.ts` |
 
 The reference threat model assumes the host authenticates users. The library does not attempt to
 identify people; it tries to ensure that no single untrusted channel can move a rule into a prompt.
@@ -221,6 +222,7 @@ The study is a package, not a script:
 - `study.ts` — arms, batches, snapshots, gates, comparisons.
 - `ablations.ts` — the three modules a clean corpus cannot exercise.
 - `integrity.ts` — replay, canonical state, and the mutation control.
+- erasure is measured by the same lane (POC-28b): nothing erased may be retrievable.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

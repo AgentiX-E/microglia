@@ -20,9 +20,9 @@
  *      zero, and a positive control under the old digest must find some, or the
  *      probe is looking at an empty store.
  *
- * Erasure (`forget`, D20) is the remaining rung of this lane and is not part of
- * this script; the artefact says so rather than reporting a zero it never
- * measured.
+ *   5. erases ten items by id and ten task instances by task, then checks that
+ *      nothing erased can be retrieved or cited — POC-28b, the deletion
+ *      obligation D20 exists for.
  */
 import { mulberry32, type DistillCandidate, type FeedbackEvent, type RunRecord } from '@agentix-e/microglia-core';
 import { replayStore, runIntegrity, type IntegrityCase } from '@agentix-e/microglia-eval';
@@ -182,17 +182,58 @@ const oldDigest = await reference.mg.recall({
 const digestOf = new Map(reference.items.map((item) => [item.id, item.scope.schemaDigest]));
 const staleInjected = newDigest.ids.filter((id) => digestOf.get(id) !== 'schema-v2').length;
 
+/**
+ * POC-28b — erasure.
+ *
+ * A deletion obligation arrives in two shapes: a host that knows the ids (a user
+ * asked for their record to go) and a host that knows the task (a task was
+ * withdrawn). Both must leave nothing that recall can still cite.
+ */
+const doomed = reference.items.slice(0, 10).map((item) => item.id);
+const erasedById = await reference.mg.forget({ ids: doomed });
+
+const tasksToErase = [
+  ...new Set(corpus.events.map((entry) => entry.taskId).filter((id): id is string => id !== undefined)),
+].slice(0, 10);
+const cascade = { events: 0, runs: 0, knowledge: 0, rescored: 0 };
+for (const taskId of tasksToErase) {
+  const erased = await reference.mg.forget({ taskId });
+  cascade.events += erased.events;
+  cascade.runs += erased.runs;
+  cascade.knowledge += erased.knowledge;
+  cascade.rescored += erased.rescored;
+}
+
+const survivors = await reference.mg.recall({
+  task: TASK,
+  text: 'for trend questions use a line chart',
+});
+const retrieved = await Promise.all(doomed.map((id) => reference.mg.store.getKnowledge(id)));
+const resurrected = retrieved.filter((item) => item !== undefined).length;
+const citedErased = survivors.ids.filter((id) => doomed.includes(id)).length;
+const eventsLeft = (await reference.mg.store.listEvents({ namespace: 'acme' })).length;
+
 const gates = [
   { id: 'order-invariance', pass: report.orderInvariance === 1, actual: report.orderInvariance, criterion: '= 1.00' },
   { id: 'replay-determinism', pass: report.replayDeterminism === 1, actual: report.replayDeterminism, criterion: '= 1.00' },
   { id: 'instrument-sensitive', pass: report.instrumentSensitive, actual: report.controlInvariance, criterion: 'control < 1.00' },
   { id: 'stale-schema-injection', pass: staleInjected === 0, actual: staleInjected, criterion: '= 0' },
   { id: 'probe-not-empty', pass: oldDigest.ids.length > 0, actual: oldDigest.ids.length, criterion: '> 0' },
+  { id: 'erased-by-id', pass: erasedById.knowledge === 10, actual: erasedById.knowledge, criterion: '= 10' },
+  { id: 'erasure-unreachable', pass: resurrected === 0, actual: resurrected, criterion: '= 0' },
+  { id: 'erasure-not-cited', pass: citedErased === 0, actual: citedErased, criterion: '= 0' },
+  { id: 'erasure-cascade', pass: cascade.events > 0, actual: cascade.events, criterion: '> 0' },
+  {
+    id: 'erasure-bounded',
+    pass: eventsLeft === EVENTS - cascade.events,
+    actual: eventsLeft,
+    criterion: `= ${EVENTS - cascade.events}`,
+  },
 ];
 
 await writeResult({
   id: 'poc-integrity',
-  title: 'POC-28 — replay invariants: order, determinism, and schema drift',
+  title: 'POC-28 — replay invariants (order, determinism, schema drift) and erasure',
   ranAt: new Date().toISOString(),
   model: 'none',
   n: EVENTS,
@@ -206,6 +247,12 @@ await writeResult({
     instrument_sensitive: report.instrumentSensitive ? 1 : 0,
     stale_schema_injected: staleInjected,
     old_digest_retrievable: oldDigest.ids.length,
+    erased_items: erasedById.knowledge,
+    erased_events: cascade.events,
+    erased_knowledge_cascade: cascade.knowledge,
+    erased_rescored: cascade.rescored,
+    events_remaining: eventsLeft,
+    resurrected_after_erasure: resurrected,
     active_items: statuses.get('active') ?? 0,
     candidate_items: statuses.get('candidate') ?? 0,
     retired_items: statuses.get('retired') ?? 0,
@@ -215,7 +262,7 @@ await writeResult({
     `Interpreter: deterministic chart interpreter over run input; ${EVENTS} events, ${TASKS} task instances, digest renamed at event ${RENAME_AT}.`,
     'Order invariance replays the same events in five shuffled journal orders; the store sorts on read, so a pass means the sort is load-bearing rather than incidental.',
     'The control replays through a view that returns events newest-first. It must disagree, or the harness cannot detect order dependence and the reported 1.00 is vacuous.',
-    'Erasure (forget, D20) is the remaining rung of this lane: it is not implemented yet, so no post-erasure recall is claimed here.',
+    'Erasure (D20) is measured here rather than asserted: ten items by id, then ten task instances by task. Nothing erased may be retrievable, and the pack may not cite it.',
     `No model calls: distillation is the deterministic rule path, so the lane costs nothing to re-run (${DEEPSEEK_MODEL} is not used).`,
   ],
   samples: gates,

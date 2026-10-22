@@ -214,3 +214,15 @@ order.
 **Mutation control** — a replay whose order-dependence is known in advance, run alongside the invariant
 it is meant to falsify. If the control passes, the instrument is blind and the reported number is
 vacuous; the integrity lane fails in that case rather than reporting a 1.00 it cannot defend.
+
+**Erasure** — `forget({ ids | taskId | actorHash })`: delete the matched events and runs, re-derive every
+claim that cited them from the evidence that survives, and rewrite the journal. Scoped to one namespace
+by the facade, because a person is not a tenant.
+
+**Tombstone** — the record left by an erasure: selector, time, ids erased. It never carries a statement or
+a payload, because a copy of the erased data would defeat the erasure it documents.
+
+**Erasure cascade** — the second-order effect of erasing evidence. A claim that loses support may fall
+below the retirement line, lose a provenance tier it no longer has evidence for, and drop back behind the
+promotion gate. That is the intended behaviour: a deletion that leaves a promotion behind has not deleted
+the thing that mattered.
