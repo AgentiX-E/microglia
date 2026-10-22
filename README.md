@@ -160,6 +160,12 @@ that quarantine stops — which is the argument for the governance layer, measur
 Every number is reproduced by `pnpm bench` and written to `bench/results/study.json`; seventeen gates
 must pass, or the build fails.
 
+`pnpm poc:l0` runs the same instrument at 1,300 cases with gold derived by policy rather than by a
+human adjudicator: 1,040 paired held-out questions, **+67.88pp** (95% CI 65.10–70.67, exact McNemar
+p = 5.9e-213, 706 gained and none lost), and the domain that received no feedback at all at 100%. The
+lane also prints the smallest effect its own sample could detect — 7.16pp — because an effect smaller
+than that would be indistinguishable from noise here.
+
 `pnpm poc:integrity` runs the second instrument: 1,000 events replayed in five shuffled orders, plus a
 control that bypasses the sort the store relies on. Order invariance and replay determinism are 1.00,
 the control disagrees (which is what makes the 1.00 mean something), and a mid-stream schema rename

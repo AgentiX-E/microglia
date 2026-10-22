@@ -175,6 +175,29 @@ export const DEFAULT_CONFIG: StudyConfig = {
   heldOutDomain: 'ops',
 };
 
+/**
+ * L0 — the preregistered rule-derived adjudication run.
+ *
+ * 1,300 cases, of which **1,040 are evaluated**: the training split exists only
+ * to teach, and every case the report talks about is one the loop never saw. The
+ * gold is `goldMark`, a stated policy, so there are no human labels to collect
+ * and no adjudicator to disagree with.
+ *
+ * Everything except the two split sizes is frozen at the default study's values.
+ * That is the whole point of a preregistration: a lane that changes the training
+ * budget and the sample size cannot say which one moved the number. The teaching
+ * budget is therefore identical to the default run — 6 rounds × 12 corrections —
+ * so L0 measures the *precision* of the effect, not a better-trained one.
+ */
+export const L0_CONFIG: StudyConfig = {
+  ...DEFAULT_CONFIG,
+  trainSize: 260,
+  holdoutSize: 1040,
+};
+
+/** Total cases the lane is specified at; the report quotes it, not the sum by hand. */
+export const L0_CASES = 1300;
+
 export type RoundMetrics = {
   readonly round: number;
   readonly accuracy: number;

@@ -225,6 +225,8 @@ The study is a package, not a script:
 - `study.ts` — arms, batches, snapshots, gates, comparisons.
 - `ablations.ts` — the three modules a clean corpus cannot exercise.
 - `integrity.ts` — replay, canonical state, and the mutation control.
+- `memform.ts` — the five formation routes as executable attacks, scored by route and trust ceiling.
+- `study.ts` — also carries `L0_CONFIG`, the frozen 1,300-case preregistration.
 - erasure is measured by the same lane (POC-28b): nothing erased may be retrievable.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the

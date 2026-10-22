@@ -54,6 +54,9 @@ jobs:
       - name: Attack lane (POC-29 five formation routes)
         run: pnpm poc:memform
 
+      - name: Pragmatics lane (L0 1,300-case rule-derived adjudication)
+        run: pnpm poc:l0
+
       - name: CPU scale and latency
         run: pnpm poc:scale
 

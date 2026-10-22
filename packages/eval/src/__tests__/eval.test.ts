@@ -8,7 +8,14 @@ import {
 } from '../workload/index.js';
 import { applyKnowledge, baselineMark, buildCorpus, goldMark } from '../scenario.js';
 import { comparePaired } from '../stats.js';
-import { knowledgePrecision, runStudy, scoreByDomain } from '../study.js';
+import {
+  DEFAULT_CONFIG,
+  L0_CASES,
+  L0_CONFIG,
+  knowledgePrecision,
+  runStudy,
+  scoreByDomain,
+} from '../study.js';
 import { renderMarkdown } from '../report.js';
 
 describe('paired statistics', () => {
@@ -187,4 +194,20 @@ describe('study', () => {
     expect(markdown).toContain('# Microglia mechanism study');
     expect(markdown).toContain('## Gates');
   }, 60_000);
+});
+
+describe('the L0 preregistration', () => {
+  it('is 1,300 cases, and the training split is the only thing it changes', () => {
+    expect(L0_CASES).toBe(1300);
+    expect(L0_CONFIG.trainSize + L0_CONFIG.holdoutSize).toBe(L0_CASES);
+    // A lane that also changed the teaching budget could not say which change
+    // moved the number, so everything else is frozen against the default study.
+    expect({ ...L0_CONFIG, trainSize: DEFAULT_CONFIG.trainSize, holdoutSize: DEFAULT_CONFIG.holdoutSize })
+      .toEqual(DEFAULT_CONFIG);
+  });
+
+  it('evaluates four fifths of the corpus, and holds one domain out entirely', () => {
+    expect(L0_CONFIG.holdoutSize / L0_CASES).toBeGreaterThan(0.75);
+    expect(L0_CONFIG.heldOutDomain).toBe(DEFAULT_CONFIG.heldOutDomain);
+  });
 });
