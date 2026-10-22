@@ -1,7 +1,7 @@
 {
   "id": "poc-l0",
   "title": "L0 — rule-derived adjudication on 1,300 cases",
-  "ranAt": "2026-10-22T10:07:57.108Z",
+  "ranAt": "2026-10-22T10:33:20.876Z",
   "model": "none",
   "n": 1300,
   "calls": 0,
@@ -19,6 +19,7 @@
     "lost": 0,
     "discordance": 0.6788461538461539,
     "resolution_pp": 0.07158749110798684,
+    "recovery": 1,
     "cases_for_3pp_resolution": 5922,
     "unseen_domain_accuracy": 1,
     "arms_passing_gates": 17,
@@ -29,6 +30,7 @@
     "Teaching budget is frozen at the default study: 6 rounds x 12 corrections. L0 measures precision, not a better-trained loop.",
     "Resolution is computed from the observed discordance (67.9%) at 80% power: this design can detect 7.2pp. The preregistered 3pp resolution is **withdrawn** -- at this discordance it needs 5922 evaluated cases, and the lane has 1040. The replacement gate asks the question that can actually be answered: is the reported effect larger than the design's own noise floor.",
     "Unseen domain 'ops' receives no feedback at all; its accuracy is the only clean transfer test in the lane.",
+    "Recovery against the policy oracle is 100.0%: the ceiling is 1.00 by construction here, because every convention in the corpus is reachable from a correction. L2b needs a corpus where it is not.",
     "Default seed 20261020; the corpus is deterministic, so the run reproduces exactly."
   ],
   "samples": [

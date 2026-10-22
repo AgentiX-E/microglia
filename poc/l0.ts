@@ -20,7 +20,7 @@
  *     discordance, which is the number that says whether a +3pp gate is even
  *     observable here.
  */
-import { DEFAULT_CONFIG, L0_CASES, L0_CONFIG, runStudy } from '@agentix-e/microglia-eval';
+import { DEFAULT_CONFIG, L0_CASES, L0_CONFIG, recoveryRatio, runStudy } from '@agentix-e/microglia-eval';
 import { detectableDelta } from '@agentix-e/microglia-eval';
 import { writeResult } from './lib.js';
 
@@ -46,6 +46,18 @@ const resolution = detectableDelta(comparison.n, comparison.discordance);
  * reports the price instead of lowering the bar silently.
  */
 const casesForThreePoints = Math.ceil((2.802 ** 2 * comparison.discordance) / GATE_DELTA ** 2);
+/**
+ * The oracle is the gold by construction: `goldMark` *is* the policy, so a lane
+ * with policy-derived gold has a ceiling of exactly 1.00 and the loop recovers
+ * all of it. That is a statement about the corpus — every convention in it is
+ * reachable from a correction — and it is why L2b needs a workload whose held-out
+ * domain cannot be recovered by widening.
+ */
+const recovery = recoveryRatio({
+  arm: comparison.treatmentAccuracy,
+  baseline: comparison.baselineAccuracy,
+  oracle: 1,
+});
 const operations = (arm: typeof full): number | undefined =>
   arm.byDomain.find((entry) => entry.domain === L0_CONFIG.heldOutDomain)?.accuracy;
 const unseenDomain = operations(full);
@@ -103,6 +115,7 @@ await writeResult({
     lost: comparison.lost,
     discordance: comparison.discordance,
     resolution_pp: resolution,
+    recovery,
     cases_for_3pp_resolution: casesForThreePoints,
     unseen_domain_accuracy: unseenDomain ?? 0,
     arms_passing_gates: study.gates.filter((gate) => gate.pass).length,
@@ -113,6 +126,7 @@ await writeResult({
     'Teaching budget is frozen at the default study: 6 rounds x 12 corrections. L0 measures precision, not a better-trained loop.',
     `Resolution is computed from the observed discordance (${(comparison.discordance * 100).toFixed(1)}%) at 80% power: this design can detect ${(resolution * 100).toFixed(1)}pp. The preregistered 3pp resolution is **withdrawn** -- at this discordance it needs ${casesForThreePoints} evaluated cases, and the lane has ${comparison.n}. The replacement gate asks the question that can actually be answered: is the reported effect larger than the design's own noise floor.`,
     `Unseen domain '${L0_CONFIG.heldOutDomain}' receives no feedback at all; its accuracy is the only clean transfer test in the lane.`,
+    `Recovery against the policy oracle is ${(recovery * 100).toFixed(1)}%: the ceiling is 1.00 by construction here, because every convention in the corpus is reachable from a correction. L2b needs a corpus where it is not.`,
     `Default seed ${DEFAULT_CONFIG.seed}; the corpus is deterministic, so the run reproduces exactly.`,
   ],
   samples: study.arms.map((arm) => ({

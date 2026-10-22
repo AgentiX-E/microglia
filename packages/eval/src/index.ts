@@ -6,6 +6,7 @@
  * these numbers from source has no business quoting them.
  */
 export { comparePaired, type PairedResult } from './stats.js';
+export { recoveryRatio, type RecoveryInput } from './recovery.js';
 
 export {
   attributeRules,
