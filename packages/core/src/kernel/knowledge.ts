@@ -15,6 +15,7 @@
  *   empirical    — when applied, did it actually help?
  */
 import { contentKey } from './ids.js';
+import { jsonEqual } from './hash.js';
 import { clamp01, logit, sigmoid, smoothedRate } from './stats.js';
 import { TIER_RANK } from './types.js';
 import type {
@@ -268,6 +269,21 @@ export function mergeEvidence(
   const duplicate = base.evidence.some(
     (entry) => entry.feedbackId === candidate.evidence.feedbackId,
   );
+  /**
+   * Nothing new: the same evidence, the same claim, the same tier.
+   *
+   * Distillation reprocesses the event log from the beginning when the caller
+   * passes no `since`, so the same candidate arrives again on every run. Writing
+   * it back would advance `updatedAt`, and a rule whose timestamp moves without
+   * changing is indistinguishable from a rule that was rewritten — which is
+   * exactly what a delivery log reads to decide what to send. A no-op has to look
+   * like one.
+   */
+  const tier = strongestTier(base.tier, candidate.tier);
+  const samePayload = jsonEqual(base.payload ?? null, candidate.payload ?? null);
+  if (duplicate && !rehabilitate && samePayload && (tier === undefined || tier === base.tier)) {
+    return item;
+  }
   const evidence: readonly EvidenceRef[] = duplicate
     ? base.evidence
     : [...base.evidence, candidate.evidence];

@@ -8,6 +8,18 @@
 export { comparePaired, type PairedResult } from './stats.js';
 export { recoveryRatio, type RecoveryInput } from './recovery.js';
 export {
+  DELIVERY_BOUND_MS,
+  TASK_TYPES,
+  countOrderingViolations,
+  percentile,
+  runDeliveryLane,
+  startReceiver,
+  type DeliveryMetrics,
+  type DeliveryReport,
+  type ReceiverBox,
+} from './lanes/delivery.js';
+
+export {
   L4ParseError,
   parseTauResults,
   taskTrials,

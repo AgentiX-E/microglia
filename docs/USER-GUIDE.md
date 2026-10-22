@@ -588,7 +588,9 @@ against your database.
 
 Run `distill()` on a timer (60s is plenty), at session end, or after N feedback events. It is cheap
 and idempotent: re-running it over the same events creates nothing new, because evidence is deduped
-by feedback id.
+by feedback id — and, since iteration 46, nothing is *rewritten* either: a rule whose evidence the
+store already holds keeps its timestamp, so "nothing happened" is distinguishable from "this rule
+changed". A delivery log depends on that distinction.
 
 ### 10.3 Erasure
 
@@ -621,6 +623,58 @@ rather than replaying it away.
 Measured (POC-28b, 1,000 events): 10 items erased by id, 10 task instances erased by task, 170 events
 and 4 claims removed by the cascade, 86 claims re-scored, and **0** erased records retrievable or cited
 afterwards.
+
+### 10.4 Telling another process what changed
+
+Polling `GET /v1/knowledge` is the honest default, and enough for a single process. A host that wants
+to react the moment a rule lands — a sidebar, a cache, a second agent — subscribes instead:
+
+```ts
+import { WebhookDispatcher, knowledgeEvents, snapshotOf } from '@agentix-e/microglia-core/delivery';
+
+let snapshot = snapshotOf(await mg.store.listKnowledge({ namespace: 'acme', status: 'all' }));
+const dispatcher = new WebhookDispatcher({
+  target: { url: 'https://host.example/microglia/events', secret: process.env.WEBHOOK_SECRET! },
+  fetch, clock: () => performance.now(), sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+});
+
+await mg.distill();
+const items = await mg.store.listKnowledge({ namespace: 'acme', status: 'all' });
+const drafts = knowledgeEvents({ namespace: 'acme', taskType: 'chart.recommend', previous: snapshot, current: items });
+snapshot = snapshotOf(items);
+const { failed } = await dispatcher.publish(drafts);
+// `failed` is the resync list: those ids never reached the receiver.
+```
+
+Three event types come from the store — `knowledge.admitted`, `knowledge.superseded`,
+`knowledge.retired` — and `taskCompleted(record)` builds the fourth from the task record you already
+hold when you close a task. Rules that were *erased* produce no event: an event naming deleted data
+would outlive the deletion.
+
+The body is posted once, and that exact string is signed:
+
+```
+X-Microglia-Signature: sha256=<hmac-sha256(secret, raw body)>
+```
+
+Verify it against the **raw** body before parsing, or a re-serialised body will fail its own
+signature:
+
+```ts
+import { hmacSha256Hex } from '@agentix-e/microglia-core/delivery';
+if (req.headers['x-microglia-signature'] !== hmacSha256Hex(process.env.WEBHOOK_SECRET!, raw)) return res.sendStatus(401);
+```
+
+Delivery is **at least once** and ordered per `(taskType, seq)`. Retries reuse the same `id`, so
+de-duplicate on it: a receiver that stores by `id` gets one row per change even when an
+acknowledgement was lost. A 4xx is not retried — the receiver refused that body — while a 5xx, a 429
+and a transport failure are. After the retries are exhausted the id lands in `failed`; nothing is
+silently dropped, and the resync is `GET /v1/knowledge?since=`.
+
+`pnpm eval:delivery` runs the whole path against a real HTTP receiver: signatures verified, an
+acknowledgement lost on purpose, one delayed response, 50 corrections. It reports 0 missed, 0 ordering
+violations, and a loopback p95 in single-digit milliseconds — a floor, not proof that a remote host is
+reached within the contract's 60 s.
 
 ## 11. Failure modes and what they mean
 

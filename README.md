@@ -77,6 +77,7 @@ import { registerProvider } from '@agentix-e/microglia-core/providers';
 | `core/apply` | pack construction, MMR, budget, rendering |
 | `core/capture` | the facade, run handle, feedback normalisation, export, doctor |
 | `core/providers` | `LlmProvider`, `EmbeddingProvider`, the registry |
+| `core/delivery` | webhook events, HMAC signing, the retrying dispatcher |
 
 ## Install
 
@@ -192,6 +193,15 @@ trust ceilings. An attacker that controls content, citations, scope claims, para
 lands **0%** at trust ≤ 0.6 and 40% at 0.9 — where it is a trusted editor, which is the product working
 as designed and is printed as a limit rather than folded into an average. Both lanes cost no model calls
 and run in CI on every push.
+
+`pnpm eval:delivery` measures the push surface against a real HTTP receiver: signed bodies verified with
+`node:crypto`'s HMAC, an acknowledgement lost on purpose so the retry path runs, one response delayed
+250 ms so the stopwatch can be shown to work, and 50 corrections. Every event arrives, in order per task
+type, **0 missed**, one intentional duplicate de-duplicated by id, loopback p95 in single-digit
+milliseconds. Building it found a defect in `distill`: a second pass over the same log used to rewrite
+every rule's `updatedAt`, so "nothing changed" and "this rule was rewritten" produced the same
+observation — the lane's first run reported **275** events for 50 changes. Fixed by making a merge with
+no new evidence a no-op; the lane now reports 50.
 
 `pnpm bundle:size` bundles both published entry points for the browser and holds them to a ceiling:
 **3,009 B raw / 1,410 B gzipped** for the client and **40,133 B / 13,842 B gzipped** for the core. The

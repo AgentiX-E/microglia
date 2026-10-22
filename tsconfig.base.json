@@ -41,6 +41,9 @@
       "@agentix-e/microglia-core/capture": [
         "packages/core/src/capture/index.ts"
       ],
+      "@agentix-e/microglia-core/delivery": [
+        "packages/core/src/delivery/index.ts"
+      ],
       "@agentix-e/microglia-eval": [
         "packages/eval/src/index.ts"
       ],
