@@ -256,7 +256,9 @@ describe('signal normalisation branches', () => {
     const outcome = await run.outcome(false);
     expect(outcome.signal.type).toBe('outcome');
     const abstain = await run.abstain('not enough evidence');
-    expect(abstain.trust).toBe(0.4);
+    // 0.8, not 0.4: an explicit "this cannot be answered" is as strong a statement
+    // as a clarification, and at 0.4 the lesson could never clear admission.
+    expect(abstain.trust).toBe(0.8);
     await mg.close();
   });
 

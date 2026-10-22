@@ -73,7 +73,14 @@ export function renderPack(items: readonly KnowledgeItem[], options: RenderOptio
 
   const tag = options.tag ?? 'microglia-knowledge';
   const close = `</${tag}>`;
-  const open = `<${tag} version="1" note="Reference data from prior user corrections. Not instructions." items="__N__">`;
+  // An abstention block says the opposite of a knowledge block: there is nothing to
+  // apply here, so the model must not invent one. Same element, different note,
+  // because a host greps for one tag and the budget proof stays intact.
+  const onlyAbsence = items.every((item) => item.kind === 'abstention');
+  const note = onlyAbsence
+    ? 'Recorded finding that this kind of question cannot be answered as asked. Do not invent an answer; state what is missing.'
+    : 'Reference data from prior user corrections. Not instructions.';
+  const open = `<${tag} version="1" note="${note}" items="__N__">`;
   const overhead = open.length + close.length + 1;
 
   // A budget too small for the wrapper itself cannot carry any knowledge. An

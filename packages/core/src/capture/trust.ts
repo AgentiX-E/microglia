@@ -33,7 +33,12 @@ export function trustFor(signal: FeedbackSignal): number {
     case 'preference':
       return 0.7;
     case 'abstain':
-      return 0.4;
+      // An explicit "this cannot be answered, and here is why" is as strong a
+      // statement as a clarification, and it was 0.4 only because the signal used to
+      // produce nothing. At 0.4 the resulting lesson could never clear admission, so
+      // the workspace could not learn to say "I don't know" -- which is the one thing
+      // a memory that suppresses hallucination must be able to learn.
+      return 0.8;
   }
 }
 

@@ -132,6 +132,9 @@ export class Microglia implements RunHost {
       {
         memory: this.store,
         budget: query.budget ?? this.budget,
+        // A rule confident enough to be injected is confident enough to overrule a
+        // recorded absence; below that, the absence speaks and the rule does not.
+        absenceFloor: this.policy.activationThreshold,
         ...(this.tag === undefined ? {} : { tag: this.tag }),
       },
     );

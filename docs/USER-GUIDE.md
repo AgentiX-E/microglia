@@ -342,6 +342,27 @@ await mg.distill();     // item.tier === 'user-text', status === 'candidate'
 // A second task says the same: promoted.
 ```
 
+### 5.2 `abstain` — the one lesson that stops a model inventing an answer
+
+```ts
+await run.abstain('the source has no revenue column');
+```
+
+An abstention is knowledge of a different shape: it says *there is nothing here*. It is stored as
+`kind: 'abstention'` with the reason in its payload, and it is rendered in **its own block with its own
+instruction** — a negation inside a block of positive rules is read as a positive rule.
+
+Two rules govern when it speaks, and both exist because the failure is asymmetric:
+
+| Rule | Why |
+|---|---|
+| It only speaks when **no positive rule clears the activation threshold** | A pack carrying both "here is the convention" and "there is no answer" is a contradiction the model resolves by answering |
+| It needs a **second distinct task** before it activates | A false abstention makes the product refuse to answer, so it is promoted like any other `user-text` lesson |
+
+The trust of an abstention is 0.8, not the 0.4 it used to be: at 0.4 the lesson could never clear admission,
+so the workspace could not learn to say "I don't know" — which is the one thing a memory that suppresses
+hallucination must be able to learn.
+
 ## 6. The knowledge lifecycle
 
 ```

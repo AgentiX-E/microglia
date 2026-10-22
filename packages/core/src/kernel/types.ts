@@ -136,7 +136,20 @@ export type RunRecord = {
   readonly feedbackIds: readonly string[];
 };
 
-export type KnowledgeKind = 'constraint' | 'exemplar' | 'negative' | 'lexicon' | 'procedure';
+export type KnowledgeKind =
+  | 'constraint'
+  | 'exemplar'
+  | 'negative'
+  | 'lexicon'
+  | 'procedure'
+  /**
+   * A recorded finding that a kind of question cannot be answered as asked.
+   *
+   * It is knowledge in the only sense that matters here: it stops the model from
+   * inventing an answer. Rendered in its own block with its own instruction,
+   * because a negation inside a positive block is read as a positive.
+   */
+  | 'abstention';
 
 /**
  * How much structure a signal carries, which caps how far its lesson may travel.

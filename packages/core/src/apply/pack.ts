@@ -5,7 +5,7 @@
  * three paraphrases of one rule consume the room that a second, distinct rule
  * needed — the same failure mode as a top-k retrieval with no diversity.
  */
-import { mmrSelect, queryCoverage } from '../kernel/index.js';
+import { defaultPolicy, mmrSelect, queryCoverage } from '../kernel/index.js';
 import type { KnowledgeItem, KnowledgePack, RecallQuery } from '../kernel/index.js';
 import type { MemoryPort } from '../memory/index.js';
 import { makePack } from './render.js';
@@ -29,6 +29,12 @@ export type BuildPackOptions = {
    * the query's own `minCoverage`, and to no gate when neither is set.
    */
   readonly minCoverage?: number;
+  /**
+   * Trust at which a positive rule silences an abstention. Defaults to the
+   * activation threshold, so "confident enough to inject" and "confident enough to
+   * overrule a recorded absence" are the same number.
+   */
+  readonly absenceFloor?: number;
 };
 
 export async function buildPack(
@@ -58,7 +64,19 @@ export async function buildPack(
     1 - Math.min(1, Math.max(0, options.diversity ?? 0.25)),
   );
 
-  return makePack(selected, {
+  // An abstention is not a rule: it may only speak when nothing confident can. A
+  // pack that carries both tells the model "here is the convention" and "there is
+  // no answer" at once, and the model resolves that contradiction by answering.
+  const floorTrust = options.absenceFloor ?? defaultPolicy.activationThreshold;
+  const positive = selected.filter((item) => item.kind !== 'abstention');
+  const absence = selected.filter((item) => item.kind === 'abstention');
+  const confident = positive.some((item) => item.trust >= floorTrust);
+  const chosen =
+    confident || absence.length === 0
+      ? positive
+      : [absence.reduce((best, item) => (item.trust > best.trust ? item : best))];
+
+  return makePack(chosen, {
     budget,
     ...(options.tag === undefined ? {} : { tag: options.tag }),
   });

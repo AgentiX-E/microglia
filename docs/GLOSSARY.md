@@ -187,3 +187,7 @@ Set from the event kind, never by configuration, and used to cap how far a lesso
 **Promotion gate** — the rule that a `user-text` item cannot activate on one task's word. It stays a
 candidate with `needs-corroboration` until a second distinct task, or evidence of a stronger tier, endorses
 the same claim.
+
+**Abstention** — a knowledge item recording that a kind of question cannot be answered as asked. Rendered in
+its own block with an instruction not to invent an answer, and it speaks only when no positive rule clears
+the activation threshold.

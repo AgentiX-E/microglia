@@ -14,6 +14,10 @@ const TRUST = {
   explicitReason: 0.55,
   outcomeCode: 0.6,
   clarification: 0.8,
+  // An abstention is cheap to record and bounded in harm: it only speaks when no
+  // confident rule exists. At 0.6 trust and weight, four corroborations were needed
+  // before the workspace would admit it had no answer -- which is the wrong trade.
+  abstention: 0.8,
 } as const;
 
 export function ruleBasedCandidates(event: FeedbackEvent): readonly DistillCandidate[] {
@@ -57,6 +61,27 @@ export function ruleBasedCandidates(event: FeedbackEvent): readonly DistillCandi
       },
       trust: Math.min(event.trust, TRUST.outcomeCode),
       dedupeKey: contentKey(`outcome|${event.task}|${signal.code}`),
+    });
+  }
+
+  if (signal.type === 'abstain') {
+    // The user is telling the workspace that this kind of question has no answer
+    // here, which is the one lesson that stops a model from inventing one.
+    out.push({
+      namespace: event.namespace,
+      kind: 'abstention',
+      scope: { task: event.task },
+      statement: `Questions of this kind cannot be answered from this workspace: ${signal.reason}.`,
+      payload: { reason: signal.reason },
+      evidence: {
+        feedbackId: event.id,
+        runId: event.runId,
+        at: event.at,
+        ...(event.taskId === undefined ? {} : { taskId: event.taskId }),
+        weight: TRUST.abstention,
+      },
+      trust: Math.min(event.trust, TRUST.abstention),
+      dedupeKey: contentKey(`abstention|${event.task}|${signal.reason}`),
     });
   }
 

@@ -99,6 +99,32 @@ describe('rule interpreter', () => {
     expect(candidates[0]?.scope.reasonCode).toBe('wrong_chart_type');
   });
 
+  it('carries no task id when the host never opened a task', () => {
+    // Four kinds, one rule: an absent task must stay absent rather than becoming a
+    // literal `undefined` key, because the store reads it as the grouping key.
+    const events = [
+      event({ kind: 'rating', signal: { type: 'rating', value: 'down', reasons: ['wrong_axis'] } }),
+      event({ kind: 'outcome', signal: { type: 'outcome', ok: false, code: 'E_SUM' } }),
+      event({ kind: 'abstain', signal: { type: 'abstain', reason: 'no revenue column' } }),
+      event({
+        kind: 'clarification',
+        signal: { type: 'clarification', question: 'what is revenue', answer: 'net of tax' },
+      }),
+    ];
+    for (const entry of events) {
+      const without = ruleBasedCandidates({ ...entry, taskId: undefined });
+      expect(without.length).toBeGreaterThan(0);
+      for (const candidate of without) {
+        expect('taskId' in candidate.evidence).toBe(false);
+      }
+      const withTask = ruleBasedCandidates({ ...entry, taskId: 'T-1' });
+      expect(withTask.length).toBe(without.length);
+      for (const candidate of withTask) {
+        expect(candidate.evidence.taskId).toBe('T-1');
+      }
+    }
+  });
+
   it('ignores a thumbs-up', () => {
     expect(
       ruleBasedCandidates(event({ kind: 'rating', signal: { type: 'rating', value: 'up', reasons: [] } })),
