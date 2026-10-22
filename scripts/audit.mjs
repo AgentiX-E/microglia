@@ -116,6 +116,34 @@ for (const internal of ['WHITEPAPER.md', 'TECH-DESIGN.md', 'ROADMAP.md', 'AUDIT.
   if (nested) fail('boundary', `docs/${internal} belongs in microglia-docs, not here`);
 }
 
+// Every `pnpm <script>` a workflow runs must exist.
+//
+// A rename that edits the call site instead of moving the definition is not
+// hypothetical: `poc:typecheck` became `typecheck:lanes` and a workflow step kept
+// `pnpm eval:typecheck`, which no package defines. The job failed in twenty
+// seconds, which is the gate working -- but only after a push. This check moves
+// that failure to the audit, where it belongs.
+{
+  const pkg = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8'));
+  const defined = new Set(Object.keys(pkg.scripts ?? {}));
+  const workflows = join(ROOT, '.github', 'workflows');
+  for (const entry of await readdir(workflows, { withFileTypes: true })) {
+    if (!entry.name.endsWith('.yml')) continue;
+    const text = await readFile(join(workflows, entry.name), 'utf8');
+    for (const line of text.split('\n')) {
+      const match = /^\s*(?:-\s*)?run:\s*(.+)$/.exec(line);
+      if (match === null) continue;
+      for (const call of match[1].matchAll(/pnpm\s+(?:run\s+)?([a-zA-Z0-9:_-]+)/g)) {
+        const name = call[1];
+        if (name === 'install' || name === 'exec' || name === 'dlx') continue;
+        if (!defined.has(name)) {
+          fail('workflow', `${entry.name} calls 'pnpm ${name}', which package.json does not define`);
+        }
+      }
+    }
+  }
+}
+
 // What ships is what can hurt a consumer. The library declares no runtime
 // dependency at all, so this is a statement about the artefact rather than a
 // formality; dev-only advisories are reported separately in the audit document
