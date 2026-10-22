@@ -9,6 +9,14 @@ export { comparePaired, type PairedResult } from './stats.js';
 export { recoveryRatio, type RecoveryInput } from './recovery.js';
 export { compareToPublished, meanPassAtK, passAtK, type PassAtKInput } from './passk.js';
 export { reachableRecovery, reachableShare, scopePair, type Scoped } from './pairs.js';
+export {
+  CONVENTIONS,
+  HELD_OUT,
+  buildConventions,
+  trainingSplit,
+  unreachableCases,
+  type ConventionCase,
+} from './conventions.js';
 
 export {
   attributeRules,
