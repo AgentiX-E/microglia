@@ -48,6 +48,15 @@ jobs:
       - name: Ablation study and gates
         run: pnpm bench
 
+      # The library's "no runtime dependency" promise, measured on the artefact a
+      # host bundles. The probe halves a ceiling and must be rejected: a budget
+      # that cannot be exceeded is not a gate.
+      - name: Bundle size (and the probe that proves it rejects)
+        run: |
+          set -euo pipefail
+          pnpm bundle:size
+          pnpm bundle:size -- --probe
+
       - name: Integrity lane (POC-28 order, determinism, schema drift)
         run: pnpm eval:integrity
 

@@ -2,7 +2,7 @@
   "name": "microglia",
   "version": "0.1.0",
   "private": true,
-  "description": "Microglia \u2014 a headless feedback flywheel SDK for agentic workflows",
+  "description": "Microglia — a headless feedback flywheel SDK for agentic workflows",
   "license": "MIT",
   "author": "Lambertyan",
   "type": "module",
@@ -22,7 +22,7 @@
     "test": "vitest run --coverage",
     "test:unit": "vitest run",
     "bench": "pnpm build && node packages/eval/dist/bench/run.js",
-    "check": "pnpm typecheck && pnpm typecheck:lanes && pnpm test && pnpm audit:repo && pnpm eval:integrity && pnpm eval:memform && pnpm eval:l0 && pnpm bench",
+    "check": "pnpm typecheck && pnpm typecheck:lanes && pnpm test && pnpm audit:repo && pnpm eval:integrity && pnpm eval:memform && pnpm eval:l0 && pnpm eval:pairs && pnpm bench && pnpm bundle:size",
     "eval:llm-reader": "tsx packages/eval/src/bin/llm-reader.ts",
     "eval:llm-distill": "tsx packages/eval/src/bin/llm-distill.ts",
     "eval:embedding": "tsx packages/eval/src/bin/embedding.ts",
@@ -37,17 +37,19 @@
     "eval:cortex": "node scripts/cortex-conformance.mjs",
     "audit:deps": "pnpm audit --prod",
     "audit:repo": "node scripts/audit.mjs",
+    "bundle:size": "node scripts/bundle-size.mjs",
     "eval:attribute": "tsx packages/eval/src/bin/attribute.ts"
   },
   "devDependencies": {
+    "@agentix-e/microglia-browser": "workspace:*",
     "@agentix-e/microglia-core": "workspace:*",
     "@agentix-e/microglia-eval": "workspace:*",
+    "@agentix-e/microglia-node": "workspace:*",
     "@types/node": "^22.10.0",
     "@vitest/coverage-v8": "^3.2.7",
+    "esbuild": "^0.28.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^3.2.7",
-    "@agentix-e/microglia-node": "workspace:*",
-    "@agentix-e/microglia-browser": "workspace:*"
+    "vitest": "^3.2.7"
   }
 }

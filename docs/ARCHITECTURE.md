@@ -276,7 +276,7 @@ This repository is **the product and the evidence that gates it**:
 | `packages/` | the library |
 | `packages/eval/src/bin/` | executable lanes that measure the library — replay invariants, the attack harness, L0/L2b/L4, the live model probes |
 | `bench/` | the ablation study and its gate report |
-| `scripts/` | the quality audit and the conformance check |
+| `scripts/` | the quality audit, the bundle-size gate and the conformance check |
 | `.github/workflows/` | the gates: `ci`, `sota`, `poc-live`, `cortex` |
 | `docs/` | the user guide, this architecture, the glossary |
 

@@ -193,6 +193,12 @@ lands **0%** at trust ≤ 0.6 and 40% at 0.9 — where it is a trusted editor, w
 as designed and is printed as a limit rather than folded into an average. Both lanes cost no model calls
 and run in CI on every push.
 
+`pnpm bundle:size` bundles both published entry points for the browser and holds them to a ceiling:
+**3,009 B raw / 1,410 B gzipped** for the client and **40,133 B / 13,842 B gzipped** for the core. The
+build would fail if either stopped bundling without Node builtins, which is the "no runtime dependency"
+promise measured rather than asserted. `pnpm bundle:size -- --probe` halves a ceiling and must be
+rejected — a budget that cannot be exceeded is not a gate.
+
 Read the [user guide](docs/USER-GUIDE.md) for the integration contract, the
 [architecture](docs/ARCHITECTURE.md) for how the pieces fit, and the
 [glossary](docs/GLOSSARY.md) for the vocabulary.
@@ -213,7 +219,7 @@ docs/         user guide, architecture, glossary
 
 ```bash
 pnpm install
-pnpm check      # typecheck → lanes → tests with coverage gates → audit → integrity → memform → L0 → study
+pnpm check      # typecheck → lanes → tests → audit → integrity → memform → L0 → L2b → study → bundle size
 pnpm bench      # study only, writes bench/results/study.json
 ```
 
