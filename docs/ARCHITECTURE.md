@@ -188,10 +188,30 @@ and never activated on confidence alone without support.
 | Cross-tenant retrieval | Namespace on every record and every query | `memory/store.ts` |
 | Poisoning through a weak channel | `trustCeiling` per call; below the floor → quarantine | `capture` |
 | Model over-trust | Model output is a *candidate*; admission is unchanged | `distill/llm.ts` |
-| Silent schema drift | Journal refuses an unknown `schema` on open | `memory/store.ts` |
+| Silent schema drift | Journal refuses an unknown `schema` on open; a new digest excludes old items from injection | `memory/store.ts`, `kernel/knowledge.ts` |
+| Inflated applicability | Widened scope is the meet of the endorsers'; three distinct tasks required | `distill/generalize.ts` |
+| Order-dependent learning | Sorted reads, id tie-breaks, canonical evidence order | `memory/store.ts`, `capture/curate.ts` |
 
 The reference threat model assumes the host authenticates users. The library does not attempt to
 identify people; it tries to ensure that no single untrusted channel can move a rule into a prompt.
+
+### 7.1 Integrity is an invariant, not a filter
+
+Screening at the prompt boundary assumes the store is trustworthy. Five of MemForm's formation routes
+never write a false record: they write *real* records at an inflated scope, with borrowed evidence, or
+in an order that favours one subset. Only two of them are visible from a single write, so the remaining
+three are invariants on the store:
+
+- **evidence** — one event is one observation, whatever number of items cite it;
+- **scope** — `widenedScopeOf` computes the meet, and only `domain` may be dropped, so a claim can never
+  be applied more widely than every endorser asserted it;
+- **selection** and **path** — curation sorts before it decides, and the merged evidence array is
+  ordered by `(at, feedbackId)`, so the same log yields the same store in any arrival order.
+
+`packages/eval/src/integrity.ts` measures the last two by replay, and ships a mutation control
+(`reverseOrderView`) that bypasses the sort. The control must *disagree*: an order-invariance number
+produced by a harness that cannot detect order is not evidence. This is the cheapest form of
+self-falsification in the repository, and the reason the integrity lane costs nothing to run.
 
 ## 8. Evaluation architecture
 
@@ -200,6 +220,7 @@ The study is a package, not a script:
 - `scenario.ts` — the fixed corpus and the deterministic reader with six documented defects.
 - `study.ts` — arms, batches, snapshots, gates, comparisons.
 - `ablations.ts` — the three modules a clean corpus cannot exercise.
+- `integrity.ts` — replay, canonical state, and the mutation control.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

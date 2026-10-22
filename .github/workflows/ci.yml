@@ -48,6 +48,9 @@ jobs:
       - name: Ablation study and gates
         run: pnpm bench
 
+      - name: Integrity lane (POC-28: order, determinism, schema drift)
+        run: pnpm poc:integrity
+
       - name: CPU scale and latency
         run: pnpm poc:scale
 

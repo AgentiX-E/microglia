@@ -160,6 +160,11 @@ that quarantine stops — which is the argument for the governance layer, measur
 Every number is reproduced by `pnpm bench` and written to `bench/results/study.json`; seventeen gates
 must pass, or the build fails.
 
+`pnpm poc:integrity` runs the second instrument: 1,000 events replayed in five shuffled orders, plus a
+control that bypasses the sort the store relies on. Order invariance and replay determinism are 1.00,
+the control disagrees (which is what makes the 1.00 mean something), and a mid-stream schema rename
+injects nothing stale. The lane costs no model calls and runs in CI on every push.
+
 Read the [user guide](docs/USER-GUIDE.md) for the integration contract, the
 [architecture](docs/ARCHITECTURE.md) for how the pieces fit, and the
 [glossary](docs/GLOSSARY.md) for the vocabulary.
@@ -171,7 +176,7 @@ packages/core     the library, five modules behind subpath exports
 packages/node     Hono routes, vendor providers, server bootstrap
 packages/browser  fetch client and offline outbox
 packages/eval     the benchmark instrument (private, not published)
-poc/              live-API experiments with recorded artefacts
+poc/              live-API and replay experiments with recorded artefacts
 bench/        the ablation study and its gate report
 scripts/      the quality audit that CI runs
 docs/         user guide, architecture, glossary
@@ -186,8 +191,8 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-99.77 / 99.77 / 100 / 98.50 over 436 tests; the seven branch arms that remain uncovered are listed with
-file, line, and reason in the internal technical design, and none is excluded with an ignore comment.
+99.80 / 98.30 / 100 / 99.80 over 513 tests; the branches that remain uncovered are listed with file,
+line, and reason in the internal technical design, and none is excluded with an ignore comment.
 
 ## Licence
 

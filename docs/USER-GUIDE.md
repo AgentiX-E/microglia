@@ -464,8 +464,59 @@ A claim learned in `sales` that recurs in `hr` with the same payload is widened 
 and its siblings are retired. This is what makes an unseen domain improve: in the study, the domain
 that received no feedback at all reached **100%** with generalisation and **32.86%** without it.
 
+Widening is the one operation that *destroys* precision, so it is bounded twice.
+
+**By construction.** The widened scope is the meet of the endorsing scopes: a dimension survives only
+when every endorser constrains it identically. `domain` is the only dimension that may disappear.
+
+| Endorsers agree on | Result |
+|---|---|
+| `intent: trend` in both | `intent: trend` survives — the rule is still about trends |
+| `intent: trend` vs `intent: comparison` | no widening: these are two rules |
+| `schemaDigest` in one, absent in the other | no widening: the second never claimed that schema |
+| nothing but `task` | `{ task }` — a rule that genuinely holds everywhere in the task |
+
+**By support.** Three **distinct tasks** must endorse the claim before the narrow copies are retired
+(`WIDENING_TASKS`). A pair is exactly the evidence one persistent user can manufacture, and retiring a
+working domain-scoped rule on a pair trades a measured gain for an unmeasured risk. Two domains produce
+two rules; the third folds them into one.
+
 Widening only targets an **active** rule. Widening onto a candidate would promote a claim that has
 not earned admission.
+
+```ts
+// Two domains: two rules, both kept.
+//   {chart.recommend, sales, trend}   {chart.recommend, hr, trend}
+// Third task corrects the same claim in `ops`:
+//   {chart.recommend, trend} with three tasks of evidence,
+//   statusReason `generalized:<id>` on the two it replaced.
+```
+
+### 8.2 The store is a function of the log
+
+A correction is evidence, and evidence has a history. If replaying that history in a different order
+built a different store, then the store would be a record of *arrival*, not of what was learned — and
+the order is exactly what an attacker, a flaky outbox, or a second writer controls.
+
+Four invariants hold, each one closing a formation route that plants no false record:
+
+| Invariant | Question it answers | Where |
+|---|---|---|
+| Evidence identity | do two observations of one correction count once? | `mergeEvidence`, `curate.mergeInto` |
+| Widening bound | can a rule claim more than its endorsers did? | `distill/generalize.ts` |
+| Selection | is curation a function of the log, not of arrival order? | `capture/curate.ts` (sorted groups, id tie-breaks) |
+| Path | does the same evidence merged in another order leave the same store? | canonical evidence order in `curate` |
+
+You can re-measure them on your own store shape:
+
+```bash
+pnpm poc:integrity   # 1,000 events, five shuffled replays, one mutation control
+```
+
+The lane reports `order_invariance`, `replay_determinism`, `stale_schema_injected`, and — the number
+that makes the other three worth reading — `control_invariance`. The control replays the log through a
+view that returns events newest-first, bypassing the sort; it **must** disagree. A harness whose control
+also passes is measuring nothing, and the lane fails rather than report a vacuous 1.00.
 
 ## 9. Exporting a dataset
 

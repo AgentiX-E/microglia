@@ -1,0 +1,61 @@
+{
+  "id": "poc-integrity",
+  "title": "POC-28 — replay invariants: order, determinism, and schema drift",
+  "ranAt": "2026-10-22T00:56:50.292Z",
+  "model": "none",
+  "n": 1000,
+  "calls": 0,
+  "metrics": {
+    "events": 1000,
+    "items": 70,
+    "order_invariance": 1,
+    "replay_determinism": 1,
+    "control_invariance": 0,
+    "instrument_sensitive": 1,
+    "stale_schema_injected": 0,
+    "old_digest_retrievable": 4,
+    "active_items": 28,
+    "candidate_items": 13,
+    "retired_items": 15,
+    "gates_passed": 5
+  },
+  "notes": [
+    "Interpreter: deterministic chart interpreter over run input; 1000 events, 60 task instances, digest renamed at event 600.",
+    "Order invariance replays the same events in five shuffled journal orders; the store sorts on read, so a pass means the sort is load-bearing rather than incidental.",
+    "The control replays through a view that returns events newest-first. It must disagree, or the harness cannot detect order dependence and the reported 1.00 is vacuous.",
+    "Erasure (forget, D20) is the remaining rung of this lane: it is not implemented yet, so no post-erasure recall is claimed here.",
+    "No model calls: distillation is the deterministic rule path, so the lane costs nothing to re-run (deepseek-chat is not used)."
+  ],
+  "samples": [
+    {
+      "id": "order-invariance",
+      "pass": true,
+      "actual": 1,
+      "criterion": "= 1.00"
+    },
+    {
+      "id": "replay-determinism",
+      "pass": true,
+      "actual": 1,
+      "criterion": "= 1.00"
+    },
+    {
+      "id": "instrument-sensitive",
+      "pass": true,
+      "actual": 0,
+      "criterion": "control < 1.00"
+    },
+    {
+      "id": "stale-schema-injection",
+      "pass": true,
+      "actual": 0,
+      "criterion": "= 0"
+    },
+    {
+      "id": "probe-not-empty",
+      "pass": true,
+      "actual": 4,
+      "criterion": "> 0"
+    }
+  ]
+}

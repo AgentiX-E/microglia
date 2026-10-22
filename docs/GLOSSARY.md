@@ -191,3 +191,26 @@ the same claim.
 **Abstention** — a knowledge item recording that a kind of question cannot be answered as asked. Rendered in
 its own block with an instruction not to invent an answer, and it speaks only when no positive rule clears
 the activation threshold.
+
+**Endorsing task** — a distinct task instance whose evidence supports a claim. Support is counted in
+endorsing tasks, never in events, which is why the number appears in both the admission score and the
+widening gate.
+
+**Widening bound** — the meet of the endorsing scopes: the widest scope that still applies to every
+endorser. A dimension survives only when all endorsers constrain it identically, and only `domain` may
+be dropped, so widening can never claim more than its evidence asserted.
+
+**Widening gate** — three distinct endorsing tasks before a claim may widen and its domain-scoped copies
+are retired. A pair is the evidence one persistent user can manufacture; a destructive act needs more.
+
+**Order invariance** — the property that the store rebuilt from a log is identical whatever order the
+events were written in. It is a property of sorted reads and id tie-breaks, and it is measured, not
+assumed.
+
+**Replay determinism** — the property that the same log replayed twice builds the same store: no wall
+clock, no ambient randomness, no id collision. Distinct from order invariance, which is about *which*
+order.
+
+**Mutation control** — a replay whose order-dependence is known in advance, run alongside the invariant
+it is meant to falsify. If the control passes, the instrument is blind and the reported number is
+vacuous; the integrity lane fails in that case rather than reporting a 1.00 it cannot defend.

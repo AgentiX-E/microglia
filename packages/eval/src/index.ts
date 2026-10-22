@@ -61,3 +61,14 @@ export {
 export { FactStore, runFactStore, type Fact, type FactStoreOptions, type FactStoreResult } from './competitor.js';
 
 export { renderJson, renderMarkdown, summarise } from './report.js';
+
+export {
+  replayStore,
+  reverseOrderView,
+  runIntegrity,
+  shuffle,
+  stateOf,
+  type IntegrityCase,
+  type IntegrityReport,
+  type Replay,
+} from './integrity.js';
