@@ -139,8 +139,12 @@ export function generalizationPlan(
   pool: readonly KnowledgeItem[],
   candidate: DistillCandidate,
 ): GeneralizationPlan | undefined {
+  // Only an **admitted** claim may endorse a widening. A quarantined or still-
+  // candidate sibling is evidence the store has not accepted, and letting it
+  // travel into the widened item is how an untrusted channel buys applicability:
+  // the scope route needs no false record, only a real one next door.
   const siblings = pool.filter(
-    (item) => item.status !== 'retired' && sameRuleShape(item, candidate),
+    (item) => item.status === 'active' && sameRuleShape(item, candidate),
   );
   if (siblings.length === 0) return undefined;
   const target = pickGeneralizationTarget(siblings);

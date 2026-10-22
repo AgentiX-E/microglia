@@ -363,6 +363,37 @@ The trust of an abstention is 0.8, not the 0.4 it used to be: at 0.4 the lesson 
 so the workspace could not learn to say "I don't know" — which is the one thing a memory that suppresses
 hallucination must be able to learn.
 
+### 5.3 What a poisoned correction can do
+
+A memory that learns from corrections can be taught a wrong one. MemForm (2026) names five ways to
+corrupt a memory **without planting a false record**, and all five are executable against this store:
+
+| Route | What the attacker does | What stops it |
+|---|---|---|
+| content | states the wrong rule, once or repeatedly | trust-weighted fusion: three tasks at trust 0.6 reach 0.48 confidence, below the 0.6 line; below the quarantine floor the claim is not even stored as knowledge |
+| evidence | cites *someone else's* correction as its own support | a candidate must cite the event that produced it; a mismatched citation is rejected and counted (`rejectedBorrowed`) |
+| scope | submits the same claim in two other domains so it is widened and then applies everywhere | widening needs three **admitted** endorsers and only drops a dimension every endorser leaves open |
+| selection | paraphrases an existing rule with a different payload, hoping a merge hands it the original's evidence | a merge requires the same payload: same words with a different rule is a contradiction, not a duplicate |
+| path | lets a contradiction arrive last, so the store resolves it in their favour | only a claim at trust ≥ 0.7 may contradict at all |
+
+Measured (POC-29: 5 routes × 100 attempts × 3 channel-trust ceilings, 500 attacks, no model calls):
+
+| Channel trust | Attack success | Reading |
+|---|---|---|
+| 0.3 (unverified: imported text, a tool output) | **0%** | below the quarantine floor |
+| 0.6 (a corroboration-band channel) | **0%** | fusion cannot reach the activation line, and the formation routes are closed |
+| 0.9 (a trusted editor) | **40%** | content and path only — see the limit below |
+
+**The limit, stated rather than averaged.** An attacker who is a fully trusted editor can teach a wrong
+rule and can overwrite a right one. No memory system can tell that apart from a user doing their job, and
+a store that refused would refuse its actual user. That is why the gate is written against a capability —
+*content, citations, scope claims, paraphrases and arrival order, but not the trust of the channel* —
+and why the 40% column is printed next to the 0% ones instead of being hidden in a single 13.2% average.
+
+What the harness itself is checked for: the trusted column is a live positive control. If the attacks
+stopped landing, it would collapse to zero and the lane would fail, because a harness that cannot detect
+a successful attack cannot be trusted to report a blocked one.
+
 ## 6. The knowledge lifecycle
 
 ```

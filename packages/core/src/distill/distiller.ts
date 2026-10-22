@@ -22,7 +22,7 @@ import {
   decideStatus,
 } from '../kernel/index.js';
 import { tierFor } from '../kernel/index.js';
-import type { DistillCandidate, KnowledgeItem } from '../kernel/index.js';
+import type { DistillCandidate, FeedbackEvent, KnowledgeItem } from '../kernel/index.js';
 import { generalizationPlan, mergeEvidence as mergeSiblingEvidence } from './generalize.js';
 import type { DistillOptions, DistillReport, InterpretContext } from './types.js';
 
@@ -42,6 +42,7 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
     contradicted: 0,
     quarantined: 0,
     rejectedUnsafe: 0,
+    rejectedBorrowed: 0,
     rejectedByHost: 0,
     failed: 0,
   };
@@ -62,11 +63,13 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
     }
     for (const raw of candidates) {
       report.candidates += 1;
-      const candidate = sanitize({ ...raw, tier: raw.tier ?? tierFor(event.kind) }, options);
-      if (!candidate) {
-        report.rejectedUnsafe += 1;
+      const screened = sanitize({ ...raw, tier: raw.tier ?? tierFor(event.kind) }, options, event);
+      if (!screened.ok) {
+        if (screened.reason === 'borrowed') report.rejectedBorrowed += 1;
+        else report.rejectedUnsafe += 1;
         continue;
       }
+      const candidate = screened.candidate;
       if (options.accept && !options.accept(candidate)) {
         report.rejectedByHost += 1;
         continue;
@@ -194,16 +197,42 @@ async function contradictSameScope(
   return count;
 }
 
-/** Redact first, then screen. Screening a secret before removing it is pointless. */
-function sanitize(candidate: DistillCandidate, options: DistillOptions): DistillCandidate | null {
+type ScreenResult =
+  | { readonly ok: true; readonly candidate: DistillCandidate }
+  | { readonly ok: false; readonly reason: 'unsafe' | 'borrowed' };
+
+/**
+ * Redact first, then screen. Screening a secret before removing it is pointless.
+ *
+ * The last check is provenance, and it is a rejection rather than a correction:
+ * a candidate must cite the event that produced it. An interpreter is host code
+ * — a model, a domain pack, a parser — so a claim citing *someone else's*
+ * feedback id is a claim buying support it did not earn. Re-binding the id here
+ * would erase the only evidence that the interpreter misbehaved.
+ */
+function sanitize(
+  candidate: DistillCandidate,
+  options: DistillOptions,
+  event: FeedbackEvent,
+): ScreenResult {
+  if (
+    candidate.evidence.feedbackId !== event.id ||
+    candidate.evidence.runId !== event.runId
+  ) {
+    return { ok: false, reason: 'borrowed' };
+  }
   const statement = redact(candidate.statement).text;
   const findings = scanForInjection(statement);
-  if (options.policy.rejectUnsafeKnowledge && hasHighSeverity(findings)) return null;
-
+  if (options.policy.rejectUnsafeKnowledge && hasHighSeverity(findings)) {
+    return { ok: false, reason: 'unsafe' };
+  }
   const payload = candidate.payload === undefined ? undefined : redactJson(candidate.payload);
   return {
-    ...candidate,
-    statement,
-    ...(payload === undefined ? {} : { payload }),
+    ok: true,
+    candidate: {
+      ...candidate,
+      statement,
+      ...(payload === undefined ? {} : { payload }),
+    },
   };
 }

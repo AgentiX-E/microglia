@@ -14,14 +14,14 @@
  *   - **Deterministic.** The same store and the same options produce the same
  *     decision, so a curated store can be compared with an uncurated one.
  */
-import { MicrogliaError } from '../kernel/index.js';
+import { MicrogliaError, hashJson } from '../kernel/index.js';
 import {
   decideStatus,
   diceSimilarity,
   scoreKnowledge,
   scopeKey,
 } from '../kernel/index.js';
-import type { EvidenceRef, KnowledgeItem, Policy } from '../kernel/index.js';
+import type { EvidenceRef, Json, KnowledgeItem, Policy } from '../kernel/index.js';
 import type { MemoryPort } from '../memory/index.js';
 
 export type CurationOptions = {
@@ -162,7 +162,14 @@ function groupForMerge(
   const buckets = new Map<string, KnowledgeItem[]>();
   for (const item of items) {
     if (!LIVE_STATUSES.has(item.status)) continue;
-    const key = `${item.namespace}|${item.kind}|${scopeKey(item.scope)}`;
+    // The payload is part of the identity, not a detail: two items whose
+    // statements are near-identical and whose payloads disagree are a
+    // contradiction, and a merge would let the survivor's payload inherit the
+    // loser's evidence. That is the selection route, and it needs no attacker
+    // beyond a paraphrase.
+    const key = `${item.namespace}|${item.kind}|${scopeKey(item.scope)}|${hashJson(
+      (item.payload ?? null) as Json,
+    )}`;
     const bucket = buckets.get(key) ?? [];
     bucket.push(item);
     buckets.set(key, bucket);

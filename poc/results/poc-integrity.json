@@ -1,7 +1,7 @@
 {
   "id": "poc-integrity",
   "title": "POC-28 — replay invariants (order, determinism, schema drift) and erasure",
-  "ranAt": "2026-10-22T01:18:24.190Z",
+  "ranAt": "2026-10-22T05:12:23.252Z",
   "model": "none",
   "n": 1000,
   "calls": 0,
@@ -22,7 +22,7 @@
     "resurrected_after_erasure": 0,
     "active_items": 28,
     "candidate_items": 13,
-    "retired_items": 15,
+    "retired_items": 14,
     "gates_passed": 10
   },
   "notes": [

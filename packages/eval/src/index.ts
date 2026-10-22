@@ -63,6 +63,20 @@ export { FactStore, runFactStore, type Fact, type FactStoreOptions, type FactSto
 export { renderJson, renderMarkdown, summarise } from './report.js';
 
 export {
+  ATTACK_ROUTES,
+  MEMFORM_ARMS,
+  TRUST_LEVELS,
+  policyFor,
+  runMemform,
+  type AttackOutcome,
+  type AttackRoute,
+  type MemformArm,
+  type MemformOptions,
+  type MemformReport,
+  type RouteScore,
+} from './memform.js';
+
+export {
   replayStore,
   reverseOrderView,
   runIntegrity,

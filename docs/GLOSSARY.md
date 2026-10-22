@@ -226,3 +226,15 @@ a payload, because a copy of the erased data would defeat the erasure it documen
 below the retirement line, lose a provenance tier it no longer has evidence for, and drop back behind the
 promotion gate. That is the intended behaviour: a deletion that leaves a promotion behind has not deleted
 the thing that mattered.
+
+**Formation route** — a way to corrupt a memory without planting a false record: content, evidence, scope,
+selection, path (MemForm, 2026). Each is an executable attack in this repository rather than a paragraph
+in a threat model.
+
+**Attack success** — the share of attempts in which a false claim becomes active *and* reaches the pack
+for the question it should not answer. A claim that is stored but never injected is not a success, and the
+harness counts the difference (`active-not-injected`).
+
+**Capability-limited attacker** — the adversary the gate is written against: it controls content,
+citations, scope claims, paraphrases and arrival order, but not the trust the host assigns to the channel
+it writes through. A fully trusted attacker is a user, and its success is reported as a limit.

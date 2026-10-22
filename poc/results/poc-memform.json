@@ -1,0 +1,225 @@
+{
+  "id": "poc-memform",
+  "title": "POC-29 — five formation routes, three trust ceilings, one gate",
+  "ranAt": "2026-10-22T05:12:23.749Z",
+  "model": "none",
+  "n": 500,
+  "calls": 0,
+  "metrics": {
+    "attempts": 500,
+    "attack_success_limited": 0,
+    "attack_success_trusted": 0.4,
+    "attack_success_overall": 0.132,
+    "content_limited": 0,
+    "content_route": 0.33,
+    "evidence_success": 0,
+    "scope_success": 0,
+    "selection_success": 0,
+    "path_limited": 0,
+    "path_route": 0.33,
+    "floor_off_delta": 0,
+    "gates_passed": 4
+  },
+  "notes": [
+    "Attacker capability: content, citations, scope claims, paraphrases and arrival order. It does not choose the trust of the channel it writes through; the lane sweeps that ceiling instead.",
+    "A fully trusted editor wins 40% of the time. That is a limit of any store that listens to its users, not a defect: the same events from a real user are a correct correction.",
+    "Quarantine floor ablation: with quarantineBelowTrust = 0 the outcome is identical (0.0% vs 0.0%); the floor changes the label of 136 claims from quarantined to candidate, not their fate. Fusion, not the floor, is what stops a low-trust claim.",
+    "The other four defences are invariants, not switches: their contribution is the attribution table below, which names the mechanism that stopped each attempt.",
+    "No model calls and no wall clock: the lane is deterministic and runs in CI."
+  ],
+  "samples": [
+    {
+      "section": "per-route",
+      "rows": [
+        {
+          "route": "content",
+          "attempts": 100,
+          "successes": 33,
+          "success": 0.33
+        },
+        {
+          "route": "evidence",
+          "attempts": 100,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "scope",
+          "attempts": 100,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "selection",
+          "attempts": 100,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "path",
+          "attempts": 100,
+          "successes": 33,
+          "success": 0.33
+        }
+      ]
+    },
+    {
+      "section": "per-trust",
+      "rows": [
+        {
+          "trust": "0.3",
+          "attempts": 170,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "trust": "0.6",
+          "attempts": 165,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "trust": "0.9",
+          "attempts": 165,
+          "successes": 66,
+          "success": 0.4
+        }
+      ]
+    },
+    {
+      "section": "matrix",
+      "rows": [
+        {
+          "route": "content",
+          "trust": 0.3,
+          "attempts": 34,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "content",
+          "trust": 0.6,
+          "attempts": 33,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "content",
+          "trust": 0.9,
+          "attempts": 33,
+          "successes": 33,
+          "success": 1
+        },
+        {
+          "route": "evidence",
+          "trust": 0.3,
+          "attempts": 34,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "evidence",
+          "trust": 0.6,
+          "attempts": 33,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "evidence",
+          "trust": 0.9,
+          "attempts": 33,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "scope",
+          "trust": 0.3,
+          "attempts": 34,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "scope",
+          "trust": 0.6,
+          "attempts": 33,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "scope",
+          "trust": 0.9,
+          "attempts": 33,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "selection",
+          "trust": 0.3,
+          "attempts": 34,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "selection",
+          "trust": 0.6,
+          "attempts": 33,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "selection",
+          "trust": 0.9,
+          "attempts": 33,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "path",
+          "trust": 0.3,
+          "attempts": 34,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "path",
+          "trust": 0.6,
+          "attempts": 33,
+          "successes": 0,
+          "success": 0
+        },
+        {
+          "route": "path",
+          "trust": 0.9,
+          "attempts": 33,
+          "successes": 33,
+          "success": 1
+        }
+      ]
+    },
+    {
+      "section": "attribution",
+      "rows": [
+        {
+          "reason": "source-trust-below-quarantine",
+          "count": 136
+        },
+        {
+          "reason": "insufficient-evidence",
+          "count": 99
+        },
+        {
+          "reason": "rejected-borrowed",
+          "count": 100
+        },
+        {
+          "reason": "active-not-injected",
+          "count": 33
+        },
+        {
+          "reason": "needs-corroboration",
+          "count": 66
+        }
+      ]
+    }
+  ]
+}

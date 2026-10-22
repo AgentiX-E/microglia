@@ -238,6 +238,18 @@ describe('the widening plan', () => {
     expect(plan?.scope).toEqual({ task: 'chart.recommend', intent: 'trend' });
   });
 
+  it('lets no unadmitted sibling endorse a widening', () => {
+    // An attacker does not need a false record: a real one next door plus two
+    // quarantined paraphrases is enough to buy applicability if the widening
+    // counts evidence the store never accepted.
+    const quarantined = { ...sibling('hr', 't2'), status: 'quarantined' as const };
+    const pool = [sibling('sales', 't1'), quarantined];
+    expect(generalizationPlan(pool, incoming('ops', 't3'))).toBeUndefined();
+
+    const admitted = [sibling('sales', 't1'), sibling('hr', 't2')];
+    expect(generalizationPlan(admitted, incoming('ops', 't3'))?.tasks).toBe(WIDENING_TASKS);
+  });
+
   it('declines when the candidate disagrees with the only sibling about the intent', () => {
     const pool = [sibling('sales', 't1'), sibling('hr', 't2')];
     const conflict = { ...incoming('ops', 't3'), scope: { task: 'chart.recommend', domain: 'ops', intent: 'comparison' } };

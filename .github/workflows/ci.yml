@@ -51,6 +51,9 @@ jobs:
       - name: Integrity lane (POC-28 order, determinism, schema drift)
         run: pnpm poc:integrity
 
+      - name: Attack lane (POC-29 five formation routes)
+        run: pnpm poc:memform
+
       - name: CPU scale and latency
         run: pnpm poc:scale
 

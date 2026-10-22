@@ -192,6 +192,9 @@ and never activated on confidence alone without support.
 | Inflated applicability | Widened scope is the meet of the endorsers'; three distinct tasks required | `distill/generalize.ts` |
 | Order-dependent learning | Sorted reads, id tie-breaks, canonical evidence order | `memory/store.ts`, `capture/curate.ts` |
 | Data retained past its consent | `forget()` erases by id, task or actor hash, re-derives the claims that cited them, and rewrites the journal | `memory/store.ts`, `memory/journal.ts` |
+| Borrowed evidence | a candidate must cite the event that produced it; a mismatch is rejected and counted | `distill/distiller.ts` |
+| Payload smuggling through a merge | curation groups by payload, so a paraphrase with a different rule is a contradiction, not a duplicate | `capture/curate.ts` |
+| Applicability inflation | widening only counts **admitted** endorsers | `distill/generalize.ts` |
 
 The reference threat model assumes the host authenticates users. The library does not attempt to
 identify people; it tries to ensure that no single untrusted channel can move a rule into a prompt.

@@ -163,7 +163,13 @@ must pass, or the build fails.
 `pnpm poc:integrity` runs the second instrument: 1,000 events replayed in five shuffled orders, plus a
 control that bypasses the sort the store relies on. Order invariance and replay determinism are 1.00,
 the control disagrees (which is what makes the 1.00 mean something), and a mid-stream schema rename
-injects nothing stale. The lane costs no model calls and runs in CI on every push.
+injects nothing stale. Erasure is measured in the same lane: nothing erased is retrievable afterwards.
+
+`pnpm poc:memform` runs the third: 500 attacks across MemForm's five formation routes at three channel
+trust ceilings. An attacker that controls content, citations, scope claims, paraphrases and arrival order
+lands **0%** at trust ≤ 0.6 and 40% at 0.9 — where it is a trusted editor, which is the product working
+as designed and is printed as a limit rather than folded into an average. Both lanes cost no model calls
+and run in CI on every push.
 
 Read the [user guide](docs/USER-GUIDE.md) for the integration contract, the
 [architecture](docs/ARCHITECTURE.md) for how the pieces fit, and the
@@ -191,7 +197,7 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-99.80 / 98.30 / 100 / 99.80 over 513 tests; the branches that remain uncovered are listed with file,
+99.82 / 97.70 / 100 / 99.82 over 535 tests; the branches that remain uncovered are listed with file,
 line, and reason in the internal technical design, and none is excluded with an ignore comment.
 
 ## Licence

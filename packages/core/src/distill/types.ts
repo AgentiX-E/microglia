@@ -76,6 +76,8 @@ export type DistillReport = {
   readonly contradicted: number;
   readonly quarantined: number;
   readonly rejectedUnsafe: number;
+  /** Claims citing an event other than the one being interpreted. */
+  readonly rejectedBorrowed: number;
   readonly rejectedByHost: number;
   /** Events whose interpreter threw. Non-strict runs count them and continue. */
   readonly failed: number;

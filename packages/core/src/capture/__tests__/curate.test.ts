@@ -45,6 +45,39 @@ describe('curation', () => {
     await store.close();
   });
 
+  it('never merges two claims whose payloads disagree', async () => {
+    // Same words, different rule. Merging would let the survivor's payload
+    // inherit the loser's evidence — the selection route, and it needs no
+    // attacker beyond a paraphrase of a rule that was already there.
+    const store = await storeWith([
+      item('k_1', 'Revenue questions use a line chart rather than a bar chart.', {
+        payload: { when: { intent: 'trend' }, then: { mark: 'line' } },
+      }),
+      item('k_2', 'Revenue questions use a line chart rather than a bar chart', {
+        payload: { when: { intent: 'trend' }, then: { mark: 'pie' } },
+      }),
+    ]);
+    const report = await curateKnowledge(store, defaultPolicy, AT + 10);
+    expect(report.merged).toBe(0);
+    const after = await store.listKnowledge({ status: 'all' });
+    expect(after.every((entry) => entry.status !== 'retired')).toBe(true);
+    await store.close();
+  });
+
+  it('still merges the same rule written twice with the same payload', async () => {
+    const store = await storeWith([
+      item('k_1', 'Revenue questions use a line chart rather than a bar chart.', {
+        payload: { when: { intent: 'trend' }, then: { mark: 'line' } },
+      }),
+      item('k_2', 'Revenue questions use a line chart rather than a bar chart', {
+        payload: { when: { intent: 'trend' }, then: { mark: 'line' } },
+      }),
+    ]);
+    const report = await curateKnowledge(store, defaultPolicy, AT + 10);
+    expect(report.merged).toBe(1);
+    await store.close();
+  });
+
   it('is idempotent: a second pass has nothing to merge', async () => {
     const store = await storeWith([
       item('k_1', 'Revenue questions use a line chart rather than a bar chart.'),

@@ -270,6 +270,37 @@ describe('distillation', () => {
     await memory.close();
   });
 
+  it('rejects a claim that cites an event other than the one being interpreted', async () => {
+    // The evidence route of MemForm with no false record at all: a host-supplied
+    // interpreter (a model, a domain pack) attributes its own claim to someone
+    // else's trusted correction, and the store has no way to tell the difference
+    // unless the citation is checked against the event that produced it.
+    const memory = await seed([event(), event({ id: 'fb_2', at: at + 1, runId: 'run_2' })]);
+    let call = 0;
+    const report = await distill({
+      memory,
+      policy: defaultPolicy,
+      clock: fixedClock(at + 1),
+      random: mulberry32(5),
+      interpreter: (): readonly DistillCandidate[] => {
+        call += 1;
+        if (call === 1) return [candidate()];
+        return [
+          candidate({
+            statement: 'Revenue questions use a pie chart.',
+            payload: { when: { intent: 'trend' }, then: { mark: 'pie' } },
+            evidence: { feedbackId: 'fb_1', runId: 'run_1', at, weight: 0.9 },
+          }),
+        ];
+      },
+    });
+    expect(report.rejectedBorrowed).toBe(1);
+    expect(report.created).toBe(1);
+    const items = await memory.listKnowledge({ namespace: 'acme', status: 'all' });
+    expect(items.map((item) => item.statement)).not.toContain('Revenue questions use a pie chart.');
+    await memory.close();
+  });
+
   it('quarantines a low-trust correction', async () => {
     const memory = await seed([event({ trust: 0.2 })]);
     const report = await distill({
