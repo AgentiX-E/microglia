@@ -57,6 +57,9 @@ jobs:
       - name: Pragmatics lane (L0 1,300-case rule-derived adjudication)
         run: pnpm eval:l0
 
+      - name: Pair contrast lane (L2b single vs pair)
+        run: pnpm eval:pairs
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

@@ -32,6 +32,7 @@
     "eval:integrity": "tsx packages/eval/src/bin/integrity.ts",
     "eval:memform": "tsx packages/eval/src/bin/memform.ts",
     "eval:l0": "tsx packages/eval/src/bin/l0.ts",
+    "eval:pairs": "tsx packages/eval/src/bin/pairs.ts",
     "eval:l4": "tsx packages/eval/src/bin/l4.ts",
     "eval:cortex": "node scripts/cortex-conformance.mjs",
     "audit:deps": "pnpm audit --prod",

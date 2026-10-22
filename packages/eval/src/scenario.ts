@@ -41,7 +41,7 @@ import {
   type DomainSchema,
   type FieldDef,
 } from './workload/index.js';
-import { MicrogliaError, type KnowledgePack } from '@agentix-e/microglia-core';
+import { MicrogliaError, type Json, type KnowledgePack } from '@agentix-e/microglia-core';
 
 export { DOMAINS } from './workload/index.js';
 
@@ -251,7 +251,15 @@ export function buildCorpus(
   return items;
 }
 
-function questionText(
+/**
+ * The question a case asks, in prose.
+ *
+ * Exported because a corpus that is not built by `buildCorpus` still has to ask
+ * the reader the same way: two spellings of "compare X across Y" would rank
+ * differently against the same store, and a lane that invents its own wording is
+ * measuring retrieval drift rather than knowledge.
+ */
+export function questionText(
   intent: ChartIntent,
   domain: string,
   measure: string,
@@ -275,6 +283,24 @@ function questionText(
     case 'ranking':
       return `Which ${category} has the highest ${measure} in ${domain}?`;
   }
+}
+
+/**
+ * The run input a chart host records at generation time.
+ *
+ * The interpreter scopes a lesson by these fields, so a lane that records a run
+ * without them produces an edit no interpreter can classify — the quiet way a
+ * lane can end up measuring nothing.
+ */
+export function queryFeatures(query: Query): Record<string, Json> {
+  return {
+    question: query.text,
+    domain: query.domain,
+    intent: query.intent,
+    field: query.field,
+    categoryCount: query.categoryCount,
+    grain: query.grain,
+  };
 }
 
 /**

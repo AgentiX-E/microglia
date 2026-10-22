@@ -1,0 +1,58 @@
+{
+  "id": "poc-l2b",
+  "title": "L2b — pair contrast: does recording the failure add anything?",
+  "ranAt": "2026-10-22T15:44:41.410Z",
+  "model": "none",
+  "n": 8,
+  "calls": 0,
+  "metrics": {
+    "teach_cases": 6,
+    "holdout_cases": 8,
+    "unreachable_cases": 1,
+    "reachable_share": 0.75,
+    "baseline_top1": 0.125,
+    "single_top1": 0.875,
+    "pair_top1": 0.875,
+    "single_recovery": 0.8571428571428571,
+    "pair_recovery": 0.8571428571428571,
+    "recovery_delta": 0,
+    "pair_helps": 0,
+    "bar": 0.05,
+    "single_reachable_top1": 1,
+    "pair_reachable_top1": 1,
+    "single_wall_top1": 0,
+    "pair_wall_top1": 0,
+    "single_runs": 6,
+    "pair_runs": 11,
+    "single_corrections": 5,
+    "pair_corrections": 5,
+    "single_knowledge": 5,
+    "pair_knowledge": 6,
+    "single_active": 3,
+    "pair_active": 3,
+    "pair_negative_lessons": 1,
+    "single_corrected_with_citation": 0,
+    "pair_corrected_with_citation": 0,
+    "verdict_is_vacuous": 1,
+    "gates_passing": 4,
+    "gates_total": 5
+  },
+  "notes": [
+    "Two protocols, one corpus, one teaching budget: 6 teaching questions, 8 evaluated, 1 of them unreachable by construction.",
+    "single: one attempt, completed, then corrected. pair: attempt one completed and recorded as a failure (wrong-mark), attempt two from the same pack completed and corrected, linked by parentRunId.",
+    "Attempt two does not re-recall: the store is not distilled between attempts, so a second read returns the same pack. The variable under test is the recorded failure, not retrieval noise.",
+    "Reachable share 75.00%: the questions whose (domain, intent) key was taught. The remainder is the held-out convention, which no correction could supply — a fixed cost the recovery denominator does not hide.",
+    "Recovery is (arm - baseline) / (oracle - baseline) on the whole holdout, with oracle 1.00 by construction: the gold is the stated convention. The bar for calling a difference an improvement is 0.05 of recovery.",
+    "Verdict: pair helps = false. A null result is a result — the failure record is not called an improvement because it was tried.",
+    "Corrected attempts that cited a rule: 0/5 single, 0/5 pair. Zero on both arms: the single teaching pass distils once at the end, so every correction was answered from an empty pack and the two protocols could not have diverged. The number is arithmetic, not evidence about the mechanism, and the lane reports it as vacuous rather than as a null effect.",
+    "The artefact carries 4/5 gates: headroom, a real wall, a split with both mass and a wall, and evidence that the failure was actually recorded."
+  ],
+  "samples": [
+    {
+      "case": "cvho_ops_comparison",
+      "gold": "scatter",
+      "single": false,
+      "pair": false
+    }
+  ]
+}

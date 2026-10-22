@@ -166,6 +166,15 @@ p = 5.9e-213, 706 gained and none lost), and the domain that received no feedbac
 lane also prints the smallest effect its own sample could detect — 7.16pp — because an effect smaller
 than that would be indistinguishable from noise here.
 
+`pnpm eval:pairs` runs the pair-contrast lane (L2b): the same corpus taught twice, once with the
+correction alone and once with the failed attempt recorded before the correction. Both arms land at
+**87.50%** against a 12.50% no-memory baseline over eight held-out questions, with 75% of them reachable
+from the teaching split and one convention that no correction could supply. The verdict is a null —
+**0.00pp**, below the 5pp bar — and the artefact says why it is *vacuous*: in a single teaching pass every
+correction is answered from an empty pack, so neither protocol had a cited rule to blame and the
+comparison could not have come out differently. That is reported as an instrument limit, not as an effect
+size.
+
 The τ²-bench lane (L4) ships its metric layer only: the unbiased `pass^k`, the task mean, and a
 comparison that meets a published number through a stated bar. It runs in the `sota` workflow behind a
 repository variable, and until the tool-calling environment exists it writes a `not-run` artefact rather
@@ -192,8 +201,7 @@ Read the [user guide](docs/USER-GUIDE.md) for the integration contract, the
 packages/core     the library, five modules behind subpath exports
 packages/node     Hono routes, vendor providers, server bootstrap
 packages/browser  fetch client and offline outbox
-packages/eval     the benchmark instrument (private, not published)
-poc/              live-API and replay experiments with recorded artefacts
+packages/eval     the benchmark instrument (private, not published); lanes in src/bin/
 bench/        the ablation study and its gate report
 scripts/      the quality audit that CI runs
 docs/         user guide, architecture, glossary
@@ -203,12 +211,12 @@ docs/         user guide, architecture, glossary
 
 ```bash
 pnpm install
-pnpm check      # typecheck → tests with coverage gates → quality audit → study
+pnpm check      # typecheck → lanes → tests with coverage gates → audit → integrity → memform → L0 → study
 pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-99.84 / 97.69 / 100 / 99.84 over 568 tests; the branches that remain uncovered are listed with file,
+99.85 / 97.75 / 100 / 99.85 over 593 tests; the branches that remain uncovered are listed with file,
 line, and reason in the internal technical design, and none is excluded with an ignore comment.
 
 ## Licence

@@ -228,6 +228,11 @@ The study is a package, not a script:
 - `memform.ts` — the five formation routes as executable attacks, scored by route and trust ceiling.
 - `study.ts` — also carries `L0_CONFIG`, the frozen 1,300-case preregistration.
 - erasure is measured by the same lane (POC-28b): nothing erased may be retrievable.
+- `conventions.ts` — the per-domain convention corpus: a teaching and a holdout question per scope, and
+  one domain whose convention is never taught.
+- `pairs.ts` — the pair-contrast arithmetic: reachable share, reachable recovery, and the verdict.
+- `lanes/pairs.ts` — the L2b protocol: two arms, one teaching budget, the citation count that decides
+  whether the comparison means anything.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.
@@ -266,7 +271,7 @@ This repository is **the product and the evidence that gates it**:
 | Here | Why |
 |---|---|
 | `packages/` | the library |
-| `packages/eval/src/bin/` | executable lanes that measure the library — replay invariants, the attack harness, L0/L4, the live model probes |
+| `packages/eval/src/bin/` | executable lanes that measure the library — replay invariants, the attack harness, L0/L2b/L4, the live model probes |
 | `bench/` | the ablation study and its gate report |
 | `scripts/` | the quality audit and the conformance check |
 | `.github/workflows/` | the gates: `ci`, `sota`, `poc-live`, `cortex` |

@@ -27,10 +27,32 @@ export {
   CONVENTIONS,
   HELD_OUT,
   buildConventions,
+  holdoutCases,
   trainingSplit,
   unreachableCases,
   type ConventionCase,
+  type ConventionSplit,
 } from './conventions.js';
+
+export {
+  L2B_BAR,
+  baselineCorrect,
+  buildL2bGates,
+  citedCorrections,
+  correctionFor,
+  featuresFor,
+  predictAll,
+  runL2b,
+  runPairArm,
+  shareOf,
+  teachCase,
+  type ArmReport,
+  type L2bArm,
+  type L2bGate,
+  type L2bReport,
+  type TeachingOutcome,
+  type WallCase,
+} from './lanes/pairs.js';
 
 export {
   attributeRules,
@@ -54,6 +76,8 @@ export {
   baselineMark,
   buildCorpus,
   goldMark,
+  queryFeatures,
+  questionText,
   specFor,
   type CorpusItem,
   type Query,

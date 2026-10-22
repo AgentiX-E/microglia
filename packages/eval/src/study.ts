@@ -47,6 +47,7 @@ import {
   applyKnowledge,
   buildCorpus,
   goldMark,
+  queryFeatures,
   type CorpusItem,
 } from './scenario.js';
 import { comparePaired, type PairedResult } from './stats.js';
@@ -510,15 +511,12 @@ export function poisonMark(intent: ChartIntent): ChartMark {
   }
 }
 
+/**
+ * The run input for one item, taken from the shared formatter so every lane
+ * records the features the interpreter scopes a lesson by.
+ */
 function featuresJson(item: CorpusItem): Record<string, Json> {
-  return {
-    question: item.query.text,
-    domain: item.query.domain,
-    intent: item.query.intent,
-    field: item.query.field,
-    categoryCount: item.query.categoryCount,
-    grain: item.query.grain,
-  };
+  return queryFeatures(item.query);
 }
 
 /**
