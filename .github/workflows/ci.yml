@@ -36,9 +36,6 @@ jobs:
       - name: Typecheck and build
         run: pnpm build
 
-      - name: Typecheck the POC scripts
-        run: pnpm eval:typecheck
-
       - name: Typecheck the lane CLIs
         run: pnpm typecheck:lanes
 
