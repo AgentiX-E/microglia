@@ -258,3 +258,27 @@ for safety gates.
 
 Nothing else is extensible, on purpose. Every additional seam is a place where the guarantee about
 what reaches a prompt could be weakened.
+
+## 11. What is in this repository, and what is not
+
+This repository is **the product and the evidence that gates it**:
+
+| Here | Why |
+|---|---|
+| `packages/` | the library |
+| `poc/` | executable lanes that measure the library — replay invariants, the attack harness, L0/L4, the live model probes |
+| `bench/` | the ablation study and its gate report |
+| `scripts/` | the quality audit and the conformance check |
+| `.github/workflows/` | the gates: `ci`, `sota`, `poc-live`, `cortex` |
+| `docs/` | the user guide, this architecture, the glossary |
+
+The rule that decides a borderline file is **what it tests, not what it says**: if running it
+tells you something about *this library*, it belongs here, even when the thing it measures is an
+external dataset or a third-party model. `scripts/hf-inventory.mjs` is the clearest case — it prints
+what a Hugging Face dataset contains — and it stays because its only caller is the `sota` job, where it
+makes a failed benchmark run explain itself.
+
+What is deliberately absent: the whitepaper, the technical design, the roadmap, the audit and the
+progress log. Those describe the *project* rather than the library, they are written for an audience
+that is not a host developer, and they live in `microglia-docs`. `pnpm audit:repo` fails the build if
+one of them drifts back.

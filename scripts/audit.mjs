@@ -101,6 +101,21 @@ for (const doc of ['README.md', 'docs/USER-GUIDE.md', 'docs/ARCHITECTURE.md', 'd
   if (!exists) fail('docs', `${doc} is missing`);
 }
 
+// The repository boundary, enforced rather than remembered.
+//
+// This repo is the product and the evidence that gates it: code, the external
+// documents a developer needs, and the workflows that run both. Internal records
+// — the whitepaper, the technical design, the roadmap, the audit, the progress
+// log — live in `microglia-docs`, because they describe the project rather than
+// the library. Keeping the list here means a document that drifts back is a red
+// build instead of a slow untangling two releases later.
+for (const internal of ['WHITEPAPER.md', 'TECH-DESIGN.md', 'ROADMAP.md', 'AUDIT.md', 'PROGRESS.md']) {
+  const exists = await stat(join(ROOT, internal)).then(() => true, () => false);
+  if (exists) fail('boundary', `${internal} belongs in microglia-docs, not here`);
+  const nested = await stat(join(ROOT, 'docs', internal)).then(() => true, () => false);
+  if (nested) fail('boundary', `docs/${internal} belongs in microglia-docs, not here`);
+}
+
 // What ships is what can hurt a consumer. The library declares no runtime
 // dependency at all, so this is a statement about the artefact rather than a
 // formality; dev-only advisories are reported separately in the audit document
