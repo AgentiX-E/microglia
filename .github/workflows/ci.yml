@@ -60,6 +60,20 @@ jobs:
       - name: Pair contrast lane (L2b single vs pair)
         run: pnpm eval:pairs
 
+      # The L4 reader is exercised without the tau2 environment: a full grid must
+      # score and a short grid must be refused rather than averaged. Both fixtures
+      # are synthetic and say so in their `info` block.
+      - name: L4 reader (scores a full grid, refuses a short one)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/l4-score" TAU_RESULTS=eval/fixtures/tau2-synthetic-60x4.json pnpm eval:l4
+          grep -q '"pass4": 1' "${RUNNER_TEMP}/l4-score/poc-l4.json"
+          if POC_RESULT_DIR="${RUNNER_TEMP}/l4-refuse" TAU_RESULTS=eval/fixtures/tau2-synthetic-60x2.json pnpm eval:l4; then
+            echo "the L4 reader scored a grid it must refuse"
+            exit 1
+          fi
+          grep -q '"status_refused": 1' "${RUNNER_TEMP}/l4-refuse/poc-l4.json"
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

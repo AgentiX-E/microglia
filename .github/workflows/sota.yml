@@ -230,6 +230,9 @@ jobs:
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           TAU_DRIVER: ${{ vars.TAU_DRIVER }}
+          # A recorded run can be re-scored without the environment; the lane
+          # prefers it over the driver when both are set.
+          TAU_RESULTS: ${{ vars.TAU_RESULTS }}
           TAU_MODEL: ${{ vars.TAU_MODEL }}
           TAU_VERSION: ${{ vars.TAU_VERSION }}
           TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data

@@ -8,6 +8,17 @@
 export { comparePaired, type PairedResult } from './stats.js';
 export { recoveryRatio, type RecoveryInput } from './recovery.js';
 export {
+  L4ParseError,
+  parseTauResults,
+  taskTrials,
+  toPassAtK,
+  type L4ParseReason,
+  type TauRun,
+  type TauTrial,
+  type TaskTrials,
+} from './l4.js';
+
+export {
   compareToPublished,
   l4Verdict,
   meanPassAtK,

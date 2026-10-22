@@ -1,26 +1,53 @@
 /**
  * L4 — τ²-bench, pass^4, against ALTK-Evolve on the same split.
  *
- * The statistics are implemented and tested (`passk.ts`): the unbiased
- * `C(c,k)/C(n,k)` estimator, the mean over tasks, and a comparison that only
- * "meets" a published number through a stated bar. What is **not** here is the
- * environment: τ²-retail and τ²-airline need a tool-calling sandbox and a user
- * simulator, and this sandbox cannot reach either.
+ * Three inputs, in order of preference, because they answer three different
+ * questions and only one of them needs the environment:
  *
- * So the lane refuses to invent a number. With `TAU_DRIVER` unset it writes an
- * artefact that says `not-run`, and exits 0 — a missing environment is not a
- * failed gate, and it must not look like one in the record. When the driver
- * exists, the workflow runs it and the same gates apply.
+ *   TAU_RESULTS  a recorded τ² result document. Re-scores a run that already
+ *                happened, so the reader and the gates can be exercised on a
+ *                machine that cannot run an agent.
+ *   TAU_DRIVER   a module exporting `run()`. Installs the agent, runs the split,
+ *                and returns the estimator's input itself.
+ *   neither      not-run. A missing environment is not a failed gate, and it must
+ *                not look like one in the record.
+ *
+ * A fourth outcome is *not* the same as not-run: a document that parsed but
+ * cannot be scored (a partial grid, an unscored denominator) is a refusal, exits
+ * non-zero, and names the reason. That is the difference between "we could not
+ * measure" and "we measured something invalid".
  */
-import { compareToPublished, meanPassAtK, type PassAtKInput } from '@agentix-e/microglia-eval';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import {
+  L4ParseError,
+  compareToPublished,
+  l4Verdict,
+  meanPassAtK,
+  parseTauResults,
+  toPassAtK,
+  type PassAtKInput,
+} from '@agentix-e/microglia-eval';
 import { writeResult } from './lib.js';
 
 const PUBLISHED = 0.575; // ALTK-Evolve, τ²-retail, pass^4 on the same split.
 const BAR = 0.05;
 const K = 4;
+const MIN_TASKS = 60;
+
+const resultsPath = process.env['TAU_RESULTS'];
 const driver = process.env['TAU_DRIVER'];
 
-if (driver === undefined) {
+/** A directory form keeps its document in `results.json`; a file form is itself. */
+async function readDocument(path: string): Promise<string> {
+  try {
+    return await readFile(path, 'utf8');
+  } catch {
+    return readFile(join(path, 'results.json'), 'utf8');
+  }
+}
+
+async function notRun(): Promise<never> {
   await writeResult({
     id: 'poc-l4',
     title: 'L4 — τ²-bench pass^4 (not run: no environment)',
@@ -30,39 +57,126 @@ if (driver === undefined) {
     calls: 0,
     metrics: { status_not_run: 1, published_pass4: PUBLISHED, bar: BAR, k: K },
     notes: [
-      'The metric layer is live (passk.ts, four tests): the unbiased estimator, the task mean, and a bar-gated comparison.',
+      'The metric layer is live (passk.ts) and so is the result reader (l4.ts, tested against both storage forms upstream ships).',
       'No result is claimed. τ²-retail and τ²-airline need a tool-calling sandbox and a user simulator; this lane reports not-run rather than a zero it did not measure.',
-      'Set TAU_DRIVER to a module exporting run(): Promise<readonly PassAtKInput[]> and the sota workflow will run it and apply the same gates.',
+      'Set TAU_RESULTS to a recorded result document to re-score one, or TAU_DRIVER to a module exporting run(): Promise<readonly PassAtKInput[]> to run a split.',
     ],
   });
-  process.stdout.write('[poc-l4] not-run: no TAU_DRIVER; metric layer verified separately\n');
+  process.stdout.write('[poc-l4] not-run: neither TAU_RESULTS nor TAU_DRIVER is set\n');
   process.exit(0);
 }
 
-const module_ = (await import(driver)) as { run: () => Promise<readonly PassAtKInput[]> };
-const tasks = await module_.run();
-const measured = meanPassAtK(tasks);
-const compared = compareToPublished(measured, PUBLISHED, BAR);
+/**
+ * Refuse a run that cannot be scored, and say why.
+ *
+ * The exit code is non-zero on purpose: a partial grid is a defective run, not a
+ * missing environment, and a lane that exited 0 here would appear in the record
+ * as a run that happened and produced nothing.
+ */
+async function refuse(error: L4ParseError, source: string): Promise<never> {
+  await writeResult({
+    id: 'poc-l4',
+    title: 'L4 — τ²-bench pass^4 (refused: the run cannot be scored)',
+    ranAt: new Date().toISOString(),
+    model: process.env['TAU_MODEL'] ?? 'unknown',
+    n: 0,
+    calls: 0,
+    metrics: { status_refused: 1, published_pass4: PUBLISHED, bar: BAR, k: K },
+    notes: [
+      `Refused with reason \`${error.reason}\`: ${error.message}`,
+      `Source: ${source}. A refused run is neither a zero nor a not-run: the split was measured and cannot be scored as specified.`,
+    ],
+  });
+  process.stderr.write(`[poc-l4] refused (${error.reason}): ${error.message}\n`);
+  process.exit(1);
+}
+
+type Measurement = {
+  readonly tasks: readonly PassAtKInput[];
+  readonly unscored: readonly string[];
+  readonly domain?: string;
+  readonly format: string;
+  readonly inferredTrials: number;
+};
+
+async function measureFromResults(path: string): Promise<Measurement> {
+  let run;
+  try {
+    run = parseTauResults(await readDocument(path));
+    const scored = toPassAtK(run, K);
+    return {
+      tasks: scored.tasks,
+      unscored: scored.unscored,
+      ...(run.domain === undefined ? {} : { domain: run.domain }),
+      format: run.format,
+      inferredTrials: run.inferredTrials,
+    };
+  } catch (error) {
+    if (error instanceof L4ParseError) return refuse(error, path);
+    throw error;
+  }
+}
+
+async function measureFromDriver(module: string): Promise<Measurement> {
+  const loaded = (await import(module)) as { run: () => Promise<readonly PassAtKInput[]> };
+  return { tasks: await loaded.run(), unscored: [], format: 'driver', inferredTrials: 0 };
+}
+
+if (resultsPath === undefined && driver === undefined) await notRun();
+
+const source = resultsPath ?? (driver as string);
+const measured =
+  resultsPath === undefined ? await measureFromDriver(driver as string) : await measureFromResults(resultsPath);
+
+const mean = meanPassAtK(measured.tasks);
+const compared = compareToPublished(mean, PUBLISHED, BAR);
+const verdict = l4Verdict({ tasks: measured.tasks, published: PUBLISHED, bar: BAR, minTasks: MIN_TASKS });
 const gates = [
-  { id: 'l4-pass4', pass: compared.meets, actual: measured, criterion: `>= published + ${BAR}` },
-  { id: 'l4-coverage', pass: tasks.length >= 60, actual: tasks.length, criterion: '>= 60 tasks' },
+  { id: 'l4-pass4', pass: compared.meets, actual: mean, criterion: `>= published + ${BAR}` },
+  {
+    id: 'l4-coverage',
+    pass: measured.tasks.length >= MIN_TASKS,
+    actual: measured.tasks.length,
+    criterion: `>= ${MIN_TASKS} tasks`,
+  },
+  // A score is only a split result if the whole grid was scored: the reader drops
+  // infrastructure failures from the denominator, so the count has to be stated.
+  {
+    id: 'l4-fully-scored',
+    pass: measured.unscored.length === 0,
+    actual: measured.unscored.length,
+    criterion: '= 0 unscored tasks',
+  },
 ];
+
 await writeResult({
   id: 'poc-l4',
   title: 'L4 — τ²-bench pass^4 against ALTK-Evolve',
   ranAt: new Date().toISOString(),
   model: process.env['TAU_MODEL'] ?? 'unknown',
-  n: tasks.length,
+  n: measured.tasks.length,
   calls: 0,
   metrics: {
-    pass4: measured,
+    pass4: mean,
     published_pass4: PUBLISHED,
     delta: compared.delta,
-    tasks: tasks.length,
+    tasks: measured.tasks.length,
+    unscored_tasks: measured.unscored.length,
+    min_tasks: MIN_TASKS,
+    k: K,
+    inferred_trials: measured.inferredTrials,
     gates_passed: gates.filter((gate) => gate.pass).length,
   },
-  notes: ['Two arms share the split; the reference number is ALTK-Evolve on τ²-retail.'],
+  notes: [
+    `Source: ${source} (${measured.format} form). Two arms must share the split; the reference number is ALTK-Evolve on τ²-retail.`,
+    `pass^4 is the unbiased C(c,4)/C(n,4) mean over ${measured.tasks.length} tasks, with success defined as \`reward == 1.0\` exactly, as upstream scores it.`,
+    verdict.coversSplit
+      ? `The split covers the minimum: ${measured.tasks.length} scored tasks.`
+      : `The split is short: ${measured.tasks.length} scored tasks against a minimum of ${MIN_TASKS}. Short splits and missed bars fail separately.`,
+  ],
   samples: gates,
 });
-for (const gate of gates) process.stdout.write(`  ${gate.pass ? 'PASS' : 'FAIL'} ${gate.id} ${gate.actual}\n`);
+for (const gate of gates) {
+  process.stdout.write(`  ${gate.pass ? 'PASS' : 'FAIL'} ${gate.id} ${gate.actual} (${gate.criterion})\n`);
+}
 if (gates.some((gate) => !gate.pass)) process.exit(1);
