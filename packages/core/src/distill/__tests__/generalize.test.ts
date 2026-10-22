@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { createKnowledgeItem, defaultPolicy } from '../../kernel/index.js';
-import type { DistillCandidate } from '../../kernel/index.js';
+import type { DistillCandidate, KnowledgeItem } from '../../kernel/index.js';
 import {
+  WIDENING_TASKS,
   canGeneralize,
+  endorsingTasks,
+  generalizationPlan,
   generalizedScope,
   mergeEvidence,
   payloadsEqual,
+  widenedScopeOf,
   withoutDomain,
 } from '../generalize.js';
 
@@ -119,5 +123,124 @@ describe('remaining generalisation branches', () => {
     const b = { ...item('hr'), evidence: a.evidence };
     const merged = mergeEvidence([a, b], candidate('ops'));
     expect(merged.evidence).toHaveLength(2);
+  });
+});
+
+describe('the widening bound', () => {
+  const base = { task: 'chart.recommend' };
+
+  it('has no meet for an empty set or two different tasks', () => {
+    expect(widenedScopeOf([])).toBeUndefined();
+    expect(widenedScopeOf([{ ...base }, { task: 'sql.generate' }])).toBeUndefined();
+  });
+
+  it('keeps every fixed dimension the endorsers agree on, and drops the domain', () => {
+    expect(
+      widenedScopeOf([
+        { ...base, domain: 'sales', intent: 'trend', field: 'revenue' },
+        { ...base, domain: 'hr', intent: 'trend', field: 'revenue' },
+      ]),
+    ).toEqual({ ...base, intent: 'trend', field: 'revenue' });
+  });
+
+  it('refuses to drop a fixed dimension, and keeps a domain all endorsers share', () => {
+    expect(
+      widenedScopeOf([
+        { ...base, domain: 'sales', intent: 'trend' },
+        { ...base, domain: 'hr', intent: 'comparison' },
+      ]),
+    ).toBeUndefined();
+    // Constrained by one endorser and open in another: dropping it would widen
+    // the claim past what the silent endorser ever asserted.
+    expect(
+      widenedScopeOf([{ ...base, domain: 'sales', reasonCode: 'empty' }, { ...base, domain: 'hr' }]),
+    ).toBeUndefined();
+    expect(
+      widenedScopeOf([
+        { ...base, domain: 'sales', intent: 'trend' },
+        { ...base, domain: 'sales', intent: 'trend' },
+      ]),
+    ).toEqual({ ...base, domain: 'sales', intent: 'trend' });
+  });
+
+  it('never drops a dimension that no endorser constrains', () => {
+    expect(widenedScopeOf([{ ...base, domain: 'sales' }, { ...base, domain: 'hr' }])).toEqual({
+      ...base,
+    });
+  });
+});
+
+describe('the widening plan', () => {
+  function sibling(domain: string | undefined, taskId: string, extra: Partial<KnowledgeItem> = {}) {
+    const candidate: DistillCandidate = {
+      namespace: 'acme',
+      kind: 'constraint',
+      scope: { task: 'chart.recommend', domain, intent: 'trend' },
+      statement: 'For a trend question over revenue. Use a line chart.',
+      payload: { when: { intent: 'trend' }, then: { mark: 'line' } } as never,
+      evidence: { feedbackId: `fb_${taskId}_${domain ?? 'any'}`, runId: `run_${taskId}`, at, weight: 0.9, taskId },
+      trust: 0.9,
+      dedupeKey: `k_${taskId}`,
+    };
+    return {
+      ...createKnowledgeItem(candidate, defaultPolicy, at, `k_${taskId}_${domain ?? 'any'}`),
+      status: 'active' as const,
+      ...extra,
+    };
+  }
+
+  function incoming(domain: string, taskId: string): DistillCandidate {
+    return {
+      namespace: 'acme',
+      kind: 'constraint',
+      scope: { task: 'chart.recommend', domain, intent: 'trend' },
+      statement: 'For a trend question over revenue. Use a line chart.',
+      payload: { when: { intent: 'trend' }, then: { mark: 'line' } } as never,
+      evidence: { feedbackId: `fb_${taskId}`, runId: `run_${taskId}`, at, weight: 0.9, taskId },
+      trust: 0.9,
+      dedupeKey: `k_${taskId}`,
+    };
+  }
+
+  it('counts distinct tasks, not observations, and falls back to the run', () => {
+    const one = sibling('sales', 't1');
+    const again = { ...sibling('hr', 't1'), evidence: [{ feedbackId: 'fb_x', runId: 'run_t1', at, weight: 0.9, taskId: 't1' }] };
+    expect(endorsingTasks([one, again], incoming('ops', 't1'))).toBe(1);
+    const legacy = { ...sibling('hr', 'r9'), evidence: [{ feedbackId: 'fb_y', runId: 'run_9', at, weight: 0.9 }] };
+    expect(endorsingTasks([one, legacy], incoming('ops', 't1'))).toBe(2);
+  });
+
+  it('declines when there is no sibling, no active sibling, or too few tasks', () => {
+    expect(generalizationPlan([], incoming('sales', 't1'))).toBeUndefined();
+    expect(generalizationPlan([sibling('sales', 't1', { status: 'candidate' })], incoming('hr', 't2'))).toBeUndefined();
+    expect(generalizationPlan([sibling('sales', 't1')], incoming('hr', 't2'))).toBeUndefined();
+  });
+
+  it('widens onto an active domain-free sibling at three tasks', () => {
+    const pool = [sibling('sales', 't1'), sibling(undefined, 't2')];
+    const plan = generalizationPlan(pool, incoming('ops', 't3'));
+    expect(plan?.target.scope.domain).toBeUndefined();
+    expect(plan?.scope).toEqual({ task: 'chart.recommend', intent: 'trend' });
+    expect(plan?.tasks).toBe(WIDENING_TASKS);
+    expect(plan?.endorsers).toHaveLength(2);
+  });
+
+  it('leaves out a sibling that keeps the joint meet undefined', () => {
+    // `canGeneralize` is pairwise: this sibling agrees with the candidate and
+    // still disagrees with the target about the intent. Letting it in would
+    // attribute its evidence to a scope it never endorsed.
+    const disagreeing = sibling('ops', 't4', {
+      scope: { task: 'chart.recommend', domain: 'ops', intent: 'comparison' },
+    });
+    const pool = [sibling('sales', 't1'), sibling(undefined, 't2'), disagreeing];
+    const plan = generalizationPlan(pool, incoming('hr', 't3'));
+    expect(plan?.endorsers.map((item) => item.id)).not.toContain(disagreeing.id);
+    expect(plan?.scope).toEqual({ task: 'chart.recommend', intent: 'trend' });
+  });
+
+  it('declines when the candidate disagrees with the only sibling about the intent', () => {
+    const pool = [sibling('sales', 't1'), sibling('hr', 't2')];
+    const conflict = { ...incoming('ops', 't3'), scope: { task: 'chart.recommend', domain: 'ops', intent: 'comparison' } };
+    expect(generalizationPlan(pool, conflict)).toBeUndefined();
   });
 });

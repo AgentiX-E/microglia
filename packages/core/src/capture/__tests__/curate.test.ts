@@ -143,6 +143,60 @@ describe('curation edges', () => {
     expect(density(left)).toBeCloseTo(0.5, 6);
   });
 
+  it('does not double count an event that both duplicates cite', async () => {
+    // The evidence route of MemForm: swap part of a real history for fake
+    // support. Two near-duplicate items citing one correction is exactly the
+    // shape a duplicate comes in, and summing their supports would let one
+    // user's single correction pay for two rules — and admit their sum.
+    const shared = { feedbackId: 'fb_shared', runId: 'run_1', at: AT, weight: 0.9 };
+    const own = { feedbackId: 'fb_own', runId: 'run_2', at: AT + 1, weight: 0.9 };
+    const first = {
+      ...item('k_1', 'Revenue questions use a line chart rather than a bar chart.'),
+      evidence: [own, shared],
+      support: 1.8,
+    };
+    const second = {
+      ...item('k_2', 'Revenue questions use a line chart rather than a bar chart'),
+      evidence: [shared],
+      support: 0.9,
+    };
+    const store = await storeWith([first, second]);
+    await curateKnowledge(store, defaultPolicy, AT + 10);
+
+    const merged = await store.getKnowledge('k_1');
+    expect(merged?.evidence).toHaveLength(2);
+    expect(merged?.support).toBeCloseTo(1.8, 6);
+    // Canonical order: oldest observation first, so the array does not record
+    // which duplicate happened to be written first.
+    expect(merged?.evidence.map((entry) => entry.feedbackId)).toEqual(['fb_shared', 'fb_own']);
+    await store.close();
+  });
+
+  it('produces the same store whichever duplicate was written first', async () => {
+    const shared = { feedbackId: 'fb_shared', runId: 'run_1', at: AT, weight: 0.9 };
+    const own = { feedbackId: 'fb_own', runId: 'run_2', at: AT + 1, weight: 0.9 };
+    const first = {
+      ...item('k_1', 'Revenue questions use a line chart rather than a bar chart.'),
+      evidence: [shared, own],
+      support: 1.8,
+    };
+    const second = {
+      ...item('k_2', 'Revenue questions use a line chart rather than a bar chart'),
+      evidence: [shared],
+      support: 0.9,
+    };
+    const forward = await storeWith([first, second]);
+    const backward = await storeWith([second, first]);
+    await curateKnowledge(forward, defaultPolicy, AT + 10);
+    await curateKnowledge(backward, defaultPolicy, AT + 10);
+
+    expect(JSON.stringify(await forward.listKnowledge({ status: 'all' }))).toBe(
+      JSON.stringify(await backward.listKnowledge({ status: 'all' })),
+    );
+    await forward.close();
+    await backward.close();
+  });
+
   it('collapses punctuation and case variants, and counts every closure', async () => {
     const store = await storeWith([
       item('k_1', 'Revenue questions use a line chart.'),

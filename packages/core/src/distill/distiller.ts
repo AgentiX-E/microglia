@@ -23,12 +23,7 @@ import {
 } from '../kernel/index.js';
 import { tierFor } from '../kernel/index.js';
 import type { DistillCandidate, KnowledgeItem } from '../kernel/index.js';
-import {
-  canGeneralize,
-  mergeEvidence as mergeSiblingEvidence,
-  pickGeneralizationTarget,
-  withoutDomain,
-} from './generalize.js';
+import { generalizationPlan, mergeEvidence as mergeSiblingEvidence } from './generalize.js';
 import type { DistillOptions, DistillReport, InterpretContext } from './types.js';
 
 export async function distill(options: DistillOptions): Promise<DistillReport> {
@@ -119,21 +114,17 @@ async function upsert(options: DistillOptions, candidate: DistillCandidate): Pro
     };
   }
 
-  const siblings =
-    options.generalize === false
-      ? []
-      : pool.filter((item) => item.status !== 'retired' && canGeneralize(item, candidate));
-  const target = pickGeneralizationTarget(siblings);
-  if (target !== undefined) {
-    const scope = target.scope.domain === undefined ? target.scope : withoutDomain(target.scope);
-    const mergedEvidence = mergeSiblingEvidence(siblings, candidate);
+  const plan = options.generalize === false ? undefined : generalizationPlan(pool, candidate);
+  if (plan !== undefined) {
+    const { target, scope, endorsers } = plan;
+    const mergedEvidence = mergeSiblingEvidence(endorsers, candidate);
     const widened: KnowledgeItem = {
       ...target,
       id: target.scope.domain === undefined ? target.id : newId('k', now, options.random),
       scope,
       evidence: mergedEvidence.evidence,
       support: mergedEvidence.support,
-      trust: Math.max(...siblings.map((item) => item.trust), candidate.trust),
+      trust: Math.max(...endorsers.map((item) => item.trust), candidate.trust),
       status: target.scope.domain === undefined ? target.status : 'candidate',
       updatedAt: now,
     };
@@ -148,7 +139,7 @@ async function upsert(options: DistillOptions, candidate: DistillCandidate): Pro
     await options.memory.putKnowledge(finalItem);
 
     let superseded = 0;
-    for (const sibling of siblings) {
+    for (const sibling of endorsers) {
       if (sibling.id === finalItem.id) continue;
       await options.memory.putKnowledge({
         ...sibling,

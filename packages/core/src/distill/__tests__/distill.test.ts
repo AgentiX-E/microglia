@@ -203,8 +203,49 @@ describe('distillation', () => {
     await memory.close();
   });
 
-  it('generalises a claim seen in two domains and retires the narrow copies', async () => {
+  it('generalises a claim endorsed by three tasks and retires the narrow copies', async () => {
+    const memory = await seed([
+      event(),
+      event({ id: 'fb_2', at: at + 1, runId: 'run_2' }),
+      event({ id: 'fb_3', at: at + 2, runId: 'run_3' }),
+    ]);
+    const domains = ['sales', 'hr', 'ops'];
+    let call = 0;
+    const report = await distill({
+      memory,
+      policy: defaultPolicy,
+      clock: fixedClock(at + 2),
+      random: mulberry32(3),
+      interpreter: (): readonly DistillCandidate[] => {
+        const domain = domains[call] ?? 'ops';
+        call += 1;
+        return [
+          candidate({
+            scope: { task: 'chart.recommend', domain, intent: 'trend' },
+            evidence: { feedbackId: `fb_${call}`, runId: `run_${call}`, at: at + call - 1, weight: 0.9 },
+          }),
+        ];
+      },
+    });
+    expect(report.created).toBe(2);
+    expect(report.generalized).toBe(1);
+    expect(report.superseded).toBe(2);
+
+    const items = await memory.listKnowledge({ namespace: 'acme', status: 'all' });
+    const active = items.filter((item) => item.status === 'active');
+    expect(active).toHaveLength(1);
+    expect(active[0]?.scope.domain).toBeUndefined();
+    expect(active[0]?.evidence).toHaveLength(3);
+    expect(items.filter((item) => item.status === 'retired')).toHaveLength(2);
+    await memory.close();
+  });
+
+  it('refuses to widen on two tasks, because widening retires a precise rule', async () => {
+    // MemForm's scope route: real records, inflated applicability. A pair is
+    // exactly the evidence a single persistent user can manufacture, and the act
+    // of widening deletes the domain-scoped rule that was working.
     const memory = await seed([event(), event({ id: 'fb_2', at: at + 1, runId: 'run_2' })]);
+    const domains = ['sales', 'hr'];
     let call = 0;
     const report = await distill({
       memory,
@@ -212,27 +253,20 @@ describe('distillation', () => {
       clock: fixedClock(at + 1),
       random: mulberry32(3),
       interpreter: (): readonly DistillCandidate[] => {
+        const domain = domains[call] ?? 'hr';
         call += 1;
-        return call === 1
-          ? [candidate()]
-          : [
-              candidate({
-                scope: { task: 'chart.recommend', domain: 'hr', intent: 'trend' },
-                evidence: { feedbackId: 'fb_2', runId: 'run_2', at: at + 1, weight: 0.9 },
-              }),
-            ];
+        return [
+          candidate({
+            scope: { task: 'chart.recommend', domain, intent: 'trend' },
+            evidence: { feedbackId: `fb_${call}`, runId: `run_${call}`, at: at + call - 1, weight: 0.9 },
+          }),
+        ];
       },
     });
-    expect(report.created).toBe(1);
-    expect(report.generalized).toBe(1);
-    expect(report.superseded).toBe(1);
-
+    expect(report.generalized).toBe(0);
+    expect(report.created).toBe(2);
     const items = await memory.listKnowledge({ namespace: 'acme', status: 'all' });
-    const active = items.filter((item) => item.status === 'active');
-    expect(active).toHaveLength(1);
-    expect(active[0]?.scope.domain).toBeUndefined();
-    expect(active[0]?.evidence).toHaveLength(2);
-    expect(items.filter((item) => item.status === 'retired')).toHaveLength(1);
+    expect(items.map((item) => item.scope.domain).sort()).toEqual(['hr', 'sales']);
     await memory.close();
   });
 

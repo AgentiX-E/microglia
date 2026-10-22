@@ -21,7 +21,7 @@ import {
   scoreKnowledge,
   scopeKey,
 } from '../kernel/index.js';
-import type { KnowledgeItem, Policy } from '../kernel/index.js';
+import type { EvidenceRef, KnowledgeItem, Policy } from '../kernel/index.js';
 import type { MemoryPort } from '../memory/index.js';
 
 export type CurationOptions = {
@@ -181,14 +181,16 @@ function mergeInto(
   now: number,
 ): KnowledgeItem {
   const seen = new Set(survivor.evidence.map((entry) => entry.feedbackId));
-  const evidence = [
-    ...survivor.evidence,
-    ...other.evidence.filter((entry) => !seen.has(entry.feedbackId)),
-  ];
+  // Support is the mass of *distinct* observations. Adding `other.support` would
+  // double count any event both items cite — and two items citing one event is
+  // exactly what a near-duplicate pair is — which would let one user's single
+  // correction pay for two rules and admit the sum of them.
+  const added = other.evidence.filter((entry) => !seen.has(entry.feedbackId));
+  const evidence = orderedEvidence([...survivor.evidence, ...added]);
   const merged: KnowledgeItem = {
     ...survivor,
     evidence,
-    support: survivor.support + other.support,
+    support: survivor.support + added.reduce((sum, entry) => sum + entry.weight, 0),
     applied: survivor.applied + other.applied,
     succeeded: survivor.succeeded + other.succeeded,
     contradictions: Math.max(survivor.contradictions, other.contradictions),
@@ -212,6 +214,19 @@ function mergeInto(
     status: decision.status,
     statusReason: decision.reason,
   };
+}
+
+/**
+ * Evidence in a canonical order.
+ *
+ * A merge product must not depend on which of two near-duplicates was seen
+ * first: the whole store is replayed from a shuffled log in the integrity lane,
+ * and an array whose order came from arrival order would make two equivalent
+ * stores compare unequal. Sorting is by observation time, then id, so the order
+ * is also *meaningful* — oldest first, the way the story happened.
+ */
+function orderedEvidence(evidence: readonly EvidenceRef[]): readonly EvidenceRef[] {
+  return [...evidence].sort((a, b) => a.at - b.at || (a.feedbackId < b.feedbackId ? -1 : 1));
 }
 
 function close(

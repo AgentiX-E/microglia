@@ -22,11 +22,16 @@ export type {
 export { distill } from './distiller.js';
 export { combineInterpreters, ruleBasedCandidates, ruleInterpreter } from './rules.js';
 export {
+  WIDENING_TASKS,
   canGeneralize,
+  endorsingTasks,
+  generalizationPlan,
   generalizedScope,
   payloadsEqual,
   pickGeneralizationTarget,
+  widenedScopeOf,
   withoutDomain,
+  type GeneralizationPlan,
 } from './generalize.js';
 export {
   buildDistillPrompt,
