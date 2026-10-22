@@ -54,27 +54,27 @@ jobs:
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           POC_MAX_CALLS: '400'
-        run: pnpm poc:llm-reader
+        run: pnpm eval:llm-reader
 
       - name: LLM distillation
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           POC_MAX_CALLS: '200'
-        run: pnpm poc:llm-distill
+        run: pnpm eval:llm-distill
 
       - name: Embedding retrieval
         env:
           ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
           POC_MAX_CALLS: '120'
-        run: pnpm poc:embedding
+        run: pnpm eval:embedding
 
       - name: CPU scale
-        run: pnpm poc:scale
+        run: pnpm eval:scale
 
       - name: Upload live evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: live-poc
-          path: poc/results
+          path: eval/results
           if-no-files-found: warn

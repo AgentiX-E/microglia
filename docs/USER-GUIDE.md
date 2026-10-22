@@ -541,7 +541,7 @@ Four invariants hold, each one closing a formation route that plants no false re
 You can re-measure them on your own store shape:
 
 ```bash
-pnpm poc:integrity   # 1,000 events, five shuffled replays, one mutation control
+pnpm eval:integrity   # 1,000 events, five shuffled replays, one mutation control
 ```
 
 The lane reports `order_invariance`, `replay_determinism`, `stale_schema_injected`, and — the number

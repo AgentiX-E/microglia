@@ -174,7 +174,7 @@ export type PocResult = {
 };
 
 export async function writeResult(result: PocResult): Promise<void> {
-  const dir = join(process.cwd(), 'poc', 'results');
+  const dir = join(process.cwd(), 'eval', 'results');
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, `${result.id}.json`), `${JSON.stringify(result, null, 2)}\n`, 'utf8');
   process.stdout.write(

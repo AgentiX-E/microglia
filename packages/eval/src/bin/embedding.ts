@@ -12,7 +12,7 @@
  */
 import { tokenize, bm25Score } from '@agentix-e/microglia-core';
 import { buildCorpus, specFor } from '@agentix-e/microglia-eval';
-import type { ChartIntent } from '../packages/eval/src/workload/index.js';
+import type { ChartIntent } from '../workload/index.js';
 import { callCount, cosine, embed, mean, rate, writeResult } from './lib.js';
 
 const SYNONYMS: Record<string, string> = {

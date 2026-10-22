@@ -32,7 +32,7 @@ import {
   type ChartConstraint,
   type ChartMark,
   type ChartSpec,
-} from '../packages/eval/src/workload/index.js';
+} from '../workload/index.js';
 import { buildCorpus, specFor, type CorpusItem } from '@agentix-e/microglia-eval';
 import { callCount, chat, extractJson, mean, percentile, rate, writeResult } from './lib.js';
 

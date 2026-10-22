@@ -38,6 +38,9 @@ export default defineConfig({
         '**/port.ts',
         '**/options.ts',
         '**/bench/**',
+        // CLI entrypoints: top-level await that writes an artefact and exits. The
+        // logic they call lives in the package and is covered there.
+        '**/bin/**',
       ],
       thresholds: {
         // Every dimension is held to the same bar. A branch that cannot be

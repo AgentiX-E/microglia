@@ -160,7 +160,7 @@ that quarantine stops — which is the argument for the governance layer, measur
 Every number is reproduced by `pnpm bench` and written to `bench/results/study.json`; seventeen gates
 must pass, or the build fails.
 
-`pnpm poc:l0` runs the same instrument at 1,300 cases with gold derived by policy rather than by a
+`pnpm eval:l0` runs the same instrument at 1,300 cases with gold derived by policy rather than by a
 human adjudicator: 1,040 paired held-out questions, **+67.88pp** (95% CI 65.10–70.67, exact McNemar
 p = 5.9e-213, 706 gained and none lost), and the domain that received no feedback at all at 100%. The
 lane also prints the smallest effect its own sample could detect — 7.16pp — because an effect smaller
@@ -171,12 +171,12 @@ comparison that meets a published number through a stated bar. It runs in the `s
 repository variable, and until the tool-calling environment exists it writes a `not-run` artefact rather
 than a zero it did not measure.
 
-`pnpm poc:integrity` runs the second instrument: 1,000 events replayed in five shuffled orders, plus a
+`pnpm eval:integrity` runs the second instrument: 1,000 events replayed in five shuffled orders, plus a
 control that bypasses the sort the store relies on. Order invariance and replay determinism are 1.00,
 the control disagrees (which is what makes the 1.00 mean something), and a mid-stream schema rename
 injects nothing stale. Erasure is measured in the same lane: nothing erased is retrievable afterwards.
 
-`pnpm poc:memform` runs the third: 500 attacks across MemForm's five formation routes at three channel
+`pnpm eval:memform` runs the third: 500 attacks across MemForm's five formation routes at three channel
 trust ceilings. An attacker that controls content, citations, scope claims, paraphrases and arrival order
 lands **0%** at trust ≤ 0.6 and 40% at 0.9 — where it is a trusted editor, which is the product working
 as designed and is printed as a limit rather than folded into an average. Both lanes cost no model calls

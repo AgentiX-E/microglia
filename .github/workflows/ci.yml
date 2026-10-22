@@ -37,7 +37,10 @@ jobs:
         run: pnpm build
 
       - name: Typecheck the POC scripts
-        run: pnpm poc:typecheck
+        run: pnpm eval:typecheck
+
+      - name: Typecheck the lane CLIs
+        run: pnpm typecheck:lanes
 
       - name: Tests with coverage gates
         run: pnpm test
@@ -49,16 +52,16 @@ jobs:
         run: pnpm bench
 
       - name: Integrity lane (POC-28 order, determinism, schema drift)
-        run: pnpm poc:integrity
+        run: pnpm eval:integrity
 
       - name: Attack lane (POC-29 five formation routes)
-        run: pnpm poc:memform
+        run: pnpm eval:memform
 
       - name: Pragmatics lane (L0 1,300-case rule-derived adjudication)
-        run: pnpm poc:l0
+        run: pnpm eval:l0
 
       - name: CPU scale and latency
-        run: pnpm poc:scale
+        run: pnpm eval:scale
 
       - name: Gate summary
         if: always()
@@ -78,6 +81,6 @@ jobs:
           name: evidence
           path: |
             bench/results
-            poc/results
+            eval/results
             coverage/coverage-summary.json
           if-no-files-found: warn
