@@ -23,6 +23,15 @@ export type ClientOptions = {
 
 export type RecallResult = Pick<KnowledgePack, 'ids' | 'rendered' | 'tokens' | 'hash'>;
 
+/** What the server reports after an erasure. */
+export type ForgetResult = {
+  readonly events: number;
+  readonly runs: number;
+  readonly knowledge: number;
+  readonly rescored: number;
+  readonly tombstone: string;
+};
+
 export type SendResult = {
   readonly sent: number;
   readonly failed: number;
@@ -74,6 +83,28 @@ export class MicrogliaClient {
     this.outbox.push({ key, payload, attempts: 0 });
     const result = await this.flush();
     return { queued: result.queued > 0, key };
+  }
+
+  /**
+   * Erase a record, synchronously and without the outbox.
+   *
+   * Every other write in this client is queued first, because a correction that
+   * arrives late is still a correction. A deletion is the opposite: one that
+   * replays after the user changed their mind deletes something they asked to
+   * keep, and one that silently waits is a promise the client cannot keep. So it
+   * either succeeds now or it throws.
+   */
+  public async forget(selector: {
+    readonly ids?: readonly string[];
+    readonly taskId?: string;
+    readonly actorHash?: string;
+  }): Promise<ForgetResult> {
+    const response = await this.request('/v1/forget', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(selector),
+    });
+    return (await response.json()) as ForgetResult;
   }
 
   /** Drain the outbox. Returns counts rather than throwing on the first failure. */

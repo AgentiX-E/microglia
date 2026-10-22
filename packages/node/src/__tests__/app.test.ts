@@ -218,3 +218,117 @@ describe('error mapping', () => {
     expect(statuses.get('MG_E_STORE_IO')).toBe(500);
   });
 });
+
+describe('the task instance over the wire', () => {
+  it('carries taskId, attempt and parentRunId from the request to the records', async () => {
+    const { app, microglia, store } = await mount({ token: TOKEN });
+    const response = await post(app, '/v1/feedback', {
+      ...edit,
+      run: { ...edit.run, taskId: 't_9', attempt: 2, parentRunId: 'run_parent' },
+    });
+    expect(response.status).toBe(201);
+    const [event] = await store.listEvents();
+    expect(event).toMatchObject({ taskId: 't_9', attempt: 2 });
+    const run = await store.getRun((event as { runId: string }).runId);
+    expect(run).toMatchObject({ taskId: 't_9', attempt: 2, parentRunId: 'run_parent' });
+    await microglia.close();
+  });
+
+  it('rejects a malformed task instance instead of silently dropping it', async () => {
+    const { app, microglia } = await mount({ token: TOKEN });
+    expect((await post(app, '/v1/feedback', { ...edit, run: { ...edit.run, taskId: '' } })).status).toBe(400);
+    expect((await post(app, '/v1/feedback', { ...edit, run: { ...edit.run, attempt: 0 } })).status).toBe(400);
+    expect((await post(app, '/v1/feedback', { ...edit, run: { ...edit.run, attempt: 1.5 } })).status).toBe(400);
+    expect((await post(app, '/v1/feedback', { ...edit, run: { ...edit.run, parentRunId: 7 } })).status).toBe(400);
+    await microglia.close();
+  });
+});
+
+describe('erasure over the wire', () => {
+  it('erases by task and reports what it removed', async () => {
+    const { app, microglia, store } = await mount({ token: TOKEN });
+    const ingest = await post(app, '/v1/feedback', {
+      ...edit,
+      run: { ...edit.run, taskId: 't_1' },
+    });
+    expect(ingest.status).toBe(201);
+
+    const response = await post(app, '/v1/forget', { taskId: 't_1' });
+    expect(response.status).toBe(200);
+    const report = (await response.json()) as { events: number; tombstone: string };
+    expect(report.events).toBe(1);
+    expect(report.tombstone).toMatch(/^[0-9a-f]{16}$/);
+    expect(await store.listEvents()).toHaveLength(0);
+    await microglia.close();
+  });
+
+  it('refuses an empty selector rather than reporting a quiet success', async () => {
+    const { app, microglia } = await mount({ token: TOKEN });
+    const response = await post(app, '/v1/forget', {});
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: 'ids, taskId or actorHash is required' });
+    await microglia.close();
+  });
+
+  it('rejects a typo instead of erasing nothing and looking successful', async () => {
+    const { app, microglia } = await mount({ token: TOKEN });
+    const response = await post(app, '/v1/forget', { taskID: 't_1' });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: 'unknown field: taskID' });
+    await microglia.close();
+  });
+
+  it('rejects a selector whose field has the wrong shape', async () => {
+    const { app, microglia } = await mount({ token: TOKEN });
+    expect((await post(app, '/v1/forget', { ids: 'k_1' })).status).toBe(400);
+    expect((await post(app, '/v1/forget', { ids: [''] })).status).toBe(400);
+    expect((await post(app, '/v1/forget', { taskId: 7 })).status).toBe(400);
+    expect((await post(app, '/v1/forget', { actorHash: '' })).status).toBe(400);
+    expect((await post(app, '/v1/forget', null)).status).toBe(400);
+    await microglia.close();
+  });
+
+  it('rejects a body that is not JSON, and one that is too large', async () => {
+    const { app, microglia } = await mount({ token: TOKEN });
+    const broken = await app.request('/v1/forget', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: '{not json',
+    });
+    expect(broken.status).toBe(400);
+    expect(await broken.json()).toMatchObject({ error: 'body must be JSON' });
+
+    const tiny = createApp({ microglia, token: TOKEN, maxBodyBytes: 4 });
+    const huge = await tiny.request('/v1/forget', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ taskId: 't_1' }),
+    });
+    expect(huge.status).toBe(413);
+    await microglia.close();
+  });
+
+  it('turns an unexpected failure into a 500 rather than a stack trace', async () => {
+    const { app, microglia } = await mount({ token: TOKEN });
+    Object.assign(microglia, {
+      forget: async () => {
+        throw new Error('disk on fire');
+      },
+    });
+    const response = await post(app, '/v1/forget', { taskId: 't_1' });
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ error: 'internal' });
+    await microglia.close();
+  });
+
+  it('requires the bearer token like every other route', async () => {
+    const { app, microglia } = await mount({ token: TOKEN });
+    const response = await app.request('/v1/forget', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ taskId: 't_1' }),
+    });
+    expect(response.status).toBe(401);
+    await microglia.close();
+  });
+});

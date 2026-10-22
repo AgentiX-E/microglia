@@ -5,7 +5,14 @@
  * durable journal. What it does carry is the outbox, because the correction a user
  * just typed is the one thing worth not losing.
  */
-export { createClient, MicrogliaClient, type ClientOptions, type RecallResult, type SendResult } from './client.js';
+export {
+  createClient,
+  MicrogliaClient,
+  type ClientOptions,
+  type ForgetResult,
+  type RecallResult,
+  type SendResult,
+} from './client.js';
 export {
   memoryOutbox,
   persistedOutbox,

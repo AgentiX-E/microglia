@@ -751,7 +751,7 @@ const server = await createServer({
 listen(server, 8080);
 ```
 
-Five endpoints, each one call into the same facade you would have used in-process:
+Six endpoints, each one call into the same facade you would have used in-process:
 
 | Route | Purpose |
 |---|---|
@@ -759,12 +759,26 @@ Five endpoints, each one call into the same facade you would have used in-proces
 | `GET /v1/recall` | the pack for a query; same options as `recall`, as query parameters |
 | `POST /v1/distill` | fold accumulated evidence into knowledge |
 | `GET /v1/knowledge` | list rules with status, trust, and scope |
+| `POST /v1/forget` | erase by `ids`, `taskId` or `actorHash`; returns the tombstone and counts |
 | `GET /v1/health` | the doctor's diagnosis and the store counts |
 
-Two properties are deliberate. A request must carry `Authorization: Bearer <token>` when a token is
-configured, and a retry may carry `Idempotency-Key`: the same key returns the same ids instead of
-recording the correction twice. The key map is per process — a durable one belongs to your
-deployment, and the library says so rather than pretending otherwise.
+Three properties are deliberate. A request must carry `Authorization: Bearer <token>` when a token is
+configured; a retry may carry `Idempotency-Key`, and the same key returns the same ids instead of
+recording the correction twice; and `/v1/forget` **rejects** an empty body, an unknown field, and a
+mistyped value instead of erasing nothing and reporting success. The key map is per process — a durable
+one belongs to your deployment, and the library says so rather than pretending otherwise.
+
+A run may name its task instance, which is what makes evidence independent and deletion by task
+possible:
+
+```json
+{ "run": { "task": "chart.recommend", "taskId": "t_7", "attempt": 2,
+           "parentRunId": "run_01j9z3k4", "input": {}, "output": {} },
+  "feedback": { "type": "edit", "after": { "mark": "line" } } }
+```
+
+Without `taskId` every event is its own task: three attempts at one job would count as three
+independent endorsements, and `{ "taskId": "t_7" }` on `/v1/forget` would match nothing.
 
 ### 15.2 The browser
 
@@ -787,6 +801,14 @@ await mg.feedback({
 `feedback` writes to the outbox **before** it sends, so a tab that closes mid-correction still delivers
 it on the next visit: `pending()` says how many are waiting, `flush()` drains them. Recall is never
 queued — stale knowledge is worse than none.
+
+`forget` is never queued either, and it does not retry on a refusal: a deletion that lands after the
+user changed their mind removes something they asked to keep, and one that waits silently is a promise
+the client cannot keep. It either succeeds now or throws, and the thrown message carries the status:
+
+```ts
+await mg.forget({ taskId: 't_7' });   // → { events, runs, knowledge, rescored, tombstone }
+```
 
 ### 15.3 Providers: configuration or code
 

@@ -5,13 +5,20 @@
  * store, and it holds the model credentials. Everything else is the same library
  * a single-process host uses.
  *
- * The route surface is deliberately five endpoints. A feedback API that grows an
- * endpoint per product feature becomes a second product; this one takes the run
- * and the reaction together, because that pair is what the library needs.
+ * The route surface is deliberately small: health, recall, feedback, distill,
+ * knowledge, and forget. A feedback API that grows an endpoint per product
+ * feature becomes a second product; this one takes the run and the reaction
+ * together, because that pair is what the library needs.
+ *
+ * `forget` is the sixth and the last. It is not a feature endpoint: a host that
+ * runs this server cannot honour a deletion obligation through the SDK alone,
+ * and a store of other people's corrections without a reachable delete is the
+ * one asymmetry worth breaking the rule for.
  */
 import { Hono } from 'hono';
 import { MicrogliaError, isMicrogliaError } from '@agentix-e/microglia-core';
 import type {
+  ErasureSelector,
   FeedbackInput,
   Json,
   JsonObject,
@@ -58,6 +65,46 @@ export function statusFor(code: MicrogliaErrorCode): 400 | 401 | 409 | 413 | 500
     case 'MG_E_STORE_CORRUPT':
       return 500;
   }
+}
+
+/**
+ * A selector body, validated field by field.
+ *
+ * Unknown fields are rejected rather than ignored: `{ taskID: 'x' }` is a typo
+ * that would erase nothing and look like success, which is the worst possible
+ * answer to a deletion request.
+ */
+function parseForget(body: unknown): { selector: ErasureSelector } | { error: string } {
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) {
+    return { error: 'body must be an object' };
+  }
+  const record = body as Record<string, unknown>;
+  const allowed = new Set(['ids', 'taskId', 'actorHash']);
+  for (const key of Object.keys(record)) {
+    if (!allowed.has(key)) return { error: `unknown field: ${key}` };
+  }
+  const ids = record['ids'];
+  if (ids !== undefined && (!Array.isArray(ids) || ids.some((id) => typeof id !== 'string' || id === ''))) {
+    return { error: 'ids must be an array of non-empty strings' };
+  }
+  const taskId = record['taskId'];
+  if (taskId !== undefined && (typeof taskId !== 'string' || taskId === '')) {
+    return { error: 'taskId must be a non-empty string' };
+  }
+  const actorHash = record['actorHash'];
+  if (actorHash !== undefined && (typeof actorHash !== 'string' || actorHash === '')) {
+    return { error: 'actorHash must be a non-empty string' };
+  }
+  if (ids === undefined && taskId === undefined && actorHash === undefined) {
+    return { error: 'ids, taskId or actorHash is required' };
+  }
+  return {
+    selector: {
+      ...(ids === undefined ? {} : { ids: ids as string[] }),
+      ...(taskId === undefined ? {} : { taskId: taskId as string }),
+      ...(actorHash === undefined ? {} : { actorHash: actorHash as string }),
+    },
+  };
 }
 
 export function createApp(options: AppOptions): Hono {
@@ -156,6 +203,9 @@ export function createApp(options: AppOptions): Hono {
               truncated: 0,
             },
           }),
+      ...(parsed.run.taskId === undefined ? {} : { taskId: parsed.run.taskId }),
+      ...(parsed.run.attempt === undefined ? {} : { attempt: parsed.run.attempt }),
+      ...(parsed.run.parentRunId === undefined ? {} : { parentRunId: parsed.run.parentRunId }),
     });
     await run.complete(parsed.run.output as Json);
     const event = await run.feedback(parsed.feedback);
@@ -198,6 +248,29 @@ export function createApp(options: AppOptions): Hono {
     });
   });
 
+  /**
+   * Erase by selector.
+   *
+   * The body never carries a namespace: the facade sets its own, so a token for
+   * one tenant cannot be replayed against another. An empty body is a 400 rather
+   * than a 200 with zeros, because `forget({})` is a wipe request that the
+   * library refuses, and the route should say so before calling it.
+   */
+  app.post('/v1/forget', async (c) => {
+    const raw = await c.req.text();
+    if (raw.length > limit) return c.json({ error: 'body too large', limit }, 413);
+    let body: unknown;
+    try {
+      body = JSON.parse(raw) as unknown;
+    } catch {
+      return c.json({ error: 'body must be JSON' }, 400);
+    }
+    const parsed = parseForget(body);
+    if ('error' in parsed) return c.json({ error: parsed.error }, 400);
+    const report = await options.microglia.forget(parsed.selector);
+    return c.json(report, 200);
+  });
+
   app.notFound((c) => c.json({ error: 'not found' }, 404));
 
   app.onError((error, c) => {
@@ -221,6 +294,17 @@ type Ingest = {
     readonly sessionId?: string;
     readonly model?: string;
     readonly packIds?: readonly string[];
+    /**
+     * The task instance this run belongs to.
+     *
+     * Without it every event is its own task, so three attempts at one job count
+     * as three independent endorsements and a deletion request that names the
+     * job matches nothing. The field is optional only because a host that never
+     * groups attempts keeps the older behaviour.
+     */
+    readonly taskId?: string;
+    readonly attempt?: number;
+    readonly parentRunId?: string;
   };
   readonly feedback: FeedbackInput;
 };
@@ -242,6 +326,18 @@ function parseIngest(body: unknown): Ingest | { error: string } {
   if ('error' in feedback) return feedback;
 
   const packIds = runRecord['packIds'];
+  const taskId = runRecord['taskId'];
+  if (taskId !== undefined && (typeof taskId !== 'string' || taskId === '')) {
+    return { error: 'run.taskId must be a non-empty string' };
+  }
+  const attempt = runRecord['attempt'];
+  if (attempt !== undefined && (!Number.isInteger(attempt) || (attempt as number) < 1)) {
+    return { error: 'run.attempt must be a positive integer' };
+  }
+  const parentRunId = runRecord['parentRunId'];
+  if (parentRunId !== undefined && typeof parentRunId !== 'string') {
+    return { error: 'run.parentRunId must be a string' };
+  }
   return {
     run: {
       task,
@@ -250,6 +346,9 @@ function parseIngest(body: unknown): Ingest | { error: string } {
       ...(typeof runRecord['sessionId'] === 'string' ? { sessionId: runRecord['sessionId'] } : {}),
       ...(typeof runRecord['model'] === 'string' ? { model: runRecord['model'] } : {}),
       ...(Array.isArray(packIds) ? { packIds: packIds.filter((id): id is string => typeof id === 'string') } : {}),
+      ...(taskId === undefined ? {} : { taskId }),
+      ...(attempt === undefined ? {} : { attempt: attempt as number }),
+      ...(parentRunId === undefined ? {} : { parentRunId }),
     },
     feedback: feedback.value,
   };

@@ -203,7 +203,7 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-99.82 / 97.70 / 100 / 99.82 over 535 tests; the branches that remain uncovered are listed with file,
+99.84 / 97.68 / 100 / 99.84 over 548 tests; the branches that remain uncovered are listed with file,
 line, and reason in the internal technical design, and none is excluded with an ignore comment.
 
 ## Licence
