@@ -195,11 +195,44 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build
         run: pnpm build
+
+      # The environment, pinned by tag and cached by that tag.
+      #
+      # Upstream ships as a repository rather than a wheel (`uv sync` against a
+      # clone, Python 3.12+), so the version is a git ref, not a semver on PyPI.
+      # Nothing is vendored: a copy of someone else's agent sandbox in this
+      # repository would sit outside the licence review and the secret scan, and
+      # would still not tell us which upstream commit we were measuring.
+      - name: Cache the tau2 environment
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .tau2-bench
+          key: tau2-${{ vars.TAU_VERSION }}-${{ runner.os }}
+
+      - name: Install tau2-bench at the pinned ref
+        env:
+          TAU_VERSION: ${{ vars.TAU_VERSION }}
+        run: |
+          set -euo pipefail
+          REF="${TAU_VERSION:-v0.2.0}"
+          if [ ! -d .tau2-bench/.git ]; then
+            git clone --depth 1 --branch "$REF" https://github.com/sierra-research/tau2-bench .tau2-bench \
+              || { echo "tau2-clone-failed:$REF"; exit 21; }
+          fi
+          cd .tau2-bench
+          python -m pip install --upgrade pip uv
+          uv sync || { echo "tau2-sync-failed:$REF"; exit 22; }
+          uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
+
       - name: L4 lane
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           TAU_DRIVER: ${{ vars.TAU_DRIVER }}
           TAU_MODEL: ${{ vars.TAU_MODEL }}
+          TAU_VERSION: ${{ vars.TAU_VERSION }}
+          TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
         run: pnpm eval:l4
       - name: Upload evidence
         if: always()
