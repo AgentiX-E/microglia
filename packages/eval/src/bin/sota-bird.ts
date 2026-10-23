@@ -58,8 +58,9 @@
  *  - `SOTA_RESAMPLES`  bootstrap resamples; default 10000, per the protocol
  *  - `POC_MAX_CALLS`   hard call budget; default 4000
  */
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { MicrogliaError, mulberry32, queryCoverage, steppingClock } from '@agentix-e/microglia-core';
@@ -72,18 +73,27 @@ import {
   type Interpreter,
 } from '@agentix-e/microglia-core/distill';
 import {
+  archiveVerdict,
   assignFolds,
   comparePaired,
   detectableDelta,
   interleaveByKey,
+  missingDatabases,
+  parseManifest,
+  requirePopulated,
+  sha256OfFile,
+  type BirdManifest,
 } from '@agentix-e/microglia-eval';
 
 const DATASET_REPO = 'https://huggingface.co/datasets/birdsql/bird_mini_dev';
 const CRITIC_REPO = 'https://huggingface.co/datasets/birdsql/bird-critic-1.0-sqlite/resolve/main';
 const MINIDEV_REPO = `${DATASET_REPO}/resolve/main`;
 
+/** `packages/eval/src` — the lane's own directory. */
 const ROOT = new URL('..', import.meta.url).pathname;
-const CACHE = join(ROOT, '.cache', 'bird');
+/** The repository root, three levels up: `src` → `eval` → `packages` → `.`. */
+const REPO = join(ROOT, '..', '..', '..');
+const CACHE = join(ROOT, '..', '.cache', 'bird');
 const RESULTS = join(ROOT, 'poc', 'results');
 
 const LIMIT = nonNegative(process.env['SOTA_LIMIT'], 0);
@@ -374,15 +384,71 @@ function parseRows(text: string): BirdRow[] {
  */
 function databaseIn(directory: string, dbId: string): string {
   const candidates = [
+    // The pinned archive's layout: MINIDEV/dev_databases/<db>/<db>.sqlite.
+    join(directory, 'dev_databases', dbId, `${dbId}.sqlite`),
     join(directory, 'mini_dev_sqlite', `${dbId}.sqlite`),
     join(directory, 'mini_dev_sqlite', dbId, `${dbId}.sqlite`),
     join(directory, `${dbId}.sqlite`),
   ];
   for (const candidate of candidates) if (existsSync(candidate)) return candidate;
   throw new MicrogliaError('MG_E_STORE_IO', `No database file for '${dbId}' under BIRD_DIR`, {
-    looked_in: join(directory, 'mini_dev_sqlite'),
-    hint: 'Expected mini_dev_sqlite/<db>.sqlite or mini_dev_sqlite/<db>/<db>.sqlite',
+    looked_in: directory,
+    hint: 'Expected dev_databases/<db>/<db>.sqlite (the pinned archive) or mini_dev_sqlite/<db>.sqlite',
   });
+}
+
+const MANIFEST = join(REPO, 'eval', 'manifests', 'bird-minidev.json');
+
+function loadManifest(): BirdManifest {
+  return parseManifest(JSON.parse(readFileSync(MANIFEST, 'utf8')));
+}
+
+/**
+ * Fetch, verify and extract the pinned archive.
+ *
+ * The digest is checked before the zip is opened: an archive that was truncated,
+ * mirrored or rebuilt changes every number the lane produces, and a size check
+ * alone would accept a same-size substitution. Extraction goes through the system
+ * `unzip` because Node has no zip reader and adding one would put a dependency in
+ * a lane that otherwise has none.
+ */
+async function prepareArchive(url: string): Promise<string> {
+  const manifest = loadManifest();
+  const dest = join(CACHE, 'minidev.zip');
+  mkdirSync(CACHE, { recursive: true });
+
+  if (!existsSync(dest) || statSync(dest).size !== manifest.bytes) {
+    process.stdout.write(`[sota] downloading ${url}\n`);
+    const response = await fetch(url, { signal: AbortSignal.timeout(600_000) });
+    if (!response.ok) {
+      throw new MicrogliaError('MG_E_STORE_IO', `The dataset archive answered ${response.status}`, {
+        url,
+        hint: 'Set BIRD_DIR to an extracted Mini-Dev directory instead.',
+      });
+    }
+    writeFileSync(dest, Buffer.from(await response.arrayBuffer()));
+  }
+
+  const verdict = archiveVerdict(manifest, {
+    bytes: statSync(dest).size,
+    sha256: await sha256OfFile(dest),
+  });
+  if (!verdict.ok) {
+    throw new MicrogliaError('MG_E_STORE_IO', `The dataset archive failed its ${verdict.reason} check`, {
+      url,
+      expected_sha256: manifest.sha256,
+      expected_bytes: manifest.bytes,
+      hint: 'Delete .cache/bird/minidev.zip and re-run; a mirror that differs is not this dataset.',
+    });
+  }
+
+  const root = join(CACHE, 'minidev');
+  const extracted = join(root, manifest.root);
+  if (!existsSync(extracted)) {
+    process.stdout.write('[sota] extracting the archive\n');
+    execFileSync('unzip', ['-q', '-o', dest, '-d', root], { stdio: 'inherit' });
+  }
+  return extracted;
 }
 
 /**
@@ -395,12 +461,29 @@ function databaseIn(directory: string, dbId: string): string {
  */
 async function loadDataset(limit: number): Promise<Dataset> {
   const explicit = process.env['BIRD_DIR'];
+  mkdirSync(CACHE, { recursive: true });
+
+  // The database root first, because the archive also carries the questions: one
+  // artefact, one digest, and the questions cannot disagree with the databases
+  // they were written against.
+  let dbRoot = explicit;
+  if (dbRoot === undefined) {
+    const archiveUrl = process.env['BIRD_ARCHIVE_URL'];
+    if (archiveUrl === undefined || archiveUrl === '') {
+      throw new MicrogliaError('MG_E_STORE_IO', 'No BIRD database source is configured', {
+        hint: 'Set BIRD_DIR to an extracted Mini-Dev directory, or BIRD_ARCHIVE_URL to the pinned archive (see eval/manifests/bird-minidev.json).',
+      });
+    }
+    dbRoot = await prepareArchive(archiveUrl);
+  }
+  const root: string = dbRoot;
+
   let rows: BirdRow[];
   let source: string;
-  if (explicit) {
-    mkdirSync(CACHE, { recursive: true });
-    rows = parseRows(readFileSync(`${explicit}/mini_dev_sqlite.json`, 'utf8'));
-    source = explicit;
+  const local = join(root, 'mini_dev_sqlite.json');
+  if (existsSync(local)) {
+    rows = parseRows(readFileSync(local, 'utf8'));
+    source = local;
   } else {
     const sources = [
       `${CRITIC_REPO}/sqlite-00000-of-00001.jsonl`,
@@ -422,7 +505,7 @@ async function loadDataset(limit: number): Promise<Dataset> {
     if (rows.length === 0) {
       throw new MicrogliaError('MG_E_STORE_IO', 'No question file could be read', {
         attempted,
-        hint: 'Set BIRD_DIR to an extracted Mini-Dev directory, or BIRD_ARCHIVE_URL to a complete archive.',
+        hint: 'The pinned archive carries mini_dev_sqlite.json; a directory without it needs a network.',
       });
     }
   }
@@ -436,49 +519,30 @@ async function loadDataset(limit: number): Promise<Dataset> {
   const ordered = interleaveByKey(pool, (row) => row.db_id);
   const slice = limit > 0 ? ordered.slice(0, limit) : ordered;
 
-  const dbDir = join(CACHE, 'db');
-  mkdirSync(dbDir, { recursive: true });
-  const paths = new Map<string, string>();
-  for (const dbId of new Set(slice.map((row) => row.db_id))) {
-    const dest = join(dbDir, `${dbId}.sqlite`);
-    if (!existsSync(dest)) {
-      const url = `${CRITIC_REPO}/database/${dbId}/${dbId}_template.sqlite`;
-      process.stdout.write(`[sota] downloading database ${dbId}\n`);
-      try {
-        const response = await fetch(url, { signal: AbortSignal.timeout(120_000) });
-        if (!response.ok) {
-          throw new MicrogliaError('MG_E_STORE_IO', `Database '${dbId}' is not in the critic dataset`, {
-            url,
-            status: response.status,
-          });
-        }
-        writeFileSync(dest, Buffer.from(await response.arrayBuffer()));
-      } catch (error) {
-        if (error instanceof MicrogliaError) throw error;
-        throw new MicrogliaError('MG_E_STORE_IO', `Database '${dbId}' could not be downloaded`, {
-          url,
-          cause: String(error),
-        });
-      }
-    }
-    paths.set(dbId, dest);
+  // There is deliberately no third database source: the lane used to fall back to
+  // `bird-critic`'s `<db>_template.sqlite` files, which are the schema and not the
+  // data. Against an empty database the gold query and the predicted query both
+  // return no rows, so `matches` scores a runnable SELECT as correct — a number
+  // about parse success wearing the name of execution accuracy.
+  const used = new Set(slice.map((row) => row.db_id));
+  const manifest = loadManifest();
+  const missing = missingDatabases(manifest, [...used]);
+  if (missing.length > 0) {
+    throw new MicrogliaError('MG_E_STORE_IO', 'The questions reference databases the archive does not carry', {
+      missing: missing.join(', '),
+      archive: manifest.version,
+    });
   }
 
-  return {
-    rows: slice,
-    source,
-    dbPath: (dbId) => {
-      if (explicit) return databaseIn(explicit, dbId);
-      const path = paths.get(dbId);
-      if (path === undefined) {
-        throw new MicrogliaError('MG_E_STORE_IO', `No database was fetched for '${dbId}'`, {
-          dbId,
-          known: [...paths.keys()].sort().join(', '),
-        });
-      }
-      return path;
-    },
-  };
+  // Every database is counted once, before any model call. A schema-only database
+  // makes every runnable query "correct", so this check is the difference between
+  // a measurement and a plausible number.
+  for (const dbId of used) {
+    const counted = requirePopulated(databaseIn(root, dbId), dbId);
+    process.stdout.write(`[sota] data ok: ${dbId} ${counted.tables} tables, ${counted.rows} rows\n`);
+  }
+
+  return { rows: slice, source, dbPath: (dbId) => databaseIn(root, dbId) };
 }
 
 function ddlOf(dbPath: string): string {

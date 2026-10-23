@@ -8,6 +8,18 @@
 export { comparePaired, type PairedResult } from './stats.js';
 export { recoveryRatio, type RecoveryInput } from './recovery.js';
 export {
+  BirdDataError,
+  archiveVerdict,
+  missingDatabases,
+  parseManifest,
+  populationOf,
+  requirePopulated,
+  sha256OfFile,
+  type BirdDataErrorReason,
+  type BirdManifest,
+} from './bird-data.js';
+
+export {
   DELIVERY_BOUND_MS,
   TASK_TYPES,
   countOrderingViolations,

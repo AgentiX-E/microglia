@@ -1,0 +1,24 @@
+{
+  "name": "bird-mini-dev",
+  "version": "v1-2024-06-20",
+  "url": "https://bird-bench.oss-cn-beijing.aliyuncs.com/minidev.zip",
+  "bytes": 800943648,
+  "sha256": "cc48ba16838204e4e214512030cb572eeb5f7bcdd999bae4b9b6ff12ec13b92f",
+  "licence": "CC-BY-SA-4.0",
+  "attribution": "BIRD Benchmark (bird-bench contributors), https://bird-bench.github.io — data licence changed to CC BY-SA 4.0 on 2024-04-27",
+  "root": "minidev/MINIDEV",
+  "databases": [
+    "california_schools",
+    "card_games",
+    "codebase_community",
+    "debit_card_specializing",
+    "european_football_2",
+    "financial",
+    "formula_1",
+    "student_club",
+    "superhero",
+    "thrombosis_prediction",
+    "toxicology"
+  ],
+  "retrievedAt": "2026-10-23"
+}
