@@ -253,6 +253,15 @@ export type GateInput = {
   readonly callFailureRate: number;
   readonly calls: number;
   readonly callFailures: number;
+  /**
+   * Present only when the run teaches a house convention.
+   *
+   * The S2b protocol fixes a floor before the result is read: below a hundred
+   * qualifying questions the run is a direction, not a verdict, and the verdict
+   * gate is not applied. Making the floor a gate that is *recorded* rather than a
+   * silent `if` is what stops "we ran it anyway" from becoming "we found".
+   */
+  readonly subset?: { readonly qualifying: number; readonly minimum: number };
 };
 
 /**
@@ -269,7 +278,7 @@ export type GateInput = {
  * sample-size shopping the gate exists to prevent.
  */
 export function buildValidityGates(input: GateInput): ValidityGate[] {
-  return [
+  const gates: ValidityGate[] = [
     {
       id: 'V1-pack-not-empty',
       criterion: 'the memory arm injected at least one rule per question on average',
@@ -338,4 +347,14 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       blocking: true,
     },
   ];
+  if (input.subset !== undefined) {
+    gates.push({
+      id: 'V9-subset-size',
+      criterion: `at least ${input.subset.minimum} qualifying questions, or the result is a direction rather than a verdict`,
+      actual: `${input.subset.qualifying} qualifying question(s)`,
+      pass: input.subset.qualifying >= input.subset.minimum,
+      blocking: false,
+    });
+  }
+  return gates;
 }

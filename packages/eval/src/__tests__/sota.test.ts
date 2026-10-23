@@ -347,8 +347,30 @@ describe('buildValidityGates', () => {
     expect(failing.actual).toBe('2.01% (36/1750 calls)');
   });
 
+  it('omits the subset gate entirely when no convention is being taught', () => {
+    expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V9-subset-size');
+  });
+
+  it('records the S2b subset floor as an advisory gate, not a silent branch', () => {
+    const wide = gate({ ...sound, subset: { qualifying: 140, minimum: 100 } }, 'V9-subset-size');
+    expect(wide.pass).toBe(true);
+    expect(wide.blocking).toBe(false);
+    expect(wide.actual).toBe('140 qualifying question(s)');
+
+    const narrow = gate({ ...sound, subset: { qualifying: 99, minimum: 100 } }, 'V9-subset-size');
+    expect(narrow.pass).toBe(false);
+    // Advisory: a narrow subset does not fail the run, it downgrades the claim.
+    expect(narrow.blocking).toBe(false);
+    expect(narrow.criterion).toContain('direction rather than a verdict');
+  });
+
   it('marks exactly V5 advisory and everything else blocking', () => {
-    const advisory = buildValidityGates(sound).filter((entry) => !entry.blocking).map((entry) => entry.id);
-    expect(advisory).toEqual(['V5-resolution']);
+    const advisory = buildValidityGates({
+      ...sound,
+      subset: { qualifying: 140, minimum: 100 },
+    })
+      .filter((entry) => !entry.blocking)
+      .map((entry) => entry.id);
+    expect(advisory).toEqual(['V5-resolution', 'V9-subset-size']);
   });
 });

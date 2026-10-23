@@ -1310,6 +1310,9 @@ async function main(): Promise<void> {
     callFailureRate,
     calls: logicalCalls,
     callFailures,
+    // The S2b protocol fixes the floor at a hundred questions before the result is
+    // read; below it the run is a direction and the artefact says so.
+    ...(ACTIVE === undefined ? {} : { subset: { qualifying: rows.length, minimum: 100 } }),
   });
 
   const assertions = {
@@ -1380,6 +1383,9 @@ async function main(): Promise<void> {
       distill_created: folds.reduce((sum, fold) => sum + fold.created, 0),
       corrections_learned: folds.reduce((sum, fold) => sum + fold.learning.edited, 0),
       duplicate_questions_dropped: dataset.duplicates,
+      // The preregistered floor, reported next to the number it qualifies.
+      qualifying_questions: rows.length,
+      direction_only: gates.some((gate) => gate.id === 'V9-subset-size' && !gate.pass),
     },
     paired: {
       n: paired.n,
