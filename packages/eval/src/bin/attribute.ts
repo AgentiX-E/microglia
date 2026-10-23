@@ -7,7 +7,9 @@
  * hypothesis — so it is computed from the artefact's per-case rows rather than
  * argued about.
  *
- * Reads `poc/results/poc-sota-bird.json`, writes `poc/results/poc-sota-attribution.json`.
+ * Reads `<results>/poc-sota-bird.json` and writes `poc-sota-attribution.json` beside
+ * it, where `<results>` is `POC_RESULT_DIR` when set and `eval/results` otherwise —
+ * the same rule every other lane follows, so the workflow's own steps can find both.
  * Association only: a rule present when a question flipped did not necessarily
  * cause the flip, and rules injected together share the credit.
  */
@@ -35,8 +37,7 @@ type Artifact = {
   readonly generated_at?: string;
 };
 
-const ROOT = new URL('..', import.meta.url).pathname;
-const RESULTS = join(ROOT, 'poc', 'results');
+const RESULTS = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 'results');
 
 function main(): void {
   const artifact = JSON.parse(
