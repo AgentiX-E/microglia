@@ -83,6 +83,29 @@ type MutableRule = {
  * stream per fold: the same id can name two different statements in two folds, and
  * merging them would attribute one fold's damage to the other fold's rule.
  */
+/**
+ * Worst first, then the most-injected, then by id.
+ *
+ * Exported and used for both ends of the table: a comparator tested only through
+ * `Array.prototype.sort` is verified in whatever order V8 happens to compare its
+ * elements, which for two or three items is one direction. Tested directly, both
+ * directions are covered and the sort cannot hide a missing tie-break.
+ */
+export function byNetAscending(a: RuleAttribution, b: RuleAttribution): number {
+  if (a.net !== b.net) return a.net - b.net;
+  if (a.injected !== b.injected) return b.injected - a.injected;
+  if (a.id === b.id) return a.fold - b.fold;
+  return a.id < b.id ? -1 : 1;
+}
+
+/** Best first, with the same tie-breaks. */
+export function byNetDescending(a: RuleAttribution, b: RuleAttribution): number {
+  if (a.net !== b.net) return b.net - a.net;
+  if (a.injected !== b.injected) return b.injected - a.injected;
+  if (a.id === b.id) return a.fold - b.fold;
+  return a.id < b.id ? -1 : 1;
+}
+
 export function attributeRules(
   cases: readonly AttributionCase[],
   items: readonly AttributionItem[],
@@ -121,16 +144,12 @@ export function attributeRules(
     }
   }
 
-  const all: RuleAttribution[] = [...byKey.values()].sort(
-    (a, b) => a.net - b.net || b.injected - a.injected || (a.id < b.id ? -1 : 1),
-  );
+  const all: RuleAttribution[] = [...byKey.values()].sort(byNetAscending);
   const injected = all.filter((rule) => rule.injected > 0);
   const harmful = injected.filter((rule) => rule.net < 0);
   const helpful = injected.filter((rule) => rule.net > 0);
   const instances = injected.reduce((sum, rule) => sum + rule.injected, 0);
-  const best = all
-    .filter((rule) => rule.net > 0)
-    .sort((a, b) => b.net - a.net || b.injected - a.injected || (a.id < b.id ? -1 : 1));
+  const best = all.filter((rule) => rule.net > 0).sort(byNetDescending);
 
   return {
     rules: all.length,

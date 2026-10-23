@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { attributeRules } from '../attribution.js';
+import { attributeRules, byNetAscending, byNetDescending } from '../attribution.js';
 
 describe('per-rule attribution', () => {
   const items = [
@@ -140,5 +140,89 @@ describe('per-rule attribution', () => {
       [{ fold: 0, id: 'k_bad', statement: 'Wrong.' }],
     );
     expect(summary.best).toEqual([]);
+  });
+
+  it('orders equally useful rules by id, in both directions', () => {
+    // Three rules with the same net and the same count: the only thing left is the
+    // id, and a comparator that is only ever called one way is half verified.
+    const summary = attributeRules(
+      [
+        { fold: 0, injected: ['k_m'], baselineCorrect: false, treatmentCorrect: true },
+        { fold: 0, injected: ['k_a'], baselineCorrect: false, treatmentCorrect: true },
+        { fold: 0, injected: ['k_z'], baselineCorrect: false, treatmentCorrect: true },
+      ],
+      [
+        { fold: 0, id: 'k_m', statement: 'Middle.' },
+        { fold: 0, id: 'k_a', statement: 'First.' },
+        { fold: 0, id: 'k_z', statement: 'Last.' },
+      ],
+    );
+    expect(summary.best.map((rule) => rule.id)).toEqual(['k_a', 'k_m', 'k_z']);
+  });
+
+  it('orders two rules the same way whichever one is handed over first', () => {
+    // Called directly, so both directions are checked rather than whatever order
+    // Array.prototype.sort happens to use for two elements. A comparator that
+    // returns 1 for both (a, b) and (b, a) is not a total order, and a sort given
+    // one is free to produce either.
+    const rule = (id: string, net: number, injected: number, fold = 0) => ({
+      fold,
+      id,
+      statement: id,
+      injected,
+      helped: 0,
+      hurt: 0,
+      net,
+    });
+    const low = rule('k_a', 1, 1);
+    const high = rule('k_b', 3, 1);
+    expect(byNetAscending(low, high)).toBeLessThan(0);
+    expect(byNetAscending(high, low)).toBeGreaterThan(0);
+    expect(byNetDescending(high, low)).toBeLessThan(0);
+    expect(byNetDescending(low, high)).toBeGreaterThan(0);
+    // Same net, different exposure: the more-seen rule sorts first in both orders.
+    const often = rule('k_c', 1, 3);
+    const rare = rule('k_d', 1, 2);
+    expect(byNetAscending(often, rare)).toBeLessThan(0);
+    expect(byNetDescending(often, rare)).toBeLessThan(0);
+    // Identical claims in two folds fall back to the fold, so the order is total.
+    expect(byNetAscending(rule('k_e', 1, 1, 0), rule('k_e', 1, 1, 1))).toBeLessThan(0);
+    expect(byNetAscending(rule('k_e', 1, 1, 1), rule('k_e', 1, 1, 0))).toBeGreaterThan(0);
+    // The descending order needs the same two fallbacks, and a test that only
+    // exercises the first comparator would leave them unverified behind it.
+    expect(byNetDescending(rule('k_f', 1, 1), rule('k_g', 1, 1))).toBeLessThan(0);
+    expect(byNetDescending(rule('k_g', 1, 1), rule('k_f', 1, 1))).toBeGreaterThan(0);
+    expect(byNetDescending(rule('k_h', 1, 1, 0), rule('k_h', 1, 1, 1))).toBeLessThan(0);
+    expect(byNetDescending(rule('k_h', 1, 1, 1), rule('k_h', 1, 1, 0))).toBeGreaterThan(0);
+  });
+
+  it('breaks ties on net, then on how often the rule was injected', () => {
+    // Three arms of one comparator, and the middle one is easy to miss: two rules
+    // that traded the same net over different numbers of appearances are not equal
+    // evidence, and the one that was seen more often goes first.
+    const summary = attributeRules(
+      [
+        // k_a: two appearances, both flips up  → net 2, injected 2
+        { fold: 0, injected: ['k_a'], baselineCorrect: false, treatmentCorrect: true },
+        { fold: 0, injected: ['k_a'], baselineCorrect: false, treatmentCorrect: true },
+        // k_b: three appearances, two up and one down → net 1, injected 3
+        { fold: 0, injected: ['k_b'], baselineCorrect: false, treatmentCorrect: true },
+        { fold: 0, injected: ['k_b'], baselineCorrect: false, treatmentCorrect: true },
+        { fold: 0, injected: ['k_b'], baselineCorrect: true, treatmentCorrect: false },
+        // k_c: two appearances, one up and one neutral → net 1, injected 2
+        { fold: 0, injected: ['k_c'], baselineCorrect: false, treatmentCorrect: true },
+        { fold: 0, injected: ['k_c'], baselineCorrect: true, treatmentCorrect: true },
+      ],
+      [
+        { fold: 0, id: 'k_a', statement: 'A.' },
+        { fold: 0, id: 'k_b', statement: 'B.' },
+        { fold: 0, id: 'k_c', statement: 'C.' },
+      ],
+    );
+    expect(summary.best.map((rule) => [rule.id, rule.net, rule.injected])).toEqual([
+      ['k_a', 2, 2],
+      ['k_b', 1, 3],
+      ['k_c', 1, 2],
+    ]);
   });
 });
