@@ -291,9 +291,18 @@ async function chat(prompt: string, maxTokens = 700): Promise<Reply> {
       continue;
     }
     if (!response.ok) {
-      throw new MicrogliaError('MG_E_STORE_IO', `DeepSeek returned ${response.status}`, {
-        body: (await response.text()).slice(0, 400),
-      });
+      // 402 is not a transient failure and not a code defect: the account has no
+      // balance. Saying so turns a benchmark that "failed" into a config problem
+      // somebody can fix, and stops anyone from reading it as a regression.
+      const body = (await response.text()).slice(0, 400);
+      if (response.status === 402) {
+        throw new MicrogliaError(
+          'MG_E_CONFIG',
+          'DeepSeek refused the call for lack of credit (402); no benchmark was run',
+          { hint: 'Top up the account behind DEEPSEEK_API_KEY, then dispatch again.', body },
+        );
+      }
+      throw new MicrogliaError('MG_E_STORE_IO', `DeepSeek returned ${response.status}`, { body });
     }
     const body = (await response.json()) as {
       choices?: { message?: { content?: string } }[];
