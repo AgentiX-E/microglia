@@ -235,6 +235,26 @@ jobs:
           TAU_VERSION: ${{ vars.TAU_VERSION }}
           TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
         run: pnpm eval:l4
+
+      # A not-run that nobody notices is a skip. The annotation is the notice: it
+      # names the variable that points at nothing, and the job stays green because
+      # nothing was measured rather than because something failed quietly.
+      - name: Say so when nothing was measured
+        if: always()
+        run: |
+          node -e "
+            const fs = require('node:fs');
+            const path = 'eval/results/poc-l4.json';
+            if (!fs.existsSync(path)) { console.log('::warning::L4 wrote no artefact'); process.exit(0); }
+            const r = require('./' + path);
+            if (r.metrics.status_not_run === 1) {
+              const why = r.metrics.status_driver_missing === 1
+                ? 'TAU_DRIVER names a module that does not exist'
+                : 'neither TAU_RESULTS nor TAU_DRIVER is set';
+              console.log('::warning::L4 did not run: ' + why);
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'L4 did not run: ' + why + '. No result is claimed.\n');
+            }
+          "
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4

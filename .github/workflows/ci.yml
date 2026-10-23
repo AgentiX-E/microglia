@@ -85,6 +85,10 @@ jobs:
             exit 1
           fi
           grep -q '"status_refused": 1' "${RUNNER_TEMP}/l4-refuse/poc-l4.json"
+          # A driver variable that names a module which is not there is an absent
+          # environment, not a failed measurement: exit 0, and say which variable.
+          POC_RESULT_DIR="${RUNNER_TEMP}/l4-missing" TAU_DRIVER=./does-not-exist.mjs pnpm eval:l4
+          grep -q '"status_driver_missing": 1' "${RUNNER_TEMP}/l4-missing/poc-l4.json"
 
       - name: CPU scale and latency
         run: pnpm eval:scale

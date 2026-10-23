@@ -47,7 +47,7 @@ async function readDocument(path: string): Promise<string> {
   }
 }
 
-async function notRun(): Promise<never> {
+async function notRun(reason?: string): Promise<never> {
   await writeResult({
     id: 'poc-l4',
     title: 'L4 — τ²-bench pass^4 (not run: no environment)',
@@ -55,14 +55,23 @@ async function notRun(): Promise<never> {
     model: 'none',
     n: 0,
     calls: 0,
-    metrics: { status_not_run: 1, published_pass4: PUBLISHED, bar: BAR, k: K },
+    metrics: {
+      status_not_run: 1,
+      published_pass4: PUBLISHED,
+      bar: BAR,
+      k: K,
+      ...(reason === undefined ? {} : { status_driver_missing: 1 }),
+    },
     notes: [
       'The metric layer is live (passk.ts) and so is the result reader (l4.ts, tested against both storage forms upstream ships).',
       'No result is claimed. τ²-retail and τ²-airline need a tool-calling sandbox and a user simulator; this lane reports not-run rather than a zero it did not measure.',
       'Set TAU_RESULTS to a recorded result document to re-score one, or TAU_DRIVER to a module exporting run(): Promise<readonly PassAtKInput[]> to run a split.',
+      ...(reason === undefined ? [] : [reason]),
     ],
   });
-  process.stdout.write('[poc-l4] not-run: neither TAU_RESULTS nor TAU_DRIVER is set\n');
+  process.stdout.write(
+    `[poc-l4] not-run: ${reason ?? 'neither TAU_RESULTS nor TAU_DRIVER is set'}\n`,
+  );
   process.exit(0);
 }
 
@@ -118,7 +127,20 @@ async function measureFromResults(path: string): Promise<Measurement> {
 }
 
 async function measureFromDriver(module: string): Promise<Measurement> {
-  const loaded = (await import(module)) as { run: () => Promise<readonly PassAtKInput[]> };
+  let loaded: { run: () => Promise<readonly PassAtKInput[]> };
+  try {
+    loaded = (await import(module)) as { run: () => Promise<readonly PassAtKInput[]> };
+  } catch (error) {
+    // A driver that cannot be *resolved* is an absent environment, not a failed
+    // measurement: the variable names a module that is not there. A driver that
+    // loads and then throws is the opposite, and propagates.
+    if ((error as { code?: string }).code === 'ERR_MODULE_NOT_FOUND') {
+      await notRun(
+        `TAU_DRIVER names '${module}', which does not exist. The variable is set, so this run reports not-run rather than a zero: an environment that cannot be reached is not a measurement that failed.`,
+      );
+    }
+    throw error;
+  }
   return { tasks: await loaded.run(), unscored: [], format: 'driver', inferredTrials: 0 };
 }
 
