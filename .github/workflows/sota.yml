@@ -78,7 +78,15 @@ jobs:
       # SHA-256 before extracting, reads the questions from the same archive, and
       # counts the rows of every database it is about to use. A pre-flight step that
       # listed a different source would be a second opinion nobody asked for.
+      # A stale artefact is worse than no artefact: the publish and upload steps run
+      # with `if: always()`, so a committed result from an earlier run would be
+      # reported as this run's evidence. Deleting it first makes "nothing was
+      # produced" visible instead of plausible.
+      - name: Drop any committed artefact
+        run: rm -f eval/results/poc-sota-bird.json eval/results/poc-sota-attribution.json
+
       - name: Run the benchmark
+        timeout-minutes: 110
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           BIRD_ARCHIVE_URL: ${{ vars.BIRD_ARCHIVE_URL }}
@@ -97,7 +105,8 @@ jobs:
           if [ -f eval/results/poc-sota-bird.json ]; then
             pnpm eval:attribute
           else
-            echo "no artefact: nothing to attribute"
+            echo "::error::no artefact: the attribution step cannot run"
+            exit 1
           fi
 
       - name: Publish the result
@@ -106,8 +115,8 @@ jobs:
           node -e "
             const fs = require('node:fs');
             if (!fs.existsSync('./eval/results/poc-sota-bird.json')) {
-              console.log('no artefact: the lane did not reach its first fold');
-              process.exit(0);
+              console.log('::error::the lane produced no artefact; nothing is published');
+              process.exit(1);
             }
             const r = require('./eval/results/poc-sota-bird.json');
             const m = r.metrics;

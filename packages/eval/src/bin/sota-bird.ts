@@ -929,7 +929,16 @@ async function runFold(
   };
 
   const cases: CaseOutcome[] = [];
-  for (const row of evalRows) {
+  for (const [position, row] of evalRows.entries()) {
+    // Progress, because a run of this size can be half an hour per fold and a silent
+    // step is indistinguishable from a hung one. The counters are the ones a reader
+    // needs to see that work is moving: which fold, how far into it, and how much
+    // budget has been spent.
+    if (position > 0 && position % 5 === 0) {
+      process.stdout.write(
+        `[sota] fold ${fold + 1}/${FOLDS} eval ${position}/${evalRows.length} calls=${calls} retries=${retries}\n`,
+      );
+    }
     const query = { task: TASK, text: row.question };
     const pack = await host.recall({ ...query, scope: { domain: row.db_id } });
     const base = await answer(row, dataset, '', 0, task);
