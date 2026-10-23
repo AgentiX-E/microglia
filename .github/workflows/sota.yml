@@ -85,8 +85,12 @@ jobs:
       - name: Drop any committed artefact
         run: rm -f eval/results/poc-sota-bird.json eval/results/poc-sota-attribution.json
 
+      # The full split is ~2,100 model calls: 352 questions × (none + full) plus one
+      # distillation call per correction. At the observed 2–3 s per call that is
+      # 70–105 minutes, so the step is capped at 160 and the job at 180. A smaller
+      # dispatch (limit / folds / arms) finishes in a fraction of that.
       - name: Run the benchmark
-        timeout-minutes: 110
+        timeout-minutes: 160
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           BIRD_ARCHIVE_URL: ${{ vars.BIRD_ARCHIVE_URL }}
