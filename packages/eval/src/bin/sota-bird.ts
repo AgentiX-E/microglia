@@ -74,17 +74,35 @@ import {
   type Interpreter,
 } from '@agentix-e/microglia-core/distill';
 import {
+  CircuitBreaker,
+  GenerationCache,
+  HOUSE_CONVENTIONS,
+  OPTIONAL_ARMS,
+  PROMPT_VERSION,
   archiveVerdict,
   assignFolds,
-  dedupeQuestions,
+  backoffMs,
+  buildValidityGates,
+  canonicalRows,
   comparePaired,
+  conventionOf,
+  dedupeQuestions,
   detectableDelta,
+  extractSql,
   interleaveByKey,
+  judgeScalar,
+  mapPool,
+  matches,
   missingDatabases,
+  parseArms,
   parseManifest,
+  promptFor,
+  reportedSql,
   requirePopulated,
   sha256OfFile,
   type BirdManifest,
+  type ConventionSpec,
+  type ConventionName,
 } from '@agentix-e/microglia-eval';
 
 const DATASET_REPO = 'https://huggingface.co/datasets/birdsql/bird_mini_dev';
@@ -105,8 +123,22 @@ const RESAMPLES = Math.max(1000, Math.trunc(nonNegative(process.env['SOTA_RESAMP
 const MODEL = process.env['SOTA_MODEL'] ?? 'deepseek-chat';
 const MAX_CALLS = nonNegative(process.env['POC_MAX_CALLS'], 4000);
 
-/** Bumped whenever the prompt text changes; a result without it is unreproducible. */
-const PROMPT_VERSION = 'sql-prompt/2';
+/**
+ * How many model calls are in flight at once.
+ *
+ * Six, not "as many as possible": the calls are latency-bound (2–5 s each) and a
+ * DeepSeek endpoint that sees thirty simultaneous requests answers some of them
+ * with 429, which the retry policy then turns into jittered wait time. Six keeps
+ * the wall clock near the network's floor — 2,800 calls at 3 s each is 23 minutes
+ * instead of 140 — while leaving the endpoint room to answer.
+ *
+ * The value is part of the artefact: a run at a different concurrency is a
+ * different run, and a reader needs to know which one produced the number.
+ */
+const CONCURRENCY = Math.min(16, Math.max(1, Math.trunc(nonNegative(process.env['SOTA_CONCURRENCY'], 6))));
+
+/** Consecutive exhausted-retry calls that end the run instead of the evidence. */
+const BREAKER_THRESHOLD = 8;
 
 /**
  * The house convention of the S2b protocol (roadmap): a workspace that reports
@@ -117,35 +149,9 @@ const PROMPT_VERSION = 'sql-prompt/2';
  * moved accuracy has in common. `SOTA_CONVENTION=thousands` turns the lane into
  * that experiment; empty keeps the ordinary execution-accuracy lane.
  */
-const CONVENTION = (process.env['SOTA_CONVENTION'] ?? '').trim();
-
-/**
- * The two conventions the lane can impose, both of them transformations the schema
- * cannot reveal.
- *
- * `thousands` scales a quantity, so it only means something for values large
- * enough to survive the division — the first attempt applied it to counts and
- * produced expected answers like 0.007.
- * `round10` is a coarse-reporting rule that is defined for every numeric answer,
- * which is what the subset needs in order to stay above twenty questions.
- */
-const CONVENTIONS = {
-  thousands: {
-    sentence: 'This workspace reports numeric answers in thousands, rounded to three decimals.',
-    transform: (value: number): number => Math.round((value / 1000) * 1000) / 1000,
-    sql: (body: string): string => `SELECT ROUND((${body}) / 1000.0, 3)`,
-    applies: (value: number): boolean => Math.abs(value) >= 1000,
-  },
-  round10: {
-    sentence: 'This workspace reports every numeric answer rounded to the nearest ten.',
-    transform: (value: number): number => Math.round(value / 10) * 10,
-    sql: (body: string): string => `SELECT ROUND((${body}) / 10.0) * 10`,
-    applies: (): boolean => true,
-  },
-} as const;
-
-type ConventionName = keyof typeof CONVENTIONS;
-const ACTIVE = CONVENTION === '' ? undefined : CONVENTIONS[CONVENTION as ConventionName];
+const CONVENTION_NAME: ConventionName | undefined = conventionOf(process.env['SOTA_CONVENTION'] ?? '');
+const ACTIVE: ConventionSpec | undefined =
+  CONVENTION_NAME === undefined ? undefined : HOUSE_CONVENTIONS[CONVENTION_NAME];
 
 type Task = {
   /** True when answers are judged under the house convention. */
@@ -158,14 +164,6 @@ const TASK = 'sql.generate';
 
 type ArmName = 'none' | 'full' | 'gated' | 'duplicate' | 'wrong-scope' | 'stated' | 'oracle';
 
-const OPTIONAL_ARMS: readonly Exclude<ArmName, 'none' | 'full'>[] = [
-  'gated',
-  'duplicate',
-  'wrong-scope',
-  'stated',
-  'oracle',
-];
-
 /**
  * The coverage floor the `gated` arm runs with, fixed before the run.
  *
@@ -176,21 +174,6 @@ const OPTIONAL_ARMS: readonly Exclude<ArmName, 'none' | 'full'>[] = [
  * so a third of the words is not a threshold, it is a filter on everything.
  */
 const MIN_COVERAGE = Math.min(1, Math.max(0, nonNegative(process.env['SOTA_MIN_COVERAGE'], 0.01)));
-
-function parseArms(raw: string | undefined): Set<ArmName> {
-  const wanted = new Set<ArmName>(['none', 'full']);
-  for (const name of (raw ?? OPTIONAL_ARMS.join(',')).split(',')) {
-    const trimmed = name.trim();
-    if (trimmed === '') continue;
-    if (!OPTIONAL_ARMS.includes(trimmed as Exclude<ArmName, 'none' | 'full'>)) {
-      throw new MicrogliaError('MG_E_CONFIG', `Unknown arm '${trimmed}'`, {
-        known: OPTIONAL_ARMS.join(', '),
-      });
-    }
-    wanted.add(trimmed as ArmName);
-  }
-  return wanted;
-}
 
 const ARMS = parseArms(process.env['SOTA_ARMS']);
 
@@ -246,6 +229,10 @@ type CaseOutcome = {
 let calls = 0;
 let tokensUsed = 0;
 let retries = 0;
+/** Logical calls (one prompt, however many HTTP attempts) and the ones that failed. */
+let logicalCalls = 0;
+let callFailures = 0;
+const breaker = new CircuitBreaker(BREAKER_THRESHOLD);
 
 type Reply = { readonly text: string; readonly tokens: number };
 
@@ -257,15 +244,22 @@ type Reply = { readonly text: string; readonly tokens: number };
  * counted and reported, so "it worked" is not confused with "it worked first
  * time". `maxTokens` is a parameter because distillation emits structured JSON and
  * truncating it is invisible: the parse fails and the correction is lost.
+ *
+ * Two counters, deliberately: `calls` counts HTTP attempts (it is what the budget
+ * is spent in), while `logicalCalls`/`callFailures` count prompts and the ones
+ * that never got an answer. The gate is on the second pair — a run whose prompts
+ * failed 12% of the time measures the endpoint, not the memory, however many
+ * attempts it took to find that out.
  */
 async function chat(prompt: string, maxTokens = 700): Promise<Reply> {
   const key = process.env['DEEPSEEK_API_KEY'];
   if (!key) throw new MicrogliaError('MG_E_CONFIG', 'DEEPSEEK_API_KEY is required');
   let last = '';
+  logicalCalls += 1;
   for (let attempt = 0; attempt < 4; attempt += 1) {
     if (attempt > 0) {
       retries += 1;
-      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** (attempt - 1)));
+      await new Promise((resolve) => setTimeout(resolve, backoffMs(attempt)));
     }
     if (calls >= MAX_CALLS) throw new MicrogliaError('MG_E_BUDGET_EXCEEDED', 'POC call budget reached');
     calls += 1;
@@ -310,7 +304,18 @@ async function chat(prompt: string, maxTokens = 700): Promise<Reply> {
     };
     const tokens = body.usage?.total_tokens ?? 0;
     tokensUsed += tokens;
+    breaker.record(true);
     return { text: body.choices?.[0]?.message?.content ?? '', tokens };
+  }
+  // Four attempts is the retry policy. Past it the prompt has no answer, and the
+  // question is whether that is noise or an outage: the breaker answers it.
+  callFailures += 1;
+  if (!breaker.record(false)) {
+    throw new MicrogliaError(
+      'MG_E_PROVIDER_FAILED',
+      `${breaker.streak} prompts in a row failed after four attempts each; the endpoint is not answering`,
+      { last, hint: 'Re-dispatch when the provider recovers; a run through an outage measures the outage.' },
+    );
   }
   throw new MicrogliaError('MG_E_STORE_IO', 'DeepSeek call failed after retries', { last });
 }
@@ -572,50 +577,60 @@ async function loadDataset(limit: number): Promise<Dataset> {
   };
 }
 
+/**
+ * The schema of a database, read once.
+ *
+ * Every prompt carries the DDL, so without a cache the lane opens the larger
+ * databases (1.08 M rows for `financial`) once per arm per question — a thousand
+ * opens to read eleven strings that cannot change during a run.
+ */
+const schemaCache = new Map<string, string>();
+
 function ddlOf(dbPath: string): string {
+  const cached = schemaCache.get(dbPath);
+  if (cached !== undefined) return cached;
   const db = new DatabaseSync(dbPath, { readOnly: true });
   try {
     const rows = db
       .prepare("select sql from sqlite_master where type='table' and sql is not null order by name")
       .all() as { sql: string }[];
-    return rows.map((row) => row.sql).join('\n');
+    const ddl = rows.map((row) => row.sql).join('\n');
+    schemaCache.set(dbPath, ddl);
+    return ddl;
+  } finally {
+    db.close();
+  }
+}
+
+/** Execute a statement and canonicalise its result set. */
+function execute(dbPath: string, sql: string): { ok: boolean; rows: string[] } {
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const rows = db.prepare(sql).all() as Record<string, unknown>[];
+    return { ok: true, rows: canonicalRows(rows) };
+  } catch {
+    return { ok: false, rows: [] };
   } finally {
     db.close();
   }
 }
 
 /**
- * Execute and canonicalise a result set.
+ * The gold query's result, executed once per question.
  *
- * Rows are compared as JSON arrays of values rather than joined strings: a value
- * that itself contains the separator would otherwise make two different answers
- * look identical.
+ * The comparison needs it for every arm of that question, and the previous
+ * version executed it twice *inside a single comparison* — three full scans of a
+ * million-row table to score one question.
  */
-function execute(dbPath: string, sql: string): { ok: boolean; rows: string[] } {
-  const db = new DatabaseSync(dbPath, { readOnly: true });
-  try {
-    const result = db.prepare(sql).all() as Record<string, unknown>[];
-    const rows = result
-      .map((row) =>
-        JSON.stringify(
-          Object.keys(row)
-            .sort()
-            .map((key) => {
-              const value = row[key];
-              if (typeof value === 'number') {
-                return Number.isInteger(value) ? value : Number(value.toFixed(6));
-              }
-              return value === null || value === undefined ? null : String(value);
-            }),
-        ),
-      )
-      .sort();
-    return { ok: true, rows };
-  } catch {
-    return { ok: false, rows: [] };
-  } finally {
-    db.close();
-  }
+const goldCache = new Map<string, { readonly ok: boolean; readonly rows: string[] }>();
+
+function goldFor(row: BirdRow, dbPath: string): { readonly ok: boolean; readonly rows: string[] } {
+  const key = idOfRow(row);
+  const cached = goldCache.get(key);
+  if (cached !== undefined) return cached;
+  const result = execute(dbPath, row.SQL);
+  goldCache.set(key, result);
+  return result;
 }
 
 /**
@@ -642,118 +657,43 @@ function scalarOf(dbPath: string, sql: string): number | undefined {
   }
 }
 
-/** The correction a user would make: the same query, reported the way this workspace reports. */
-function reportedSql(sql: string): string {
-  if (ACTIVE === undefined) return sql;
-  const body = sql.replace(/;\s*$/, '').trim();
-  return ACTIVE.sql(body);
-}
-
-/** BIRD answers are compared as unordered multisets, the standard EX metric. */
-function matches(predicted: readonly string[], gold: readonly string[]): boolean {
-  if (predicted.length !== gold.length) return false;
-  for (let index = 0; index < gold.length; index += 1) {
-    if (predicted[index] !== gold[index]) return false;
-  }
-  return true;
-}
-
-/**
- * Pull one statement out of a model reply.
- *
- * A fence is authoritative when present. Without one, the first line that starts
- * a statement is used, after leading `--` and block comments are stripped: a model
- * that prefixes a comment has still answered, and treating that as a parse failure
- * would understate the arm.
- */
-function extractSql(raw: string): string | undefined {
-  const fenced = /```(?:sql)?\s*([\s\S]*?)```/i.exec(raw);
-  const body = (fenced?.[1] ?? raw).trim();
-  if (body === '') return undefined;
-  const stripped = body.replace(/^(?:\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/))*\s*/, '');
-  const fromStart = /^(select|with)\b[\s\S]*/i.exec(stripped)?.[0];
-  const fromLine = /(?:^|\n)\s*((?:select|with)\b[\s\S]*)/i.exec(stripped)?.[1];
-  const statement = fromStart ?? fromLine;
-  return statement?.replace(/;[\s\n]*$/, '').trim();
-}
-
-function promptFor(row: BirdRow, ddl: string, pack: string, stated = false): string {
-  return [
-    'You write one SQLite query that answers the question exactly.',
-    'Return the SQL only, in a ```sql fence, with no explanation.',
-    'Use only the tables and columns in the schema. Prefer explicit JOINs. Do not invent columns.',
-    `Schema:\n${ddl}`,
-    row.evidence ? `Evidence (may be wrong; it is external knowledge):\n${row.evidence}` : '',
-    stated && ACTIVE !== undefined ? `Workspace convention:\n- ${ACTIVE.sentence}` : '',
-    pack === '' ? '' : `Workspace conventions learned from earlier corrections:\n${pack}`,
-    `Question: ${row.question}`,
-  ]
-    .filter((line) => line !== '')
-    .join('\n\n');
-}
-
-type Answer = {
+type Judged = {
   readonly sql: string;
   readonly correct: boolean;
   readonly parseOk: boolean;
   readonly execOk: boolean;
-  readonly packIds: number;
   readonly tokens: number;
+  /** Local scoring time; the model's own latency is measured by the caller. */
   readonly latencyMs: number;
 };
 
 /**
- * Answer one question under one condition, without writing anything.
+ * Turn one reply into a scored outcome. No model call, no write.
  *
- * The evaluation arms are read-only by construction: no run is begun, no feedback
- * is recorded. An earlier version recorded a correction here, which meant the
- * store under measurement grew while it was measured.
+ * `reply` is undefined when the call failed after its retries: that is not a
+ * parse failure, and it is counted separately — a run in which one prompt in five
+ * never got an answer cannot be read as a statement about knowledge.
  */
-async function answer(
-  row: BirdRow,
-  dataset: Dataset,
-  packText: string,
-  packIds: number,
-  task: Task,
-  stated = false,
-): Promise<Answer> {
-  const dbPath = dataset.dbPath(row.db_id);
-  const ddl = ddlOf(dbPath);
-  const started = performance.now();
-  let sql = '';
-  let parseOk = false;
-  let tokens = 0;
-  try {
-    const reply = await chat(promptFor(row, ddl, packText, stated));
-    tokens = reply.tokens;
-    const extracted = extractSql(reply.text);
-    sql = extracted ?? '';
-    parseOk = extracted !== undefined;
-  } catch (error) {
-    if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
-    parseOk = false;
-  }
+function judgeReply(row: BirdRow, dbPath: string, reply: Reply | undefined, task: Task): Judged {
+  const extracted = reply === undefined ? undefined : extractSql(reply.text);
+  const sql = extracted ?? '';
+  const parseOk = extracted !== undefined;
   const predicted = sql === '' ? { ok: false, rows: [] } : execute(dbPath, sql);
-  const correct = task.convention
-    ? judgeConvention(dbPath, sql, task.expected.get(idOfRow(row)))
-    : predicted.ok && execute(dbPath, row.SQL).ok && matches(predicted.rows, execute(dbPath, row.SQL).rows);
+  let correct = false;
+  if (task.convention) {
+    correct = judgeScalar(scalarOf(dbPath, sql), task.expected.get(idOfRow(row)));
+  } else if (predicted.ok) {
+    const gold = goldFor(row, dbPath);
+    correct = gold.ok && matches(predicted.rows, gold.rows);
+  }
   return {
     sql,
     correct,
     parseOk,
     execOk: predicted.ok,
-    packIds,
-    tokens,
-    latencyMs: Math.round(performance.now() - started),
+    tokens: reply?.tokens ?? 0,
+    latencyMs: 0,
   };
-}
-
-/** The convention's judgement: one numeric answer, compared at the stated precision. */
-function judgeConvention(dbPath: string, sql: string, expected: number | undefined): boolean {
-  if (expected === undefined || sql === '') return false;
-  const value = scalarOf(dbPath, sql);
-  if (value === undefined) return false;
-  return Math.abs(value - expected) < 1e-6;
 }
 
 function idOfRow(row: BirdRow): string {
@@ -766,6 +706,9 @@ type LearningPass = {
   readonly goldFailed: number;
 };
 
+/** Generated text per question id, spread across folds. */
+const generations = new GenerationCache();
+
 /**
  * The learning pass: generate, compare against the gold result, correct on a
  * mismatch.
@@ -775,6 +718,21 @@ type LearningPass = {
  * wrong rows is wrong even when it runs. The earlier version compared only result
  * sets and therefore treated a failed generation as correct whenever the gold
  * query happened to return no rows — the exact cases most worth learning from.
+ *
+ * Two phases, and the split is what makes the pass parallel without making the
+ * memory order-dependent:
+ *
+ *  1. **Generate** every question's first attempt concurrently. Prompts depend only
+ *     on the question, its evidence and the schema, so this phase touches no
+ *     memory and its answers cannot depend on which call finished first.
+ *  2. **Record** the runs serially, in corpus order. `begin`/`complete`/`edit`
+ *     advance a stepping clock, and the distilled pack's ids are derived from it;
+ *     recording out of order would still be deterministic in isolation but would
+ *     differ from the serial lane for no reason.
+ *
+ * A failed generation is cached as a failure: the same prompt in a later fold is
+ * not an independent event, and paying four times to learn that the endpoint
+ * dropped one prompt would spend the budget without adding evidence.
  */
 async function learn(
   host: Awaited<ReturnType<typeof openMicroglia>>,
@@ -782,12 +740,40 @@ async function learn(
   dataset: Dataset,
   task: Task,
 ): Promise<LearningPass> {
+  const texts = await mapPool(rows, CONCURRENCY, async (row) => {
+    const key = idOfRow(row);
+    const cached = generations.get(key);
+    if (cached !== undefined) {
+      generations.count(true);
+      return cached;
+    }
+    generations.count(false);
+    try {
+      const reply = await chat(
+        promptFor({
+          question: row.question,
+          evidence: row.evidence,
+          ddl: ddlOf(dataset.dbPath(row.db_id)),
+          pack: '',
+          stated: false,
+          convention: ACTIVE,
+        }),
+      );
+      generations.set(key, reply.text);
+      return reply.text;
+    } catch (error) {
+      // A provider outage ends the run; a single unanswered prompt is data.
+      if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+      generations.set(key, '');
+      return '';
+    }
+  });
+
   let edited = 0;
   let goldFailed = 0;
-  for (const row of rows) {
+  for (const [index, row] of rows.entries()) {
     const dbPath = dataset.dbPath(row.db_id);
-    const ddl = ddlOf(dbPath);
-    const sql = extractSql((await chat(promptFor(row, ddl, ''))).text) ?? '';
+    const sql = extractSql(texts[index] ?? '') ?? '';
     const handle = host.begin({
       task: TASK,
       input: { question: row.question, domain: row.db_id, schemaDigest: row.db_id },
@@ -798,16 +784,13 @@ async function learn(
     await handle.complete({ sql });
     // The correction is what a user would type, not what the benchmark happens to
     // hold: under the convention that is the same query reported in thousands.
-    const target = task.convention ? reportedSql(row.SQL) : row.SQL;
+    const target = reportedSql(row.SQL, ACTIVE);
     const expected = task.expected.get(idOfRow(row));
-    const satisfied = task.convention
-      ? judgeConvention(dbPath, sql, expected)
-      : execute(dbPath, row.SQL).ok && execute(dbPath, sql).ok &&
-        matches(execute(dbPath, sql).rows, execute(dbPath, row.SQL).rows);
     if (task.convention && expected === undefined) {
       goldFailed += 1;
       continue;
     }
+    const satisfied = judgeReply(row, dbPath, { text: texts[index] ?? '', tokens: 0 }, task).correct;
     if (!satisfied) {
       await handle.edit({ sql: target }, { note: 'execution mismatch' });
       edited += 1;
@@ -937,66 +920,139 @@ async function runFold(
     return databases[(index + 1) % databases.length] ?? dbId;
   };
 
-  const cases: CaseOutcome[] = [];
+  // Three phases instead of one loop, because the model calls are what take the
+  // time and everything else is local. Recall, prompt construction, and judging
+  // are memory or SQLite work measured in microseconds; the calls are 2–5 seconds
+  // each. Issuing them one at a time made a fold 27 minutes long, which is what
+  // pushed the first full-split dispatch past its step timeout at fold 4 of 5.
+  //
+  //  1. plan    — for each question, recall every arm's pack and build its prompt
+  //  2. call    — issue every prompt with bounded concurrency
+  //  3. judge   — score the replies in corpus order, writing nothing
+  //
+  // The phases cannot bias the measurement: a prompt is built from the frozen pack
+  // before any call is made, and scoring happens after every reply has arrived, so
+  // no call's result influences another's prompt.
+  type PlannedCall = {
+    readonly position: number;
+    readonly arm: ArmName;
+    readonly prompt: string;
+    readonly packIds: number;
+  };
+  type PackInfo = { readonly ids: readonly string[]; readonly coverage: number };
+  const plans: PlannedCall[] = [];
+  const packs: PackInfo[] = [];
+
+  const call = (position: number, arm: ArmName, packText: string, packIds: number): void => {
+    const row = evalRows[position] as BirdRow;
+    plans.push({
+      position,
+      arm,
+      packIds,
+      prompt: promptFor({
+        question: row.question,
+        evidence: row.evidence,
+        ddl: ddlOf(dataset.dbPath(row.db_id)),
+        pack: packText,
+        stated: arm === 'stated',
+        convention: ACTIVE,
+      }),
+    });
+  };
+
   for (const [position, row] of evalRows.entries()) {
-    // Progress, because a run of this size can be half an hour per fold and a silent
-    // step is indistinguishable from a hung one. The counters are the ones a reader
-    // needs to see that work is moving: which fold, how far into it, and how much
-    // budget has been spent.
-    if (position > 0 && position % 5 === 0) {
-      process.stdout.write(
-        `[sota] fold ${fold + 1}/${FOLDS} eval ${position}/${evalRows.length} calls=${calls} retries=${retries}\n`,
-      );
-    }
     const query = { task: TASK, text: row.question };
     const pack = await host.recall({ ...query, scope: { domain: row.db_id } });
-    const base = await answer(row, dataset, '', 0, task);
-    const full = await answer(row, dataset, pack.rendered, pack.ids.length, task);
-
-    const arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>> = {};
-    const armSql: Partial<Record<Exclude<ArmName, 'none' | 'full'>, string>> = {};
-    const armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
+    packs.push({
+      ids: pack.ids,
+      coverage: Number(queryCoverage(row.question, pack.items[0]?.statement ?? '').toFixed(3)),
+    });
+    call(position, 'none', '', 0);
+    call(position, 'full', pack.rendered, pack.ids.length);
     if (ARMS.has('gated')) {
-      const gated = await host.recall({
-        ...query,
-        scope: { domain: row.db_id },
-        minCoverage: MIN_COVERAGE,
-      });
-      const result = await answer(row, dataset, gated.rendered, gated.ids.length, task);
-      arms.gated = result.correct;
-      armSql.gated = result.sql;
-      armPackIds.gated = result.packIds;
+      const gated = await host.recall({ ...query, scope: { domain: row.db_id }, minCoverage: MIN_COVERAGE });
+      call(position, 'gated', gated.rendered, gated.ids.length);
     }
     if (ARMS.has('duplicate')) {
       const twice = pack.rendered === '' ? '' : `${pack.rendered}\n${pack.rendered}`;
-      const result = await answer(row, dataset, twice, pack.ids.length, task);
-      arms.duplicate = result.correct;
-      armSql.duplicate = result.sql;
-      armPackIds.duplicate = result.packIds;
+      call(position, 'duplicate', twice, pack.ids.length);
     }
     if (ARMS.has('wrong-scope')) {
       const wrong = await host.recall({ ...query, scope: { domain: nextDatabase(row.db_id) } });
-      const result = await answer(row, dataset, wrong.rendered, wrong.ids.length, task);
-      arms['wrong-scope'] = result.correct;
-      armSql['wrong-scope'] = result.sql;
-      armPackIds['wrong-scope'] = result.packIds;
+      call(position, 'wrong-scope', wrong.rendered, wrong.ids.length);
     }
-    if (ARMS.has('stated')) {
-      const result = await answer(row, dataset, '', 0, task, true);
-      arms.stated = result.correct;
-      armSql.stated = result.sql;
-      armPackIds.stated = 0;
-    }
+    if (ARMS.has('stated')) call(position, 'stated', '', 0);
     if (ARMS.has('oracle')) {
       // Under the convention the oracle is the expected value, not the gold SQL:
       // the question is whether a single stated fact changes the answer form.
       const hint = task.convention
-        ? `- The answer this workspace accepts for this question is ${task.expected.get(idOfRow(row)) ?? 'unknown'}; it is the only accepted form.`
+        ? `- The answer this workspace accepts for this question is ${task.expected.get(idOf(row)) ?? 'unknown'}; it is the only accepted form.`
         : `- ${row.SQL}`;
-      const result = await answer(row, dataset, hint, 0, task);
-      arms.oracle = result.correct;
-      armSql.oracle = result.sql;
-      armPackIds.oracle = 0;
+      call(position, 'oracle', hint, 0);
+    }
+  }
+
+  let completed = 0;
+  const replies = await mapPool(plans, CONCURRENCY, async (plan) => {
+    let reply: Reply | undefined;
+    try {
+      reply = await chat(plan.prompt);
+    } catch (error) {
+      // Two failures are not data: a spent budget and a provider that has stopped
+      // answering both mean the remaining replies would describe an outage.
+      if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+      if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+      reply = undefined;
+    }
+    completed += 1;
+    // Progress every twenty calls: a silent step is indistinguishable from a hung
+    // one, which is how a ten-hour run went unnoticed.
+    if (completed % 20 === 0 || completed === plans.length) {
+      process.stdout.write(
+        `[sota] fold ${fold + 1}/${FOLDS} eval ${completed}/${plans.length} calls=${calls} ` +
+          `retries=${retries} failed=${callFailures}\n`,
+      );
+    }
+    return reply;
+  });
+
+  const judged = new Map<string, Judged>();
+  for (const [index, plan] of plans.entries()) {
+    const row = evalRows[plan.position] as BirdRow;
+    const started = performance.now();
+    const result = judgeReply(row, dataset.dbPath(row.db_id), replies[index], task);
+    judged.set(`${plan.position}:${plan.arm}`, {
+      ...result,
+      latencyMs: Math.round(performance.now() - started),
+    });
+  }
+
+  const packIdsOf = new Map(plans.map((plan) => [`${plan.position}:${plan.arm}`, plan.packIds]));
+  const cases: CaseOutcome[] = [];
+  for (const [position, row] of evalRows.entries()) {
+    const pick = (arm: ArmName): Judged =>
+      judged.get(`${position}:${arm}`) ?? {
+        sql: '',
+        correct: false,
+        parseOk: false,
+        execOk: false,
+        tokens: 0,
+        latencyMs: 0,
+      };
+    const base = pick('none');
+    const full = pick('full');
+    const pack = packs[position] as PackInfo;
+
+    const arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>> = {};
+    const armSql: Partial<Record<Exclude<ArmName, 'none' | 'full'>, string>> = {};
+    const armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
+    for (const plan of plans) {
+      if (plan.position !== position) continue;
+      if (plan.arm === 'none' || plan.arm === 'full') continue;
+      const result = pick(plan.arm);
+      arms[plan.arm] = result.correct;
+      armSql[plan.arm] = result.sql;
+      armPackIds[plan.arm] = plan.packIds;
     }
 
     cases.push({
@@ -1012,8 +1068,8 @@ async function runFold(
       withoutMemoryCorrect: base.correct,
       parseOk: full.parseOk,
       execOk: full.execOk,
-      packIds: full.packIds,
-      coverage: Number(queryCoverage(row.question, pack.items[0]?.statement ?? '').toFixed(3)),
+      packIds: packIdsOf.get(`${position}:full`) ?? 0,
+      coverage: pack.coverage,
       expected: task.expected.get(idOf(row)) ?? null,
       packIdList: pack.ids,
       tokens: full.tokens,
@@ -1086,10 +1142,12 @@ type ArmSummary = {
 };
 
 async function main(): Promise<void> {
-  if (CONVENTION !== '' && ACTIVE === undefined) {
-    throw new MicrogliaError('MG_E_CONFIG', `Unknown convention '${CONVENTION}'`, {
-      known: Object.keys(CONVENTIONS).join(', '),
-    });
+  if ((process.env['SOTA_CONVENTION'] ?? '').trim() !== '' && ACTIVE === undefined) {
+    throw new MicrogliaError(
+      'MG_E_CONFIG',
+      `Unknown convention '${(process.env['SOTA_CONVENTION'] ?? '').trim()}'`,
+      { known: Object.keys(HOUSE_CONVENTIONS).join(', ') },
+    );
   }
   const dataset = await loadDataset(LIMIT);
   const idOf = (row: BirdRow): string => `${row.db_id}#${row.question_id}`;
@@ -1109,7 +1167,7 @@ async function main(): Promise<void> {
       throw new MicrogliaError('MG_E_CONFIG', 'Too few questions define the convention', {
         qualifying: rows.length,
         of: dataset.rows.length,
-        convention: CONVENTION,
+        convention: CONVENTION_NAME,
       });
     }
   }
@@ -1151,8 +1209,6 @@ async function main(): Promise<void> {
       if (foldOf.get(item.id) !== fold.fold) leaked += 1;
     }
   }
-  const partitionOk = duplicated === 0 && seen.size === rows.length && leaked === 0;
-
   const parseRate = rate(cases.map((item) => item.parseOk));
   const execRate = rate(cases.map((item) => item.execOk));
   const learnTotal = folds.reduce((sum, fold) => sum + fold.learn, 0);
@@ -1214,63 +1270,30 @@ async function main(): Promise<void> {
     (best, entry) => (best === undefined || entry.delta_pp > best.delta_pp ? entry : best),
     undefined,
   );
-  const gates = [
-    {
-      id: 'V1-pack-not-empty',
-      criterion: 'the memory arm injected at least one rule per question on average',
-      actual: `${meanPackIds.toFixed(2)} rules/question`,
-      pass: meanPackIds > 0,
-      blocking: true,
+  // The gate definitions live in `sota.ts` because they are the part of this lane
+  // that decides whether a number is publishable, and a decision with no test is a
+  // preference. The CLI supplies the measurements.
+  const callFailureRate = logicalCalls === 0 ? 0 : callFailures / logicalCalls;
+  const gates = buildValidityGates({
+    meanPackIds,
+    partition: {
+      evaluated: seen.size,
+      total: rows.length,
+      duplicated,
+      leaked,
     },
-    {
-      id: 'V2-fold-partition',
-      criterion: 'every question is evaluated exactly once, by a memory that never learned from it',
-      actual: `${seen.size}/${rows.length} questions, ${duplicated} duplicates, ${leaked} leaks`,
-      pass: partitionOk,
-      blocking: true,
-    },
-    {
-      id: 'V3-parse-rate',
-      criterion: 'at least 90% of replies contain a statement',
-      actual: `${(parseRate * 100).toFixed(2)}%`,
-      pass: parseRate >= 0.9,
-      blocking: true,
-    },
-    {
-      id: 'V4-gold-executable',
-      criterion: 'at least 99% of gold queries execute, or the dataset is not usable',
-      actual: `${(goldExecRate * 100).toFixed(2)}%`,
-      pass: goldExecRate >= 0.99,
-      blocking: true,
-    },
-    {
-      id: 'V5-resolution',
-      criterion: 'the sample can resolve a 6pp effect at 80% power',
-      actual: `minimum detectable ${(detectable * 100).toFixed(2)}pp at n=${cases.length}`,
-      pass: detectable <= 0.06,
-      blocking: false,
-    },
-    {
-      id: 'V6-controls-inject',
-      criterion: 'every pack-based control arm injected at least one rule on average',
-      actual:
-        packControls
-          .map((entry) => `${entry.arm}: ${entry.mean_pack_ids.toFixed(2)} rules/question`)
-          .join(', ') || 'no pack-based controls configured',
-      pass: packControls.every((entry) => entry.mean_pack_ids > 0),
-      blocking: true,
-    },
-    {
-      id: 'V7-channel',
-      criterion: 'a stated control moves accuracy by at least 10pp',
-      actual:
-        channelBest === undefined
-          ? 'no channel control was run'
-          : `${channelBest.delta_pp.toFixed(2)}pp with the ${channelBest.arm} control`,
-      pass: channelBest === undefined ? true : channelBest.delta_pp >= 10,
-      blocking: true,
-    },
-  ];
+    parseRate,
+    goldExecRate,
+    detectablePp: detectable * 100,
+    packControls: packControls.map((entry) => ({ arm: entry.arm, meanPackIds: entry.mean_pack_ids })),
+    channelBest:
+      channelBest === undefined
+        ? undefined
+        : { arm: channelBest.arm, deltaPp: channelBest.delta_pp },
+    callFailureRate,
+    calls: logicalCalls,
+    callFailures,
+  });
 
   const assertions = {
     /**
@@ -1306,6 +1329,9 @@ async function main(): Promise<void> {
       task: TASK,
       distill_prompt: 'distill-prompt/2',
       distill_max_tokens: 2000,
+      concurrency: CONCURRENCY,
+      breaker_threshold: BREAKER_THRESHOLD,
+      generation_cache: generations.stats,
     },
     n: {
       total: rows.length,
@@ -1315,9 +1341,12 @@ async function main(): Promise<void> {
       qualifying: rows.length,
       reported: rows.length === 0 ? 0 : expected.size,
     },
+    // `calls` counts HTTP attempts; `prompts` counts logical calls, which is the
+    // denominator of the reliability gate.
     calls,
     retries,
-    tokens: tokensUsed,
+    prompts: logicalCalls,
+    call_failures: callFailures,
     metrics: {
       accuracy_without_memory: paired.baselineAccuracy,
       accuracy_with_memory: paired.treatmentAccuracy,

@@ -113,6 +113,34 @@ export {
 } from './attribution.js';
 
 export {
+  CircuitBreaker,
+  backoffMs,
+  mapPool,
+} from './concurrency.js';
+
+export {
+  HOUSE_CONVENTIONS,
+  OPTIONAL_ARMS,
+  PROMPT_VERSION,
+  GenerationCache,
+  buildValidityGates,
+  canonicalRows,
+  conventionOf,
+  extractSql,
+  judgeScalar,
+  matches,
+  parseArms,
+  promptFor,
+  reportedSql,
+  type ConventionName,
+  type ConventionSpec,
+  type GateInput,
+  type PromptInput,
+  type SqlArm,
+  type ValidityGate,
+} from './sota.js';
+
+export {
   assignFolds,
   detectableDelta,
   discordanceOf,

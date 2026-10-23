@@ -35,6 +35,10 @@ on:
         description: 'Control arms beyond none+full (gated,duplicate,wrong-scope,stated,oracle)'
         required: false
         default: 'gated,oracle'
+      concurrency:
+        description: 'Model calls in flight at once (1 = serial)'
+        required: false
+        default: '6'
   schedule:
     - cron: '0 3 * * 1'
 
@@ -85,10 +89,18 @@ jobs:
       - name: Drop any committed artefact
         run: rm -f eval/results/poc-sota-bird.json eval/results/poc-sota-attribution.json
 
-      # The full split is ~2,100 model calls: 352 questions × (none + full) plus one
-      # distillation call per correction. At the observed 2–3 s per call that is
-      # 70–105 minutes, so the step is capped at 160 and the job at 180. A smaller
-      # dispatch (limit / folds / arms) finishes in a fraction of that.
+      # The full split is ~1,750 model calls: 350 questions × (none + full + gated +
+      # oracle) once each, plus one learning generation per question (cached across
+      # folds — cross-fitting would otherwise ask the same prompt four times).
+      #
+      # The first full-split dispatch issued those calls serially and did not
+      # finish: four folds in 160 minutes, because a fold is 560 calls at 2–5 s and
+      # one provider stall added 48 minutes. Calls are now bounded-parallel
+      # (SOTA_CONCURRENCY, six by default), which puts the whole run near 25–40
+      # minutes. The cap stays at 160 so that a slow endpoint still fails on the
+      # step rather than on the job, and a provider that stops answering trips the
+      # breaker and fails with MG_E_PROVIDER_FAILED instead of publishing a number
+      # produced by an outage.
       - name: Run the benchmark
         timeout-minutes: 160
         env:
@@ -98,6 +110,7 @@ jobs:
           SOTA_FOLDS: ${{ github.event.inputs.folds || '5' }}
           SOTA_GENERALIZE: ${{ github.event.inputs.generalize || 'true' }}
           SOTA_ARMS: ${{ github.event.inputs.arms || 'gated,oracle' }}
+          SOTA_CONCURRENCY: ${{ github.event.inputs.concurrency || '6' }}
           SOTA_CONVENTION: ${{ github.event.inputs.convention || '' }}
           SOTA_RESAMPLES: '10000'
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}

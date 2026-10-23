@@ -350,31 +350,32 @@ describe('the query string is input, not decoration', () => {
 
 describe('error mapping', () => {
   it('maps every named failure to a status a client can act on', () => {
-    const codes: MicrogliaErrorCode[] = [
-      'MG_E_CONFIG',
-      'MG_E_SCHEMA_VERSION',
-      'MG_E_SCHEMA_INVALID',
-      'MG_E_NOT_OPEN',
-      'MG_E_RUN_COMMITTED',
-      'MG_E_NO_OUTPUT',
-      'MG_E_INVALID_SIGNAL',
-      'MG_E_UNKNOWN_TASK',
-      'MG_E_UNKNOWN_SCOPE',
-      'MG_E_STORE_IO',
-      'MG_E_STORE_CORRUPT',
-      'MG_E_KNOWLEDGE_UNSAFE',
-      'MG_E_BUDGET_EXCEEDED',
-      'MG_E_NAMESPACE_MISMATCH',
-      'MG_E_PACK_STALE',
-      'MG_E_PROVIDER_MISSING',
-    ];
-    const statuses = new Map(codes.map((code) => [code, statusFor(code)]));
-    expect(statuses.get('MG_E_CONFIG')).toBe(400);
-    expect(statuses.get('MG_E_NAMESPACE_MISMATCH')).toBe(401);
-    expect(statuses.get('MG_E_RUN_COMMITTED')).toBe(409);
-    expect(statuses.get('MG_E_BUDGET_EXCEEDED')).toBe(413);
-    expect(statuses.get('MG_E_PROVIDER_MISSING')).toBe(503);
-    expect(statuses.get('MG_E_STORE_IO')).toBe(500);
+    // A `Record` over the code union, not a list: adding a code without deciding
+    // its status is a compile error here rather than a 500 in production.
+    const expected: Record<MicrogliaErrorCode, 400 | 401 | 409 | 413 | 500 | 503> = {
+      MG_E_CONFIG: 400,
+      MG_E_SCHEMA_VERSION: 400,
+      MG_E_SCHEMA_INVALID: 400,
+      MG_E_INVALID_SIGNAL: 400,
+      MG_E_UNKNOWN_TASK: 400,
+      MG_E_UNKNOWN_SCOPE: 400,
+      MG_E_KNOWLEDGE_UNSAFE: 400,
+      MG_E_NAMESPACE_MISMATCH: 401,
+      MG_E_RUN_COMMITTED: 409,
+      MG_E_NO_OUTPUT: 409,
+      MG_E_PACK_STALE: 409,
+      MG_E_TASK_CONFLICT: 409,
+      MG_E_TASK_CLOSED: 409,
+      MG_E_BUDGET_EXCEEDED: 413,
+      MG_E_PROVIDER_MISSING: 503,
+      MG_E_PROVIDER_FAILED: 503,
+      MG_E_NOT_OPEN: 503,
+      MG_E_STORE_IO: 500,
+      MG_E_STORE_CORRUPT: 500,
+    };
+    for (const [code, status] of Object.entries(expected)) {
+      expect(statusFor(code as MicrogliaErrorCode)).toBe(status);
+    }
   });
 });
 

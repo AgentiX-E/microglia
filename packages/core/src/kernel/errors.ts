@@ -32,7 +32,12 @@ export type MicrogliaErrorCode =
   // A host asked for a provider that neither an instance nor a registered factory
   // supplies. Distinct from MG_E_CONFIG: the configuration is well formed, the
   // name simply resolves to nothing.
-  | 'MG_E_PROVIDER_MISSING';
+  | 'MG_E_PROVIDER_MISSING'
+  // A provider that was answering stopped answering: retries were exhausted for
+  // several requests in a row. Distinct from MG_E_PROVIDER_MISSING (nothing is
+  // configured) and from MG_E_STORE_IO (the local store): a caller that keeps
+  // going through this spends its budget measuring an outage.
+  | 'MG_E_PROVIDER_FAILED';
 
 export class MicrogliaError extends Error {
   public readonly code: MicrogliaErrorCode;

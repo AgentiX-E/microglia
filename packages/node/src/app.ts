@@ -60,6 +60,7 @@ export function statusFor(code: MicrogliaErrorCode): 400 | 401 | 409 | 413 | 500
     case 'MG_E_BUDGET_EXCEEDED':
       return 413;
     case 'MG_E_PROVIDER_MISSING':
+    case 'MG_E_PROVIDER_FAILED':
     case 'MG_E_NOT_OPEN':
       return 503;
     case 'MG_E_STORE_IO':
