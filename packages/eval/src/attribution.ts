@@ -46,7 +46,17 @@ export type AttributionSummary = {
   readonly neutral: number;
   /** Share of injected rule-instances whose rule has a negative net. */
   readonly harmfulShare: number;
+  /** The rules that cost the most, worst first. */
   readonly top: readonly RuleAttribution[];
+  /**
+   * The rules that helped most, best first.
+   *
+   * `top` alone is a list of suspects, and a report that only ever publishes
+   * suspects invites the conclusion that the pack is uniformly bad. The other end
+   * of the same table is what says whether the mechanism is worth keeping while the
+   * harmful rules are dealt with.
+   */
+  readonly best: readonly RuleAttribution[];
 };
 
 /**
@@ -118,6 +128,10 @@ export function attributeRules(
   const harmful = injected.filter((rule) => rule.net < 0);
   const helpful = injected.filter((rule) => rule.net > 0);
   const instances = injected.reduce((sum, rule) => sum + rule.injected, 0);
+  const best = all
+    .filter((rule) => rule.net > 0)
+    .sort((a, b) => b.net - a.net || b.injected - a.injected || (a.id < b.id ? -1 : 1));
+
   return {
     rules: all.length,
     injectedRules: injected.length,
@@ -126,5 +140,6 @@ export function attributeRules(
     neutral: injected.length - helpful.length - harmful.length,
     harmfulShare: instances === 0 ? 0 : harmful.reduce((sum, rule) => sum + rule.injected, 0) / instances,
     top: all.slice(0, 20),
+    best: best.slice(0, 20),
   };
 }

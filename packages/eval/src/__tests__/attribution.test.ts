@@ -113,4 +113,32 @@ describe('per-rule attribution', () => {
     );
     expect(summary.top.map((rule) => rule.id)).toEqual(['k1', 'k2']);
   });
+
+  it('publishes the rules that helped as well as the ones that hurt', () => {
+    // The artefact used to carry only the worst twenty. A reader given a list of
+    // suspects and nothing else concludes the pack is uniformly bad, when what the
+    // same table shows is 11 harmful against 5 helpful of 74 injected.
+    const summary = attributeRules(
+      [
+        { fold: 0, injected: ['k_bad'], baselineCorrect: true, treatmentCorrect: false },
+        { fold: 0, injected: ['k_good'], baselineCorrect: false, treatmentCorrect: true },
+        { fold: 0, injected: ['k_good'], baselineCorrect: false, treatmentCorrect: true },
+      ],
+      [
+        { fold: 0, id: 'k_bad', statement: 'Wrong but plausible.' },
+        { fold: 0, id: 'k_good', statement: 'Right and useful.' },
+      ],
+    );
+    expect(summary.top.map((rule) => rule.id)).toEqual(['k_bad', 'k_good']);
+    expect(summary.best.map((rule) => rule.id)).toEqual(['k_good']);
+    expect(summary.best[0]?.net).toBe(2);
+  });
+
+  it('leaves the best list empty when nothing helped', () => {
+    const summary = attributeRules(
+      [{ fold: 0, injected: ['k_bad'], baselineCorrect: true, treatmentCorrect: false }],
+      [{ fold: 0, id: 'k_bad', statement: 'Wrong.' }],
+    );
+    expect(summary.best).toEqual([]);
+  });
 });

@@ -73,7 +73,13 @@ function main(): void {
   );
   for (const rule of summary.top.slice(0, 5)) {
     process.stdout.write(
-      `[attribution] fold ${rule.fold} net=${rule.net} injected=${rule.injected} :: ${rule.statement.slice(0, 110)}\n`,
+      `[attribution] worst fold ${rule.fold} net=${rule.net} injected=${rule.injected} :: ${rule.statement.slice(0, 110)}\n`,
+    );
+  }
+  // Both ends, because a list of suspects alone reads as "the pack is uniformly bad".
+  for (const rule of summary.best.slice(0, 3)) {
+    process.stdout.write(
+      `[attribution] best  fold ${rule.fold} net=+${rule.net} injected=${rule.injected} :: ${rule.statement.slice(0, 110)}\n`,
     );
   }
 }
