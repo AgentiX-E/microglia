@@ -1,0 +1,196 @@
+{
+  "id": "poc-sota-attribution",
+  "source_artifact": "poc-sota-bird.json",
+  "source_generated_at": "2026-10-23T11:27:14.670Z",
+  "n": 60,
+  "summary": {
+    "rules": 124,
+    "injectedRules": 74,
+    "helpful": 5,
+    "harmful": 11,
+    "neutral": 58,
+    "harmfulShare": 0.16666666666666666,
+    "top": [
+      {
+        "fold": 1,
+        "id": "k_01hf7uaq3t_d5emm",
+        "statement": "When computing a percentage of atoms matching a condition across joined tables, the numerator and denominator must both count distinct atom identifiers to avoid row duplication from the join.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 2,
+        "net": -2
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaq38_affgr",
+        "statement": "Computing a percentage as SUM(...) * 100 / SUM(...) over integer columns without a REAL cast produces an incorrect result in SQLite.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaq3h_fdg1w",
+        "statement": "Using the column name 'types' instead of 'type' on the cards table causes an execution mismatch.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaq3i_ffbky",
+        "statement": "Queries joining cards to legalities on uuid should select DISTINCT status to avoid duplicate rows.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaq3m_887b4",
+        "statement": "When a question asks whether each expense was approved, the result should project only the approval column rather than additional descriptive columns.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaq3n_57yw0",
+        "statement": "Date equality filters on event dates are expressed with a LIKE prefix pattern matching the date string.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaq3r_fm62r",
+        "statement": "Date literals in SQL for this schema use the ISO format 'YYYY-MM-DD HH:MM:SS.0' rather than slash-separated dates.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaq3s_8xeyg",
+        "statement": "A valid query for this schema joins posts to comments on posts.Id = comments.PostId and filters on comments.UserId and comments.CreationDate.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaq3l_02xcd",
+        "statement": "A ratio of total single bonds to distinct atom count does not compute an average per molecule and yields a different value than averaging per-molecule single-bond counts.",
+        "injected": 1,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaq3l_02xcd",
+        "statement": "The ratio of outpatient to inpatient counts is computed as the outpatient count divided by the inpatient count, not the reverse.",
+        "injected": 1,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaq4i_9zp4v",
+        "statement": "Joining connected.bond_id to bond.bond_id produces an execution mismatch in the toxicology schema.",
+        "injected": 1,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaq32_5cdmy",
+        "statement": "In SQLite, integer division truncates, so a percentage computed as integer_sum * 100 / integer_sum yields 0 or a truncated integer unless a cast to REAL or a decimal literal is applied.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaq33_0pavc",
+        "statement": "Computing a percentage with integer operands and no REAL cast produces an execution mismatch against the expected numeric result.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaq34_ayat1",
+        "statement": "For a question asking which drivers are eliminated in the first qualifying period, selecting the driver with the maximum q1 time returns the slowest qualifier rather than the set of eliminated drivers.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaq35_eqqr5",
+        "statement": "When a question asks for the customer with the least total consumption over a period, the query must aggregate consumption per customer with SUM and GROUP BY before ordering and limiting.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaq36_8rgb1",
+        "statement": "Ordering by a per-row consumption column and limiting to one row does not answer a least-total-consumption question when a customer has multiple consumption rows.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaq38_affgr",
+        "statement": "When grouping by a team name column that is not the join key, the query can return duplicate team rows if names collide; grouping by the team identifier avoids this.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaq39_epz90",
+        "statement": "A valid pattern for 'which away team won the most' is to filter away_team_goal > home_team_goal, group by the away team identifier, and order by COUNT(*) descending with LIMIT 1.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaq39_epz90",
+        "statement": "For a question asking which drivers are eliminated in the first qualifying period, selecting the driver with the maximum q1 time returns the slowest qualifier rather than the set of eliminated drivers.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaq3b_8fabe",
+        "statement": "Filtering rows by a category condition before applying a HAVING count threshold changes which groups qualify, so the category filter must be applied after the group-count selection rather than in the same WHERE clause.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      }
+    ]
+  }
+}

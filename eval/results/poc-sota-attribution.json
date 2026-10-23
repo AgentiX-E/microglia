@@ -1,55 +1,109 @@
 {
   "id": "poc-sota-attribution",
   "source_artifact": "poc-sota-bird.json",
-  "source_generated_at": "2026-10-23T11:27:14.670Z",
-  "n": 60,
+  "source_generated_at": "2026-10-23T15:39:41.800Z",
+  "n": 350,
   "summary": {
-    "rules": 124,
-    "injectedRules": 74,
-    "helpful": 5,
-    "harmful": 11,
-    "neutral": 58,
-    "harmfulShare": 0.16666666666666666,
+    "rules": 1304,
+    "injectedRules": 429,
+    "helpful": 24,
+    "harmful": 53,
+    "neutral": 352,
+    "harmfulShare": 0.1326676176890157,
     "top": [
       {
-        "fold": 1,
-        "id": "k_01hf7uaq3t_d5emm",
-        "statement": "When computing a percentage of atoms matching a condition across joined tables, the numerator and denominator must both count distinct atom identifiers to avoid row duplication from the join.",
-        "injected": 2,
+        "fold": 0,
+        "id": "k_01hf7uaqqq_cvc02",
+        "statement": "A query answering 'which driver ranked first in the Canadian Grand Prix in 2007, give reference name' selects forename, surname, and driverRef from drivers joined through results to races filtered on race name, year, and rank = 1.",
+        "injected": 5,
         "helped": 0,
         "hurt": 2,
         "net": -2
       },
       {
-        "fold": 2,
-        "id": "k_01hf7uaq38_affgr",
-        "statement": "Computing a percentage as SUM(...) * 100 / SUM(...) over integer columns without a REAL cast produces an incorrect result in SQLite.",
-        "injected": 2,
+        "fold": 0,
+        "id": "k_01hf7uaqt7_et1zp",
+        "statement": "In the formula_1 schema, a race is identified by its name in the races table (e.g., 'Canadian Grand Prix'), not by its circuit name in the circuits table.",
+        "injected": 5,
+        "helped": 0,
+        "hurt": 2,
+        "net": -2
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqmb_fkvtx",
+        "statement": "A ratio of total single bonds to distinct atoms is not the same as the average number of single bonds per molecule.",
+        "injected": 4,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
-        "fold": 2,
-        "id": "k_01hf7uaq3h_fdg1w",
-        "statement": "Using the column name 'types' instead of 'type' on the cards table causes an execution mismatch.",
-        "injected": 2,
+        "fold": 1,
+        "id": "k_01hf7uaqmb_fkvtx",
+        "statement": "A question asking for the top 4 teams by highest buildUpPlaySpeed requires ORDER BY buildUpPlaySpeed DESC, not ASC.",
+        "injected": 4,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
-        "fold": 2,
-        "id": "k_01hf7uaq3i_ffbky",
-        "statement": "Queries joining cards to legalities on uuid should select DISTINCT status to avoid duplicate rows.",
-        "injected": 2,
+        "fold": 1,
+        "id": "k_01hf7uaqt2_452j8",
+        "statement": "When counting patients filtered by a laboratory value range, the join between Patient and Examination must be made through the Laboratory table's ID rather than directly on Patient.ID.",
+        "injected": 4,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqll_38490",
+        "statement": "A winning-away-team count query joins League, Match, and Team, filters on league name and season, compares away_team_goal minus home_team_goal to zero, groups by the away team identifier, and orders by COUNT(*) descending with LIMIT 1.",
+        "injected": 3,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
         "fold": 0,
-        "id": "k_01hf7uaq3m_887b4",
+        "id": "k_01hf7uaqtb_76223",
+        "statement": "Joining set_translations on set code and filtering by language does not yield the Italian ruling text; the ruling text must come from the foreign_data table joined on card uuid.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqth_6gedp",
+        "statement": "Using a MAX subquery to filter for the highest converted mana cost returns all tied rows, whereas ordering by converted mana cost descending with a limit returns a single row.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqlk_fx1yw",
+        "statement": "When grouping by a team name column that is not the join key, the query can return duplicate team rows if names collide; grouping by the team identifier avoids this.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqlm_eftxx",
+        "statement": "When a question asks for the customer with the least total consumption over a period, consumption must be aggregated per customer with SUM before ordering and limiting.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqmk_c7nx9",
         "statement": "When a question asks whether each expense was approved, the result should project only the approval column rather than additional descriptive columns.",
         "injected": 2,
         "helped": 0,
@@ -57,139 +111,267 @@
         "net": -1
       },
       {
+        "fold": 3,
+        "id": "k_01hf7uaqn2_eydbf",
+        "statement": "Percentage calculations over card language data require joining the cards table to foreign_data on uuid, since language is stored in foreign_data and card identity in cards.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqnh_a4v24",
+        "statement": "Age-based patient filters in this schema are expressed as the difference between the examination date year and the birthday year.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqni_6sym6",
+        "statement": "Joining comments to postHistory on the post and requiring the comment author to equal the postHistory user does not correctly identify comments left by users who edited the post.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
         "fold": 0,
-        "id": "k_01hf7uaq3n_57yw0",
-        "statement": "Date equality filters on event dates are expressed with a LIKE prefix pattern matching the date string.",
+        "id": "k_01hf7uaqnm_cb9gf",
+        "statement": "Computing a percentage from foreign_data alone without joining cards produces an execution mismatch when the question asks about cards.",
         "injected": 2,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
-        "fold": 1,
-        "id": "k_01hf7uaq3r_fm62r",
-        "statement": "Date literals in SQL for this schema use the ISO format 'YYYY-MM-DD HH:MM:SS.0' rather than slash-separated dates.",
+        "fold": 4,
+        "id": "k_01hf7uaqno_8n8rd",
+        "statement": "Queries answering which user added a bounty to a post must select the user's display name and the post title, not only the display name.",
         "injected": 2,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
-        "fold": 1,
-        "id": "k_01hf7uaq3s_8xeyg",
-        "statement": "A valid query for this schema joins posts to comments on posts.Id = comments.PostId and filters on comments.UserId and comments.CreationDate.",
+        "fold": 4,
+        "id": "k_01hf7uaqob_3ttjb",
+        "statement": "Grouping by both user and post with HAVING COUNT(*) = 1 does not express a per-user constraint on the number of post history entries per post.",
         "injected": 2,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
+        "fold": 4,
+        "id": "k_01hf7uaqon_atsnx",
+        "statement": "A percentage of non-first-place finishes for a driver since a given year requires joining results to races and drivers and filtering on race year and driver surname.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqp0_f44gz",
+        "statement": "For a question about a driver's fastest lap, joining the results table and ordering by results.milliseconds selects race results rather than lap times, producing an execution mismatch.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqqp_2rcbp",
+        "statement": "A query that lists and groups patients by sex selects the patient ID and sex columns and groups by both ID and sex.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      }
+    ],
+    "best": [
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqs8_b5dvw",
+        "statement": "When computing the percentage of atoms of a given element among atoms in molecules matching a label filter, the denominator is the count of all atoms in those molecules, not the count of distinct molecules.",
+        "injected": 4,
+        "helped": 2,
+        "hurt": 0,
+        "net": 2
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqo4_4v4cn",
+        "statement": "When computing a percentage of molecules matching a condition, the denominator must count distinct molecules rather than bond rows, since joining bond and molecule multiplies molecule rows.",
+        "injected": 2,
+        "helped": 2,
+        "hurt": 0,
+        "net": 2
+      },
+      {
         "fold": 1,
-        "id": "k_01hf7uaq3l_02xcd",
-        "statement": "A ratio of total single bonds to distinct atom count does not compute an average per molecule and yields a different value than averaging per-molecule single-bond counts.",
+        "id": "k_01hf7uaqss_1f8ea",
+        "statement": "Joining set_translations on set code and filtering by language does not yield the Italian ruling text; the ruling text must come from the foreign_data table joined on card uuid.",
+        "injected": 5,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqrk_7tfe7",
+        "statement": "When a question references an event context, the query joins event to attendance to member to income rather than joining income directly to member.",
+        "injected": 3,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqs3_cn9dj",
+        "statement": "When a question asks for a single attribute (e.g., the publisher) of a set of entities, the SELECT clause should project only that attribute rather than also including the entity identifier.",
+        "injected": 3,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqm6_41mjt",
+        "statement": "In the california_schools schema, the school name column is `School Name` in the frpm table, not `School` in the schools table.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqn4_9axg8",
+        "statement": "In the california_schools schema, the frpm table's `Free Meal Count (Ages 5-17)` column is the field that represents free or reduced price meal counts, not `FRPM Count (Ages 5-17)`.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqoi_7p278",
+        "statement": "Joining event to budget to expense to member via link_to_event, link_to_budget, and link_to_member resolves the member responsible for an event's budget.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqom_2xqcs",
+        "statement": "In the formula_1 schema, the results table records per-race finishing positions, while driverStandings records cumulative standings, so a question about race finishing position is not answered by driverStandings.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqqb_d1vfw",
+        "statement": "In the california_schools schema, the FRPM percentage must be computed as FRPM Count (Ages 5-17) times 100 divided by Enrollment (Ages 5-17), since no precomputed percent column exists.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqqb_d1vfw",
+        "statement": "String literal comparisons in SQL against attribute values are case-sensitive in this schema, so 'durability' does not match the stored value 'Durability'.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqlh_a0wp3",
+        "statement": "The region value 'East Bohemia' is stored in the district table as 'east Bohemia' with a lowercase initial letter.",
         "injected": 1,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
       },
       {
-        "fold": 2,
-        "id": "k_01hf7uaq3l_02xcd",
-        "statement": "The ratio of outpatient to inpatient counts is computed as the outpatient count divided by the inpatient count, not the reverse.",
+        "fold": 4,
+        "id": "k_01hf7uaqm8_008k7",
+        "statement": "Ordering rows by birth_date and then by average salary with LIMIT 1 does not satisfy a query that asks for the oldest female client and separately the district with the lowest average salary.",
         "injected": 1,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
       },
       {
-        "fold": 1,
-        "id": "k_01hf7uaq4i_9zp4v",
-        "statement": "Joining connected.bond_id to bond.bond_id produces an execution mismatch in the toxicology schema.",
+        "fold": 4,
+        "id": "k_01hf7uaqng_0366y",
+        "statement": "Filtering patients by birth year less than 18 does not identify underage patients at examination time; age must be computed as the difference between examination year and birth year.",
         "injected": 1,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 0,
-        "id": "k_01hf7uaq32_5cdmy",
-        "statement": "In SQLite, integer division truncates, so a percentage computed as integer_sum * 100 / integer_sum yields 0 or a truncated integer unless a cast to REAL or a decimal literal is applied.",
-        "injected": 2,
-        "helped": 0,
+        "helped": 1,
         "hurt": 0,
-        "net": 0
-      },
-      {
-        "fold": 0,
-        "id": "k_01hf7uaq33_0pavc",
-        "statement": "Computing a percentage with integer operands and no REAL cast produces an execution mismatch against the expected numeric result.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 0,
-        "net": 0
-      },
-      {
-        "fold": 0,
-        "id": "k_01hf7uaq34_ayat1",
-        "statement": "For a question asking which drivers are eliminated in the first qualifying period, selecting the driver with the maximum q1 time returns the slowest qualifier rather than the set of eliminated drivers.",
-        "injected": 2,
-        "helped": 0,
-        "hurt": 0,
-        "net": 0
+        "net": 1
       },
       {
         "fold": 2,
-        "id": "k_01hf7uaq35_eqqr5",
-        "statement": "When a question asks for the customer with the least total consumption over a period, the query must aggregate consumption per customer with SUM and GROUP BY before ordering and limiting.",
-        "injected": 2,
-        "helped": 0,
+        "id": "k_01hf7uaqod_akep8",
+        "statement": "When ordering by a nullable score column to find a minimum, rows with NULL in that column must be excluded so they do not sort first.",
+        "injected": 1,
+        "helped": 1,
         "hurt": 0,
-        "net": 0
+        "net": 1
       },
       {
         "fold": 2,
-        "id": "k_01hf7uaq36_8rgb1",
-        "statement": "Ordering by a per-row consumption column and limiting to one row does not answer a least-total-consumption question when a customer has multiple consumption rows.",
-        "injected": 2,
-        "helped": 0,
+        "id": "k_01hf7uaqoe_efakp",
+        "statement": "For lowest-value queries, the score table is joined to the schools table on cds = CDSCode, with the score column used for ordering and the phone column selected from the schools table.",
+        "injected": 1,
+        "helped": 1,
         "hurt": 0,
-        "net": 0
+        "net": 1
       },
       {
-        "fold": 0,
-        "id": "k_01hf7uaq38_affgr",
-        "statement": "When grouping by a team name column that is not the join key, the query can return duplicate team rows if names collide; grouping by the team identifier avoids this.",
-        "injected": 2,
-        "helped": 0,
+        "fold": 4,
+        "id": "k_01hf7uaqop_crn86",
+        "statement": "When the question asks for each school's average writing score and the satscores table already stores AvgScrWrite per school, selecting AvgScrWrite directly joined to schools satisfies the request without GROUP BY.",
+        "injected": 1,
+        "helped": 1,
         "hurt": 0,
-        "net": 0
+        "net": 1
       },
       {
-        "fold": 0,
-        "id": "k_01hf7uaq39_epz90",
-        "statement": "A valid pattern for 'which away team won the most' is to filter away_team_goal > home_team_goal, group by the away team identifier, and order by COUNT(*) descending with LIMIT 1.",
-        "injected": 2,
-        "helped": 0,
+        "fold": 3,
+        "id": "k_01hf7uaqp2_5dc4s",
+        "statement": "Grouping by users.Id and applying HAVING COUNT(posts.Id) > 10 filters individual users rather than aggregating averages over the set of users with more than 10 posts, producing per-user rows instead of two overall averages.",
+        "injected": 1,
+        "helped": 1,
         "hurt": 0,
-        "net": 0
+        "net": 1
       },
       {
-        "fold": 1,
-        "id": "k_01hf7uaq39_epz90",
-        "statement": "For a question asking which drivers are eliminated in the first qualifying period, selecting the driver with the maximum q1 time returns the slowest qualifier rather than the set of eliminated drivers.",
-        "injected": 2,
-        "helped": 0,
+        "fold": 3,
+        "id": "k_01hf7uaqr5_7mxwv",
+        "statement": "The question asks for the post id, so the selected column must be the post's Id (or its owner's user id only if the post id is unavailable), not the owner's user id alone.",
+        "injected": 1,
+        "helped": 1,
         "hurt": 0,
-        "net": 0
+        "net": 1
       },
       {
-        "fold": 2,
-        "id": "k_01hf7uaq3b_8fabe",
-        "statement": "Filtering rows by a category condition before applying a HAVING count threshold changes which groups qualify, so the category filter must be applied after the group-count selection rather than in the same WHERE clause.",
-        "injected": 2,
-        "helped": 0,
+        "fold": 3,
+        "id": "k_01hf7uaqrg_ea6qf",
+        "statement": "When a question asks for the user who last edited a post, the post must be joined to users via the LastEditorUserId column rather than via the post owner column.",
+        "injected": 1,
+        "helped": 1,
         "hurt": 0,
-        "net": 0
+        "net": 1
       }
     ]
   }

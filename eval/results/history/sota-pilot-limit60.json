@@ -1,0 +1,3096 @@
+{
+  "id": "poc-sota-bird",
+  "protocol": "cross-fitted-kfold/3",
+  "dataset": "BIRD Mini-Dev (sqlite)",
+  "source": "/home/runner/work/microglia/microglia/packages/eval/.cache/bird/minidev/minidev/MINIDEV/mini_dev_sqlite.json",
+  "model": "deepseek-chat",
+  "prompt_version": "sql-prompt/2",
+  "config": {
+    "folds": 3,
+    "seed": 7,
+    "limit": 60,
+    "generalize": true,
+    "resamples": 10000,
+    "budget_chars": 1200,
+    "duplicate_multiplier": 2,
+    "min_coverage": 0.01,
+    "arms": [
+      "none",
+      "full",
+      "gated"
+    ],
+    "convention": null,
+    "task": "sql.generate",
+    "distill_prompt": "distill-prompt/2",
+    "distill_max_tokens": 2000
+  },
+  "n": {
+    "total": 60,
+    "eval": 60,
+    "learn_mean": 40,
+    "databases": 11,
+    "qualifying": 60,
+    "reported": 0
+  },
+  "calls": 362,
+  "retries": 0,
+  "tokens": 382846,
+  "metrics": {
+    "accuracy_without_memory": 0.4666666666666667,
+    "accuracy_with_memory": 0.4166666666666667,
+    "delta_pp": -5,
+    "parse_rate": 1,
+    "exec_rate": 1,
+    "gold_exec_rate": 1,
+    "mean_pack_ids": 1.9,
+    "latency_p50_ms": 1109,
+    "latency_p95_ms": 1499,
+    "knowledge_active_mean": 40.333333333333336,
+    "knowledge_active_last": 42,
+    "distill_failed": 0,
+    "distill_created": 124,
+    "corrections_learned": 62,
+    "duplicate_questions_dropped": 2
+  },
+  "paired": {
+    "n": 60,
+    "lost": 6,
+    "gained": 3,
+    "discordance": 0.15,
+    "p_value": 0.5078125000000013,
+    "delta_pp": -5,
+    "ci_low_pp": -15,
+    "ci_high_pp": 5,
+    "min_detectable_pp": 14.01
+  },
+  "arms": [
+    {
+      "arm": "full",
+      "n": 60,
+      "accuracy": 0.4166666666666667,
+      "delta_pp": -5,
+      "ci_low_pp": -15,
+      "ci_high_pp": 5,
+      "p_value": 0.5078125000000013,
+      "gained": 3,
+      "lost": 6,
+      "mean_pack_ids": 1.9
+    },
+    {
+      "arm": "gated",
+      "n": 60,
+      "accuracy": 0.4166666666666667,
+      "delta_pp": -5,
+      "ci_low_pp": -11.666666666666666,
+      "ci_high_pp": 0,
+      "p_value": 0.2500000000000003,
+      "gained": 0,
+      "lost": 3,
+      "mean_pack_ids": 1.1666666666666667
+    }
+  ],
+  "gates": [
+    {
+      "id": "V1-pack-not-empty",
+      "criterion": "the memory arm injected at least one rule per question on average",
+      "actual": "1.90 rules/question",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V2-fold-partition",
+      "criterion": "every question is evaluated exactly once, by a memory that never learned from it",
+      "actual": "60/60 questions, 0 duplicates, 0 leaks",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V3-parse-rate",
+      "criterion": "at least 90% of replies contain a statement",
+      "actual": "100.00%",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V4-gold-executable",
+      "criterion": "at least 99% of gold queries execute, or the dataset is not usable",
+      "actual": "100.00%",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V5-resolution",
+      "criterion": "the sample can resolve a 6pp effect at 80% power",
+      "actual": "minimum detectable 14.01pp at n=60",
+      "pass": false,
+      "blocking": false
+    },
+    {
+      "id": "V6-controls-inject",
+      "criterion": "every pack-based control arm injected at least one rule on average",
+      "actual": "gated: 1.17 rules/question",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V7-channel",
+      "criterion": "a stated control moves accuracy by at least 10pp",
+      "actual": "no channel control was run",
+      "pass": true,
+      "blocking": true
+    }
+  ],
+  "assertions": {
+    "pack_frozen_during_eval": "fold 0: 61a22fe2eb9ab819, fold 1: 16fa56b7db1b2282, fold 2: cdf8c11ed62ccc22",
+    "evaluation_writes_no_feedback": true
+  },
+  "per_fold": [
+    {
+      "fold": 0,
+      "eval": 20,
+      "learn": 40,
+      "edited": 18,
+      "active": 34,
+      "failed_distill": 0,
+      "mean_pack_ids": 1.8,
+      "without_memory": 0.35,
+      "with_memory": 0.45,
+      "delta_pp": 10.000000000000004
+    },
+    {
+      "fold": 1,
+      "eval": 20,
+      "learn": 40,
+      "edited": 23,
+      "active": 45,
+      "failed_distill": 0,
+      "mean_pack_ids": 1.9,
+      "without_memory": 0.55,
+      "with_memory": 0.4,
+      "delta_pp": -15.000000000000002
+    },
+    {
+      "fold": 2,
+      "eval": 20,
+      "learn": 40,
+      "edited": 21,
+      "active": 42,
+      "failed_distill": 0,
+      "mean_pack_ids": 2,
+      "without_memory": 0.5,
+      "with_memory": 0.4,
+      "delta_pp": -9.999999999999998
+    }
+  ],
+  "distill_failure_samples": [],
+  "per_case": [
+    {
+      "id": "debit_card_specializing#1472",
+      "questionId": 1472,
+      "dbId": "debit_card_specializing",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "In 2012, who had the least consumption in LAM?",
+      "goldSql": "SELECT T1.CustomerID FROM customers AS T1 INNER JOIN yearmonth AS T2 ON T1.CustomerID = T2.CustomerID WHERE T1.Segment = 'LAM' AND SUBSTR(T2.Date, 1, 4) = '2012' GROUP BY T1.CustomerID ORDER BY SUM(T2.Consumption) ASC LIMIT 1",
+      "predictedSql": "SELECT c.CustomerID\nFROM customers c\nJOIN yearmonth y ON c.CustomerID = y.CustomerID\nWHERE c.Segment = 'LAM'\n  AND SUBSTR(y.Date, 1, 4) = '2012'\nGROUP BY c.CustomerID\nORDER BY SUM(y.Consumption) ASC\nLIMIT 1",
+      "correct": true,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.333,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq43_3s89t",
+        "k_01hf7uaq3r_fm62r"
+      ],
+      "tokens": 710,
+      "latencyMs": 1297,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT c.CustomerID\nFROM customers c\nJOIN yearmonth y ON c.CustomerID = y.CustomerID\nWHERE y.Date BETWEEN '201201' AND '201212'\n  AND c.Currency = 'LAM'\nGROUP BY c.CustomerID\nORDER BY SUM(y.Consumption) ASC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "european_football_2#1025",
+      "questionId": 1025,
+      "dbId": "european_football_2",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "Give the name of the league had the most goals in the 2016 season?",
+      "goldSql": "SELECT t2.name FROM Match AS t1 INNER JOIN League AS t2 ON t1.league_id = t2.id WHERE t1.season = '2015/2016' GROUP BY t2.name ORDER BY SUM(t1.home_team_goal + t1.away_team_goal) DESC LIMIT 1",
+      "predictedSql": "SELECT l.name\nFROM League l\nJOIN \"Match\" m ON m.league_id = l.id\nWHERE m.season = '2015/2016'\nGROUP BY l.id, l.name\nORDER BY SUM(m.home_team_goal + m.away_team_goal) DESC\nLIMIT 1",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.125,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq39_epz90",
+        "k_01hf7uaq38_affgr"
+      ],
+      "tokens": 2534,
+      "latencyMs": 883,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT l.name\nFROM League l\nJOIN \"Match\" m ON m.league_id = l.id\nWHERE m.season = '2015/2016'\nGROUP BY l.id, l.name\nORDER BY SUM(m.home_team_goal + m.away_team_goal) DESC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "california_schools#12",
+      "questionId": 12,
+      "dbId": "california_schools",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "Among the schools with an SAT excellence rate of over 0.3, what is the highest eligible free rate for students aged 5-17?",
+      "goldSql": "SELECT MAX(CAST(T1.`Free Meal Count (Ages 5-17)` AS REAL) / T1.`Enrollment (Ages 5-17)`) FROM frpm AS T1 INNER JOIN satscores AS T2 ON T1.CDSCode = T2.cds WHERE CAST(T2.NumGE1500 AS REAL) / T2.NumTstTakr > 0.3",
+      "predictedSql": "SELECT MAX(CAST(f.`Free Meal Count (Ages 5-17)` AS REAL) / f.`Enrollment (Ages 5-17)`)\nFROM frpm f\nJOIN satscores s ON f.CDSCode = s.cds\nWHERE CAST(s.NumGE1500 AS REAL) / s.NumTstTakr > 0.3",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.2,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq40_bt4et",
+        "k_01hf7uaq3j_8rvqr"
+      ],
+      "tokens": 1486,
+      "latencyMs": 1114,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT MAX(CAST(f.`Free Meal Count (Ages 5-17)` AS REAL) / f.`Enrollment (Ages 5-17)`)\nFROM frpm f\nJOIN satscores s ON f.CDSCode = s.cds\nWHERE CAST(s.NumGE1500 AS REAL) / s.NumTstTakr > 0.3"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "financial#89",
+      "questionId": 89,
+      "dbId": "financial",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "How many accounts who choose issuance after transaction are staying in East Bohemia region?",
+      "goldSql": "SELECT COUNT(T2.account_id) FROM district AS T1 INNER JOIN account AS T2 ON T1.district_id = T2.district_id WHERE T1.A3 = 'east Bohemia' AND T2.frequency = 'POPLATEK PO OBRATU'",
+      "predictedSql": "SELECT COUNT(DISTINCT a.account_id)\nFROM account a\nJOIN district d ON a.district_id = d.district_id\nWHERE a.frequency = 'POPLATEK PO OBRATU'\n  AND d.A3 = 'east Bohemia'",
+      "correct": true,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3c_acbxy",
+        "k_01hf7uaq3d_e876m"
+      ],
+      "tokens": 1080,
+      "latencyMs": 872,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT COUNT(DISTINCT a.account_id)\nFROM account a\nJOIN district d ON a.district_id = d.district_id\nWHERE a.frequency = 'POPLATEK PO OBRATU'\n  AND d.A3 = 'East Bohemia'"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "student_club#1322",
+      "questionId": 1322,
+      "dbId": "student_club",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "Among the events attended by more than 10 members of the Student_Club, how many of them are meetings?",
+      "goldSql": "SELECT T1.event_name FROM event AS T1  INNER JOIN attendance AS T2 ON T1.event_id = T2.link_to_event GROUP BY T1.event_id  HAVING COUNT(T2.link_to_event) > 10 EXCEPT SELECT T1.event_name  FROM event AS T1  WHERE T1.type = 'Meeting'",
+      "predictedSql": "SELECT COUNT(DISTINCT e.event_id)\nFROM event e\nJOIN attendance a ON a.link_to_event = e.event_id\nWHERE e.type = 'Meeting'\nGROUP BY e.event_id\nHAVING COUNT(a.link_to_member) > 10",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.091,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3m_887b4",
+        "k_01hf7uaq3n_57yw0"
+      ],
+      "tokens": 895,
+      "latencyMs": 1005,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT COUNT(*) FROM (\n    SELECT a.link_to_event\n    FROM attendance a\n    JOIN event e ON a.link_to_event = e.event_id\n    GROUP BY a.link_to_event\n    HAVING COUNT(a.link_to_member) > 10\n) AS attended_events\nJOIN event e2 ON attended_events.link_to_event = e2.event_id\nWHERE e2.type = 'Meeting'"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "formula_1#865",
+      "questionId": 865,
+      "dbId": "formula_1",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "For all the drivers who finished the game in race No. 592, who is the oldest?",
+      "goldSql": "SELECT T1.forename, T1.surname FROM drivers AS T1 INNER JOIN results AS T2 ON T2.driverId = T1.driverId WHERE T2.raceId = 592 AND T2.time IS NOT NULL AND T1.dob IS NOT NULL ORDER BY T1.dob ASC LIMIT 1",
+      "predictedSql": "SELECT d.forename, d.surname, d.dob\nFROM results r\nJOIN drivers d ON d.driverId = r.driverId\nWHERE r.raceId = 592\n  AND r.time IS NOT NULL\nORDER BY d.dob ASC\nLIMIT 1",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.111,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq34_ayat1",
+        "k_01hf7uaq3h_fdg1w"
+      ],
+      "tokens": 1701,
+      "latencyMs": 870,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT d.forename, d.surname, d.dob\nFROM results r\nJOIN drivers d ON d.driverId = r.driverId\nWHERE r.raceId = 592\n  AND r.time IS NOT NULL\nORDER BY d.dob ASC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "superhero#723",
+      "questionId": 723,
+      "dbId": "superhero",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "Among the superheroes with blue eyes, how many of them have the super power of \"Agility\"?",
+      "goldSql": "SELECT COUNT(T1.id) FROM superhero AS T1 INNER JOIN hero_power AS T2 ON T1.id = T2.hero_id INNER JOIN superpower AS T3 ON T2.power_id = T3.id INNER JOIN colour AS T4 ON T1.eye_colour_id = T4.id WHERE T3.power_name = 'Agility' AND T4.colour = 'Blue'",
+      "predictedSql": "SELECT COUNT(DISTINCT s.id)\nFROM superhero s\nJOIN colour c ON s.eye_colour_id = c.id\nJOIN hero_power hp ON s.id = hp.hero_id\nJOIN superpower sp ON hp.power_id = sp.id\nWHERE c.colour = 'Blue'\n  AND sp.power_name = 'Agility'",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3o_bjtew",
+        "k_01hf7uaq3p_8saxp"
+      ],
+      "tokens": 889,
+      "latencyMs": 1244,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT COUNT(DISTINCT s.id)\nFROM superhero s\nJOIN colour c ON s.eye_colour_id = c.id\nJOIN hero_power hp ON s.id = hp.hero_id\nJOIN superpower sp ON hp.power_id = sp.id\nWHERE c.colour = 'Blue'\n  AND sp.power_name = 'Agility'"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "card_games#345",
+      "questionId": 345,
+      "dbId": "card_games",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "For artifact type of cards that do not have multiple faces on the same card, state its legalities status for vintage play format.",
+      "goldSql": "SELECT DISTINCT T2.status FROM cards AS T1 INNER JOIN legalities AS T2 ON T1.uuid = T2.uuid WHERE T1.type = 'Artifact' AND T2.format = 'vintage' AND T1.side IS NULL",
+      "predictedSql": "SELECT DISTINCT legalities.status\nFROM cards\nJOIN legalities ON legalities.uuid = cards.uuid\nWHERE cards.types = 'Artifact'\n  AND cards.side IS NULL\n  AND legalities.format = 'vintage'",
+      "correct": true,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 1,
+      "coverage": 0.188,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq37_d76mn"
+      ],
+      "tokens": 1313,
+      "latencyMs": 1284,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT DISTINCT c.name, l.status\nFROM cards c\nJOIN legalities l ON c.uuid = l.uuid\nWHERE c.types = 'Artifact'\n  AND c.side IS NULL\n  AND l.format = 'vintage'"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1152",
+      "questionId": 1152,
+      "dbId": "thrombosis_prediction",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "What is the ratio of outpatient to inpatient followed up treatment among all the 'SLE' diagnosed patient?",
+      "goldSql": "SELECT SUM(CASE WHEN Admission = '+' THEN 1.0 ELSE 0 END) / SUM(CASE WHEN Admission = '-' THEN 1 ELSE 0 END) FROM Patient WHERE Diagnosis = 'SLE'",
+      "predictedSql": "SELECT CAST(SUM(CASE WHEN Admission = '-' THEN 1 ELSE 0 END) AS REAL) / SUM(CASE WHEN Admission = '+' THEN 1 ELSE 0 END)\nFROM Patient\nWHERE Diagnosis = 'SLE'",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq33_0pavc",
+        "k_01hf7uaq32_5cdmy"
+      ],
+      "tokens": 1061,
+      "latencyMs": 992,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT\n  CAST(SUM(CASE WHEN Admission = '-' THEN 1 ELSE 0 END) AS REAL) /\n  SUM(CASE WHEN Admission = '+' THEN 1 ELSE 0 END) AS ratio\nFROM Patient\nWHERE Diagnosis = 'SLE'"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "codebase_community#563",
+      "questionId": 563,
+      "dbId": "codebase_community",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "User No.3025 gave a comment at 20:29:39 on 2014/4/23 to a post, how many favorite counts did that post get?",
+      "goldSql": "SELECT T1.FavoriteCount FROM posts AS T1 INNER JOIN comments AS T2 ON T1.Id = T2.PostId WHERE T2.CreationDate = '2014-04-23 20:29:39.0' AND T2.UserId = 3025",
+      "predictedSql": "SELECT p.FavoriteCount\nFROM comments c\nJOIN posts p ON c.PostId = p.Id\nWHERE c.UserId = 3025\n  AND c.CreationDate = '2014/4/23 20:29:39.0'",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 0,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [],
+      "tokens": 1141,
+      "latencyMs": 805,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT p.FavoriteCount\nFROM comments c\nJOIN posts p ON c.PostId = p.Id\nWHERE c.UserId = 3025\n  AND c.CreationDate = '2014/4/23 20:29:39.0'"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "toxicology#201",
+      "questionId": 201,
+      "dbId": "toxicology",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "What is the percentage of carbon in double-bond molecules?",
+      "goldSql": "SELECT CAST(COUNT(DISTINCT CASE WHEN T1.element = 'c' THEN T1.atom_id ELSE NULL END) AS REAL) * 100 / COUNT(DISTINCT T1.atom_id) FROM atom AS T1 INNER JOIN bond AS T2 ON T1.molecule_id = T2.molecule_id WHERE T2.bond_type = '='",
+      "predictedSql": "SELECT CAST(SUM(CASE WHEN atom.element = 'c' THEN 1 ELSE 0 END) AS REAL) * 100 / COUNT(atom.atom_id)\nFROM atom\nJOIN bond ON atom.molecule_id = bond.molecule_id\nWHERE bond.bond_type = '='",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.2,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3v_a8w94",
+        "k_01hf7uaq3u_6w50r"
+      ],
+      "tokens": 687,
+      "latencyMs": 1371,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT CAST(SUM(CASE WHEN atom.element = 'c' THEN 1 ELSE 0 END) AS REAL) * 100 / COUNT(atom.atom_id)\nFROM atom\nJOIN bond ON atom.molecule_id = bond.molecule_id\nWHERE bond.bond_type = '='"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "debit_card_specializing#1479",
+      "questionId": 1479,
+      "dbId": "debit_card_specializing",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "Which year recorded the most consumption of gas paid in CZK?",
+      "goldSql": "SELECT SUBSTR(T2.Date, 1, 4) FROM customers AS T1 INNER JOIN yearmonth AS T2 ON T1.CustomerID = T2.CustomerID WHERE T1.Currency = 'CZK' GROUP BY SUBSTR(T2.Date, 1, 4) ORDER BY SUM(T2.Consumption) DESC LIMIT 1",
+      "predictedSql": "SELECT SUBSTR(ym.Date, 1, 4) AS Year\nFROM yearmonth ym\nJOIN customers c ON c.CustomerID = ym.CustomerID\nWHERE c.Currency = 'CZK'\nGROUP BY SUBSTR(ym.Date, 1, 4)\nORDER BY SUM(ym.Consumption) DESC\nLIMIT 1",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.143,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq43_3s89t",
+        "k_01hf7uaq3r_fm62r"
+      ],
+      "tokens": 692,
+      "latencyMs": 1162,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT SUBSTR(ym.Date, 1, 4) AS year\nFROM yearmonth ym\nJOIN customers c ON c.CustomerID = ym.CustomerID\nWHERE c.Currency = 'CZK'\nGROUP BY SUBSTR(ym.Date, 1, 4)\nORDER BY SUM(ym.Consumption) DESC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "european_football_2#1030",
+      "questionId": 1030,
+      "dbId": "european_football_2",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "Give the name of the league had the most matches end as draw in the 2016 season?",
+      "goldSql": "SELECT t2.name FROM Match AS t1 INNER JOIN League AS t2 ON t1.league_id = t2.id WHERE t1.season = '2015/2016' AND t1.home_team_goal = t1.away_team_goal GROUP BY t2.name ORDER BY COUNT(t1.id) DESC LIMIT 1",
+      "predictedSql": "SELECT l.name\nFROM \"Match\" m\nJOIN League l ON m.league_id = l.id\nWHERE m.season = '2015/2016'\n  AND m.home_team_goal = m.away_team_goal\nGROUP BY l.id, l.name\nORDER BY COUNT(*) DESC\nLIMIT 1",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.1,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq39_epz90",
+        "k_01hf7uaq38_affgr"
+      ],
+      "tokens": 2539,
+      "latencyMs": 1133,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT l.name\nFROM \"Match\" m\nJOIN League l ON m.league_id = l.id\nWHERE m.season = '2015/2016'\n  AND m.home_team_goal = m.away_team_goal\nGROUP BY m.league_id, l.name\nORDER BY COUNT(*) DESC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "california_schools#25",
+      "questionId": 25,
+      "dbId": "california_schools",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "Name schools in Riverside which the average of average math score for SAT is grater than 400, what is the funding type of these schools?",
+      "goldSql": "SELECT T1.sname, T2.`Charter Funding Type` FROM satscores AS T1 INNER JOIN frpm AS T2 ON T1.cds = T2.CDSCode WHERE T2.`District Name` LIKE 'Riverside%' GROUP BY T1.sname, T2.`Charter Funding Type` HAVING CAST(SUM(T1.AvgScrMath) AS REAL) / COUNT(T1.cds) > 400",
+      "predictedSql": "SELECT DISTINCT s.School, s.FundingType\nFROM schools s\nJOIN satscores sat ON s.CDSCode = sat.cds\nWHERE s.City = 'Riverside'\n  AND sat.AvgScrMath > 400",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.333,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq41_8tezy",
+        "k_01hf7uaq3i_ffbky"
+      ],
+      "tokens": 1369,
+      "latencyMs": 1296,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT DISTINCT s.School, s.FundingType\nFROM schools s\nJOIN satscores sc ON s.CDSCode = sc.cds\nWHERE s.City = 'Riverside'\n  AND sc.AvgScrMath > 400"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "financial#95",
+      "questionId": 95,
+      "dbId": "financial",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "List out the account numbers of clients who are youngest and have highest average salary?",
+      "goldSql": "SELECT T1.account_id  FROM account AS T1 INNER JOIN disp AS T2 ON T1.account_id = T2.account_id INNER JOIN client AS T3 ON T2.client_id = T3.client_id INNER JOIN district AS T4 on T4.district_id = T1.district_id WHERE T2.client_id = ( SELECT client_id FROM client ORDER BY birth_date DESC LIMIT 1) GROUP BY T4.A11, T1.account_id",
+      "predictedSql": "SELECT a.account_id\nFROM account a\nJOIN disp d ON d.account_id = a.account_id\nJOIN client c ON c.client_id = d.client_id\nJOIN district di ON di.district_id = c.district_id\nWHERE c.birth_date = (SELECT MAX(c2.birth_date) FROM client c2)\n  AND di.A11 = (SELECT MAX(di2.A11) FROM district di2)",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3c_acbxy",
+        "k_01hf7uaq3d_e876m"
+      ],
+      "tokens": 1117,
+      "latencyMs": 1112,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT a.account_id\nFROM account a\nJOIN disp d ON d.account_id = a.account_id\nJOIN client c ON c.client_id = d.client_id\nJOIN district di ON di.district_id = c.district_id\nWHERE c.birth_date = (SELECT MAX(c2.birth_date) FROM client c2)\n  AND di.A11 = (SELECT MAX(di2.A11) FROM district di2)"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "student_club#1339",
+      "questionId": 1339,
+      "dbId": "student_club",
+      "fold": 0,
+      "difficulty": "challenging",
+      "question": "Calculate the total average cost that Elijah Allen spent in the events on September and October.",
+      "goldSql": "SELECT AVG(T2.cost) FROM member AS T1 INNER JOIN expense AS T2 ON T1.member_id = T2.link_to_member WHERE T1.last_name = 'Allen' AND T1.first_name = 'Elijah' AND (SUBSTR(T2.expense_date, 6, 2) = '09' OR SUBSTR(T2.expense_date, 6, 2) = '10')",
+      "predictedSql": "SELECT AVG(e.cost)\nFROM expense e\nJOIN member m ON e.link_to_member = m.member_id\nWHERE m.first_name = 'Elijah'\n  AND m.last_name = 'Allen'\n  AND (substr(e.expense_date, 5, 2) = '09' OR substr(e.expense_date, 5, 2) = '10')",
+      "correct": false,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3m_887b4",
+        "k_01hf7uaq3n_57yw0"
+      ],
+      "tokens": 957,
+      "latencyMs": 1289,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT AVG(e.cost)\nFROM expense e\nJOIN member m ON e.link_to_member = m.member_id\nWHERE m.first_name = 'Elijah'\n  AND m.last_name = 'Allen'\n  AND (strftime('%m', e.expense_date) = '09' OR strftime('%m', e.expense_date) = '10')"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "formula_1#877",
+      "questionId": 877,
+      "dbId": "formula_1",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "For all the drivers who finished the game in race No. 872, who is the youngest?",
+      "goldSql": "SELECT T1.forename, T1.surname FROM drivers AS T1 INNER JOIN results AS T2 ON T2.driverId = T1.driverId WHERE T2.raceId = 872 AND T2.time IS NOT NULL ORDER BY T1.dob DESC LIMIT 1",
+      "predictedSql": "SELECT d.forename, d.surname, d.dob\nFROM results r\nJOIN drivers d ON d.driverId = r.driverId\nWHERE r.raceId = 872\n  AND r.time IS NOT NULL\nORDER BY d.dob DESC\nLIMIT 1",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.111,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq34_ayat1",
+        "k_01hf7uaq3h_fdg1w"
+      ],
+      "tokens": 1676,
+      "latencyMs": 960,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT d.forename, d.surname, d.dob\nFROM results r\nJOIN drivers d ON d.driverId = r.driverId\nWHERE r.raceId = 872\n  AND r.time IS NOT NULL\nORDER BY d.dob DESC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "superhero#728",
+      "questionId": 728,
+      "dbId": "superhero",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "Rank superheroes from Marvel Comics by their eye color popularity, starting with the most common color.",
+      "goldSql": "SELECT colour.colour AS EyeColor, COUNT(superhero.id) AS Count, RANK() OVER (ORDER BY COUNT(superhero.id) DESC) AS PopularityRank FROM superhero INNER JOIN colour ON superhero.eye_colour_id = colour.id INNER JOIN publisher ON superhero.publisher_id = publisher.id WHERE publisher.publisher_name = 'Marvel Comics' GROUP BY colour.colour",
+      "predictedSql": "SELECT s.superhero_name, c.colour AS eye_colour, RANK() OVER (ORDER BY COUNT(s.id) DESC) AS rank\nFROM superhero s\nJOIN publisher p ON s.publisher_id = p.id\nJOIN colour c ON s.eye_colour_id = c.id\nWHERE p.publisher_name = 'Marvel Comics'\nGROUP BY s.id, s.superhero_name, c.colour\nORDER BY rank",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.1,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3o_bjtew",
+        "k_01hf7uaq3p_8saxp"
+      ],
+      "tokens": 900,
+      "latencyMs": 1053,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT s.superhero_name, c.colour AS eye_colour, RANK() OVER (ORDER BY COUNT(*) DESC) AS rank\nFROM superhero s\nJOIN publisher p ON s.publisher_id = p.id\nJOIN colour c ON s.eye_colour_id = c.id\nWHERE p.publisher_name = 'Marvel Comics'\nGROUP BY s.id, s.superhero_name, c.colour\nORDER BY rank"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "card_games#349",
+      "questionId": 349,
+      "dbId": "card_games",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "Name the card and artist with the most ruling information. Also state if the card is a promotional printing.",
+      "goldSql": "SELECT T1.name, T1.artist, T1.isPromo FROM cards AS T1 INNER JOIN rulings AS T2 ON T1.uuid = T2.uuid WHERE T1.isPromo = 1 AND T1.artist = (SELECT artist FROM cards WHERE isPromo = 1 GROUP BY artist HAVING COUNT(DISTINCT uuid) = (SELECT MAX(count_uuid) FROM ( SELECT COUNT(DISTINCT uuid) AS count_uuid FROM cards WHERE isPromo = 1 GROUP BY artist ))) LIMIT 1",
+      "predictedSql": "SELECT c.name, c.artist, c.isPromo\nFROM cards c\nJOIN rulings r ON r.uuid = c.uuid\nGROUP BY c.uuid\nORDER BY COUNT(r.id) DESC\nLIMIT 1",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 1,
+      "coverage": 0.091,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq37_d76mn"
+      ],
+      "tokens": 1296,
+      "latencyMs": 974,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT c.name, c.artist, c.isPromo\nFROM cards c\nJOIN rulings r ON r.uuid = c.uuid\nGROUP BY c.uuid\nORDER BY COUNT(r.id) DESC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1164",
+      "questionId": 1164,
+      "dbId": "thrombosis_prediction",
+      "fold": 0,
+      "difficulty": "moderate",
+      "question": "How many of the patients with the most serious thrombosis cases examined in 1997 are women?",
+      "goldSql": "SELECT  COUNT(*) FROM Patient AS T1 INNER JOIN Examination AS T2 ON T1.ID = T2.ID WHERE T1.SEX = 'F' AND STRFTIME('%Y', T2.`Examination Date`) = '1997' AND T2.Thrombosis = 1",
+      "predictedSql": "SELECT COUNT(DISTINCT p.ID)\nFROM Patient p\nJOIN Examination e ON p.ID = e.ID\nWHERE e.Thrombosis = 1\n  AND strftime('%Y', e.`Examination Date`) = '1997'\n  AND p.SEX = 'F'",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq32_5cdmy",
+        "k_01hf7uaq33_0pavc"
+      ],
+      "tokens": 1037,
+      "latencyMs": 873,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT COUNT(DISTINCT p.ID)\nFROM Patient p\nJOIN Examination e ON p.ID = e.ID\nWHERE e.Thrombosis = 1\n  AND strftime('%Y', e.`Examination Date`) = '1997'\n  AND p.SEX = 'F'"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1149",
+      "questionId": 1149,
+      "dbId": "thrombosis_prediction",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "Are there more in-patient or outpatient who were male? What is the deviation in percentage?",
+      "goldSql": "SELECT CAST(SUM(CASE WHEN Admission = '+' THEN 1 ELSE 0 END) AS REAL) * 100 / SUM(CASE WHEN Admission = '-' THEN 1 ELSE 0 END) FROM Patient WHERE SEX = 'M'",
+      "predictedSql": "SELECT \n  CASE \n    WHEN SUM(CASE WHEN Admission = '+' THEN 1 ELSE 0 END) > SUM(CASE WHEN Admission = '-' THEN 1 ELSE 0 END) \n    THEN 'in-patient'\n    ELSE 'outpatient'\n  END AS more_common,\n  (SUM(CASE WHEN Admission = '-' THEN 1 ELSE 0 END) * 1.0 / SUM(CASE WHEN Admission = '+' THEN 1 ELSE 0 END)) * 100 AS deviation_percentage\nFROM Patient\nWHERE SEX = 'M'",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.143,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3n_57yw0",
+        "k_01hf7uaq3o_bjtew"
+      ],
+      "tokens": 1094,
+      "latencyMs": 1089,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT\n  SUM(CASE WHEN Admission = '+' THEN 1 ELSE 0 END) AS in_patient_male,\n  SUM(CASE WHEN Admission = '-' THEN 1 ELSE 0 END) AS out_patient_male,\n  (SUM(CASE WHEN Admission = '-' THEN 1 ELSE 0 END) * 100.0 /\n   SUM(CASE WHEN Admission = '+' THEN 1 ELSE 0 END)) AS deviation_percentage\nFROM Patient\nWHERE SEX = 'M'"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "codebase_community#544",
+      "questionId": 544,
+      "dbId": "codebase_community",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "What is the display name of the user who last edited the post \"Examples for teaching: Correlation does not mean causation\"?",
+      "goldSql": "SELECT T2.DisplayName FROM posts AS T1 INNER JOIN users AS T2 ON T1.LastEditorUserId = T2.Id WHERE T1.Title = 'Examples for teaching: Correlation does not mean causation'",
+      "predictedSql": "SELECT u.DisplayName\nFROM posts p\nJOIN users u ON p.LastEditorUserId = u.Id\nWHERE p.Title = 'Examples for teaching: Correlation does not mean causation'",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3r_fm62r",
+        "k_01hf7uaq3s_8xeyg"
+      ],
+      "tokens": 1361,
+      "latencyMs": 1240,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT u.DisplayName\nFROM posts p\nJOIN users u ON p.LastEditorUserId = u.Id\nWHERE p.Title = 'Examples for teaching: Correlation does not mean causation'"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "toxicology#197",
+      "questionId": 197,
+      "dbId": "toxicology",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "Calculate the average number of oxygen atoms in single-bonded molecules.",
+      "goldSql": "SELECT AVG(oxygen_count) FROM (SELECT T1.molecule_id, COUNT(T1.element) AS oxygen_count FROM atom AS T1 INNER JOIN bond AS T2 ON T1.molecule_id = T2.molecule_id  WHERE T2.bond_type = '-' AND T1.element = 'o'  GROUP BY T1.molecule_id) AS oxygen_counts",
+      "predictedSql": "SELECT AVG(oxygen_count)\nFROM (\n  SELECT m.molecule_id, COUNT(DISTINCT a.atom_id) AS oxygen_count\n  FROM molecule m\n  JOIN bond b ON b.molecule_id = m.molecule_id AND b.bond_type = '-'\n  JOIN atom a ON a.molecule_id = m.molecule_id AND a.element = 'o'\n  GROUP BY m.molecule_id\n)",
+      "correct": false,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.25,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3l_02xcd",
+        "k_01hf7uaq3t_d5emm"
+      ],
+      "tokens": 739,
+      "latencyMs": 1368,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT AVG(oxygen_count)\nFROM (\n  SELECT m.molecule_id, COUNT(DISTINCT a.atom_id) AS oxygen_count\n  FROM molecule m\n  JOIN bond b ON b.molecule_id = m.molecule_id\n  JOIN atom a ON a.molecule_id = m.molecule_id\n  WHERE b.bond_type = '-' AND a.element = 'o'\n  GROUP BY m.molecule_id\n)"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "debit_card_specializing#1473",
+      "questionId": 1473,
+      "dbId": "debit_card_specializing",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "What was the average monthly consumption of customers in SME for the year 2013?",
+      "goldSql": "SELECT AVG(T2.Consumption) / 12 FROM customers AS T1 INNER JOIN yearmonth AS T2 ON T1.CustomerID = T2.CustomerID WHERE SUBSTR(T2.Date, 1, 4) = '2013' AND T1.Segment = 'SME'",
+      "predictedSql": "SELECT AVG(ym.Consumption) / 12 AS AverageMonthlyConsumption\nFROM yearmonth ym\nJOIN customers c ON c.CustomerID = ym.CustomerID\nWHERE c.Segment = 'SME'\n  AND ym.Date BETWEEN '201301' AND '201312'",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.571,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq4k_276dn",
+        "k_01hf7uaq37_d76mn"
+      ],
+      "tokens": 701,
+      "latencyMs": 1098,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT AVG(ym.Consumption) / 12 AS AvgMonthlyConsumption\nFROM yearmonth ym\nJOIN customers c ON c.CustomerID = ym.CustomerID\nWHERE c.Segment = 'SME'\n  AND ym.Date BETWEEN '201301' AND '201312'"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "european_football_2#1028",
+      "questionId": 1028,
+      "dbId": "european_football_2",
+      "fold": 1,
+      "difficulty": "challenging",
+      "question": "In Scotland Premier League, which away team won the most during the 2010 season?",
+      "goldSql": "SELECT teamInfo.team_long_name FROM League AS leagueData INNER JOIN Match AS matchData ON leagueData.id = matchData.league_id INNER JOIN Team AS teamInfo ON matchData.away_team_api_id = teamInfo.team_api_id WHERE leagueData.name = 'Scotland Premier League' AND matchData.season = '2009/2010' AND matchData.away_team_goal - matchData.home_team_goal > 0 GROUP BY matchData.away_team_api_id ORDER BY COUNT(*) DESC LIMIT 1",
+      "predictedSql": "SELECT t.team_long_name\nFROM \"Match\" m\nJOIN League l ON m.league_id = l.id\nJOIN Team t ON m.away_team_api_id = t.team_api_id\nWHERE l.name = 'Scotland Premier League'\n  AND m.season = '2009/2010'\n  AND m.away_team_goal > m.home_team_goal\nGROUP BY t.team_long_name\nORDER BY COUNT(*) DESC\nLIMIT 1",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 1,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3q_c2rqq"
+      ],
+      "tokens": 2502,
+      "latencyMs": 1217,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT t.team_long_name\nFROM \"Match\" m\nJOIN League l ON m.league_id = l.id\nJOIN Team t ON m.away_team_api_id = t.team_api_id\nWHERE l.name = 'Scotland Premier League'\n  AND m.season = '2009/2010'\n  AND m.away_team_goal > m.home_team_goal\nGROUP BY t.team_long_name\nORDER BY COUNT(*) DESC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "california_schools#23",
+      "questionId": 23,
+      "dbId": "california_schools",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "List the names of schools with more than 30 difference in enrollements between K-12 and ages 5-17? Please also give the full street adress of the schools.",
+      "goldSql": "SELECT T1.School, T1.Street FROM schools AS T1 INNER JOIN frpm AS T2 ON T1.CDSCode = T2.CDSCode WHERE T2.`Enrollment (K-12)` - T2.`Enrollment (Ages 5-17)` > 30",
+      "predictedSql": "SELECT frpm.`School Name`, schools.Street\nFROM frpm\nJOIN schools ON frpm.CDSCode = schools.CDSCode\nWHERE (frpm.`Enrollment (K-12)` - frpm.`Enrollment (Ages 5-17)`) > 30",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.053,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3v_a8w94",
+        "k_01hf7uaq40_bt4et"
+      ],
+      "tokens": 1404,
+      "latencyMs": 956,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT frpm.`School Name`, schools.Street\nFROM frpm\nJOIN schools ON frpm.CDSCode = schools.CDSCode\nWHERE (frpm.`Enrollment (K-12)` - frpm.`Enrollment (Ages 5-17)`) > 30"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "financial#93",
+      "questionId": 93,
+      "dbId": "financial",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "How many male customers who are living in North Bohemia have average salary greater than 8000?",
+      "goldSql": "SELECT COUNT(T1.client_id) FROM client AS T1 INNER JOIN district AS T2 ON T1.district_id = T2.district_id WHERE T1.gender = 'M' AND T2.A3 = 'north Bohemia' AND T2.A11 > 8000",
+      "predictedSql": "SELECT COUNT(DISTINCT c.client_id)\nFROM client c\nJOIN district d ON c.district_id = d.district_id\nWHERE c.gender = 'M'\n  AND d.A3 = 'North Bohemia'\n  AND d.A11 > 8000",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.154,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq49_07byc",
+        "k_01hf7uaq3e_fbrss"
+      ],
+      "tokens": 1066,
+      "latencyMs": 1161,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT COUNT(DISTINCT c.client_id)\nFROM client c\nJOIN district d ON c.district_id = d.district_id\nWHERE c.gender = 'M'\n  AND d.A3 = 'North Bohemia'\n  AND d.A11 > 8000"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "student_club#1323",
+      "questionId": 1323,
+      "dbId": "student_club",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "List all the names of events that had an attendance of over 20 students but were not fundraisers.",
+      "goldSql": "SELECT T1.event_name FROM event AS T1 INNER JOIN attendance AS T2 ON T1.event_id = T2.link_to_event GROUP BY T1.event_id HAVING COUNT(T2.link_to_event) > 20 EXCEPT SELECT T1.event_name FROM event AS T1  WHERE T1.type = 'Fundraiser'",
+      "predictedSql": "SELECT e.event_name\nFROM event e\nJOIN attendance a ON a.link_to_event = e.event_id\nWHERE e.type <> 'Fundraiser'\nGROUP BY e.event_id, e.event_name\nHAVING COUNT(a.link_to_member) > 20",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.083,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3f_dd131",
+        "k_01hf7uaq3g_9g7y1"
+      ],
+      "tokens": 992,
+      "latencyMs": 1112,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT e.event_name\nFROM event e\nJOIN attendance a ON a.link_to_event = e.event_id\nWHERE e.type <> 'Fundraiser'\nGROUP BY e.event_id, e.event_name\nHAVING COUNT(a.link_to_member) > 20"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "formula_1#866",
+      "questionId": 866,
+      "dbId": "formula_1",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "Who was the player that got the lap time of 0:01:27 in the race No. 161? Show his introduction website.",
+      "goldSql": "SELECT DISTINCT T2.forename, T2.surname, T2.url FROM lapTimes AS T1 INNER JOIN drivers AS T2 ON T2.driverId = T1.driverId WHERE T1.raceId = 161 AND T1.time LIKE '1:27%'",
+      "predictedSql": "SELECT drivers.url\nFROM lapTimes\nJOIN drivers ON drivers.driverId = lapTimes.driverId\nWHERE lapTimes.raceId = 161\n  AND lapTimes.time LIKE '1:27%'\nLIMIT 1",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.067,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq4c_bf0vq",
+        "k_01hf7uaq39_epz90"
+      ],
+      "tokens": 1697,
+      "latencyMs": 845,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT drivers.url\nFROM lapTimes\nJOIN drivers ON drivers.driverId = lapTimes.driverId\nWHERE lapTimes.raceId = 161\n  AND lapTimes.time LIKE '0:01:27%'\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "superhero#724",
+      "questionId": 724,
+      "dbId": "superhero",
+      "fold": 1,
+      "difficulty": "challenging",
+      "question": "Please list the superhero names of all the superheroes that have blue eyes and blond hair.",
+      "goldSql": "SELECT T1.superhero_name FROM superhero AS T1 INNER JOIN colour AS T2 ON T1.eye_colour_id = T2.id INNER JOIN colour AS T3 ON T1.hair_colour_id = T3.id WHERE T2.colour = 'Blue' AND T3.colour = 'Blond'",
+      "predictedSql": "SELECT superhero.superhero_name\nFROM superhero\nJOIN colour AS eye_colour ON superhero.eye_colour_id = eye_colour.id\nJOIN colour AS hair_colour ON superhero.hair_colour_id = hair_colour.id\nWHERE eye_colour.colour = 'Blue'\n  AND hair_colour.colour = 'Blond'",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.091,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq4e_4eapp",
+        "k_01hf7uaq46_f30kn"
+      ],
+      "tokens": 985,
+      "latencyMs": 1139,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT superhero.superhero_name\nFROM superhero\nINNER JOIN colour AS eye_colour ON superhero.eye_colour_id = eye_colour.id\nINNER JOIN colour AS hair_colour ON superhero.hair_colour_id = hair_colour.id\nWHERE eye_colour.colour = 'Blue'\n  AND hair_colour.colour = 'Blond'"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "card_games#346",
+      "questionId": 346,
+      "dbId": "card_games",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "List all the card id and artist with unknown power which are legal for commander play format.",
+      "goldSql": "SELECT T1.id, T1.artist FROM cards AS T1 INNER JOIN legalities AS T2 ON T1.uuid = T2.uuid WHERE T2.status = 'Legal' AND T2.format = 'commander' AND (T1.power IS NULL OR T1.power = '*')",
+      "predictedSql": "SELECT DISTINCT cards.id, cards.artist\nFROM cards\nJOIN legalities ON cards.uuid = legalities.uuid\nWHERE legalities.format = 'commander'\n  AND legalities.status = 'Legal'\n  AND (cards.power = '*' OR cards.power IS NULL)",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.182,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3b_8fabe",
+        "k_01hf7uaq3c_acbxy"
+      ],
+      "tokens": 1438,
+      "latencyMs": 1499,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT DISTINCT cards.id, cards.artist\nFROM cards\nJOIN legalities ON cards.uuid = legalities.uuid\nWHERE legalities.format = 'commander'\n  AND legalities.status = 'Legal'\n  AND (cards.power = '*' OR cards.power IS NULL)"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1156",
+      "questionId": 1156,
+      "dbId": "thrombosis_prediction",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "State the ID and age of patient with positive degree of coagulation.",
+      "goldSql": "SELECT DISTINCT T1.ID, STRFTIME('%Y', CURRENT_TIMESTAMP) - STRFTIME('%Y', T1.Birthday) FROM Patient AS T1 INNER JOIN Examination AS T2 ON T1.ID = T2.ID WHERE T2.RVVT = '+'",
+      "predictedSql": "SELECT DISTINCT p.ID, CAST(strftime('%Y', 'now') AS INTEGER) - CAST(strftime('%Y', p.Birthday) AS INTEGER) AS age\nFROM Patient p\nJOIN Examination e ON p.ID = e.ID\nWHERE e.RVVT = '+'",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3n_57yw0",
+        "k_01hf7uaq3o_bjtew"
+      ],
+      "tokens": 1000,
+      "latencyMs": 781,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT DISTINCT p.ID, CAST(strftime('%Y', 'now') AS INTEGER) - CAST(strftime('%Y', p.Birthday) AS INTEGER) AS age\nFROM Patient p\nJOIN Examination e ON p.ID = e.ID\nWHERE e.RVVT = '+'"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "codebase_community#565",
+      "questionId": 565,
+      "dbId": "codebase_community",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "User No.23853 gave a comment to a post at 9:08:18 on 2013/7/12, was that post well-finished?",
+      "goldSql": "SELECT IIF(T2.ClosedDate IS NULL, 'NOT well-finished', 'well-finished') AS resylt FROM comments AS T1 INNER JOIN posts AS T2 ON T1.PostId = T2.Id WHERE T1.UserId = 23853 AND T1.CreationDate = '2013-07-12 09:08:18.0'",
+      "predictedSql": "SELECT CASE WHEN p.ClosedDate IS NULL THEN 'Yes' ELSE 'No' END AS WellFinished\nFROM comments c\nJOIN posts p ON p.Id = c.PostId\nWHERE c.UserId = 23853\n  AND c.CreationDate = '2013-07-12 09:08:18.0'",
+      "correct": false,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3r_fm62r",
+        "k_01hf7uaq3s_8xeyg"
+      ],
+      "tokens": 1443,
+      "latencyMs": 1283,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT CASE WHEN p.ClosedDate IS NULL THEN 'not well-finished' ELSE 'well-finished' END\nFROM comments c\nJOIN posts p ON c.PostId = p.Id\nWHERE c.UserId = 23853\n  AND c.CreationDate = '2013-07-12 09:08:18.0'"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "toxicology#206",
+      "questionId": 206,
+      "dbId": "toxicology",
+      "fold": 1,
+      "difficulty": "challenging",
+      "question": "What elements are in the TR004_8_9 bond atoms?",
+      "goldSql": "SELECT DISTINCT T1.element FROM atom AS T1 INNER JOIN connected AS T2 ON T1.atom_id = T2.atom_id WHERE T2.bond_id = 'TR004_8_9'",
+      "predictedSql": "SELECT DISTINCT a.element\nFROM bond b\nJOIN connected c ON b.molecule_id = c.atom_id\nJOIN atom a ON c.atom_id = a.atom_id\nWHERE b.bond_id = 'TR004_8_9'",
+      "correct": false,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.25,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3t_d5emm",
+        "k_01hf7uaq4i_9zp4v"
+      ],
+      "tokens": 686,
+      "latencyMs": 762,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT DISTINCT a.element\nFROM bond b\nJOIN connected c ON b.molecule_id = c.atom_id\nJOIN atom a ON c.atom_id = a.atom_id\nWHERE b.bond_id = 'TR004_8_9'"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "debit_card_specializing#1480",
+      "questionId": 1480,
+      "dbId": "debit_card_specializing",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "What was the gas consumption peak month for SME customers in 2013?",
+      "goldSql": "SELECT SUBSTR(T2.Date, 5, 2) FROM customers AS T1 INNER JOIN yearmonth AS T2 ON T1.CustomerID = T2.CustomerID WHERE SUBSTR(T2.Date, 1, 4) = '2013' AND T1.Segment = 'SME' GROUP BY SUBSTR(T2.Date, 5, 2) ORDER BY SUM(T2.Consumption) DESC LIMIT 1",
+      "predictedSql": "SELECT ym.Date, SUM(ym.Consumption) AS TotalConsumption\nFROM yearmonth ym\nJOIN customers c ON c.CustomerID = ym.CustomerID\nWHERE c.Segment = 'SME'\n  AND substr(ym.Date, 1, 4) = '2013'\nGROUP BY ym.Date\nORDER BY TotalConsumption DESC\nLIMIT 1",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.286,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq38_affgr",
+        "k_01hf7uaq4j_d90zv"
+      ],
+      "tokens": 705,
+      "latencyMs": 1378,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT ym.Date\nFROM yearmonth ym\nJOIN customers c ON c.CustomerID = ym.CustomerID\nWHERE c.Segment = 'SME'\n  AND substr(ym.Date, 1, 4) = '2013'\nGROUP BY ym.Date\nORDER BY SUM(ym.Consumption) DESC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "european_football_2#1031",
+      "questionId": 1031,
+      "dbId": "european_football_2",
+      "fold": 1,
+      "difficulty": "challenging",
+      "question": "At present, calculate for the player's age who have a sprint speed of no less than 97 between 2013 to 2015.",
+      "goldSql": "SELECT DISTINCT DATETIME() - T2.birthday age FROM Player_Attributes AS t1 INNER JOIN Player AS t2 ON t1.player_api_id = t2.player_api_id WHERE STRFTIME('%Y',t1.`date`) >= '2013' AND STRFTIME('%Y',t1.`date`) <= '2015' AND t1.sprint_speed >= 97",
+      "predictedSql": "SELECT DISTINCT\n    p.player_name,\n    (strftime('%Y', 'now') - strftime('%Y', p.birthday)) AS age\nFROM Player p\nJOIN Player_Attributes pa\n    ON pa.player_api_id = p.player_api_id\nWHERE pa.sprint_speed >= 97\n  AND CAST(strftime('%Y', pa.date) AS INTEGER) BETWEEN 2013 AND 2015\nORDER BY age DESC",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 1,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3q_c2rqq"
+      ],
+      "tokens": 2478,
+      "latencyMs": 1250,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT DISTINCT\n    p.player_name,\n    (CAST(strftime('%Y', 'now') AS INTEGER) - CAST(strftime('%Y', p.birthday) AS INTEGER)) -\n    (CAST(strftime('%m-%d', 'now') AS TEXT) < CAST(strftime('%m-%d', p.birthday) AS TEXT)) AS age\nFROM Player p\nJOIN Player_Attributes pa ON pa.player_api_id = p.player_api_id\nWHERE pa.sprint_speed >= 97\n  AND CAST(strftime('%Y', pa.date) AS INTEGER) BETWEEN 2013 AND 2015"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "california_schools#26",
+      "questionId": 26,
+      "dbId": "california_schools",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "State the names and full communication address of high schools in Monterey which has more than 800 free or reduced price meals for ages 15-17?",
+      "goldSql": "SELECT T1.`School Name`, T2.Street, T2.City, T2.State, T2.Zip FROM frpm AS T1 INNER JOIN schools AS T2 ON T1.CDSCode = T2.CDSCode WHERE T2.County = 'Monterey' AND T1.`Free Meal Count (Ages 5-17)` > 800 AND T1.`School Type` = 'High Schools (Public)'",
+      "predictedSql": "SELECT frpm.`School Name`, schools.Street, schools.City, schools.State, schools.Zip\nFROM frpm\nJOIN schools ON frpm.CDSCode = schools.CDSCode\nWHERE schools.City = 'Monterey'\n  AND frpm.`School Type` = 'High Schools (Public)'\n  AND frpm.`FRPM Count (Ages 5-17)` > 800",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.111,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq40_bt4et",
+        "k_01hf7uaq3v_a8w94"
+      ],
+      "tokens": 1412,
+      "latencyMs": 939,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT frpm.`School Name`, schools.Street, schools.City, schools.State, schools.Zip\nFROM frpm\nJOIN schools ON frpm.CDSCode = schools.CDSCode\nWHERE schools.City = 'Monterey'\n  AND frpm.`School Type` = 'High Schools (Public)'\n  AND frpm.`FRPM Count (Ages 5-17)` > 800"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "financial#98",
+      "questionId": 98,
+      "dbId": "financial",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "Among the accounts who have approved loan date in 1997, list out the accounts that have the lowest approved amount and choose weekly issuance statement.",
+      "goldSql": "SELECT T2.account_id FROM loan AS T1 INNER JOIN account AS T2 ON T1.account_id = T2.account_id WHERE STRFTIME('%Y', T1.date) = '1997' AND T2.frequency = 'POPLATEK TYDNE' ORDER BY T1.amount LIMIT 1",
+      "predictedSql": "SELECT a.account_id\nFROM account a\nJOIN loan l ON a.account_id = l.account_id\nWHERE l.status = 'A'\n  AND strftime('%Y', l.date) = '1997'\n  AND a.frequency = 'POPLATEK TYDNE'\n  AND l.amount = (\n      SELECT MIN(l2.amount)\n      FROM loan l2\n      JOIN account a2 ON a2.account_id = l2.account_id\n      WHERE l2.status = 'A'\n        AND strftime('%Y', l2.date) = '1997'\n        AND a2.frequency = 'POPLATEK TYDNE'\n  )",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.063,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq42_4zy32",
+        "k_01hf7uaq3d_e876m"
+      ],
+      "tokens": 1179,
+      "latencyMs": 1302,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT a.account_id\nFROM account AS a\nJOIN loan AS l ON l.account_id = a.account_id\nWHERE l.status = 'A'\n  AND strftime('%Y', l.date) = '1997'\n  AND a.frequency = 'POPLATEK TYDNE'\n  AND l.amount = (\n      SELECT MIN(l2.amount)\n      FROM loan AS l2\n      JOIN account AS a2 ON a2.account_id = l2.account_id\n      WHERE l2.status = 'A'\n        AND strftime('%Y', l2.date) = '1997'\n        AND a2.frequency = 'POPLATEK TYDNE'\n  )"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "student_club#1340",
+      "questionId": 1340,
+      "dbId": "student_club",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "Calculate the difference of the total amount spent in all events by the Student_Club in year 2019 and 2020.",
+      "goldSql": "SELECT SUM(CASE WHEN SUBSTR(T1.event_date, 1, 4) = '2019' THEN T2.spent ELSE 0 END) - SUM(CASE WHEN SUBSTR(T1.event_date, 1, 4) = '2020' THEN T2.spent ELSE 0 END) AS num FROM event AS T1 INNER JOIN budget AS T2 ON T1.event_id = T2.link_to_event",
+      "predictedSql": "SELECT\n  SUM(CASE WHEN substr(e.event_date, 1, 4) = '2019' THEN b.spent ELSE 0 END) -\n  SUM(CASE WHEN substr(e.event_date, 1, 4) = '2020' THEN b.spent ELSE 0 END) AS difference\nFROM budget b\nJOIN event e ON b.link_to_event = e.event_id\nWHERE substr(e.event_date, 1, 4) IN ('2019', '2020')",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.182,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3f_dd131",
+        "k_01hf7uaq44_04rkm"
+      ],
+      "tokens": 1015,
+      "latencyMs": 1217,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT\n  SUM(CASE WHEN substr(e.event_date, 1, 4) = '2019' THEN b.spent ELSE 0 END) -\n  SUM(CASE WHEN substr(e.event_date, 1, 4) = '2020' THEN b.spent ELSE 0 END) AS difference\nFROM budget b\nJOIN event e ON b.link_to_event = e.event_id\nWHERE substr(e.event_date, 1, 4) IN ('2019', '2020')"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "formula_1#879",
+      "questionId": 879,
+      "dbId": "formula_1",
+      "fold": 1,
+      "difficulty": "moderate",
+      "question": "For the driver who set the fastest lap speed, what is his nationality?",
+      "goldSql": "SELECT T1.nationality FROM drivers AS T1 INNER JOIN results AS T2 ON T2.driverId = T1.driverId ORDER BY T2.fastestLapSpeed DESC LIMIT 1",
+      "predictedSql": "SELECT d.nationality\nFROM results r\nJOIN drivers d ON d.driverId = r.driverId\nWHERE r.fastestLapSpeed IS NOT NULL\nORDER BY CAST(r.fastestLapSpeed AS REAL) DESC\nLIMIT 1",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.25,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq39_epz90",
+        "k_01hf7uaq4b_9gjs5"
+      ],
+      "tokens": 1638,
+      "latencyMs": 882,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT d.nationality\nFROM results r\nJOIN drivers d ON d.driverId = r.driverId\nWHERE r.fastestLapSpeed IS NOT NULL\nORDER BY CAST(r.fastestLapSpeed AS REAL) DESC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "student_club#1317",
+      "questionId": 1317,
+      "dbId": "student_club",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "Among the students from the Student_Club who attended the event \"Women's Soccer\", how many of them want a T-shirt that's in medium size?",
+      "goldSql": "SELECT COUNT(T1.event_id) FROM event AS T1 INNER JOIN attendance AS T2 ON T1.event_id = T2.link_to_event INNER JOIN member AS T3 ON T2.link_to_member = T3.member_id WHERE T1.event_name = 'Women''s Soccer' AND T3.t_shirt_size = 'Medium'",
+      "predictedSql": "SELECT COUNT(DISTINCT m.member_id)\nFROM member m\nJOIN attendance a ON a.link_to_member = m.member_id\nJOIN event e ON e.event_id = a.link_to_event\nWHERE e.event_name = 'Women''s Soccer'\n  AND m.t_shirt_size = 'Medium'",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.071,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3c_acbxy",
+        "k_01hf7uaq3b_8fabe"
+      ],
+      "tokens": 984,
+      "latencyMs": 1042,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT COUNT(DISTINCT m.member_id)\nFROM member m\nJOIN attendance a ON m.member_id = a.link_to_member\nJOIN event e ON a.link_to_event = e.event_id\nWHERE e.event_name = 'Women''s Soccer'\n  AND m.t_shirt_size = 'Medium'"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "formula_1#846",
+      "questionId": 846,
+      "dbId": "formula_1",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "Please list the reference names of the drivers who are eliminated in the first period in race number 20.",
+      "goldSql": "SELECT T2.driverRef FROM qualifying AS T1 INNER JOIN drivers AS T2 ON T2.driverId = T1.driverId WHERE T1.raceId = 20 ORDER BY T1.q1 DESC LIMIT 5",
+      "predictedSql": "SELECT T1.driverRef\nFROM drivers AS T1\nINNER JOIN qualifying AS T2 ON T2.driverId = T1.driverId\nWHERE T2.raceId = 20\n  AND T2.q1 IS NOT NULL\n  AND T2.q1 = (\n      SELECT MAX(q1)\n      FROM qualifying\n      WHERE raceId = 20\n  )",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.25,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq46_f30kn",
+        "k_01hf7uaq3g_9g7y1"
+      ],
+      "tokens": 1746,
+      "latencyMs": 923,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT d.driverRef\nFROM qualifying q\nJOIN drivers d ON d.driverId = q.driverId\nWHERE q.raceId = 20\n  AND q.q1 IS NOT NULL\n  AND q.q1 = (\n    SELECT MAX(q2.q1)\n    FROM qualifying q2\n    WHERE q2.raceId = 20\n      AND q2.q1 IS NOT NULL\n  )"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "superhero#719",
+      "questionId": 719,
+      "dbId": "superhero",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "Among the superheroes with the super power of \"Super Strength\", how many of them have a height of over 200cm?",
+      "goldSql": "SELECT COUNT(T1.id) FROM superhero AS T1 INNER JOIN hero_power AS T2 ON T1.id = T2.hero_id INNER JOIN superpower AS T3 ON T2.power_id = T3.id WHERE T3.power_name = 'Super Strength' AND T1.height_cm > 200",
+      "predictedSql": "SELECT COUNT(DISTINCT superhero.id)\nFROM superhero\nJOIN hero_power ON superhero.id = hero_power.hero_id\nJOIN superpower ON hero_power.power_id = superpower.id\nWHERE superpower.power_name = 'Super Strength'\n  AND superhero.height_cm > 200",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.091,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq48_a2vrq",
+        "k_01hf7uaq47_danxa"
+      ],
+      "tokens": 892,
+      "latencyMs": 920,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT COUNT(DISTINCT superhero.id)\nFROM superhero\nJOIN hero_power ON superhero.id = hero_power.hero_id\nJOIN superpower ON hero_power.power_id = superpower.id\nWHERE superpower.power_name = 'Super Strength'\n  AND superhero.height_cm > 200"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "card_games#344",
+      "questionId": 344,
+      "dbId": "card_games",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "List all the mythic rarity print cards banned in gladiator format.",
+      "goldSql": "SELECT DISTINCT T1.id FROM cards AS T1 INNER JOIN legalities AS T2 ON T1.uuid = T2.uuid WHERE T2.format = 'gladiator' AND T2.status = 'Banned' AND T1.rarity = 'mythic'",
+      "predictedSql": "SELECT DISTINCT cards.name\nFROM cards\nJOIN legalities ON cards.uuid = legalities.uuid\nWHERE cards.rarity = 'mythic'\n  AND legalities.format = 'gladiator'\n  AND legalities.status = 'Banned'",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.111,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3h_fdg1w",
+        "k_01hf7uaq3i_ffbky"
+      ],
+      "tokens": 1409,
+      "latencyMs": 847,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT DISTINCT cards.name\nFROM cards\nJOIN legalities ON cards.uuid = legalities.uuid\nWHERE cards.rarity = 'mythic'\n  AND legalities.format = 'gladiator'\n  AND legalities.status = 'Banned'"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1150",
+      "questionId": 1150,
+      "dbId": "thrombosis_prediction",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "What is the percentage of female patient were born after 1930?",
+      "goldSql": "SELECT CAST(SUM(CASE WHEN STRFTIME('%Y', Birthday) > '1930' THEN 1 ELSE 0 END) AS REAL) * 100 / COUNT(*) FROM Patient WHERE SEX = 'F'",
+      "predictedSql": "SELECT CAST(COUNT(CASE WHEN p.SEX = 'F' AND CAST(strftime('%Y', p.Birthday) AS INTEGER) > 1930 THEN 1 END) AS REAL) * 100.0 / COUNT(CASE WHEN p.SEX = 'F' THEN 1 END) AS percentage\nFROM Patient p",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.167,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq38_affgr",
+        "k_01hf7uaq37_d76mn"
+      ],
+      "tokens": 1074,
+      "latencyMs": 1197,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT CAST(SUM(CASE WHEN p.SEX = 'F' AND CAST(strftime('%Y', p.Birthday) AS INTEGER) > 1930 THEN 1 ELSE 0 END) AS REAL) * 100.0 / SUM(CASE WHEN p.SEX = 'F' THEN 1 ELSE 0 END) AS percentage\nFROM Patient p"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "codebase_community#557",
+      "questionId": 557,
+      "dbId": "codebase_community",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "Among the posts with a score of over 5, what is the percentage of them being owned by an elder user?",
+      "goldSql": "SELECT CAST(SUM(IIF(T2.Age > 65, 1, 0)) AS REAL) * 100 / COUNT(T1.Id) FROM posts AS T1 INNER JOIN users AS T2 ON T1.OwnerUserId = T2.Id WHERE T1.Score > 5",
+      "predictedSql": "SELECT CAST(SUM(CASE WHEN T2.Age > 65 THEN 1 ELSE 0 END) AS REAL) * 100 / COUNT(T1.Id)\nFROM posts AS T1\nINNER JOIN users AS T2 ON T1.OwnerUserId = T2.Id\nWHERE T1.Score > 5",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.091,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3q_c2rqq",
+        "k_01hf7uaq3p_8saxp"
+      ],
+      "tokens": 1430,
+      "latencyMs": 1162,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT CAST(COUNT(CASE WHEN T2.Age > 65 THEN 1 END) AS REAL) * 100 / COUNT(T1.Id)\nFROM posts AS T1\nINNER JOIN users AS T2 ON T1.OwnerUserId = T2.Id\nWHERE T1.Score > 5"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "toxicology#198",
+      "questionId": 198,
+      "dbId": "toxicology",
+      "fold": 2,
+      "difficulty": "challenging",
+      "question": "On average how many carcinogenic molecules are single bonded?",
+      "goldSql": "SELECT AVG(single_bond_count) FROM (SELECT T3.molecule_id, COUNT(T1.bond_type) AS single_bond_count FROM bond AS T1  INNER JOIN atom AS T2 ON T1.molecule_id = T2.molecule_id INNER JOIN molecule AS T3 ON T3.molecule_id = T2.molecule_id WHERE T1.bond_type = '-' AND T3.label = '+' GROUP BY T3.molecule_id) AS subquery",
+      "predictedSql": "SELECT CAST(COUNT(DISTINCT CASE WHEN bond.bond_type = '-' THEN atom.atom_id END) AS REAL) / COUNT(DISTINCT atom.atom_id)\nFROM atom\nJOIN molecule ON atom.molecule_id = molecule.molecule_id\nJOIN connected ON atom.atom_id = connected.atom_id\nJOIN bond ON connected.bond_id = bond.bond_id\nWHERE molecule.label = '+'",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3r_fm62r",
+        "k_01hf7uaq3s_8xeyg"
+      ],
+      "tokens": 756,
+      "latencyMs": 1100,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT CAST(SUM(CASE WHEN bond.bond_type = '-' THEN 1 ELSE 0 END) AS REAL) / COUNT(DISTINCT atom.atom_id)\nFROM atom\nJOIN molecule ON atom.molecule_id = molecule.molecule_id\nJOIN connected ON atom.atom_id = connected.atom_id\nJOIN bond ON connected.bond_id = bond.bond_id\nWHERE molecule.label = '+'"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "debit_card_specializing#1476",
+      "questionId": 1476,
+      "dbId": "debit_card_specializing",
+      "fold": 2,
+      "difficulty": "challenging",
+      "question": "What was the difference in gas consumption between CZK-paying customers and EUR-paying customers in 2012?",
+      "goldSql": "SELECT SUM(IIF(T1.Currency = 'CZK', T2.Consumption, 0)) - SUM(IIF(T1.Currency = 'EUR', T2.Consumption, 0)) FROM customers AS T1 INNER JOIN yearmonth AS T2 ON T1.CustomerID = T2.CustomerID WHERE SUBSTR(T2.Date, 1, 4) = '2012'",
+      "predictedSql": "SELECT\n  SUM(CASE WHEN c.Currency = 'CZK' THEN y.Consumption ELSE 0 END) -\n  SUM(CASE WHEN c.Currency = 'EUR' THEN y.Consumption ELSE 0 END) AS Difference\nFROM yearmonth y\nJOIN customers c ON c.CustomerID = y.CustomerID\nWHERE y.Date BETWEEN '201201' AND '201212'",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.111,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq36_8rgb1",
+        "k_01hf7uaq35_eqqr5"
+      ],
+      "tokens": 735,
+      "latencyMs": 1326,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT\n  SUM(CASE WHEN c.Currency = 'CZK' THEN y.Consumption ELSE 0 END) -\n  SUM(CASE WHEN c.Currency = 'EUR' THEN y.Consumption ELSE 0 END) AS Difference\nFROM yearmonth y\nJOIN customers c ON c.CustomerID = y.CustomerID\nWHERE y.Date BETWEEN '201201' AND '201212'"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "european_football_2#1029",
+      "questionId": 1029,
+      "dbId": "european_football_2",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "What are the speed in which attacks are put together of the top 4 teams with the highest build Up Play Speed?",
+      "goldSql": "SELECT t1.buildUpPlaySpeed FROM Team_Attributes AS t1 INNER JOIN Team AS t2 ON t1.team_api_id = t2.team_api_id ORDER BY t1.buildUpPlaySpeed ASC LIMIT 4",
+      "predictedSql": "SELECT t.team_long_name, ta.buildUpPlaySpeed\nFROM Team_Attributes ta\nJOIN Team t ON t.team_api_id = ta.team_api_id\nWHERE ta.buildUpPlaySpeed IS NOT NULL\nORDER BY ta.buildUpPlaySpeed DESC\nLIMIT 4",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3d_e876m",
+        "k_01hf7uaq44_04rkm"
+      ],
+      "tokens": 2521,
+      "latencyMs": 811,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT t.team_long_name, ta.buildUpPlaySpeed\nFROM Team_Attributes ta\nJOIN Team t ON t.team_api_id = ta.team_api_id\nWHERE ta.buildUpPlaySpeed IS NOT NULL\nORDER BY ta.buildUpPlaySpeed DESC\nLIMIT 4"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "california_schools#24",
+      "questionId": 24,
+      "dbId": "california_schools",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "Give the names of the schools with the percent eligible for free meals in K-12 is more than 0.1 and test takers whose test score is greater than or equal to 1500?",
+      "goldSql": "SELECT T2.`School Name` FROM satscores AS T1 INNER JOIN frpm AS T2 ON T1.cds = T2.CDSCode WHERE CAST(T2.`Free Meal Count (K-12)` AS REAL) / T2.`Enrollment (K-12)` > 0.1 AND T1.NumGE1500 > 0",
+      "predictedSql": "SELECT DISTINCT s.School\nFROM schools s\nJOIN frpm f ON f.CDSCode = s.CDSCode\nJOIN satscores sa ON sa.cds = s.CDSCode\nWHERE f.`Percent (%) Eligible Free (K-12)` > 0.1\n  AND sa.NumGE1500 > 0",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.105,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq4c_bf0vq",
+        "k_01hf7uaq4b_9gjs5"
+      ],
+      "tokens": 1441,
+      "latencyMs": 974,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT DISTINCT s.School\nFROM schools s\nJOIN frpm f ON s.CDSCode = f.CDSCode\nJOIN satscores sa ON s.CDSCode = sa.cds\nWHERE f.`Free Meal Count (K-12)` / f.`Enrollment (K-12)` > 0.1\n  AND sa.NumGE1500 > 0"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "financial#94",
+      "questionId": 94,
+      "dbId": "financial",
+      "fold": 2,
+      "difficulty": "challenging",
+      "question": "List out the account numbers of female clients who are oldest and has lowest average salary, calculate the gap between this lowest average salary with the highest average salary?",
+      "goldSql": "SELECT T1.account_id , ( SELECT MAX(A11) - MIN(A11) FROM district ) FROM account AS T1 INNER JOIN district AS T2 ON T1.district_id = T2.district_id INNER JOIN disp AS T3 ON T1.account_id = T3.account_id INNER JOIN client AS T4 ON T3.client_id = T4.client_id WHERE T2.district_id = ( SELECT district_id FROM client WHERE gender = 'F' ORDER BY birth_date ASC LIMIT 1 ) ORDER BY T2.A11 DESC LIMIT 1",
+      "predictedSql": "SELECT a.account_id,\n       (SELECT MAX(d2.A11) FROM district d2) - d1.A11 AS gap\nFROM client c\nJOIN disp dp ON dp.client_id = c.client_id\nJOIN account a ON a.account_id = dp.account_id\nJOIN district d1 ON d1.district_id = a.district_id\nWHERE c.gender = 'F'\n  AND c.birth_date = (SELECT MIN(c2.birth_date) FROM client c2 WHERE c2.gender = 'F')\n  AND d1.A11 = (SELECT MIN(d3.A11) FROM district d3)",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.2,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq40_bt4et",
+        "k_01hf7uaq3v_a8w94"
+      ],
+      "tokens": 1173,
+      "latencyMs": 1237,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT a.account_id,\n       (SELECT MAX(d2.A11) FROM district d2) - d.A11 AS gap\nFROM client c\nJOIN disp dp ON dp.client_id = c.client_id\nJOIN account a ON a.account_id = dp.account_id\nJOIN district d ON d.district_id = a.district_id\nWHERE c.gender = 'F'\n  AND c.birth_date = (SELECT MIN(c2.birth_date) FROM client c2 WHERE c2.gender = 'F')\n  AND d.A11 = (SELECT MIN(d3.A11) FROM district d3)"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "student_club#1338",
+      "questionId": 1338,
+      "dbId": "student_club",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "Was each expense in October Meeting on October 8, 2019 approved?",
+      "goldSql": "SELECT T3.approved FROM event AS T1 INNER JOIN budget AS T2 ON T1.event_id = T2.link_to_event INNER JOIN expense AS T3 ON T2.budget_id = T3.link_to_budget WHERE T1.event_name = 'October Meeting' AND T1.event_date LIKE '2019-10-08%'",
+      "predictedSql": "SELECT expense.expense_id, expense.expense_description, expense.approved\nFROM expense\nJOIN budget ON expense.link_to_budget = budget.budget_id\nJOIN event ON budget.link_to_event = event.event_id\nWHERE event.event_name = 'October Meeting'\n  AND event.event_date = '2019-10-08'",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3b_8fabe",
+        "k_01hf7uaq3c_acbxy"
+      ],
+      "tokens": 984,
+      "latencyMs": 1109,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT e.expense_id, e.expense_description, e.approved\nFROM expense e\nJOIN budget b ON e.link_to_budget = b.budget_id\nJOIN event ev ON b.link_to_event = ev.event_id\nWHERE ev.event_name = 'October Meeting'\n  AND ev.event_date = '2019-10-08'"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "formula_1#869",
+      "questionId": 869,
+      "dbId": "formula_1",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "For the constructor which got the highest point in the race No. 9 , what is its introduction website?",
+      "goldSql": "SELECT T2.url FROM constructorResults AS T1 INNER JOIN constructors AS T2 ON T2.constructorId = T1.constructorId WHERE T1.raceId = 9 ORDER BY T1.points DESC LIMIT 1",
+      "predictedSql": "SELECT constructors.url\nFROM constructorResults\nJOIN constructors ON constructors.constructorId = constructorResults.constructorId\nWHERE constructorResults.raceId = 9\nORDER BY constructorResults.points DESC\nLIMIT 1",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.2,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3o_bjtew",
+        "k_01hf7uaq3f_dd131"
+      ],
+      "tokens": 1648,
+      "latencyMs": 1351,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT constructors.url\nFROM constructorResults\nJOIN constructors ON constructors.constructorId = constructorResults.constructorId\nWHERE constructorResults.raceId = 9\nORDER BY constructorResults.points DESC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "superhero#726",
+      "questionId": 726,
+      "dbId": "superhero",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "Rank heroes published by Marvel Comics by their height in descending order.",
+      "goldSql": "SELECT superhero_name, height_cm, RANK() OVER (ORDER BY height_cm DESC) AS HeightRank FROM superhero INNER JOIN publisher ON superhero.publisher_id = publisher.id WHERE publisher.publisher_name = 'Marvel Comics'",
+      "predictedSql": "SELECT superhero.superhero_name, superhero.height_cm\nFROM superhero\nJOIN publisher ON superhero.publisher_id = publisher.id\nWHERE publisher.publisher_name = 'Marvel Comics'\nORDER BY superhero.height_cm DESC",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.25,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq48_a2vrq",
+        "k_01hf7uaq47_danxa"
+      ],
+      "tokens": 859,
+      "latencyMs": 783,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT superhero.superhero_name, superhero.height_cm,\n       RANK() OVER (ORDER BY superhero.height_cm DESC) AS height_rank\nFROM superhero\nJOIN publisher ON superhero.publisher_id = publisher.id\nWHERE publisher.publisher_name = 'Marvel Comics'\nORDER BY height_rank"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "card_games#347",
+      "questionId": 347,
+      "dbId": "card_games",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "Find all cards illustrated by Stephen Daniel and describe the text of the ruling of these cards. State if these cards have missing or degraded properties and values.",
+      "goldSql": "SELECT T1.id, T2.text, T1.hasContentWarning FROM cards AS T1 INNER JOIN rulings AS T2 ON T1.uuid = T2.uuid WHERE T1.artist = 'Stephen Daniele'",
+      "predictedSql": "SELECT DISTINCT c.id, r.text, c.hasContentWarning\nFROM cards c\nJOIN rulings r ON r.uuid = c.uuid\nWHERE c.artist = 'Stephen Daniel'",
+      "correct": false,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.063,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3h_fdg1w",
+        "k_01hf7uaq3i_ffbky"
+      ],
+      "tokens": 1405,
+      "latencyMs": 911,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT DISTINCT c.id, r.text, c.hasContentWarning\nFROM cards c\nJOIN rulings r ON r.uuid = c.uuid\nWHERE c.artist = 'Stephen Daniel'"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1162",
+      "questionId": 1162,
+      "dbId": "thrombosis_prediction",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "How many female patients who came at the hospital in 1997 was immediately followed at the outpatient clinic?",
+      "goldSql": "SELECT COUNT(*) FROM Patient WHERE STRFTIME('%Y', Description) = '1997' AND SEX = 'F' AND Admission = '-'",
+      "predictedSql": "SELECT COUNT(*)\nFROM Patient\nWHERE SEX = 'F'\n  AND strftime('%Y', \"First Date\") = '1997'\n  AND Admission = '-'",
+      "correct": false,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.091,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3l_02xcd",
+        "k_01hf7uaq38_affgr"
+      ],
+      "tokens": 1001,
+      "latencyMs": 925,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT COUNT(DISTINCT p.ID)\nFROM Patient p\nWHERE p.SEX = 'F'\n  AND strftime('%Y', p.Description) = '1997'\n  AND p.Admission = '-'"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "codebase_community#571",
+      "questionId": 571,
+      "dbId": "codebase_community",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "For the user No.24, how many times is the number of his/her posts compared to his/her votes?",
+      "goldSql": "SELECT CAST(COUNT(DISTINCT T2.Id) AS REAL) / COUNT(DISTINCT T1.Id) FROM votes AS T1 INNER JOIN posts AS T2 ON T1.UserId = T2.OwnerUserId WHERE T1.UserId = 24",
+      "predictedSql": "SELECT CAST(COUNT(DISTINCT posts.Id) AS REAL) / COUNT(DISTINCT votes.Id)\nFROM users\nLEFT JOIN posts ON posts.OwnerUserId = users.Id\nLEFT JOIN votes ON votes.UserId = users.Id\nWHERE users.Id = 24",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.091,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3q_c2rqq",
+        "k_01hf7uaq3p_8saxp"
+      ],
+      "tokens": 1410,
+      "latencyMs": 1048,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT CAST(COUNT(DISTINCT posts.Id) AS REAL) / COUNT(DISTINCT votes.Id)\nFROM users\nLEFT JOIN posts ON posts.OwnerUserId = users.Id\nLEFT JOIN votes ON votes.UserId = users.Id\nWHERE users.Id = 24"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    },
+    {
+      "id": "toxicology#207",
+      "questionId": 207,
+      "dbId": "toxicology",
+      "fold": 2,
+      "difficulty": "challenging",
+      "question": "What elements are in a double type bond?",
+      "goldSql": "SELECT DISTINCT T1.element FROM atom AS T1 INNER JOIN bond AS T2 ON T1.molecule_id = T2.molecule_id INNER JOIN connected AS T3 ON T1.atom_id = T3.atom_id WHERE T2.bond_type = '='",
+      "predictedSql": "SELECT DISTINCT a.element\nFROM atom a\nJOIN connected c ON a.atom_id = c.atom_id\nJOIN bond b ON c.bond_id = b.bond_id\nWHERE b.bond_type = '='",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3r_fm62r",
+        "k_01hf7uaq3s_8xeyg"
+      ],
+      "tokens": 691,
+      "latencyMs": 1784,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "SELECT DISTINCT a.element\nFROM atom a\nJOIN connected c ON a.atom_id = c.atom_id\nJOIN bond b ON c.bond_id = b.bond_id\nWHERE b.bond_type = '='"
+      },
+      "armPackIds": {
+        "gated": 0
+      }
+    },
+    {
+      "id": "debit_card_specializing#1481",
+      "questionId": 1481,
+      "dbId": "debit_card_specializing",
+      "fold": 2,
+      "difficulty": "challenging",
+      "question": "What is the difference in the annual average consumption of the customers with the least amount of consumption paid in CZK for 2013 between SME and LAM, LAM and KAM, and KAM and SME?",
+      "goldSql": "SELECT CAST(SUM(IIF(T1.Segment = 'SME', T2.Consumption, 0)) AS REAL) / COUNT(T1.CustomerID) - CAST(SUM(IIF(T1.Segment = 'LAM', T2.Consumption, 0)) AS REAL) / COUNT(T1.CustomerID) , CAST(SUM(IIF(T1.Segment = 'LAM', T2.Consumption, 0)) AS REAL) / COUNT(T1.CustomerID) - CAST(SUM(IIF(T1.Segment = 'KAM', T2.Consumption, 0)) AS REAL) / COUNT(T1.CustomerID) , CAST(SUM(IIF(T1.Segment = 'KAM', T2.Consumption, 0)) AS REAL) / COUNT(T1.CustomerID) - CAST(SUM(IIF(T1.Segment = 'SME', T2.Consumption, 0)) AS REAL) / COUNT(T1.CustomerID) FROM customers AS T1 INNER JOIN yearmonth AS T2 ON T1.CustomerID = T2.CustomerID WHERE T1.Currency = 'CZK' AND T2.Consumption = ( SELECT MIN(Consumption) FROM yearmonth ) AND T2.Date BETWEEN 201301 AND 201312",
+      "predictedSql": "WITH yearly AS (\n    SELECT\n        y.CustomerID,\n        c.Segment,\n        SUM(y.Consumption) AS total_consumption\n    FROM yearmonth y\n    JOIN customers c ON c.CustomerID = y.CustomerID\n    WHERE y.Date BETWEEN '201301' AND '201312'\n      AND c.Currency = 'CZK'\n    GROUP BY y.CustomerID, c.Segment\n),\nmin_per_segment AS (\n    SELECT Segment, MIN(total_consumption) AS min_consumption\n    FROM yearly\n    GROUP BY Segment\n),\nleast_customers AS (\n    SELECT y.Segment, y.CustomerID, y.total_consumption\n    FROM yearly y\n    JOIN min_per_segment m\n      ON m.Segment = y.Segment\n     AND m.min_consumption = y.total_consumption\n),\nsegment_avg AS (\n    SELECT Segment, AVG(total_consumption) AS avg_consumption\n    FROM least_customers\n    GROUP BY Segment\n)\nSELECT\n    (SELECT avg_consumption FROM segment_avg WHERE Segment = 'SME') -\n    (SELECT avg_consumption FROM segment_avg WHERE Segment = 'LAM') AS SME_minus_LAM,\n    (SELECT avg_consumption FROM segment_avg WHERE Segment = 'LAM') -\n    (SELECT avg_consumption FROM segment_avg WHERE Segment = 'KAM') AS LAM_minus_KAM,\n    (SELECT avg_consumption FROM segment_avg WHERE Segment = 'KAM') -\n    (SELECT avg_consumption FROM segment_avg WHERE Segment = 'SME') AS KAM_minus_SME",
+      "correct": false,
+      "withoutMemoryCorrect": false,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.143,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq36_8rgb1",
+        "k_01hf7uaq35_eqqr5"
+      ],
+      "tokens": 1072,
+      "latencyMs": 2119,
+      "arms": {
+        "gated": false
+      },
+      "armSql": {
+        "gated": "WITH customer_totals AS (\n    SELECT\n        ym.CustomerID,\n        c.Segment,\n        SUM(ym.Consumption) AS total_consumption\n    FROM yearmonth ym\n    JOIN customers c ON c.CustomerID = ym.CustomerID\n    WHERE ym.Date BETWEEN '201301' AND '201312'\n      AND c.Currency = 'CZK'\n    GROUP BY ym.CustomerID, c.Segment\n),\nsegment_min AS (\n    SELECT\n        Segment,\n        MIN(total_consumption) AS min_consumption\n    FROM customer_totals\n    GROUP BY Segment\n),\nsegment_avg AS (\n    SELECT\n        ct.Segment,\n        AVG(ct.total_consumption) AS annual_avg\n    FROM customer_totals ct\n    JOIN segment_min sm\n      ON sm.Segment = ct.Segment\n     AND sm.min_consumption = ct.total_consumption\n    GROUP BY ct.Segment\n)\nSELECT\n    (SELECT annual_avg FROM segment_avg WHERE Segment = 'SME') -\n    (SELECT annual_avg FROM segment_avg WHERE Segment = 'LAM') AS SME_minus_LAM,\n    (SELECT annual_avg FROM segment_avg WHERE Segment = 'LAM') -\n    (SELECT annual_avg FROM segment_avg WHERE Segment = 'KAM') AS LAM_minus_KAM,\n    (SELECT annual_avg FROM segment_avg WHERE Segment = 'KAM') -\n    (SELECT annual_avg FROM segment_avg WHERE Segment = 'SME') AS KAM_minus_SME"
+      },
+      "armPackIds": {
+        "gated": 2
+      }
+    },
+    {
+      "id": "european_football_2#1032",
+      "questionId": 1032,
+      "dbId": "european_football_2",
+      "fold": 2,
+      "difficulty": "moderate",
+      "question": "Give the name of the league with the highest matches of all time and how many matches were played in the said league.",
+      "goldSql": "SELECT t2.name, t1.max_count FROM League AS t2 JOIN (SELECT league_id, MAX(cnt) AS max_count FROM (SELECT league_id, COUNT(id) AS cnt FROM Match GROUP BY league_id) AS subquery) AS t1 ON t1.league_id = t2.id",
+      "predictedSql": "SELECT League.name, COUNT(\"Match\".id) AS match_count\nFROM League\nJOIN \"Match\" ON \"Match\".league_id = League.id\nGROUP BY League.id, League.name\nORDER BY match_count DESC\nLIMIT 1",
+      "correct": true,
+      "withoutMemoryCorrect": true,
+      "parseOk": true,
+      "execOk": true,
+      "packIds": 2,
+      "coverage": 0.1,
+      "expected": null,
+      "packIdList": [
+        "k_01hf7uaq3d_e876m",
+        "k_01hf7uaq44_04rkm"
+      ],
+      "tokens": 2499,
+      "latencyMs": 1036,
+      "arms": {
+        "gated": true
+      },
+      "armSql": {
+        "gated": "SELECT League.name, COUNT(\"Match\".id) AS match_count\nFROM League\nJOIN \"Match\" ON \"Match\".league_id = League.id\nGROUP BY League.id, League.name\nORDER BY match_count DESC\nLIMIT 1"
+      },
+      "armPackIds": {
+        "gated": 1
+      }
+    }
+  ],
+  "items": [
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq45_0cad2",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A query for the nationality of the driver with the fastest lap speed joins drivers to results on driverId, orders by fastestLapSpeed descending, and limits to one row.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq44_04rkm",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Filtering out NULL fastestLapSpeed values before ordering is unnecessary when the query only needs the top row by that column, since NULLs sort last in descending order.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq43_3s89t",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "The question asks for the annual average consumption of customers with the least consumption, which requires aggregating each customer's yearly consumption before selecting the minimum per segment, not comparing individual monthly Consumption values.",
+      "domain": "debit_card_specializing"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq42_4zy32",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Filtering yearmonth rows by a global MIN(Consumption) across all customers does not select the per-segment minimum-consumption customers, so the resulting averages are not the least-consumption averages per segment.",
+      "domain": "debit_card_specializing"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq41_8tezy",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the california_schools schema, high schools are identified by `School Type` = 'High Schools (Public)' in the frpm table rather than by a LIKE pattern on the school name.",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq40_bt4et",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the california_schools schema, the frpm table's `Free Meal Count (Ages 5-17)` column is the field that represents free or reduced price meal counts, not `FRPM Count (Ages 5-17)`.",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3v_a8w94",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Joining atom to bond via connected.bond_id produces an execution mismatch in the toxicology schema.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3u_6w50r",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the toxicology schema, atom-to-bond joins must go through the molecule_id column rather than the connected table's bond_id column.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3t_d5emm",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In SQLite, subtracting a date string from DATETIME() yields a duration rather than a year count, so it is not a valid age computation.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3s_8xeyg",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Computing age by subtracting the year of a birthday from the current year via strftime ignores the month and day, producing an off-by-one age for players whose birthday has not yet occurred this year.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3r_fm62r",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Peak-month queries over yearmonth data require grouping by the month component and ordering by the aggregate SUM of Consumption, not by the raw Consumption column.",
+      "domain": "debit_card_specializing"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3q_c2rqq",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for a peak month, the result must be the month component extracted from the date column rather than the full date value.",
+      "domain": "debit_card_specializing"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3p_8saxp",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "An ORDER BY clause alone does not satisfy a request to rank heroes by height.",
+      "domain": "superhero"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3o_bjtew",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks to rank rows, the SQL must use a window ranking function such as RANK() rather than only ORDER BY.",
+      "domain": "superhero"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3n_57yw0",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Date equality filters on event dates are expressed with a LIKE prefix pattern matching the date string.",
+      "domain": "student_club"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3m_887b4",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks whether each expense was approved, the result should project only the approval column rather than additional descriptive columns.",
+      "domain": "student_club"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3l_02xcd",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for an entity that is the oldest (or otherwise extreme) and also has an extreme attribute, the entity selection is resolved in a subquery and the attribute comparison is applied afterward.",
+      "domain": "financial"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3k_d32k5",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Ordering rows by a joined column and applying LIMIT 1 selects the extreme across all joined rows rather than the extreme within the filtered subset, producing a different row than a subquery that first isolates the target entity.",
+      "domain": "financial"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3j_8rvqr",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the california_schools schema, the free meal ratio must be computed with CAST of `Free Meal Count (K-12)` to REAL before division by `Enrollment (K-12)`.",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3i_ffbky",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the california_schools schema, the school name column is `School Name` in the frpm table, not `School` in the schools table.",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3h_fdg1w",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for a person's introduction website, the result should include the driver's forename, surname, and url rather than only the url.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3g_9g7y1",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the formula_1 schema, lapTimes.time values are stored without a leading zero hour component (e.g., '1:27%' rather than '0:01:27%').",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3e_fbrss",
+      "status": "candidate",
+      "trust": 0.9,
+      "statement": "When a question asks for the top N teams by a metric, the result must include the team name column alongside the metric, not the metric alone.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3f_dd131",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A question asking for the top 4 teams by highest buildUpPlaySpeed requires ORDER BY buildUpPlaySpeed DESC, not ASC.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3d_e876m",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Using COUNT(DISTINCT client_id) instead of COUNT(client_id) changes the result when the join can produce duplicate client rows.",
+      "domain": "financial"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3c_acbxy",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When filtering on a categorical column value, the literal must match the stored casing exactly, since string comparisons are case-sensitive in this schema.",
+      "domain": "financial"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3b_8fabe",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Computing an average per molecule requires grouping by molecule_id and counting bonds within each group, then averaging those per-group counts.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq3a_1vxkc",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A ratio of total single bonds to distinct atoms is not the same as the average number of single bonds per molecule.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq39_epz90",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A valid pattern for 'which away team won the most' is to filter away_team_goal > home_team_goal, group by the away team identifier, and order by COUNT(*) descending with LIMIT 1.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq38_affgr",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When grouping by a team name column that is not the join key, the query can return duplicate team rows if names collide; grouping by the team identifier avoids this.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq36_8rgb1",
+      "status": "candidate",
+      "trust": 0.9,
+      "statement": "When a question asks for cards, the result should project the card identifier rather than all columns.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq37_d76mn",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A query joining cards to legalities can return duplicate card rows, so DISTINCT is needed when listing cards.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq35_eqqr5",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Eliminated drivers in a qualifying period are identified by ordering qualifying times descending and taking the slowest N rows, not by an equality match against the maximum time.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq34_ayat1",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "For a question asking which drivers are eliminated in the first qualifying period, selecting the driver with the maximum q1 time returns the slowest qualifier rather than the set of eliminated drivers.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq33_0pavc",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Computing a percentage with integer operands and no REAL cast produces an execution mismatch against the expected numeric result.",
+      "domain": "thrombosis_prediction"
+    },
+    {
+      "fold": 0,
+      "id": "k_01hf7uaq32_5cdmy",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In SQLite, integer division truncates, so a percentage computed as integer_sum * 100 / integer_sum yields 0 or a truncated integer unless a cast to REAL or a decimal literal is applied.",
+      "domain": "thrombosis_prediction"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq4k_276dn",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for differences in annual average consumption between segments, the correct approach filters customers by currency, restricts yearmonth rows to the target year, and computes each segment's average consumption directly over all matching customers rather than over a pre-filtered minimum subset.",
+      "domain": "debit_card_specializing"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq4j_d90zv",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "The original query computed per-segment minimum annual consumption and then averaged only customers at that minimum, which does not match the intended interpretation of averaging annual consumption across all CZK customers in each segment.",
+      "domain": "debit_card_specializing"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq4i_9zp4v",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Joining connected.bond_id to bond.bond_id produces an execution mismatch in the toxicology schema.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq4h_cw3rh",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the toxicology schema, atom-to-bond joins must go through the molecule_id column rather than through the connected table's bond_id column.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq4g_acs41",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A query that ranks cards by ruling count must aggregate over the rulings join and order by the ruling count rather than grouping by card uuid alone.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq4f_frz49",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Grouping by a single unique identifier column while selecting other non-aggregated columns does not satisfy the requirement to rank entities by their count of related rows.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq4e_4eapp",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A popularity ranking over eye colors uses GROUP BY colour.colour with COUNT(superhero.id) and RANK() OVER (ORDER BY COUNT(superhero.id) DESC).",
+      "domain": "superhero"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq4d_fxbsf",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Grouping by superhero name and selecting superhero_name produces per-superhero rows rather than per-eye-color aggregates when the question asks for eye color popularity ranking.",
+      "domain": "superhero"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq4c_bf0vq",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A youngest-driver query orders drivers by dob descending and limits to one row after filtering results by raceId and non-null time.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq4b_9gjs5",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Selecting a dob column in a youngest-driver query returns an extra column beyond the requested forename and surname.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq4a_9wvzs",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Selecting the youngest client is expressed as ordering client rows by birth_date descending with LIMIT 1 rather than comparing birth_date to a MAX subquery.",
+      "domain": "financial"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq49_07byc",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Joining district via client.district_id and filtering on district.A11 does not answer a question about highest average salary, since A11 is not a salary aggregate.",
+      "domain": "financial"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq48_a2vrq",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for an average of a column across grouped rows, the threshold condition belongs in HAVING over an aggregate expression rather than in WHERE over the raw column.",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq47_danxa",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Filtering rows by a per-row column value (e.g., AvgScrMath > 400) is not equivalent to filtering groups by an aggregate of that column (e.g., SUM(AvgScrMath)/COUNT(cds) > 400).",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq46_f30kn",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "An ORDER BY clause alone does not satisfy a request to rank heroes by height.",
+      "domain": "superhero"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq45_0cad2",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks to rank rows, the SQL must use a window ranking function such as RANK() OVER rather than only ORDER BY.",
+      "domain": "superhero"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq44_04rkm",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Date equality filters on event dates are expressed with a LIKE prefix pattern matching the date string.",
+      "domain": "student_club"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq43_3s89t",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks whether each expense was approved, the result should project only the approval column rather than additional descriptive columns.",
+      "domain": "student_club"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq42_4zy32",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A gap between the lowest and highest average salary is computed as a scalar subquery subtracting MIN(A11) from MAX(A11) over the district table, independent of the outer row.",
+      "domain": "financial"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq41_8tezy",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Ordering rows by a joined attribute and applying LIMIT 1 selects the wrong client when the intended filter is the oldest female client's district, because the ordering must be applied inside a subquery on the client table before joining.",
+      "domain": "financial"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq40_bt4et",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the california_schools schema, the satscores column `NumGE1500` is compared with a strict greater-than when the question asks for scores greater than 1500, and the free-meal ratio requires casting the count to REAL before division.",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3v_a8w94",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the california_schools schema, the school name column is `School Name` in the frpm table, not `School` in the schools table.",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3u_6w50r",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Using SUM(CASE WHEN ... THEN 1 ELSE 0 END) over a joined table inflates counts when the join produces multiple rows per atom.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3t_d5emm",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When computing a percentage of atoms matching a condition across joined tables, the numerator and denominator must both count distinct atom identifiers to avoid row duplication from the join.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3s_8xeyg",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A valid query for this schema joins posts to comments on posts.Id = comments.PostId and filters on comments.UserId and comments.CreationDate.",
+      "domain": "codebase_community"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3r_fm62r",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Date literals in SQL for this schema use the ISO format 'YYYY-MM-DD HH:MM:SS.0' rather than slash-separated dates.",
+      "domain": "codebase_community"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3p_8saxp",
+      "status": "candidate",
+      "trust": 0.9,
+      "statement": "When a question asks for the top N teams by a metric, the result must include the team name column alongside the metric, not the metric alone.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3q_c2rqq",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A question asking for the top 4 teams with the highest value requires ORDER BY DESC, not ORDER BY ASC.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3o_bjtew",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Integer division in SQLite is avoided by multiplying the numerator count by 1.0 before dividing.",
+      "domain": "thrombosis_prediction"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3n_57yw0",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "The ratio of outpatient to inpatient counts is computed as the outpatient count divided by the inpatient count, not the reverse.",
+      "domain": "thrombosis_prediction"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3m_887b4",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A per-molecule average is computed by grouping bonds by molecule_id, counting qualifying bonds per group, and averaging those group counts in an outer query.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3l_02xcd",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A ratio of total single bonds to distinct atom count does not compute an average per molecule and yields a different value than averaging per-molecule single-bond counts.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3k_d32k5",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Queries joining cards to legalities and filtering on a format should select DISTINCT status to avoid duplicate rows.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3j_8rvqr",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Using the column name 'types' instead of 'type' on the cards table causes an execution mismatch.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3i_ffbky",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A column used in ORDER BY or in a comparison should be guarded with an IS NOT NULL predicate when NULL values could otherwise affect ordering or filtering semantics.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3h_fdg1w",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for a person's identity (e.g., name) rather than their attributes, the SELECT clause should project only the identifying columns and not auxiliary attributes used solely for ordering or filtering.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3g_9g7y1",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A 'how many of them are Y' question over a set defined by a HAVING threshold is answered by computing the threshold set first and then counting its Y members, e.g. via EXCEPT or a nested subquery.",
+      "domain": "student_club"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3f_dd131",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Counting rows that satisfy a filter inside a HAVING-constrained join returns the count of qualifying meetings rather than the total number of events attended by more than 10 members, which is the quantity the question asks for.",
+      "domain": "student_club"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3e_fbrss",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "The district region value 'East Bohemia' is stored as 'east Bohemia' in the database.",
+      "domain": "financial"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3d_e876m",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Using COUNT(DISTINCT account_id) instead of COUNT(account_id) over a join that cannot duplicate account rows produces a different result than the reference query.",
+      "domain": "financial"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3c_acbxy",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A query listing cards banned in a format joins cards to legalities on uuid and filters on format, status, and rarity.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3b_8fabe",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a query asks for cards, selecting the card identifier column rather than all columns avoids duplicate rows from the join.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq3a_1vxkc",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Elimination in the first qualifying period is represented by ordering qualifying rows by q1 descending and taking the bottom-ranked drivers via LIMIT.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq39_epz90",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "For a question asking which drivers are eliminated in the first qualifying period, selecting the driver with the maximum q1 time returns the slowest qualifier rather than the set of eliminated drivers.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq38_affgr",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Ordering by a per-month consumption column without grouping by customer returns a single month's value rather than the customer's annual total.",
+      "domain": "debit_card_specializing"
+    },
+    {
+      "fold": 1,
+      "id": "k_01hf7uaq37_d76mn",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for the customer with the least total consumption over a year, consumption must be aggregated per customer with SUM before ordering and limiting.",
+      "domain": "debit_card_specializing"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq4e_4eapp",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A query for the nationality of the driver with the fastest lap speed joins drivers to results on driverId, orders by fastestLapSpeed descending, and limits to one row.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq4d_fxbsf",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Filtering out NULL fastestLapSpeed values before ordering is unnecessary when the query only needs the top row by that column, since NULLs sort last in descending order.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq4c_bf0vq",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the california_schools schema, high schools are identified by `School Type` = 'High Schools (Public)' in the frpm table rather than by a grade-span pattern on schools.GSoffered.",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq4b_9gjs5",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the california_schools schema, the frpm table's free/reduced-price meal count column is named `Free Meal Count (Ages 5-17)`, not `FRPM Count (Ages 5-17)`.",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq4a_9wvzs",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "The question asks for the artist with the most ruling information, so the aggregation must be grouped by artist rather than by card uuid.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq49_07byc",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Grouping by a single identifier column while selecting other non-aggregated columns produces a query that does not satisfy the stated question about the artist with the most ruling information.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq48_a2vrq",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Ranking eye colour popularity for a publisher is expressed by grouping on colour.colour, counting superhero.id, and applying RANK() OVER (ORDER BY COUNT(superhero.id) DESC).",
+      "domain": "superhero"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq47_danxa",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Grouping by superhero identity and name alongside eye colour produces per-superhero rows rather than per-eye-colour popularity counts.",
+      "domain": "superhero"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq46_f30kn",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A query answering 'who is the youngest driver among those who finished race 872' selects forename and surname from drivers joined to results on driverId, filters raceId = 872 and non-null time, orders by dob descending, and limits to 1.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq45_0cad2",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for a single attribute of a person (such as a name), the SELECT clause should project only that attribute and not include the ordering column used to determine the result.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq44_04rkm",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In SQLite, subtracting a date string from DATETIME() yields a duration rather than a calendar age, so age requires explicit year/month/day arithmetic.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq43_3s89t",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Computing age by subtracting the year of a birthday from the current year via strftime ignores the month and day, producing an off-by-one age for players whose birthday has not yet occurred this year.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq42_4zy32",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Peak-period questions over a joined fact table require grouping by the extracted period and ordering by the aggregate SUM of the measure, rather than ordering raw rows.",
+      "domain": "debit_card_specializing"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq41_8tezy",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for a peak month, the result must be the month component extracted from the date column, not the full date value.",
+      "domain": "debit_card_specializing"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq40_bt4et",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "The district's average salary attribute (A11) must be joined to the account via the account's own district_id, not via the client's district_id.",
+      "domain": "financial"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3v_a8w94",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Using MAX(birth_date) to identify the youngest client fails when multiple clients share the same birth date, since it does not select a single youngest client.",
+      "domain": "financial"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3u_6w50r",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for an average of a column across grouped rows, the threshold condition belongs in HAVING over an aggregate expression rather than in WHERE over the raw column.",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3t_d5emm",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Filtering rows by a per-row column value (e.g., AvgScrMath > 400) is not equivalent to filtering groups by an aggregate of that column (e.g., SUM(AvgScrMath)/COUNT(cds) > 400).",
+      "domain": "california_schools"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3s_8xeyg",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Using SUM(CASE WHEN ... THEN 1 ELSE 0 END) over a joined table inflates counts when the join produces multiple rows per atom.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3r_fm62r",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When computing a percentage of atoms matching a condition across joined tables, the numerator and denominator must both count distinct atom identifiers to avoid row duplication from the join.",
+      "domain": "toxicology"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3q_c2rqq",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A query joining posts and comments to filter by comment attributes selects the post column and applies comment filters in the WHERE clause.",
+      "domain": "codebase_community"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3p_8saxp",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Date literals in SQL must use the ISO format 'YYYY-MM-DD HH:MM:SS' rather than slash-separated formats like 'YYYY/M/D H:MM:SS.0'.",
+      "domain": "codebase_community"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3o_bjtew",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for a driver's introduction website, the result set includes drivers.forename, drivers.surname, and drivers.url.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3n_57yw0",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In the formula_1 schema, lapTimes.time values are stored without a leading zero hour component (e.g., '1:27%' rather than '0:01:27%').",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3m_887b4",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Integer division in SQLite is avoided by multiplying the numerator count by 1.0 before dividing.",
+      "domain": "thrombosis_prediction"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3l_02xcd",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "The ratio of outpatient to inpatient counts is computed as the outpatient count divided by the inpatient count, not the reverse.",
+      "domain": "thrombosis_prediction"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3k_d32k5",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Using COUNT(DISTINCT client_id) instead of COUNT(client_id) changes the result when the join can produce duplicate client rows.",
+      "domain": "financial"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3j_8rvqr",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When filtering on a categorical column value, the literal must match the stored casing exactly, since string comparisons are case-sensitive in this schema.",
+      "domain": "financial"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3i_ffbky",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Queries joining cards to legalities on uuid should select DISTINCT status to avoid duplicate rows.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3h_fdg1w",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Using the column name 'types' instead of 'type' on the cards table causes an execution mismatch.",
+      "domain": "card_games"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3g_9g7y1",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Selecting the ordering column in the projection is unnecessary when the question only asks for identifying attributes.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3f_dd131",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When ordering by a nullable column to find an extreme value, rows with NULL in that column must be excluded by an explicit IS NOT NULL filter.",
+      "domain": "formula_1"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3e_fbrss",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A valid pattern for 'which away team won the most' is to filter away_team_goal > home_team_goal, group by the away team identifier, and order by COUNT(*) descending with LIMIT 1.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3d_e876m",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When grouping by a team name column that is not the join key, the query can return duplicate team rows if names collide; grouping by the team identifier avoids this.",
+      "domain": "european_football_2"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3c_acbxy",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "A question asking how many items of a subtype are within a group-filtered set is expressed as a set difference between the group-filtered selection and the subtype selection.",
+      "domain": "student_club"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3b_8fabe",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Filtering rows by a category condition before applying a HAVING count threshold changes which groups qualify, so the category filter must be applied after the group-count selection rather than in the same WHERE clause.",
+      "domain": "student_club"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq3a_1vxkc",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "The district region value 'East Bohemia' is stored as 'east Bohemia' in the database.",
+      "domain": "financial"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq39_epz90",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Using COUNT(DISTINCT account_id) instead of COUNT(account_id) over a join that cannot duplicate account rows produces a different result than the reference query.",
+      "domain": "financial"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq38_affgr",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Computing a percentage as SUM(...) * 100 / SUM(...) over integer columns without a REAL cast produces an incorrect result in SQLite.",
+      "domain": "thrombosis_prediction"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq37_d76mn",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "In SQLite, integer division truncates, so a percentage computed as integer_sum * 100 / integer_sum yields 0 or a truncated integer unless a cast to REAL or a decimal literal is applied.",
+      "domain": "thrombosis_prediction"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq36_8rgb1",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "Ordering by a per-row consumption column and limiting to one row does not answer a least-total-consumption question when a customer has multiple consumption rows.",
+      "domain": "debit_card_specializing"
+    },
+    {
+      "fold": 2,
+      "id": "k_01hf7uaq35_eqqr5",
+      "status": "active",
+      "trust": 0.9,
+      "statement": "When a question asks for the customer with the least total consumption over a period, the query must aggregate consumption per customer with SUM and GROUP BY before ordering and limiting.",
+      "domain": "debit_card_specializing"
+    }
+  ],
+  "generated_at": "2026-10-23T11:27:14.670Z"
+}

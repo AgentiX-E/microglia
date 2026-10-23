@@ -716,6 +716,8 @@ Failures split the way the protocol wants them to: a malformed *request* is a JS
 | `MG_E_SCHEMA_INVALID` | domain registry missing a role | one temporal, two categories, two measures |
 | `MG_E_NOT_OPEN` | write after `close()` | reads stay valid; writes do not |
 | `MG_E_STORE_IO` | journal path unreadable | check permissions; a directory where a file belongs |
+| `MG_E_PROVIDER_MISSING` | no provider is registered under that name | register a factory, or pass an instance |
+| `MG_E_PROVIDER_FAILED` | the provider stopped answering: retries were exhausted for several requests in a row | retry when it recovers — a loop that runs through an outage records the outage |
 
 An empty edit is an error, not a no-op: it means the user's action did not change the output, and
 recording it would teach that "nothing" is a correction.

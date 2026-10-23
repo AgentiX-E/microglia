@@ -175,7 +175,22 @@ type ArmName = 'none' | 'full' | 'gated' | 'duplicate' | 'wrong-scope' | 'stated
  */
 const MIN_COVERAGE = Math.min(1, Math.max(0, nonNegative(process.env['SOTA_MIN_COVERAGE'], 0.01)));
 
-const ARMS = parseArms(process.env['SOTA_ARMS']);
+/**
+ * `parseArms` is a library function and refuses with a `RangeError`; the lane's
+ * contract is a named configuration failure, so a typo in `SOTA_ARMS` reads the
+ * same way as a typo in `SOTA_CONVENTION` instead of as a crash.
+ */
+function armsFrom(raw: string | undefined): Set<ArmName> {
+  try {
+    return parseArms(raw) as Set<ArmName>;
+  } catch (error) {
+    throw new MicrogliaError('MG_E_CONFIG', (error as Error).message, {
+      known: OPTIONAL_ARMS.join(', '),
+    });
+  }
+}
+
+const ARMS = armsFrom(process.env['SOTA_ARMS']);
 
 function nonNegative(raw: string | undefined, fallback: number): number {
   if (raw === undefined || raw === '') return fallback;
@@ -762,8 +777,10 @@ async function learn(
       generations.set(key, reply.text);
       return reply.text;
     } catch (error) {
-      // A provider outage ends the run; a single unanswered prompt is data.
+      // Two failures end the run rather than becoming data: a spent budget and a
+      // provider that has stopped answering. A single unanswered prompt is data.
       if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+      if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
       generations.set(key, '');
       return '';
     }
