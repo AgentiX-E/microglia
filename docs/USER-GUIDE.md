@@ -741,13 +741,25 @@ Measured on a 2-vCPU CI runner, Node 22, no GPU:
 
 | Items in store | Build (replay) | `recall` p50 | `recall` p95 | Heap |
 |---|---|---|---|---|
-| 1,000 | 5 ms | 1.3 ms | 1.9–4.2 ms | 1.6 MB |
-| 5,000 | 22 ms | 1.5 ms | 2.2–4.4 ms | 7.1 MB |
-| 10,000 | 45 ms | 2.1 ms | 2.6–3.1 ms | 14 MB |
+| 1,000 | 16 ms | 1.3 ms | 1.9–3.9 ms | 6 MB |
+| 10,000 | 94 ms | 2.1 ms | 2.7–3.1 ms | 29 MB |
+| 50,000 | 421 ms | 8.9 ms | 10.8–12.2 ms | 113–119 MB |
+| 100,000 | 946 ms | 18.6 ms | 22.7–24.7 ms | 174–199 MB |
 
-The scope scan is O(n) per query. It is not the bottleneck at 10k; the next checkpoint is 100k, where
-the SQLite index becomes worthwhile. Distillation is O(events × rules); an LLM interpreter costs one
-model call per feedback event.
+Two things to read from that table, and one of them is not latency.
+
+**Latency is not your problem until very late.** The scope scan is O(n) per query, and at 100k rules it is
+still ~23 ms at p95 — one fifth of the 100 ms budget this repository gates on. A sidebar or an
+autocomplete stays comfortable.
+
+**Memory is the constraint.** About **1.7–2.0 KB per rule**: 100k rules is ~200 MB of heap in a single Node
+process. That is what a small container or a browser tab runs out of, and it arrives around **130k rules**
+against the 256 MB budget the library holds itself to. If you expect to keep more than that, plan for the
+SQLite index (the store is already an interface) rather than for a bigger box.
+
+Pack size is budgeted, not cumulative: 1k and 100k stores both inject ~258 tokens per question, because the
+pack is chosen by relevance under a character budget. Distillation is O(events × rules); an LLM interpreter
+costs one model call per feedback event.
 
 ## 14. Recipes
 
