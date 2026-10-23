@@ -739,12 +739,16 @@ Be honest about the preconditions; the product is only useful inside them.
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:
 
-| Items in store | Build (replay) | `recall` p50 | `recall` p95 | Heap |
+| Items in store | Loading them | `recall` p50 | `recall` p95 | Heap |
 |---|---|---|---|---|
 | 1,000 | 16 ms | 1.3 ms | 1.9–3.9 ms | 6 MB |
 | 10,000 | 94 ms | 2.1 ms | 2.7–3.1 ms | 29 MB |
 | 50,000 | 421 ms | 8.9 ms | 10.8–12.2 ms | 113–119 MB |
 | 100,000 | 946 ms | 18.6 ms | 22.7–24.7 ms | 174–199 MB |
+
+"Loading" is building the index from a fresh store, which is what a cold start pays. A warm reopen replays
+the journal instead, and is cheaper because the scoring already happened: **26 ms against 57 ms for 10k
+items**, measured the same way on the same machine.
 
 Two things to read from that table, and one of them is not latency.
 
