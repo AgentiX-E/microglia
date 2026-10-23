@@ -1,0 +1,351 @@
+{
+  "id": "poc-sota-attribution",
+  "source_artifact": "poc-sota-bird.json",
+  "source_generated_at": "2026-10-23T17:18:15.293Z",
+  "n": 350,
+  "summary": {
+    "rules": 1280,
+    "injectedRules": 442,
+    "helpful": 17,
+    "harmful": 42,
+    "neutral": 383,
+    "harmfulShare": 0.11396011396011396,
+    "top": [
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqmj_ajq8j",
+        "statement": "The district's average salary attribute (A11) must be joined to the account via the account's own district_id, not via the client's district_id.",
+        "injected": 4,
+        "helped": 0,
+        "hurt": 2,
+        "net": -2
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqqk_1mb88",
+        "statement": "A query answering 'which driver ranked first in the Canadian Grand Prix in 2007, give reference name' selects forename, surname, and driverRef from drivers joined through results to races filtered on race name, year, and rank = 1.",
+        "injected": 5,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqt1_8g7z0",
+        "statement": "In the formula_1 schema, a race is identified by races.name (e.g., 'Canadian Grand Prix'), not by circuits.name.",
+        "injected": 5,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqp1_es22g",
+        "statement": "Counting distinct loan account_ids joined only on loan.status = 'C' undercounts accounts with running contracts when status 'D' loans also qualify.",
+        "injected": 4,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqsn_ff8x2",
+        "statement": "In the thrombosis_prediction schema, a normal IgA level is expressed as IGA BETWEEN 80 AND 500.",
+        "injected": 4,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqsp_794b3",
+        "statement": "When counting patients filtered by a laboratory value range, the join between Patient and Examination must be made through the Laboratory table's ID rather than directly on Patient.ID.",
+        "injected": 4,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqnn_dv01m",
+        "statement": "Selecting only the user display name omits the post title that the question's phrasing implies should be returned.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqs5_6j8tc",
+        "statement": "A normal IgG range expressed as strictly greater than 900 and strictly less than 2000 is equivalent to the inclusive BETWEEN 900 AND 2000 predicate.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqtb_76223",
+        "statement": "Using a MAX subquery to filter for the highest converted mana cost returns all tied rows, whereas ordering by converted mana cost descending with a limit returns a single row.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqli_2cx01",
+        "statement": "When grouping by a team name column that is not the join key, the query can return duplicate team rows if names collide; grouping by the team identifier avoids this.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqlj_42hje",
+        "statement": "A valid pattern for 'which away team won the most' is to filter away_team_goal > home_team_goal, group by the away team identifier, and order by COUNT(*) descending with LIMIT 1.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqlk_fx1yw",
+        "statement": "Ordering by a per-row consumption column without grouping by customer returns a single row's value rather than the customer's total consumption.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqnm_cb9gf",
+        "statement": "When a question asks which user performed an action on a post, the result set should include both the user's display name and the post title.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqnq_frqev",
+        "statement": "A query for comments left by users who edited a post must relate the comment's author to the post's editor, not merely join comments and postHistory on the shared post.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqnt_dv2hx",
+        "statement": "When a question asks for the average view count per post alongside each post's title and comment, the aggregate must be grouped by the post's title and comment text rather than by post id alone.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqnv_crqbp",
+        "statement": "When a question asks which user performed an action on a post, the result set includes both the user's display name and the post title.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqp0_f44gz",
+        "statement": "In the financial schema, loan status 'C' denotes a running contract and status 'D' denotes another loan state that the edited query treats as also qualifying for the running-contract count.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqp9_faqww",
+        "statement": "Counting distinct loan account_id values joined only to account and filtering loan.status = 'C' omits loan status 'D' rows that the corrected query includes.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqs4_atz4y",
+        "statement": "Questions referencing an event date require joining event, attendance, member, and income tables to connect members to the event and their received funds.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqsu_33jw9",
+        "statement": "In the thrombosis_prediction schema, a normal IgA level is expressed as IGA BETWEEN 80 AND 500.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      }
+    ],
+    "best": [
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqn5_bnmy3",
+        "statement": "Joining races and results with table aliases and filtering on races.date yields the drivers who participated in a race on a given date.",
+        "injected": 4,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqpf_bh99r",
+        "statement": "A query answering 'which driver ranked first in the Canadian Grand Prix in 2007, give reference name' selects forename, surname, and driverRef from drivers joined through results to races filtered on race name, year, and rank = 1.",
+        "injected": 4,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqsb_2z0rw",
+        "statement": "Ruling text filtered by language is retrieved by joining foreign_data to cards on uuid and cards to sets on setCode, then filtering on set name and language.",
+        "injected": 4,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqs2_5w41f",
+        "statement": "Dividing the count of chlorine atoms by the count of distinct molecule IDs does not yield the percentage of chlorine atoms among atoms in carcinogenic molecules.",
+        "injected": 3,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqm4_1gdyr",
+        "statement": "In the california_schools schema, the school name column is `School Name` in the frpm table, not `School` in the schools table.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqo1_b3r62",
+        "statement": "Counting bond rows as the denominator for a molecule-level percentage overcounts molecules that have multiple bonds of the filtered type.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqqh_2b1e1",
+        "statement": "A query joining budget and event on link_to_event = event_id with filters on location, type, and spent=0 and projecting DISTINCT category and type satisfies the MU 215 guest speaker zero-budget category question.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqqi_7fc2n",
+        "statement": "When a question asks for a category alongside a filter attribute from a joined table, the SELECT clause must include that attribute column, not only the category.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqrb_5mp34",
+        "statement": "When a question references an event date, the query joins event to attendance to member to income rather than joining income directly to member.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqrn_1a4cw",
+        "statement": "When a question asks for a category alongside a filter attribute from a joined table, the SELECT list must include that attribute (e.g., event type) in addition to the category.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqsv_1t8g3",
+        "statement": "A valid query for listing card names and their banned formats uses table aliases T1 and T2 with INNER JOIN on uuid and GROUP BY on both selected columns.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqt9_bas7y",
+        "statement": "Filtering legalities by status = 'Legal' in the WHERE clause drops cards that have no legal format, whereas the question asks for all cards in the set with their legal formats.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqm8_008k7",
+        "statement": "When a question asks whether each expense was approved, the result should project only the approval column rather than additional descriptive columns.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqol_6dyd0",
+        "statement": "When a question asks for each school's average score and the scores table already stores an average column per school, the query selects that column joined to schools rather than applying an aggregate function.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqot_evqws",
+        "statement": "A question asking for a driver's fastest lap in the Formula 1 schema is answered by joining races, lapTimes, and drivers and ordering by lapTimes.milliseconds.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqro_ca1db",
+        "statement": "A query joining event and budget on event_id = link_to_event with filters on location, type, and spent=0, selecting DISTINCT category and type, satisfies the MU 215 guest-speaker zero-budget question.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqsk_464kj",
+        "statement": "A query joining foreign_data to cards and sets must use DISTINCT to avoid duplicate ruling text rows.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      }
+    ]
+  }
+}
