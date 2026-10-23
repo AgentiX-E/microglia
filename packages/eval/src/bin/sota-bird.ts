@@ -1248,9 +1248,12 @@ async function main(): Promise<void> {
       expected.set(idOf(row), ACTIVE.transform(value));
       return true;
     });
-    if (rows.length < 20) {
-      throw new MicrogliaError('MG_E_CONFIG', 'Too few questions define the convention', {
-        qualifying: rows.length,
+    // No minimum beyond "enough to fold": the protocol says a subset below a
+    // hundred is reported as a direction, not refused. The earlier threshold of
+    // twenty made the lane exit before it could report anything, which is how a
+    // subset of nineteen becomes silence instead of a number with a caveat.
+    if (rows.length === 0) {
+      throw new MicrogliaError('MG_E_CONFIG', 'No question defines the convention', {
         of: dataset.rows.length,
         convention: CONVENTION_NAME,
       });

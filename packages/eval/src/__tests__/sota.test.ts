@@ -37,13 +37,16 @@ describe('conventionOf', () => {
 });
 
 describe('the two house conventions', () => {
-  it('scales thousands and defines itself only on values large enough to survive it', () => {
+  it('scales thousands, and is defined for every numeric answer', () => {
     const spec = HOUSE_CONVENTIONS.thousands;
     expect(spec.transform(2_500_000)).toBe(2500);
     expect(spec.transform(2_500_400)).toBe(2500.4);
-    expect(spec.applies(1000)).toBe(true);
-    expect(spec.applies(999)).toBe(false);
+    // The subset is "one row, one numeric column", not "at least a thousand": a
+    // convention that reports in thousands is defined for 999 and for 5.
+    expect(spec.applies(999)).toBe(true);
+    expect(spec.applies(5)).toBe(true);
     expect(spec.applies(-1000)).toBe(true);
+    expect(spec.transform(5)).toBe(0.005);
   });
 
   it('rounds to ten for every numeric answer', () => {

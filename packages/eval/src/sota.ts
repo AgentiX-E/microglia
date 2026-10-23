@@ -31,7 +31,16 @@ export type ConventionSpec = {
   readonly transform: (value: number) => number;
   /** The gold query rewritten to report the way the workspace reports. */
   readonly sql: (body: string) => string;
-  /** Whether the convention is defined for this raw value. */
+  /**
+   * Whether the convention is defined for this raw value.
+   *
+   * Deliberately total. An earlier `thousands` restricted itself to values of at
+   * least a thousand, which reads sensible and is wrong for the experiment: the
+   * protocol defines its subset as "gold is one row with one numeric column", and
+   * the extra filter cut the qualifying set below the floor the protocol needs,
+   * so the lane refused to run at all. A convention that reports in thousands is
+   * defined for 5 (0.005) as much as for 5,000,000.
+   */
   readonly applies: (value: number) => boolean;
 };
 
@@ -40,7 +49,7 @@ export const HOUSE_CONVENTIONS = {
     sentence: 'This workspace reports numeric answers in thousands, rounded to three decimals.',
     transform: (value: number): number => Math.round((value / 1000) * 1000) / 1000,
     sql: (body: string): string => `SELECT ROUND((${body}) / 1000.0, 3)`,
-    applies: (value: number): boolean => Math.abs(value) >= 1000,
+    applies: (): boolean => true,
   },
   round10: {
     sentence: 'This workspace reports every numeric answer rounded to the nearest ten.',
