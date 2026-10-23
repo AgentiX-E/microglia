@@ -64,6 +64,26 @@ describe('doctor diagnostics', () => {
     await memory.close();
   });
 
+  it('calls it a warning when every claim is waiting, not a note', async () => {
+    // A store where *nothing* is usable is a different situation from one with a
+    // few waiting lessons: the first is a workspace that will never learn anything
+    // from prose, and reporting it as `info` buried it under ordinary notes.
+    const memory = await store();
+    await memory.putKnowledge({
+      ...makeItem({}, 'c1'),
+      status: 'candidate',
+      statusReason: 'needs-corroboration',
+    });
+    const result = await diagnose({ memory, namespace: 'acme', policy: defaultPolicy, now: at });
+    const awaiting = result.issues.find((issue) => issue.code === 'MG_D_AWAITING_CORROBORATION');
+    expect(awaiting?.severity).toBe('warn');
+
+    await memory.putKnowledge({ ...makeItem({}, 'a1'), status: 'active' });
+    const mixed = await diagnose({ memory, namespace: 'acme', policy: defaultPolicy, now: at });
+    expect(mixed.issues.find((issue) => issue.code === 'MG_D_AWAITING_CORROBORATION')?.severity).toBe('info');
+    await memory.close();
+  });
+
   it('reports feedback with no knowledge as informational only', async () => {
     const memory = await store();
     const mg = await openMicroglia({

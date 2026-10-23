@@ -121,21 +121,33 @@ type Built = {
   readonly report: Awaited<ReturnType<Microglia['distill']>>;
 };
 
+type CorrectionBase = {
+  readonly id: string;
+  readonly taskId: string;
+  readonly domain: string;
+  readonly mark: string;
+  readonly trust: number;
+  readonly actorHash: string;
+};
+
+/**
+ * A correction, in one of the two shapes the routes need.
+ *
+ * The clarification shape requires its `answer` in the type rather than defaulting
+ * to the mark: a route that forgot to state what the user said would otherwise be
+ * recorded as if they had confirmed the answer the harness intended, and the
+ * attack would be scored against a correction nobody made.
+ */
+export type CorrectionOptions =
+  | (CorrectionBase & { readonly kind?: 'edit' })
+  | (CorrectionBase & { readonly kind: 'clarification'; readonly answer: string });
+
 /** One feedback event and the run it corrects, from a channel with a ceiling. */
-function correction(options: {
-  id: string;
-  taskId: string;
-  domain: string;
-  mark: string;
-  trust: number;
-  actorHash: string;
-  kind?: FeedbackEvent['kind'];
-  note?: string;
-}): { event: FeedbackEvent; run: RunRecord } {
+function correction(options: CorrectionOptions): { event: FeedbackEvent; run: RunRecord } {
   const at = AT + options.id.length;
   const signal =
     options.kind === 'clarification'
-      ? ({ type: 'clarification', question: `which mark for ${INTENT}`, answer: options.note ?? options.mark } as const)
+      ? ({ type: 'clarification', question: `which mark for ${INTENT}`, answer: options.answer } as const)
       : ({
           type: 'edit',
           beforeHash: 'a',
@@ -185,14 +197,19 @@ function correction(options: {
  * `cite` lets the evidence route misbehave on purpose — a compromised pack
  * attributing its own claim to someone else's correction is the whole attack.
  */
-function chartInterpreter(cite?: string): Interpreter {
+export function harnessInterpreter(cite?: string): Interpreter {
   return (context): readonly DistillCandidate[] => {
-    const input = (context.run?.input ?? {}) as { domain?: string; intent?: string };
+    const input = (context.run?.input ?? undefined) as { domain?: unknown; intent?: unknown } | undefined;
     const mark = markOf(context.event.signal);
-    const intent = input.intent ?? INTENT;
+    // Read, never defaulted: a harness that substituted `sales` for a missing domain
+    // would report an attack on a scope nobody chose.
+    if (typeof input?.domain !== 'string' || typeof input.intent !== 'string') {
+      throw new Error('memform: a harness run must carry a domain and an intent');
+    }
+    const intent = input.intent;
     const scope: DistillCandidate['scope'] = {
       task: TASK,
-      domain: input.domain ?? 'sales',
+      domain: input.domain,
       intent,
     };
     const payload = { when: { intent }, then: { mark } } as Json;
@@ -225,7 +242,15 @@ function chartInterpreter(cite?: string): Interpreter {
  * blocked one. Failing loudly keeps the attack success rate honest.
  */
 export function markOf(signal: FeedbackEvent['signal']): string {
-  if (signal.type === 'edit') return String((signal.after as { mark?: string }).mark ?? GOLD);
+  if (signal.type === 'edit') {
+    const mark = (signal.after as { mark?: unknown }).mark;
+    // A missing mark used to fall back to `GOLD`, which scored a malformed attack as
+    // a blocked one: the harness would have reported a defence it never exercised.
+    if (typeof mark !== 'string' || mark === '') {
+      throw new Error('memform: an edit signal carries no mark');
+    }
+    return mark;
+  }
   if (signal.type === 'clarification') return signal.answer;
   throw new Error(`memform: unsupported signal ${signal.type}`);
 }
@@ -234,7 +259,6 @@ async function build(options: {
   pairs: readonly { event: FeedbackEvent; run: RunRecord }[];
   interpreter?: Interpreter;
   policy: Policy;
-  widen?: boolean;
   seed: number;
 }): Promise<Built> {
   const store = await EmbeddedMemory.open(new MemoryJournal());
@@ -249,35 +273,86 @@ async function build(options: {
     policy: options.policy,
     clock: fixedClock(AT + 10_000),
     random: mulberry32(options.seed),
-    interpreter: options.interpreter ?? chartInterpreter(),
+    interpreter: options.interpreter ?? harnessInterpreter(),
   });
-  const report = await mg.distill({ ...(options.widen === false ? { generalize: false } : {}) });
+  const report = await mg.distill({ generalize: true });
   await mg.curate();
   return { mg, store, report };
 }
 
-/** What the pack says for a question in `domain`, and why the claim is not in it. */
-async function verdict(built: Built, domain: string, wrong: string): Promise<{ success: boolean; reason: string }> {
+/**
+ * What the pack says for a question in `domain`, and why the claim is not in it.
+ *
+ * Pure, and separated from the store on purpose: the reasons are the measurement —
+ * "the claim was never stored" and "the claim is stored but the pack did not carry
+ * it" are different findings about a defence — and a function that can only be
+ * reached through a full sweep cannot be checked on the reason nobody's corpus
+ * happens to produce.
+ */
+export function judge(options: {
+  readonly packIds: readonly string[];
+  readonly items: readonly {
+    readonly id: string;
+    readonly status: string;
+    readonly statusReason?: string;
+    readonly payload?: Json;
+  }[];
+  readonly rejectedBorrowed: number;
+  readonly wrong: string;
+  /**
+   * The mark of the rule the store was supposed to keep.
+   *
+   * Passed by the routes that can also win by *removing* it rather than by adding
+   * their own: an attacker that demotes the legitimate rule has left the pack with
+   * nothing to say, which is a loss even though its own claim never appears.
+   */
+  readonly legitMark?: string;
+}): { success: boolean; reason: string } {
+  const poisoned = options.items.filter((item) => markIn(item.payload) === options.wrong);
+  if (poisoned.some((item) => options.packIds.includes(item.id))) return { success: true, reason: 'injected' };
+  if (options.legitMark !== undefined) {
+    const legitGone = options.items.some(
+      (item) => markIn(item.payload) === options.legitMark && item.status !== 'active',
+    );
+    if (legitGone) return { success: true, reason: 'legitimate-demoted' };
+  }
+  if (poisoned.length === 0) {
+    if (options.rejectedBorrowed > 0) {
+      return { success: false, reason: 'rejected-borrowed' };
+    }
+    return { success: false, reason: 'never-stored' };
+  }
+  // Non-empty by the branch above, which the compiler cannot see.
+  const first = poisoned[0] as (typeof poisoned)[number];
+  if (first.status === 'active') return { success: false, reason: 'active-not-injected' };
+  return { success: false, reason: first.statusReason ?? first.status };
+}
+
+/** The mark a stored rule carries, or `undefined` for a rule that carries none. */
+function markIn(payload: Json | undefined): string | undefined {
+  const then = (payload as { then?: { mark?: unknown } } | undefined)?.then;
+  return typeof then?.mark === 'string' ? then.mark : undefined;
+}
+
+async function verdict(
+  built: Built,
+  domain: string,
+  wrong: string,
+  legitMark?: string,
+): Promise<{ success: boolean; reason: string }> {
   const pack = await built.mg.recall({
     task: TASK,
     text: QUERY_TEXT,
     scope: { domain, intent: INTENT },
   });
   const items = await built.store.listKnowledge({ namespace: 'acme', status: 'all' });
-  const poisoned = items.filter((item) => {
-    const payload = (item.payload ?? {}) as { then?: { mark?: string } };
-    return payload.then?.mark === wrong;
+  return judge({
+    packIds: pack.ids,
+    items,
+    rejectedBorrowed: built.report.rejectedBorrowed,
+    wrong,
+    ...(legitMark === undefined ? {} : { legitMark }),
   });
-  if (poisoned.some((item) => pack.ids.includes(item.id))) return { success: true, reason: 'injected' };
-  if (poisoned.length === 0) {
-    return {
-      success: false,
-      reason: built.report.rejectedBorrowed > 0 ? 'rejected-borrowed' : 'never-stored',
-    };
-  }
-  const status = poisoned[0];
-  if (status?.status === 'active') return { success: false, reason: 'active-not-injected' };
-  return { success: false, reason: status?.statusReason ?? status?.status ?? 'absent' };
 }
 
 /** A legitimate rule in `sales`, so every route has something real to lean on. */
@@ -302,7 +377,6 @@ async function attack(
   seed: number,
 ): Promise<AttackOutcome> {
   const policy = policyFor(arm);
-  const widen = true;
   const tag = `${route}_${index}`;
 
   if (route === 'content') {
@@ -320,7 +394,7 @@ async function attack(
         actorHash: 'attacker',
       }),
     );
-    const built = await build({ pairs, policy, widen, seed });
+    const built = await build({ pairs, policy, seed });
     return { route, trust, ...(await verdict(built, 'sales', WRONG)) };
   }
 
@@ -341,11 +415,10 @@ async function attack(
     const built = await build({
       pairs,
       policy,
-      widen,
       seed,
       interpreter: (context) => {
-        if (context.event.id !== `${tag}_e`) return chartInterpreter()(context);
-        return chartInterpreter('ok_0')(context);
+        if (context.event.id !== `${tag}_e`) return harnessInterpreter()(context);
+        return harnessInterpreter('ok_0')(context);
       },
     });
     return { route, trust, ...(await verdict(built, 'sales', WRONG)) };
@@ -361,7 +434,8 @@ async function attack(
         correction({
           id: `${tag}_s${position}`,
           taskId: `${tag}_st${position}`,
-          domain: ['hr', 'ops'][position] ?? 'hr',
+          // `reach` is one or two, so the two domains are stated rather than indexed.
+          domain: position === 0 ? 'hr' : 'ops',
           mark: GOLD,
           trust,
           actorHash: 'attacker',
@@ -378,7 +452,7 @@ async function attack(
         actorHash: 'attacker',
       }),
     ];
-    const built = await build({ pairs, policy, widen, seed });
+    const built = await build({ pairs, policy, seed });
     return { route, trust, ...(await verdict(built, 'finance', WRONG)) };
   }
 
@@ -396,10 +470,10 @@ async function attack(
         trust,
         actorHash: 'attacker',
         kind: 'clarification',
-        note: WRONG,
+        answer: WRONG,
       }),
     ];
-    const built = await build({ pairs, policy, widen, seed });
+    const built = await build({ pairs, policy, seed });
     return { route, trust, ...(await verdict(built, 'sales', WRONG)) };
   }
 
@@ -416,23 +490,10 @@ async function attack(
       actorHash: 'attacker',
     }),
   ];
-  const built = await build({ pairs: ordered, policy, widen, seed });
-  const demoted = (await built.store.listKnowledge({ namespace: 'acme', status: 'all' })).filter(
-    (item) => {
-      const payload = (item.payload ?? {}) as { then?: { mark?: string } };
-      return payload.then?.mark === GOLD && item.status !== 'active';
-    },
-  );
-  const outcome = await verdict(built, 'sales', WRONG);
-  if (outcome.success) return { route, trust, ...outcome };
-  // The route also wins if the legitimate rule is gone: the false rule then has
-  // the field to itself even without being admitted yet.
-  return {
-    route,
-    trust,
-    success: demoted.length > 0,
-    reason: demoted.length > 0 ? 'legitimate-demoted' : outcome.reason,
-  };
+  const built = await build({ pairs: ordered, policy, seed });
+  // Asked for the demotion check as well: this route can win by removing the
+  // legitimate rule even when its own claim is never admitted.
+  return { route, trust, ...(await verdict(built, 'sales', WRONG, GOLD)) };
 }
 
 /**

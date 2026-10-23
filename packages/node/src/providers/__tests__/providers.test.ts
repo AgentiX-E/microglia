@@ -91,4 +91,52 @@ describe('zhipu embeddings', () => {
     const base = await peer(() => ({ status: 429, body: { error: 'quota' } }));
     await expect(zhipuEmbeddings({ apiKey: 'k', baseUrl: base }).embed(['a'])).rejects.toThrow(/Zhipu returned 429/);
   });
+
+  it('lets the declarative form set the model and the base URL', async () => {
+    // The factory is what a config file reaches, so an ignored `model` would mean a
+    // deployment silently ran a different model than it declared — and an ignored
+    // `baseUrl` would mean it called the vendor instead of the gateway.
+    let path = '';
+    const base = await peer((url) => {
+      path = url;
+      return { status: 200, body: { data: [{ embedding: [0.1, 0.2] }] } };
+    });
+    const provider = zhipuFactory({ apiKey: 'k', model: 'embedding-3', baseUrl: base });
+    expect(provider.id).toBe('zhipu:embedding-3');
+    const vectors = await provider.embed(['hello']);
+    expect(vectors).toEqual([[0.1, 0.2]]);
+    expect(path).toBe('/embeddings');
+  });
+
+  it('refuses a reply whose entry holds no vector, instead of indexing an empty one', async () => {
+    // The count would have matched: two inputs, two entries. An empty vector would
+    // then reach the index, where every comparison against it is meaningless and no
+    // consumer could tell that from a genuine miss.
+    const base = await peer(() => ({ status: 200, body: { data: [{}, { embedding: [1] }] } }));
+    const provider = zhipuEmbeddings({ apiKey: 'k', baseUrl: base });
+    await expect(provider.embed(['a', 'b'])).rejects.toThrow(/no vector/);
+    const zero = await peer(() => ({ status: 200, body: { data: [{ embedding: [] }] } }));
+    await expect(zhipuEmbeddings({ apiKey: 'k', baseUrl: zero }).embed(['a'])).rejects.toThrow(/no vector/);
+  });
+});
+
+describe('the declarative form of both providers', () => {
+  it('falls back to the documented default model when the config names none', async () => {
+    const base = await peer(() => ({ status: 200, body: { choices: [{ message: { content: 'ok' } }] } }));
+    const provider = deepseekFactory({ apiKey: 'k', baseUrl: base });
+    expect(provider.id).toBe('deepseek:deepseek-chat');
+  });
+
+  it('gives deepseek the model and base URL it was configured with', async () => {
+    let path = '';
+    const base = await peer((url) => {
+      path = url;
+      return { status: 200, body: { choices: [{ message: { content: 'ok' } }] } };
+    });
+    const provider = deepseekFactory({ apiKey: 'k', model: 'deepseek-reasoner', baseUrl: base });
+    expect(provider.id).toBe('deepseek:deepseek-reasoner');
+    const reply = await provider.complete({ prompt: 'q' });
+    expect(reply.model).toBe('deepseek-reasoner');
+    expect(path).toBe('/chat/completions');
+  });
 });

@@ -69,6 +69,74 @@ export function statusFor(code: MicrogliaErrorCode): 400 | 401 | 409 | 413 | 500
 }
 
 /**
+ * A parsed query parameter, or the reason it could not be parsed.
+ *
+ * A union rather than a fallback: `?status=bogus` used to reach the store as an
+ * unknown status and come back as an empty list with a 200, which reads as "you
+ * have no knowledge" — a lie that a caller has no way to notice. Every call site
+ * now has to answer both arms, and the route answers the failing one with a 400.
+ */
+export type ParsedQuery<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly reason: string };
+
+/** The two statuses the API defines. `all` includes retired and quarantined. */
+const STATUSES = ['active', 'all'] as const;
+
+/** `?status=`, defaulting to `active`: the list a host polls is the live one. */
+export function parseStatusQuery(raw: string | undefined): ParsedQuery<'active' | 'all'> {
+  if (raw === undefined) return { ok: true, value: 'active' };
+  const match = STATUSES.find((status) => status === raw);
+  if (match === undefined) {
+    return { ok: false, reason: `status must be one of ${STATUSES.join(', ')}, got '${raw}'` };
+  }
+  return { ok: true, value: match };
+}
+
+/**
+ * `?limit=`, absent meaning no limit.
+ *
+ * The digits are checked as text, not as a number: `Number('2.0')` is 2 and
+ * `Number('1e3')` is 1000, so a numeric check would accept a decimal point and a
+ * scientific literal and then behave as though neither had been written. `limit`
+ * is a count of rows; the grammar for a count is digits.
+ */
+export function parseLimitQuery(raw: string | undefined): ParsedQuery<number | undefined> {
+  if (raw === undefined) return { ok: true, value: undefined };
+  const trimmed = raw.trim();
+  if (!/^[1-9]\d*$/.test(trimmed)) {
+    return { ok: false, reason: `limit must be a positive integer, got '${raw}'` };
+  }
+  const value = Number(trimmed);
+  if (!Number.isSafeInteger(value)) {
+    return { ok: false, reason: `limit must be a safe integer, got '${raw}'` };
+  }
+  return { ok: true, value };
+}
+
+/**
+ * Remember an idempotent result, keeping the map bounded.
+ *
+ * Bounded because the map is per process and unbounded only in the sense that a
+ * long-lived host would grow it forever: 1,000 recent keys is more than a retry
+ * window needs, and the oldest is evicted first. The eviction is here rather than
+ * inside the route so it can be exercised without 1,001 requests.
+ */
+export const IDEMPOTENCY_CAPACITY = 1000;
+
+export function remember(
+  seen: Map<string, { runId: string; eventId: string }>,
+  key: string,
+  value: { runId: string; eventId: string },
+): void {
+  if (seen.size >= IDEMPOTENCY_CAPACITY) {
+    const oldest = seen.keys().next().value;
+    if (oldest !== undefined) seen.delete(oldest);
+  }
+  seen.set(key, value);
+}
+
+/**
  * A selector body, validated field by field.
  *
  * Unknown fields are rejected rather than ignored: `{ taskID: 'x' }` is a typo
@@ -232,32 +300,46 @@ export function createApp(options: AppOptions): Hono {
       ...(parsed.run.parentRunId === undefined ? {} : { parentRunId: parsed.run.parentRunId }),
     });
     await run.complete(parsed.run.output as Json);
-    const event = await run.feedback(parsed.feedback);
+    const event = await run.feedback(parsed.feedback, {
+      ...(parsed.run.actorIdHash === undefined
+        ? {}
+        : { actor: { type: 'user' as const, idHash: parsed.run.actorIdHash } }),
+    });
     const result = { runId: run.id, eventId: event.id };
-    if (key !== undefined) {
-      if (seen.size >= 1000) {
-        const oldest = seen.keys().next().value;
-        if (oldest !== undefined) seen.delete(oldest);
-      }
-      seen.set(key, result);
-    }
+    if (key !== undefined) remember(seen, key, result);
     return c.json(result, 201);
   });
 
   app.post('/v1/distill', async (c) => {
     const body = (await c.req.json().catch(() => ({}))) as { generalize?: unknown };
+    // Present and not a boolean is a refusal, not a default. `"false"` is a truthy
+    // string, so dropping it silently applied the wider behaviour the caller was
+    // trying to switch off.
+    if (body.generalize !== undefined && typeof body.generalize !== 'boolean') {
+      return c.json(
+        { error: 'MG_E_SCHEMA_INVALID', message: 'generalize must be a boolean when present' },
+        400,
+      );
+    }
     const report = await options.microglia.distill({
-      ...(typeof body.generalize === 'boolean' ? { generalize: body.generalize } : {}),
+      ...(body.generalize === undefined ? {} : { generalize: body.generalize }),
     });
     return c.json(report);
   });
 
   app.get('/v1/knowledge', async (c) => {
-    const status = c.req.query('status');
+    const parsed = parseStatusQuery(c.req.query('status'));
+    if (!parsed.ok) {
+      return c.json({ error: 'MG_E_SCHEMA_INVALID', message: parsed.reason }, 400);
+    }
+    const limited = parseLimitQuery(c.req.query('limit'));
+    if (!limited.ok) {
+      return c.json({ error: 'MG_E_SCHEMA_INVALID', message: limited.reason }, 400);
+    }
     const items = await options.microglia.store.listKnowledge({
       namespace: options.microglia.namespace,
-      ...(status === undefined ? { status: 'active' } : { status: status as 'active' | 'all' }),
-      ...(c.req.query('limit') === undefined ? {} : { limit: Number(c.req.query('limit')) }),
+      status: parsed.value,
+      ...(limited.value === undefined ? {} : { limit: limited.value }),
     });
     return c.json({
       count: items.length,
@@ -329,16 +411,57 @@ type Ingest = {
     readonly taskId?: string;
     readonly attempt?: number;
     readonly parentRunId?: string;
+    /**
+     * A salted hash of who produced this reaction, when the host has one.
+     *
+     * Without it `POST /v1/forget { actorHash }` — a documented selector — matched
+     * nothing and answered 200: the surface accepted a request it could never
+     * satisfy. It is an identity for erasure only; the actor *type* stays `user`,
+     * because trust never climbs on a claim the requester makes about itself.
+     */
+    readonly actorIdHash?: string;
   };
   readonly feedback: FeedbackInput;
 };
 
+const INGEST_FIELDS = new Set(['run', 'feedback']);
+const RUN_FIELDS = new Set([
+  'task',
+  'input',
+  'output',
+  'sessionId',
+  'model',
+  'packIds',
+  'taskId',
+  'attempt',
+  'parentRunId',
+  'actorIdHash',
+]);
+
+/**
+ * Reject an unknown field, naming it.
+ *
+ * Lenient parsing is how a typo becomes a silent behaviour change: `run.taskID`
+ * was dropped, so the task grouping the caller asked for never happened and three
+ * attempts at one job counted as three independent endorsements. The erasure
+ * selector has refused unknown fields since it was written for the same reason;
+ * this is the same rule at the other end of the surface.
+ */
+function unknownField(record: Record<string, unknown>, allowed: ReadonlySet<string>): string | undefined {
+  for (const key of Object.keys(record)) if (!allowed.has(key)) return `unknown field: ${key}`;
+  return undefined;
+}
+
 function parseIngest(body: unknown): Ingest | { error: string } {
   if (typeof body !== 'object' || body === null) return { error: 'body must be an object' };
   const record = body as Record<string, unknown>;
+  const unknown = unknownField(record, INGEST_FIELDS);
+  if (unknown !== undefined) return { error: unknown };
   const run = record['run'];
   if (typeof run !== 'object' || run === null) return { error: 'run is required' };
   const runRecord = run as Record<string, unknown>;
+  const unknownRun = unknownField(runRecord, RUN_FIELDS);
+  if (unknownRun !== undefined) return { error: `run.${unknownRun.replace('unknown field: ', '')} is not a field` };
   const task = runRecord['task'];
   const input = runRecord['input'];
   const output = runRecord['output'];
@@ -358,6 +481,10 @@ function parseIngest(body: unknown): Ingest | { error: string } {
   if (attempt !== undefined && (!Number.isInteger(attempt) || (attempt as number) < 1)) {
     return { error: 'run.attempt must be a positive integer' };
   }
+  const actorIdHash = runRecord['actorIdHash'];
+  if (actorIdHash !== undefined && (typeof actorIdHash !== 'string' || actorIdHash === '')) {
+    return { error: 'run.actorIdHash must be a non-empty string' };
+  }
   const parentRunId = runRecord['parentRunId'];
   if (parentRunId !== undefined && typeof parentRunId !== 'string') {
     return { error: 'run.parentRunId must be a string' };
@@ -373,6 +500,7 @@ function parseIngest(body: unknown): Ingest | { error: string } {
       ...(taskId === undefined ? {} : { taskId }),
       ...(attempt === undefined ? {} : { attempt: attempt as number }),
       ...(parentRunId === undefined ? {} : { parentRunId }),
+      ...(actorIdHash === undefined ? {} : { actorIdHash }),
     },
     feedback: feedback.value,
   };

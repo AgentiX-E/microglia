@@ -42,7 +42,18 @@ export function zhipuEmbeddings(options: ZhipuOptions): EmbeddingProvider {
         });
       }
       const body = (await response.json()) as { data?: { embedding?: number[] }[] };
-      const vectors = (body.data ?? []).map((entry) => entry.embedding ?? []);
+      const data = body.data ?? [];
+      // An entry with no vector is a malformed reply, not a similarity of zero. The
+      // empty vector would flow into an index where every comparison against it is
+      // meaningless, and nothing downstream could tell that from a real miss.
+      const missing = data.findIndex((entry) => entry.embedding === undefined || entry.embedding.length === 0);
+      if (missing !== -1) {
+        throw new MicrogliaError('MG_E_PROVIDER_MISSING', 'Zhipu returned an entry with no vector', {
+          index: missing,
+          received: data.length,
+        });
+      }
+      const vectors = data.map((entry) => entry.embedding as number[]);
       if (vectors.length !== texts.length) {
         throw new MicrogliaError('MG_E_PROVIDER_MISSING', 'Zhipu returned a different number of vectors', {
           expected: texts.length,

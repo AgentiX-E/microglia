@@ -151,6 +151,39 @@ describe('curation', () => {
     await store.close();
   });
 
+  it('breaks a density tie by id, so the same store prunes the same rule', async () => {
+    // Two rules with equal utility are equally expensive to lose, and a comparator
+    // that returned 0 for the tie would leave the outcome to the sort's stability.
+    // Pruning must be reproducible from the store alone.
+    const a = item('k_1', 'Revenue uses a line chart.');
+    const b = item('k_2', 'Revenue uses a donut chart.');
+    expect(density({ ...a, utility: { injected: 2, flippedUp: 1, flippedDown: 1 } })).toBe(
+      density({ ...b, utility: { injected: 2, flippedUp: 1, flippedDown: 1 } }),
+    );
+    const c = item('k_3', 'Revenue uses a scatter chart.');
+    // Newest first, so the bucket is listed k_3, k_2, k_1 and the comparator is
+    // called with the smaller id on the left as well as on the right. A comparator
+    // tested in one direction only is a comparator half verified.
+    const store = await storeWith([
+      { ...a, utility: { injected: 2, flippedUp: 1, flippedDown: 1 }, updatedAt: AT + 1 },
+      { ...b, utility: { injected: 2, flippedUp: 1, flippedDown: 1 }, updatedAt: AT + 2 },
+      { ...c, utility: { injected: 2, flippedUp: 1, flippedDown: 1 }, updatedAt: AT + 3 },
+    ]);
+    const report = await curateKnowledge(store, defaultPolicy, AT + 10, {
+      maxItemsPerTask: 1,
+      prune: true,
+    });
+    // Three items, one survivor: the two lowest densities go, and the tie between
+    // them is broken by id.
+    expect(report.pruned).toBe(2);
+    const after = await store.listKnowledge({ status: 'all' });
+    expect(after.filter((entry) => entry.status === 'retired').map((entry) => entry.id).sort()).toEqual([
+      'k_1',
+      'k_2',
+    ]);
+    await store.close();
+  });
+
   it('rejects options that would silently do something else', async () => {
     const store = await storeWith([]);
     await expect(curateKnowledge(store, defaultPolicy, AT, { mergeThreshold: 0 })).rejects.toThrow(
@@ -228,6 +261,23 @@ describe('curation edges', () => {
     );
     await forward.close();
     await backward.close();
+  });
+
+  it('orders merged evidence by id when two observations share a timestamp', async () => {
+    // Two corrections can land on the same clock tick. Ordering them by arrival
+    // would make a store's evidence depend on which request the network delivered
+    // first, and the replay lane would then compare two equivalent stores unequal.
+    const statement = 'Revenue questions use a line chart.';
+    const later = { feedbackId: 'fb_z', runId: 'run_z', at: AT, weight: 0.9 };
+    const earlier = { feedbackId: 'fb_a', runId: 'run_a', at: AT, weight: 0.9 };
+    const store = await storeWith([
+      { ...item('k_1', statement), evidence: [later] },
+      { ...item('k_2', statement), evidence: [earlier] },
+    ]);
+    await curateKnowledge(store, defaultPolicy, AT + 10);
+    const merged = (await store.listKnowledge({ status: 'all' }))[0];
+    expect(merged?.evidence.map((entry) => entry.feedbackId)).toEqual(['fb_a', 'fb_z']);
+    await store.close();
   });
 
   it('collapses punctuation and case variants, and counts every closure', async () => {

@@ -1,7 +1,19 @@
 import { describe, expect, it } from 'vitest';
 import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
-import { openMicroglia, type MicrogliaErrorCode } from '@agentix-e/microglia-core';
-import { createApp, statusFor } from '../app.js';
+import {
+  createKnowledgeItem,
+  defaultPolicy,
+  openMicroglia,
+  type MicrogliaErrorCode,
+} from '@agentix-e/microglia-core';
+import {
+  IDEMPOTENCY_CAPACITY,
+  createApp,
+  parseLimitQuery,
+  parseStatusQuery,
+  remember,
+  statusFor,
+} from '../app.js';
 
 const TOKEN = 'test-token';
 
@@ -133,6 +145,18 @@ describe('http surface', () => {
     expect(minimal.status).toBe(201);
   });
 
+  it('refuses an oversized MCP body with 413 rather than parsing it', async () => {
+    const store = await EmbeddedMemory.open(new MemoryJournal());
+    const microglia = await openMicroglia({ app: 'test', namespace: 'acme', store });
+    const app = createApp({ microglia, token: TOKEN, maxBodyBytes: 16 });
+    const response = await app.request('/v1/mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    expect(response.status).toBe(413);
+  });
+
   it('refuses a body above the configured limit', async () => {
     const store = await EmbeddedMemory.open(new MemoryJournal());
     const microglia = await openMicroglia({ app: 'test', namespace: 'acme', store });
@@ -186,6 +210,141 @@ describe('http surface', () => {
 
     const missingRoute = await app.request('/v1/nope', { headers: { authorization: `Bearer ${TOKEN}` } });
     expect(missingRoute.status).toBe(404);
+  });
+});
+
+describe('the ingest body is a contract, not a suggestion', () => {
+  it('rejects a misspelt run field instead of dropping what it meant', async () => {
+    // `run.taskID` used to be discarded without a word, so the grouping the caller
+    // asked for never happened and three attempts at one job were counted as three
+    // independent endorsements. A typo has to be an error, not a silence.
+    const { app, store } = await mount({ token: TOKEN });
+    const response = await post(app, '/v1/feedback', { ...edit, run: { ...edit.run, taskID: 't_1' } });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: 'run.taskID is not a field' });
+    expect(await store.listEvents()).toHaveLength(0);
+  });
+
+  it('rejects an unknown top-level field too', async () => {
+    const { app } = await mount({ token: TOKEN });
+    const response = await post(app, '/v1/feedback', { ...edit, meta: { ui: 'sidebar' } });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: 'unknown field: meta' });
+  });
+
+  it('takes an actor hash of the right shape and refuses any other', async () => {
+    const { app, store } = await mount({ token: TOKEN });
+    for (const bad of ['', 7, null]) {
+      const response = await post(app, '/v1/feedback', { ...edit, run: { ...edit.run, actorIdHash: bad } });
+      expect(response.status).toBe(400);
+    }
+    const good = await post(app, '/v1/feedback', { ...edit, run: { ...edit.run, actorIdHash: 'sha256:x' } });
+    expect(good.status).toBe(201);
+    const [event] = await store.listEvents();
+    expect(event?.actor).toEqual({ type: 'user', idHash: 'sha256:x' });
+  });
+});
+
+describe('the idempotency map is bounded on purpose', () => {
+  it('keeps the newest keys and evicts the oldest once it is full', () => {
+    // Tested directly rather than through 1,001 requests: the map is the unit, and
+    // a route test that made a thousand round trips would be slow and would still
+    // not say which key was dropped.
+    const seen = new Map<string, { runId: string; eventId: string }>();
+    for (let i = 0; i < IDEMPOTENCY_CAPACITY; i += 1) {
+      remember(seen, `k${i}`, { runId: `run_${i}`, eventId: `fb_${i}` });
+    }
+    expect(seen.size).toBe(IDEMPOTENCY_CAPACITY);
+    remember(seen, 'overflow', { runId: 'run_x', eventId: 'fb_x' });
+    expect(seen.size).toBe(IDEMPOTENCY_CAPACITY);
+    expect(seen.has('k0')).toBe(false);
+    expect(seen.has('overflow')).toBe(true);
+    expect(seen.has(`k${IDEMPOTENCY_CAPACITY - 1}`)).toBe(true);
+  });
+});
+
+describe('the query string is input, not decoration', () => {
+  it('rejects a status it does not define, instead of listing nothing', async () => {
+    // `?status=bogus` used to answer 200 with an empty list: a typo read as "you
+    // have no knowledge". An empty answer to a valid question is a fact; an empty
+    // answer to an invalid one is a lie with a 200 in front of it.
+    const { app } = await mount({ token: TOKEN });
+    const response = await app.request('/v1/knowledge?status=bogus', {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: 'MG_E_SCHEMA_INVALID' });
+  });
+
+  it('rejects a limit that is not a positive integer', async () => {
+    const { app } = await mount({ token: TOKEN });
+    for (const raw of ['abc', '-1', '0', '1.5', '']) {
+      const response = await app.request(`/v1/knowledge?limit=${raw}`, {
+        headers: { authorization: `Bearer ${TOKEN}` },
+      });
+      expect({ raw, status: response.status }).toEqual({ raw, status: 400 });
+    }
+  });
+
+  it('honours a limit it accepted, and lists everything without one', async () => {
+    const { app, store } = await mount({ token: TOKEN });
+    // Written through the store rather than distilled: this is a test of the query
+    // string, and a domain-blind facade would distil nothing to page through.
+    for (const [index, id] of ['k_1', 'k_2'].entries()) {
+      await store.putKnowledge(
+        createKnowledgeItem(
+          {
+            namespace: 'acme',
+            kind: 'constraint',
+            scope: { task: 'chart.recommend' },
+            statement: `Rule ${id}`,
+            evidence: { feedbackId: `fb_${id}`, runId: 'run', at: 1_700_000_000_000, weight: 0.9 },
+            trust: 0.9,
+            dedupeKey: id,
+          },
+          defaultPolicy,
+          1_700_000_000_000 + index,
+          id,
+        ),
+      );
+    }
+    const all = (await (await app.request('/v1/knowledge?status=all', {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    })).json()) as { count: number };
+    expect(all.count).toBeGreaterThan(0);
+    const one = (await (await app.request('/v1/knowledge?status=all&limit=1', {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    })).json()) as { count: number };
+    expect(one.count).toBe(1);
+  });
+
+  it('parses the two defined statuses and no others', () => {
+    expect(parseStatusQuery(undefined)).toEqual({ ok: true, value: 'active' });
+    expect(parseStatusQuery('active')).toEqual({ ok: true, value: 'active' });
+    expect(parseStatusQuery('all')).toEqual({ ok: true, value: 'all' });
+    expect(parseStatusQuery('retired').ok).toBe(false);
+    expect(parseStatusQuery('ACTIVE').ok).toBe(false);
+  });
+
+  it('parses a limit as an integer, and absence as no limit at all', () => {
+    expect(parseLimitQuery(undefined)).toEqual({ ok: true, value: undefined });
+    expect(parseLimitQuery('7')).toEqual({ ok: true, value: 7 });
+    expect(parseLimitQuery(' 7 ')).toEqual({ ok: true, value: 7 });
+    for (const raw of ['abc', '0', '-3', '2.0', '1e3', '99999999999999999999']) {
+      expect({ raw, ok: parseLimitQuery(raw).ok }).toEqual({ raw, ok: false });
+    }
+  });
+
+  it('refuses a generalize flag that is present and not a boolean', async () => {
+    // `{"generalize": "false"}` is a truthy string: silently dropping it applied the
+    // *wider* behaviour the caller meant to switch off.
+    const { app } = await mount({ token: TOKEN });
+    const response = await post(app, '/v1/distill', { generalize: 'false' });
+    expect(response.status).toBe(400);
+    const fine = await post(app, '/v1/distill', { generalize: false });
+    expect(fine.status).toBe(200);
+    const none = await post(app, '/v1/distill', {});
+    expect(none.status).toBe(200);
   });
 });
 
@@ -259,6 +418,63 @@ describe('erasure over the wire', () => {
     expect(report.events).toBe(1);
     expect(report.tombstone).toMatch(/^[0-9a-f]{16}$/);
     expect(await store.listEvents()).toHaveLength(0);
+    await microglia.close();
+  });
+
+  it('erases by the ids it was given, and only those', async () => {
+    const { app, microglia, store } = await mount({ token: TOKEN });
+    const first = (await (await post(app, '/v1/feedback', edit)).json()) as { eventId: string };
+    await post(app, '/v1/feedback', edit);
+    expect(await store.listEvents()).toHaveLength(2);
+
+    const response = await post(app, '/v1/forget', { ids: [first.eventId] });
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { events: number }).events).toBe(1);
+    const left = await store.listEvents();
+    expect(left).toHaveLength(1);
+    expect(left[0]?.id).not.toBe(first.eventId);
+    await microglia.close();
+  });
+
+  it('erases everything one actor contributed, once the surface records who that is', async () => {
+    // The HTTP surface used to accept `actorHash` while never recording one, so the
+    // selector matched nothing and answered 200 — a quiet success in the one place
+    // the route exists to avoid one.
+    const { app, microglia, store } = await mount({ token: TOKEN });
+    const mine = { ...edit, run: { ...edit.run, actorIdHash: 'sha256:alice' } };
+    const theirs = { ...edit, run: { ...edit.run, actorIdHash: 'sha256:bob' } };
+    await post(app, '/v1/feedback', mine);
+    await post(app, '/v1/feedback', mine);
+    await post(app, '/v1/feedback', theirs);
+    expect(await store.listEvents()).toHaveLength(3);
+
+    const response = await post(app, '/v1/forget', { actorHash: 'sha256:alice' });
+    expect(response.status).toBe(200);
+    expect(((await response.json()) as { events: number }).events).toBe(2);
+    const left = await store.listEvents();
+    expect(left).toHaveLength(1);
+    expect(left[0]?.task).toBe('chart.recommend');
+    await microglia.close();
+  });
+
+  it('applies both halves of a mixed selector', async () => {
+    const { app, microglia, store } = await mount({ token: TOKEN });
+    const a = (await (await post(app, '/v1/feedback', { ...edit, run: { ...edit.run, taskId: 't_a' } })).json()) as {
+      eventId: string;
+    };
+    await post(app, '/v1/feedback', { ...edit, run: { ...edit.run, taskId: 't_b' } });
+    const response = await post(app, '/v1/forget', { ids: [a.eventId], taskId: 't_b' });
+    expect(((await response.json()) as { events: number }).events).toBe(2);
+    expect(await store.listEvents()).toHaveLength(0);
+    await microglia.close();
+  });
+
+  it('treats ids: [] as no selector at all, rather than as a wipe', async () => {
+    const { app, microglia, store } = await mount({ token: TOKEN });
+    await post(app, '/v1/feedback', edit);
+    const response = await post(app, '/v1/forget', { ids: [] });
+    expect(response.status).toBe(400);
+    expect(await store.listEvents()).toHaveLength(1);
     await microglia.close();
   });
 

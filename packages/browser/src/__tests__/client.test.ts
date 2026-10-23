@@ -45,3 +45,83 @@ describe('the client erase path', () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+describe('the client ingest path', () => {
+  it('sends a correction with its task instance and actor, and clears the queue', async () => {
+    const calls: { url: string; init: RequestInit | undefined }[] = [];
+    const client = clientWith(
+      () => new Response(JSON.stringify({ runId: 'run_1', eventId: 'fb_1' }), { status: 201 }),
+      calls,
+    );
+    const result = await client.feedback({
+      run: {
+        task: 'chart.recommend',
+        input: { q: 'sales by month' },
+        output: { mark: 'line' },
+        taskId: 't_1',
+        attempt: 2,
+        parentRunId: 'run_0',
+        actorIdHash: 'sha256:alice',
+      },
+      feedback: { type: 'edit', after: { mark: 'bar' } },
+    });
+    expect(result.queued).toBe(false);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe(`${ENDPOINT}/v1/feedback`);
+    const body = JSON.parse(String(calls[0]?.init?.body)) as {
+      run: Record<string, unknown>;
+    };
+    expect(body.run['taskId']).toBe('t_1');
+    expect(body.run['attempt']).toBe(2);
+    expect(body.run['parentRunId']).toBe('run_0');
+    expect(body.run['actorIdHash']).toBe('sha256:alice');
+    expect(client.pending()).toBe(0);
+  });
+
+  it('keeps the correction queued when the network refuses it', async () => {
+    // The outbox is the point of the client: a correction made offline has to
+    // survive, and a send that failed has to be visible as pending rather than
+    // reported as sent.
+    const calls: { url: string; init: RequestInit | undefined }[] = [];
+    const client = clientWith(
+      () => new Response(JSON.stringify({ error: 'down' }), { status: 400 }),
+      calls,
+    );
+    const result = await client.feedback({
+      run: { task: 'chart.recommend', input: {}, output: {} },
+      feedback: { type: 'rating', value: 'down' },
+    });
+    expect(result.queued).toBe(true);
+    expect(client.pending()).toBe(1);
+  });
+
+  it('omits the authorization header when no token was configured', async () => {
+    const calls: { url: string; init: RequestInit | undefined }[] = [];
+    const client = createClient({
+      endpoint: ENDPOINT,
+      attempts: 1,
+      fetch: async (url, init) => {
+        calls.push({ url: String(url), init });
+        return new Response(JSON.stringify({ ok: true, stats: {} }), { status: 200 });
+      },
+    });
+    await client.health();
+    expect((calls[0]?.init?.headers as Record<string, string>)['authorization']).toBeUndefined();
+  });
+});
+
+describe('a host that throws something that is not an Error', () => {
+  it('reports it as an Error rather than rethrowing a bare string', async () => {
+    // A wrapped fetch (tracing, a proxy shim) can throw anything. Rethrowing the
+    // string would give callers `catch (e)` a value with no stack and no message.
+    const client = createClient({
+      endpoint: ENDPOINT,
+      attempts: 1,
+      fetch: async () => {
+        throw 'boom';
+      },
+    });
+    await expect(client.health()).rejects.toBeInstanceOf(Error);
+    await expect(client.health()).rejects.toThrow(/boom/);
+  });
+});

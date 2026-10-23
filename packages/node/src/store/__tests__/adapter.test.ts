@@ -165,6 +165,29 @@ describe('projection lifecycle', () => {
   });
 });
 
+describe('a fact holds a statement as well as a payload', () => {
+  it('uses the statement as the object when there is no payload', () => {
+    // A prose lesson has no structured payload, and a fact whose object is the
+    // string "undefined" would be worse than no projection at all.
+    const prose = item({ payload: undefined, statement: 'Deploy on Fridays is forbidden' });
+    const fact = toCortexFact(createKnowledgeItem(prose, defaultPolicy, at));
+    expect(fact.object).toBe('Deploy on Fridays is forbidden');
+  });
+
+  it('splits a statement that has no full stop, and one that has no subject', () => {
+    // The splitter reads `subject predicate.` out of prose; both boundaries are
+    // absent in statements hosts actually write, and a crash on either would take
+    // the whole projection down.
+    const noDot = toCortexFact(createKnowledgeItem(item({ statement: 'Prefer bars always' }), defaultPolicy, at));
+    expect(noDot.subject).toBe('Prefer');
+    expect(noDot.predicate).toBe('bars always');
+
+    const oneWord = toCortexFact(createKnowledgeItem(item({ statement: 'Forbidden. Really.' }), defaultPolicy, at));
+    expect(oneWord.subject).toBe('Forbidden');
+    expect(oneWord.predicate).toBe('states');
+  });
+});
+
 describe('type compatibility', () => {
   it('produces a value assignable to cortex MemoryValue', () => {
     const memory: CortexMemoryValue = toCortexMemory(item());

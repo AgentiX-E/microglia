@@ -219,32 +219,46 @@ export function repairJson(text: string): string {
 /**
  * Read the candidates array out of a model reply.
  *
- * Three shapes have been observed in practice: the documented
- * `{"candidates": [...]}`, a bare array, and a single candidate object returned
- * when the model decides one lesson is enough. A parser that insists on the first
- * discards the other two as "not JSON", which on the public lane cost 26% of all
- * corrections — a bias in the knowledge, not a formatting nuisance.
+ * Four shapes have been observed in practice: the documented
+ * `{"candidates": [...]}`, a bare array, a single candidate object returned when
+ * the model decides one lesson is enough, and any of those after a sentence of
+ * prose. A parser that insists on the first discards the rest as "not JSON", which
+ * on the public lane cost 26% of all corrections — a bias in the knowledge, not a
+ * formatting nuisance.
  *
- * Repair is attempted only after the strict parse fails, and only in two steps
- * that cannot change a valid document: escape control characters inside strings,
- * then drop trailing commas. Anything still unparseable is reported with the
- * reply's opening characters, because "not JSON" alone cannot be acted on.
+ * Extraction therefore tries **every** plausible start, not the first one. A reply
+ * that opens with `Note [1] here:` mentions a bracket before it says anything, and
+ * the old "slice from the first bracket" rule handed the parser `[1]` and called
+ * the whole reply unparseable. Each start is scanned to its balanced close with
+ * strings respected, so a `}` inside a statement cannot end the payload early.
+ *
+ * Repair is attempted only after the strict parse of a slice fails, and only in two
+ * steps that cannot change a valid document: escape control characters inside
+ * strings, then drop trailing commas. Anything still unparseable is reported with
+ * the reply's opening characters, because "not JSON" alone cannot be acted on.
  */
 export function parseCandidates(raw: string): unknown[] {
-  const text = extractJson(raw);
-  const attempts = [text, repairJson(text), repairJson(text).replace(/,\s*([}\]])/g, '$1')];
+  const text = raw.trim();
+  const slices = jsonSlices(text);
   let lastError = '';
-  for (const attempt of attempts) {
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(attempt) as unknown;
-    } catch (error) {
-      lastError = String(error);
-      continue;
+  for (const [position, slice] of slices.entries()) {
+    const repaired = repairJson(slice);
+    for (const attempt of [slice, repaired, repaired.replace(/,\s*([}\]])/g, '$1')]) {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(attempt) as unknown;
+      } catch (error) {
+        lastError = String(error);
+        continue;
+      }
+      // Only a reply that *is* `[]` means "nothing to learn". An empty array found
+      // inside a structure is a fragment of a wrong-shaped answer, and reading it
+      // as a legitimate empty result is how `{"rules":[]}` used to distil nothing
+      // and report success.
+      const list = asCandidateList(parsed, position === 0);
+      if (list !== undefined) return list;
+      lastError = 'parsed, but holds no candidate object';
     }
-    const list = asCandidateList(parsed);
-    if (list !== undefined) return list;
-    lastError = 'parsed, but holds no candidate object';
   }
   throw new MicrogliaError('MG_E_INVALID_SIGNAL', 'LLM response is not JSON', {
     cause: lastError,
@@ -252,8 +266,19 @@ export function parseCandidates(raw: string): unknown[] {
   });
 }
 
-function asCandidateList(parsed: unknown): unknown[] | undefined {
-  if (Array.isArray(parsed)) return parsed;
+/**
+ * A parsed value as a list of candidates, or `undefined` if it is not one.
+ *
+ * An empty array is a legitimate answer — "this correction taught nothing" — while
+ * an array of numbers is not a candidate list at all. Treating the second as the
+ * first returned an empty distillation with no error, so "the model had nothing to
+ * say" and "the model said nonsense" produced the same observation.
+ */
+function asCandidateList(parsed: unknown, allowEmptyArray: boolean): unknown[] | undefined {
+  if (Array.isArray(parsed)) {
+    if (parsed.length === 0) return allowEmptyArray ? parsed : undefined;
+    return parsed.some((entry) => typeof entry === 'object' && entry !== null) ? parsed : undefined;
+  }
   if (parsed === null || typeof parsed !== 'object') return undefined;
   const record = parsed as Record<string, unknown>;
   const list = record['candidates'];
@@ -262,20 +287,67 @@ function asCandidateList(parsed: unknown): unknown[] | undefined {
   return undefined;
 }
 
-/** Models sometimes wrap JSON in prose or fences; extract the first object. */
-function extractJson(raw: string): string {
-  const trimmed = raw.trim();
-  if (trimmed.startsWith('{') || trimmed.startsWith('[')) return trimmed;
-  // Either shape may be wrapped in prose or a fence. Slicing from the first `{`
-  // alone silently drops the brackets of a top-level array, which then fails to
-  // parse as the candidates it plainly is.
-  const object = trimmed.indexOf('{');
-  const array = trimmed.indexOf('[');
-  const start = object === -1 ? array : array === -1 ? object : Math.min(object, array);
-  if (start === -1) return trimmed;
-  const close = trimmed[start] === '{' ? '}' : ']';
-  const end = trimmed.lastIndexOf(close);
-  return end > start ? trimmed.slice(start, end + 1) : trimmed;
+/** How many bracketed starts to consider. A reply with more is not one we can help. */
+const MAX_STARTS = 32;
+
+/**
+ * Every plausible JSON payload in a reply, in the order they appear.
+ *
+ * The whole trimmed reply is first, so a clean document is parsed exactly as
+ * written. Then each `{` or `[` is tried as a start and scanned to its balanced
+ * close — brackets inside strings are skipped, so a statement may contain one.
+ */
+function jsonSlices(text: string): readonly string[] {
+  const slices: string[] = [text];
+  const seen = new Set<string>([text]);
+  let starts = 0;
+  for (let index = 0; index < text.length && starts < MAX_STARTS; index += 1) {
+    const char = text[index];
+    if (char !== '{' && char !== '[') continue;
+    starts += 1;
+    const slice = balancedFrom(text, index);
+    if (slice === undefined || seen.has(slice)) continue;
+    seen.add(slice);
+    slices.push(slice);
+  }
+  return slices;
+}
+
+/**
+ * The balanced construct that starts at `start`, or `undefined` if it never closes.
+ *
+ * Depth counts only the bracket that opened the slice: `{"a":[1,2]}` is one object,
+ * and the inner array does not need its own bookkeeping. Strings and escapes are
+ * tracked because a `}` inside a statement is text, not structure.
+ */
+function balancedFrom(text: string, start: number): string | undefined {
+  const open = text[start];
+  const close = open === '{' ? '}' : ']';
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (char === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (inString) continue;
+    if (char === open) depth += 1;
+    else if (char === close) {
+      depth -= 1;
+      if (depth === 0) return text.slice(start, index + 1);
+    }
+  }
+  return undefined;
 }
 
 /**

@@ -17,6 +17,19 @@ export type FeedbackPayload = {
     readonly sessionId?: string;
     readonly model?: string;
     readonly packIds?: readonly string[];
+    /**
+     * The task instance, and this attempt's place in it.
+     *
+     * A browser host is the one most likely to retry a generation, and without
+     * these two the server sees each attempt as an unrelated event — so a deletion
+     * that names the job matches nothing, and three attempts count as three
+     * endorsements of whatever they share.
+     */
+    readonly taskId?: string;
+    readonly attempt?: number;
+    readonly parentRunId?: string;
+    /** A salted hash of the person, so their contributions can be erased by actor. */
+    readonly actorIdHash?: string;
   };
   readonly feedback: FeedbackInput;
 };

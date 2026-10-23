@@ -86,4 +86,31 @@ describe('per-rule attribution', () => {
     // r1: net -1 over 2 injections; r2: net 0 over 2 injections.
     expect(summary.harmfulShare).toBeCloseTo(0.5, 6);
   });
+
+  it('reports a zero harmful share when nothing was injected at all', () => {
+    // A lane whose pack was empty injected no rule-instances, and dividing by that
+    // zero would make the summary NaN — which reads as "no data" in a table and as
+    // a crash in a gate.
+    const summary = attributeRules(
+      [{ fold: 0, injected: [], baselineCorrect: false, treatmentCorrect: true }],
+      [{ fold: 0, id: 'k1', statement: 'Use a line chart.' }],
+    );
+    expect(summary).toMatchObject({ injectedRules: 0, harmfulShare: 0, neutral: 0 });
+  });
+
+  it('orders equally-shaped rules by id so two runs report the same table', () => {
+    // The tie-break is what makes the table diffable across runs; without it the
+    // order follows insertion, which follows the store.
+    const summary = attributeRules(
+      [
+        { fold: 0, injected: ['k2'], baselineCorrect: true, treatmentCorrect: false },
+        { fold: 0, injected: ['k1'], baselineCorrect: true, treatmentCorrect: false },
+      ],
+      [
+        { fold: 0, id: 'k2', statement: 'Use a bar chart.' },
+        { fold: 0, id: 'k1', statement: 'Use a pie chart.' },
+      ],
+    );
+    expect(summary.top.map((rule) => rule.id)).toEqual(['k1', 'k2']);
+  });
 });

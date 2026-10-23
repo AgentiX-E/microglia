@@ -840,27 +840,47 @@ Six endpoints, each one call into the same facade you would have used in-process
 | `POST /v1/feedback` | ingest one run and the reaction to it; returns `runId` and `eventId` |
 | `GET /v1/recall` | the pack for a query; same options as `recall`, as query parameters |
 | `POST /v1/distill` | fold accumulated evidence into knowledge |
-| `GET /v1/knowledge` | list rules with status, trust, and scope |
+| `GET /v1/knowledge` | list rules with status, trust, and scope; `?status=active\|all`, `?limit=<n>` |
 | `POST /v1/forget` | erase by `ids`, `taskId` or `actorHash`; returns the tombstone and counts |
 | `GET /v1/health` | the doctor's diagnosis and the store counts |
 
-Three properties are deliberate. A request must carry `Authorization: Bearer <token>` when a token is
+Four properties are deliberate. A request must carry `Authorization: Bearer <token>` when a token is
 configured; a retry may carry `Idempotency-Key`, and the same key returns the same ids instead of
-recording the correction twice; and `/v1/forget` **rejects** an empty body, an unknown field, and a
-mistyped value instead of erasing nothing and reporting success. The key map is per process — a durable
-one belongs to your deployment, and the library says so rather than pretending otherwise.
+recording the correction twice; every route **rejects** an unknown field, a mistyped value and an
+out-of-vocabulary query parameter instead of doing something adjacent and reporting success; and the key
+map is per process and holds the last 1,000 keys — a durable one belongs to your deployment, and the
+library says so rather than pretending otherwise.
+
+The strictness is worth one paragraph because it is not decoration. `GET /v1/knowledge?status=bogus` used
+to answer **200 with an empty list**, which is indistinguishable from "you have no knowledge": a typo read
+as a fact. `?limit=abc` did the same through `NaN`, and `?limit=-1` silently dropped the last row.
+`{"generalize": "false"}` — a string, not a boolean — was dropped in silence, so the *wider* distillation
+the caller was trying to switch off ran instead. All four are now refusals:
+
+| Mistake | Answer |
+|---|---|
+| `?status=` anything but `active` or `all` | `400 MG_E_SCHEMA_INVALID`, naming the allowed values |
+| `?limit=0`, `-1`, `2.0`, `abc`, `1e3` | `400`, because a count of rows is written in digits |
+| `{"generalize": "false"}` | `400`, not the default |
+| `{"run": {"taskID": "t_7"}}` | `400 run.taskID is not a field` |
+| unknown body field | `400 unknown field: <name>` |
 
 A run may name its task instance, which is what makes evidence independent and deletion by task
 possible:
 
 ```json
 { "run": { "task": "chart.recommend", "taskId": "t_7", "attempt": 2,
-           "parentRunId": "run_01j9z3k4", "input": {}, "output": {} },
+           "parentRunId": "run_01j9z3k4", "actorIdHash": "sha256:…", "input": {}, "output": {} },
   "feedback": { "type": "edit", "after": { "mark": "line" } } }
 ```
 
 Without `taskId` every event is its own task: three attempts at one job would count as three
 independent endorsements, and `{ "taskId": "t_7" }` on `/v1/forget` would match nothing.
+
+`actorIdHash` is what makes `{ "actorHash": "sha256:…" }` on `/v1/forget` mean anything: the route
+accepts that selector, so the ingest has to be able to record the identity it names. It is a salted hash
+of the person, never a raw identifier, and it does **not** raise trust — trust comes from the channel's
+ceiling and from corroboration across tasks, never from what a request says about itself.
 
 ### 15.2 The browser
 
@@ -875,7 +895,15 @@ const mg = createClient({
 
 const pack = await mg.recall({ task: 'chart.recommend', text: question });
 await mg.feedback({
-  run: { task: 'chart.recommend', input: { question }, output: spec, packIds: pack.ids },
+  run: {
+    task: 'chart.recommend',
+    input: { question },
+    output: spec,
+    packIds: pack.ids,
+    taskId: 't_7',        // optional: groups the attempts at one job
+    attempt: 1,
+    actorIdHash: userId,  // optional: lets forget({ actorHash }) reach it
+  },
   feedback: { type: 'edit', after: corrected },
 });
 ```

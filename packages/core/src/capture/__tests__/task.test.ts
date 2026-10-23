@@ -20,6 +20,26 @@ function codeOf(run: () => unknown): string {
 }
 
 describe('task instance', () => {
+  it('carries the session a task was opened with', async () => {
+    const mg = await host();
+    const task = mg.openTask({ taskId: 'T-9', taskType: 'chart.recommend', sessionId: 's-1' });
+    const run = task.begin({ attempt: 1, input: { question: 'q' } });
+    await run.complete({ mark: 'line' });
+    expect((await task.complete({ status: 'accepted' })).sessionId).toBe('s-1');
+  });
+
+  it('records a task opened without a session at all', async () => {
+    // A host that never had a session — a batch job, a queue worker — must still get
+    // a task record; the field is absent rather than the string "undefined".
+    const mg = await host();
+    const task = mg.openTask({ taskId: 'T-0', taskType: 'chart.recommend' });
+    const run = task.begin({ attempt: 1, input: { question: 'q' } });
+    await run.complete({ mark: 'line' });
+    const record = await task.complete({ status: 'accepted' });
+    expect(record).not.toHaveProperty('sessionId');
+    expect(record.taskId).toBe('T-0');
+  });
+
   it('groups attempts and records the terminal decision', async () => {
     const mg = await host();
     const task = mg.openTask({ taskId: 'T-1', taskType: 'chart.recommend' });

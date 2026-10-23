@@ -165,6 +165,33 @@ describe('application tie-breaks and domain precision', () => {
     expect(applyKnowledge(pack, item).mark).toBe('line');
   });
 
+  it('lets a later, more specific rule beat the one already chosen', async () => {
+    // The reader reduces in pack order, so the comparison has to work in the
+    // direction where the *incumbent* is the loser. A reader tested only with the
+    // winner first would keep whichever rule the store happened to list first.
+    const { createKnowledgeItem, defaultPolicy } = await import('@agentix-e/microglia-core');
+    const global = createKnowledgeItem(
+      {
+        namespace: 'acme', kind: 'constraint',
+        scope: { task: 'chart.recommend', intent: 'trend' },
+        statement: 'global',
+        payload: { when: { intent: 'trend' }, then: { mark: 'line' } } as never,
+        evidence: { feedbackId: 'g', runId: 'r', at: 1, weight: 0.9 }, trust: 0.9, dedupeKey: 'g',
+      }, defaultPolicy, 1, 'g',
+    );
+    const scoped = {
+      ...global,
+      id: 's',
+      scope: { ...global.scope, field: 'revenue' },
+      payload: { when: { intent: 'trend' }, then: { mark: 'bar' } } as never,
+    };
+    const item = buildCorpus(10, 7, 'holdout').find((entry) => entry.query.intent === 'trend')!;
+    // The specific rule first, so the comparison the reader makes is "does the
+    // incumbent lose to this candidate" rather than "does it win".
+    const pack = { items: [scoped, global], ids: ['s', 'g'], rendered: '', tokens: 0, hash: 'h', budget: 0, truncated: 0 };
+    expect(applyKnowledge(pack, item).mark).toBe('bar');
+  });
+
   it('scores a domain-scoped rule across its domain only', async () => {
     const { createKnowledgeItem, defaultPolicy } = await import('@agentix-e/microglia-core');
     const scoped = createKnowledgeItem(
@@ -183,24 +210,59 @@ describe('application tie-breaks and domain precision', () => {
 });
 
 describe('confidence tie-break', () => {
-  it('prefers the higher-confidence rule at equal specificity', async () => {
-    const { createKnowledgeItem, defaultPolicy } = await import('@agentix-e/microglia-core');
-    const make = (id: string, weight: number, mark: 'line' | 'scatter') =>
-      createKnowledgeItem(
-        {
-          namespace: 'acme', kind: 'constraint',
-          scope: { task: 'chart.recommend', intent: 'trend' },
-          statement: `rule ${id}`,
-          payload: { when: { intent: 'trend' }, then: { mark } } as never,
-          evidence: { feedbackId: id, runId: 'r', at: 1, weight }, trust: 0.9, dedupeKey: id,
-        }, defaultPolicy, 1, id,
-      );
+  /**
+   * A pack item as the reader sees it.
+   *
+   * Written as a literal rather than built through `createKnowledgeItem`: the point
+   * here is the reader's preference order, and a factory call that quietly returns a
+   * *quarantined* item would remove one of the two candidates and leave the
+   * comparison untested while the assertion still passed.
+   */
+  const rule = (id: string, mark: 'line' | 'scatter', confidence: number) => ({
+    id,
+    namespace: 'acme',
+    kind: 'constraint' as const,
+    scope: { task: 'chart.recommend', intent: 'trend' },
+    statement: `rule ${id}`,
+    payload: { when: { intent: 'trend' }, then: { mark } },
+    status: 'active' as const,
+    confidence,
+    trust: 0.9,
+    support: 1,
+    contradictions: 0,
+    applied: 0,
+    succeeded: 0,
+    evidence: [],
+    validFrom: 1,
+    validUntil: Infinity,
+    systemFrom: 1,
+    systemUntil: Infinity,
+    createdAt: 1,
+    updatedAt: 1,
+    schema: 'microglia.knowledge/1' as const,
+  });
+
+  it('prefers the higher-confidence rule at equal specificity, in either order', () => {
     const item = buildCorpus(12, 7, 'holdout').find((entry) => entry.query.intent === 'trend')!;
-    const pack = {
-      items: [make('low', 0.2, 'scatter'), make('high', 0.9, 'line')],
-      ids: ['low', 'high'], rendered: '', tokens: 0, hash: 'h', budget: 0, truncated: 0,
-    };
-    expect(applyKnowledge(pack, item).mark).toBe('line');
+    const high = rule('a_high', 'line', 0.9);
+    const low = rule('z_low', 'scatter', 0.2);
+    // Ids chosen so the id tie-break would pick the *scatter* rule: if confidence is
+    // ignored, these assertions fail.
+    for (const items of [
+      [high, low],
+      [low, high],
+    ]) {
+      const pack = {
+        items,
+        ids: items.map((entry) => entry.id),
+        rendered: '',
+        tokens: 0,
+        hash: 'h',
+        budget: 0,
+        truncated: 0,
+      };
+      expect(applyKnowledge(pack as never, item).mark).toBe('line');
+    }
   });
 });
 

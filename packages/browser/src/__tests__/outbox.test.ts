@@ -69,3 +69,35 @@ describe('persisted outbox', () => {
     expect(outbox.list()).toEqual([]);
   });
 });
+
+describe('the outbox ledger', () => {
+  it('ignores an update for a key it does not hold', () => {
+    // Retries race with a flush that already succeeded. An update for a gone key
+    // must not resurrect it, and must not throw inside a retry loop.
+    const outbox = memoryOutbox();
+    const payload = { run: { task: 't', input: {}, output: {} }, feedback: { type: 'rating', value: 'up' } };
+    outbox.push({ key: 'k1', payload, attempts: 0 });
+    outbox.update('absent', 5);
+    expect(outbox.list().map((entry) => entry.key)).toEqual(['k1']);
+    outbox.update('k1', 2);
+    expect(outbox.list()[0]?.attempts).toBe(2);
+  });
+});
+describe('the persisted outbox', () => {
+  it('ignores an update for a key it does not hold', () => {
+    const memory = new Map<string, string>();
+    const storage: StorageLike = {
+      getItem: (key) => memory.get(key) ?? null,
+      setItem: (key, value) => void memory.set(key, value),
+      removeItem: (key) => void memory.delete(key),
+    };
+    const outbox = persistedOutbox(storage);
+    const payload = { run: { task: 't', input: {}, output: {} }, feedback: { type: 'rating', value: 'up' } };
+    outbox.push({ key: 'k1', payload, attempts: 0 });
+    outbox.update('absent', 9);
+    expect(outbox.list()).toHaveLength(1);
+    expect(outbox.list()[0]?.attempts).toBe(0);
+    outbox.update('k1', 3);
+    expect(outbox.list()[0]?.attempts).toBe(3);
+  });
+});
