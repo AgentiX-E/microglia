@@ -127,9 +127,19 @@ export function matches(predicted: readonly string[], gold: readonly string[]): 
   return true;
 }
 
-export type SqlArm = 'none' | 'full' | 'gated' | 'duplicate' | 'wrong-scope' | 'stated' | 'oracle';
+export type SqlArm =
+  | 'none'
+  | 'full'
+  /** The same corrections, distilled without scope widening: an arm, not a dispatch. */
+  | 'full-narrow'
+  | 'gated'
+  | 'duplicate'
+  | 'wrong-scope'
+  | 'stated'
+  | 'oracle';
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = [
+  'full-narrow',
   'gated',
   'duplicate',
   'wrong-scope',

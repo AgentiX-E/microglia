@@ -156,7 +156,16 @@ describe('matches', () => {
 describe('parseArms', () => {
   it('defaults to every optional arm plus the two required ones', () => {
     const arms = parseArms(undefined);
-    expect([...arms].sort()).toEqual(['duplicate', 'full', 'gated', 'none', 'oracle', 'stated', 'wrong-scope']);
+    expect([...arms].sort()).toEqual([
+      'duplicate',
+      'full',
+      'full-narrow',
+      'gated',
+      'none',
+      'oracle',
+      'stated',
+      'wrong-scope',
+    ]);
   });
 
   it('keeps none and full even when the caller lists nothing', () => {
@@ -173,7 +182,18 @@ describe('parseArms', () => {
   });
 
   it('covers every documented arm', () => {
-    expect([...OPTIONAL_ARMS]).toEqual(['gated', 'duplicate', 'wrong-scope', 'stated', 'oracle']);
+    expect([...OPTIONAL_ARMS]).toEqual([
+      'full-narrow',
+      'gated',
+      'duplicate',
+      'wrong-scope',
+      'stated',
+      'oracle',
+    ]);
+  });
+
+  it('accepts the scope-widening arm, which is a pack built from the same corrections', () => {
+    expect([...parseArms('full-narrow')].sort()).toEqual(['full', 'full-narrow', 'none']);
   });
 });
 

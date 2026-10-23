@@ -162,7 +162,15 @@ type Task = {
 /** Task name under which knowledge is scoped, and therefore recalled. */
 const TASK = 'sql.generate';
 
-type ArmName = 'none' | 'full' | 'gated' | 'duplicate' | 'wrong-scope' | 'stated' | 'oracle';
+type ArmName =
+  | 'none'
+  | 'full'
+  | 'full-narrow'
+  | 'gated'
+  | 'duplicate'
+  | 'wrong-scope'
+  | 'stated'
+  | 'oracle';
 
 /**
  * The coverage floor the `gated` arm runs with, fixed before the run.
@@ -853,6 +861,8 @@ type FoldResult = {
   readonly created: number;
   readonly meanPackIds: number;
   readonly digest: string;
+  /** Active rules in the unwidened memory, or null when no such memory was built. */
+  readonly narrowActive: number | null;
   readonly items: readonly StoredItem[];
   readonly distillFailures: readonly string[];
 };
@@ -878,19 +888,32 @@ function recording(inner: Interpreter, sink: string[], lastReply: () => string):
   };
 }
 
-async function runFold(
-  fold: number,
-  rows: readonly BirdRow[],
-  foldOf: ReadonlyMap<string, number>,
+type FoldMemory = {
+  readonly store: EmbeddedMemory;
+  readonly host: Awaited<ReturnType<typeof openMicroglia>>;
+  readonly learning: LearningPass;
+  readonly distilled: { readonly created: number; readonly failed: number };
+  readonly frozen: { readonly active: number; readonly total: number; readonly digest: string };
+  readonly distillFailures: readonly string[];
+};
+
+/**
+ * One fold's memory: learn from the other folds, distil, freeze.
+ *
+ * The whole construction is a function of `(learnRows, generalize)` so it can be
+ * run twice for one fold and produce two packs that differ in a single decision.
+ * The learning *generations* are shared through `GenerationCache`, so the second
+ * construction costs local store writes and one distillation, not another 280
+ * model calls.
+ */
+async function buildFoldMemory(
+  generalize: boolean,
+  learnRows: readonly BirdRow[],
   dataset: Dataset,
   task: Task,
-): Promise<FoldResult> {
-  const idOf = (row: BirdRow): string => `${row.db_id}#${row.question_id}`;
-  const evalRows = rows.filter((row) => foldOf.get(idOf(row)) === fold);
-  const learnRows = rows.filter((row) => foldOf.get(idOf(row)) !== fold);
-
+): Promise<FoldMemory> {
   const store = await EmbeddedMemory.open(new MemoryJournal());
-  const distillFailures: string[] = [];
+  const failures: string[] = [];
   let lastReply = '';
   const host = await openMicroglia({
     app: 'microglia-sota',
@@ -907,7 +930,7 @@ async function runFold(
             },
           },
         }),
-        distillFailures,
+        failures,
         () => lastReply,
       ),
       ruleInterpreter,
@@ -916,10 +939,41 @@ async function runFold(
     clock: steppingClock(1_700_000_000_000, 1),
     random: mulberry32(SEED),
   });
-
   const learning = await learn(host, learnRows, dataset, task);
-  const distilled = await host.distill({ generalize: GENERALIZE });
+  const distilled = await host.distill({ generalize });
   const frozen = await knowledgeDigest(store);
+  return { store, host, learning, distilled, frozen, distillFailures: failures };
+}
+
+async function runFold(
+  fold: number,
+  rows: readonly BirdRow[],
+  foldOf: ReadonlyMap<string, number>,
+  dataset: Dataset,
+  task: Task,
+): Promise<FoldResult> {
+  const idOf = (row: BirdRow): string => `${row.db_id}#${row.question_id}`;
+  const evalRows = rows.filter((row) => foldOf.get(idOf(row)) === fold);
+  const learnRows = rows.filter((row) => foldOf.get(idOf(row)) !== fold);
+
+  const widened = await buildFoldMemory(GENERALIZE, learnRows, dataset, task);
+  // Scope widening is an arm here, not a second dispatch: the same corrections are
+  // distilled twice, once promoting rules that recur across databases and once
+  // leaving them where they were observed, so the two packs differ in exactly one
+  // decision. Two dispatches would leave the comparison inside the run-to-run noise
+  // of this benchmark, which is about half a percentage point.
+  const narrowed =
+    ARMS.has('full-narrow') && GENERALIZE
+      ? await buildFoldMemory(false, learnRows, dataset, task)
+      : undefined;
+  const store = widened.store;
+  const learning = widened.learning;
+  const distilled = widened.distilled;
+  const frozen = widened.frozen;
+  const distillFailures = [
+    ...widened.distillFailures,
+    ...(narrowed === undefined ? [] : narrowed.distillFailures),
+  ];
 
   // The wrong-scope control must inject text, or it silently becomes a second
   // no-memory arm. It therefore rotates to the next database that actually holds
@@ -979,15 +1033,27 @@ async function runFold(
 
   for (const [position, row] of evalRows.entries()) {
     const query = { task: TASK, text: row.question };
-    const pack = await host.recall({ ...query, scope: { domain: row.db_id } });
+    const pack = await widened.host.recall({ ...query, scope: { domain: row.db_id } });
     packs.push({
       ids: pack.ids,
       coverage: Number(queryCoverage(row.question, pack.items[0]?.statement ?? '').toFixed(3)),
     });
     call(position, 'none', '', 0);
     call(position, 'full', pack.rendered, pack.ids.length);
+    if (ARMS.has('full-narrow')) {
+      // The same store, distilled without widening. `narrowed` is undefined when
+      // the run itself is unwidened, in which case the two arms are identical and
+      // the artefact says so rather than pretending they differ.
+      const memory = narrowed ?? widened;
+      const narrowPack = await memory.host.recall({ ...query, scope: { domain: row.db_id } });
+      call(position, 'full-narrow', narrowPack.rendered, narrowPack.ids.length);
+    }
     if (ARMS.has('gated')) {
-      const gated = await host.recall({ ...query, scope: { domain: row.db_id }, minCoverage: MIN_COVERAGE });
+      const gated = await widened.host.recall({
+        ...query,
+        scope: { domain: row.db_id },
+        minCoverage: MIN_COVERAGE,
+      });
       call(position, 'gated', gated.rendered, gated.ids.length);
     }
     if (ARMS.has('duplicate')) {
@@ -995,7 +1061,7 @@ async function runFold(
       call(position, 'duplicate', twice, pack.ids.length);
     }
     if (ARMS.has('wrong-scope')) {
-      const wrong = await host.recall({ ...query, scope: { domain: nextDatabase(row.db_id) } });
+      const wrong = await widened.host.recall({ ...query, scope: { domain: nextDatabase(row.db_id) } });
       call(position, 'wrong-scope', wrong.rendered, wrong.ids.length);
     }
     if (ARMS.has('stated')) call(position, 'stated', '', 0);
@@ -1112,7 +1178,8 @@ async function runFold(
     statement: item.statement,
     domain: item.scope.domain ?? null,
   }));
-  await host.close();
+  await widened.host.close();
+  if (narrowed !== undefined) await narrowed.host.close();
 
   const packIds = cases.reduce((sum, item) => sum + item.packIds, 0);
   process.stdout.write(
@@ -1130,6 +1197,7 @@ async function runFold(
     created: distilled.created,
     meanPackIds: cases.length === 0 ? 0 : packIds / cases.length,
     digest: frozen.digest,
+    narrowActive: narrowed?.frozen.active ?? null,
     items,
     distillFailures,
   };
@@ -1280,7 +1348,11 @@ async function main(): Promise<void> {
   // holding it to "rules per question" asks it for something it does not do, which
   // is how this gate failed a run whose every other reading was sound.
   const packControls = arms.filter(
-    (entry) => entry.arm === 'gated' || entry.arm === 'duplicate' || entry.arm === 'wrong-scope',
+    (entry) =>
+      entry.arm === 'gated' ||
+      entry.arm === 'duplicate' ||
+      entry.arm === 'wrong-scope' ||
+      entry.arm === 'full-narrow',
   );
   const channel = arms.filter((entry) => entry.arm === 'oracle' || entry.arm === 'stated');
   const channelBest = channel.reduce<ArmSummary | undefined>(
@@ -1352,6 +1424,10 @@ async function main(): Promise<void> {
       concurrency: CONCURRENCY,
       breaker_threshold: BREAKER_THRESHOLD,
       generation_cache: generations.stats,
+      // True only when this run built a second, unwidened memory. When the run is
+      // itself unwidened, `full-narrow` is the same pack under a second name, and a
+      // reader must not read the two arms as a comparison.
+      narrow_distinct: folds.some((fold) => fold.narrowActive !== null),
     },
     n: {
       total: rows.length,
