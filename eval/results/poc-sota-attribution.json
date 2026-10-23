@@ -1,155 +1,119 @@
 {
   "id": "poc-sota-attribution",
   "source_artifact": "poc-sota-bird.json",
-  "source_generated_at": "2026-10-21T14:14:39.366Z",
-  "n": 146,
+  "source_generated_at": "2026-10-23T11:27:14.670Z",
+  "n": 60,
   "summary": {
-    "rules": 944,
-    "injectedRules": 225,
-    "helpful": 6,
-    "harmful": 0,
-    "neutral": 219,
-    "harmfulShare": 0,
+    "rules": 124,
+    "injectedRules": 74,
+    "helpful": 5,
+    "harmful": 11,
+    "neutral": 58,
+    "harmfulShare": 0.16666666666666666,
     "top": [
       {
-        "fold": 2,
-        "id": "k_01hf7uaqfa_2s2c3",
-        "statement": "Counting patients with abnormal platelet levels requires joining Patient and Laboratory tables rather than querying Laboratory alone.",
-        "injected": 4,
+        "fold": 1,
+        "id": "k_01hf7uaq3t_d5emm",
+        "statement": "When computing a percentage of atoms matching a condition across joined tables, the numerator and denominator must both count distinct atom identifiers to avoid row duplication from the join.",
+        "injected": 2,
         "helped": 0,
-        "hurt": 0,
-        "net": 0
+        "hurt": 2,
+        "net": -2
       },
       {
-        "fold": 3,
-        "id": "k_01hf7uaqat_8c718",
-        "statement": "The question asks for a count of superheroes, so the result must be an exact integer count rather than a rounded or bucketed value.",
-        "injected": 3,
+        "fold": 2,
+        "id": "k_01hf7uaq38_affgr",
+        "statement": "Computing a percentage as SUM(...) * 100 / SUM(...) over integer columns without a REAL cast produces an incorrect result in SQLite.",
+        "injected": 2,
         "helped": 0,
-        "hurt": 0,
-        "net": 0
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaq3h_fdg1w",
+        "statement": "Using the column name 'types' instead of 'type' on the cards table causes an execution mismatch.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaq3i_ffbky",
+        "statement": "Queries joining cards to legalities on uuid should select DISTINCT status to avoid duplicate rows.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
       },
       {
         "fold": 0,
-        "id": "k_01hf7uaqbj_467dt",
-        "statement": "Selecting the account with the lowest loan amount is expressed by ordering the joined loan-account rows by loan amount ascending and taking the first row with LIMIT 1.",
-        "injected": 3,
+        "id": "k_01hf7uaq3m_887b4",
+        "statement": "When a question asks whether each expense was approved, the result should project only the approval column rather than additional descriptive columns.",
+        "injected": 2,
         "helped": 0,
-        "hurt": 0,
-        "net": 0
+        "hurt": 1,
+        "net": -1
       },
       {
         "fold": 0,
-        "id": "k_01hf7uaqbm_0xdy3",
-        "statement": "Counting distinct patient IDs is not equivalent to counting examination rows when the question asks for a count of patients with a condition, since a patient may have multiple matching examinations.",
-        "injected": 3,
+        "id": "k_01hf7uaq3n_57yw0",
+        "statement": "Date equality filters on event dates are expressed with a LIKE prefix pattern matching the date string.",
+        "injected": 2,
         "helped": 0,
-        "hurt": 0,
-        "net": 0
-      },
-      {
-        "fold": 2,
-        "id": "k_01hf7uaqd1_e2rav",
-        "statement": "In the card_games schema, a card without multiple faces is identified by cards.side IS NULL.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 0,
-        "net": 0
-      },
-      {
-        "fold": 4,
-        "id": "k_01hf7uaqd5_eqjzx",
-        "statement": "Counting cards by matching a phrase in the cards table's text column misses matches that only appear in the rulings table, which requires joining rulings to cards on uuid.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 0,
-        "net": 0
+        "hurt": 1,
+        "net": -1
       },
       {
         "fold": 1,
-        "id": "k_01hf7uaqd9_2qccq",
-        "statement": "In the card_games schema, a card without multiple faces is identified by cards.side IS NULL.",
-        "injected": 3,
+        "id": "k_01hf7uaq3r_fm62r",
+        "statement": "Date literals in SQL for this schema use the ISO format 'YYYY-MM-DD HH:MM:SS.0' rather than slash-separated dates.",
+        "injected": 2,
         "helped": 0,
-        "hurt": 0,
-        "net": 0
-      },
-      {
-        "fold": 2,
-        "id": "k_01hf7uaqer_b3z26",
-        "statement": "A count query that answers a 'how many' question should not be wrapped in ROUND(.../10.0)*10, since that rounds the count to the nearest ten and changes the answer.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 0,
-        "net": 0
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqf7_f3pxp",
-        "statement": "Computing a percentage of posts by the most influential user requires joining users to posts and filtering on the maximum reputation via a subquery.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 0,
-        "net": 0
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqfc_b74kf",
-        "statement": "Computing a percentage with SUM(CASE WHEN gender='Female' THEN 1 ELSE 0 END) / COUNT(*) over rows filtered to a single publisher yields the female share of that publisher's heroes, not the share of all heroes published by that publisher relative to a broader denominator.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 0,
-        "net": 0
+        "hurt": 1,
+        "net": -1
       },
       {
         "fold": 1,
-        "id": "k_01hf7uaqfq_a4vzd",
-        "statement": "The question asks for a count of male patients with normal WBC and abnormal fibrinogen, so the SQL must return a raw COUNT(DISTINCT patient ID) filtered on SEX='M', WBC in (3.5, 9.0), and FG outside [150, 450].",
-        "injected": 3,
+        "id": "k_01hf7uaq3s_8xeyg",
+        "statement": "A valid query for this schema joins posts to comments on posts.Id = comments.PostId and filters on comments.UserId and comments.CreationDate.",
+        "injected": 2,
         "helped": 0,
-        "hurt": 0,
-        "net": 0
+        "hurt": 1,
+        "net": -1
       },
       {
-        "fold": 4,
-        "id": "k_01hf7uaqfv_d38bt",
-        "statement": "When a question asks for a percentage of a subgroup among patients, the denominator must count only patients satisfying the same filter conditions as the numerator's subgroup (e.g., PT >= 14), not all joined rows.",
-        "injected": 3,
+        "fold": 1,
+        "id": "k_01hf7uaq3l_02xcd",
+        "statement": "A ratio of total single bonds to distinct atom count does not compute an average per molecule and yields a different value than averaging per-molecule single-bond counts.",
+        "injected": 1,
         "helped": 0,
-        "hurt": 0,
-        "net": 0
-      },
-      {
-        "fold": 4,
-        "id": "k_01hf7uaqg2_cdvtq",
-        "statement": "The question asks for a count of male patients with normal WBC and abnormal fibrinogen, so the SQL must filter SEX='M', WBC within the normal range, and FG outside the normal range, without additional rounding or bucketing.",
-        "injected": 3,
-        "helped": 0,
-        "hurt": 0,
-        "net": 0
+        "hurt": 1,
+        "net": -1
       },
       {
         "fold": 2,
-        "id": "k_01hf7uaqb3_4epqa",
-        "statement": "A count of superheroes filtered by eye colour and superpower name is expressed with COUNT(DISTINCT s.id) over joins to colour, hero_power, and superpower.",
-        "injected": 2,
+        "id": "k_01hf7uaq3l_02xcd",
+        "statement": "The ratio of outpatient to inpatient counts is computed as the outpatient count divided by the inpatient count, not the reverse.",
+        "injected": 1,
         "helped": 0,
-        "hurt": 0,
-        "net": 0
+        "hurt": 1,
+        "net": -1
       },
       {
-        "fold": 2,
-        "id": "k_01hf7uaqbg_1a819",
-        "statement": "Filtering loans by status = 'A' is not required when the question asks only for accounts with an approved loan date in 1997 and the lowest approved amount.",
-        "injected": 2,
+        "fold": 1,
+        "id": "k_01hf7uaq4i_9zp4v",
+        "statement": "Joining connected.bond_id to bond.bond_id produces an execution mismatch in the toxicology schema.",
+        "injected": 1,
         "helped": 0,
-        "hurt": 0,
-        "net": 0
+        "hurt": 1,
+        "net": -1
       },
       {
-        "fold": 4,
-        "id": "k_01hf7uaqbi_4awft",
-        "statement": "The district table's A11 column represents average salary, so selecting the highest average salary requires MAX(di.A11) rather than a join condition on district_id.",
+        "fold": 0,
+        "id": "k_01hf7uaq32_5cdmy",
+        "statement": "In SQLite, integer division truncates, so a percentage computed as integer_sum * 100 / integer_sum yields 0 or a truncated integer unless a cast to REAL or a decimal literal is applied.",
         "injected": 2,
         "helped": 0,
         "hurt": 0,
@@ -157,8 +121,17 @@
       },
       {
         "fold": 0,
-        "id": "k_01hf7uaqbi_9dq53",
-        "statement": "Filtering loans by status = 'A' is unnecessary when the question only specifies an approved loan date in 1997, since the date field already implies approval.",
+        "id": "k_01hf7uaq33_0pavc",
+        "statement": "Computing a percentage with integer operands and no REAL cast produces an execution mismatch against the expected numeric result.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaq34_ayat1",
+        "statement": "For a question asking which drivers are eliminated in the first qualifying period, selecting the driver with the maximum q1 time returns the slowest qualifier rather than the set of eliminated drivers.",
         "injected": 2,
         "helped": 0,
         "hurt": 0,
@@ -166,8 +139,35 @@
       },
       {
         "fold": 2,
-        "id": "k_01hf7uaqbk_467dt",
-        "statement": "When a question asks for a count of patients, the SQL answer must return a single aggregated count value rather than a raw row-level query.",
+        "id": "k_01hf7uaq35_eqqr5",
+        "statement": "When a question asks for the customer with the least total consumption over a period, the query must aggregate consumption per customer with SUM and GROUP BY before ordering and limiting.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaq36_8rgb1",
+        "statement": "Ordering by a per-row consumption column and limiting to one row does not answer a least-total-consumption question when a customer has multiple consumption rows.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaq38_affgr",
+        "statement": "When grouping by a team name column that is not the join key, the query can return duplicate team rows if names collide; grouping by the team identifier avoids this.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaq39_epz90",
+        "statement": "A valid pattern for 'which away team won the most' is to filter away_team_goal > home_team_goal, group by the away team identifier, and order by COUNT(*) descending with LIMIT 1.",
         "injected": 2,
         "helped": 0,
         "hurt": 0,
@@ -175,8 +175,8 @@
       },
       {
         "fold": 1,
-        "id": "k_01hf7uaqbl_cpfey",
-        "statement": "Month extraction from a date column can be expressed with SUBSTR(date_col, 6, 2) as an alternative to strftime('%m', date_col).",
+        "id": "k_01hf7uaq39_epz90",
+        "statement": "For a question asking which drivers are eliminated in the first qualifying period, selecting the driver with the maximum q1 time returns the slowest qualifier rather than the set of eliminated drivers.",
         "injected": 2,
         "helped": 0,
         "hurt": 0,
@@ -184,8 +184,8 @@
       },
       {
         "fold": 2,
-        "id": "k_01hf7uaqbl_cpfey",
-        "statement": "Using COUNT(DISTINCT p.ID) with a join on Patient and Examination was rejected in favor of a subquery-based COUNT(*) wrapped in ROUND arithmetic.",
+        "id": "k_01hf7uaq3b_8fabe",
+        "statement": "Filtering rows by a category condition before applying a HAVING count threshold changes which groups qualify, so the category filter must be applied after the group-count selection rather than in the same WHERE clause.",
         "injected": 2,
         "helped": 0,
         "hurt": 0,
