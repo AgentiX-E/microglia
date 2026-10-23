@@ -131,6 +131,53 @@ describe('run lifecycle', () => {
     await mg.close();
   });
 
+  it('carries the note a reviewer wrote into the edit signal', async () => {
+    // `edit(after, { note })` accepted a note and the normaliser dropped it, so the
+    // one piece of human context an interpreter could use never reached the store.
+    const { mg, store } = await create();
+    const run = mg.begin(baseRun);
+    await run.complete({ mark: 'bar' });
+    await run.edit({ mark: 'line' }, { note: 'wrong axis for a time series' });
+    const [event] = await store.listEvents();
+    expect(event?.signal.type).toBe('edit');
+    expect(event?.signal.type === 'edit' ? event.signal.note : undefined).toBe('wrong axis for a time series');
+    await mg.close();
+  });
+
+  it('omits the note when none was given', async () => {
+    const { mg, store } = await create();
+    const run = mg.begin(baseRun);
+    await run.complete({ mark: 'bar' });
+    await run.edit({ mark: 'line' });
+    const [event] = await store.listEvents();
+    expect(event?.signal.type === 'edit' ? 'note' in event.signal : true).toBe(false);
+    await mg.close();
+  });
+
+  it('refuses to record feedback against a run from another namespace', async () => {
+    // The write end of this boundary was guarded (`persistRun`); the feedback end
+    // was not, so a facade could annotate another tenant's run and the next
+    // distillation would read that run through this tenant's interpreter. Found by
+    // an MCP tool test, which is exactly the sort of caller the SDK is for.
+    const { mg, store } = await create();
+    const run = mg.begin(baseRun);
+    const record = await run.complete({ mark: 'bar' });
+
+    const foreign = new Microglia({
+      app: 'test',
+      namespace: 'other',
+      store,
+      clock: { now: () => 1_700_000_000_000 },
+    });
+    await expect(
+      foreign.recordFeedback(record, { type: 'edit', after: { mark: 'line' } }),
+    ).rejects.toThrow(/MG_E_NAMESPACE_MISMATCH/);
+    // And nothing was written: a refused write that still lands is worse than one
+    // that throws.
+    expect(await store.listEvents()).toHaveLength(0);
+    await mg.close();
+  });
+
   it('refuses to persist a run from another namespace', async () => {
     const { mg } = await create();
     const run = mg.begin(baseRun);

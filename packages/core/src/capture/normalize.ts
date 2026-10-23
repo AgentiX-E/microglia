@@ -105,6 +105,7 @@ function toSignal(
         ops,
         distance: clamp01(distance),
         after,
+        ...(input.note === undefined ? {} : { note: redact(input.note).text }),
       };
     }
 

@@ -17,6 +17,7 @@
  */
 import { Hono } from 'hono';
 import { MicrogliaError, isMicrogliaError } from '@agentix-e/microglia-core';
+import { RPC_PARSE_ERROR, createMcpHandler } from './mcp.js';
 import type {
   ErasureSelector,
   FeedbackInput,
@@ -118,6 +119,12 @@ export function createApp(options: AppOptions): Hono {
    * the host to build anything.
    */
   const seen = new Map<string, { runId: string; eventId: string }>();
+  /**
+   * The MCP surface is mounted as one route rather than a framework plugin: it is a
+   * JSON-RPC envelope over the same facade, and a second routing layer would only
+   * add a place for the two to disagree about authentication.
+   */
+  const mcp = createMcpHandler({ microglia: options.microglia });
 
   app.use('*', async (c, next) => {
     if (options.token !== undefined) {
@@ -127,6 +134,23 @@ export function createApp(options: AppOptions): Hono {
       }
     }
     await next();
+  });
+
+  app.post('/v1/mcp', async (c) => {
+    const raw = await c.req.text();
+    if (raw.length > limit) return c.json({ error: 'body too large', limit }, 413);
+    let body: unknown;
+    try {
+      body = JSON.parse(raw) as unknown;
+    } catch {
+      // A parse error has no id to echo; JSON-RPC says use null.
+      return c.json({ jsonrpc: '2.0', id: null, error: { code: RPC_PARSE_ERROR, message: 'Parse error' } }, 400);
+    }
+    const response = await mcp(body);
+    // A notification gets no body; 202 says "received", which is all a notification
+    // can be owed.
+    if (response === undefined) return c.body(null, 202);
+    return c.json(response);
   });
 
   app.get('/v1/health', async (c) => {

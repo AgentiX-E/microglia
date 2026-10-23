@@ -6,6 +6,20 @@
  * server that owns its store should also own its lifecycle.
  */
 export { createApp, statusFor, type AppOptions } from './app.js';
+export {
+  MCP_LATEST_PROTOCOL,
+  MCP_PROTOCOL_VERSIONS,
+  MCP_TOOLS,
+  RPC_INVALID_PARAMS,
+  RPC_INVALID_REQUEST,
+  RPC_METHOD_NOT_FOUND,
+  RPC_PARSE_ERROR,
+  createMcpHandler,
+  type JsonRpcResponse,
+  type McpHandler,
+  type McpOptions,
+  type McpTool,
+} from './mcp.js';
 export { createServer, listen, type Server, type ServerOptions } from './server.js';
 export { deepseekProvider, deepseekFactory, DEEPSEEK_BASE, type DeepSeekOptions } from './providers/deepseek.js';
 export { zhipuEmbeddings, zhipuFactory, ZHIPU_BASE, type ZhipuOptions } from './providers/zhipu.js';

@@ -676,6 +676,34 @@ acknowledgement lost on purpose, one delayed response, 50 corrections. It report
 violations, and a loopback p95 in single-digit milliseconds — a floor, not proof that a remote host is
 reached within the contract's 60 s.
 
+### 10.5 Handing the memory to an agent over MCP
+
+An agent that runs its own tool loop can ask for conventions instead of receiving a prompt block. The
+server exposes two tools over JSON-RPC at `POST /v1/mcp` — no new process, no second store, the same
+facade the HTTP routes use:
+
+```bash
+curl -s localhost:8787/v1/mcp -H 'content-type: application/json' -d '{
+  "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+  "params": { "name": "microglia_recall",
+              "arguments": { "taskType": "chart.recommend", "question": "compare revenue by region" } } }'
+```
+
+| Tool | Arguments | Returns |
+|---|---|---|
+| `microglia_recall` | `taskType`, `question`, optional `domain`, `budget` | the rendered pack as text, with `_meta.ids`, `tokens`, `truncated` |
+| `microglia_feedback` | `runId`, `kind` (`edit` / `rating` / `abstain`), plus `after`, `value` or `reason` | a one-line acknowledgement, or `isError: true` with the reason |
+
+Two things are deliberate. **`microglia_feedback` takes a `runId`**, not a task id: feedback in this
+library attaches to one immutable generation, and a task can have several attempts — a task id alone
+cannot say which attempt the user was judging. And **the surface is two tools**: a tool-calling agent
+that recalls on every turn has replaced a prompt block with a latency tax, which is what the POC-20 gate
+measures (≤2 calls per task).
+
+Failures split the way the protocol wants them to: a malformed *request* is a JSON-RPC error
+(`-32602`), while a *tool* failure — an unknown run, a namespace refusal — comes back as
+`isError: true` with a message the model can read and act on. A notification gets `202` and no body.
+
 ## 11. Failure modes and what they mean
 
 | Error code | Cause | Fix |

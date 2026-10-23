@@ -55,7 +55,7 @@ is strong enough to steer a prompt, and forgets it when it stops being true.
 | Package | Role | Runtime dependencies |
 |---|---|---|
 | `@agentix-e/microglia-core` | The library: domain model, store, distillation, pack construction, facade, provider contracts | none |
-| `@agentix-e/microglia-node` | HTTP ingestion and recall on Hono, DeepSeek and Zhipu providers | core, `hono` |
+| `@agentix-e/microglia-node` | HTTP ingestion and recall on Hono, an MCP tool surface (`POST /v1/mcp`), DeepSeek and Zhipu providers | core, `hono` |
 | `@agentix-e/microglia-browser` | Client with an offline outbox; talks to the node server | core |
 
 `core` is the whole mechanism in one install and has **no runtime dependency**, so it bundles for the

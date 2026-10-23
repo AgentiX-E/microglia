@@ -167,6 +167,18 @@ export class Microglia implements RunHost {
     options: FeedbackOptions = {},
   ): Promise<FeedbackEvent> {
     this.assertOpen();
+    // A run from another namespace is not this host's to annotate. Without this the
+    // event would be written under *this* namespace while citing a foreign run id,
+    // and the next distillation would read that run through this tenant's
+    // interpreter — one workspace's content becoming another's knowledge, which is
+    // the boundary `putRun` already guards at the write end.
+    if (run.namespace !== this.namespace) {
+      throw new MicrogliaError('MG_E_NAMESPACE_MISMATCH', 'Feedback cites a run from another namespace', {
+        expected: this.namespace,
+        actual: run.namespace,
+        runId: run.id,
+      });
+    }
     const at = options.at ?? this.clock.now();
     const event = buildFeedbackEvent({
       input,

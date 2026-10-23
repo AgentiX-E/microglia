@@ -163,10 +163,12 @@ export function populationOf(path: string): { readonly tables: number; readonly 
       .all() as { name: string }[];
     let rows = 0;
     for (const table of names) {
-      const counted = db.prepare(`SELECT COUNT(*) AS n FROM "${table.name.replace(/"/g, '""')}"`).get() as
-        | { n: number }
-        | undefined;
-      rows += counted?.n ?? 0;
+      // `COUNT(*)` always returns exactly one row; the assertion is the type, not a
+      // hope, and a guard here would be an arm no database can reach.
+      const counted = db.prepare(`SELECT COUNT(*) AS n FROM "${table.name.replace(/"/g, '""')}"`).get() as {
+        n: number;
+      };
+      rows += counted.n;
     }
     return { tables: names.length, rows };
   } finally {

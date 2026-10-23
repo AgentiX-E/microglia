@@ -233,6 +233,8 @@ The study is a package, not a script:
 - `pairs.ts` — the pair-contrast arithmetic: reachable share, reachable recovery, and the verdict.
 - `lanes/pairs.ts` — the L2b protocol: two arms over two teaching rounds, the citation count that decides
   whether the comparison means anything, and a cross-arm diff of the rules each store ends with.
+- `mcp.ts` (in `packages/node`) — the two-tool MCP surface: JSON-RPC over HTTP, request errors as
+  protocol codes, tool failures as readable results.
 - `lanes/delivery.ts` — POC-19: a real HTTP receiver that verifies HMAC and de-duplicates, an
   acknowledgement lost on purpose, and a delayed response that proves the latency measurement is live.
 - `l4.ts` — the τ²-bench result reader: both storage forms, and four named refusals taken from

@@ -56,6 +56,15 @@ export type FeedbackSignal =
       readonly distance: number;
       /** Canonical post-edit value, redacted, used as the learning target. */
       readonly after: Json;
+      /**
+       * What the reviewer said about the edit, when they said anything.
+       *
+       * `RunHandle.edit` has always accepted this option and the normaliser used to
+       * drop it, so an interpreter saw an edit without the one piece of context a
+       * human supplied. Carried, not interpreted: prose is evidence at the user-text
+       * tier, never an instruction.
+       */
+      readonly note?: string;
     }
   | {
       readonly type: 'preference';
