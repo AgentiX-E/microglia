@@ -286,9 +286,10 @@ This repository is **the product and the evidence that gates it**:
 
 The rule that decides a borderline file is **what it tests, not what it says**: if running it
 tells you something about *this library*, it belongs here, even when the thing it measures is an
-external dataset or a third-party model. `scripts/hf-inventory.mjs` is the clearest case — it prints
-what a Hugging Face dataset contains — and it stays because its only caller is the `sota` job, where it
-makes a failed benchmark run explain itself.
+external build or a third-party package. `scripts/cortex-conformance.mjs` is the clearest case — it
+projects a knowledge item through the adapter and compares the result against what cortex's own factory
+produces — and it stays because that comparison is the only evidence that the structural copy of
+`MemoryValue` is still accurate.
 
 What is deliberately absent: the whitepaper, the technical design, the roadmap, the audit and the
 progress log. Those describe the *project* rather than the library, they are written for an audience

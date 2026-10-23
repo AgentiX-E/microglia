@@ -73,13 +73,11 @@ jobs:
             exit 1
           fi
 
-      # The upstream question repository keeps its SQLite databases elsewhere (the
-      # file list is questions only). The lane therefore assembles the benchmark
-      # from birdsql/bird_mini_dev and birdsql/bird-critic-1.0-sqlite, and says
-      # which files it found when it cannot.
-      - name: Dataset inventory
-        run: node scripts/hf-inventory.mjs birdsql/bird_mini_dev birdsql/bird-critic-1.0-sqlite
-
+      # No inventory step: the lane verifies its own data. It reads the pinned
+      # manifest (`eval/manifests/bird-minidev.json`), checks the download's size and
+      # SHA-256 before extracting, reads the questions from the same archive, and
+      # counts the rows of every database it is about to use. A pre-flight step that
+      # listed a different source would be a second opinion nobody asked for.
       - name: Run the benchmark
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
