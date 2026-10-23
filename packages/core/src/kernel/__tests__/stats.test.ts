@@ -46,6 +46,32 @@ describe('McNemar exact test', () => {
   it('is symmetric in its arguments', () => {
     expect(mcnemarExact(9, 2)).toBeCloseTo(mcnemarExact(2, 9), 12);
   });
+
+  it('equals the exact two-sided binomial, to the last bit', () => {
+    // The quantities above are thresholds ("less than 0.01"), which a function with
+    // a wrong normalisation can still satisfy. These are the exact values of
+    // 2·P(X ≤ min(b,c)) for X ~ Bin(b+c, ½), computed in rational arithmetic
+    // independently of this implementation: sum(C(n,i), i≤k) / 2^(n-1), capped at 1.
+    const reference: readonly (readonly [number, number, number])[] = [
+      [12, 1, 0.00341796875],
+      [6, 2, 0.2890625],
+      [9, 2, 0.0654296875],
+      [0, 7, 0.015625],
+      [3, 0, 0.25],
+      [15, 5, 0.04138946533203125],
+      [20, 3, 0.00048828125],
+      [50, 42, 0.4657074457730625],
+      // The cap: the doubled tail would exceed 1 for a near-even split.
+      [1, 1, 1],
+    ];
+    for (const [b, c, expected] of reference) {
+      // Twelve decimal places, not bit equality: the implementation works in
+      // log-space (log-gamma, log-sum-exp), so the last two bits differ from exact
+      // rational arithmetic. Everything that matters to a published p-value is in
+      // the first twelve digits.
+      expect(mcnemarExact(b, c)).toBeCloseTo(expected, 12);
+    }
+  });
 });
 
 describe('bootstrap', () => {

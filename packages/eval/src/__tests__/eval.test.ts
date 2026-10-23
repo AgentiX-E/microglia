@@ -8,6 +8,7 @@ import {
 } from '../workload/index.js';
 import { applyKnowledge, baselineMark, buildCorpus, goldMark } from '../scenario.js';
 import { comparePaired } from '../stats.js';
+import { detectableDelta } from '../protocol.js';
 import {
   DEFAULT_CONFIG,
   L0_CASES,
@@ -39,6 +40,45 @@ describe('paired statistics', () => {
     const same = [true, false, true, false];
     expect(comparePaired(same, same).p).toBe(1);
     expect(comparePaired(same, same).delta).toBe(0);
+  });
+
+  it('produces an interval of the width a normal approximation predicts', () => {
+    // 400 pairs, 80 discordant (20%), split 50 gained / 30 lost: delta 5pp.
+    // The interval is a percentile bootstrap of the paired difference, so its
+    // half-width should track 1.96·sqrt(p_d/n) = 4.38pp. A test that only checked
+    // "the point estimate is inside the interval" would pass for any width at all,
+    // including an interval so wide that every null result looks inconclusive.
+    const baseline: boolean[] = [];
+    const treatment: boolean[] = [];
+    for (let i = 0; i < 400; i += 1) {
+      const correct = i < 200;
+      baseline.push(correct);
+      // Thirty that were right become wrong; fifty that were wrong become right.
+      const lost = correct && i < 30;
+      const gained = !correct && i < 250;
+      treatment.push(lost ? false : gained ? true : correct);
+    }
+    const result = comparePaired(baseline, treatment, 7, 2000);
+    expect(result.gained).toBe(50);
+    expect(result.lost).toBe(30);
+    expect(result.delta).toBeCloseTo(0.05, 10);
+    const halfWidth = (result.deltaCI.high - result.deltaCI.low) / 2;
+    const expected = 1.96 * Math.sqrt((result.discordance * 1) / result.n);
+    expect(halfWidth).toBeGreaterThan(expected * 0.85);
+    expect(halfWidth).toBeLessThan(expected * 1.15);
+  });
+
+  it('sizes the smallest detectable difference to the power the constant implies', () => {
+    // detectableDelta uses z = 2.802, which is 1.96 + 0.84: 80% power at a two-sided
+    // 5% level. The claim it supports is "this run could not have detected a
+    // difference smaller than X", so the constant has to match the interval it is
+    // quoted beside — if MDD were reported as 1.96·sqrt(p_d/n) the claim would be
+    // 43% optimistic.
+    const n = 400;
+    const discordance = 0.2;
+    const mdd = detectableDelta(n, discordance);
+    expect(mdd).toBeCloseTo(2.802 * Math.sqrt(discordance / n), 10);
+    expect(mdd / (1.96 * Math.sqrt(discordance / n))).toBeCloseTo(1.4296, 4);
   });
 });
 
