@@ -58,6 +58,7 @@
  *  - `SOTA_RESAMPLES`  bootstrap resamples; default 10000, per the protocol
  *  - `POC_MAX_CALLS`   hard call budget; default 4000
  */
+import { writeJson } from './lib.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
@@ -75,6 +76,7 @@ import {
 import {
   archiveVerdict,
   assignFolds,
+  dedupeQuestions,
   comparePaired,
   detectableDelta,
   interleaveByKey,
@@ -94,7 +96,6 @@ const ROOT = new URL('..', import.meta.url).pathname;
 /** The repository root, three levels up: `src` → `eval` → `packages` → `.`. */
 const REPO = join(ROOT, '..', '..', '..');
 const CACHE = join(ROOT, '..', '.cache', 'bird');
-const RESULTS = join(ROOT, 'poc', 'results');
 
 const LIMIT = nonNegative(process.env['SOTA_LIMIT'], 0);
 const FOLDS = Math.max(2, Math.trunc(nonNegative(process.env['SOTA_FOLDS'], 5)));
@@ -310,6 +311,8 @@ type Dataset = {
   readonly dbPath: (dbId: string) => string;
   /** Where the questions came from, recorded in the artefact. */
   readonly source: string;
+  /** Rows the archive repeats verbatim: dropped, and stated in the artefact. */
+  readonly duplicates: number;
 };
 
 async function fetchText(url: string): Promise<string | undefined> {
@@ -510,6 +513,16 @@ async function loadDataset(limit: number): Promise<Dataset> {
     }
   }
 
+  // The pinned file repeats two rows verbatim (`financial#137`, `#138`), so 500
+  // records describe 498 questions and the fold assignment — which is keyed by
+  // `db_id#question_id` and refuses duplicate keys — would refuse the whole run.
+  // The repeats are dropped and counted, and the count travels with the artefact.
+  const deduped = dedupeQuestions(rows);
+  rows = [...deduped.rows];
+  if (deduped.duplicates > 0) {
+    process.stdout.write(`[sota] dropped ${deduped.duplicates} repeated question(s)\n`);
+  }
+
   // The lane measures transfer, so the slice skips the easiest third: a question a
   // model answers without help carries no signal for either arm. The remainder is
   // interleaved across databases, because a prefix of a database-sorted file is a
@@ -542,7 +555,12 @@ async function loadDataset(limit: number): Promise<Dataset> {
     process.stdout.write(`[sota] data ok: ${dbId} ${counted.tables} tables, ${counted.rows} rows\n`);
   }
 
-  return { rows: slice, source, dbPath: (dbId) => databaseIn(root, dbId) };
+  return {
+    rows: slice,
+    source,
+    duplicates: deduped.duplicates,
+    dbPath: (dbId) => databaseIn(root, dbId),
+  };
 }
 
 function ddlOf(dbPath: string): string {
@@ -1297,6 +1315,7 @@ async function main(): Promise<void> {
       distill_failed: folds.reduce((sum, fold) => sum + fold.failedDistill, 0),
       distill_created: folds.reduce((sum, fold) => sum + fold.created, 0),
       corrections_learned: folds.reduce((sum, fold) => sum + fold.learning.edited, 0),
+      duplicate_questions_dropped: dataset.duplicates,
     },
     paired: {
       n: paired.n,
@@ -1331,8 +1350,11 @@ async function main(): Promise<void> {
     generated_at: new Date().toISOString(),
   };
 
-  mkdirSync(RESULTS, { recursive: true });
-  writeFileSync(join(RESULTS, 'poc-sota-bird.json'), `${JSON.stringify(artifact, null, 2)}\n`);
+  // Through the shared writer, which honours POC_RESULT_DIR and otherwise writes to
+  // `eval/results` — the directory the workflow's publish and attribution steps read.
+  // The lane used to write to `packages/eval/src/poc/results`, a path from before the
+  // rename, so the artefact existed and the job could not find it.
+  await writeJson('poc-sota-bird', artifact);
   process.stdout.write(
     `[sota] n=${cases.length} without=${(paired.baselineAccuracy * 100).toFixed(2)}% ` +
       `with=${(paired.treatmentAccuracy * 100).toFixed(2)}% delta=${(paired.delta * 100).toFixed(2)}pp ` +

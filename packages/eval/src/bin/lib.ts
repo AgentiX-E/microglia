@@ -173,12 +173,23 @@ export type PocResult = {
   readonly samples?: readonly unknown[];
 };
 
-export async function writeResult(result: PocResult): Promise<void> {
+/**
+ * Write a lane's artefact where the gate, the workflow and the documents read it.
+ *
+ * One function rather than a constant per lane: the S2 lane kept a `poc/results`
+ * path from before the rename, so its artefact was written to a directory nothing
+ * else looked at and the workflow's own publish step failed to find it.
+ */
+export async function writeJson(id: string, value: unknown): Promise<void> {
   // The committed artefact lives in the repository; a self-check run redirects it
   // so a CI gate can exercise a lane without overwriting the evidence it ships.
   const dir = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 'results');
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, `${result.id}.json`), `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+  await writeFile(join(dir, `${id}.json`), `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+}
+
+export async function writeResult(result: PocResult): Promise<void> {
+  await writeJson(result.id, result);
   process.stdout.write(
     `[${result.id}] ${Object.entries(result.metrics)
       .map(([k, v]) => `${k}=${typeof v === 'number' ? Number(v.toFixed(4)) : v}`)

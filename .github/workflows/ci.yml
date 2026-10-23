@@ -89,6 +89,10 @@ jobs:
           # environment, not a failed measurement: exit 0, and say which variable.
           POC_RESULT_DIR="${RUNNER_TEMP}/l4-missing" TAU_DRIVER=./does-not-exist.mjs pnpm eval:l4
           grep -q '"status_driver_missing": 1' "${RUNNER_TEMP}/l4-missing/poc-l4.json"
+          # A workflow variable that does not exist expands to the empty string, and
+          # that must read as absent rather than as a path named ''.
+          POC_RESULT_DIR="${RUNNER_TEMP}/l4-empty" TAU_RESULTS= TAU_DRIVER= pnpm eval:l4
+          grep -q '"status_not_run": 1' "${RUNNER_TEMP}/l4-empty/poc-l4.json"
 
       - name: CPU scale and latency
         run: pnpm eval:scale

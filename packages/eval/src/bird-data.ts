@@ -55,15 +55,23 @@ export type BirdDataErrorReason =
   | 'digest-mismatch'
   | 'missing-databases'
   | 'empty-database'
-  | 'unreadable-database';
+  | 'unreadable-database'
+  | 'question-id-collision';
 
 export class BirdDataError extends Error {
   public readonly reason: BirdDataErrorReason;
+  /** What the check saw, so a failure can be acted on without a debugger. */
+  public readonly details: Readonly<Record<string, unknown>>;
 
-  public constructor(reason: BirdDataErrorReason, message: string) {
+  public constructor(
+    reason: BirdDataErrorReason,
+    message: string,
+    details: Readonly<Record<string, unknown>> = {},
+  ) {
     super(`${reason}: ${message}`);
     this.name = 'BirdDataError';
     this.reason = reason;
+    this.details = details;
   }
 }
 
@@ -205,4 +213,60 @@ export function sha256OfFile(path: string): Promise<string> {
     stream.on('error', reject);
     stream.on('end', () => resolve(hash.digest('hex')));
   });
+}
+
+/** The fields that identify one question, whatever else a row carries. */
+export type QuestionIdentity = {
+  readonly db_id: string;
+  readonly question_id: number;
+  readonly question: string;
+  readonly SQL: string;
+};
+
+export type Deduped<T> = {
+  readonly rows: readonly T[];
+  readonly duplicates: number;
+};
+
+/**
+ * Drop rows the archive repeats, and refuse rows whose id names two questions.
+ *
+ * The pinned Mini-Dev file contains **two byte-identical rows** — `financial#137`
+ * and `financial#138` — so 500 records describe 498 questions. The lane's fold
+ * assignment is keyed by `db_id#question_id` and correctly refuses duplicate keys,
+ * which is how this was found: without the dedupe the entire benchmark refused to
+ * start. Counting the repeats and dropping them is the honest repair; counting the
+ * same question twice would inflate n and give one question two votes.
+ *
+ * A collision whose *content* differs is the opposite situation — one id, two
+ * questions — and there is no defensible way to pick: that fails with a name.
+ */
+export function dedupeQuestions<T extends QuestionIdentity>(rows: readonly T[]): Deduped<T> {
+  const seen = new Map<string, T>();
+  const out: T[] = [];
+  let duplicates = 0;
+  for (const row of rows) {
+    const key = `${row.db_id}#${row.question_id}`;
+    const prior = seen.get(key);
+    if (prior === undefined) {
+      seen.set(key, row);
+      out.push(row);
+      continue;
+    }
+    if (prior.question === row.question && prior.SQL === row.SQL) {
+      duplicates += 1;
+      continue;
+    }
+    throw new BirdDataError(
+      'question-id-collision',
+      `Two different questions share the id '${key}'`,
+      {
+        db_id: row.db_id,
+        question_id: row.question_id,
+        first: prior.question.slice(0, 120),
+        second: row.question.slice(0, 120),
+      },
+    );
+  }
+  return { rows: out, duplicates };
 }

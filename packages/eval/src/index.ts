@@ -10,6 +10,7 @@ export { recoveryRatio, type RecoveryInput } from './recovery.js';
 export {
   BirdDataError,
   archiveVerdict,
+  dedupeQuestions,
   missingDatabases,
   parseManifest,
   populationOf,
@@ -17,6 +18,8 @@ export {
   sha256OfFile,
   type BirdDataErrorReason,
   type BirdManifest,
+  type Deduped,
+  type QuestionIdentity,
 } from './bird-data.js';
 
 export {

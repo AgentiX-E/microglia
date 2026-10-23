@@ -35,8 +35,21 @@ const BAR = 0.05;
 const K = 4;
 const MIN_TASKS = 60;
 
-const resultsPath = process.env['TAU_RESULTS'];
-const driver = process.env['TAU_DRIVER'];
+/**
+ * An environment variable that a workflow did not set.
+ *
+ * `vars.TAU_RESULTS` expands to the empty string when the variable does not exist,
+ * so `process.env.TAU_RESULTS` is `''` rather than `undefined`. Reading that as a
+ * path made the lane try to open `results.json` in the working directory and fail
+ * with ENOENT — a missing variable reported as a filesystem bug.
+ */
+function envPath(name: string): string | undefined {
+  const value = process.env[name];
+  return value === undefined || value.trim() === '' ? undefined : value;
+}
+
+const resultsPath = envPath('TAU_RESULTS');
+const driver = envPath('TAU_DRIVER');
 
 /** A directory form keeps its document in `results.json`; a file form is itself. */
 async function readDocument(path: string): Promise<string> {

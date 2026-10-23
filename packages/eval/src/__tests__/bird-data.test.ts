@@ -11,6 +11,7 @@ import {
   parseManifest,
   populationOf,
   requirePopulated,
+  dedupeQuestions,
   sha256OfFile,
   type BirdDataErrorReason,
 } from '../bird-data.js';
@@ -155,5 +156,42 @@ describe('what a database actually holds', () => {
       'INSERT INTO t DEFAULT VALUES',
     ]);
     expect(requirePopulated(path, 'ok')).toEqual({ tables: 1, rows: 1 });
+  });
+});
+
+describe('the questions the archive repeats', () => {
+  const question = (id: number, text: string, sql = 'SELECT 1') => ({
+    db_id: 'financial',
+    question_id: id,
+    question: text,
+    SQL: sql,
+  });
+
+  it('drops a byte-identical repeat and counts it', () => {
+    // The pinned Mini-Dev file really does this: `financial#137` and `#138` appear
+    // twice, verbatim, so 500 records describe 498 questions. Counting the question
+    // twice would give it two votes in a paired test.
+    const result = dedupeQuestions([
+      question(1, 'How many accounts?'),
+      question(2, 'How many clients?'),
+      question(1, 'How many accounts?'),
+    ]);
+    expect(result.rows.map((row) => row.question_id)).toEqual([1, 2]);
+    expect(result.duplicates).toBe(1);
+  });
+
+  it('refuses an id that names two different questions', () => {
+    // One id, two questions is a different situation from a repeated row, and there
+    // is no defensible way to choose between them: the run has to stop.
+    expect(() =>
+      dedupeQuestions([question(1, 'How many accounts?'), question(1, 'How many clients?')]),
+    ).toThrow(/question-id-collision/);
+  });
+
+  it('keeps the same id in two databases, because the key is the pair', () => {
+    const other = { ...question(1, 'A different question'), db_id: 'superhero' };
+    const result = dedupeQuestions([question(1, 'How many accounts?'), other]);
+    expect(result.rows).toHaveLength(2);
+    expect(result.duplicates).toBe(0);
   });
 });
