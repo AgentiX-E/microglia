@@ -155,6 +155,20 @@ export type SqlArm =
    * run-to-run noise of two dispatches.
    */
   | 'full-plain'
+  /**
+   * Only rules corroborated by at least two independent corrections.
+   *
+   * Every harmful rule in iterations 61-63 was activated by a *single* observation, and
+   * the store has always recorded how many observations a claim has - the pack has
+   * simply never filtered on it. This arm does, because it is the one quality axis that
+   * is measured rather than inferred: no text, no similarity, no model judgement, just
+   * the count of independent corrections behind the rule.
+   *
+   * Deliberately not a pack control for V6: an empty pack at this threshold is a
+   * legitimate result ("nothing in this corpus was corroborated twice"), not a broken
+   * control, and failing the run on it would prevent publishing the finding.
+   */
+  | 'full-corroborated'
   | 'gated'
   | 'duplicate'
   | 'wrong-scope'
@@ -164,6 +178,7 @@ export type SqlArm =
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = [
   'full-narrow',
   'full-plain',
+  'full-corroborated',
   'gated',
   'duplicate',
   'wrong-scope',

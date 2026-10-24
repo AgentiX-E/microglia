@@ -169,6 +169,7 @@ type ArmName =
   | 'full'
   | 'full-narrow'
   | 'full-plain'
+  | 'full-corroborated'
   | 'gated'
   | 'duplicate'
   | 'wrong-scope'
@@ -202,6 +203,15 @@ function armsFrom(raw: string | undefined): Set<ArmName> {
 }
 
 const ARMS = armsFrom(process.env['SOTA_ARMS']);
+
+/**
+ * Independent corrections a rule needs before the corroboration arm injects it.
+ *
+ * Two, because that is the smallest number that can mean "this happened again", and
+ * because the store's own activation policy treats a second observation differently
+ * from a first.
+ */
+const CORROBORATION = 2;
 
 function nonNegative(raw: string | undefined, fallback: number): number {
   if (raw === undefined || raw === '') return fallback;
@@ -1007,6 +1017,16 @@ async function runFold(
       const plain = makePack(pack.items, { budget: pack.budget, conditions: false });
       call(position, 'full-plain', plain.rendered, plain.ids.length);
     }
+    if (ARMS.has('full-corroborated')) {
+      // The same recall, filtered on a count the store already keeps. A rule with one
+      // observation is a hypothesis; the arm asks whether treating it as one - rather
+      // than as a rule - is what the pack has been missing.
+      const corroborated = makePack(
+        pack.items.filter((item) => item.evidence.length >= CORROBORATION),
+        { budget: pack.budget },
+      );
+      call(position, 'full-corroborated', corroborated.rendered, corroborated.ids.length);
+    }
     if (ARMS.has('gated')) {
       const gated = await widened.host.recall({
         ...query,
@@ -1442,6 +1462,10 @@ async function main(): Promise<void> {
       // itself unwidened, `full-narrow` is the same pack under a second name, and a
       // reader must not read the two arms as a comparison.
       narrow_distinct: folds.some((fold) => fold.narrowActive !== null),
+      // The corroboration threshold this run applied, or null when the arm was off.
+      // A filter is a condition of the result: a number produced at a different
+      // threshold is a different number.
+      corroboration_min: ARMS.has('full-corroborated') ? CORROBORATION : null,
     },
     n: {
       total: rows.length,

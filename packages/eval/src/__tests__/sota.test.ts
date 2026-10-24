@@ -163,6 +163,7 @@ describe('parseArms', () => {
     expect([...arms].sort()).toEqual([
       'duplicate',
       'full',
+      'full-corroborated',
       'full-narrow',
       'full-plain',
       'gated',
@@ -190,6 +191,7 @@ describe('parseArms', () => {
     expect([...OPTIONAL_ARMS]).toEqual([
       'full-narrow',
       'full-plain',
+      'full-corroborated',
       'gated',
       'duplicate',
       'wrong-scope',
@@ -204,6 +206,10 @@ describe('parseArms', () => {
 
   it('accepts the shape arm, which differs from full by one field of text', () => {
     expect([...parseArms('full-plain')].sort()).toEqual(['full', 'full-plain', 'none']);
+  });
+
+  it('accepts the corroboration arm, which filters the same pack on evidence count', () => {
+    expect([...parseArms('full-corroborated')].sort()).toEqual(['full', 'full-corroborated', 'none']);
   });
 });
 
