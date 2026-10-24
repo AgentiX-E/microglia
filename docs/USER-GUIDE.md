@@ -736,6 +736,14 @@ Be honest about the preconditions; the product is only useful inside them.
    a strong model at 90.48% (or moved it to 88.10%). The value is *your* conventions, where the same
    model goes from 0% to 75–89%.
 5. **Structured outputs need `editSemantics`.** See §4.
+6. **A convention with a *form* is not transmitted by description.** Measured on BIRD Mini-Dev (145
+   questions, 5 folds, 1,301 model calls): writing a workspace convention into the prompt moved execution
+   accuracy from 0.69% to 4.14–5.52%; handing over the exact answer in the exact form reached 48.97–56.55%,
+   short of the 90% needed to attribute the result to knowledge rather than to output format. The pack
+   steers *what* the model produces; it does not certify *form*. If a unit, a rounding, a precision or an
+   ordering is a requirement, enforce it after generation or encode it in the schema — a sentence in the
+   prompt is a hint, not a contract. (On discrete choices the same mechanism does move a strong model:
+   0% to 75–89% on chart-type conventions, which is where item 4's number comes from.)
 
 ## 13. Performance and limits
 
