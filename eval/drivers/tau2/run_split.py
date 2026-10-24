@@ -81,13 +81,26 @@ def main(argv: list[str]) -> int:
         raise SystemExit("tau2-no-tasks")
     print(f"[tau2] {args.phase}: {len(tasks)} task(s), {args.trials} trial(s), agent={args.agent}", file=sys.stderr)
 
+    # An existing output file makes `run_tasks` ask `ConsoleDisplay.console.input`
+    # whether to resume - an interactive prompt, in a CI job, with no TTY. Deleting
+    # the file first is the only way to keep that branch unreachable; a hang is the
+    # most expensive failure mode a benchmark can have.
+    if os.path.exists(args.out):
+        os.remove(args.out)
+
     results = run_tasks(
         domain=args.domain,
         tasks=tasks,
         agent=args.agent,
         user="user_simulator",
         llm_agent=model,
+        # Upstream's `run_tasks` does `if "seed" in llm_args_agent`, so passing None
+        # raises `TypeError: argument of type 'NoneType' is not iterable` before the
+        # first episode. The parameters are optional in the signature and required by
+        # the body; two empty dicts are the difference between a run and a traceback.
+        llm_args_agent={},
         llm_user=model,
+        llm_args_user={},
         num_trials=args.trials,
         max_steps=args.max_steps,
         save_to=args.out,
