@@ -88,11 +88,20 @@ const TASK = 'tau2.act';
 /** One `run_split.py` invocation, with its stdout surfaced on failure. */
 async function phase(args: readonly string[]): Promise<void> {
   try {
-    await runFile(PYTHON, args as string[], {
+    const finished = await runFile(PYTHON, args as string[], {
       cwd: REPO,
       maxBuffer: 64 * 1024 * 1024,
       env: { ...process.env },
     });
+    // The phase writes one summary line; the benchmark writes thousands of its own.
+    // Printing the tail keeps a run's shape visible without turning the job log
+    // into a transcript, and it is the only evidence that a phase ran at all when
+    // the lane is green.
+    const tail = [finished.stdout, finished.stderr]
+      .filter((text) => text.trim() !== '')
+      .map((text) => text.trim().split('\n').slice(-2).join('\n'))
+      .join('\n');
+    if (tail !== '') process.stdout.write(`[tau2] ${tail}\n`);
   } catch (error) {
     const failure = error as { stdout?: string; stderr?: string; message: string };
     const detail = [failure.stderr, failure.stdout].filter(Boolean).join('\n').slice(-2000);
