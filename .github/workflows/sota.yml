@@ -51,6 +51,10 @@ on:
         description: 'Tasks to draw for L4 (0 = the whole set; a smoke run wants 4-6)'
         required: false
         default: '0'
+      l4_train_share:
+        description: 'Share of L4 tasks used for learning (0.4 gives retail 68 held out, above its 60 floor)'
+        required: false
+        default: '0.5'
   schedule:
     - cron: '0 3 * * 1'
 
@@ -293,7 +297,7 @@ jobs:
           TAU_DOMAIN: ${{ vars.TAU_DOMAIN || 'retail' }}
           TAU_TRIALS: ${{ vars.TAU_TRIALS || '4' }}
           TAU_MEMORY: ${{ vars.TAU_MEMORY || 'true' }}
-          TAU_TRAIN_SHARE: ${{ vars.TAU_TRAIN_SHARE || '0.5' }}
+          TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
           TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '4' }}
           TAU_MAX_TASKS: ${{ github.event.inputs.l4_tasks || vars.TAU_MAX_TASKS || '0' }}
           TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
