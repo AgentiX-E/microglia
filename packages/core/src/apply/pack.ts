@@ -30,6 +30,23 @@ export type BuildPackOptions = {
    */
   readonly minCoverage?: number;
   /**
+   * Independent corrections a rule needs before it may be injected. Default 1.
+   *
+   * The pack layer already decides what is *relevant* (`minCoverage`) and what the
+   * model can be shown safely; this decides what has been *observed enough*. It is a
+   * separate question, and on the two workloads measured here it has a large answer:
+   *
+   *  - BIRD Mini-Dev (350 questions, 5 folds): every one of 1,296 distilled rules came
+   *    from a single correction, so a floor of 2 injects nothing - and the mechanism's
+   *    cost (-2 to -4pp) goes to zero with it.
+   *  - The chart study (recurring defects): the same floor keeps 96.43% of 100.00%,
+   *    so requiring a second observation costs 3.57pp of a 68.21pp lift.
+   *
+   * A host chooses which of those two worlds it is in; the default stays 1 so no
+   * existing caller changes behaviour on an upgrade.
+   */
+  readonly minEvidence?: number;
+  /**
    * Trust at which a positive rule silences an abstention. Defaults to the
    * activation threshold, so "confident enough to inject" and "confident enough to
    * overrule a recorded absence" are the same number.
@@ -53,10 +70,18 @@ export async function buildPack(
   // last is not enough — they are still injected, still paid for in tokens, and
   // measured to move nothing. The coverage floor turns a weak match into no match.
   const floor = options.minCoverage ?? query.minCoverage ?? 0;
-  const eligible =
+  const byRelevance =
     floor <= 0
       ? hits
       : hits.filter((hit) => queryCoverage(query.text, hit.item.statement) >= floor);
+  // Corroboration is a different question from relevance, and it is asked before MMR:
+  // a rule with one observation should not occupy a slot that a corroborated rule
+  // could have filled.
+  const minEvidence = Math.max(1, Math.trunc(options.minEvidence ?? query.minEvidence ?? 1));
+  const eligible =
+    minEvidence <= 1
+      ? byRelevance
+      : byRelevance.filter((hit) => hit.item.evidence.length >= minEvidence);
 
   const selected = mmrSelect<KnowledgeItem>(
     eligible.map((hit) => ({ item: hit.item, relevance: hit.score, text: hit.item.statement })),

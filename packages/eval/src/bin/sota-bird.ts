@@ -1018,13 +1018,14 @@ async function runFold(
       call(position, 'full-plain', plain.rendered, plain.ids.length);
     }
     if (ARMS.has('full-corroborated')) {
-      // The same recall, filtered on a count the store already keeps. A rule with one
-      // observation is a hypothesis; the arm asks whether treating it as one - rather
-      // than as a rule - is what the pack has been missing.
-      const corroborated = makePack(
-        pack.items.filter((item) => item.evidence.length >= CORROBORATION),
-        { budget: pack.budget },
-      );
+      // The same recall with the pack layer's corroboration floor - the product path,
+      // not a filter applied in the lane: a rule with one observation is a hypothesis,
+      // and the arm asks whether treating it as one is what the pack has been missing.
+      const corroborated = await widened.host.recall({
+        ...query,
+        scope: { domain: row.db_id },
+        minEvidence: CORROBORATION,
+      });
       call(position, 'full-corroborated', corroborated.rendered, corroborated.ids.length);
     }
     if (ARMS.has('gated')) {

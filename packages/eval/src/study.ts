@@ -97,7 +97,8 @@ export type ArmName =
   | 'no-generalization'
   | 'no-credit'
   | 'no-contradiction'
-  | 'narrow-budget';
+  | 'narrow-budget'
+  | 'corroborated-only';
 
 export type ArmConfig = {
   readonly name: ArmName;
@@ -113,6 +114,17 @@ export type ArmConfig = {
   readonly maxContradictions: number;
   /** Pack budget in characters, or `null` to use the study budget. */
   readonly packBudget: number | null;
+  /**
+   * Independent corrections a rule needs before it may be injected. `1` is the
+   * shipped behaviour: one correction is enough to reach a prompt.
+   *
+   * The BIRD lane lost 2-4pp with the same mechanism on a corpus where every
+   * correction is unique, and no rule there is ever corroborated twice. This arm
+   * asks the other half of that question: on a workload where mistakes *recur*, does
+   * requiring corroboration cost anything? If it does not, "one observation is not
+   * a rule" is a policy the product can adopt with evidence on both sides.
+   */
+  readonly minEvidence: number;
 };
 
 function arm(name: ArmName, overrides: Partial<Omit<ArmConfig, 'name'>> = {}): ArmConfig {
@@ -126,6 +138,7 @@ function arm(name: ArmName, overrides: Partial<Omit<ArmConfig, 'name'>> = {}): A
     credit: true,
     maxContradictions: 1,
     packBudget: null,
+    minEvidence: 1,
     ...overrides,
   };
 }
@@ -147,6 +160,7 @@ export const ARMS: readonly ArmConfig[] = [
   // A budget that fits one rule instead of six: the pack layer's contribution,
   // measured at the point where it actually binds (400 characters).
   arm('narrow-budget', { packBudget: 400 }),
+  arm('corroborated-only', { minEvidence: 2 }),
 ];
 
 export type StudyConfig = {
@@ -293,17 +307,21 @@ export async function evaluateHoldout(
   holdout: readonly CorpusItem[],
   useMemory: boolean,
   budget: number,
+  minEvidence = 1,
 ): Promise<{ correct: boolean[]; meanTokens: number; p50Ms: number; p95Ms: number }> {
   const correct: boolean[] = [];
   const latencies: number[] = [];
   let tokens = 0;
   for (const item of holdout) {
     const started = performance.now();
+    // The floor is a pack-layer option, not a filter applied here: the arm has to
+    // exercise the path a host would use, or it measures a reimplementation.
     const pack = useMemory
       ? await mg.recall({
           task: TASK,
           text: item.query.text,
           scope: { domain: item.query.domain, intent: item.query.intent },
+          ...(minEvidence > 1 ? { minEvidence } : {}),
         })
       : emptyPack(budget);
     latencies.push(performance.now() - started);
@@ -348,7 +366,7 @@ export async function runArm(
     random: mulberry32(config.seed + seedOffset),
   });
 
-  const initial = await evaluateHoldout(mg, corpus.holdout, arm.useMemory, packBudget);
+  const initial = await evaluateHoldout(mg, corpus.holdout, arm.useMemory, packBudget, arm.minEvidence);
   // `latest` is carried explicitly so the final metrics never need an
   // optional-chain into an array that is guaranteed non-empty.
   let latest = await snapshot(
@@ -397,7 +415,7 @@ export async function runArm(
     }
 
     if (arm.useMemory) await mg.distill({ generalize: arm.generalize });
-    const evaluated = await evaluateHoldout(mg, corpus.holdout, arm.useMemory, packBudget);
+    const evaluated = await evaluateHoldout(mg, corpus.holdout, arm.useMemory, packBudget, arm.minEvidence);
     latest = await snapshot(
       mg,
       round + 1,

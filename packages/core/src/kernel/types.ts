@@ -457,4 +457,13 @@ export type RecallQuery = {
    * cost. What it costs is recorded here rather than acted on by changing a default.
    */
   readonly anchoring?: 'lexical' | 'scope';
+  /**
+   * Independent corrections a rule needs before it may be injected.
+   *
+   * The pack layer's third gate, beside scope (which rules could apply), coverage
+   * (which rules the question mentions) and this one (which rules have been observed
+   * more than once). Absent means 1: one correction is enough, which is the behaviour
+   * every caller had before the field existed.
+   */
+  readonly minEvidence?: number;
 };
