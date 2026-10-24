@@ -154,7 +154,7 @@ export class EmbeddedMemory implements MemoryPort {
      * becomes a candidate and is ranked on confidence when it has no lexical
      * overlap.
      */
-    if (query.scope) {
+    if (query.scope && (query.anchoring ?? 'scope') === 'scope') {
       for (const [id, item] of this.knowledge) {
         if (item.status !== 'active') continue;
         if (item.namespace !== query.namespace) continue;

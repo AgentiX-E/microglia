@@ -121,6 +121,17 @@ export {
 export { LlmClient, type ChatReply, type LlmClientOptions, type LlmStats } from './model-client.js';
 
 export {
+  creditedWith,
+  embeddingText,
+  pairsOf,
+  separationOf,
+  type CaseRecord,
+  type Credited,
+  type Separation,
+  type SimilarityPair,
+} from './embed-probe.js';
+
+export {
   HOUSE_CONVENTIONS,
   OPTIONAL_ARMS,
   PROMPT_VERSION,

@@ -418,4 +418,26 @@ export type RecallQuery = {
    * correct facts becomes prompt noise.
    */
   readonly minCoverage?: number;
+  /**
+   * Whether a scope-matched rule that shares **no word** with the query may be
+   * injected.
+   *
+   * `'scope'` (the behaviour before iteration 62) treats a structured scope as an
+   * index: every rule in the domain becomes a candidate, and confidence — which is
+   * a function of time and corroboration, not of relevance — can carry it into the
+   * top-k. That was deliberate, to keep rules that had generalised out of a domain
+   * reachable, and it is what made a pack of 2.0 rules per question contain, on
+   * BIRD, injections whose median lexical overlap with the question was 13% and 57%
+   * of which shared under a sixth of the question's content words.
+   *
+   * `'lexical'` requires an anchor: a rule enters the pack because the question
+   * mentions something in it. Scope still filters — a rule outside the scope never
+   * appears — but it cannot be the only reason.
+   *
+   * The default stays `'scope'` because that is the published contract, and because
+   * the measurement says the keyword gate is not the fix: on BIRD, requiring one
+   * shared word removed the pack's unanchored rules and recovered 0.29pp of a 4.00pp
+   * cost. What it costs is recorded here rather than acted on by changing a default.
+   */
+  readonly anchoring?: 'lexical' | 'scope';
 };
