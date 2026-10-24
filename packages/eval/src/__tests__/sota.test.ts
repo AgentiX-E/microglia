@@ -345,6 +345,13 @@ describe('buildValidityGates', () => {
     expect(gate({ ...sound, detectablePp: 6 }, 'V5-resolution').pass).toBe(true);
   });
 
+  it('V5 says a sample with no discordant pairs cannot estimate anything', () => {
+    const flat = gate({ ...sound, detectablePp: Number.POSITIVE_INFINITY }, 'V5-resolution');
+    expect(flat.pass).toBe(false);
+    expect(flat.blocking).toBe(false);
+    expect(flat.actual).toBe('not estimable: no question changed hands');
+  });
+
   it('V6 passes when no pack control was configured, and fails a control that injected nothing', () => {
     expect(gate({ ...sound, packControls: [] }, 'V6-controls-inject').pass).toBe(true);
     expect(gate({ ...sound, packControls: [] }, 'V6-controls-inject').actual).toBe(

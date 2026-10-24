@@ -353,8 +353,14 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
     {
       id: 'V5-resolution',
       criterion: 'the sample can resolve a 6pp effect at 80% power',
-      actual: `minimum detectable ${input.detectablePp.toFixed(2)}pp`,
-      pass: input.detectablePp <= 6,
+      // A sample in which no question changed hands has no variance to estimate, so
+      // the minimum detectable difference is not large — it does not exist. Printing
+      // "Infinitypp" reads like a bug in the arithmetic; saying what it means is the
+      // same failure with an explanation attached.
+      actual: Number.isFinite(input.detectablePp)
+        ? `minimum detectable ${input.detectablePp.toFixed(2)}pp`
+        : 'not estimable: no question changed hands',
+      pass: Number.isFinite(input.detectablePp) && input.detectablePp <= 6,
       blocking: false,
     },
     {

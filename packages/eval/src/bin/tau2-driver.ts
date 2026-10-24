@@ -27,7 +27,7 @@
  */
 import { execFile } from 'node:child_process';
 import { createServer, type Server } from 'node:http';
-import { mkdtempSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -66,7 +66,23 @@ const TRAIN_SHARE = Number(process.env['TAU_TRAIN_SHARE'] ?? 0.5) || 0.5;
  * and the artefact records `n` so a small run cannot be read as a large one.
  */
 const MAX_TASKS = Math.max(0, Number(process.env['TAU_MAX_TASKS'] ?? 0) || 0);
-const PYTHON = process.env['TAU_PYTHON'] ?? 'python3';
+/**
+ * The interpreter that can import `tau2`.
+ *
+ * `uv sync` puts the benchmark in `.tau2-bench/.venv`, so the system `python3` on a
+ * runner cannot import it — which is how the first smoke run failed: the driver was
+ * found, the phase ran, and the import failed one layer below the orchestration.
+ * The environment variable still wins, because a caller with a different layout
+ * knows better than a guess.
+ */
+function pythonPath(): string {
+  const explicit = process.env['TAU_PYTHON'];
+  if (explicit !== undefined && explicit.trim() !== '') return explicit;
+  const venv = join(REPO, '.tau2-bench', '.venv', 'bin', 'python');
+  return existsSync(venv) ? venv : 'python3';
+}
+
+const PYTHON = pythonPath();
 const TASK = 'tau2.act';
 
 /** One `run_split.py` invocation, with its stdout surfaced on failure. */
