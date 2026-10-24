@@ -161,6 +161,7 @@ describe('parseArms', () => {
   it('defaults to every optional arm plus the two required ones', () => {
     const arms = parseArms(undefined);
     expect([...arms].sort()).toEqual([
+      'critique',
       'duplicate',
       'full',
       'full-corroborated',
@@ -192,6 +193,7 @@ describe('parseArms', () => {
       'full-narrow',
       'full-plain',
       'full-corroborated',
+      'critique',
       'gated',
       'duplicate',
       'wrong-scope',
@@ -210,6 +212,10 @@ describe('parseArms', () => {
 
   it('accepts the corroboration arm, which filters the same pack on evidence count', () => {
     expect([...parseArms('full-corroborated')].sort()).toEqual(['full', 'full-corroborated', 'none']);
+  });
+
+  it('accepts the critique arm, which asks for a decision per item', () => {
+    expect([...parseArms('critique')].sort()).toEqual(['critique', 'full', 'none']);
   });
 });
 
@@ -256,7 +262,7 @@ describe('promptFor', () => {
   });
 
   it('keeps the prompt version next to the prompt it describes', () => {
-    expect(PROMPT_VERSION).toBe('sql-prompt/2');
+    expect(PROMPT_VERSION).toBe('sql-prompt/3');
   });
 });
 
@@ -509,5 +515,38 @@ describe('armPairsAgainstFull', () => {
     expect(pair).toMatchObject({ n: 20, deltaPp: 0, lost: 0, gained: 0, p: 1 });
     expect(pair?.ciLowPp).toBe(0);
     expect(pair?.ciHighPp).toBe(0);
+  });
+});
+
+describe('the critique prompt', () => {
+  const base = {
+    question: 'How many students?',
+    evidence: '',
+    ddl: 'CREATE TABLE students (id INTEGER);',
+    pack: '{"id":"k1","statement":"x"}',
+    stated: false,
+    convention: NO_CONVENTION,
+  };
+
+  it('asks for one decision per item before the query', () => {
+    const prompt = promptFor({ ...base, critique: true });
+    expect(prompt).toContain('<id>: apply');
+    expect(prompt).toContain('use only the items you marked apply');
+    // The instruction has to sit after the block it refers to and before the question,
+    // or "that block" names the wrong text.
+    expect(prompt.indexOf('decide for each item')).toBeGreaterThan(prompt.indexOf('{"id":"k1"'));
+    expect(prompt.indexOf('decide for each item')).toBeLessThan(prompt.indexOf('Question:'));
+  });
+
+  it('leaves the ordinary prompt untouched', () => {
+    expect(promptFor(base)).not.toContain('decide for each item');
+    expect(promptFor({ ...base, critique: false })).not.toContain('decide for each item');
+  });
+
+  it('does not ask for decisions about a pack that was not injected', () => {
+    // An instruction to judge an empty block is an instruction the model has to invent
+    // a subject for, which is the failure mode the empty pack exists to avoid.
+    const prompt = promptFor({ ...base, pack: '', critique: true });
+    expect(prompt).not.toContain('decide for each item');
   });
 });

@@ -170,6 +170,7 @@ type ArmName =
   | 'full-narrow'
   | 'full-plain'
   | 'full-corroborated'
+  | 'critique'
   | 'gated'
   | 'duplicate'
   | 'wrong-scope'
@@ -968,7 +969,13 @@ async function runFold(
   const plans: PlannedCall[] = [];
   const packs: PackInfo[] = [];
 
-  const call = (position: number, arm: ArmName, packText: string, packIds: number): void => {
+  const call = (
+    position: number,
+    arm: ArmName,
+    packText: string,
+    packIds: number,
+    critique = false,
+  ): void => {
     const row = evalRows[position] as BirdRow;
     plans.push({
       position,
@@ -981,6 +988,7 @@ async function runFold(
         pack: packText,
         stated: arm === 'stated',
         convention: ACTIVE,
+        ...(critique ? { critique: true } : {}),
       }),
     });
   };
@@ -1027,6 +1035,12 @@ async function runFold(
         minEvidence: CORROBORATION,
       });
       call(position, 'full-corroborated', corroborated.rendered, corroborated.ids.length);
+    }
+    if (ARMS.has('critique')) {
+      // The same pack as `full`; the only difference is that the prompt requires a
+      // decision about each item before the query. Cached like every other arm, so the
+      // cost is one prompt per question rather than a second protocol.
+      call(position, 'critique', pack.rendered, pack.ids.length, true);
     }
     if (ARMS.has('gated')) {
       const gated = await widened.host.recall({
@@ -1374,7 +1388,8 @@ async function main(): Promise<void> {
       entry.arm === 'duplicate' ||
       entry.arm === 'wrong-scope' ||
       entry.arm === 'full-narrow' ||
-      entry.arm === 'full-plain',
+      entry.arm === 'full-plain' ||
+      entry.arm === 'critique',
   );
   const channel = arms.filter((entry) => entry.arm === 'oracle' || entry.arm === 'stated');
   const channelBest = channel.reduce<ArmSummary | undefined>(

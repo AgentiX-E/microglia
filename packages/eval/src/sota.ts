@@ -16,7 +16,7 @@
 import { comparePaired } from './stats.js';
 
 /** Bumped whenever the prompt text changes; a result without it is unreproducible. */
-export const PROMPT_VERSION = 'sql-prompt/2';
+export const PROMPT_VERSION = 'sql-prompt/3';
 
 /**
  * A house convention the workspace can impose.
@@ -169,6 +169,17 @@ export type SqlArm =
    * control, and failing the run on it would prevent publishing the finding.
    */
   | 'full-corroborated'
+  /**
+   * The same pack, with the model asked to *decide* applicability before answering.
+   *
+   * Iterations 63 and 64 showed that a rule can carry its condition and that the model
+   * reads it, and that the answer still does not change for the better. What no arm has
+   * tested is the difference between reading a condition and being required to return a
+   * decision about it: MemHarness's critique step, where the model states whether a
+   * memory applies before it is allowed to use it. One extra instruction, no extra call,
+   * so the comparison with `full` isolates the requirement rather than the protocol.
+   */
+  | 'critique'
   | 'gated'
   | 'duplicate'
   | 'wrong-scope'
@@ -179,6 +190,7 @@ export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = [
   'full-narrow',
   'full-plain',
   'full-corroborated',
+  'critique',
   'gated',
   'duplicate',
   'wrong-scope',
@@ -286,6 +298,15 @@ export type PromptInput = {
   /** Whether the arm states the workspace convention explicitly. */
   readonly stated: boolean;
   readonly convention: ConventionSpec | undefined;
+  /**
+   * Whether the prompt requires an applicability decision per item before the query.
+   *
+   * A requirement, not a suggestion: the instruction names the output shape and says
+   * the query may only use the items marked `apply`. Asking the model to *remember* a
+   * condition is what the `when` field already does; asking it to *return* one is a
+   * different task, and the difference is what this arm measures.
+   */
+  readonly critique?: boolean;
 };
 
 export function promptFor(input: PromptInput): string {
@@ -297,6 +318,11 @@ export function promptFor(input: PromptInput): string {
     input.evidence ? `Evidence (may be wrong; it is external knowledge):\n${input.evidence}` : '',
     input.stated && input.convention !== undefined ? `Workspace convention:\n- ${input.convention.sentence}` : '',
     input.pack === '' ? '' : `Workspace conventions learned from earlier corrections:\n${input.pack}`,
+    input.pack === '' || input.critique !== true
+      ? ''
+      : 'Before writing the query, decide for each item in that block whether it applies to this question. ' +
+        'Write one line per item, in the form `<id>: apply` or `<id>: skip`, followed by one clause of reasoning. ' +
+        'Then write the query, and use only the items you marked apply.',
     `Question: ${input.question}`,
   ]
     .filter((line) => line !== '')
