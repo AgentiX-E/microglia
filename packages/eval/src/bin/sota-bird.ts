@@ -1068,8 +1068,14 @@ async function runFold(
     if (ARMS.has('oracle')) {
       // Under the convention the oracle is the expected value, not the gold SQL:
       // the question is whether a single stated fact changes the answer form.
+      // The oracle states the answer *and* says to return it verbatim. The earlier
+      // wording ("the answer this workspace accepts is X") left the model free to
+      // write a query that computes the raw value instead, and it did: 144 of 145
+      // questions came back as queries, the arm scored 0.69%, and the channel gate
+      // failed for a reason that was a prompt defect rather than a finding.
       const hint = task.convention
-        ? `- The answer this workspace accepts for this question is ${task.expected.get(idOf(row)) ?? 'unknown'}; it is the only accepted form.`
+        ? `- Return exactly this value for this question, as a single numeric literal: ${task.expected.get(idOf(row)) ?? 'unknown'}. ` +
+          'It is already in the form this workspace reports; do not divide or round it again.'
         : `- ${row.SQL}`;
       call(position, 'oracle', hint, 0);
     }
@@ -1241,6 +1247,8 @@ async function main(): Promise<void> {
   // one-column numeric answer is the only place the convention is defined.
   const expected = new Map<string, number>();
   let rows = dataset.rows;
+  /** Share of rewritten gold queries that report the value the convention expects. */
+  let conventionExecRate: number | undefined;
   if (ACTIVE !== undefined) {
     rows = dataset.rows.filter((row) => {
       const value = scalarOf(dataset.dbPath(row.db_id), row.SQL);
@@ -1248,6 +1256,21 @@ async function main(): Promise<void> {
       expected.set(idOf(row), ACTIVE.transform(value));
       return true;
     });
+    // The convention lane's `gold_exec_rate`: rewrite each gold query to report the
+    // way the workspace reports and check that the value it produces is the one the
+    // scorer expects. Without this, a disagreement between the rewrite and the
+    // transform is indistinguishable from a model that cannot follow the
+    // convention - and both read as "the mechanism does not work".
+    let agrees = 0;
+    for (const row of rows) {
+      const reported = scalarOf(dataset.dbPath(row.db_id), reportedSql(row.SQL, ACTIVE));
+      if (judgeScalar(reported, expected.get(idOf(row)))) agrees += 1;
+    }
+    conventionExecRate = rows.length === 0 ? 1 : agrees / rows.length;
+    process.stdout.write(
+      `[sota] convention ok on ${agrees}/${rows.length} gold queries ` +
+        `(${((rows.length === 0 ? 1 : agrees / rows.length) * 100).toFixed(2)}%)\n`,
+    );
     // No minimum beyond "enough to fold": the protocol says a subset below a
     // hundred is reported as a direction, not refused. The earlier threshold of
     // twenty made the lane exit before it could report anything, which is how a
@@ -1388,6 +1411,7 @@ async function main(): Promise<void> {
     // The S2b protocol fixes the floor at a hundred questions before the result is
     // read; below it the run is a direction and the artefact says so.
     ...(ACTIVE === undefined ? {} : { subset: { qualifying: rows.length, minimum: 100 } }),
+    ...(conventionExecRate === undefined ? {} : { conventionExecRate }),
   });
 
   const assertions = {
@@ -1486,6 +1510,7 @@ async function main(): Promise<void> {
       learn: fold.learn,
       edited: fold.learning.edited,
       active: fold.activeRules,
+      active_narrow: fold.narrowActive,
       failed_distill: fold.failedDistill,
       mean_pack_ids: Number(fold.meanPackIds.toFixed(3)),
       without_memory: rate(fold.cases.map((item) => item.withoutMemoryCorrect)),
@@ -1520,11 +1545,10 @@ async function main(): Promise<void> {
 
   const failed = gates.filter((gate) => gate.blocking && !gate.pass);
   if (failed.length > 0) {
-    throw new MicrogliaError(
-      'MG_E_CONFIG',
-      'The benchmark ran but cannot support a claim',
-      { failed: failed.map((gate) => `${gate.id}: ${gate.actual}`) },
-    );
+    const detail = failed.map((gate) => `${gate.id}: ${gate.actual}`).join('; ');
+    throw new MicrogliaError('MG_E_CONFIG', `The benchmark ran but cannot support a claim (${detail})`, {
+      failed: failed.map((gate) => ({ id: gate.id, actual: gate.actual, criterion: gate.criterion })),
+    });
   }
 }
 

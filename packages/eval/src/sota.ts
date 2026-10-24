@@ -281,6 +281,15 @@ export type GateInput = {
    * silent `if` is what stops "we ran it anyway" from becoming "we found".
    */
   readonly subset?: { readonly qualifying: number; readonly minimum: number };
+  /**
+   * Share of qualifying questions whose gold query, rewritten to report the way
+   * the workspace reports, produces the expected value.
+   *
+   * This is the convention lane's counterpart to `goldExecRate`: without it, a
+   * scoring bug and a model that cannot follow the convention look identical, and
+   * both look like "the mechanism does not work".
+   */
+  readonly conventionExecRate?: number;
 };
 
 /**
@@ -373,6 +382,15 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       actual: `${input.subset.qualifying} qualifying question(s)`,
       pass: input.subset.qualifying >= input.subset.minimum,
       blocking: false,
+    });
+  }
+  if (input.conventionExecRate !== undefined) {
+    gates.push({
+      id: 'V10-convention-executable',
+      criterion: 'at least 99% of rewritten gold queries report the value the convention expects',
+      actual: `${(input.conventionExecRate * 100).toFixed(2)}%`,
+      pass: input.conventionExecRate >= 0.99,
+      blocking: true,
     });
   }
   return gates;

@@ -387,6 +387,21 @@ describe('buildValidityGates', () => {
     expect(narrow.criterion).toContain('direction rather than a verdict');
   });
 
+  it('omits the convention-execution gate unless a convention is taught', () => {
+    expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V10-convention-executable');
+  });
+
+  it('V10 refuses a run whose rewritten gold disagrees with the expected value', () => {
+    // This is the gate that separates a scoring bug from a model that cannot follow
+    // the convention: if the gold query, rewritten, does not produce the value the
+    // scorer expects, no answer could pass and the run measures the rewrite.
+    expect(gate({ ...sound, conventionExecRate: 1 }, 'V10-convention-executable').pass).toBe(true);
+    const failing = gate({ ...sound, conventionExecRate: 0.98 }, 'V10-convention-executable');
+    expect(failing.pass).toBe(false);
+    expect(failing.blocking).toBe(true);
+    expect(failing.actual).toBe('98.00%');
+  });
+
   it('marks exactly V5 advisory and everything else blocking', () => {
     const advisory = buildValidityGates({
       ...sound,

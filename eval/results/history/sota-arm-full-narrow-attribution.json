@@ -1,0 +1,315 @@
+{
+  "id": "poc-sota-attribution",
+  "source_artifact": "poc-sota-bird.json",
+  "source_generated_at": "2026-10-24T00:15:43.260Z",
+  "n": 350,
+  "summary": {
+    "rules": 1295,
+    "injectedRules": 423,
+    "helpful": 13,
+    "harmful": 38,
+    "neutral": 372,
+    "harmfulShare": 0.12283236994219653,
+    "top": [
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqmj_ajq8j",
+        "statement": "Selecting the youngest client is reliably done with ORDER BY birth_date DESC LIMIT 1 rather than a MAX subquery.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 2,
+        "net": -2
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqqj_9q3b6",
+        "statement": "A query answering 'which driver ranked first in the Canadian Grand Prix in 2007, give reference name' selects forename, surname, and driverRef from drivers joined through results to races filtered on race name, year, and rank = 1.",
+        "injected": 5,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqss_5z10w",
+        "statement": "Joining a set-translations table on set code and filtering by language does not yield the Italian ruling text for cards in a set; the ruling text must come from a foreign-data table joined on card uuid.",
+        "injected": 5,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqt4_f451r",
+        "statement": "In the formula_1 schema, a race is identified by its name in the races table (e.g., 'Canadian Grand Prix'), not by its circuit name in the circuits table.",
+        "injected": 5,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqo3_548x9",
+        "statement": "Comparing the average finishing rate of the tallest and shortest players is expressed by computing each group's average in separate subqueries, unioning the labeled results, and selecting the label with the highest average.",
+        "injected": 4,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqqn_a0184",
+        "statement": "When a question asks to list patients grouped by sex, the patient ID must appear in the GROUP BY clause alongside sex.",
+        "injected": 4,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqrt_7ddeg",
+        "statement": "A query for patients with a normal WBC range and an abnormal fibrinogen range must group the fibrinogen OR condition in parentheses so the WBC and sex filters still apply.",
+        "injected": 4,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqsg_9xpb9",
+        "statement": "Joining set_translations on set code and filtering by language does not yield the Italian ruling text for cards in a set; the ruling text must come from the foreign_data table joined on card uuid.",
+        "injected": 4,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqlj_42hje",
+        "statement": "A winning-away-team count query filters with away_team_goal - home_team_goal > 0 and orders by COUNT(*) DESC with LIMIT 1.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqnv_crqbp",
+        "statement": "The eligible free rate is computed as the free meal count divided by enrollment, with the numerator cast to a real type to avoid integer division.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqo2_b9bwg",
+        "statement": "Queries answering a question about which user performed an action on a post must select the user's display name and the post's title, not only the display name.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqpq_6snq9",
+        "statement": "Joining Player_Attributes to Player and filtering by player_name in a WHERE clause while selecting a single row via ORDER BY date DESC LIMIT 1 fails to compute a comparison between two named players' ratings.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqro_ca1db",
+        "statement": "When a question asks for the user who last edited a post, the post must be joined to users via the LastEditorUserId column rather than via the post owner's UserId.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqt9_bas7y",
+        "statement": "A query joining foreign_data to cards and sets can return duplicate ruling text rows, so DISTINCT is required to deduplicate results.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqte_d8xvv",
+        "statement": "Using a MAX subquery to filter for the highest converted mana cost returns all tied rows, whereas ordering by converted mana cost descending with a limit returns a single row.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqtj_0bzhm",
+        "statement": "A query counting male patients with normal anti-centromere and anti-SSB levels joins Patient and Laboratory on ID and filters SEX='M' with CENTROMEA and SSB each IN ('negative','0').",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqlm_eftxx",
+        "statement": "When a question asks for the customer with the least total consumption over a year, the query must aggregate consumption per customer with SUM and group by customer before ordering and limiting.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqlq_d69wp",
+        "statement": "Ordering buildUpPlaySpeed descending and limiting to 4 returns the highest-speed teams, not the lowest, so a question asking for the top teams by highest buildUpPlaySpeed is not satisfied by an ascending order.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqo5_cq7s3",
+        "statement": "Grouping by post id while selecting user columns produces one row per post rather than one row per user, which does not answer a per-user question.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqor_cfvmh",
+        "statement": "Ordering results.fastestLap ASC does not yield the race of a driver's fastest lap in the formula_1 schema.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      }
+    ],
+    "best": [
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqod_akep8",
+        "statement": "Joining from the event table through budget and expense to member resolves the member responsible for an event's budget.",
+        "injected": 4,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqs2_5w41f",
+        "statement": "A percentage of atoms of a given element among carcinogenic molecules is computed as the count of that element's atoms divided by the total atom count of the joined rows, not by the count of distinct molecules.",
+        "injected": 3,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqm0_58138",
+        "statement": "The district region value 'North Bohemia' is stored with a lowercase initial letter as 'north Bohemia' in the district table.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqm2_4zc84",
+        "statement": "In the california_schools schema, the school name column is `School Name` in the frpm table, not `School` in the schools table.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqmi_5w0qz",
+        "statement": "Ordering rows by birth_date and then by district average salary before applying LIMIT 1 selects the oldest female client's district rather than the district with the lowest average salary among female clients.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqnv_crqbp",
+        "statement": "Counting bond rows as the denominator for a molecule-level percentage overcounts molecules that have multiple bonds of the filtered type.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqqk_1mb88",
+        "statement": "Filtering a school by district name when the question specifies a city name produces a mismatch, because district and city are distinct columns in the california_schools schema.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqrf_9xa4k",
+        "statement": "Questions about funds received on an event date require joining event, attendance, member, and income tables via link_to_event and link_to_member, with DISTINCT applied to member names.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqm1_1q6pv",
+        "statement": "Filtering district.A3 with the capitalized string 'North Bohemia' does not match the stored value and yields incorrect results.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqq8_32y7g",
+        "statement": "The corrected query selects account_id from the account table rather than client_id from the disp table, indicating the question's 'account holder identification numbers' maps to account identifiers in this schema.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqre_94tar",
+        "statement": "Aggregating patient IDs with GROUP_CONCAT into a single column does not satisfy a request to list and group patients by sex.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqst_7k0ha",
+        "statement": "Age at a historical event is computed as the difference between the event year and the birth year, not between the current year and the birth year.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqtu_5420k",
+        "statement": "In the thrombosis_prediction domain, a normal anti-centromere or anti-SSB lab result is encoded as 'negative' or '0', not as '-' or '+-'.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      }
+    ]
+  }
+}
