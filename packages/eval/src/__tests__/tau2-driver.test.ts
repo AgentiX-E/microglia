@@ -73,8 +73,8 @@ describe('the L4 driver', () => {
       // trials, so pass^4 is 0 for each - the estimator's answer, not an average
       // that would read 50%.
       expect(tasks).toEqual([
-        { successes: 2, trials: 4, k: 4 },
-        { successes: 2, trials: 4, k: 4 },
+        { successes: 2, trials: 4, k: 4, taskId: 't3' },
+        { successes: 2, trials: 4, k: 4, taskId: 't4' },
       ]);
       const written = JSON.parse(readFileSync(join(dir, 'eval.json'), 'utf8')) as { simulations: unknown[] };
       expect(written.simulations).toHaveLength(8);

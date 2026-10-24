@@ -255,7 +255,7 @@ export function toPassAtK(
       continue;
     }
     const successes = group.rewards.filter((reward) => reward === 1).length;
-    scoreable.push({ successes, trials: group.rewards.length, k });
+    scoreable.push({ successes, trials: group.rewards.length, k, taskId: group.taskId });
   }
 
   if (short.length > 0) {

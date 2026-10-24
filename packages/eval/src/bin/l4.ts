@@ -22,6 +22,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import {
   L4ParseError,
+  comparePaired,
   compareToPublished,
   l4Verdict,
   meanPassAtK,
@@ -51,6 +52,15 @@ function envPath(name: string): string | undefined {
 
 const resultsPath = envPath('TAU_RESULTS');
 const driver = envPath('TAU_DRIVER');
+/**
+ * Another arm's artefact, for a paired comparison.
+ *
+ * Two means are not a comparison: they differ by the memory, by the day, and by
+ * whatever the endpoint was doing. With the per-task results of both arms, the same
+ * tasks can be paired and the difference gets an interval and a p-value. Optional,
+ * because an arm can be measured before its partner exists.
+ */
+const referencePath = envPath('TAU_REFERENCE');
 
 /** A directory form keeps its document in `results.json`; a file form is itself. */
 async function readDocument(path: string): Promise<string> {
@@ -174,8 +184,37 @@ const measured =
 const mean = meanPassAtK(measured.tasks);
 const compared = compareToPublished(mean, PUBLISHED, BAR);
 const verdict = l4Verdict({ tasks: measured.tasks, published: PUBLISHED, bar: BAR, minTasks: MIN_TASKS });
+type ReferenceTask = { readonly id: string; readonly passed_all: boolean };
+let paired: { delta: number; low: number; high: number; p: number; n: number } | undefined;
+if (referencePath !== undefined) {
+  const document = JSON.parse(await readFile(referencePath, 'utf8')) as { per_task?: ReferenceTask[] };
+  const before = new Map((document.per_task ?? []).map((entry) => [entry.id, entry.passed_all]));
+  const common = measured.tasks.filter((task) => task.taskId !== undefined && before.has(task.taskId));
+  if (common.length > 0) {
+    const comparison = comparePaired(
+      common.map((task) => before.get(task.taskId as string) === true),
+      common.map((task) => task.successes === task.trials),
+      7,
+      10_000,
+    );
+    paired = {
+      delta: comparison.delta * 100,
+      low: comparison.deltaCI.low * 100,
+      high: comparison.deltaCI.high * 100,
+      p: comparison.p,
+      n: comparison.n,
+    };
+  }
+}
+
 const gates = [
   { id: 'l4-pass4', pass: compared.meets, actual: mean, criterion: `>= published + ${BAR}` },
+  {
+    id: 'l4-paired',
+    pass: paired === undefined ? true : paired.delta >= 0 && paired.p < 0.05,
+    actual: paired === undefined ? 'no reference arm' : `${paired.delta.toFixed(2)}pp (p=${paired.p.toFixed(4)})`,
+    criterion: 'against the same agent without the memory: delta >= 0 at p<0.05',
+  },
   {
     id: 'l4-coverage',
     pass: measured.tasks.length >= MIN_TASKS,
@@ -206,6 +245,8 @@ await writeResult({
     tasks: measured.tasks.length,
     unscored_tasks: measured.unscored.length,
     min_tasks: MIN_TASKS,
+    ...(paired === undefined ? {} : { paired_delta_pp: paired.delta, paired_ci_low_pp: paired.low,
+      paired_ci_high_pp: paired.high, paired_p: paired.p, paired_n: paired.n }),
     k: K,
     inferred_trials: measured.inferredTrials,
     gates_passed: gates.filter((gate) => gate.pass).length,

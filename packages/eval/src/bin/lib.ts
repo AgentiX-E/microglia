@@ -171,6 +171,13 @@ export type PocResult = {
   readonly metrics: Record<string, number>;
   readonly notes: readonly string[];
   readonly samples?: readonly unknown[];
+  /**
+   * Per-unit outcomes, when a lane can be paired against another arm later.
+   *
+   * `L4` needs this: pass^4 is a mean over tasks, and two means from two runs are
+   * not a comparison. Typed loosely because each lane's unit is different.
+   */
+  readonly per_task?: readonly unknown[];
 };
 
 /**

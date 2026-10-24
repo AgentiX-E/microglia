@@ -1,0 +1,44 @@
+{
+  "id": "poc-l4",
+  "title": "L4 — τ²-bench pass^4 against ALTK-Evolve",
+  "ranAt": "2026-10-24T11:46:58.406Z",
+  "model": "deepseek/deepseek-chat",
+  "n": 68,
+  "calls": 0,
+  "metrics": {
+    "pass4": 0.5882352941176471,
+    "published_pass4": 0.575,
+    "delta": 0.013235294117647123,
+    "tasks": 68,
+    "unscored_tasks": 0,
+    "min_tasks": 60,
+    "k": 4,
+    "inferred_trials": 0,
+    "gates_passed": 2
+  },
+  "notes": [
+    "Source: ./packages/eval/src/bin/tau2-driver.ts (driver form). Two arms must share the split; the reference number is ALTK-Evolve on τ²-retail.",
+    "pass^4 is the unbiased C(c,4)/C(n,4) mean over 68 tasks, with success defined as `reward == 1.0` exactly, as upstream scores it.",
+    "The split covers the minimum: 68 scored tasks."
+  ],
+  "samples": [
+    {
+      "id": "l4-pass4",
+      "pass": false,
+      "actual": 0.5882352941176471,
+      "criterion": ">= published + 0.05"
+    },
+    {
+      "id": "l4-coverage",
+      "pass": true,
+      "actual": 68,
+      "criterion": ">= 60 tasks"
+    },
+    {
+      "id": "l4-fully-scored",
+      "pass": true,
+      "actual": 0,
+      "criterion": "= 0 unscored tasks"
+    }
+  ]
+}

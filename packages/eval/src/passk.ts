@@ -17,6 +17,16 @@ export type PassAtKInput = {
   /** Trials run for that task. */
   readonly trials: number;
   readonly k: number;
+  /**
+   * Which task this is, when the caller knows.
+   *
+   * Optional because the estimator does not need it — `pass^k` is a per-task number
+   * and the mean is over tasks — but a *comparison* between two arms does: two runs
+   * of the same split can only be paired task by task if the tasks are named. The
+   * first two full L4 arms were measured without it, and the only thing that could
+   * be reported was the difference between two means.
+   */
+  readonly taskId?: string;
 };
 
 /** Unbiased pass^k for one task, in [0, 1]. */
