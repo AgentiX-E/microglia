@@ -39,6 +39,10 @@ on:
         description: 'Model calls in flight at once (1 = serial)'
         required: false
         default: '6'
+      bird:
+        description: 'Run the BIRD lane (false = L4 only, for a smoke run)'
+        required: false
+        default: 'true'
       l4:
         description: 'Also run the L4 lane (needs the tau2 environment; hours of calls)'
         required: false
@@ -56,6 +60,9 @@ permissions:
 jobs:
   bird:
     name: BIRD Mini-Dev (cross-fitted, memory on/off)
+    # A dispatch that only wants the L4 lane should not pay for a BIRD run it did
+    # not ask for. Scheduled and push-triggered runs are unaffected.
+    if: github.event_name != 'workflow_dispatch' || github.event.inputs.bird != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
