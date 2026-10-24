@@ -25,8 +25,18 @@ otherwise.
 item. Different scopes are not contradictions: a domain-specific exception is supposed to disagree with
 the general rule, and specificity resolves it at read time.
 
+**Condition** — the `when` field on a knowledge item: the property of a task under which the claim
+applies, distilled beside the statement and rendered *before* it. It is text for a reader, not a filter:
+measured on BIRD, rendering it changed half the answers and none of the scores. A condition the runtime
+must enforce belongs in `tables`/`columns` logic, not in prose.
+
 **Correction** — a structured statement of what the output should have been. Distinct from a rating
 (an opinion about it) and from an outcome (a measurement of it).
+
+**Corroboration** — a claim observed more than once, counted as the number of independent feedback
+events behind it (`evidence.length`). The pack can require it (`minEvidence`); on the two workloads
+measured here it is the property that separates a rule worth injecting from one that is noise, because a
+single correction is a hypothesis rather than a rule.
 
 **Credit assignment** — attributing a later outcome to the knowledge that was in the prompt at
 generation time. Counts `applied` and `succeeded` on exactly the items whose ids the run cited.
