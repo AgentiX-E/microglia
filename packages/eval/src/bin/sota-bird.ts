@@ -767,7 +767,10 @@ async function knowledgeDigest(
   const active = items.filter((item) => item.status === 'active');
   const canonical = [...items]
     .sort((a, b) => (a.id < b.id ? -1 : 1))
-    .map((item) => [item.id, item.status, item.trust, item.statement].join('\u0000'))
+    // The condition is part of what is frozen: two runs that differ only in `when`
+    // are two different memories, and a digest that ignored the field would call
+    // them the same and make the freeze proof silent about the experiment.
+    .map((item) => [item.id, item.status, item.trust, item.statement, item.when ?? ''].join('\u0000'))
     .join('\u0001');
   return {
     active: active.length,
@@ -781,6 +784,8 @@ type StoredItem = {
   readonly status: string;
   readonly trust: number;
   readonly statement: string;
+  /** The condition the rule applies under, or null when it named none. */
+  readonly when: string | null;
   /** The database the rule is scoped to, or null when it generalised out of one. */
   readonly domain: string | null;
 };
@@ -795,6 +800,9 @@ type FoldResult = {
   readonly failedDistill: number;
   readonly created: number;
   readonly meanPackIds: number;
+  /** Rules injected into a prompt this fold, and how many named a condition. */
+  readonly injectedRules: number;
+  readonly injectedWithCondition: number;
   readonly digest: string;
   /** Active rules in the unwidened memory, or null when no such memory was built. */
   readonly narrowActive: number | null;
@@ -966,9 +974,17 @@ async function runFold(
     });
   };
 
+  // What the shape experiment actually had to work with. Counted at the pack, not at
+  // the store: an item that named a condition and never reached a prompt cannot
+  // change an answer, and the gate below is about what was injected.
+  let injectedRules = 0;
+  let injectedWithCondition = 0;
+
   for (const [position, row] of evalRows.entries()) {
     const query = { task: TASK, text: row.question };
     const pack = await widened.host.recall({ ...query, scope: { domain: row.db_id } });
+    injectedRules += pack.items.length;
+    injectedWithCondition += pack.items.filter((item) => item.when !== undefined).length;
     packs.push({
       ids: pack.ids,
       coverage: Number(queryCoverage(row.question, pack.items[0]?.statement ?? '').toFixed(3)),
@@ -1127,6 +1143,7 @@ async function runFold(
     status: item.status,
     trust: Number(item.trust.toFixed(4)),
     statement: item.statement,
+    when: item.when ?? null,
     domain: item.scope.domain ?? null,
   }));
   await widened.host.close();
@@ -1147,6 +1164,8 @@ async function runFold(
     failedDistill: distilled.failed,
     created: distilled.created,
     meanPackIds: cases.length === 0 ? 0 : packIds / cases.length,
+    injectedRules,
+    injectedWithCondition,
     digest: frozen.digest,
     narrowActive: narrowed?.frozen.active ?? null,
     items,
@@ -1334,6 +1353,12 @@ async function main(): Promise<void> {
   // The gate definitions live in `sota.ts` because they are the part of this lane
   // that decides whether a number is publishable, and a decision with no test is a
   // preference. The CLI supplies the measurements.
+  // Summed over folds rather than averaged: a rule injected into two questions was
+  // shown twice, and the gate asks what the prompts contained.
+  const injected = {
+    rules: folds.reduce((sum, fold) => sum + fold.injectedRules, 0),
+    conditions: folds.reduce((sum, fold) => sum + fold.injectedWithCondition, 0),
+  };
   const callFailureRate = llm.stats.prompts === 0 ? 0 : llm.stats.failures / llm.stats.prompts;
   const gates = buildValidityGates({
     meanPackIds,
@@ -1358,6 +1383,9 @@ async function main(): Promise<void> {
     // read; below it the run is a direction and the artefact says so.
     ...(ACTIVE === undefined ? {} : { subset: { qualifying: rows.length, minimum: 100 } }),
     ...(conventionExecRate === undefined ? {} : { conventionExecRate }),
+    ...(injected.rules === 0
+      ? {}
+      : { packConditions: { injected: injected.rules, withCondition: injected.conditions } }),
     // The protocol's oracle ceiling applies to the convention lane, where the
     // accepted answer has a form the model must reproduce.
     ...(ACTIVE === undefined || channelBest === undefined ? {} : { channelCeiling: channelBest.accuracy }),
@@ -1430,6 +1458,15 @@ async function main(): Promise<void> {
       latency_p50_ms: percentile(cases.map((item) => item.latencyMs), 0.5),
       latency_p95_ms: percentile(cases.map((item) => item.latencyMs), 0.95),
       knowledge_active_mean: activeMean,
+      // The shape experiment's two denominators: rules injected, and how many of
+      // them said when they apply. `active_with_condition` counts the store, which
+      // is where a reader looks to see whether the distiller changed behaviour.
+      injected_rules: injected.rules,
+      injected_with_condition: injected.conditions,
+      active_with_condition: folds.reduce(
+        (sum, fold) => sum + fold.items.filter((item) => item.status === 'active' && item.when !== null).length,
+        0,
+      ),
       knowledge_active_last: folds.at(-1)?.activeRules ?? 0,
       distill_failed: folds.reduce((sum, fold) => sum + fold.failedDistill, 0),
       distill_created: folds.reduce((sum, fold) => sum + fold.created, 0),

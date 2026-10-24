@@ -304,6 +304,16 @@ export type GateInput = {
    */
   readonly conventionExecRate?: number;
   /**
+   * How many injected rules carried an applicability condition.
+   *
+   * The shape experiment's validity condition. `full` and `full-plain` differ only
+   * in that field, so a run in which the distiller produced no condition has two
+   * identical arms and a delta of zero that means nothing. Recording it as a gate
+   * makes "the model declined to say when" visible instead of indistinguishable
+   * from "the condition does not help".
+   */
+  readonly packConditions?: { readonly injected: number; readonly withCondition: number };
+  /**
    * Absolute accuracy of the strongest channel control, when the protocol names a
    * ceiling for it.
    *
@@ -404,6 +414,17 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       blocking: true,
     },
   ];
+  if (input.packConditions !== undefined) {
+    const { injected, withCondition } = input.packConditions;
+    const share = injected === 0 ? 0 : withCondition / injected;
+    gates.push({
+      id: 'V12-shape-present',
+      criterion: 'at least 50% of injected rules state when they apply, or the two shapes are the same pack',
+      actual: `${withCondition}/${injected} injected rule(s) carried a condition (${(share * 100).toFixed(1)}%)`,
+      pass: share >= 0.5,
+      blocking: false,
+    });
+  }
   if (input.subset !== undefined) {
     gates.push({
       id: 'V9-subset-size',

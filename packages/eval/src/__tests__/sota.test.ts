@@ -383,6 +383,29 @@ describe('buildValidityGates', () => {
     expect(failing.actual).toBe('2.01% (36/1750 calls)');
   });
 
+  it('omits the shape gate when nothing was injected to inspect', () => {
+    expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V12-shape-present');
+  });
+
+  it('V12 reports what share of injected rules said when they apply', () => {
+    // The shape experiment's validity condition: two arms that differ only in the
+    // condition are the same pack when no rule carries one, and a delta of zero
+    // then measures nothing. Advisory, because a run with no conditions is still a
+    // run - it is a result about the distiller rather than about the shape.
+    const present = gate({ ...sound, packConditions: { injected: 200, withCondition: 140 } }, 'V12-shape-present');
+    expect(present.pass).toBe(true);
+    expect(present.blocking).toBe(false);
+    expect(present.actual).toBe('140/200 injected rule(s) carried a condition (70.0%)');
+
+    const absent = gate({ ...sound, packConditions: { injected: 200, withCondition: 92 } }, 'V12-shape-present');
+    expect(absent.pass).toBe(false);
+    expect(absent.criterion).toContain('the two shapes are the same pack');
+
+    const empty = gate({ ...sound, packConditions: { injected: 0, withCondition: 0 } }, 'V12-shape-present');
+    expect(empty.pass).toBe(false);
+    expect(empty.actual).toBe('0/0 injected rule(s) carried a condition (0.0%)');
+  });
+
   it('omits the subset gate entirely when no convention is being taught', () => {
     expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V9-subset-size');
   });
