@@ -170,3 +170,20 @@ export function embeddingText(item: KnowledgeItem): string {
     .filter((part) => part !== '')
     .join('\n');
 }
+
+/**
+ * The text a *filter* would compare against a question: the condition alone.
+ *
+ * Distinct from `embeddingText`, which is what a *retriever* ranks on. Iteration 63
+ * established that rendering the condition changes what the model writes and not
+ * whether it is right, so the remaining question is whether the condition can decide
+ * applicability without the model — and if it can, the text to score is the condition,
+ * not the claim.
+ */
+export function conditionText(item: KnowledgeItem): string | undefined {
+  const when = item.when;
+  if (when === undefined || when.trim() === '') return undefined;
+  return when.trim();
+}
+
+

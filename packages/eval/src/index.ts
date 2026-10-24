@@ -121,6 +121,7 @@ export {
 export { LlmClient, type ChatReply, type LlmClientOptions, type LlmStats } from './model-client.js';
 
 export {
+  conditionText,
   creditedWith,
   embeddingText,
   pairsOf,

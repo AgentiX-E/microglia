@@ -1,5 +1,38 @@
 import { describe, expect, it } from 'vitest';
-import { creditedWith, embeddingText, pairsOf, separationOf, type CaseRecord } from '../embed-probe.js';
+import type { KnowledgeItem } from '@agentix-e/microglia-core';
+import {
+  conditionText,
+  creditedWith,
+  embeddingText,
+  pairsOf,
+  separationOf,
+  type CaseRecord,
+} from '../embed-probe.js';
+
+const item = (overrides: Partial<KnowledgeItem> = {}): KnowledgeItem =>
+  ({
+    schema: 'microglia.knowledge/1',
+    id: 'k1',
+    namespace: 'acme',
+    kind: 'constraint',
+    scope: { task: 'sql.generate', domain: 'formula_1' },
+    statement: 'Races are identified by name.',
+    evidence: [],
+    support: 1,
+    contradictions: 0,
+    confidence: 0.9,
+    trust: 0.9,
+    validFrom: 0,
+    validUntil: Infinity,
+    systemFrom: 0,
+    systemUntil: Infinity,
+    status: 'active',
+    applied: 0,
+    succeeded: 0,
+    createdAt: 0,
+    updatedAt: 0,
+    ...overrides,
+  }) as KnowledgeItem;
 
 const question = (overrides: Partial<CaseRecord> = {}): CaseRecord => ({
   question: 'how many students are there',
@@ -132,5 +165,22 @@ describe('embeddingText', () => {
       scope: { task: 't' },
     } as never);
     expect(text.split('\n')).toHaveLength(2);
+  });
+});
+
+describe('the condition is the text a filter would score', () => {
+  it('returns the condition alone, not the claim', () => {
+    // `separation` in the probe scores what a retriever ranks on; a filter compares
+    // the question with the condition, and mixing the claim into that text would
+    // measure the wrong thing.
+    expect(conditionText(item({ when: '  when the question names a race  ' }))).toBe(
+      'when the question names a race',
+    );
+    expect(conditionText(item({ when: 'when the question names a race' }))).not.toContain('Races are identified');
+  });
+
+  it('is undefined when the item carries no condition', () => {
+    expect(conditionText(item())).toBeUndefined();
+    expect(conditionText(item({ when: '   ' }))).toBeUndefined();
   });
 });

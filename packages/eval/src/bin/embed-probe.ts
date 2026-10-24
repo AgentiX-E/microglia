@@ -14,7 +14,15 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { KnowledgeItem } from '@agentix-e/microglia-core';
-import { creditedWith, embeddingText, pairsOf, separationOf, type CaseRecord } from '@agentix-e/microglia-eval';
+import { queryCoverage } from '@agentix-e/microglia-core';
+import {
+  conditionText,
+  creditedWith,
+  embeddingText,
+  pairsOf,
+  separationOf,
+  type CaseRecord,
+} from '@agentix-e/microglia-eval';
 import { writeJson } from './lib.js';
 
 const ARTEFACT = process.env['SOTA_ARTEFACT'] ?? join('eval', 'results', 'poc-sota-bird.json');
@@ -105,24 +113,57 @@ process.stderr.write(
 
 const creditedIds = new Set([...credited.hurt, ...credited.helped]);
 const ruleTexts = new Map<string, string>();
+const conditionTexts = new Map<string, string>();
 for (const id of creditedIds) {
   const item = items.get(id);
-  if (item !== undefined) ruleTexts.set(id, embeddingText(item));
+  if (item === undefined) continue;
+  ruleTexts.set(id, embeddingText(item));
+  const condition = conditionText(item);
+  if (condition !== undefined) conditionTexts.set(id, condition);
 }
 const questionTexts = [...new Set(cases.map((entry) => entry.question))];
 
-const vectors = await embed([...new Set([...ruleTexts.values(), ...questionTexts])]);
-const vectorOfRule = (id: string): readonly number[] | undefined => {
-  const text = ruleTexts.get(id);
-  return text === undefined ? undefined : vectors.get(text);
-};
+const vectors = await embed([
+  ...new Set([...ruleTexts.values(), ...conditionTexts.values(), ...questionTexts]),
+]);
+const vectorOf = (text: string | undefined): readonly number[] | undefined =>
+  text === undefined ? undefined : vectors.get(text);
 
 const pairs = pairsOf(cases, credited, (question, ruleId) => {
   const a = vectors.get(question);
-  const b = vectorOfRule(ruleId);
+  const b = vectorOf(ruleTexts.get(ruleId));
   return a === undefined || b === undefined ? 0 : cosine(a, b);
 });
 const separation = separationOf(pairs, { resamples: 5000 });
+
+/**
+ * The same question, asked of the condition.
+ *
+ * `pairsOf` requires a similarity per pair, and a rule without a condition has none:
+ * scoring it as zero would put every unconditioned rule in the "dissimilar" bucket and
+ * make a separation look real. The pairs are therefore restricted to the rules that
+ * carry one, which is 100% of this artefact's rules and need not be of the next.
+ */
+const conditionedCases = cases.map((entry) => ({
+  ...entry,
+  packIdList: entry.packIdList.filter((id) => conditionTexts.has(id)),
+}));
+const conditionPairs = pairsOf(conditionedCases, credited, (question, ruleId) => {
+  const a = vectors.get(question);
+  const b = vectorOf(conditionTexts.get(ruleId));
+  return a === undefined || b === undefined ? 0 : cosine(a, b);
+});
+const conditionSeparation = separationOf(conditionPairs, { resamples: 5000 });
+
+// The lexical baseline for the same question, computed without a provider: if a
+// keyword test over the condition separates the two groups, no index is needed.
+// `queryCoverage` is the store's own gate (`minCoverage`), not a second definition of
+// the same quantity: a probe that measured coverage with a different tokenizer would
+// report a number no caller could reproduce.
+const lexicalPairs = pairsOf(conditionedCases, credited, (question, ruleId) =>
+  queryCoverage(question, conditionTexts.get(ruleId) ?? ''),
+);
+const lexicalSeparation = separationOf(lexicalPairs, { resamples: 5000 });
 
 await writeJson('poc-embed-probe', {
   id: 'poc-embed-probe',
@@ -131,17 +172,23 @@ await writeJson('poc-embed-probe', {
   source: ARTEFACT,
   model: MODEL,
   n: pairs.length,
+  n_condition: conditionPairs.length,
   rules: { hurt: credited.hurt.length, helped: credited.helped.length, neutral: credited.neutral.length },
   separation,
+  condition_separation: conditionSeparation,
+  condition_lexical_separation: lexicalSeparation,
   notes: [
     'Lexical baseline on the same artefact: median word coverage 0.133 for hurt rules and 0.130 for helped rules; identifier coverage 0.000 for both.',
+    '`separation` scores the rule text a retriever ranks on; `condition_separation` scores the condition alone, which is what a filter would compare; `condition_lexical_separation` is the same comparison without a provider.',
     'Pairs are (question, credited rule) occurrences, not rules: a rule that is close to the question it hurt is exactly the case a retriever has to fix.',
     'Permutation test, 5,000 resamples, fixed seed: the p-value is the share of relabellings whose median gap is at least the observed one.',
   ],
 });
 
+const line = (name: string, value: typeof separation): string =>
+  `[probe] ${name.padEnd(10)} hurt n=${value.hurt.n} median=${value.hurt.median.toFixed(3)} | ` +
+  `helped n=${value.helped.n} median=${value.helped.median.toFixed(3)} | ` +
+  `gap=${value.gap.toFixed(3)} p=${value.p.toFixed(4)} separated=${value.separated}\n`;
 process.stdout.write(
-  `[probe] hurt n=${separation.hurt.n} median=${separation.hurt.median.toFixed(3)} | ` +
-    `helped n=${separation.helped.n} median=${separation.helped.median.toFixed(3)} | ` +
-    `gap=${separation.gap.toFixed(3)} p=${separation.p.toFixed(4)} separated=${separation.separated}\n`,
+  line('statement', separation) + line('condition', conditionSeparation) + line('lexical', lexicalSeparation),
 );
