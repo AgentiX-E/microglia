@@ -76,6 +76,11 @@ def main(argv: list[str]) -> int:
     os.environ.setdefault("MICROGLIA_DOMAIN", args.domain)
 
     model = os.environ.get("TAU_MODEL", "deepseek/deepseek-chat")
+    # litellm raises on a 429 rather than retrying, and one raised call aborts the
+    # whole `run_tasks` - 68 tasks and 272 episodes lost to a rate limit one minute
+    # from the end (the first reference-arm attempt). `num_retries` is litellm's own
+    # knob and is forwarded verbatim through `llm_args_*`.
+    retries = int(os.environ.get("TAU_RETRIES", "4"))
     tasks = get_tasks(args.domain, wanted or None)
     if not tasks:
         raise SystemExit("tau2-no-tasks")
@@ -98,9 +103,9 @@ def main(argv: list[str]) -> int:
         # raises `TypeError: argument of type 'NoneType' is not iterable` before the
         # first episode. The parameters are optional in the signature and required by
         # the body; two empty dicts are the difference between a run and a traceback.
-        llm_args_agent={},
+        llm_args_agent={"num_retries": retries},
         llm_user=model,
-        llm_args_user={},
+        llm_args_user={"num_retries": retries},
         num_trials=args.trials,
         max_steps=args.max_steps,
         save_to=args.out,

@@ -302,7 +302,8 @@ jobs:
           TAU_TRIALS: ${{ vars.TAU_TRIALS || '4' }}
           TAU_MEMORY: ${{ github.event.inputs.l4_memory || vars.TAU_MEMORY || 'true' }}
           TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
-          TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '4' }}
+          TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '2' }}
+          TAU_RETRIES: ${{ vars.TAU_RETRIES || '4' }}
           TAU_MAX_TASKS: ${{ github.event.inputs.l4_tasks || vars.TAU_MAX_TASKS || '0' }}
           TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
         run: pnpm eval:l4
