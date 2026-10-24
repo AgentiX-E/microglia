@@ -58,6 +58,14 @@ const DOMAIN = process.env['TAU_DOMAIN'] ?? 'retail';
 const MEMORY = (process.env['TAU_MEMORY'] ?? 'true') !== 'false';
 const TRIALS = Math.max(1, Number(process.env['TAU_TRIALS'] ?? 4) || 4);
 const TRAIN_SHARE = Number(process.env['TAU_TRAIN_SHARE'] ?? 0.5) || 0.5;
+/**
+ * How many tasks to draw before splitting; `0` means the whole set.
+ *
+ * A smoke run has to be affordable: the retail set is over a hundred tasks, and
+ * four trials on both halves is hours. A cap changes the sample, not the protocol,
+ * and the artefact records `n` so a small run cannot be read as a large one.
+ */
+const MAX_TASKS = Math.max(0, Number(process.env['TAU_MAX_TASKS'] ?? 0) || 0);
 const PYTHON = process.env['TAU_PYTHON'] ?? 'python3';
 const TASK = 'tau2.act';
 
@@ -132,7 +140,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const ids = listed.tasks ?? [];
   if (ids.length === 0) throw new Error('tau2 returned no tasks');
 
-  const { train, test } = splitTaskIds(ids, TRAIN_SHARE);
+  const drawn = MAX_TASKS > 0 ? ids.slice(0, MAX_TASKS) : ids;
+  const { train, test } = splitTaskIds(drawn, TRAIN_SHARE);
   if (test.length === 0) throw new Error('tau2 split left no held-out task');
 
   const evalPath = join(workdir, 'eval.json');

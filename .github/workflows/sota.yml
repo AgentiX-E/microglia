@@ -39,6 +39,14 @@ on:
         description: 'Model calls in flight at once (1 = serial)'
         required: false
         default: '6'
+      l4:
+        description: 'Also run the L4 lane (needs the tau2 environment; hours of calls)'
+        required: false
+        default: 'false'
+      l4_tasks:
+        description: 'Tasks to draw for L4 (0 = the whole set; a smoke run wants 4-6)'
+        required: false
+        default: '0'
   schedule:
     - cron: '0 3 * * 1'
 
@@ -203,7 +211,10 @@ jobs:
   # measure, so the gate is a repository variable rather than a TODO.
   l4:
     name: 'L4 tau-bench pass^4'
-    if: vars.TAU_ENV_READY == 'true'
+    # Two switches, because the variable is for "this repository runs L4 now" and
+    # the input is for "check the wiring once". A dispatch that sets neither leaves
+    # a lane that costs hours of model calls switched off.
+    if: vars.TAU_ENV_READY == 'true' || github.event.inputs.l4 == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 150
     steps:
@@ -271,6 +282,7 @@ jobs:
           TAU_MEMORY: ${{ vars.TAU_MEMORY || 'true' }}
           TAU_TRAIN_SHARE: ${{ vars.TAU_TRAIN_SHARE || '0.5' }}
           TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '4' }}
+          TAU_MAX_TASKS: ${{ github.event.inputs.l4_tasks || vars.TAU_MAX_TASKS || '0' }}
           TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
         run: pnpm eval:l4
 
