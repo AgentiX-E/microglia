@@ -77,6 +77,7 @@ import {
 import {
   GenerationCache,
   HOUSE_CONVENTIONS,
+  armPairsAgainstFull,
   OPTIONAL_ARMS,
   PROMPT_VERSION,
   archiveVerdict,
@@ -1329,6 +1330,15 @@ async function main(): Promise<void> {
     });
   }
 
+  // Each control against `full`, paired on the questions both answered. The deltas
+  // against `none` above are the treatment effect; these are the difference between
+  // two treatments, which is what a control is for.
+  const armPairs = armPairsAgainstFull(
+    cases.map((item) => ({ full: item.correct, arms: item.arms })),
+    SEED,
+    RESAMPLES,
+  );
+
   // The channel control is whichever control states the knowledge in a form the
   // model can act on. On the convention lane the measured answer is that a value
   // ("the accepted answer is 10") is ignored while a rule ("report rounded to the
@@ -1488,6 +1498,7 @@ async function main(): Promise<void> {
       min_detectable_pp: detectable * 100,
     },
     arms,
+    arm_pairs: armPairs,
     gates,
     assertions,
     per_fold: folds.map((fold) => ({

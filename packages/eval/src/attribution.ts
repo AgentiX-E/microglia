@@ -24,12 +24,22 @@ export type AttributionItem = {
   readonly fold: number;
   readonly id: string;
   readonly statement: string;
+  /**
+   * The condition the rule was stored with, when the artefact records one.
+   *
+   * Optional because attribution predates the field: an artefact written before
+   * iteration 63 has no conditions, and reading absence as "unconditional" would
+   * report every rule in those runs as a general rule.
+   */
+  readonly when?: string | null;
 };
 
 export type RuleAttribution = {
   readonly fold: number;
   readonly id: string;
   readonly statement: string;
+  /** Whether the artefact recorded an applicability condition for this rule. */
+  readonly conditioned: boolean;
   readonly injected: number;
   /** Questions wrong without the pack and right with it. */
   readonly helped: number;
@@ -46,6 +56,24 @@ export type AttributionSummary = {
   readonly neutral: number;
   /** Share of injected rule-instances whose rule has a negative net. */
   readonly harmfulShare: number;
+  /**
+   * The same split, by whether the rule said when it applies.
+   *
+   * This is what turns the arm comparison into a diagnosis: a pack whose harmful
+   * rules are all unconditional and whose helpful rules are all conditioned says the
+   * condition is doing the work; a pack where both groups look the same says it is
+   * not, however the arm average moved.
+   */
+  readonly conditioned: {
+    readonly injected: number;
+    readonly helpful: number;
+    readonly harmful: number;
+  };
+  readonly unconditioned: {
+    readonly injected: number;
+    readonly helpful: number;
+    readonly harmful: number;
+  };
   /** The rules that cost the most, worst first. */
   readonly top: readonly RuleAttribution[];
   /**
@@ -70,6 +98,7 @@ type MutableRule = {
   fold: number;
   id: string;
   statement: string;
+  conditioned: boolean;
   injected: number;
   helped: number;
   hurt: number;
@@ -117,6 +146,7 @@ export function attributeRules(
       fold: item.fold,
       id: item.id,
       statement: item.statement,
+      conditioned: typeof item.when === 'string' && item.when.length > 0,
       injected: 0,
       helped: 0,
       hurt: 0,
@@ -151,6 +181,15 @@ export function attributeRules(
   const instances = injected.reduce((sum, rule) => sum + rule.injected, 0);
   const best = all.filter((rule) => rule.net > 0).sort(byNetDescending);
 
+  const split = (group: readonly RuleAttribution[], conditioned: boolean) => {
+    const subset = group.filter((rule) => rule.conditioned === conditioned);
+    return {
+      injected: subset.reduce((sum, rule) => sum + rule.injected, 0),
+      helpful: subset.filter((rule) => rule.net > 0).length,
+      harmful: subset.filter((rule) => rule.net < 0).length,
+    };
+  };
+
   return {
     rules: all.length,
     injectedRules: injected.length,
@@ -158,6 +197,8 @@ export function attributeRules(
     harmful: harmful.length,
     neutral: injected.length - helpful.length - harmful.length,
     harmfulShare: instances === 0 ? 0 : harmful.reduce((sum, rule) => sum + rule.injected, 0) / instances,
+    conditioned: split(injected, true),
+    unconditioned: split(injected, false),
     top: all.slice(0, 20),
     best: best.slice(0, 20),
   };

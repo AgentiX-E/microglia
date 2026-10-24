@@ -87,6 +87,29 @@ describe('per-rule attribution', () => {
     expect(summary.harmfulShare).toBeCloseTo(0.5, 6);
   });
 
+  it('splits the table by whether a rule said when it applies', () => {
+    // The diagnosis the arm comparison cannot give on its own: if the harmful rules
+    // are the unconditional ones and the helpful rules are the conditioned ones, the
+    // condition is doing the work. If both groups look alike, it is not - however the
+    // arm average moved.
+    const summary = attributeRules(
+      [
+        { fold: 0, injected: ['c1'], baselineCorrect: false, treatmentCorrect: true },
+        { fold: 0, injected: ['u1'], baselineCorrect: true, treatmentCorrect: false },
+        { fold: 0, injected: ['u2'], baselineCorrect: true, treatmentCorrect: false },
+      ],
+      [
+        { fold: 0, id: 'c1', statement: 'conditioned and useful', when: 'when a race is named' },
+        { fold: 0, id: 'u1', statement: 'unconditional and harmful' },
+        { fold: 0, id: 'u2', statement: 'also unconditional', when: '' },
+      ],
+    );
+    expect(summary.conditioned).toEqual({ injected: 1, helpful: 1, harmful: 0 });
+    expect(summary.unconditioned).toEqual({ injected: 2, helpful: 0, harmful: 2 });
+    expect(summary.top.find((rule) => rule.id === 'c1')?.conditioned).toBe(true);
+    expect(summary.top.find((rule) => rule.id === 'u2')?.conditioned).toBe(false);
+  });
+
   it('reports a zero harmful share when nothing was injected at all', () => {
     // A lane whose pack was empty injected no rule-instances, and dividing by that
     // zero would make the summary NaN — which reads as "no data" in a table and as

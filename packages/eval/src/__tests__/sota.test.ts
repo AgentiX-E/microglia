@@ -4,6 +4,7 @@ import {
   GenerationCache,
   OPTIONAL_ARMS,
   PROMPT_VERSION,
+  armPairsAgainstFull,
   buildValidityGates,
   canonicalRows,
   conventionOf,
@@ -461,5 +462,46 @@ describe('buildValidityGates', () => {
       .filter((entry) => !entry.blocking)
       .map((entry) => entry.id);
     expect(advisory).toEqual(['V5-resolution', 'V9-subset-size']);
+  });
+});
+
+describe('armPairsAgainstFull', () => {
+  it('pairs each control against full on the questions both answered', () => {
+    const rows = [
+      { full: true, arms: { 'full-plain': true, gated: false } },
+      { full: true, arms: { 'full-plain': false, gated: false } },
+      { full: false, arms: { 'full-plain': false, gated: false } },
+      { full: false, arms: { 'full-plain': false, gated: false } },
+    ];
+    const pairs = armPairsAgainstFull(rows);
+    const plain = pairs.find((pair) => pair.arm === 'full-plain');
+    const gated = pairs.find((pair) => pair.arm === 'gated');
+    // `full-plain` is right once where `full` is right, and wrong once where it is;
+    // `gated` never passes. Both deltas are against `full`, not against `none`.
+    expect(plain).toMatchObject({ n: 4, lost: 1, gained: 0, deltaPp: -25 });
+    expect(gated).toMatchObject({ n: 4, lost: 2, gained: 0, deltaPp: -50 });
+  });
+
+  it('skips questions an arm never answered instead of counting them as failures', () => {
+    // A control that was not configured for a case has no outcome. Counting absence
+    // as a loss would let a partially-run arm look worse than it measured.
+    const rows = [
+      { full: true, arms: { gated: undefined } },
+      { full: true, arms: { gated: false } },
+    ];
+    const [pair] = armPairsAgainstFull(rows);
+    expect(pair).toMatchObject({ arm: 'gated', n: 1, lost: 1 });
+  });
+
+  it('reports no pairs when no control ran', () => {
+    expect(armPairsAgainstFull([{ full: true, arms: {} }])).toEqual([]);
+  });
+
+  it('leaves the interval touching zero when the two arms never disagree', () => {
+    const rows = Array.from({ length: 20 }, () => ({ full: true, arms: { oracle: true } }));
+    const [pair] = armPairsAgainstFull(rows);
+    expect(pair).toMatchObject({ n: 20, deltaPp: 0, lost: 0, gained: 0, p: 1 });
+    expect(pair?.ciLowPp).toBe(0);
+    expect(pair?.ciHighPp).toBe(0);
   });
 });

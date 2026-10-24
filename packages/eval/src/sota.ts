@@ -13,6 +13,8 @@
  * no tests at all — a lane whose *decisions* were the least covered part of the
  * repository.
  */
+import { comparePaired } from './stats.js';
+
 /** Bumped whenever the prompt text changes; a result without it is unreproducible. */
 export const PROMPT_VERSION = 'sql-prompt/2';
 
@@ -186,6 +188,78 @@ export function parseArms(raw: string | undefined): Set<SqlArm> {
     wanted.add(trimmed as Exclude<SqlArm, 'none' | 'full'>);
   }
   return wanted;
+}
+
+/**
+ * One control arm, compared to `full` on the questions both answered.
+ *
+ * Every arm in this lane was previously described by its delta against `none`, and
+ * the difference between two arms was read as the difference of two deltas. That
+ * point estimate is exact - both are measured on the same questions against the same
+ * baseline - but its interval was not: two intervals against a shared baseline say
+ * nothing about the difference between the arms, and this project has already
+ * published one comparison that was wrong by a factor of two for exactly that
+ * reason. Pairing the arms directly gives the difference an interval and a p-value.
+ */
+export type ArmPair = {
+  readonly arm: string;
+  /** `arm - full`, in percentage points; negative means the arm did worse. */
+  readonly deltaPp: number;
+  readonly ciLowPp: number;
+  readonly ciHighPp: number;
+  readonly p: number;
+  readonly n: number;
+  /** Questions `full` got right and this arm got wrong. */
+  readonly lost: number;
+  /** Questions this arm got right and `full` got wrong. */
+  readonly gained: number;
+};
+
+export type ArmRow = {
+  readonly full: boolean;
+  readonly arms: Readonly<Record<string, boolean | undefined>>;
+};
+
+/**
+ * Every optional arm present in the rows, paired against `full`.
+ *
+ * Only questions where the arm actually answered are paired: an arm that was not
+ * configured for a case has no outcome, and treating its absence as a failure would
+ * invent one.
+ */
+export function armPairsAgainstFull(
+  rows: readonly ArmRow[],
+  seed = 7,
+  resamples = 10_000,
+): readonly ArmPair[] {
+  const names = new Set<string>();
+  for (const row of rows) {
+    for (const [name, value] of Object.entries(row.arms)) {
+      if (value !== undefined) names.add(name);
+    }
+  }
+  const pairs: ArmPair[] = [];
+  for (const name of [...names].sort()) {
+    const scored = rows.filter((row) => row.arms[name] !== undefined);
+    if (scored.length === 0) continue;
+    const comparison = comparePaired(
+      scored.map((row) => row.full),
+      scored.map((row) => row.arms[name] === true),
+      seed,
+      resamples,
+    );
+    pairs.push({
+      arm: name,
+      deltaPp: comparison.delta * 100,
+      ciLowPp: comparison.deltaCI.low * 100,
+      ciHighPp: comparison.deltaCI.high * 100,
+      p: comparison.p,
+      n: comparison.n,
+      lost: comparison.lost,
+      gained: comparison.gained,
+    });
+  }
+  return pairs;
 }
 
 export type PromptInput = {

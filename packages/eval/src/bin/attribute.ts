@@ -28,6 +28,7 @@ type ItemRow = {
   readonly fold: number;
   readonly id: string;
   readonly statement: string;
+  readonly when?: string | null;
 };
 
 type Artifact = {
@@ -54,6 +55,7 @@ function main(): void {
     fold: row.fold,
     id: row.id,
     statement: row.statement,
+    when: row.when ?? null,
   }));
 
   const summary = attributeRules(cases, items);
@@ -69,7 +71,11 @@ function main(): void {
   process.stdout.write(
     `[attribution] ${summary.injectedRules} of ${summary.rules} rules were ever injected; ` +
       `${summary.harmful} harmful, ${summary.helpful} helpful, ${summary.neutral} neutral; ` +
-      `${(summary.harmfulShare * 100).toFixed(1)}% of injections belong to a harmful rule\n`,
+      `${(summary.harmfulShare * 100).toFixed(1)}% of injections belong to a harmful rule\n` +
+      `[attribution] conditioned: ${summary.conditioned.injected} injection(s), ` +
+      `${summary.conditioned.harmful} harmful / ${summary.conditioned.helpful} helpful; ` +
+      `unconditioned: ${summary.unconditioned.injected} injection(s), ` +
+      `${summary.unconditioned.harmful} harmful / ${summary.unconditioned.helpful} helpful\n`,
   );
   for (const rule of summary.top.slice(0, 5)) {
     process.stdout.write(
