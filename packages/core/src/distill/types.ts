@@ -81,6 +81,14 @@ export type DistillReport = {
   readonly rejectedByHost: number;
   /** Events whose interpreter threw. Non-strict runs count them and continue. */
   readonly failed: number;
+  /**
+   * Claims that arrived with a condition the stored item already had, and a
+   * different one.
+   *
+   * The merge keeps the first condition, so this count is the only place a reader
+   * can see that the rule was learned under two descriptions of when it applies.
+   */
+  readonly conditionConflicts: number;
 };
 
 export type { Clock, DistillCandidate, FeedbackEvent, KnowledgeItem, Policy, RandomSource, RunRecord };

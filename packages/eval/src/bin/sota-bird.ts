@@ -65,6 +65,7 @@ import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'no
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { MicrogliaError, mulberry32, queryCoverage, steppingClock } from '@agentix-e/microglia-core';
+import { makePack } from '@agentix-e/microglia-core/apply';
 import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
 import { openMicroglia } from '@agentix-e/microglia-core/capture';
 import {
@@ -166,6 +167,7 @@ type ArmName =
   | 'none'
   | 'full'
   | 'full-narrow'
+  | 'full-plain'
   | 'gated'
   | 'duplicate'
   | 'wrong-scope'
@@ -981,6 +983,13 @@ async function runFold(
       const narrowPack = await memory.host.recall({ ...query, scope: { domain: row.db_id } });
       call(position, 'full-narrow', narrowPack.rendered, narrowPack.ids.length);
     }
+    if (ARMS.has('full-plain')) {
+      // The same items, rendered without the condition and with the plain note.
+      // `pack.items` is what survived the budget, so the two arms carry the same
+      // ids by construction - the comparison is the rendering, not the retrieval.
+      const plain = makePack(pack.items, { budget: pack.budget, conditions: false });
+      call(position, 'full-plain', plain.rendered, plain.ids.length);
+    }
     if (ARMS.has('gated')) {
       const gated = await widened.host.recall({
         ...query,
@@ -1314,7 +1323,8 @@ async function main(): Promise<void> {
       entry.arm === 'gated' ||
       entry.arm === 'duplicate' ||
       entry.arm === 'wrong-scope' ||
-      entry.arm === 'full-narrow',
+      entry.arm === 'full-narrow' ||
+      entry.arm === 'full-plain',
   );
   const channel = arms.filter((entry) => entry.arm === 'oracle' || entry.arm === 'stated');
   const channelBest = channel.reduce<ArmSummary | undefined>(
@@ -1385,7 +1395,7 @@ async function main(): Promise<void> {
       arms: [...ARMS],
       convention: ACTIVE?.sentence ?? null,
       task: TASK,
-      distill_prompt: 'distill-prompt/2',
+      distill_prompt: 'distill-prompt/3',
       distill_max_tokens: 2000,
       concurrency: CONCURRENCY,
       breaker_threshold: BREAKER_THRESHOLD,

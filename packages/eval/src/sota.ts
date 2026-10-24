@@ -141,6 +141,18 @@ export type SqlArm =
   | 'full'
   /** The same corrections, distilled without scope widening: an arm, not a dispatch. */
   | 'full-narrow'
+  /**
+   * The same items as `full`, rendered without their applicability condition.
+   *
+   * The shape ablation. Iteration 62 measured that the retriever cannot tell a
+   * harmful rule from a helpful one (median cosine 0.232 against 0.228, p = 0.86),
+   * so what a rule says about *when* it applies became the candidate explanation.
+   * `full` renders that condition in front of the claim; `full-plain` renders the
+   * same ids with the plain note. Both are scored against the same `none` arm on
+   * the same questions, so the difference is one field of text rather than the
+   * run-to-run noise of two dispatches.
+   */
+  | 'full-plain'
   | 'gated'
   | 'duplicate'
   | 'wrong-scope'
@@ -149,6 +161,7 @@ export type SqlArm =
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = [
   'full-narrow',
+  'full-plain',
   'gated',
   'duplicate',
   'wrong-scope',

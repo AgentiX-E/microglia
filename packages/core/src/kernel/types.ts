@@ -313,6 +313,21 @@ export type KnowledgeItem = {
   readonly scope: KnowledgeScope;
   /** One sentence, declarative, self-contained. Rendered verbatim. */
   readonly statement: string;
+  /**
+   * The condition under which the statement applies, when the distiller can state one.
+   *
+   * Added after the measurement in iteration 62: rules credited with a hurt sat at
+   * median cosine 0.232 from the question that was harmed and rules credited with a
+   * help at 0.228 (p = 0.86), and word coverage was 0.133 against 0.130. Two signals,
+   * no separation — so the failing thing was not *which* rule was retrieved but what
+   * the rule says. A statement records what was true; it says nothing about when it
+   * is true, and the prompt asked the model to treat the first as the second.
+   *
+   * `when` is that missing half, and it is rendered *before* the statement so a
+   * reader meets the condition first. Absent means the distiller declined to name
+   * one, which is not the same as "always" — the renderer says so.
+   */
+  readonly when?: string;
   /** Machine-usable payload (e.g. exemplar input/output), if the kind needs one. */
   readonly payload?: Json;
   readonly evidence: readonly EvidenceRef[];
@@ -393,6 +408,8 @@ export type DistillCandidate = {
   readonly kind: KnowledgeKind;
   readonly scope: KnowledgeScope;
   readonly statement: string;
+  /** The condition under which the claim applies; see `KnowledgeItem.when`. */
+  readonly when?: string;
   readonly payload?: Json;
   readonly evidence: EvidenceRef;
   readonly trust: number;

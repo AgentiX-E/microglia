@@ -224,6 +224,7 @@ export function createKnowledgeItem(
     succeeded: 0,
     createdAt: now,
     updatedAt: now,
+    ...(candidate.when === undefined ? {} : { when: candidate.when }),
     ...(candidate.payload === undefined ? {} : { payload: candidate.payload }),
     ...(candidate.tier === undefined ? {} : { tier: candidate.tier }),
     ...(quarantined ? { statusReason: 'source-trust-below-quarantine' } : {}),
@@ -281,7 +282,24 @@ export function mergeEvidence(
    */
   const tier = strongestTier(base.tier, candidate.tier);
   const samePayload = jsonEqual(base.payload ?? null, candidate.payload ?? null);
-  if (duplicate && !rehabilitate && samePayload && (tier === undefined || tier === base.tier)) {
+  /**
+   * A condition is adopted once and then held.
+   *
+   * The first observation that names a condition is the one the rule was learned
+   * under; a later event restating the same claim is not evidence about scope, it is
+   * the same claim again. An existing condition is therefore never overwritten, and a
+   * *different* condition arriving later is counted by the distiller as a conflict
+   * rather than silently replacing one of the two. Nothing to adopt means nothing
+   * changed, which keeps this a no-op like any other repeat.
+   */
+  const adopts = base.when === undefined && candidate.when !== undefined;
+  if (
+    duplicate &&
+    !rehabilitate &&
+    !adopts &&
+    samePayload &&
+    (tier === undefined || tier === base.tier)
+  ) {
     return item;
   }
   const evidence: readonly EvidenceRef[] = duplicate
@@ -299,6 +317,7 @@ export function mergeEvidence(
       ? {}
       : { tier: strongestTier(base.tier, candidate.tier) as ProvenanceTier }),
     updatedAt: now,
+    ...(adopts ? { when: candidate.when as string } : {}),
     ...(candidate.payload === undefined ? {} : { payload: candidate.payload }),
   };
   const decision = decideStatus({ ...merged, confidence: scoreKnowledge(merged, policy, now) }, policy, now);

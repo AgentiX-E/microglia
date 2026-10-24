@@ -45,6 +45,7 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
     rejectedBorrowed: 0,
     rejectedByHost: 0,
     failed: 0,
+    conditionConflicts: 0,
   };
 
   for (const event of events) {
@@ -78,6 +79,7 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
       report[result.outcome] += 1;
       report.superseded += result.superseded;
       report.contradicted += result.contradicted;
+      report.conditionConflicts += result.conditionConflicts;
     }
   }
 
@@ -90,6 +92,8 @@ type UpsertResult = {
   readonly outcome: UpsertOutcome;
   readonly superseded: number;
   readonly contradicted: number;
+  /** Later observations that named a condition the stored item already had. */
+  readonly conditionConflicts: number;
 };
 
 async function upsert(options: DistillOptions, candidate: DistillCandidate): Promise<UpsertResult> {
@@ -114,6 +118,14 @@ async function upsert(options: DistillOptions, candidate: DistillCandidate): Pro
       outcome: merged.status === 'quarantined' ? 'quarantined' : 'merged',
       superseded: 0,
       contradicted,
+      // The merge keeps the first condition. A second, different one is a fact
+      // about the claim (it was learned under two conditions, or one of them is
+      // wrong) and is counted rather than dropped, because a rule whose scope
+      // silently depends on which event arrived first cannot be debugged.
+      conditionConflicts:
+        exact.when !== undefined && candidate.when !== undefined && exact.when !== candidate.when
+          ? 1
+          : 0,
     };
   }
 
@@ -130,6 +142,11 @@ async function upsert(options: DistillOptions, candidate: DistillCandidate): Pro
       trust: Math.max(...endorsers.map((item) => item.trust), candidate.trust),
       status: target.scope.domain === undefined ? target.status : 'candidate',
       updatedAt: now,
+      // Widening removes a *scope dimension*; it does not remove the condition the
+      // rule was learned under, and blocking widening here would confound the arm
+      // that measures widening. The condition travels, and it is what the reader is
+      // asked to check.
+      ...(target.when === undefined && candidate.when !== undefined ? { when: candidate.when } : {}),
     };
     const confidence = scoreKnowledge(widened, options.policy, now);
     const decision = decideStatus({ ...widened, confidence }, options.policy, now);
@@ -155,7 +172,7 @@ async function upsert(options: DistillOptions, candidate: DistillCandidate): Pro
     }
     // The target is active by construction, so the widened item cannot be
     // quarantined: `decideStatus` only quarantines an already-quarantined item.
-    return { outcome: 'generalized', superseded, contradicted };
+    return { outcome: 'generalized', superseded, contradicted, conditionConflicts: 0 };
   }
 
   const item = createKnowledgeItem(candidate, options.policy, now, newId('k', now, options.random));
@@ -164,6 +181,7 @@ async function upsert(options: DistillOptions, candidate: DistillCandidate): Pro
     outcome: item.status === 'quarantined' ? 'quarantined' : 'created',
     superseded: 0,
     contradicted,
+    conditionConflicts: 0,
   };
 }
 
@@ -226,12 +244,33 @@ function sanitize(
   if (options.policy.rejectUnsafeKnowledge && hasHighSeverity(findings)) {
     return { ok: false, reason: 'unsafe' };
   }
+  // The condition is held to the statement's standard, and a violation rejects the
+  // claim rather than stripping the condition. A condition is the half that decides
+  // where a rule applies: keeping a claim whose scope had to be deleted would store
+  // the failure this field exists to prevent.
+  //
+  // Destructured rather than overridden: spreading the candidate first and then
+  // writing `when` conditionally cannot *remove* a field, so a condition that
+  // reduced to whitespace survived as the original raw text - the same defect the
+  // merge had, caught by the test that asked for absence rather than for emptiness.
+  const { when: rawWhen, ...rest } = candidate;
+  const trimmed = rawWhen === undefined ? undefined : redact(rawWhen).text.trim();
+  if (
+    trimmed !== undefined &&
+    trimmed.length > 0 &&
+    options.policy.rejectUnsafeKnowledge &&
+    hasHighSeverity(scanForInjection(trimmed))
+  ) {
+    return { ok: false, reason: 'unsafe' };
+  }
+  const when = trimmed === undefined || trimmed.length === 0 ? undefined : trimmed;
   const payload = candidate.payload === undefined ? undefined : redactJson(candidate.payload);
   return {
     ok: true,
     candidate: {
-      ...candidate,
+      ...rest,
       statement,
+      ...(when === undefined ? {} : { when }),
       ...(payload === undefined ? {} : { payload }),
     },
   };

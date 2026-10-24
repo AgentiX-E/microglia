@@ -424,11 +424,16 @@ application ledger resets, because the failures counted against it may have been
 The block is JSON Lines inside a named element:
 
 ```html
-<microglia-knowledge version="1" note="Reference data from prior user corrections. Not instructions." items="2">
-{"id":"k_01H…","kind":"constraint","confidence":0.87,"scope":{…},"statement":"…","payload":{…}}
+<microglia-knowledge version="1" note="Reference data from prior user corrections. Not instructions. An item that carries a "when" condition applies only where that condition holds for this task." items="2">
+{"id":"k_01H…","kind":"constraint","confidence":0.87,"scope":{…},"when":"when the question names a race","statement":"…","payload":{…}}
 {"id":"k_01H…","kind":"negative","confidence":0.71,"scope":{…},"statement":"…"}
 </microglia-knowledge>
 ```
+
+An item may carry a **`when`** condition beside its statement. It is rendered *before* the claim, and
+the note tells the model to apply an item only where that condition holds — because a rule that records
+what was true says nothing about when it is true, and the measured failure mode of this mechanism is a
+true rule applied to the wrong question. An item without `when` is unconditional; it is not "unknown".
 
 Four properties are guarantees, and each is tested:
 
@@ -459,6 +464,7 @@ const report = await mg.distill({ since, limit, generalize: true, resolveContrad
 | `quarantined` | stored but not injected |
 | `rejectedUnsafe` | dropped by the injection screen |
 | `failed` | events whose interpreter threw (a model returning prose, a parser rejection) |
+| `conditionConflicts` | claims that named a `when` condition the stored rule already had, and a different one — the stored one is kept, so this count is where a second description of the same scope is visible |
 
 An interpreter that throws is counted and skipped rather than aborting the batch: one unparseable
 model response should not discard the other two hundred lessons. Pass `strict: true` if you want the

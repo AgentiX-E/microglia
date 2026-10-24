@@ -111,7 +111,7 @@ RunRecord      id, at, namespace, sessionId, task, input, output,
                feedbackIds
 
 KnowledgeItem  id, namespace, kind, scope{task, domain, intent, field, …},
-               statement, payload, evidence[], trust, support, confidence,
+               statement, when?, payload, evidence[], trust, support, confidence,
                contradictions, applied, succeeded, status, statusReason,
                createdAt, updatedAt, validUntil, systemUntil
 ```

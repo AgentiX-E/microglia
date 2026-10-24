@@ -163,6 +163,7 @@ describe('parseArms', () => {
       'duplicate',
       'full',
       'full-narrow',
+      'full-plain',
       'gated',
       'none',
       'oracle',
@@ -187,6 +188,7 @@ describe('parseArms', () => {
   it('covers every documented arm', () => {
     expect([...OPTIONAL_ARMS]).toEqual([
       'full-narrow',
+      'full-plain',
       'gated',
       'duplicate',
       'wrong-scope',
@@ -197,6 +199,10 @@ describe('parseArms', () => {
 
   it('accepts the scope-widening arm, which is a pack built from the same corrections', () => {
     expect([...parseArms('full-narrow')].sort()).toEqual(['full', 'full-narrow', 'none']);
+  });
+
+  it('accepts the shape arm, which differs from full by one field of text', () => {
+    expect([...parseArms('full-plain')].sort()).toEqual(['full', 'full-plain', 'none']);
   });
 });
 

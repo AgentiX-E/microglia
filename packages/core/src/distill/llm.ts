@@ -69,12 +69,16 @@ export function buildDistillPrompt(
     'Return JSON only, with this shape:',
     '{"candidates":[{"kind":"constraint|exemplar|negative|lexicon|procedure",',
     '"statement":"one sentence, declarative, no instructions to the reader",',
+    '"when":"the condition under which the statement applies",',
     '"scope":{"task":"...","domain":"...","intent":"...","field":"...","reasonCode":"..."},',
     '"payload":{}}]}',
     'Rules:',
     '- Return at most two candidates. More than two is discarded, and a long reply is cut off mid-object, which loses all of them.',
     '- Omit scope keys that the event does not establish. Never guess a domain.',
     '- A statement must be verifiable by a human and must not contain second-person instructions.',
+    '- A statement is a rule, not a report of the case that taught it. "Questions that name a race join results to races on raceId" is a rule; "the query answering <one question> selects forename, surname and driverRef" restates one answer and must not be returned.',
+    '- `when` names a property the reader can check on a *different* input: what the question asks for, which tables or columns it involves, what the answer must be comparable to. Do not restate the statement, do not restate the question, and do not write a condition that is always true.',
+    '- Omit `when` only when the lesson genuinely holds for every input of the task.',
     '- Return an empty array when the event teaches nothing reusable.',
     taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '',
     payloadHint === undefined ? '' : `Payload example (copy this shape exactly): ${payloadHint}`,
@@ -124,11 +128,13 @@ export function parseDistillResponse(
 
     const scope = parseScope(record['scope'], base.task);
     const payload = isJson(record['payload']) ? record['payload'] : undefined;
+    const when = parseWhen(record['when'], statement.trim());
     out.push({
       namespace: base.namespace,
       kind: kind as KnowledgeKind,
       scope,
       statement: statement.trim(),
+      ...(when === undefined ? {} : { when }),
       ...(payload === undefined ? {} : { payload }),
       evidence: {
         feedbackId: base.eventId,
@@ -147,6 +153,25 @@ export function parseDistillResponse(
     });
   }
   return out;
+}
+
+/**
+ * The condition a claim applies under, or `undefined` when the model did not give
+ * a usable one.
+ *
+ * Dropped rather than rejecting the claim: a good statement with a useless
+ * condition is still a lesson, while a condition that merely restates the
+ * statement carries no information about application — and rendering it would
+ * teach a reader that the field is noise, which is worse than an absent field.
+ * The ceiling is 240 characters because a condition longer than the claim it
+ * qualifies is a description of the case, not a test.
+ */
+function parseWhen(value: unknown, statement: string): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (trimmed.length < 3 || trimmed.length > 240) return undefined;
+  if (trimmed.toLowerCase() === statement.toLowerCase()) return undefined;
+  return trimmed;
 }
 
 function parseScope(value: unknown, task: string): KnowledgeScope {
