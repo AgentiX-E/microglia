@@ -742,7 +742,13 @@ Be honest about the preconditions; the product is only useful inside them.
    a strong model at 90.48% (or moved it to 88.10%). The value is *your* conventions, where the same
    model goes from 0% to 75–89%.
 5. **Structured outputs need `editSemantics`.** See §4.
-6. **A convention with a *form* is not transmitted by description.** Measured on BIRD Mini-Dev (145
+6. **A `when` condition is read as text, not enforced as a filter.** An item's condition changes what the
+   model writes — on BIRD, 48% of 350 answers differed when the condition was rendered — and it does not
+   change whether the answer is right: paired against the same items without it, **0.00pp, CI
+   [−2.57, +2.57], p = 1.00**, 10 questions gained and 10 lost. Write conditions anyway (they make a pack
+   auditable and they help a human reviewer), but if applicability has to be *guaranteed*, filter before
+   the prompt — a note is a hint, not a gate.
+7. **A convention with a *form* is not transmitted by description.** Measured on BIRD Mini-Dev (145
    questions, 5 folds, 1,301 model calls): writing a workspace convention into the prompt moved execution
    accuracy from 0.69% to 4.14–5.52%; handing over the exact answer in the exact form reached 48.97–56.55%,
    short of the 90% needed to attribute the result to knowledge rather than to output format. The pack
