@@ -250,15 +250,27 @@ jobs:
           uv sync || { echo "tau2-sync-failed:$REF"; exit 22; }
           uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
 
+      # The lane, with the repository's own driver unless a variable overrides it.
+      #
+      # The job itself is gated on `TAU_ENV_READY`, so this does not make L4 run by
+      # default — it makes the gate the only switch, which is what a lane that costs
+      # hours of model calls should have. `TAU_MEMORY=false` runs the reference arm
+      # on its own, which is the cheap way to check the wiring before paying for both.
       - name: L4 lane
+        timeout-minutes: 240
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          TAU_DRIVER: ${{ vars.TAU_DRIVER }}
+          TAU_DRIVER: ${{ vars.TAU_DRIVER || './packages/eval/src/bin/tau2-driver.ts' }}
           # A recorded run can be re-scored without the environment; the lane
           # prefers it over the driver when both are set.
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}
-          TAU_MODEL: ${{ vars.TAU_MODEL }}
+          TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-chat' }}
           TAU_VERSION: ${{ vars.TAU_VERSION }}
+          TAU_DOMAIN: ${{ vars.TAU_DOMAIN || 'retail' }}
+          TAU_TRIALS: ${{ vars.TAU_TRIALS || '4' }}
+          TAU_MEMORY: ${{ vars.TAU_MEMORY || 'true' }}
+          TAU_TRAIN_SHARE: ${{ vars.TAU_TRAIN_SHARE || '0.5' }}
+          TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '4' }}
           TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
         run: pnpm eval:l4
 

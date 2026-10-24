@@ -18,7 +18,8 @@
  * measure" and "we measured something invalid".
  */
 import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { pathToFileURL } from 'node:url';
 import {
   L4ParseError,
   compareToPublished,
@@ -140,9 +141,16 @@ async function measureFromResults(path: string): Promise<Measurement> {
 }
 
 async function measureFromDriver(module: string): Promise<Measurement> {
+  // A relative specifier in a dynamic `import` resolves against *this file*, not the
+  // working directory, so `./packages/eval/src/bin/tau2-driver.ts` - the obvious way
+  // to name a driver in a workflow - would look for it inside `bin/`. Resolving
+  // against the working directory is what a caller means, and it is what the
+  // environment variable's documentation says.
+  const specifier =
+    module.startsWith('.') || module.startsWith('/') ? pathToFileURL(resolve(module)).href : module;
   let loaded: { run: () => Promise<readonly PassAtKInput[]> };
   try {
-    loaded = (await import(module)) as { run: () => Promise<readonly PassAtKInput[]> };
+    loaded = (await import(specifier)) as { run: () => Promise<readonly PassAtKInput[]> };
   } catch (error) {
     // A driver that cannot be *resolved* is an absent environment, not a failed
     // measurement: the variable names a module that is not there. A driver that

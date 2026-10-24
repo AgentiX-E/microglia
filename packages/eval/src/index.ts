@@ -143,6 +143,19 @@ export {
 } from './sota.js';
 
 export {
+  actionSentence,
+  taskCorrection,
+  driverArgs,
+  learnableCorrections,
+  parseTauTasks,
+  splitTaskIds,
+  type Correction,
+  type DriverCommand,
+  type TauAction,
+  type TauTask,
+} from './tau2.js';
+
+export {
   assignFolds,
   detectableDelta,
   discordanceOf,
