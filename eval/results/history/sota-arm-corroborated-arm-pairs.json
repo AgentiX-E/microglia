@@ -1,0 +1,18 @@
+{
+  "id": "poc-sota-arm-pairs",
+  "source_artifact": "poc-sota-bird.json",
+  "source_generated_at": "2026-10-24T15:12:50.519Z",
+  "n": 350,
+  "pairs": [
+    {
+      "arm": "full-corroborated",
+      "deltaPp": 2.2857142857142856,
+      "ciLowPp": -0.5714285714285714,
+      "ciHighPp": 5.142857142857142,
+      "p": 0.16863754391670105,
+      "n": 350,
+      "lost": 9,
+      "gained": 17
+    }
+  ]
+}

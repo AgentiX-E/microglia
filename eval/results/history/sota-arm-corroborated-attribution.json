@@ -1,0 +1,388 @@
+{
+  "id": "poc-sota-attribution",
+  "source_artifact": "poc-sota-bird.json",
+  "source_generated_at": "2026-10-24T15:12:50.519Z",
+  "n": 350,
+  "summary": {
+    "rules": 1312,
+    "injectedRules": 396,
+    "helpful": 16,
+    "harmful": 27,
+    "neutral": 353,
+    "harmfulShare": 0.08653846153846154,
+    "conditioned": {
+      "injected": 624,
+      "helpful": 16,
+      "harmful": 27
+    },
+    "unconditioned": {
+      "injected": 0,
+      "helpful": 0,
+      "harmful": 0
+    },
+    "top": [
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqp7_4ft25",
+        "statement": "Joining event to member through budget and expense traverses event.link_to_event = budget.link_to_event, budget.budget_id = expense.link_to_budget, and expense.link_to_member = member.member_id.",
+        "conditioned": true,
+        "injected": 5,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqt3_a4e09",
+        "statement": "Counting patients who satisfy a condition on an examination attribute requires joining the examination table and counting its rows, since the patient table alone does not carry that attribute.",
+        "conditioned": true,
+        "injected": 5,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqlt_57gxr",
+        "statement": "When a question asks for a team's attribute value, the selected columns must include the attribute being ranked on rather than only the team name.",
+        "conditioned": true,
+        "injected": 4,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqlk_fx1yw",
+        "statement": "A team's win count is grouped by its identifier rather than by its display name when the query aggregates match outcomes per team.",
+        "conditioned": true,
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqm2_4zc84",
+        "statement": "When a question asks for a percentage of atoms of a given element among atoms in molecules matching a bond-type filter, the numerator and denominator must both count distinct atom_id values, because joining atom to bond multiplies each atom row by the number of matching bonds.",
+        "conditioned": true,
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqn1_5bdwj",
+        "statement": "A percentage of cards in a given language is computed over the cards table joined to foreign_data on uuid, not over foreign_data alone.",
+        "conditioned": true,
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqn7_07ykh",
+        "statement": "A query that asks who is the youngest among drivers who finished a race filters results to rows where the finish time is not null.",
+        "conditioned": true,
+        "injected": 3,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqlp_89hqc",
+        "statement": "A percentage deviation between two counts is computed as the first count cast to a real type, multiplied by 100, then divided by the second count.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqoa_980yp",
+        "statement": "A numeric column compared to a literal value is compared using the literal's numeric type rather than as a quoted string.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqph_d4a33",
+        "statement": "A user's posts are reached through postHistory joined on UserId and PostId when the question attributes posts to a user by display name.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqq0_93wwe",
+        "statement": "A percentage denominator counts the rows that satisfy the question's filters, so the count is taken over the filtered base table rather than over all joined rows.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqq1_7gpvw",
+        "statement": "Expense rows join to events through the budget table using expense.link_to_budget = budget.budget_id and budget.link_to_event = event.event_id.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqrr_e3bge",
+        "statement": "Counts of patients must be computed over a join between Patient and Laboratory on ID rather than from Laboratory alone.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqte_d8xvv",
+        "statement": "Rulings text in a requested language is stored in the foreign_data table, joined to cards on uuid, not in the rulings table or a set_translations table.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqtf_5e13w",
+        "statement": "A query that joins a per-card text table to cards and sets can return duplicate rows when a card has multiple matching rows, so DISTINCT is needed to list each text once.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqlo_byh50",
+        "statement": "A per-customer ranking over a multi-row period requires GROUP BY on the customer key so that each customer contributes exactly one row to the ordering.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqnu_d2568",
+        "statement": "A count of distinct patients joined to a one-to-many event table uses COUNT on the patient key without DISTINCT when each patient-event pair is unique.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqnv_crqbp",
+        "statement": "When the question asks for an average per post alongside per-comment text, the grouping keys include both the post identity and the comment text.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqoj_0pehg",
+        "statement": "Joins that traverse event to budget to expense to member follow the foreign keys link_to_event, link_to_budget, and link_to_member in that order.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqon_atsnx",
+        "statement": "Integer division in SQLite truncates to zero when the numerator is smaller than the denominator, so a percentage computed as (A13 - A12) / A12 without casting yields 0 for any district whose unemployment rate rose by less than 100%.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      }
+    ],
+    "best": [
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqso_ckv3x",
+        "statement": "A percentage value is expressed on a 0-100 scale by multiplying the ratio by 100.",
+        "conditioned": true,
+        "injected": 6,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqmo_9tewk",
+        "statement": "When a question asks for the percentage of atoms of a given element among atoms in molecules matching a bond-type filter, the numerator and denominator must both count distinct atom_id values, because joining atom to bond duplicates atoms that have multiple matching bonds.",
+        "conditioned": true,
+        "injected": 4,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqme_9qs9z",
+        "statement": "When a question asks for a peak month, the result is the month component of the date column, not the full date value.",
+        "conditioned": true,
+        "injected": 3,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqo5_cq7s3",
+        "statement": "Counting bond rows when the question asks for a percentage of molecules overcounts molecules that have multiple bonds of the filtered type.",
+        "conditioned": true,
+        "injected": 3,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqrl_bbrr9",
+        "statement": "When a question asks for people who received funds on a date tied to an event, the query must join event, attendance, member, and income tables rather than joining income directly to member.",
+        "conditioned": true,
+        "injected": 3,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqro_ca1db",
+        "statement": "A query that lists names for a category should return distinct values when multiple rows can share the same name.",
+        "conditioned": true,
+        "injected": 3,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqsf_7xfgh",
+        "statement": "A percentage answer is expressed on a 0-100 scale by multiplying the ratio by 100, rather than returning a 0-1 fraction.",
+        "conditioned": true,
+        "injected": 3,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqt0_5b32p",
+        "statement": "A query that joins a per-card text table to cards and sets can return duplicate rows when a card has multiple matching rows, so DISTINCT is required to list each text once.",
+        "conditioned": true,
+        "injected": 3,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqm4_1gdyr",
+        "statement": "When a question asks for school names, the school name column comes from the frpm table (School Name), not from the schools table (School).",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqn6_dsksp",
+        "statement": "A condition on free or reduced price meal counts uses the Free Meal Count (Ages 5-17) column rather than the FRPM Count (Ages 5-17) column.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqlv_aandw",
+        "statement": "Questions asking who achieved something in a race require selecting driver identity columns (forename, surname, url) rather than only the driver url.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqqb_d1vfw",
+        "statement": "A driver's first race is identified by ordering races by year ascending and taking the earliest row.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqqr_evsaf",
+        "statement": "A question naming a city and a county is filtered on both the City and County columns, not on the District column.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqsv_1t8g3",
+        "statement": "Rulings text in a requested language is stored in the foreign_data table, joined to cards on uuid, not in the rulings table or a set_translations table.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqt3_a4e09",
+        "statement": "A year-over-year subtraction of birth year from examination year yields an approximate age that can misclassify patients whose birthday falls after the examination date within the same year.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqtv_9f6v9",
+        "statement": "A request for a racer's full name is satisfied by selecting forename and surname as separate columns rather than concatenating them into one column.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      }
+    ]
+  }
+}
