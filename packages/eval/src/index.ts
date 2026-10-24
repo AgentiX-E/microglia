@@ -118,6 +118,8 @@ export {
   mapPool,
 } from './concurrency.js';
 
+export { LlmClient, type ChatReply, type LlmClientOptions, type LlmStats } from './model-client.js';
+
 export {
   HOUSE_CONVENTIONS,
   OPTIONAL_ARMS,

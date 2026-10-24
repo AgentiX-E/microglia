@@ -74,14 +74,13 @@ import {
   type Interpreter,
 } from '@agentix-e/microglia-core/distill';
 import {
-  CircuitBreaker,
   GenerationCache,
   HOUSE_CONVENTIONS,
   OPTIONAL_ARMS,
   PROMPT_VERSION,
   archiveVerdict,
   assignFolds,
-  backoffMs,
+  LlmClient,
   buildValidityGates,
   canonicalRows,
   comparePaired,
@@ -101,8 +100,9 @@ import {
   requirePopulated,
   sha256OfFile,
   type BirdManifest,
-  type ConventionSpec,
+  type ChatReply,
   type ConventionName,
+  type ConventionSpec,
 } from '@agentix-e/microglia-eval';
 
 const DATASET_REPO = 'https://huggingface.co/datasets/birdsql/bird_mini_dev';
@@ -249,99 +249,27 @@ type CaseOutcome = {
   readonly armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>>;
 };
 
-let calls = 0;
-let tokensUsed = 0;
-let retries = 0;
-/** Logical calls (one prompt, however many HTTP attempts) and the ones that failed. */
-let logicalCalls = 0;
-let callFailures = 0;
-const breaker = new CircuitBreaker(BREAKER_THRESHOLD);
-
-type Reply = { readonly text: string; readonly tokens: number };
+type Reply = ChatReply;
 
 /**
- * One model call, with the failure modes a long run actually meets.
+ * The lane's one model client.
  *
- * A two-hour run makes thousands of calls; without a timeout a single stalled
- * socket stops it, and without a retry a single 429 loses the run. Retries are
- * counted and reported, so "it worked" is not confused with "it worked first
- * time". `maxTokens` is a parameter because distillation emits structured JSON and
- * truncating it is invisible: the parse fails and the correction is lost.
- *
- * Two counters, deliberately: `calls` counts HTTP attempts (it is what the budget
- * is spent in), while `logicalCalls`/`callFailures` count prompts and the ones
- * that never got an answer. The gate is on the second pair — a run whose prompts
- * failed 12% of the time measures the endpoint, not the memory, however many
- * attempts it took to find that out.
+ * It counts HTTP attempts (`calls`, what the budget is spent in) separately from
+ * prompts (`prompts`, the denominator of the reliability gate), retries a 429 or a
+ * 5xx, refuses a 402 as a configuration failure, and ends the run with
+ * `MG_E_PROVIDER_FAILED` after several prompts fail in a row — a per-call retry
+ * policy cannot tell noise from an outage, and a benchmark that runs through one
+ * measures the outage.
  */
-async function chat(prompt: string, maxTokens = 700): Promise<Reply> {
-  const key = process.env['DEEPSEEK_API_KEY'];
-  if (!key) throw new MicrogliaError('MG_E_CONFIG', 'DEEPSEEK_API_KEY is required');
-  let last = '';
-  logicalCalls += 1;
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    if (attempt > 0) {
-      retries += 1;
-      await new Promise((resolve) => setTimeout(resolve, backoffMs(attempt)));
-    }
-    if (calls >= MAX_CALLS) throw new MicrogliaError('MG_E_BUDGET_EXCEEDED', 'POC call budget reached');
-    calls += 1;
-    let response: Response;
-    try {
-      response = await fetch('https://api.deepseek.com/chat/completions', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0,
-          max_tokens: maxTokens,
-        }),
-        signal: AbortSignal.timeout(60_000),
-      });
-    } catch (error) {
-      last = `network: ${String(error)}`;
-      continue;
-    }
-    if (response.status === 429 || response.status >= 500) {
-      last = `status ${response.status}`;
-      continue;
-    }
-    if (!response.ok) {
-      // 402 is not a transient failure and not a code defect: the account has no
-      // balance. Saying so turns a benchmark that "failed" into a config problem
-      // somebody can fix, and stops anyone from reading it as a regression.
-      const body = (await response.text()).slice(0, 400);
-      if (response.status === 402) {
-        throw new MicrogliaError(
-          'MG_E_CONFIG',
-          'DeepSeek refused the call for lack of credit (402); no benchmark was run',
-          { hint: 'Top up the account behind DEEPSEEK_API_KEY, then dispatch again.', body },
-        );
-      }
-      throw new MicrogliaError('MG_E_STORE_IO', `DeepSeek returned ${response.status}`, { body });
-    }
-    const body = (await response.json()) as {
-      choices?: { message?: { content?: string } }[];
-      usage?: { total_tokens?: number };
-    };
-    const tokens = body.usage?.total_tokens ?? 0;
-    tokensUsed += tokens;
-    breaker.record(true);
-    return { text: body.choices?.[0]?.message?.content ?? '', tokens };
-  }
-  // Four attempts is the retry policy. Past it the prompt has no answer, and the
-  // question is whether that is noise or an outage: the breaker answers it.
-  callFailures += 1;
-  if (!breaker.record(false)) {
-    throw new MicrogliaError(
-      'MG_E_PROVIDER_FAILED',
-      `${breaker.streak} prompts in a row failed after four attempts each; the endpoint is not answering`,
-      { last, hint: 'Re-dispatch when the provider recovers; a run through an outage measures the outage.' },
-    );
-  }
-  throw new MicrogliaError('MG_E_STORE_IO', 'DeepSeek call failed after retries', { last });
-}
+const llm = new LlmClient({
+  apiKey: process.env['DEEPSEEK_API_KEY'] ?? '',
+  model: MODEL,
+  maxCalls: MAX_CALLS,
+  breakerThreshold: BREAKER_THRESHOLD,
+});
+
+const chat = (prompt: string, maxTokens = 700): Promise<ChatReply> => llm.chat(prompt, maxTokens);
+
 
 type Dataset = {
   readonly rows: readonly BirdRow[];
@@ -697,7 +625,12 @@ type Judged = {
  * parse failure, and it is counted separately — a run in which one prompt in five
  * never got an answer cannot be read as a statement about knowledge.
  */
-function judgeReply(row: BirdRow, dbPath: string, reply: Reply | undefined, task: Task): Judged {
+function judgeReply(
+  row: BirdRow,
+  dbPath: string,
+  reply: { readonly text: string; readonly tokens?: number } | undefined,
+  task: Task,
+): Judged {
   const extracted = reply === undefined ? undefined : extractSql(reply.text);
   const sql = extracted ?? '';
   const parseOk = extracted !== undefined;
@@ -1101,8 +1034,8 @@ async function runFold(
     // one, which is how a ten-hour run went unnoticed.
     if (completed % 20 === 0 || completed === plans.length) {
       process.stdout.write(
-        `[sota] fold ${fold + 1}/${FOLDS} eval ${completed}/${plans.length} calls=${calls} ` +
-          `retries=${retries} failed=${callFailures}\n`,
+        `[sota] fold ${fold + 1}/${FOLDS} eval ${completed}/${plans.length} ` +
+          `calls=${llm.stats.calls} retries=${llm.stats.retries} failed=${llm.stats.failures}\n`,
       );
     }
     return reply;
@@ -1193,7 +1126,7 @@ async function runFold(
   const packIds = cases.reduce((sum, item) => sum + item.packIds, 0);
   process.stdout.write(
     `[sota] fold ${fold + 1}/${FOLDS}: eval=${cases.length} learn=${learnRows.length} ` +
-      `edited=${learning.edited} active=${frozen.active} calls=${calls}\n`,
+      `edited=${learning.edited} active=${frozen.active} calls=${llm.stats.calls}\n`,
   );
   return {
     fold,
@@ -1391,7 +1324,7 @@ async function main(): Promise<void> {
   // The gate definitions live in `sota.ts` because they are the part of this lane
   // that decides whether a number is publishable, and a decision with no test is a
   // preference. The CLI supplies the measurements.
-  const callFailureRate = logicalCalls === 0 ? 0 : callFailures / logicalCalls;
+  const callFailureRate = llm.stats.prompts === 0 ? 0 : llm.stats.failures / llm.stats.prompts;
   const gates = buildValidityGates({
     meanPackIds,
     partition: {
@@ -1409,8 +1342,8 @@ async function main(): Promise<void> {
         ? undefined
         : { arm: channelBest.arm, deltaPp: channelBest.delta_pp },
     callFailureRate,
-    calls: logicalCalls,
-    callFailures,
+    calls: llm.stats.prompts,
+    callFailures: llm.stats.failures,
     // The S2b protocol fixes the floor at a hundred questions before the result is
     // read; below it the run is a direction and the artefact says so.
     ...(ACTIVE === undefined ? {} : { subset: { qualifying: rows.length, minimum: 100 } }),
@@ -1472,10 +1405,10 @@ async function main(): Promise<void> {
     },
     // `calls` counts HTTP attempts; `prompts` counts logical calls, which is the
     // denominator of the reliability gate.
-    calls,
-    retries,
-    prompts: logicalCalls,
-    call_failures: callFailures,
+    calls: llm.stats.calls,
+    retries: llm.stats.retries,
+    prompts: llm.stats.prompts,
+    call_failures: llm.stats.failures,
     metrics: {
       accuracy_without_memory: paired.baselineAccuracy,
       accuracy_with_memory: paired.treatmentAccuracy,
@@ -1539,7 +1472,7 @@ async function main(): Promise<void> {
     `[sota] n=${cases.length} without=${(paired.baselineAccuracy * 100).toFixed(2)}% ` +
       `with=${(paired.treatmentAccuracy * 100).toFixed(2)}% delta=${(paired.delta * 100).toFixed(2)}pp ` +
       `ci=[${(paired.deltaCI.low * 100).toFixed(2)}, ${(paired.deltaCI.high * 100).toFixed(2)}] ` +
-      `p=${paired.p.toFixed(4)} min-detectable=${(detectable * 100).toFixed(2)}pp calls=${calls}\n`,
+      `p=${paired.p.toFixed(4)} min-detectable=${(detectable * 100).toFixed(2)}pp calls=${llm.stats.calls}\n`,
   );
   for (const entry of arms.slice(1)) {
     process.stdout.write(
