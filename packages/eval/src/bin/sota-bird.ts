@@ -1073,10 +1073,13 @@ async function runFold(
       // write a query that computes the raw value instead, and it did: 144 of 145
       // questions came back as queries, the arm scored 0.69%, and the channel gate
       // failed for a reason that was a prompt defect rather than a finding.
-      const hint = task.convention
-        ? `- Return exactly this value for this question, as a single numeric literal: ${task.expected.get(idOf(row)) ?? 'unknown'}. ` +
-          'It is already in the form this workspace reports; do not divide or round it again.'
-        : `- ${row.SQL}`;
+      // Under a convention the oracle is the *rewritten* query, not the value.
+      // The value form was tried: "return exactly this value ... as a single numeric
+      // literal" moved accuracy 0.69% -> 48.97%, because half the replies were
+      // queries rather than the literal. A hint the model can copy - the same query
+      // it would have written, reported the workspace's way - is the only form that
+      // measures knowledge rather than output format.
+      const hint = task.convention ? `- ${reportedSql(row.SQL, ACTIVE)}` : `- ${row.SQL}`;
       call(position, 'oracle', hint, 0);
     }
   }
@@ -1412,6 +1415,9 @@ async function main(): Promise<void> {
     // read; below it the run is a direction and the artefact says so.
     ...(ACTIVE === undefined ? {} : { subset: { qualifying: rows.length, minimum: 100 } }),
     ...(conventionExecRate === undefined ? {} : { conventionExecRate }),
+    // The protocol's oracle ceiling applies to the convention lane, where the
+    // accepted answer has a form the model must reproduce.
+    ...(ACTIVE === undefined || channelBest === undefined ? {} : { channelCeiling: channelBest.accuracy }),
   });
 
   const assertions = {

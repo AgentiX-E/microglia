@@ -290,6 +290,16 @@ export type GateInput = {
    * both look like "the mechanism does not work".
    */
   readonly conventionExecRate?: number;
+  /**
+   * Absolute accuracy of the strongest channel control, when the protocol names a
+   * ceiling for it.
+   *
+   * The S2b protocol requires the oracle arm to reach 90%: an oracle that cannot
+   * make the model produce the accepted answer at all means the lane is measuring
+   * the model's output format, not its use of knowledge. V7 asks whether the
+   * channel *responds*; this asks whether it is *usable*, and both have to hold.
+   */
+  readonly channelCeiling?: number;
 };
 
 /**
@@ -382,6 +392,15 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       actual: `${input.subset.qualifying} qualifying question(s)`,
       pass: input.subset.qualifying >= input.subset.minimum,
       blocking: false,
+    });
+  }
+  if (input.channelCeiling !== undefined) {
+    gates.push({
+      id: 'V11-channel-ceiling',
+      criterion: 'the strongest channel control reaches 90% accuracy, or the lane cannot express its answer',
+      actual: `${(input.channelCeiling * 100).toFixed(2)}%`,
+      pass: input.channelCeiling >= 0.9,
+      blocking: true,
     });
   }
   if (input.conventionExecRate !== undefined) {

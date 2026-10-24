@@ -1,0 +1,270 @@
+{
+  "id": "poc-sota-attribution",
+  "source_artifact": "poc-sota-bird.json",
+  "source_generated_at": "2026-10-24T01:45:39.644Z",
+  "n": 145,
+  "summary": {
+    "rules": 1149,
+    "injectedRules": 233,
+    "helpful": 8,
+    "harmful": 0,
+    "neutral": 225,
+    "harmfulShare": 0,
+    "top": [
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqhu_eydbf",
+        "statement": "Including '-' and '+-' alongside 'negative' and '0' in an anti-SM normal-value filter broadens the result set beyond what the question's 'normal' criterion specifies.",
+        "injected": 4,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqc4_2p0jw",
+        "statement": "Selecting the account with the lowest loan amount is expressed by ordering the joined loan-account rows by loan amount ascending and taking the first row.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqfm_b3x7j",
+        "statement": "Dividing a patient count by 1000 and rounding to three decimals does not answer a question phrased as 'how many patients'.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqfs_7850s",
+        "statement": "Dividing a patient count by 1000 and rounding to three decimals does not answer a question phrased as 'how many patients'.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqg6_9jvf8",
+        "statement": "When computing a percentage of posts by the most influential user, the denominator should count posts joined to the max-reputation user rather than all users.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqgh_38490",
+        "statement": "Computing a percentage with COUNT(*) as the denominator after filtering rows by a condition yields the wrong ratio when the intended denominator is the count of rows matching only part of the filter.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqgq_b6nj8",
+        "statement": "Abnormal platelet thresholds are inclusive at the boundaries: lower than normal is PLT <= 100 and higher than normal is PLT >= 400.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqhc_caapc",
+        "statement": "A ratio between male and female superheroes is computed as a direct division of the two counts without an additional scaling divisor.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqho_10hvn",
+        "statement": "A query answering 'difference in number of superheroes' between two publishers must return the unnormalized count difference, not a scaled or rounded value.",
+        "injected": 3,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqbc_2nr05",
+        "statement": "A question phrased as 'how many' requires the query result to be the raw count of matching entities, not a ratio or scaled value.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqc4_2p0jw",
+        "statement": "Computing a percentage directly from foreign_data without joining cards produces an execution mismatch because the denominator must come from the cards table.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqc5_cbcxk",
+        "statement": "Computing a percentage over only the foreign_data table ignores the cards table join required to count cards, producing an execution mismatch.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqc6_4v7q7",
+        "statement": "Percentage queries over card_games require joining cards to foreign_data on uuid before aggregating language counts.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqc6_4v7q7",
+        "statement": "Selecting the single account with the highest approved loan amount among loans with duration > 12 and account opening year 1993 is expressed as an ORDER BY amount DESC LIMIT 1 over the joined loan-account rows filtered by those conditions.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqc7_b2766",
+        "statement": "The edited SQL divides account_id by 1000.0 and rounds to 3 decimals, which does not correspond to selecting the account with the highest approved loan amount.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqcb_bf6as",
+        "statement": "A percentage of French-language cards among Story Spotlight cards is computed as 100 times the count of matching rows divided by the total count of Story Spotlight cards joined to foreign_data.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqd4_eqjzx",
+        "statement": "Filtering a date column with STRFTIME('%Y', Date) >= '2012' includes transactions from 2012 itself and therefore does not satisfy an 'after 2012/1/1' condition.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqd7_b8zyh",
+        "statement": "Counting bonds rather than distinct molecules overcounts molecules that have multiple triple bonds when computing the percentage of carcinogenic molecules among triple-bond molecules.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqd8_2qccq",
+        "statement": "Counting bonds rather than distinct molecules overcounts molecules that have multiple triple bonds when computing the percentage of carcinogenic molecules among triple-bond molecules.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqde_13psg",
+        "statement": "Average lap time queries in the formula_1 schema require joining lapTimes to races and drivers, filtering on driver forename/surname and race name/year, and dividing the millisecond average by 1000.0 with rounding.",
+        "injected": 2,
+        "helped": 0,
+        "hurt": 0,
+        "net": 0
+      }
+    ],
+    "best": [
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqdo_d5p2b",
+        "statement": "Counting distinct card ids after joining cards to rulings avoids double-counting cards that have multiple matching rulings.",
+        "injected": 3,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqf9_2s2c3",
+        "statement": "Joining client through disp and account to reach district overcounts clients who hold multiple accounts, inflating the denominator relative to a direct client-to-district join.",
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqck_b3161",
+        "statement": "A completion rate expressed as a bare ratio (completed/total) does not match the expected output format when the reference answer is a percentage rounded to three decimals.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqcl_43z78",
+        "statement": "Completion rate for a race is computed as the count of drivers with non-null finish time divided by total drivers in that race, scaled to a percentage and rounded to three decimals.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqd1_0frng",
+        "statement": "A query computing AVG(home_team_goal) directly does not match the expected result for the Poland 2010/2011 average home team goal question, which instead requires SUM(home_team_goal)/COUNT(id) divided by 1000 and rounded to 3 decimals.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqdn_cp5ee",
+        "statement": "Filtering a card's text column directly misses matches that reside in a joined rulings table, so text-based card conditions require joining rulings on uuid.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqg0_96cxj",
+        "statement": "Questions asking for the oldest female client with the lowest average salary require ordering by birth_date ascending and district A11 ascending, then wrapping the selected account_id in ROUND(account_id / 1000.0, 3).",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqh4_008k7",
+        "statement": "When a question asks how many players satisfy a condition, the expected SQL result may require scaling the count (e.g., dividing by 1000 and rounding) rather than returning the raw integer count.",
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      }
+    ]
+  }
+}

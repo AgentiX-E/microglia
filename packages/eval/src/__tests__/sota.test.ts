@@ -402,6 +402,21 @@ describe('buildValidityGates', () => {
     expect(failing.actual).toBe('98.00%');
   });
 
+  it('omits the channel ceiling outside the convention lane', () => {
+    expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V11-channel-ceiling');
+  });
+
+  it('V11 requires the strongest control to reach the ceiling the protocol names', () => {
+    // V7 asks whether the channel responds at all; V11 asks whether it is usable.
+    // An oracle at 49% says the model will not reproduce the answer form even when
+    // it is handed to it, and a mechanism measurement on top of that is meaningless.
+    expect(gate({ ...sound, channelCeiling: 0.9 }, 'V11-channel-ceiling').pass).toBe(true);
+    const failing = gate({ ...sound, channelCeiling: 0.4897 }, 'V11-channel-ceiling');
+    expect(failing.pass).toBe(false);
+    expect(failing.blocking).toBe(true);
+    expect(failing.actual).toBe('48.97%');
+  });
+
   it('marks exactly V5 advisory and everything else blocking', () => {
     const advisory = buildValidityGates({
       ...sound,
