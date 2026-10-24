@@ -1,32 +1,64 @@
 {
   "id": "poc-embed-probe",
   "title": "Is semantic similarity a relevance signal where lexical overlap is none?",
-  "ranAt": "2026-10-24T12:30:42.828Z",
+  "ranAt": "2026-10-24T14:26:56.947Z",
   "source": "eval/results/poc-sota-bird.json",
   "model": "embedding-3",
-  "n": 222,
+  "n": 148,
+  "n_condition": 148,
   "rules": {
-    "hurt": 46,
-    "helped": 19,
-    "neutral": 5
+    "hurt": 28,
+    "helped": 12,
+    "neutral": 3
   },
   "separation": {
     "hurt": {
-      "n": 152,
-      "median": 0.23157505527631528,
-      "mean": 0.24248245496724657
+      "n": 105,
+      "median": 0.2537539586968496,
+      "mean": 0.2544863873838529
     },
     "helped": {
-      "n": 70,
-      "median": 0.22752124578992097,
-      "mean": 0.23485443032173653
+      "n": 43,
+      "median": 0.22649314762701142,
+      "mean": 0.22603453790309427
     },
-    "gap": -0.004053809486394305,
-    "p": 0.8624,
+    "gap": -0.02726081106983816,
+    "p": 0.1198,
+    "separated": false
+  },
+  "condition_separation": {
+    "hurt": {
+      "n": 105,
+      "median": 0.313293408499253,
+      "mean": 0.31741729231907884
+    },
+    "helped": {
+      "n": 43,
+      "median": 0.27837156440596245,
+      "mean": 0.2865379554384438
+    },
+    "gap": -0.03492184409329058,
+    "p": 0.0616,
+    "separated": false
+  },
+  "condition_lexical_separation": {
+    "hurt": {
+      "n": 105,
+      "median": 0,
+      "mean": 0.031364604894016664
+    },
+    "helped": {
+      "n": 43,
+      "median": 0,
+      "mean": 0.03730671782997365
+    },
+    "gap": 0,
+    "p": 1,
     "separated": false
   },
   "notes": [
     "Lexical baseline on the same artefact: median word coverage 0.133 for hurt rules and 0.130 for helped rules; identifier coverage 0.000 for both.",
+    "`separation` scores the rule text a retriever ranks on; `condition_separation` scores the condition alone, which is what a filter would compare; `condition_lexical_separation` is the same comparison without a provider.",
     "Pairs are (question, credited rule) occurrences, not rules: a rule that is close to the question it hurt is exactly the case a retriever has to fix.",
     "Permutation test, 5,000 resamples, fixed seed: the p-value is the share of relabellings whose median gap is at least the observed one."
   ]
