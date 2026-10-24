@@ -41,6 +41,7 @@
     "bundle:size": "node scripts/bundle-size.mjs",
     "eval:attribute": "tsx packages/eval/src/bin/attribute.ts",
     "eval:arm-pairs": "tsx packages/eval/src/bin/arm-pairs.ts",
+    "eval:l4-pair": "tsx packages/eval/src/bin/l4-pair.ts",
     "eval:probe": "tsx packages/eval/src/bin/embed-probe.ts"
   },
   "devDependencies": {

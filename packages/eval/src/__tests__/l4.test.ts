@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   L4ParseError,
+  compareArms,
   parseTauResults,
   taskTrials,
   toPassAtK,
@@ -207,5 +208,51 @@ describe('turning a run into the estimator input', () => {
       ),
     );
     expect(reasonOf(() => toPassAtK(blank, 4))).toBe('no-scored-tasks');
+  });
+});
+
+describe('pairing the two arms of a split', () => {
+  const task = (id: string, passedAll: boolean) => ({ id, passedAll });
+
+  it('reports no difference when the arms agree task by task', () => {
+    const first = [task('a', true), task('b', false), task('c', true)];
+    const comparison = compareArms(first, first);
+    expect(comparison).toMatchObject({ paired: 3, deltaPp: 0, lost: 0, gained: 0, p: 1 });
+    expect(comparison.onlyFirst).toBe(0);
+    expect(comparison.onlySecond).toBe(0);
+  });
+
+  it('signs the delta as second minus first', () => {
+    // Every task the reference passed and the memory failed: the memory is worse, so
+    // the delta is negative. A sign error here would report a 66pp loss as a gain.
+    const reference = [task('a', true), task('b', true), task('c', true)];
+    const memory = [task('a', false), task('b', false), task('c', true)];
+    const comparison = compareArms(reference, memory);
+    expect(comparison.deltaPp).toBeCloseTo(-66.6666, 3);
+    expect(comparison.lost).toBe(2);
+    expect(comparison.gained).toBe(0);
+    // Three pairs cannot exclude zero: the bootstrap over two losses and one tie puts
+    // the upper bound exactly at zero, which is the honest reading of a 3-task sample.
+    expect(comparison.ciHighPp).toBeLessThanOrEqual(0);
+  });
+
+  it('pairs only the tasks both arms scored, and counts the rest', () => {
+    // Two runs that look like one split may not be one: a different train share moves
+    // the held-out half. The intersection is what a paired test is defined on, and the
+    // remainder has to be visible.
+    const reference = [task('a', true), task('b', true), task('c', true)];
+    const memory = [task('b', false), task('c', true), task('d', true)];
+    const comparison = compareArms(reference, memory);
+    expect(comparison.paired).toBe(2);
+    expect(comparison.onlyFirst).toBe(1);
+    expect(comparison.onlySecond).toBe(1);
+    expect(comparison.lost).toBe(1);
+  });
+
+  it('returns a defined empty comparison rather than NaN when nothing overlaps', () => {
+    const comparison = compareArms([task('a', true)], [task('b', true)]);
+    expect(comparison).toMatchObject({ paired: 0, deltaPp: 0, p: 1, lost: 0, gained: 0 });
+    expect(comparison.onlyFirst).toBe(1);
+    expect(comparison.onlySecond).toBe(1);
   });
 });

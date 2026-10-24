@@ -31,6 +31,7 @@
  * lane can report *why* a run was not scoreable instead of scoring half of it.
  */
 import type { PassAtKInput } from './passk.js';
+import { comparePaired } from './stats.js';
 
 /** One scored attempt: which task, which trial, what reward (null = unscored). */
 export type TauTrial = {
@@ -265,4 +266,86 @@ export function toPassAtK(
     throw new L4ParseError('no-scored-tasks', `all ${groups.length} task(s) are unscored`);
   }
   return { tasks: scoreable, unscored };
+}
+
+/**
+ * One task's outcome, as an arm's artefact records it.
+ *
+ * `passedAll` is the k=4 reading: a task contributes 1 to `pass^4` only when every
+ * trial passed.
+ */
+export type ArmTask = {
+  readonly id: string;
+  readonly passedAll: boolean;
+};
+
+export type ArmComparison = {
+  /** Tasks both arms scored, which is the only set a paired test is defined on. */
+  readonly paired: number;
+  /** Tasks only one arm scored. Non-zero means the two runs did not share a split. */
+  readonly onlyFirst: number;
+  readonly onlySecond: number;
+  /** `second - first`, in percentage points. */
+  readonly deltaPp: number;
+  readonly ciLowPp: number;
+  readonly ciHighPp: number;
+  /** Two-sided exact McNemar p-value over the paired questions. */
+  readonly p: number;
+  readonly lost: number;
+  readonly gained: number;
+};
+
+/**
+ * Pair two arms of the same split, task by task.
+ *
+ * The two full runs of iterations 60-61 were compared as two means (0.6471 against
+ * 0.5882), which is a difference with no interval and no denominator: it cannot say
+ * whether the memory cost 5.89 points or whether the two runs happened to disagree on
+ * a few tasks. Pairing on the task id gives the difference both.
+ *
+ * Tasks scored by only one arm are reported rather than dropped: with
+ * `TAU_TRAIN_SHARE` and `TAU_MAX_TASKS` both in play, two runs that look like one
+ * split may not be, and a paired test on the intersection would hide that.
+ */
+export function compareArms(
+  first: readonly ArmTask[],
+  second: readonly ArmTask[],
+  seed = 7,
+  resamples = 10_000,
+): ArmComparison {
+  const before = new Map(first.map((task) => [task.id, task.passedAll]));
+  const after = new Map(second.map((task) => [task.id, task.passedAll]));
+  const common = [...before.keys()].filter((id) => after.has(id)).sort();
+  const onlyFirst = [...before.keys()].filter((id) => !after.has(id)).length;
+  const onlySecond = [...after.keys()].filter((id) => !before.has(id)).length;
+  if (common.length === 0) {
+    return {
+      paired: 0,
+      onlyFirst,
+      onlySecond,
+      deltaPp: 0,
+      ciLowPp: 0,
+      ciHighPp: 0,
+      p: 1,
+      lost: 0,
+      gained: 0,
+    };
+  }
+  const comparison = comparePaired(
+    common.map((id) => before.get(id) === true),
+    common.map((id) => after.get(id) === true),
+    seed,
+    resamples,
+  );
+  return {
+    paired: comparison.n,
+    onlyFirst,
+    onlySecond,
+    deltaPp: comparison.delta * 100,
+    ciLowPp: comparison.deltaCI.low * 100,
+    ciHighPp: comparison.deltaCI.high * 100,
+    p: comparison.p,
+    lost: comparison.lost,
+    gained: comparison.gained,
+  };
 }

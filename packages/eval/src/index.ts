@@ -36,9 +36,12 @@ export {
 
 export {
   L4ParseError,
+  compareArms,
   parseTauResults,
   taskTrials,
   toPassAtK,
+  type ArmComparison,
+  type ArmTask,
   type L4ParseReason,
   type TauRun,
   type TauTrial,
