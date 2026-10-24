@@ -259,6 +259,12 @@ jobs:
           cd .tau2-bench
           python -m pip install --upgrade pip uv
           uv sync || { echo "tau2-sync-failed:$REF"; exit 22; }
+          # litellm imports its MCP handler eagerly on the first completion and does
+          # not declare `mcp` as a hard dependency, so every model call raises
+          # ModuleNotFoundError before a request is sent. Installing it here is the
+          # whole fix; the alternative is pinning litellm, which would also pin the
+          # provider adapters this lane depends on.
+          uv pip install mcp || { echo "tau2-mcp-missing:$REF"; exit 24; }
           uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
 
       # The lane, with the repository's own driver unless a variable overrides it.
