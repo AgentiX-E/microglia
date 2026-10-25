@@ -3,6 +3,7 @@ import {
   L4ParseError,
   compareArms,
   parseTauResults,
+  perTaskRows,
   taskTrials,
   toPassAtK,
   type L4ParseReason,
@@ -254,5 +255,27 @@ describe('pairing the two arms of a split', () => {
     expect(comparison).toMatchObject({ paired: 0, deltaPp: 0, p: 1, lost: 0, gained: 0 });
     expect(comparison.onlyFirst).toBe(1);
     expect(comparison.onlySecond).toBe(1);
+  });
+});
+
+describe('the per-task rows an artefact carries', () => {
+  it('turns a scored task into the row a pairing step joins on', () => {
+    // The defect this exists for: the pairing step shipped before the artefact carried
+    // per-task rows, so the comparison it was built for could not run at all.
+    expect(
+      perTaskRows([
+        { successes: 4, trials: 4, k: 4, taskId: 't1' },
+        { successes: 2, trials: 4, k: 4, taskId: 't2' },
+      ]),
+    ).toEqual([
+      { id: 't1', successes: 4, trials: 4, passed_all: true },
+      { id: 't2', successes: 2, trials: 4, passed_all: false },
+    ]);
+  });
+
+  it('refuses a task with no id instead of labelling it', () => {
+    // Two tasks called `unknown` would pair the wrong rows and report a difference that
+    // belongs to neither arm.
+    expect(() => perTaskRows([{ successes: 4, trials: 4, k: 4 }])).toThrow(L4ParseError);
   });
 });

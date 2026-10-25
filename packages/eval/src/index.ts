@@ -38,6 +38,7 @@ export {
   L4ParseError,
   compareArms,
   parseTauResults,
+  perTaskRows,
   taskTrials,
   toPassAtK,
   type ArmComparison,

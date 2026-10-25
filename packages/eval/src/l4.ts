@@ -349,3 +349,30 @@ export function compareArms(
     gained: comparison.gained,
   };
 }
+
+/**
+ * The per-task rows an artefact carries so a later arm can be paired against it.
+ *
+ * `pass^4` is a mean over tasks, and two means from two runs are not a comparison. An
+ * artefact without these rows can be quoted and not compared, which is the state every
+ * L4 report before iteration 66 was in - and the pairing step that was written to fix it
+ * had nothing to read, because this function did not exist.
+ *
+ * A task without an id is refused rather than labelled: an id is what the pair joins on,
+ * and two tasks called `unknown` would produce a comparison between the wrong rows.
+ */
+export function perTaskRows(
+  tasks: readonly PassAtKInput[],
+): readonly { readonly id: string; readonly successes: number; readonly trials: number; readonly passed_all: boolean }[] {
+  return tasks.map((task) => {
+    if (task.taskId === undefined) {
+      throw new L4ParseError('bad-entry', 'a scored task has no id, so it cannot be paired');
+    }
+    return {
+      id: task.taskId,
+      successes: task.successes,
+      trials: task.trials,
+      passed_all: task.successes === task.trials,
+    };
+  });
+}

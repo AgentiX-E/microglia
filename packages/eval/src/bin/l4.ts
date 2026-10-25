@@ -27,6 +27,7 @@ import {
   l4Verdict,
   meanPassAtK,
   parseTauResults,
+  perTaskRows,
   toPassAtK,
   type PassAtKInput,
 } from '@agentix-e/microglia-eval';
@@ -258,6 +259,9 @@ await writeResult({
       ? `The split covers the minimum: ${measured.tasks.length} scored tasks.`
       : `The split is short: ${measured.tasks.length} scored tasks against a minimum of ${MIN_TASKS}. Short splits and missed bars fail separately.`,
   ],
+  // Per-task outcomes, so the other arm can be paired against this artefact instead of
+  // compared to its mean. Written by every run, used by `pnpm eval:l4-pair`.
+  per_task: perTaskRows(measured.tasks),
   samples: gates,
 });
 for (const gate of gates) {
