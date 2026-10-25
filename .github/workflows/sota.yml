@@ -244,6 +244,18 @@ jobs:
             eval/results/poc-sota-attribution.json
           if-no-files-found: error
 
+      # A separate step because `if-no-files-found: error` is the right default and the
+      # wrong one here: the adjudication only runs when it was asked for, and folding it
+      # into the step above would fail every run that did not buy it. The first dispatch
+      # that produced one uploaded nothing, so its numbers exist only in a log.
+      - name: Upload the adjudication
+        if: inputs.adjudicate == 'true' && inputs.bird == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sota-adjudication
+          path: eval/results/sota-adjudication.json
+          if-no-files-found: error
+
   # The retrieval-signal probe.
   #
   # Not a benchmark: it reads an artefact that already exists and asks whether a
