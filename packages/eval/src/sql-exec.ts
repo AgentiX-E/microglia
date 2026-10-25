@@ -111,6 +111,10 @@ export function resolveDatabase(directory: string, dbId: string): string {
     join(directory, 'dev_databases', dbId, `${dbId}.sqlite`),
     join(directory, 'MINIDEV', 'dev_databases', dbId, `${dbId}.sqlite`),
     join(directory, 'minidev', 'MINIDEV', 'dev_databases', dbId, `${dbId}.sqlite`),
+    // The vendor archive unpacks to `minidev/MINIDEV/...`; a directory the extractor
+    // already named `minidev` therefore ends up with two of them. Guessing which one the
+    // operator has produces a lane that cannot find databases it extracted correctly.
+    join(directory, 'minidev', 'minidev', 'MINIDEV', 'dev_databases', dbId, `${dbId}.sqlite`),
   ];
   for (const candidate of candidates) if (existsSync(candidate)) return candidate;
   return candidates[0] as string;

@@ -60,6 +60,19 @@ type Case = {
   readonly fold: number;
 };
 
+/**
+ * Why a call failed, kept because the first version dropped it.
+ *
+ * The lane reported "no question was answered by both arms" for a run in which every call
+ * had failed, which is true and useless: it names the symptom and hides the cause. The
+ * first three messages now travel with the failure.
+ */
+const failures: string[] = [];
+
+function noteFailure(stage: string, error: unknown): void {
+  if (failures.length < 3) failures.push(`${stage}: ${error instanceof Error ? error.message : String(error)}`);
+}
+
 type Answer = {
   readonly prover: JudgeVerdict;
   readonly refuter: RefuterVerdict | undefined;
@@ -87,7 +100,8 @@ async function judgeOne(
   let prover: JudgeVerdict;
   try {
     prover = parseJudgeReply((await client.chat(prompt, 320)).text);
-  } catch {
+  } catch (error) {
+    noteFailure('prover', error);
     return undefined;
   }
   // The refuter only runs where the prover approved: a rejected query needs no second
@@ -106,7 +120,8 @@ async function judgeOne(
   try {
     const refuter = parseRefuterReply((await client.chat(refuterPrompt, 320)).text);
     return { prover, refuter, rowsDiffer: rowsDiffer(run, gold) };
-  } catch {
+  } catch (error) {
+    noteFailure('refuter', error);
     return { prover, refuter: undefined, rowsDiffer: rowsDiffer(run, gold) };
   }
 }
@@ -143,6 +158,10 @@ async function main(): Promise<void> {
       fold: item.fold,
       withMemory: verdictOf(withMemory),
       withoutMemory: verdictOf(withoutMemory),
+      // Carried so the lane can tell "the veto never fired" from "the veto could not fire":
+      // if no pair ever reports equal rows, the databases are not where the directory says
+      // and the evidenced criterion has quietly become the plain cascade.
+      sameRows: withMemory === undefined ? false : !withMemory.rowsDiffer,
       execution: { withMemory: item.correct, withoutMemory: item.withoutMemoryCorrect },
     };
   });
@@ -154,7 +173,17 @@ async function main(): Promise<void> {
       item.withMemory !== undefined && item.withoutMemory !== undefined,
   );
   if (paired.length === 0) {
-    throw new Error('no question was answered by both arms; the delta would describe the endpoint');
+    throw new Error(
+      `no question was answered by both arms; the delta would describe the endpoint. ` +
+        `calls=${client.stats.calls} failures=${client.stats.failures}` +
+        (failures.length === 0 ? ' (no exception was raised, so nothing was attempted)' : ` first: ${failures.join(' | ')}`),
+    );
+  }
+  if (!scored.some((item) => item.sameRows)) {
+    throw new Error(
+      'no pair of queries returned the same rows, so the veto could never fire: check BIRD_DB_DIR. ' +
+        'An evidenced run in that state is a plain cascade wearing its name',
+    );
   }
   const judged = comparePaired(
     paired.map((item) => item.withoutMemory),
@@ -192,6 +221,7 @@ async function main(): Promise<void> {
       // How often the new criterion disagrees with the one the run was scored by. This is
       // the size of the disagreement between the two measurements, not between two runs.
       verdict_changes: changedHands,
+      pairs_with_equal_rows: scored.filter((item) => item.sameRows).length,
       retries: client.stats.retries,
     },
     notes: [

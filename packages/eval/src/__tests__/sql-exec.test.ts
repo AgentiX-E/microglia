@@ -157,6 +157,18 @@ describe('resolveDatabase', () => {
     expect(resolveDatabase(shallowDir, 'other')).toBe(placed);
   });
 
+  it('finds the doubled nesting an extractor named minidev produces', () => {
+    // The vendor archive contains minidev/MINIDEV/...; unpacking it into a directory that
+    // is itself called minidev gives minidev/minidev/MINIDEV/... and a candidate list
+    // without that shape reports "cannot find the database" for a correct extraction.
+    const doubled = join(directory, 'doubled');
+    const nested = join(doubled, 'minidev', 'minidev', 'MINIDEV', 'dev_databases', 'deep');
+    mkdirSync(nested, { recursive: true });
+    const placed = join(nested, 'deep.sqlite');
+    writeFileSync(placed, '');
+    expect(resolveDatabase(doubled, 'deep')).toBe(placed);
+  });
+
   it('returns the flat path when nothing exists, so the driver reports the path it tried', () => {
     expect(resolveDatabase(join(directory, 'absent-dir'), 'gone')).toBe(
       join(directory, 'absent-dir', 'gone.sqlite'),
