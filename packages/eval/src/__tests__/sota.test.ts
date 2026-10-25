@@ -155,6 +155,39 @@ describe('matches', () => {
   it('postpones ordering to the caller: two unsorted lists are not equal', () => {
     expect(matches(['[2]', '[1]'], ['[1]', '[2]'])).toBe(false);
   });
+
+  it('keeps counting duplicates under the multiset reading, which is the default', () => {
+    // The default has to stay the multiset reading: every number this lane published was
+    // scored that way, and a silent change of criterion would make the next run
+    // incomparable with the last while calling itself an improvement.
+    expect(matches(['[1]', '[1]'], ['[1]'])).toBe(false);
+    expect(matches(['[1]', '[1]'], ['[1]'], 'multiset')).toBe(false);
+  });
+
+  it('collapses duplicates under the set reading', () => {
+    expect(matches(['[1]', '[1]'], ['[1]'], 'set')).toBe(true);
+    expect(matches(['[1]', '[1]', '[2]'], ['[2]', '[1]'], 'set')).toBe(true);
+  });
+
+  it('still separates different values under the set reading', () => {
+    expect(matches(['[1]', '[2]'], ['[1]', '[3]'], 'set')).toBe(false);
+    expect(matches(['[1]'], ['[1]', '[2]'], 'set')).toBe(false);
+    expect(matches([], [])).toBe(true);
+  });
+
+  it('agrees with itself on inputs that carry no duplicates', () => {
+    // The two readings can only differ on duplicate rows, so a set that has none is the
+    // control: any disagreement there would be a bug in one of the two branches.
+    const cases: [string[], string[]][] = [
+      [['[1]', '[2]'], ['[1]', '[2]']],
+      [['[1]'], ['[2]']],
+      [['[1]'], []],
+      [[], []],
+    ];
+    for (const [left, right] of cases) {
+      expect(matches(left, right, 'set')).toBe(matches(left, right, 'multiset'));
+    }
+  });
 });
 
 describe('parseArms', () => {

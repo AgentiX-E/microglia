@@ -170,6 +170,15 @@ export type PocResult = {
   readonly calls: number;
   readonly metrics: Record<string, number>;
   readonly notes: readonly string[];
+  /**
+   * Which configuration produced this run, when a lane supports more than one.
+   *
+   * A variant belongs in the artefact rather than only in the notes because two runs of
+   * the same lane under different criteria write the same file name, and a reader who
+   * cannot tell them apart will compare one against the other and call the difference a
+   * result.
+   */
+  readonly variant?: string;
   readonly samples?: readonly unknown[];
   /**
    * Per-unit outcomes, when a lane can be paired against another arm later.

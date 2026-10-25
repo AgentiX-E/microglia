@@ -146,6 +146,7 @@ export {
   armPairsAgainstFull,
   buildValidityGates,
   canonicalRows,
+  type ResultComparison,
   conventionOf,
   extractSql,
   judgeScalar,
@@ -280,3 +281,13 @@ export {
   type RoseVecErrorReason,
   type RoseVecRow,
 } from './rose-vec.js';
+
+export {
+  JUDGE_PROMPT_VERSION,
+  buildJudgePrompt,
+  judgePairs,
+  parseJudgeReply,
+  sampleRows,
+  type JudgeInput,
+  type JudgeVerdict,
+} from './judge.js';

@@ -26,6 +26,18 @@ name: judge
 on:
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'Criteria to measure: execution (free), llm (one call per item), or both'
+        required: false
+        default: 'both'
+      judge_model:
+        description: 'Model that acts as the judge'
+        required: false
+        default: 'deepseek-chat'
+      judge_max_calls:
+        description: 'Hard cap on judge calls'
+        required: false
+        default: '400'
       upload:
         description: 'Upload the artefact (false = print only, for a quick look)'
         required: false
@@ -97,8 +109,25 @@ jobs:
           echo "extracted $count databases"
           test "$count" -eq 11
 
+      # The key is required only when a judge is asked for, and the lane says so rather
+      # than treating an empty key as a zero-call run: a kappa over no items is not a
+      # low score, it is the absence of a measurement.
+      - name: Require a judge key when the judge is asked for
+        if: inputs.mode != 'execution'
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          if [ -z "$DEEPSEEK_API_KEY" ]; then
+            echo "::error::JUDGE_MODE=${{ inputs.mode }} needs DEEPSEEK_API_KEY"
+            exit 1
+          fi
+
       - name: Calibrate
         env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          JUDGE_MODE: ${{ inputs.mode }}
+          JUDGE_MODEL: ${{ inputs.judge_model }}
+          JUDGE_MAX_CALLS: ${{ inputs.judge_max_calls }}
           ROSE_VEC_DIR: ${{ github.workspace }}/.cache/rose-vec
           BIRD_DB_DIR: ${{ github.workspace }}/.cache/bird/databases
           POC_RESULT_DIR: ${{ github.workspace }}/eval/results

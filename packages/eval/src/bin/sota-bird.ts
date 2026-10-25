@@ -109,6 +109,7 @@ import {
   sha256OfFile,
   type BirdManifest,
   type ChatReply,
+  type ResultComparison,
   type ConventionName,
   type ConventionSpec,
 } from '@agentix-e/microglia-eval';
@@ -212,6 +213,30 @@ function armsFrom(raw: string | undefined): Set<ArmName> {
 const ARMS = armsFrom(process.env['SOTA_ARMS']);
 
 /**
+ * Which reading of "the same answer" is the lane's verdict, and which is its shadow.
+ *
+ * `multiset` stays the default because every number this lane has published was scored
+ * that way, and a silent change of criterion would make the next run incomparable with
+ * the last while claiming to be an improvement. `set` is available for the comparison
+ * that motivated it: on ROSE-VEC's adjudicated predictions the multiset reading calls
+ * 129 of 216 correct queries wrong where the set reading calls 87, and a criterion that
+ * harsh on both arms compresses whatever difference the arms produce.
+ *
+ * Both readings are computed on every run regardless of the setting, because the SQL is
+ * executed once and only the comparison differs. The shadow column therefore answers
+ * "would this delta have survived the other criterion" without a second dispatch, which
+ * is the only way to compare two criteria on one sample rather than two.
+ */
+function semanticsFrom(raw: string | undefined): ResultComparison {
+  if (raw === undefined || raw === '' || raw === 'multiset') return 'multiset';
+  if (raw === 'set') return 'set';
+  throw new MicrogliaError('MG_E_CONFIG', `SOTA_SEMANTICS must be 'multiset' or 'set', got '${raw}'`);
+}
+
+const SEMANTICS = semanticsFrom(process.env['SOTA_SEMANTICS']);
+const SHADOW_SEMANTICS: ResultComparison = SEMANTICS === 'set' ? 'multiset' : 'set';
+
+/**
  * Independent corrections a rule needs before the corroboration arm injects it.
  *
  * Two, because that is the smallest number that can mean "this happened again", and
@@ -247,6 +272,9 @@ type CaseOutcome = {
   readonly predictedSql: string;
   readonly correct: boolean;
   readonly withoutMemoryCorrect: boolean;
+  /** The same two verdicts under the other result comparison. */
+  readonly shadowCorrect: boolean;
+  readonly shadowWithoutMemoryCorrect: boolean;
   readonly parseOk: boolean;
   readonly execOk: boolean;
   readonly packIds: number;
@@ -260,6 +288,7 @@ type CaseOutcome = {
   readonly latencyMs: number;
   /** Optional arms, present only when configured. */
   readonly arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
+  readonly shadowArms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
   /**
    * The statement each control arm produced. Without it a failed control can only
    * be described ("the oracle moved nothing"), not diagnosed ("the oracle wrote
@@ -630,7 +659,10 @@ function scalarOf(dbPath: string, sql: string): number | undefined {
 
 type Judged = {
   readonly sql: string;
+  /** The configured reading, which is what every published number is scored by. */
   readonly correct: boolean;
+  /** The other reading of the same execution, scored in the same run. */
+  readonly shadowCorrect: boolean;
   readonly parseOk: boolean;
   readonly execOk: boolean;
   readonly tokens: number;
@@ -656,15 +688,21 @@ function judgeReply(
   const parseOk = extracted !== undefined;
   const predicted = sql === '' ? { ok: false, rows: [] } : execute(dbPath, sql);
   let correct = false;
+  let shadowCorrect = false;
   if (task.convention) {
+    // A scalar convention has one answer at one precision, so the two readings cannot
+    // disagree and the shadow is not a second opinion but the same one.
     correct = judgeScalar(scalarOf(dbPath, sql), task.expected.get(idOfRow(row)));
+    shadowCorrect = correct;
   } else if (predicted.ok) {
     const gold = goldFor(row, dbPath);
-    correct = gold.ok && matches(predicted.rows, gold.rows);
+    correct = gold.ok && matches(predicted.rows, gold.rows, SEMANTICS);
+    shadowCorrect = gold.ok && matches(predicted.rows, gold.rows, SHADOW_SEMANTICS);
   }
   return {
     sql,
     correct,
+    shadowCorrect,
     parseOk,
     execOk: predicted.ok,
     tokens: reply?.tokens ?? 0,
@@ -1128,6 +1166,7 @@ async function runFold(
       judged.get(`${position}:${arm}`) ?? {
         sql: '',
         correct: false,
+        shadowCorrect: false,
         parseOk: false,
         execOk: false,
         tokens: 0,
@@ -1138,6 +1177,7 @@ async function runFold(
     const pack = packs[position] as PackInfo;
 
     const arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>> = {};
+    const shadowArms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>> = {};
     const armSql: Partial<Record<Exclude<ArmName, 'none' | 'full'>, string>> = {};
     const armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
     for (const plan of plans) {
@@ -1145,6 +1185,7 @@ async function runFold(
       if (plan.arm === 'none' || plan.arm === 'full') continue;
       const result = pick(plan.arm);
       arms[plan.arm] = result.correct;
+      shadowArms[plan.arm] = result.shadowCorrect;
       armSql[plan.arm] = result.sql;
       armPackIds[plan.arm] = plan.packIds;
     }
@@ -1159,7 +1200,9 @@ async function runFold(
       goldSql: row.SQL,
       predictedSql: full.sql,
       correct: full.correct,
+      shadowCorrect: full.shadowCorrect,
       withoutMemoryCorrect: base.correct,
+      shadowWithoutMemoryCorrect: base.shadowCorrect,
       parseOk: full.parseOk,
       execOk: full.execOk,
       packIds: packIdsOf.get(`${position}:full`) ?? 0,
@@ -1169,6 +1212,7 @@ async function runFold(
       tokens: full.tokens,
       latencyMs: full.latencyMs,
       arms,
+      shadowArms,
       armSql,
       armPackIds,
     });
@@ -1313,6 +1357,16 @@ async function main(): Promise<void> {
   const withoutMemory = cases.map((item) => item.withoutMemoryCorrect);
   const withMemory = cases.map((item) => item.correct);
   const paired = comparePaired(withoutMemory, withMemory, SEED, RESAMPLES);
+  // The same sample under the other comparison. The SQL was executed once, so any
+  // difference between the two deltas is the criterion rather than the run — the one
+  // comparison a second dispatch could never make cleanly.
+  const pairedShadow = comparePaired(
+    cases.map((item) => item.shadowWithoutMemoryCorrect),
+    cases.map((item) => item.shadowCorrect),
+    SEED,
+    RESAMPLES,
+  );
+  const scoredDisagreements = cases.reduce((sum, item) => sum + (item.correct === item.shadowCorrect ? 0 : 1), 0);
   const meanPackIds = cases.reduce((sum, item) => sum + item.packIds, 0) / Math.max(1, cases.length);
   const activeMean = folds.reduce((sum, fold) => sum + fold.activeRules, 0) / Math.max(1, folds.length);
 
@@ -1379,6 +1433,11 @@ async function main(): Promise<void> {
   // two treatments, which is what a control is for.
   const armPairs = armPairsAgainstFull(
     cases.map((item) => ({ full: item.correct, arms: item.arms })),
+    SEED,
+    RESAMPLES,
+  );
+  const armPairsShadow = armPairsAgainstFull(
+    cases.map((item) => ({ full: item.shadowCorrect, arms: item.shadowArms })),
     SEED,
     RESAMPLES,
   );
@@ -1560,8 +1619,24 @@ async function main(): Promise<void> {
       ci_high_pp: paired.deltaCI.high * 100,
       min_detectable_pp: detectable * 100,
     },
+    // The criterion that scored every number above, and the reading it was compared
+    // against. Two names, because "accuracy" without one is not a number.
+    scored_by: SEMANTICS,
+    shadow_by: SHADOW_SEMANTICS,
+    scored_disagreements: scoredDisagreements,
+    paired_shadow: {
+      n: pairedShadow.n,
+      lost: pairedShadow.lost,
+      gained: pairedShadow.gained,
+      discordance: pairedShadow.discordance,
+      p_value: pairedShadow.p,
+      delta_pp: pairedShadow.delta * 100,
+      ci_low_pp: pairedShadow.deltaCI.low * 100,
+      ci_high_pp: pairedShadow.deltaCI.high * 100,
+    },
     arms,
     arm_pairs: armPairs,
+    arm_pairs_shadow: armPairsShadow,
     gates,
     assertions,
     per_fold: folds.map((fold) => ({

@@ -68,7 +68,20 @@ describe('LlmClient', () => {
   });
 
   it('refuses an empty key instead of sending an unauthenticated call', () => {
-    expect(() => new LlmClient({ apiKey: '', model: 'm', maxCalls: 1 })).toThrow(/DEEPSEEK_API_KEY/);
+    expect(() => new LlmClient({ apiKey: '', model: 'm', maxCalls: 1 })).toThrow(/API key is required/);
+  });
+
+  it('names no vendor in that message, because the client speaks one shape for all of them', () => {
+    // The client is an OpenAI-compatible chat caller with a configurable endpoint. A
+    // message naming one provider reads as "the others are unsupported" when the only
+    // thing missing was the key.
+    let message = '';
+    try {
+      new LlmClient({ apiKey: '', model: 'm', maxCalls: 1 });
+    } catch (error) {
+      message = String(error);
+    }
+    expect(message).not.toMatch(/DEEPSEEK|ZHIPU|OPENAI/i);
   });
 
   it('returns the text, the token count and the attempts it took', async () => {

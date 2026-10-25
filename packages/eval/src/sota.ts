@@ -129,8 +129,39 @@ export function canonicalRows(rows: readonly Record<string, unknown>[]): string[
     .sort();
 }
 
-/** BIRD answers are compared as unordered multisets, the standard EX metric. */
-export function matches(predicted: readonly string[], gold: readonly string[]): boolean {
+/**
+ * How two result sets are compared.
+ *
+ * The distinction is not academic: on ROSE-VEC's 322 adjudicated predictions the two
+ * readings of the same execution disagree on **52 items (16.1%)**, and the multiset
+ * reading calls 129 correct predictions wrong where the set reading calls 87. `set`
+ * collapses duplicate rows, so a query that returns the right values a different number
+ * of times passes; `multiset` keeps them, so it fails. Neither is "the" execution
+ * accuracy — BIRD's official scorer is the multiset reading, ROSE's published baseline
+ * is the set reading — which is why the name has to travel with the number.
+ */
+export type ResultComparison = 'multiset' | 'set';
+
+/**
+ * BIRD answers are compared as unordered multisets by default, the standard EX metric.
+ *
+ * `set` is offered because it is the definition under which a criterion agrees with
+ * expert adjudication most closely (kappa 0.4717 against 0.2995 on ROSE-VEC), and a lane
+ * that can only produce one of the two cannot tell whether a delta came from the arms or
+ * from the criterion.
+ */
+export function matches(
+  predicted: readonly string[],
+  gold: readonly string[],
+  comparison: ResultComparison = 'multiset',
+): boolean {
+  if (comparison === 'set') {
+    const left = new Set(predicted);
+    const right = new Set(gold);
+    if (left.size !== right.size) return false;
+    for (const value of left) if (!right.has(value)) return false;
+    return true;
+  }
   if (predicted.length !== gold.length) return false;
   for (const [index, value] of gold.entries()) {
     if (predicted[index] !== value) return false;

@@ -67,7 +67,10 @@ export class LlmClient {
 
   public constructor(private readonly options: LlmClientOptions) {
     if (options.apiKey === '') {
-      throw new MicrogliaError('MG_E_CONFIG', 'DEEPSEEK_API_KEY is required');
+      // The message names the option, not a vendor: this client speaks the OpenAI chat
+      // shape, and the key that funds it is the caller's choice. Naming DeepSeek here
+      // would make a second provider look unsupported when only its name was missing.
+      throw new MicrogliaError('MG_E_CONFIG', 'An API key is required for the model endpoint');
     }
     this.breaker = new CircuitBreaker(options.breakerThreshold ?? 8);
   }

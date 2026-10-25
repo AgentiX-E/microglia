@@ -212,7 +212,17 @@ of 216 correct predictions are called wrong by the second. Two degenerate criter
 them: always-correct reaches κ 0 while scoring **0.6708** accuracy, higher than the multiset criterion's
 0.5950, which is the reason the lane emits accuracy, κ and MCC together and refuses to emit one alone.
 It costs no model calls, needs the pinned 800 MB Mini-Dev archive for the databases, and runs as its own
-workflow rather than on every push.
+workflow rather than on every push. `JUDGE_MODE=llm` (or `both`) adds a model judge on the same items:
+it is shown the question, the benchmark's external knowledge, the columns the query returned and five
+rows — never the gold query, because a judge that compares is execution accuracy with a markup. `UNKNOWN`
+is a first-class answer and unstated verdicts are counted beside the kappa rather than folded into it.
+The judge's own agreement with the committee has **not been measured yet**: it needs a provider key, and
+the lane refuses to run without one instead of reporting a kappa over zero items.
+
+The S2 lane takes the same question one level down: `SOTA_SEMANTICS=multiset` (default, the reading every
+published number was scored under) or `set` (the reading under which execution accuracy agrees with the
+committee most closely). Both are computed on every run, from one execution, so the shadow column answers
+"would this delta have survived the other criterion" without a second dispatch.
 
 `pnpm bundle:size` bundles both published entry points for the browser and holds them to a ceiling:
 **3,009 B raw / 1,410 B gzipped** for the client and **42,762 B / 14,533 B gzipped** for the core. The

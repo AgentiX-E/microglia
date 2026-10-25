@@ -31,6 +31,10 @@ on:
         description: 'House convention (empty, or thousands)'
         required: false
         default: ''
+      semantics:
+        description: 'Result comparison that scores the run: multiset (BIRD official) or set (ROSE baseline); the other is computed alongside'
+        required: false
+        default: 'multiset'
       arms:
         description: 'Control arms beyond none+full (gated,duplicate,wrong-scope,stated,oracle)'
         required: false
@@ -138,6 +142,7 @@ jobs:
           SOTA_GENERALIZE: ${{ github.event.inputs.generalize || 'true' }}
           SOTA_ARMS: ${{ github.event.inputs.arms || 'gated,oracle' }}
           SOTA_CONCURRENCY: ${{ github.event.inputs.concurrency || '6' }}
+          SOTA_SEMANTICS: ${{ github.event.inputs.semantics || 'multiset' }}
           SOTA_CONVENTION: ${{ github.event.inputs.convention || '' }}
           SOTA_RESAMPLES: '10000'
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}
