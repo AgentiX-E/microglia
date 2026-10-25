@@ -177,6 +177,21 @@ type ArmName =
   | 'full-narrow'
   | 'full-plain'
   | 'full-corroborated'
+  /**
+   * The same pack after the history-based deletion the literature prescribes.
+   *
+   * Xiong et al. (arXiv 2505.16067) report that agents imitate retrieved experience
+   * closely enough that a bad record propagates, and that deleting records by their
+   * observed utility beats deleting by age — with selective addition and deletion
+   * together recovering about 10 points over naive growth. This arm is the deletion
+   * half at the granularity this framework has: a rule that was injected into a
+   * generated answer which then failed earns a negative credit, and a rule whose
+   * credit is negative is retired before the held-out questions are scored.
+   *
+   * The validation pass reads `learnRows`, never `evalRows`: deleting on the basis of
+   * the questions being scored would be leakage with a tidy name.
+   */
+  | 'full-validated'
   | 'critique'
   | 'gated'
   | 'duplicate'
@@ -211,6 +226,18 @@ function armsFrom(raw: string | undefined): Set<ArmName> {
 }
 
 const ARMS = armsFrom(process.env['SOTA_ARMS']);
+
+/**
+ * Trials a rule needs before a failure retires it.
+ *
+ * One, because this corpus injects about 1.8 rules per question and most rules are seen
+ * once: a threshold of two would retire nothing and report the same number as `full`
+ * under a different name. The value is a setting so the ablation can move it.
+ */
+const VALIDATION_MIN_TRIALS = Math.max(1, Math.trunc(nonNegative(process.env['SOTA_VALIDATION_TRIALS'], 1)));
+
+/** One entry per fold in which the deletion arm ran. */
+const validations: { fold: number; rules: number; injected: number; trials: number; retired: number }[] = [];
 
 /**
  * Which reading of "the same answer" is the lane's verdict, and which is its shadow.
@@ -955,6 +982,72 @@ async function buildFoldMemory(
   return { store, host, learning, distilled, frozen, distillFailures: failures };
 }
 
+/**
+ * Which rules, when injected, were followed by a wrong answer.
+ *
+ * The literature's deletion rule (Xiong et al. 2025) is utility-based rather than
+ * age-based: a record is retired because the tasks it was retrieved for went badly, not
+ * because it is old. This is that rule at the granularity this framework has. Only
+ * negative evidence counts — a correct answer while a rule was present is not evidence
+ * that the rule helped, because the model may have been right anyway — so the score is
+ * "trials" and "failures", and a rule with more failures than zero is a candidate.
+ *
+ * The pass reads `learnRows`. Deleting on the basis of the questions being scored would
+ * be leakage with a tidier name, and it would also make the arm unbeatable by
+ * construction.
+ */
+async function validateMemory(
+  host: FoldMemory['host'],
+  rows: readonly BirdRow[],
+  dataset: Dataset,
+  task: Task,
+): Promise<{ readonly rules: number; readonly injected: number; readonly trials: number; readonly retired: number }> {
+  const outcomes = await mapPool(rows, CONCURRENCY, async (row) => {
+    const pack = await host.recall({ task: TASK, text: row.question, scope: { domain: row.db_id } });
+    if (pack.ids.length === 0) return { ids: [] as readonly string[], failed: false };
+    try {
+      const reply = await chat(
+        promptFor({
+          question: row.question,
+          evidence: row.evidence,
+          ddl: ddlOf(dataset.dbPath(row.db_id)),
+          pack: pack.rendered,
+          stated: false,
+          convention: ACTIVE,
+        }),
+      );
+      const judged = judgeReply(row, dataset.dbPath(row.db_id), reply, task);
+      return { ids: pack.ids, failed: !judged.correct };
+    } catch {
+      // A call that never returned says nothing about the rule it was carrying.
+      return { ids: [] as readonly string[], failed: false };
+    }
+  });
+  const credit = new Map<string, { trials: number; failures: number }>();
+  let injected = 0;
+  for (const outcome of outcomes) {
+    if (outcome.ids.length === 0) continue;
+    injected += 1;
+    for (const id of outcome.ids) {
+      const entry = credit.get(id) ?? { trials: 0, failures: 0 };
+      credit.set(id, {
+        trials: entry.trials + 1,
+        failures: entry.failures + (outcome.failed ? 1 : 0),
+      });
+    }
+  }
+  const doomed = [...credit.entries()]
+    .filter(([, entry]) => entry.failures > 0 && entry.trials >= VALIDATION_MIN_TRIALS)
+    .map(([id]) => id);
+  if (doomed.length > 0) await host.forget({ ids: doomed });
+  return {
+    rules: credit.size,
+    injected,
+    trials: [...credit.values()].reduce((sum, entry) => sum + entry.trials, 0),
+    retired: doomed.length,
+  };
+}
+
 async function runFold(
   fold: number,
   rows: readonly BirdRow[],
@@ -1054,9 +1147,26 @@ async function runFold(
   let injectedRules = 0;
   let injectedWithCondition = 0;
 
+  // A snapshot taken before the validated arm deletes anything. The other arms are
+  // defined against the store as learned; a deletion that changed their packs would make
+  // `full` and `full-validated` the same arm under two names, and the comparison would
+  // report a difference of zero as if it had measured something.
+  type Pack = Awaited<ReturnType<typeof widened.host.recall>>;
+  const rawPacks = new Map<number, Pack>();
+  for (const [position, row] of evalRows.entries()) {
+    rawPacks.set(position, await widened.host.recall({ task: TASK, text: row.question, scope: { domain: row.db_id } }));
+  }
+  // The deletion half of the literature's prescription, run on learn rows only, before
+  // any held-out question is scored.
+  let validation: Awaited<ReturnType<typeof validateMemory>> | undefined;
+  if (ARMS.has('full-validated')) {
+    validation = await validateMemory(widened.host, learnRows, dataset, task);
+    validations.push({ fold, ...validation });
+  }
+
   for (const [position, row] of evalRows.entries()) {
     const query = { task: TASK, text: row.question };
-    const pack = await widened.host.recall({ ...query, scope: { domain: row.db_id } });
+    const pack = rawPacks.get(position) as Pack;
     injectedRules += pack.items.length;
     injectedWithCondition += pack.items.filter((item) => item.when !== undefined).length;
     packs.push({
@@ -1065,6 +1175,11 @@ async function runFold(
     });
     call(position, 'none', '', 0);
     call(position, 'full', pack.rendered, pack.ids.length);
+    if (ARMS.has('full-validated')) {
+      // Read again, after the deletion: this is the only arm that sees the pruned store.
+      const pruned = await widened.host.recall({ ...query, scope: { domain: row.db_id } });
+      call(position, 'full-validated', pruned.rendered, pruned.ids.length);
+    }
     if (ARMS.has('full-narrow')) {
       // The same store, distilled without widening. `narrowed` is undefined when
       // the run itself is unwidened, in which case the two arms are identical and
@@ -1610,6 +1725,14 @@ async function main(): Promise<void> {
         };
       })(),
       knowledge_active_last: folds.at(-1)?.activeRules ?? 0,
+      // The deletion arm's own accounting: how many rules were seen in validation, how
+      // many questions injected one, and how many rules the failures retired. A run that
+      // retires nothing reports the same accuracy as `full` for a reason a reader can see.
+      validation_folds: validations.length,
+      validation_rules_seen: validations.reduce((sum, entry) => sum + entry.rules, 0),
+      validation_rules_retired: validations.reduce((sum, entry) => sum + entry.retired, 0),
+      validation_injected_questions: validations.reduce((sum, entry) => sum + entry.injected, 0),
+      validation_trials: validations.reduce((sum, entry) => sum + entry.trials, 0),
       distill_failed: folds.reduce((sum, fold) => sum + fold.failedDistill, 0),
       distill_created: folds.reduce((sum, fold) => sum + fold.created, 0),
       corrections_learned: folds.reduce((sum, fold) => sum + fold.learning.edited, 0),
