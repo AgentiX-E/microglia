@@ -340,13 +340,15 @@ async function main(): Promise<void> {
   // costs no extra calls — one takes every overturn, the other refuses the ones that
   // blame the reference. If the gain survives refusing them, it does not rest on the
   // claim nobody has checked.
-  const cascadeWith = (accepts: (verdict: RefuterVerdict) => boolean): Map<string, JudgeVerdict> => {
+  const cascadeWith = (accepts: (verdict: RefuterVerdict, questionId: string) => boolean): Map<string, JudgeVerdict> => {
     const verdicts = new Map<string, JudgeVerdict>();
     for (const row of rows) {
       const prover = judgeVerdicts.get(row.questionId);
       if (prover === undefined) continue;
       const refuter = refuters.get(row.questionId);
-      const decided = cascadeVerdict(prover, refuter === undefined || accepts(refuter) ? refuter : { ...refuter, overturned: false });
+      const accepted =
+        refuter === undefined ? true : accepts(refuter, row.questionId);
+      const decided = cascadeVerdict(prover, accepted ? refuter : { ...(refuter as RefuterVerdict), overturned: false });
       verdicts.set(row.questionId, {
         correct: decided,
         rationale: refuter?.rationale ?? prover.rationale,
@@ -384,8 +386,24 @@ async function main(): Promise<void> {
   const cascadeVerdicts = cascadeWith(() => true);
   const cascadeOutcome = judgePairs(rows, cascadeVerdicts);
   const cascadeReport = agreementReport(cascadeOutcome.pairs, { seed: 20261025, resamples: 2000 });
+  // The strict reading refuses every `GOLD_ERROR`, which is too blunt: 72 of the 82 landed
+  // on items whose two queries returned different rows, and that is the case the mechanism
+  // exists for. What is actually indefensible is narrower — blaming the reference for a
+  // query that returned *the same rows* — so the third variant refuses only that.
+  //
+  // This is the useful role for execution accuracy, and the reason it is worth keeping
+  // even though it makes a poor criterion: equal rows do not prove equal logic, so it can
+  // never license an approval, but unequal rows do prove unequal logic, so it can always
+  // veto a claim that the two are the same. Necessary condition, used as a veto.
   const strictVerdicts = cascadeWith((verdict) => verdict.diagnosis !== 'gold-error');
   const strictReport = agreementReport(judgePairs(rows, strictVerdicts).pairs, { seed: 20261025, resamples: 2000 });
+  const evidencedVerdicts = cascadeWith(
+    (verdict, questionId) => verdict.diagnosis !== 'gold-error' || bySetVerdict.get(questionId) === false,
+  );
+  const evidencedReport = agreementReport(judgePairs(rows, evidencedVerdicts).pairs, {
+    seed: 20261025,
+    resamples: 2000,
+  });
   const diagnoses = [...refuters.values()].reduce<Record<string, number>>((counts, verdict) => {
     counts[verdict.diagnosis] = (counts[verdict.diagnosis] ?? 0) + 1;
     return counts;
@@ -466,6 +484,7 @@ async function main(): Promise<void> {
                   refuterNoDiagnosis: diagnoses['none'] ?? 0,
                   ...summarise('cascade', cascadeReport),
                   ...summarise('cascadeStrict', strictReport),
+                  ...summarise('cascadeEvidenced', evidencedReport),
                   refuterOverturnedSameRows: crossed.filter((entry) => entry.exAgrees).length,
                   refuterOverturnedDifferentRows: crossed.filter((entry) => !entry.exAgrees).length,
                   ...Object.fromEntries(Object.entries(crossTab)),
@@ -490,7 +509,7 @@ async function main(): Promise<void> {
             `Judge ${JUDGE_MODEL} (${JUDGE_PROMPT_VERSION}): kappa ${judgeReport.kappa?.toFixed(4) ?? 'not estimable'} on ${judgeReport.n} stated verdicts of ${rows.length}, ${judgeFailures.length} calls failed, ${judgeOutcome.unparsed.length} replies unparsed.`,
             ...(CASCADE === 'cascade'
               ? [
-                  `Refuter (${REFUTER_PROMPT_VERSION}) on ${refuterCalls} approved items: ${[...refuters.values()].filter((verdict) => verdict.overturned === true).length} overturned, ${refuterFailures.length} calls failed, ${[...refuters.values()].filter((verdict) => verdict.stated === 'unparsed').length} unparsed; cascade kappa ${cascadeReport.kappa?.toFixed(4) ?? 'not estimable'} on ${cascadeReport.n}; refusing overturns that blame the reference gives kappa ${strictReport.kappa?.toFixed(4) ?? 'not estimable'}.`,
+                  `Refuter (${REFUTER_PROMPT_VERSION}) on ${refuterCalls} approved items: ${[...refuters.values()].filter((verdict) => verdict.overturned === true).length} overturned, ${refuterFailures.length} calls failed, ${[...refuters.values()].filter((verdict) => verdict.stated === 'unparsed').length} unparsed; cascade kappa ${cascadeReport.kappa?.toFixed(4) ?? 'not estimable'} on ${cascadeReport.n}; refusing overturns that blame the reference gives kappa ${strictReport.kappa?.toFixed(4) ?? 'not estimable'}, and refusing only those where the two queries returned the same rows gives kappa ${evidencedReport.kappa?.toFixed(4) ?? 'not estimable'}.`,
                 ]
               : []),
           ]),
