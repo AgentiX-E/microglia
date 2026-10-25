@@ -257,6 +257,10 @@ export function createApp(options: AppOptions): Hono {
       tokens: pack.tokens,
       hash: pack.hash,
       truncated: pack.truncated,
+      // A pack silenced by the corroboration floor is not a pack that matched nothing,
+      // and an HTTP client that cannot see the difference will treat the policy as a
+      // retrieval failure and weaken the threshold.
+      ...(pack.suppressed === undefined ? {} : { suppressed: pack.suppressed }),
     });
   });
 

@@ -17,13 +17,16 @@ import {
 
 const TOKEN = 'test-token';
 
-async function mount(options: { token?: string } = {}) {
+async function mount(options: { token?: string; corroborationFloor?: number } = {}) {
   const store = await EmbeddedMemory.open(new MemoryJournal());
   const microglia = await openMicroglia({
     app: 'test',
     namespace: 'acme',
     store,
     clock: { now: () => 1_700_000_000_000 },
+    ...(options.corroborationFloor === undefined
+      ? {}
+      : { corroborationFloor: options.corroborationFloor }),
   });
   const app = createApp({ microglia, ...(options.token === undefined ? {} : { token: options.token }) });
   return { app, microglia, store };
@@ -210,6 +213,23 @@ describe('http surface', () => {
 
     const missingRoute = await app.request('/v1/nope', { headers: { authorization: `Bearer ${TOKEN}` } });
     expect(missingRoute.status).toBe(404);
+  });
+
+  it('tells an HTTP client when a pack was silenced rather than unmatched', async () => {
+    // The driver and any other HTTP consumer sees an empty pack either way. Only one of
+    // those two silences is a retrieval failure, so the reason has to cross the wire.
+    const { app } = await mount({ token: TOKEN, corroborationFloor: 0.05 });
+    const silenced = await app.request('/v1/recall?task=chart.recommend&text=sales', {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    expect(silenced.status).toBe(200);
+    expect(await silenced.json()).toMatchObject({ ids: [], suppressed: 'uncorroborated-store' });
+
+    const unbiased = await mount({ token: TOKEN });
+    const plain = await unbiased.app.request('/v1/recall?task=chart.recommend&text=sales', {
+      headers: { authorization: `Bearer ${TOKEN}` },
+    });
+    expect(await plain.json()).not.toHaveProperty('suppressed');
   });
 });
 
