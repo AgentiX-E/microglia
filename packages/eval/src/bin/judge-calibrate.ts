@@ -356,6 +356,31 @@ async function main(): Promise<void> {
     return verdicts;
   };
 
+  // Every overturn, crossed against what execution accuracy already knew about the item.
+  //
+  // This is the check the cascade's kappa needs and cannot supply itself. A refuter that
+  // says "the reference is wrong" about a pair of queries that returned *the same rows*
+  // is making a claim the execution has no evidence for; one that says it where the rows
+  // differ, and the committee still approved the prediction, is describing the case ROSE
+  // exists for. The two are counted apart so the claim can be sized rather than believed.
+  const rowById = new Map(rows.map((row) => [row.questionId, row]));
+  const overturns = [...refuters.entries()].filter(([, verdict]) => verdict.overturned === true);
+  const crossed = overturns.map(([questionId, verdict]) => ({
+    questionId,
+    diagnosis: verdict.diagnosis,
+    exAgrees: bySetVerdict.get(questionId) === true,
+    committeeAccepted: rowById.get(questionId)?.label === true,
+    rationale: verdict.rationale,
+  }));
+  const counts = (predicate: (entry: (typeof crossed)[number]) => boolean): number => crossed.filter(predicate).length;
+  const crossTab = {
+    goldErrorSameRows: counts((entry) => entry.diagnosis === 'gold-error' && entry.exAgrees),
+    goldErrorDifferentRows: counts((entry) => entry.diagnosis === 'gold-error' && !entry.exAgrees),
+    goldErrorCommitteeAccepted: counts((entry) => entry.diagnosis === 'gold-error' && entry.committeeAccepted),
+    otherSameRows: counts((entry) => entry.diagnosis !== 'gold-error' && entry.exAgrees),
+    otherDifferentRows: counts((entry) => entry.diagnosis !== 'gold-error' && !entry.exAgrees),
+  };
+
   const cascadeVerdicts = cascadeWith(() => true);
   const cascadeOutcome = judgePairs(rows, cascadeVerdicts);
   const cascadeReport = agreementReport(cascadeOutcome.pairs, { seed: 20261025, resamples: 2000 });
@@ -441,6 +466,9 @@ async function main(): Promise<void> {
                   refuterNoDiagnosis: diagnoses['none'] ?? 0,
                   ...summarise('cascade', cascadeReport),
                   ...summarise('cascadeStrict', strictReport),
+                  refuterOverturnedSameRows: crossed.filter((entry) => entry.exAgrees).length,
+                  refuterOverturnedDifferentRows: crossed.filter((entry) => !entry.exAgrees).length,
+                  ...Object.fromEntries(Object.entries(crossTab)),
                 }
               : {}),
           }),
@@ -467,7 +495,10 @@ async function main(): Promise<void> {
               : []),
           ]),
     ],
-    samples: committee.pairs.map((pair) => ({ left: pair.left, right: pair.right, n: pair.n, kappa: pair.kappa ?? null })),
+    samples: [
+      ...committee.pairs.map((pair) => ({ kind: 'rater-pair', left: pair.left, right: pair.right, n: pair.n, kappa: pair.kappa ?? null })),
+      ...crossed.map((entry) => ({ kind: 'overturn', ...entry })),
+    ],
   });
 }
 

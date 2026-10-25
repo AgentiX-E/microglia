@@ -226,6 +226,13 @@ than a standard answer — so the reference is allowed to lose, and the refuter 
 `AMBIGUOUS` or `COINCIDENTAL` when it does. An unclear refutation leaves the approval standing: if a parse
 failure could flip a verdict, the prompt's wording would become a scoring parameter.
 
+The cascade reaches κ **0.5918** [0.5028, 0.6770] against the Prover's 0.4642 and EX's 0.4717 — the first
+mechanism here that moves agreement toward the committee. The ablation is what keeps that honest:
+`cascadeStrict` refuses overturns whose diagnosis is `GOLD_ERROR`, and it lands at **0.4239**, below the
+Prover. The whole gain therefore rests on 82 claims that the reference query is wrong, none of which this
+repository has yet checked, and two runs of the same prompt differ by 6pp in κ against a 12.8pp effect.
+The number is real and unverified, and the road map says so.
+
 The S2 lane takes the same question one level down: `SOTA_SEMANTICS=multiset` (default, the reading every
 published number was scored under) or `set` (the reading under which execution accuracy agrees with the
 committee most closely). Both are computed on every run, from one execution, so the shadow column answers
