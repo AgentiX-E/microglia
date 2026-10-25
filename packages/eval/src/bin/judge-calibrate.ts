@@ -333,19 +333,34 @@ async function main(): Promise<void> {
   // The cascade as a criterion: approved only where the Prover approved and the Refuter
   // did not overturn. Same items, so the comparison with the Prover alone is a difference
   // in mechanism rather than in sample.
-  const cascadeVerdicts = new Map<string, JudgeVerdict>();
-  for (const row of rows) {
-    const prover = judgeVerdicts.get(row.questionId);
-    if (prover === undefined) continue;
-    const decided = cascadeVerdict(prover, refuters.get(row.questionId));
-    cascadeVerdicts.set(row.questionId, {
-      correct: decided,
-      rationale: refuters.get(row.questionId)?.rationale ?? prover.rationale,
-      stated: decided === undefined ? 'unknown' : decided ? 'correct' : 'incorrect',
-    });
-  }
+  //
+  // `accepts` is a parameter because of what the first run showed: 94 of 101 overturns
+  // were attributed to GOLD_ERROR, and "the reference is wrong" is the easiest thing for
+  // a refuter to say. Two variants are computed from the same replies, so the ablation
+  // costs no extra calls — one takes every overturn, the other refuses the ones that
+  // blame the reference. If the gain survives refusing them, it does not rest on the
+  // claim nobody has checked.
+  const cascadeWith = (accepts: (verdict: RefuterVerdict) => boolean): Map<string, JudgeVerdict> => {
+    const verdicts = new Map<string, JudgeVerdict>();
+    for (const row of rows) {
+      const prover = judgeVerdicts.get(row.questionId);
+      if (prover === undefined) continue;
+      const refuter = refuters.get(row.questionId);
+      const decided = cascadeVerdict(prover, refuter === undefined || accepts(refuter) ? refuter : { ...refuter, overturned: false });
+      verdicts.set(row.questionId, {
+        correct: decided,
+        rationale: refuter?.rationale ?? prover.rationale,
+        stated: decided === undefined ? 'unknown' : decided ? 'correct' : 'incorrect',
+      });
+    }
+    return verdicts;
+  };
+
+  const cascadeVerdicts = cascadeWith(() => true);
   const cascadeOutcome = judgePairs(rows, cascadeVerdicts);
   const cascadeReport = agreementReport(cascadeOutcome.pairs, { seed: 20261025, resamples: 2000 });
+  const strictVerdicts = cascadeWith((verdict) => verdict.diagnosis !== 'gold-error');
+  const strictReport = agreementReport(judgePairs(rows, strictVerdicts).pairs, { seed: 20261025, resamples: 2000 });
   const diagnoses = [...refuters.values()].reduce<Record<string, number>>((counts, verdict) => {
     counts[verdict.diagnosis] = (counts[verdict.diagnosis] ?? 0) + 1;
     return counts;
@@ -425,6 +440,7 @@ async function main(): Promise<void> {
                   refuterCoincidental: diagnoses['coincidental'] ?? 0,
                   refuterNoDiagnosis: diagnoses['none'] ?? 0,
                   ...summarise('cascade', cascadeReport),
+                  ...summarise('cascadeStrict', strictReport),
                 }
               : {}),
           }),
@@ -446,7 +462,7 @@ async function main(): Promise<void> {
             `Judge ${JUDGE_MODEL} (${JUDGE_PROMPT_VERSION}): kappa ${judgeReport.kappa?.toFixed(4) ?? 'not estimable'} on ${judgeReport.n} stated verdicts of ${rows.length}, ${judgeFailures.length} calls failed, ${judgeOutcome.unparsed.length} replies unparsed.`,
             ...(CASCADE === 'cascade'
               ? [
-                  `Refuter (${REFUTER_PROMPT_VERSION}) on ${refuterCalls} approved items: ${[...refuters.values()].filter((verdict) => verdict.overturned === true).length} overturned, ${refuterFailures.length} calls failed, ${[...refuters.values()].filter((verdict) => verdict.stated === 'unparsed').length} unparsed; cascade kappa ${cascadeReport.kappa?.toFixed(4) ?? 'not estimable'} on ${cascadeReport.n}.`,
+                  `Refuter (${REFUTER_PROMPT_VERSION}) on ${refuterCalls} approved items: ${[...refuters.values()].filter((verdict) => verdict.overturned === true).length} overturned, ${refuterFailures.length} calls failed, ${[...refuters.values()].filter((verdict) => verdict.stated === 'unparsed').length} unparsed; cascade kappa ${cascadeReport.kappa?.toFixed(4) ?? 'not estimable'} on ${cascadeReport.n}; refusing overturns that blame the reference gives kappa ${strictReport.kappa?.toFixed(4) ?? 'not estimable'}.`,
                 ]
               : []),
           ]),

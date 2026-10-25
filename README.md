@@ -216,8 +216,15 @@ workflow rather than on every push. `JUDGE_MODE=llm` (or `both`) adds a model ju
 it is shown the question, the benchmark's external knowledge, the columns the query returned and five
 rows — never the gold query, because a judge that compares is execution accuracy with a markup. `UNKNOWN`
 is a first-class answer and unstated verdicts are counted beside the kappa rather than folded into it.
-The judge's own agreement with the committee has **not been measured yet**: it needs a provider key, and
-the lane refuses to run without one instead of reporting a kappa over zero items.
+
+Measured, the Prover reaches κ **0.4762** [0.3636, 0.5793] on 308 stated verdicts — level with the `set`
+criterion's 0.4717, not above it. It fixes what row comparison cannot (87 false negatives fall to 11) and
+pays in the opposite currency (3 false positives rise to 50), because it approves 82% of items where the
+committee approved 67%. `JUDGE_CASCADE=cascade` adds ROSE's adversarial Refuter, run only on what the
+Prover approved, which is shown the reference query and told in those words that it is evidence rather
+than a standard answer — so the reference is allowed to lose, and the refuter can name `GOLD_ERROR`,
+`AMBIGUOUS` or `COINCIDENTAL` when it does. An unclear refutation leaves the approval standing: if a parse
+failure could flip a verdict, the prompt's wording would become a scoring parameter.
 
 The S2 lane takes the same question one level down: `SOTA_SEMANTICS=multiset` (default, the reading every
 published number was scored under) or `set` (the reading under which execution accuracy agrees with the
