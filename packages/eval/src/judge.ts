@@ -151,3 +151,116 @@ export function judgePairs(
   }
   return { pairs, unstated, unparsed };
 }
+
+/**
+ * The adversarial half of the cascade, which is the half the first run proved is needed.
+ *
+ * A Prover shown only the question and the result approved 82% of 322 items against a
+ * committee that approved 67%: it reads plausibility, and a wrong query with the right
+ * shape reads plausibly. The Refuter is given what the Prover was deliberately denied —
+ * the gold query — and told to treat it as *evidence that may be wrong*, not as the
+ * answer. Its job is to find the decisive difference, or to say that the gold is the
+ * thing that is wrong. That framing is what separates this from execution accuracy: the
+ * reference can lose the argument.
+ *
+ * It runs only on the items the Prover approved, for two reasons: a rejected query needs
+ * no second opinion, and the cost is then proportional to how permissive the Prover is.
+ */
+export const REFUTER_PROMPT_VERSION = 'refuter-prompt/1';
+
+export type RefuterInput = {
+  readonly question: string;
+  readonly evidence: string | undefined;
+  readonly sql: string;
+  readonly columns: readonly string[];
+  readonly sample: readonly string[];
+  readonly goldSql: string;
+  readonly goldColumns: readonly string[];
+  readonly goldSample: readonly string[];
+};
+
+export type RefuterDiagnosis = 'none' | 'gold-error' | 'ambiguous' | 'coincidental';
+
+export type RefuterVerdict = {
+  /** `true` when the Prover's approval is overturned. `undefined` when the reply was unclear. */
+  readonly overturned: boolean | undefined;
+  readonly diagnosis: RefuterDiagnosis;
+  readonly rationale: string;
+  readonly stated: 'uphold' | 'overturn' | 'unparsed';
+};
+
+export function buildRefuterPrompt(input: RefuterInput): string {
+  const evidence = input.evidence === undefined || input.evidence.trim() === '' ? '(none)' : input.evidence.trim();
+  const predictedRows =
+    input.sample.length === 0 ? '(no rows)' : truncate(input.sample.slice(0, MAX_SAMPLE_ROWS).join('\n'), MAX_SAMPLE_CHARS);
+  const goldRows =
+    input.goldSample.length === 0
+      ? '(no rows)'
+      : truncate(input.goldSample.slice(0, MAX_SAMPLE_ROWS).join('\n'), MAX_SAMPLE_CHARS);
+  return [
+    'A first reviewer judged the SQL below CORRECT. Your job is to try to overturn that.',
+    '',
+    'You are given a reference query. It is EVIDENCE, NOT A STANDARD ANSWER: it was written',
+    'by a person and it can itself be wrong, incomplete, or one of several valid readings of',
+    'an ambiguous question. Do not overturn the query merely because it differs from the',
+    'reference. Overturn it only when you can name a difference that changes the answer to',
+    'the question as asked.',
+    '',
+    'Answer in exactly three lines:',
+    'VERDICT: UPHOLD | OVERTURN',
+    'DIAGNOSIS: NONE | GOLD_ERROR | AMBIGUOUS | COINCIDENTAL',
+    'REASON: one sentence',
+    '',
+    'Use DIAGNOSIS: GOLD_ERROR when the reference is the wrong one. Use AMBIGUOUS when both',
+    'readings answer the question and the question does not settle which was meant. Use',
+    'COINCIDENTAL when the two queries differ in logic but happen to return the same rows',
+    'here, so the agreement does not show the query is right. Use NONE when you uphold.',
+    '',
+    `QUESTION: ${input.question.trim()}`,
+    `KNOWLEDGE: ${evidence}`,
+    'QUERY UNDER REVIEW:',
+    input.sql.trim(),
+    `ITS COLUMNS: ${input.columns.length === 0 ? '(none)' : input.columns.join(', ')}`,
+    'ITS ROWS:',
+    predictedRows,
+    'REFERENCE QUERY (evidence, possibly wrong):',
+    input.goldSql.trim(),
+    `ITS COLUMNS: ${input.goldColumns.length === 0 ? '(none)' : input.goldColumns.join(', ')}`,
+    'ITS ROWS:',
+    goldRows,
+  ].join('\n');
+}
+
+const REFUTER_VERDICT = /^\s*VERDICT\s*:\s*(UPHOLD|OVERTURN)\s*$/im;
+const DIAGNOSIS = /^\s*DIAGNOSIS\s*:\s*(NONE|GOLD_ERROR|AMBIGUOUS|COINCIDENTAL)\s*$/im;
+
+/**
+ * Read the refuter's reply.
+ *
+ * A reply without a verdict is `unparsed` and its `overturned` is `undefined`, which the
+ * cascade keeps as an approval: an unclear objection is not an objection, and letting a
+ * parsing failure change a verdict would make the prompt's wording a scoring parameter.
+ */
+export function parseRefuterReply(text: string): RefuterVerdict {
+  const stated = REFUTER_VERDICT.exec(text)?.[1]?.toUpperCase();
+  const diagnosis = (DIAGNOSIS.exec(text)?.[1]?.toUpperCase() ?? 'NONE').toLowerCase().replace('_', '-') as RefuterDiagnosis;
+  const rationale = REASON.exec(text)?.[1]?.trim() ?? text.trim().slice(0, 200);
+  if (stated === 'UPHOLD') return { overturned: false, diagnosis, rationale, stated: 'uphold' };
+  if (stated === 'OVERTURN') return { overturned: true, diagnosis, rationale, stated: 'overturn' };
+  return { overturned: undefined, diagnosis, rationale, stated: 'unparsed' };
+}
+
+/**
+ * The ROSE cascade, as arithmetic.
+ *
+ * A query is credited only if the Prover approved it *and* the Refuter failed to overturn
+ * that approval. A Prover rejection is final — the refuter is not asked about a query the
+ * first reviewer already refused — and an unclear refutation leaves the approval standing.
+ */
+export function cascadeVerdict(prover: JudgeVerdict, refuter: RefuterVerdict | undefined): boolean | undefined {
+  if (prover.correct === undefined) return undefined;
+  if (!prover.correct) return false;
+  if (refuter === undefined) return true;
+  if (refuter.overturned === undefined) return true;
+  return !refuter.overturned;
+}

@@ -37,10 +37,13 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
   JUDGE_PROMPT_VERSION,
+  REFUTER_PROMPT_VERSION,
   LlmClient,
   agreementReport,
   buildJudgePrompt,
+  buildRefuterPrompt,
   canonicalRows,
+  cascadeVerdict,
   cohenKappa,
   consensusOf,
   judgePairs,
@@ -50,6 +53,7 @@ import {
   matches,
   parseJudgeReply,
   parseRater,
+  parseRefuterReply,
   parseRoseVec,
   raterAgreement,
   rowsEqual,
@@ -58,6 +62,7 @@ import {
   type AgreementReport,
   type JudgeVerdict,
   type JudgedPair,
+  type RefuterVerdict,
   type RaterLabels,
   type RoseVecRow,
 } from '@agentix-e/microglia-eval';
@@ -92,6 +97,25 @@ function judgeModeFrom(raw: string | undefined): JudgeMode {
 }
 
 const MODE = judgeModeFrom(process.env['JUDGE_MODE']);
+
+/**
+ * Whether the run stops at the Prover or adds ROSE's adversarial Refuter.
+ *
+ * The Prover alone approved 82% of the committee's 322 items against a committee rate of
+ * 67%, and the extra approvals were the 50 wrong queries it found plausible. The Refuter
+ * exists for exactly that failure: it is shown the reference query as evidence and asked
+ * to name the difference that changes the answer. It only runs on what the Prover
+ * approved, so its cost is proportional to how permissive the Prover is.
+ */
+type Cascade = 'prover' | 'cascade';
+
+function cascadeFrom(raw: string | undefined): Cascade {
+  if (raw === undefined || raw === '' || raw === 'prover') return 'prover';
+  if (raw === 'cascade') return 'cascade';
+  throw new Error(`JUDGE_CASCADE must be prover or cascade, got '${raw}'`);
+}
+
+const CASCADE = cascadeFrom(process.env['JUDGE_CASCADE']);
 const JUDGE_MODEL = process.env['JUDGE_MODEL'] ?? 'deepseek-chat';
 const JUDGE_ENDPOINT = process.env['JUDGE_ENDPOINT'];
 const JUDGE_MAX_CALLS = Math.max(1, Math.trunc(Number(process.env['JUDGE_MAX_CALLS'] ?? 400)));
@@ -192,6 +216,7 @@ async function main(): Promise<void> {
   const bySetVerdict = new Map<string, boolean>();
   const byMultisetVerdict = new Map<string, boolean>();
   const executions = new Map<string, Executed>();
+  const goldExecutions = new Map<string, Executed>();
   const unscored: string[] = [];
   let semanticsDisagree = 0;
   for (const row of rows) {
@@ -202,6 +227,7 @@ async function main(): Promise<void> {
       continue;
     }
     executions.set(row.questionId, predicted);
+    goldExecutions.set(row.questionId, gold);
     const bySet = setVerdict(predicted, gold);
     const byMultiset = multisetVerdict(predicted, gold);
     if (bySet !== byMultiset) semanticsDisagree += 1;
@@ -262,6 +288,69 @@ async function main(): Promise<void> {
     judgeCalls = client.stats.calls;
     judgePrompts = client.stats.prompts;
   }
+  // The Refuter, on the subset the Prover approved. It sees the reference query, which
+  // the Prover was denied, and is told the reference can be the wrong one — the framing
+  // that makes this a second opinion rather than execution accuracy in a costume.
+  const refuters = new Map<string, RefuterVerdict>();
+  const refuterFailures: string[] = [];
+  let refuterCalls = 0;
+  if (MODE !== 'execution' && CASCADE === 'cascade') {
+    const apiKey = process.env['DEEPSEEK_API_KEY'] ?? '';
+    const client = new LlmClient({
+      apiKey,
+      model: JUDGE_MODEL,
+      maxCalls: JUDGE_MAX_CALLS,
+      ...(JUDGE_ENDPOINT === undefined || JUDGE_ENDPOINT === '' ? {} : { endpoint: JUDGE_ENDPOINT }),
+    });
+    const approved = rows.filter((row) => judgeVerdicts.get(row.questionId)?.correct === true);
+    const replies = await mapPool(approved, JUDGE_CONCURRENCY, async (row) => {
+      const executed = executions.get(row.questionId) as Executed;
+      const gold = goldExecutions.get(row.questionId) as Executed;
+      const prompt = buildRefuterPrompt({
+        question: row.question,
+        evidence: row.evidence,
+        sql: row.predictedSql,
+        columns: executed.columns,
+        sample: sampleRows(executed.canonical),
+        goldSql: row.goldSql,
+        goldColumns: gold.columns,
+        goldSample: sampleRows(gold.canonical),
+      });
+      try {
+        const reply = await client.chat(prompt, 320);
+        return { questionId: row.questionId, verdict: parseRefuterReply(reply.text) as RefuterVerdict | undefined };
+      } catch {
+        return { questionId: row.questionId, verdict: undefined };
+      }
+    });
+    for (const replyItem of replies) {
+      if (replyItem.verdict === undefined) refuterFailures.push(replyItem.questionId);
+      else refuters.set(replyItem.questionId, replyItem.verdict);
+    }
+    refuterCalls = client.stats.calls;
+  }
+
+  // The cascade as a criterion: approved only where the Prover approved and the Refuter
+  // did not overturn. Same items, so the comparison with the Prover alone is a difference
+  // in mechanism rather than in sample.
+  const cascadeVerdicts = new Map<string, JudgeVerdict>();
+  for (const row of rows) {
+    const prover = judgeVerdicts.get(row.questionId);
+    if (prover === undefined) continue;
+    const decided = cascadeVerdict(prover, refuters.get(row.questionId));
+    cascadeVerdicts.set(row.questionId, {
+      correct: decided,
+      rationale: refuters.get(row.questionId)?.rationale ?? prover.rationale,
+      stated: decided === undefined ? 'unknown' : decided ? 'correct' : 'incorrect',
+    });
+  }
+  const cascadeOutcome = judgePairs(rows, cascadeVerdicts);
+  const cascadeReport = agreementReport(cascadeOutcome.pairs, { seed: 20261025, resamples: 2000 });
+  const diagnoses = [...refuters.values()].reduce<Record<string, number>>((counts, verdict) => {
+    counts[verdict.diagnosis] = (counts[verdict.diagnosis] ?? 0) + 1;
+    return counts;
+  }, {});
+
   const judgeOutcome = judgePairs(rows, judgeVerdicts);
   const judgeReport = agreementReport(judgeOutcome.pairs, { seed: 20261025, resamples: 2000 });
 
@@ -297,7 +386,7 @@ async function main(): Promise<void> {
   await writeResult({
     id: 'judge-calibration',
     title: 'What a judge has to beat, on public adjudicated NL2SQL labels',
-    variant: MODE,
+    variant: MODE === 'execution' ? 'execution' : `${MODE}+${CASCADE}`,
     ranAt: new Date().toISOString(),
     model: 'none (deterministic execution)',
     n: rows.length,
@@ -325,6 +414,19 @@ async function main(): Promise<void> {
             judgeUnstated: judgeOutcome.unstated.length,
             judgeUnparsed: judgeOutcome.unparsed.length,
             ...summarise('llm', judgeReport),
+            ...(CASCADE === 'cascade'
+              ? {
+                  refuterCalls,
+                  refuterFailed: refuterFailures.length,
+                  refuterOverturned: [...refuters.values()].filter((verdict) => verdict.overturned === true).length,
+                  refuterUnparsed: [...refuters.values()].filter((verdict) => verdict.stated === 'unparsed').length,
+                  refuterGoldError: diagnoses['gold-error'] ?? 0,
+                  refuterAmbiguous: diagnoses['ambiguous'] ?? 0,
+                  refuterCoincidental: diagnoses['coincidental'] ?? 0,
+                  refuterNoDiagnosis: diagnoses['none'] ?? 0,
+                  ...summarise('cascade', cascadeReport),
+                }
+              : {}),
           }),
       allTrueKappa: trueKappa,
       allFalseKappa: falseKappa,
@@ -342,6 +444,11 @@ async function main(): Promise<void> {
         ? []
         : [
             `Judge ${JUDGE_MODEL} (${JUDGE_PROMPT_VERSION}): kappa ${judgeReport.kappa?.toFixed(4) ?? 'not estimable'} on ${judgeReport.n} stated verdicts of ${rows.length}, ${judgeFailures.length} calls failed, ${judgeOutcome.unparsed.length} replies unparsed.`,
+            ...(CASCADE === 'cascade'
+              ? [
+                  `Refuter (${REFUTER_PROMPT_VERSION}) on ${refuterCalls} approved items: ${[...refuters.values()].filter((verdict) => verdict.overturned === true).length} overturned, ${refuterFailures.length} calls failed, ${[...refuters.values()].filter((verdict) => verdict.stated === 'unparsed').length} unparsed; cascade kappa ${cascadeReport.kappa?.toFixed(4) ?? 'not estimable'} on ${cascadeReport.n}.`,
+                ]
+              : []),
           ]),
     ],
     samples: committee.pairs.map((pair) => ({ left: pair.left, right: pair.right, n: pair.n, kappa: pair.kappa ?? null })),

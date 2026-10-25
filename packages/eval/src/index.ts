@@ -284,10 +284,17 @@ export {
 
 export {
   JUDGE_PROMPT_VERSION,
+  REFUTER_PROMPT_VERSION,
   buildJudgePrompt,
+  buildRefuterPrompt,
+  cascadeVerdict,
+  parseRefuterReply,
   judgePairs,
   parseJudgeReply,
   sampleRows,
   type JudgeInput,
   type JudgeVerdict,
+  type RefuterDiagnosis,
+  type RefuterInput,
+  type RefuterVerdict,
 } from './judge.js';

@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { buildJudgePrompt, judgePairs, parseJudgeReply, sampleRows, type JudgeInput } from '../judge.js';
+import {
+  buildJudgePrompt,
+  buildRefuterPrompt,
+  cascadeVerdict,
+  judgePairs,
+  parseJudgeReply,
+  parseRefuterReply,
+  sampleRows,
+  type JudgeInput,
+} from '../judge.js';
 
 const input = (overrides: Partial<JudgeInput> = {}): JudgeInput => ({
   question: 'What is the highest eligible free rate for K-12 students in Alameda County?',
@@ -169,5 +178,138 @@ describe('judgePairs', () => {
     expect(result.pairs).toHaveLength(0);
     expect(result.unstated).toEqual(['0', '1', '2', '3']);
     expect(result.unparsed).toEqual([]);
+  });
+});
+
+describe('buildRefuterPrompt', () => {
+  const refuterInput = {
+    question: 'What is the highest eligible free rate for K-12 students in Alameda County?',
+    evidence: undefined,
+    sql: 'SELECT MAX(rate) FROM frpm',
+    columns: ['rate'],
+    sample: ['[0.9]'],
+    goldSql: 'SELECT rate FROM frpm ORDER BY rate DESC LIMIT 1',
+    goldColumns: ['rate'],
+    goldSample: ['[0.9]'],
+  };
+
+  it('shows both queries and both results', () => {
+    const prompt = buildRefuterPrompt(refuterInput);
+    expect(prompt).toContain('SELECT MAX(rate) FROM frpm');
+    expect(prompt).toContain('SELECT rate FROM frpm ORDER BY rate DESC LIMIT 1');
+    expect(prompt).toContain('ITS COLUMNS: rate');
+    expect(prompt).toContain('[0.9]');
+  });
+
+  it('frames the reference as evidence that can be wrong, which is the whole cascade', () => {
+    const prompt = buildRefuterPrompt(refuterInput);
+    expect(prompt).toContain('EVIDENCE, NOT A STANDARD ANSWER');
+    expect(prompt).toContain('it can itself be wrong');
+    expect(prompt).toContain('Do not overturn the query merely because it differs from the');
+  });
+
+  it('states what each diagnosis means, so the label is not left to the model to invent', () => {
+    const prompt = buildRefuterPrompt(refuterInput);
+    expect(prompt).toContain('GOLD_ERROR when the reference is the wrong one');
+    expect(prompt).toContain('AMBIGUOUS when both');
+    expect(prompt).toContain('COINCIDENTAL when the two queries differ in logic');
+  });
+
+  it('marks absent knowledge and absent rows rather than leaving gaps', () => {
+    const prompt = buildRefuterPrompt({
+      ...refuterInput,
+      evidence: '  ',
+      columns: [],
+      sample: [],
+      goldSample: [],
+      goldColumns: [],
+    });
+    expect(prompt).toContain('KNOWLEDGE: (none)');
+    expect(prompt).toContain('ITS ROWS:\n(no rows)');
+    expect(prompt).toContain('ITS COLUMNS: (none)');
+  });
+
+  it('carries the benchmark knowledge when the question has some', () => {
+    const prompt = buildRefuterPrompt({ ...refuterInput, evidence: 'rate = free meal count / enrollment' });
+    expect(prompt).toContain('KNOWLEDGE: rate = free meal count / enrollment');
+  });
+
+  it('truncates long result samples on both sides', () => {
+    const long = `[${'y'.repeat(900)}]`;
+    const prompt = buildRefuterPrompt({ ...refuterInput, sample: [long], goldSample: [long] });
+    expect(prompt.match(/\.\.\./g)?.length).toBe(2);
+  });
+});
+
+describe('parseRefuterReply', () => {
+  it('reads an uphold and an overturn', () => {
+    expect(parseRefuterReply('VERDICT: UPHOLD\nDIAGNOSIS: NONE\nREASON: same intent').overturned).toBe(false);
+    expect(
+      parseRefuterReply('VERDICT: OVERTURN\nDIAGNOSIS: COINCIDENTAL\nREASON: different filter, same rows here')
+        .overturned,
+    ).toBe(true);
+  });
+
+  it('maps each diagnosis spelling', () => {
+    expect(parseRefuterReply('VERDICT: OVERTURN\nDIAGNOSIS: GOLD_ERROR').diagnosis).toBe('gold-error');
+    expect(parseRefuterReply('VERDICT: OVERTURN\nDIAGNOSIS: AMBIGUOUS').diagnosis).toBe('ambiguous');
+    expect(parseRefuterReply('VERDICT: UPHOLD\nDIAGNOSIS: COINCIDENTAL').diagnosis).toBe('coincidental');
+  });
+
+  it('defaults the diagnosis to none when the line is missing', () => {
+    expect(parseRefuterReply('VERDICT: UPHOLD\nREASON: fine').diagnosis).toBe('none');
+  });
+
+  it('leaves an unclear reply unparsed rather than reading it as an objection', () => {
+    // An unclear objection is not an objection: if a parse failure could flip a verdict,
+    // the prompt's wording would become a scoring parameter.
+    const verdict = parseRefuterReply('I am not sure.');
+    expect(verdict.overturned).toBeUndefined();
+    expect(verdict.stated).toBe('unparsed');
+    expect(verdict.rationale).toBe('I am not sure.');
+  });
+
+  it('keeps the reason, and caps the fallback text', () => {
+    expect(parseRefuterReply('VERDICT: OVERTURN\nREASON: wrong join key').rationale).toBe('wrong join key');
+    expect(parseRefuterReply('z'.repeat(400)).rationale).toHaveLength(200);
+  });
+
+  it('does not read a verdict out of prose that names both options', () => {
+    expect(parseRefuterReply('Could be UPHOLD or OVERTURN.').overturned).toBeUndefined();
+  });
+});
+
+describe('cascadeVerdict', () => {
+  const approved = { correct: true, rationale: '', stated: 'correct' as const };
+  const rejected = { correct: false, rationale: '', stated: 'incorrect' as const };
+  const unknown = { correct: undefined, rationale: '', stated: 'unknown' as const };
+  const uphold = { overturned: false, diagnosis: 'none' as const, rationale: '', stated: 'uphold' as const };
+  const overturn = { overturned: true, diagnosis: 'coincidental' as const, rationale: '', stated: 'overturn' as const };
+  const unclear = { overturned: undefined, diagnosis: 'none' as const, rationale: '', stated: 'unparsed' as const };
+
+  it('credits a query the prover approved and the refuter could not overturn', () => {
+    expect(cascadeVerdict(approved, uphold)).toBe(true);
+  });
+
+  it('refuses a query the refuter overturned', () => {
+    expect(cascadeVerdict(approved, overturn)).toBe(false);
+  });
+
+  it('keeps a prover rejection without asking the refuter', () => {
+    expect(cascadeVerdict(rejected, undefined)).toBe(false);
+    expect(cascadeVerdict(rejected, uphold)).toBe(false);
+  });
+
+  it('has no verdict when the prover stated none, whatever the refuter said', () => {
+    expect(cascadeVerdict(unknown, uphold)).toBeUndefined();
+    expect(cascadeVerdict(unknown, overturn)).toBeUndefined();
+  });
+
+  it('treats an unclear refutation as no refutation', () => {
+    expect(cascadeVerdict(approved, unclear)).toBe(true);
+  });
+
+  it('returns the prover verdict when the refuter never ran', () => {
+    expect(cascadeVerdict(approved, undefined)).toBe(true);
   });
 });
