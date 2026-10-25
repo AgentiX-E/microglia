@@ -35,6 +35,18 @@ export type MicrogliaOptions = {
   readonly interpreter?: Interpreter;
   /** Character budget for `recall`; defaults to `policy.defaultBudget`. */
   readonly budget?: number;
+  /**
+   * Silence the pack when less than this share of active rules has been observed
+   * more than once. Off by default; a host that knows its workload repeats should
+   * leave it off.
+   *
+   * The measurement behind it: the mechanism's benefit is conditional on corrections
+   * recurring. Where they do (the chart study, six defect families) the pack is worth
+   * 68.21pp; where every correction is unique (BIRD: 1,296 rules, none corroborated)
+   * it costs 2-4pp. A store that cannot corroborate anything cannot help, and this is
+   * how it says so instead of injecting anyway.
+   */
+  readonly corroborationFloor?: number;
   /** Element name used by the renderer; defaults to `microglia-knowledge`. */
   readonly tag?: string;
   /** Apply feedback to the knowledge that was in the run's prompt. Default true. */

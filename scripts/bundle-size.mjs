@@ -26,16 +26,20 @@ import { build } from 'esbuild';
 /**
  * Measured 2026-10-22, esbuild 0.28.2, target es2022, minified ESM.
  *
- * Raised once since, 2026-10-25: 42,000 -> 43,000 (gzip 15,000 -> 15,500) for the
- * condition field, the corroboration gate and their projection helpers. That is
- * 1,796 bytes of raw growth for `when` on every item, `minEvidence` on the pack, and
- * `corroborationShare`/`observationsOf`/`Microglia.corroboration` - measured at
- * 41,796 before the change. Written down here rather than adjusted silently, because a
- * ceiling nobody argues about is a ceiling that only ever moves one way by accident.
+ * Raised twice on 2026-10-25, for one feature family rather than for drift:
+ *
+ *   42,000 -> 43,000 (gzip 15,000 -> 15,500): `when` on every item, `minEvidence` on the
+ *   pack, and `corroborationShare`/`observationsOf`/`Microglia.corroboration`.
+ *   43,000 -> 44,000 (gzip 15,500 -> 16,000): `corroborationFloor`, the cached share on
+ *   the recall path, and `KnowledgePack.suppressed` - the enforcement of the same
+ *   measurement, which would otherwise ship as advice in a document.
+ *
+ * Written down instead of adjusted silently, because a ceiling nobody argues about is a
+ * ceiling that only ever moves one way by accident.
  */
 const BUDGETS = [
   { name: 'browser', entry: 'packages/browser/dist/index.js', raw: 3200, gzip: 1600 },
-  { name: 'core', entry: 'packages/core/dist/index.js', raw: 43000, gzip: 15500 },
+  { name: 'core', entry: 'packages/core/dist/index.js', raw: 44000, gzip: 16000 },
 ];
 
 const probe = process.argv.includes('--probe');

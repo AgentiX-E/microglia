@@ -148,6 +148,8 @@ export function makePack(
   items: readonly KnowledgeItem[],
   options: RenderOptions,
 ): KnowledgePack {
+  // `suppressed` is set by the caller that decided to silence the pack, not by the
+  // renderer: this function only knows what it was given.
   const rendered = renderPack(items, options);
   // `items` must describe exactly what was rendered. Returning the full input
   // would let a caller read a rule the prompt never contained: the study's reader

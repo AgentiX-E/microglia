@@ -68,6 +68,16 @@ export class Microglia implements RunHost {
   private readonly budget: number;
   private readonly tag: string | undefined;
   private readonly creditEnabled: boolean;
+  private readonly corroborationFloor: number | undefined;
+  /**
+   * Cached corroboration share, invalidated by anything that changes the knowledge.
+   *
+   * `recall` is on the request path, and re-reading the whole store on every request to
+   * answer a question that only changes when the store does would be a per-request tax
+   * for a per-distillation fact.
+   */
+  private corroborationCache: { readonly version: number; readonly share: number } | undefined;
+  private knowledgeVersion = 0;
   private readonly editSemantics:
     | ((before: Json, after: Json) => number | undefined)
     | undefined;
@@ -99,6 +109,17 @@ export class Microglia implements RunHost {
     this.tag = options.tag;
     this.creditEnabled = options.credit ?? true;
     this.editSemantics = options.editSemantics;
+    this.corroborationFloor = options.corroborationFloor;
+    if (
+      this.corroborationFloor !== undefined &&
+      (!Number.isFinite(this.corroborationFloor) ||
+        this.corroborationFloor < 0 ||
+        this.corroborationFloor > 1)
+    ) {
+      throw new MicrogliaError('MG_E_CONFIG', 'corroborationFloor must be in [0, 1]', {
+        corroborationFloor: this.corroborationFloor,
+      });
+    }
   }
 
   /** Convenience factory; identical to `new Microglia(options)`. */
@@ -129,9 +150,10 @@ export class Microglia implements RunHost {
    * The pack is what the host injects; its `ids` are what the run cites, and
    * therefore what can later be credited or blamed.
    */
-  public recall(query: Omit<RecallQuery, 'namespace'>): Promise<KnowledgePack> {
+  public async recall(query: Omit<RecallQuery, 'namespace'>): Promise<KnowledgePack> {
     this.assertOpen();
-    return buildPack(
+    const silenced = await this.cannotCorroborate();
+    const pack = await buildPack(
       { ...query, namespace: this.namespace },
       {
         memory: this.store,
@@ -139,9 +161,30 @@ export class Microglia implements RunHost {
         // A rule confident enough to be injected is confident enough to overrule a
         // recorded absence; below that, the absence speaks and the rule does not.
         absenceFloor: this.policy.activationThreshold,
+        // A store that cannot corroborate its own rules cannot help, and this is how it
+        // declines rather than injecting anyway: the floor is raised to two observations
+        // for the duration of this request.
+        ...(silenced ? { minEvidence: 2 } : {}),
         ...(this.tag === undefined ? {} : { tag: this.tag }),
       },
     );
+    // An empty pack for a reason is not the same as an empty pack for no reason, and a
+    // host that cannot tell them apart will read this silence as a retrieval failure.
+    return silenced && pack.ids.length === 0
+      ? { ...pack, suppressed: 'uncorroborated-store' as const }
+      : pack;
+  }
+
+  /** Whether the configured floor silences this store, cached per knowledge version. */
+  private async cannotCorroborate(): Promise<boolean> {
+    if (this.corroborationFloor === undefined) return false;
+    const cached = this.corroborationCache;
+    if (cached !== undefined && cached.version === this.knowledgeVersion) {
+      return cached.share < this.corroborationFloor;
+    }
+    const { share } = await this.corroboration();
+    this.corroborationCache = { version: this.knowledgeVersion, share };
+    return share < this.corroborationFloor;
   }
 
   public nextId(prefix: string): string {
@@ -194,6 +237,9 @@ export class Microglia implements RunHost {
     });
     await this.store.appendEvent(event);
     if (this.creditEnabled) await this.credit(run, event, at);
+    // The corroboration share can only change when knowledge changes, and feedback is
+    // the first half of that: it may not add a rule yet, but the next distillation will.
+    this.knowledgeVersion += 1;
     return event;
   }
 
@@ -204,12 +250,16 @@ export class Microglia implements RunHost {
    * with an uncurated one. Pruning is off unless asked: a rule with no observed
    * outcome is unmeasured, not useless.
    */
-  public curate(options: CurationOptions = {}): Promise<CurationReport> {
+  public async curate(options: CurationOptions = {}): Promise<CurationReport> {
     this.assertOpen();
-    return curateKnowledge(this.store, this.policy, this.clock.now(), {
+    const report = await curateKnowledge(this.store, this.policy, this.clock.now(), {
       namespace: this.namespace,
       ...options,
     });
+    // Curation retires items, and a retired rule cannot corroborate anything - so the
+    // cached share is stale even when nothing was written.
+    this.knowledgeVersion += 1;
+    return report;
   }
 
   /**
@@ -220,13 +270,15 @@ export class Microglia implements RunHost {
    * a deletion request that reaches further than the request did is a worse bug
    * than the data it was meant to remove.
    */
-  public forget(selector: ErasureSelector = {}): Promise<ErasureReport> {
+  public async forget(selector: ErasureSelector = {}): Promise<ErasureReport> {
     this.assertOpen();
-    return this.store.forget(
+    const report = await this.store.forget(
       { ...selector, namespace: this.namespace },
       this.policy,
       this.clock.now(),
     );
+    this.knowledgeVersion += 1;
+    return report;
   }
 
   public async distill(
@@ -238,7 +290,7 @@ export class Microglia implements RunHost {
     } = {},
   ): Promise<DistillReport> {
     this.assertOpen();
-    return distillLog({
+    const report = await distillLog({
       memory: this.store,
       policy: this.policy,
       clock: this.clock,
@@ -251,6 +303,8 @@ export class Microglia implements RunHost {
         ? {}
         : { resolveContradictions: options.resolveContradictions }),
     });
+    this.knowledgeVersion += 1;
+    return report;
   }
 
   public async exportDataset(

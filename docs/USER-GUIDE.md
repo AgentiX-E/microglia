@@ -99,6 +99,7 @@ The result is a `KnowledgePack`:
 | `tokens` | a character-based estimate (length / 4) |
 | `hash` | digest of `rendered`, recorded in the run's provenance |
 | `truncated` | how many candidates were dropped for the budget |
+| `suppressed` | `'uncorroborated-store'` when a configured `corroborationFloor` silenced the pack; absent otherwise |
 
 #### Inject only what the question is about
 
@@ -147,6 +148,30 @@ So the floor costs 3.57pp of a 68.21pp lift where mistakes recur, and removes a 
 not. If you do not know which world you are in, compare `evidence.length` on your own store: a corpus
 where every rule has exactly one observation is a corpus where the pack cannot be corroborated, and the
 honest configuration there is `minEvidence: 2` — which will inject nothing.
+
+#### And switch the pack off when the workspace never repeats itself
+
+`minEvidence: 2` is a decision you make per call. `corroborationFloor` makes it automatic for a store that
+cannot possibly satisfy it — the case the measurements keep landing on:
+
+```ts
+const mg = await openMicroglia({
+  app: 'reports',
+  namespace: 'acme',
+  store,
+  corroborationFloor: 0.05,    // silence the pack if under 5% of active rules were seen twice
+});
+
+const pack = await mg.recall({ task: 'chart.recommend', text: question });
+if (pack.suppressed === 'uncorroborated-store') {
+  // Not "nothing matched": this workspace has no corroborated rule, so the pack was
+  // silenced deliberately. Log it as a workspace property, not as a retrieval failure.
+}
+```
+
+The share is computed once per knowledge version (distillation, curation, feedback and erasure invalidate
+it) and costs one pass over the store, no model call. Default: off — an empty pack because of a policy is
+worse than a full one when the policy is wrong about your workload.
 
 `minCoverage` is absolute rather than relative — BM25 scores are only comparable inside one query, so
 a threshold on them cannot answer "is this rule about this question". Coverage can: it is the share of

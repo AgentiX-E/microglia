@@ -368,6 +368,16 @@ export type KnowledgePack = {
   readonly hash: string;
   readonly budget: number;
   readonly truncated: number;
+  /**
+   * Why a pack that a host asked for came back empty, when it was suppressed rather
+   * than merely unmatched.
+   *
+   * `'uncorroborated-store'` means the corroboration floor was applied: the store
+   * cannot corroborate its own rules, so the pack was silenced deliberately. A host
+   * that cannot tell that from "nothing matched" will read a deliberate silence as a
+   * retrieval failure and lower thresholds until the noise returns.
+   */
+  readonly suppressed?: 'uncorroborated-store';
 };
 
 export type Policy = {
