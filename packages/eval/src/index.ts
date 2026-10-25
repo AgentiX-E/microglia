@@ -288,6 +288,7 @@ export {
   buildJudgePrompt,
   buildRefuterPrompt,
   cascadeVerdict,
+  evidencedVerdict,
   parseRefuterReply,
   judgePairs,
   parseJudgeReply,
@@ -298,3 +299,5 @@ export {
   type RefuterInput,
   type RefuterVerdict,
 } from './judge.js';
+
+export { executeQuery, resolveDatabase, rowsDiffer, type ExecuteOptions, type QueryOutcome } from './sql-exec.js';

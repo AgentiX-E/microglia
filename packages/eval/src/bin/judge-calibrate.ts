@@ -34,7 +34,6 @@
  */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { DatabaseSync } from 'node:sqlite';
 import {
   JUDGE_PROMPT_VERSION,
   REFUTER_PROMPT_VERSION,
@@ -44,6 +43,10 @@ import {
   buildRefuterPrompt,
   canonicalRows,
   cascadeVerdict,
+  evidencedVerdict,
+  executeQuery,
+  resolveDatabase,
+  rowsDiffer,
   cohenKappa,
   consensusOf,
   judgePairs,
@@ -62,6 +65,7 @@ import {
   type AgreementReport,
   type JudgeVerdict,
   type JudgedPair,
+  type QueryOutcome,
   type RefuterVerdict,
   type RaterLabels,
   type RoseVecRow,
@@ -121,36 +125,10 @@ const JUDGE_ENDPOINT = process.env['JUDGE_ENDPOINT'];
 const JUDGE_MAX_CALLS = Math.max(1, Math.trunc(Number(process.env['JUDGE_MAX_CALLS'] ?? 400)));
 const JUDGE_CONCURRENCY = Math.min(8, Math.max(1, Math.trunc(Number(process.env['JUDGE_CONCURRENCY'] ?? 4))));
 
-type Executed = {
-  readonly ok: boolean;
-  /** Cells in select-list order, which is how a Python tuple would arrive. */
-  readonly tuples: readonly (readonly unknown[])[];
-  /** The repository's canonical encoding: column names sorted, numbers rounded. */
-  readonly canonical: readonly string[];
-  /** Column names the query returned, which is what the judge is shown instead of a schema. */
-  readonly columns: readonly string[];
-};
+type Executed = QueryOutcome;
 
 function execute(dbId: string, sql: string): Executed {
-  let db: DatabaseSync | undefined;
-  try {
-    db = new DatabaseSync(join(DB_DIR, `${dbId}.sqlite`), { readOnly: true });
-    const rows = db.prepare(sql).all() as Record<string, unknown>[];
-    // Object key order is select-list order for a statement read this way. Two columns
-    // of the same name would collapse into one key, which makes this comparison laxer
-    // than a Python tuple; the multiset criterion below does not share that weakness,
-    // so a row where the two disagree is visible rather than silent.
-    return {
-      ok: true,
-      tuples: rows.map((row) => Object.values(row)),
-      canonical: canonicalRows(rows),
-      columns: rows.length === 0 ? [] : Object.keys(rows[0] as Record<string, unknown>),
-    };
-  } catch {
-    return { ok: false, tuples: [], canonical: [], columns: [] };
-  } finally {
-    db?.close();
-  }
+  return executeQuery(resolveDatabase(DB_DIR, dbId), sql);
 }
 
 /** ROSE's semantics: set of tuples, column order significant. */
@@ -340,15 +318,17 @@ async function main(): Promise<void> {
   // costs no extra calls — one takes every overturn, the other refuses the ones that
   // blame the reference. If the gain survives refusing them, it does not rest on the
   // claim nobody has checked.
-  const cascadeWith = (accepts: (verdict: RefuterVerdict, questionId: string) => boolean): Map<string, JudgeVerdict> => {
+  // Three readings, one per line, each delegating the decision to the shared definition
+  // so the lane cannot drift from the module the tests cover.
+  const buildVerdicts = (
+    decide: (prover: JudgeVerdict, refuter: RefuterVerdict | undefined, questionId: string) => boolean | undefined,
+  ): Map<string, JudgeVerdict> => {
     const verdicts = new Map<string, JudgeVerdict>();
     for (const row of rows) {
       const prover = judgeVerdicts.get(row.questionId);
       if (prover === undefined) continue;
       const refuter = refuters.get(row.questionId);
-      const accepted =
-        refuter === undefined ? true : accepts(refuter, row.questionId);
-      const decided = cascadeVerdict(prover, accepted ? refuter : { ...(refuter as RefuterVerdict), overturned: false });
+      const decided = decide(prover, refuter, row.questionId);
       verdicts.set(row.questionId, {
         correct: decided,
         rationale: refuter?.rationale ?? prover.rationale,
@@ -383,7 +363,7 @@ async function main(): Promise<void> {
     otherDifferentRows: counts((entry) => entry.diagnosis !== 'gold-error' && !entry.exAgrees),
   };
 
-  const cascadeVerdicts = cascadeWith(() => true);
+  const cascadeVerdicts = buildVerdicts((prover, refuter) => cascadeVerdict(prover, refuter));
   const cascadeOutcome = judgePairs(rows, cascadeVerdicts);
   const cascadeReport = agreementReport(cascadeOutcome.pairs, { seed: 20261025, resamples: 2000 });
   // The strict reading refuses every `GOLD_ERROR`, which is too blunt: 72 of the 82 landed
@@ -395,10 +375,16 @@ async function main(): Promise<void> {
   // even though it makes a poor criterion: equal rows do not prove equal logic, so it can
   // never license an approval, but unequal rows do prove unequal logic, so it can always
   // veto a claim that the two are the same. Necessary condition, used as a veto.
-  const strictVerdicts = cascadeWith((verdict) => verdict.diagnosis !== 'gold-error');
+  const strictVerdicts = buildVerdicts((prover, refuter) =>
+    cascadeVerdict(prover, refuter?.diagnosis === 'gold-error' ? { ...refuter, overturned: false } : refuter),
+  );
   const strictReport = agreementReport(judgePairs(rows, strictVerdicts).pairs, { seed: 20261025, resamples: 2000 });
-  const evidencedVerdicts = cascadeWith(
-    (verdict, questionId) => verdict.diagnosis !== 'gold-error' || bySetVerdict.get(questionId) === false,
+  const evidencedVerdicts = buildVerdicts((prover, refuter, questionId) =>
+    evidencedVerdict(
+      prover,
+      refuter,
+      rowsDiffer(executions.get(questionId) as Executed, goldExecutions.get(questionId) as Executed),
+    ),
   );
   const evidencedReport = agreementReport(judgePairs(rows, evidencedVerdicts).pairs, {
     seed: 20261025,

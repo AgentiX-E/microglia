@@ -59,6 +59,10 @@ on:
         description: 'Measure whether embedding similarity separates helpful from harmful rules'
         required: false
         default: 'false'
+      adjudicate:
+        description: 'Re-score the answers this run produced with the evidenced cascade (costs up to 4 calls per question)'
+        required: false
+        default: 'false'
       l4_arms:
         description: 'L4 arms to run: both (memory then reference, paired), memory, or reference'
         required: false
@@ -157,6 +161,19 @@ jobs:
             echo "::error::no artefact: the attribution step cannot run"
             exit 1
           fi
+
+      # The re-score runs on the answers this job just produced, which is the point: the
+      # model is not asked anything new, only a different criterion is applied to what it
+      # already said. It sits before the publish step so a failure here is visible in the
+      # run's own output rather than only in an artefact nobody opened.
+      - name: Re-score with the evidenced cascade
+        if: inputs.adjudicate == 'true' && inputs.bird == 'true'
+        timeout-minutes: 90
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          BIRD_DB_DIR: ${{ github.workspace }}/packages/eval/.cache/bird
+          JUDGE_CONCURRENCY: '4'
+        run: pnpm eval:adjudicate
 
       - name: Publish the result
         if: always()

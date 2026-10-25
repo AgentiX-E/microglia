@@ -264,3 +264,31 @@ export function cascadeVerdict(prover: JudgeVerdict, refuter: RefuterVerdict | u
   if (refuter.overturned === undefined) return true;
   return !refuter.overturned;
 }
+
+/**
+ * The evidenced cascade, defined once so both lanes that use it mean the same thing.
+ *
+ * A `GOLD_ERROR` overturn is accepted only when execution can tell the two queries apart.
+ * The rule is not "trust the refuter" and not "trust the reference": it is that a claim
+ * about the reference being wrong needs something in the pair for it to be wrong *about*,
+ * and equal rows are not that thing. Equal rows do not prove equivalence — 3 of 132
+ * row-identical items in ROSE-VEC were still rejected by the committee — but they are
+ * consistent with it, so they cannot carry an accusation either.
+ *
+ * Expressed as a veto inside a criterion rather than as a post-filter, because a filter
+ * applied to finished verdicts can be forgotten by the next caller.
+ */
+export function evidencedVerdict(
+  prover: JudgeVerdict,
+  refuter: RefuterVerdict | undefined,
+  rowsDiffer: boolean,
+): boolean | undefined {
+  // The veto is applied to the refuter's reply, not to the cascade's output: written the
+  // other way round it never fires, because by then the approval has already been refused
+  // and there is nothing left to restore. The test that caught this asserted the one case
+  // where the two orderings differ.
+  if (refuter?.overturned === true && refuter.diagnosis === 'gold-error' && !rowsDiffer) {
+    return cascadeVerdict(prover, { ...refuter, overturned: false });
+  }
+  return cascadeVerdict(prover, refuter);
+}

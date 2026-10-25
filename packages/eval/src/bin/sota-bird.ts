@@ -270,6 +270,15 @@ type CaseOutcome = {
   readonly question: string;
   readonly goldSql: string;
   readonly predictedSql: string;
+  /**
+   * What the same question produced with no memory.
+   *
+   * Stored because the adjudication lane cannot re-ask a question: it re-scores answers
+   * that were already given, and a paired comparison needs both halves of the pair. The
+   * artefact carried only the boolean for three iterations, which made an independent
+   * criterion impossible without a second 2,370-call dispatch.
+   */
+  readonly baselineSql: string;
   readonly correct: boolean;
   readonly withoutMemoryCorrect: boolean;
   /** The same two verdicts under the other result comparison. */
@@ -1199,6 +1208,7 @@ async function runFold(
       question: row.question,
       goldSql: row.SQL,
       predictedSql: full.sql,
+      baselineSql: base.sql,
       correct: full.correct,
       shadowCorrect: full.shadowCorrect,
       withoutMemoryCorrect: base.correct,

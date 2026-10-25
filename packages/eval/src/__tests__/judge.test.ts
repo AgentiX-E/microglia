@@ -3,6 +3,7 @@ import {
   buildJudgePrompt,
   buildRefuterPrompt,
   cascadeVerdict,
+  evidencedVerdict,
   judgePairs,
   parseJudgeReply,
   parseRefuterReply,
@@ -311,5 +312,36 @@ describe('cascadeVerdict', () => {
 
   it('returns the prover verdict when the refuter never ran', () => {
     expect(cascadeVerdict(approved, undefined)).toBe(true);
+  });
+});
+
+describe('evidencedVerdict', () => {
+  const approved = { correct: true, rationale: '', stated: 'correct' as const };
+  const rejected = { correct: false, rationale: '', stated: 'incorrect' as const };
+  const unknown = { correct: undefined, rationale: '', stated: 'unknown' as const };
+  const goldError = { overturned: true, diagnosis: 'gold-error' as const, rationale: '', stated: 'overturn' as const };
+  const coincidental = { overturned: true, diagnosis: 'coincidental' as const, rationale: '', stated: 'overturn' as const };
+  const uphold = { overturned: false, diagnosis: 'none' as const, rationale: '', stated: 'uphold' as const };
+
+  it('vetoes a GOLD_ERROR overturn when the rows agree, because the claim has no evidence', () => {
+    expect(evidencedVerdict(approved, goldError, false)).toBe(true);
+  });
+
+  it('accepts the same overturn when the rows differ, because then it has evidence', () => {
+    expect(evidencedVerdict(approved, goldError, true)).toBe(false);
+  });
+
+  it('does not need execution agreement to accept an overturn that is not about the reference', () => {
+    // COINCIDENTAL says the two queries return the same rows here by accident, so its
+    // claim is the opposite of the one being vetoed and the veto does not apply.
+    expect(evidencedVerdict(approved, coincidental, false)).toBe(false);
+    expect(evidencedVerdict(approved, coincidental, true)).toBe(false);
+  });
+
+  it('leaves everything the plain cascade decides untouched', () => {
+    expect(evidencedVerdict(approved, uphold, true)).toBe(true);
+    expect(evidencedVerdict(approved, undefined, false)).toBe(true);
+    expect(evidencedVerdict(rejected, goldError, false)).toBe(false);
+    expect(evidencedVerdict(unknown, goldError, true)).toBeUndefined();
   });
 });
