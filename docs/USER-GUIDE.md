@@ -769,11 +769,21 @@ Be honest about the preconditions; the product is only useful inside them.
    a strong model at 90.48% (or moved it to 88.10%). The value is *your* conventions, where the same
    model goes from 0% to 75–89%.
 5. **Structured outputs need `editSemantics`.** See §4.
-6. **A rule learned once is a hypothesis.** Measured twice: on the chart study a corroboration floor of
-   two keeps 96.43% of 100.00%; on BIRD Mini-Dev it injects **nothing**, because every one of 1,296
-   distilled rules came from a single correction — and that is the workload where the pack costs 2-4pp.
-   The mechanism's benefit lives where corrections *recur*; where each one is unique, the pack cannot be
-   corroborated and there is nothing for it to be right about. See `minEvidence` in §3.
+6. **A rule learned once is a hypothesis.** Measured three times: on the chart study a corroboration
+   floor of two keeps 96.43% of 100.00%; on BIRD Mini-Dev it injects **nothing**, because every one of
+   1,296 distilled rules came from a single correction — and that is the workload where the pack costs
+   2-4pp; on τ²-retail (46 training tasks, each corrected once) the memory costs 7.35pp. **The
+   mechanism's benefit is conditional on corrections recurring**, so measure that before you turn the
+   pack on — the number is free:
+
+   ```ts
+   const stats = await mg.corroboration();
+   // { active: 1296, corroborated: 0, share: 0 } - this workload does not repeat
+   // itself, so a pack built from it is noise. minEvidence: 2 is then the honest
+   // configuration: it will inject nothing, deliberately.
+   ```
+
+   See `minEvidence` in §3.
 7. **A `when` condition is read as text, not enforced as a filter.** An item's condition changes what the
    model writes — on BIRD, 48% of 350 answers differed when the condition was rendered — and it does not
    change whether the answer is right: paired against the same items without it, **0.00pp, CI

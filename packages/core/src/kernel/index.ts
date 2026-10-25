@@ -103,7 +103,9 @@ export { defaultPolicy, resolvePolicy } from './policy.js';
 
 export {
   applyOutcome,
+  corroborationShare,
   createKnowledgeItem,
+  observationsOf,
   decideStatus,
   dedupeKeyOf,
   expireKnowledge,

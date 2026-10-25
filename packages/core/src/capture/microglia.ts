@@ -9,7 +9,9 @@
 import {
   MicrogliaError,
   applyOutcome,
+  corroborationShare,
   defaultPolicy,
+  observationsOf,
   newId,
   mulberry32,
   resolvePolicy,
@@ -281,6 +283,26 @@ export class Microglia implements RunHost {
 
   public stats(): Promise<MemoryStats> {
     return this.store.stats();
+  }
+
+  /**
+   * How much of this workspace has been told the same thing twice.
+   *
+   * The measurement that decides whether the mechanism can help at all, made available
+   * before anyone turns the pack on: on the workloads measured here the share and the
+   * effect move together, and a share near zero means the corrections do not recur, so a
+   * pack built from them is noise. Cheap — one pass over the knowledge, no model call.
+   */
+  public async corroboration(): Promise<{
+    readonly active: number;
+    readonly corroborated: number;
+    readonly share: number;
+  }> {
+    this.assertOpen();
+    const items = await this.store.listKnowledge({ namespace: this.namespace, status: 'all' });
+    return corroborationShare(
+      items.map((item) => ({ status: item.status, observations: observationsOf(item) })),
+    );
   }
 
   public async close(): Promise<void> {

@@ -64,7 +64,13 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { MicrogliaError, mulberry32, queryCoverage, steppingClock } from '@agentix-e/microglia-core';
+import {
+  MicrogliaError,
+  corroborationShare,
+  mulberry32,
+  queryCoverage,
+  steppingClock,
+} from '@agentix-e/microglia-core';
 import { makePack } from '@agentix-e/microglia-core/apply';
 import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
 import { openMicroglia } from '@agentix-e/microglia-core/capture';
@@ -798,6 +804,8 @@ type StoredItem = {
   readonly statement: string;
   /** The condition the rule applies under, or null when it named none. */
   readonly when: string | null;
+  /** Independent observations behind the rule; the corroboration metric's input. */
+  readonly evidence: number;
   /** The database the rule is scoped to, or null when it generalised out of one. */
   readonly domain: string | null;
 };
@@ -1180,6 +1188,7 @@ async function runFold(
     trust: Number(item.trust.toFixed(4)),
     statement: item.statement,
     when: item.when ?? null,
+    evidence: item.evidence.length,
     domain: item.scope.domain ?? null,
   }));
   await widened.host.close();
@@ -1517,6 +1526,20 @@ async function main(): Promise<void> {
         (sum, fold) => sum + fold.items.filter((item) => item.status === 'active' && item.when !== null).length,
         0,
       ),
+      // The workload's recurrence, as the product would measure it: the share of active
+      // rules with more than one observation. Zero here is the finding of iteration 65,
+      // and it is now a number every run reports rather than one a reader has to derive.
+      ...(() => {
+        const counts = folds.flatMap((fold) =>
+          fold.items.map((item) => ({ status: item.status, observations: item.evidence })),
+        );
+        const summary = corroborationShare(counts);
+        return {
+          active_corroborated: summary.corroborated,
+          active_total: summary.active,
+          corroboration_share: summary.share,
+        };
+      })(),
       knowledge_active_last: folds.at(-1)?.activeRules ?? 0,
       distill_failed: folds.reduce((sum, fold) => sum + fold.failedDistill, 0),
       distill_created: folds.reduce((sum, fold) => sum + fold.created, 0),

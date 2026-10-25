@@ -491,3 +491,45 @@ function strongestTier(
   if (right === undefined) return left;
   return TIER_RANK[left] >= TIER_RANK[right] ? left : right;
 }
+
+/**
+ * How much of the store has been observed more than once.
+ *
+ * The number the last three iterations kept arriving at from different directions, made
+ * explicit: the mechanism's benefit is conditional on corrections recurring, and this is
+ * the cheapest measurement of that condition. It needs no model call, no inference, and
+ * no schema — only the evidence lists the store already keeps.
+ *
+ * On the three workloads this repository runs, the share and the effect move together:
+ * the chart study (six defect families, most rules corroborated) gains 68.21pp; BIRD
+ * (1,296 rules, **none** corroborated) loses 2-4pp; τ²-retail (46 training tasks, each
+ * corrected once) loses 7.35pp as a difference of means.
+ *
+ * Retired and conflicted items are excluded: a rule that cannot be injected cannot
+ * corroborate anything, and counting it would report a store as healthy on the strength
+ * of the rules it has already withdrawn.
+ */
+export type CorroborationInput = {
+  readonly status: string;
+  /** Independent observations behind the item; `evidence.length` for a stored item. */
+  readonly observations: number;
+};
+
+/** The shape a caller has: a knowledge item, or a projection of one. */
+export function observationsOf(item: Pick<KnowledgeItem, 'evidence'>): number {
+  return item.evidence.length;
+}
+
+export function corroborationShare(items: readonly CorroborationInput[]): {
+  readonly active: number;
+  readonly corroborated: number;
+  readonly share: number;
+} {
+  const active = items.filter((item) => item.status === 'active');
+  const corroborated = active.filter((item) => item.observations >= 2).length;
+  return {
+    active: active.length,
+    corroborated,
+    share: active.length === 0 ? 0 : corroborated / active.length,
+  };
+}

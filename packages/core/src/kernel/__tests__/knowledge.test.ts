@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   applyOutcome,
+  corroborationShare,
+  observationsOf,
   createKnowledgeItem,
   decideStatus,
   dedupeKeyOf,
@@ -178,5 +180,41 @@ describe('scope and identity', () => {
     expect(item.systemUntil).toBe(2_000);
     const decision = decideStatus(item, defaultPolicy, 2_000 + 90 * 86_400_000);
     expect(decision.status).toBe('retired');
+  });
+});
+
+describe('corroborationShare', () => {
+  const withObservations = (observations: number, status = 'active') => ({ status, observations });
+
+  it('counts the active items observed more than once', () => {
+    // The number that decides whether the mechanism can help at all: on BIRD it is zero,
+    // on the chart study it is most of the store, and the effect moves with it.
+    expect(
+      corroborationShare([
+        withObservations(1),
+        withObservations(2),
+        withObservations(3),
+      ]),
+    ).toEqual({ active: 3, corroborated: 2, share: 2 / 3 });
+  });
+
+  it('ignores items that cannot be injected', () => {
+    // A retired rule cannot reach a prompt, so it cannot corroborate anything. Counting
+    // it would report a store as healthy on the strength of what it withdrew.
+    expect(
+      corroborationShare([
+        withObservations(1),
+        withObservations(4, 'retired'),
+        withObservations(4, 'quarantined'),
+      ]),
+    ).toEqual({ active: 1, corroborated: 0, share: 0 });
+  });
+
+  it('is zero for an empty store rather than undefined', () => {
+    expect(corroborationShare([])).toEqual({ active: 0, corroborated: 0, share: 0 });
+  });
+
+  it('reads the observation count off an item the way a caller would', () => {
+    expect(observationsOf({ evidence: [{}, {}] as never })).toBe(2);
   });
 });

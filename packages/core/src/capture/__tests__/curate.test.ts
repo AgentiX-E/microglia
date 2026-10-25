@@ -418,3 +418,29 @@ describe('utility counters', () => {
     await mg.close();
   });
 });
+
+describe('the corroboration report', () => {
+  it('counts what was observed twice and nothing that cannot be injected', async () => {
+    const once = item('k_1', 'Revenue questions use a line chart.');
+    const twice = {
+      ...item('k_2', 'Break revenue down by region.'),
+      evidence: [
+        { feedbackId: 'fb_2a', runId: 'run_2', at: AT, weight: 0.9 },
+        { feedbackId: 'fb_2b', runId: 'run_3', at: AT + 1, weight: 0.9 },
+      ],
+      support: 1.8,
+    } as KnowledgeItem;
+    const retired = {
+      ...item('k_3', 'Churn questions use a bar chart.'),
+      status: 'retired' as const,
+      evidence: twice.evidence,
+    } as KnowledgeItem;
+
+    const store = await storeWith([once, twice, retired]);
+    const mg = await openMicroglia({ app: 'acme', namespace: 'acme', store });
+    // The number a host checks before trusting a pack: half the active store here is
+    // corroborated, and the retired rule - which cannot reach a prompt - is not counted.
+    expect(await mg.corroboration()).toEqual({ active: 2, corroborated: 1, share: 0.5 });
+    await mg.close();
+  });
+});
