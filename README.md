@@ -226,12 +226,21 @@ than a standard answer — so the reference is allowed to lose, and the refuter 
 `AMBIGUOUS` or `COINCIDENTAL` when it does. An unclear refutation leaves the approval standing: if a parse
 failure could flip a verdict, the prompt's wording would become a scoring parameter.
 
-The cascade reaches κ **0.5918** [0.5028, 0.6770] against the Prover's 0.4642 and EX's 0.4717 — the first
-mechanism here that moves agreement toward the committee. The ablation is what keeps that honest:
-`cascadeStrict` refuses overturns whose diagnosis is `GOLD_ERROR`, and it lands at **0.4239**, below the
-Prover. The whole gain therefore rests on 82 claims that the reference query is wrong, none of which this
-repository has yet checked, and two runs of the same prompt differ by 6pp in κ against a 12.8pp effect.
-The number is real and unverified, and the road map says so.
+The cascade reaches κ **0.5974** [0.5078, 0.6830] against the Prover's 0.4746 and EX's 0.4717. Two
+ablations say where the gain comes from, and both are computed from the same replies: `cascadeStrict`
+refuses every overturn that blames the reference and lands at **0.4542**, below the Prover, while
+`cascadeEvidenced` refuses only the ones where the two queries returned **the same rows** and lands at
+**0.6676** [0.5803, 0.7515] — an interval that does not overlap the Prover's 0.5761 upper bound, and
+within 4.1pp of the committee's own 0.7085.
+
+That ordering is the argument. Execution accuracy is a necessary condition for logical equivalence and
+not a sufficient one: of 132 items whose query returned exactly the gold's rows the committee still
+rejected 3, so equal rows cannot license an approval — but unequal rows always prove the queries differ,
+so they can always veto one. The division of labour is therefore the model supplies the judgement and the
+database supplies the veto, and it replicates at κ 0.6676 / 0.6634 / 0.6736 over three dispatches (1.0pp
+spread on a 19.3pp effect). What it does not establish is that the 70 evidenced overturns are *correct*
+rather than merely *evidenced*; 39 of them disagree with the committee, and that remainder is stated on
+the road map rather than folded into the number.
 
 The S2 lane takes the same question one level down: `SOTA_SEMANTICS=multiset` (default, the reading every
 published number was scored under) or `set` (the reading under which execution accuracy agrees with the
