@@ -1,0 +1,460 @@
+{
+  "id": "poc-l4",
+  "title": "L4 — τ²-bench pass^4 against ALTK-Evolve",
+  "ranAt": "2026-10-25T03:43:49.150Z",
+  "model": "deepseek/deepseek-chat",
+  "n": 68,
+  "calls": 0,
+  "metrics": {
+    "pass4": 0.5147058823529411,
+    "published_pass4": 0.575,
+    "delta": -0.06029411764705883,
+    "tasks": 68,
+    "unscored_tasks": 0,
+    "min_tasks": 60,
+    "k": 4,
+    "inferred_trials": 0,
+    "gates_passed": 3
+  },
+  "notes": [
+    "Source: ./packages/eval/src/bin/tau2-driver.ts (driver form). Two arms must share the split; the reference number is ALTK-Evolve on τ²-retail.",
+    "pass^4 is the unbiased C(c,4)/C(n,4) mean over 68 tasks, with success defined as `reward == 1.0` exactly, as upstream scores it.",
+    "The split covers the minimum: 68 scored tasks."
+  ],
+  "per_task": [
+    {
+      "id": "4",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "5",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "6",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "7",
+      "successes": 2,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "8",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "9",
+      "successes": 2,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "38",
+      "successes": 2,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "39",
+      "successes": 2,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "40",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "41",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "42",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "43",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "44",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "45",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "46",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "47",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "48",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "49",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "50",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "51",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "52",
+      "successes": 1,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "53",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "54",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "55",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "56",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "57",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "58",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "59",
+      "successes": 0,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "60",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "61",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "62",
+      "successes": 2,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "63",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "64",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "65",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "66",
+      "successes": 1,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "67",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "68",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "69",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "70",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "71",
+      "successes": 1,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "72",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "73",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "74",
+      "successes": 2,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "75",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "76",
+      "successes": 2,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "77",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "78",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "79",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "80",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "81",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "82",
+      "successes": 3,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "83",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "84",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "85",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "86",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "87",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "88",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "89",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "90",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "91",
+      "successes": 0,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "92",
+      "successes": 2,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "93",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "94",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "95",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "96",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "97",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "98",
+      "successes": 1,
+      "trials": 4,
+      "passed_all": false
+    },
+    {
+      "id": "99",
+      "successes": 1,
+      "trials": 4,
+      "passed_all": false
+    }
+  ],
+  "samples": [
+    {
+      "id": "l4-pass4",
+      "pass": false,
+      "actual": 0.5147058823529411,
+      "criterion": ">= published + 0.05"
+    },
+    {
+      "id": "l4-paired",
+      "pass": true,
+      "actual": "no reference arm",
+      "criterion": "against the same agent without the memory: delta >= 0 at p<0.05"
+    },
+    {
+      "id": "l4-coverage",
+      "pass": true,
+      "actual": 68,
+      "criterion": ">= 60 tasks"
+    },
+    {
+      "id": "l4-fully-scored",
+      "pass": true,
+      "actual": 0,
+      "criterion": "= 0 unscored tasks"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import {
   compareArms,
   parseTauResults,
   perTaskRows,
+  resolutionOf,
   taskTrials,
   toPassAtK,
   type L4ParseReason,
@@ -277,5 +278,49 @@ describe('the per-task rows an artefact carries', () => {
     // Two tasks called `unknown` would pair the wrong rows and report a difference that
     // belongs to neither arm.
     expect(() => perTaskRows([{ successes: 4, trials: 4, k: 4 }])).toThrow(L4ParseError);
+  });
+});
+
+describe('what a paired comparison could have detected', () => {
+  const comparison = (paired: number, lost: number, gained: number) => ({
+    paired,
+    onlyFirst: 0,
+    onlySecond: 0,
+    deltaPp: ((gained - lost) / paired) * 100,
+    ciLowPp: 0,
+    ciHighPp: 0,
+    p: 1,
+    lost,
+    gained,
+  });
+
+  it('reports the half-width the sample actually buys', () => {
+    // The run that made this necessary: 68 tasks, 13 lost and 14 gained.
+    const resolution = resolutionOf(comparison(68, 13, 14));
+    expect(resolution.standardErrorPp).toBeCloseTo(7.64, 2);
+    expect(resolution.halfWidthPp).toBeCloseTo(14.98, 1);
+    expect(resolution.detectableAtFivePp).toBe(false);
+    // And what it would take to see a 5pp difference at that discordance rate.
+    expect(resolution.tasksForFivePp).toBe(611);
+  });
+
+  it('says what a well-powered sample would need for 3pp', () => {
+    expect(resolutionOf(comparison(68, 13, 14)).tasksForThreePp).toBe(1695);
+  });
+
+  it('treats perfect agreement as no resolution rather than infinite confidence', () => {
+    // Zero discordance gives a zero standard error, which reads as certainty. It is the
+    // opposite: two arms that never disagree say nothing about the difference between
+    // them, and the required sample size is undefined rather than zero.
+    const resolution = resolutionOf(comparison(68, 0, 0));
+    expect(resolution.halfWidthPp).toBe(0);
+    expect(resolution.tasksForFivePp).toBe(0);
+    expect(resolution.detectableAtFivePp).toBe(true);
+  });
+
+  it('reports infinity when nothing was paired', () => {
+    const resolution = resolutionOf(comparison(0, 0, 0));
+    expect(resolution.halfWidthPp).toBe(Number.POSITIVE_INFINITY);
+    expect(resolution.detectableAtFivePp).toBe(false);
   });
 });

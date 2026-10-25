@@ -1,0 +1,62 @@
+{
+  "id": "poc-l4-pair",
+  "title": "L4 — memory arm against the reference arm on one split, paired per task",
+  "ranAt": "2026-10-25T04:19:31.944Z",
+  "first": {
+    "path": "/tmp/l4pair/arms/reference/poc-l4.json",
+    "ranAt": "2026-10-25T03:43:49.150Z",
+    "pass4": 0.5147058823529411
+  },
+  "second": {
+    "path": "/tmp/l4pair/arms/memory/poc-l4.json",
+    "ranAt": "2026-10-25T02:49:19.560Z",
+    "pass4": 0.5294117647058824
+  },
+  "comparison": {
+    "paired": 68,
+    "onlyFirst": 0,
+    "onlySecond": 0,
+    "deltaPp": 1.4705882352941175,
+    "ciLowPp": -13.23529411764706,
+    "ciHighPp": 16.176470588235293,
+    "p": 0.9999999999999899,
+    "lost": 13,
+    "gained": 14
+  },
+  "resolution": {
+    "standardErrorPp": 7.6414006216274,
+    "halfWidthPp": 14.977145218389705,
+    "tasksForFivePp": 611,
+    "tasksForThreePp": 1695,
+    "detectableAtFivePp": false
+  },
+  "gates": [
+    {
+      "id": "l4-paired",
+      "criterion": "memory - reference >= 0 at p < 0.05",
+      "actual": "1.47pp (p=1.0000, n=68)",
+      "pass": false,
+      "blocking": true
+    },
+    {
+      "id": "l4-resolution",
+      "criterion": "the design can detect a 5pp difference: 95% half-width <= 5pp",
+      "actual": "±15.0pp at n=68 (needs ~611 tasks)",
+      "pass": false,
+      "blocking": false
+    },
+    {
+      "id": "l4-same-split",
+      "criterion": "both arms scored exactly the same tasks",
+      "actual": "0 only in first, 0 only in second",
+      "pass": true,
+      "blocking": true
+    }
+  ],
+  "notes": [
+    "`deltaPp` is second - first, so a negative number means the second arm (memory) did worse.",
+    "pass^4 per task is the k=4 reading: a task counts only when all four trials passed.",
+    "The pair is defined on the intersection of task ids; tasks scored by one arm only are counted, not dropped silently.",
+    "Published reference for scale: ALTK-Evolve pass^4 = 0.575 on tau2-retail."
+  ]
+}

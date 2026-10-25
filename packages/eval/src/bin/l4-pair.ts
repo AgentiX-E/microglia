@@ -11,7 +11,7 @@
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { compareArms } from '@agentix-e/microglia-eval';
+import { compareArms, resolutionOf } from '@agentix-e/microglia-eval';
 import { writeJson } from './lib.js';
 
 type TaskRow = { readonly id: string; readonly passed_all: boolean };
@@ -59,6 +59,7 @@ const comparison = compareArms(
 );
 
 const splitMatches = comparison.onlyFirst === 0 && comparison.onlySecond === 0;
+const resolution = resolutionOf(comparison);
 const gates = [
   {
     id: 'l4-paired',
@@ -66,6 +67,16 @@ const gates = [
     actual: `${comparison.deltaPp.toFixed(2)}pp (p=${comparison.p.toFixed(4)}, n=${comparison.paired})`,
     pass: comparison.deltaPp >= 0 && comparison.p < BAR,
     blocking: true,
+  },
+  {
+    id: 'l4-resolution',
+    criterion: 'the design can detect a 5pp difference: 95% half-width <= 5pp',
+    actual: `±${resolution.halfWidthPp.toFixed(1)}pp at n=${comparison.paired} (needs ~${resolution.tasksForFivePp} tasks)`,
+    pass: resolution.detectableAtFivePp,
+    // Advisory, not blocking: an unresolvable run is still a run, and refusing to publish
+    // it would leave the sample size unmeasured. What it cannot do is support a 5pp claim,
+    // and this is the line that says so.
+    blocking: false,
   },
   {
     id: 'l4-same-split',
@@ -83,6 +94,7 @@ await writeJson('poc-l4-pair', {
   first: { path: FIRST, ranAt: first.ranAt ?? null, pass4: first.metrics?.pass4 ?? null },
   second: { path: SECOND, ranAt: second.ranAt ?? null, pass4: second.metrics?.pass4 ?? null },
   comparison,
+  resolution,
   gates,
   notes: [
     '`deltaPp` is second - first, so a negative number means the second arm (memory) did worse.',

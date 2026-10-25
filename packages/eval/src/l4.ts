@@ -376,3 +376,56 @@ export function perTaskRows(
     };
   });
 }
+
+/**
+ * What a paired L4 comparison could have detected, and what it would take.
+ *
+ * The lane compares `pass^4` means over 68 tasks, and the discordance between two arms
+ * is about 40% of them — 27 of 68 in the run that made this necessary. The standard error
+ * of a paired difference is therefore `sqrt(lost + gained) / n`, which is **7.6pp**, and
+ * the 95% half-width is **15pp**. The lane's own bar is 5pp, so the bar was never inside
+ * the design's reach: at this sample only an effect of about fifteen points could have
+ * been detected, and the arms differ by one or two.
+ *
+ * Reporting that beside the delta is the difference between "the memory costs points"
+ * and "this run could not have seen the difference it was looking for".
+ */
+export type Resolution = {
+  /** Standard error of the paired difference, in percentage points. */
+  readonly standardErrorPp: number;
+  /** 95% half-width, in percentage points. */
+  readonly halfWidthPp: number;
+  /** Paired tasks needed for a 5pp half-width at the observed discordance rate. */
+  readonly tasksForFivePp: number;
+  /** Paired tasks needed for a 3pp half-width. */
+  readonly tasksForThreePp: number;
+  readonly detectableAtFivePp: boolean;
+};
+
+export function resolutionOf(comparison: ArmComparison): Resolution {
+  const n = comparison.paired;
+  const discordant = comparison.lost + comparison.gained;
+  if (n === 0) {
+    return {
+      standardErrorPp: Number.POSITIVE_INFINITY,
+      halfWidthPp: Number.POSITIVE_INFINITY,
+      tasksForFivePp: Number.POSITIVE_INFINITY,
+      tasksForThreePp: Number.POSITIVE_INFINITY,
+      detectableAtFivePp: false,
+    };
+  }
+  const standardErrorPp = (Math.sqrt(discordant) / n) * 100;
+  const halfWidthPp = 1.96 * standardErrorPp;
+  // n needed scales with the discordance *count*, which itself scales with n; for a
+  // half-width h the standard error must be h/1.96, so n = 1.96^2 * d / (h * n_old)^2 * n_old
+  // reduces to the ratio below.
+  const scale = (target: number): number =>
+    discordant === 0 ? 0 : (1.96 ** 2 * discordant) / (n * (target / 100) ** 2);
+  return {
+    standardErrorPp,
+    halfWidthPp,
+    tasksForFivePp: Math.ceil(scale(5)),
+    tasksForThreePp: Math.ceil(scale(3)),
+    detectableAtFivePp: halfWidthPp <= 5,
+  };
+}
