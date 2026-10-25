@@ -203,8 +203,19 @@ every rule's `updatedAt`, so "nothing changed" and "this rule was rewritten" pro
 observation — the lane's first run reported **275** events for 50 changes. Fixed by making a merge with
 no new evidence a no-op; the lane now reports 50.
 
+`pnpm eval:judge` scores criteria against labels that were already paid for. ROSE-VEC publishes 322
+expert-adjudicated predictions on BIRD questions, and publishes the five annotators' own verdict files
+beside them, so the committee can be held to its own standard first: mean pairwise κ **0.7085**
+(0.5115–0.8522). Execution accuracy, measured on the same items, agrees with that committee at κ
+**0.4717** under ROSE's set semantics and **0.2995** under this repository's multiset semantics — 129
+of 216 correct predictions are called wrong by the second. Two degenerate criteria are scored alongside
+them: always-correct reaches κ 0 while scoring **0.6708** accuracy, higher than the multiset criterion's
+0.5950, which is the reason the lane emits accuracy, κ and MCC together and refuses to emit one alone.
+It costs no model calls, needs the pinned 800 MB Mini-Dev archive for the databases, and runs as its own
+workflow rather than on every push.
+
 `pnpm bundle:size` bundles both published entry points for the browser and holds them to a ceiling:
-**3,009 B raw / 1,410 B gzipped** for the client and **40,133 B / 13,842 B gzipped** for the core. The
+**3,009 B raw / 1,410 B gzipped** for the client and **42,762 B / 14,533 B gzipped** for the core. The
 build would fail if either stopped bundling without Node builtins, which is the "no runtime dependency"
 promise measured rather than asserted. `pnpm bundle:size -- --probe` halves a ceiling and must be
 rejected — a budget that cannot be exceeded is not a gate.

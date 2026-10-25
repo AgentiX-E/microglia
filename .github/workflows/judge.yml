@@ -1,0 +1,115 @@
+name: judge
+
+# The calibration lane.
+#
+# It answers one question and refuses to answer any other: how well does a criterion
+# agree with people who were paid to disagree carefully? The lane produces no product
+# number and gates nothing. It exists because the audit carried a blocker — "an LLM
+# judge needs 200 human labels before it can be trusted" — and a blocker that nobody
+# has priced is a blocker that stays.
+#
+# Two facts make the item cheaper than it looked, and both are measured here rather
+# than asserted:
+#
+#   - the reference already exists in public. ROSE-VEC publishes expert-adjudicated
+#     verdicts for real NL2SQL predictions, and the annotators' own five files are
+#     published beside it, so the committee can be scored against itself;
+#   - execution accuracy is not a substitute for that reference. On the same 322 items
+#     it agrees with the committee far less than the committee agrees with itself,
+#     which is why "gold is computable" does not mean "the gold is the judge".
+#
+# The databases are the 800 MB archive the S2 lane already pins. It is fetched from
+# the vendor and checked against the digest in `eval/manifests/bird-minidev.json`;
+# the ROSE files are fetched from the paper's repository and checked against the
+# digests below. A changed byte on either side fails the run rather than moving the
+# number quietly.
+on:
+  workflow_dispatch:
+    inputs:
+      upload:
+        description: 'Upload the artefact (false = print only, for a quick look)'
+        required: false
+        default: 'true'
+
+permissions:
+  contents: read
+
+jobs:
+  calibrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Build
+        run: pnpm build
+
+      # The digest list is inline rather than in a manifest file because these six
+      # files are the paper's artefact, not this repository's dataset: copying them
+      # into `eval/manifests` would suggest this project ships them.
+      - name: Fetch ROSE-VEC and the annotators' files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir -p .cache/rose-vec
+          base="https://raw.githubusercontent.com/CedricPei/ROSE/master/data/annotations"
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "$base/rose-vec-bird.json" -o .cache/rose-vec/rose-vec-bird.json
+          for i in 1 2 3 4 5; do
+            curl -fsSL -H "Authorization: Bearer $GH_TOKEN" "$base/bird/annotations_$i.json" -o ".cache/rose-vec/annotations_$i.json"
+          done
+          cd .cache/rose-vec
+          sha256sum -c --quiet <<'SUMS'
+          996631db0bb24f36c19fbe3170d7209e3d613b9eb1b4426b2288db7a949a980f  rose-vec-bird.json
+          70d3c06e9ae3e47aeb5a5becbfb9eddaef4580dfafccfbe2efc544c8395834f7  annotations_1.json
+          2864b94b37cf154cf37e73d1a08573c01d2889c087682761b7d37a327fb4fbf7  annotations_2.json
+          326c2940312345a079229096e2f5e8fcfe7a3ee472e950494651e607256f9242  annotations_3.json
+          16ab9e76f6ff561c2dcd3dd41e63bf573ccbfb6f271f89fcf4e92847a4635b80  annotations_4.json
+          64b0e62903ea8e1f8fddae9949f08ed9007dc0e566c3fac623969a8d3ad7c3b1  annotations_5.json
+          SUMS
+
+      # The database root is flattened, because that is the one layout both this lane
+      # and a reader with a manually extracted copy can produce. The digest is read
+      # from the manifest rather than repeated here: one pin, one place to change it.
+      - name: Fetch and verify the pinned Mini-Dev databases
+        run: |
+          set -euo pipefail
+          url=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('eval/manifests/bird-minidev.json','utf8')).url)")
+          digest=$(node -e "process.stdout.write(JSON.parse(require('fs').readFileSync('eval/manifests/bird-minidev.json','utf8')).sha256)")
+          mkdir -p .cache/bird
+          curl -fsSL --retry 3 --retry-delay 5 "$url" -o .cache/bird/minidev.zip
+          echo "$digest  .cache/bird/minidev.zip" | sha256sum -c -
+          mkdir -p .cache/bird/databases
+          unzip -q -o -j .cache/bird/minidev.zip 'minidev/MINIDEV/dev_databases/*/*.sqlite' -d .cache/bird/databases
+          count=$(ls .cache/bird/databases/*.sqlite | wc -l)
+          echo "extracted $count databases"
+          test "$count" -eq 11
+
+      - name: Calibrate
+        env:
+          ROSE_VEC_DIR: ${{ github.workspace }}/.cache/rose-vec
+          BIRD_DB_DIR: ${{ github.workspace }}/.cache/bird/databases
+          POC_RESULT_DIR: ${{ github.workspace }}/eval/results
+        run: pnpm eval:judge
+
+      - name: Print the artefact
+        run: cat eval/results/judge-calibration.json
+
+      - uses: actions/upload-artifact@v4
+        if: inputs.upload == 'true'
+        with:
+          name: judge-calibration
+          path: eval/results/judge-calibration.json
+          if-no-files-found: error

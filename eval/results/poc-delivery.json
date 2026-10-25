@@ -1,7 +1,7 @@
 {
   "id": "poc-delivery",
   "title": "POC-19 — webhook delivery: signed, ordered, at least once",
-  "ranAt": "2026-10-23T00:50:14.273Z",
+  "ranAt": "2026-10-25T07:29:02.672Z",
   "model": "none",
   "n": 50,
   "calls": 0,
@@ -14,9 +14,9 @@
     "retries": 1,
     "signature_failures": 0,
     "ordering_violations": 0,
-    "p50_ms": 0.642,
-    "p95_ms": 2.571,
-    "slowest_ms": 253.637,
+    "p50_ms": 0.663,
+    "p95_ms": 2.63,
+    "slowest_ms": 253.297,
     "bound_ms": 60000,
     "gates_passed": 7,
     "gates_total": 7
@@ -25,7 +25,7 @@
     "A real HTTP receiver on loopback verifies an HMAC over the posted bytes, stores by event id and de-duplicates; the sender is the library's own WebhookDispatcher.",
     "The receiver stores the first request and then loses the acknowledgement, so the retry has to carry the same id: one repeat, one stored event, zero missed. A sender with random ids would have shown two stored events instead.",
     "One request is answered 250 ms late on purpose. The slowest delivery has to move past it, or a stopwatch stuck at zero would pass the latency gate.",
-    "p95 is 2.571 ms on loopback. The contract's 60 s is a ceiling this lane cannot stress — it reports the floor and inherits the bound rather than proving it.",
+    "p95 is 2.63 ms on loopback. The contract's 60 s is a ceiling this lane cannot stress — it reports the floor and inherits the bound rather than proving it.",
     "Event types are derived from store transitions (admitted, rewritten, retired); task.completed is built from the record the host holds when it closes a task, because the task table is the host's."
   ]
 }

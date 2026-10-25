@@ -1,7 +1,7 @@
 {
   "id": "poc-l0",
   "title": "L0 — rule-derived adjudication on 1,300 cases",
-  "ranAt": "2026-10-23T00:50:12.944Z",
+  "ranAt": "2026-10-25T07:29:01.336Z",
   "model": "none",
   "n": 1300,
   "calls": 0,
@@ -85,6 +85,12 @@
     {
       "arm": "narrow-budget",
       "top1": 0.3211538461538462,
+      "knowledge": 16,
+      "active": 6
+    },
+    {
+      "arm": "corroborated-only",
+      "top1": 0.9644230769230769,
       "knowledge": 16,
       "active": 6
     }

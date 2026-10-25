@@ -254,3 +254,29 @@ export {
   type IntegrityReport,
   type Replay,
 } from './integrity.js';
+
+export {
+  agreementReport,
+  cohenKappa,
+  confusionOf,
+  mccOf,
+  raterAgreement,
+  type AgreementReport,
+  type Confusion,
+  type JudgedPair,
+  type PairwiseAgreement,
+  type RaterAgreement,
+  type RaterLabels,
+} from './agreement.js';
+
+export {
+  RoseVecError,
+  consensusOf,
+  judgedPairs,
+  labelDisputes,
+  parseRater,
+  parseRoseVec,
+  rowsEqual,
+  type RoseVecErrorReason,
+  type RoseVecRow,
+} from './rose-vec.js';

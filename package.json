@@ -35,6 +35,7 @@
     "eval:pairs": "tsx packages/eval/src/bin/pairs.ts",
     "eval:delivery": "tsx packages/eval/src/bin/delivery.ts",
     "eval:l4": "tsx packages/eval/src/bin/l4.ts",
+    "eval:judge": "tsx packages/eval/src/bin/judge-calibrate.ts",
     "eval:cortex": "node scripts/cortex-conformance.mjs",
     "audit:deps": "pnpm audit --prod",
     "audit:repo": "node scripts/audit.mjs",
