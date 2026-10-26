@@ -191,6 +191,16 @@ describe('matches', () => {
 });
 
 describe('parseArms', () => {
+  it('accepts every arm the package declares, one name at a time', () => {
+    // The regression this exists for: `full-validated` was added to a lane's local copy
+    // of the union, compiled there, and was rejected by this function at runtime — a
+    // dispatch failed two seconds in with "Unknown arm". Every declared name is now
+    // proved selectable.
+    for (const arm of OPTIONAL_ARMS) {
+      expect([...parseArms(arm)]).toEqual(['none', 'full', arm]);
+    }
+  });
+
   it('defaults to every optional arm plus the two required ones', () => {
     const arms = parseArms(undefined);
     expect([...arms].sort()).toEqual([
@@ -200,6 +210,7 @@ describe('parseArms', () => {
       'full-corroborated',
       'full-narrow',
       'full-plain',
+      'full-validated',
       'gated',
       'none',
       'oracle',
@@ -222,10 +233,14 @@ describe('parseArms', () => {
   });
 
   it('covers every documented arm', () => {
+    // The table is checked against the union at compile time, so this cannot catch an
+    // omission — it catches a change. Adding an arm has to touch this list, which puts
+    // the decision somewhere a reviewer sees it rather than inside a `Record` literal.
     expect([...OPTIONAL_ARMS]).toEqual([
       'full-narrow',
       'full-plain',
       'full-corroborated',
+      'full-validated',
       'critique',
       'gated',
       'duplicate',

@@ -201,6 +201,17 @@ export type SqlArm =
    */
   | 'full-corroborated'
   /**
+   * The same pack after utility-based deletion.
+   *
+   * Xiong et al. (arXiv 2505.16067) report that a retrieved record is followed closely
+   * enough to propagate its error, and that deleting by observed utility beats deleting
+   * by age: selective addition plus history-based deletion recovers about 10 points over
+   * naive growth. The arm runs the pack over the fold's learn rows, credits a rule with a
+   * failure when the answer it was injected into was wrong, and retires the rules so
+   * credited before any held-out question is scored.
+   */
+  | 'full-validated'
+  /**
    * The same pack, with the model asked to *decide* applicability before answering.
    *
    * Iterations 63 and 64 showed that a rule can carry its condition and that the model
@@ -217,17 +228,31 @@ export type SqlArm =
   | 'stated'
   | 'oracle';
 
-export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = [
-  'full-narrow',
-  'full-plain',
-  'full-corroborated',
-  'critique',
-  'gated',
-  'duplicate',
-  'wrong-scope',
-  'stated',
-  'oracle',
-];
+/**
+ * Every optional arm, as a table keyed by the union itself.
+ *
+ * A plain array would let a new `SqlArm` variant exist without a string to select it —
+ * which is exactly what happened: `full-validated` was added to a lane's local copy of
+ * the union, the lane's `ARMS.has('full-validated')` compiled, and `parseArms` rejected
+ * the name at runtime. A `Record` over the union makes the omission a compile error, and
+ * deriving the array from it means the two cannot drift again.
+ */
+const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
+  'full-narrow': true,
+  'full-plain': true,
+  'full-corroborated': true,
+  'full-validated': true,
+  critique: true,
+  gated: true,
+  duplicate: true,
+  'wrong-scope': true,
+  stated: true,
+  oracle: true,
+};
+
+export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(
+  OPTIONAL_ARM_TABLE,
+) as readonly Exclude<SqlArm, 'none' | 'full'>[];
 
 /**
  * Parse `SOTA_ARMS`.

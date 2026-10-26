@@ -108,6 +108,7 @@ import {
   requirePopulated,
   sha256OfFile,
   type BirdManifest,
+  type SqlArm,
   type ChatReply,
   type ResultComparison,
   type ConventionName,
@@ -171,33 +172,11 @@ type Task = {
 /** Task name under which knowledge is scoped, and therefore recalled. */
 const TASK = 'sql.generate';
 
-type ArmName =
-  | 'none'
-  | 'full'
-  | 'full-narrow'
-  | 'full-plain'
-  | 'full-corroborated'
-  /**
-   * The same pack after the history-based deletion the literature prescribes.
-   *
-   * Xiong et al. (arXiv 2505.16067) report that agents imitate retrieved experience
-   * closely enough that a bad record propagates, and that deleting records by their
-   * observed utility beats deleting by age — with selective addition and deletion
-   * together recovering about 10 points over naive growth. This arm is the deletion
-   * half at the granularity this framework has: a rule that was injected into a
-   * generated answer which then failed earns a negative credit, and a rule whose
-   * credit is negative is retired before the held-out questions are scored.
-   *
-   * The validation pass reads `learnRows`, never `evalRows`: deleting on the basis of
-   * the questions being scored would be leakage with a tidy name.
-   */
-  | 'full-validated'
-  | 'critique'
-  | 'gated'
-  | 'duplicate'
-  | 'wrong-scope'
-  | 'stated'
-  | 'oracle';
+/**
+ * The arm set has one definition, in the package: a lane-local copy is how `full-validated`
+ * came to compile here while `parseArms` rejected it at runtime.
+ */
+type ArmName = SqlArm;
 
 /**
  * The coverage floor the `gated` arm runs with, fixed before the run.
