@@ -308,9 +308,10 @@ export {
   groundedItems,
   resolveDatabase,
   rowsDiffer,
-  schemaNames,
+  schemaIndex,
   type ExecuteOptions,
   type QueryOutcome,
+  type SchemaIndex,
 } from './sql-exec.js';
 
 export {

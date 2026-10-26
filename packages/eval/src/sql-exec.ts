@@ -121,46 +121,50 @@ export function resolveDatabase(directory: string, dbId: string): string {
 }
 
 /**
- * Every table and column name a database exposes, lower-cased.
+ * What a database exposes, split by how distinctive each name is.
  *
- * Used to answer one question about a stored rule: does it name anything that exists here?
- * Across 1,320 rules distilled from BIRD, 77% name no table or column at all — they are prose
- * about meaning ("a '+’ value in the coagulation test columns"), and a reader cannot check one
- * against the schema it is being injected into. Among the 21.5% that do name a table, 77% name
- * one the question's own answer uses.
- *
- * The list is cached per path because a fold asks this once per question and the schema does
- * not change during a run.
+ * The split matters more than it looks. A first version of the grounding filter accepted any
+ * column name, and 80% of the pack passed it — because BIRD has columns called `date`, `name`,
+ * `status` and `rank`, and rules say those words in ordinary sentences. Only a *distinctive*
+ * name is evidence that a rule is about this database.
  */
-const schemaCache = new Map<string, ReadonlySet<string>>();
+export type SchemaIndex = {
+  /** Table names, lower-cased. Distinctive: `frpm`, `player_attributes`. */
+  readonly tables: ReadonlySet<string>;
+  /** Column names, lower-cased. Many are ordinary words. */
+  readonly columns: ReadonlySet<string>;
+};
 
-export function schemaNames(dbPath: string): ReadonlySet<string> {
+const schemaCache = new Map<string, SchemaIndex>();
+
+export function schemaIndex(dbPath: string): SchemaIndex {
   const hit = schemaCache.get(dbPath);
   if (hit !== undefined) return hit;
-  const names = new Set<string>();
+  const tables = new Set<string>();
+  const columns = new Set<string>();
   let db: DatabaseSync | undefined;
   try {
     db = new DatabaseSync(dbPath, { readOnly: true });
-    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[];
-    for (const table of tables) {
-      names.add(table.name.toLowerCase());
+    const found = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[];
+    for (const table of found) {
+      tables.add(table.name.toLowerCase());
       // Identifier quoting inside PRAGMA: a name with a quote in it would break the
       // statement, and a name with a quote in it is not something this project produces.
-      const columns = db.prepare(`PRAGMA table_info("${table.name.replace(/"/g, '""')}")`).all() as {
+      const listed = db.prepare(`PRAGMA table_info("${table.name.replace(/"/g, '""')}")`).all() as {
         name: string;
       }[];
-      for (const column of columns) names.add(String(column.name).toLowerCase());
+      for (const column of listed) columns.add(String(column.name).toLowerCase());
     }
   } catch {
-    // A database that will not open has no names; the caller sees an empty set and every
-    // rule looks ungrounded, which is a visible failure rather than a silent pass.
-    return new Set();
+    // A database that will not open has no names; the caller sees empty sets and every rule
+    // looks ungrounded, which is a visible failure rather than a silent pass.
+    return { tables: new Set(), columns: new Set() };
   } finally {
     if (db !== undefined) db.close();
   }
-  const frozen: ReadonlySet<string> = names;
-  schemaCache.set(dbPath, frozen);
-  return frozen;
+  const index: SchemaIndex = { tables, columns };
+  schemaCache.set(dbPath, index);
+  return index;
 }
 
 /**
@@ -173,12 +177,25 @@ export function schemaNames(dbPath: string): ReadonlySet<string> {
  */
 export function groundedItems<T extends { readonly statement: string }>(
   items: readonly T[],
-  names: ReadonlySet<string>,
+  index: SchemaIndex,
 ): readonly T[] {
-  return items.filter((item) => {
-    for (const word of item.statement.toLowerCase().match(/[a-z][a-z0-9_]*/g) ?? []) {
-      if (names.has(word)) return true;
-    }
-    return false;
-  });
+  return items.filter((item) => namesIn(item.statement, index));
+}
+
+/**
+ * Whether a statement names something a reader can look up unambiguously.
+ *
+ * A table name always counts: `frpm` and `player_attributes` are not English. A column counts
+ * only when its name cannot be read as prose — it carries `_` or a space. That restriction is
+ * the whole point, and it was measured the hard way: a first version accepted any column, and
+ * 80% of the pack passed because rules say "date", "name", "status" and "rank" in ordinary
+ * sentences. The strict reading passes 21.5%, which is the share that names a *distinctive*
+ * identifier, and only that reading produces an arm meaningfully different from `full`.
+ */
+function namesIn(statement: string, index: SchemaIndex): boolean {
+  for (const word of statement.toLowerCase().match(/[a-z][a-z0-9_]*/g) ?? []) {
+    if (index.tables.has(word)) return true;
+    if (index.columns.has(word) && (word.includes('_') || word.includes(' '))) return true;
+  }
+  return false;
 }

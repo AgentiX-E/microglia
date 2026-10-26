@@ -117,7 +117,7 @@ import {
   reportedSql,
   requirePopulated,
   resolveDatabase,
-  schemaNames,
+  schemaIndex,
   sha256OfFile,
   type AnchorMode,
   type BirdManifest,
@@ -1417,7 +1417,7 @@ async function runFold(
     if (ARMS.has('full-grounded')) {
       // Checkable rules only. The filter reads the schema of this database, not the question,
       // so it cannot leak the answer into the pack.
-      const grounded = groundedItems(pack.items, schemaNames(dataset.dbPath(row.db_id)));
+      const grounded = groundedItems(pack.items, schemaIndex(dataset.dbPath(row.db_id)));
       const kept = makePack(grounded, { budget: pack.budget });
       groundedSizes.push({ all: pack.items.length, grounded: grounded.length });
       call(position, 'full-grounded', kept.rendered, kept.ids.length);
@@ -1425,7 +1425,7 @@ async function runFold(
     if (ARMS.has('full-sampled')) {
       // Same size as the grounded pack, chosen from the same ids, so the two arms differ in
       // which rules a reader can check rather than in how many rules there are.
-      const size = groundedItems(pack.items, schemaNames(dataset.dbPath(row.db_id))).length;
+      const size = groundedItems(pack.items, schemaIndex(dataset.dbPath(row.db_id))).length;
       const order = [...pack.items];
       const random = mulberry32(SEED + position);
       for (let at = order.length - 1; at > 0; at -= 1) {
