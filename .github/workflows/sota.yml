@@ -140,6 +140,20 @@ jobs:
       # step rather than on the job, and a provider that stops answering trips the
       # breaker and fails with MG_E_PROVIDER_FAILED instead of publishing a number
       # produced by an outage.
+      # Between dispatches, not within one. Every run distils its own rules from its own
+      # replies, so `full` has been anything from -4.57pp to +0.86pp across five dispatches
+      # of identical code: the treatment moved, not just the measurement. Replaying the
+      # distillations makes a re-run learn the same store, which is what lets a cross-run
+      # comparison vary in one thing. The key carries the run id because actions/cache never
+      # overwrites an existing key, and the restore is a prefix match.
+      - name: Restore the distillation cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/distill
+          key: distill-${{ vars.SOTA_MODEL || 'deepseek-chat' }}-sql-prompt-3-${{ github.run_id }}
+          restore-keys: |
+            distill-${{ vars.SOTA_MODEL || 'deepseek-chat' }}-sql-prompt-3-
+
       - name: Run the benchmark
         timeout-minutes: 160
         env:
@@ -152,6 +166,7 @@ jobs:
           SOTA_CONCURRENCY: ${{ github.event.inputs.concurrency || '6' }}
           SOTA_SEMANTICS: ${{ github.event.inputs.semantics || 'multiset' }}
           SOTA_VALIDATION_CREDIT: ${{ github.event.inputs.validation_credit || 'absolute' }}
+          SOTA_DISTILL_CACHE: ${{ github.workspace }}/.cache/distill/cache.json
           SOTA_CONVENTION: ${{ github.event.inputs.convention || '' }}
           SOTA_RESAMPLES: '10000'
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}

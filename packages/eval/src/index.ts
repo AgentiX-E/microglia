@@ -321,3 +321,5 @@ export {
   type RetirementPolicy,
   type ValidationCredit,
 } from './validation.js';
+
+export { DistillCache, type DistillCacheStats } from './distill-cache.js';

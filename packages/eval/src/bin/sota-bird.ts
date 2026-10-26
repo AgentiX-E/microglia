@@ -81,6 +81,7 @@ import {
   type Interpreter,
 } from '@agentix-e/microglia-core/distill';
 import {
+  DistillCache,
   GenerationCache,
   HOUSE_CONVENTIONS,
   armPairsAgainstFull,
@@ -213,6 +214,15 @@ function armsFrom(raw: string | undefined): Set<ArmName> {
     });
   }
 }
+
+/**
+ * The distillation cache, persisted so a replayed dispatch learns the same store.
+ *
+ * Unset path means no persistence: the run pays for every distillation, as every run did
+ * before this existed. The workflow points it at a path it caches between dispatches.
+ */
+const DISTILL_CACHE_PATH = process.env['SOTA_DISTILL_CACHE'] ?? '';
+const distillations = DistillCache.load(DISTILL_CACHE_PATH);
 
 const ARMS = armsFrom(process.env['SOTA_ARMS']);
 
@@ -1027,9 +1037,18 @@ async function buildFoldMemory(
       recording(
         createLlmInterpreter({
           llm: {
+            // Distillation is the step that makes the *treatment*, not just the measurement:
+            // two dispatches of the same code distil different rules from different replies,
+            // so `full` has been anything from −4.57pp to +0.86pp across five runs. Replaying
+            // the replies makes a re-run learn the same store, which is the only way an arm
+            // comparison across dispatches varies in one thing.
             complete: async (prompt) => {
+              const key = DistillCache.keyOf(MODEL, PROMPT_VERSION, prompt);
+              const cached = distillations.get(key);
+              if (cached !== undefined) return cached;
               const reply = await chat(prompt, 2000);
               lastReply = reply.text;
+              distillations.set(key, reply.text);
               return reply.text;
             },
           },
@@ -1602,6 +1621,10 @@ async function runFold(
   await widened.host.close();
   if (narrowed !== undefined) await narrowed.host.close();
 
+  // Written per fold: a run that dies at fold 4 keeps the distillations it paid for, and the
+  // next dispatch replays them instead of buying them again.
+  distillations.save();
+
   const packIds = cases.reduce((sum, item) => sum + item.packIds, 0);
   process.stdout.write(
     `[sota] fold ${fold + 1}/${FOLDS}: eval=${cases.length} learn=${learnRows.length} ` +
@@ -2046,6 +2069,16 @@ async function main(): Promise<void> {
        * about its own source question.
        */
       validation_self_excluded: validations.reduce((sum, entry) => sum + entry.excluded, 0),
+      /**
+       * The distillation cache, because a replayed run is a different kind of evidence.
+       *
+       * A run with zero hits learnt its own store; one with a thousand hits replayed a store
+       * an earlier dispatch learnt. Both are valid, and they answer different questions, so
+       * the counts travel with the numbers they produced.
+       */
+      distill_cache_hits: distillations.stats.hits,
+      distill_cache_misses: distillations.stats.misses,
+      distill_cache_entries: distillations.stats.size,
       validation_harmed: validations.reduce((sum, entry) => sum + entry.harmed, 0),
       /**
        * Questions the anchored arm could not revise, because the first round never answered.
