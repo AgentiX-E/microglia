@@ -247,6 +247,24 @@ published number was scored under) or `set` (the reading under which execution a
 committee most closely). Both are computed on every run, from one execution, so the shadow column answers
 "would this delta have survived the other criterion" without a second dispatch.
 
+`SOTA_ARMS=full-validated` runs the deletion half of the memory literature's remedy: after a fold learns,
+it answers its own learn rows, credits each rule that reached a prompt whose answer was wrong, and retires
+the rules whose failure share is at least `SOTA_VALIDATION_FAILURE_RATE` (default 0.5) over at least
+`SOTA_VALIDATION_TRIALS` (default 2) injections — on learn rows only, because deleting on the questions
+being scored is leakage with a tidier name. It retires **268 of 805 rules**, changes the pack on **192 of
+350** scored questions, and moves the result by **−0.57pp [−2.86, +1.71], p = 0.81** against `full` on the
+same questions. The artefact says why: the credit carries no per-rule information, and the failure counts
+fit a single binomial at the lane's own error rate (pooled χ² 10.71 on 9 degrees of freedom, p = 0.296), so
+"the worst third" is a random third. A `validation_histogram` and the policy that produced it travel with
+every run, because a deletion that retired nothing and a rule that was never injected twice otherwise look
+the same.
+
+`DEEPSEEK_ENDPOINT` points the lane at a stand-in instead of the provider, and
+`eval/drivers/stand-in.mjs` is one: a rule per distillation, `SELECT 1` for every query. It exists because a
+sequencing defect in the deletion arm — it wrote to the store inside the scoring window — reached CI and
+spent fourteen minutes failing a guard that was correct, and every other mechanism here had been rehearsed
+locally first. The artefact records the endpoint host, so a rehearsal cannot be mistaken for a run.
+
 `pnpm bundle:size` bundles both published entry points for the browser and holds them to a ceiling:
 **3,009 B raw / 1,410 B gzipped** for the client and **42,762 B / 14,533 B gzipped** for the core. The
 build would fail if either stopped bundling without Node builtins, which is the "no runtime dependency"
@@ -278,7 +296,7 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-**99.97 / 99.62 / 100 / 99.97** over **1,066 tests**; the branch arms that remain uncovered are
+**99.97 / 99.62 / 100 / 99.97** over **1,081 tests**; the branch arms that remain uncovered are
 listed with file, line, and reason in the internal technical design, and none is excluded with an ignore
 comment.
 

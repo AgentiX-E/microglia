@@ -1,0 +1,3792 @@
+{
+  "id": "sota-adjudication",
+  "title": "The S2 answers, re-scored by a criterion EX did not choose",
+  "ranAt": "2026-10-26T02:44:42.540Z",
+  "model": "deepseek-chat",
+  "n": 292,
+  "calls": 1211,
+  "variant": "judge-prompt/1+refuter-prompt/1",
+  "metrics": {
+    "questions": 292,
+    "dropped": 58,
+    "judged_without_memory": 0.708904109589041,
+    "judged_with_memory": 0.660958904109589,
+    "judged_delta_pp": -4.794520547945205,
+    "judged_ci_low_pp": -8.904109589041095,
+    "judged_ci_high_pp": -1.0273972602739725,
+    "judged_p": 0.024306510109454657,
+    "judged_lost": 24,
+    "judged_gained": 10,
+    "execution_without_memory": 0.5924657534246576,
+    "execution_with_memory": 0.5616438356164384,
+    "execution_delta_pp": -3.0821917808219177,
+    "execution_p": 0.10775214433669844,
+    "verdict_changes": 49,
+    "pairs_with_equal_rows": 185,
+    "retries": 3
+  },
+  "notes": [
+    "Source poc-sota-bird.json, 350 questions, 292 answered by both arms.",
+    "Judged: 0.7089 -> 0.6610, delta -4.79pp [-8.90, -1.03], p=0.0243.",
+    "Execution: delta -3.08pp, p=0.1078.",
+    "The two criteria disagree on 49 of 292 judged verdicts."
+  ],
+  "per_task": [
+    {
+      "id": "european_football_2#1025",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#197",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#12",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "debit_card_specializing#1473",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#865",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#723",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "financial#94",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "student_club#1338",
+      "fold": 0,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1156",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#347",
+      "fold": 0,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#571",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1032",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#208",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#27",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1482",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#880",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#732",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1359",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1171",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#397",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#586",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "california_schools#37",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#117",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1057",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#219",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1521",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#895",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#743",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "student_club#1390",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1189",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#409",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "financial#136",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#633",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1084",
+      "fold": 0,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#231",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "california_schools#62",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#909",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#760",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1404",
+      "fold": 0,
+      "withMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1208",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#459",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#665",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "financial#152",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1098",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#242",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#85",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#944",
+      "fold": 0,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#773",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1435",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1231",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#469",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#694",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#189",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1110",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#249",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#963",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#790",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1241",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#479",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1130",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#268",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#990",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#800",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1254",
+      "fold": 0,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#487",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#1002",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1146",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#825",
+      "fold": 0,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1267",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#530",
+      "fold": 0,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#544",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1028",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "toxicology#198",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "california_schools#23",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "debit_card_specializing#1476",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#866",
+      "fold": 1,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#724",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "financial#95",
+      "fold": 1,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "student_club#1339",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1162",
+      "fold": 1,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#349",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#572",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1036",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#212",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#28",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1490",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#881",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#733",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1375",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1175",
+      "fold": 1,
+      "withMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#402",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#587",
+      "fold": 1,
+      "withMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#118",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1058",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "toxicology#220",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#40",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1526",
+      "fold": 1,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#896",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#744",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1398",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1192",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#412",
+      "fold": 1,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#137",
+      "fold": 1,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#634",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1088",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#232",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#72",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#928",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#761",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1405",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1209",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#462",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#672",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#168",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1102",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#243",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#87",
+      "fold": 1,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#954",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#775",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1457",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1232",
+      "fold": 1,
+      "sameRows": false,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#472",
+      "fold": 1,
+      "sameRows": false,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#701",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "financial#192",
+      "fold": 1,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1113",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#253",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#972",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#794",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1242",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#480",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1135",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "toxicology#273",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#994",
+      "fold": 1,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#801",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1255",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#518",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#1003",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1148",
+      "fold": 1,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#829",
+      "fold": 1,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1270",
+      "fold": 1,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "student_club#1317",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1149",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#344",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#557",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1029",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "toxicology#201",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "california_schools#24",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1479",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#869",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#726",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#98",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1340",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1164",
+      "fold": 2,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#352",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#578",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "financial#100",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1037",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#213",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#31",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1501",
+      "fold": 2,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#884",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#736",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1376",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1179",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#405",
+      "fold": 2,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#595",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#125",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1068",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "toxicology#226",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#45",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1529",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#897",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#751",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1399",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1195",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#415",
+      "fold": 2,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#138",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#637",
+      "fold": 2,
+      "withMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1091",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#234",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "california_schools#77",
+      "fold": 2,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#931",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#766",
+      "fold": 2,
+      "withMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "student_club#1426",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1225",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#465",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#682",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#169",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1103",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#244",
+      "fold": 2,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#955",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#782",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1460",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1235",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#473",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#707",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "financial#194",
+      "fold": 2,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1114",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#255",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#981",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#796",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1243",
+      "fold": 2,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#483",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1136",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#281",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#819",
+      "fold": 2,
+      "withMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1256",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#522",
+      "fold": 2,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#1011",
+      "fold": 2,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1275",
+      "fold": 2,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#89",
+      "fold": 3,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "student_club#1322",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1150",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#345",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#563",
+      "fold": 3,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1030",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#206",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#25",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1480",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#877",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#728",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#99",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1350",
+      "fold": 3,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1168",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#371",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#581",
+      "fold": 3,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#115",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1040",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#215",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "california_schools#32",
+      "fold": 3,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1506",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#892",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#739",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1381",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1185",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#407",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#598",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "financial#128",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1076",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#228",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#47",
+      "fold": 3,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "debit_card_specializing#1531",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#904",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#753",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1401",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1201",
+      "fold": 3,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#416",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#639",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#145",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1094",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "toxicology#236",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#79",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#933",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#769",
+      "fold": 3,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "student_club#1427",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1227",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#466",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#683",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#173",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1105",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#245",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#960",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#786",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1464",
+      "fold": 3,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1238",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#474",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#716",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1115",
+      "fold": 3,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "toxicology#260",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#988",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#797",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1247",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#484",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1139",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#282",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#822",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1257",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#528",
+      "fold": 3,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#1014",
+      "fold": 3,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1281",
+      "fold": 3,
+      "withMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "debit_card_specializing#1472",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#846",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#719",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "financial#93",
+      "fold": 4,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "student_club#1323",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1152",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#346",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#565",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1031",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "toxicology#207",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "california_schools#26",
+      "fold": 4,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1481",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#879",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#730",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1352",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1169",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#391",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#584",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#116",
+      "fold": 4,
+      "withMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1042",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#218",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1509",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#894",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#740",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#36",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "student_club#1387",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1187",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#408",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "codebase_community#604",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1080",
+      "fold": 4,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "toxicology#230",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "california_schools#48",
+      "fold": 4,
+      "withMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "debit_card_specializing#1533",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#906",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#758",
+      "fold": 4,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#129",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "student_club#1403",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1205",
+      "fold": 4,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#427",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#640",
+      "fold": 4,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#149",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1096",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#240",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "california_schools#83",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#940",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#772",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "student_club#1432",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1229",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#468",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "codebase_community#685",
+      "fold": 4,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "financial#186",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1107",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "toxicology#247",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "formula_1#962",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#788",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1239",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "card_games#477",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "european_football_2#1124",
+      "fold": 4,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#263",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#989",
+      "fold": 4,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "superhero#798",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1252",
+      "fold": 4,
+      "withoutMemory": false,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#486",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "formula_1#1001",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "european_football_2#1141",
+      "fold": 4,
+      "withMemory": false,
+      "withoutMemory": true,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "toxicology#327",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "superhero#824",
+      "fold": 4,
+      "withMemory": true,
+      "withoutMemory": true,
+      "sameRows": true,
+      "execution": {
+        "withMemory": true,
+        "withoutMemory": true
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1265",
+      "fold": 4,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "card_games#529",
+      "fold": 4,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    },
+    {
+      "id": "thrombosis_prediction#1302",
+      "fold": 4,
+      "sameRows": false,
+      "execution": {
+        "withMemory": false,
+        "withoutMemory": false
+      }
+    }
+  ]
+}
