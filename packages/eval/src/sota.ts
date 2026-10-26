@@ -201,6 +201,27 @@ export type SqlArm =
    */
   | 'full-corroborated'
   /**
+   * The same pack, moved after the question.
+   *
+   * `full` renders schema, evidence, pack, question. Every result this project has published
+   * was produced under that order, and the order was never a variable. Recency is the one
+   * position effect with a consistent sign in the literature, and it costs one arm to find
+   * out whether the 2–5pp is partly an artefact of putting the rule before the question.
+   * It also gives `full-anchored` a control with the same order, so the anchoring test is
+   * one difference rather than two.
+   */
+  | 'full-late'
+  /**
+   * The pack as an objection to the model's own draft, in a second call.
+   *
+   * The failure being attacked is imitation: a retrieved record shapes the answer before the
+   * question has been read. A model cannot be instructed out of that (ICML 2025 measures every
+   * natural-language intervention failing), but it can be given its own answer to imitate
+   * instead. Costs two calls per question — the draft and the revision — and reports the
+   * revision, which is the answer the arm is claiming.
+   */
+  | 'full-anchored'
+  /**
    * The same pack after utility-based deletion.
    *
    * Xiong et al. (arXiv 2505.16067) report that a retrieved record is followed closely
@@ -241,6 +262,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-narrow': true,
   'full-plain': true,
   'full-corroborated': true,
+  'full-late': true,
+  'full-anchored': true,
   'full-validated': true,
   critique: true,
   gated: true,
@@ -363,9 +386,28 @@ export type PromptInput = {
    * different task, and the difference is what this arm measures.
    */
   readonly critique?: boolean;
+  /**
+   * Where the pack sits relative to the question.
+   *
+   * `before` is what every published number was produced under: schema, evidence, pack,
+   * then the question. `after` puts the question first and the pack last, which is the
+   * only change in the `full-late` arm and exists so that the anchoring arm has a control
+   * with the same order. Position is a confound that costs one line to hold fixed and a
+   * whole iteration to discover afterwards.
+   */
+  readonly packPosition?: 'before' | 'after';
 };
 
 export function promptFor(input: PromptInput): string {
+  const packBlock = input.pack === '' ? '' : `Workspace conventions learned from earlier corrections:\n${input.pack}`;
+  const critiqueBlock =
+    input.pack === '' || input.critique !== true
+      ? ''
+      : 'Before writing the query, decide for each item in that block whether it applies to this question. ' +
+        'Write one line per item, in the form `<id>: apply` or `<id>: skip`, followed by one clause of reasoning. ' +
+        'Then write the query, and use only the items you marked apply.';
+  const question = `Question: ${input.question}`;
+  const before = input.packPosition !== 'after';
   return [
     'You write one SQLite query that answers the question exactly.',
     'Return the SQL only, in a ```sql fence, with no explanation.',
@@ -373,13 +415,9 @@ export function promptFor(input: PromptInput): string {
     `Schema:\n${input.ddl}`,
     input.evidence ? `Evidence (may be wrong; it is external knowledge):\n${input.evidence}` : '',
     input.stated && input.convention !== undefined ? `Workspace convention:\n- ${input.convention.sentence}` : '',
-    input.pack === '' ? '' : `Workspace conventions learned from earlier corrections:\n${input.pack}`,
-    input.pack === '' || input.critique !== true
-      ? ''
-      : 'Before writing the query, decide for each item in that block whether it applies to this question. ' +
-        'Write one line per item, in the form `<id>: apply` or `<id>: skip`, followed by one clause of reasoning. ' +
-        'Then write the query, and use only the items you marked apply.',
-    `Question: ${input.question}`,
+    ...(before ? [packBlock] : [question, packBlock]),
+    critiqueBlock,
+    ...(before ? [question] : []),
   ]
     .filter((line) => line !== '')
     .join('\n\n');
@@ -624,4 +662,56 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
     });
   }
   return gates;
+}
+
+/**
+ * The second-call prompt: the model audits its own draft against the pack.
+ *
+ * Why this arm exists at all. Injecting a retrieved rule into a cold prompt costs 2–5pp on
+ * BIRD (iterations 71–76), and the loss survives every explanation tried: the criterion, the
+ * ranking, the shape, the dose, the scope, a required decision, corroboration, and retiring
+ * a third of the store. Two papers say why the survival is expected. Xiong et al.
+ * (arXiv 2505.16067) describe *experience-following*: a similar input produces a similar
+ * output because the model imitates the retrieved record rather than reasoning from the
+ * question. "Unable to Forget" (ICML 2025) measures interference as a causal variable
+ * independent of context length, and finds that every natural-language intervention —
+ * including "ignore the irrelevant history" and chain-of-thought — fails to remove it.
+ *
+ * A model that imitates the rule cannot be talked out of imitating it, but it can be given
+ * something else to imitate: its own answer. Asking for the query first and the rule second
+ * makes the rule an objection to a draft rather than a template for one. That is a
+ * structural difference, which is the only kind the interference result leaves room for.
+ *
+ * The framing is deliberately permissive. "Change only what a rule justifies, and return the
+ * draft unchanged if none applies" makes doing nothing the default, because the measured
+ * failure is not a model that ignores good rules — it is a model that follows bad ones.
+ */
+export type AnchorInput = {
+  readonly question: string;
+  readonly evidence: string;
+  readonly ddl: string;
+  /** The model's own answer without any pack. Empty when that call failed. */
+  readonly draft: string;
+  readonly pack: string;
+};
+
+export function anchorPromptFor(input: AnchorInput): string {
+  return [
+    'You revise one SQLite query that answers the question below.',
+    'Return the SQL only, in a ```sql fence, with no explanation.',
+    `Schema:\n${input.ddl}`,
+    input.evidence ? `Evidence (may be wrong; it is external knowledge):\n${input.evidence}` : '',
+    `Question: ${input.question}`,
+    `A first attempt at this question:\n${input.draft}`,
+    input.pack === '' ? '' : `Conventions learned from earlier corrections:\n${input.pack}`,
+    // The instruction refers to a block that may not be there. With no pack the arm would
+    // be asking the model to weigh nothing, which is a different question.
+    input.pack === ''
+      ? ''
+      : 'Those conventions were learned from other questions and may not apply to this one. ' +
+        'If none applies, return the first attempt unchanged. ' +
+        'If one applies, change only what it justifies and keep everything else.',
+  ]
+    .filter((line) => line !== '')
+    .join('\n\n');
 }

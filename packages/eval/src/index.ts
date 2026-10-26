@@ -152,6 +152,7 @@ export {
   judgeScalar,
   matches,
   parseArms,
+  anchorPromptFor,
   promptFor,
   reportedSql,
   type ArmPair,

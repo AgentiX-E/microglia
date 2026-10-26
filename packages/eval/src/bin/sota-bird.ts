@@ -86,6 +86,7 @@ import {
   armPairsAgainstFull,
   OPTIONAL_ARMS,
   PROMPT_VERSION,
+  anchorPromptFor,
   archiveVerdict,
   assignFolds,
   LlmClient,
@@ -854,6 +855,13 @@ async function learn(
     const sql = extractSql(texts[index] ?? '') ?? '';
     const handle = host.begin({
       task: TASK,
+      // The question is the task. Without this the host opens a run per attempt, and the
+      // evidence refs it writes carry no task — which contradicts the contract in
+      // `EvidenceRef` ("support is counted per task, not per event: eight attempts of one
+      // task are one observation by one user") and makes a rule impossible to attribute to
+      // the question it was learned from. Attribution is what the validation pass needs to
+      // stop crediting a rule for the question that produced it.
+      taskId: idOfRow(row),
       input: { question: row.question, domain: row.db_id, schemaDigest: row.db_id },
       model: MODEL,
       promptVersion: PROMPT_VERSION,
@@ -927,6 +935,8 @@ type FoldResult = {
    */
   readonly validatedPackDiffers: number;
   readonly validatedPositions: number;
+  /** Questions the anchored arm could not revise because the first round had no answer. */
+  readonly anchoredSkipped: number;
   /** Rules injected into a prompt this fold, and how many named a condition. */
   readonly injectedRules: number;
   readonly injectedWithCondition: number;
@@ -1057,9 +1067,11 @@ async function validateMemory(
   readonly retired: number;
   readonly histogram: Readonly<Record<string, number>>;
   readonly decisive: number;
+  readonly excluded: number;
   readonly helped: number;
   readonly harmed: number;
 }> {
+  let excluded = 0;
   const judged = async (row: BirdRow, pack: string): Promise<boolean | undefined> => {
     try {
       const reply = await chat(
@@ -1085,7 +1097,20 @@ async function validateMemory(
   // there, which costs a second call per validation row and is the only score that can tell
   // a rule that hurts from a question that is hard.
   const outcomes = await mapPool(rows, CONCURRENCY, async (row) => {
-    const pack = await host.recall({ task: TASK, text: row.question, scope: { domain: row.db_id } });
+    const recalled = await host.recall({ task: TASK, text: row.question, scope: { domain: row.db_id } });
+    // A rule learned from this very question cannot be scored on it: the correction that
+    // produced the rule was this question's answer, so the with-rule call is being asked to
+    // reproduce the answer it was given. That is why the first counterfactual run credited
+    // 132 rules with exactly one help and never a harm — the shape of a leak, not of a
+    // signal. The rows being validated are the rows the fold learned from, so the exclusion
+    // has to happen per item rather than by choosing a different split.
+    const selfId = idOfRow(row);
+    const items = recalled.items.filter((item) => !item.evidence.some((ref) => ref.taskId === selfId));
+    excluded += recalled.items.length - items.length;
+    const pack =
+      items.length === recalled.items.length
+        ? { ids: recalled.ids, rendered: recalled.rendered }
+        : { ids: items.map((item) => item.id), rendered: makePack(items, { budget: recalled.budget }).rendered };
     if (pack.ids.length === 0) return { ids: [] as readonly string[], failed: false, helped: false, harmed: false };
     if (CREDIT === 'absolute') {
       const ok = await judged(row, pack.rendered);
@@ -1139,6 +1164,8 @@ async function validateMemory(
     retired: doomed.length,
     histogram: CREDIT === 'absolute' ? creditHistogram(absolute) : decisiveHistogram(counterfactual),
     decisive,
+    /** Rules dropped because they were learned from the row being scored. */
+    excluded,
     helped: [...counterfactual.values()].reduce((sum, entry) => sum + entry.helped, 0),
     harmed: [...counterfactual.values()].reduce((sum, entry) => sum + entry.harmed, 0),
   };
@@ -1219,6 +1246,7 @@ async function runFold(
     packText: string,
     packIds: number,
     critique = false,
+    packPosition: 'before' | 'after' = 'before',
   ): void => {
     const row = evalRows[position] as BirdRow;
     plans.push({
@@ -1232,6 +1260,7 @@ async function runFold(
         pack: packText,
         stated: arm === 'stated',
         convention: ACTIVE,
+        packPosition,
         ...(critique ? { critique: true } : {}),
       }),
     });
@@ -1245,6 +1274,12 @@ async function runFold(
   /** Questions where the pruned store produced a different pack from the unpruned one. */
   let validatedPackDiffers = 0;
   let validatedPositions = 0;
+  /** The pack each question would see, held for the anchored arm's second call. */
+  const anchored = new Map<number, Pack>();
+  /** The revision each question received, judged with the rest after both rounds. */
+  const anchoredReplies = new Map<number, Reply | undefined>();
+  const anchoredPackIds = new Map<number, number>();
+  let anchoredSkipped = 0;
 
   // A snapshot taken before the validated arm deletes anything. The other arms are
   // defined against the store as learned; a deletion that changed their packs would make
@@ -1341,6 +1376,15 @@ async function runFold(
       const wrong = await widened.host.recall({ ...query, scope: { domain: nextDatabase(row.db_id) } });
       call(position, 'wrong-scope', wrong.rendered, wrong.ids.length);
     }
+    if (ARMS.has('full-late')) {
+      // Same pack, same text, one thing changed: it now follows the question.
+      call(position, 'full-late', pack.rendered, pack.ids.length, false, 'after');
+    }
+    if (ARMS.has('full-anchored')) {
+      // The revision is planned after the first round, because its prompt contains the
+      // model's own draft. The pack is remembered here and used then.
+      anchored.set(position, pack);
+    }
     if (ARMS.has('stated')) call(position, 'stated', '', 0);
     if (ARMS.has('oracle')) {
       // Under the convention the oracle is the expected value, not the gold SQL:
@@ -1385,6 +1429,48 @@ async function runFold(
     return reply;
   });
 
+  // The anchored arm's second round. It is a separate phase because its prompt contains the
+  // first round's answer, and because a draft that never arrived leaves nothing to revise —
+  // that question is counted as unanswered by this arm rather than silently scored as wrong.
+  if (ARMS.has('full-anchored')) {
+    const index = new Map(plans.map((plan, at) => [`${plan.position}:${plan.arm}`, at]));
+    const revisions: { position: number; reply: Reply | undefined }[] = [];
+    const batch = [...anchored.entries()].flatMap(([position, pack]) => {
+      const at = index.get(`${position}:none`);
+      const draft = at === undefined ? undefined : replies[at];
+      if (draft === undefined) return [];
+      const row = evalRows[position] as BirdRow;
+      return [
+        {
+          position,
+          prompt: anchorPromptFor({
+            question: row.question,
+            evidence: row.evidence,
+            ddl: ddlOf(dataset.dbPath(row.db_id)),
+            draft: draft.text,
+            pack: pack.rendered,
+          }),
+          packIds: pack.ids.length,
+        },
+      ];
+    });
+    anchoredSkipped = anchored.size - batch.length;
+    const revised = await mapPool(batch, CONCURRENCY, async (item) => {
+      try {
+        return { position: item.position, reply: await chat(item.prompt) };
+      } catch (error) {
+        if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+        if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+        return { position: item.position, reply: undefined };
+      }
+    });
+    revisions.push(...revised);
+    for (const revision of revisions) {
+      anchoredReplies.set(revision.position, revision.reply);
+      anchoredPackIds.set(revision.position, batch.find((item) => item.position === revision.position)?.packIds ?? 0);
+    }
+  }
+
   const judged = new Map<string, Judged>();
   for (const [index, plan] of plans.entries()) {
     const row = evalRows[plan.position] as BirdRow;
@@ -1394,6 +1480,20 @@ async function runFold(
       ...result,
       latencyMs: Math.round(performance.now() - started),
     });
+  }
+
+  // The anchored arm's revisions are judged here rather than in the loop above, because they
+  // did not exist when it ran. They are registered as plans with an empty prompt so the case
+  // assembly below treats them like every other arm instead of special-casing one.
+  for (const [position, reply] of anchoredReplies) {
+    const row = evalRows[position] as BirdRow;
+    const started = performance.now();
+    const result = judgeReply(row, dataset.dbPath(row.db_id), reply, task);
+    judged.set(`${position}:full-anchored`, {
+      ...result,
+      latencyMs: Math.round(performance.now() - started),
+    });
+    plans.push({ position, arm: 'full-anchored', prompt: '', packIds: anchoredPackIds.get(position) ?? 0 });
   }
 
   const packIdsOf = new Map(plans.map((plan) => [`${plan.position}:${plan.arm}`, plan.packIds]));
@@ -1495,6 +1595,7 @@ async function runFold(
     injectedWithCondition,
     validatedPackDiffers,
     validatedPositions,
+    anchoredSkipped,
     // What learning produced and what was actually scored, carried separately because the
     // validated arm makes them differ on purpose.
     digest: scoringFrozen.digest,
@@ -1911,7 +2012,22 @@ async function main(): Promise<void> {
       validation_credit: CREDIT,
       validation_decisive_questions: validations.reduce((sum, entry) => sum + entry.decisive, 0),
       validation_helped: validations.reduce((sum, entry) => sum + entry.helped, 0),
+      /**
+       * Rules dropped from a validation row because the row itself produced them.
+       *
+       * The first counterfactual run had no way to drop them, and 132 of its 213 credited
+       * rules showed exactly one help and no harm — the signature of a rule being asked
+       * about its own source question.
+       */
+      validation_self_excluded: validations.reduce((sum, entry) => sum + entry.excluded, 0),
       validation_harmed: validations.reduce((sum, entry) => sum + entry.harmed, 0),
+      /**
+       * Questions the anchored arm could not revise, because the first round never answered.
+       *
+       * The arm needs a draft. A question without one is not a wrong revision, it is no
+       * revision, and the count is what keeps the two apart in the arm summary.
+       */
+      anchored_skipped_questions: folds.reduce((sum, fold) => sum + fold.anchoredSkipped, 0),
       // The arm's own evidence that the deletion reached the questions it scored.
       validated_pack_differences: folds.reduce((sum, fold) => sum + fold.validatedPackDiffers, 0),
       validated_positions: folds.reduce((sum, fold) => sum + fold.validatedPositions, 0),

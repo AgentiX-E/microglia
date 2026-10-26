@@ -12,6 +12,7 @@ import {
   judgeScalar,
   matches,
   parseArms,
+  anchorPromptFor,
   promptFor,
   reportedSql,
   type GateInput,
@@ -207,7 +208,9 @@ describe('parseArms', () => {
       'critique',
       'duplicate',
       'full',
+      'full-anchored',
       'full-corroborated',
+      'full-late',
       'full-narrow',
       'full-plain',
       'full-validated',
@@ -240,6 +243,8 @@ describe('parseArms', () => {
       'full-narrow',
       'full-plain',
       'full-corroborated',
+      'full-late',
+      'full-anchored',
       'full-validated',
       'critique',
       'gated',
@@ -596,5 +601,72 @@ describe('the critique prompt', () => {
     // a subject for, which is the failure mode the empty pack exists to avoid.
     const prompt = promptFor({ ...base, pack: '', critique: true });
     expect(prompt).not.toContain('decide for each item');
+  });
+});
+
+describe('promptFor pack position', () => {
+  const base = {
+    question: 'How many students?',
+    evidence: '',
+    ddl: 'CREATE TABLE s (id INTEGER)',
+    pack: '- rule one',
+    stated: false,
+    convention: undefined,
+  };
+
+  it('puts the pack before the question by default, which is what every published number used', () => {
+    const prompt = promptFor(base);
+    expect(prompt.indexOf('- rule one')).toBeLessThan(prompt.indexOf('Question: How many students?'));
+  });
+
+  it('puts the pack after the question when asked, and changes nothing else', () => {
+    const early = promptFor(base);
+    const late = promptFor({ ...base, packPosition: 'after' });
+    expect(late.indexOf('Question: How many students?')).toBeLessThan(late.indexOf('- rule one'));
+    // Same lines, one moved: the arm is position, not wording.
+    expect(late.split('\n\n').sort()).toEqual(early.split('\n\n').sort());
+  });
+
+  it('does not duplicate the question when the pack is empty and placed after it', () => {
+    const prompt = promptFor({ ...base, pack: '', packPosition: 'after' });
+    expect(prompt.match(/Question:/g)).toHaveLength(1);
+  });
+});
+
+describe('anchorPromptFor', () => {
+  const base = {
+    question: 'How many students?',
+    evidence: '',
+    ddl: 'CREATE TABLE s (id INTEGER)',
+    draft: 'SELECT COUNT(*) FROM s',
+    pack: '- rule one',
+  };
+
+  it('carries the draft verbatim, because the draft is what the model is being asked to keep', () => {
+    expect(anchorPromptFor(base)).toContain('SELECT COUNT(*) FROM s');
+  });
+
+  it('puts the question before the rules, so the rules cannot shape the reading of it', () => {
+    const prompt = anchorPromptFor(base);
+    expect(prompt.indexOf('Question: How many students?')).toBeLessThan(prompt.indexOf('- rule one'));
+    expect(prompt.indexOf('A first attempt')).toBeLessThan(prompt.indexOf('- rule one'));
+  });
+
+  it('makes doing nothing the default, which is the failure the arm exists for', () => {
+    const prompt = anchorPromptFor(base);
+    expect(prompt).toContain('If none applies, return the first attempt unchanged.');
+    expect(prompt).toContain('change only what it justifies');
+    expect(prompt).toContain('may not apply to this one');
+  });
+
+  it('omits the rules block entirely when the pack is empty', () => {
+    const prompt = anchorPromptFor({ ...base, pack: '' });
+    expect(prompt).not.toContain('Conventions learned from earlier corrections');
+    expect(prompt).not.toContain('If none applies');
+  });
+
+  it('keeps the evidence when the benchmark supplies it', () => {
+    const prompt = anchorPromptFor({ ...base, evidence: 'rate = count / enrollment' });
+    expect(prompt).toContain('Evidence (may be wrong; it is external knowledge):');
   });
 });

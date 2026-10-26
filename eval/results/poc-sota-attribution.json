@@ -1,19 +1,19 @@
 {
   "id": "poc-sota-attribution",
   "source_artifact": "poc-sota-bird.json",
-  "source_generated_at": "2026-10-26T02:34:23.261Z",
+  "source_generated_at": "2026-10-26T06:53:19.485Z",
   "n": 350,
   "summary": {
-    "rules": 1028,
-    "injectedRules": 264,
-    "helpful": 11,
-    "harmful": 17,
-    "neutral": 236,
-    "harmfulShare": 0.07579462102689487,
+    "rules": 1288,
+    "injectedRules": 382,
+    "helpful": 18,
+    "harmful": 31,
+    "neutral": 333,
+    "harmfulShare": 0.11409395973154363,
     "conditioned": {
-      "injected": 409,
-      "helpful": 11,
-      "harmful": 17
+      "injected": 596,
+      "helpful": 18,
+      "harmful": 31
     },
     "unconditioned": {
       "injected": 0,
@@ -22,9 +22,49 @@
     },
     "top": [
       {
-        "fold": 4,
-        "id": "k_01hf7uaqqc_52m58",
-        "statement": "A COUNT over a parent table joined to a child table without DISTINCT overcounts parents that have multiple matching child rows.",
+        "fold": 3,
+        "id": "k_01hf7uaqo0_ezged",
+        "statement": "Filtering a patient by diagnosis and description date is expressed as a subquery on Patient.ID used with IN, rather than a JOIN to Patient.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 2,
+        "net": -2
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqpg_9xme1",
+        "statement": "A per-unit price filter is expressed as Price divided by Amount compared to the threshold, without an additional Amount > 0 guard.",
+        "conditioned": true,
+        "injected": 6,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqt0_5b32p",
+        "statement": "Counting patients who satisfy a condition on an examination attribute requires joining Examination to the patient identifier and counting that identifier, rather than counting rows from a Patient table joined only on shared IDs.",
+        "conditioned": true,
+        "injected": 6,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqtf_5e13w",
+        "statement": "When a question asks for a count of patients, counting rows from a single joined table pair without DISTINCT can overcount patients who have multiple matching rows in the joined table.",
+        "conditioned": true,
+        "injected": 5,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqm7_bq6te",
+        "statement": "A query that ranks teams by count of away wins must group by the team identifier used in the join, not by the team name column.",
         "conditioned": true,
         "injected": 4,
         "helped": 0,
@@ -33,8 +73,28 @@
       },
       {
         "fold": 0,
-        "id": "k_01hf7uaqmj_ajq8j",
-        "statement": "Questions asking who achieved something in a race require selecting driver identity columns (forename, surname, url) rather than only the driver url.",
+        "id": "k_01hf7uaqmp_3y15d",
+        "statement": "When a question asks for the percentage of atoms of a given element among atoms in molecules matching a bond-type filter, the numerator and denominator must both count distinct atom_id values, because joining atom to bond multiplies atom rows by the number of matching bonds per molecule.",
+        "conditioned": true,
+        "injected": 4,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqs8_b5dvw",
+        "statement": "Patient-level questions join Laboratory to Patient on ID rather than querying Laboratory alone.",
+        "conditioned": true,
+        "injected": 4,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqle_e0rvb",
+        "statement": "When a question asks to list cards, the SELECT clause projects the card identifier column rather than all columns of the cards table.",
         "conditioned": true,
         "injected": 3,
         "helped": 0,
@@ -42,29 +102,19 @@
         "net": -1
       },
       {
-        "fold": 4,
-        "id": "k_01hf7uaqqt_0gh4a",
-        "statement": "Bond type values in the bond table are stored without surrounding spaces, so equality filters on bond_type must use the bare value.",
+        "fold": 1,
+        "id": "k_01hf7uaqmg_caapc",
+        "statement": "When a question asks for school names, the name must be selected from the frpm table's `School Name` column rather than from a schools table's School column.",
         "conditioned": true,
-        "injected": 3,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 4,
-        "id": "k_01hf7uaqs5_6j8tc",
-        "statement": "A percentage of atoms of a given element among a filtered set of molecules is computed as the count of matching atoms divided by the total count of atoms in those molecules, not by the count of distinct molecules.",
-        "conditioned": true,
-        "injected": 3,
+        "injected": 2,
         "helped": 0,
         "hurt": 1,
         "net": -1
       },
       {
         "fold": 0,
-        "id": "k_01hf7uaqmb_fkvtx",
-        "statement": "When a question asks for an average count of bonds per molecule, the denominator must be the number of molecules, not the number of atoms or bonds.",
+        "id": "k_01hf7uaqmm_bt45e",
+        "statement": "Questions asking who achieved something in a race require selecting driver identity columns (forename, surname, url) rather than only the driver url.",
         "conditioned": true,
         "injected": 2,
         "helped": 0,
@@ -72,9 +122,9 @@
         "net": -1
       },
       {
-        "fold": 2,
-        "id": "k_01hf7uaqnn_dv01m",
-        "statement": "A join between Patient and Laboratory is keyed on Patient.ID = Laboratory.ID, and the examination date is read from Laboratory.Date.",
+        "fold": 0,
+        "id": "k_01hf7uaqn8_34pjx",
+        "statement": "A driver is counted as having finished a race only when results.time is not null.",
         "conditioned": true,
         "injected": 2,
         "helped": 0,
@@ -82,9 +132,9 @@
         "net": -1
       },
       {
-        "fold": 2,
-        "id": "k_01hf7uaqr9_aj0qe",
-        "statement": "A question asking for the date of a player's highest value in an attribute is answered by ordering the attribute descending, taking the top row, and returning its date.",
+        "fold": 0,
+        "id": "k_01hf7uaqnl_70hsy",
+        "statement": "A percentage of cards in a given language is computed over the cards table joined to foreign_data on uuid, not over foreign_data alone.",
         "conditioned": true,
         "injected": 2,
         "helped": 0,
@@ -93,8 +143,38 @@
       },
       {
         "fold": 4,
-        "id": "k_01hf7uaqrl_bbrr9",
-        "statement": "Player_Attributes rows join to Player rows on player_fifa_api_id, not on player_api_id.",
+        "id": "k_01hf7uaqnl_70hsy",
+        "statement": "When a question asks which user performed an action on a post, the result set includes both the user's display name and the post's title.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqos_81rdc",
+        "statement": "A phrase about a player remaining in position when the team attacks maps to the attacking_work_rate column, and a phrase about preferred foot maps to the preferred_foot column.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqp5_7xerq",
+        "statement": "Post popularity is measured by summing ViewCount over posts reached through postHistory rather than over posts owned directly by the user.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 0,
+        "id": "k_01hf7uaqpb_5gftn",
+        "statement": "Text about a card's abilities is stored in the rulings table, not in the cards table.",
         "conditioned": true,
         "injected": 2,
         "helped": 0,
@@ -103,7 +183,27 @@
       },
       {
         "fold": 1,
-        "id": "k_01hf7uaqsh_das7c",
+        "id": "k_01hf7uaqq9_drpvc",
+        "statement": "A percentage eligible for FRPM is computed as the FRPM count divided by enrollment, multiplied by 100, rather than read from a precomputed percent column.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqqe_5h2dq",
+        "statement": "A percentage comparison between two named players' overall ratings requires each player's rating to be selected by matching player_name in Player and joining Player_Attributes on player_api_id, not by ordering Player_Attributes rows and taking a single LIMIT 1 row.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 0,
+        "hurt": 1,
+        "net": -1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqro_ca1db",
         "statement": "Patient-level questions join Laboratory to Patient on ID rather than querying Laboratory alone.",
         "conditioned": true,
         "injected": 2,
@@ -113,130 +213,40 @@
       },
       {
         "fold": 4,
-        "id": "k_01hf7uaqlq_d69wp",
-        "statement": "The cards table column holding the card type is named type, not types.",
+        "id": "k_01hf7uaqnm_cb9gf",
+        "statement": "Joins between votes, posts, and users are ordered posts to votes to users, with each join keyed on the matching Id column.",
         "conditioned": true,
         "injected": 1,
         "helped": 0,
         "hurt": 1,
         "net": -1
-      },
-      {
-        "fold": 4,
-        "id": "k_01hf7uaqlu_b6nj8",
-        "statement": "A question asking for a single attribute of the top N teams returns only that attribute column, not additional identifying columns such as team name.",
-        "conditioned": true,
-        "injected": 1,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqmp_3y15d",
-        "statement": "Joining atom to bond requires the molecule_id column, not a path through the connected table.",
-        "conditioned": true,
-        "injected": 1,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqns_5apa5",
-        "statement": "When a question asks for the lowest or highest value of a ratio between two columns, the ratio is computed in the ORDER BY clause and the query returns the single extreme row with LIMIT 1.",
-        "conditioned": true,
-        "injected": 1,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 0,
-        "id": "k_01hf7uaqod_akep8",
-        "statement": "Molecules lacking a given atom element are counted by joining molecules to atoms and counting distinct molecule ids where the element differs, rather than by a NOT EXISTS subquery.",
-        "conditioned": true,
-        "injected": 1,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqpt_2d3wb",
-        "statement": "When a question asks for top-N districts by an aggregate, the query must aggregate the measure and order by that aggregate descending, not return distinct district names ordered alphabetically.",
-        "conditioned": true,
-        "injected": 1,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 2,
-        "id": "k_01hf7uaqt3_a4e09",
-        "statement": "Wrapping a COUNT over a patient ID in DISTINCT is unnecessary when the joins do not multiply patient rows.",
-        "conditioned": true,
-        "injected": 1,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 0,
-        "id": "k_01hf7uaqt9_bas7y",
-        "statement": "A query that joins cards to a table keyed by uuid and filters on a set name can return duplicate rows, so DISTINCT is needed when only one text column is selected.",
-        "conditioned": true,
-        "injected": 1,
-        "helped": 0,
-        "hurt": 1,
-        "net": -1
-      },
-      {
-        "fold": 1,
-        "id": "k_01hf7uaqr5_7mxwv",
-        "statement": "Selecting eye_colour_id, hair_colour_id, and skin_colour_id from the superhero table does not answer a question that asks for the eyes, hair, and skin colour of superheroes.",
-        "conditioned": true,
-        "injected": 7,
-        "helped": 0,
-        "hurt": 0,
-        "net": 0
-      },
-      {
-        "fold": 4,
-        "id": "k_01hf7uaqqg_3h3d0",
-        "statement": "The order of selected columns follows the order in which the question requests them.",
-        "conditioned": true,
-        "injected": 6,
-        "helped": 0,
-        "hurt": 0,
-        "net": 0
-      },
-      {
-        "fold": 3,
-        "id": "k_01hf7uaqqo_86xec",
-        "statement": "Selecting eye_colour_id, hair_colour_id, and skin_colour_id from the superhero table does not answer a question that asks for the eyes, hair, and skin colour of superheroes.",
-        "conditioned": true,
-        "injected": 6,
-        "helped": 0,
-        "hurt": 0,
-        "net": 0
       }
     ],
     "best": [
       {
-        "fold": 2,
-        "id": "k_01hf7uaqn2_eydbf",
-        "statement": "A percentage increase between two years is computed with the earlier year's value as the denominator.",
+        "fold": 4,
+        "id": "k_01hf7uaqmk_c7nx9",
+        "statement": "A query that asks who is the youngest among drivers who finished a race filters results to rows where the finish time is non-null.",
         "conditioned": true,
-        "injected": 8,
+        "injected": 5,
         "helped": 1,
         "hurt": 0,
         "net": 1
       },
       {
-        "fold": 2,
-        "id": "k_01hf7uaqrh_15z97",
-        "statement": "When a question asks for people who received funds on a date tied to an event, the query must join event, attendance, member, and income tables rather than joining income directly to member.",
+        "fold": 3,
+        "id": "k_01hf7uaqsk_464kj",
+        "statement": "A query that joins cards to sets and filters by set name and language must select DISTINCT to avoid duplicate rows when multiple cards match.",
+        "conditioned": true,
+        "injected": 5,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqtr_5n9md",
+        "statement": "The Laboratory.SM column encodes normal anti-SM results as the values 'negative' and '0'.",
         "conditioned": true,
         "injected": 4,
         "helped": 1,
@@ -244,19 +254,9 @@
         "net": 1
       },
       {
-        "fold": 4,
-        "id": "k_01hf7uaqrk_7tfe7",
-        "statement": "Patient-level questions join the Patient table to Laboratory on Patient.ID = Laboratory.ID rather than querying Laboratory alone.",
-        "conditioned": true,
-        "injected": 4,
-        "helped": 1,
-        "hurt": 0,
-        "net": 1
-      },
-      {
-        "fold": 4,
-        "id": "k_01hf7uaqn6_dsksp",
-        "statement": "A completion rate over drivers in a race is the count of drivers with a non-null finish time divided by the count of drivers entered in that race.",
+        "fold": 3,
+        "id": "k_01hf7uaqlm_eftxx",
+        "statement": "Wrapping a percentage computation in NULLIF to guard against division by zero produces a result that does not match the expected execution.",
         "conditioned": true,
         "injected": 3,
         "helped": 1,
@@ -264,9 +264,9 @@
         "net": 1
       },
       {
-        "fold": 4,
-        "id": "k_01hf7uaqsc_f5nas",
-        "statement": "A strict inequality on a date threshold excludes rows on the threshold date, so 'after 1990/1/1' maps to a greater-than comparison, not greater-than-or-equal.",
+        "fold": 1,
+        "id": "k_01hf7uaqmb_fkvtx",
+        "statement": "A question asking for a metric of the top N teams returns only that metric column, not the team name column.",
         "conditioned": true,
         "injected": 3,
         "helped": 1,
@@ -274,9 +274,9 @@
         "net": 1
       },
       {
-        "fold": 2,
-        "id": "k_01hf7uaqn3_e6phs",
-        "statement": "When a question asks for the segments with the biggest and lowest percentage increase, the result must identify both the segment name and its percentage value for each extreme.",
+        "fold": 1,
+        "id": "k_01hf7uaqp9_faqww",
+        "statement": "The phrase 'would remain in his position when the team attacked' maps to the attacking_work_rate column with value 'low'.",
         "conditioned": true,
         "injected": 2,
         "helped": 1,
@@ -284,9 +284,9 @@
         "net": 1
       },
       {
-        "fold": 4,
-        "id": "k_01hf7uaqqp_2rcbp",
-        "statement": "When a question asks about loans belonging to clients, the join path from loan to client must pass through account and disp, and disp rows are filtered to type = 'OWNER' so that only account owners are counted.",
+        "fold": 3,
+        "id": "k_01hf7uaqpt_2d3wb",
+        "statement": "When a question asks for tags used in posts, the posts table's Tags column already stores the tag values, so joining a separate tags table is unnecessary.",
         "conditioned": true,
         "injected": 2,
         "helped": 1,
@@ -294,19 +294,89 @@
         "net": 1
       },
       {
-        "fold": 2,
-        "id": "k_01hf7uaqm9_bdq0x",
-        "statement": "Date equality filters on a date column are written with LIKE and a trailing percent wildcard when the stored value may include a time component.",
-        "conditioned": true,
-        "injected": 1,
-        "helped": 1,
-        "hurt": 0,
-        "net": 1
-      },
-      {
-        "fold": 2,
+        "fold": 0,
         "id": "k_01hf7uaqq8_32y7g",
-        "statement": "String literals compared against attribute_name must match the stored casing exactly, since attribute names are stored capitalized (e.g., 'Durability').",
+        "statement": "A driver's first race is identified by ordering races by year ascending and taking the earliest, without requiring a round tiebreaker.",
+        "conditioned": true,
+        "injected": 2,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqlp_89hqc",
+        "statement": "A query that asks for a list of entities should select only the identifying column of the primary table rather than all columns.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqme_9qs9z",
+        "statement": "A city or district filter on a school-location question is applied to the district/location column of the schools or frpm table, not to a column of the satscores table.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqmj_ajq8j",
+        "statement": "A query that asks who is the youngest among a set of drivers selects only the identifying name columns, not the birth-date column used for ordering.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 4,
+        "id": "k_01hf7uaqn3_e6phs",
+        "statement": "The DOC column in the schools table holds the DOC type of a school.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqo1_b3r62",
+        "statement": "When a question asks for an aggregate over posts together with per-comment text, the aggregate is computed over the joined post-comment rows rather than over posts alone.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqq9_drpvc",
+        "statement": "String literals compared against attribute_name must match the stored casing exactly, such as 'Durability' rather than 'durability'.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 2,
+        "id": "k_01hf7uaqqa_151a7",
+        "statement": "When a question asks for the top entity by a numeric attribute, the query orders by the attribute value column descending and limits to one row.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 3,
+        "id": "k_01hf7uaqrq_768wq",
+        "statement": "A join path from users to comments must traverse posts via posts.OwnerUserId and comments.PostId rather than joining users directly to comments on a user id.",
         "conditioned": true,
         "injected": 1,
         "helped": 1,
@@ -315,18 +385,18 @@
       },
       {
         "fold": 0,
-        "id": "k_01hf7uaqso_ckv3x",
-        "statement": "Date literals in SQLite comparisons must use the ISO format YYYY-MM-DD rather than slash-separated forms like M/D/YYYY.",
-        "conditioned": true,
-        "injected": 1,
-        "helped": 1,
-        "hurt": 0,
-        "net": 1
-      },
-      {
-        "fold": 0,
-        "id": "k_01hf7uaqtp_eyer7",
+        "id": "k_01hf7uaqts_fphdr",
         "statement": "A request for a racer's full name is satisfied by selecting forename and surname as separate columns rather than concatenating them into one column.",
+        "conditioned": true,
+        "injected": 1,
+        "helped": 1,
+        "hurt": 0,
+        "net": 1
+      },
+      {
+        "fold": 1,
+        "id": "k_01hf7uaqu1_f8ef4",
+        "statement": "Counting non-distinct IDs after joining Patient to Laboratory and Examination overcounts patients who have multiple matching rows.",
         "conditioned": true,
         "injected": 1,
         "helped": 1,
