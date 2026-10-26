@@ -259,6 +259,25 @@ fit a single binomial at the lane's own error rate (pooled χ² 10.71 on 9 degre
 every run, because a deletion that retired nothing and a rule that was never injected twice otherwise look
 the same.
 
+`SOTA_ARMS=full-anchored` answers the question *first* and revises against the pack in a second call, so
+a retrieved rule is an objection to a draft rather than a template for an answer. Two dispatches:
+
+| Arm | Run 1 | Run 2 | Paired against `full` |
+|---|---|---|---|
+| no memory | 54.00% | 53.71% | — |
+| `full` | 50.29% (−3.71pp) | 49.71% (−4.00pp) | — |
+| `full-late` (pack after the question) | 48.86% (−5.14pp) | 49.14% (−4.57pp) | −1.43pp / −0.57pp |
+| **`full-anchored`** | **51.71% (−2.29pp)** | **54.00% (+0.29pp)** | **+1.43pp / +4.29pp** |
+
+Run 2 puts the anchored arm at **statistically indistinguishable from answering with no memory** while
+`full` costs 4pp in the same run, and the paired gain over `full` is **+4.29pp, p = 0.0167** (+2.86pp
+pooled over both dispatches, McNemar p = 0.0205). The arm recovers the loss and forfeits the gain —
+it loses 10 and 5 questions where `full` loses 23 and 25, and gains 2 and 6 where `full` gains 10 and 11 —
+because "unchanged" is the default and a rule has to justify a change. Moving the pack *later* makes
+things worse in both runs, which is the opposite of what a lost-in-the-middle reading predicts and what
+an imitation reading predicts: the nearer a rule sits to where the answer is written, the more it is
+copied.
+
 `DEEPSEEK_ENDPOINT` points the lane at a stand-in instead of the provider, and
 `eval/drivers/stand-in.mjs` is one: a rule per distillation, `SELECT 1` for every query. It exists because a
 sequencing defect in the deletion arm — it wrote to the store inside the scoring window — reached CI and
