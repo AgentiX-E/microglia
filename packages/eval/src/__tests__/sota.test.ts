@@ -11,10 +11,12 @@ import {
   extractSql,
   judgeScalar,
   matches,
+  mismatchNote,
   parseArms,
   anchorPromptFor,
   promptFor,
   retryPromptFor,
+  retrySubset,
   reportedSql,
   type GateInput,
 } from '../sota.js';
@@ -217,11 +219,14 @@ describe('parseArms', () => {
       'full-narrow',
       'full-onretry',
       'full-plain',
+      'full-repair',
+      'full-repair-onretry',
       'full-sampled',
       'full-validated',
       'gated',
       'none',
       'oracle',
+      'retry-blank',
       'stated',
       'wrong-scope',
     ]);
@@ -251,6 +256,9 @@ describe('parseArms', () => {
       'full-grounded',
       'full-sampled',
       'full-onretry',
+      'full-repair',
+      'full-repair-onretry',
+      'retry-blank',
       'full-late',
       'full-anchored',
       'full-anchored-conditional',
@@ -764,5 +772,151 @@ describe('retryPromptFor', () => {
     expect(retryPromptFor({ ...base, evidence: 'rate = count / enrolment' })).toContain(
       'Evidence (may be wrong; it is external knowledge):',
     );
+  });
+
+  it('asks for a repair when the block holds repairs', () => {
+    const prompt = retryPromptFor({ ...base, packKind: 'repair' });
+    expect(prompt).toContain('Repairs of earlier failures, each with the reason it was wrong');
+    expect(prompt).toContain('Check whether one of those failures is this failure.');
+    expect(prompt).not.toContain('Check whether one of those conventions explains the failure.');
+  });
+
+  it('labels nothing when a repair arm has no repair to show', () => {
+    // An empty pack under the repair form must render exactly as an empty pack under the
+    // rule form: the arm would otherwise differ from `retry-blank` in its instructions
+    // rather than in what it was given.
+    expect(retryPromptFor({ ...base, pack: '', packKind: 'repair' })).toBe(
+      retryPromptFor({ ...base, pack: '' }),
+    );
+  });
+});
+
+describe('mismatchNote', () => {
+  const shape = (over: Partial<{ ok: boolean; error: string; rows: number; columns: string[] }>) => ({
+    ok: true,
+    rows: 1,
+    columns: ['count'],
+    ...over,
+  });
+
+  it('quotes the driver when the attempt did not run', () => {
+    expect(mismatchNote(shape({ ok: false, error: 'Error: no such column: t2.raceId' }), shape({}))).toBe(
+      'it failed: Error: no such column: t2.raceId',
+    );
+  });
+
+  it('says so when the driver gave no message', () => {
+    // The type allows an absent error, and a note that rendered "undefined" would be
+    // indistinguishable from a diagnosis nobody made.
+    expect(mismatchNote({ ok: false, rows: 0, columns: [] }, shape({}))).toBe(
+      'it failed: the driver gave no message',
+    );
+  });
+
+  it('compares row counts before column names', () => {
+    // A join that multiplies rows also renames them; the count is the cause and the
+    // names are the symptom, so the note leads with the count.
+    expect(mismatchNote(shape({ rows: 12 }), shape({ rows: 1 }))).toBe(
+      'it returned 12 rows where the corrected query returns 1',
+    );
+  });
+
+  it('names both column lists when only the projection differs', () => {
+    expect(mismatchNote(shape({ columns: ['name'] }), shape({ columns: ['forename', 'surname'] }))).toBe(
+      'it returned columns [name] where the corrected query returns [forename, surname]',
+    );
+  });
+
+  it('falls back to the values when the shape agrees', () => {
+    expect(mismatchNote(shape({}), shape({}))).toBe(
+      "it returned the corrected query's columns and row count, but different values",
+    );
+  });
+
+  it('does not claim a difference it did not measure when the correction itself failed', () => {
+    expect(mismatchNote(shape({}), shape({ ok: false, error: 'boom' }))).toBe(
+      'it ran but returned the wrong rows',
+    );
+  });
+});
+
+describe('retrySubset', () => {
+  const row = (retried: boolean, base: boolean, arm: boolean) => ({
+    retried,
+    withoutMemoryCorrect: base,
+    arms: { 'retry-blank': arm } as Record<string, boolean | undefined>,
+  });
+
+  it('says nothing when no question was retried', () => {
+    // An empty block rather than a zero: a run where nothing failed measured no retry arm,
+    // and a delta of 0pp would read as a measured null.
+    expect(retrySubset([row(false, false, true)])).toEqual([]);
+  });
+
+  it('measures the arm on the retried questions only', () => {
+    const cases = [
+      row(true, false, true),
+      row(true, false, false),
+      row(true, true, true),
+      // Excluded: its first answer worked, so no retry arm touched it.
+      row(false, false, false),
+    ];
+    const rows = retrySubset(cases, 7, 200);
+    const blank = rows.find((entry) => entry.arm === 'retry-blank');
+    expect(blank).toBeDefined();
+    expect(blank?.n).toBe(3);
+    expect(blank?.withoutMemoryAccuracy).toBeCloseTo(1 / 3, 6);
+    expect(blank?.accuracy).toBeCloseTo(2 / 3, 6);
+    expect(blank?.gained).toBe(1);
+    expect(blank?.lost).toBe(0);
+    expect(blank?.deltaPp).toBeCloseTo(100 / 3, 6);
+  });
+
+  it('reports an arm that only some retried questions carry', () => {
+    const cases = [
+      { retried: true, withoutMemoryCorrect: false, arms: { 'retry-blank': true } },
+      { retried: true, withoutMemoryCorrect: false, arms: {} },
+    ];
+    const rows = retrySubset(cases, 7, 200);
+    expect(rows).toHaveLength(1);
+    // The question without the arm is not a failure of the arm; it is not a pair.
+    expect(rows[0]?.n).toBe(1);
+  });
+});
+
+describe('the pack is labelled by what it holds', () => {
+  const prompt = (packKind?: 'rule' | 'repair') =>
+    promptFor({
+      question: 'How many races?',
+      evidence: '',
+      ddl: 'CREATE TABLE races (raceId INT);',
+      pack: '{"statement":"x"}',
+      stated: false,
+      convention: NO_CONVENTION,
+      ...(packKind === undefined ? {} : { packKind }),
+    });
+
+  it('keeps the rule wording by default, because every published number used it', () => {
+    expect(prompt()).toContain('Workspace conventions learned from earlier corrections:');
+    expect(prompt('rule')).toBe(prompt());
+  });
+
+  it('calls a repair note what it is', () => {
+    const text = prompt('repair');
+    expect(text).toContain('Repairs of earlier failures, each with the reason it was wrong');
+    expect(text).not.toContain('Workspace conventions learned from earlier corrections:');
+  });
+
+  it('leaves an empty pack unlabelled either way', () => {
+    const empty = promptFor({
+      question: 'q',
+      evidence: '',
+      ddl: 'd',
+      pack: '',
+      stated: false,
+      convention: NO_CONVENTION,
+      packKind: 'repair',
+    });
+    expect(empty).not.toContain('Repairs of earlier failures');
   });
 });

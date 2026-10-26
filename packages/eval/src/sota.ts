@@ -230,7 +230,7 @@ export type SqlArm =
    * rules behave differently from the pack as a whole — which is the content half of "the
    * memory is wrong", as opposed to the selection half every earlier arm attacked.
    */
-  | 'full-onretry'
+  | 'full-grounded'
   /**
    * The pack is never shown before the first answer, only after a failure.
    *
@@ -243,7 +243,43 @@ export type SqlArm =
    * The failure signal is the only one available without the answer key: the query does not
    * execute, or it executes and returns nothing. That is what a deployed system can see.
    */
-  | 'full-grounded'
+  | 'full-onretry'
+  /**
+   * The same corrections, distilled into an account of the failure instead of a rule.
+   *
+   * Every memory this project has measured stores a declarative rule: "questions that name
+   * a race join results to races on raceId". The literature that reports gains stores
+   * something else. ExpeL (arXiv 2308.10144) extracts insights by *comparing* failed and
+   * successful attempts, and ReasoningBank (arXiv 2509.25140) reports that failure-derived
+   * memories are where the guardrails come from. A rule says what is true; a repair says
+   * what went wrong, why, what fixed it, and when that fix generalises.
+   *
+   * The pair exists in this lane already and has never been used as content: `output` is
+   * the first attempt, `signal.after` is the correction, and the lane now also records how
+   * the two results differed. This arm feeds exactly that pair to a distiller asked for a
+   * contrastive account. Same timing as `full`, so the difference is the content.
+   */
+  | 'full-repair'
+  /**
+   * The repair account, spent only on a failed first answer.
+   *
+   * The content half and the timing half of the same hypothesis, together: if a repair
+   * note is what a retry loop can act on, this is the arm that should beat both of its
+   * parents. If it does not, the two effects are not additive and the interaction is the
+   * finding.
+   */
+  | 'full-repair-onretry'
+  /**
+   * The retry, with no memory at all.
+   *
+   * The control that makes `full-onretry` readable. That arm's +1.14pp was measured
+   * against `none`, and a second attempt — even a blind one — is itself a treatment: the
+   * model sees its own failed query and a failure message it did not have before. Without
+   * this arm the difference between "retrying helps" and "the memory helps a retry" is
+   * unmeasurable, and the first published version of the retry result could not tell them
+   * apart.
+   */
+  | 'retry-blank'
   /**
    * The same number of rules, chosen at random from the same pack.
    *
@@ -307,6 +343,9 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-grounded': true,
   'full-sampled': true,
   'full-onretry': true,
+  'full-repair': true,
+  'full-repair-onretry': true,
+  'retry-blank': true,
   'full-late': true,
   'full-anchored': true,
   'full-anchored-conditional': true,
@@ -417,6 +456,21 @@ export function armPairsAgainstFull(
   return pairs;
 }
 
+/**
+ * The two things a pack can contain.
+ *
+ * `rule` is a declarative claim about the workspace; `repair` is an account of one
+ * failure — what the attempt did, why it was wrong, what fixed it. The distinction is the
+ * content half of the experiment, so it is a type rather than a convention: a lane that
+ * grows a third form has to name it here and say which label it renders under.
+ */
+export type PackKind = 'rule' | 'repair';
+
+const PACK_LABEL: Record<PackKind, string> = {
+  rule: 'Workspace conventions learned from earlier corrections:',
+  repair: 'Repairs of earlier failures, each with the reason it was wrong and the change that fixed it:',
+};
+
 export type PromptInput = {
   readonly question: string;
   readonly evidence: string;
@@ -436,6 +490,16 @@ export type PromptInput = {
    */
   readonly critique?: boolean;
   /**
+   * What the block is, in the prompt's own words.
+   *
+   * A repair note and a rule are different objects, and calling a repair note a
+   * "convention" would ask the reader to apply a story about a failure as if it were a
+   * fact about the workspace. The default is the rule wording, unchanged, because every
+   * published number was produced with it and a silent re-wording would move the baseline
+   * under the comparison.
+   */
+  readonly packKind?: PackKind;
+  /**
    * Where the pack sits relative to the question.
    *
    * `before` is what every published number was produced under: schema, evidence, pack,
@@ -448,7 +512,8 @@ export type PromptInput = {
 };
 
 export function promptFor(input: PromptInput): string {
-  const packBlock = input.pack === '' ? '' : `Workspace conventions learned from earlier corrections:\n${input.pack}`;
+  const packBlock =
+    input.pack === '' ? '' : `${PACK_LABEL[input.packKind ?? 'rule']}\n${input.pack}`;
   const critiqueBlock =
     input.pack === '' || input.critique !== true
       ? ''
@@ -804,9 +869,35 @@ export type RetryInput = {
   /** What the database said: `no rows` or the driver's message. */
   readonly failure: string;
   readonly pack: string;
+  /** What the pack holds; the empty pack renders identically either way. */
+  readonly packKind?: PackKind;
+};
+
+const RETRY_LABEL: Record<PackKind, string> = {
+  rule: 'Conventions learned from earlier corrections:',
+  repair: 'Repairs of earlier failures, each with the reason it was wrong and the change that fixed it:',
+};
+
+/**
+ * What to do with the block, which depends on what the block is.
+ *
+ * A rule is a claim to check against the failure; a repair is a story whose ending is a
+ * change to try. The second asks for more than "does this apply" — it asks whether this
+ * failure is the one that was repaired, which is the question the whole retry arm exists
+ * to put to the model.
+ */
+const RETRY_INSTRUCTION: Record<PackKind, string> = {
+  rule:
+    'Check whether one of those conventions explains the failure. If one does, apply it. ' +
+    'If none does, write a different query that answers the question.',
+  repair:
+    'Each item states a failure, why it was wrong, and the change that fixed it. ' +
+    'Check whether one of those failures is this failure. If one is, apply the same change. ' +
+    'If none is, write a different query that answers the question.',
 };
 
 export function retryPromptFor(input: RetryInput): string {
+  const kind = input.packKind ?? 'rule';
   return [
     'You fix one SQLite query that answers the question below.',
     'Return the SQL only, in a ```sql fence, with no explanation.',
@@ -815,12 +906,119 @@ export function retryPromptFor(input: RetryInput): string {
     `Question: ${input.question}`,
     `An earlier attempt at this question:\n${input.attempt}`,
     `That attempt did not work: ${input.failure}`,
-    input.pack === '' ? '' : `Conventions learned from earlier corrections:\n${input.pack}`,
-    input.pack === ''
-      ? ''
-      : 'Check whether one of those conventions explains the failure. If one does, apply it. ' +
-        'If none does, write a different query that answers the question.',
+    input.pack === '' ? '' : `${RETRY_LABEL[kind]}\n${input.pack}`,
+    input.pack === '' ? '' : RETRY_INSTRUCTION[kind],
   ]
     .filter((line) => line !== '')
     .join('\n\n');
+}
+
+/**
+ * How the attempt's result differed from the correction's, in words the distiller can use.
+ *
+ * A rule distiller is told the correction and left to guess why the attempt was wrong; a
+ * repair distiller cannot be, because "why it was wrong" is the content being learned. The
+ * only grounded source for that is the two results side by side, so the lane measures them
+ * and states the difference: a failure message, a row count, a column list, or — when both
+ * agree on shape — the fact that only the values differ.
+ *
+ * Deliberately shape-only. The values themselves are the answer to the question being
+ * learned from, and a note that quotes them would be a restatement of one case dressed as
+ * a lesson. Row counts and column names are schema vocabulary; the numbers inside are not.
+ */
+export type ResultShape = {
+  readonly ok: boolean;
+  readonly error?: string;
+  readonly rows: number;
+  readonly columns: readonly string[];
+};
+
+export function mismatchNote(attempt: ResultShape, correction: ResultShape): string {
+  if (!attempt.ok) {
+    // The driver's own message, because a paraphrase would be a diagnosis and this note
+    // is evidence: "no such column: t2.raceId" tells the distiller which relation was
+    // invented, while "the join was wrong" tells it what we already suspected.
+    return `it failed: ${attempt.error ?? 'the driver gave no message'}`;
+  }
+  if (!correction.ok) {
+    return 'it ran but returned the wrong rows';
+  }
+  if (attempt.rows !== correction.rows) {
+    return `it returned ${attempt.rows} rows where the corrected query returns ${correction.rows}`;
+  }
+  if (attempt.columns.join('\u0000') !== correction.columns.join('\u0000')) {
+    return (
+      `it returned columns [${attempt.columns.join(', ')}] ` +
+      `where the corrected query returns [${correction.columns.join(', ')}]`
+    );
+  }
+  return 'it returned the corrected query\'s columns and row count, but different values';
+}
+
+/**
+ * The retry arms, measured on the questions that were retried.
+ *
+ * A population delta is the wrong statistic for a conditional treatment: only the
+ * questions whose first answer failed can move, which on this benchmark is 41 of 350, so
+ * an effect that fixes a third of them reads as +2pp and its interval spans zero. The
+ * subset comparison answers the question the arm was built to ask — of the questions that
+ * failed, how many did the repair loop recover — and it costs one filter.
+ *
+ * Reported alongside the population delta rather than instead of it: the subset number is
+ * conditional on a post-treatment variable (the first answer's failure), which is exactly
+ * what makes it informative and exactly what makes it uninterpretable as a headline.
+ */
+export type RetrySubsetRow = {
+  readonly arm: string;
+  readonly n: number;
+  readonly withoutMemoryAccuracy: number;
+  readonly accuracy: number;
+  readonly deltaPp: number;
+  readonly ciLowPp: number;
+  readonly ciHighPp: number;
+  readonly p: number;
+  readonly gained: number;
+  readonly lost: number;
+};
+
+export function retrySubset(
+  cases: readonly {
+    readonly retried: boolean;
+    readonly withoutMemoryCorrect: boolean;
+    readonly arms: Readonly<Record<string, boolean | undefined>>;
+  }[],
+  seed = 7,
+  resamples = 10_000,
+): readonly RetrySubsetRow[] {
+  const retried = cases.filter((item) => item.retried);
+  if (retried.length === 0) return [];
+  const names = new Set<string>();
+  for (const item of retried) {
+    for (const [name, value] of Object.entries(item.arms)) {
+      if (value !== undefined) names.add(name);
+    }
+  }
+  const rows: RetrySubsetRow[] = [];
+  for (const name of [...names].sort()) {
+    const scored = retried.filter((item) => item.arms[name] !== undefined);
+    const comparison = comparePaired(
+      scored.map((item) => item.withoutMemoryCorrect),
+      scored.map((item) => item.arms[name] === true),
+      seed,
+      resamples,
+    );
+    rows.push({
+      arm: name,
+      n: comparison.n,
+      withoutMemoryAccuracy: comparison.baselineAccuracy,
+      accuracy: comparison.treatmentAccuracy,
+      deltaPp: comparison.delta * 100,
+      ciLowPp: comparison.deltaCI.low * 100,
+      ciHighPp: comparison.deltaCI.high * 100,
+      p: comparison.p,
+      gained: comparison.gained,
+      lost: comparison.lost,
+    });
+  }
+  return rows;
 }

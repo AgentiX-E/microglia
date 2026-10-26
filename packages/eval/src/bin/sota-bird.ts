@@ -78,6 +78,7 @@ import {
   combineInterpreters,
   createLlmInterpreter,
   ruleInterpreter,
+  type DistillForm,
   type Interpreter,
 } from '@agentix-e/microglia-core/distill';
 import {
@@ -107,6 +108,7 @@ import {
   judgeScalar,
   mapPool,
   matches,
+  mismatchNote,
   missingDatabases,
   executeQuery,
   groundedItems,
@@ -118,6 +120,7 @@ import {
   reportedSql,
   requirePopulated,
   retryPromptFor,
+  retrySubset,
   resolveDatabase,
   schemaIndex,
   sha256OfFile,
@@ -128,6 +131,8 @@ import {
   type ResultComparison,
   type ConventionName,
   type ConventionSpec,
+  type PackKind,
+  type ResultShape,
 } from '@agentix-e/microglia-eval';
 
 const DATASET_REPO = 'https://huggingface.co/datasets/birdsql/bird_mini_dev';
@@ -271,6 +276,18 @@ const DECISIVE = parseDecisivePolicy({
 });
 
 /**
+ * The arms that answer first and only then consult a memory.
+ *
+ * One list, because the eligible set has to be the same for all of them: the trigger is a
+ * property of the first answer — it did not run, or it ran and returned nothing — so an
+ * arm that retried a different set of questions would be measuring a different population.
+ * `retry-blank` is the same second attempt with no pack at all, which is what separates
+ * "retrying helps" from "the memory helps a retry".
+ */
+const RETRY_ARMS = ['full-onretry', 'full-repair-onretry', 'retry-blank'] as const;
+type RetryArm = (typeof RETRY_ARMS)[number];
+
+/**
  * The anchored arms this run was asked for, and how firmly each revises.
  *
  * A list rather than two booleans so the two modes cannot diverge in anything except the
@@ -369,6 +386,15 @@ type CaseOutcome = {
   readonly packIdList: readonly string[];
   readonly tokens: number;
   readonly latencyMs: number;
+  /**
+   * Whether this question's first answer failed, which is what put it in the retry arms.
+   *
+   * Carried because the retry arms are conditional treatments: their population delta is
+   * the effect diluted by the 88% of questions that never reached them, and the honest
+   * reading is the one taken on this flag. It is also a post-treatment variable, so it is
+   * recorded as a fact and not used as a filter on any other arm.
+   */
+  readonly retried: boolean;
   /** Optional arms, present only when configured. */
   readonly arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
   readonly shadowArms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
@@ -768,6 +794,41 @@ type Judged = {
  * parse failure, and it is counted separately — a run in which one prompt in five
  * never got an answer cannot be read as a statement about knowledge.
  */
+/**
+ * One query's result as shape: did it run, how many rows, which columns.
+ *
+ * The columns come from the driver rather than from the projected text, so an alias the
+ * correction introduced and an alias the attempt invented are distinguishable, and a note
+ * that says "it returned [name] where the corrected query returns [forename, surname]"
+ * points at the change rather than at the rows.
+ */
+function resultShapeOf(dbPath: string, sql: string | undefined): ResultShape {
+  if (sql === undefined) {
+    return { ok: false, error: 'the reply contained no query', rows: 0, columns: [] };
+  }
+  const outcome = executeQuery(dbPath, sql);
+  return {
+    ok: outcome.ok,
+    ...(outcome.error === undefined ? {} : { error: outcome.error }),
+    rows: outcome.tuples.length,
+    columns: outcome.columns,
+  };
+}
+
+/**
+ * What a deployment can see about a first answer without the answer key.
+ *
+ * The two conditions every retry arm triggers on, and nothing else: a query that does not
+ * run, or one that runs and returns no rows. Both are decidable from the database alone, so
+ * the retry population is a property of the pipeline rather than of the benchmark.
+ */
+function failureOf(dbPath: string, sql: string | undefined): string | undefined {
+  if (sql === undefined) return 'it did not contain a query';
+  const outcome = executeQuery(dbPath, sql);
+  if (!outcome.ok) return `it failed with: ${outcome.error ?? 'an error'}`;
+  return outcome.tuples.length === 0 ? 'it returned no rows' : undefined;
+}
+
 function judgeReply(
   row: BirdRow,
   dbPath: string,
@@ -880,7 +941,10 @@ async function learn(
   let goldFailed = 0;
   for (const [index, row] of rows.entries()) {
     const dbPath = dataset.dbPath(row.db_id);
-    const sql = extractSql(texts[index] ?? '') ?? '';
+    // Kept un-defaulted: "the reply contained no query" and "the query returned nothing"
+    // are different failures, and a repair note that conflates them teaches nothing.
+    const attempted = extractSql(texts[index] ?? '');
+    const sql = attempted ?? '';
     const handle = host.begin({
       task: TASK,
       // The question is the task. Without this the host opens a run per attempt, and the
@@ -906,7 +970,12 @@ async function learn(
     }
     const satisfied = judgeReply(row, dbPath, { text: texts[index] ?? '', tokens: 0 }, task).correct;
     if (!satisfied) {
-      await handle.edit({ sql: target }, { note: 'execution mismatch' });
+      // The note is what was observed, not what we concluded. The rule form ignores it —
+      // it states a fact about the workspace — and the repair form is built on it, because
+      // "why the attempt was wrong" cannot be learned from two queries alone: a join that
+      // multiplies rows and a join on the wrong key look the same in the SQL.
+      const note = mismatchNote(resultShapeOf(dbPath, attempted), resultShapeOf(dbPath, target));
+      await handle.edit({ sql: target }, { note });
       edited += 1;
     }
   }
@@ -986,6 +1055,8 @@ type FoldResult = {
   readonly activeRulesBeforeValidation: number;
   /** Active rules in the unwidened memory, or null when no such memory was built. */
   readonly narrowActive: number | null;
+  /** Active items in the repair memory, or null when the content arm was off. */
+  readonly repairActive: number | null;
   readonly items: readonly StoredItem[];
   readonly distillFailures: readonly string[];
 };
@@ -1034,6 +1105,7 @@ async function buildFoldMemory(
   learnRows: readonly BirdRow[],
   dataset: Dataset,
   task: Task,
+  form: DistillForm = 'lesson',
 ): Promise<FoldMemory> {
   const store = await EmbeddedMemory.open(new MemoryJournal());
   const failures: string[] = [];
@@ -1061,6 +1133,10 @@ async function buildFoldMemory(
               return reply.text;
             },
           },
+          // The form is what the distiller is asked *for*, so it belongs here rather than
+          // in the lane: two memories over the same corrections, differing in one string of
+          // instruction, is the content half of the experiment.
+          form,
         }),
         failures,
         () => lastReply,
@@ -1234,6 +1310,14 @@ async function runFold(
     ARMS.has('full-narrow') && GENERALIZE
       ? await buildFoldMemory(false, learnRows, dataset, task)
       : undefined;
+  // The content axis. A second store over the *same* corrections, differing in one
+  // instruction string: rules say what is true, repairs say what failed and what fixed it.
+  // Built only when an arm asks, because the distillation is the expensive half of a fold.
+  const wantsRepair = RETRY_ARMS.some((arm) => arm !== 'retry-blank' && ARMS.has(arm)) ||
+    ARMS.has('full-repair');
+  const repaired = wantsRepair
+    ? await buildFoldMemory(GENERALIZE, learnRows, dataset, task, 'repair')
+    : undefined;
   const store = widened.store;
   const learning = widened.learning;
   const distilled = widened.distilled;
@@ -1241,6 +1325,7 @@ async function runFold(
   const distillFailures = [
     ...widened.distillFailures,
     ...(narrowed === undefined ? [] : narrowed.distillFailures),
+    ...(repaired === undefined ? [] : repaired.distillFailures),
   ];
 
   // The wrong-scope control must inject text, or it silently becomes a second
@@ -1282,6 +1367,14 @@ async function runFold(
   const plans: PlannedCall[] = [];
   const packs: PackInfo[] = [];
 
+  /**
+   * Which arm renders which kind of block.
+   *
+   * A table rather than a parameter: the kind is a property of the arm, and an arm that
+   * had to be told twice what it was would eventually be told two different things.
+   */
+  const PACK_KIND: Partial<Record<ArmName, PackKind>> = { 'full-repair': 'repair' };
+
   const call = (
     position: number,
     arm: ArmName,
@@ -1304,6 +1397,10 @@ async function runFold(
         convention: ACTIVE,
         packPosition,
         ...(critique ? { critique: true } : {}),
+        // The block is labelled by what it holds. Rendering a repair note under the
+        // rule heading would ask the reader to act on a story as if it were a fact, and
+        // the arm would then measure the mismatch between label and content.
+        ...(PACK_KIND[arm] === undefined ? {} : { packKind: PACK_KIND[arm] as PackKind }),
       }),
     });
   };
@@ -1316,8 +1413,14 @@ async function runFold(
   /** Questions where the pruned store produced a different pack from the unpruned one. */
   let validatedPackDiffers = 0;
   let validatedPositions = 0;
-  /** The pack each question would see on a retry, held until the first answer has run. */
-  const retries = new Map<number, Pack>();
+  /**
+   * The pack each question would see on a retry, held until the first answer has run.
+   *
+   * Both forms, because the retry arms differ in what they hand the retry and must see the
+   * same question: `rule` is the declarative pack, `repair` the contrastive one, and either
+   * may be empty for a given question.
+   */
+  const retries = new Map<number, { rule: Pack; repair: Pack | undefined }>();
   /** Questions that failed and therefore got a retry, and questions that never needed one. */
   let retried = 0;
   let notRetried = 0;
@@ -1335,8 +1438,11 @@ async function runFold(
   // report a difference of zero as if it had measured something.
   type Pack = Awaited<ReturnType<typeof widened.host.recall>>;
   const rawPacks = new Map<number, Pack>();
+  const repairPacks = new Map<number, Pack>();
   for (const [position, row] of evalRows.entries()) {
-    rawPacks.set(position, await widened.host.recall({ task: TASK, text: row.question, scope: { domain: row.db_id } }));
+    const query = { task: TASK, text: row.question, scope: { domain: row.db_id } };
+    rawPacks.set(position, await widened.host.recall(query));
+    if (repaired !== undefined) repairPacks.set(position, await repaired.host.recall(query));
   }
   // The deletion half of the literature's prescription, run on learn rows only, before
   // any held-out question is scored.
@@ -1424,10 +1530,17 @@ async function runFold(
       const wrong = await widened.host.recall({ ...query, scope: { domain: nextDatabase(row.db_id) } });
       call(position, 'wrong-scope', wrong.rendered, wrong.ids.length);
     }
-    if (ARMS.has('full-onretry')) {
+    if (RETRY_ARMS.some((arm) => ARMS.has(arm))) {
       // Nothing is planned here: the retry needs the first answer's execution result, so its
       // prompt cannot be built until that answer exists.
-      retries.set(position, pack);
+      retries.set(position, { rule: pack, repair: repairPacks.get(position) });
+    }
+    if (ARMS.has('full-repair')) {
+      // The repair pack in the first prompt: same timing as `full`, one thing different.
+      const repairPack = repairPacks.get(position);
+      if (repairPack !== undefined) {
+        call(position, 'full-repair', repairPack.rendered, repairPack.ids.length);
+      }
     }
     if (ARMS.has('full-grounded')) {
       // Checkable rules only. The filter reads the schema of this database, not the question,
@@ -1505,16 +1618,24 @@ async function runFold(
     return reply;
   });
 
-  // The retry arm's only round with the pack, and it happens only where the first answer did
+  // The retry arms' only round with a pack, and it happens only where the first answer did
   // not work: the query failed to execute, or it executed and returned nothing. Those are the
   // two signals a deployment has without the answer key, and they are also the two the
   // literature's correction loops act on.
-  const retryReplies = new Map<number, Reply | undefined>();
-  const retryPackIds = new Map<number, number>();
-  if (ARMS.has('full-onretry')) {
+  //
+  // The three arms are issued from one pass because the eligible set is part of the design
+  // rather than a consequence of the treatment: `retry-blank` retries exactly the questions
+  // the memoried arms retry, so the comparison is one population under two treatments. A
+  // retry decided per arm would let a difference in which questions failed masquerade as a
+  // difference in what the retry was given.
+  const retryReplies = new Map<string, { position: number; arm: RetryArm; reply: Reply | undefined; packIds: number }>();
+  /** Questions whose first answer failed: the population the retry arms are measured on. */
+  const retriedPositions = new Set<number>();
+  const retryArmsThisRun = RETRY_ARMS.filter((arm) => ARMS.has(arm));
+  if (retryArmsThisRun.length > 0) {
     const index = new Map(plans.map((plan, at) => [`${plan.position}:${plan.arm}`, at]));
-    const batch: { position: number; prompt: string; packIds: number }[] = [];
-    for (const [position, pack] of retries) {
+    const batch: { position: number; arm: RetryArm; prompt: string; packIds: number }[] = [];
+    for (const [position, packsHere] of retries) {
       const at = index.get(`${position}:none`);
       const reply = at === undefined ? undefined : replies[at];
       if (reply === undefined) {
@@ -1522,49 +1643,50 @@ async function runFold(
         continue;
       }
       const row = evalRows[position] as BirdRow;
-      const sql = extractSql(reply.text);
-      const run =
-        sql === undefined
-          ? { ok: false, tuples: [], failure: 'it did not contain a query' }
-          : (() => {
-              const outcome = executeQuery(dataset.dbPath(row.db_id), sql);
-              return {
-                ok: outcome.ok,
-                tuples: outcome.tuples,
-                failure: `it failed with: ${outcome.error ?? 'an error'}`,
-              };
-            })();
-      const failure = !run.ok ? run.failure : (run.tuples as readonly unknown[]).length === 0 ? 'it returned no rows' : undefined;
+      const dbPath = dataset.dbPath(row.db_id);
+      const failure = failureOf(dbPath, extractSql(reply.text));
       if (failure === undefined) {
         notRetried += 1;
         continue;
       }
       retried += 1;
-      batch.push({
-        position,
-        prompt: retryPromptFor({
-          question: row.question,
-          evidence: row.evidence,
-          ddl: ddlOf(dataset.dbPath(row.db_id)),
-          attempt: reply.text,
-          failure,
-          pack: pack.rendered,
-        }),
-        packIds: pack.ids.length,
-      });
+      retriedPositions.add(position);
+      for (const arm of retryArmsThisRun) {
+        const repair = arm === 'full-repair-onretry';
+        const pack = arm === 'retry-blank' ? '' : (repair ? packsHere.repair?.rendered : packsHere.rule.rendered) ?? '';
+        const packIds = arm === 'retry-blank' ? 0 : (repair ? packsHere.repair?.ids.length : packsHere.rule.ids.length) ?? 0;
+        batch.push({
+          position,
+          arm,
+          packIds,
+          prompt: retryPromptFor({
+            question: row.question,
+            evidence: row.evidence,
+            ddl: ddlOf(dataset.dbPath(row.db_id)),
+            attempt: reply.text,
+            failure,
+            pack,
+            ...(repair ? { packKind: 'repair' as const } : {}),
+          }),
+        });
+      }
     }
     const fixed = await mapPool(batch, CONCURRENCY, async (item) => {
       try {
-        return { position: item.position, reply: await chat(item.prompt) };
+        return { ...item, reply: await chat(item.prompt) };
       } catch (error) {
         if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
         if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
-        return { position: item.position, reply: undefined };
+        return { ...item, reply: undefined };
       }
     });
     for (const entry of fixed) {
-      retryReplies.set(entry.position, entry.reply);
-      retryPackIds.set(entry.position, batch.find((item) => item.position === entry.position)?.packIds ?? 0);
+      retryReplies.set(`${entry.position}:${entry.arm}`, {
+        position: entry.position,
+        arm: entry.arm,
+        reply: entry.reply,
+        packIds: entry.packIds,
+      });
     }
   }
 
@@ -1650,23 +1772,23 @@ async function runFold(
 
   // A question that never needed a retry keeps its first answer under this arm's name: the
   // pack was not shown, so the answer it produced is the answer this arm is claiming.
-  if (ARMS.has('full-onretry')) {
-    for (const [position, reply] of retryReplies) {
-      const row = evalRows[position] as BirdRow;
-      const started = performance.now();
-      const result = judgeReply(row, dataset.dbPath(row.db_id), reply, task);
-      judged.set(`${position}:full-onretry`, {
-        ...result,
-        latencyMs: Math.round(performance.now() - started),
-      });
-      plans.push({ position, arm: 'full-onretry', prompt: '', packIds: retryPackIds.get(position) ?? 0 });
-    }
+  for (const entry of retryReplies.values()) {
+    const row = evalRows[entry.position] as BirdRow;
+    const started = performance.now();
+    const result = judgeReply(row, dataset.dbPath(row.db_id), entry.reply, task);
+    judged.set(`${entry.position}:${entry.arm}`, {
+      ...result,
+      latencyMs: Math.round(performance.now() - started),
+    });
+    plans.push({ position: entry.position, arm: entry.arm, prompt: '', packIds: entry.packIds });
+  }
+  for (const arm of retryArmsThisRun) {
     for (const position of retries.keys()) {
-      if (retryReplies.has(position)) continue;
+      if (retryReplies.has(`${position}:${arm}`)) continue;
       const first = judged.get(`${position}:none`);
       if (first === undefined) continue;
-      judged.set(`${position}:full-onretry`, first);
-      plans.push({ position, arm: 'full-onretry', prompt: '', packIds: 0 });
+      judged.set(`${position}:${arm}`, first);
+      plans.push({ position, arm, prompt: '', packIds: 0 });
     }
   }
 
@@ -1717,6 +1839,7 @@ async function runFold(
       shadowWithoutMemoryCorrect: base.shadowCorrect,
       parseOk: full.parseOk,
       execOk: full.execOk,
+      retried: retriedPositions.has(position),
       packIds: packIdsOf.get(`${position}:full`) ?? 0,
       coverage: pack.coverage,
       expected: task.expected.get(idOf(row)) ?? null,
@@ -1738,6 +1861,19 @@ async function runFold(
       after: after.digest,
     });
   }
+  // The second store is held to the same proof. It is only read after construction, so a
+  // difference here would mean the repair arms were scored against a memory that changed
+  // while they were being measured - the one failure this lane has already had once.
+  if (repaired !== undefined) {
+    const repairAfter = await knowledgeDigest(repaired.store);
+    if (repairAfter.digest !== repaired.frozen.digest) {
+      throw new MicrogliaError('MG_E_CONFIG', 'Evaluation mutated the repair memory', {
+        fold,
+        before: repaired.frozen.digest,
+        after: repairAfter.digest,
+      });
+    }
+  }
   const items = (await store.listKnowledge({ namespace: 'bird', status: 'all' })).map((item) => ({
     id: item.id,
     status: item.status,
@@ -1749,6 +1885,7 @@ async function runFold(
   }));
   await widened.host.close();
   if (narrowed !== undefined) await narrowed.host.close();
+  if (repaired !== undefined) await repaired.host.close();
 
   // Written per fold: a run that dies at fold 4 keeps the distillations it paid for, and the
   // next dispatch replays them instead of buying them again.
@@ -1786,6 +1923,7 @@ async function runFold(
     digestBeforeValidation: frozen.digest,
     activeRulesBeforeValidation: frozen.active,
     narrowActive: narrowed?.frozen.active ?? null,
+    repairActive: repaired?.frozen.active ?? null,
     items,
     distillFailures,
   };
@@ -2103,6 +2241,10 @@ async function main(): Promise<void> {
       convention: ACTIVE?.sentence ?? null,
       task: TASK,
       distill_prompt: 'distill-prompt/3',
+      // The repair form is a second distiller over the same events. Recorded separately
+      // because a number produced under it is not comparable to one produced under the
+      // rule form, and a single `distill_prompt` field would let a reader assume it was.
+      distill_prompt_repair: folds.some((fold) => fold.repairActive !== null) ? 'distill-prompt/3+repair' : null,
       distill_max_tokens: 2000,
       concurrency: CONCURRENCY,
       breaker_threshold: BREAKER_THRESHOLD,
@@ -2233,6 +2375,17 @@ async function main(): Promise<void> {
       retried_questions: folds.reduce((sum, fold) => sum + fold.retried, 0),
       not_retried_questions: folds.reduce((sum, fold) => sum + fold.notRetried, 0),
       /**
+       * The retry arms measured on the questions they were allowed to touch.
+       *
+       * A population delta divides a conditional effect by the whole benchmark — 41
+       * eligible questions out of 350 — so a repair loop that recovers a third of its
+       * failures reads as +2pp with an interval that includes zero. This block answers the
+       * question the arm was built to ask, and it is reported next to the population delta
+       * rather than instead of it: conditioning on the first answer's failure is exactly
+       * what makes it informative and exactly what stops it from being a headline.
+       */
+      retry_subset: retrySubset(cases),
+      /**
        * What the grounding filter removed, because a pack of a quarter the size is a
        * different experiment if the reader cannot see that it is.
        */
@@ -2289,6 +2442,7 @@ async function main(): Promise<void> {
       edited: fold.learning.edited,
       active: fold.activeRules,
       active_narrow: fold.narrowActive,
+      active_repair: fold.repairActive,
       failed_distill: fold.failedDistill,
       mean_pack_ids: Number(fold.meanPackIds.toFixed(3)),
       without_memory: rate(fold.cases.map((item) => item.withoutMemoryCorrect)),

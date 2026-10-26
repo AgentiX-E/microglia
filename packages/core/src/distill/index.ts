@@ -37,6 +37,7 @@ export {
   buildDistillPrompt,
   createLlmInterpreter,
   parseDistillResponse,
+  type DistillForm,
   type LlmInterpreterOptions,
   type LlmPort,
 } from './llm.js';
