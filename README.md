@@ -260,23 +260,31 @@ every run, because a deletion that retired nothing and a rule that was never inj
 the same.
 
 `SOTA_ARMS=full-anchored` answers the question *first* and revises against the pack in a second call, so
-a retrieved rule is an objection to a draft rather than a template for an answer. Two dispatches:
+a retrieved rule is an objection to a draft rather than a template for an answer. Five dispatches:
 
-| Arm | Run 1 | Run 2 | Paired against `full` |
-|---|---|---|---|
-| no memory | 54.00% | 53.71% | — |
-| `full` | 50.29% (−3.71pp) | 49.71% (−4.00pp) | — |
-| `full-late` (pack after the question) | 48.86% (−5.14pp) | 49.14% (−4.57pp) | −1.43pp / −0.57pp |
-| **`full-anchored`** | **51.71% (−2.29pp)** | **54.00% (+0.29pp)** | **+1.43pp / +4.29pp** |
+| Arm | 1 | 2 | 3 | 4 | 5 | Paired against `full`, pooled |
+|---|---|---|---|---|---|---|
+| no memory | 54.00% | 53.71% | 52.57% | 53.14% | 53.71% | — |
+| `full` | 50.29% | 49.71% | 53.43% | 53.14% | 52.00% | −3.71 / −4.00 / +0.86 / 0.00 / −1.71pp |
+| `full-anchored` | +1.43 | +4.29 | −1.14 | 0.00 | −0.57 | **+0.80pp, McNemar p = 0.285** (67 lost / 81 gained) |
+| `full-anchored-conditional` | — | — | −1.71 | −1.43 | −2.00 | **−1.71pp, p = 0.066** (52 lost / 34 gained) |
 
-Run 2 puts the anchored arm at **statistically indistinguishable from answering with no memory** while
-`full` costs 4pp in the same run, and the paired gain over `full` is **+4.29pp, p = 0.0167** (+2.86pp
-pooled over both dispatches, McNemar p = 0.0205). The arm recovers the loss and forfeits the gain —
-it loses 10 and 5 questions where `full` loses 23 and 25, and gains 2 and 6 where `full` gains 10 and 11 —
-because "unchanged" is the default and a rule has to justify a change. Moving the pack *later* makes
-things worse in both runs, which is the opposite of what a lost-in-the-middle reading predicts and what
-an imitation reading predicts: the nearer a rule sits to where the answer is written, the more it is
-copied.
+The fifth column is the honest one. Two dispatches made anchoring look decisive (+4.29pp, p = 0.0167);
+three more put the effect at +0.80pp with p = 0.285. **The earlier claim that anchoring removes the pack's
+cost does not replicate, and the reason is measurable**: every dispatch distils its own rules from its own
+replies, so the treatment — the store — was resampled each run, and `full` itself moved from −4.00pp to
++0.86pp across runs of unchanged code. Comparisons inside a run are valid, because the arms share a store;
+comparisons across runs were not, and the first two runs were the favourable tail of that distribution.
+
+The conditional variant, which tells the model to act on an item whose `when` condition holds, is worse
+than `full` in all three runs that measured it. Loosening the conservative instruction re-imports exactly
+the harm it was avoiding, which is a negative result in the useful direction: it says the benefit comes
+from making "unchanged" the default, not from finding a better reason to change.
+
+`SOTA_DISTILL_CACHE` points the distillation at a file, and the workflow restores that file across
+dispatches, so the next run learns the same store instead of a new one. Over a rehearsal against the
+stand-in, the second run made 160 calls where the first made 201 and hit the cache 40 times out of 40 —
+same store, fewer calls, and an arm comparison that finally varies in one thing.
 
 `DEEPSEEK_ENDPOINT` points the lane at a stand-in instead of the provider, and
 `eval/drivers/stand-in.mjs` is one: a rule per distillation, `SELECT 1` for every query. It exists because a
