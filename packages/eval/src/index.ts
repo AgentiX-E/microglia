@@ -301,3 +301,12 @@ export {
 } from './judge.js';
 
 export { executeQuery, resolveDatabase, rowsDiffer, type ExecuteOptions, type QueryOutcome } from './sql-exec.js';
+
+export {
+  DEFAULT_RETIREMENT,
+  creditHistogram,
+  parseRetirementPolicy,
+  retireeFrom,
+  type RetirementPolicy,
+  type ValidationCredit,
+} from './validation.js';

@@ -273,12 +273,12 @@ docs/         user guide, architecture, glossary
 
 ```bash
 pnpm install
-pnpm check      # typecheck → lanes → tests → audit → integrity → memform → L0 → L2b → study → bundle size
+pnpm check      # typecheck → lanes → tests → audit → integrity → memform → L0 → L2b → delivery → study → bundle size
 pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-**99.97 / 99.54 / 100 / 99.97** over **751 tests**; the fourteen branch arms that remain uncovered are
+**99.97 / 99.62 / 100 / 99.97** over **1,066 tests**; the branch arms that remain uncovered are
 listed with file, line, and reason in the internal technical design, and none is excluded with an ignore
 comment.
 

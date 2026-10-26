@@ -92,6 +92,7 @@ import {
   buildValidityGates,
   canonicalRows,
   comparePaired,
+  creditHistogram,
   conventionOf,
   dedupeQuestions,
   detectableDelta,
@@ -103,9 +104,12 @@ import {
   missingDatabases,
   parseArms,
   parseManifest,
+  parseRetirementPolicy,
+  retireeFrom,
   promptFor,
   reportedSql,
   requirePopulated,
+  resolveDatabase,
   sha256OfFile,
   type BirdManifest,
   type SqlArm,
@@ -207,16 +211,20 @@ function armsFrom(raw: string | undefined): Set<ArmName> {
 const ARMS = armsFrom(process.env['SOTA_ARMS']);
 
 /**
- * Trials a rule needs before a failure retires it.
+ * When an injected rule has earned retirement.
  *
- * One, because this corpus injects about 1.8 rules per question and most rules are seen
- * once: a threshold of two would retire nothing and report the same number as `full`
- * under a different name. The value is a setting so the ablation can move it.
+ * Two knobs, both settings, because the right value is the experiment: the trial floor
+ * keeps a single unlucky question from retiring anything, and the failure share decides
+ * how much of a rule's record has to be bad. See `validation.ts` for why the test is a
+ * share rather than a count.
  */
-const VALIDATION_MIN_TRIALS = Math.max(1, Math.trunc(nonNegative(process.env['SOTA_VALIDATION_TRIALS'], 1)));
+const RETIREMENT = parseRetirementPolicy({
+  minTrials: process.env['SOTA_VALIDATION_TRIALS'],
+  failureRate: process.env['SOTA_VALIDATION_FAILURE_RATE'],
+});
 
 /** One entry per fold in which the deletion arm ran. */
-const validations: { fold: number; rules: number; injected: number; trials: number; retired: number }[] = [];
+const validations: (Awaited<ReturnType<typeof validateMemory>> & { fold: number })[] = [];
 
 /**
  * Which reading of "the same answer" is the lane's verdict, and which is its shadow.
@@ -325,11 +333,24 @@ type Reply = ChatReply;
  * policy cannot tell noise from an outage, and a benchmark that runs through one
  * measures the outage.
  */
+/**
+ * Where the model calls go, when a caller points them somewhere else.
+ *
+ * Unset in every published run, and the host is recorded in the artefact so a reader can
+ * tell those runs from a local rehearsal. It exists because every mechanism in this
+ * project was supposed to be proved against a stand-in before it was paid for, and the
+ * benchmark lane was the one place that could not be: a sequencing defect in the deletion
+ * arm reached CI, ran fourteen minutes, and reported a crash where it should have reported
+ * a number.
+ */
+const ENDPOINT = process.env['DEEPSEEK_ENDPOINT'] ?? '';
+
 const llm = new LlmClient({
   apiKey: process.env['DEEPSEEK_API_KEY'] ?? '',
   model: MODEL,
   maxCalls: MAX_CALLS,
   breakerThreshold: BREAKER_THRESHOLD,
+  ...(ENDPOINT === '' ? {} : { endpoint: ENDPOINT }),
 });
 
 const chat = (prompt: string, maxTokens = 700): Promise<ChatReply> => llm.chat(prompt, maxTokens);
@@ -409,23 +430,18 @@ function parseRows(text: string): BirdRow[] {
 /**
  * Locate a database inside an extracted Mini-Dev directory.
  *
- * BIRD has shipped two layouts (`mini_dev_sqlite/<db>.sqlite` and
- * `mini_dev_sqlite/<db>/<db>.sqlite`), and guessing one of them produces a lane
- * that "cannot find the database" for a dataset the user extracted correctly. The
- * error names the directory it looked in rather than the database it missed.
+ * The search itself lives in `sql-exec.ts`, because three lanes needed it and the second
+ * copy of it was already wrong: the adjudication lane looked in four places and missed the
+ * one an operator with a directory called `minidev` ends up with, so every pair of queries
+ * reported different rows and the evidenced criterion silently became the plain cascade.
+ * One implementation, tested, and this function only adds the message.
  */
 function databaseIn(directory: string, dbId: string): string {
-  const candidates = [
-    // The pinned archive's layout: MINIDEV/dev_databases/<db>/<db>.sqlite.
-    join(directory, 'dev_databases', dbId, `${dbId}.sqlite`),
-    join(directory, 'mini_dev_sqlite', `${dbId}.sqlite`),
-    join(directory, 'mini_dev_sqlite', dbId, `${dbId}.sqlite`),
-    join(directory, `${dbId}.sqlite`),
-  ];
-  for (const candidate of candidates) if (existsSync(candidate)) return candidate;
+  const resolved = resolveDatabase(directory, dbId);
+  if (existsSync(resolved)) return resolved;
   throw new MicrogliaError('MG_E_STORE_IO', `No database file for '${dbId}' under BIRD_DIR`, {
     looked_in: directory,
-    hint: 'Expected dev_databases/<db>/<db>.sqlite (the pinned archive) or mini_dev_sqlite/<db>.sqlite',
+    hint: 'Expected dev_databases/<db>/<db>.sqlite (the pinned archive), mini_dev_sqlite/<db>/<db>.sqlite, or a flat <db>.sqlite',
   });
 }
 
@@ -873,10 +889,27 @@ type FoldResult = {
   readonly failedDistill: number;
   readonly created: number;
   readonly meanPackIds: number;
+  /**
+   * Questions where the pruning changed the recalled pack, and how many were read twice.
+   *
+   * Zero differences with a non-zero retirement count means the arm measured `full` twice.
+   */
+  readonly validatedPackDiffers: number;
+  readonly validatedPositions: number;
   /** Rules injected into a prompt this fold, and how many named a condition. */
   readonly injectedRules: number;
   readonly injectedWithCondition: number;
+  /** Digest of the store at the moment scoring began, which is what the guard checks. */
   readonly digest: string;
+  /**
+   * Digest and active count as learning produced them, before any arm retired anything.
+   *
+   * Equal to `digest`/`activeRules` unless `full-validated` ran, in which case the pair
+   * records what the deletion removed. Kept because a single digest would make the guard
+   * either fire on the intended mutation or stop covering the unintended ones.
+   */
+  readonly digestBeforeValidation: string;
+  readonly activeRulesBeforeValidation: number;
   /** Active rules in the unwidened memory, or null when no such memory was built. */
   readonly narrowActive: number | null;
   readonly items: readonly StoredItem[];
@@ -968,8 +1001,13 @@ async function buildFoldMemory(
  * age-based: a record is retired because the tasks it was retrieved for went badly, not
  * because it is old. This is that rule at the granularity this framework has. Only
  * negative evidence counts — a correct answer while a rule was present is not evidence
- * that the rule helped, because the model may have been right anyway — so the score is
- * "trials" and "failures", and a rule with more failures than zero is a candidate.
+ * that the rule helped, because the model may have been right anyway — so what is
+ * collected is a score of trials and failures, and `retireeFrom` decides from it.
+ *
+ * The decision itself lives in `validation.ts` rather than here because it is a threshold,
+ * and a threshold in a lane is a threshold nobody can test. The first version retired any
+ * rule with a single failure, which a stand-in endpoint answered wrongly on purpose, and
+ * it retired every rule it touched.
  *
  * The pass reads `learnRows`. Deleting on the basis of the questions being scored would
  * be leakage with a tidier name, and it would also make the arm unbeatable by
@@ -980,7 +1018,13 @@ async function validateMemory(
   rows: readonly BirdRow[],
   dataset: Dataset,
   task: Task,
-): Promise<{ readonly rules: number; readonly injected: number; readonly trials: number; readonly retired: number }> {
+): Promise<{
+  readonly rules: number;
+  readonly injected: number;
+  readonly trials: number;
+  readonly retired: number;
+  readonly histogram: Readonly<Record<string, number>>;
+}> {
   const outcomes = await mapPool(rows, CONCURRENCY, async (row) => {
     const pack = await host.recall({ task: TASK, text: row.question, scope: { domain: row.db_id } });
     if (pack.ids.length === 0) return { ids: [] as readonly string[], failed: false };
@@ -1015,15 +1059,14 @@ async function validateMemory(
       });
     }
   }
-  const doomed = [...credit.entries()]
-    .filter(([, entry]) => entry.failures > 0 && entry.trials >= VALIDATION_MIN_TRIALS)
-    .map(([id]) => id);
+  const doomed = retireeFrom(credit, RETIREMENT);
   if (doomed.length > 0) await host.forget({ ids: doomed });
   return {
     rules: credit.size,
     injected,
     trials: [...credit.values()].reduce((sum, entry) => sum + entry.trials, 0),
     retired: doomed.length,
+    histogram: creditHistogram(credit),
   };
 }
 
@@ -1125,6 +1168,9 @@ async function runFold(
   // change an answer, and the gate below is about what was injected.
   let injectedRules = 0;
   let injectedWithCondition = 0;
+  /** Questions where the pruned store produced a different pack from the unpruned one. */
+  let validatedPackDiffers = 0;
+  let validatedPositions = 0;
 
   // A snapshot taken before the validated arm deletes anything. The other arms are
   // defined against the store as learned; a deletion that changed their packs would make
@@ -1143,6 +1189,14 @@ async function runFold(
     validations.push({ fold, ...validation });
   }
 
+  // The guard below proves that scoring writes nothing. An arm that retires rules writes
+  // during construction instead, so the digest it is held to has to be taken *after* the
+  // retirement and *before* the first question — otherwise the guard fires on the one
+  // mutation the run intended, and the run reports a crash where it should report a
+  // number. The pre-deletion digest is kept in the record, so the difference is a fact a
+  // reader can check rather than a guard that had to be loosened to let the arm through.
+  const scoringFrozen = ARMS.has('full-validated') ? await knowledgeDigest(store) : frozen;
+
   for (const [position, row] of evalRows.entries()) {
     const query = { task: TASK, text: row.question };
     const pack = rawPacks.get(position) as Pack;
@@ -1157,6 +1211,12 @@ async function runFold(
     if (ARMS.has('full-validated')) {
       // Read again, after the deletion: this is the only arm that sees the pruned store.
       const pruned = await widened.host.recall({ ...query, scope: { domain: row.db_id } });
+      validatedPositions += 1;
+      // Counted rather than assumed. A retirement that removed rules no held-out question
+      // would have recalled leaves this arm identical to `full` on every scored question,
+      // and its delta is then the difference between two names for one condition. The
+      // count is what turns that from an inference into a reading.
+      if (pruned.ids.join('\u0000') !== pack.ids.join('\u0000')) validatedPackDiffers += 1;
       call(position, 'full-validated', pruned.rendered, pruned.ids.length);
     }
     if (ARMS.has('full-narrow')) {
@@ -1323,10 +1383,10 @@ async function runFold(
   }
 
   const after = await knowledgeDigest(store);
-  if (after.digest !== frozen.digest) {
+  if (after.digest !== scoringFrozen.digest) {
     throw new MicrogliaError('MG_E_CONFIG', 'Evaluation mutated knowledge', {
       fold,
-      before: frozen.digest,
+      before: scoringFrozen.digest,
       after: after.digest,
     });
   }
@@ -1345,7 +1405,7 @@ async function runFold(
   const packIds = cases.reduce((sum, item) => sum + item.packIds, 0);
   process.stdout.write(
     `[sota] fold ${fold + 1}/${FOLDS}: eval=${cases.length} learn=${learnRows.length} ` +
-      `edited=${learning.edited} active=${frozen.active} calls=${llm.stats.calls}\n`,
+      `edited=${learning.edited} active=${scoringFrozen.active} calls=${llm.stats.calls}\n`,
   );
   return {
     fold,
@@ -1353,17 +1413,37 @@ async function runFold(
     eval: cases.length,
     cases,
     learning,
-    activeRules: frozen.active,
+    activeRules: scoringFrozen.active,
     failedDistill: distilled.failed,
     created: distilled.created,
     meanPackIds: cases.length === 0 ? 0 : packIds / cases.length,
     injectedRules,
     injectedWithCondition,
-    digest: frozen.digest,
+    validatedPackDiffers,
+    validatedPositions,
+    // What learning produced and what was actually scored, carried separately because the
+    // validated arm makes them differ on purpose.
+    digest: scoringFrozen.digest,
+    digestBeforeValidation: frozen.digest,
+    activeRulesBeforeValidation: frozen.active,
     narrowActive: narrowed?.frozen.active ?? null,
     items,
     distillFailures,
   };
+}
+
+/**
+ * The host of an endpoint, without the path or any query it carried.
+ *
+ * Used only to label a run, but it is parsed rather than echoed: an endpoint with a token
+ * in its query string would otherwise be written into a committed artefact.
+ */
+function hostOf(endpoint: string): string {
+  try {
+    return new URL(endpoint).host;
+  } catch {
+    return 'unparseable';
+  }
 }
 
 function rate(values: readonly boolean[]): number {
@@ -1616,7 +1696,29 @@ async function main(): Promise<void> {
      * merely doubtful. The digest is recorded here so the claim is auditable.
      */
     pack_frozen_during_eval: folds.map((fold) => `fold ${fold.fold}: ${fold.digest}`).join(', '),
+    /**
+     * Where the store changed between learning and scoring, when an arm changed it.
+     *
+     * The validated arm retires rules before the first question, so its fold has two
+     * digests. Recording both keeps the guard above honest: it still compares against a
+     * single value, and a reader can see that the value it compares against was taken
+     * after the one mutation the run intended rather than before it.
+     */
+    store_changes_before_scoring: folds
+      .filter((fold) => fold.digest !== fold.digestBeforeValidation)
+      .map(
+        (fold) =>
+          `fold ${fold.fold}: ${fold.activeRulesBeforeValidation} -> ${fold.activeRules} active rules, ` +
+          `${fold.digestBeforeValidation} -> ${fold.digest}`,
+      ),
     evaluation_writes_no_feedback: true,
+    /**
+     * The host every call went to, or `default` when the lane was not redirected.
+     *
+     * A rehearsal against a stand-in produces numbers of exactly the shape a real run
+     * produces, so the artefact has to say which one it is.
+     */
+    model_endpoint: ENDPOINT === '' ? 'default' : hostOf(ENDPOINT),
   };
 
   const items = folds.flatMap((fold) =>
@@ -1712,6 +1814,25 @@ async function main(): Promise<void> {
       validation_rules_retired: validations.reduce((sum, entry) => sum + entry.retired, 0),
       validation_injected_questions: validations.reduce((sum, entry) => sum + entry.injected, 0),
       validation_trials: validations.reduce((sum, entry) => sum + entry.trials, 0),
+      /**
+       * Rules by observed failure share, merged across folds, in `failures/trials` form.
+       *
+       * Without it a run that retires nothing is ambiguous: the policy may have refused
+       * to act, or no rule may ever have been injected twice. Both produce an empty
+       * deletion list and the same accuracy, and only this distinguishes them.
+       */
+      validation_histogram: JSON.stringify(
+        validations.reduce<Record<string, number>>((merged, entry) => {
+          for (const [share, count] of Object.entries(entry.histogram)) {
+            merged[share] = (merged[share] ?? 0) + count;
+          }
+          return merged;
+        }, {}),
+      ),
+      validation_policy: `minTrials=${RETIREMENT.minTrials} failureRate=${RETIREMENT.failureRate}`,
+      // The arm's own evidence that the deletion reached the questions it scored.
+      validated_pack_differences: folds.reduce((sum, fold) => sum + fold.validatedPackDiffers, 0),
+      validated_positions: folds.reduce((sum, fold) => sum + fold.validatedPositions, 0),
       distill_failed: folds.reduce((sum, fold) => sum + fold.failedDistill, 0),
       distill_created: folds.reduce((sum, fold) => sum + fold.created, 0),
       corrections_learned: folds.reduce((sum, fold) => sum + fold.learning.edited, 0),
