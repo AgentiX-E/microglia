@@ -18,6 +18,10 @@
 import { createServer } from 'node:http';
 
 const port = Number(process.argv[2] ?? 8899);
+// The SQL every non-distillation prompt receives. `SELECT 1` executes and returns a row, so
+// nothing fails and the retry arm never fires; an invalid statement makes every question fail,
+// which is how the retry path is rehearsed.
+const SQL = process.env['STANDIN_SQL'] ?? 'SELECT 1';
 let distilled = 0;
 let prompted = 0;
 
@@ -49,7 +53,7 @@ const server = createServer((request, response) => {
       });
     } else {
       prompted += 1;
-      content = 'SELECT 1';
+      content = SQL;
     }
     response.writeHead(200, { 'content-type': 'application/json' });
     response.end(

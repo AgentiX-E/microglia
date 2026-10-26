@@ -154,6 +154,8 @@ export {
   parseArms,
   anchorPromptFor,
   promptFor,
+  retryPromptFor,
+  type RetryInput,
   type AnchorInput,
   type AnchorMode,
   reportedSql,

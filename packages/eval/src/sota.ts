@@ -230,6 +230,19 @@ export type SqlArm =
    * rules behave differently from the pack as a whole — which is the content half of "the
    * memory is wrong", as opposed to the selection half every earlier arm attacked.
    */
+  | 'full-onretry'
+  /**
+   * The pack is never shown before the first answer, only after a failure.
+   *
+   * Every arm so far puts guidance in front of the question, and iteration 80 measured what
+   * that costs: about 1.7pp per rule injected, independent of what the rules say. This arm
+   * follows the shape of a real correction loop instead — answer, notice the answer did not
+   * work, retry with the experience in hand — so the pack is spent only on the questions that
+   * failed, and only when there is something to explain.
+   *
+   * The failure signal is the only one available without the answer key: the query does not
+   * execute, or it executes and returns nothing. That is what a deployed system can see.
+   */
   | 'full-grounded'
   /**
    * The same number of rules, chosen at random from the same pack.
@@ -293,6 +306,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-corroborated': true,
   'full-grounded': true,
   'full-sampled': true,
+  'full-onretry': true,
   'full-late': true,
   'full-anchored': true,
   'full-anchored-conditional': true,
@@ -768,6 +782,44 @@ export function anchorPromptFor(input: AnchorInput, mode: AnchorMode = 'conserva
     // The instruction refers to a block that may not be there. With no pack the arm would
     // be asking the model to weigh nothing, which is a different question.
     input.pack === '' ? '' : ANCHOR_INSTRUCTION[mode],
+  ]
+    .filter((line) => line !== '')
+    .join('\n\n');
+}
+
+/**
+ * The retry prompt: the model has already answered, the answer failed, and now it sees the pack.
+ *
+ * The difference from `anchorPromptFor` is what the second call is *for*. Anchoring asks the
+ * model to audit a draft it may have got right; this asks it to explain a failure, which is the
+ * only moment at which a rule about a past mistake is evidence rather than a suggestion. The
+ * failure is stated in the terms the system observed — no rows, or an execution error — because
+ * inventing a diagnosis for the model would make the arm measure the diagnosis.
+ */
+export type RetryInput = {
+  readonly question: string;
+  readonly evidence: string;
+  readonly ddl: string;
+  readonly attempt: string;
+  /** What the database said: `no rows` or the driver's message. */
+  readonly failure: string;
+  readonly pack: string;
+};
+
+export function retryPromptFor(input: RetryInput): string {
+  return [
+    'You fix one SQLite query that answers the question below.',
+    'Return the SQL only, in a ```sql fence, with no explanation.',
+    `Schema:\n${input.ddl}`,
+    input.evidence ? `Evidence (may be wrong; it is external knowledge):\n${input.evidence}` : '',
+    `Question: ${input.question}`,
+    `An earlier attempt at this question:\n${input.attempt}`,
+    `That attempt did not work: ${input.failure}`,
+    input.pack === '' ? '' : `Conventions learned from earlier corrections:\n${input.pack}`,
+    input.pack === ''
+      ? ''
+      : 'Check whether one of those conventions explains the failure. If one does, apply it. ' +
+        'If none does, write a different query that answers the question.',
   ]
     .filter((line) => line !== '')
     .join('\n\n');

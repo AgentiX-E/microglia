@@ -14,6 +14,7 @@ import {
   parseArms,
   anchorPromptFor,
   promptFor,
+  retryPromptFor,
   reportedSql,
   type GateInput,
 } from '../sota.js';
@@ -214,6 +215,7 @@ describe('parseArms', () => {
       'full-grounded',
       'full-late',
       'full-narrow',
+      'full-onretry',
       'full-plain',
       'full-sampled',
       'full-validated',
@@ -248,6 +250,7 @@ describe('parseArms', () => {
       'full-corroborated',
       'full-grounded',
       'full-sampled',
+      'full-onretry',
       'full-late',
       'full-anchored',
       'full-anchored-conditional',
@@ -718,5 +721,48 @@ describe('anchorPromptFor modes', () => {
       expect(prompt).not.toContain('first attempt unchanged');
       expect(prompt).not.toContain('Check that condition');
     }
+  });
+});
+
+describe('retryPromptFor', () => {
+  const base = {
+    question: 'How many students?',
+    evidence: '',
+    ddl: 'CREATE TABLE s (id INTEGER)',
+    attempt: 'SELECT COUNT(*) FROM missing',
+    failure: 'it failed with: no such table: missing',
+    pack: '- {"statement":"count rows with COUNT(*)"}',
+  };
+
+  it('states the failure in the terms the system observed, not a diagnosis', () => {
+    const prompt = retryPromptFor(base);
+    expect(prompt).toContain('That attempt did not work: it failed with: no such table: missing');
+    // The arm measures the retry, so inventing a cause would make it measure the invention.
+    expect(prompt).not.toContain('the table does not exist');
+  });
+
+  it('puts the attempt and the failure before the pack, so the failure frames it', () => {
+    const prompt = retryPromptFor(base);
+    expect(prompt.indexOf('An earlier attempt')).toBeLessThan(prompt.indexOf('Conventions learned'));
+    expect(prompt.indexOf('did not work')).toBeLessThan(prompt.indexOf('Conventions learned'));
+  });
+
+  it('asks the model to check the conventions against the failure', () => {
+    const prompt = retryPromptFor(base);
+    expect(prompt).toContain('Check whether one of those conventions explains the failure.');
+    expect(prompt).toContain('If none does, write a different query that answers the question.');
+  });
+
+  it('carries no conventions block and no instruction when the pack is empty', () => {
+    const prompt = retryPromptFor({ ...base, pack: '' });
+    expect(prompt).not.toContain('Conventions learned');
+    expect(prompt).not.toContain('Check whether one of those conventions');
+    expect(prompt).toContain('That attempt did not work');
+  });
+
+  it('keeps the evidence line when the benchmark supplies any', () => {
+    expect(retryPromptFor({ ...base, evidence: 'rate = count / enrolment' })).toContain(
+      'Evidence (may be wrong; it is external knowledge):',
+    );
   });
 });

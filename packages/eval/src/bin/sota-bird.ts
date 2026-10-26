@@ -108,6 +108,7 @@ import {
   mapPool,
   matches,
   missingDatabases,
+  executeQuery,
   groundedItems,
   parseArms,
   parseManifest,
@@ -116,6 +117,7 @@ import {
   promptFor,
   reportedSql,
   requirePopulated,
+  retryPromptFor,
   resolveDatabase,
   schemaIndex,
   sha256OfFile,
@@ -965,6 +967,9 @@ type FoldResult = {
   readonly anchoredSkipped: number;
   /** How many rules each pack carried and how many survived the grounding filter. */
   readonly grounded: { readonly all: number; readonly kept: number };
+  /** Questions the retry arm acted on, and questions it left alone. */
+  readonly retried: number;
+  readonly notRetried: number;
   /** Rules injected into a prompt this fold, and how many named a condition. */
   readonly injectedRules: number;
   readonly injectedWithCondition: number;
@@ -1311,6 +1316,11 @@ async function runFold(
   /** Questions where the pruned store produced a different pack from the unpruned one. */
   let validatedPackDiffers = 0;
   let validatedPositions = 0;
+  /** The pack each question would see on a retry, held until the first answer has run. */
+  const retries = new Map<number, Pack>();
+  /** Questions that failed and therefore got a retry, and questions that never needed one. */
+  let retried = 0;
+  let notRetried = 0;
   /** How much of each pack survives the grounding filter, so the shrink is a number. */
   const groundedSizes: { all: number; grounded: number }[] = [];
   /** The pack each question would see, held for the anchored arm's second call. */
@@ -1414,6 +1424,11 @@ async function runFold(
       const wrong = await widened.host.recall({ ...query, scope: { domain: nextDatabase(row.db_id) } });
       call(position, 'wrong-scope', wrong.rendered, wrong.ids.length);
     }
+    if (ARMS.has('full-onretry')) {
+      // Nothing is planned here: the retry needs the first answer's execution result, so its
+      // prompt cannot be built until that answer exists.
+      retries.set(position, pack);
+    }
     if (ARMS.has('full-grounded')) {
       // Checkable rules only. The filter reads the schema of this database, not the question,
       // so it cannot leak the answer into the pack.
@@ -1489,6 +1504,69 @@ async function runFold(
     }
     return reply;
   });
+
+  // The retry arm's only round with the pack, and it happens only where the first answer did
+  // not work: the query failed to execute, or it executed and returned nothing. Those are the
+  // two signals a deployment has without the answer key, and they are also the two the
+  // literature's correction loops act on.
+  const retryReplies = new Map<number, Reply | undefined>();
+  const retryPackIds = new Map<number, number>();
+  if (ARMS.has('full-onretry')) {
+    const index = new Map(plans.map((plan, at) => [`${plan.position}:${plan.arm}`, at]));
+    const batch: { position: number; prompt: string; packIds: number }[] = [];
+    for (const [position, pack] of retries) {
+      const at = index.get(`${position}:none`);
+      const reply = at === undefined ? undefined : replies[at];
+      if (reply === undefined) {
+        notRetried += 1;
+        continue;
+      }
+      const row = evalRows[position] as BirdRow;
+      const sql = extractSql(reply.text);
+      const run =
+        sql === undefined
+          ? { ok: false, tuples: [], failure: 'it did not contain a query' }
+          : (() => {
+              const outcome = executeQuery(dataset.dbPath(row.db_id), sql);
+              return {
+                ok: outcome.ok,
+                tuples: outcome.tuples,
+                failure: `it failed with: ${outcome.error ?? 'an error'}`,
+              };
+            })();
+      const failure = !run.ok ? run.failure : (run.tuples as readonly unknown[]).length === 0 ? 'it returned no rows' : undefined;
+      if (failure === undefined) {
+        notRetried += 1;
+        continue;
+      }
+      retried += 1;
+      batch.push({
+        position,
+        prompt: retryPromptFor({
+          question: row.question,
+          evidence: row.evidence,
+          ddl: ddlOf(dataset.dbPath(row.db_id)),
+          attempt: reply.text,
+          failure,
+          pack: pack.rendered,
+        }),
+        packIds: pack.ids.length,
+      });
+    }
+    const fixed = await mapPool(batch, CONCURRENCY, async (item) => {
+      try {
+        return { position: item.position, reply: await chat(item.prompt) };
+      } catch (error) {
+        if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+        if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+        return { position: item.position, reply: undefined };
+      }
+    });
+    for (const entry of fixed) {
+      retryReplies.set(entry.position, entry.reply);
+      retryPackIds.set(entry.position, batch.find((item) => item.position === entry.position)?.packIds ?? 0);
+    }
+  }
 
   // The anchored arm's second round. It is a separate phase because its prompt contains the
   // first round's answer, and because a draft that never arrived leaves nothing to revise —
@@ -1568,6 +1646,28 @@ async function runFold(
       latencyMs: Math.round(performance.now() - started),
     });
     plans.push({ position: entry.position, arm: entry.arm, prompt: '', packIds: entry.packIds });
+  }
+
+  // A question that never needed a retry keeps its first answer under this arm's name: the
+  // pack was not shown, so the answer it produced is the answer this arm is claiming.
+  if (ARMS.has('full-onretry')) {
+    for (const [position, reply] of retryReplies) {
+      const row = evalRows[position] as BirdRow;
+      const started = performance.now();
+      const result = judgeReply(row, dataset.dbPath(row.db_id), reply, task);
+      judged.set(`${position}:full-onretry`, {
+        ...result,
+        latencyMs: Math.round(performance.now() - started),
+      });
+      plans.push({ position, arm: 'full-onretry', prompt: '', packIds: retryPackIds.get(position) ?? 0 });
+    }
+    for (const position of retries.keys()) {
+      if (retryReplies.has(position)) continue;
+      const first = judged.get(`${position}:none`);
+      if (first === undefined) continue;
+      judged.set(`${position}:full-onretry`, first);
+      plans.push({ position, arm: 'full-onretry', prompt: '', packIds: 0 });
+    }
   }
 
   const packIdsOf = new Map(plans.map((plan) => [`${plan.position}:${plan.arm}`, plan.packIds]));
@@ -1674,6 +1774,8 @@ async function runFold(
     validatedPackDiffers,
     validatedPositions,
     anchoredSkipped,
+    retried,
+    notRetried,
     grounded: {
       all: groundedSizes.reduce((sum, entry) => sum + entry.all, 0),
       kept: groundedSizes.reduce((sum, entry) => sum + entry.grounded, 0),
@@ -2121,6 +2223,15 @@ async function main(): Promise<void> {
        */
       anchored_skipped_questions: folds.reduce((sum, fold) => sum + fold.anchoredSkipped, 0),
       // The arm's own evidence that the deletion reached the questions it scored.
+      /**
+       * How often the retry arm actually spent its pack.
+       *
+       * The arm's whole claim is that it shows guidance only where an answer failed, so a run
+       * in which almost nothing failed would be measuring the no-memory arm under a different
+       * name. Both counts travel so that is visible instead of inferred.
+       */
+      retried_questions: folds.reduce((sum, fold) => sum + fold.retried, 0),
+      not_retried_questions: folds.reduce((sum, fold) => sum + fold.notRetried, 0),
       /**
        * What the grounding filter removed, because a pack of a quarter the size is a
        * different experiment if the reader cannot see that it is.
