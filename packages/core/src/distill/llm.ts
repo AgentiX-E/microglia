@@ -46,6 +46,8 @@ export type LlmInterpreterOptions = {
    * measurement used; `repair` asks for the contrastive account instead.
    */
   readonly form?: DistillForm;
+  /** Called for each candidate the parser dropped, with the reason. */
+  readonly audit?: (reason: DropReason) => void;
 };
 
 const KINDS = new Set<KnowledgeKind>([
@@ -90,17 +92,17 @@ export type DistillForm = 'lesson' | 'repair';
 const REPAIR_INSTRUCTION: readonly string[] = [
   'You compare one wrong attempt with the correction that replaced it, and state what generalises.',
   'Return JSON only, with this shape:',
-  '{"candidates":[{"kind":"procedure","statement":"...","when":"...","scope":{"task":"...","domain":"..."},"payload":{}}]}',
+  '{"candidates":[{"kind":"procedure","statement":"...","when":"...","payload":{"wrong":"...","cause":"..."}}]}',
   'The event holds the task input, the attempt the model made (`output`), the correction a reviewer saved (`signal.after`), and `signal.note`, which states how the attempt was observed to fail.',
   'Rules:',
-  '- Return exactly one candidate. A second one is a different lesson from the same failure, and one failure teaches one thing.',
-  '- The statement has three parts in a single string, in this order: what the attempt did; why that returns the wrong answer; what the correction does instead that fixes it.',
-  '- The "why" must name a mechanism that the schema or the question explains: a join that multiplies rows, an aggregate taken at the wrong grain, a filter on the wrong column, a value reported in the wrong unit. "It was wrong" and "the correction joins the tables" are restatements, not explanations.',
+  '- Return exactly one candidate and nothing outside the JSON object.',
+  '- `statement` is the fix: what the corrected query does that the attempt did not, in at most 240 characters. One sentence, no preamble.',
+  '- `payload.wrong` is what the attempt did — the projection, the join, the grain, the filter — in one clause.',
+  '- `payload.cause` is why that returns a different answer than the question asks for. Name a mechanism the schema or the question explains: a join that multiplies rows, an aggregate taken at the wrong grain, a filter on the wrong column, a value reported in the wrong unit, a projection that drops the column the question names. "It was wrong" and "the correction joins the tables" are restatements, not causes.',
+  '- `when` is the condition under which the fix generalises to a different question: what the question asks for, which relations or columns it names, what its answer must look like. It must be checkable against the schema and the question, and it must not hold for every question.',
   '- Do not quote the values of this case. Row counts, column names and relations are evidence; the numbers inside the rows are the answer to one question and must not appear.',
-  '- `when` is the condition under which the repair generalises to a different question: what the question asks for, which relations or columns it names, what its answer must look like. It must be checkable against the schema and the question, and it must not hold for every question.',
-  '- Omit scope keys the event does not establish. Never guess a domain.',
+  '- Set no keys inside `payload` other than `wrong` and `cause`, and no scope keys the event does not establish. Never guess a domain.',
   '- State what fails and what works. No second-person instructions, no advice to the reader, no imperative mood.',
-  '- The statement is at most 400 characters.',
 ];
 
 export function buildDistillPrompt(
@@ -154,6 +156,24 @@ export function buildDistillPrompt(
 }
 
 /**
+ * The longest statement the parser accepts.
+ *
+ * Raised from 400 after a run in which a whole content form vanished: the repair
+ * distiller writes three parts — what failed, why, and the fix — and a great many of its
+ * statements landed past 400 characters, where the parser dropped them *without a
+ * counter*, so the memory looked as though the model had found nothing to say. A cap that
+ * silently discards most of a form is not a cap, it is a filter nobody declared.
+ *
+ * 640 rather than unlimited: a statement is rendered into a 1,200-character pack inside a
+ * JSON envelope, and a claim that cannot share a pack with any other claim is not
+ * something a reader can weigh against anything.
+ */
+export const MAX_STATEMENT = 640;
+
+/** Why a candidate the model returned did not become knowledge. */
+export type DropReason = 'unknown-kind' | 'empty-statement' | 'statement-too-long';
+
+/**
  * Parse and validate. Every rejection is a named error, because a silent parse
  * failure would look exactly like "the model had nothing to teach".
  */
@@ -167,6 +187,16 @@ export function parseDistillResponse(
     at: number;
     /** The task instance the evidence came from, when the host opened one. */
     taskId?: string;
+    /**
+     * Told about every candidate that was parsed but not kept.
+     *
+     * A drop is not an error — a 700-character statement is a real reply that cannot be
+     * stored — but it is invisible, and invisibility is what let one content form vanish
+     * from a store while the run reported four parse failures. The lane aggregates these,
+     * so "did the distiller say nothing, or did we throw it away?" has an answer in the
+     * artefact instead of in a guess.
+     */
+    audit?: (reason: DropReason) => void;
     /**
      * Trust the resulting claim inherits. It defaults to the model floor (0.6), and
      * a caller passes the event's own trust: a lesson distilled from an
@@ -184,9 +214,18 @@ export function parseDistillResponse(
     const record = entry as Record<string, unknown>;
     const kind = record['kind'];
     const statement = record['statement'];
-    if (typeof kind !== 'string' || !KINDS.has(kind as KnowledgeKind)) continue;
-    if (typeof statement !== 'string' || statement.trim().length === 0) continue;
-    if (statement.length > 400) continue;
+    if (typeof kind !== 'string' || !KINDS.has(kind as KnowledgeKind)) {
+      base.audit?.('unknown-kind');
+      continue;
+    }
+    if (typeof statement !== 'string' || statement.trim().length === 0) {
+      base.audit?.('empty-statement');
+      continue;
+    }
+    if (statement.length > MAX_STATEMENT) {
+      base.audit?.('statement-too-long');
+      continue;
+    }
 
     const scope = parseScope(record['scope'], base.task);
     const payload = isJson(record['payload']) ? record['payload'] : undefined;
@@ -461,6 +500,7 @@ export function createLlmInterpreter(options: LlmInterpreterOptions): Interprete
       at: context.event.at,
       trust: context.event.trust,
       ...(context.event.taskId === undefined ? {} : { taskId: context.event.taskId }),
+      ...(options.audit === undefined ? {} : { audit: options.audit }),
     });
     return parsed.slice(0, max);
   };

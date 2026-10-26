@@ -79,6 +79,7 @@ import {
   createLlmInterpreter,
   ruleInterpreter,
   type DistillForm,
+  type DropReason,
   type Interpreter,
 } from '@agentix-e/microglia-core/distill';
 import {
@@ -1002,6 +1003,15 @@ async function knowledgeDigest(
   };
 }
 
+/** A repair-store item, with the account it carries in `payload`. */
+type RepairItem = {
+  readonly id: string;
+  readonly status: string;
+  readonly statement: string;
+  readonly when: string | null;
+  readonly payload: unknown;
+};
+
 type StoredItem = {
   readonly id: string;
   readonly status: string;
@@ -1057,6 +1067,13 @@ type FoldResult = {
   readonly narrowActive: number | null;
   /** Active items in the repair memory, or null when the content arm was off. */
   readonly repairActive: number | null;
+  /** What the repair store holds, sampled: a count alone cannot show what was learned. */
+  readonly repairItems: readonly RepairItem[];
+  /** Candidates dropped by the parser, per form. */
+  readonly distillDrops: {
+    readonly rule: Readonly<Record<string, number>>;
+    readonly repair: Readonly<Record<string, number>> | null;
+  };
   readonly items: readonly StoredItem[];
   readonly distillFailures: readonly string[];
 };
@@ -1089,6 +1106,14 @@ type FoldMemory = {
   readonly distilled: { readonly created: number; readonly failed: number };
   readonly frozen: { readonly active: number; readonly total: number; readonly digest: string };
   readonly distillFailures: readonly string[];
+  /**
+   * Candidates the parser accepted as JSON and then dropped, by reason.
+   *
+   * The one number this lane was missing. A store that ends up with one item can mean the
+   * distiller had nothing to say or that we discarded what it said, and those are opposite
+   * findings. Counting the drops is what turns the difference into a reading.
+   */
+  readonly drops: Readonly<Record<string, number>>;
 };
 
 /**
@@ -1109,6 +1134,7 @@ async function buildFoldMemory(
 ): Promise<FoldMemory> {
   const store = await EmbeddedMemory.open(new MemoryJournal());
   const failures: string[] = [];
+  const drops: Record<string, number> = {};
   let lastReply = '';
   const host = await openMicroglia({
     app: 'microglia-sota',
@@ -1127,7 +1153,10 @@ async function buildFoldMemory(
               const key = DistillCache.keyOf(MODEL, PROMPT_VERSION, prompt);
               const cached = distillations.get(key);
               if (cached !== undefined) return cached;
-              const reply = await chat(prompt, 2000);
+              // The repair form writes an object with three fields; the rule form writes one
+              // sentence. Truncation is silent — the reply fails to parse and is counted as
+              // "the model said nothing" — so the headroom is set where the risk is.
+              const reply = await chat(prompt, form === 'repair' ? 3000 : 2000);
               lastReply = reply.text;
               distillations.set(key, reply.text);
               return reply.text;
@@ -1137,6 +1166,9 @@ async function buildFoldMemory(
           // in the lane: two memories over the same corrections, differing in one string of
           // instruction, is the content half of the experiment.
           form,
+          audit: (reason: DropReason) => {
+            drops[reason] = (drops[reason] ?? 0) + 1;
+          },
         }),
         failures,
         () => lastReply,
@@ -1150,7 +1182,7 @@ async function buildFoldMemory(
   const learning = await learn(host, learnRows, dataset, task);
   const distilled = await host.distill({ generalize });
   const frozen = await knowledgeDigest(store);
-  return { store, host, learning, distilled, frozen, distillFailures: failures };
+  return { store, host, learning, distilled, frozen, distillFailures: failures, drops };
 }
 
 /**
@@ -1883,6 +1915,16 @@ async function runFold(
     evidence: item.evidence.length,
     domain: item.scope.domain ?? null,
   }));
+  const repairItems: RepairItem[] =
+    repaired === undefined
+      ? []
+      : (await repaired.store.listKnowledge({ namespace: 'bird', status: 'all' })).map((item) => ({
+          id: item.id,
+          status: item.status,
+          statement: item.statement,
+          when: item.when ?? null,
+          payload: item.payload ?? null,
+        }));
   await widened.host.close();
   if (narrowed !== undefined) await narrowed.host.close();
   if (repaired !== undefined) await repaired.host.close();
@@ -1924,6 +1966,8 @@ async function runFold(
     activeRulesBeforeValidation: frozen.active,
     narrowActive: narrowed?.frozen.active ?? null,
     repairActive: repaired?.frozen.active ?? null,
+    repairItems,
+    distillDrops: { rule: widened.drops, repair: repaired?.drops ?? null },
     items,
     distillFailures,
   };
@@ -2386,6 +2430,15 @@ async function main(): Promise<void> {
        */
       retry_subset: retrySubset(cases),
       /**
+       * What the repair memory actually contained, sampled from the first fold.
+       *
+       * The first run of this arm reported one active repair per fold and the artefact
+       * could not say why: a store holding nothing and a store holding one generic item
+       * look the same from the outside. The sample travels with the counts so a reader can
+       * see the notes, and `distill_drops` says whether there were notes to see.
+       */
+      items_repair: (folds[0]?.repairItems ?? []).slice(0, 30),
+      /**
        * What the grounding filter removed, because a pack of a quarter the size is a
        * different experiment if the reader cannot see that it is.
        */
@@ -2443,6 +2496,7 @@ async function main(): Promise<void> {
       active: fold.activeRules,
       active_narrow: fold.narrowActive,
       active_repair: fold.repairActive,
+      distill_drops: fold.distillDrops,
       failed_distill: fold.failedDistill,
       mean_pack_ids: Number(fold.meanPackIds.toFixed(3)),
       without_memory: rate(fold.cases.map((item) => item.withoutMemoryCorrect)),

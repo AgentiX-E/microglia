@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildDistillPrompt, createLlmInterpreter, parseDistillResponse } from '../llm.js';
+import {
+  MAX_STATEMENT,
+  buildDistillPrompt,
+  createLlmInterpreter,
+  parseDistillResponse,
+  type DropReason,
+} from '../llm.js';
 import type { FeedbackEvent, RunRecord } from '../../kernel/index.js';
 
 const at = 1_700_000_000_000;
@@ -55,9 +61,12 @@ describe('prompt construction', () => {
   it('asks for a contrastive account under the repair form', () => {
     const prompt = buildDistillPrompt({ event, run }, [], undefined, 'repair');
     expect(prompt).toContain('You compare one wrong attempt with the correction that replaced it');
-    // The three parts are the form's whole content: an explanation without the mechanism is
-    // the declarative rule it exists to replace.
-    expect(prompt).toContain('what the attempt did; why that returns the wrong answer; what the correction does instead');
+    // The account is the form's whole content: the fix is the statement, and the failure and
+    // its cause are named fields. An account without the mechanism is the declarative rule
+    // this form exists to replace.
+    expect(prompt).toContain('`statement` is the fix');
+    expect(prompt).toContain('`payload.wrong`');
+    expect(prompt).toContain('`payload.cause`');
     expect(prompt).toContain('`signal.after`');
     expect(prompt).toContain('`signal.note`');
     expect(prompt).not.toContain('You extract reusable, declarative lessons');
@@ -111,7 +120,7 @@ describe('response parsing', () => {
         'text',
         { kind: 'unknown', statement: 'x' },
         { kind: 'constraint', statement: '   ' },
-        { kind: 'constraint', statement: 'y'.repeat(401) },
+        { kind: 'constraint', statement: 'y'.repeat(641) },
         { kind: 'lexicon', statement: 'ok', scope: 'not-an-object', payload: { a: 1 } },
       ],
     });
@@ -178,5 +187,58 @@ describe('trust inheritance', () => {
     const [candidate] = parseDistillResponse(response, base);
     expect(candidate?.trust).toBe(0.6);
     expect(candidate?.evidence.weight).toBe(0.6);
+  });
+});
+
+describe('what the parser threw away', () => {
+  const raw = (statement: string, kind = 'constraint') =>
+    JSON.stringify({ candidates: [{ kind, statement }] });
+
+  it('keeps a statement up to the cap', () => {
+    const kept = parseDistillResponse(raw('z'.repeat(MAX_STATEMENT)), base);
+    expect(kept).toHaveLength(1);
+  });
+
+  it('reports a statement one character past the cap', () => {
+    const drops: DropReason[] = [];
+    const kept = parseDistillResponse(raw('z'.repeat(MAX_STATEMENT + 1)), {
+      ...base,
+      audit: (reason) => drops.push(reason),
+    });
+    expect(kept).toHaveLength(0);
+    expect(drops).toEqual(['statement-too-long']);
+  });
+
+  it('reports an unknown kind and an empty statement separately', () => {
+    const drops: DropReason[] = [];
+    const kept = parseDistillResponse(
+      JSON.stringify({
+        candidates: [
+          { kind: 'advice', statement: 'x' },
+          { kind: 'constraint', statement: '  ' },
+        ],
+      }),
+      { ...base, audit: (reason) => drops.push(reason) },
+    );
+    expect(kept).toHaveLength(0);
+    expect(drops).toEqual(['unknown-kind', 'empty-statement']);
+  });
+
+  it('says nothing when every candidate was kept', () => {
+    // The count has to distinguish "the model said nothing" from "we discarded it", so a
+    // clean parse must produce no audit calls at all.
+    const drops: DropReason[] = [];
+    parseDistillResponse(raw('a claim'), { ...base, audit: (reason) => drops.push(reason) });
+    expect(drops).toEqual([]);
+  });
+
+  it('forwards the audit through the interpreter', async () => {
+    const drops: DropReason[] = [];
+    const interpreter = createLlmInterpreter({
+      llm: { complete: async () => raw('z'.repeat(MAX_STATEMENT + 1)) },
+      audit: (reason) => drops.push(reason),
+    });
+    await interpreter({ event, run });
+    expect(drops).toEqual(['statement-too-long']);
   });
 });

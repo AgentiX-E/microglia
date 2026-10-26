@@ -34,10 +34,12 @@ export {
   type GeneralizationPlan,
 } from './generalize.js';
 export {
+  MAX_STATEMENT,
   buildDistillPrompt,
   createLlmInterpreter,
   parseDistillResponse,
   type DistillForm,
+  type DropReason,
   type LlmInterpreterOptions,
   type LlmPort,
 } from './llm.js';

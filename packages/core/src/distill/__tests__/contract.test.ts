@@ -135,7 +135,7 @@ describe('response parsing', () => {
           null,
           { kind: 'rumour', statement: 'Something.' },
           { kind: 'constraint', statement: '   ' },
-          { kind: 'constraint', statement: 'x'.repeat(401) },
+          { kind: 'constraint', statement: 'x'.repeat(641) },
           { kind: 'constraint', statement: 'A real lesson: use a line chart for trends.' },
         ],
       }),
