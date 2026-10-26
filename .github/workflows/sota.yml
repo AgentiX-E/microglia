@@ -63,6 +63,10 @@ on:
         description: 'Re-score the answers this run produced with the evidenced cascade (costs up to 4 calls per question)'
         required: false
         default: 'false'
+      validation_credit:
+        description: 'How full-validated scores a rule before retiring it: absolute (one call per validation row) or counterfactual (two, and only disagreements count)'
+        required: false
+        default: 'absolute'
       l4_arms:
         description: 'L4 arms to run: both (memory then reference, paired), memory, or reference'
         required: false
@@ -147,6 +151,7 @@ jobs:
           SOTA_ARMS: ${{ github.event.inputs.arms || 'gated,oracle' }}
           SOTA_CONCURRENCY: ${{ github.event.inputs.concurrency || '6' }}
           SOTA_SEMANTICS: ${{ github.event.inputs.semantics || 'multiset' }}
+          SOTA_VALIDATION_CREDIT: ${{ github.event.inputs.validation_credit || 'absolute' }}
           SOTA_CONVENTION: ${{ github.event.inputs.convention || '' }}
           SOTA_RESAMPLES: '10000'
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}

@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_DECISIVE,
   DEFAULT_RETIREMENT,
   creditHistogram,
+  decisiveHistogram,
+  parseDecisivePolicy,
   parseRetirementPolicy,
+  outcomeCredit,
   retireeFrom,
+  retireeFromDecisive,
   type ValidationCredit,
 } from '../validation.js';
 
@@ -98,5 +103,117 @@ describe('creditHistogram', () => {
 
   it('is empty when no rule was injected', () => {
     expect(creditHistogram(new Map())).toEqual({});
+  });
+});
+
+describe('retireeFromDecisive', () => {
+  it('retires a rule that won the questions it changed, in the wrong direction', () => {
+    expect(retireeFromDecisive(new Map([['a', { helped: 0, harmed: 2 }]]))).toEqual(['a']);
+  });
+
+  it('keeps a rule that changed outcomes for the better', () => {
+    expect(retireeFromDecisive(new Map([['a', { helped: 2, harmed: 0 }]]))).toEqual([]);
+  });
+
+  it('keeps a rule whose record is tied, because a tie is not a verdict', () => {
+    // The absolute policy retired at exactly one half and produced a random pruning; the
+    // default here is two thirds for that reason, and the boundary is asserted both ways.
+    expect(retireeFromDecisive(new Map([['a', { helped: 1, harmed: 1 }]]))).toEqual([]);
+    expect(retireeFromDecisive(new Map([['a', { helped: 1, harmed: 1 }]]), { minDecisive: 2, harmShare: 0.5 })).toEqual(
+      ['a'],
+    );
+  });
+
+  it('retires at two harms to one help, which is the stated boundary', () => {
+    expect(retireeFromDecisive(new Map([['a', { helped: 1, harmed: 2 }]]))).toEqual(['a']);
+    expect(retireeFromDecisive(new Map([['a', { helped: 2, harmed: 3 }]]))).toEqual([]);
+  });
+
+  it('needs the decisive floor before it will act at all', () => {
+    // One comparison that went badly is one coin flip, and this is the whole reason the
+    // counterfactual exists: a single trial is what the absolute score got wrong.
+    expect(retireeFromDecisive(new Map([['a', { helped: 0, harmed: 1 }]]))).toEqual([]);
+    expect(retireeFromDecisive(new Map([['a', { helped: 0, harmed: 1 }]]), { minDecisive: 1, harmShare: 1 })).toEqual([
+      'a',
+    ]);
+  });
+
+  it('ignores rules no comparison ever touched', () => {
+    expect(retireeFromDecisive(new Map([['a', { helped: 0, harmed: 0 }]]))).toEqual([]);
+  });
+
+  it('sorts, so a store digest is a function of the data rather than of map order', () => {
+    const credit = new Map([
+      ['c', { helped: 0, harmed: 2 }],
+      ['a', { helped: 0, harmed: 2 }],
+      ['b', { helped: 0, harmed: 3 }],
+    ]);
+    expect(retireeFromDecisive(credit)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('retires a rule that lost three of four, and keeps one that lost two of five', () => {
+    expect(retireeFromDecisive(new Map([['a', { helped: 1, harmed: 3 }]]))).toEqual(['a']);
+    expect(retireeFromDecisive(new Map([['a', { helped: 3, harmed: 2 }]]))).toEqual([]);
+  });
+});
+
+describe('parseDecisivePolicy', () => {
+  it('defaults both knobs', () => {
+    expect(parseDecisivePolicy({})).toEqual(DEFAULT_DECISIVE);
+    expect(parseDecisivePolicy({ minDecisive: '', harmShare: '' })).toEqual(DEFAULT_DECISIVE);
+  });
+
+  it('reads both knobs', () => {
+    expect(parseDecisivePolicy({ minDecisive: '3', harmShare: '0.75' })).toEqual({ minDecisive: 3, harmShare: 0.75 });
+  });
+
+  it('refuses a floor that is not a whole number of at least one', () => {
+    expect(() => parseDecisivePolicy({ minDecisive: '0' })).toThrow(/decisive floor/);
+    expect(() => parseDecisivePolicy({ minDecisive: '1.5' })).toThrow(/decisive floor/);
+  });
+
+  it('refuses a share outside the interval', () => {
+    expect(() => parseDecisivePolicy({ harmShare: '0' })).toThrow(/harm share/);
+    expect(() => parseDecisivePolicy({ harmShare: '-0.5' })).toThrow(/harm share/);
+    expect(() => parseDecisivePolicy({ harmShare: '2' })).toThrow(/harm share/);
+  });
+});
+
+describe('decisiveHistogram', () => {
+  it('counts rules by the share of the comparisons they lost', () => {
+    const credit = new Map([
+      ['a', { helped: 2, harmed: 0 }],
+      ['b', { helped: 1, harmed: 1 }],
+      ['c', { helped: 1, harmed: 1 }],
+      ['d', { helped: 0, harmed: 3 }],
+    ]);
+    expect(decisiveHistogram(credit)).toEqual({ '0/2': 1, '1/2': 2, '3/3': 1 });
+  });
+
+  it('omits rules no comparison touched, rather than counting them as unharmed', () => {
+    expect(decisiveHistogram(new Map([['a', { helped: 0, harmed: 0 }]]))).toEqual({});
+  });
+});
+
+describe('outcomeCredit', () => {
+  it('credits a rule with a help when the answer was wrong without it', () => {
+    expect(outcomeCredit(true, false)).toBe('helped');
+  });
+
+  it('credits a rule with a harm when the answer was right without it', () => {
+    expect(outcomeCredit(false, true)).toBe('harmed');
+  });
+
+  it('says nothing when both answers agree, in either direction', () => {
+    // This is the case the absolute score counted as evidence: a rule present at a wrong
+    // answer. Here it is explicitly uninformative, because the answer was wrong anyway.
+    expect(outcomeCredit(false, false)).toBe('uninformative');
+    expect(outcomeCredit(true, true)).toBe('uninformative');
+  });
+
+  it('says nothing when a call failed, because a failed call is not an outcome', () => {
+    expect(outcomeCredit(undefined, false)).toBe('uninformative');
+    expect(outcomeCredit(true, undefined)).toBe('uninformative');
+    expect(outcomeCredit(undefined, undefined)).toBe('uninformative');
   });
 });

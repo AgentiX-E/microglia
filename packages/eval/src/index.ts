@@ -303,8 +303,16 @@ export {
 export { executeQuery, resolveDatabase, rowsDiffer, type ExecuteOptions, type QueryOutcome } from './sql-exec.js';
 
 export {
+  DEFAULT_DECISIVE,
   DEFAULT_RETIREMENT,
   creditHistogram,
+  decisiveHistogram,
+  parseDecisivePolicy,
+  outcomeCredit,
+  retireeFromDecisive,
+  type DecisiveCredit,
+  type DecisivePolicy,
+  type OutcomeCredit,
   parseRetirementPolicy,
   retireeFrom,
   type RetirementPolicy,

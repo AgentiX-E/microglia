@@ -93,6 +93,10 @@ import {
   canonicalRows,
   comparePaired,
   creditHistogram,
+  decisiveHistogram,
+  outcomeCredit,
+  parseDecisivePolicy,
+  retireeFromDecisive,
   conventionOf,
   dedupeQuestions,
   detectableDelta,
@@ -221,6 +225,33 @@ const ARMS = armsFrom(process.env['SOTA_ARMS']);
 const RETIREMENT = parseRetirementPolicy({
   minTrials: process.env['SOTA_VALIDATION_TRIALS'],
   failureRate: process.env['SOTA_VALIDATION_FAILURE_RATE'],
+});
+
+/**
+ * How a rule's record is scored before it is retired.
+ *
+ * `absolute` asks whether the rule was present when the answer was wrong, which is
+ * confounded with the question's difficulty: the failure counts it produces fit a single
+ * binomial at the lane's own error rate. `counterfactual` answers every validation question
+ * twice and credits a rule only where the outcome changed, which costs a second call per
+ * row and is the only score that can separate a rule that hurts from a question that is
+ * hard. Default `absolute`, because the cheaper reading should be the one a caller gets
+ * without asking.
+ */
+type CreditMode = 'absolute' | 'counterfactual';
+
+function creditModeFrom(raw: string | undefined): CreditMode {
+  if (raw === undefined || raw === '' || raw === 'absolute') return 'absolute';
+  if (raw === 'counterfactual') return 'counterfactual';
+  throw new Error(`SOTA_VALIDATION_CREDIT must be absolute or counterfactual, got '${raw}'`);
+}
+
+const CREDIT = creditModeFrom(process.env['SOTA_VALIDATION_CREDIT']);
+
+/** The counterfactual policy, which is stricter than the absolute one on purpose. */
+const DECISIVE = parseDecisivePolicy({
+  minDecisive: process.env['SOTA_DECISIVE_TRIALS'],
+  harmShare: process.env['SOTA_HARM_SHARE'],
 });
 
 /** One entry per fold in which the deletion arm ran. */
@@ -1019,54 +1050,97 @@ async function validateMemory(
   dataset: Dataset,
   task: Task,
 ): Promise<{
+  readonly mode: string;
   readonly rules: number;
   readonly injected: number;
   readonly trials: number;
   readonly retired: number;
   readonly histogram: Readonly<Record<string, number>>;
+  readonly decisive: number;
+  readonly helped: number;
+  readonly harmed: number;
 }> {
-  const outcomes = await mapPool(rows, CONCURRENCY, async (row) => {
-    const pack = await host.recall({ task: TASK, text: row.question, scope: { domain: row.db_id } });
-    if (pack.ids.length === 0) return { ids: [] as readonly string[], failed: false };
+  const judged = async (row: BirdRow, pack: string): Promise<boolean | undefined> => {
     try {
       const reply = await chat(
         promptFor({
           question: row.question,
           evidence: row.evidence,
           ddl: ddlOf(dataset.dbPath(row.db_id)),
-          pack: pack.rendered,
+          pack,
           stated: false,
           convention: ACTIVE,
         }),
       );
-      const judged = judgeReply(row, dataset.dbPath(row.db_id), reply, task);
-      return { ids: pack.ids, failed: !judged.correct };
+      return judgeReply(row, dataset.dbPath(row.db_id), reply, task).correct;
     } catch {
       // A call that never returned says nothing about the rule it was carrying.
-      return { ids: [] as readonly string[], failed: false };
+      return undefined;
     }
+  };
+
+  // Two ways to decide what a rule did, both settings. `absolute` asks whether the rule was
+  // present when the answer was wrong, which iteration 76 showed is mostly a question about
+  // the question; `counterfactual` asks whether the answer changed because the rule was
+  // there, which costs a second call per validation row and is the only score that can tell
+  // a rule that hurts from a question that is hard.
+  const outcomes = await mapPool(rows, CONCURRENCY, async (row) => {
+    const pack = await host.recall({ task: TASK, text: row.question, scope: { domain: row.db_id } });
+    if (pack.ids.length === 0) return { ids: [] as readonly string[], failed: false, helped: false, harmed: false };
+    if (CREDIT === 'absolute') {
+      const ok = await judged(row, pack.rendered);
+      return { ids: pack.ids, failed: ok === false, helped: false, harmed: false };
+    }
+    const [withRule, withoutRule] = await Promise.all([judged(row, pack.rendered), judged(row, '')]);
+    const credit = outcomeCredit(withRule, withoutRule);
+    // A pair whose calls both failed carries no verdict either; `outcomeCredit` folds it
+    // into `uninformative`, and the ids are dropped so the rule is not credited a trial it
+    // did not have.
+    if (credit === 'uninformative' && (withRule === undefined || withoutRule === undefined)) {
+      return { ids: [] as readonly string[], failed: false, helped: false, harmed: false };
+    }
+    return {
+      ids: pack.ids,
+      failed: false,
+      helped: credit === 'helped',
+      harmed: credit === 'harmed',
+    };
   });
-  const credit = new Map<string, { trials: number; failures: number }>();
+
   let injected = 0;
+  let decisive = 0;
+  const absolute = new Map<string, { trials: number; failures: number }>();
+  const counterfactual = new Map<string, { helped: number; harmed: number }>();
   for (const outcome of outcomes) {
     if (outcome.ids.length === 0) continue;
     injected += 1;
+    if (outcome.helped || outcome.harmed) decisive += 1;
     for (const id of outcome.ids) {
-      const entry = credit.get(id) ?? { trials: 0, failures: 0 };
-      credit.set(id, {
+      const entry = absolute.get(id) ?? { trials: 0, failures: 0 };
+      absolute.set(id, {
         trials: entry.trials + 1,
         failures: entry.failures + (outcome.failed ? 1 : 0),
       });
+      const pair = counterfactual.get(id) ?? { helped: 0, harmed: 0 };
+      counterfactual.set(id, {
+        helped: pair.helped + (outcome.helped ? 1 : 0),
+        harmed: pair.harmed + (outcome.harmed ? 1 : 0),
+      });
     }
   }
-  const doomed = retireeFrom(credit, RETIREMENT);
+  const doomed =
+    CREDIT === 'absolute' ? retireeFrom(absolute, RETIREMENT) : retireeFromDecisive(counterfactual, DECISIVE);
   if (doomed.length > 0) await host.forget({ ids: doomed });
   return {
-    rules: credit.size,
+    mode: CREDIT,
+    rules: absolute.size,
     injected,
-    trials: [...credit.values()].reduce((sum, entry) => sum + entry.trials, 0),
+    trials: [...absolute.values()].reduce((sum, entry) => sum + entry.trials, 0),
     retired: doomed.length,
-    histogram: creditHistogram(credit),
+    histogram: CREDIT === 'absolute' ? creditHistogram(absolute) : decisiveHistogram(counterfactual),
+    decisive,
+    helped: [...counterfactual.values()].reduce((sum, entry) => sum + entry.helped, 0),
+    harmed: [...counterfactual.values()].reduce((sum, entry) => sum + entry.harmed, 0),
   };
 }
 
@@ -1829,7 +1903,15 @@ async function main(): Promise<void> {
           return merged;
         }, {}),
       ),
-      validation_policy: `minTrials=${RETIREMENT.minTrials} failureRate=${RETIREMENT.failureRate}`,
+      validation_policy:
+        CREDIT === 'absolute'
+          ? `absolute share>=${RETIREMENT.failureRate} over >=${RETIREMENT.minTrials} trials`
+          : `counterfactual harmShare>=${DECISIVE.harmShare.toFixed(4)} over >=${DECISIVE.minDecisive} decisive`,
+      /** Which score decided the deletions, and what it saw. */
+      validation_credit: CREDIT,
+      validation_decisive_questions: validations.reduce((sum, entry) => sum + entry.decisive, 0),
+      validation_helped: validations.reduce((sum, entry) => sum + entry.helped, 0),
+      validation_harmed: validations.reduce((sum, entry) => sum + entry.harmed, 0),
       // The arm's own evidence that the deletion reached the questions it scored.
       validated_pack_differences: folds.reduce((sum, fold) => sum + fold.validatedPackDiffers, 0),
       validated_positions: folds.reduce((sum, fold) => sum + fold.validatedPositions, 0),

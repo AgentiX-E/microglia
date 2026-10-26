@@ -102,3 +102,115 @@ export function creditHistogram(credit: ReadonlyMap<string, ValidationCredit>): 
   }
   return out;
 }
+
+/**
+ * Credit measured against the counterfactual, which is the one the absolute share cannot
+ * supply.
+ *
+ * The absolute score asks "was this rule present when the answer was wrong", and iteration
+ * 76 showed that question is answered by the question: the failure counts fit a single
+ * binomial at the lane's own error rate (pooled χ² 10.71 on 9 degrees of freedom, p = 0.296),
+ * so retiring the worst third was retiring a random third — 268 rules removed, −0.57pp
+ * measured, p = 0.81.
+ *
+ * This score asks the question the deletion was supposed to be based on: *did this answer
+ * change because the rule was there?* Each validation question is answered twice, once with
+ * the pack and once without, and a rule is credited only where the two outcomes differ.
+ * Questions the model gets right either way, or wrong either way, teach nothing about the
+ * rule and are excluded — which is exactly what removes the difficulty confound, because
+ * difficulty is the part that is identical in both halves of a pair.
+ *
+ * The price is a second call per validation question, so it is a setting rather than the
+ * default: a lane that doubles its spend by default is a lane nobody re-runs.
+ */
+export type DecisiveCredit = {
+  /** Questions this rule was present for where the answer was wrong without it. */
+  readonly helped: number;
+  /** Questions this rule was present for where the answer was right without it. */
+  readonly harmed: number;
+};
+
+export type DecisivePolicy = {
+  /** Comparisons in which the outcome changed before a share may retire a rule. */
+  readonly minDecisive: number;
+  /** Share of those comparisons that must have gone the wrong way, in (0, 1]. */
+  readonly harmShare: number;
+};
+
+/**
+ * Two thirds, not a half.
+ *
+ * A rule with one harmful comparison and one helpful one has a record of exactly nothing,
+ * and retiring it on the tie would repeat the mistake this score exists to correct: the
+ * absolute policy retired on a share of one half and the result was a random pruning. Two
+ * thirds means "at least twice as many harms as helps", which a 2–0 or a 2–1 record meets
+ * and a 1–1 record does not.
+ */
+export const DEFAULT_DECISIVE: DecisivePolicy = { minDecisive: 2, harmShare: 2 / 3 };
+
+export function parseDecisivePolicy(raw: {
+  readonly minDecisive?: string | undefined;
+  readonly harmShare?: string | undefined;
+}): DecisivePolicy {
+  const minDecisive =
+    raw.minDecisive === undefined || raw.minDecisive === '' ? DEFAULT_DECISIVE.minDecisive : Number(raw.minDecisive);
+  const harmShare =
+    raw.harmShare === undefined || raw.harmShare === '' ? DEFAULT_DECISIVE.harmShare : Number(raw.harmShare);
+  if (!Number.isFinite(minDecisive) || minDecisive < 1 || Math.trunc(minDecisive) !== minDecisive) {
+    throw new Error(`the decisive floor must be a whole number of at least 1, got '${String(raw.minDecisive)}'`);
+  }
+  if (!Number.isFinite(harmShare) || harmShare <= 0 || harmShare > 1) {
+    throw new Error(`the harm share must be in (0, 1], got '${String(raw.harmShare)}'`);
+  }
+  return { minDecisive, harmShare };
+}
+
+/**
+ * The rules this policy retires, from counterfactual credit.
+ *
+ * `minDecisive: 1` is permitted and means "retire on the first question where it made
+ * things worse", which is a real setting for a system that would rather be sparse than
+ * right — it is not the default because one pair is one coin flip.
+ */
+export function retireeFromDecisive(
+  credit: ReadonlyMap<string, DecisiveCredit>,
+  policy: DecisivePolicy = DEFAULT_DECISIVE,
+): readonly string[] {
+  const out: string[] = [];
+  for (const [id, entry] of credit) {
+    const decisive = entry.helped + entry.harmed;
+    if (decisive < policy.minDecisive) continue;
+    if (entry.harmed / decisive < policy.harmShare) continue;
+    out.push(id);
+  }
+  return out.sort();
+}
+
+/** Rules by observed harm share, as `harmed/decisive`, for the same reason as its absolute twin. */
+export function decisiveHistogram(credit: ReadonlyMap<string, DecisiveCredit>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const entry of credit.values()) {
+    if (entry.helped + entry.harmed === 0) continue;
+    const key = `${entry.harmed}/${entry.helped + entry.harmed}`;
+    out[key] = (out[key] ?? 0) + 1;
+  }
+  return out;
+}
+
+/**
+ * What one comparison says about the rule that was in the pack.
+ *
+ * Kept as a function rather than inline because it is the only place the counterfactual's
+ * logic lives, and it has four cases that all produce the same arithmetic if written
+ * carelessly: a call that failed, two calls that agreed, and the two directions of
+ * disagreement. `uninformative` is not the absence of a verdict — it is the verdict
+ * "this question teaches nothing about this rule", which is why it is counted separately
+ * from a harm.
+ */
+export type OutcomeCredit = 'helped' | 'harmed' | 'uninformative';
+
+export function outcomeCredit(withRule: boolean | undefined, withoutRule: boolean | undefined): OutcomeCredit {
+  if (withRule === undefined || withoutRule === undefined) return 'uninformative';
+  if (withRule === withoutRule) return 'uninformative';
+  return withRule ? 'helped' : 'harmed';
+}
