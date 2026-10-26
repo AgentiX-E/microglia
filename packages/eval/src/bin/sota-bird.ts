@@ -116,6 +116,7 @@ import {
   requirePopulated,
   resolveDatabase,
   sha256OfFile,
+  type AnchorMode,
   type BirdManifest,
   type SqlArm,
   type ChatReply,
@@ -254,6 +255,19 @@ const DECISIVE = parseDecisivePolicy({
   minDecisive: process.env['SOTA_DECISIVE_TRIALS'],
   harmShare: process.env['SOTA_HARM_SHARE'],
 });
+
+/**
+ * The anchored arms this run was asked for, and how firmly each revises.
+ *
+ * A list rather than two booleans so the two modes cannot diverge in anything except the
+ * instruction: they read the same pack, see the same draft, and differ in one sentence.
+ */
+const ANCHORED: readonly { readonly arm: ArmName; readonly mode: AnchorMode }[] = (
+  [
+    { arm: 'full-anchored', mode: 'conservative' },
+    { arm: 'full-anchored-conditional', mode: 'conditional' },
+  ] as const
+).filter((entry) => ARMS.has(entry.arm));
 
 /** One entry per fold in which the deletion arm ran. */
 const validations: (Awaited<ReturnType<typeof validateMemory>> & { fold: number })[] = [];
@@ -1276,9 +1290,8 @@ async function runFold(
   let validatedPositions = 0;
   /** The pack each question would see, held for the anchored arm's second call. */
   const anchored = new Map<number, Pack>();
-  /** The revision each question received, judged with the rest after both rounds. */
-  const anchoredReplies = new Map<number, Reply | undefined>();
-  const anchoredPackIds = new Map<number, number>();
+  /** The revision each question received for each anchored arm, judged after both rounds. */
+  const anchoredReplies = new Map<string, { position: number; arm: ArmName; reply: Reply | undefined; packIds: number }>();
   let anchoredSkipped = 0;
 
   // A snapshot taken before the validated arm deletes anything. The other arms are
@@ -1380,8 +1393,8 @@ async function runFold(
       // Same pack, same text, one thing changed: it now follows the question.
       call(position, 'full-late', pack.rendered, pack.ids.length, false, 'after');
     }
-    if (ARMS.has('full-anchored')) {
-      // The revision is planned after the first round, because its prompt contains the
+    if (ANCHORED.length > 0) {
+      // The revisions are planned after the first round, because their prompts contain the
       // model's own draft. The pack is remembered here and used then.
       anchored.set(position, pack);
     }
@@ -1432,42 +1445,55 @@ async function runFold(
   // The anchored arm's second round. It is a separate phase because its prompt contains the
   // first round's answer, and because a draft that never arrived leaves nothing to revise —
   // that question is counted as unanswered by this arm rather than silently scored as wrong.
-  if (ARMS.has('full-anchored')) {
+  if (ANCHORED.length > 0) {
     const index = new Map(plans.map((plan, at) => [`${plan.position}:${plan.arm}`, at]));
-    const revisions: { position: number; reply: Reply | undefined }[] = [];
-    const batch = [...anchored.entries()].flatMap(([position, pack]) => {
+    const batch: { position: number; arm: ArmName; prompt: string; packIds: number }[] = [];
+    let unanswered = 0;
+    for (const [position, pack] of anchored) {
       const at = index.get(`${position}:none`);
       const draft = at === undefined ? undefined : replies[at];
-      if (draft === undefined) return [];
+      if (draft === undefined) {
+        unanswered += 1;
+        continue;
+      }
       const row = evalRows[position] as BirdRow;
-      return [
-        {
+      for (const anchoredArm of ANCHORED) {
+        batch.push({
           position,
-          prompt: anchorPromptFor({
-            question: row.question,
-            evidence: row.evidence,
-            ddl: ddlOf(dataset.dbPath(row.db_id)),
-            draft: draft.text,
-            pack: pack.rendered,
-          }),
+          arm: anchoredArm.arm,
+          prompt: anchorPromptFor(
+            {
+              question: row.question,
+              evidence: row.evidence,
+              ddl: ddlOf(dataset.dbPath(row.db_id)),
+              draft: draft.text,
+              pack: pack.rendered,
+            },
+            anchoredArm.mode,
+          ),
           packIds: pack.ids.length,
-        },
-      ];
-    });
-    anchoredSkipped = anchored.size - batch.length;
+        });
+      }
+    }
+    // Counted per question, not per call: a question is unanswered by every anchored arm
+    // when the draft is missing, and reporting it once per arm would triple the number.
+    anchoredSkipped = unanswered;
     const revised = await mapPool(batch, CONCURRENCY, async (item) => {
       try {
-        return { position: item.position, reply: await chat(item.prompt) };
+        return { item, reply: await chat(item.prompt) };
       } catch (error) {
         if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
         if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
-        return { position: item.position, reply: undefined };
+        return { item, reply: undefined };
       }
     });
-    revisions.push(...revised);
-    for (const revision of revisions) {
-      anchoredReplies.set(revision.position, revision.reply);
-      anchoredPackIds.set(revision.position, batch.find((item) => item.position === revision.position)?.packIds ?? 0);
+    for (const entry of revised) {
+      anchoredReplies.set(`${entry.item.position}:${entry.item.arm}`, {
+        position: entry.item.position,
+        arm: entry.item.arm,
+        reply: entry.reply,
+        packIds: entry.item.packIds,
+      });
     }
   }
 
@@ -1485,15 +1511,15 @@ async function runFold(
   // The anchored arm's revisions are judged here rather than in the loop above, because they
   // did not exist when it ran. They are registered as plans with an empty prompt so the case
   // assembly below treats them like every other arm instead of special-casing one.
-  for (const [position, reply] of anchoredReplies) {
-    const row = evalRows[position] as BirdRow;
+  for (const entry of anchoredReplies.values()) {
+    const row = evalRows[entry.position] as BirdRow;
     const started = performance.now();
-    const result = judgeReply(row, dataset.dbPath(row.db_id), reply, task);
-    judged.set(`${position}:full-anchored`, {
+    const result = judgeReply(row, dataset.dbPath(row.db_id), entry.reply, task);
+    judged.set(`${entry.position}:${entry.arm}`, {
       ...result,
       latencyMs: Math.round(performance.now() - started),
     });
-    plans.push({ position, arm: 'full-anchored', prompt: '', packIds: anchoredPackIds.get(position) ?? 0 });
+    plans.push({ position: entry.position, arm: entry.arm, prompt: '', packIds: entry.packIds });
   }
 
   const packIdsOf = new Map(plans.map((plan) => [`${plan.position}:${plan.arm}`, plan.packIds]));

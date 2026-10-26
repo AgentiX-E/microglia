@@ -209,6 +209,7 @@ describe('parseArms', () => {
       'duplicate',
       'full',
       'full-anchored',
+      'full-anchored-conditional',
       'full-corroborated',
       'full-late',
       'full-narrow',
@@ -245,6 +246,7 @@ describe('parseArms', () => {
       'full-corroborated',
       'full-late',
       'full-anchored',
+      'full-anchored-conditional',
       'full-validated',
       'critique',
       'gated',
@@ -668,5 +670,49 @@ describe('anchorPromptFor', () => {
   it('keeps the evidence when the benchmark supplies it', () => {
     const prompt = anchorPromptFor({ ...base, evidence: 'rate = count / enrollment' });
     expect(prompt).toContain('Evidence (may be wrong; it is external knowledge):');
+  });
+});
+
+describe('anchorPromptFor modes', () => {
+  const base = {
+    question: 'How many students?',
+    evidence: '',
+    ddl: 'CREATE TABLE s (id INTEGER)',
+    draft: 'SELECT COUNT(*) FROM s',
+    pack: '- {"when":"the question counts rows","statement":"count with COUNT(*)"}',
+  };
+
+  it('keeps the conservative reading as the default, so an existing arm cannot change by accident', () => {
+    expect(anchorPromptFor(base)).toBe(anchorPromptFor(base, 'conservative'));
+    expect(anchorPromptFor(base)).toContain('return the first attempt unchanged');
+  });
+
+  it('changes one sentence between modes and nothing else', () => {
+    const conservative = anchorPromptFor(base).split('\n\n');
+    const conditional = anchorPromptFor(base, 'conditional').split('\n\n');
+    // Same number of blocks, same blocks except the last: the arms differ in the
+    // instruction and nothing else, which is what makes the comparison one variable.
+    expect(conditional).toHaveLength(conservative.length);
+    expect(conditional.slice(0, -1)).toEqual(conservative.slice(0, -1));
+    expect(conditional.at(-1)).not.toBe(conservative.at(-1));
+  });
+
+  it('tells the conditional arm to act on a condition that holds, and to check it', () => {
+    const prompt = anchorPromptFor(base, 'conditional');
+    expect(prompt).toContain('Check that condition against the question above.');
+    expect(prompt).toContain('apply that item even where the first attempt disagrees with it');
+    expect(prompt).toContain('change nothing else');
+  });
+
+  it('still makes doing nothing the default when no condition holds', () => {
+    expect(anchorPromptFor(base, 'conditional')).toContain('return the first attempt unchanged');
+  });
+
+  it('carries no instruction at all when the pack is empty, in either mode', () => {
+    for (const mode of ['conservative', 'conditional'] as const) {
+      const prompt = anchorPromptFor({ ...base, pack: '' }, mode);
+      expect(prompt).not.toContain('first attempt unchanged');
+      expect(prompt).not.toContain('Check that condition');
+    }
   });
 });

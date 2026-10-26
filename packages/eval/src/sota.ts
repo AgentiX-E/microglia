@@ -222,6 +222,17 @@ export type SqlArm =
    */
   | 'full-anchored'
   /**
+   * The anchored arm, with the conservative default replaced by the condition check.
+   *
+   * Iteration 78's anchored arm recovered the pack's 4pp loss and gained almost nothing
+   * (2 and 6 questions against `full`'s 10 and 11), because "change only what it justifies"
+   * gives a wrong draft every benefit of the doubt. This arm keeps the order, the block and
+   * the second call, and asks the model to apply an item whose `when` condition holds even
+   * where the draft disagrees — the one part of a rule that speaks about this question
+   * rather than about the question that taught it.
+   */
+  | 'full-anchored-conditional'
+  /**
    * The same pack after utility-based deletion.
    *
    * Xiong et al. (arXiv 2505.16067) report that a retrieved record is followed closely
@@ -264,6 +275,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-corroborated': true,
   'full-late': true,
   'full-anchored': true,
+  'full-anchored-conditional': true,
   'full-validated': true,
   critique: true,
   gated: true,
@@ -346,8 +358,11 @@ export function armPairsAgainstFull(
   }
   const pairs: ArmPair[] = [];
   for (const name of [...names].sort()) {
+    // No guard for the empty case: `names` was built from the rows themselves and only from
+    // entries whose value is defined, so every name here has at least one row. The guard
+    // that used to sit on this line could not be reached, and an unreachable branch in a
+    // comparison function is a branch nobody has ever exercised.
     const scored = rows.filter((row) => row.arms[name] !== undefined);
-    if (scored.length === 0) continue;
     const comparison = comparePaired(
       scored.map((row) => row.full),
       scored.map((row) => row.arms[name] === true),
@@ -695,7 +710,33 @@ export type AnchorInput = {
   readonly pack: string;
 };
 
-export function anchorPromptFor(input: AnchorInput): string {
+/**
+ * How firmly the revision should act on a convention it is shown.
+ *
+ * `conservative` makes "unchanged" the default and gives the model no reason to touch a
+ * draft it already produced, which is what recovered the 4pp loss in iteration 78 — and
+ * what forfeited the 10 questions where a rule would have fixed a wrong draft.
+ *
+ * `conditional` keeps the same order and the same block, and changes one sentence: an item
+ * whose `when` condition holds for the question is to be applied even where the draft
+ * disagrees. The condition is the only part of a rule that speaks about *this* question
+ * rather than about the question that taught it, so it is the only basis on which a
+ * revision can be asked to act against its own draft without asking it to imitate.
+ */
+export type AnchorMode = 'conservative' | 'conditional';
+
+const ANCHOR_INSTRUCTION: Record<AnchorMode, string> = {
+  conservative:
+    'Those conventions were learned from other questions and may not apply to this one. ' +
+    'If none applies, return the first attempt unchanged. ' +
+    'If one applies, change only what it justifies and keep everything else.',
+  conditional:
+    'Each item may carry a "when" condition. Check that condition against the question above. ' +
+    'If it holds, apply that item even where the first attempt disagrees with it, and change nothing else. ' +
+    'If no item carries a condition that holds, return the first attempt unchanged.',
+};
+
+export function anchorPromptFor(input: AnchorInput, mode: AnchorMode = 'conservative'): string {
   return [
     'You revise one SQLite query that answers the question below.',
     'Return the SQL only, in a ```sql fence, with no explanation.',
@@ -706,11 +747,7 @@ export function anchorPromptFor(input: AnchorInput): string {
     input.pack === '' ? '' : `Conventions learned from earlier corrections:\n${input.pack}`,
     // The instruction refers to a block that may not be there. With no pack the arm would
     // be asking the model to weigh nothing, which is a different question.
-    input.pack === ''
-      ? ''
-      : 'Those conventions were learned from other questions and may not apply to this one. ' +
-        'If none applies, return the first attempt unchanged. ' +
-        'If one applies, change only what it justifies and keep everything else.',
+    input.pack === '' ? '' : ANCHOR_INSTRUCTION[mode],
   ]
     .filter((line) => line !== '')
     .join('\n\n');

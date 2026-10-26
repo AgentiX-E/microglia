@@ -154,6 +154,8 @@ export {
   parseArms,
   anchorPromptFor,
   promptFor,
+  type AnchorInput,
+  type AnchorMode,
   reportedSql,
   type ArmPair,
   type ArmRow,
