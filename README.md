@@ -281,6 +281,30 @@ than `full` in all three runs that measured it. Loosening the conservative instr
 the harm it was avoiding, which is a negative result in the useful direction: it says the benefit comes
 from making "unchanged" the default, not from finding a better reason to change.
 
+`SOTA_ARMS=full-grounded` keeps only the rules whose statement names a table, or a column whose name
+cannot be read as prose, and `full-sampled` keeps the same number chosen at random. The pair exists because
+"the memory is wrong" has two readings — the content, or the quantity — and only a size-matched control
+separates them:
+
+| Arm | Rules per pack | ACC | Δ vs no memory | Δ vs `full` |
+|---|---|---|---|---|
+| no memory | 0 | 53.71% | — | — |
+| `full` | 1.76 | 50.86% | −2.86pp | — |
+| `full-grounded` | 1.16 | 51.43% | −2.29pp | +0.57pp (p = 0.774) |
+| `full-sampled` | 1.16 | 51.71% | −2.00pp | +0.86pp (p = 0.607) |
+
+The two pruned arms are **indistinguishable from each other** (p = 1.0) and both beat `full` by carrying
+0.6 fewer rules, so what the memory says is not what costs: how much of it is in front of the question is.
+Across the four sizes accuracy falls about **1.7pp per rule injected**. The audit behind the arm is worth
+quoting too — of 1,288 distilled rules, 77% carry a condition that begins "The question asks…", 11% name
+anything with an underscore in it, and 29% quote a literal value: the store is mostly English prose about
+meaning, which is checkable against the data but not against the catalogue.
+
+An earlier version of that filter accepted any column name and passed 79.7% of the pack, because BIRD has
+columns called `date`, `name` and `rank`. Grounding on those is grounding on English; the strict test is
+the one reported, and the loose number stays in `eval/results/history/` as the measurement that would have
+been published had the arm not been rehearsed against a stand-in first.
+
 `SOTA_DISTILL_CACHE` points the distillation at a file, and the workflow restores that file across
 dispatches, so the next run learns the same store instead of a new one. Over a rehearsal against the
 stand-in, the second run made 160 calls where the first made 201 and hit the cache 40 times out of 40 —
