@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterAll, describe, expect, it } from 'vitest';
-import { executeQuery, resolveDatabase, rowsDiffer } from '../sql-exec.js';
+import { executeQuery, groundedItems, resolveDatabase, rowsDiffer, schemaNames } from '../sql-exec.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'microglia-sql-'));
 const database = join(directory, 'fixture.sqlite');
@@ -173,5 +173,67 @@ describe('resolveDatabase', () => {
     expect(resolveDatabase(join(directory, 'absent-dir'), 'gone')).toBe(
       join(directory, 'absent-dir', 'gone.sqlite'),
     );
+  });
+});
+
+describe('schemaNames', () => {
+  it('lists tables and columns lower-cased, and caches the answer', () => {
+    const names = schemaNames(database);
+    expect(names.has('t')).toBe(true);
+    expect(names.has('label')).toBe(true);
+    expect(names.has('id')).toBe(true);
+    // Same object on the second call: a fold asks once per question and the schema of a
+    // read-only file does not change under it.
+    expect(schemaNames(database)).toBe(names);
+  });
+
+  it('returns an empty set for a file that is not a database, after opening it', () => {
+    // The open succeeds lazily and the first statement fails, which takes the other path
+    // through the cleanup: the handle exists and has to be closed.
+    const path = join(directory, 'garbage.sqlite');
+    writeFileSync(path, 'not a database at all');
+    expect(schemaNames(path).size).toBe(0);
+  });
+
+  it('returns an empty set for a database that will not open, rather than throwing', () => {
+    // Every rule then looks ungrounded, which is a visible failure instead of a silent pass.
+    expect(schemaNames(join(directory, 'missing.sqlite')).size).toBe(0);
+  });
+});
+
+describe('groundedItems', () => {
+  const names = new Set(['fixture', 'label', 'amount']);
+
+  it('keeps a rule that names a column', () => {
+    const items = [{ statement: 'The label column stores the row name.' }];
+    expect(groundedItems(items, names)).toEqual(items);
+  });
+
+  it('drops a rule that names nothing in the schema, which is 77% of the BIRD store', () => {
+    const items = [{ statement: 'A positive measure is represented by a plus sign.' }];
+    expect(groundedItems(items, names)).toEqual([]);
+  });
+
+  it('matches whole words only, so player does not match player_attributes', () => {
+    const items = [{ statement: 'Player rows are joined on their identifier.' }];
+    expect(groundedItems(items, new Set(['player_attributes']))).toEqual([]);
+  });
+
+  it('is case-insensitive, because the statement is prose and the schema is not', () => {
+    const items = [{ statement: 'The LABEL column is unique.' }];
+    expect(groundedItems(items, names)).toEqual(items);
+  });
+
+  it('keeps the order it was given, so a pack is still ranked', () => {
+    const items = [{ statement: 'amount matters' }, { statement: 'nothing here' }, { statement: 'label matters' }];
+    expect(groundedItems(items, names).map((item) => item.statement)).toEqual(['amount matters', 'label matters']);
+  });
+
+  it('drops a statement with no words at all, which has nothing to match', () => {
+    expect(groundedItems([{ statement: '***' }], names)).toEqual([]);
+  });
+
+  it('drops everything when the schema is empty, which is how a broken database shows up', () => {
+    expect(groundedItems([{ statement: 'label matters' }], new Set())).toEqual([]);
   });
 });

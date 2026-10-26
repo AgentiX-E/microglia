@@ -119,3 +119,66 @@ export function resolveDatabase(directory: string, dbId: string): string {
   for (const candidate of candidates) if (existsSync(candidate)) return candidate;
   return candidates[0] as string;
 }
+
+/**
+ * Every table and column name a database exposes, lower-cased.
+ *
+ * Used to answer one question about a stored rule: does it name anything that exists here?
+ * Across 1,320 rules distilled from BIRD, 77% name no table or column at all — they are prose
+ * about meaning ("a '+’ value in the coagulation test columns"), and a reader cannot check one
+ * against the schema it is being injected into. Among the 21.5% that do name a table, 77% name
+ * one the question's own answer uses.
+ *
+ * The list is cached per path because a fold asks this once per question and the schema does
+ * not change during a run.
+ */
+const schemaCache = new Map<string, ReadonlySet<string>>();
+
+export function schemaNames(dbPath: string): ReadonlySet<string> {
+  const hit = schemaCache.get(dbPath);
+  if (hit !== undefined) return hit;
+  const names = new Set<string>();
+  let db: DatabaseSync | undefined;
+  try {
+    db = new DatabaseSync(dbPath, { readOnly: true });
+    const tables = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all() as { name: string }[];
+    for (const table of tables) {
+      names.add(table.name.toLowerCase());
+      // Identifier quoting inside PRAGMA: a name with a quote in it would break the
+      // statement, and a name with a quote in it is not something this project produces.
+      const columns = db.prepare(`PRAGMA table_info("${table.name.replace(/"/g, '""')}")`).all() as {
+        name: string;
+      }[];
+      for (const column of columns) names.add(String(column.name).toLowerCase());
+    }
+  } catch {
+    // A database that will not open has no names; the caller sees an empty set and every
+    // rule looks ungrounded, which is a visible failure rather than a silent pass.
+    return new Set();
+  } finally {
+    if (db !== undefined) db.close();
+  }
+  const frozen: ReadonlySet<string> = names;
+  schemaCache.set(dbPath, frozen);
+  return frozen;
+}
+
+/**
+ * The rules whose statement names a table or column of this database.
+ *
+ * Matching is by whole word on a lower-cased statement, so `player` does not match
+ * `player_attributes` and a rule about `rank` matches a column called `rank`. The point is not
+ * that a grounded rule is right — it is that a grounded rule can be *checked*, and the
+ * measurement in iteration 80 says three quarters of the pack cannot be.
+ */
+export function groundedItems<T extends { readonly statement: string }>(
+  items: readonly T[],
+  names: ReadonlySet<string>,
+): readonly T[] {
+  return items.filter((item) => {
+    for (const word of item.statement.toLowerCase().match(/[a-z][a-z0-9_]*/g) ?? []) {
+      if (names.has(word)) return true;
+    }
+    return false;
+  });
+}

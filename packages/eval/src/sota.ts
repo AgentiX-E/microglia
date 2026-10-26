@@ -222,6 +222,24 @@ export type SqlArm =
    */
   | 'full-anchored'
   /**
+   * The pack restricted to rules whose statement names a table or column of this database.
+   *
+   * Across 1,320 rules distilled from BIRD, 77% name nothing in the schema: they are prose
+   * about meaning that a reader cannot check against the catalogue. Of the 21.5% that do name
+   * a table, 77% name one the question's own answer uses. This arm asks whether *checkable*
+   * rules behave differently from the pack as a whole — which is the content half of "the
+   * memory is wrong", as opposed to the selection half every earlier arm attacked.
+   */
+  | 'full-grounded'
+  /**
+   * The same number of rules, chosen at random from the same pack.
+   *
+   * Without it, `full-grounded` differs from `full` in two things at once: which rules and how
+   * many. Iteration 66 found no dose response, but a null there does not license a two-variable
+   * experiment here — the control is one arm and it makes the comparison single.
+   */
+  | 'full-sampled'
+  /**
    * The anchored arm, with the conservative default replaced by the condition check.
    *
    * Iteration 78's anchored arm recovered the pack's 4pp loss and gained almost nothing
@@ -273,6 +291,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-narrow': true,
   'full-plain': true,
   'full-corroborated': true,
+  'full-grounded': true,
+  'full-sampled': true,
   'full-late': true,
   'full-anchored': true,
   'full-anchored-conditional': true,

@@ -108,6 +108,7 @@ import {
   mapPool,
   matches,
   missingDatabases,
+  groundedItems,
   parseArms,
   parseManifest,
   parseRetirementPolicy,
@@ -116,6 +117,7 @@ import {
   reportedSql,
   requirePopulated,
   resolveDatabase,
+  schemaNames,
   sha256OfFile,
   type AnchorMode,
   type BirdManifest,
@@ -961,6 +963,8 @@ type FoldResult = {
   readonly validatedPositions: number;
   /** Questions the anchored arm could not revise because the first round had no answer. */
   readonly anchoredSkipped: number;
+  /** How many rules each pack carried and how many survived the grounding filter. */
+  readonly grounded: { readonly all: number; readonly kept: number };
   /** Rules injected into a prompt this fold, and how many named a condition. */
   readonly injectedRules: number;
   readonly injectedWithCondition: number;
@@ -1307,6 +1311,8 @@ async function runFold(
   /** Questions where the pruned store produced a different pack from the unpruned one. */
   let validatedPackDiffers = 0;
   let validatedPositions = 0;
+  /** How much of each pack survives the grounding filter, so the shrink is a number. */
+  const groundedSizes: { all: number; grounded: number }[] = [];
   /** The pack each question would see, held for the anchored arm's second call. */
   const anchored = new Map<number, Pack>();
   /** The revision each question received for each anchored arm, judged after both rounds. */
@@ -1407,6 +1413,29 @@ async function runFold(
     if (ARMS.has('wrong-scope')) {
       const wrong = await widened.host.recall({ ...query, scope: { domain: nextDatabase(row.db_id) } });
       call(position, 'wrong-scope', wrong.rendered, wrong.ids.length);
+    }
+    if (ARMS.has('full-grounded')) {
+      // Checkable rules only. The filter reads the schema of this database, not the question,
+      // so it cannot leak the answer into the pack.
+      const grounded = groundedItems(pack.items, schemaNames(dataset.dbPath(row.db_id)));
+      const kept = makePack(grounded, { budget: pack.budget });
+      groundedSizes.push({ all: pack.items.length, grounded: grounded.length });
+      call(position, 'full-grounded', kept.rendered, kept.ids.length);
+    }
+    if (ARMS.has('full-sampled')) {
+      // Same size as the grounded pack, chosen from the same ids, so the two arms differ in
+      // which rules a reader can check rather than in how many rules there are.
+      const size = groundedItems(pack.items, schemaNames(dataset.dbPath(row.db_id))).length;
+      const order = [...pack.items];
+      const random = mulberry32(SEED + position);
+      for (let at = order.length - 1; at > 0; at -= 1) {
+        const swap = Math.floor(random() * (at + 1));
+        const held = order[at] as (typeof order)[number];
+        order[at] = order[swap] as (typeof order)[number];
+        order[swap] = held;
+      }
+      const sampled = makePack(order.slice(0, size), { budget: pack.budget });
+      call(position, 'full-sampled', sampled.rendered, sampled.ids.length);
     }
     if (ARMS.has('full-late')) {
       // Same pack, same text, one thing changed: it now follows the question.
@@ -1645,6 +1674,10 @@ async function runFold(
     validatedPackDiffers,
     validatedPositions,
     anchoredSkipped,
+    grounded: {
+      all: groundedSizes.reduce((sum, entry) => sum + entry.all, 0),
+      kept: groundedSizes.reduce((sum, entry) => sum + entry.grounded, 0),
+    },
     // What learning produced and what was actually scored, carried separately because the
     // validated arm makes them differ on purpose.
     digest: scoringFrozen.digest,
@@ -2088,6 +2121,15 @@ async function main(): Promise<void> {
        */
       anchored_skipped_questions: folds.reduce((sum, fold) => sum + fold.anchoredSkipped, 0),
       // The arm's own evidence that the deletion reached the questions it scored.
+      /**
+       * What the grounding filter removed, because a pack of a quarter the size is a
+       * different experiment if the reader cannot see that it is.
+       */
+      grounded_pack_share: (() => {
+        const all = folds.reduce((sum, fold) => sum + fold.grounded.all, 0);
+        const kept = folds.reduce((sum, fold) => sum + fold.grounded.kept, 0);
+        return all === 0 ? 0 : Number((kept / all).toFixed(4));
+      })(),
       validated_pack_differences: folds.reduce((sum, fold) => sum + fold.validatedPackDiffers, 0),
       validated_positions: folds.reduce((sum, fold) => sum + fold.validatedPositions, 0),
       distill_failed: folds.reduce((sum, fold) => sum + fold.failedDistill, 0),

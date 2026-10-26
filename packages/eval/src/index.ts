@@ -303,7 +303,15 @@ export {
   type RefuterVerdict,
 } from './judge.js';
 
-export { executeQuery, resolveDatabase, rowsDiffer, type ExecuteOptions, type QueryOutcome } from './sql-exec.js';
+export {
+  executeQuery,
+  groundedItems,
+  resolveDatabase,
+  rowsDiffer,
+  schemaNames,
+  type ExecuteOptions,
+  type QueryOutcome,
+} from './sql-exec.js';
 
 export {
   DEFAULT_DECISIVE,
