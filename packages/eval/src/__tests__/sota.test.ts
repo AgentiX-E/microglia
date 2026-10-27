@@ -211,6 +211,7 @@ describe('parseArms', () => {
       'chars-150',
       'chars-300',
       'chars-600',
+      'chars-900',
       'critique',
       'duplicate',
       'full',
@@ -276,6 +277,7 @@ describe('parseArms', () => {
       'chars-150',
       'chars-300',
       'chars-600',
+      'chars-900',
       'none-replica',
     ]);
   });

@@ -339,6 +339,7 @@ export type SqlArm =
   | 'chars-150'
   | 'chars-300'
   | 'chars-600'
+  | 'chars-900'
   /**
    * The no-memory arm, asked twice.
    *
@@ -386,6 +387,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'chars-150': true,
   'chars-300': true,
   'chars-600': true,
+  'chars-900': true,
   'none-replica': true,
 };
 

@@ -293,7 +293,7 @@ const RETRY_ARMS = ['full-onretry', 'full-repair-onretry', 'retry-blank'] as con
  * A table so the arm names in the union and the budgets in the lane cannot drift: the arm is
  * `chars-<n>`, and the number in its name is the number the pack layer is given.
  */
-const CHARS_ARMS = [150, 300, 600] as const;
+const CHARS_ARMS = [150, 300, 600, 900] as const;
 type RetryArm = (typeof RETRY_ARMS)[number];
 
 /**
