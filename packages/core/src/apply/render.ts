@@ -133,8 +133,17 @@ export function renderPack(items: readonly KnowledgeItem[], options: RenderOptio
     used += line.length + 1;
   }
 
+  // A budget that admits no item is the same case as a budget smaller than the wrapper, and the
+  // honest answer to both is nothing at all. The first version returned the wrapper with
+  // `items="0"`, which is two hundred characters of a block that claims knowledge and carries
+  // none: measured at 230 characters against an empty pack, it cost 1.14pp on the public lane,
+  // and no reader could have told it apart from an empty one by looking at the prompt.
+  if (lines.length === 0) {
+    return { rendered: '', ids: [], tokens: 0, truncated };
+  }
+
   const header = open.replace('__N__', String(lines.length));
-  const rendered = `${header}\n${lines.join('\n')}${lines.length > 0 ? '\n' : ''}${close}`;
+  const rendered = `${header}\n${lines.join('\n')}\n${close}`;
 
   return {
     rendered,

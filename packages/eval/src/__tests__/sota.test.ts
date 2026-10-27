@@ -228,6 +228,7 @@ describe('parseArms', () => {
       'full-validated',
       'gated',
       'none',
+      'none-replica',
       'oracle',
       'retry-blank',
       'stated',
@@ -275,6 +276,7 @@ describe('parseArms', () => {
       'chars-150',
       'chars-300',
       'chars-600',
+      'none-replica',
     ]);
   });
 

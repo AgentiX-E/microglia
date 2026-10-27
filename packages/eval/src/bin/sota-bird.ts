@@ -1519,6 +1519,11 @@ async function runFold(
       coverage: Number(queryCoverage(row.question, pack.items[0]?.statement ?? '').toFixed(3)),
     });
     call(position, 'none', '', 0);
+    if (ARMS.has('none-replica')) {
+      // The same prompt, byte for byte. Whatever this arm reports is what the endpoint does to
+      // an unchanged question, and it is the floor every other number has to clear.
+      call(position, 'none-replica', '', 0);
+    }
     call(position, 'full', pack.rendered, pack.ids.length);
     if (ARMS.has('full-validated')) {
       // Read again, after the deletion: this is the only arm that sees the pruned store.

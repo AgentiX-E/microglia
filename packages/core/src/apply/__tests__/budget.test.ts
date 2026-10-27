@@ -96,3 +96,15 @@ describe('pack consistency', () => {
     expect(pack).toMatchObject({ items: [], ids: [], rendered: '', tokens: 0, truncated: 4 });
   });
 });
+
+describe('a budget that admits no item', () => {
+  it('renders nothing rather than a wrapper that claims zero items', () => {
+    // Two hundred characters of a block that says `items="0"` is text the model reads and
+    // knowledge it does not get. On the public lane an empty wrapper of 230 characters cost
+    // 1.14pp against no block at all, and nothing else in the prompt distinguished them.
+    const rendered = renderPack([item(1)], { budget: 260 });
+    expect(rendered.rendered).toBe('');
+    expect(rendered.ids).toEqual([]);
+    expect(rendered.truncated).toBe(1);
+  });
+});

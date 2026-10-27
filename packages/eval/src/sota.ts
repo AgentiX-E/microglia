@@ -338,7 +338,21 @@ export type SqlArm =
    */
   | 'chars-150'
   | 'chars-300'
-  | 'chars-600';
+  | 'chars-600'
+  /**
+   * The no-memory arm, asked twice.
+   *
+   * The prompt is byte-identical to `none`, so every difference between the two is noise: the
+   * provider is not deterministic at temperature 0, and this lane has been reporting effects
+   * smaller than that difference. Measured on the dose run that motivated the arm: 4 questions
+   * gained and 1 lost, +0.86pp, between two identical prompts — larger than the "memory helps a
+   * retry" effect this project reported three times.
+   *
+   * An arm that measures the instrument rather than the treatment. It costs one call per
+   * question and it is the only honest way to say whether a difference of one question means
+   * anything.
+   */
+  | 'none-replica';
 
 /**
  * Every optional arm, as a table keyed by the union itself.
@@ -372,6 +386,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'chars-150': true,
   'chars-300': true,
   'chars-600': true,
+  'none-replica': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(
