@@ -2249,6 +2249,63 @@ async function main(): Promise<void> {
   const goldExecRate = learnTotal === 0 ? 1 : 1 - goldFailures / learnTotal;
   const detectable = detectableDelta(cases.length, paired.discordance);
 
+  /**
+   * The relevance split, scored by the arm that saw the pack.
+   *
+   * The first version passed the case's `correct`, which is the `full` arm's outcome, for every
+   * arm — so the procedural block described the rule arm's accuracy partitioned by the procedural
+   * pack's relevance, and read as a 5pp loss that the arm's own total (+0.86pp) contradicted. The
+   * numbers were in the artefact; they were just not each other's.
+   */
+  const relevanceFor = (arm: ArmName) =>
+    relevanceSplit(
+      cases.map((item) => ({
+        correct: arm === 'full' ? item.correct : item.arms[arm] === true,
+        withoutMemoryCorrect: item.withoutMemoryCorrect,
+        goldSql: item.goldSql,
+        injected:
+          arm === 'full'
+            ? item.injected
+            : arm === 'full-repair'
+              ? item.injectedRepair
+              : item.injectedProcedural,
+      })),
+    );
+  /**
+   * The split and the arm total have to be the same number.
+   *
+   * They were not, in the run that introduced the block: the split was scored by one arm's
+   * outcomes and the packs came from another, so it reported a 5pp loss for an arm the artefact
+   * recorded at +0.86pp. A block that cannot be reconciled with the total it is meant to explain
+   * is worse than no block, because it reads as a finding.
+   */
+  const reconcile = (arm: ArmName, split: ReturnType<typeof relevanceSplit>): void => {
+    const implied = split.onTopic * split.onTopicAccuracy + split.offTopic * split.offTopicAccuracy;
+    const answered = cases.filter(
+      (item) =>
+        (arm === 'full' || item.arms[arm] !== undefined) &&
+        (arm === 'full'
+          ? item.injected.length > 0
+          : arm === 'full-repair'
+            ? item.injectedRepair.length > 0
+            : item.injectedProcedural.length > 0),
+    );
+    const correct = answered.filter((item) =>
+      arm === 'full' ? item.correct : item.arms[arm] === true,
+    ).length;
+    if (Math.abs(implied - correct) > 0.5) {
+      throw new MicrogliaError('MG_E_CONFIG', 'The relevance split does not reconcile', {
+        arm,
+        implied,
+        correct,
+        packs: split.packs,
+      });
+    }
+  };
+  reconcile('full', relevanceFor('full'));
+  reconcile('full-repair', relevanceFor('full-repair'));
+  reconcile('full-procedural', relevanceFor('full-procedural'));
+
   const arms: ArmSummary[] = [
     {
       arm: 'full',
@@ -2573,13 +2630,9 @@ async function main(): Promise<void> {
        * judged by what it retrieves, and this lane judged its own by accuracy alone — which
        * cannot tell "the memory is wrong" from "the memory never arrived".
        */
-      retrieval_relevance: relevanceSplit(cases),
-      retrieval_relevance_repair: relevanceSplit(
-        cases.map((item) => ({ ...item, injected: item.injectedRepair })),
-      ),
-      retrieval_relevance_procedural: relevanceSplit(
-        cases.map((item) => ({ ...item, injected: item.injectedProcedural })),
-      ),
+      retrieval_relevance: relevanceFor('full'),
+      retrieval_relevance_repair: relevanceFor('full-repair'),
+      retrieval_relevance_procedural: relevanceFor('full-procedural'),
       /**
        * What the repair memory actually contained, sampled from the first fold.
        *
