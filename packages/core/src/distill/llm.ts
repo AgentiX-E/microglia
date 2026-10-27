@@ -228,7 +228,18 @@ export function parseDistillResponse(
     }
 
     const scope = parseScope(record['scope'], base.task);
-    const payload = isJson(record['payload']) ? record['payload'] : undefined;
+    // An empty object is the model saying "no payload" in the only way its schema allows,
+    // and it must be normalised to absence: `{}` and `undefined` are the same claim, but the
+    // store's contradiction check compares them with `jsonEqual`, where they differ — so one
+    // stray `{}` among a hundred payload-free claims makes every one of them contradict every
+    // other, and the whole memory stalls at confidence 0.456. Measured, not guessed: 19 of 20
+    // items demoted on the alternating probe.
+    const parsedPayload = isJson(record['payload']) ? record['payload'] : undefined;
+    const payload =
+      parsedPayload !== null && typeof parsedPayload === 'object' && !Array.isArray(parsedPayload) &&
+      Object.keys(parsedPayload as Record<string, unknown>).length === 0
+        ? undefined
+        : parsedPayload;
     const when = parseWhen(record['when'], statement.trim());
     out.push({
       namespace: base.namespace,

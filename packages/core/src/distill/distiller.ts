@@ -207,7 +207,13 @@ async function contradictSameScope(
     if (item.status !== 'active') continue;
     if (item.kind !== candidate.kind) continue;
     if (scopeKey(item.scope) !== key) continue;
-    if (jsonEqual(item.payload ?? null, candidate.payload ?? null)) continue;
+    // Two empty payloads are not "equal data", they are "no data": a claim that carries no
+    // structured content cannot conflict with another claim on the grounds that its content
+    // differs, and treating the absent case as a value made one model that sometimes writes
+    // `"payload": {}` demote every rule in its own store. The comparison is therefore made
+    // only where there is something to compare.
+    if (item.payload === undefined || candidate.payload === undefined) continue;
+    if (jsonEqual(item.payload, candidate.payload)) continue;
     const next = recordContradiction(item, candidate.evidence.weight, options.policy, now);
     await options.memory.putKnowledge(next);
     count += 1;

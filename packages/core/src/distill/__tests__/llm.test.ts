@@ -244,3 +244,28 @@ describe('what the parser threw away', () => {
     expect(drops).toEqual(['statement-too-long']);
   });
 });
+
+describe('an empty payload is no payload', () => {
+  it('normalises {} to absent, so the store does not read it as conflicting data', () => {
+    const [candidateItem] = parseDistillResponse(
+      JSON.stringify({ candidates: [{ kind: 'procedure', statement: 'A claim.', payload: {} }] }),
+      base,
+    );
+    expect(candidateItem?.payload).toBeUndefined();
+  });
+
+  it('keeps a payload that carries something, including an empty array', () => {
+    const [objectItem] = parseDistillResponse(
+      JSON.stringify({ candidates: [{ kind: 'procedure', statement: 'A claim.', payload: { wrong: 'x' } }] }),
+      base,
+    );
+    expect(objectItem?.payload).toEqual({ wrong: 'x' });
+    const [arrayItem] = parseDistillResponse(
+      JSON.stringify({ candidates: [{ kind: 'procedure', statement: 'A claim.', payload: [] }] }),
+      base,
+    );
+    // An empty array is a value the model chose to report; only the empty object is the
+    // schema's way of saying "nothing".
+    expect(arrayItem?.payload).toEqual([]);
+  });
+});

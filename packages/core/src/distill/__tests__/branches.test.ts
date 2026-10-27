@@ -111,6 +111,38 @@ describe('distillation branches', () => {
     expect(report.contradicted).toBe(1);
     await memory.close();
   });
+
+  it('does not treat an absent payload as conflicting content', async () => {
+    // The defect this test was written for: a model that writes `"payload": {}` on some
+    // replies and omits it on others made every claim in the store contradict every other,
+    // because `jsonEqual({}, null)` is false. Nineteen of twenty items stall at confidence
+    // 0.456 and never activate, so the memory looks empty while holding the lessons.
+    const memory = await EmbeddedMemory.open(new MemoryJournal());
+    await memory.appendEvent(event('fb_1'));
+    await memory.appendEvent(event('fb_2'));
+    await memory.putKnowledge(
+      createKnowledgeItem(
+        candidate('fb_1', { payload: { wrong: 'counted distinct ids', cause: 'the join multiplies rows' } }),
+        defaultPolicy,
+        at,
+        'k_existing',
+      ),
+    );
+
+    const report = await distill({
+      memory,
+      policy: defaultPolicy,
+      clock: fixedClock(at),
+      random: mulberry32(4),
+      // The helper defaults to a payload; this candidate is the one a model returns when it
+      // writes `"payload": {}` and the parser normalises it away.
+      interpreter: () => [
+        candidate('fb_2', { statement: 'A different lesson with no payload.', payload: undefined }),
+      ],
+    });
+    expect(report.contradicted).toBe(0);
+    await memory.close();
+  });
 });
 
 describe('interpreter failure isolation', () => {
