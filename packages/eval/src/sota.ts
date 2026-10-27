@@ -325,7 +325,20 @@ export type SqlArm =
   | 'duplicate'
   | 'wrong-scope'
   | 'stated'
-  | 'oracle';
+  | 'oracle'
+  /**
+   * The same pack, cut to a measured number of characters.
+   *
+   * Every arm so far varied either which claims were injected or how many. The one quantity that
+   * has moved with accuracy in every comparison is the *size of the block*: one rule of about
+   * 250 characters and one repair note of about 450 both cost accuracy, and 1.86 short rules
+   * cost more than 1.00 long ones by about the same margin. These arms make that the independent
+   * variable: same store, same retrieval, same question, a character budget the pack layer
+   * enforces. `full` is the 1,200-character point.
+   */
+  | 'chars-150'
+  | 'chars-300'
+  | 'chars-600';
 
 /**
  * Every optional arm, as a table keyed by the union itself.
@@ -356,6 +369,9 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'wrong-scope': true,
   stated: true,
   oracle: true,
+  'chars-150': true,
+  'chars-300': true,
+  'chars-600': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(

@@ -208,6 +208,9 @@ describe('parseArms', () => {
   it('defaults to every optional arm plus the two required ones', () => {
     const arms = parseArms(undefined);
     expect([...arms].sort()).toEqual([
+      'chars-150',
+      'chars-300',
+      'chars-600',
       'critique',
       'duplicate',
       'full',
@@ -269,6 +272,9 @@ describe('parseArms', () => {
       'wrong-scope',
       'stated',
       'oracle',
+      'chars-150',
+      'chars-300',
+      'chars-600',
     ]);
   });
 

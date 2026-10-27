@@ -286,6 +286,14 @@ const DECISIVE = parseDecisivePolicy({
  * "retrying helps" from "the memory helps a retry".
  */
 const RETRY_ARMS = ['full-onretry', 'full-repair-onretry', 'retry-blank'] as const;
+
+/**
+ * The character budgets the dose arms use.
+ *
+ * A table so the arm names in the union and the budgets in the lane cannot drift: the arm is
+ * `chars-<n>`, and the number in its name is the number the pack layer is given.
+ */
+const CHARS_ARMS = [150, 300, 600] as const;
 type RetryArm = (typeof RETRY_ARMS)[number];
 
 /**
@@ -406,6 +414,9 @@ type CaseOutcome = {
    */
   readonly armSql: Partial<Record<Exclude<ArmName, 'none' | 'full'>, string>>;
   readonly armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>>;
+  readonly armPackChars: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>>;
+  /** Characters the `full` arm injected, the 1,200-character end of the dose curve. */
+  readonly packChars: number;
 };
 
 type Reply = ChatReply;
@@ -1394,6 +1405,8 @@ async function runFold(
     readonly arm: ArmName;
     readonly prompt: string;
     readonly packIds: number;
+    /** Characters of knowledge the prompt carried: the x-axis of the dose curve. */
+    readonly packChars: number;
   };
   type PackInfo = { readonly ids: readonly string[]; readonly coverage: number };
   const plans: PlannedCall[] = [];
@@ -1420,6 +1433,7 @@ async function runFold(
       position,
       arm,
       packIds,
+      packChars: packText.length,
       prompt: promptFor({
         question: row.question,
         evidence: row.evidence,
@@ -1461,7 +1475,10 @@ async function runFold(
   /** The pack each question would see, held for the anchored arm's second call. */
   const anchored = new Map<number, Pack>();
   /** The revision each question received for each anchored arm, judged after both rounds. */
-  const anchoredReplies = new Map<string, { position: number; arm: ArmName; reply: Reply | undefined; packIds: number }>();
+  const anchoredReplies = new Map<
+    string,
+    { position: number; arm: ArmName; reply: Reply | undefined; packIds: number; packChars: number }
+  >();
   let anchoredSkipped = 0;
 
   // A snapshot taken before the validated arm deletes anything. The other arms are
@@ -1567,6 +1584,13 @@ async function runFold(
       // prompt cannot be built until that answer exists.
       retries.set(position, { rule: pack, repair: repairPacks.get(position) });
     }
+    for (const chars of CHARS_ARMS) {
+      if (!ARMS.has(`chars-${chars}`)) continue;
+      // The same store and the same retrieval, with one number changed: the character budget the
+      // pack layer enforces. `full` is the 1,200-character point of the same curve.
+      const cut = await widened.host.recall({ ...query, scope: { domain: row.db_id }, budget: chars });
+      call(position, `chars-${chars}`, cut.rendered, cut.ids.length);
+    }
     if (ARMS.has('full-repair')) {
       // The repair pack in the first prompt: same timing as `full`, one thing different.
       const repairPack = repairPacks.get(position);
@@ -1660,13 +1684,16 @@ async function runFold(
   // the memoried arms retry, so the comparison is one population under two treatments. A
   // retry decided per arm would let a difference in which questions failed masquerade as a
   // difference in what the retry was given.
-  const retryReplies = new Map<string, { position: number; arm: RetryArm; reply: Reply | undefined; packIds: number }>();
+  const retryReplies = new Map<
+    string,
+    { position: number; arm: RetryArm; reply: Reply | undefined; packIds: number; packChars: number }
+  >();
   /** Questions whose first answer failed: the population the retry arms are measured on. */
   const retriedPositions = new Set<number>();
   const retryArmsThisRun = RETRY_ARMS.filter((arm) => ARMS.has(arm));
   if (retryArmsThisRun.length > 0) {
     const index = new Map(plans.map((plan, at) => [`${plan.position}:${plan.arm}`, at]));
-    const batch: { position: number; arm: RetryArm; prompt: string; packIds: number }[] = [];
+    const batch: { position: number; arm: RetryArm; prompt: string; packIds: number; packChars: number }[] = [];
     for (const [position, packsHere] of retries) {
       const at = index.get(`${position}:none`);
       const reply = at === undefined ? undefined : replies[at];
@@ -1691,6 +1718,7 @@ async function runFold(
           position,
           arm,
           packIds,
+          packChars: pack.length,
           prompt: retryPromptFor({
             question: row.question,
             evidence: row.evidence,
@@ -1718,6 +1746,7 @@ async function runFold(
         arm: entry.arm,
         reply: entry.reply,
         packIds: entry.packIds,
+        packChars: entry.packChars,
       });
     }
   }
@@ -1727,7 +1756,7 @@ async function runFold(
   // that question is counted as unanswered by this arm rather than silently scored as wrong.
   if (ANCHORED.length > 0) {
     const index = new Map(plans.map((plan, at) => [`${plan.position}:${plan.arm}`, at]));
-    const batch: { position: number; arm: ArmName; prompt: string; packIds: number }[] = [];
+    const batch: { position: number; arm: ArmName; prompt: string; packIds: number; packChars: number }[] = [];
     let unanswered = 0;
     for (const [position, pack] of anchored) {
       const at = index.get(`${position}:none`);
@@ -1752,6 +1781,7 @@ async function runFold(
             anchoredArm.mode,
           ),
           packIds: pack.ids.length,
+          packChars: pack.rendered.length,
         });
       }
     }
@@ -1773,6 +1803,7 @@ async function runFold(
         arm: entry.item.arm,
         reply: entry.reply,
         packIds: entry.item.packIds,
+        packChars: entry.item.packChars,
       });
     }
   }
@@ -1799,7 +1830,13 @@ async function runFold(
       ...result,
       latencyMs: Math.round(performance.now() - started),
     });
-    plans.push({ position: entry.position, arm: entry.arm, prompt: '', packIds: entry.packIds });
+    plans.push({
+      position: entry.position,
+      arm: entry.arm,
+      prompt: '',
+      packIds: entry.packIds,
+      packChars: entry.packChars,
+    });
   }
 
   // A question that never needed a retry keeps its first answer under this arm's name: the
@@ -1812,7 +1849,13 @@ async function runFold(
       ...result,
       latencyMs: Math.round(performance.now() - started),
     });
-    plans.push({ position: entry.position, arm: entry.arm, prompt: '', packIds: entry.packIds });
+    plans.push({
+      position: entry.position,
+      arm: entry.arm,
+      prompt: '',
+      packIds: entry.packIds,
+      packChars: entry.packChars,
+    });
   }
   for (const arm of retryArmsThisRun) {
     for (const position of retries.keys()) {
@@ -1820,11 +1863,12 @@ async function runFold(
       const first = judged.get(`${position}:none`);
       if (first === undefined) continue;
       judged.set(`${position}:${arm}`, first);
-      plans.push({ position, arm, prompt: '', packIds: 0 });
+      plans.push({ position, arm, prompt: '', packIds: 0, packChars: 0 });
     }
   }
 
   const packIdsOf = new Map(plans.map((plan) => [`${plan.position}:${plan.arm}`, plan.packIds]));
+  const packCharsOf = new Map(plans.map((plan) => [`${plan.position}:${plan.arm}`, plan.packChars]));
   const cases: CaseOutcome[] = [];
   for (const [position, row] of evalRows.entries()) {
     const pick = (arm: ArmName): Judged =>
@@ -1845,6 +1889,7 @@ async function runFold(
     const shadowArms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>> = {};
     const armSql: Partial<Record<Exclude<ArmName, 'none' | 'full'>, string>> = {};
     const armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
+    const armPackChars: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
     for (const plan of plans) {
       if (plan.position !== position) continue;
       if (plan.arm === 'none' || plan.arm === 'full') continue;
@@ -1853,6 +1898,7 @@ async function runFold(
       shadowArms[plan.arm] = result.shadowCorrect;
       armSql[plan.arm] = result.sql;
       armPackIds[plan.arm] = plan.packIds;
+      armPackChars[plan.arm] = plan.packChars;
     }
 
     cases.push({
@@ -1873,6 +1919,7 @@ async function runFold(
       execOk: full.execOk,
       retried: retriedPositions.has(position),
       packIds: packIdsOf.get(`${position}:full`) ?? 0,
+      packChars: packCharsOf.get(`${position}:full`) ?? 0,
       coverage: pack.coverage,
       expected: task.expected.get(idOf(row)) ?? null,
       packIdList: pack.ids,
@@ -1882,6 +1929,7 @@ async function runFold(
       shadowArms,
       armSql,
       armPackIds,
+      armPackChars,
     });
   }
 
@@ -2008,6 +2056,12 @@ type ArmSummary = {
   readonly gained: number;
   readonly lost: number;
   readonly mean_pack_ids: number;
+  /**
+   * Characters of knowledge per question, the same thing measured as text rather than as
+   * claims. Every comparison this lane has run that moved accuracy moved this number too, and
+   * until it was recorded the coincidence could not be told from a cause.
+   */
+  readonly mean_pack_chars: number;
 };
 
 async function main(): Promise<void> {
@@ -2093,6 +2147,7 @@ async function main(): Promise<void> {
   );
   const scoredDisagreements = cases.reduce((sum, item) => sum + (item.correct === item.shadowCorrect ? 0 : 1), 0);
   const meanPackIds = cases.reduce((sum, item) => sum + item.packIds, 0) / Math.max(1, cases.length);
+  const meanPackChars = cases.reduce((sum, item) => sum + item.packChars, 0) / Math.max(1, cases.length);
   const activeMean = folds.reduce((sum, fold) => sum + fold.activeRules, 0) / Math.max(1, folds.length);
 
   // Every question exactly once, and never learned from in its own fold. A split
@@ -2127,6 +2182,7 @@ async function main(): Promise<void> {
       gained: paired.gained,
       lost: paired.lost,
       mean_pack_ids: meanPackIds,
+      mean_pack_chars: meanPackChars,
     },
   ];
   for (const name of OPTIONAL_ARMS) {
@@ -2150,6 +2206,8 @@ async function main(): Promise<void> {
       lost: comparison.lost,
       mean_pack_ids:
         present.reduce((sum, item) => sum + (item.armPackIds[name] ?? 0), 0) / present.length,
+      mean_pack_chars:
+        present.reduce((sum, item) => sum + (item.armPackChars[name] ?? 0), 0) / present.length,
     });
   }
 
