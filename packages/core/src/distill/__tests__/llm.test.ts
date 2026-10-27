@@ -269,3 +269,15 @@ describe('an empty payload is no payload', () => {
     expect(arrayItem?.payload).toEqual([]);
   });
 });
+
+describe('the procedural form', () => {
+  it('asks for a rule with no case in it', () => {
+    const prompt = buildDistillPrompt({ event, run }, [], undefined, 'procedure');
+    expect(prompt).toContain('names no table, no column, no alias, no literal and no database');
+    expect(prompt).toContain('about the shape of the question, not about the case that taught it');
+    // The other forms' sentences must not leak in: a reader cannot be told two different things
+    // about what a statement is.
+    expect(prompt).not.toContain('You compare one wrong attempt');
+    expect(prompt).not.toContain('You extract reusable, declarative lessons');
+  });
+});

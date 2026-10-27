@@ -227,6 +227,7 @@ describe('parseArms', () => {
       'full-narrow',
       'full-onretry',
       'full-plain',
+      'full-procedural',
       'full-repair',
       'full-repair-onretry',
       'full-sampled',
@@ -284,6 +285,7 @@ describe('parseArms', () => {
       'chars-900',
       'none-replica',
       'full-asked',
+      'full-procedural',
     ]);
   });
 

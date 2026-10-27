@@ -222,6 +222,22 @@ describe('distillation window', () => {
     expect((await mg.distill({ limit: 1 })).events).toBe(1);
     await mg.close();
   });
+
+  it('lets the host veto a claim before it is stored', async () => {
+    // A prompt can ask for a lesson with no table names in it; only the host can refuse one that
+    // has them. The veto is counted, so a store emptied by its own filter is visible.
+    const { mg } = await host();
+    const run = mg.begin({ task: 'chart.recommend', input: { q: 'a' } });
+    await run.complete({ mark: 'bar' });
+    await run.rate('down', ['wrong_chart_type']);
+
+    const report = await mg.distill({ accept: () => false });
+    expect(report.events).toBe(1);
+    expect(report.candidates).toBeGreaterThan(0);
+    expect(report.rejectedByHost).toBe(report.candidates);
+    expect(report.created).toBe(0);
+    await mg.close();
+  });
 });
 
 describe('observability', () => {

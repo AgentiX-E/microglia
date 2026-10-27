@@ -364,7 +364,22 @@ export type SqlArm =
    * when none does. It is the same store, the same recall and one filter, and it is the arm the
    * audit says should be tried before any claim about retrieval is made.
    */
-  | 'full-asked';
+  | 'full-asked'
+  /**
+   * The same corrections, stated as procedures with no case in them.
+   *
+   * The relevance audit's conclusion is that the nouns are the problem: a pack that names an
+   * entity of the answer is followed and costs 2.6-2.8pp, a pack that names nothing is ignored and
+   * costs nothing, and the longer the explanation the larger the loss. So the next form removes
+   * the nouns: "when a question counts entities across a one-to-many join, aggregate after
+   * filtering, because the join multiplies rows" has no table in it, nothing for the model to map
+   * onto this question, and nothing to reproduce.
+   *
+   * This is the shape ExpeL's insights and ReasoningBank's strategies take, and the one form this
+   * project has never tried. Enforced, not requested: the lane's `accept` filter refuses any
+   * candidate naming a table or column of the database it was learned from.
+   */
+  | 'full-procedural';
 
 /**
  * Every optional arm, as a table keyed by the union itself.
@@ -401,6 +416,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'chars-900': true,
   'none-replica': true,
   'full-asked': true,
+  'full-procedural': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(

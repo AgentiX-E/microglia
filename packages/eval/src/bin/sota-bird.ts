@@ -421,6 +421,8 @@ type CaseOutcome = {
   readonly injected: readonly string[];
   /** The same for the repair memory, when the content arm ran. */
   readonly injectedRepair: readonly string[];
+  /** The same for the procedural memory, when that arm ran. */
+  readonly injectedProcedural: readonly string[];
   /** Characters the `full` arm injected, the 1,200-character end of the dose curve. */
   readonly packChars: number;
 };
@@ -1084,6 +1086,8 @@ type FoldResult = {
   readonly narrowActive: number | null;
   /** Active items in the repair memory, or null when the content arm was off. */
   readonly repairActive: number | null;
+  /** Active items in the procedural memory, or null when that arm was off. */
+  readonly proceduralActive: number | null;
   /** What the repair store holds, sampled: a count alone cannot show what was learned. */
   readonly repairItems: readonly RepairItem[];
   /** Candidates dropped by the parser, per form. */
@@ -1197,7 +1201,22 @@ async function buildFoldMemory(
     random: mulberry32(SEED),
   });
   const learning = await learn(host, learnRows, dataset, task);
-  const distilled = await host.distill({ generalize });
+  // A prompt can ask for a procedure with no case nouns in it; only the host can refuse one that
+  // has them. The filter reads the schema of the database the claim was learned from, so a note
+  // that names one of its tables or columns never reaches the store — and a note that names
+  // another database's is caught when that database's fold is built.
+  const accept =
+    form === 'procedure'
+      ? (candidate: { statement: string; when?: string; scope: { domain?: string } }): boolean => {
+          const domain = candidate.scope.domain;
+          if (domain === undefined) return true;
+          const index = schemaIndex(dataset.dbPath(domain));
+          const text = `${candidate.statement} ${candidate.when ?? ''}`;
+          const named = new Set([...index.tables, ...index.columns]);
+          return !mentionsAny(text, named);
+        }
+      : undefined;
+  const distilled = await host.distill({ generalize, ...(accept === undefined ? {} : { accept }) });
   const frozen = await knowledgeDigest(store);
   return { store, host, learning, distilled, frozen, distillFailures: failures, drops };
 }
@@ -1367,6 +1386,10 @@ async function runFold(
   const repaired = wantsRepair
     ? await buildFoldMemory(GENERALIZE, learnRows, dataset, task, 'repair')
     : undefined;
+  // The form no arm had tried: the same corrections, stated as procedures with no case in them.
+  const procedural = ARMS.has('full-procedural')
+    ? await buildFoldMemory(GENERALIZE, learnRows, dataset, task, 'procedure')
+    : undefined;
   const store = widened.store;
   const learning = widened.learning;
   const distilled = widened.distilled;
@@ -1375,6 +1398,7 @@ async function runFold(
     ...widened.distillFailures,
     ...(narrowed === undefined ? [] : narrowed.distillFailures),
     ...(repaired === undefined ? [] : repaired.distillFailures),
+    ...(procedural === undefined ? [] : procedural.distillFailures),
   ];
 
   // The wrong-scope control must inject text, or it silently becomes a second
@@ -1494,15 +1518,18 @@ async function runFold(
   type Pack = Awaited<ReturnType<typeof widened.host.recall>>;
   const rawPacks = new Map<number, Pack>();
   const repairPacks = new Map<number, Pack>();
+  const proceduralPacks = new Map<number, Pack>();
   const injectedText = (pack: Pack): string[] =>
     pack.items.map((item) => `${item.statement} ${item.when ?? ''}`);
   /** The texts each question's packs contained, for the relevance audit. */
   const injectedByPosition = new Map<number, string[]>();
   const injectedRepairByPosition = new Map<number, string[]>();
+  const injectedProceduralByPosition = new Map<number, string[]>();
   for (const [position, row] of evalRows.entries()) {
     const query = { task: TASK, text: row.question, scope: { domain: row.db_id } };
     rawPacks.set(position, await widened.host.recall(query));
     if (repaired !== undefined) repairPacks.set(position, await repaired.host.recall(query));
+    if (procedural !== undefined) proceduralPacks.set(position, await procedural.host.recall(query));
   }
   // The deletion half of the literature's prescription, run on learn rows only, before
   // any held-out question is scored.
@@ -1532,6 +1559,9 @@ async function runFold(
     injectedByPosition.set(position, injectedText(pack));
     if (repairPacks.get(position) !== undefined) {
       injectedRepairByPosition.set(position, injectedText(repairPacks.get(position) as Pack));
+    }
+    if (proceduralPacks.get(position) !== undefined) {
+      injectedProceduralByPosition.set(position, injectedText(proceduralPacks.get(position) as Pack));
     }
     call(position, 'none', '', 0);
     if (ARMS.has('none-replica')) {
@@ -1618,6 +1648,12 @@ async function runFold(
       const kept = pack.items.filter((item) => mentionsAny(`${item.statement} ${item.when ?? ''}`, asked));
       const askPack = makePack(kept, { budget: pack.budget });
       call(position, 'full-asked', askPack.rendered, askPack.ids.length);
+    }
+    if (ARMS.has('full-procedural')) {
+      const procedurePack = proceduralPacks.get(position);
+      if (procedurePack !== undefined) {
+        call(position, 'full-procedural', procedurePack.rendered, procedurePack.ids.length);
+      }
     }
     if (ARMS.has('full-repair')) {
       // The repair pack in the first prompt: same timing as `full`, one thing different.
@@ -1948,6 +1984,7 @@ async function runFold(
       retried: retriedPositions.has(position),
       injected: injectedByPosition.get(position) ?? [],
       injectedRepair: injectedRepairByPosition.get(position) ?? [],
+      injectedProcedural: injectedProceduralByPosition.get(position) ?? [],
       packIds: packIdsOf.get(`${position}:full`) ?? 0,
       packChars: packCharsOf.get(`${position}:full`) ?? 0,
       coverage: pack.coverage,
@@ -1974,6 +2011,16 @@ async function runFold(
   // The second store is held to the same proof. It is only read after construction, so a
   // difference here would mean the repair arms were scored against a memory that changed
   // while they were being measured - the one failure this lane has already had once.
+  if (procedural !== undefined) {
+    const procedureAfter = await knowledgeDigest(procedural.store);
+    if (procedureAfter.digest !== procedural.frozen.digest) {
+      throw new MicrogliaError('MG_E_CONFIG', 'Evaluation mutated the procedural memory', {
+        fold,
+        before: procedural.frozen.digest,
+        after: procedureAfter.digest,
+      });
+    }
+  }
   if (repaired !== undefined) {
     const repairAfter = await knowledgeDigest(repaired.store);
     if (repairAfter.digest !== repaired.frozen.digest) {
@@ -2006,6 +2053,7 @@ async function runFold(
   await widened.host.close();
   if (narrowed !== undefined) await narrowed.host.close();
   if (repaired !== undefined) await repaired.host.close();
+  if (procedural !== undefined) await procedural.host.close();
 
   // Written per fold: a run that dies at fold 4 keeps the distillations it paid for, and the
   // next dispatch replays them instead of buying them again.
@@ -2044,6 +2092,7 @@ async function runFold(
     activeRulesBeforeValidation: frozen.active,
     narrowActive: narrowed?.frozen.active ?? null,
     repairActive: repaired?.frozen.active ?? null,
+    proceduralActive: procedural?.frozen.active ?? null,
     repairItems,
     distillDrops: { rule: widened.drops, repair: repaired?.drops ?? null },
     items,
@@ -2528,6 +2577,9 @@ async function main(): Promise<void> {
       retrieval_relevance_repair: relevanceSplit(
         cases.map((item) => ({ ...item, injected: item.injectedRepair })),
       ),
+      retrieval_relevance_procedural: relevanceSplit(
+        cases.map((item) => ({ ...item, injected: item.injectedProcedural })),
+      ),
       /**
        * What the repair memory actually contained, sampled from the first fold.
        *
@@ -2595,6 +2647,7 @@ async function main(): Promise<void> {
       active: fold.activeRules,
       active_narrow: fold.narrowActive,
       active_repair: fold.repairActive,
+      active_procedural: fold.proceduralActive,
       distill_drops: fold.distillDrops,
       failed_distill: fold.failedDistill,
       mean_pack_ids: Number(fold.meanPackIds.toFixed(3)),

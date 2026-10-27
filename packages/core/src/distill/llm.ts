@@ -78,7 +78,7 @@ const KINDS = new Set<KnowledgeKind>([
  * changes what a *candidate is*, not only how it is worded: a repair must name a mechanism
  * and must not quote the case's values.
  */
-export type DistillForm = 'lesson' | 'repair';
+export type DistillForm = 'lesson' | 'repair' | 'procedure';
 
 /**
  * The repair form's instructions.
@@ -89,6 +89,34 @@ export type DistillForm = 'lesson' | 'repair';
  * mechanism ("the correct query joins the tables") is the declarative rule this form
  * exists to replace, and one that quotes the case is a restatement of a single answer.
  */
+/**
+ * The procedural form: a rule about how to answer, with no case inside it.
+ *
+ * The two other forms both carry the case. A lesson names the tables it was learned on ("questions
+ * that name a race join results to races on raceId") and a repair names the query that failed; on
+ * the public lane, a pack of those is *followed*, not weighed — 77-82% of packs name an entity the
+ * answer uses, and they cost 2.6pp, while the packs that name nothing are ignored and cost
+ * nothing. The nouns are what the model latches onto.
+ *
+ * This form asks for the same knowledge with the nouns removed: a procedure stated in terms of the
+ * shape of the question. It is the form ExpeL's insights and ReasoningBank's strategies take —
+ * "verify the page identifier before scrolling" has no page in it — and the form this project has
+ * never tried. The host enforces it, because a prompt cannot: `accept` refuses any candidate that
+ * names a table or column of the database it was learned from.
+ */
+const PROCEDURE_INSTRUCTION: readonly string[] = [
+  'You state one procedure for answering questions of a kind, from one failure and its correction.',
+  'Return JSON only, with this shape:',
+  '{"candidates":[{"kind":"procedure","statement":"...","when":"..."}]}',
+  'Rules:',
+  '- Return exactly one candidate and nothing outside the JSON object.',
+  '- The statement names no table, no column, no alias, no literal and no database. It is about the shape of the question, not about the case that taught it.',
+  '- The statement has three parts in one sentence: when a question has <shape>, the answer must <operation>, because <mechanism>.',
+  '- `when` is the trigger, in the question\'s own terms: what is being counted, compared, filtered or ordered, and what the answer is shaped like.',
+  '- A reader who has never seen this database must be able to follow it, and a reader who has must not be able to recognise the case from it.',
+  '- At most 240 characters in the statement.',
+];
+
 const REPAIR_INSTRUCTION: readonly string[] = [
   'You compare one wrong attempt with the correction that replaced it, and state what generalises.',
   'Return JSON only, with this shape:',
@@ -120,7 +148,9 @@ export function buildDistillPrompt(
     output: context.run?.output ?? null,
   };
   const instructions =
-    form === 'repair'
+    form === 'procedure'
+      ? [...PROCEDURE_INSTRUCTION, taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '']
+      : form === 'repair'
       ? [
           ...REPAIR_INSTRUCTION,
           taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '',

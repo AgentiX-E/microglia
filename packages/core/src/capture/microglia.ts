@@ -31,6 +31,7 @@ import type {
   RunRecord,
 } from '../kernel/index.js';
 import type { MemoryPort, MemoryStats } from '../memory/index.js';
+import type { DistillCandidate } from '../kernel/index.js';
 import { buildPack } from '../apply/index.js';
 import {
   distill as distillLog,
@@ -287,6 +288,14 @@ export class Microglia implements RunHost {
       limit?: number;
       generalize?: boolean;
       resolveContradictions?: boolean;
+      /**
+       * Veto a claim before it is stored.
+       *
+       * A host-level filter, not a policy: the rule that a procedure may not name a table is a
+       * property of what this store is for, and a prompt that asks for it is a request rather than
+       * a guarantee.
+       */
+      accept?: (candidate: DistillCandidate) => boolean;
     } = {},
   ): Promise<DistillReport> {
     this.assertOpen();
@@ -302,6 +311,7 @@ export class Microglia implements RunHost {
       ...(options.resolveContradictions === undefined
         ? {}
         : { resolveContradictions: options.resolveContradictions }),
+      ...(options.accept === undefined ? {} : { accept: options.accept }),
     });
     this.knowledgeVersion += 1;
     return report;
