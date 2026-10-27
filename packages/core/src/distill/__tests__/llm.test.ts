@@ -61,12 +61,14 @@ describe('prompt construction', () => {
   it('asks for a contrastive account under the repair form', () => {
     const prompt = buildDistillPrompt({ event, run }, [], undefined, 'repair');
     expect(prompt).toContain('You compare one wrong attempt with the correction that replaced it');
-    // The account is the form's whole content: the fix is the statement, and the failure and
-    // its cause are named fields. An account without the mechanism is the declarative rule
-    // this form exists to replace.
-    expect(prompt).toContain('`statement` is the fix');
-    expect(prompt).toContain('`payload.wrong`');
-    expect(prompt).toContain('`payload.cause`');
+    // The account is the form's whole content: three sentences — what failed, why, and the
+    // fix — in one statement. An account without the mechanism is the declarative rule this
+    // form exists to replace.
+    expect(prompt).toContain('The statement is the account, in three sentences');
+    expect(prompt).toContain('must name a mechanism');
+    // A per-case record is what the store's contradiction rule reads as a conflicting claim
+    // about the same slot, so the form forbids one.
+    expect(prompt).toContain('Set no `payload`');
     expect(prompt).toContain('`signal.after`');
     expect(prompt).toContain('`signal.note`');
     expect(prompt).not.toContain('You extract reusable, declarative lessons');

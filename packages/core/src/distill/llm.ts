@@ -92,16 +92,16 @@ export type DistillForm = 'lesson' | 'repair';
 const REPAIR_INSTRUCTION: readonly string[] = [
   'You compare one wrong attempt with the correction that replaced it, and state what generalises.',
   'Return JSON only, with this shape:',
-  '{"candidates":[{"kind":"procedure","statement":"...","when":"...","payload":{"wrong":"...","cause":"..."}}]}',
+  '{"candidates":[{"kind":"procedure","statement":"...","when":"...","scope":{"task":"...","domain":"..."}}]}',
   'The event holds the task input, the attempt the model made (`output`), the correction a reviewer saved (`signal.after`), and `signal.note`, which states how the attempt was observed to fail.',
   'Rules:',
   '- Return exactly one candidate and nothing outside the JSON object.',
-  '- `statement` is the fix: what the corrected query does that the attempt did not, in at most 240 characters. One sentence, no preamble.',
-  '- `payload.wrong` is what the attempt did — the projection, the join, the grain, the filter — in one clause.',
-  '- `payload.cause` is why that returns a different answer than the question asks for. Name a mechanism the schema or the question explains: a join that multiplies rows, an aggregate taken at the wrong grain, a filter on the wrong column, a value reported in the wrong unit, a projection that drops the column the question names. "It was wrong" and "the correction joins the tables" are restatements, not causes.',
-  '- `when` is the condition under which the fix generalises to a different question: what the question asks for, which relations or columns it names, what its answer must look like. It must be checkable against the schema and the question, and it must not hold for every question.',
+  '- The statement is the account, in three sentences, in this order: what the attempt did; why that returns a different answer than the question asks for; what the correction does instead. Two hundred to four hundred characters in total.',
+  '- The middle sentence must name a mechanism the schema or the question explains: a join that multiplies rows, an aggregate taken at the wrong grain, a filter on the wrong column, a value reported in the wrong unit, a projection that drops the column the question names. \"It was wrong\" and \"the correction joins the tables\" are restatements, not causes.',
+  '- `when` is the condition under which the account generalises to a different question: what the question asks for, which relations or columns it names, what its answer must look like. It must be checkable against the schema and the question, and it must not hold for every question.',
   '- Do not quote the values of this case. Row counts, column names and relations are evidence; the numbers inside the rows are the answer to one question and must not appear.',
-  '- Set no keys inside `payload` other than `wrong` and `cause`, and no scope keys the event does not establish. Never guess a domain.',
+  '- Set no `payload`. The account is the statement; a per-case record added to it is data about one question, not a lesson.',
+  '- Omit scope keys the event does not establish. Never guess a domain.',
   '- State what fails and what works. No second-person instructions, no advice to the reader, no imperative mood.',
 ];
 
