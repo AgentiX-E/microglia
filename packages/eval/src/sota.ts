@@ -353,7 +353,18 @@ export type SqlArm =
    * question and it is the only honest way to say whether a difference of one question means
    * anything.
    */
-  | 'none-replica';
+  | 'none-replica'
+  /**
+   * The pack restricted to rules that name something the *question* names.
+   *
+   * The relevance audit found that 210 of 350 packs named nothing the answer uses, and that the
+   * 140 which did scored 43.6% against a 53.4% baseline: a rule sharing vocabulary with the
+   * answer is followed, not weighed. The obvious repair is to keep only rules that share
+   * vocabulary with the *question* — the entities the user actually said — and to inject nothing
+   * when none does. It is the same store, the same recall and one filter, and it is the arm the
+   * audit says should be tried before any claim about retrieval is made.
+   */
+  | 'full-asked';
 
 /**
  * Every optional arm, as a table keyed by the union itself.
@@ -389,6 +400,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'chars-600': true,
   'chars-900': true,
   'none-replica': true,
+  'full-asked': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(
@@ -1054,4 +1066,109 @@ export function retrySubset(
     });
   }
   return rows;
+}
+
+/**
+ * The identifiers a SQL statement actually uses.
+ *
+ * Not a parser: the tokens minus the reserved words, lowercased. It exists to answer one
+ * question the lane could not answer before — is the rule that was put in front of this
+ * question *about* anything the answer involves — and a token set is enough for that.
+ */
+export function sqlIdentifiers(sql: string): ReadonlySet<string> {
+  const reserved = new Set([
+    'select', 'from', 'where', 'group', 'by', 'order', 'having', 'join', 'inner', 'left',
+    'right', 'outer', 'full', 'on', 'as', 'and', 'or', 'not', 'in', 'is', 'null', 'count',
+    'sum', 'avg', 'min', 'max', 'distinct', 'case', 'when', 'then', 'else', 'end', 'limit',
+    'offset', 'union', 'all', 'desc', 'asc', 'like', 'between', 'with', 'cast', 'round',
+    'abs', 'int', 'real', 'text', 'nulls', 'first', 'last', 'exists', 'cast', 'strftime',
+  ]);
+  const out = new Set<string>();
+  for (const token of sql.match(/[A-Za-z_][A-Za-z_0-9]*/g) ?? []) {
+    const lower = token.toLowerCase();
+    if (!reserved.has(lower)) out.add(lower);
+  }
+  return out;
+}
+
+/** Whether a claim's text names one of the identifiers. */
+export function mentionsAny(text: string, identifiers: ReadonlySet<string>): boolean {
+  const haystack = text.toLowerCase();
+  for (const identifier of identifiers) {
+    if (identifier.length < 3) continue;
+    const at = haystack.indexOf(identifier);
+    if (at === -1) continue;
+    // Whole-token match: `race` inside `races` is a different word about a different table.
+    const before = at === 0 ? '' : haystack[at - 1] ?? '';
+    const after = haystack[at + identifier.length] ?? '';
+    if (!/[a-z0-9_]/.test(before) && !/[a-z0-9_]/.test(after)) return true;
+  }
+  return false;
+}
+
+/**
+ * Retrieval relevance, and what accuracy does inside each half.
+ *
+ * The question this answers is the one the whole line of work depends on and had never asked:
+ * when a pack arrives, is it about the question? Measured on run 40506721172, 210 of 350 packs
+ * named nothing the gold query uses — a question about oxygen atoms in molecules received a note
+ * about parsing lap times — and the 140 that did named something scored **43.6%** against a
+ * 53.4% baseline, while the off-topic half scored 54.8%.
+ *
+ * Which is the opposite of the reading one wants from a relevance metric, and the reason it has
+ * to be measured rather than assumed: a rule that shares vocabulary with the answer is not a
+ * rule the model can use, it is a rule the model follows.
+ *
+ * `identifiers` comes from the gold query because the measurement may look at the answer; the
+ * pack never can.
+ */
+export type RelevanceSplit = {
+  readonly packs: number;
+  readonly onTopic: number;
+  readonly offTopic: number;
+  readonly onTopicAccuracy: number;
+  readonly offTopicAccuracy: number;
+  readonly onTopicBaseline: number;
+  readonly offTopicBaseline: number;
+};
+
+export function relevanceSplit(
+  cases: readonly {
+    readonly correct: boolean;
+    readonly withoutMemoryCorrect: boolean;
+    readonly goldSql: string;
+    readonly injected: readonly string[];
+  }[],
+): RelevanceSplit {
+  let packs = 0;
+  let onTopic = 0;
+  let onRight = 0;
+  let onBase = 0;
+  let offTopic = 0;
+  let offRight = 0;
+  let offBase = 0;
+  for (const item of cases) {
+    if (item.injected.length === 0) continue;
+    packs += 1;
+    const identifiers = sqlIdentifiers(item.goldSql);
+    const on = item.injected.some((text) => mentionsAny(text, identifiers));
+    if (on) {
+      onTopic += 1;
+      onRight += item.correct ? 1 : 0;
+      onBase += item.withoutMemoryCorrect ? 1 : 0;
+    } else {
+      offTopic += 1;
+      offRight += item.correct ? 1 : 0;
+      offBase += item.withoutMemoryCorrect ? 1 : 0;
+    }
+  }
+  return {
+    packs,
+    onTopic,
+    offTopic,
+    onTopicAccuracy: onTopic === 0 ? 0 : onRight / onTopic,
+    offTopicAccuracy: offTopic === 0 ? 0 : offRight / offTopic,
+    onTopicBaseline: onTopic === 0 ? 0 : onBase / onTopic,
+    offTopicBaseline: offTopic === 0 ? 0 : offBase / offTopic,
+  };
 }

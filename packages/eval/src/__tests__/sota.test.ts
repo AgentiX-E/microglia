@@ -11,7 +11,10 @@ import {
   extractSql,
   judgeScalar,
   matches,
+  mentionsAny,
   mismatchNote,
+  relevanceSplit,
+  sqlIdentifiers,
   parseArms,
   anchorPromptFor,
   promptFor,
@@ -217,6 +220,7 @@ describe('parseArms', () => {
       'full',
       'full-anchored',
       'full-anchored-conditional',
+      'full-asked',
       'full-corroborated',
       'full-grounded',
       'full-late',
@@ -279,6 +283,7 @@ describe('parseArms', () => {
       'chars-600',
       'chars-900',
       'none-replica',
+      'full-asked',
     ]);
   });
 
@@ -928,5 +933,58 @@ describe('the pack is labelled by what it holds', () => {
       packKind: 'repair',
     });
     expect(empty).not.toContain('Repairs of earlier failures');
+  });
+});
+
+describe('is the pack about the question', () => {
+  it('reads identifiers out of a statement, not keywords', () => {
+    const identifiers = sqlIdentifiers('SELECT s.school, AVG(e.score) FROM schools s JOIN exams e ON s.id = e.schoolId');
+    expect(identifiers.has('schools')).toBe(true);
+    expect(identifiers.has('exams')).toBe(true);
+    expect(identifiers.has('score')).toBe(true);
+    expect(identifiers.has('select')).toBe(false);
+    expect(identifiers.has('avg')).toBe(false);
+  });
+
+  it('matches whole tokens only', () => {
+    // `race` inside `races` is a different word about a different table, and a substring match
+    // would score every pack as relevant to every question that shares a stem.
+    const identifiers = new Set(['race']);
+    expect(mentionsAny('the races table keys on raceId', identifiers)).toBe(false);
+    expect(mentionsAny('a race is one event', identifiers)).toBe(true);
+  });
+
+  it('ignores identifiers too short to be evidence', () => {
+    expect(mentionsAny('the id column', new Set(['id']))).toBe(false);
+  });
+
+  it('splits accuracy by whether the pack named anything the answer uses', () => {
+    const split = relevanceSplit([
+      // on-topic and wrong
+      { correct: false, withoutMemoryCorrect: true, goldSql: 'SELECT count(*) FROM atoms', injected: ['a rule about atoms'] },
+      // off-topic and right
+      { correct: true, withoutMemoryCorrect: true, goldSql: 'SELECT count(*) FROM atoms', injected: ['a rule about lap times'] },
+      // no pack at all: not part of either half
+      { correct: true, withoutMemoryCorrect: true, goldSql: 'SELECT 1', injected: [] },
+    ]);
+    expect(split.packs).toBe(2);
+    expect(split.onTopic).toBe(1);
+    expect(split.offTopic).toBe(1);
+    expect(split.onTopicAccuracy).toBe(0);
+    expect(split.onTopicBaseline).toBe(1);
+    expect(split.offTopicAccuracy).toBe(1);
+  });
+
+  it('reports zero rather than dividing by an empty half', () => {
+    const split = relevanceSplit([]);
+    expect(split).toEqual({
+      packs: 0,
+      onTopic: 0,
+      offTopic: 0,
+      onTopicAccuracy: 0,
+      offTopicAccuracy: 0,
+      onTopicBaseline: 0,
+      offTopicBaseline: 0,
+    });
   });
 });

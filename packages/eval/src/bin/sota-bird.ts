@@ -109,6 +109,7 @@ import {
   judgeScalar,
   mapPool,
   matches,
+  mentionsAny,
   mismatchNote,
   missingDatabases,
   executeQuery,
@@ -122,6 +123,7 @@ import {
   requirePopulated,
   retryPromptFor,
   retrySubset,
+  relevanceSplit,
   resolveDatabase,
   schemaIndex,
   sha256OfFile,
@@ -415,6 +417,10 @@ type CaseOutcome = {
   readonly armSql: Partial<Record<Exclude<ArmName, 'none' | 'full'>, string>>;
   readonly armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>>;
   readonly armPackChars: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>>;
+  /** The claims the `full` arm injected, as text: the input to the relevance audit. */
+  readonly injected: readonly string[];
+  /** The same for the repair memory, when the content arm ran. */
+  readonly injectedRepair: readonly string[];
   /** Characters the `full` arm injected, the 1,200-character end of the dose curve. */
   readonly packChars: number;
 };
@@ -1488,6 +1494,11 @@ async function runFold(
   type Pack = Awaited<ReturnType<typeof widened.host.recall>>;
   const rawPacks = new Map<number, Pack>();
   const repairPacks = new Map<number, Pack>();
+  const injectedText = (pack: Pack): string[] =>
+    pack.items.map((item) => `${item.statement} ${item.when ?? ''}`);
+  /** The texts each question's packs contained, for the relevance audit. */
+  const injectedByPosition = new Map<number, string[]>();
+  const injectedRepairByPosition = new Map<number, string[]>();
   for (const [position, row] of evalRows.entries()) {
     const query = { task: TASK, text: row.question, scope: { domain: row.db_id } };
     rawPacks.set(position, await widened.host.recall(query));
@@ -1518,6 +1529,10 @@ async function runFold(
       ids: pack.ids,
       coverage: Number(queryCoverage(row.question, pack.items[0]?.statement ?? '').toFixed(3)),
     });
+    injectedByPosition.set(position, injectedText(pack));
+    if (repairPacks.get(position) !== undefined) {
+      injectedRepairByPosition.set(position, injectedText(repairPacks.get(position) as Pack));
+    }
     call(position, 'none', '', 0);
     if (ARMS.has('none-replica')) {
       // The same prompt, byte for byte. Whatever this arm reports is what the endpoint does to
@@ -1595,6 +1610,14 @@ async function runFold(
       // pack layer enforces. `full` is the 1,200-character point of the same curve.
       const cut = await widened.host.recall({ ...query, scope: { domain: row.db_id }, budget: chars });
       call(position, `chars-${chars}`, cut.rendered, cut.ids.length);
+    }
+    if (ARMS.has('full-asked')) {
+      // Only rules that name something the question names. A pack of unrelated rules is not a
+      // smaller treatment, it is a different one: the audit showed it does nothing at all.
+      const asked = new Set(row.question.toLowerCase().match(/[a-z_][a-z_0-9]*/g) ?? []);
+      const kept = pack.items.filter((item) => mentionsAny(`${item.statement} ${item.when ?? ''}`, asked));
+      const askPack = makePack(kept, { budget: pack.budget });
+      call(position, 'full-asked', askPack.rendered, askPack.ids.length);
     }
     if (ARMS.has('full-repair')) {
       // The repair pack in the first prompt: same timing as `full`, one thing different.
@@ -1923,6 +1946,8 @@ async function runFold(
       parseOk: full.parseOk,
       execOk: full.execOk,
       retried: retriedPositions.has(position),
+      injected: injectedByPosition.get(position) ?? [],
+      injectedRepair: injectedRepairByPosition.get(position) ?? [],
       packIds: packIdsOf.get(`${position}:full`) ?? 0,
       packChars: packCharsOf.get(`${position}:full`) ?? 0,
       coverage: pack.coverage,
@@ -2492,6 +2517,17 @@ async function main(): Promise<void> {
        * what makes it informative and exactly what stops it from being a headline.
        */
       retry_subset: retrySubset(cases),
+      /**
+       * Whether the pack was about the question, and what accuracy did in each half.
+       *
+       * The number the whole line of work depended on and never had. A retrieval pipeline is
+       * judged by what it retrieves, and this lane judged its own by accuracy alone — which
+       * cannot tell "the memory is wrong" from "the memory never arrived".
+       */
+      retrieval_relevance: relevanceSplit(cases),
+      retrieval_relevance_repair: relevanceSplit(
+        cases.map((item) => ({ ...item, injected: item.injectedRepair })),
+      ),
       /**
        * What the repair memory actually contained, sampled from the first fold.
        *
