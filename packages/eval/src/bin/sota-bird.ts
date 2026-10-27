@@ -1649,6 +1649,10 @@ async function runFold(
       const askPack = makePack(kept, { budget: pack.budget });
       call(position, 'full-asked', askPack.rendered, askPack.ids.length);
     }
+    if (ARMS.has('chars-proc-600') && procedural !== undefined) {
+      const cut = await procedural.host.recall({ ...query, scope: { domain: row.db_id }, budget: 600 });
+      call(position, 'chars-proc-600', cut.rendered, cut.ids.length);
+    }
     if (ARMS.has('full-procedural')) {
       const procedurePack = proceduralPacks.get(position);
       if (procedurePack !== undefined) {

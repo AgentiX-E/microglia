@@ -379,7 +379,16 @@ export type SqlArm =
    * project has never tried. Enforced, not requested: the lane's `accept` filter refuses any
    * candidate naming a table or column of the database it was learned from.
    */
-  | 'full-procedural';
+  | 'full-procedural'
+  /**
+   * The procedural pack, cut to one item's worth of characters.
+   *
+   * The case-bearing pack has a measured dose: nothing under one item, 3.1pp at one item, the same
+   * at two. The procedural pack has one point — 1.76 items, 1,064 characters, +0.86pp — and one
+   * point cannot separate "procedures are cheap" from "procedures are cheap at this size". At 600
+   * characters the pack carries one procedure where it carried two.
+   */
+  | 'chars-proc-600';
 
 /**
  * Every optional arm, as a table keyed by the union itself.
@@ -417,6 +426,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'none-replica': true,
   'full-asked': true,
   'full-procedural': true,
+  'chars-proc-600': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(
