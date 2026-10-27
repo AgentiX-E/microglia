@@ -281,3 +281,48 @@ describe('the procedural form', () => {
     expect(prompt).not.toContain('You extract reusable, declarative lessons');
   });
 });
+
+describe('the host can supply the failure code', () => {
+  it('fills reasonCode when the model left it out', async () => {
+    const interpreter = createLlmInterpreter({
+      llm: {
+        complete: async () =>
+          JSON.stringify({
+            candidates: [{ kind: 'procedure', statement: 'A claim.', scope: { task: 'chart.recommend' } }],
+          }),
+      },
+      reasonCodeOf: () => 'no-rows',
+    });
+    const [candidateItem] = await interpreter({ event, run });
+    expect(candidateItem?.scope.reasonCode).toBe('no-rows');
+  });
+
+  it('keeps the code the model gave', async () => {
+    const interpreter = createLlmInterpreter({
+      llm: {
+        complete: async () =>
+          JSON.stringify({
+            candidates: [
+              { kind: 'procedure', statement: 'A claim.', scope: { task: 'chart.recommend', reasonCode: 'syntax' } },
+            ],
+          }),
+      },
+      reasonCodeOf: () => 'no-rows',
+    });
+    const [candidateItem] = await interpreter({ event, run });
+    // The model saw the event; the host's classifier is a fallback for the field, not an override.
+    expect(candidateItem?.scope.reasonCode).toBe('syntax');
+  });
+
+  it('leaves the scope untouched when the host has no code', async () => {
+    const interpreter = createLlmInterpreter({
+      llm: {
+        complete: async () =>
+          JSON.stringify({ candidates: [{ kind: 'procedure', statement: 'A claim.', scope: { task: 'chart.recommend' } }] }),
+      },
+      reasonCodeOf: () => undefined,
+    });
+    const [candidateItem] = await interpreter({ event, run });
+    expect(candidateItem?.scope.reasonCode).toBeUndefined();
+  });
+});

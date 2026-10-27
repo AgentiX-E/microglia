@@ -9,6 +9,7 @@ import {
   canonicalRows,
   conventionOf,
   extractSql,
+  failureKind,
   judgeScalar,
   matches,
   mentionsAny,
@@ -238,6 +239,7 @@ describe('parseArms', () => {
       'none-replica',
       'oracle',
       'retry-blank',
+      'retry-keyed',
       'stated',
       'wrong-scope',
     ]);
@@ -288,6 +290,7 @@ describe('parseArms', () => {
       'full-asked',
       'full-procedural',
       'chars-proc-600',
+      'retry-keyed',
     ]);
   });
 
@@ -990,5 +993,33 @@ describe('is the pack about the question', () => {
       onTopicBaseline: 0,
       offTopicBaseline: 0,
     });
+  });
+});
+
+describe('failureKind', () => {
+  it('reads the driver vocabulary the lane actually stores', () => {
+    expect(failureKind('it failed with: Error: no such column: t2.raceId')).toBe('missing-column');
+    expect(failureKind('it failed with: Error: no such table: missing')).toBe('missing-table');
+    expect(failureKind('it failed with: Error: near "FROM": syntax error')).toBe('syntax');
+    expect(failureKind('it returned no rows')).toBe('no-rows');
+    expect(failureKind('it did not contain a query')).toBe('no-query');
+  });
+
+  it('reads the mismatch notes the learning pass writes', () => {
+    expect(failureKind('it returned 12 rows where the corrected query returns 1')).toBe('row-count');
+    expect(failureKind('it returned columns [name] where the corrected query returns [id]')).toBe('columns');
+    expect(failureKind("it returned the corrected query's columns and row count, but different values")).toBe('values');
+  });
+
+  it('says other rather than guessing', () => {
+    expect(failureKind('the endpoint returned something unexpected')).toBe('other');
+    expect(failureKind('')).toBe('other');
+  });
+
+  it('classifies the same text the same way in both directions', () => {
+    // The key only works because learn-time and retry-time run this function on the same
+    // vocabulary; a case-sensitive or prefix-matching version would split one failure into two.
+    const note = 'it returned no rows';
+    expect(failureKind(note)).toBe(failureKind(`  ${note.toUpperCase()}  `));
   });
 });

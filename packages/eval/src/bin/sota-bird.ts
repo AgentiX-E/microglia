@@ -105,6 +105,7 @@ import {
   dedupeQuestions,
   detectableDelta,
   extractSql,
+  failureKind,
   interleaveByKey,
   judgeScalar,
   mapPool,
@@ -287,7 +288,7 @@ const DECISIVE = parseDecisivePolicy({
  * `retry-blank` is the same second attempt with no pack at all, which is what separates
  * "retrying helps" from "the memory helps a retry".
  */
-const RETRY_ARMS = ['full-onretry', 'full-repair-onretry', 'retry-blank'] as const;
+const RETRY_ARMS = ['full-onretry', 'full-repair-onretry', 'retry-blank', 'retry-keyed'] as const;
 
 /**
  * The character budgets the dose arms use.
@@ -1088,6 +1089,8 @@ type FoldResult = {
   readonly repairActive: number | null;
   /** Active items in the procedural memory, or null when that arm was off. */
   readonly proceduralActive: number | null;
+  /** Failure-keyed recalls asked, and how many found a note. */
+  readonly failureKey: { readonly asked: number; readonly hit: number };
   /** What the repair store holds, sampled: a count alone cannot show what was learned. */
   readonly repairItems: readonly RepairItem[];
   /** Candidates dropped by the parser, per form. */
@@ -1189,6 +1192,15 @@ async function buildFoldMemory(
           form,
           audit: (reason: DropReason) => {
             drops[reason] = (drops[reason] ?? 0) + 1;
+          },
+          // The failure code travels with the claim, so a retry can look up the note by what went
+          // wrong rather than by what the question was about. The classifier is the same function
+          // on both sides, which is what makes the key a key and not a guess.
+          reasonCodeOf: (context) => {
+            const signal = context.event.signal;
+            if (signal.type !== 'edit') return undefined;
+            const note = signal.note ?? '';
+            return note === '' ? undefined : failureKind(note);
           },
         }),
         failures,
@@ -1387,7 +1399,7 @@ async function runFold(
     ? await buildFoldMemory(GENERALIZE, learnRows, dataset, task, 'repair')
     : undefined;
   // The form no arm had tried: the same corrections, stated as procedures with no case in them.
-  const procedural = ARMS.has('full-procedural')
+  const procedural = ARMS.has('full-procedural') || ARMS.has('retry-keyed') || ARMS.has('chars-proc-600')
     ? await buildFoldMemory(GENERALIZE, learnRows, dataset, task, 'procedure')
     : undefined;
   const store = widened.store;
@@ -1500,6 +1512,9 @@ async function runFold(
   /** Questions that failed and therefore got a retry, and questions that never needed one. */
   let retried = 0;
   let notRetried = 0;
+  /** How often a failure-keyed recall found a note, and how often it was asked. */
+  let keyedTried = 0;
+  let keyedHits = 0;
   /** How much of each pack survives the grounding filter, so the shrink is a number. */
   const groundedSizes: { all: number; grounded: number }[] = [];
   /** The pack each question would see, held for the anchored arm's second call. */
@@ -1778,10 +1793,35 @@ async function runFold(
       }
       retried += 1;
       retriedPositions.add(position);
+      let keyedText = '';
+      let keyedIds = 0;
+      if (retryArmsThisRun.includes('retry-keyed') && procedural !== undefined) {
+        const code = failureKind(failure);
+        const keyed = await procedural.host.recall({
+          task: TASK,
+          text: row.question,
+          scope: { domain: row.db_id, reasonCode: code },
+        });
+        keyedText = keyed.rendered;
+        keyedIds = keyed.ids.length;
+        keyedTried += 1;
+        if (keyedIds > 0) keyedHits += 1;
+      }
       for (const arm of retryArmsThisRun) {
         const repair = arm === 'full-repair-onretry';
-        const pack = arm === 'retry-blank' ? '' : (repair ? packsHere.repair?.rendered : packsHere.rule.rendered) ?? '';
-        const packIds = arm === 'retry-blank' ? 0 : (repair ? packsHere.repair?.ids.length : packsHere.rule.ids.length) ?? 0;
+        const keyed = arm === 'retry-keyed';
+        const pack =
+          arm === 'retry-blank'
+            ? ''
+            : keyed
+              ? keyedText
+              : (repair ? packsHere.repair?.rendered : packsHere.rule.rendered) ?? '';
+        const packIds =
+          arm === 'retry-blank'
+            ? 0
+            : keyed
+              ? keyedIds
+              : (repair ? packsHere.repair?.ids.length : packsHere.rule.ids.length) ?? 0;
         batch.push({
           position,
           arm,
@@ -2097,6 +2137,7 @@ async function runFold(
     narrowActive: narrowed?.frozen.active ?? null,
     repairActive: repaired?.frozen.active ?? null,
     proceduralActive: procedural?.frozen.active ?? null,
+    failureKey: { asked: keyedTried, hit: keyedHits },
     repairItems,
     distillDrops: { rule: widened.drops, repair: repaired?.drops ?? null },
     items,
@@ -2627,6 +2668,17 @@ async function main(): Promise<void> {
        * what makes it informative and exactly what stops it from being a headline.
        */
       retry_subset: retrySubset(cases),
+      /**
+       * Whether the failure key found anything.
+       *
+       * A keyed arm that retrieves nothing on every question is a no-memory arm with a nicer
+       * name; this number is what distinguishes "the key is wrong" from "the store had nothing to
+       * say about this kind of failure".
+       */
+      failure_key: {
+        asked: folds.reduce((sum, fold) => sum + fold.failureKey.asked, 0),
+        hit: folds.reduce((sum, fold) => sum + fold.failureKey.hit, 0),
+      },
       /**
        * Whether the pack was about the question, and what accuracy did in each half.
        *

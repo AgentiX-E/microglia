@@ -388,7 +388,20 @@ export type SqlArm =
    * point cannot separate "procedures are cheap" from "procedures are cheap at this size". At 600
    * characters the pack carries one procedure where it carried two.
    */
-  | 'chars-proc-600';
+  | 'chars-proc-600'
+  /**
+   * The retry, retrieving the procedure by the *failure* rather than by the question.
+   *
+   * Every retrievable note in this project is found by comparing it to the question, and the
+   * question does not say what failed. A note learned from "it returned nothing" is stored with
+   * `scope.reasonCode = no-rows`, and at retry the same classifier runs on the failure the database
+   * just produced, so the recall key is the failure instead of the topic.
+   *
+   * This is the arm the three misgivings about this memory design converge on: the content is a
+   * procedure (no case to imitate), the moment is after a failure (no first impression to displace),
+   * and the key is the thing that actually varies (what went wrong).
+   */
+  | 'retry-keyed';
 
 /**
  * Every optional arm, as a table keyed by the union itself.
@@ -427,6 +440,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-asked': true,
   'full-procedural': true,
   'chars-proc-600': true,
+  'retry-keyed': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(
@@ -1197,4 +1211,47 @@ export function relevanceSplit(
     onTopicBaseline: onTopic === 0 ? 0 : onBase / onTopic,
     offTopicBaseline: offTopic === 0 ? 0 : offBase / offTopic,
   };
+}
+
+/**
+ * The kind of failure, from the words a deployment actually has.
+ *
+ * A retry is triggered by one of two things — the query did not run, or it ran and returned
+ * nothing — and a note learned from a failure is only usable if it is retrieved by *that*, not by
+ * the question. The question does not say what failed; the failure does.
+ *
+ * The vocabulary is deliberately small and closed. Every kind here is a distinction the database or
+ * the driver makes, so the classifier can be a pure function of the text and cannot drift with a
+ * model's mood:
+ *
+ *   missing-column / missing-table / syntax / no-rows / no-query / other
+ *
+ * `no-rows` is the one that matters most: it is both a retry trigger and the most common shape of a
+ * wrong answer, so a note learned from "it returned nothing" is exactly the note a retry needs.
+ */
+export type FailureKind =
+  | 'missing-column'
+  | 'missing-table'
+  | 'syntax'
+  | 'no-rows'
+  | 'no-query'
+  | 'row-count'
+  | 'columns'
+  | 'values'
+  | 'other';
+
+export function failureKind(failure: string): FailureKind {
+  const text = failure.toLowerCase();
+  if (text.includes('no such column') || text.includes('no column named')) return 'missing-column';
+  if (text.includes('no such table')) return 'missing-table';
+  if (text.includes('syntax error') || text.includes('near "')) return 'syntax';
+  if (text.includes('returned no rows') || text.includes('returned nothing')) return 'no-rows';
+  if (text.includes('no query') || text.includes('did not contain a query')) return 'no-query';
+  // The mismatch notes the learning pass records for an answer that ran and was still wrong.
+  // The column note also contains "where the corrected query returns", so it is read first: a
+  // classifier whose answer depends on the order of its own branches has to say so.
+  if (text.includes('returned columns')) return 'columns';
+  if (text.includes('where the corrected query returns')) return 'row-count';
+  if (text.includes('different values')) return 'values';
+  return 'other';
 }

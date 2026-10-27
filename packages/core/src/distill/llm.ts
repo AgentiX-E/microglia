@@ -48,6 +48,16 @@ export type LlmInterpreterOptions = {
   readonly form?: DistillForm;
   /** Called for each candidate the parser dropped, with the reason. */
   readonly audit?: (reason: DropReason) => void;
+  /**
+   * A scope field the host knows and the model cannot.
+   *
+   * The `reasonCode` dimension exists so a claim can say *what went wrong* rather than *what it is
+   * about*, and a distiller reading one event cannot fill it reliably: the model sees the failure
+   * but has no vocabulary for the store's own taxonomy. A host that classifies its own failures can
+   * hand the code in, and the claim is then retrievable by the same code at use time — which is the
+   * only way a note about a failure can be found by a failure.
+   */
+  readonly reasonCodeOf?: (context: InterpretContext) => string | undefined;
 };
 
 const KINDS = new Set<KnowledgeKind>([
@@ -543,6 +553,16 @@ export function createLlmInterpreter(options: LlmInterpreterOptions): Interprete
       ...(context.event.taskId === undefined ? {} : { taskId: context.event.taskId }),
       ...(options.audit === undefined ? {} : { audit: options.audit }),
     });
-    return parsed.slice(0, max);
+    const code = options.reasonCodeOf?.(context);
+    if (code === undefined) return parsed.slice(0, max);
+    // The model's own code wins when it gave one: it saw the event, and the host's classifier is a
+    // fallback for the field, not an override of an observation.
+    return parsed
+      .map((candidate) =>
+        candidate.scope.reasonCode === undefined
+          ? { ...candidate, scope: { ...candidate.scope, reasonCode: code } }
+          : candidate,
+      )
+      .slice(0, max);
   };
 }
