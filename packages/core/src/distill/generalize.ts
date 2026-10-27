@@ -31,8 +31,23 @@ export const WIDENING_TASKS = 3;
 /** Dimensions that may never be dropped, in the order they are checked. */
 const FIXED_DIMENSIONS = ['schemaDigest', 'intent', 'field', 'reasonCode'] as const;
 
+/**
+ * Whether two claims carry the same structured content.
+ *
+ * An empty object is "no payload", not "empty payload": the two representations of the same
+ * claim must not be told apart, or a model that writes `{}` on some replies and omits the key
+ * on others splits one claim into two that can never corroborate each other.
+ */
 export function payloadsEqual(a: KnowledgeItem, b: DistillCandidate): boolean {
-  return jsonEqual(a.payload ?? null, b.payload ?? null);
+  return jsonEqual(withoutEmpty(a.payload), withoutEmpty(b.payload));
+}
+
+function withoutEmpty<T>(payload: T | undefined): T | null {
+  if (payload === undefined || payload === null) return null;
+  if (typeof payload === 'object' && !Array.isArray(payload)) {
+    return Object.keys(payload as Record<string, unknown>).length === 0 ? null : payload;
+  }
+  return payload;
 }
 
 /**
@@ -71,11 +86,41 @@ export function widenedScopeOf(scopes: readonly KnowledgeScope[]): KnowledgeScop
   return widened;
 }
 
-/** Same namespace, kind and payload, and a domain that differs. */
+/**
+ * Whether two claims are the same claim, seen from two scopes.
+ *
+ * A claim is identified by what it says, and what it says depends on how the domain represents
+ * it. A lesson represented as a record — `{when: {intent}, then: {mark}}`, the shape the chart
+ * domain uses — *is* the record, and its sentence is a description two hosts may word
+ * differently, so equal records are the same claim. A lesson written as a sentence has no
+ * record to compare, and the sentence is all there is.
+ *
+ * The first version compared only the payload. With prose claims that degenerates to "same
+ * kind", and a store then merges every distinct lesson it holds into one: measured at 200
+ * distinct procedure notes across five domains, 200 items became 3 — one widened, two retired,
+ * and a lane that read the empty pack as "the model had nothing to say" for four dispatches.
+ *
+ * The converse rule is a constraint on hosts rather than a defect: a prose lesson must not
+ * carry a per-case record, because the store will then treat two such lessons as one claim
+ * written two ways.
+ */
+function sameClaim(item: KnowledgeItem, candidate: DistillCandidate): boolean {
+  // A record decides for itself. Two equal records are one claim however they were worded, and
+  // two different records are two claims however they were worded: the sentence cannot settle
+  // what the data disagrees about.
+  if (item.payload !== undefined && candidate.payload !== undefined) {
+    return payloadsEqual(item, candidate);
+  }
+  // With no record on either side there is nothing but the sentence, and two sentences are two
+  // claims. This is the branch that was missing, and its absence merged a whole store into one.
+  return item.statement.trim() === candidate.statement.trim();
+}
+
+/** Same claim, kind and namespace, and a domain that differs. */
 function sameRuleShape(item: KnowledgeItem, candidate: DistillCandidate): boolean {
   if (item.namespace !== candidate.namespace) return false;
   if (item.kind !== candidate.kind) return false;
-  if (!payloadsEqual(item, candidate)) return false;
+  if (!sameClaim(item, candidate)) return false;
   // A candidate without a domain has nothing to widen away, and an item in the
   // same domain is a merge, not a generalisation.
   if (candidate.scope.domain === undefined) return false;

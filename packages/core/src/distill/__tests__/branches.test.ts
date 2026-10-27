@@ -101,14 +101,57 @@ describe('distillation branches', () => {
       policy: defaultPolicy,
       clock: fixedClock(at),
       random: mulberry32(3),
+      // The same claim, learned again with different content: same sentence, different data.
       interpreter: () => [
         candidate('fb_2', {
           payload: { when: { intent: 'trend' }, then: { mark: 'scatter' } },
-          statement: 'For a trend question over revenue. Use a scatter chart.',
         }),
       ],
     });
     expect(report.contradicted).toBe(1);
+    await memory.close();
+  });
+
+  it('keeps distinct lessons distinct when widening is on', async () => {
+    // The defect this test exists for: widening identified a claim by its payload alone, so a
+    // store fed 200 distinct procedure notes across five domains kept 3 items — one widened
+    // and two retired. The lane read that as "the model had nothing to say" for four
+    // dispatches. A claim is its sentence, and widening must say so.
+    const memory = await EmbeddedMemory.open(new MemoryJournal());
+    const domains = ['a', 'b', 'c'];
+    const events = Array.from({ length: 12 }, (_, index) => event(`fb_${index}`));
+    for (const item of events) await memory.appendEvent(item);
+
+    let call = 0;
+    const report = await distill({
+      memory,
+      policy: defaultPolicy,
+      clock: fixedClock(at),
+      random: mulberry32(6),
+      generalize: true,
+      interpreter: (context) => {
+        // The claim must cite the event that produced it, or the store rejects it as borrowed
+        // evidence — which is what the first version of this test measured instead of the
+        // collapse it was written for.
+        const index = call;
+        call += 1;
+        return [
+          candidate(context.event.id, {
+            scope: { task: 'chart.recommend', domain: domains[index % domains.length] as string },
+            statement: `Lesson ${index}: a distinct claim about one question.`,
+            payload: undefined,
+            // What the parser produces for a distinct sentence; the helper's `k_<domain>`
+            // default would merge every third claim through the exact-duplicate path instead.
+            dedupeKey: `k_${index}`,
+          }),
+        ];
+      },
+    });
+
+    const items = await memory.listKnowledge({ namespace: 'acme', status: 'all' });
+    expect(report.created).toBe(12);
+    expect(items).toHaveLength(12);
+    expect(items.every((item) => item.status === 'active')).toBe(true);
     await memory.close();
   });
 

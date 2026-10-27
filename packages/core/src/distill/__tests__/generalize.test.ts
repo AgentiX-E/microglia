@@ -85,9 +85,55 @@ describe('generalisation predicate', () => {
     expect(canGeneralize(generalized, candidate('ops'))).toBe(true);
   });
 
+  it('lets two equal records widen however they were worded', () => {
+    // The payload is the claim in a structured domain; the sentence is a description two hosts
+    // may write differently. This is the pair the L2b corpus relies on.
+    expect(
+      canGeneralize(item('sales'), candidate('hr', { statement: 'A different claim entirely.' })),
+    ).toBe(true);
+  });
+
+  it('needs the sentence when there is no record on either side', () => {
+    // A prose lesson has no record, and comparing payloads alone then degenerates to "same
+    // kind": 200 distinct notes across five domains became 3 items.
+    const prose = { ...item('sales'), payload: undefined };
+    expect(canGeneralize(prose, candidate('hr', { payload: undefined }))).toBe(true);
+    expect(
+      canGeneralize(prose, candidate('hr', { payload: undefined, statement: 'A different claim.' })),
+    ).toBe(false);
+    expect(canGeneralize(prose, candidate('hr', { payload: undefined, statement: '  For a trend question over revenue. Use a line chart.  ' }))).toBe(true);
+  });
+
+  it('refuses the same sentence with different data', () => {
+    // The words agree and the records do not: that is two claims about different content, and
+    // the store must not merge them or it will average the data.
+    expect(
+      canGeneralize(item('sales'), candidate('hr', {
+        payload: { when: { intent: 'trend' }, then: { mark: 'pie' } } as never,
+      })),
+    ).toBe(false);
+  });
+
   it('compares payloads structurally', () => {
     expect(payloadsEqual(item('sales'), candidate('hr'))).toBe(true);
     expect(payloadsEqual({ ...item('sales'), payload: undefined }, candidate('hr'))).toBe(false);
+  });
+
+  it('passes through payloads that are not records', () => {
+    // An array or a scalar is data the host chose to report; only an empty object means
+    // nothing, and only absence means nothing at all.
+    expect(payloadsEqual({ ...item('sales'), payload: [] }, { ...candidate('hr'), payload: [] })).toBe(true);
+    expect(payloadsEqual({ ...item('sales'), payload: [] }, { ...candidate('hr'), payload: {} })).toBe(false);
+    expect(payloadsEqual({ ...item('sales'), payload: 'x' }, { ...candidate('hr'), payload: 'x' })).toBe(true);
+    expect(payloadsEqual({ ...item('sales'), payload: null }, { ...candidate('hr'), payload: undefined })).toBe(true);
+  });
+
+  it('treats an empty object payload as no payload', () => {
+    // `{}` is the schema's way of saying "nothing", and a model that writes it on some
+    // replies would otherwise split one claim into two that can never corroborate.
+    expect(payloadsEqual({ ...item('sales'), payload: {} }, { ...candidate('hr'), payload: undefined })).toBe(true);
+    expect(payloadsEqual({ ...item('sales'), payload: {} }, { ...candidate('hr'), payload: {} })).toBe(true);
+    expect(payloadsEqual({ ...item('sales'), payload: {} }, candidate('hr'))).toBe(false);
   });
 
   it('removes only the domain dimension', () => {

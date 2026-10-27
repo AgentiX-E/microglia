@@ -207,11 +207,11 @@ async function contradictSameScope(
     if (item.status !== 'active') continue;
     if (item.kind !== candidate.kind) continue;
     if (scopeKey(item.scope) !== key) continue;
-    // Two empty payloads are not "equal data", they are "no data": a claim that carries no
-    // structured content cannot conflict with another claim on the grounds that its content
-    // differs, and treating the absent case as a value made one model that sometimes writes
-    // `"payload": {}` demote every rule in its own store. The comparison is therefore made
-    // only where there is something to compare.
+    // A conflict needs two claims about the same thing, and the scope is what says so: two
+    // items of one kind in one scope answer one question, so different content is a
+    // disagreement. What cannot be a disagreement is an absent side — a claim that carries no
+    // structured content offers no data to conflict with, and treating absence as a value made
+    // a store merge and retire every note that met another (200 notes, 5 active).
     if (item.payload === undefined || candidate.payload === undefined) continue;
     if (jsonEqual(item.payload, candidate.payload)) continue;
     const next = recordContradiction(item, candidate.evidence.weight, options.policy, now);
