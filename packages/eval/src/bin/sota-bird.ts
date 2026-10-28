@@ -2015,16 +2015,30 @@ async function runFold(
    * second place to change when one of them changes. A name the pattern does not match is not a
    * sampling arm.
    */
-  const samplingSpec = (arm: ArmName): { n: number; selector: 'majority' | 'first' | 'random' } | undefined => {
-    const match = /^sample-(\d+)(?:-(first|random))?$/.exec(arm);
+  const samplingSpec = (
+    arm: ArmName,
+  ): { n: number; selector: 'majority' | 'first' | 'random' | 'oracle' } | undefined => {
+    const match = /^sample-(\d+)(?:-(first|random|oracle))?$/.exec(arm);
     if (match === null) return undefined;
     const n = Number(match[1]);
     if (!Number.isInteger(n) || n < 2) return undefined;
     const suffix = match[2];
-    return { n, selector: suffix === 'first' ? 'first' : suffix === 'random' ? 'random' : 'majority' };
+    const selector =
+      suffix === 'first' ? 'first' : suffix === 'random' ? 'random' : suffix === 'oracle' ? 'oracle' : 'majority';
+    return { n, selector };
   };
   const samplingArmsThisRun = (OPTIONAL_ARMS as readonly ArmName[]).filter(
-    (arm) => samplingSpec(arm) !== undefined && ARMS.has(arm),
+    (arm) => (samplingSpec(arm)?.selector ?? 'oracle') !== 'oracle' && ARMS.has(arm),
+  );
+  /**
+   * The ceiling arm the caller asked for, if any.
+   *
+   * Named for the number of draws it reads so a run cannot claim a ceiling it did not measure: a
+   * three-draw run asking for `sample-5-oracle` would be reporting the best of three under a name
+   * that says five.
+   */
+  const ceilingArm = (OPTIONAL_ARMS as readonly ArmName[]).find(
+    (arm) => samplingSpec(arm)?.selector === 'oracle' && ARMS.has(arm),
   );
   /**
    * What the best selector could possibly have scored.
@@ -2037,7 +2051,7 @@ async function runFold(
    *
    * It costs nothing: every draw is judged anyway so the chosen one can be scored.
    */
-  const wantsCeiling = ARMS.has('sample-5-oracle');
+  const wantsCeiling = ceilingArm !== undefined;
   const sampleReplies = new Map<string, Reply | undefined>();
   const drawJudged = new Map<number, Judged[]>();
   /**
@@ -2056,10 +2070,11 @@ async function runFold(
   if (samplingArmsThisRun.length > 0 || wantsCeiling) {
     const index = new Map(plans.map((plan, at) => [`${plan.position}:${plan.arm}`, at]));
     const batch: { position: number; draw: number; prompt: string }[] = [];
-    samplingDraws =
-      samplingArmsThisRun.length === 0
-        ? 5
-        : Math.max(...samplingArmsThisRun.map((arm) => samplingSpec(arm)?.n ?? 1));
+    samplingDraws = Math.max(
+      2,
+      ...samplingArmsThisRun.map((arm) => samplingSpec(arm)?.n ?? 1),
+      ceilingArm === undefined ? 1 : (samplingSpec(ceilingArm)?.n ?? 1),
+    );
     for (const position of evalRows.keys()) {
       const at = index.get(`${position}:none`);
       const wording = at === undefined ? undefined : plans[at]?.prompt;
@@ -2074,24 +2089,43 @@ async function runFold(
       `[sota] fold ${fold + 1}/${FOLDS} sampling ${batch.length} draws ` +
         `(${samplingDraws} per question, temperature ${SAMPLE_TEMPERATURE})\n`,
     );
+    let sampled = 0;
     const drawn = await mapPool(batch, CONCURRENCY, async (item) => {
       try {
-        return { item, reply: await chat(item.prompt, 700, SAMPLE_TEMPERATURE) };
+        const reply = await chat(item.prompt, 700, SAMPLE_TEMPERATURE);
+        return { item, reply };
       } catch (error) {
         if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
         if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
         return { item, reply: undefined };
+      } finally {
+        sampled += 1;
+        // A phase with no output is indistinguishable from a hung one: this is the print whose
+        // absence turned a stuck run into an eighty-eight-minute silence.
+        if (sampled % 25 === 0 || sampled === batch.length) {
+          process.stdout.write(
+            `[sota] fold ${fold + 1}/${FOLDS} draws ${sampled}/${batch.length} ` +
+              `calls=${llm.stats.calls} failed=${llm.stats.failures}\n`,
+          );
+        }
       }
     });
     for (const entry of drawn) {
       sampleReplies.set(`${entry.item.position}:${entry.item.draw}`, entry.reply);
     }
 
+    let scored = 0;
     for (const position of evalRows.keys()) {
       const row = evalRows[position] as BirdRow;
       const dbPath = dataset.dbPath(row.db_id);
       const candidates: Candidate[] = [];
       const verdicts: Judged[] = [];
+      scored += 1;
+      if (scored % 10 === 0 || scored === evalRows.length) {
+        process.stdout.write(
+          `[sota] fold ${fold + 1}/${FOLDS} scoring draws ${scored}/${evalRows.length}\n`,
+        );
+      }
       for (let draw = 0; draw < samplingDraws; draw += 1) {
         const reply = sampleReplies.get(`${position}:${draw}`);
         const sql = reply === undefined ? undefined : extractSql(reply.text);
@@ -2182,12 +2216,12 @@ async function runFold(
       packChars: 0,
     });
   }
-  if (wantsCeiling) {
+  if (ceilingArm !== undefined) {
     for (const [position, verdicts] of drawJudged) {
       const anyCorrect = verdicts.find((verdict) => verdict.correct) ?? verdicts[0];
       if (anyCorrect === undefined) continue;
-      judged.set(`${position}:sample-5-oracle`, anyCorrect);
-      plans.push({ position, arm: 'sample-5-oracle', prompt: '', packIds: 0, packChars: 0 });
+      judged.set(`${position}:${ceilingArm}`, anyCorrect);
+      plans.push({ position, arm: ceilingArm, prompt: '', packIds: 0, packChars: 0 });
     }
   }
 
