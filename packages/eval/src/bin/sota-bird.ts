@@ -108,6 +108,7 @@ import {
   failureKind,
   interleaveByKey,
   judgeScalar,
+  linkSchema,
   mapPool,
   selectByConsistency,
   selectFirst,
@@ -1144,6 +1145,17 @@ type FoldResult = {
         readonly correctDraws: readonly number[];
       }
     | null;
+  /**
+   * What the lexical linker did, when that arm ran.
+   *
+   * A pruner whose `nothing-matched` share is most of the run is a pruner that measured nothing, and
+   * the arm's delta would then be a reading of its own abstentions. Both numbers travel.
+   */
+  readonly link: {
+    readonly reasons: Readonly<Record<string, number>>;
+    readonly dropped: number;
+    readonly total: number;
+  } | null;
   /** What the repair store holds, sampled: a count alone cannot show what was learned. */
   readonly repairItems: readonly RepairItem[];
   /** Candidates dropped by the parser, per form. */
@@ -1522,6 +1534,8 @@ async function runFold(
     packIds: number,
     critique = false,
     packPosition: 'before' | 'after' = 'before',
+    /** The schema to show, when it is not the database's own. */
+    schema?: string,
   ): void => {
     const row = evalRows[position] as BirdRow;
     plans.push({
@@ -1532,7 +1546,7 @@ async function runFold(
       prompt: promptFor({
         question: row.question,
         evidence: row.evidence,
-        ddl: ddlOf(dataset.dbPath(row.db_id)),
+        ddl: schema ?? ddlOf(dataset.dbPath(row.db_id)),
         pack: packText,
         stated: arm === 'stated',
         convention: ACTIVE,
@@ -1551,6 +1565,10 @@ async function runFold(
   // change an answer, and the gate below is about what was injected.
   let injectedRules = 0;
   let injectedWithCondition = 0;
+  /** What the lexical linker decided, per question: a pruner that never prunes measures nothing. */
+  const linkReasons: Record<string, number> = {};
+  let linkDropped = 0;
+  let linkTotal = 0;
   /** Questions where the pruned store produced a different pack from the unpruned one. */
   let validatedPackDiffers = 0;
   let validatedPositions = 0;
@@ -1768,6 +1786,17 @@ async function runFold(
       // The revisions are planned after the first round, because their prompts contain the
       // model's own draft. The pack is remembered here and used then.
       anchored.set(position, pack);
+    }
+    if (ARMS.has('linked')) {
+      const linked = linkSchema(
+        ddlOf(dataset.dbPath(row.db_id)),
+        row.question,
+        row.evidence,
+      );
+      linkReasons[linked.reason] = (linkReasons[linked.reason] ?? 0) + 1;
+      linkDropped += linked.dropped;
+      linkTotal += linked.total;
+      call(position, 'linked', '', 0, false, 'before', linked.ddl);
     }
     if (ARMS.has('stated')) call(position, 'stated', '', 0);
     if (ARMS.has('oracle')) {
@@ -2350,6 +2379,7 @@ async function runFold(
     repairActive: repaired?.frozen.active ?? null,
     proceduralActive: procedural?.frozen.active ?? null,
     failureKey: { asked: keyedTried, hit: keyedHits, stored: storedCodes, observed: observedCodes },
+    link: ARMS.has('linked') ? { reasons: linkReasons, dropped: linkDropped, total: linkTotal } : null,
     sampling:
       samplingArmsThisRun.length === 0
         ? null
@@ -2899,6 +2929,24 @@ async function main(): Promise<void> {
        * sample-5-first` is what alternatives are worth before anyone judges them, and `sample-5 -
        * sample-5-random` is the selector. A single `sample-5 - none` number cannot separate those.
        */
+      /**
+       * How much of the schema the linker removed, and how often it declined to remove anything.
+       *
+       * Reported beside the arm's delta because a pruner that abstains on most questions produces a
+       * delta that describes its abstentions, not its effect.
+       */
+      schema_link: folds.every((fold) => fold.link === null)
+        ? null
+        : {
+            reasons: folds.reduce<Record<string, number>>((all, fold) => {
+              for (const [reason, count] of Object.entries(fold.link?.reasons ?? {})) {
+                all[reason] = (all[reason] ?? 0) + count;
+              }
+              return all;
+            }, {}),
+            dropped: folds.reduce((sum, fold) => sum + (fold.link?.dropped ?? 0), 0),
+            total: folds.reduce((sum, fold) => sum + (fold.link?.total ?? 0), 0),
+          },
       sampling:
         folds.every((fold) => fold.sampling === null)
           ? null

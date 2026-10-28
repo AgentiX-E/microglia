@@ -235,6 +235,7 @@ describe('parseArms', () => {
       'full-sampled',
       'full-validated',
       'gated',
+      'linked',
       'none',
       'none-replica',
       'oracle',
@@ -301,6 +302,7 @@ describe('parseArms', () => {
       'sample-5-first',
       'sample-5-random',
       'sample-5-oracle',
+      'linked',
     ]);
   });
 

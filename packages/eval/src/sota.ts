@@ -443,7 +443,20 @@ export type SqlArm =
    *
    * Costs no calls: every draw is scored anyway so the chosen one can be measured.
    */
-  | 'sample-5-oracle';
+  | 'sample-5-oracle'
+  /**
+   * The same question with the schema pruned to the tables it names.
+   *
+   * MCS-SQL measures +2.1 points from schema linking alone with the same model, and CHASE-SQL names
+   * schema linking as the primary cause of failure in nearly half its unsuccessful cases. This
+   * pipeline has always sent every CREATE statement: on a BIRD database that is up to thirteen
+   * tables for a question that needs two.
+   *
+   * Lexical rather than model-based, for the same reason every memory arm here is deterministic: a
+   * model-based linker's contribution cannot be separated from the model's variance on the same
+   * questions, and this project has ten iterations of evidence about what that costs an argument.
+   */
+  | 'linked';
 
 /**
  * Every optional arm, as a table keyed by the union itself.
@@ -488,6 +501,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-5-first': true,
   'sample-5-random': true,
   'sample-5-oracle': true,
+  linked: true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(

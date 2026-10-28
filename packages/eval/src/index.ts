@@ -7,6 +7,13 @@
  */
 export { comparePaired, type PairedResult } from './stats.js';
 export {
+  linkSchema,
+  questionTokens,
+  schemaBlocks,
+  type LinkedSchema,
+  type SchemaBlock,
+} from './schema-link.js';
+export {
   selectByConsistency,
   selectFirst,
   selectRandom,
