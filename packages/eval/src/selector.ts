@@ -18,6 +18,11 @@
  *
  * A model-based selector would confound the third line with the second, because it needs the
  * candidates to exist before it can be wrong.
+ *
+ * That is why it was run second, and the order is now a result: agreement was measured at +0.00pp
+ * on 350 questions while the best of the same three draws was +5.43pp [3.14, 8.00], so the ceiling
+ * was there and agreement retrieved none of it. `selectByModel` is the next rung, measured against
+ * `selectByConsistency` on identical draws — the extra call it costs is the only thing that differs.
  */
 
 /**
@@ -41,6 +46,8 @@ export type SelectionReason =
   | 'no-agreement'
   /** Nothing ran, so the first draw was taken. */
   | 'nothing-ran'
+  /** A model read the candidates and named one. */
+  | 'model'
   /** No candidates at all: the caller asked for a selection it did not supply. */
   | 'empty';
 
@@ -164,6 +171,68 @@ export function selectFirst(candidates: readonly Candidate[]): Selection {
     reason: candidates.length === 0 ? 'empty' : 'no-agreement',
     emptyResult: false,
   };
+}
+
+/**
+ * The prompt that asks a model to read the candidates and pick one.
+ *
+ * This is the selector MCS-SQL measures (+2.1pp over value samples at twenty draws) and that
+ * CHASE-SQL's selection agent measures (+4.2pp over self-consistency). It is here because the
+ * consistency selector was run first and caught none of the ceiling: a five-point gap between what
+ * the draws contained and what agreement retrieved is not a gap that agreement can close, since
+ * agreement is blind to which candidate is right when all of them are distinct.
+ *
+ * The task prompt is passed through verbatim rather than re-described, so the selector sees exactly
+ * the schema and evidence the generator saw. Anything else would make a win ambiguous: it could be
+ * the choice, or it could be a second, better-worded statement of the same question.
+ */
+export function choicePrompt(task: string, queries: readonly string[]): string {
+  const blocks = queries.map((query, index) => `[${index + 1}]\n${query}`);
+  return (
+    `${task}\n\n` +
+    `${queries.length} candidate ${queries.length === 1 ? 'query was' : 'queries were'} written ` +
+    `for the task above. Exactly one of them is the most likely to answer the question correctly.\n\n` +
+    `${blocks.join('\n\n')}\n\n` +
+    'Reply with the number of the most likely correct query inside <choice></choice> and nothing else.'
+  );
+}
+
+/**
+ * The candidate a reply names, or `undefined` when it names none.
+ *
+ * The tag is read first because a model that explains itself writes numbers in the explanation:
+ * "among these 3 candidates, [1] joins the wrong table" contains a 1, a 3 and a 1, and only one of
+ * them is the choice. A bare number is accepted as a fallback because a terse reply is a valid one,
+ * and out-of-range numbers are refused rather than clamped — clamping turns "I chose 4 of 3" into a
+ * silent vote for the last candidate, which is a measurement artefact dressed as a selection.
+ */
+export function parseChoice(text: string, count: number): number | undefined {
+  if (count <= 0) return undefined;
+  const tagged = /<choice>\s*(\d+)\s*<\/choice>/i.exec(text);
+  const raw = tagged === null ? /\b(\d+)\b/.exec(text) : tagged;
+  if (raw === null) return undefined;
+  const number = Number(raw[1]);
+  if (!Number.isInteger(number) || number < 1 || number > count) return undefined;
+  return number - 1;
+}
+
+/**
+ * The selection a model made, with the fallback the arm needs to stay scoreable.
+ *
+ * `chosen === undefined` means the reply did not name a candidate. The arm then takes the first
+ * draw, which is what `sample-N-first` already scores, so the questions the selector failed on land
+ * on the control's answer rather than leaving the arm with a different, easier population. The
+ * count of these is reported separately: a model selector that answers nothing is a `first` arm
+ * with an invoice.
+ */
+export function selectByModel(count: number, chosen: number | undefined): Selection {
+  if (count <= 0) {
+    return { chosen: 0, votes: 0, groups: 0, reason: 'empty', emptyResult: false };
+  }
+  if (chosen === undefined || chosen < 0 || chosen >= count) {
+    return { chosen: 0, votes: 1, groups: 0, reason: 'no-agreement', emptyResult: false };
+  }
+  return { chosen, votes: 1, groups: 0, reason: 'model', emptyResult: false };
 }
 
 /** How the selectors behaved across a run, which is what makes a gain attributable. */

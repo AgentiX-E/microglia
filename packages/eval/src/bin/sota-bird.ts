@@ -105,12 +105,15 @@ import {
   dedupeQuestions,
   detectableDelta,
   extractSql,
+  choicePrompt,
   failureKind,
   interleaveByKey,
   judgeScalar,
   linkSchema,
   mapPool,
+  parseChoice,
   selectByConsistency,
+  selectByModel,
   selectFirst,
   selectRandom,
   selectionStats,
@@ -432,6 +435,14 @@ type CaseOutcome = {
    * right. Their joint distribution is what separates a generation failure from a selection one.
    */
   readonly draws: { readonly distinct: number; readonly correct: number } | null;
+  /**
+   * What the linker offered this question, or null when the arm did not run.
+   *
+   * The arm's population delta mixes questions it pruned with questions it left alone, and the
+   * second group had a byte-identical prompt. Without this field a 7.4pp loss cannot be attributed
+   * to pruning rather than to the run.
+   */
+  readonly schemaTables: { readonly kept: number; readonly total: number; readonly pruned: boolean } | null;
   /** Optional arms, present only when configured. */
   readonly arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
   readonly shadowArms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
@@ -1143,6 +1154,15 @@ type FoldResult = {
          * where they are right exactly once has everything.
          */
         readonly correctDraws: readonly number[];
+        /**
+         * The model selector's own accounting, when an arm used it.
+         *
+         * `asked` is the questions whose draws disagreed — the only ones where a choice existed —
+         * and `unparsed` the ones whose reply named no candidate. Read together they say whether a
+         * delta belongs to the selector: an arm with `unparsed === asked` scored the first draw on
+         * every question and is `sample-N-first` with an extra call in the bill.
+         */
+        readonly model: { readonly asked: number; readonly unparsed: number } | null;
       }
     | null;
   /**
@@ -1567,6 +1587,8 @@ async function runFold(
   let injectedWithCondition = 0;
   /** What the lexical linker decided, per question: a pruner that never prunes measures nothing. */
   const linkReasons: Record<string, number> = {};
+  /** Tables kept and offered, per question, so the arm's harm can be split by whether it pruned. */
+  const linkKept = new Map<number, { readonly kept: number; readonly total: number; readonly pruned: boolean }>();
   let linkDropped = 0;
   let linkTotal = 0;
   /** Questions where the pruned store produced a different pack from the unpruned one. */
@@ -1796,6 +1818,11 @@ async function runFold(
       linkReasons[linked.reason] = (linkReasons[linked.reason] ?? 0) + 1;
       linkDropped += linked.dropped;
       linkTotal += linked.total;
+      linkKept.set(position, {
+        kept: linked.kept.length,
+        total: linked.total,
+        pruned: linked.reason === 'linked',
+      });
       call(position, 'linked', '', 0, false, 'before', linked.ddl);
     }
     if (ARMS.has('stated')) call(position, 'stated', '', 0);
@@ -2017,14 +2044,22 @@ async function runFold(
    */
   const samplingSpec = (
     arm: ArmName,
-  ): { n: number; selector: 'majority' | 'first' | 'random' | 'oracle' } | undefined => {
-    const match = /^sample-(\d+)(?:-(first|random|oracle))?$/.exec(arm);
+  ): { n: number; selector: 'majority' | 'first' | 'random' | 'oracle' | 'model' } | undefined => {
+    const match = /^sample-(\d+)(?:-(first|random|oracle|model))?$/.exec(arm);
     if (match === null) return undefined;
     const n = Number(match[1]);
     if (!Number.isInteger(n) || n < 2) return undefined;
     const suffix = match[2];
     const selector =
-      suffix === 'first' ? 'first' : suffix === 'random' ? 'random' : suffix === 'oracle' ? 'oracle' : 'majority';
+      suffix === 'first'
+        ? 'first'
+        : suffix === 'random'
+          ? 'random'
+          : suffix === 'oracle'
+            ? 'oracle'
+            : suffix === 'model'
+              ? 'model'
+              : 'majority';
     return { n, selector };
   };
   const samplingArmsThisRun = (OPTIONAL_ARMS as readonly ArmName[]).filter(
@@ -2065,6 +2100,13 @@ async function runFold(
   const drawFacts = new Map<number, { readonly distinct: number; readonly correct: number }>();
   const chosenJudged = new Map<string, { readonly position: number; readonly arm: ArmName; readonly verdict: Judged }>();
   const selectionByArm = new Map<ArmName, Selection[]>();
+  /**
+   * How often the model selector was asked, and how often it named nothing.
+   *
+   * Fold-scoped because the artefact reports it per fold: a selector that answered every question
+   * in four folds and none in the fifth is a run whose fifth fold measured `sample-N-first`.
+   */
+  const modelSelection = new Map<number, { readonly asked: number; readonly unparsed: number }>();
   const correctDraws = new Array<number>(0).fill(0);
   let samplingDraws = 0;
   if (samplingArmsThisRun.length > 0 || wantsCeiling) {
@@ -2115,11 +2157,22 @@ async function runFold(
     }
 
     let scored = 0;
+    /**
+     * The draws, executed and judged once, so every selector reads the same candidates.
+     *
+     * Held across the passes below because the model selector is a call and the others are not:
+     * running them in one pass would either serialise those calls or execute every draw twice.
+     */
+    const poolByPosition = new Map<
+      number,
+      { readonly candidates: Candidate[]; readonly verdicts: Judged[]; readonly queries: string[] }
+    >();
     for (const position of evalRows.keys()) {
       const row = evalRows[position] as BirdRow;
       const dbPath = dataset.dbPath(row.db_id);
       const candidates: Candidate[] = [];
       const verdicts: Judged[] = [];
+      const queries: string[] = [];
       scored += 1;
       if (scored % 10 === 0 || scored === evalRows.length) {
         process.stdout.write(
@@ -2136,10 +2189,15 @@ async function runFold(
           signature: outcome === undefined ? undefined : signatureOf(outcome),
           rows: outcome === undefined ? 0 : outcome.tuples.length,
         });
+        // The raw query, because the model selector reads text and cannot group rows. A draw that
+        // produced no SQL is carried as the empty string: dropping it would shift every later
+        // index and make the model's answer point at a different query than it read.
+        queries.push(sql ?? '');
         // Every draw is scored, not only the chosen one, because the ceiling is the score of a
         // selector that always picked right and cannot be computed after the fact.
         verdicts.push(judgeReply(row, dbPath, reply, task));
       }
+      poolByPosition.set(position, { candidates, verdicts, queries });
       drawJudged.set(position, verdicts);
       const right = verdicts.filter((verdict) => verdict.correct).length;
       const distinct = new Set(
@@ -2148,29 +2206,102 @@ async function runFold(
       drawFacts.set(position, { distinct, correct: right });
       while (correctDraws.length <= right) correctDraws.push(0);
       correctDraws[right] = (correctDraws[right] ?? 0) + 1;
+    }
+
+    /**
+     * Ask a model which candidate to keep, only where there is something to choose.
+     *
+     * The skip is the design, not an optimisation: three byte-identical queries are one candidate,
+     * and a selector that spends a call agreeing with itself would report a cost with no decision
+     * behind it. `modelAsked` therefore counts the questions where the choice was real, which is
+     * the denominator every other number about this arm should be read against.
+     */
+    const choiceBatch: { position: number; arm: ArmName; prompt: string }[] = [];
+    for (const position of evalRows.keys()) {
+      const pool = poolByPosition.get(position);
+      if (pool === undefined) continue;
+      for (const arm of samplingArmsThisRun) {
+        const spec = samplingSpec(arm);
+        if (spec?.selector !== 'model') continue;
+        const slice = pool.candidates.slice(0, spec.n);
+        const distinct = new Set(
+          slice.map((item) => item.signature).filter((item) => item !== undefined),
+        ).size;
+        if (distinct < 2) continue;
+        const at = index.get(`${position}:none`);
+        const wording = at === undefined ? undefined : plans[at]?.prompt;
+        if (wording === undefined) continue;
+        choiceBatch.push({
+          position,
+          arm,
+          prompt: choicePrompt(wording, pool.queries.slice(0, spec.n)),
+        });
+      }
+    }
+    const choiceAtIndex = new Map<string, number | undefined>();
+    let modelAsked = 0;
+    let modelUnparsed = 0;
+    if (choiceBatch.length > 0) {
+      process.stdout.write(
+        `[sota] fold ${fold + 1}/${FOLDS} asking a model to choose in ${choiceBatch.length} cases\n`,
+      );
+      let asked = 0;
+      const answers = await mapPool(choiceBatch, CONCURRENCY, async (item) => {
+        try {
+          const reply = await chat(item.prompt, 200, 0);
+          return { item, choice: parseChoice(reply.text, (samplingSpec(item.arm)?.n ?? 0)) };
+        } catch (error) {
+          if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+          if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+          return { item, choice: undefined };
+        } finally {
+          asked += 1;
+          if (asked % 25 === 0 || asked === choiceBatch.length) {
+            process.stdout.write(
+              `[sota] fold ${fold + 1}/${FOLDS} choices ${asked}/${choiceBatch.length} ` +
+                `calls=${llm.stats.calls} failed=${llm.stats.failures}\n`,
+            );
+          }
+        }
+      });
+      for (const entry of answers) {
+        choiceAtIndex.set(`${entry.item.position}:${entry.item.arm}`, entry.choice);
+        modelAsked += 1;
+        if (entry.choice === undefined) modelUnparsed += 1;
+      }
+    }
+
+    for (const position of evalRows.keys()) {
+      const pool = poolByPosition.get(position);
+      if (pool === undefined) continue;
       // Every arm gets a verdict even when no draw arrived: the `none` baseline scores a failed
       // call as a wrong answer, and an arm that silently dropped the question would be measured on
       // a different, easier population than the one it is compared against.
       for (const arm of samplingArmsThisRun) {
         const spec = samplingSpec(arm);
         if (spec === undefined) continue;
-        const pool = candidates.slice(0, spec.n);
+        const slice = pool.candidates.slice(0, spec.n);
         const selection =
           spec.selector === 'random'
-            ? selectRandom(pool, mulberry32(SEED + position))
+            ? selectRandom(slice, mulberry32(SEED + position))
             : spec.selector === 'first'
-              ? selectFirst(pool)
-              : selectByConsistency(pool);
+              ? selectFirst(slice)
+              : spec.selector === 'model'
+                ? selectByModel(slice.length, choiceAtIndex.get(`${position}:${arm}`))
+                : selectByConsistency(slice);
         chosenJudged.set(`${position}:${arm}`, {
           position,
           arm,
-          verdict: verdicts[selection.chosen] ?? (verdicts[0] as Judged),
+          verdict: pool.verdicts[selection.chosen] ?? (pool.verdicts[0] as Judged),
         });
         const list = selectionByArm.get(arm);
         if (list === undefined) selectionByArm.set(arm, [selection]);
         else list.push(selection);
       }
     }
+    // Fold-scoped, so the artefact can report how often the selector was asked and how often it
+    // answered nothing — an arm that fell back on every question is a `first` arm with an invoice.
+    if (modelAsked > 0) modelSelection.set(fold, { asked: modelAsked, unparsed: modelUnparsed });
   }
 
   const judged = new Map<string, Judged>();
@@ -2305,6 +2436,7 @@ async function runFold(
       execOk: full.execOk,
       retried: retriedPositions.has(position),
       draws: drawFacts.get(position) ?? null,
+      schemaTables: linkKept.get(position) ?? null,
       injected: injectedByPosition.get(position) ?? [],
       injectedRepair: injectedRepairByPosition.get(position) ?? [],
       injectedProcedural: injectedProceduralByPosition.get(position) ?? [],
@@ -2434,6 +2566,7 @@ async function runFold(
               [...selectionByArm].map(([arm, list]) => [arm, selectionStats(list)]),
             ),
             correctDraws,
+            model: modelSelection.get(fold) ?? null,
           },
     repairItems,
     distillDrops: { rule: widened.drops, repair: repaired?.drops ?? null },
@@ -3026,6 +3159,15 @@ async function main(): Promise<void> {
                   },
                 ),
               ),
+              model: folds.every((fold) => (fold.sampling?.model ?? null) === null)
+                ? null
+                : {
+                    asked: folds.reduce((sum, fold) => sum + (fold.sampling?.model?.asked ?? 0), 0),
+                    unparsed: folds.reduce(
+                      (sum, fold) => sum + (fold.sampling?.model?.unparsed ?? 0),
+                      0,
+                    ),
+                  },
             },
       /**
        * Whether the failure key found anything.

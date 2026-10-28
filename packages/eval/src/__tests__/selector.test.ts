@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  choicePrompt,
+  parseChoice,
   selectByConsistency,
+  selectByModel,
   selectFirst,
   selectRandom,
   selectionStats,
@@ -155,5 +158,92 @@ describe('selectionStats', () => {
       nothingRan: 0,
       meanVotes: 0,
     });
+  });
+});
+
+describe('choicePrompt', () => {
+  it('numbers every candidate and names them as candidates, not as answers', () => {
+    // The wording matters: a prompt that calls the queries "answers" invites the model to agree
+    // with the first one it sees, which is the `first` arm under another name.
+    const prompt = choicePrompt('TASK', ['SELECT 1', 'SELECT 2', 'SELECT 3']);
+    expect(prompt).toContain('TASK');
+    expect(prompt).toContain('[1]\nSELECT 1');
+    expect(prompt).toContain('[3]\nSELECT 3');
+    expect(prompt).toContain('<choice>');
+  });
+
+  it('carries the count so a prompt cannot disagree with itself', () => {
+    expect(choicePrompt('TASK', ['SELECT 1', 'SELECT 2'])).toContain('2 candidate');
+    expect(choicePrompt('TASK', ['SELECT 1'])).toContain('1 candidate');
+  });
+
+  it('does not renumber when a candidate is empty', () => {
+    // An empty string is still a candidate — it is a draw that produced nothing, and dropping it
+    // would shift every later index and make the selector's answer point at the wrong query.
+    const prompt = choicePrompt('TASK', ['SELECT 1', '', 'SELECT 3']);
+    expect(prompt).toContain('[2]\n\n');
+    expect(prompt).toContain('[3]\nSELECT 3');
+  });
+});
+
+describe('parseChoice', () => {
+  it('reads the tagged number', () => {
+    expect(parseChoice('<choice>2</choice>', 3)).toBe(1);
+  });
+
+  it('ignores numbers outside the tag when a tag is present', () => {
+    // The model routinely restates the question ("among 3 candidates ...") before choosing. A
+    // parser that took the first integer would read the count as the choice and be wrong on
+    // exactly the answers that look most considered.
+    expect(parseChoice('Among 3 candidates, <choice>1</choice> is best.', 3)).toBe(0);
+  });
+
+  it('falls back to a bare number when the tags are missing', () => {
+    expect(parseChoice('2', 3)).toBe(1);
+    expect(parseChoice('Candidate 3.', 3)).toBe(2);
+  });
+
+  it('refuses a number that is not a candidate', () => {
+    // 0 and 4 are not indices. Returning undefined rather than clamping keeps the caller honest:
+    // it can count unparseable selections instead of silently scoring them as the first draw.
+    expect(parseChoice('<choice>0</choice>', 3)).toBeUndefined();
+    expect(parseChoice('<choice>4</choice>', 3)).toBeUndefined();
+  });
+
+  it('refuses prose with no number at all', () => {
+    expect(parseChoice('I cannot decide.', 3)).toBeUndefined();
+  });
+
+  it('refuses anything when there is nothing to choose from', () => {
+    expect(parseChoice('<choice>1</choice>', 0)).toBeUndefined();
+  });
+});
+
+describe('selectByModel', () => {
+  it('takes the index the model chose', () => {
+    expect(selectByModel(3, 1)).toEqual({
+      chosen: 1,
+      votes: 1,
+      groups: 0,
+      reason: 'model',
+      emptyResult: false,
+    });
+  });
+
+  it('takes the first draw when the model did not answer', () => {
+    // The fallback is `no-agreement` at index 0 rather than an error, because the arm has to be
+    // scored on the same population as its control. The count of fallbacks is what says whether
+    // the selector was working or merely present.
+    expect(selectByModel(3, undefined)).toEqual({
+      chosen: 0,
+      votes: 1,
+      groups: 0,
+      reason: 'no-agreement',
+      emptyResult: false,
+    });
+  });
+
+  it('reports the empty case for no candidates', () => {
+    expect(selectByModel(0, undefined).reason).toBe('empty');
   });
 });

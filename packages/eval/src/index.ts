@@ -14,7 +14,10 @@ export {
   type SchemaBlock,
 } from './schema-link.js';
 export {
+  choicePrompt,
+  parseChoice,
   selectByConsistency,
+  selectByModel,
   selectFirst,
   selectRandom,
   selectionStats,

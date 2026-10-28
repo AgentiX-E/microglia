@@ -450,6 +450,21 @@ export type SqlArm =
   /** The ceiling on the same three draws: a cheaper run still needs to know where it stands. */
   | 'sample-3-oracle'
   /**
+   * The same three draws, chosen by a model that reads them.
+   *
+   * Measured against `sample-3`, which selects by agreement on identical draws. The only difference
+   * is the selector, which is what makes the comparison the answer to "is agreement enough?": it was
+   * measured at +0.00pp while the ceiling on those draws was +5.43pp [3.14, 8.00], so the question
+   * is now whether a reader of the candidates can reach any of what agreement left behind.
+   *
+   * Costs one call per question whose draws disagreed, and none where they all agreed — asking a
+   * model to choose between three byte-identical queries measures nothing but its willingness to
+   * answer.
+   */
+  | 'sample-3-model'
+  /** The five-draw version of the model selector, for the run that has the draws anyway. */
+  | 'sample-5-model'
+  /**
    * The same question with the schema pruned to the tables it names.
    *
    * MCS-SQL measures +2.1 points from schema linking alone with the same model, and CHASE-SQL names
@@ -509,6 +524,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-3-first': true,
   'sample-3-random': true,
   'sample-3-oracle': true,
+  'sample-3-model': true,
+  'sample-5-model': true,
   linked: true,
 };
 
