@@ -35,6 +35,10 @@ on:
         description: 'Result comparison that scores the run: multiset (BIRD official) or set (ROSE baseline); the other is computed alongside'
         required: false
         default: 'multiset'
+      sample_temperature:
+        description: 'Temperature for the sample-N arms (0 would make every draw identical)'
+        required: false
+        default: '0.7'
       arms:
         description: 'Control arms beyond none+full (gated,duplicate,wrong-scope,stated,oracle)'
         required: false
@@ -169,6 +173,7 @@ jobs:
           SOTA_DISTILL_CACHE: ${{ github.workspace }}/.cache/distill/cache.json
           SOTA_CONVENTION: ${{ github.event.inputs.convention || '' }}
           SOTA_RESAMPLES: '10000'
+          SOTA_SAMPLE_TEMPERATURE: ${{ github.event.inputs.sample_temperature || '0.7' }}
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}
         run: pnpm eval:sota
 

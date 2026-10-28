@@ -401,7 +401,37 @@ export type SqlArm =
    * procedure (no case to imitate), the moment is after a failure (no first impression to displace),
    * and the key is the thing that actually varies (what went wrong).
    */
-  | 'retry-keyed';
+  | 'retry-keyed'
+  /**
+   * Three draws at a non-zero temperature, chosen by the largest agreeing group.
+   *
+   * The axis this project never varied. Every memory arm and every baseline has been one draw at
+   * temperature 0, and the noise floor measured with an identical prompt (`none-replica`, 3-6
+   * discordant questions) is the same size as every effect reported so far. Selection among several
+   * draws is what the systems above 70% on the leaderboards do — CHASE-SQL with a selection model,
+   * XiYan-SQL by voting — and it is measurable on this protocol for the cost of the extra draws.
+   *
+   * Three rather than five first, because the prefix of a five-draw sample *is* a three-draw sample:
+   * one pass of five supplies both arms, so the curve over the number of draws costs nothing extra.
+   */
+  | 'sample-3'
+  /** Five draws, largest agreeing group. The other end of the same pass. */
+  | 'sample-5'
+  /**
+   * The same five draws, and the first one.
+   *
+   * The control that separates temperature from selection. Without it, any difference between
+   * `sample-5` and `none` is attributable to either.
+   */
+  | 'sample-5-first'
+  /**
+   * The same five draws, one of them at random.
+   *
+   * The second control, and the harder one to argue with: a finite sample of a distribution contains
+   * a better draw than its first element more often than chance, so "more candidates help" and "the
+   * selector helps" produce the same sign. Only this arm says which.
+   */
+  | 'sample-5-random';
 
 /**
  * Every optional arm, as a table keyed by the union itself.
@@ -441,6 +471,10 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-procedural': true,
   'chars-proc-600': true,
   'retry-keyed': true,
+  'sample-3': true,
+  'sample-5': true,
+  'sample-5-first': true,
+  'sample-5-random': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(

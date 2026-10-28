@@ -75,7 +75,18 @@ export class LlmClient {
     this.breaker = new CircuitBreaker(options.breakerThreshold ?? 8);
   }
 
-  public async chat(prompt: string, maxTokens = 700): Promise<ChatReply> {
+  /**
+   * One completion.
+   *
+   * `temperature` exists because a single draw cannot be compared with itself: every memory
+   * measurement in this project has been a one-sample comparison, and the noise floor measured with
+   * an identical prompt (`none-replica`) is the same size as the effects being reported. Sampling
+   * several draws is the only way to say whether a difference is the treatment or the draw.
+   *
+   * The default stays 0. Every published number was produced at 0, and a silent change would move
+   * the baseline under the comparison.
+   */
+  public async chat(prompt: string, maxTokens = 700, temperature = 0): Promise<ChatReply> {
     const fetchImpl = this.options.fetchImpl ?? fetch;
     const sleep = this.options.sleep ?? (async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
     const random = this.options.random ?? Math.random;
@@ -104,7 +115,7 @@ export class LlmClient {
           body: JSON.stringify({
             model: this.options.model,
             messages: [{ role: 'user', content: prompt }],
-            temperature: 0,
+            temperature,
             max_tokens: maxTokens,
           }),
           signal: AbortSignal.timeout(timeout),

@@ -109,6 +109,11 @@ import {
   interleaveByKey,
   judgeScalar,
   mapPool,
+  selectByConsistency,
+  selectFirst,
+  selectRandom,
+  selectionStats,
+  signatureOf,
   matches,
   mentionsAny,
   mismatchNote,
@@ -135,8 +140,11 @@ import {
   type ResultComparison,
   type ConventionName,
   type ConventionSpec,
+  type Candidate,
   type PackKind,
   type ResultShape,
+  type Selection,
+  type SelectionStats,
 } from '@agentix-e/microglia-eval';
 
 const DATASET_REPO = 'https://huggingface.co/datasets/birdsql/bird_mini_dev';
@@ -152,6 +160,15 @@ const CACHE = join(ROOT, '..', '.cache', 'bird');
 const LIMIT = nonNegative(process.env['SOTA_LIMIT'], 0);
 const FOLDS = Math.max(2, Math.trunc(nonNegative(process.env['SOTA_FOLDS'], 5)));
 const SEED = Math.trunc(nonNegative(process.env['SOTA_SEED'], 7));
+/**
+ * The temperature the sample-N arms draw at.
+ *
+ * Not 0, because at 0 the draws are identical and the arms measure nothing — the endpoint is
+ * already not deterministic at 0, but not reliably enough to produce five different candidates.
+ * Not 1 either: a SQL query has a large exact-syntax prior, and the interesting variation is in
+ * which join and which aggregate are chosen, not in whether the statement is well formed.
+ */
+const SAMPLE_TEMPERATURE = nonNegative(process.env['SOTA_SAMPLE_TEMPERATURE'], 0.7);
 const GENERALIZE = (process.env['SOTA_GENERALIZE'] ?? 'true') !== 'false';
 const RESAMPLES = Math.max(1000, Math.trunc(nonNegative(process.env['SOTA_RESAMPLES'], 10_000)));
 const MODEL = process.env['SOTA_MODEL'] ?? 'deepseek-chat';
@@ -460,7 +477,8 @@ const llm = new LlmClient({
   ...(ENDPOINT === '' ? {} : { endpoint: ENDPOINT }),
 });
 
-const chat = (prompt: string, maxTokens = 700): Promise<ChatReply> => llm.chat(prompt, maxTokens);
+const chat = (prompt: string, maxTokens = 700, temperature = 0): Promise<ChatReply> =>
+  llm.chat(prompt, maxTokens, temperature);
 
 
 type Dataset = {
@@ -1096,6 +1114,20 @@ type FoldResult = {
     readonly stored: Readonly<Record<string, number>>;
     readonly observed: Readonly<Record<string, number>>;
   };
+  /**
+   * What the selectors did, when any sampling arm ran.
+   *
+   * A selector is only as good as its input distribution, and this block is what makes a gain
+   * attributable: how often the draws agreed at all, how often the winner was the empty result (the
+   * signature of a wrong join), and how many draws were actually taken.
+   */
+  readonly sampling:
+    | {
+        readonly draws: number;
+        readonly temperature: number;
+        readonly byArm: Readonly<Record<string, SelectionStats>>;
+      }
+    | null;
   /** What the repair store holds, sampled: a count alone cannot show what was learned. */
   readonly repairItems: readonly RepairItem[];
   /** Candidates dropped by the parser, per form. */
@@ -1925,6 +1957,94 @@ async function runFold(
     }
   }
 
+  // The sampling arms' draws. One pass of N per question at a non-zero temperature, from the
+  // no-memory prompt, with three arms reading from it: two selectors and a first-draw control.
+  //
+  // The pass is shared because the arms must differ in *one* thing. Drawing separately per arm
+  // would give each its own noise, and the whole question being asked is whether choosing among
+  // draws beats not choosing — which needs the same draws on both sides.
+  const SAMPLING_ARM_N: Partial<Record<ArmName, number>> = {
+    'sample-3': 3,
+    'sample-5': 5,
+    'sample-5-first': 5,
+    'sample-5-random': 5,
+  };
+  const samplingArmsThisRun = (Object.keys(SAMPLING_ARM_N) as ArmName[]).filter((arm) =>
+    ARMS.has(arm),
+  );
+  const sampleReplies = new Map<string, Reply | undefined>();
+  const sampleChosen = new Map<
+    string,
+    { readonly position: number; readonly arm: ArmName; readonly selection: Selection }
+  >();
+  const selectionByArm = new Map<ArmName, Selection[]>();
+  let samplingDraws = 0;
+  if (samplingArmsThisRun.length > 0) {
+    const index = new Map(plans.map((plan, at) => [`${plan.position}:${plan.arm}`, at]));
+    const batch: { position: number; draw: number; prompt: string }[] = [];
+    samplingDraws = Math.max(...samplingArmsThisRun.map((arm) => SAMPLING_ARM_N[arm] ?? 1));
+    for (const position of evalRows.keys()) {
+      const at = index.get(`${position}:none`);
+      const wording = at === undefined ? undefined : plans[at]?.prompt;
+      // A question with no baseline prompt has nothing to redraw. Counting it as an unanswered
+      // draw would be a different experiment; skipping it keeps the arms on one population.
+      if (wording === undefined) continue;
+      for (let draw = 0; draw < samplingDraws; draw += 1) {
+        batch.push({ position, draw, prompt: wording });
+      }
+    }
+    process.stdout.write(
+      `[sota] fold ${fold + 1}/${FOLDS} sampling ${batch.length} draws ` +
+        `(${samplingDraws} per question, temperature ${SAMPLE_TEMPERATURE})\n`,
+    );
+    const drawn = await mapPool(batch, CONCURRENCY, async (item) => {
+      try {
+        return { item, reply: await chat(item.prompt, 700, SAMPLE_TEMPERATURE) };
+      } catch (error) {
+        if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+        if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+        return { item, reply: undefined };
+      }
+    });
+    for (const entry of drawn) {
+      sampleReplies.set(`${entry.item.position}:${entry.item.draw}`, entry.reply);
+    }
+
+    for (const position of evalRows.keys()) {
+      const row = evalRows[position] as BirdRow;
+      const dbPath = dataset.dbPath(row.db_id);
+      const candidates: Candidate[] = [];
+      for (let draw = 0; draw < samplingDraws; draw += 1) {
+        const reply = sampleReplies.get(`${position}:${draw}`);
+        const sql = reply === undefined ? undefined : extractSql(reply.text);
+        // Executed once per draw and read by every arm: the selector's input is the result, and a
+        // selector that executed its own copy would be measuring a different set of candidates.
+        const outcome = sql === undefined ? undefined : executeQuery(dbPath, sql);
+        candidates.push({
+          signature: outcome === undefined ? undefined : signatureOf(outcome),
+          rows: outcome === undefined ? 0 : outcome.tuples.length,
+        });
+      }
+      // Every arm gets a plan even when no draw arrived: the `none` baseline scores a failed call as
+      // a wrong answer, and an arm that silently dropped the question would be measured on a
+      // different, easier population than the one it is compared against.
+      for (const arm of samplingArmsThisRun) {
+        const n = SAMPLING_ARM_N[arm] ?? 1;
+        const pool = candidates.slice(0, n);
+        const selection =
+          arm === 'sample-5-random'
+            ? selectRandom(pool, mulberry32(SEED + position))
+            : arm === 'sample-5-first'
+              ? selectFirst(pool)
+              : selectByConsistency(pool);
+        sampleChosen.set(`${position}:${arm}`, { position, arm, selection });
+        const list = selectionByArm.get(arm);
+        if (list === undefined) selectionByArm.set(arm, [selection]);
+        else list.push(selection);
+      }
+    }
+  }
+
   const judged = new Map<string, Judged>();
   for (const [index, plan] of plans.entries()) {
     const row = evalRows[plan.position] as BirdRow;
@@ -1953,6 +2073,27 @@ async function runFold(
       prompt: '',
       packIds: entry.packIds,
       packChars: entry.packChars,
+    });
+  }
+
+  // The sampling arms' chosen draws are judged here, after the selectors have run: the answer an
+  // arm claims is the one its selector picked, and judging the other draws would score candidates
+  // nobody used.
+  for (const entry of sampleChosen.values()) {
+    const row = evalRows[entry.position] as BirdRow;
+    const reply = sampleReplies.get(`${entry.position}:${entry.selection.chosen}`);
+    const started = performance.now();
+    const result = judgeReply(row, dataset.dbPath(row.db_id), reply, task);
+    judged.set(`${entry.position}:${entry.arm}`, {
+      ...result,
+      latencyMs: Math.round(performance.now() - started),
+    });
+    plans.push({
+      position: entry.position,
+      arm: entry.arm,
+      prompt: '',
+      packIds: 0,
+      packChars: 0,
     });
   }
 
@@ -2153,6 +2294,16 @@ async function runFold(
     repairActive: repaired?.frozen.active ?? null,
     proceduralActive: procedural?.frozen.active ?? null,
     failureKey: { asked: keyedTried, hit: keyedHits, stored: storedCodes, observed: observedCodes },
+    sampling:
+      samplingArmsThisRun.length === 0
+        ? null
+        : {
+            draws: samplingDraws,
+            temperature: SAMPLE_TEMPERATURE,
+            byArm: Object.fromEntries(
+              [...selectionByArm].map(([arm, list]) => [arm, selectionStats(list)]),
+            ),
+          },
     repairItems,
     distillDrops: { rule: widened.drops, repair: repaired?.drops ?? null },
     items,
@@ -2683,6 +2834,42 @@ async function main(): Promise<void> {
        * what makes it informative and exactly what stops it from being a headline.
        */
       retry_subset: retrySubset(cases),
+      /**
+       * What the selectors did across the whole run, and what they had to work with.
+       *
+       * The four arms this block describes are one experimental design: the draws are shared, so
+       * `sample-5-first - none` is the price of a non-zero temperature, `sample-5-random -
+       * sample-5-first` is what alternatives are worth before anyone judges them, and `sample-5 -
+       * sample-5-random` is the selector. A single `sample-5 - none` number cannot separate those.
+       */
+      sampling:
+        folds.every((fold) => fold.sampling === null)
+          ? null
+          : {
+              draws: folds[0]?.sampling?.draws ?? 0,
+              temperature: folds[0]?.sampling?.temperature ?? 0,
+              by_arm: Object.fromEntries(
+                [...new Set(folds.flatMap((fold) => Object.keys(fold.sampling?.byArm ?? {})))].map(
+                  (arm) => {
+                    const parts = folds
+                      .map((fold) => fold.sampling?.byArm[arm])
+                      .filter((item): item is SelectionStats => item !== undefined);
+                    const questions = parts.reduce((sum, item) => sum + item.questions, 0);
+                    const votes = parts.reduce((sum, item) => sum + item.meanVotes * item.questions, 0);
+                    return [
+                      arm,
+                      {
+                        questions,
+                        agreed: parts.reduce((sum, item) => sum + item.agreed, 0),
+                        chose_empty: parts.reduce((sum, item) => sum + item.choseEmpty, 0),
+                        nothing_ran: parts.reduce((sum, item) => sum + item.nothingRan, 0),
+                        mean_votes: questions === 0 ? 0 : votes / questions,
+                      },
+                    ];
+                  },
+                ),
+              ),
+            },
       /**
        * Whether the failure key found anything.
        *

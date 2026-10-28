@@ -240,6 +240,10 @@ describe('parseArms', () => {
       'oracle',
       'retry-blank',
       'retry-keyed',
+      'sample-3',
+      'sample-5',
+      'sample-5-first',
+      'sample-5-random',
       'stated',
       'wrong-scope',
     ]);
@@ -291,6 +295,10 @@ describe('parseArms', () => {
       'full-procedural',
       'chars-proc-600',
       'retry-keyed',
+      'sample-3',
+      'sample-5',
+      'sample-5-first',
+      'sample-5-random',
     ]);
   });
 

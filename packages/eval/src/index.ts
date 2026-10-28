@@ -6,6 +6,17 @@
  * these numbers from source has no business quoting them.
  */
 export { comparePaired, type PairedResult } from './stats.js';
+export {
+  selectByConsistency,
+  selectFirst,
+  selectRandom,
+  selectionStats,
+  signatureOf,
+  type Candidate,
+  type Selection,
+  type SelectionReason,
+  type SelectionStats,
+} from './selector.js';
 export { recoveryRatio, type RecoveryInput } from './recovery.js';
 export {
   BirdDataError,

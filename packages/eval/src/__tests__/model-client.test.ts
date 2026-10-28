@@ -177,4 +177,16 @@ describe('LlmClient', () => {
       max_tokens: 1234,
     });
   });
+
+  it('sends the temperature it was given, for the sampling arms', async () => {
+    // A single draw cannot be compared with itself, so the arms that draw several times need a
+    // non-zero temperature to have anything to select between. The default stays 0 so that every
+    // published number keeps the baseline it was measured against.
+    const { instance, seen } = client([ok('x')]);
+    await instance.chat('PROMPT TEXT', 700, 0.7);
+    const body = JSON.parse(seen[0]?.split(' ').slice(1).join(' ') ?? '{}') as {
+      temperature?: number;
+    };
+    expect(body.temperature).toBe(0.7);
+  });
 });
