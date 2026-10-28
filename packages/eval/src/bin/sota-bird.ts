@@ -424,6 +424,13 @@ type CaseOutcome = {
    * recorded as a fact and not used as a filter on any other arm.
    */
   readonly retried: boolean;
+  /**
+   * The sampling facts for this question, or null when no sampling arm ran.
+   *
+   * `distinct` is how many different results the draws produced and `correct` how many of them were
+   * right. Their joint distribution is what separates a generation failure from a selection one.
+   */
+  readonly draws: { readonly distinct: number; readonly correct: number } | null;
   /** Optional arms, present only when configured. */
   readonly arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
   readonly shadowArms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
@@ -1995,6 +2002,15 @@ async function runFold(
   const wantsCeiling = ARMS.has('sample-5-oracle');
   const sampleReplies = new Map<string, Reply | undefined>();
   const drawJudged = new Map<number, Judged[]>();
+  /**
+   * How the draws for one question differed, and how many of them were right.
+   *
+   * Kept per question rather than only as a histogram because the two facts have to be joined: a
+   * question with five distinct wrong answers is a generation failure, one with five distinct
+   * answers of which one is right is a selection failure, and one with five identical wrong answers
+   * is neither — it is the model being confidently wrong, which no amount of sampling fixes.
+   */
+  const drawFacts = new Map<number, { readonly distinct: number; readonly correct: number }>();
   const chosenJudged = new Map<string, { readonly position: number; readonly arm: ArmName; readonly verdict: Judged }>();
   const selectionByArm = new Map<ArmName, Selection[]>();
   const correctDraws = new Array<number>(0).fill(0);
@@ -2054,6 +2070,10 @@ async function runFold(
       }
       drawJudged.set(position, verdicts);
       const right = verdicts.filter((verdict) => verdict.correct).length;
+      const distinct = new Set(
+        candidates.map((item) => item.signature).filter((item) => item !== undefined),
+      ).size;
+      drawFacts.set(position, { distinct, correct: right });
       while (correctDraws.length <= right) correctDraws.push(0);
       correctDraws[right] = (correctDraws[right] ?? 0) + 1;
       // Every arm gets a verdict even when no draw arrived: the `none` baseline scores a failed
@@ -2211,6 +2231,7 @@ async function runFold(
       parseOk: full.parseOk,
       execOk: full.execOk,
       retried: retriedPositions.has(position),
+      draws: drawFacts.get(position) ?? null,
       injected: injectedByPosition.get(position) ?? [],
       injectedRepair: injectedRepairByPosition.get(position) ?? [],
       injectedProcedural: injectedProceduralByPosition.get(position) ?? [],
