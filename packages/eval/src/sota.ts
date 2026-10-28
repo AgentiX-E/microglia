@@ -444,6 +444,9 @@ export type SqlArm =
    * Costs no calls: every draw is scored anyway so the chosen one can be measured.
    */
   | 'sample-5-oracle'
+  /** The three-draw versions of the two controls, so a cheaper run still has them. */
+  | 'sample-3-first'
+  | 'sample-3-random'
   /**
    * The same question with the schema pruned to the tables it names.
    *
@@ -501,6 +504,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-5-first': true,
   'sample-5-random': true,
   'sample-5-oracle': true,
+  'sample-3-first': true,
+  'sample-3-random': true,
   linked: true,
 };
 

@@ -242,6 +242,8 @@ describe('parseArms', () => {
       'retry-blank',
       'retry-keyed',
       'sample-3',
+      'sample-3-first',
+      'sample-3-random',
       'sample-5',
       'sample-5-first',
       'sample-5-oracle',
@@ -302,6 +304,8 @@ describe('parseArms', () => {
       'sample-5-first',
       'sample-5-random',
       'sample-5-oracle',
+      'sample-3-first',
+      'sample-3-random',
       'linked',
     ]);
   });

@@ -2008,14 +2008,23 @@ async function runFold(
   // The pass is shared because the arms must differ in *one* thing. Drawing separately per arm
   // would give each its own noise, and the whole question being asked is whether choosing among
   // draws beats not choosing — which needs the same draws on both sides.
-  const SAMPLING_ARM_N: Partial<Record<ArmName, number>> = {
-    'sample-3': 3,
-    'sample-5': 5,
-    'sample-5-first': 5,
-    'sample-5-random': 5,
+  /**
+   * What a sampling arm asks for, read from its name.
+   *
+   * The arm names carry the design — `sample-<n>[-<selector>]` — and a table beside them would be a
+   * second place to change when one of them changes. A name the pattern does not match is not a
+   * sampling arm.
+   */
+  const samplingSpec = (arm: ArmName): { n: number; selector: 'majority' | 'first' | 'random' } | undefined => {
+    const match = /^sample-(\d+)(?:-(first|random))?$/.exec(arm);
+    if (match === null) return undefined;
+    const n = Number(match[1]);
+    if (!Number.isInteger(n) || n < 2) return undefined;
+    const suffix = match[2];
+    return { n, selector: suffix === 'first' ? 'first' : suffix === 'random' ? 'random' : 'majority' };
   };
-  const samplingArmsThisRun = (Object.keys(SAMPLING_ARM_N) as ArmName[]).filter((arm) =>
-    ARMS.has(arm),
+  const samplingArmsThisRun = (OPTIONAL_ARMS as readonly ArmName[]).filter(
+    (arm) => samplingSpec(arm) !== undefined && ARMS.has(arm),
   );
   /**
    * What the best selector could possibly have scored.
@@ -2050,7 +2059,7 @@ async function runFold(
     samplingDraws =
       samplingArmsThisRun.length === 0
         ? 5
-        : Math.max(...samplingArmsThisRun.map((arm) => SAMPLING_ARM_N[arm] ?? 1));
+        : Math.max(...samplingArmsThisRun.map((arm) => samplingSpec(arm)?.n ?? 1));
     for (const position of evalRows.keys()) {
       const at = index.get(`${position}:none`);
       const wording = at === undefined ? undefined : plans[at]?.prompt;
@@ -2109,12 +2118,13 @@ async function runFold(
       // call as a wrong answer, and an arm that silently dropped the question would be measured on
       // a different, easier population than the one it is compared against.
       for (const arm of samplingArmsThisRun) {
-        const n = SAMPLING_ARM_N[arm] ?? 1;
-        const pool = candidates.slice(0, n);
+        const spec = samplingSpec(arm);
+        if (spec === undefined) continue;
+        const pool = candidates.slice(0, spec.n);
         const selection =
-          arm === 'sample-5-random'
+          spec.selector === 'random'
             ? selectRandom(pool, mulberry32(SEED + position))
-            : arm === 'sample-5-first'
+            : spec.selector === 'first'
               ? selectFirst(pool)
               : selectByConsistency(pool);
         chosenJudged.set(`${position}:${arm}`, {
