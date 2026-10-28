@@ -21,6 +21,7 @@ import {
   promptFor,
   retryPromptFor,
   retrySubset,
+  schemaLinkSplit,
   reportedSql,
   type GateInput,
 } from '../sota.js';
@@ -242,6 +243,7 @@ describe('parseArms', () => {
       'retry-blank',
       'retry-keyed',
       'sample-3',
+      'sample-3-exec',
       'sample-3-first',
       'sample-3-model',
       'sample-3-oracle',
@@ -311,6 +313,7 @@ describe('parseArms', () => {
       'sample-3-random',
       'sample-3-oracle',
       'sample-3-model',
+      'sample-3-exec',
       'sample-5-model',
       'linked',
     ]);
@@ -975,6 +978,18 @@ describe('is the pack about the question', () => {
     expect(identifiers.has('avg')).toBe(false);
   });
 
+  it('finds an identifier at the very start of the claim', () => {
+    // The boundary check reads the character before the match, and there is none at position zero.
+    // Reading `haystack[-1]` there would be `undefined`, and `/[a-z0-9_]/.test(undefined)` is true,
+    // so the first word of a claim would never count — the one position a rule most often puts a
+    // table name in.
+    expect(mentionsAny('atoms are large', new Set(['atoms']))).toBe(true);
+  });
+
+  it('returns no identifiers from a statement that has none', () => {
+    expect([...sqlIdentifiers('1 + 2')]).toEqual([]);
+  });
+
   it('matches whole tokens only', () => {
     // `race` inside `races` is a different word about a different table, and a substring match
     // would score every pack as relevant to every question that shares a stem.
@@ -1002,6 +1017,27 @@ describe('is the pack about the question', () => {
     expect(split.onTopicAccuracy).toBe(0);
     expect(split.onTopicBaseline).toBe(1);
     expect(split.offTopicAccuracy).toBe(1);
+  });
+
+  it('reports zero for a half no pack landed in, without dividing by it', () => {
+    // A run where every pack is off-topic still has an on-topic accuracy, and it is a zero with no
+    // denominator behind it. Dividing anyway would produce NaN, which compares false against
+    // everything and would quietly pass a threshold.
+    const offOnly = relevanceSplit([
+      { correct: true, withoutMemoryCorrect: false, goldSql: 'SELECT count(*) FROM atoms', injected: ['a rule about lap times'] },
+    ]);
+    expect(offOnly.onTopic).toBe(0);
+    expect(offOnly.onTopicAccuracy).toBe(0);
+    expect(offOnly.onTopicBaseline).toBe(0);
+    expect(offOnly.offTopicAccuracy).toBe(1);
+    const onOnly = relevanceSplit([
+      { correct: false, withoutMemoryCorrect: true, goldSql: 'SELECT count(*) FROM atoms', injected: ['a rule about atoms'] },
+    ]);
+    expect(onOnly.offTopic).toBe(0);
+    expect(onOnly.offTopicAccuracy).toBe(0);
+    expect(onOnly.offTopicBaseline).toBe(0);
+    expect(onOnly.onTopicAccuracy).toBe(0);
+    expect(onOnly.onTopicBaseline).toBe(1);
   });
 
   it('reports zero rather than dividing by an empty half', () => {
@@ -1078,5 +1114,54 @@ describe('an arm list may name the two required arms', () => {
 
   it('still refuses a name that is not an arm', () => {
     expect(() => parseArms('none,full,oracle2')).toThrow(/Unknown arm 'oracle2'/);
+  });
+});
+
+describe('schemaLinkSplit', () => {
+  const item = (pruned: boolean, base: boolean, linked: boolean) => ({
+    schemaTables: { kept: pruned ? 2 : 6, total: 6, pruned },
+    withoutMemoryCorrect: base,
+    arms: { linked },
+  });
+
+  it('separates the questions the linker pruned from the ones it did not', () => {
+    // Four pruned questions, three of them broken by the pruning; two untouched, both fine.
+    // The population delta is (1/4 - 4/4)/6 * ... — a number dominated by whichever group is
+    // larger, which is the reason the split exists.
+    const split = schemaLinkSplit([
+      item(true, true, false),
+      item(true, true, false),
+      item(true, true, false),
+      item(true, false, true),
+      item(false, true, true),
+      item(false, true, true),
+    ]);
+    expect(split).not.toBeNull();
+    expect(split?.pruned.questions).toBe(4);
+    expect(split?.pruned.withoutMemoryAccuracy).toBe(0.75);
+    expect(split?.pruned.accuracy).toBe(0.25);
+    expect(split?.pruned.deltaPp).toBeCloseTo(-50, 6);
+    expect(split?.pruned.lost).toBe(3);
+    expect(split?.unchanged.deltaPp).toBe(0);
+  });
+
+  it('counts a gain as a gain and a loss as a loss in the same group', () => {
+    const split = schemaLinkSplit([item(true, false, true), item(true, true, false)]);
+    expect(split?.pruned.gained).toBe(1);
+    expect(split?.pruned.lost).toBe(1);
+    expect(split?.pruned.deltaPp).toBe(0);
+  });
+
+  it('reports nothing when the arm did not run', () => {
+    // A split over an arm that produced no answers would be a table of zeroes claiming to be a
+    // measurement, which is the failure mode the null return exists to prevent.
+    expect(schemaLinkSplit([{ schemaTables: null, withoutMemoryCorrect: true, arms: {} }])).toBeNull();
+    expect(schemaLinkSplit([])).toBeNull();
+  });
+
+  it('does not divide by an empty group', () => {
+    const split = schemaLinkSplit([item(true, true, true)]);
+    expect(split?.unchanged.questions).toBe(0);
+    expect(split?.unchanged.deltaPp).toBe(0);
   });
 });

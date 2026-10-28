@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   choicePrompt,
+  choicePromptWithResults,
   parseChoice,
+  renderRows,
   selectByConsistency,
   selectByModel,
   selectFirst,
@@ -245,5 +247,51 @@ describe('selectByModel', () => {
 
   it('reports the empty case for no candidates', () => {
     expect(selectByModel(0, undefined).reason).toBe('empty');
+  });
+});
+
+describe('renderRows', () => {
+  it('says a query did not run rather than showing it as empty', () => {
+    // A failed query and a query that correctly returns nothing are the two most confusable
+    // outcomes in this lane, and a selector shown "0 rows" for both would prefer broken SQL.
+    expect(renderRows(false, [])).toBe('the query did not run');
+    expect(renderRows(true, [])).toBe('0 rows');
+  });
+
+  it('counts rows and shows the first five', () => {
+    const rows = [[1], [2], [3], [4], [5], [6], [7]];
+    expect(renderRows(true, rows)).toBe('7 rows: (1) (2) (3) (4) (5) … 2 more');
+  });
+
+  it('uses the singular for one row', () => {
+    expect(renderRows(true, [[1]])).toBe('1 row: (1)');
+  });
+
+  it('marks null and truncates long text', () => {
+    // The point of showing rows is that a literal that does not exist in the data is visible.
+    // A NULL that prints as the word "null" is indistinguishable from the string 'null'.
+    const long = 'x'.repeat(200);
+    const rendered = renderRows(true, [[null, long]]);
+    expect(rendered).toContain('NULL');
+    expect(rendered).toContain('…');
+    expect(rendered.length).toBeLessThan(200);
+  });
+});
+
+describe('choicePromptWithResults', () => {
+  it('shows each candidate with the rows it returned', () => {
+    const prompt = choicePromptWithResults('TASK', [
+      { sql: 'SELECT 1', result: '1 row: (1)' },
+      { sql: 'SELECT 2', result: '0 rows' },
+    ]);
+    expect(prompt).toContain('[1]\nSELECT 1\n-> 1 row: (1)');
+    expect(prompt).toContain('[2]\nSELECT 2\n-> 0 rows');
+    expect(prompt).toContain('<choice>');
+  });
+
+  it('says the results are the database\'s, so the choice is not read as a self-consistency vote', () => {
+    expect(choicePromptWithResults('TASK', [{ sql: 'SELECT 1', result: '0 rows' }])).toContain(
+      'what the database returns',
+    );
   });
 });

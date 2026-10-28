@@ -198,6 +198,73 @@ export function choicePrompt(task: string, queries: readonly string[]): string {
 }
 
 /**
+ * What a candidate returned, as text a selector can read.
+ *
+ * Five rows and a truncation marker, because the question this answers is "does this query return
+ * the kind of thing the question asked for", and five rows answer it while five hundred cost tokens
+ * without adding a distinction. Strings are cut at sixty characters for the same reason.
+ *
+ * A failed query is not `0 rows`. They are the two most confusable outcomes in this lane — a wrong
+ * join returns nothing and a broken query returns nothing — and a selection prompt that renders
+ * both as an empty result teaches the reader that empty is common. `NULL` is spelled out for the
+ * same reason: `null` and the four-letter string are different values and look the same otherwise.
+ */
+export function renderRows(ok: boolean, tuples: readonly (readonly unknown[])[]): string {
+  if (!ok) return 'the query did not run';
+  if (tuples.length === 0) return '0 rows';
+  const cell = (value: unknown): string => {
+    if (value === null) return 'NULL';
+    const text = String(value);
+    return text.length > 60 ? `${text.slice(0, 60)}…` : text;
+  };
+  const shown = tuples.slice(0, 5).map((row) => `(${row.map(cell).join(', ')})`);
+  const rest = tuples.length - shown.length;
+  const head = `${tuples.length} row${tuples.length === 1 ? '' : 's'}: `;
+  return rest > 0 ? `${head}${shown.join(' ')} … ${rest} more` : `${head}${shown.join(' ')}`;
+}
+
+/** One candidate, as the result-reading selector sees it. */
+export type CandidateWithResult = {
+  readonly sql: string;
+  /** Output of `renderRows`. */
+  readonly result: string;
+};
+
+/**
+ * The same question as `choicePrompt`, with the one thing the previous selector could not see.
+ *
+ * Iteration 93 measured a multiple-choice selector over SQL text at chance — 18 of 82 questions
+ * where a choice existed, against 18 for taking the first draw and 35 for the best of the three. The
+ * candidates were indistinguishable *as text*, which is what the arm could not check: two queries
+ * that differ in one join condition read as two plausible queries.
+ *
+ * What a deployed system does at that point is run them. Every draw is executed anyway — that is
+ * how agreement is computed — so showing the rows costs nothing that has not already been paid and
+ * adds the only evidence that separates a candidate returning three surnames from one returning
+ * two thousand rows.
+ *
+ * It is not the answer key: the rows are the candidate's own output, and a wrong query returns
+ * wrong rows the selector has to judge. What it is not, either, is free at inference time: N
+ * candidates means N executions, which this lane already performs.
+ */
+export function choicePromptWithResults(
+  task: string,
+  candidates: readonly CandidateWithResult[],
+): string {
+  const blocks = candidates.map(
+    (candidate, index) => `[${index + 1}]\n${candidate.sql}\n-> ${candidate.result}`,
+  );
+  return (
+    `${task}\n\n` +
+    `${candidates.length} candidate ${candidates.length === 1 ? 'query was' : 'queries were'} ` +
+    `written for the task above. Each is shown with what the database returns when it runs. ` +
+    `Exactly one is the most likely to answer the question correctly.\n\n` +
+    `${blocks.join('\n\n')}\n\n` +
+    'Reply with the number of the most likely correct query inside <choice></choice> and nothing else.'
+  );
+}
+
+/**
  * The candidate a reply names, or `undefined` when it names none.
  *
  * The tag is read first because a model that explains itself writes numbers in the explanation:

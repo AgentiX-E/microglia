@@ -106,12 +106,15 @@ import {
   detectableDelta,
   extractSql,
   choicePrompt,
+  choicePromptWithResults,
   failureKind,
   interleaveByKey,
   judgeScalar,
   linkSchema,
   mapPool,
   parseChoice,
+  renderRows,
+  schemaLinkSplit,
   selectByConsistency,
   selectByModel,
   selectFirst,
@@ -1162,7 +1165,9 @@ type FoldResult = {
          * delta belongs to the selector: an arm with `unparsed === asked` scored the first draw on
          * every question and is `sample-N-first` with an extra call in the bill.
          */
-        readonly model: { readonly asked: number; readonly unparsed: number } | null;
+        readonly selectors:
+          | Readonly<Record<string, { readonly asked: number; readonly unparsed: number }>>
+          | null;
       }
     | null;
   /**
@@ -2044,8 +2049,11 @@ async function runFold(
    */
   const samplingSpec = (
     arm: ArmName,
-  ): { n: number; selector: 'majority' | 'first' | 'random' | 'oracle' | 'model' } | undefined => {
-    const match = /^sample-(\d+)(?:-(first|random|oracle|model))?$/.exec(arm);
+  ): {
+    n: number;
+    selector: 'majority' | 'first' | 'random' | 'oracle' | 'model' | 'exec';
+  } | undefined => {
+    const match = /^sample-(\d+)(?:-(first|random|oracle|model|exec))?$/.exec(arm);
     if (match === null) return undefined;
     const n = Number(match[1]);
     if (!Number.isInteger(n) || n < 2) return undefined;
@@ -2059,7 +2067,9 @@ async function runFold(
             ? 'oracle'
             : suffix === 'model'
               ? 'model'
-              : 'majority';
+              : suffix === 'exec'
+                ? 'exec'
+                : 'majority';
     return { n, selector };
   };
   const samplingArmsThisRun = (OPTIONAL_ARMS as readonly ArmName[]).filter(
@@ -2101,12 +2111,15 @@ async function runFold(
   const chosenJudged = new Map<string, { readonly position: number; readonly arm: ArmName; readonly verdict: Judged }>();
   const selectionByArm = new Map<ArmName, Selection[]>();
   /**
-   * How often the model selector was asked, and how often it named nothing.
+   * How often each selector arm was asked, and how often it named nothing.
    *
    * Fold-scoped because the artefact reports it per fold: a selector that answered every question
    * in four folds and none in the fifth is a run whose fifth fold measured `sample-N-first`.
    */
-  const modelSelection = new Map<number, { readonly asked: number; readonly unparsed: number }>();
+  const choiceAccounting = new Map<
+    number,
+    Readonly<Record<string, { readonly asked: number; readonly unparsed: number }>>
+  >();
   const correctDraws = new Array<number>(0).fill(0);
   let samplingDraws = 0;
   if (samplingArmsThisRun.length > 0 || wantsCeiling) {
@@ -2165,7 +2178,12 @@ async function runFold(
      */
     const poolByPosition = new Map<
       number,
-      { readonly candidates: Candidate[]; readonly verdicts: Judged[]; readonly queries: string[] }
+      {
+        readonly candidates: Candidate[];
+        readonly verdicts: Judged[];
+        readonly queries: string[];
+        readonly results: string[];
+      }
     >();
     for (const position of evalRows.keys()) {
       const row = evalRows[position] as BirdRow;
@@ -2173,6 +2191,7 @@ async function runFold(
       const candidates: Candidate[] = [];
       const verdicts: Judged[] = [];
       const queries: string[] = [];
+      const results: string[] = [];
       scored += 1;
       if (scored % 10 === 0 || scored === evalRows.length) {
         process.stdout.write(
@@ -2193,11 +2212,15 @@ async function runFold(
         // produced no SQL is carried as the empty string: dropping it would shift every later
         // index and make the model's answer point at a different query than it read.
         queries.push(sql ?? '');
+        // What the selector that reads rows is shown. Rendered here, once per draw, because the
+        // execution result is the candidate's own output and re-running it later would be a second
+        // execution of the same query with a different answer.
+        results.push(renderRows(outcome === undefined ? false : outcome.ok, outcome?.tuples ?? []));
         // Every draw is scored, not only the chosen one, because the ceiling is the score of a
         // selector that always picked right and cannot be computed after the fact.
         verdicts.push(judgeReply(row, dbPath, reply, task));
       }
-      poolByPosition.set(position, { candidates, verdicts, queries });
+      poolByPosition.set(position, { candidates, verdicts, queries, results });
       drawJudged.set(position, verdicts);
       const right = verdicts.filter((verdict) => verdict.correct).length;
       const distinct = new Set(
@@ -2222,7 +2245,7 @@ async function runFold(
       if (pool === undefined) continue;
       for (const arm of samplingArmsThisRun) {
         const spec = samplingSpec(arm);
-        if (spec?.selector !== 'model') continue;
+        if (spec === undefined || (spec.selector !== 'model' && spec.selector !== 'exec')) continue;
         const slice = pool.candidates.slice(0, spec.n);
         const distinct = new Set(
           slice.map((item) => item.signature).filter((item) => item !== undefined),
@@ -2234,13 +2257,19 @@ async function runFold(
         choiceBatch.push({
           position,
           arm,
-          prompt: choicePrompt(wording, pool.queries.slice(0, spec.n)),
+          prompt:
+            spec.selector === 'exec'
+              ? choicePromptWithResults(
+                  wording,
+                  pool.queries
+                    .slice(0, spec.n)
+                    .map((sql, index) => ({ sql, result: pool.results[index] ?? 'the query did not run' })),
+                )
+              : choicePrompt(wording, pool.queries.slice(0, spec.n)),
         });
       }
     }
     const choiceAtIndex = new Map<string, number | undefined>();
-    let modelAsked = 0;
-    let modelUnparsed = 0;
     if (choiceBatch.length > 0) {
       process.stdout.write(
         `[sota] fold ${fold + 1}/${FOLDS} asking a model to choose in ${choiceBatch.length} cases\n`,
@@ -2264,11 +2293,18 @@ async function runFold(
           }
         }
       });
+      const byArm: Record<string, { asked: number; unparsed: number }> = {};
       for (const entry of answers) {
         choiceAtIndex.set(`${entry.item.position}:${entry.item.arm}`, entry.choice);
-        modelAsked += 1;
-        if (entry.choice === undefined) modelUnparsed += 1;
+        const account = byArm[entry.item.arm] ?? { asked: 0, unparsed: 0 };
+        byArm[entry.item.arm] = {
+          asked: account.asked + 1,
+          unparsed: account.unparsed + (entry.choice === undefined ? 1 : 0),
+        };
       }
+      // Per arm, because the two selectors are asked different questions of the same draws and one
+      // of them answering nothing is not evidence about the other.
+      choiceAccounting.set(fold, byArm);
     }
 
     for (const position of evalRows.keys()) {
@@ -2286,7 +2322,7 @@ async function runFold(
             ? selectRandom(slice, mulberry32(SEED + position))
             : spec.selector === 'first'
               ? selectFirst(slice)
-              : spec.selector === 'model'
+              : spec.selector === 'model' || spec.selector === 'exec'
                 ? selectByModel(slice.length, choiceAtIndex.get(`${position}:${arm}`))
                 : selectByConsistency(slice);
         chosenJudged.set(`${position}:${arm}`, {
@@ -2299,9 +2335,6 @@ async function runFold(
         else list.push(selection);
       }
     }
-    // Fold-scoped, so the artefact can report how often the selector was asked and how often it
-    // answered nothing — an arm that fell back on every question is a `first` arm with an invoice.
-    if (modelAsked > 0) modelSelection.set(fold, { asked: modelAsked, unparsed: modelUnparsed });
   }
 
   const judged = new Map<string, Judged>();
@@ -2566,7 +2599,7 @@ async function runFold(
               [...selectionByArm].map(([arm, list]) => [arm, selectionStats(list)]),
             ),
             correctDraws,
-            model: modelSelection.get(fold) ?? null,
+            selectors: choiceAccounting.get(fold) ?? null,
           },
     repairItems,
     distillDrops: { rule: widened.drops, repair: repaired?.drops ?? null },
@@ -3123,6 +3156,15 @@ async function main(): Promise<void> {
             }, {}),
             dropped: folds.reduce((sum, fold) => sum + (fold.link?.dropped ?? 0), 0),
             total: folds.reduce((sum, fold) => sum + (fold.link?.total ?? 0), 0),
+            /**
+             * The same delta, split by whether the linker shortened the prompt.
+             *
+             * The population figure is an average over questions the linker changed and questions
+             * it left byte-identical, and the second group outnumbers the first five to one. Without
+             * this split the arm's delta describes the run; with it, the `unchanged` group is a
+             * noise floor measured on the same questions in the same fold.
+             */
+            split: schemaLinkSplit(cases),
           },
       sampling:
         folds.every((fold) => fold.sampling === null)
@@ -3159,15 +3201,18 @@ async function main(): Promise<void> {
                   },
                 ),
               ),
-              model: folds.every((fold) => (fold.sampling?.model ?? null) === null)
+              selectors: folds.every((fold) => (fold.sampling?.selectors ?? null) === null)
                 ? null
-                : {
-                    asked: folds.reduce((sum, fold) => sum + (fold.sampling?.model?.asked ?? 0), 0),
-                    unparsed: folds.reduce(
-                      (sum, fold) => sum + (fold.sampling?.model?.unparsed ?? 0),
-                      0,
-                    ),
-                  },
+                : folds.reduce<Record<string, { asked: number; unparsed: number }>>((all, fold) => {
+                    for (const [arm, account] of Object.entries(fold.sampling?.selectors ?? {})) {
+                      const total = all[arm] ?? { asked: 0, unparsed: 0 };
+                      all[arm] = {
+                        asked: total.asked + account.asked,
+                        unparsed: total.unparsed + account.unparsed,
+                      };
+                    }
+                    return all;
+                  }, {}),
             },
       /**
        * Whether the failure key found anything.

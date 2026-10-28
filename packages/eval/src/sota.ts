@@ -465,6 +465,16 @@ export type SqlArm =
   /** The five-draw version of the model selector, for the run that has the draws anyway. */
   | 'sample-5-model'
   /**
+   * The same three draws, and a model that is shown what each of them returns.
+   *
+   * The arm that follows from iteration 93's negative result. A selector over SQL text scored 18 of
+   * 82 questions where a choice existed — the same as taking the first draw, against 35 for the best
+   * of the three — because two queries that differ in one join condition read as two plausible
+   * queries. The rows are the only signal that distinguishes them, and this lane already executes
+   * every draw to compute agreement, so showing them costs nothing it has not already paid.
+   */
+  | 'sample-3-exec'
+  /**
    * The same question with the schema pruned to the tables it names.
    *
    * MCS-SQL measures +2.1 points from schema linking alone with the same model, and CHASE-SQL names
@@ -525,6 +535,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-3-random': true,
   'sample-3-oracle': true,
   'sample-3-model': true,
+  'sample-3-exec': true,
   'sample-5-model': true,
   linked: true,
 };
@@ -1237,8 +1248,11 @@ export function mentionsAny(text: string, identifiers: ReadonlySet<string>): boo
     const at = haystack.indexOf(identifier);
     if (at === -1) continue;
     // Whole-token match: `race` inside `races` is a different word about a different table.
-    const before = at === 0 ? '' : haystack[at - 1] ?? '';
-    const after = haystack[at + identifier.length] ?? '';
+    // `charAt` rather than indexing because it returns the empty string past either end, which is
+    // what the boundary test needs; `haystack[at - 1]` at position zero is `undefined`, and
+    // `/[a-z0-9_]/.test(undefined)` is true — the first word of a claim would never count.
+    const before = at === 0 ? '' : haystack.charAt(at - 1);
+    const after = haystack.charAt(at + identifier.length);
     if (!/[a-z0-9_]/.test(before) && !/[a-z0-9_]/.test(after)) return true;
   }
   return false;
@@ -1311,9 +1325,89 @@ export function relevanceSplit(
   };
 }
 
+export type SchemaLinkGroup = {
+  readonly questions: number;
+  readonly withoutMemoryAccuracy: number;
+  readonly accuracy: number;
+  readonly deltaPp: number;
+  readonly gained: number;
+  readonly lost: number;
+};
+
+export type SchemaLinkSplit = {
+  /** Questions whose prompt the linker actually shortened. */
+  readonly pruned: SchemaLinkGroup;
+  /**
+   * Questions whose prompt came through byte-identical to the baseline.
+   *
+   * Not a control group in the experimental sense — it was not assigned, it is what the linker
+   * declined to touch — but it is the only group that can tell a pruner's effect from a run's
+   * drift: its two prompts are the same string, so its delta is the noise floor measured on the
+   * same questions in the same fold. A `linked` arm whose pruned and unchanged groups both move by
+   * the same amount did not measure pruning.
+   */
+  readonly unchanged: SchemaLinkGroup;
+};
+
+const emptyGroup = (): SchemaLinkGroup => ({
+  questions: 0,
+  withoutMemoryAccuracy: 0,
+  accuracy: 0,
+  deltaPp: 0,
+  gained: 0,
+  lost: 0,
+});
+
 /**
- * The kind of failure, from the words a deployment actually has.
+ * The `linked` arm's delta, split by whether the linker did anything.
  *
+ * The population delta cannot answer the question the arm was built to ask, and iteration 92 is the
+ * proof: 292 of 350 prompts were byte-identical to the baseline, so −7.4pp had to be carried by the
+ * 122 questions that were actually pruned, i.e. −21pp on that subset — a number no prompt edit of
+ * this size produces, and a sign the delta was describing the run rather than the pruner. Splitting
+ * it is what makes the claim falsifiable in one direction and the abstentions visible in the other.
+ */
+export function schemaLinkSplit(
+  cases: readonly {
+    readonly schemaTables: { readonly kept: number; readonly total: number; readonly pruned: boolean } | null;
+    readonly withoutMemoryCorrect: boolean;
+    readonly arms: Readonly<Record<string, boolean | undefined>>;
+  }[],
+): SchemaLinkSplit | null {
+  const groups = { pruned: emptyGroup(), unchanged: emptyGroup() };
+  let seen = 0;
+  for (const item of cases) {
+    const tables = item.schemaTables;
+    const linked = item.arms['linked'];
+    if (tables === null || linked === undefined) continue;
+    seen += 1;
+    const key = tables.pruned ? 'pruned' : 'unchanged';
+    const group = groups[key];
+    const before = item.withoutMemoryCorrect;
+    groups[key] = {
+      questions: group.questions + 1,
+      accuracy: group.accuracy + (linked ? 1 : 0),
+      withoutMemoryAccuracy: group.withoutMemoryAccuracy + (before ? 1 : 0),
+      gained: group.gained + (!before && linked ? 1 : 0),
+      lost: group.lost + (before && !linked ? 1 : 0),
+      deltaPp: 0,
+    };
+  }
+  if (seen === 0) return null;
+  const finish = (group: SchemaLinkGroup): SchemaLinkGroup => {
+    const scale = group.questions === 0 ? 0 : 1 / group.questions;
+    return {
+      ...group,
+      accuracy: group.accuracy * scale,
+      withoutMemoryAccuracy: group.withoutMemoryAccuracy * scale,
+      deltaPp: (group.accuracy - group.withoutMemoryAccuracy) * scale * 100,
+    };
+  };
+  return { pruned: finish(groups.pruned), unchanged: finish(groups.unchanged) };
+}
+
+/**
+ * The kind of failure, from the words a deployment actually has. *
  * A retry is triggered by one of two things — the query did not run, or it ran and returned
  * nothing — and a note learned from a failure is only usable if it is retrieved by *that*, not by
  * the question. The question does not say what failed; the failure does.
