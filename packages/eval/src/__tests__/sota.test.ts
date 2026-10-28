@@ -243,6 +243,7 @@ describe('parseArms', () => {
       'sample-3',
       'sample-5',
       'sample-5-first',
+      'sample-5-oracle',
       'sample-5-random',
       'stated',
       'wrong-scope',
@@ -299,6 +300,7 @@ describe('parseArms', () => {
       'sample-5',
       'sample-5-first',
       'sample-5-random',
+      'sample-5-oracle',
     ]);
   });
 
@@ -1049,5 +1051,20 @@ describe('the two vocabularies have to be one', () => {
     expect(
       failureKind(mismatchNote({ ok: true, rows: 2, columns: [] }, { ok: true, rows: 5, columns: [] })),
     ).toBe('row-count');
+  });
+});
+
+describe('an arm list may name the two required arms', () => {
+  it('accepts none and full instead of calling them unknown', () => {
+    // The natural way to write a dispatch cost a whole job: install, build, restore the cache, then
+    // "Unknown arm 'full'" — because `full` is always measured and therefore never in the optional
+    // table the parser searched. Redundant is not wrong.
+    expect([...parseArms('none,full,gated')].sort()).toEqual(['full', 'gated', 'none']);
+    expect([...parseArms('none')].sort()).toEqual(['full', 'none']);
+    expect([...parseArms('full,full,none')].sort()).toEqual(['full', 'none']);
+  });
+
+  it('still refuses a name that is not an arm', () => {
+    expect(() => parseArms('none,full,oracle2')).toThrow(/Unknown arm 'oracle2'/);
   });
 });

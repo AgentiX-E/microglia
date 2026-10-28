@@ -431,7 +431,19 @@ export type SqlArm =
    * a better draw than its first element more often than chance, so "more candidates help" and "the
    * selector helps" produce the same sign. Only this arm says which.
    */
-  | 'sample-5-random';
+  | 'sample-5-random'
+  /**
+   * The best a selector could have done on the same five draws.
+   *
+   * Reads the answer key and is not deployable. It exists because the two failures it separates are
+   * confused constantly: "the candidates were there and the choice was wrong" and "the candidates
+   * were never there" call for opposite work. CHASE-SQL reports that gap as 14 points on BIRD
+   * (self-consistency 68.84, upper bound 82.79), which is the largest quantity in their table and
+   * the reason they built a selection model at all.
+   *
+   * Costs no calls: every draw is scored anyway so the chosen one can be measured.
+   */
+  | 'sample-5-oracle';
 
 /**
  * Every optional arm, as a table keyed by the union itself.
@@ -475,6 +487,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-5': true,
   'sample-5-first': true,
   'sample-5-random': true,
+  'sample-5-oracle': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(
@@ -492,6 +505,11 @@ export function parseArms(raw: string | undefined): Set<SqlArm> {
   for (const name of (raw ?? OPTIONAL_ARMS.join(',')).split(',')) {
     const trimmed = name.trim();
     if (trimmed === '') continue;
+    // `none` and `full` are always measured, and saying so explicitly is the natural way to write
+    // an arm list: a dispatch that named them was rejected as "Unknown arm 'full'" after the job
+    // had already installed, built and restored its cache. Redundant is not wrong, and a parser
+    // that refuses the obvious invocation is a parser that will be worked around.
+    if (trimmed === 'none' || trimmed === 'full') continue;
     if (!(OPTIONAL_ARMS as readonly string[]).includes(trimmed)) {
       throw new RangeError(`Unknown arm '${trimmed}'; known arms are ${OPTIONAL_ARMS.join(', ')}`);
     }

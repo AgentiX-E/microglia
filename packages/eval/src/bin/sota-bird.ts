@@ -1126,6 +1126,15 @@ type FoldResult = {
         readonly draws: number;
         readonly temperature: number;
         readonly byArm: Readonly<Record<string, SelectionStats>>;
+        /**
+         * How many draws were right, per question: index is the count, value the questions.
+         *
+         * The distribution the same-run ceiling comes from, and the only number that says whether
+         * more draws add *distinct* correct answers or repeat the same one. A run where every
+         * correct question is right in all five draws has nothing for a selector to find, and a run
+         * where they are right exactly once has everything.
+         */
+        readonly correctDraws: readonly number[];
       }
     | null;
   /** What the repair store holds, sampled: a count alone cannot show what was learned. */
@@ -1972,17 +1981,31 @@ async function runFold(
   const samplingArmsThisRun = (Object.keys(SAMPLING_ARM_N) as ArmName[]).filter((arm) =>
     ARMS.has(arm),
   );
+  /**
+   * What the best selector could possibly have scored.
+   *
+   * CHASE-SQL's Table 1 is the reason this exists: single query 63.01, self-consistency 68.84,
+   * upper bound 82.79. Fourteen points sit between what the model can produce and what a selector
+   * retrieves, which is why "the candidates are there and the choice is wrong" is a different claim
+   * from "the candidates are not there". This arm is not deployable — it reads the answer key — and
+   * its only purpose is to say which of the two a run is in.
+   *
+   * It costs nothing: every draw is judged anyway so the chosen one can be scored.
+   */
+  const wantsCeiling = ARMS.has('sample-5-oracle');
   const sampleReplies = new Map<string, Reply | undefined>();
-  const sampleChosen = new Map<
-    string,
-    { readonly position: number; readonly arm: ArmName; readonly selection: Selection }
-  >();
+  const drawJudged = new Map<number, Judged[]>();
+  const chosenJudged = new Map<string, { readonly position: number; readonly arm: ArmName; readonly verdict: Judged }>();
   const selectionByArm = new Map<ArmName, Selection[]>();
+  const correctDraws = new Array<number>(0).fill(0);
   let samplingDraws = 0;
-  if (samplingArmsThisRun.length > 0) {
+  if (samplingArmsThisRun.length > 0 || wantsCeiling) {
     const index = new Map(plans.map((plan, at) => [`${plan.position}:${plan.arm}`, at]));
     const batch: { position: number; draw: number; prompt: string }[] = [];
-    samplingDraws = Math.max(...samplingArmsThisRun.map((arm) => SAMPLING_ARM_N[arm] ?? 1));
+    samplingDraws =
+      samplingArmsThisRun.length === 0
+        ? 5
+        : Math.max(...samplingArmsThisRun.map((arm) => SAMPLING_ARM_N[arm] ?? 1));
     for (const position of evalRows.keys()) {
       const at = index.get(`${position}:none`);
       const wording = at === undefined ? undefined : plans[at]?.prompt;
@@ -2014,6 +2037,7 @@ async function runFold(
       const row = evalRows[position] as BirdRow;
       const dbPath = dataset.dbPath(row.db_id);
       const candidates: Candidate[] = [];
+      const verdicts: Judged[] = [];
       for (let draw = 0; draw < samplingDraws; draw += 1) {
         const reply = sampleReplies.get(`${position}:${draw}`);
         const sql = reply === undefined ? undefined : extractSql(reply.text);
@@ -2024,10 +2048,17 @@ async function runFold(
           signature: outcome === undefined ? undefined : signatureOf(outcome),
           rows: outcome === undefined ? 0 : outcome.tuples.length,
         });
+        // Every draw is scored, not only the chosen one, because the ceiling is the score of a
+        // selector that always picked right and cannot be computed after the fact.
+        verdicts.push(judgeReply(row, dbPath, reply, task));
       }
-      // Every arm gets a plan even when no draw arrived: the `none` baseline scores a failed call as
-      // a wrong answer, and an arm that silently dropped the question would be measured on a
-      // different, easier population than the one it is compared against.
+      drawJudged.set(position, verdicts);
+      const right = verdicts.filter((verdict) => verdict.correct).length;
+      while (correctDraws.length <= right) correctDraws.push(0);
+      correctDraws[right] = (correctDraws[right] ?? 0) + 1;
+      // Every arm gets a verdict even when no draw arrived: the `none` baseline scores a failed
+      // call as a wrong answer, and an arm that silently dropped the question would be measured on
+      // a different, easier population than the one it is compared against.
       for (const arm of samplingArmsThisRun) {
         const n = SAMPLING_ARM_N[arm] ?? 1;
         const pool = candidates.slice(0, n);
@@ -2037,7 +2068,11 @@ async function runFold(
             : arm === 'sample-5-first'
               ? selectFirst(pool)
               : selectByConsistency(pool);
-        sampleChosen.set(`${position}:${arm}`, { position, arm, selection });
+        chosenJudged.set(`${position}:${arm}`, {
+          position,
+          arm,
+          verdict: verdicts[selection.chosen] ?? (verdicts[0] as Judged),
+        });
         const list = selectionByArm.get(arm);
         if (list === undefined) selectionByArm.set(arm, [selection]);
         else list.push(selection);
@@ -2076,18 +2111,10 @@ async function runFold(
     });
   }
 
-  // The sampling arms' chosen draws are judged here, after the selectors have run: the answer an
-  // arm claims is the one its selector picked, and judging the other draws would score candidates
-  // nobody used.
-  for (const entry of sampleChosen.values()) {
-    const row = evalRows[entry.position] as BirdRow;
-    const reply = sampleReplies.get(`${entry.position}:${entry.selection.chosen}`);
-    const started = performance.now();
-    const result = judgeReply(row, dataset.dbPath(row.db_id), reply, task);
-    judged.set(`${entry.position}:${entry.arm}`, {
-      ...result,
-      latencyMs: Math.round(performance.now() - started),
-    });
+  // The sampling arms are registered here, after the selectors have run: the answer an arm claims
+  // is the one its selector picked, and the other draws were scored only to size the ceiling.
+  for (const entry of chosenJudged.values()) {
+    judged.set(`${entry.position}:${entry.arm}`, entry.verdict);
     plans.push({
       position: entry.position,
       arm: entry.arm,
@@ -2095,6 +2122,14 @@ async function runFold(
       packIds: 0,
       packChars: 0,
     });
+  }
+  if (wantsCeiling) {
+    for (const [position, verdicts] of drawJudged) {
+      const anyCorrect = verdicts.find((verdict) => verdict.correct) ?? verdicts[0];
+      if (anyCorrect === undefined) continue;
+      judged.set(`${position}:sample-5-oracle`, anyCorrect);
+      plans.push({ position, arm: 'sample-5-oracle', prompt: '', packIds: 0, packChars: 0 });
+    }
   }
 
   // A question that never needed a retry keeps its first answer under this arm's name: the
@@ -2303,6 +2338,7 @@ async function runFold(
             byArm: Object.fromEntries(
               [...selectionByArm].map(([arm, list]) => [arm, selectionStats(list)]),
             ),
+            correctDraws,
           },
     repairItems,
     distillDrops: { rule: widened.drops, repair: repaired?.drops ?? null },
@@ -2848,6 +2884,14 @@ async function main(): Promise<void> {
           : {
               draws: folds[0]?.sampling?.draws ?? 0,
               temperature: folds[0]?.sampling?.temperature ?? 0,
+              correct_draws: folds.reduce<number[]>((all, fold) => {
+                const counts = fold.sampling?.correctDraws ?? [];
+                for (const [right, count] of counts.entries()) {
+                  while (all.length <= right) all.push(0);
+                  all[right] = (all[right] ?? 0) + count;
+                }
+                return all;
+              }, []),
               by_arm: Object.fromEntries(
                 [...new Set(folds.flatMap((fold) => Object.keys(fold.sampling?.byArm ?? {})))].map(
                   (arm) => {
