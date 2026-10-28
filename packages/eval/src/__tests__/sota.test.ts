@@ -254,6 +254,7 @@ describe('parseArms', () => {
       'sample-5-oracle',
       'sample-5-random',
       'stated',
+      'values',
       'wrong-scope',
     ]);
   });
@@ -315,6 +316,7 @@ describe('parseArms', () => {
       'sample-3-model',
       'sample-3-exec',
       'sample-5-model',
+      'values',
       'linked',
     ]);
   });

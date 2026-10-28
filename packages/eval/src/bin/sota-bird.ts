@@ -114,13 +114,16 @@ import {
   mapPool,
   parseChoice,
   renderRows,
+  renderValue,
   schemaLinkSplit,
+  schemaWithValues,
   selectByConsistency,
   selectByModel,
   selectFirst,
   selectRandom,
   selectionStats,
   signatureOf,
+  type ValueSample,
   matches,
   mentionsAny,
   mismatchNote,
@@ -778,6 +781,75 @@ function ddlOf(dbPath: string): string {
   } finally {
     db.close();
   }
+}
+
+/**
+ * A few distinct values per column, read once per database.
+ *
+ * Cached for the same reason the DDL is: eleven databases, thirty-odd questions each, and a sample
+ * that cannot change during a run. Three values per column because the question is "what shape is
+ * this column's data", and a table with more than sixteen annotated columns would replace the schema
+ * with a list of literals.
+ *
+ * `distinct` is the right verb: the first three rows of a sorted table are three copies of one value
+ * as often as not, and a sample that shows the same string three times teaches nothing about the
+ * domain the column covers.
+ */
+const valuesCache = new Map<
+  string,
+  { readonly ddl: string; readonly stats: { tables: number; columns: number; annotated: number } }
+>();
+
+const quoteIdentifier = (name: string): string => `"${name.replaceAll('"', '""')}"`;
+
+function valuesDdl(dbPath: string): { ddl: string; stats: { tables: number; columns: number; annotated: number } } {
+  const cached = valuesCache.get(dbPath);
+  if (cached !== undefined) return cached;
+  const stats = { tables: 0, columns: 0, annotated: 0 };
+  const samples = new Map<string, readonly ValueSample[]>();
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const tables = db
+      .prepare("select name from sqlite_master where type='table' and name not like 'sqlite_%'")
+      .all() as { name: string }[];
+    for (const { name } of tables) {
+      const columns = db.prepare(`pragma table_info(${quoteIdentifier(name)})`).all() as {
+        name: string;
+      }[];
+      const tableSamples: ValueSample[] = [];
+      for (const column of columns) {
+        stats.columns += 1;
+        const identifier = quoteIdentifier(column.name);
+        let values: unknown[] = [];
+        try {
+          const rows = db
+            .prepare(
+              `select distinct ${identifier} as v from ${quoteIdentifier(name)} ` +
+                `where ${identifier} is not null limit 3`,
+            )
+            .all() as { v: unknown }[];
+          values = rows.map((row) => row.v);
+        } catch {
+          // A column whose type cannot be compared (a blob, for instance) is skipped rather than
+          // failing the run: the arm is an annotation, not a migration.
+          values = [];
+        }
+        if (values.length === 0) continue;
+        stats.annotated += 1;
+        tableSamples.push({ column: column.name, values: values.map(renderValue) });
+      }
+      stats.tables += 1;
+      samples.set(name, tableSamples);
+    }
+  } finally {
+    db.close();
+  }
+  const entry = {
+    ddl: schemaWithValues(ddlOf(dbPath), (table) => samples.get(table) ?? []),
+    stats,
+  };
+  valuesCache.set(dbPath, entry);
+  return entry;
 }
 
 /** Execute a statement and canonicalise its result set. */
@@ -1829,6 +1901,11 @@ async function runFold(
         pruned: linked.reason === 'linked',
       });
       call(position, 'linked', '', 0, false, 'before', linked.ddl);
+    }
+    if (ARMS.has('values')) {
+      // The same question, the same pack position, one input changed: the schema now says what the
+      // columns hold. Compared against `none`, which is the same prompt without the annotation.
+      call(position, 'values', '', 0, false, 'before', valuesDdl(dataset.dbPath(row.db_id)).ddl);
     }
     if (ARMS.has('stated')) call(position, 'stated', '', 0);
     if (ARMS.has('oracle')) {
@@ -3166,6 +3243,26 @@ async function main(): Promise<void> {
              */
             split: schemaLinkSplit(cases),
           },
+      /**
+       * What the value annotator produced, so an arm that annotated nothing cannot look like one
+       * that annotated everything.
+       *
+       * The published gain for value samples is +4.8pp with an index that links question tokens to
+       * cell values. This arm annotates every column uniformly, which is a different and weaker
+       * treatment, and these counts are what say how much text the model was actually given.
+       */
+      value_samples:
+        valuesCache.size === 0
+          ? null
+          : {
+              databases: valuesCache.size,
+              tables: [...valuesCache.values()].reduce((sum, entry) => sum + entry.stats.tables, 0),
+              columns: [...valuesCache.values()].reduce((sum, entry) => sum + entry.stats.columns, 0),
+              annotated: [...valuesCache.values()].reduce(
+                (sum, entry) => sum + entry.stats.annotated,
+                0,
+              ),
+            },
       sampling:
         folds.every((fold) => fold.sampling === null)
           ? null

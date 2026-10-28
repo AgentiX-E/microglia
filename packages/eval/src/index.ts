@@ -32,6 +32,12 @@ export {
 } from './selector.js';
 export { recoveryRatio, type RecoveryInput } from './recovery.js';
 export {
+  renderValue,
+  schemaWithValues,
+  type TableValues,
+  type ValueSample,
+} from './value-samples.js';
+export {
   BirdDataError,
   archiveVerdict,
   dedupeQuestions,

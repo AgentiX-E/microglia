@@ -475,6 +475,16 @@ export type SqlArm =
    */
   | 'sample-3-exec'
   /**
+   * The same question with the schema annotated with a few values per column.
+   *
+   * The prompt has only ever carried the DDL, so every literal in every answer is a guess about a
+   * column's contents: `'M'` or `'Male'`, `'1970-01-01'` or `'01/01/1970'`, `'Rock'` or `'rock'`.
+   * MCS-SQL measures value samples as +4.8pp on BIRD dev — their largest single component, above
+   * schema linking and above their selection step — and it is the only published lever left that
+   * acts on the generator rather than on the choice among candidates.
+   */
+  | 'values'
+  /**
    * The same question with the schema pruned to the tables it names.
    *
    * MCS-SQL measures +2.1 points from schema linking alone with the same model, and CHASE-SQL names
@@ -537,6 +547,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-3-model': true,
   'sample-3-exec': true,
   'sample-5-model': true,
+  values: true,
   linked: true,
 };
 
