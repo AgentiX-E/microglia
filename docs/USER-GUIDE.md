@@ -101,6 +101,45 @@ The result is a `KnowledgePack`:
 | `truncated` | how many candidates were dropped for the budget |
 | `suppressed` | `'uncorroborated-store'` when a configured `corroborationFloor` silenced the pack; absent otherwise |
 
+#### Where you put the pack matters more than what is in it
+
+This library was measured on a public text-to-SQL benchmark across fifteen dispatches. The result is
+uncomfortable and consistent: a pack placed **before** the first answer costs accuracy, whichever
+form it takes, and the same pack placed **after a failure** costs nothing and gains nothing.
+
+| What was injected | Where | Δ accuracy | runs |
+|---|---|---|---|
+| rules naming the case | before the answer | **−3.7pp** | 5, four significant |
+| the same, cut to one item | before the answer | −3.1pp | 1 |
+| an account of the failure ("what failed, why, what fixed it") | before the answer | **−5.2pp** | 2, both significant |
+| the same knowledge as a procedure with no case in it | before the answer | −1.0pp | 3, not significant |
+| any of the above | after a failed answer | **0.0pp** | 6, never a loss |
+
+Two details decide the interpretation:
+
+* **A pack that is not about the question does nothing at all.** Packs whose text named nothing the
+  answer used left accuracy unchanged (74.6% with, 74.6% without). Only packs that named something
+  the answer used moved it — downwards. The model does not weigh a retrieved record; it follows it.
+* **The cost arrives with the first readable claim.** Below one item the pack is empty and the cost
+  is zero; at one item it is about three points, and it grows with how much of a case the text
+  describes.
+
+So the integration that this evidence supports is:
+
+```ts
+// 1. No pack before the first attempt.
+const first = await mg.recall({ task, text: question, scope });
+if (await fails(first)) {
+  // 2. Spend the pack only where an answer already failed, and key it by the failure.
+  const retry = await mg.recall({ task, text: question, scope: { ...scope, reasonCode: code } });
+  // 3. Show it, and let the failure — not the pack — set the agenda.
+}
+```
+
+`reasonCode` is the one scope dimension a host should fill from its own classifier: it is what lets a
+note about a failure be found by a failure. A host that leaves it empty is retrieving notes about
+topics when what it has is a symptom.
+
 #### Inject only what the question is about
 
 A scope match is not a topical match. A rule filed under the same domain is returned even when the

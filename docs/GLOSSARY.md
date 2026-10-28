@@ -248,3 +248,13 @@ harness counts the difference (`active-not-injected`).
 **Capability-limited attacker** — the adversary the gate is written against: it controls content,
 citations, scope claims, paraphrases and arrival order, but not the trust the host assigns to the channel
 it writes through. A fully trusted attacker is a user, and its success is reported as a limit.
+
+## reasonCode
+
+The one scope dimension that says *what went wrong* rather than *what the claim is about*. A host
+fills it from its own classifier — `no-rows`, `missing-column`, `syntax`, `row-count` — and the
+library writes it on the claim at distillation time and filters on it at recall time. A note about a
+failure is only findable by a failure if this is filled; measured on the public lane, filling it took
+a keyed recall from 0 hits in 22 attempts to 25 in 26, and the accuracy did not move.
+
+See also: scope, tier, reason code in `USER-GUIDE` §3.1.
