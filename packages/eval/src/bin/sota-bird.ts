@@ -1089,8 +1089,13 @@ type FoldResult = {
   readonly repairActive: number | null;
   /** Active items in the procedural memory, or null when that arm was off. */
   readonly proceduralActive: number | null;
-  /** Failure-keyed recalls asked, and how many found a note. */
-  readonly failureKey: { readonly asked: number; readonly hit: number };
+  /** Failure-keyed recalls asked, and how many found a note, with both vocabularies. */
+  readonly failureKey: {
+    readonly asked: number;
+    readonly hit: number;
+    readonly stored: Readonly<Record<string, number>>;
+    readonly observed: Readonly<Record<string, number>>;
+  };
   /** What the repair store holds, sampled: a count alone cannot show what was learned. */
   readonly repairItems: readonly RepairItem[];
   /** Candidates dropped by the parser, per form. */
@@ -1515,6 +1520,9 @@ async function runFold(
   /** How often a failure-keyed recall found a note, and how often it was asked. */
   let keyedTried = 0;
   let keyedHits = 0;
+  /** What the procedural store files its notes under, and what the retries ask for. */
+  const storedCodes: Record<string, number> = {};
+  const observedCodes: Record<string, number> = {};
   /** How much of each pack survives the grounding filter, so the shrink is a number. */
   const groundedSizes: { all: number; grounded: number }[] = [];
   /** The pack each question would see, held for the anchored arm's second call. */
@@ -1797,6 +1805,7 @@ async function runFold(
       let keyedIds = 0;
       if (retryArmsThisRun.includes('retry-keyed') && procedural !== undefined) {
         const code = failureKind(failure);
+        observedCodes[code] = (observedCodes[code] ?? 0) + 1;
         const keyed = await procedural.host.recall({
           task: TASK,
           text: row.question,
@@ -2094,6 +2103,12 @@ async function runFold(
           when: item.when ?? null,
           payload: item.payload ?? null,
         }));
+  if (procedural !== undefined) {
+    for (const item of await procedural.store.listKnowledge({ namespace: 'bird', status: 'all' })) {
+      const code = item.scope.reasonCode ?? 'none';
+      storedCodes[code] = (storedCodes[code] ?? 0) + 1;
+    }
+  }
   await widened.host.close();
   if (narrowed !== undefined) await narrowed.host.close();
   if (repaired !== undefined) await repaired.host.close();
@@ -2137,7 +2152,7 @@ async function runFold(
     narrowActive: narrowed?.frozen.active ?? null,
     repairActive: repaired?.frozen.active ?? null,
     proceduralActive: procedural?.frozen.active ?? null,
-    failureKey: { asked: keyedTried, hit: keyedHits },
+    failureKey: { asked: keyedTried, hit: keyedHits, stored: storedCodes, observed: observedCodes },
     repairItems,
     distillDrops: { rule: widened.drops, repair: repaired?.drops ?? null },
     items,
@@ -2678,6 +2693,26 @@ async function main(): Promise<void> {
       failure_key: {
         asked: folds.reduce((sum, fold) => sum + fold.failureKey.asked, 0),
         hit: folds.reduce((sum, fold) => sum + fold.failureKey.hit, 0),
+        /**
+         * The two vocabularies, side by side.
+         *
+         * A key is only a key if the store and the retry speak the same language. The first run of
+         * this arm asked 22 times and hit nothing, and the artefact could not say whether the
+         * store lacked the code or the recall refused it; these two histograms answer that in one
+         * look.
+         */
+        stored: folds.reduce<Record<string, number>>((all, fold) => {
+          for (const [code, count] of Object.entries(fold.failureKey.stored)) {
+            all[code] = (all[code] ?? 0) + count;
+          }
+          return all;
+        }, {}),
+        observed: folds.reduce<Record<string, number>>((all, fold) => {
+          for (const [code, count] of Object.entries(fold.failureKey.observed)) {
+            all[code] = (all[code] ?? 0) + count;
+          }
+          return all;
+        }, {}),
       },
       /**
        * Whether the pack was about the question, and what accuracy did in each half.

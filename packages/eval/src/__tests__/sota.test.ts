@@ -1023,3 +1023,23 @@ describe('failureKind', () => {
     expect(failureKind(note)).toBe(failureKind(`  ${note.toUpperCase()}  `));
   });
 });
+
+describe('the two vocabularies have to be one', () => {
+  it('says "no rows" in the words the retry uses', () => {
+    // The learning pass writes the mismatch note and the retry loop writes the failure; the failure
+    // key compares their codes. "0 rows" on one side and "no rows" on the other is two vocabularies,
+    // and it cost a whole arm: 22 asks, 0 hits.
+    const note = mismatchNote(
+      { ok: true, rows: 0, columns: [] },
+      { ok: true, rows: 3, columns: ['count'] },
+    );
+    expect(note).toBe('it returned no rows, where the corrected query returns 3');
+    expect(failureKind(note)).toBe(failureKind('it returned no rows'));
+  });
+
+  it('still distinguishes a right row count from a zero one', () => {
+    expect(
+      failureKind(mismatchNote({ ok: true, rows: 2, columns: [] }, { ok: true, rows: 5, columns: [] })),
+    ).toBe('row-count');
+  });
+});

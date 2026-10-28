@@ -1029,6 +1029,13 @@ export function mismatchNote(attempt: ResultShape, correction: ResultShape): str
     return 'it ran but returned the wrong rows';
   }
   if (attempt.rows !== correction.rows) {
+    // "No rows" is said in the words the retry uses. The learning pass and the retry loop classify
+    // the same failure, and a vocabulary that says "0 rows" on one side and "no rows" on the other
+    // is two vocabularies: measured, the failure key found nothing on 22 of 22 retries because no
+    // note had ever been filed under `no-rows`.
+    if (attempt.rows === 0) {
+      return `it returned no rows, where the corrected query returns ${correction.rows}`;
+    }
     return `it returned ${attempt.rows} rows where the corrected query returns ${correction.rows}`;
   }
   if (attempt.columns.join('\u0000') !== correction.columns.join('\u0000')) {
