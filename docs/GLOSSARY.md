@@ -128,6 +128,23 @@ knowledge, holding the generator fixed. Not a benchmark result, and never quoted
 **Micro-ablation** — a targeted experiment that constructs the smallest workload in which a module
 binds, because a whole-corpus arm would report zero for a module that simply never fires.
 
+**Ceiling** — the best accuracy any selector could reach on the candidates a run actually produced,
+computed from the answer key. A selector's delta is only meaningful beside the ceiling it was aiming
+at: retrieving one point of a seven-point ceiling and retrieving one point of a twenty-point ceiling
+are different results, and this project reports them as such.
+
+**Memory prior** — a table keyed on the shape of an executed result, holding how often results of that
+shape turned out to be correct, read from the other folds. It is the object a verifier reads when memory
+*judges* a candidate instead of proposing one: no rule text, no relevance filter, no embedding, only
+"on this shape, were we right before". The strength of the idea is that the key is a property of the
+attempt rather than of the wording of a lesson, so it is complete at one observation.
+
+**Position (of memory)** — where a stored item acts, of four: the prompt prefix, the retry, a feature
+the verifier reads, or the prior the verifier is built from. This project measures the four separately,
+because a rule that helps in one position and hurts in another is not a single claim: the same store
+that costs 3.14pp as a prefix is worth nothing on retry, and the object that replaces it is not a rule
+at all.
+
 **Power** — the sample size needed to detect an effect at a stated confidence. Stated per benchmark so
 a null result is not confused with an underpowered one.
 
