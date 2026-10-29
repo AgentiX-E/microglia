@@ -136,6 +136,7 @@ import {
   renderMschema,
   selectByConsistency,
   selectByModel,
+  selectByShape,
   selectFirst,
   selectRandom,
   selectionStats,
@@ -2661,9 +2662,9 @@ async function runFold(
     arm: ArmName,
   ): {
     n: number;
-    selector: 'majority' | 'first' | 'random' | 'oracle' | 'model' | 'exec';
+    selector: 'majority' | 'first' | 'random' | 'oracle' | 'model' | 'exec' | 'shape';
   } | undefined => {
-    const match = /^sample-(\d+)(?:-(first|random|oracle|model|exec))?$/.exec(arm);
+    const match = /^sample-(\d+)(?:-(first|random|oracle|model|exec|shape))?$/.exec(arm);
     if (match === null) return undefined;
     const n = Number(match[1]);
     if (!Number.isInteger(n) || n < 2) return undefined;
@@ -2679,7 +2680,9 @@ async function runFold(
               ? 'model'
               : suffix === 'exec'
                 ? 'exec'
-                : 'majority';
+                : suffix === 'shape'
+                  ? 'shape'
+                  : 'majority';
     return { n, selector };
   };
   const samplingArmsThisRun = (OPTIONAL_ARMS as readonly ArmName[]).filter(
@@ -2967,6 +2970,20 @@ async function runFold(
       choiceAccounting.set(fold, byArm);
     }
 
+    /**
+     * The first `n` draws of a question, as the shape composite reads them.
+     *
+     * `selectByShape` ranks execution *signatures*, and the record written for the analysis is the
+     * only place a signature survives — the `Candidate` slice the other selectors read carries a
+     * result identity and a row count, which is enough to agree and not enough to judge a shape. The
+     * record is written in the same iteration as `poolByPosition`, so a position with a pool always
+     * has one; the cast states that once rather than branching on a case the loop already excludes.
+     */
+    const shapePoolOf = (position: number, n: number): PoolQuestion => {
+      const recorded = poolByPositionRecord.get(position) as PoolQuestion;
+      return { ...recorded, candidates: recorded.candidates.slice(0, n) };
+    };
+
     for (const position of evalRows.keys()) {
       const pool = poolByPosition.get(position);
       if (pool === undefined) continue;
@@ -2978,13 +2995,15 @@ async function runFold(
         if (spec === undefined) continue;
         const slice = pool.candidates.slice(0, spec.n);
         const selection =
-          spec.selector === 'random'
-            ? selectRandom(slice, mulberry32(SEED + position))
-            : spec.selector === 'first'
-              ? selectFirst(slice)
-              : spec.selector === 'model' || spec.selector === 'exec'
-                ? selectByModel(slice.length, choiceAtIndex.get(`${position}:${arm}`))
-                : selectByConsistency(slice);
+          spec.selector === 'shape'
+            ? selectByShape(shapePoolOf(position, spec.n))
+            : spec.selector === 'random'
+              ? selectRandom(slice, mulberry32(SEED + position))
+              : spec.selector === 'first'
+                ? selectFirst(slice)
+                : spec.selector === 'model' || spec.selector === 'exec'
+                  ? selectByModel(slice.length, choiceAtIndex.get(`${position}:${arm}`))
+                  : selectByConsistency(slice);
         chosenJudged.set(`${position}:${arm}`, {
           position,
           arm,

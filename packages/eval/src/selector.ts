@@ -48,6 +48,8 @@ export type SelectionReason =
   | 'nothing-ran'
   /** A model read the candidates and named one. */
   | 'model'
+  /** The execution-shape composite endorsed one; see `selectByShape`. */
+  | 'shape'
   /** No candidates at all: the caller asked for a selection it did not supply. */
   | 'empty';
 

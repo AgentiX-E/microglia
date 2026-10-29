@@ -507,6 +507,26 @@ export type SqlArm =
    */
   | 'sample-3-exec'
   /**
+   * The same five draws, chosen by the execution-shape composite.
+   *
+   * R7.2a priced this composite on the draws a five-draw run had already recorded: on the 122
+   * questions where the draws disagreed it scored 40.2% against 32.8% for the first draw, +7.38pp,
+   * gained 11 and lost 2, exact McNemar p = 0.0225. That is the first positive selection number this
+   * project has produced, and it is a simulation — the composite was applied to a recorded pool, so
+   * it has no confidence interval of its own and has never been scored by the same judge as an arm.
+   *
+   * This arm is that measurement. It costs no calls: every draw is executed anyway to compute
+   * agreement, and the five signals that vote here are the five that cleared their own gate
+   * (`value-type`, `column-shape`, `empty`, `row-shape`, `duplicate-share`; `null-share` did not,
+   * z = 1.23). The set is fixed in `SHAPE_VOTERS` rather than re-derived inside each fold, because a
+   * selector that chooses its features on the data it is scored on reports the fit, not the feature.
+   *
+   * Its honest baseline is `sample-5-first`, not `none`: the composite can only act where a choice
+   * exists, and charging it with the cost of the extra draws would be pricing temperature as
+   * judgement.
+   */
+  | 'sample-5-shape'
+  /**
    * The same question with the schema annotated with a few values per column.
    *
    * The prompt has only ever carried the DDL, so every literal in every answer is a guess about a
@@ -618,6 +638,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-3-oracle': true,
   'sample-3-model': true,
   'sample-3-exec': true,
+  'sample-5-shape': true,
   'sample-5-model': true,
   values: true,
   'm-schema': true,

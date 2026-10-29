@@ -99,6 +99,7 @@ export {
 } from './pool.js';
 export {
   ALPHA,
+  SHAPE_VOTERS,
   Z_BAR,
   compositeGate,
   compositePicks,
@@ -107,6 +108,7 @@ export {
   normalUpper,
   readComposite,
   seOf,
+  selectByShape,
   type CompositeReading,
   type CompositeVerdict,
   type SignalVerdict,

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { execSignatureOf, type ExecSignature, type QuestionShape } from '../exec-signature.js';
 import type { PoolCandidate, PoolQuestion, PoolSignalReading } from '../pool.js';
 import {
+  SHAPE_VOTERS,
   compositeGate,
   compositePicks,
   gateOf,
@@ -9,6 +10,7 @@ import {
   normalUpper,
   readComposite,
   seOf,
+  selectByShape,
 } from '../signal-gate.js';
 
 const NO_SHAPE: QuestionShape = {
@@ -401,6 +403,118 @@ describe('compositeGate', () => {
       'column-shape',
       'null-share',
       'duplicate-share',
+      'value-type',
+    ]);
+  });
+});
+
+describe('selectByShape', () => {
+  it('names the candidate the fixed signal set objects to least', () => {
+    // R7.2a's reading, turned into a strategy: the five signals that cleared their own gate vote, and
+    // the pick is the candidate with the fewest objections. The set is fixed in code rather than
+    // re-derived per fold, because a selector that chooses its own features on the data it is scored
+    // on is reporting the fit, not the feature.
+    const selection = selectByShape(emptyFirst('q1'));
+    expect(selection.chosen).toBe(1);
+    expect(selection.reason).toBe('shape');
+    expect(selection.votes).toBe(1);
+  });
+
+  it('keeps the first draw when nothing objects to anything', () => {
+    const indifferent = question('q1', [candidate(0, false, ran(2)), candidate(1, true, ran(3))]);
+    const selection = selectByShape(indifferent);
+    expect(selection.chosen).toBe(0);
+    expect(selection.votes).toBe(0);
+    expect(selection.reason).toBe('no-agreement');
+  });
+
+  it('counts the distinct answers among the candidates that ran', () => {
+    const pool = question('q1', [
+      candidate(0, false, ran(2), 0),
+      candidate(1, true, ran(3), 1),
+      candidate(2, false, null, -1),
+    ]);
+    expect(selectByShape(pool).groups).toBe(2);
+  });
+
+  it('reports an empty pool as a refusal rather than as a pick', () => {
+    const selection = selectByShape(question('q1', []));
+    expect(selection.reason).toBe('empty');
+    expect(selection.groups).toBe(0);
+  });
+
+  it('says nothing ran when every candidate failed, and does not call it a preference', () => {
+    // A failure is an absent answer, not a worse one. The composite scores it below anything that
+    // ran, so it can be chosen — but on a field where nothing ran there is no decision to report, and
+    // `selectionStats` counts these apart so a run of broken SQL cannot look like a run of judgement.
+    const broken = question('q1', [candidate(0, false, null, -1), candidate(1, true, null, -1)]);
+    const selection = selectByShape(broken);
+    expect(selection.reason).toBe('nothing-ran');
+    expect(selection.votes).toBe(0);
+    expect(selection.emptyResult).toBe(false);
+  });
+
+  it('says when the candidate it chose returned nothing, because that is a failure worth counting', () => {
+    // The one ordering the composite gets wrong on purpose: an empty result on a question that does
+    // not ask for absence scores below a query that never ran, so the broken candidate wins. Both are
+    // wrong, so the arm's accuracy is unaffected — but the pick is an empty result and the run has to
+    // report that rather than leave a reader to infer it.
+    const asksForNothing = question(
+      'q1',
+      [candidate(0, false, empty()), candidate(1, true, null, -1)],
+      { ...NO_SHAPE, wantsMissing: true },
+    );
+    const selection = selectByShape(asksForNothing);
+    expect(selection.chosen).toBe(0);
+    expect(selection.emptyResult).toBe(true);
+    expect(selection.reason).toBe('shape');
+  });
+
+  it('cannot prefer an empty result even when the question asks for one', () => {
+    // The composite's ceiling, stated as a test rather than as a caveat. No signal returns a positive
+    // score, so "the question asks for what is absent" only lifts the penalty; it never becomes
+    // evidence. On a level field the tie-break keeps the first draw, and that is why this module needs
+    // a signal that can endorse something before its ceiling moves again.
+    const asksForNothing = question(
+      'q1',
+      [candidate(0, false, ran(2)), candidate(1, true, empty())],
+      { ...NO_SHAPE, wantsMissing: true },
+    );
+    const selection = selectByShape(asksForNothing);
+    expect(selection.chosen).toBe(0);
+    expect(selection.votes).toBe(0);
+    expect(selection.reason).toBe('no-agreement');
+  });
+
+  it('makes the same choice the simulation priced, on every pool', () => {
+    // The arm and the object R7.2a measured have to be one function, or the run's delta is a
+    // measurement of a strategy that was never simulated.
+    const pools = [
+      emptyFirst('q1'),
+      question('q2', [candidate(0, false, ran(2)), candidate(1, true, ran(3))]),
+      question('q3', [candidate(0, false, empty()), candidate(1, true, null, -1)]),
+      question('q4', [
+        candidate(0, false, empty()),
+        candidate(1, true, ran(2)),
+        candidate(2, false, ran(2), 0),
+      ]),
+    ];
+    const simulated = compositePicks(pools, SHAPE_VOTERS);
+    expect(pools.map((pool) => selectByShape(pool).chosen)).toEqual(
+      pools.map((pool, at) => {
+        const draw = simulated[at];
+        return pool.candidates.findIndex((item) => item.draw === draw);
+      }),
+    );
+  });
+
+  it('votes with the five signals the gate licensed and not with the one it removed', () => {
+    // A signal that failed its own gate is not allowed to influence a public result by the back door.
+    expect([...SHAPE_VOTERS].sort()).toEqual([
+      'column-shape',
+      'duplicate-share',
+      'empty',
+      'row-shape',
       'value-type',
     ]);
   });

@@ -31,6 +31,7 @@
  */
 
 import { FAILED_SIGNATURE, scoreOf, type QuestionShape, type SignalName } from './exec-signature.js';
+import type { Selection } from './selector.js';
 import {
   outcomesOf,
   signalReadings,
@@ -184,22 +185,46 @@ export function compositePicks(
   signals: readonly SignalName[],
 ): readonly (number | undefined)[] {
   return questions.map((question) => {
-    let best: PoolCandidate | undefined;
-    let bestVotes = Number.NEGATIVE_INFINITY;
-    for (const candidate of question.candidates) {
-      const votes = votesOf(candidate, question.shape, signals);
-      // Strictly greater, so an abstaining composite keeps the earlier draw and reproduces the
-      // baseline exactly. Ties going the other way would make the delta a measurement of the
-      // tie-break rather than of the signals.
-      if (best === undefined || votes > bestVotes) {
-        best = candidate;
-        bestVotes = votes;
-      }
-    }
-    return best?.draw;
+    const best = bestIndex(question, signals);
+    return best === undefined ? undefined : (question.candidates[best] as PoolCandidate).draw;
   });
 }
 
+/**
+ * The index of the candidate the signals prefer, with ties going to the earliest draw.
+ *
+ * One implementation, because two would be two definitions of "the composite" and the arm scored in
+ * a run has to be the same object that was priced in the simulation. `compositePicks` reports the
+ * answer and `selectByShape` reports the decision that produced it; neither owns the rule.
+ *
+ * `undefined` only for a question with no candidates, which the gate's population excludes but a
+ * caller can still construct.
+ */
+function bestIndex(question: PoolQuestion, signals: readonly SignalName[]): number | undefined {
+  let best: number | undefined;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  for (const [index, candidate] of question.candidates.entries()) {
+    const score = votesOf(candidate, question.shape, signals);
+    // Strictly greater, so an abstaining composite keeps the earlier draw and reproduces the
+    // baseline exactly. Ties going the other way would make the delta a measurement of the
+    // tie-break rather than of the signals.
+    if (score > bestScore) {
+      best = index;
+      bestScore = score;
+    }
+  }
+  return best;
+}
+
+/**
+ * How much a candidate has going for it, as a sum of the signals' opinions.
+ *
+ * The scale is a count of objections, not of endorsements: `scoreOf` never returns a positive number
+ * because no signal in this module is allowed to prefer a shape, only to reject one. Every number
+ * this function returns is therefore ≤ 0, and "the best candidate" is the one with the fewest
+ * objections. That asymmetry is deliberate and it is where the composite's ceiling comes from — it
+ * can refuse a wrong answer it can recognise, and it cannot find a right one it cannot.
+ */
 function votesOf(
   candidate: PoolCandidate,
   shape: QuestionShape,
@@ -281,4 +306,68 @@ export function compositeGate(
   options: { readonly resamples?: number; readonly seed?: number } = {},
 ): CompositeReading {
   return readComposite(questions, signalReadings(questions, options));
+}
+
+/**
+ * The signals a public pick is allowed to vote with.
+ *
+ * Fixed here, and fixed *after* the gate that licensed them, which is the only order that keeps the
+ * arm honest: the set comes from run `40862283263`, where five of six signals cleared
+ * `AUC - 0.5 > 2 SE` after Holm and `null-share` did not (z = 1.23). A selector that re-derived its
+ * feature set inside each fold would be choosing its features on the data it is then scored on, and
+ * the delta would be a measurement of the fit.
+ *
+ * The order is the order the readings were taken in, so a log line reads the same way twice.
+ */
+export const SHAPE_VOTERS: readonly SignalName[] = [
+  'empty',
+  'row-shape',
+  'column-shape',
+  'duplicate-share',
+  'value-type',
+];
+
+/**
+ * The shape composite as a strategy: pick the candidate the licensed signals object to least.
+ *
+ * This is what R7.2a measured as a simulation, made executable so it can be scored as an arm inside a
+ * cross-fitted run — with the same multiset judge as every other arm, on the same draws, against
+ * `sample-5-first` as the honest baseline rather than against `none`. The choice itself is delegated
+ * to the same `bestIndex` that `compositePicks` uses, so the arm a run scores cannot drift from the
+ * object the simulation priced.
+ *
+ * `votes` is the number of candidates the winner outscored, not the size of a group, because this
+ * selector has no group: two candidates can be scored apart and still return the same rows. It reads
+ * as "how many alternatives were overruled", and it is zero exactly when the composite had nothing to
+ * say — which is also exactly when `reason` is `'no-agreement'` and the answer is the baseline's.
+ *
+ * A consequence worth stating rather than hiding: because no signal returns a positive score, a
+ * question that asks for what is *absent* only stops the composite objecting to an empty result. It
+ * cannot prefer one. `selectByShape` therefore falls back to the first draw when the field is level,
+ * and the omission is a candidate for the next signal rather than a gap to paper over here.
+ */
+export function selectByShape(question: PoolQuestion): Selection {
+  const groups = new Set(
+    question.candidates
+      .filter((candidate) => candidate.resultKey >= 0)
+      .map((candidate) => candidate.resultKey),
+  ).size;
+  const chosen = bestIndex(question, SHAPE_VOTERS);
+  if (chosen === undefined) {
+    return { chosen: 0, votes: 0, groups: 0, reason: 'empty', emptyResult: false };
+  }
+  const winner = question.candidates[chosen] as PoolCandidate;
+  const winnerScore = votesOf(winner, question.shape, SHAPE_VOTERS);
+  const overruled = question.candidates.filter(
+    (candidate) => votesOf(candidate, question.shape, SHAPE_VOTERS) < winnerScore,
+  ).length;
+  return {
+    chosen,
+    votes: overruled,
+    groups,
+    // Nothing ran is not a preference for the first failure, and `selectionStats` counts it apart.
+    reason:
+      groups === 0 ? 'nothing-ran' : overruled > 0 ? 'shape' : 'no-agreement',
+    emptyResult: winner.signature !== null && winner.signature.empty,
+  };
 }
