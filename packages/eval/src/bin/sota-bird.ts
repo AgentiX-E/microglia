@@ -127,6 +127,7 @@ import {
   verdictOf,
   schemaWithValues,
   poolSummary,
+  readComposite,
   signalReadings,
   unionCeiling,
   execSignatureOf,
@@ -4153,19 +4154,51 @@ async function main(): Promise<void> {
         const questions = folds.flatMap((fold) => fold.pool);
         if (questions.length === 0) return null;
         const summary = poolSummary(questions);
+        const readings = signalReadings(questions);
+        // The gate is computed here as well as printed by `eval:signals`, and the artefact is the
+        // primary copy: a reader who has the file should not have to re-run a command to learn
+        // whether any signal was allowed to rank anything.
+        const gate = readComposite(questions, readings);
+        // A lookup rather than a map: six verdicts and seven readings is forty-two comparisons, and
+        // the map needed a cast to key by a name that includes the baseline.
+        const verdictOfSignal = (signal: string) =>
+          gate.verdicts.find((verdict) => verdict.signal === signal);
         return {
           ...summary,
           distinct_histogram: summary.distinctHistogram,
-          signals: signalReadings(questions).map((reading) => ({
-            signal: reading.signal,
-            eligible: reading.eligible,
-            top_pick: reading.topPick,
-            accuracy: Number(reading.accuracy.toFixed(4)),
-            auc: Number(reading.auc.toFixed(4)),
-            auc_low: Number(reading.aucLow.toFixed(4)),
-            auc_high: Number(reading.aucHigh.toFixed(4)),
-            pairs: reading.pairs,
-          })),
+          signals: readings.map((reading) => {
+            const verdict = verdictOfSignal(reading.signal);
+            return {
+              signal: reading.signal,
+              eligible: reading.eligible,
+              top_pick: reading.topPick,
+              accuracy: Number(reading.accuracy.toFixed(4)),
+              auc: Number(reading.auc.toFixed(4)),
+              auc_low: Number(reading.aucLow.toFixed(4)),
+              auc_high: Number(reading.aucHigh.toFixed(4)),
+              // The standard error the gate divides by, after the floor: a reader who cannot see it
+              // cannot check the verdict.
+              auc_se: Number(reading.aucSe.toFixed(4)),
+              positive: reading.positive,
+              negative: reading.negative,
+              pairs: reading.pairs,
+              z: verdict === undefined ? null : Number(verdict.z.toFixed(4)),
+              holm: verdict === undefined ? null : Number(verdict.holm.toPrecision(4)),
+              survives: verdict === undefined ? null : verdict.survives,
+            };
+          }),
+          gate: {
+            kept: gate.kept,
+            inert: gate.inert,
+            eligible: gate.eligible,
+            composite_top_pick: gate.compositeTopPick,
+            composite_accuracy: Number(gate.compositeAccuracy.toFixed(4)),
+            baseline_accuracy: Number(gate.baselineAccuracy.toFixed(4)),
+            delta_pp: Number(gate.deltaPp.toFixed(2)),
+            gained: gate.gained,
+            lost: gate.lost,
+            verdict: gate.verdict,
+          },
         };
       })(),
       /**
