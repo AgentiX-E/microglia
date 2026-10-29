@@ -22,6 +22,11 @@ function ran(rows: number): ExecSignature {
   });
 }
 
+/** A signature for a result that ran and returned nothing. */
+function emptyResult(): ExecSignature {
+  return execSignatureOf({ rows: [], columns: ['c'], failed: false });
+}
+
 function candidate(draw: number, correct: boolean, resultKey: number, signature: ExecSignature | null): PoolCandidate {
   return { draw, correct, resultKey, signature };
 }
@@ -299,6 +304,29 @@ describe('signalReading', () => {
     expect(reading.pairs).toBe(0);
     expect(reading.auc).toBe(0.5);
     expect(Number.isNaN(reading.aucLow)).toBe(false);
+  });
+
+  it('ranks only inside a question, because that is the only ordering a selector is asked to make', () => {
+    // Two questions that a pooled AUC cannot tell apart from a perfect signal. In the first, the
+    // correct candidate is non-empty and the wrong one is empty, which `empty` ranks perfectly. In
+    // the second, one question asks for what is absent, so every candidate scores zero and the
+    // signal has nothing to say: 25 pairs, all ties.
+    //
+    // Within questions the reading is (1 x 1 + 0.5 x 25) / 26 = 0.519. Pooled across the two lists
+    // every correct candidate outranks every wrong one — 0 against -2, 36 pairs — and the same
+    // signal reports 1.000. The old estimator reported the second number while `pairs` counted the
+    // first, so a signal that abstains on a wide question was credited with winning the narrow one.
+    const questions = [
+      question('q1', [candidate(0, true, 0, ran(2)), candidate(1, false, 1, emptyResult())]),
+      question(
+        'q2',
+        Array.from({ length: 10 }, (_, at) => candidate(at, at < 5, 0, emptyResult())),
+        { ...NO_SHAPE, wantsMissing: true },
+      ),
+    ];
+    const reading = signalReading(questions, 'empty');
+    expect(reading.pairs).toBe(26);
+    expect(reading.auc).toBeCloseTo(13.5 / 26, 6);
   });
 
   it('is deterministic for a given seed and moves the interval when the sample is resampled', () => {

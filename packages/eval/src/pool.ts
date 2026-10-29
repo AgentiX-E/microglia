@@ -238,9 +238,12 @@ export type PoolSignalReading = {
  * Implemented by rank rather than by pair enumeration because a question with 21 candidates has 441
  * pairs and the resampling loop would do that two thousand times per signal; the midrank formula is
  * one pass and gives the same number.
+ *
+ * Both lists are required to be non-empty. The one caller checks, and a guard here would be a branch
+ * no test could take — the pool is mostly questions where every candidate is right or none is, and
+ * skipping those is `aucWithin`'s job rather than this function's.
  */
 function aucOf(positive: readonly number[], negative: readonly number[]): number {
-  if (positive.length === 0 || negative.length === 0) return 0.5;
   type Entry = { readonly score: number; readonly positive: boolean };
   const merged: Entry[] = [
     ...positive.map((score): Entry => ({ score, positive: true })),
@@ -265,6 +268,42 @@ function aucOf(positive: readonly number[], negative: readonly number[]): number
   const n1 = positive.length;
   const n2 = negative.length;
   return (rankSum - (n1 * (n1 + 1)) / 2) / (n1 * n2);
+}
+
+/**
+ * The AUC over the pairs a selector is actually asked to order: the ones inside a question.
+ *
+ * Ranking a correct candidate from one question against an incorrect one from another is not a
+ * decision any selector in this project makes, and pooling the two lists anyway does not merely add
+ * noise — it adds a large block of near-ties, because two candidates scored by the same signal on
+ * different questions usually score the same, and every one of those ties counts as half. The pooled
+ * figure is therefore pulled toward 0.5 by an amount that depends on how many questions each list
+ * happens to contain, which is the definition of a quantity that cannot be compared across pools.
+ *
+ * It also disagreed with the record: `pairs` was already the within-question count, so the artefact
+ * carried a denominator its own numerator never used. `pairs` and this function now count the same
+ * things, and a signal's reading means "of the orderings this selector is asked to make, this share
+ * came out right".
+ */
+function aucWithin(
+  positive: readonly (readonly number[])[],
+  negative: readonly (readonly number[])[],
+): number {
+  let wins = 0;
+  let pairs = 0;
+  for (let at = 0; at < positive.length; at += 1) {
+    const up = positive[at] as number[];
+    const down = negative[at] as number[];
+    const here = up.length * down.length;
+    // A question where every candidate is right, or none is, offers no ordering to rank and no
+    // pairs to count. It is the common case: 141 of 350 questions had no correct draw at all.
+    if (here === 0) continue;
+    // Per question, by rank: the midrank formula is exact for the same reason it is above, and the
+    // grouped call keeps every comparison inside one question's candidate list.
+    wins += aucOf(up, down) * here;
+    pairs += here;
+  }
+  return pairs === 0 ? 0.5 : wins / pairs;
 }
 
 function scoreFor(candidate: PoolCandidate, shape: QuestionShape, signal: SignalChoice): number {
@@ -319,21 +358,23 @@ export function signalReading(
     negative.push(down);
     pairs += up.length * down.length;
   }
-  const flatten = (groups: readonly (readonly number[])[]): number[] => groups.flatMap((group) => [...group]);
-  const point = aucOf(flatten(positive), flatten(negative));
+  const point = aucWithin(positive, negative);
   const resamples = options.resamples ?? RESAMPLES;
   const random = mulberry32(options.seed ?? 7);
   const drawn: number[] = [];
   if (questions.length > 1) {
     for (let round = 0; round < resamples; round += 1) {
-      const ups: number[] = [];
-      const downs: number[] = [];
+      // The resampled questions keep their candidate lists: a cluster bootstrap resamples clusters,
+      // and flattening them would put the cross-question pairs back in through the interval even
+      // after the point estimate stopped using them.
+      const ups: number[][] = [];
+      const downs: number[][] = [];
       for (let at = 0; at < questions.length; at += 1) {
         const which = Math.floor(random() * questions.length);
-        ups.push(...(positive[which] as number[]));
-        downs.push(...(negative[which] as number[]));
+        ups.push(positive[which] as number[]);
+        downs.push(negative[which] as number[]);
       }
-      drawn.push(aucOf(ups, downs));
+      drawn.push(aucWithin(ups, downs));
     }
   }
   drawn.sort((a, b) => a - b);
