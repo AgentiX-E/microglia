@@ -5,7 +5,7 @@
  * ablation runner, and the gate definitions. A release that cannot reproduce
  * these numbers from source has no business quoting them.
  */
-export { comparePaired, type PairedResult } from './stats.js';
+export { clusterBootstrapCI, comparePaired, type PairedResult } from './stats.js';
 export {
   forecastBudget,
   type BudgetForecast,
@@ -504,3 +504,25 @@ export {
 } from './validation.js';
 
 export { DistillCache, type DistillCacheStats } from './distill-cache.js';
+
+export {
+  classify,
+  densityGates,
+  densityReport,
+  identifierTokens,
+  mentionsTerms,
+  policyTable,
+  ruleTerms,
+  selectDensityRules,
+  stratumOf,
+  targetPanels,
+  type DensityInput,
+  type DensityReport,
+  type DensityRule,
+  type DensityTarget,
+  type DensityTrial,
+  type PolicyName,
+  type PolicyRow,
+  type StratumSummary,
+  type StoredRuleInput,
+} from './density.js';

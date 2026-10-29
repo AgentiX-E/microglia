@@ -70,6 +70,7 @@ import {
   mulberry32,
   queryCoverage,
   steppingClock,
+  type KnowledgeItem,
 } from '@agentix-e/microglia-core';
 import { makePack } from '@agentix-e/microglia-core/apply';
 import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
@@ -137,6 +138,11 @@ import {
   renderMschema,
   CONTRASTS,
   contrastTable,
+  classify,
+  densityGates,
+  densityReport,
+  selectDensityRules,
+  targetPanels,
   priorPicks,
   priorScopeOf,
   priorTable,
@@ -149,6 +155,9 @@ import {
   selectionStats,
   signatureOf,
   type Admission,
+  type DensityReport,
+  type DensityTarget,
+  type DensityTrial,
   type ExecSignature,
   type GeneratorKind,
   type PackCell,
@@ -1328,6 +1337,27 @@ type StoredItem = {
 const TRANSFER_TARGETS = nonNegative(process.env['SOTA_TRANSFER_TARGETS'], 4);
 
 /**
+ * The density family's panel, or zero when the stage is off.
+ *
+ * R9 exists because every memory arm measured so far gave each rule about a quarter of a decisive
+ * observation, and no filter can rank rules on a quarter of an observation each. This stage holds
+ * the rule set and the questions fixed, shows one rule at a time, and gives every rule `panel`
+ * questions from its own database — twenty, which is the number the roadmap fixed before the stage
+ * opened. Zero keeps the stage off, because it costs a call per rule per question.
+ */
+const DENSITY_PANEL = nonNegative(process.env['SOTA_DENSITY_PANEL'], 0);
+
+/**
+ * Rules taken from each database, capped so the family stays affordable.
+ *
+ * Eight per database rather than the store's whole population: a full pass over a five-fold store's
+ * rules would be some six thousand calls, and the discriminating share it estimates is a proportion
+ * that eighty rules already resolve to about five points. The selection itself is by content hash,
+ * so the subset is a sample of the store rather than the rules that look best.
+ */
+const DENSITY_RULES_PER_DB = nonNegative(process.env['SOTA_DENSITY_RULES_PER_DB'], 8);
+
+/**
  * The character budget the probe renders its rules with, matching the host's default.
  *
  * A single rule can be long, and a probe that truncated the rule it was testing would report a
@@ -1599,6 +1629,235 @@ async function probeMemory(
   };
 }
 
+/** What one density run measured, and which databases could not be part of it. */
+type DensityRun = {
+  readonly report: DensityReport;
+  /** Databases whose usable questions were fewer than the panel, with the count they had. */
+  readonly excluded: Readonly<Record<string, number>>;
+  readonly rules: number;
+  /** Rules that named a database the panel could not cover, so they were never shown. */
+  readonly unplaced: number;
+  readonly calls: number;
+  /** Injections whose call never returned: holes, not verdicts, and kept out of the ledger. */
+  readonly unmeasured: number;
+};
+
+/**
+ * The density family: one rule at a time, twenty questions from its own database.
+ *
+ * Every arm this project has run injects a *pack*, and the attribution instrument then credits each
+ * flip to every rule that shared the prompt — which makes the ledger an upper bound on the number of
+ * distinct causes rather than a decomposition of the effect. This pass removes that ambiguity by
+ * construction: one rule in the prompt, so a flip has exactly one candidate cause, and the ledger's
+ * `rulesPerInjection` is one by design rather than by luck.
+ *
+ * The control is the `none` arm's answer to the same question, already measured and cached by the
+ * learning pass — the same prompt with an empty pack, at the same temperature. Nothing is re-asked
+ * to obtain it, and because the generator is deterministic at temperature 0, a flip can only have
+ * been caused by the rule. That is what makes "inert" a measurement here instead of a residue.
+ *
+ * The floor is a second, cheaper question: one rule from a different database, shown on the same
+ * panel. Its vocabulary is absent from the workspace, so if it flips answers as often as the real
+ * rules do, the flips are about the *presence* of text in that block rather than its content — and
+ * every attribution in this project's record would have to be reread.
+ *
+ * Panels are shared. A database whose usable questions come to fewer than the panel is named in
+ * `excluded` and left out rather than shortened: the family's claim is that every rule got the same
+ * number of chances, and a rule given sixteen is not a rule given twenty.
+ */
+async function densityPass(input: {
+  readonly items: readonly KnowledgeItem[];
+  readonly cases: readonly CaseOutcome[];
+  readonly dataset: Dataset;
+  readonly task: Task;
+}): Promise<DensityRun> {
+  const rules = selectDensityRules(
+    input.items.map((item) => ({
+      id: item.id,
+      status: item.status,
+      statement: item.statement,
+      when: item.when ?? null,
+      domain: item.scope.domain ?? null,
+    })),
+    DENSITY_RULES_PER_DB,
+  );
+  const itemById = new Map(input.items.map((item) => [item.id, item]));
+  const panels = targetPanels(
+    input.cases.map((entry) => ({
+      id: entry.id,
+      dbId: entry.dbId,
+      question: entry.question,
+      evidence: entry.evidence,
+      goldSql: entry.goldSql,
+      baselineCorrect: entry.withoutMemoryCorrect,
+    })),
+    DENSITY_PANEL,
+    SEED,
+  );
+
+  const excluded: Record<string, number> = {};
+  const panelDbs: string[] = [];
+  for (const [dbId, panel] of panels) {
+    if (panel.length < DENSITY_PANEL) excluded[dbId] = panel.length;
+    else panelDbs.push(dbId);
+  }
+  panelDbs.sort();
+
+  type Plan = {
+    readonly ruleId: string;
+    readonly domain: string;
+    readonly targetId: string;
+    readonly order: number;
+    readonly row: BirdRow;
+    readonly prompt: string;
+    readonly baselineCorrect: boolean;
+    readonly relevant: boolean;
+    readonly cued: boolean;
+  };
+  const plans: Plan[] = [];
+  const floorPlans: Plan[] = [];
+  let unplaced = 0;
+  const caseById = new Map(input.cases.map((entry) => [entry.id, entry]));
+  for (const [at, dbId] of panelDbs.entries()) {
+    const panel = panels.get(dbId) as readonly DensityTarget[];
+    const dbPath = input.dataset.dbPath(dbId);
+    const index = schemaIndex(dbPath);
+    const schema = new Set([...index.tables, ...index.columns]);
+    const ddl = ddlOf(dbPath);
+    const here = rules.filter((rule) => rule.domain === dbId);
+    for (const rule of here) {
+      const item = itemById.get(rule.id) as KnowledgeItem;
+      const pack = makePack([item], { budget: PROBE_BUDGET }).rendered;
+      for (const [order, target] of panel.entries()) {
+        const entry = caseById.get(target.id) as CaseOutcome;
+        const verdict = classify(rule, schema, target);
+        plans.push({
+          ruleId: rule.id,
+          domain: dbId,
+          targetId: target.id,
+          order,
+          row: {
+            question_id: entry.questionId,
+            db_id: entry.dbId,
+            question: entry.question,
+            evidence: entry.evidence,
+            SQL: entry.goldSql,
+            difficulty: entry.difficulty,
+          },
+          prompt: promptFor({
+            question: target.question,
+            evidence: target.evidence,
+            ddl,
+            pack,
+            stated: false,
+            convention: ACTIVE,
+          }),
+          baselineCorrect: target.baselineCorrect,
+          relevant: verdict.relevant,
+          cued: verdict.cued,
+        });
+      }
+    }
+    // One foreign rule per panel, drawn from a rotating offset so the floor is not one donor
+    // database measured ten times.
+    const start = rules.length === 0 ? 0 : (at * 3) % rules.length;
+    const donor = [...rules.slice(start), ...rules.slice(0, start)].find((rule) => rule.domain !== dbId);
+    if (donor === undefined) continue;
+    const donorItem = itemById.get(donor.id) as KnowledgeItem;
+    const donorPack = makePack([donorItem], { budget: PROBE_BUDGET }).rendered;
+    for (const [order, target] of panel.entries()) {
+      const entry = caseById.get(target.id) as CaseOutcome;
+      const verdict = classify(donor, schema, target);
+      floorPlans.push({
+        ruleId: donor.id,
+        domain: dbId,
+        targetId: target.id,
+        order,
+        row: {
+          question_id: entry.questionId,
+          db_id: entry.dbId,
+          question: entry.question,
+          evidence: entry.evidence,
+          SQL: entry.goldSql,
+          difficulty: entry.difficulty,
+        },
+        prompt: promptFor({
+          question: target.question,
+          evidence: target.evidence,
+          ddl,
+          pack: donorPack,
+          stated: false,
+          convention: ACTIVE,
+        }),
+        baselineCorrect: target.baselineCorrect,
+        relevant: verdict.relevant,
+        cued: verdict.cued,
+      });
+    }
+  }
+  for (const rule of rules) {
+    if (!panelDbs.includes(rule.domain)) unplaced += 1;
+  }
+
+  const calls = (plans.length + floorPlans.length);
+  process.stdout.write(
+    `[sota] density: ${rules.length} rules x ${DENSITY_PANEL} questions from ` +
+      `${panelDbs.length} databases, ${floorPlans.length} floor injections, ${calls} calls\n`,
+  );
+
+  let moved = 0;
+  const ask = async (plan: Plan): Promise<DensityTrial | undefined> => {
+    let correct: boolean;
+    try {
+      const reply = await chat(plan.prompt);
+      correct = judgeReply(plan.row, input.dataset.dbPath(plan.domain), reply, input.task).correct;
+    } catch (error) {
+      // A call that never returned is a hole, and a hole scored as a wrong answer would turn an
+      // endpoint hiccup into a finding about the rule. It is dropped from the ledger and counted
+      // instead: the alternatives are to score it, which is a fabricated verdict, or to fail the
+      // run, which throws away the injections that did return.
+      if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+      if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+      moved += 1;
+      return undefined;
+    }
+    moved += 1;
+    if (moved % 100 === 0 || moved === calls) {
+      process.stdout.write(`[sota] density ${moved}/${calls} calls=${llm.stats.calls}\n`);
+    }
+    return {
+      ruleId: plan.ruleId,
+      domain: plan.domain,
+      targetId: plan.targetId,
+      order: plan.order,
+      correct,
+      baselineCorrect: plan.baselineCorrect,
+      relevant: plan.relevant,
+      cued: plan.cued,
+    };
+  };
+
+  const asked = await mapPool(plans, CONCURRENCY, ask);
+  const askedFloor = await mapPool(floorPlans, CONCURRENCY, ask);
+  const trials = asked.filter((trial): trial is DensityTrial => trial !== undefined);
+  const floorTrials = askedFloor.filter((trial): trial is DensityTrial => trial !== undefined);
+  return {
+    report: densityReport({
+      rules,
+      panel: DENSITY_PANEL,
+      trials,
+      floorTrials,
+      resamples: RESAMPLES,
+      seed: SEED,
+    }),
+    excluded,
+    rules: rules.length,
+    unplaced,
+    calls,
+    unmeasured: asked.length + askedFloor.length - trials.length - floorTrials.length,
+  };
+}
+
 type FoldResult = {
   readonly fold: number;
   readonly learn: number;
@@ -1762,6 +2021,14 @@ type FoldResult = {
     readonly repair: Readonly<Record<string, number>> | null;
   };
   readonly items: readonly StoredItem[];
+  /**
+   * The same rows as the store returned them, kept so the density stage can render a rule exactly
+   * as a prompt would.
+   *
+   * `items` is a projection: it drops the fields `makePack` needs to render one rule, and a density
+   * stage that re-rendered a rule its own way would measure a prompt the deployment never sends.
+   */
+  readonly storeItems: readonly KnowledgeItem[];
   readonly distillFailures: readonly string[];
 };
 
@@ -3265,7 +3532,8 @@ async function runFold(
       });
     }
   }
-  const items = (await store.listKnowledge({ namespace: 'bird', status: 'all' })).map((item) => ({
+  const listed = await store.listKnowledge({ namespace: 'bird', status: 'all' });
+  const items = listed.map((item) => ({
     id: item.id,
     status: item.status,
     trust: Number(item.trust.toFixed(4)),
@@ -3309,6 +3577,7 @@ async function runFold(
     learn: learnRows.length,
     eval: cases.length,
     cases,
+    storeItems: listed,
     pool: [...poolByPositionRecord.values()],
     learning,
     activeRules: scoringFrozen.active,
@@ -3626,6 +3895,27 @@ async function main(): Promise<void> {
   const detectable = detectableDelta(cases.length, paired.discordance);
 
   /**
+   * R9.1's family, when the dispatch asked for one.
+   *
+   * Fold 0's store supplies the rules, and it is fixed by construction: one store, one hash-ordered
+   * subset per database, chosen before the second half of the panel is looked at. The controls come
+   * from every fold's `none` arm, because a question's answer without memory is a property of the
+   * question and does not belong to the fold that happened to score it.
+   *
+   * Fold 0 rather than the union: the folds' stores are five distillations of overlapping evidence,
+   * and a union would be a store no fold ever held.
+   */
+  const density =
+    DENSITY_PANEL === 0 || folds.length === 0
+      ? null
+      : await densityPass({
+          items: (folds[0] as FoldResult).storeItems,
+          cases,
+          dataset,
+          task,
+        });
+
+  /**
    * The relevance split, scored by the arm that saw the pack.
    *
    * The first version passed the case's `correct`, which is the `full` arm's outcome, for every
@@ -3909,6 +4199,10 @@ async function main(): Promise<void> {
     // accepted answer has a form the model must reproduce.
     ...(ACTIVE === undefined || channelBest === undefined ? {} : { channelCeiling: channelBest.accuracy }),
   });
+  // R9's family, appended rather than folded into `buildValidityGates`: its bars are about whether
+  // the *workload* can decide the question, and a family that cannot is a reason to rebuild the
+  // family, not a reason to disbelieve the accuracy above.
+  gates.push(...(density === null ? [] : densityGates(density.report)));
 
   const assertions = {
     /**
@@ -3981,6 +4275,9 @@ async function main(): Promise<void> {
       // A filter is a condition of the result: a number produced at a different
       // threshold is a different number.
       corroboration_min: ARMS.has('full-corroborated') ? CORROBORATION : null,
+      // The family's shape, so a reader can say which one produced the numbers above.
+      density:
+        DENSITY_PANEL === 0 ? null : { panel: DENSITY_PANEL, rules_per_db: DENSITY_RULES_PER_DB },
     },
     n: {
       total: rows.length,
@@ -4004,6 +4301,18 @@ async function main(): Promise<void> {
       exec_rate: execRate,
       gold_exec_rate: goldExecRate,
       mean_pack_ids: meanPackIds,
+      // R9's family: one rule at a time, a fixed rule set, and a panel of questions per database.
+      // Absent rather than null when the stage did not run, because a null would read as a
+      // measurement that came back empty.
+      ...(density === null
+        ? {}
+        : {
+            density: density.report,
+            density_excluded: density.excluded,
+            density_unplaced: density.unplaced,
+            density_unmeasured: density.unmeasured,
+            density_calls: density.calls,
+          }),
       latency_p50_ms: percentile(cases.map((item) => item.latencyMs), 0.5),
       latency_p95_ms: percentile(cases.map((item) => item.latencyMs), 0.95),
       knowledge_active_mean: activeMean,

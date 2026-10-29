@@ -69,3 +69,61 @@ export function comparePaired(
     deltaCI,
   };
 }
+
+/**
+ * A confidence interval when the unit of observation is a cluster, not a value.
+ *
+ * `bootstrapCI` resamples single values, which is right when each one is an independent draw. A
+ * rule shown on twenty questions is not: one question appears under every rule in its database, so
+ * those twenty questions contribute twenty correlated observations per rule. Resampling them as if
+ * they were independent would shrink the interval by roughly the square root of the cluster size —
+ * an interval that says "measured" about a number that is not.
+ *
+ * The cluster is resampled, not the observation: draw C clusters with replacement and take every
+ * value each drawn cluster carries. That is the standard cluster bootstrap, and it has a cost that
+ * every caller has to state: the effective sample is the number of clusters, not the number of
+ * values, so a design that adds rules without adding questions buys precision it does not have.
+ *
+ * A single cluster returns its own mean as both bounds, because a resample of one cluster is that
+ * cluster and an interval that admitted it would be narrower than the data.
+ */
+export function clusterBootstrapCI(
+  values: readonly number[],
+  clusters: readonly string[],
+  resamples = 10_000,
+  seed = 12345,
+): Interval {
+  if (values.length !== clusters.length) {
+    throw new Error('A clustered interval needs one cluster label per value');
+  }
+  if (values.length === 0) return { low: 0, high: 0, point: 0 };
+  const byCluster = new Map<string, number[]>();
+  for (const [at, label] of clusters.entries()) {
+    const bucket = byCluster.get(label) ?? [];
+    bucket.push(values[at] as number);
+    byCluster.set(label, bucket);
+  }
+  const groups = [...byCluster.values()];
+  const point = values.reduce((sum, value) => sum + value, 0) / values.length;
+  if (groups.length === 1) return { low: point, high: point, point };
+  const random = mulberry32(seed);
+  const samples: number[] = [];
+  for (let i = 0; i < resamples; i += 1) {
+    let total = 0;
+    let count = 0;
+    for (let draw = 0; draw < groups.length; draw += 1) {
+      const bucket = groups[Math.floor(random() * groups.length)] as number[];
+      for (const value of bucket) {
+        total += value;
+        count += 1;
+      }
+    }
+    samples.push(total / count);
+  }
+  samples.sort((left, right) => left - right);
+  return {
+    low: samples[Math.floor(0.025 * (samples.length - 1))] as number,
+    high: samples[Math.ceil(0.975 * (samples.length - 1))] as number,
+    point,
+  };
+}

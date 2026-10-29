@@ -39,6 +39,14 @@ on:
         description: 'Foreign cases each admitted rule is shown (0 disables the transfer measurement)'
         required: false
         default: '4'
+      density_panel:
+        description: 'R9.1: questions every selected rule is shown, one rule at a time (0 disables the family; 20 is the pre-registered panel)'
+        required: false
+        default: '0'
+      density_rules_per_db:
+        description: 'R9.1: rules drawn from each database, by content hash (8 per database is ~1,400 calls at a panel of 20)'
+        required: false
+        default: '8'
       sample_temperature:
         description: 'Temperature for the sample-N arms (0 would make every draw identical)'
         required: false
@@ -179,6 +187,8 @@ jobs:
           SOTA_RESAMPLES: '10000'
           SOTA_SAMPLE_TEMPERATURE: ${{ github.event.inputs.sample_temperature || '0.7' }}
           SOTA_TRANSFER_TARGETS: ${{ github.event.inputs.transfer_targets || '4' }}
+          SOTA_DENSITY_PANEL: ${{ github.event.inputs.density_panel || '0' }}
+          SOTA_DENSITY_RULES_PER_DB: ${{ github.event.inputs.density_rules_per_db || '8' }}
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '8000' }}
         run: pnpm eval:sota
 
@@ -238,6 +248,19 @@ jobs:
             pnpm eval:prior
           else
             echo "no artefact, so no memory to price"
+          fi
+
+      # R9.1's reading, off the same artefact: one rule at a time, twenty questions from its own
+      # database, and a foreign rule on the same panel as the floor. It exits zero when the family
+      # was not measured, because a run that did not buy the stage has nothing to report and is not
+      # a failed run.
+      - name: Read the density family
+        if: always()
+        run: |
+          if [ -f eval/results/poc-sota-bird.json ]; then
+            pnpm eval:density
+          else
+            echo "no artefact, so no family to read"
           fi
 
       # R7.1's ceiling, read off the artefact: three generators, the union over them, and the three
@@ -318,6 +341,24 @@ jobs:
               r.distill_failure_samples.length === 0
                 ? 'No distillation parse failures.'
                 : 'Distillation failures: ' + r.distill_failure_samples.join(' | '),
+              ...(m.density === undefined ? [] : [
+                '',
+                '### R9.1 — one rule at a time, ' + m.density.panel + ' questions per rule',
+                '',
+                '| Stratum | rules | injections | discriminating | flips | delta |',
+                '| --- | --- | --- | --- | --- | --- |',
+                ...['overall', 'relevant', 'irrelevant', 'cued', 'floor'].map((k) =>
+                  '| ' + k + ' | ' + m.density[k].rules + ' | ' + m.density[k].injections + ' | ' +
+                  ((1 - m.density[k].inertShare) * 100).toFixed(1) + '% | ' +
+                  (m.density[k].flipRate * 100).toFixed(1) + '% | ' +
+                  m.density[k].deltaPp.toFixed(2) + 'pp |'),
+                '',
+                '| Policy | shown | accuracy | delta | 95% CI |',
+                '| --- | --- | --- | --- | --- |',
+                ...m.density.policies.map((a) => '| ' + a.name + ' | ' + a.shown + '/' + a.injections +
+                  ' | ' + (a.treatmentAccuracy * 100).toFixed(2) + '% | ' + a.deltaPp.toFixed(2) +
+                  'pp | [' + a.ciLowPp.toFixed(2) + ', ' + a.ciHighPp.toFixed(2) + '] |'),
+              ]),
             ];
             const text = lines.join('\n');
             fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, text + '\n');

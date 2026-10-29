@@ -45,6 +45,7 @@
     "eval:pool": "tsx packages/eval/src/bin/pool.ts",
     "eval:signals": "tsx packages/eval/src/bin/signals.ts",
     "eval:prior": "tsx packages/eval/src/bin/prior.ts",
+    "eval:density": "tsx packages/eval/src/bin/density.ts",
     "eval:union": "tsx packages/eval/src/bin/union.ts",
     "eval:store": "tsx packages/eval/src/bin/store.ts",
     "eval:arm-pairs": "tsx packages/eval/src/bin/arm-pairs.ts",
