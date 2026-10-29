@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { drawsOf, poolFromArtifact, type ArtifactPoolCase } from '../artifact-pool.js';
+import { shapeOf } from '../exec-signature.js';
 
 function row(over: Partial<ArtifactPoolCase> = {}): ArtifactPoolCase {
   return {
@@ -102,6 +103,20 @@ describe('poolFromArtifact', () => {
     );
     expect(pool.questions[0]?.shape.wantsCount).toBe(true);
     expect(Number.isNaN(pool.draws)).toBe(false);
+  });
+
+  it('reproduces the run\'s shape exactly when the artefact carries the evidence', () => {
+    // The writer's half of the contract. The first artefact that carried a pool did not carry the
+    // evidence, so every re-analysis read each question against an empty string and reported signal
+    // readings that were not the run's — `empty` came back at 0.5719 where the run had computed
+    // 0.5653. The field on `CaseOutcome` is required, which is what stops the writer dropping it
+    // again; this test says what the field is for.
+    const question = 'Give me the total.';
+    const evidence = 'The ratio is per account.';
+    expect(shapeOf(question, evidence).wantsAverage).toBe(true);
+    expect(shapeOf(question, '').wantsAverage).toBe(false);
+    const pool = poolFromArtifact([row({ question, evidence })], []);
+    expect(pool.questions[0]?.shape).toEqual(shapeOf(question, evidence));
   });
 
   it('reports an empty pool for an artifact with no cases at all', () => {

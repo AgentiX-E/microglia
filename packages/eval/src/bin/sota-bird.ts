@@ -426,6 +426,16 @@ type CaseOutcome = {
   readonly fold: number;
   readonly difficulty: string;
   readonly question: string;
+  /**
+   * The evidence BIRD ships with the question, verbatim.
+   *
+   * Recorded because the question's shape is read from the question *and* its evidence, and the
+   * artefact is the only place a past run's shapes can be recomputed from. Without this field a
+   * re-analysis silently reads every question against an empty evidence string, so the signal
+   * readings it produces are not the run's — the first artefact that carried a pool omitted it, and
+   * the gate read back 0.5719 for `empty` where the run itself had computed 0.5653.
+   */
+  readonly evidence: string;
   readonly goldSql: string;
   readonly predictedSql: string;
   /**
@@ -3147,6 +3157,7 @@ async function runFold(
       fold,
       difficulty: row.difficulty,
       question: row.question,
+      evidence: row.evidence,
       goldSql: row.SQL,
       predictedSql: full.sql,
       baselineSql: base.sql,
