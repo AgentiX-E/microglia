@@ -9,6 +9,7 @@ import {
   holmAdjust,
   normalUpper,
   readComposite,
+  readSubsets,
   seOf,
   selectByShape,
 } from '../signal-gate.js';
@@ -31,6 +32,16 @@ function ran(rows: number): ExecSignature {
 
 function empty(): ExecSignature {
   return execSignatureOf({ rows: [], columns: ['c'], failed: false });
+}
+
+/** One non-numeric cell: the shape an average was asked for and text was returned. */
+function text(): ExecSignature {
+  return execSignatureOf({ rows: [['n/a']], columns: ['c'], failed: false });
+}
+
+/** One numeric cell: the same question, answered in the unit it asked for. */
+function numeric(): ExecSignature {
+  return execSignatureOf({ rows: [[1.5]], columns: ['c'], failed: false });
 }
 
 function candidate(
@@ -349,6 +360,69 @@ describe('readComposite', () => {
     expect(result.compositeAccuracy).toBe(0);
     expect(result.baselineAccuracy).toBe(0);
     expect(result.deltaPp).toBe(0);
+  });
+});
+
+describe('readSubsets', () => {
+  it('prices a subset against the first draw, not against another subset', () => {
+    // Every row shares one baseline. Comparing a drop-one composite to the full composite answers
+    // "what did this member add"; comparing it to the first draw answers "what is this set worth",
+    // and only the second is comparable across rows.
+    const questions = [emptyFirst('q1'), emptyFirst('q2')];
+    const rows = readSubsets(questions, [['empty'], []]);
+    expect(rows[0]?.accuracy).toBe(1);
+    expect(rows[0]?.deltaPp).toBeCloseTo(100, 6);
+    expect(rows[0]?.gained).toBe(2);
+    expect(rows[1]?.accuracy).toBe(0);
+    expect(rows[1]?.deltaPp).toBe(0);
+  });
+
+  it('shows a member earning its place as a smaller subset scoring worse', () => {
+    // A question that asks for an average and is answered with text: only `value-type` objects, so
+    // only the subset that contains it can pick the right draw. Dropping it costs both questions.
+    const asksForNumber: QuestionShape = { ...NO_SHAPE, wantsAverage: true };
+    const questions = [
+      question('q1', [candidate(0, false, text()), candidate(1, true, numeric())], asksForNumber),
+      question('q2', [candidate(0, false, text()), candidate(1, true, numeric())], asksForNumber),
+    ];
+    const rows = readSubsets(questions, [['value-type', 'empty'], ['empty'], ['value-type']]);
+    expect(rows[0]?.accuracy).toBe(1);
+    expect(rows[0]?.gained).toBe(2);
+    expect(rows[1]?.accuracy).toBe(0);
+    // Nothing lost, because the first draw was already wrong on both: the gap between the two rows
+    // is a gain one of them made, not a break the other one caused. Reporting it as a loss would
+    // credit the baseline with answers it never had.
+    expect(rows[1]?.lost).toBe(0);
+    expect(rows[2]?.accuracy).toBe(1);
+  });
+
+  it('shows the voters are redundant about emptiness, because every one of them objects to it', () => {
+    // `scoreOf` penalises an empty result on every signal it has, not only on the one called
+    // `empty`, so a set that loses `empty` still refuses an empty answer. That redundancy is why
+    // dropping one voter is a small change on this pool and why the six AUCs sit so close together:
+    // they are not six opinions, they are four opinions about shape and two about a shared floor.
+    const rows = readSubsets([emptyFirst('q1'), emptyFirst('q2')], [
+      ['empty', 'row-shape'],
+      ['row-shape'],
+      ['empty'],
+    ]);
+    expect(rows[1]?.accuracy).toBe(rows[0]?.accuracy);
+    expect(rows[2]?.accuracy).toBe(rows[0]?.accuracy);
+  });
+
+  it('counts a subset that breaks a question the baseline had right', () => {
+    const questions = [
+      question('broken', [candidate(0, true, empty()), candidate(1, false, ran(2))]),
+    ];
+    const rows = readSubsets(questions, [['empty']]);
+    expect(rows[0]?.gained).toBe(0);
+    expect(rows[0]?.lost).toBe(1);
+    expect(rows[0]?.deltaPp).toBeCloseTo(-100, 6);
+  });
+
+  it('returns one row per subset asked for, and nothing for nothing', () => {
+    expect(readSubsets([emptyFirst('q1')], [])).toEqual([]);
+    expect(readSubsets([], [['empty']])[0]?.accuracy).toBe(0);
   });
 });
 

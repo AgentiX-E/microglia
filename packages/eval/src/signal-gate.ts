@@ -258,34 +258,113 @@ export function readComposite(
   // construction rather than by a second implementation of the same rule.
   const compositePicked = compositePicks(eligible, kept);
   const baselinePicked = compositePicks(eligible, []);
-  let compositeTopPick = 0;
-  let baselineTopPick = 0;
-  let gained = 0;
-  let lost = 0;
-  for (let at = 0; at < eligible.length; at += 1) {
-    const question = eligible[at] as PoolQuestion;
-    const compositeRight = isRight(question, compositePicked[at]);
-    const baselineRight = isRight(question, baselinePicked[at]);
-    if (compositeRight) compositeTopPick += 1;
-    if (baselineRight) baselineTopPick += 1;
-    if (compositeRight && !baselineRight) gained += 1;
-    if (!compositeRight && baselineRight) lost += 1;
-  }
-  const compositeAccuracy = eligible.length === 0 ? 0 : compositeTopPick / eligible.length;
-  const baselineAccuracy = eligible.length === 0 ? 0 : baselineTopPick / eligible.length;
+  const composite = tallyOf(eligible, compositePicked, baselinePicked);
+  // A baseline measured against itself gains nothing and loses nothing, which is the definition of
+  // the control rather than a second computation of it.
+  const baseline = tallyOf(eligible, baselinePicked, baselinePicked);
   return {
     verdicts,
     kept,
     inert,
     eligible: eligible.length,
-    compositeTopPick,
-    compositeAccuracy,
-    baselineTopPick,
-    baselineAccuracy,
-    deltaPp: (compositeAccuracy - baselineAccuracy) * 100,
+    compositeTopPick: composite.topPick,
+    compositeAccuracy: composite.accuracy,
+    baselineTopPick: baseline.topPick,
+    baselineAccuracy: baseline.accuracy,
+    deltaPp: (composite.accuracy - baseline.accuracy) * 100,
+    gained: composite.gained,
+    lost: composite.lost,
+    verdict: kept.length === 0 ? 'inert' : 'usable',
+  };
+}
+
+/** One signal subset's accuracy on a pool, against the first draw. */
+export type SubsetReading = {
+  /** The signals the composite voted with. Empty is the first-draw control. */
+  readonly signals: readonly SignalName[];
+  readonly topPick: number;
+  readonly accuracy: number;
+  /** Accuracy minus the first draw's, in percentage points. */
+  readonly deltaPp: number;
+  /** Questions this subset answers correctly and the first draw does not. */
+  readonly gained: number;
+  /** Questions the first draw answers correctly and this subset does not. */
+  readonly lost: number;
+};
+
+/**
+ * What several signal subsets are worth on one pool, each against the same first draw.
+ *
+ * The question this exists to answer is the one a composite hides: whether the whole set is worth
+ * more than its best part. Eleven iterations shipped a composite, measured the composite, and could
+ * not say which of its members was responsible when it came out negative. The gate made each signal
+ * answerable alone; this makes each *subset* answerable alone, so "drop one" and "keep only one" are
+ * arithmetic over a recorded pool rather than two more dispatches.
+ *
+ * Read it as a description, not as a test. Every row is computed on the same questions the signals
+ * were licensed on, so the spread across eleven rows is in-sample and the largest of them would be
+ * selected by construction. It says where the composite's weight sits; it does not say that the
+ * heaviest member would survive a fresh sample, which is what the arm that scores
+ * `sample-5-shape` in a cross-fitted run is for.
+ */
+export function readSubsets(
+  questions: readonly PoolQuestion[],
+  subsets: readonly (readonly SignalName[])[],
+): readonly SubsetReading[] {
+  const eligible = questions.filter((question) => outcomesOf(question) >= 2);
+  const baselinePicked = compositePicks(eligible, []);
+  return subsets.map((signals) => {
+    const tally = tallyOf(eligible, compositePicks(eligible, signals), baselinePicked);
+    return {
+      signals,
+      topPick: tally.topPick,
+      accuracy: tally.accuracy,
+      deltaPp: (tally.accuracy - tally.baselineAccuracy) * 100,
+      gained: tally.gained,
+      lost: tally.lost,
+    };
+  });
+}
+
+type Tally = {
+  readonly topPick: number;
+  readonly accuracy: number;
+  readonly baselineAccuracy: number;
+  readonly gained: number;
+  readonly lost: number;
+};
+
+/**
+ * How often a set of picks was right, and how it moved against a reference set.
+ *
+ * One loop, because three callers want the same four numbers and a second copy of "gained minus lost"
+ * is a second chance for the two to disagree about which side is which.
+ */
+function tallyOf(
+  questions: readonly PoolQuestion[],
+  picked: readonly (number | undefined)[],
+  reference: readonly (number | undefined)[],
+): Tally {
+  let topPick = 0;
+  let referenceTopPick = 0;
+  let gained = 0;
+  let lost = 0;
+  for (let at = 0; at < questions.length; at += 1) {
+    const question = questions[at] as PoolQuestion;
+    const right = isRight(question, picked[at]);
+    const referenceRight = isRight(question, reference[at]);
+    if (right) topPick += 1;
+    if (referenceRight) referenceTopPick += 1;
+    if (right && !referenceRight) gained += 1;
+    if (!right && referenceRight) lost += 1;
+  }
+  const share = (count: number): number => (questions.length === 0 ? 0 : count / questions.length);
+  return {
+    topPick,
+    accuracy: share(topPick),
+    baselineAccuracy: share(referenceTopPick),
     gained,
     lost,
-    verdict: kept.length === 0 ? 'inert' : 'usable',
   };
 }
 

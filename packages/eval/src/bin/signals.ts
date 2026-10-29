@@ -19,7 +19,9 @@ import {
   Z_BAR,
   compositeGate,
   poolFromArtifact,
+  readSubsets,
   type ArtifactPoolCase,
+  type SignalName,
 } from '@agentix-e/microglia-eval';
 
 type Artifact = {
@@ -69,6 +71,34 @@ function main(): void {
           `(+${gate.gained} / -${gate.lost})\n` +
           `[signals] removed ${gate.inert.length} signal(s): ${gate.inert.join(', ')}\n`,
   );
+  if (gate.verdict === 'inert') return;
+
+  // Two families, one table: dropping a member says whether it earns its place, keeping only one
+  // says whether the set is worth more than its best part. They answer different questions and the
+  // composite has never been able to answer either, because it only ever reported its total.
+  const plans: { readonly label: string; readonly signals: readonly SignalName[] }[] = [
+    { label: `all of ${gate.kept.join('+')}`, signals: gate.kept },
+    ...gate.kept.map((signal) => ({
+      label: `without ${signal}`,
+      signals: gate.kept.filter((name) => name !== signal),
+    })),
+    ...gate.kept.map((signal) => ({ label: `only ${signal}`, signals: [signal] })),
+  ];
+  const rows = readSubsets(questions, plans.map((plan) => plan.signals));
+  process.stdout.write(
+    `[signals] subsets, in sample on these ${gate.eligible} question(s) and against the first ` +
+      `draw. A description of where the weight is, not a test of it.\n`,
+  );
+  for (const [at, plan] of plans.entries()) {
+    const row = rows[at];
+    if (row === undefined) continue;
+    process.stdout.write(
+      `[signals]   ${plan.label.padEnd(52)} ` +
+        `${(row.accuracy * 100).toFixed(1)}% ` +
+        `${row.deltaPp >= 0 ? '+' : ''}${row.deltaPp.toFixed(2)}pp ` +
+        `(+${row.gained} / -${row.lost})\n`,
+    );
+  }
 }
 
 main();

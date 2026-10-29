@@ -107,11 +107,13 @@ export {
   holmAdjust,
   normalUpper,
   readComposite,
+  readSubsets,
   seOf,
   selectByShape,
   type CompositeReading,
   type CompositeVerdict,
   type SignalVerdict,
+  type SubsetReading,
 } from './signal-gate.js';
 export {
   FAILED_SIGNATURE,
