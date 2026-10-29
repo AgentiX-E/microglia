@@ -158,6 +158,37 @@ The fact-store row is the competitor comparison: an ADD/UPDATE/DELETE memory, im
 and run on the same corrections. It gains 24pp over no memory and loses everything under the poison
 that quarantine stops — which is the argument for the governance layer, measured rather than asserted.
 
+### On a public benchmark, the prefix form is worth less than nothing
+
+Those arms run on a synthetic corpus built to have systematic, repeating defects — the case the
+mechanism was designed for. The same mechanism on BIRD Mini-Dev, a public one-shot text-to-SQL
+benchmark, measures the other case, and it is the one you should read first:
+
+| Arm | Position | Δ vs no memory | n |
+|---|---|---|---|
+| lexical schema linking (pruned DDL) | input | −8.00pp | 350 |
+| rule pack injected before the question (`full`), pooled over two dispatches | input | **−2.29pp** (p = 0.052) | 700 |
+| `full-verified` — only rules that reproduce their own correction | input | +0.71pp (p = 0.42) | 700 |
+| value samples in the DDL | input | +0.29pp | 350 |
+| model selection over five draws | output | −2.43pp | 350 |
+| **oracle over five draws** | **ceiling** | **+3.52pp** | 350 |
+
+The reason is not a tuning problem, and it is worth stating before you integrate:
+
+> A rule distilled from one correction repairs **22.6%** of the questions a bare retry cannot fix —
+> **on the question it came from**. Pointed at a foreign question it repairs 29 and breaks 29 out of
+> 892 trials: **+0.00pp net**. A rule and its case are one object.
+
+So the library is worth integrating where corrections *repeat* — a workspace with a house convention,
+a schema whose grain is not guessable, a chart style a team insists on — and it is worth nothing where
+every request is new. The recall path costs attention on every call, and attention spent on a rule
+that does not apply is a real loss. The mechanisms that do not depend on repetition (M4, the evaluation
+set every correction forms) are free and are the reason to capture corrections even when distillation
+buys nothing.
+
+The full accounting is in `WHITEPAPER.md` §3.5–3.6.1 of the [AgentiX-E/microglia-docs](https://github.com/AgentiX-E/microglia-docs)
+repository; the pre-registered criteria and their refutations are in its `ROADMAP.md`.
+
 Every number is reproduced by `pnpm bench` and written to `bench/results/study.json`; seventeen gates
 must pass, or the build fails.
 
