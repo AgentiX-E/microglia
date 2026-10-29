@@ -68,6 +68,13 @@ export {
 } from './m-schema.js';
 export { unionCeiling, type UnionCase, type UnionCeiling } from './union.js';
 export {
+  drawsOf,
+  poolFromArtifact,
+  type ArtifactPool,
+  type ArtifactPoolCandidate,
+  type ArtifactPoolCase,
+} from './artifact-pool.js';
+export {
   poolReport,
   type PoolReport,
   type PoolReportQuestion,
@@ -77,6 +84,7 @@ export {
   poolSummary,
   signalReading,
   signalReadings,
+  outcomesOf,
   type PoolCandidate,
   type PoolQuestion,
   type PoolSignalReading,
@@ -84,6 +92,21 @@ export {
   type SignalChoice,
 } from './pool.js';
 export {
+  ALPHA,
+  Z_BAR,
+  compositeGate,
+  compositePicks,
+  gateOf,
+  holmAdjust,
+  normalUpper,
+  readComposite,
+  seOf,
+  type CompositeReading,
+  type CompositeVerdict,
+  type SignalVerdict,
+} from './signal-gate.js';
+export {
+  FAILED_SIGNATURE,
   SIGNALS,
   scoreOf,
   shapeOf,

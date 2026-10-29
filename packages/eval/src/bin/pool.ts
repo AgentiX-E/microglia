@@ -15,95 +15,21 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { poolReport, type PoolReportQuestion } from '@agentix-e/microglia-eval';
-
-type PoolRow = {
-  readonly draw: number;
-  readonly correct: boolean;
-  readonly resultKey: number;
-  readonly signature: {
-    readonly failed: boolean;
-    readonly empty: boolean;
-    readonly rowCount: number;
-    readonly columnCount: number;
-    readonly nullShare: number;
-    readonly duplicateShare: number;
-    readonly numericOnly: boolean;
-    readonly scalar: boolean;
-  } | null;
-};
-
-type CaseRow = {
-  readonly id: string;
-  readonly question: string;
-  readonly evidence?: string;
-  readonly pool: readonly PoolRow[] | null;
-};
+import { poolFromArtifact, poolReport, type ArtifactPoolCase } from '@agentix-e/microglia-eval';
 
 type Artifact = {
-  readonly per_case: readonly CaseRow[];
+  readonly per_case: readonly ArtifactPoolCase[];
   readonly config?: { readonly arms?: readonly string[] };
   readonly generated_at?: string;
 };
 
 const RESULTS = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 'results');
 
-const PLURAL = /\b(each|every|list|all|per|top\s+\d+|bottom\s+\d+)\b/i;
-const COUNT = /\b(how many|number of|count)\b/i;
-const AVERAGE = /\b(average|mean|ratio|percentage|percent|proportion|share)\b/i;
-const MISSING = /\b(no|not|none|never|without|missing|absent)\b/i;
-const DISTINCT = /\b(distinct|unique)\b/i;
-
-/**
- * The question's shape, recomputed from the artefact rather than read from it.
- *
- * The shape is a pure function of the question text and its evidence, both of which the artefact
- * carries, so recomputing keeps the recorded pool a record of *candidates* and not of an
- * interpretation. If the reader changes, the pool stays the same and the reading changes with the
- * code — which is the direction that lets a past run be re-analysed.
- */
-function shapeOf(question: string, evidence: string): PoolReportQuestion['shape'] {
-  const text = `${question} ${evidence}`;
-  return {
-    wantsMany: PLURAL.test(text),
-    wantsCount: COUNT.test(text),
-    wantsAverage: AVERAGE.test(text),
-    wantsMissing: MISSING.test(text),
-    wantsDistinct: DISTINCT.test(text),
-  };
-}
-
-/** Draws the run took, read from the arm names, because a three-draw run is not a five-draw one. */
-function drawsOf(artifact: Artifact): number {
-  let most = 0;
-  for (const arm of artifact.config?.arms ?? []) {
-    const match = /^sample-(\d+)/.exec(arm);
-    if (match === null) continue;
-    const n = Number(match[1]);
-    if (Number.isInteger(n) && n > most) most = n;
-  }
-  return most;
-}
-
 function main(): void {
   const artifact = JSON.parse(
     readFileSync(join(RESULTS, 'poc-sota-bird.json'), 'utf8'),
   ) as Artifact;
-  const draws = drawsOf(artifact);
-  const questions: PoolReportQuestion[] = [];
-  for (const row of artifact.per_case) {
-    if (row.pool === null || row.pool.length === 0) continue;
-    questions.push({
-      id: row.id,
-      shape: shapeOf(row.question, row.evidence ?? ''),
-      candidates: row.pool.map((candidate) => ({
-        draw: candidate.draw,
-        correct: candidate.correct,
-        resultKey: candidate.resultKey,
-        signature: candidate.signature,
-      })),
-    });
-  }
+  const { questions, draws } = poolFromArtifact(artifact.per_case, artifact.config?.arms ?? []);
   if (questions.length === 0) {
     process.stdout.write(
       '[pool] no pool in this artefact: none of the sampling arms ran, so there is nothing to describe\n',

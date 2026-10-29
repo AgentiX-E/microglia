@@ -74,20 +74,30 @@ export const SIGNALS = [
 
 export type SignalName = (typeof SIGNALS)[number];
 
+/**
+ * The signature of a statement that did not run.
+ *
+ * Exported because three modules need the same answer to "what shape does a failure have": the
+ * signature of the result, the tie-break in the pool's signal readings, and the composite's vote.
+ * Three copies of this literal is three chances for one of them to drift into reporting a shape for
+ * something that has none.
+ */
+export const FAILED_SIGNATURE: ExecSignature = Object.freeze({
+  failed: true,
+  empty: true,
+  rowCount: 0,
+  columnCount: 0,
+  nullShare: 0,
+  duplicateShare: 0,
+  numericOnly: false,
+  scalar: false,
+});
+
 export function execSignatureOf(outcome: ExecOutcome): ExecSignature {
   if (outcome.failed) {
     // A statement that did not run has no shape. Reporting the shape of an empty result for it
     // would let a syntax error be scored as "wrong but plausible" rather than as "not an answer".
-    return {
-      failed: true,
-      empty: true,
-      rowCount: 0,
-      columnCount: 0,
-      nullShare: 0,
-      duplicateShare: 0,
-      numericOnly: false,
-      scalar: false,
-    };
+    return FAILED_SIGNATURE;
   }
   const rowCount = outcome.rows.length;
   const columnCount = outcome.columns.length;

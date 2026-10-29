@@ -315,6 +315,56 @@ describe('signalReading', () => {
     expect(first.aucLow).toBeLessThanOrEqual(first.auc);
     expect(first.aucHigh).toBeGreaterThanOrEqual(first.auc);
   });
+
+  it('reports the group sizes the AUC was computed over, not just their product', () => {
+    // The gate that reads this number needs the size of the smaller group: the standard error of an
+    // AUC at these counts is bounded by it, and a pair count alone cannot say how the pairs were
+    // split between candidates that were right and candidates that were not.
+    const questions = [
+      question('q1', [candidate(0, true, 0, ran(1)), candidate(1, false, 1, ran(5)), candidate(2, false, 2, ran(6))]),
+      question('q2', [candidate(0, true, 0, ran(2)), candidate(1, false, 1, ran(7)), candidate(2, false, 2, ran(8))]),
+    ];
+    const reading = signalReading(questions, 'empty', { resamples: 100 });
+    expect(reading.positive).toBe(2);
+    expect(reading.negative).toBe(4);
+    // Pairs are counted inside each question, so two questions of one right against two wrong make
+    // four comparisons and not `positive * negative`. The distinction matters: the gate's floor is
+    // read from the group sizes, and a cross-question product would overstate how many independent
+    // comparisons the pool contains.
+    expect(reading.pairs).toBe(4);
+  });
+
+  it('reports a zero standard error when every question agreed, which the gate floors', () => {
+    // The bootstrap cannot see inside a question, so a pool where every pair is concordant returns
+    // the same AUC on every resample. Zero here is not certainty, and the gate that reads it is
+    // responsible for saying so.
+    const questions = [
+      question('q1', [candidate(0, false, 0, ran(1)), candidate(1, true, 1, ran(5))]),
+      question('q2', [candidate(0, false, 0, ran(1)), candidate(1, true, 1, ran(6))]),
+    ].map((item) => ({ ...item, shape: LIST_SHAPE }));
+    const reading = signalReading(questions, 'row-shape', { resamples: 100 });
+    expect(reading.auc).toBe(1);
+    expect(reading.aucSe).toBe(0);
+  });
+
+  it('reports a positive standard error when the questions disagreed', () => {
+    const questions = [
+      question('q1', [candidate(0, false, 0, ran(1)), candidate(1, true, 1, ran(5))]),
+      question('q2', [candidate(0, true, 0, ran(2)), candidate(1, false, 1, ran(6))]),
+      question('q3', [candidate(0, false, 0, ran(3)), candidate(1, true, 1, ran(7))]),
+    ].map((item) => ({ ...item, shape: LIST_SHAPE }));
+    const reading = signalReading(questions, 'row-shape', { resamples: 200 });
+    expect(reading.aucSe).toBeGreaterThan(0);
+    expect(reading.aucSe).toBeLessThan(0.5);
+  });
+
+  it('reports a zero standard error when there was only one question to resample', () => {
+    const questions = [
+      question('q1', [candidate(0, false, 0, ran(1)), candidate(1, true, 1, ran(5))]),
+    ].map((item) => ({ ...item, shape: LIST_SHAPE }));
+    const reading = signalReading(questions, 'row-shape', { resamples: 200 });
+    expect(reading.aucSe).toBe(0);
+  });
 });
 
 describe('signalReadings', () => {

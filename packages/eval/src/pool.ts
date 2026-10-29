@@ -41,6 +41,7 @@
 
 import { mulberry32 } from '@agentix-e/microglia-core';
 import {
+  FAILED_SIGNATURE,
   SIGNALS,
   scoreOf,
   type ExecSignature,
@@ -95,17 +96,6 @@ export type PoolSummary = {
   readonly noneRight: number;
 };
 
-const FAILED: ExecSignature = Object.freeze({
-  failed: true,
-  empty: true,
-  rowCount: 0,
-  columnCount: 0,
-  nullShare: 0,
-  duplicateShare: 0,
-  numericOnly: false,
-  scalar: false,
-});
-
 /** How many times the question set is resampled for one interval. */
 const RESAMPLES = 2_000;
 
@@ -133,7 +123,7 @@ function distinctOf(question: PoolQuestion): number {
  * agrees on which to keep, and that agreement is worth measuring — even though it collapsed to a
  * single *answer*.
  */
-function outcomesOf(question: PoolQuestion): number {
+export function outcomesOf(question: PoolQuestion): number {
   const seen = new Set<number>();
   let failed = false;
   for (const candidate of question.candidates) {
@@ -227,6 +217,17 @@ export type PoolSignalReading = {
   readonly auc: number;
   readonly aucLow: number;
   readonly aucHigh: number;
+  /**
+   * Standard deviation of the resampled AUCs, which is the standard error the gate reads.
+   *
+   * Reported rather than held privately because the interval and the gate are not the same rule:
+   * the interval is a percentile pair, the gate is `AUC − 0.5 > 2 SE`, and a reader who cannot see
+   * the SE cannot check the second one.
+   */
+  readonly aucSe: number;
+  /** Correct candidates the AUC was computed over, and incorrect ones. */
+  readonly positive: number;
+  readonly negative: number;
   /** Correct/incorrect candidate pairs the AUC was computed from. */
   readonly pairs: number;
 };
@@ -268,7 +269,7 @@ function aucOf(positive: readonly number[], negative: readonly number[]): number
 
 function scoreFor(candidate: PoolCandidate, shape: QuestionShape, signal: SignalChoice): number {
   if (signal === 'draw-order') return -candidate.draw;
-  return scoreOf(candidate.signature ?? FAILED, shape, signal);
+  return scoreOf(candidate.signature ?? FAILED_SIGNATURE, shape, signal);
 }
 
 function pickOf(question: PoolQuestion, signal: SignalChoice): PoolCandidate | undefined {
@@ -338,6 +339,11 @@ export function signalReading(
   drawn.sort((a, b) => a - b);
   const low = drawn.length === 0 ? point : (drawn[Math.floor(0.025 * (drawn.length - 1))] as number);
   const high = drawn.length === 0 ? point : (drawn[Math.ceil(0.975 * (drawn.length - 1))] as number);
+  // The gate in R7.2a is stated in standard errors, not in percentiles, so the standard error is a
+  // reported number rather than something a reader has to reconstruct from a symmetric-looking
+  // interval. It is the population deviation of the resampled AUCs; when the resampling never ran
+  // (one question, or one side empty) it is zero and the gate applies its own floor.
+  const aucSe = deviationOf(drawn);
   return {
     signal,
     eligible: eligible.length,
@@ -346,8 +352,19 @@ export function signalReading(
     auc: point,
     aucLow: low,
     aucHigh: high,
+    aucSe,
+    positive: positive.reduce((sum, group) => sum + group.length, 0),
+    negative: negative.reduce((sum, group) => sum + group.length, 0),
     pairs,
   };
+}
+
+/** Population standard deviation of the resampled values, zero when there are none. */
+function deviationOf(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+  const squared = values.reduce((sum, value) => sum + (value - mean) ** 2, 0);
+  return Math.sqrt(squared / values.length);
 }
 
 /** Every signal beside the baseline, in a fixed order so a table cannot quietly omit one. */

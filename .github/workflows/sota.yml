@@ -215,6 +215,19 @@ jobs:
             echo "no artefact, so no pool to describe"
           fi
 
+      # R7.2a's gate, on the same pool. No calls: the signals are functions of the recorded
+      # signatures, and the composite is scored on the candidates the run already produced. It
+      # exits zero when nothing survives, because "no signal separates right answers from wrong
+      # ones" is a finding rather than a broken step.
+      - name: Gate the execution signals
+        if: always()
+        run: |
+          if [ -f eval/results/poc-sota-bird.json ]; then
+            pnpm eval:signals
+          else
+            echo "no artefact, so no signals to gate"
+          fi
+
       # The re-score runs on the answers this job just produced, which is the point: the
       # model is not asked anything new, only a different criterion is applied to what it
       # already said. It sits before the publish step so a failure here is visible in the
