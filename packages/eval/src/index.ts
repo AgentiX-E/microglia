@@ -66,7 +66,13 @@ export {
   type MschemaTable,
   type RenderOptions,
 } from './m-schema.js';
-export { unionCeiling, type UnionCase, type UnionCeiling } from './union.js';
+export {
+  unionCeiling,
+  type UnionCase,
+  type UnionCeiling,
+  type UnionDistinct,
+} from './union.js';
+export { storeReport, type StoreRun, type StoreTotals } from './store-report.js';
 export {
   drawsOf,
   poolFromArtifact,
