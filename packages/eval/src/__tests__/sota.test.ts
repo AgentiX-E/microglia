@@ -235,6 +235,7 @@ describe('parseArms', () => {
       'full-repair-onretry',
       'full-sampled',
       'full-shuffled',
+      'full-transferred',
       'full-validated',
       'full-verified',
       'gated',
@@ -322,6 +323,7 @@ describe('parseArms', () => {
       'linked',
       'full-verified',
       'full-shuffled',
+      'full-transferred',
     ]);
   });
 
@@ -629,6 +631,48 @@ describe('buildValidityGates', () => {
     );
     expect(noop.pass).toBe(false);
     expect(noop.criterion).toContain('`full` under a second name');
+  });
+
+  it('omits the transfer gates when transfer was not measured', () => {
+    expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V15-transfer-reconciles');
+    expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V16-transfer-resolvable');
+  });
+
+  it('V15 requires the transfer trials to reconcile', () => {
+    const balanced = gate(
+      { ...sound, transfer: { trials: 1160, informative: 1010, repaired: 24, blankRight: 140, unmeasured: 10 } },
+      'V15-transfer-reconciles',
+    );
+    expect(balanced.pass).toBe(true);
+    expect(balanced.blocking).toBe(true);
+    expect(balanced.actual).toContain('1160/1160 trial(s)');
+
+    const short = gate(
+      { ...sound, transfer: { trials: 1160, informative: 1010, repaired: 24, blankRight: 100, unmeasured: 10 } },
+      'V15-transfer-reconciles',
+    );
+    expect(short.pass).toBe(false);
+    expect(short.actual).toContain('1120/1160 trial(s)');
+  });
+
+  it('V16 records whether the transfer rate is resolvable at this sample', () => {
+    // Advisory, for the same reason V5 is: refusing to publish a small sample encourages the
+    // sample-size shopping the gate exists to prevent. What it stops is the number being quoted
+    // as if it had the precision of a larger one.
+    const enough = gate(
+      { ...sound, transfer: { trials: 1160, informative: 400, repaired: 8, blankRight: 700, unmeasured: 60 } },
+      'V16-transfer-resolvable',
+    );
+    expect(enough.pass).toBe(true);
+    expect(enough.blocking).toBe(false);
+    expect(enough.actual).toBe('400 informative trial(s), 8 repair(s)');
+
+    const thin = gate(
+      { ...sound, transfer: { trials: 60, informative: 40, repaired: 2, blankRight: 20, unmeasured: 0 } },
+      'V16-transfer-resolvable',
+    );
+    expect(thin.pass).toBe(false);
+    expect(thin.criterion).toContain('a direction rather than a rate');
   });
 
   it('omits the subset gate entirely when no convention is being taught', () => {
@@ -1112,6 +1156,29 @@ describe('is the pack about the question', () => {
     expect(split.onTopicAccuracy).toBe(0);
     expect(split.onTopicBaseline).toBe(1);
     expect(split.offTopicAccuracy).toBe(1);
+  });
+
+  it('scores an off-topic pack that made the answer wrong as a loss', () => {
+    // The other direction of the off-topic half: a pack naming nothing in the gold query, on a
+    // question the baseline had right. Without it the split's only off-topic evidence is a gain,
+    // and a reader could not tell whether the half was scored at all.
+    const split = relevanceSplit([
+      // Off-topic and lost: the baseline had it and the pack broke it.
+      { correct: false, withoutMemoryCorrect: true, goldSql: 'SELECT count(*) FROM atoms', injected: ['a rule about lap times'] },
+      // Off-topic and gained: the baseline missed it and the pack rescued it. Both directions
+      // exist in the same half, which is why the half's accuracy is a rate and not a count.
+      { correct: true, withoutMemoryCorrect: false, goldSql: 'SELECT count(*) FROM atoms', injected: ['a rule about lap times'] },
+      { correct: true, withoutMemoryCorrect: true, goldSql: 'SELECT count(*) FROM atoms', injected: ['a rule about atoms'] },
+      // On-topic and gained, which is the only combination that exercises the on-topic baseline
+      // counter's negative half inside the loop.
+      { correct: true, withoutMemoryCorrect: false, goldSql: 'SELECT count(*) FROM atoms', injected: ['a rule about atoms'] },
+    ]);
+    expect(split.offTopic).toBe(2);
+    expect(split.offTopicAccuracy).toBe(0.5);
+    expect(split.offTopicBaseline).toBe(0.5);
+    expect(split.onTopic).toBe(2);
+    expect(split.onTopicAccuracy).toBe(1);
+    expect(split.onTopicBaseline).toBe(0.5);
   });
 
   it('reports zero for a half no pack landed in, without dividing by it', () => {

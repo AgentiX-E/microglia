@@ -333,6 +333,16 @@ export type SqlArm =
    */
   | 'full-shuffled'
   /**
+   * The same pack, reduced to the rules that repaired a case other than their own.
+   *
+   * The arm that follows from iteration 96. Reproducing its own correction makes a rule a
+   * demonstration; repairing a different question makes it knowledge. Nothing in this project has
+   * ever distinguished the two, so a store of 1,256 demonstrations has been injected as if it were
+   * 1,256 lessons. The arm carries only the intersection, and its pack size is reported because a
+   * store that admits nothing is a finding about the corpus rather than an arm that did nothing.
+   */
+  | 'full-transferred'
+  /**
    * The same pack, with the model asked to *decide* applicability before answering.
    *
    * Iterations 63 and 64 showed that a rule can carry its condition and that the model
@@ -573,6 +583,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   linked: true,
   'full-verified': true,
   'full-shuffled': true,
+  'full-transferred': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(
@@ -886,6 +897,21 @@ export type GateInput = {
     readonly packDiffers: number;
     readonly questions: number;
   };
+  /**
+   * What the transfer measurement found, when it ran.
+   *
+   * The three buckets have to reconcile to the trials for the same reason the admission buckets
+   * do, and `informative` has to be large enough for the rate to mean anything: a rate computed on
+   * forty informative trials cannot separate 2% from 8%, and publishing it beside one computed on
+   * four hundred would give two numbers the same standing.
+   */
+  readonly transfer?: {
+    readonly trials: number;
+    readonly informative: number;
+    readonly repaired: number;
+    readonly blankRight: number;
+    readonly unmeasured: number;
+  };
 };
 
 /**
@@ -1021,6 +1047,23 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       criterion: 'the gate changed at least one held-out pack, or the arm is `full` under a second name',
       actual: `${packDiffers}/${questions} question(s)`,
       pass: packDiffers > 0,
+      blocking: false,
+    });
+  }
+  if (input.transfer !== undefined) {
+    const { trials, informative, repaired, blankRight, unmeasured } = input.transfer;
+    gates.push({
+      id: 'V15-transfer-reconciles',
+      criterion: 'every transfer trial is measured, informative, or a target that needed nothing',
+      actual: `${unmeasured + blankRight + informative}/${trials} trial(s): ${informative} informative, ${blankRight} already repaired by the retry, ${unmeasured} unmeasured`,
+      pass: unmeasured + blankRight + informative === trials,
+      blocking: true,
+    });
+    gates.push({
+      id: 'V16-transfer-resolvable',
+      criterion: 'at least 100 informative trials, or the transfer rate is a direction rather than a rate',
+      actual: `${informative} informative trial(s), ${repaired} repair(s)`,
+      pass: informative >= 100,
       blocking: false,
     });
   }

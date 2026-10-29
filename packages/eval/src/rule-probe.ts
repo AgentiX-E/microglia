@@ -203,3 +203,127 @@ export function shuffledSource(
   });
   return (ranked[0] as PackCell).position;
 }
+
+/**
+ * Transfer: does a rule that repairs its own case repair any other?
+ *
+ * The own-case probe answers whether a correction is *in* the store. It cannot answer whether the
+ * rule is worth carrying, because a rule that reproduces only the case it was written from is a
+ * lookup table with one row. This is the second question, and it is the last one on the memory axis
+ * that can separate a store that is useless from a store that is too small:
+ *
+ *   repairs per question ≈ (rules admitted per pack) × (transfer rate)
+ *
+ * With 0.44 admitted rules per question measured in iteration 96, a transfer rate of 2% is worth
+ * about 3 questions of 350 — inside the floor — and a rate of 20% is worth 30 questions. The number
+ * decides whether more data or a different substrate is the answer, and neither can be argued for
+ * without it.
+ *
+ * The targets are other corrected cases from the same database. The blank for a target is a
+ * property of the target, not of the rule, so it is measured once and reused across every rule
+ * pointed at it — which is what makes four targets per rule affordable.
+ */
+export type TransferTrial = {
+  readonly itemId: string;
+  /** The foreign case the rule was shown. */
+  readonly targetId: string;
+  /** Whether a bare retry already repaired the target, in which case the trial shows nothing. */
+  readonly blankCorrect: boolean;
+  /** `undefined` when the call did not return, which is not a verdict about the rule. */
+  readonly withRuleCorrect: boolean | undefined;
+};
+
+export type TransferSummary = {
+  /** Rules the probe pointed at foreign cases. */
+  readonly rules: number;
+  readonly trials: number;
+  /** Trials whose target a bare retry could not repair: the only ones that can show work. */
+  readonly informative: number;
+  /** Of those, the ones the rule repaired. */
+  readonly repaired: number;
+  /** Trials whose target needed nothing, and where the rule broke it anyway. */
+  readonly broke: number;
+  /** Trials whose target needed nothing and stayed correct. */
+  readonly blankRight: number;
+  /** Trials that changed nothing on a target that was wrong either way. */
+  readonly unchanged: number;
+  /** Trials whose call never returned. */
+  readonly unmeasured: number;
+  /** `repaired / informative`, and zero when there was nothing informative to divide by. */
+  readonly rate: number;
+  /** Rules that repaired at least one foreign case. */
+  readonly rulesWithRepair: number;
+};
+
+/**
+ * Counts over the transfer trials, with every total defined so an empty probe has no NaN.
+ *
+ * `broke` is separated from `blankRight` because they mean opposite things: one is a rule that
+ * damaged a case needing nothing, the other a rule that was merely unnecessary. The four counts
+ * `unmeasured + blankRight + informative = trials` reconcile, and `broke` is read inside
+ * `blankRight` rather than beside it, so nothing is counted twice.
+ */
+export function transferSummary(trials: readonly TransferTrial[]): TransferSummary {
+  const measured = trials.filter((trial) => trial.withRuleCorrect !== undefined);
+  const informative = measured.filter((trial) => !trial.blankCorrect);
+  const repaired = informative.filter((trial) => trial.withRuleCorrect === true);
+  const blankRight = measured.filter((trial) => trial.blankCorrect);
+  return {
+    rules: new Set(trials.map((trial) => trial.itemId)).size,
+    trials: trials.length,
+    informative: informative.length,
+    repaired: repaired.length,
+    broke: blankRight.filter((trial) => trial.withRuleCorrect === false).length,
+    blankRight: blankRight.length,
+    unchanged: informative.length - repaired.length,
+    unmeasured: trials.length - measured.length,
+    rate: informative.length === 0 ? 0 : repaired.length / informative.length,
+    rulesWithRepair: new Set(repaired.map((trial) => trial.itemId)).size,
+  };
+}
+
+/** The rules that repaired at least one foreign case, in the order the trials named them. */
+export function transferringItemIds(trials: readonly TransferTrial[]): readonly string[] {
+  const kept: string[] = [];
+  const seen = new Set<string>();
+  for (const trial of trials) {
+    if (trial.withRuleCorrect !== true || trial.blankCorrect) continue;
+    if (seen.has(trial.itemId)) continue;
+    seen.add(trial.itemId);
+    kept.push(trial.itemId);
+  }
+  return kept;
+}
+
+/**
+ * How many foreign cases each rule is shown, and which.
+ *
+ * Four, because the rate is what matters and the rate is estimated across trials rather than per
+ * rule: 294 admitted rules × 4 targets is 1,176 trials, which resolves a rate near 2% (about 24
+ * repairs) and cannot resolve one near 0.2% (about 2). Saying so is part of the result.
+ *
+ * Sampling rather than taking the nearest neighbours: a nearest-neighbour target set would measure
+ * transfer to similar questions, which is a different and easier question than the one a retrieval
+ * system actually faces.
+ *
+ * A partial Fisher-Yates draw over the candidate list, so every target is equally likely and the
+ * result is reproducible for a given generator. Excluding the rule's own case is not a preference —
+ * including it would count the case the own-case probe already measured, and inflate the rate by
+ * construction.
+ */
+export function transferTargets(
+  candidates: readonly string[],
+  self: string,
+  count: number,
+  random: () => number,
+): readonly string[] {
+  const pool = candidates.filter((candidate) => candidate !== self);
+  const take = Math.min(count, pool.length);
+  for (let index = 0; index < take; index += 1) {
+    const at = index + Math.floor(random() * (pool.length - index));
+    const held = pool[index] as string;
+    pool[index] = pool[at] as string;
+    pool[at] = held;
+  }
+  return pool.slice(0, take);
+}

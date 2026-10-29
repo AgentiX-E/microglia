@@ -119,6 +119,9 @@ import {
   renderValue,
   schemaLinkSplit,
   shuffledSource,
+  transferSummary,
+  transferTargets,
+  transferringItemIds,
   verdictOf,
   schemaWithValues,
   selectByConsistency,
@@ -131,6 +134,7 @@ import {
   type PackCell,
   type ProbeSummary,
   type ProbeTrial,
+  type TransferSummary,
   type ValueSample,
   matches,
   mentionsAny,
@@ -1167,6 +1171,15 @@ type StoredItem = {
 };
 
 /**
+ * Foreign cases each admitted rule is shown, when transfer is measured.
+ *
+ * Four, because the rate is estimated across trials rather than per rule: 294 admitted rules × 4 is
+ * 1,176 trials, which resolves a rate near 2% and cannot resolve one near 0.2%. Set to zero to skip
+ * the measurement; the arm then reports an empty pack rather than a rate nobody computed.
+ */
+const TRANSFER_TARGETS = nonNegative(process.env['SOTA_TRANSFER_TARGETS'], 4);
+
+/**
  * The character budget the probe renders its rules with, matching the host's default.
  *
  * A single rule can be long, and a probe that truncated the rule it was testing would report a
@@ -1183,7 +1196,24 @@ type ProbeRun = {
   readonly skipped: Readonly<Record<string, number>>;
   /** How the corrected cases failed, which is the population the probe can speak about. */
   readonly failureKinds: Readonly<Record<string, number>>;
+  /**
+   * Verdicts against failure kinds, because `useless` is ambiguous without it.
+   *
+   * A rule distilled from a case whose only symptom is "the person who asked rejected the answer"
+   * had nothing mechanical to work from, and 85% of this corpus's corrections are that case. A
+   * `useless` share concentrated there says the extraction needs a symptom, not a better distiller;
+   * the same share spread evenly says the distiller is the problem. One table separates them.
+   */
+  readonly byKind: Readonly<Record<string, Readonly<Record<string, number>>>>;
   readonly rules: number;
+  /** What the rules that survive the gate can do to other questions, or null when not measured. */
+  readonly transfer:
+    | {
+        readonly summary: TransferSummary;
+        readonly rules: readonly string[];
+        readonly skipped: Readonly<Record<string, number>>;
+      }
+    | null;
 };
 
 /**
@@ -1209,6 +1239,7 @@ async function probeMemory(
   learnRows: readonly BirdRow[],
   dataset: Dataset,
   task: Task,
+  transferTargetsPerRule: number,
 ): Promise<ProbeRun> {
   const items = await store.listKnowledge({ namespace: 'bird', status: 'active' });
   const itemById = new Map(items.map((item) => [item.id, item]));
@@ -1228,6 +1259,11 @@ async function probeMemory(
 
   const skipped: Record<string, number> = {};
   const failureKinds: Record<string, number> = {};
+  /** What each corrected case needs to be re-asked, kept so transfer can reuse it. */
+  const detailById = new Map<
+    string,
+    { readonly row: BirdRow; readonly attempt: string; readonly failure: string; readonly ddl: string; readonly kind: string }
+  >();
   const plans: {
     taskId: string;
     row: BirdRow;
@@ -1248,19 +1284,21 @@ async function probeMemory(
     const sql = extractSql(attempt);
     const outcome = sql === undefined ? undefined : executeQuery(dataset.dbPath(row.db_id), sql);
     let failure: string;
+    let kind: string;
     if (outcome === undefined) {
       failure = 'it did not contain a query';
-      bump(failureKinds, 'no-query');
+      kind = 'no-query';
     } else if (!outcome.ok) {
       failure = `it failed with: ${outcome.error ?? 'an error'}`;
-      bump(failureKinds, 'error');
+      kind = 'error';
     } else if (outcome.tuples.length === 0) {
       failure = 'it returned no rows';
-      bump(failureKinds, 'empty');
+      kind = 'empty';
     } else {
       failure = 'it ran, but the person who asked rejected the answer';
-      bump(failureKinds, 'rejected');
+      kind = 'rejected';
     }
+    bump(failureKinds, kind);
     const carried = itemIds
       .map((id) => itemById.get(id))
       .filter((item): item is NonNullable<typeof item> => item !== undefined);
@@ -1268,13 +1306,9 @@ async function probeMemory(
       bump(skipped, 'no-items');
       continue;
     }
-    const base = {
-      question: row.question,
-      evidence: row.evidence,
-      ddl: ddlOf(dataset.dbPath(row.db_id)),
-      attempt,
-      failure,
-    };
+    const ddl = ddlOf(dataset.dbPath(row.db_id));
+    detailById.set(taskId, { row, attempt, failure, ddl, kind });
+    const base = { question: row.question, evidence: row.evidence, ddl, attempt, failure };
     plans.push({
       taskId,
       row,
@@ -1297,6 +1331,8 @@ async function probeMemory(
     }
   };
   let completed = 0;
+  /** A target's blank is a property of the target, so it is measured once and reused by transfer. */
+  const blankByTask = new Map<string, boolean | undefined>();
   // Two calls per plan in flight at once, so the pool is halved: the endpoint's rate limit is a
   // property of the run, and a probe that doubled the in-flight count would buy its measurement
   // with retries that belong to nobody's budget.
@@ -1305,6 +1341,7 @@ async function probeMemory(
       asked(plan.row, plan.blank),
       asked(plan.row, plan.withRules),
     ]);
+    blankByTask.set(plan.taskId, blankCorrect);
     completed += 1;
     if (completed % 20 === 0 || completed === plans.length) {
       process.stdout.write(
@@ -1318,13 +1355,99 @@ async function probeMemory(
     };
   });
 
+  const admission = admissionOf(items, trials);
+  /** Verdicts beside failure kinds, so a `useless` share that is all `rejected` is visible. */
+  const byKind: Record<string, Record<string, number>> = {};
+  for (const trial of trials) {
+    const kind = detailById.get(trial.taskId)?.kind ?? 'unknown';
+    const row = byKind[kind] ?? (byKind[kind] = {});
+    const key = trial.verdict ?? 'unmeasured';
+    row[key] = (row[key] ?? 0) + 1;
+  }
+
+  // Transfer: point every admitted rule at foreign cases from the same database. The question is
+  // not whether the rule is in the store — the own-case probe settled that — but whether it is
+  // knowledge, which is what a repair of a *different* question would show.
+  let transfer: ProbeRun['transfer'] = null;
+  if (transferTargetsPerRule > 0) {
+    const admitted = new Set(admission.kept);
+    const kept = items.filter((item) => admitted.has(item.id));
+    const skippedTransfer: Record<string, number> = {};
+    const candidates = [...detailById.keys()];
+    const transferPlans: {
+      itemId: string;
+      targetId: string;
+      row: BirdRow;
+      prompt: string;
+    }[] = [];
+    for (const [at, item] of kept.entries()) {
+      const domain = item.scope.domain;
+      // A rule that generalised out of its database has no workspace to transfer into, and asking
+      // it about another database would measure something the store never claimed.
+      if (domain === undefined) {
+        bump(skippedTransfer, 'no-domain');
+        continue;
+      }
+      const own = new Set(
+        item.evidence.map((ref) => ref.taskId).filter((id): id is string => id !== undefined),
+      );
+      const pool = candidates.filter(
+        (taskId) => !own.has(taskId) && detailById.get(taskId)?.row.db_id === domain,
+      );
+      if (pool.length === 0) {
+        bump(skippedTransfer, 'no-target');
+        continue;
+      }
+      const drawn = transferTargets(pool, '', transferTargetsPerRule, mulberry32(SEED + at));
+      const pack = makePack([item], { budget: PROBE_BUDGET }).rendered;
+      for (const targetId of drawn) {
+        const detail = detailById.get(targetId) as NonNullable<ReturnType<typeof detailById.get>>;
+        transferPlans.push({
+          itemId: item.id,
+          targetId,
+          row: detail.row,
+          prompt: retryPromptFor({
+            question: detail.row.question,
+            evidence: detail.row.evidence,
+            ddl: detail.ddl,
+            attempt: detail.attempt,
+            failure: detail.failure,
+            pack,
+          }),
+        });
+      }
+    }
+    let moved = 0;
+    const transferTrials = await mapPool(transferPlans, CONCURRENCY, async (plan) => {
+      moved += 1;
+      if (moved % 50 === 0 || moved === transferPlans.length) {
+        process.stdout.write(
+          `[sota] transfer ${moved}/${transferPlans.length} rules=${kept.length} calls=${llm.stats.calls}\n`,
+        );
+      }
+      return {
+        itemId: plan.itemId,
+        targetId: plan.targetId,
+        blankCorrect: blankByTask.get(plan.targetId) === true,
+        withRuleCorrect: await asked(plan.row, plan.prompt),
+      };
+    });
+    transfer = {
+      summary: transferSummary(transferTrials),
+      rules: transferringItemIds(transferTrials),
+      skipped: skippedTransfer,
+    };
+  }
+
   return {
     trials,
     summary: probeSummary(trials),
-    admission: admissionOf(items, trials),
+    admission,
     skipped,
     failureKinds,
+    byKind,
     rules: items.length,
+    transfer,
   };
 }
 
@@ -1453,6 +1576,22 @@ type FoldResult = {
     readonly brokeItsSource: number;
     readonly unsupported: number;
     /** Items per pack before and after the gate, and questions whose pack it changed. */
+    readonly packAll: number;
+    readonly packKept: number;
+    readonly packDiffers: number;
+    /** Verdicts beside failure kinds: `useless` means one thing with a symptom and another without. */
+    readonly byKind: Readonly<Record<string, Readonly<Record<string, number>>>>;
+  } | null;
+  /**
+   * What the admitted rules did to other questions, or null when transfer was not measured.
+   *
+   * `summary.rate` is repairs over *informative* trials — targets a bare retry could not repair —
+   * and it is the one number that converts a store's size into an expected number of repairs.
+   */
+  readonly transfer: {
+    readonly summary: TransferSummary;
+    readonly rules: number;
+    readonly skipped: Readonly<Record<string, number>>;
     readonly packAll: number;
     readonly packKept: number;
     readonly packDiffers: number;
@@ -1892,6 +2031,9 @@ async function runFold(
   /** Questions whose shuffled pack came from a real donor, and how many were identical anyway. */
   let shuffledDonors = 0;
   let shuffledIdentical = 0;
+  /** What the transfer gate left in each pack, and how many questions it changed. */
+  const transferSizes: { all: number; kept: number }[] = [];
+  let transferDiffers = 0;
   /**
    * The pack each question would see on a retry, held until the first answer has run.
    *
@@ -1943,7 +2085,7 @@ async function runFold(
   // The gate on extraction, run before anything is scored and on learn rows only. Its verdicts
   // filter the store the held-out questions see, so it must not read them.
   if (ARMS.has('full-verified')) {
-    probe = await probeMemory(store, learnRows, dataset, task);
+    probe = await probeMemory(store, learnRows, dataset, task, TRANSFER_TARGETS);
   }
 
   // The size-matched donor library the shuffled arm draws from: every held-out question's own
@@ -2006,6 +2148,17 @@ async function runFold(
       verifiedSizes.push({ all: pack.items.length, kept: surviving.length });
       if (gatedPack.ids.join('\u0000') !== pack.ids.join('\u0000')) verifiedDiffers += 1;
       call(position, 'full-verified', gatedPack.rendered, gatedPack.ids.length);
+    }
+    if (ARMS.has('full-transferred') && probe?.transfer != null) {
+      // The intersection of two gates: the rule reproduced its own correction, and it repaired a
+      // different question. What is left is the only content this project has ever shown to be
+      // knowledge rather than a demonstration, and its pack size is the finding if it is small.
+      const transferring = new Set(probe.transfer.rules);
+      const surviving = pack.items.filter((item) => transferring.has(item.id));
+      const transferredPack = makePack(surviving, { budget: pack.budget });
+      transferSizes.push({ all: pack.items.length, kept: surviving.length });
+      if (transferredPack.ids.join('\u0000') !== pack.ids.join('\u0000')) transferDiffers += 1;
+      call(position, 'full-transferred', transferredPack.rendered, transferredPack.ids.length);
     }
     if (ARMS.has('full-shuffled')) {
       // Another question's pack from the same database, matched on item count. Same vocabulary,
@@ -2958,6 +3111,18 @@ async function runFold(
             packAll: verifiedSizes.reduce((sum, entry) => sum + entry.all, 0),
             packKept: verifiedSizes.reduce((sum, entry) => sum + entry.kept, 0),
             packDiffers: verifiedDiffers,
+            byKind: probe.byKind,
+          },
+    transfer:
+      probe?.transfer == null
+        ? null
+        : {
+            summary: probe.transfer.summary,
+            rules: probe.transfer.rules.length,
+            skipped: probe.transfer.skipped,
+            packAll: transferSizes.reduce((sum, entry) => sum + entry.all, 0),
+            packKept: transferSizes.reduce((sum, entry) => sum + entry.kept, 0),
+            packDiffers: transferDiffers,
           },
     shuffled: ARMS.has('full-shuffled')
       ? { donors: shuffledDonors, identical: shuffledIdentical }
@@ -3292,6 +3457,18 @@ async function main(): Promise<void> {
             questions: cases.length,
           },
         }),
+    // The transfer measurement's own bookkeeping, when it ran.
+    ...(folds.every((fold) => fold.transfer === null)
+      ? {}
+      : {
+          transfer: {
+            trials: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0),
+            informative: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.informative ?? 0), 0),
+            repaired: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0),
+            blankRight: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.blankRight ?? 0), 0),
+            unmeasured: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0),
+          },
+        }),
     callFailureRate,
     calls: llm.stats.prompts,
     callFailures: llm.stats.failures,
@@ -3590,6 +3767,75 @@ async function main(): Promise<void> {
             pack_all: folds.reduce((sum, fold) => sum + (fold.probe?.packAll ?? 0), 0),
             pack_kept: folds.reduce((sum, fold) => sum + (fold.probe?.packKept ?? 0), 0),
             pack_differs: folds.reduce((sum, fold) => sum + (fold.probe?.packDiffers ?? 0), 0),
+            /**
+             * Verdicts beside the kind of failure the case presented.
+             *
+             * 85% of this corpus's corrections have no mechanical symptom, and a rule distilled
+             * from one of those had nothing to work from but the fact of rejection. Reading
+             * `useless` without this table would blame the distiller for an absent signal.
+             */
+            by_kind: folds.reduce<Record<string, Record<string, number>>>((all, fold) => {
+              for (const [kind, counts] of Object.entries(fold.probe?.byKind ?? {})) {
+                const row = all[kind] ?? (all[kind] = {});
+                for (const [verdict, count] of Object.entries(counts)) {
+                  row[verdict] = (row[verdict] ?? 0) + count;
+                }
+              }
+              return all;
+            }, {}),
+            by_fold: folds.map((fold) => ({
+              fold: fold.fold,
+              source_questions: fold.probe?.sourceQuestions ?? 0,
+              supplied: fold.probe?.supplied ?? 0,
+              rate:
+                fold.probe === null || fold.probe.sourceQuestions === 0
+                  ? 0
+                  : Number((fold.probe.supplied / fold.probe.sourceQuestions).toFixed(4)),
+            })),
+          },
+      /**
+       * Whether the admitted rules are knowledge or demonstrations.
+       *
+       * The own-case probe says whether a correction is in the store; this says whether what is in
+       * the store can repair anything else. `rate` is repairs over informative trials — targets a
+       * bare retry could not repair — and it converts directly into the expected number of repairs
+       * per question: `rate × mean_pack_ids`. Without it, a store that is too small and a store
+       * that is useless are indistinguishable.
+       */
+      rule_transfer: folds.every((fold) => fold.transfer === null)
+        ? null
+        : {
+            rules: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.rules ?? 0), 0),
+            trials: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0),
+            informative: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.informative ?? 0), 0),
+            repaired: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0),
+            broke: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0),
+            blank_right: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.blankRight ?? 0), 0),
+            unchanged: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unchanged ?? 0), 0),
+            unmeasured: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0),
+            // Recomputed from the sums rather than averaged over folds: a per-fold mean of rates
+            // would weight a fold with forty informative trials like one with four hundred.
+            rate: (() => {
+              const informative = folds.reduce(
+                (sum, fold) => sum + (fold.transfer?.summary.informative ?? 0),
+                0,
+              );
+              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
+              return informative === 0 ? 0 : Number((repaired / informative).toFixed(4));
+            })(),
+            rules_with_repair: folds.reduce(
+              (sum, fold) => sum + (fold.transfer?.summary.rulesWithRepair ?? 0),
+              0,
+            ),
+            skipped: folds.reduce<Record<string, number>>((all, fold) => {
+              for (const [reason, count] of Object.entries(fold.transfer?.skipped ?? {})) {
+                all[reason] = (all[reason] ?? 0) + count;
+              }
+              return all;
+            }, {}),
+            pack_all: folds.reduce((sum, fold) => sum + (fold.transfer?.packAll ?? 0), 0),
+            pack_kept: folds.reduce((sum, fold) => sum + (fold.transfer?.packKept ?? 0), 0),
+            pack_differs: folds.reduce((sum, fold) => sum + (fold.transfer?.packDiffers ?? 0), 0),
           },
       /**
        * What the shuffled arm drew from, so a fallback to the question's own pack is visible.

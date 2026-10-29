@@ -35,6 +35,10 @@ on:
         description: 'Result comparison that scores the run: multiset (BIRD official) or set (ROSE baseline); the other is computed alongside'
         required: false
         default: 'multiset'
+      transfer_targets:
+        description: 'Foreign cases each admitted rule is shown (0 disables the transfer measurement)'
+        required: false
+        default: '4'
       sample_temperature:
         description: 'Temperature for the sample-N arms (0 would make every draw identical)'
         required: false
@@ -174,6 +178,7 @@ jobs:
           SOTA_CONVENTION: ${{ github.event.inputs.convention || '' }}
           SOTA_RESAMPLES: '10000'
           SOTA_SAMPLE_TEMPERATURE: ${{ github.event.inputs.sample_temperature || '0.7' }}
+          SOTA_TRANSFER_TARGETS: ${{ github.event.inputs.transfer_targets || '4' }}
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}
         run: pnpm eval:sota
 

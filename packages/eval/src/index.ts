@@ -36,6 +36,9 @@ export {
   keptItemIds,
   probeSummary,
   shuffledSource,
+  transferSummary,
+  transferTargets,
+  transferringItemIds,
   verdictOf,
   type Admission,
   type PackCell,
@@ -43,6 +46,8 @@ export {
   type ProbeSummary,
   type ProbeTrial,
   type ProbeVerdict,
+  type TransferSummary,
+  type TransferTrial,
 } from './rule-probe.js';
 export {
   renderValue,
