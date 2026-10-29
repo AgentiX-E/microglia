@@ -24,6 +24,7 @@ type AttributionArtifact = {
     readonly helpful?: number;
     readonly harmful?: number;
     readonly neutral?: number;
+    readonly harmfulShare?: number;
   };
 };
 
@@ -54,13 +55,17 @@ function main(): void {
     // An attribution file without a summary is a failed run's placeholder. Skipping it is honest:
     // counting it as a run with zero rules would enter a zero into the mean that no run measured.
     if (summary === undefined) continue;
+    // The artefact's `helpful`, `harmful` and `neutral` count rules, not instances: they sum to
+    // `injectedRules`. `harmfulShare` is the only instance-weighted number in the summary, and it is
+    // carried separately rather than mixed into a total that would silently mix two units.
     runs.push({
       id: artifact.source_generated_at ?? artifact.id ?? file,
       rules: summary.rules ?? 0,
-      injected: summary.injectedRules ?? 0,
-      helpful: summary.helpful ?? 0,
-      harmful: summary.harmful ?? 0,
-      neutral: summary.neutral ?? 0,
+      injectedRules: summary.injectedRules ?? 0,
+      helpfulRules: summary.helpful ?? 0,
+      harmfulRules: summary.harmful ?? 0,
+      neutralRules: summary.neutral ?? 0,
+      harmfulInstanceShare: summary.harmfulShare ?? 0,
     });
   }
   if (runs.length === 0) {
@@ -72,21 +77,24 @@ function main(): void {
 
   const report = storeReport(runs);
   process.stdout.write(
-    `[store] ${report.runs} run(s), ${report.rules} stored rule(s), ${report.injected} injected ` +
-      `instance(s) = ${(report.injectedShare * 100).toFixed(1)}% of the store ever reached a prompt\n` +
-      `[store] of the instances that reached a prompt: ` +
-      `${(report.helpfulShare * 100).toFixed(2)}% repaired the answer ` +
-      `(${report.helpful}), ${(report.harmfulShare * 100).toFixed(2)}% broke it (${report.harmful}), ` +
-      `${(report.neutralShare * 100).toFixed(2)}% changed nothing (${report.neutral})\n` +
-      `[store] net ${report.net} instance(s) = ${(report.netShare * 100).toFixed(2)}pp of the ` +
-      `injected population; exact McNemar p=${report.p.toPrecision(3)}\n`,
+    `[store] ${report.runs} run(s), ${report.rules} stored rule(s); ${report.injectedRules} of them ` +
+      `reached a prompt = ${(report.injectedShare * 100).toFixed(1)}% of the store\n` +
+      // Rule counts, named as rule counts. The artefact's classes sum to the injected rules, so a
+      // reader who takes them for instances reads a claim an order of magnitude stronger.
+      `[store] of those rules: ${(report.helpfulShare * 100).toFixed(2)}% net-repaired ` +
+      `(${report.helpfulRules}), ${(report.harmfulShare * 100).toFixed(2)}% net-broke ` +
+      `(${report.harmfulRules}), ${(report.neutralShare * 100).toFixed(2)}% washed out ` +
+      `(${report.neutralRules})\n` +
+      `[store] net ${report.net} rule(s); exact sign test p=${report.p.toPrecision(3)}; ` +
+      `instance-weighted harmful share across runs ` +
+      `${(report.harmfulInstanceRange.low * 100).toFixed(1)}%-` +
+      `${(report.harmfulInstanceRange.high * 100).toFixed(1)}%\n`,
   );
   for (const entry of report.perRun) {
-    const share = entry.injected === 0 ? 0 : entry.harmful / entry.injected;
     process.stdout.write(
-      `[store] ${entry.id}  rules ${entry.rules}  injected ${entry.injected}  ` +
-        `+${entry.helpful} / -${entry.harmful} / =${entry.neutral}  ` +
-        `broken ${(share * 100).toFixed(1)}%\n`,
+      `[store] ${entry.id}  rules ${entry.rules}  injected ${entry.injectedRules}  ` +
+        `+${entry.helpfulRules} / -${entry.harmfulRules} / =${entry.neutralRules}  ` +
+        `harmful instances ${(entry.harmfulInstanceShare * 100).toFixed(1)}%\n`,
     );
   }
 }
