@@ -32,6 +32,19 @@ export {
 } from './selector.js';
 export { recoveryRatio, type RecoveryInput } from './recovery.js';
 export {
+  admissionOf,
+  keptItemIds,
+  probeSummary,
+  shuffledSource,
+  verdictOf,
+  type Admission,
+  type PackCell,
+  type ProbedItem,
+  type ProbeSummary,
+  type ProbeTrial,
+  type ProbeVerdict,
+} from './rule-probe.js';
+export {
   renderValue,
   schemaWithValues,
   type TableValues,

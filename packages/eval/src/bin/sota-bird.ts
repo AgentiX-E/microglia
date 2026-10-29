@@ -89,6 +89,7 @@ import {
   armPairsAgainstFull,
   OPTIONAL_ARMS,
   PROMPT_VERSION,
+  admissionOf,
   anchorPromptFor,
   archiveVerdict,
   assignFolds,
@@ -113,9 +114,12 @@ import {
   linkSchema,
   mapPool,
   parseChoice,
+  probeSummary,
   renderRows,
   renderValue,
   schemaLinkSplit,
+  shuffledSource,
+  verdictOf,
   schemaWithValues,
   selectByConsistency,
   selectByModel,
@@ -123,6 +127,10 @@ import {
   selectRandom,
   selectionStats,
   signatureOf,
+  type Admission,
+  type PackCell,
+  type ProbeSummary,
+  type ProbeTrial,
   type ValueSample,
   matches,
   mentionsAny,
@@ -341,6 +349,7 @@ const ANCHORED: readonly { readonly arm: ArmName; readonly mode: AnchorMode }[] 
 
 /** One entry per fold in which the deletion arm ran. */
 const validations: (Awaited<ReturnType<typeof validateMemory>> & { fold: number })[] = [];
+
 
 /**
  * Which reading of "the same answer" is the lane's verdict, and which is its shadow.
@@ -1157,6 +1166,168 @@ type StoredItem = {
   readonly domain: string | null;
 };
 
+/**
+ * The character budget the probe renders its rules with, matching the host's default.
+ *
+ * A single rule can be long, and a probe that truncated the rule it was testing would report a
+ * failure of the renderer as a failure of the extraction.
+ */
+const PROBE_BUDGET = 1200;
+
+/** What one fold's rule probe found. */
+type ProbeRun = {
+  readonly trials: readonly ProbeTrial[];
+  readonly summary: ProbeSummary;
+  readonly admission: Admission;
+  /** Source questions the probe never reached, by reason, because a hole is not a verdict. */
+  readonly skipped: Readonly<Record<string, number>>;
+  /** How the corrected cases failed, which is the population the probe can speak about. */
+  readonly failureKinds: Readonly<Record<string, number>>;
+  readonly rules: number;
+};
+
+/**
+ * Ask the store to reproduce the corrections it was built from.
+ *
+ * A distilled rule is a claim that one correction generalises, and the first thing such a claim
+ * must survive is its own case: given the failure, the attempt that failed and the rules derived
+ * from it, does the correction come back? Two calls per corrected question — with the rules and
+ * without — because a second attempt already repairs some failures by itself, and crediting that
+ * to the rules is the error this project has spent ten iterations avoiding.
+ *
+ * Reads `learn` rows only. The verdicts are then used to filter the store that answers the held-out
+ * questions, so a probe that read those questions would be leakage with a tidier name.
+ *
+ * A question whose first attempt ran and returned rows was still corrected, and the retry prompt
+ * has no observable failure to state. The probe says what a correction loop actually knows at that
+ * point — that the person who asked rejected the answer — rather than inventing a database
+ * symptom; the four kinds are counted apart so a `rejected` share that dominates the population is
+ * visible instead of assumed away.
+ */
+async function probeMemory(
+  store: EmbeddedMemory,
+  learnRows: readonly BirdRow[],
+  dataset: Dataset,
+  task: Task,
+): Promise<ProbeRun> {
+  const items = await store.listKnowledge({ namespace: 'bird', status: 'active' });
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const rowById = new Map(learnRows.map((row) => [idOfRow(row), row]));
+  const byTask = new Map<string, string[]>();
+  for (const item of items) {
+    const seen = new Set<string>();
+    for (const ref of item.evidence) {
+      const taskId = ref.taskId;
+      if (taskId === undefined || seen.has(taskId)) continue;
+      seen.add(taskId);
+      const ids = byTask.get(taskId);
+      if (ids === undefined) byTask.set(taskId, [item.id]);
+      else ids.push(item.id);
+    }
+  }
+
+  const skipped: Record<string, number> = {};
+  const failureKinds: Record<string, number> = {};
+  const plans: {
+    taskId: string;
+    row: BirdRow;
+    itemIds: readonly string[];
+    blank: string;
+    withRules: string;
+  }[] = [];
+  const bump = (sink: Record<string, number>, key: string): void => {
+    sink[key] = (sink[key] ?? 0) + 1;
+  };
+  for (const [taskId, itemIds] of byTask) {
+    const row = rowById.get(taskId);
+    if (row === undefined) {
+      bump(skipped, 'no-source-row');
+      continue;
+    }
+    const attempt = generations.get(taskId) ?? '';
+    const sql = extractSql(attempt);
+    const outcome = sql === undefined ? undefined : executeQuery(dataset.dbPath(row.db_id), sql);
+    let failure: string;
+    if (outcome === undefined) {
+      failure = 'it did not contain a query';
+      bump(failureKinds, 'no-query');
+    } else if (!outcome.ok) {
+      failure = `it failed with: ${outcome.error ?? 'an error'}`;
+      bump(failureKinds, 'error');
+    } else if (outcome.tuples.length === 0) {
+      failure = 'it returned no rows';
+      bump(failureKinds, 'empty');
+    } else {
+      failure = 'it ran, but the person who asked rejected the answer';
+      bump(failureKinds, 'rejected');
+    }
+    const carried = itemIds
+      .map((id) => itemById.get(id))
+      .filter((item): item is NonNullable<typeof item> => item !== undefined);
+    if (carried.length === 0) {
+      bump(skipped, 'no-items');
+      continue;
+    }
+    const base = {
+      question: row.question,
+      evidence: row.evidence,
+      ddl: ddlOf(dataset.dbPath(row.db_id)),
+      attempt,
+      failure,
+    };
+    plans.push({
+      taskId,
+      row,
+      itemIds,
+      blank: retryPromptFor({ ...base, pack: '' }),
+      withRules: retryPromptFor({ ...base, pack: makePack(carried, { budget: PROBE_BUDGET }).rendered }),
+    });
+  }
+
+  // One call that never returns is a hole in the measurement, not a verdict about the rules, so
+  // both halves of a pair resolve to `undefined` rather than to `false`.
+  const asked = async (row: BirdRow, prompt: string): Promise<boolean | undefined> => {
+    try {
+      const reply = await chat(prompt);
+      return judgeReply(row, dataset.dbPath(row.db_id), reply, task).correct;
+    } catch (error) {
+      if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+      if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+      return undefined;
+    }
+  };
+  let completed = 0;
+  // Two calls per plan in flight at once, so the pool is halved: the endpoint's rate limit is a
+  // property of the run, and a probe that doubled the in-flight count would buy its measurement
+  // with retries that belong to nobody's budget.
+  const trials = await mapPool(plans, Math.max(1, Math.ceil(CONCURRENCY / 2)), async (plan) => {
+    const [blankCorrect, withRulesCorrect] = await Promise.all([
+      asked(plan.row, plan.blank),
+      asked(plan.row, plan.withRules),
+    ]);
+    completed += 1;
+    if (completed % 20 === 0 || completed === plans.length) {
+      process.stdout.write(
+        `[sota] probe ${completed}/${plans.length} rules=${items.length} calls=${llm.stats.calls}\n`,
+      );
+    }
+    return {
+      taskId: plan.taskId,
+      itemIds: plan.itemIds,
+      verdict: verdictOf(blankCorrect, withRulesCorrect),
+    };
+  });
+
+  return {
+    trials,
+    summary: probeSummary(trials),
+    admission: admissionOf(items, trials),
+    skipped,
+    failureKinds,
+    rules: items.length,
+  };
+}
+
 type FoldResult = {
   readonly fold: number;
   readonly learn: number;
@@ -1253,6 +1424,47 @@ type FoldResult = {
     readonly dropped: number;
     readonly total: number;
   } | null;
+  /**
+   * What the reproducibility gate found, or null when its arm did not run.
+   *
+   * The first measurement of extraction quality this project has, as opposed to a measurement of
+   * what the extraction is worth on held-out questions. `supplied` is the number of corrections
+   * the store can reproduce from itself, `broke` the number it makes worse, and `blankFixRate` the
+   * share a retry repairs without any memory at all — without which the first number would read as
+   * the rules' contribution.
+   */
+  readonly probe: {
+    readonly sourceQuestions: number;
+    readonly measured: number;
+    readonly unmeasured: number;
+    readonly supplied: number;
+    readonly redundant: number;
+    readonly broke: number;
+    readonly useless: number;
+    readonly rules: number;
+    readonly blankFixRate: number;
+    /** Source questions the gate never reached, by reason: a hole is not a verdict. */
+    readonly skipped: Readonly<Record<string, number>>;
+    /** How the corrected cases failed, so the gate's population is described rather than implied. */
+    readonly failureKinds: Readonly<Record<string, number>>;
+    /** Rules kept, and the buckets the rest fell into. */
+    readonly kept: number;
+    readonly noVerifiedSource: number;
+    readonly brokeItsSource: number;
+    readonly unsupported: number;
+    /** Items per pack before and after the gate, and questions whose pack it changed. */
+    readonly packAll: number;
+    readonly packKept: number;
+    readonly packDiffers: number;
+  } | null;
+  /**
+   * What the shuffled arm did, or null when it did not run.
+   *
+   * `donors` counts questions that drew a replacement pack and `identical` the ones whose donor
+   * happened to carry the same rules, because an arm that silently fell back to its own pack on
+   * every question is `full` with a second name.
+   */
+  readonly shuffled: { readonly donors: number; readonly identical: number } | null;
   /** What the repair store holds, sampled: a count alone cannot show what was learned. */
   readonly repairItems: readonly RepairItem[];
   /** Candidates dropped by the parser, per form. */
@@ -1671,6 +1883,15 @@ async function runFold(
   /** Questions where the pruned store produced a different pack from the unpruned one. */
   let validatedPackDiffers = 0;
   let validatedPositions = 0;
+  /** The reproducibility gate's verdict for this fold, once it has run. */
+  let probe: ProbeRun | undefined;
+  /** What the gate did to each pack: items before and after, so a shrink is a number. */
+  const verifiedSizes: { all: number; kept: number }[] = [];
+  /** Questions where the gate changed the pack. Zero differences means it scored `full` twice. */
+  let verifiedDiffers = 0;
+  /** Questions whose shuffled pack came from a real donor, and how many were identical anyway. */
+  let shuffledDonors = 0;
+  let shuffledIdentical = 0;
   /**
    * The pack each question would see on a retry, held until the first answer has run.
    *
@@ -1719,6 +1940,23 @@ async function runFold(
     if (repaired !== undefined) repairPacks.set(position, await repaired.host.recall(query));
     if (procedural !== undefined) proceduralPacks.set(position, await procedural.host.recall(query));
   }
+  // The gate on extraction, run before anything is scored and on learn rows only. Its verdicts
+  // filter the store the held-out questions see, so it must not read them.
+  if (ARMS.has('full-verified')) {
+    probe = await probeMemory(store, learnRows, dataset, task);
+  }
+
+  // The size-matched donor library the shuffled arm draws from: every held-out question's own
+  // pack size, so a swap can be made without also changing how much text was injected.
+  const packLibrary: PackCell[] =
+    ARMS.has('full-shuffled')
+      ? [...rawPacks].map(([position, pack]) => ({
+          position,
+          db: (evalRows[position] as BirdRow).db_id,
+          items: pack.items.length,
+        }))
+      : [];
+
   // The deletion half of the literature's prescription, run on learn rows only, before
   // any held-out question is scored.
   let validation: Awaited<ReturnType<typeof validateMemory>> | undefined;
@@ -1758,6 +1996,34 @@ async function runFold(
       call(position, 'none-replica', '', 0);
     }
     call(position, 'full', pack.rendered, pack.ids.length);
+    if (ARMS.has('full-verified') && probe !== undefined) {
+      // The same retrieval, the same order, the same budget, and only the rules that reproduced
+      // their own correction. A question whose every rule failed the gate therefore sees an empty
+      // pack, which is `none` for that question - counted in `verifiedSizes` rather than hidden.
+      const kept = new Set(probe.admission.kept);
+      const surviving = pack.items.filter((item) => kept.has(item.id));
+      const gatedPack = makePack(surviving, { budget: pack.budget });
+      verifiedSizes.push({ all: pack.items.length, kept: surviving.length });
+      if (gatedPack.ids.join('\u0000') !== pack.ids.join('\u0000')) verifiedDiffers += 1;
+      call(position, 'full-verified', gatedPack.rendered, gatedPack.ids.length);
+    }
+    if (ARMS.has('full-shuffled')) {
+      // Another question's pack from the same database, matched on item count. Same vocabulary,
+      // same size, different content: the one comparison that separates "the retrieved case is
+      // what misleads" from "advice about this workspace is what misleads".
+      const donorPosition = shuffledSource(packLibrary, {
+        position,
+        db: row.db_id,
+        items: pack.items.length,
+      });
+      const donor = donorPosition === undefined ? undefined : rawPacks.get(donorPosition);
+      if (donor !== undefined) {
+        shuffledDonors += 1;
+        if (donor.ids.join('\u0000') === pack.ids.join('\u0000')) shuffledIdentical += 1;
+      }
+      const swapped = makePack(donor === undefined ? [] : donor.items, { budget: pack.budget });
+      call(position, 'full-shuffled', swapped.rendered, swapped.ids.length);
+    }
     if (ARMS.has('full-validated')) {
       // Read again, after the deletion: this is the only arm that sees the pruned store.
       const pruned = await widened.host.recall({ ...query, scope: { domain: row.db_id } });
@@ -2678,6 +2944,24 @@ async function runFold(
             correctDraws,
             selectors: choiceAccounting.get(fold) ?? null,
           },
+    probe:
+      probe === undefined
+        ? null
+        : {
+            ...probe.summary,
+            skipped: probe.skipped,
+            failureKinds: probe.failureKinds,
+            kept: probe.admission.kept.length,
+            noVerifiedSource: probe.admission.noVerifiedSource,
+            brokeItsSource: probe.admission.brokeItsSource,
+            unsupported: probe.admission.unsupported,
+            packAll: verifiedSizes.reduce((sum, entry) => sum + entry.all, 0),
+            packKept: verifiedSizes.reduce((sum, entry) => sum + entry.kept, 0),
+            packDiffers: verifiedDiffers,
+          },
+    shuffled: ARMS.has('full-shuffled')
+      ? { donors: shuffledDonors, identical: shuffledIdentical }
+      : null,
     repairItems,
     distillDrops: { rule: widened.drops, repair: repaired?.drops ?? null },
     items,
@@ -2994,6 +3278,20 @@ async function main(): Promise<void> {
       channelBest === undefined
         ? undefined
         : { arm: channelBest.arm, deltaPp: channelBest.delta_pp },
+    // The gate's own bookkeeping, so a store filtered by a miscount cannot publish a number.
+    ...(folds.every((fold) => fold.probe === null)
+      ? {}
+      : {
+          probe: {
+            rules: folds.reduce((sum, fold) => sum + (fold.probe?.rules ?? 0), 0),
+            kept: folds.reduce((sum, fold) => sum + (fold.probe?.kept ?? 0), 0),
+            noVerifiedSource: folds.reduce((sum, fold) => sum + (fold.probe?.noVerifiedSource ?? 0), 0),
+            brokeItsSource: folds.reduce((sum, fold) => sum + (fold.probe?.brokeItsSource ?? 0), 0),
+            unsupported: folds.reduce((sum, fold) => sum + (fold.probe?.unsupported ?? 0), 0),
+            packDiffers: folds.reduce((sum, fold) => sum + (fold.probe?.packDiffers ?? 0), 0),
+            questions: cases.length,
+          },
+        }),
     callFailureRate,
     calls: llm.stats.prompts,
     callFailures: llm.stats.failures,
@@ -3242,6 +3540,65 @@ async function main(): Promise<void> {
              * noise floor measured on the same questions in the same fold.
              */
             split: schemaLinkSplit(cases),
+          },
+      /**
+       * Whether the store can reproduce the corrections it was built from.
+       *
+       * The question the memory line needed and never asked. Every previous arm measured what the
+       * extraction is worth on held-out questions, which confounds a rule that is wrong with a rule
+       * that does not transfer; this one asks the rule to reproduce its own case, with a paired
+       * blank so the retry's own repair rate is subtracted rather than credited.
+       *
+       * `kept` and the three drop buckets have to sum to `rules`, and `packDiffers` has to be
+       * non-zero for `full-verified` to be a treatment rather than a second name for `full`.
+       */
+      rule_probe: folds.every((fold) => fold.probe === null)
+        ? null
+        : {
+            source_questions: folds.reduce((sum, fold) => sum + (fold.probe?.sourceQuestions ?? 0), 0),
+            measured: folds.reduce((sum, fold) => sum + (fold.probe?.measured ?? 0), 0),
+            unmeasured: folds.reduce((sum, fold) => sum + (fold.probe?.unmeasured ?? 0), 0),
+            supplied: folds.reduce((sum, fold) => sum + (fold.probe?.supplied ?? 0), 0),
+            redundant: folds.reduce((sum, fold) => sum + (fold.probe?.redundant ?? 0), 0),
+            broke: folds.reduce((sum, fold) => sum + (fold.probe?.broke ?? 0), 0),
+            useless: folds.reduce((sum, fold) => sum + (fold.probe?.useless ?? 0), 0),
+            blank_fix_rate: (() => {
+              const measured = folds.reduce((sum, fold) => sum + (fold.probe?.measured ?? 0), 0);
+              const fixed = folds.reduce(
+                (sum, fold) => sum + (fold.probe?.redundant ?? 0) + (fold.probe?.broke ?? 0),
+                0,
+              );
+              return measured === 0 ? 0 : Number((fixed / measured).toFixed(4));
+            })(),
+            failure_kinds: folds.reduce<Record<string, number>>((all, fold) => {
+              for (const [kind, count] of Object.entries(fold.probe?.failureKinds ?? {})) {
+                all[kind] = (all[kind] ?? 0) + count;
+              }
+              return all;
+            }, {}),
+            skipped: folds.reduce<Record<string, number>>((all, fold) => {
+              for (const [reason, count] of Object.entries(fold.probe?.skipped ?? {})) {
+                all[reason] = (all[reason] ?? 0) + count;
+              }
+              return all;
+            }, {}),
+            rules: folds.reduce((sum, fold) => sum + (fold.probe?.rules ?? 0), 0),
+            kept: folds.reduce((sum, fold) => sum + (fold.probe?.kept ?? 0), 0),
+            no_verified_source: folds.reduce((sum, fold) => sum + (fold.probe?.noVerifiedSource ?? 0), 0),
+            broke_its_source: folds.reduce((sum, fold) => sum + (fold.probe?.brokeItsSource ?? 0), 0),
+            unsupported: folds.reduce((sum, fold) => sum + (fold.probe?.unsupported ?? 0), 0),
+            pack_all: folds.reduce((sum, fold) => sum + (fold.probe?.packAll ?? 0), 0),
+            pack_kept: folds.reduce((sum, fold) => sum + (fold.probe?.packKept ?? 0), 0),
+            pack_differs: folds.reduce((sum, fold) => sum + (fold.probe?.packDiffers ?? 0), 0),
+          },
+      /**
+       * What the shuffled arm drew from, so a fallback to the question's own pack is visible.
+       */
+      shuffled: folds.every((fold) => fold.shuffled === null)
+        ? null
+        : {
+            donors: folds.reduce((sum, fold) => sum + (fold.shuffled?.donors ?? 0), 0),
+            identical: folds.reduce((sum, fold) => sum + (fold.shuffled?.identical ?? 0), 0),
           },
       /**
        * What the value annotator produced, so an arm that annotated nothing cannot look like one

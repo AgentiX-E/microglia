@@ -234,7 +234,9 @@ describe('parseArms', () => {
       'full-repair',
       'full-repair-onretry',
       'full-sampled',
+      'full-shuffled',
       'full-validated',
+      'full-verified',
       'gated',
       'linked',
       'none',
@@ -318,6 +320,8 @@ describe('parseArms', () => {
       'sample-5-model',
       'values',
       'linked',
+      'full-verified',
+      'full-shuffled',
     ]);
   });
 
@@ -536,6 +540,95 @@ describe('buildValidityGates', () => {
     const empty = gate({ ...sound, packConditions: { injected: 0, withCondition: 0 } }, 'V12-shape-present');
     expect(empty.pass).toBe(false);
     expect(empty.actual).toBe('0/0 injected rule(s) carried a condition (0.0%)');
+  });
+
+  it('omits the probe gates when the reproducibility arm did not run', () => {
+    expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V13-probe-reconciles');
+    expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V14-probe-applied');
+  });
+
+  it('V13 requires the gate to account for every rule it was given', () => {
+    // The store is filtered by a count, and a count that loses rules makes every
+    // `full-verified` number a measurement of the bookkeeping rather than of the memory.
+    // Blocking, because there is no reading of an artefact whose own totals disagree.
+    const consistent = gate(
+      {
+        ...sound,
+        probe: {
+          rules: 258,
+          kept: 40,
+          noVerifiedSource: 18,
+          brokeItsSource: 12,
+          unsupported: 188,
+          packDiffers: 210,
+          questions: 350,
+        },
+      },
+      'V13-probe-reconciles',
+    );
+    expect(consistent.pass).toBe(true);
+    expect(consistent.blocking).toBe(true);
+    expect(consistent.actual).toContain('258/258 rule(s)');
+
+    const short = gate(
+      {
+        ...sound,
+        probe: {
+          rules: 258,
+          kept: 40,
+          noVerifiedSource: 18,
+          brokeItsSource: 12,
+          unsupported: 100,
+          packDiffers: 210,
+          questions: 350,
+        },
+      },
+      'V13-probe-reconciles',
+    );
+    expect(short.pass).toBe(false);
+    expect(short.actual).toContain('170/258 rule(s)');
+  });
+
+  it('V14 records whether the gate changed a single held-out pack', () => {
+    // Advisory for the reason V12 is: a gate that kept everything is a null result about
+    // the extraction, and the probe's own numbers still stand. What must not happen is the
+    // arm being compared to `full` as if the two were different treatments.
+    const applied = gate(
+      {
+        ...sound,
+        probe: {
+          rules: 10,
+          kept: 10,
+          noVerifiedSource: 0,
+          brokeItsSource: 0,
+          unsupported: 0,
+          packDiffers: 4,
+          questions: 350,
+        },
+      },
+      'V14-probe-applied',
+    );
+    expect(applied.pass).toBe(true);
+    expect(applied.blocking).toBe(false);
+    expect(applied.actual).toBe('4/350 question(s)');
+
+    const noop = gate(
+      {
+        ...sound,
+        probe: {
+          rules: 10,
+          kept: 10,
+          noVerifiedSource: 0,
+          brokeItsSource: 0,
+          unsupported: 0,
+          packDiffers: 0,
+          questions: 350,
+        },
+      },
+      'V14-probe-applied',
+    );
+    expect(noop.pass).toBe(false);
+    expect(noop.criterion).toContain('`full` under a second name');
   });
 
   it('omits the subset gate entirely when no convention is being taught', () => {

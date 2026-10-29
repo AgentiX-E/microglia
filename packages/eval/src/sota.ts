@@ -311,6 +311,28 @@ export type SqlArm =
    */
   | 'full-validated'
   /**
+   * The same pack, reduced to the rules that reproduced their own correction.
+   *
+   * Every memory arm measured here is negative or null, and none of them asked the store to
+   * demonstrate anything. A distilled rule is a claim that one correction generalises, and a
+   * claim like that can be tested on its own case: hand the model the failure, the failed
+   * attempt and the rules derived from it, and see whether the correction comes back. The
+   * test runs on learn rows with a paired blank, so the retry's own repair rate is subtracted
+   * rather than credited. Only the rules that supplied something survive; the arm asks whether
+   * a store of demonstrated experience behaves differently from a store of plausible prose.
+   */
+  | 'full-verified'
+  /**
+   * The same number of rules, drawn from a different question in the same database.
+   *
+   * The missing cell of the mechanism table. `wrong-scope` measures foreign rules and is
+   * inert, so a matching vocabulary is what makes the model follow a claim; `duplicate`
+   * doubles the same pack and prices the dosage. This arm keeps the vocabulary, keeps the
+   * size, and changes the content, which is the only comparison that says whether the harm
+   * belongs to the retrieved case or to the mere presence of advice about this workspace.
+   */
+  | 'full-shuffled'
+  /**
    * The same pack, with the model asked to *decide* applicability before answering.
    *
    * Iterations 63 and 64 showed that a rule can carry its condition and that the model
@@ -549,6 +571,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-5-model': true,
   values: true,
   linked: true,
+  'full-verified': true,
+  'full-shuffled': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(
@@ -844,6 +868,24 @@ export type GateInput = {
    * channel *responds*; this asks whether it is *usable*, and both have to hold.
    */
   readonly channelCeiling?: number;
+  /**
+   * What the reproducibility gate did, when its arm ran.
+   *
+   * `kept` plus the three drop buckets has to equal `rules`: a gate that loses rules between
+   * counting and filtering has a defect in its bookkeeping, and a defect there would make every
+   * `full-verified` number a measurement of the bug rather than of the store. `packDiffers` is
+   * the arm's own validity condition — a gate that kept everything it saw is `full` under a
+   * second name, which is the failure mode every earlier control in this lane exists to catch.
+   */
+  readonly probe?: {
+    readonly rules: number;
+    readonly kept: number;
+    readonly noVerifiedSource: number;
+    readonly brokeItsSource: number;
+    readonly unsupported: number;
+    readonly packDiffers: number;
+    readonly questions: number;
+  };
 };
 
 /**
@@ -962,6 +1004,24 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       actual: `${(input.channelCeiling * 100).toFixed(2)}%`,
       pass: input.channelCeiling >= 0.9,
       blocking: true,
+    });
+  }
+  if (input.probe !== undefined) {
+    const { rules, kept, noVerifiedSource, brokeItsSource, unsupported, packDiffers, questions } = input.probe;
+    const counted = kept + noVerifiedSource + brokeItsSource + unsupported;
+    gates.push({
+      id: 'V13-probe-reconciles',
+      criterion: 'the reproducibility gate accounts for every rule it was given',
+      actual: `${counted}/${rules} rule(s): ${kept} kept, ${unsupported} unsupported, ${brokeItsSource} broke its source, ${noVerifiedSource} unprobed`,
+      pass: counted === rules,
+      blocking: true,
+    });
+    gates.push({
+      id: 'V14-probe-applied',
+      criterion: 'the gate changed at least one held-out pack, or the arm is `full` under a second name',
+      actual: `${packDiffers}/${questions} question(s)`,
+      pass: packDiffers > 0,
+      blocking: false,
     });
   }
   if (input.conventionExecRate !== undefined) {
