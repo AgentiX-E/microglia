@@ -56,6 +56,25 @@ export {
   type TransferTrial,
 } from './rule-probe.js';
 export {
+  collectMschema,
+  renderMschema,
+  type CollectOptions,
+  type MschemaColumn,
+  type MschemaForeignKey,
+  type MschemaTable,
+  type RenderOptions,
+} from './m-schema.js';
+export {
+  SIGNALS,
+  scoreOf,
+  shapeOf,
+  execSignatureOf,
+  type ExecOutcome,
+  type QuestionShape,
+  type ExecSignature,
+  type SignalName,
+} from './exec-signature.js';
+export {
   renderValue,
   schemaWithValues,
   type TableValues,
