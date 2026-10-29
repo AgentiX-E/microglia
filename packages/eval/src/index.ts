@@ -87,6 +87,18 @@ export {
   type PoolVerdict,
 } from './pool-report.js';
 export {
+  PRIOR_SCOPES,
+  keyOf,
+  priorPicks,
+  priorReading,
+  priorTable,
+  type PriorCandidate,
+  type PriorCase,
+  type PriorPick,
+  type PriorReading,
+  type PriorScope,
+} from './memory-prior.js';
+export {
   poolSummary,
   signalReading,
   signalReadings,
@@ -265,11 +277,19 @@ export {
 } from './embed-probe.js';
 
 export {
+  CONTRASTS,
   HOUSE_CONVENTIONS,
   OPTIONAL_ARMS,
   PROMPT_VERSION,
   GenerationCache,
   armPairsAgainstFull,
+  contrastTable,
+  SAMPLING_SELECTORS,
+  priorScopeOf,
+  samplingSpecOf,
+  type ContrastRow,
+  type ContrastSpec,
+  type SamplingSelector,
   buildValidityGates,
   canonicalRows,
   type ResultComparison,

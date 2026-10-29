@@ -135,6 +135,12 @@ import {
   shapeOf,
   collectMschema,
   renderMschema,
+  CONTRASTS,
+  contrastTable,
+  priorPicks,
+  priorScopeOf,
+  priorTable,
+  samplingSpecOf,
   selectByConsistency,
   selectByModel,
   selectByShape,
@@ -147,6 +153,7 @@ import {
   type GeneratorKind,
   type PackCell,
   type PoolQuestion,
+  type PriorScope,
   type ProbeSummary,
   type ProbeTrial,
   type TransferSummary,
@@ -1107,6 +1114,50 @@ function judgeReply(
 
 function idOfRow(row: BirdRow): string {
   return `${row.db_id}#${row.question_id}`;
+}
+
+/**
+ * The memory prior's arm, applied after every fold has been measured.
+ *
+ * This is the only selector in the lane that cannot run inside the fold it scores. Every other one
+ * reads the draws of the question in front of it; this one reads what happened to questions *like*
+ * it in the other folds, and those outcomes do not exist until the run is nearly over.
+ *
+ * A question with no pool is left without the arm rather than scored as a failure, which is how
+ * every other arm treats a question it never saw — an absent outcome and a wrong answer are different
+ * facts, and only one of them is a measurement of the selector.
+ */
+function withPriorPicks(
+  cases: readonly CaseOutcome[],
+  arm: Exclude<ArmName, 'none' | 'full'>,
+  scope: PriorScope,
+): readonly CaseOutcome[] {
+  const picks = priorPicks(
+    cases.map((item) => ({
+      id: item.id,
+      dbId: item.dbId,
+      fold: item.fold,
+      candidates: (item.pool ?? []).map((candidate) => ({
+        draw: candidate.draw,
+        correct: candidate.correct,
+        signature: candidate.signature,
+      })),
+    })),
+    scope,
+  );
+  const out: CaseOutcome[] = [];
+  for (const [at, item] of cases.entries()) {
+    const pick = picks[at];
+    const chosen = pick === undefined || pick.chosen < 0 ? 0 : pick.chosen;
+    const verdict = (item.pool ?? [])[chosen];
+    if (verdict === undefined) {
+      out.push(item);
+      continue;
+    }
+    const arms: CaseOutcome['arms'] = { ...item.arms, [arm]: verdict.correct };
+    out.push({ ...item, arms });
+  }
+  return out;
 }
 
 type LearningPass = {
@@ -2662,43 +2713,26 @@ async function runFold(
   // The pass is shared because the arms must differ in *one* thing. Drawing separately per arm
   // would give each its own noise, and the whole question being asked is whether choosing among
   // draws beats not choosing — which needs the same draws on both sides.
+  const samplingArmsThisRun = (OPTIONAL_ARMS as readonly ArmName[]).filter((arm) => {
+    const selector = samplingSpecOf(arm)?.selector ?? 'oracle';
+    // `prior` is excluded here and dispatched after every fold is known, because it is the one
+    // selector that cannot run inside the fold that scores it.
+    return selector !== 'oracle' && selector !== 'prior' && ARMS.has(arm);
+  });
   /**
-   * What a sampling arm asks for, read from its name.
+   * The memory prior, when it was asked for.
    *
-   * The arm names carry the design — `sample-<n>[-<selector>]` — and a table beside them would be a
-   * second place to change when one of them changes. A name the pattern does not match is not a
-   * sampling arm.
+   * It reads the pool and decides nothing at draw time: the lookups are built from the other folds,
+   * and the other folds do not exist until the run is nearly over. So it is not a sampling arm, it
+   * is the reason to take draws at all — and it is split out here rather than handled inside the
+   * selection loop because a selector that ranked candidates using outcomes from questions it has
+   * already scored would be reading the fold it is about to be measured on.
    */
-  const samplingSpec = (
-    arm: ArmName,
-  ): {
-    n: number;
-    selector: 'majority' | 'first' | 'random' | 'oracle' | 'model' | 'exec' | 'shape' | 'value';
-  } | undefined => {
-    const match = /^sample-(\d+)(?:-(first|random|oracle|model|exec|shape|value))?$/.exec(arm);
-    if (match === null) return undefined;
-    const n = Number(match[1]);
-    if (!Number.isInteger(n) || n < 2) return undefined;
-    const suffix = match[2];
-    const selector =
-      suffix === 'first'
-        ? 'first'
-        : suffix === 'random'
-          ? 'random'
-          : suffix === 'oracle'
-            ? 'oracle'
-            : suffix === 'model'
-              ? 'model'
-              : suffix === 'exec'
-                ? 'exec'
-                : suffix === 'shape' || suffix === 'value'
-                  ? suffix
-                  : 'majority';
-    return { n, selector };
-  };
-  const samplingArmsThisRun = (OPTIONAL_ARMS as readonly ArmName[]).filter(
-    (arm) => (samplingSpec(arm)?.selector ?? 'oracle') !== 'oracle' && ARMS.has(arm),
+  const priorArm = (OPTIONAL_ARMS as readonly ArmName[]).find(
+    (arm) =>
+      priorScopeOf(samplingSpecOf(arm)?.selector ?? 'majority') !== undefined && ARMS.has(arm),
   );
+  const priorRequested = priorArm !== undefined;
   /**
    * The ceiling arm the caller asked for, if any.
    *
@@ -2707,7 +2741,7 @@ async function runFold(
    * that says five.
    */
   const ceilingArm = (OPTIONAL_ARMS as readonly ArmName[]).find(
-    (arm) => samplingSpec(arm)?.selector === 'oracle' && ARMS.has(arm),
+    (arm) => samplingSpecOf(arm)?.selector === 'oracle' && ARMS.has(arm),
   );
   /**
    * What the best selector could possibly have scored.
@@ -2756,13 +2790,16 @@ async function runFold(
   >();
   const correctDraws = new Array<number>(0).fill(0);
   let samplingDraws = 0;
-  if (samplingArmsThisRun.length > 0 || wantsCeiling) {
+  if (samplingArmsThisRun.length > 0 || wantsCeiling || priorRequested) {
     const index = new Map(plans.map((plan, at) => [`${plan.position}:${plan.arm}`, at]));
     const batch: { position: number; draw: number; prompt: string }[] = [];
     samplingDraws = Math.max(
       2,
-      ...samplingArmsThisRun.map((arm) => samplingSpec(arm)?.n ?? 1),
-      ceilingArm === undefined ? 1 : (samplingSpec(ceilingArm)?.n ?? 1),
+      ...samplingArmsThisRun.map((arm) => samplingSpecOf(arm)?.n ?? 1),
+      ceilingArm === undefined ? 1 : (samplingSpecOf(ceilingArm)?.n ?? 1),
+      // The prior's name carries its draw count like every other sampling arm, so a five-draw prior
+      // asked for on its own still pays for five draws rather than silently reading one.
+      priorArm === undefined ? 1 : (samplingSpecOf(priorArm)?.n ?? 1),
     );
     for (const position of evalRows.keys()) {
       const at = index.get(`${position}:none`);
@@ -2889,6 +2926,11 @@ async function runFold(
       poolByPositionRecord.set(position, {
         id: idOf(row),
         shape: shapeOf(row.question, row.evidence),
+        // The two fields a memory prior is keyed on. Recorded here rather than reconstructed from
+        // the fold summary, because a question's database is a property of the question and the
+        // pool is the only per-question record the artefact keeps.
+        dbId: row.db_id,
+        fold,
         candidates: verdicts.map((verdict, draw) => ({
           draw,
           correct: verdict.correct,
@@ -2918,7 +2960,7 @@ async function runFold(
       const pool = poolByPosition.get(position);
       if (pool === undefined) continue;
       for (const arm of samplingArmsThisRun) {
-        const spec = samplingSpec(arm);
+        const spec = samplingSpecOf(arm);
         if (spec === undefined || (spec.selector !== 'model' && spec.selector !== 'exec')) continue;
         const slice = pool.candidates.slice(0, spec.n);
         const distinct = new Set(
@@ -2952,7 +2994,7 @@ async function runFold(
       const answers = await mapPool(choiceBatch, CONCURRENCY, async (item) => {
         try {
           const reply = await chat(item.prompt, 200, 0);
-          return { item, choice: parseChoice(reply.text, (samplingSpec(item.arm)?.n ?? 0)) };
+          return { item, choice: parseChoice(reply.text, (samplingSpecOf(item.arm)?.n ?? 0)) };
         } catch (error) {
           if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
           if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
@@ -3002,7 +3044,7 @@ async function runFold(
       // call as a wrong answer, and an arm that silently dropped the question would be measured on
       // a different, easier population than the one it is compared against.
       for (const arm of samplingArmsThisRun) {
-        const spec = samplingSpec(arm);
+        const spec = samplingSpecOf(arm);
         if (spec === undefined) continue;
         const slice = pool.candidates.slice(0, spec.n);
         const selection =
@@ -3525,7 +3567,27 @@ async function main(): Promise<void> {
     }
   }
 
-  const cases = folds.flatMap((fold) => fold.cases);
+  /**
+   * The prior arms this run asked for, each with the memory it reads.
+   *
+   * Read here rather than carried out of the fold, because a fold cannot decide a question whose
+   * answer depends on the other four. The list is derived from `OPTIONAL_ARMS` and the arm set rather
+   * than from a literal, so an arm name that exists but cannot be dispatched — or a dispatch that
+   * names an arm the run does not implement — is a compile error or an empty list, never a silent
+   * no-op.
+   */
+  const priorArms: { readonly arm: Exclude<ArmName, 'none' | 'full'>; readonly scope: PriorScope }[] = [];
+  for (const arm of OPTIONAL_ARMS) {
+    const scope = priorScopeOf(samplingSpecOf(arm)?.selector ?? 'majority');
+    if (scope !== undefined && ARMS.has(arm as ArmName)) {
+      priorArms.push({ arm: arm as Exclude<ArmName, 'none' | 'full'>, scope });
+    }
+  }
+  // Applied here rather than beside the other selectors: these are the only arms that read the other
+  // folds, and until this line the other folds did not exist.
+  let measured: readonly CaseOutcome[] = folds.flatMap((fold) => fold.cases);
+  for (const entry of priorArms) measured = withPriorPicks(measured, entry.arm, entry.scope);
+  const cases = measured;
   const withoutMemory = cases.map((item) => item.withoutMemoryCorrect);
   const withMemory = cases.map((item) => item.correct);
   const paired = comparePaired(withoutMemory, withMemory, SEED, RESAMPLES);
@@ -3666,6 +3728,43 @@ async function main(): Promise<void> {
   // two treatments, which is what a control is for.
   const armPairs = armPairsAgainstFull(
     cases.map((item) => ({ full: item.correct, arms: item.arms })),
+    SEED,
+    RESAMPLES,
+  );
+  /**
+   * The pairs this project pre-registered, measured here rather than in a script after the fact.
+   *
+   * `armPairs` above compares every arm to `full`, which is the wrong control for a selector among
+   * draws: `full` answers once, and a selector that answers five times and picks one is a different
+   * experiment. The pairs that matter — a selector against the first draw, a generator against the
+   * direct prompt — are declared in `CONTRASTS` before the run and computed here on the questions
+   * both arms answered.
+   */
+  /**
+   * The three keys, on this run's own pool.
+   *
+   * The arms answer the question out of sample; this block answers it in sample and says what the
+   * arms are comparing. A scope whose arm did not run still appears, because "the database alone
+   * cannot separate two answers to one question" is a fact about the key rather than about the run.
+   */
+  const priors =
+    priorArms.length === 0
+      ? undefined
+      : priorTable(
+          cases.map((item) => ({
+            id: item.id,
+            dbId: item.dbId,
+            fold: item.fold,
+            candidates: (item.pool ?? []).map((candidate) => ({
+              draw: candidate.draw,
+              correct: candidate.correct,
+              signature: candidate.signature,
+            })),
+          })),
+        );
+  const contrasts = contrastTable(
+    cases.map((item) => ({ full: item.correct, arms: item.arms })),
+    CONTRASTS,
     SEED,
     RESAMPLES,
   );
@@ -4500,6 +4599,8 @@ async function main(): Promise<void> {
       ci_high_pp: pairedShadow.deltaCI.high * 100,
     },
     arms,
+    contrasts,
+    ...(priors === undefined ? {} : { prior: priors }),
     arm_pairs: armPairs,
     arm_pairs_shadow: armPairsShadow,
     gates,

@@ -119,6 +119,20 @@ describe('poolFromArtifact', () => {
     expect(pool.questions[0]?.shape).toEqual(shapeOf(question, evidence));
   });
 
+  it('carries the database and the fold, which is what a memory prior is keyed on', () => {
+    const pool = poolFromArtifact([row({ dbId: 'california_schools', fold: 3 })], []);
+    expect(pool.questions[0]?.dbId).toBe('california_schools');
+    expect(pool.questions[0]?.fold).toBe(3);
+  });
+
+  it('omits the database rather than inventing one when the file predates the field', () => {
+    // A prior keyed on `undefined` would report a number about a corpus it never saw; the fields
+    // being absent is information, and the reader keeps them absent.
+    const pool = poolFromArtifact([row()], []);
+    expect('dbId' in (pool.questions[0] ?? {})).toBe(false);
+    expect('fold' in (pool.questions[0] ?? {})).toBe(false);
+  });
+
   it('reports an empty pool for an artifact with no cases at all', () => {
     const pool = poolFromArtifact([], []);
     expect(pool.questions).toEqual([]);

@@ -4,8 +4,12 @@ import {
   GenerationCache,
   OPTIONAL_ARMS,
   PROMPT_VERSION,
+  CONTRASTS,
   armPairsAgainstFull,
   buildValidityGates,
+  contrastTable,
+  priorScopeOf,
+  samplingSpecOf,
   canonicalRows,
   conventionOf,
   extractSql,
@@ -258,6 +262,8 @@ describe('parseArms', () => {
       'sample-5-first',
       'sample-5-model',
       'sample-5-oracle',
+      'sample-5-prior',
+      'sample-5-prior-shape',
       'sample-5-random',
       'sample-5-shape',
       'sample-5-value',
@@ -386,6 +392,8 @@ describe('parseArms', () => {
       'sample-3-exec',
       'sample-5-shape',
       'sample-5-value',
+      'sample-5-prior',
+      'sample-5-prior-shape',
       'sample-5-model',
       'values',
       'm-schema',
@@ -1510,5 +1518,76 @@ describe('schemaLinkSplit', () => {
     const split = schemaLinkSplit([item(true, true, true)]);
     expect(split?.unchanged.questions).toBe(0);
     expect(split?.unchanged.deltaPp).toBe(0);
+  });
+});
+
+describe('samplingSpecOf', () => {
+  it('reads the draw count and the selector out of the arm name', () => {
+    expect(samplingSpecOf('sample-5')).toEqual({ n: 5, selector: 'majority' });
+    expect(samplingSpecOf('sample-5-first')).toEqual({ n: 5, selector: 'first' });
+    expect(samplingSpecOf('sample-3-exec')).toEqual({ n: 3, selector: 'exec' });
+  });
+
+  it('knows the memory prior, which is a selector that reads other folds', () => {
+    // It is parsed here rather than in the lane because two sites read it: the fold that takes the
+    // draws and the aggregation that decides afterwards. A second copy of this regex is how an arm
+    // came to exist in one file and not the other.
+    expect(samplingSpecOf('sample-5-prior')).toEqual({ n: 5, selector: 'prior' });
+    expect(samplingSpecOf('sample-5-prior-shape')).toEqual({ n: 5, selector: 'prior-shape' });
+  });
+
+  it('refuses a name that is not a sampling arm', () => {
+    expect(samplingSpecOf('none-replica')).toBeUndefined();
+    expect(samplingSpecOf('sample-5-bogus')).toBeUndefined();
+  });
+
+  it('refuses a run that would call one draw a sample, because there is no choice in it', () => {
+    expect(samplingSpecOf('sample-1')).toBeUndefined();
+    expect(samplingSpecOf('sample-0')).toBeUndefined();
+  });
+});
+
+describe('priorScopeOf', () => {
+  it('maps each prior arm to the memory it reads, and every other selector to none', () => {
+    expect(priorScopeOf('prior')).toBe('db-signature');
+    expect(priorScopeOf('prior-shape')).toBe('signature');
+    expect(priorScopeOf('first')).toBeUndefined();
+    expect(priorScopeOf('majority')).toBeUndefined();
+    expect(priorScopeOf('oracle')).toBeUndefined();
+  });
+});
+
+describe('contrastTable', () => {
+  it('pairs two arms on the questions both answered, and signs the delta as treatment minus control', () => {
+    const rows = [
+      { full: true, arms: { 'sample-5-first': false, 'sample-5-shape': true } },
+      { full: true, arms: { 'sample-5-first': true, 'sample-5-shape': true } },
+      { full: false, arms: { 'sample-5-first': false, 'sample-5-shape': false } },
+    ];
+    const [row] = contrastTable(rows, [{ label: 'b vs a', treatment: 'sample-5-shape', control: 'sample-5-first' }], 7, 200);
+    // One question separates them: b right where a wrong.
+    expect(row?.n).toBe(3);
+    expect(row?.gained).toBe(1);
+    expect(row?.lost).toBe(0);
+    expect(row?.deltaPp).toBeGreaterThan(0);
+  });
+
+  it('omits a pair whose arms did not both run, rather than measuring half of it', () => {
+    const rows = [{ full: true, arms: { 'sample-5-first': true } }];
+    expect(contrastTable(rows, [{ label: 'x', treatment: 'sample-5-shape', control: 'sample-5-first' }])).toEqual([]);
+  });
+
+  it('pre-registers the pairs the last four iterations argued about', () => {
+    // The pairs that decide whether the composite is worth its members, whether memory has a
+    // position left, and whether the generator pool was ever a pool.
+    const labels = CONTRASTS.map((spec) => spec.label);
+    expect(labels).toContain('shape vs first draw');
+    expect(labels).toContain('value vs first draw');
+    expect(labels).toContain('prior vs first draw');
+    expect(labels).toContain('m-schema vs direct');
+  });
+
+  it('names a control for every pair that is not the arm itself', () => {
+    for (const spec of CONTRASTS) expect(spec.control).not.toBe(spec.treatment);
   });
 });

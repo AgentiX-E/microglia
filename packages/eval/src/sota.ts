@@ -13,6 +13,7 @@
  * no tests at all — a lane whose *decisions* were the least covered part of the
  * repository.
  */
+import type { PriorScope } from './memory-prior.js';
 import { comparePaired } from './stats.js';
 
 /** Bumped whenever the prompt text changes; a result without it is unreproducible. */
@@ -541,6 +542,38 @@ export type SqlArm =
    */
   | 'sample-5-value'
   /**
+   * The same five draws, chosen by what memory recalls about the shape of the answer.
+   *
+   * The fourth position for memory, and the only one this project has never priced. As a prompt
+   * prefix it costs -3.14pp and always has. On retry it is worth +0.29pp over a retry with an empty
+   * pack, which is nothing. As a selection feature its content never enters, because every selector
+   * here reads result shapes. This arm reads a shape too — but a shape *recalled from other folds on
+   * the same database*, which is the one thing a memory system has that a selector does not.
+   *
+   * It is deliberately the strongest version. Extraction and retrieval are assumed perfect: no rule
+   * text, no relevance filter, no embedding. Only "on this database, how often did a result of this
+   * shape turn out right", answered leave-one-fold-out. If a verifier with perfect recall cannot beat
+   * the first draw, no verifier built out of the same signal can, and the next iteration should not
+   * be spent building one.
+   *
+   * Costs the pool's draws and no calls of its own, and its honest baseline is `sample-5-first` for
+   * the same reason the shape composite's is.
+   */
+  | 'sample-5-prior'
+  /**
+   * The same, keyed on the shape alone — the database deliberately forgotten.
+   *
+   * The two keys answer different questions and the previous pool says they disagree: with perfect
+   * recall, `db-signature` nets **+1.27pp** over the first draw and the shape alone nets **+3.80pp**,
+   * because 208 keys over 350 questions leave only 38 questions with any support while 118 keys leave
+   * 53. A memory that insists on the database is a memory that has usually never seen this database.
+   *
+   * Both arms are free — they read the same pool — so the comparison is out of sample rather than an
+   * argument about which key was right, and it is the same question the composite asked about its own
+   * members: is the context worth the sparsity it buys.
+   */
+  | 'sample-5-prior-shape'
+  /**
    * The same question with the schema annotated with a few values per column.
    *
    * The prompt has only ever carried the DDL, so every literal in every answer is a guess about a
@@ -605,6 +638,67 @@ export type SqlArm =
   | 'linked';
 
 /**
+ * What a sampling arm asks for, read from its name.
+ *
+ * The arm names carry the design — `sample-<n>[-<selector>]` — and a table beside them would be a
+ * second place to change when one of them changes. It lives here rather than in the lane because
+ * two places now read it: the fold that takes the draws, and the aggregation that applies the memory
+ * prior after every fold is known. A lane-local parser read from a second site is how
+ * `full-validated` came to exist in one file and not the other.
+ */
+/**
+ * The selectors an arm name can carry, in the order the pattern tries them.
+ *
+ * The list is the single source of truth: the pattern below is built from it, so a new selector
+ * cannot be added to the type and forgotten by the parser, and a name the parser accepts cannot be
+ * missing from the type. `prior-shape` sits after `prior` because the alternation is ordered and a
+ * prefix that matches would otherwise leave the rest of the name unconsumed.
+ */
+export const SAMPLING_SELECTORS = [
+  'first',
+  'random',
+  'oracle',
+  'model',
+  'exec',
+  'shape',
+  'value',
+  'prior-shape',
+  'prior',
+] as const;
+
+export type SamplingSelector = 'majority' | (typeof SAMPLING_SELECTORS)[number];
+
+const SAMPLING_PATTERN = new RegExp(`^sample-(\\d+)(?:-(${SAMPLING_SELECTORS.join('|')}))?$`);
+
+export function samplingSpecOf(
+  arm: string,
+): { readonly n: number; readonly selector: SamplingSelector } | undefined {
+  const match = SAMPLING_PATTERN.exec(arm);
+  if (match === null) return undefined;
+  const n = Number(match[1]);
+  if (!Number.isInteger(n) || n < 2) return undefined;
+  // The pattern's capture group is built from `SAMPLING_SELECTORS`, so a matched suffix is one of
+  // them; the assertion records that rather than re-deciding it with a chain of comparisons whose
+  // final fallback no test could ever reach.
+  const suffix = match[2] as (typeof SAMPLING_SELECTORS)[number] | undefined;
+  return { n, selector: suffix ?? 'majority' };
+}
+
+/**
+ * Which memory a prior arm reads.
+ *
+ * `sample-5-prior` looks a result up under what the database taught; `sample-5-prior-shape` under the
+ * shape alone. Both are selectors over the same pool, so the mapping from a name to a scope is a
+ * one-line function rather than a second table: an arm whose name says nothing about its key would be
+ * an arm a reader has to open the lane to understand.
+ */
+export function priorScopeOf(selector: SamplingSelector): PriorScope | undefined {
+  if (selector === 'prior') return 'db-signature';
+  if (selector === 'prior-shape') return 'signature';
+  return undefined;
+}
+
+/**
  * Every optional arm, as a table keyed by the union itself.
  *
  * A plain array would let a new `SqlArm` variant exist without a string to select it —
@@ -654,6 +748,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-3-exec': true,
   'sample-5-shape': true,
   'sample-5-value': true,
+  'sample-5-prior': true,
+  'sample-5-prior-shape': true,
   'sample-5-model': true,
   values: true,
   'm-schema': true,
@@ -691,6 +787,99 @@ export function parseArms(raw: string | undefined): Set<SqlArm> {
     wanted.add(trimmed as Exclude<SqlArm, 'none' | 'full'>);
   }
   return wanted;
+}
+
+/**
+ * The arm-versus-arm comparisons this project has pre-registered.
+ *
+ * Every arm in this lane is reported against `none`, and an arm that selects among draws has an
+ * honest baseline of `sample-5-first` rather than `none` — the draw it would have taken had it
+ * decided nothing. Until now those pairs were computed after the run, in a script outside the
+ * repository, which means the numbers in the progress log had no committed derivation and the pairs
+ * themselves were chosen with the artefact in hand.
+ *
+ * This table is the fix: the comparisons are declared here, before a run, and the artefact carries
+ * them. A row whose arms did not both run is simply absent, so a run that omits one of a pair cannot
+ * produce half a comparison.
+ *
+ * Each pair names the control it actually needs. A selector among draws is paired with the first
+ * draw; a generator is paired with the replicate of the direct prompt, because both make one call and
+ * the difference between them is the prompt rather than the draw count.
+ */
+export type ContrastSpec = {
+  readonly label: string;
+  readonly treatment: Exclude<SqlArm, 'none' | 'full'>;
+  readonly control: Exclude<SqlArm, 'none' | 'full'>;
+};
+
+export const CONTRASTS: readonly ContrastSpec[] = [
+  { label: 'shape vs first draw', treatment: 'sample-5-shape', control: 'sample-5-first' },
+  { label: 'value vs first draw', treatment: 'sample-5-value', control: 'sample-5-first' },
+  { label: 'shape vs value', treatment: 'sample-5-shape', control: 'sample-5-value' },
+  { label: 'prior vs first draw', treatment: 'sample-5-prior', control: 'sample-5-first' },
+  { label: 'prior vs shape', treatment: 'sample-5-prior', control: 'sample-5-shape' },
+  { label: 'prior-shape vs first draw', treatment: 'sample-5-prior-shape', control: 'sample-5-first' },
+  { label: 'prior-shape vs prior', treatment: 'sample-5-prior-shape', control: 'sample-5-prior' },
+  { label: 'm-schema vs direct', treatment: 'm-schema', control: 'none-replica' },
+  { label: 'gen-plan vs direct', treatment: 'gen-plan', control: 'none-replica' },
+  { label: 'gen-decompose vs direct', treatment: 'gen-decompose', control: 'none-replica' },
+  { label: 'model selector vs agreement', treatment: 'sample-5-model', control: 'sample-5' },
+  { label: 'exec selector vs agreement', treatment: 'sample-3-exec', control: 'sample-3' },
+];
+
+/** One pre-registered pair, measured on the questions both arms answered. */
+export type ContrastRow = {
+  readonly label: string;
+  /** `treatment - control`, in percentage points. */
+  readonly deltaPp: number;
+  readonly ciLowPp: number;
+  readonly ciHighPp: number;
+  readonly p: number;
+  readonly n: number;
+  readonly treatmentAccuracy: number;
+  readonly controlAccuracy: number;
+  readonly gained: number;
+  readonly lost: number;
+};
+
+/**
+ * The pre-registered pairs that both arms of actually ran.
+ *
+ * Paired on the questions both answered, never on a union: an arm that skipped a question has no
+ * outcome there, and imputing one would make the difference a measurement of the imputation.
+ */
+export function contrastTable(
+  rows: readonly ArmRow[],
+  specs: readonly ContrastSpec[] = CONTRASTS,
+  seed = 7,
+  resamples = 10_000,
+): readonly ContrastRow[] {
+  const out: ContrastRow[] = [];
+  for (const spec of specs) {
+    const scored = rows.filter(
+      (row) => row.arms[spec.treatment] !== undefined && row.arms[spec.control] !== undefined,
+    );
+    if (scored.length === 0) continue;
+    const comparison = comparePaired(
+      scored.map((row) => row.arms[spec.control] === true),
+      scored.map((row) => row.arms[spec.treatment] === true),
+      seed,
+      resamples,
+    );
+    out.push({
+      label: spec.label,
+      deltaPp: comparison.delta * 100,
+      ciLowPp: comparison.deltaCI.low * 100,
+      ciHighPp: comparison.deltaCI.high * 100,
+      p: comparison.p,
+      n: comparison.n,
+      treatmentAccuracy: comparison.treatmentAccuracy,
+      controlAccuracy: comparison.baselineAccuracy,
+      gained: comparison.gained,
+      lost: comparison.lost,
+    });
+  }
+  return out;
 }
 
 /**

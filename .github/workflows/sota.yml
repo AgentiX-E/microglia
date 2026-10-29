@@ -228,6 +228,18 @@ jobs:
             echo "no artefact, so no signals to gate"
           fi
 
+      # R7.3a's price, on the same pool: what a verifier would be worth if its extraction and
+      # retrieval were perfect. It exits zero when the prior cannot beat the first draw, because
+      # "memory cannot judge" is the finding that decides whether the next stage exists.
+      - name: Price the memory prior
+        if: always()
+        run: |
+          if [ -f eval/results/poc-sota-bird.json ]; then
+            pnpm eval:prior
+          else
+            echo "no artefact, so no memory to price"
+          fi
+
       # R7.1's ceiling, read off the artefact: three generators, the union over them, and the three
       # bars that were fixed before the dispatch. It exits zero when a bar is refuted, because a
       # refuted bar is the stage's result and not a broken step.

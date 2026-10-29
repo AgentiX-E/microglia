@@ -27,6 +27,14 @@ export type ArtifactPoolCase = {
   readonly question: string;
   readonly evidence?: string;
   /**
+   * The database and the fold, when the file recorded them.
+   *
+   * The pool itself does not need them; the memory prior does, because "on this database, shapes like
+   * this were wrong" is only a memory if the database and the fold the answer came from are both known.
+   */
+  readonly dbId?: string;
+  readonly fold?: number;
+  /**
    * The candidates, or null when no sampling arm ran.
    *
    * Optional as well as nullable because an artefact written before this field existed is exactly
@@ -93,6 +101,10 @@ export function poolFromArtifact(
       id: entry.id,
       shape: shapeOf(entry.question, entry.evidence ?? ''),
       candidates,
+      // Carried through only when present, so a reader can tell an unrecorded database from a
+      // database called '' without asking the artefact which version wrote it.
+      ...(entry.dbId === undefined ? {} : { dbId: entry.dbId }),
+      ...(entry.fold === undefined ? {} : { fold: entry.fold }),
     });
   }
   return {

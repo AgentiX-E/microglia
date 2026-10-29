@@ -68,6 +68,16 @@ export type PoolQuestion = {
   readonly id: string;
   readonly shape: QuestionShape;
   readonly candidates: readonly PoolCandidate[];
+  /**
+   * The database this question was asked against, when the artefact recorded it.
+   *
+   * Optional rather than required, because an artefact written before the field existed is exactly
+   * the thing a re-analysis reads, and a memory prior keyed on `undefined` would report a number
+   * about a corpus it never saw. The prior checks the field and refuses instead.
+   */
+  readonly dbId?: string;
+  /** The cross-fitting fold, for the same reason and under the same rule. */
+  readonly fold?: number;
 };
 
 export type PoolSummary = {
