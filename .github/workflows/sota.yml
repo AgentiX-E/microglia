@@ -203,6 +203,18 @@ jobs:
             exit 1
           fi
 
+      # R7.0's reading, printed where the run can be read without opening anything. It exits zero
+      # when the artefact carries no pool, because a run with no sampling arm has nothing to
+      # describe and is not a failed run — the lane says so in its own line instead.
+      - name: Describe the candidate pool
+        if: always()
+        run: |
+          if [ -f eval/results/poc-sota-bird.json ]; then
+            pnpm eval:pool
+          else
+            echo "no artefact, so no pool to describe"
+          fi
+
       # The re-score runs on the answers this job just produced, which is the point: the
       # model is not asked anything new, only a different criterion is applied to what it
       # already said. It sits before the publish step so a failure here is visible in the

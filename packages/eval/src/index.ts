@@ -67,6 +67,12 @@ export {
   type RenderOptions,
 } from './m-schema.js';
 export {
+  poolReport,
+  type PoolReport,
+  type PoolReportQuestion,
+  type PoolVerdict,
+} from './pool-report.js';
+export {
   poolSummary,
   signalReading,
   signalReadings,
