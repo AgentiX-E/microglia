@@ -3,6 +3,7 @@ import { execSignatureOf, type ExecSignature, type QuestionShape } from '../exec
 import type { PoolCandidate, PoolQuestion, PoolSignalReading } from '../pool.js';
 import {
   SHAPE_VOTERS,
+  VALUE_VOTERS,
   compositeGate,
   compositePicks,
   gateOf,
@@ -591,5 +592,22 @@ describe('selectByShape', () => {
       'row-shape',
       'value-type',
     ]);
+    // And the ablation member is its own set, not a filter of this one: the arm that drops to a
+    // single voter has to be able to say which voter, from one place.
+    expect(VALUE_VOTERS).toEqual(['value-type']);
+  });
+
+  it('answers differently when it is handed one voter instead of five', () => {
+    // The two arms the ablation asks for, on one pool: a list question answered with a single number
+    // is `row-shape`'s objection and nobody else's, so the five-voter set moves off the first draw
+    // and the one-voter set cannot.
+    const listQuestion = question(
+      'q1',
+      [candidate(0, false, numeric()), candidate(1, true, ran(2))],
+      { ...NO_SHAPE, wantsMany: true },
+    );
+    expect(selectByShape(listQuestion).chosen).toBe(1);
+    expect(selectByShape(listQuestion, VALUE_VOTERS).chosen).toBe(0);
+    expect(selectByShape(listQuestion, VALUE_VOTERS).reason).toBe('no-agreement');
   });
 });

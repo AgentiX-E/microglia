@@ -527,6 +527,20 @@ export type SqlArm =
    */
   | 'sample-5-shape'
   /**
+   * The same five draws, chosen by one signal: the unit the answer is in.
+   *
+   * The composite's own ablation asked whether the set is worth more than its best part, and the
+   * in-sample answer was that it is not: `value-type` alone takes 39.3% of the 40.2% the five take,
+   * and never breaks a question the first draw had right. That reading cannot settle the question it
+   * raises, because the member was picked by looking at the pool. This arm settles it out of sample,
+   * on identical draws, and costs no calls — both selectors read the same five executions.
+   *
+   * It is the smallest arm in this table and the one that decides the most: if it matches
+   * `sample-5-shape`, four signals and their maintenance are carrying nothing, and the honest
+   * conclusion is that this verifier is one rule about units rather than a composite.
+   */
+  | 'sample-5-value'
+  /**
    * The same question with the schema annotated with a few values per column.
    *
    * The prompt has only ever carried the DDL, so every literal in every answer is a guess about a
@@ -639,6 +653,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-3-model': true,
   'sample-3-exec': true,
   'sample-5-shape': true,
+  'sample-5-value': true,
   'sample-5-model': true,
   values: true,
   'm-schema': true,

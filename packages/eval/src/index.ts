@@ -100,6 +100,7 @@ export {
 export {
   ALPHA,
   SHAPE_VOTERS,
+  VALUE_VOTERS,
   Z_BAR,
   compositeGate,
   compositePicks,

@@ -407,6 +407,20 @@ export const SHAPE_VOTERS: readonly SignalName[] = [
 ];
 
 /**
+ * The one member whose opinion is not shared with the rest.
+ *
+ * The ablation in iteration 104 found that four of the five voters fire on the same candidates: every
+ * signal penalises an empty result, so `empty`, `row-shape` and `column-shape` are largely one opinion
+ * counted three times. `value-type` alone reaches 39.3% of the composite's 40.2% and never breaks a
+ * question the first draw had right, which makes "the set against its best member" the only comparison
+ * that decides whether the other four are worth their complexity.
+ *
+ * Kept here rather than inline in the lane because it is the same kind of object as `SHAPE_VOTERS`: a
+ * signal set that a public selector may vote with, fixed once and named.
+ */
+export const VALUE_VOTERS: readonly SignalName[] = ['value-type'];
+
+/**
  * The shape composite as a strategy: pick the candidate the licensed signals object to least.
  *
  * This is what R7.2a measured as a simulation, made executable so it can be scored as an arm inside a
@@ -424,29 +438,34 @@ export const SHAPE_VOTERS: readonly SignalName[] = [
  * question that asks for what is *absent* only stops the composite objecting to an empty result. It
  * cannot prefer one. `selectByShape` therefore falls back to the first draw when the field is level,
  * and the omission is a candidate for the next signal rather than a gap to paper over here.
+ *
+ * The signal set is a parameter with the licensed five as its default, so the arm that ablates the set
+ * to one member is the same function rather than a second implementation of it.
  */
-export function selectByShape(question: PoolQuestion): Selection {
+export function selectByShape(
+  question: PoolQuestion,
+  signals: readonly SignalName[] = SHAPE_VOTERS,
+): Selection {
   const groups = new Set(
     question.candidates
       .filter((candidate) => candidate.resultKey >= 0)
       .map((candidate) => candidate.resultKey),
   ).size;
-  const chosen = bestIndex(question, SHAPE_VOTERS);
+  const chosen = bestIndex(question, signals);
   if (chosen === undefined) {
     return { chosen: 0, votes: 0, groups: 0, reason: 'empty', emptyResult: false };
   }
   const winner = question.candidates[chosen] as PoolCandidate;
-  const winnerScore = votesOf(winner, question.shape, SHAPE_VOTERS);
+  const winnerScore = votesOf(winner, question.shape, signals);
   const overruled = question.candidates.filter(
-    (candidate) => votesOf(candidate, question.shape, SHAPE_VOTERS) < winnerScore,
+    (candidate) => votesOf(candidate, question.shape, signals) < winnerScore,
   ).length;
   return {
     chosen,
     votes: overruled,
     groups,
     // Nothing ran is not a preference for the first failure, and `selectionStats` counts it apart.
-    reason:
-      groups === 0 ? 'nothing-ran' : overruled > 0 ? 'shape' : 'no-agreement',
+    reason: groups === 0 ? 'nothing-ran' : overruled > 0 ? 'shape' : 'no-agreement',
     emptyResult: winner.signature !== null && winner.signature.empty,
   };
 }

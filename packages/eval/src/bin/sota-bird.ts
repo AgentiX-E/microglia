@@ -130,6 +130,7 @@ import {
   readComposite,
   signalReadings,
   unionCeiling,
+  VALUE_VOTERS,
   execSignatureOf,
   shapeOf,
   collectMschema,
@@ -2662,9 +2663,9 @@ async function runFold(
     arm: ArmName,
   ): {
     n: number;
-    selector: 'majority' | 'first' | 'random' | 'oracle' | 'model' | 'exec' | 'shape';
+    selector: 'majority' | 'first' | 'random' | 'oracle' | 'model' | 'exec' | 'shape' | 'value';
   } | undefined => {
-    const match = /^sample-(\d+)(?:-(first|random|oracle|model|exec|shape))?$/.exec(arm);
+    const match = /^sample-(\d+)(?:-(first|random|oracle|model|exec|shape|value))?$/.exec(arm);
     if (match === null) return undefined;
     const n = Number(match[1]);
     if (!Number.isInteger(n) || n < 2) return undefined;
@@ -2680,8 +2681,8 @@ async function runFold(
               ? 'model'
               : suffix === 'exec'
                 ? 'exec'
-                : suffix === 'shape'
-                  ? 'shape'
+                : suffix === 'shape' || suffix === 'value'
+                  ? suffix
                   : 'majority';
     return { n, selector };
   };
@@ -2997,13 +2998,17 @@ async function runFold(
         const selection =
           spec.selector === 'shape'
             ? selectByShape(shapePoolOf(position, spec.n))
-            : spec.selector === 'random'
-              ? selectRandom(slice, mulberry32(SEED + position))
-              : spec.selector === 'first'
-                ? selectFirst(slice)
-                : spec.selector === 'model' || spec.selector === 'exec'
-                  ? selectByModel(slice.length, choiceAtIndex.get(`${position}:${arm}`))
-                  : selectByConsistency(slice);
+            : spec.selector === 'value'
+              ? // The composite ablated to its one independent member, on the same draws. Two arms,
+                // one cost: both read the executions the sampling pass already paid for.
+                selectByShape(shapePoolOf(position, spec.n), VALUE_VOTERS)
+              : spec.selector === 'random'
+                ? selectRandom(slice, mulberry32(SEED + position))
+                : spec.selector === 'first'
+                  ? selectFirst(slice)
+                  : spec.selector === 'model' || spec.selector === 'exec'
+                    ? selectByModel(slice.length, choiceAtIndex.get(`${position}:${arm}`))
+                    : selectByConsistency(slice);
         chosenJudged.set(`${position}:${arm}`, {
           position,
           arm,
