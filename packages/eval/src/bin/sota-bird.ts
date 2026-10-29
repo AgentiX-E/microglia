@@ -1671,17 +1671,6 @@ async function densityPass(input: {
   readonly dataset: Dataset;
   readonly task: Task;
 }): Promise<DensityRun> {
-  const rules = selectDensityRules(
-    input.items.map((item) => ({
-      id: item.id,
-      status: item.status,
-      statement: item.statement,
-      when: item.when ?? null,
-      domain: item.scope.domain ?? null,
-    })),
-    DENSITY_RULES_PER_DB,
-  );
-  const itemById = new Map(input.items.map((item) => [item.id, item]));
   const panels = targetPanels(
     input.cases.map((entry) => ({
       id: entry.id,
@@ -1702,6 +1691,26 @@ async function densityPass(input: {
     else panelDbs.push(dbId);
   }
   panelDbs.sort();
+
+  // The rule set is chosen from the databases that have a panel, not from the store: the first
+  // dispatch selected before it knew which panels existed, so eight rules from the one database the
+  // corpus cannot fill were carried into the family and never shown, and V18 failed the run on
+  // bookkeeping rather than on a measurement. A rule that cannot be exercised is not part of a
+  // family whose claim is the number of chances, and the count of what was left out travels with
+  // the report so the exclusion is visible instead of silent.
+  const covered = new Set(panelDbs);
+  const rules = selectDensityRules(
+    input.items.map((item) => ({
+      id: item.id,
+      status: item.status,
+      statement: item.statement,
+      when: item.when ?? null,
+      domain: item.scope.domain ?? null,
+    })),
+    DENSITY_RULES_PER_DB,
+    covered,
+  );
+  const itemById = new Map(input.items.map((item) => [item.id, item]));
 
   type Plan = {
     readonly ruleId: string;
@@ -1795,8 +1804,11 @@ async function densityPass(input: {
       });
     }
   }
-  for (const rule of rules) {
-    if (!panelDbs.includes(rule.domain)) unplaced += 1;
+  // Counted over the store rather than over the selection: what a reader wants to know is how much
+  // of the store the family could not reach, not how much of an already-filtered subset it dropped.
+  for (const item of input.items) {
+    const domain = item.scope.domain ?? '';
+    if (item.status === 'active' && domain !== '' && !covered.has(domain)) unplaced += 1;
   }
 
   const calls = (plans.length + floorPlans.length);

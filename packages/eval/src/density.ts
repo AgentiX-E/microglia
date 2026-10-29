@@ -131,12 +131,14 @@ function compareByHash(leftKey: string, leftId: string, rightKey: string, rightI
 export function selectDensityRules(
   items: readonly StoredRuleInput[],
   perDb: number,
+  domains?: ReadonlySet<string>,
 ): readonly DensityRule[] {
   const cap = Math.max(0, Math.floor(perDb));
   const byDomain = new Map<string, DensityRule[]>();
   for (const item of items) {
     if (item.status !== 'active') continue;
     if (item.domain === null || item.domain === '') continue;
+    if (domains !== undefined && !domains.has(item.domain)) continue;
     if (item.statement.trim() === '') continue;
     const bucket = byDomain.get(item.domain) ?? [];
     bucket.push({
@@ -466,6 +468,126 @@ export function policyTable(
   ];
 }
 
+/** One rule's record over the panel, split by half, because a policy may only learn from one. */
+export type RuleDensityRow = {
+  readonly id: string;
+  readonly shown: number;
+  readonly helped: number;
+  readonly harmed: number;
+  /** The first half of the panel: everything a policy is allowed to look at. */
+  readonly fitHelped: number;
+  readonly fitHarmed: number;
+  /** The second half: everything the policy is scored on. */
+  readonly scoreHelped: number;
+  readonly scoreHarmed: number;
+  /** The injections whose question was answered by a query using this rule's vocabulary. */
+  readonly relevantShown: number;
+  readonly relevantHelped: number;
+  readonly relevantHarmed: number;
+};
+
+/**
+ * The per-rule ledger, which is the only form in which "did this rule do anything" is a question
+ * about a rule rather than about a stratum.
+ *
+ * The two halves are separated here rather than summed, because the sum answers a question nobody
+ * can deploy: a policy that decides whether to carry a rule has to decide it from the questions it
+ * has seen, and the artefact has to carry the split or the fit cannot be re-examined afterwards.
+ */
+export function ruleDensityRows(
+  rules: readonly DensityRule[],
+  trials: readonly DensityTrial[],
+  split: number,
+): readonly RuleDensityRow[] {
+  const byRule = new Map<string, RuleDensityRow>();
+  for (const rule of rules) {
+    byRule.set(rule.id, {
+      id: rule.id,
+      shown: 0,
+      helped: 0,
+      harmed: 0,
+      fitHelped: 0,
+      fitHarmed: 0,
+      scoreHelped: 0,
+      scoreHarmed: 0,
+      relevantShown: 0,
+      relevantHelped: 0,
+      relevantHarmed: 0,
+    });
+  }
+  for (const trial of trials) {
+    const row = byRule.get(trial.ruleId);
+    // A trial whose rule is not in the selected set would mean the lane exercised a rule it never
+    // selected, which is a defect rather than a row; it is dropped and the reconciliation gate
+    // catches the count.
+    if (row === undefined) continue;
+    const repaired = trial.correct && !trial.baselineCorrect ? 1 : 0;
+    const broke = !trial.correct && trial.baselineCorrect ? 1 : 0;
+    const fit = trial.order < split;
+    byRule.set(trial.ruleId, {
+      ...row,
+      shown: row.shown + 1,
+      helped: row.helped + repaired,
+      harmed: row.harmed + broke,
+      fitHelped: row.fitHelped + (fit ? repaired : 0),
+      fitHarmed: row.fitHarmed + (fit ? broke : 0),
+      scoreHelped: row.scoreHelped + (fit ? 0 : repaired),
+      scoreHarmed: row.scoreHarmed + (fit ? 0 : broke),
+      relevantShown: row.relevantShown + (trial.relevant ? 1 : 0),
+      relevantHelped: row.relevantHelped + (trial.relevant ? repaired : 0),
+      relevantHarmed: row.relevantHarmed + (trial.relevant ? broke : 0),
+    });
+  }
+  return [...byRule.values()];
+}
+
+/** Whether a rule that looked good on the first half keeps looking good on the second. */
+export type SignPersistence = {
+  /** Rules whose net effect had a sign on the fit half: the population a policy can choose from. */
+  readonly withFitSign: number;
+  /** Rules whose net effect had a sign on both halves: the only ones the question applies to. */
+  readonly paired: number;
+  readonly agreed: number;
+  readonly disagreed: number;
+  /** Share of the paired rules whose scoring half had the same sign as the fit half. */
+  readonly agreement: number;
+  /** Exact two-sided test over `agreed` against `disagreed`, or 1 when nothing was paired. */
+  readonly p: number;
+};
+
+/**
+ * Does the half a policy can see predict the half it is scored on?
+ *
+ * This is R9.3's precondition, and it is cheaper to read from the ledger than from the policy's
+ * delta: a policy that gains is a policy whose selection *generalised*, and a policy that gains
+ * because the fit half was lucky is one whose sign does not repeat. Asking the per-rule question
+ * separately keeps the two apart — the delta says how much a whole policy was worth on one draw of
+ * eighty rules, the persistence says whether there was anything to learn.
+ */
+export function signPersistence(rows: readonly RuleDensityRow[]): SignPersistence {
+  let withFitSign = 0;
+  let paired = 0;
+  let agreed = 0;
+  let disagreed = 0;
+  for (const row of rows) {
+    const fit = row.fitHelped - row.fitHarmed;
+    const score = row.scoreHelped - row.scoreHarmed;
+    if (fit !== 0) withFitSign += 1;
+    if (fit === 0 || score === 0) continue;
+    paired += 1;
+    if (Math.sign(fit) === Math.sign(score)) agreed += 1;
+    else disagreed += 1;
+  }
+  return {
+    withFitSign,
+    paired,
+    agreed,
+    disagreed,
+    agreement: share(agreed, paired),
+    p: paired === 0 ? 1 : mcnemarExact(disagreed, agreed),
+  };
+}
+
 /** Everything one density run measured. */
 export type DensityReport = {
   /** Questions each rule was shown, fixed before the run. */
@@ -482,6 +604,9 @@ export type DensityReport = {
   /** The wrong-scope control: one foreign rule on the same panel, for the cost of a floor. */
   readonly floor: StratumSummary;
   readonly policies: readonly PolicyRow[];
+  /** The ledger itself, so a policy's fit can be re-examined without the trials. */
+  readonly perRule: readonly RuleDensityRow[];
+  readonly signs: SignPersistence;
 };
 
 export type DensityInput = {
@@ -502,6 +627,8 @@ export type DensityInput = {
  */
 export function densityReport(input: DensityInput): DensityReport {
   const options = { resamples: input.resamples ?? 10_000, seed: input.seed ?? 7 };
+  const split = Math.ceil(input.panel / 2);
+  const perRule = ruleDensityRows(input.rules, input.trials, split);
   const counts = new Map<string, number>();
   for (const trial of input.trials) {
     counts.set(trial.ruleId, (counts.get(trial.ruleId) ?? 0) + 1);
@@ -523,7 +650,9 @@ export function densityReport(input: DensityInput): DensityReport {
     irrelevant: stratumOf(input.trials.filter((trial) => !trial.relevant), options),
     cued: stratumOf(input.trials.filter((trial) => trial.cued), options),
     floor: stratumOf(input.floorTrials, options),
-    policies: policyTable(input.trials, Math.ceil(input.panel / 2), options),
+    policies: policyTable(input.trials, split, options),
+    perRule,
+    signs: signPersistence(perRule),
   };
 }
 

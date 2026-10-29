@@ -513,7 +513,9 @@ export {
   mentionsTerms,
   policyTable,
   ruleTerms,
+  ruleDensityRows,
   selectDensityRules,
+  signPersistence,
   stratumOf,
   targetPanels,
   type DensityInput,
@@ -523,6 +525,8 @@ export {
   type DensityTrial,
   type PolicyName,
   type PolicyRow,
+  type RuleDensityRow,
+  type SignPersistence,
   type StratumSummary,
   type StoredRuleInput,
 } from './density.js';

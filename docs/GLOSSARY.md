@@ -145,6 +145,20 @@ because a rule that helps in one position and hurts in another is not a single c
 that costs 3.14pp as a prefix is worth nothing on retry, and the object that replaces it is not a rule
 at all.
 
+**Panel (density family)** — the fixed set of questions, one set per database, that every selected rule
+from that database is shown. Shared rather than drawn per rule, so that two rules are compared on the
+same questions and the control is measured once per question instead of once per rule.
+
+**Density family** — a workload built to give every rule a fixed number of chances: a rule set held
+constant across the measurement, one rule in each prompt so a flip has exactly one candidate cause, and
+a panel of twenty questions per rule. It exists because the alternative — a pack of rules and an
+attribution instrument that credits a flip to everything in the prompt — cannot separate "this rule did
+nothing" from "this rule was shown twice".
+
+**Floor (density family)** — the flip rate of a rule from a *different* database, shown on the same
+panel. It prices the possibility that any text in the pack block moves answers, which would make every
+per-rule attribution in this project an artefact of the block rather than of its content.
+
 **Power** — the sample size needed to detect an effect at a stated confidence. Stated per benchmark so
 a null result is not confused with an underpowered one.
 

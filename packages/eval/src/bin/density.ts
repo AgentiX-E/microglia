@@ -97,6 +97,25 @@ function main(): void {
     );
   }
 
+  // How the flips are distributed over the rules, because a stratum's flip rate is an average and
+  // the average is what hid the shape for ten iterations: a few rules that move several answers and
+  // a majority that move none looks exactly like one rule moving a few.
+  const buckets = new Map<number, number>();
+  for (const row of report.perRule) {
+    const flips = row.helped + row.harmed;
+    buckets.set(flips, (buckets.get(flips) ?? 0) + 1);
+  }
+  const histogram = [...buckets.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map(([flips, rules]) => `${flips}:${rules}`)
+    .join(' ');
+  process.stdout.write(`[density] flips per rule (flips:rules) ${histogram}\n`);
+  const signs = report.signs;
+  process.stdout.write(
+    `[density] sign persistence ${signs.agreed} of ${signs.paired} rule(s) that had a sign on both ` +
+      `halves kept it (${(signs.agreement * 100).toFixed(1)}%), p ${signs.p.toFixed(3)}; ` +
+      `${signs.withFitSign} rule(s) had a sign to learn from\n`,
+  );
   const relevant = report.relevant;
   const floorFlip = report.floor.flipRate;
   process.stdout.write(

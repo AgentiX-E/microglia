@@ -4,7 +4,9 @@ import {
   densityGates,
   densityReport,
   policyTable,
+  ruleDensityRows,
   selectDensityRules,
+  signPersistence,
   stratumOf,
   targetPanels,
   type DensityRule,
@@ -104,6 +106,11 @@ describe('selectDensityRules', () => {
     const forward = selectDensityRules(items, 1).map((entry) => entry.id);
     const backward = selectDensityRules([...items].reverse(), 1).map((entry) => entry.id);
     expect(backward).toEqual(forward);
+  });
+
+  it('takes nothing from a database the panels do not cover', () => {
+    const items = [stored({ id: 'a1', domain: 'db_a' }), stored({ id: 'b1', domain: 'db_b' })];
+    expect(selectDensityRules(items, 2, new Set(['db_a'])).map((entry) => entry.id)).toEqual(['a1']);
   });
 
   it('takes nothing when the cap is zero', () => {
@@ -353,6 +360,88 @@ describe('policyTable', () => {
     const fitted = rows.find((row) => row.name === 'fitted');
     expect(fitted?.shown).toBe(0);
     expect(fitted?.deltaPp).toBeCloseTo(0, 10);
+  });
+});
+
+describe('ruleDensityRows', () => {
+  it('splits a rule\'s record into the half a policy may read and the half it is scored on', () => {
+    const rows = ruleDensityRows(
+      [rule('r1')],
+      [
+        trial({ ruleId: 'r1', targetId: 't1', order: 0, correct: true }),
+        trial({ ruleId: 'r1', targetId: 't2', order: 1, correct: false, baselineCorrect: true }),
+        trial({ ruleId: 'r1', targetId: 't3', order: 2, correct: true, relevant: true }),
+        trial({ ruleId: 'r1', targetId: 't4', order: 3, correct: true }),
+      ],
+      2,
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      shown: 4,
+      helped: 3,
+      harmed: 1,
+      fitHelped: 1,
+      fitHarmed: 1,
+      scoreHelped: 2,
+      scoreHarmed: 0,
+      relevantShown: 1,
+      relevantHelped: 1,
+      relevantHarmed: 0,
+    });
+  });
+
+  it('keeps a selected rule that was never shown, at zero', () => {
+    const rows = ruleDensityRows([rule('r1'), rule('r2')], [trial({ ruleId: 'r1', targetId: 't1' })], 1);
+    expect(rows.map((row) => row.shown)).toEqual([1, 0]);
+  });
+
+  it('drops a trial whose rule was never selected rather than inventing a rule', () => {
+    const rows = ruleDensityRows([rule('r1')], [trial({ ruleId: 'ghost', targetId: 't1' })], 1);
+    expect(rows.map((row) => row.id)).toEqual(['r1']);
+  });
+});
+
+describe('signPersistence', () => {
+  function row(id: string, fit: number, score: number) {
+    return {
+      id,
+      shown: 4,
+      helped: Math.max(fit, 0) + Math.max(score, 0),
+      harmed: Math.max(-fit, 0) + Math.max(-score, 0),
+      fitHelped: Math.max(fit, 0),
+      fitHarmed: Math.max(-fit, 0),
+      scoreHelped: Math.max(score, 0),
+      scoreHarmed: Math.max(-score, 0),
+      relevantShown: 0,
+      relevantHelped: 0,
+      relevantHarmed: 0,
+    };
+  }
+
+  it('reports how many rules had a sign to learn from and how often it repeated', () => {
+    const signs = signPersistence([
+      row('a', 2, 1),
+      row('b', 1, -1),
+      row('c', -2, -1),
+      row('d', 0, 2),
+    ]);
+    expect(signs.withFitSign).toBe(3);
+    expect(signs.paired).toBe(3);
+    expect(signs.agreed).toBe(2);
+    expect(signs.disagreed).toBe(1);
+    expect(signs.agreement).toBeCloseTo(2 / 3, 10);
+    expect(signs.p).toBeGreaterThan(0.5);
+  });
+
+  it('calls a sign that never repeats unpredicted', () => {
+    const signs = signPersistence(Array.from({ length: 8 }, (_unused, at) => row(`r${at}`, 1, at % 2 === 0 ? -1 : 1)));
+    expect(signs.agreed).toBe(4);
+    expect(signs.disagreed).toBe(4);
+    expect(signs.p).toBe(1);
+  });
+
+  it('says nothing when no rule had a sign to repeat', () => {
+    expect(signPersistence([row('a', 0, 0)])).toMatchObject({ paired: 0, agreed: 0, agreement: 0, p: 1 });
   });
 });
 
