@@ -517,6 +517,22 @@ export type SqlArm =
    */
   | 'values'
   /**
+   * The same question with the schema written as a semi-structured block instead of DDL.
+   *
+   * XiYan-SQL publishes the exact cell this arm tests: BIRD dev, DeepSeek, DDL schema 53.52, and
+   * the same model and split with M-Schema 55.15 — +1.63 from the representation alone, with no
+   * training, no retrieval and no memory. Our own baseline is 53.43 on that model, so the arm is a
+   * direct test of a competitor's ablation on our harness rather than an analogy.
+   *
+   * What changes is placement, not information: values sit inside the column's parenthesis, the
+   * primary key is marked rather than inferred, and the foreign keys are stated once as join
+   * equations. This project has twice moved facts around without changing them and measured the
+   * placement — a value annotation above the DDL at +0.29pp, the whole rule pack above it at
+   * −2.86pp — which is why the arm is worth a dispatch: the same facts in the slot a reader
+   * expects are worth two points elsewhere.
+   */
+  | 'm-schema'
+  /**
    * The same question with the schema pruned to the tables it names.
    *
    * MCS-SQL measures +2.1 points from schema linking alone with the same model, and CHASE-SQL names
@@ -580,6 +596,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-3-exec': true,
   'sample-5-model': true,
   values: true,
+  'm-schema': true,
   linked: true,
   'full-verified': true,
   'full-shuffled': true,
@@ -911,6 +928,20 @@ export type GateInput = {
     readonly repaired: number;
     readonly blankRight: number;
     readonly unmeasured: number;
+    readonly measured: number;
+    readonly broke: number;
+    readonly netPp: number;
+    readonly verdict: string;
+  };
+  /** The candidate pool, when a sampling arm recorded one. */
+  readonly pool?: {
+    readonly questions: number;
+    readonly expected: number;
+    readonly candidates: number;
+    readonly signed: number;
+    readonly unsigned: number;
+    /** Every question's distinct-result count was at least one, or the recording dropped a case. */
+    readonly consistent: boolean;
   };
 };
 
@@ -1065,6 +1096,41 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       actual: `${informative} informative trial(s), ${repaired} repair(s)`,
       pass: informative >= 100,
       blocking: false,
+    });
+    // The conditional rate cannot go down: its denominator excludes, by construction, every trial
+    // where the rule could do damage. A summary that reports it without the break side is a
+    // summary that can only look like progress, so the net marginal effect is now a gate rather
+    // than a column somebody may or may not read.
+    const marginal = input.transfer;
+    gates.push({
+      id: 'V17-transfer-net-reported',
+      criterion:
+        'the transfer summary states its net marginal effect, and the repair and break counts reconcile with it',
+      actual:
+        `${marginal.netPp.toFixed(2)}pp net over ${marginal.measured} measured trial(s): ` +
+        `${marginal.repaired} repaired, ${marginal.broke} broken, verdict \`${marginal.verdict}\``,
+      pass:
+        marginal.measured > 0 &&
+        Math.abs(marginal.netPp - ((marginal.repaired - marginal.broke) / marginal.measured) * 100) <
+          1e-9,
+      blocking: true,
+    });
+  }
+  if (input.pool !== undefined) {
+    const { questions, expected, candidates, signed, unsigned, consistent } = input.pool;
+    gates.push({
+      id: 'V18-pool-complete',
+      criterion: 'the pool describes every question the baseline answered, or the instrumentation dropped cases',
+      actual: `${questions}/${expected} question(s), ${candidates} candidate(s)`,
+      pass: questions === expected && questions > 0,
+      blocking: true,
+    });
+    gates.push({
+      id: 'V19-pool-reconciles',
+      criterion: 'every recorded candidate is either signed or explicitly unsigned, and every question has a result',
+      actual: `${signed} signed + ${unsigned} unsigned = ${candidates} candidate(s)`,
+      pass: signed + unsigned === candidates && consistent,
+      blocking: true,
     });
   }
   if (input.conventionExecRate !== undefined) {

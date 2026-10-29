@@ -240,6 +240,7 @@ describe('parseArms', () => {
       'full-verified',
       'gated',
       'linked',
+      'm-schema',
       'none',
       'none-replica',
       'oracle',
@@ -320,6 +321,7 @@ describe('parseArms', () => {
       'sample-3-exec',
       'sample-5-model',
       'values',
+      'm-schema',
       'linked',
       'full-verified',
       'full-shuffled',
@@ -638,9 +640,38 @@ describe('buildValidityGates', () => {
     expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V16-transfer-resolvable');
   });
 
+  /**
+   * A transfer input with every field the gates read, derived rather than restated.
+   *
+   * The gates consume the whole 2x2 — repaired, broken, measured — so a fixture that names only
+   * the counts would make `netPp` a number the test invented. Deriving it means a change to the
+   * reconciliation in the gate breaks the fixture's arithmetic instead of hiding behind it.
+   */
+  const transferInput = (input: {
+    trials: number;
+    informative: number;
+    repaired: number;
+    blankRight: number;
+    unmeasured: number;
+    broke?: number;
+  }) => {
+    const measured = input.trials - input.unmeasured;
+    const broke = input.broke ?? 0;
+    return {
+      ...input,
+      broke,
+      measured,
+      netPp: measured === 0 ? 0 : ((input.repaired - broke) / measured) * 100,
+      verdict: input.informative < 100 ? 'unmeasured' : input.repaired - broke <= 0 ? 'no-transfer' : 'transfers',
+    };
+  };
+
   it('V15 requires the transfer trials to reconcile', () => {
     const balanced = gate(
-      { ...sound, transfer: { trials: 1160, informative: 1010, repaired: 24, blankRight: 140, unmeasured: 10 } },
+      {
+        ...sound,
+        transfer: transferInput({ trials: 1160, informative: 1010, repaired: 24, blankRight: 140, unmeasured: 10 }),
+      },
       'V15-transfer-reconciles',
     );
     expect(balanced.pass).toBe(true);
@@ -648,11 +679,90 @@ describe('buildValidityGates', () => {
     expect(balanced.actual).toContain('1160/1160 trial(s)');
 
     const short = gate(
-      { ...sound, transfer: { trials: 1160, informative: 1010, repaired: 24, blankRight: 100, unmeasured: 10 } },
+      {
+        ...sound,
+        transfer: transferInput({ trials: 1160, informative: 1010, repaired: 24, blankRight: 100, unmeasured: 10 }),
+      },
       'V15-transfer-reconciles',
     );
     expect(short.pass).toBe(false);
     expect(short.actual).toContain('1120/1160 trial(s)');
+  });
+
+  it('V17 refuses a transfer summary whose net effect does not reconcile with its counts', () => {
+    // The gate exists because the conditional rate cannot go down. A summary that reports a rate
+    // and no net effect is a summary that can only look like progress, so the reconciliation is
+    // blocking: a `netPp` that disagrees with `(repaired - broke) / measured` fails the run.
+    const honest = gate(
+      {
+        ...sound,
+        transfer: transferInput({
+          trials: 900,
+          informative: 820,
+          repaired: 29,
+          broke: 29,
+          blankRight: 70,
+          unmeasured: 10,
+        }),
+      },
+      'V17-transfer-net-reported',
+    );
+    expect(honest.pass).toBe(true);
+    expect(honest.blocking).toBe(true);
+    expect(honest.actual).toContain('0.00pp net over 890');
+    expect(honest.actual).toContain('`no-transfer`');
+
+    const edited = gate(
+      {
+        ...sound,
+        transfer: { ...transferInput({ trials: 900, informative: 820, repaired: 29, blankRight: 70, unmeasured: 10 }), netPp: 12 },
+      },
+      'V17-transfer-net-reported',
+    );
+    expect(edited.pass).toBe(false);
+  });
+
+  it('omits the pool gates when no sampling arm ran', () => {
+    const ids = buildValidityGates(sound).map((entry) => entry.id);
+    expect(ids).not.toContain('V18-pool-complete');
+    expect(ids).not.toContain('V19-pool-reconciles');
+  });
+
+  it('V18 refuses a pool that describes fewer questions than the run answered', () => {
+    const whole = gate(
+      { ...sound, pool: { questions: 350, expected: 350, candidates: 1750, signed: 1740, unsigned: 10, consistent: true } },
+      'V18-pool-complete',
+    );
+    expect(whole.pass).toBe(true);
+    expect(whole.blocking).toBe(true);
+    expect(whole.actual).toBe('350/350 question(s), 1750 candidate(s)');
+
+    const dropped = gate(
+      { ...sound, pool: { questions: 340, expected: 350, candidates: 1700, signed: 1690, unsigned: 10, consistent: true } },
+      'V18-pool-complete',
+    );
+    expect(dropped.pass).toBe(false);
+  });
+
+  it('V19 refuses a pool whose candidates do not reconcile or whose questions lost their results', () => {
+    const sound_pool = gate(
+      { ...sound, pool: { questions: 350, expected: 350, candidates: 1750, signed: 1740, unsigned: 10, consistent: true } },
+      'V19-pool-reconciles',
+    );
+    expect(sound_pool.pass).toBe(true);
+    expect(sound_pool.actual).toBe('1740 signed + 10 unsigned = 1750 candidate(s)');
+
+    const lost = gate(
+      { ...sound, pool: { questions: 350, expected: 350, candidates: 1750, signed: 1700, unsigned: 10, consistent: true } },
+      'V19-pool-reconciles',
+    );
+    expect(lost.pass).toBe(false);
+
+    const inconsistent = gate(
+      { ...sound, pool: { questions: 350, expected: 350, candidates: 1750, signed: 1740, unsigned: 10, consistent: false } },
+      'V19-pool-reconciles',
+    );
+    expect(inconsistent.pass).toBe(false);
   });
 
   it('V16 records whether the transfer rate is resolvable at this sample', () => {
@@ -660,7 +770,10 @@ describe('buildValidityGates', () => {
     // sample-size shopping the gate exists to prevent. What it stops is the number being quoted
     // as if it had the precision of a larger one.
     const enough = gate(
-      { ...sound, transfer: { trials: 1160, informative: 400, repaired: 8, blankRight: 700, unmeasured: 60 } },
+      {
+        ...sound,
+        transfer: transferInput({ trials: 1160, informative: 400, repaired: 8, blankRight: 700, unmeasured: 60 }),
+      },
       'V16-transfer-resolvable',
     );
     expect(enough.pass).toBe(true);
@@ -668,7 +781,10 @@ describe('buildValidityGates', () => {
     expect(enough.actual).toBe('400 informative trial(s), 8 repair(s)');
 
     const thin = gate(
-      { ...sound, transfer: { trials: 60, informative: 40, repaired: 2, blankRight: 20, unmeasured: 0 } },
+      {
+        ...sound,
+        transfer: transferInput({ trials: 60, informative: 40, repaired: 2, blankRight: 20, unmeasured: 0 }),
+      },
       'V16-transfer-resolvable',
     );
     expect(thin.pass).toBe(false);

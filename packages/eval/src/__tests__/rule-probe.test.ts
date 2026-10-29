@@ -330,6 +330,67 @@ describe('transferSummary', () => {
     const summary = transferSummary([]);
     expect(summary).toMatchObject({ rules: 0, trials: 0, informative: 0, rate: 0, rulesWithRepair: 0 });
   });
+
+  it('counts a rule that breaks a target the retry had fixed, not only the ones it repairs', () => {
+    // The rate the lane published until iteration 99 divides by the targets a bare retry could not
+    // fix, which excludes by construction every trial where the rule can do damage. A statistic
+    // that cannot go down is not a measurement of value, so the summary carries the whole 2x2.
+    const summary = transferSummary([
+      trial('k1', 'b', false, true),
+      trial('k1', 'c', false, false),
+      trial('k1', 'd', true, true),
+      trial('k1', 'e', true, false),
+    ]);
+    expect(summary.measured).toBe(4);
+    expect(summary.marginalRepair).toBeCloseTo(0.25, 6);
+    expect(summary.marginalBreak).toBeCloseTo(0.25, 6);
+    expect(summary.netPp).toBe(0);
+    expect(summary.breakRate).toBeCloseTo(0.5, 6);
+  });
+
+  it('reads a rule that repairs and never breaks as a positive net effect', () => {
+    const summary = transferSummary([
+      trial('k1', 'b', false, true),
+      trial('k2', 'c', false, true),
+      trial('k3', 'd', true, true),
+      trial('k3', 'e', true, true),
+    ]);
+    expect(summary.marginalRepair).toBeCloseTo(0.5, 6);
+    expect(summary.marginalBreak).toBe(0);
+    expect(summary.netPp).toBeCloseTo(50, 6);
+    expect(summary.breakRate).toBe(0);
+  });
+
+  it('says no-transfer when the net marginal effect is zero, whatever the conditional rate says', () => {
+    // The shape iteration 99 measured: a real repair rate on the hard targets, cancelled by the
+    // same number of breaks on the easy ones. Calling that a transfer because the conditional rate
+    // is above zero would be reading a ratio whose denominator was chosen after the fact.
+    const triples = Array.from({ length: 120 }, (_, at) => {
+      const hard = trial(`h${at}`, `t${at}`, false, at < 9);
+      const easy = trial(`e${at}`, `u${at}`, true, at >= 9);
+      return [hard, easy] as const;
+    }).flat();
+    const summary = transferSummary(triples);
+    expect(summary.rate).toBeCloseTo(9 / 120, 6);
+    expect(summary.netPp).toBe(0);
+    expect(summary.verdict).toBe('no-transfer');
+  });
+
+  it('says unmeasured rather than no-transfer when too few trials could show anything', () => {
+    // A verdict is a claim, and a claim drawn from eleven informative trials is not one. The floor
+    // is the same hundred the resolvability gate uses.
+    const summary = transferSummary([trial('k1', 'b', false, true), trial('k1', 'c', false, false)]);
+    expect(summary.informative).toBe(2);
+    expect(summary.verdict).toBe('unmeasured');
+  });
+
+  it('says transfers only when the net effect survives the floor', () => {
+    const trials = Array.from({ length: 200 }, (_, at) => trial(`k${at}`, `t${at}`, false, at < 40));
+    const summary = transferSummary(trials);
+    expect(summary.informative).toBe(200);
+    expect(summary.netPp).toBeCloseTo(20, 6);
+    expect(summary.verdict).toBe('transfers');
+  });
 });
 
 describe('transferringItemIds', () => {

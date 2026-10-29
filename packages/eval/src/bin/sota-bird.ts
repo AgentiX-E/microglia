@@ -120,11 +120,18 @@ import {
   renderValue,
   schemaLinkSplit,
   shuffledSource,
+  TRANSFER_FLOOR,
   transferSummary,
   transferTargets,
   transferringItemIds,
   verdictOf,
   schemaWithValues,
+  poolSummary,
+  signalReadings,
+  execSignatureOf,
+  shapeOf,
+  collectMschema,
+  renderMschema,
   selectByConsistency,
   selectByModel,
   selectFirst,
@@ -132,7 +139,9 @@ import {
   selectionStats,
   signatureOf,
   type Admission,
+  type ExecSignature,
   type PackCell,
+  type PoolQuestion,
   type ProbeSummary,
   type ProbeTrial,
   type TransferSummary,
@@ -455,6 +464,20 @@ type CaseOutcome = {
    * right. Their joint distribution is what separates a generation failure from a selection one.
    */
   readonly draws: { readonly distinct: number; readonly correct: number } | null;
+  /**
+   * Every candidate this question produced, or null when no sampling arm ran.
+   *
+   * The artefact carries the pool itself rather than only its summary because the summary is a
+   * choice about what to look at. Distinct-answer counts, signal AUCs and the ceiling's
+   * decomposition are all functions of this field, and putting the candidates in the file is what
+   * lets the next question about them be answered without a dispatch.
+   */
+  readonly pool: readonly {
+    readonly draw: number;
+    readonly correct: boolean;
+    readonly resultKey: number;
+    readonly signature: ExecSignature | null;
+  }[] | null;
   /**
    * What the linker offered this question, or null when the arm did not run.
    *
@@ -864,6 +887,43 @@ function valuesDdl(dbPath: string): { ddl: string; stats: { tables: number; colu
   };
   valuesCache.set(dbPath, entry);
   return entry;
+}
+
+/**
+ * The schema as a semi-structured block, cached per database.
+ *
+ * Cached for the same reason the DDL is: a fold asks for the same eleven databases 350 times, and
+ * rebuilding an introspection per question would spend the run's time on reading table layouts.
+ *
+ * The sample count is three, matching the value arm, so the two arms differ in *placement* rather
+ * than in how much of the data they show: `values` puts the samples in a comment above the DDL,
+ * `m-schema` puts them inside the column's own parenthesis. XiYan's ablation changes the
+ * representation, and this project's own two placement measurements (+0.29 and −2.86) say the
+ * position is the part that moves the number.
+ */
+const mschemaCache = new Map<string, { readonly ddl: string; readonly stats: { tables: number; columns: number } }>();
+
+function mschemaDdl(
+  dbPath: string,
+  dbId: string,
+): { ddl: string; stats: { tables: number; columns: number } } {
+  const cached = mschemaCache.get(dbPath);
+  if (cached !== undefined) return cached;
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const tables = collectMschema(db, { samples: 3 });
+    const entry = {
+      ddl: renderMschema(dbId, tables),
+      stats: {
+        tables: tables.length,
+        columns: tables.reduce((sum, table) => sum + table.columns.length, 0),
+      },
+    };
+    mschemaCache.set(dbPath, entry);
+    return entry;
+  } finally {
+    db.close();
+  }
 }
 
 /** Execute a statement and canonicalise its result set. */
@@ -1605,6 +1665,8 @@ type FoldResult = {
    * every question is `full` with a second name.
    */
   readonly shuffled: { readonly donors: number; readonly identical: number } | null;
+  /** The candidate pool this fold produced, empty when no sampling arm ran. */
+  readonly pool: readonly PoolQuestion[];
   /** What the repair store holds, sampled: a count alone cannot show what was learned. */
   readonly repairItems: readonly RepairItem[];
   /** Candidates dropped by the parser, per form. */
@@ -2327,6 +2389,21 @@ async function runFold(
       // columns hold. Compared against `none`, which is the same prompt without the annotation.
       call(position, 'values', '', 0, false, 'before', valuesDdl(dataset.dbPath(row.db_id)).ddl);
     }
+    if (ARMS.has('m-schema')) {
+      // The same facts, written where a reader of tables expects them. One input changed against
+      // `none`; the arm exists because a competitor's ablation prices the placement at +1.63 on
+      // this exact model and split, and a published cell is worth reproducing before it is argued
+      // with.
+      call(
+        position,
+        'm-schema',
+        '',
+        0,
+        false,
+        'before',
+        mschemaDdl(dataset.dbPath(row.db_id), row.db_id).ddl,
+      );
+    }
     if (ARMS.has('stated')) call(position, 'stated', '', 0);
     if (ARMS.has('oracle')) {
       // Under the convention the oracle is the expected value, not the gold SQL:
@@ -2605,6 +2682,16 @@ async function runFold(
    * is neither — it is the model being confidently wrong, which no amount of sampling fixes.
    */
   const drawFacts = new Map<number, { readonly distinct: number; readonly correct: number }>();
+  /**
+   * The pool as the measurement needs it, kept per question so the artefact carries the candidates
+   * rather than only their summary.
+   *
+   * Iteration 99's whole point: with the candidates in the artefact, every question about them —
+   * how many distinct answers the draws contained, whether a signal could have ordered them, what
+   * share of the ceiling a deterministic rule captures — is a computation over a file, not a
+   * dispatch. The sampling run pays for the draws once; the analysis costs nothing.
+   */
+  const poolByPositionRecord = new Map<number, PoolQuestion>();
   const chosenJudged = new Map<string, { readonly position: number; readonly arm: ArmName; readonly verdict: Judged }>();
   const selectionByArm = new Map<ArmName, Selection[]>();
   /**
@@ -2689,6 +2776,12 @@ async function runFold(
       const verdicts: Judged[] = [];
       const queries: string[] = [];
       const results: string[] = [];
+      // The pool the measurement reads, built from the same executions as the selectors' candidates
+      // rather than from a second pass over them: a second execution is a second answer, and two
+      // readings of one pool that disagree are worse than one reading.
+      const keyOf = new Map<string, number>();
+      const shapes: (ExecSignature | null)[] = [];
+      const keys: number[] = [];
       scored += 1;
       if (scored % 10 === 0 || scored === evalRows.length) {
         process.stdout.write(
@@ -2716,9 +2809,43 @@ async function runFold(
         // Every draw is scored, not only the chosen one, because the ceiling is the score of a
         // selector that always picked right and cannot be computed after the fact.
         verdicts.push(judgeReply(row, dbPath, reply, task));
+        // A draw with no query and a draw whose query did not run are both `null` here — neither
+        // produced a result a selector could pick — but only the second has a shape, and the shape
+        // is what says whether the failure looked like a wrong answer or like a refusal.
+        if (outcome === undefined) {
+          keys.push(-1);
+          shapes.push(null);
+        } else {
+          const key = signatureOf(outcome);
+          if (key === undefined) {
+            keys.push(-1);
+            shapes.push(execSignatureOf({ rows: [], columns: [], failed: true }));
+          } else {
+            const at = keyOf.get(key);
+            if (at === undefined) {
+              keyOf.set(key, keyOf.size);
+              keys.push(keyOf.size - 1);
+            } else {
+              keys.push(at);
+            }
+            shapes.push(
+              execSignatureOf({ rows: outcome.tuples, columns: outcome.columns, failed: false }),
+            );
+          }
+        }
       }
       poolByPosition.set(position, { candidates, verdicts, queries, results });
       drawJudged.set(position, verdicts);
+      poolByPositionRecord.set(position, {
+        id: idOf(row),
+        shape: shapeOf(row.question, row.evidence),
+        candidates: verdicts.map((verdict, draw) => ({
+          draw,
+          correct: verdict.correct,
+          resultKey: keys[draw] ?? -1,
+          signature: shapes[draw] ?? null,
+        })),
+      });
       const right = verdicts.filter((verdict) => verdict.correct).length;
       const distinct = new Set(
         candidates.map((item) => item.signature).filter((item) => item !== undefined),
@@ -2966,6 +3093,9 @@ async function runFold(
       execOk: full.execOk,
       retried: retriedPositions.has(position),
       draws: drawFacts.get(position) ?? null,
+      // The candidates themselves, so every question about the pool is a computation over this
+      // file rather than another dispatch.
+      pool: poolByPositionRecord.get(position)?.candidates ?? null,
       schemaTables: linkKept.get(position) ?? null,
       injected: injectedByPosition.get(position) ?? [],
       injectedRepair: injectedRepairByPosition.get(position) ?? [],
@@ -3060,6 +3190,7 @@ async function runFold(
     learn: learnRows.length,
     eval: cases.length,
     cases,
+    pool: [...poolByPositionRecord.values()],
     learning,
     activeRules: scoringFrozen.active,
     failedDistill: distilled.failed,
@@ -3539,8 +3670,55 @@ async function main(): Promise<void> {
             repaired: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0),
             blankRight: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.blankRight ?? 0), 0),
             unmeasured: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0),
+            measured:
+              folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
+              folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0),
+            broke: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0),
+            netPp: (() => {
+              const measured =
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
+              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
+              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
+              return measured === 0 ? 0 : ((repaired - broke) / measured) * 100;
+            })(),
+            verdict: (() => {
+              const informative = folds.reduce(
+                (sum, fold) => sum + (fold.transfer?.summary.informative ?? 0),
+                0,
+              );
+              const measured =
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
+              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
+              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
+              if (informative < TRANSFER_FLOOR) return 'unmeasured';
+              return measured === 0 || repaired - broke <= 0 ? 'no-transfer' : 'transfers';
+            })(),
           },
         }),
+    // The pool's own bookkeeping. A gate rather than a comment because instrumentation that
+    // silently drops questions makes every number derived from it a number about the survivor set.
+    ...(folds.every((fold) => fold.pool.length === 0)
+      ? {}
+      : (() => {
+          const questions = folds.flatMap((fold) => fold.pool);
+          const summary = poolSummary(questions);
+          return {
+            pool: {
+              questions: questions.length,
+              expected: cases.length,
+              candidates: summary.candidates,
+              signed: summary.signed,
+              unsigned: summary.unsigned,
+              consistent: questions.every(
+                (question) =>
+                  question.candidates.length > 0 &&
+                  question.candidates.every((candidate) => candidate.resultKey >= -1),
+              ),
+            },
+          };
+        })()),
     callFailureRate,
     calls: llm.stats.prompts,
     callFailures: llm.stats.failures,
@@ -3866,6 +4044,39 @@ async function main(): Promise<void> {
             })),
           },
       /**
+       * The candidate pool, described.
+       *
+       * R7.0: before a selector is built, the pool it would select from has to be described, and
+       * the number that decides the stage is how many *distinct execution results* a question's
+       * draws contained. Five draws that collapse to one answer are one candidate with five
+       * spellings, and not even an oracle can gain on them.
+       *
+       * `signals` prices each execution signal alone, at candidate level, against the base rate of
+       * taking the first draw. It is computed here rather than in a separate run because it reads
+       * candidates the sampling pass already produced: the analysis of a pool costs no calls, and
+       * a signal that does not separate answers from non-answers is reported as inert before it is
+       * allowed to rank anything.
+       */
+      pool: (() => {
+        const questions = folds.flatMap((fold) => fold.pool);
+        if (questions.length === 0) return null;
+        const summary = poolSummary(questions);
+        return {
+          ...summary,
+          distinct_histogram: summary.distinctHistogram,
+          signals: signalReadings(questions).map((reading) => ({
+            signal: reading.signal,
+            eligible: reading.eligible,
+            top_pick: reading.topPick,
+            accuracy: Number(reading.accuracy.toFixed(4)),
+            auc: Number(reading.auc.toFixed(4)),
+            auc_low: Number(reading.aucLow.toFixed(4)),
+            auc_high: Number(reading.aucHigh.toFixed(4)),
+            pairs: reading.pairs,
+          })),
+        };
+      })(),
+      /**
        * Whether the admitted rules are knowledge or demonstrations.
        *
        * The own-case probe says whether a correction is in the store; this says whether what is in
@@ -3894,6 +4105,53 @@ async function main(): Promise<void> {
               );
               const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
               return informative === 0 ? 0 : Number((repaired / informative).toFixed(4));
+            })(),
+            // The whole 2x2, because `rate` alone can only go up: its denominator is the targets a
+            // bare retry could not fix, which excludes every trial where the rule does damage.
+            measured: (() => {
+              const trials = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0);
+              const unmeasured = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
+              return trials - unmeasured;
+            })(),
+            marginal_repair: (() => {
+              const measured =
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
+              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
+              return measured === 0 ? 0 : Number((repaired / measured).toFixed(4));
+            })(),
+            marginal_break: (() => {
+              const measured =
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
+              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
+              return measured === 0 ? 0 : Number((broke / measured).toFixed(4));
+            })(),
+            net_pp: (() => {
+              const measured =
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
+              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
+              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
+              return measured === 0 ? 0 : Number((((repaired - broke) / measured) * 100).toFixed(2));
+            })(),
+            break_rate: (() => {
+              const blankRight = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.blankRight ?? 0), 0);
+              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
+              return blankRight === 0 ? 0 : Number((broke / blankRight).toFixed(4));
+            })(),
+            verdict: (() => {
+              const informative = folds.reduce(
+                (sum, fold) => sum + (fold.transfer?.summary.informative ?? 0),
+                0,
+              );
+              const measured =
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
+                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
+              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
+              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
+              if (informative < TRANSFER_FLOOR) return 'unmeasured';
+              return measured === 0 || repaired - broke <= 0 ? 'no-transfer' : 'transfers';
             })(),
             rules_with_repair: folds.reduce(
               (sum, fold) => sum + (fold.transfer?.summary.rulesWithRepair ?? 0),

@@ -38,6 +38,7 @@ export {
 } from './selector.js';
 export { recoveryRatio, type RecoveryInput } from './recovery.js';
 export {
+  TRANSFER_FLOOR,
   admissionOf,
   keptItemIds,
   probeSummary,
@@ -54,6 +55,7 @@ export {
   type ProbeVerdict,
   type TransferSummary,
   type TransferTrial,
+  type TransferVerdict,
 } from './rule-probe.js';
 export {
   collectMschema,
@@ -64,6 +66,16 @@ export {
   type MschemaTable,
   type RenderOptions,
 } from './m-schema.js';
+export {
+  poolSummary,
+  signalReading,
+  signalReadings,
+  type PoolCandidate,
+  type PoolQuestion,
+  type PoolSignalReading,
+  type PoolSummary,
+  type SignalChoice,
+} from './pool.js';
 export {
   SIGNALS,
   scoreOf,

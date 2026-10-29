@@ -249,11 +249,49 @@ export type TransferSummary = {
   readonly unchanged: number;
   /** Trials whose call never returned. */
   readonly unmeasured: number;
-  /** `repaired / informative`, and zero when there was nothing informative to divide by. */
+  /** Trials that produced a verdict, which is the denominator of every marginal below. */
+  readonly measured: number;
+  /**
+   * `repaired / informative`, and zero when there was nothing informative to divide by.
+   *
+   * Retained because iteration 96 pre-registered it, and because it is a real conditional
+   * quantity: among the targets a bare retry could not fix, this share a rule fixed. It is **not**
+   * a value statistic and must never be read as one — the denominator excludes by construction
+   * every trial where the rule could do damage, so it cannot go down. Iteration 99 measured the
+   * damage: 3.52% conditional repair beside 42.6% breakage of targets that were already right.
+   */
   readonly rate: number;
+  /** Share of all measured trials the rule repaired: the gain side of the marginal effect. */
+  readonly marginalRepair: number;
+  /** Share of all measured trials the rule damaged: the loss side the `rate` hides. */
+  readonly marginalBreak: number;
+  /**
+   * The marginal effect in percentage points, `(repaired - broke) / measured`.
+   *
+   * This is the only number in the summary that answers "does a rule help". It is a net figure on
+   * the same population a deployment would see, rather than a ratio over a subset chosen after the
+   * fact.
+   */
+  readonly netPp: number;
+  /** Of the targets a bare retry already fixed, the share the rule broke. */
+  readonly breakRate: number;
+  /** What the summary supports, with the floor applied before any claim is made. */
+  readonly verdict: TransferVerdict;
   /** Rules that repaired at least one foreign case. */
   readonly rulesWithRepair: number;
 };
+
+/**
+ * What a transfer measurement supports.
+ *
+ * Three states rather than a boolean because "the rules do not transfer" and "there were not enough
+ * trials to tell" are different findings, and a product decision that treats them alike would
+ * cancel a line of work on the strength of eleven trials.
+ */
+export type TransferVerdict = 'unmeasured' | 'no-transfer' | 'transfers';
+
+/** Informative trials below this count make the rate a direction rather than a measurement. */
+export const TRANSFER_FLOOR = 100;
 
 /**
  * Counts over the transfer trials, with every total defined so an empty probe has no NaN.
@@ -268,16 +306,27 @@ export function transferSummary(trials: readonly TransferTrial[]): TransferSumma
   const informative = measured.filter((trial) => !trial.blankCorrect);
   const repaired = informative.filter((trial) => trial.withRuleCorrect === true);
   const blankRight = measured.filter((trial) => trial.blankCorrect);
+  const broke = blankRight.filter((trial) => trial.withRuleCorrect === false).length;
+  const netPp = measured.length === 0 ? 0 : ((repaired.length - broke) / measured.length) * 100;
   return {
     rules: new Set(trials.map((trial) => trial.itemId)).size,
     trials: trials.length,
     informative: informative.length,
     repaired: repaired.length,
-    broke: blankRight.filter((trial) => trial.withRuleCorrect === false).length,
+    broke,
     blankRight: blankRight.length,
     unchanged: informative.length - repaired.length,
     unmeasured: trials.length - measured.length,
+    measured: measured.length,
     rate: informative.length === 0 ? 0 : repaired.length / informative.length,
+    marginalRepair: measured.length === 0 ? 0 : repaired.length / measured.length,
+    marginalBreak: measured.length === 0 ? 0 : broke / measured.length,
+    netPp,
+    breakRate: blankRight.length === 0 ? 0 : broke / blankRight.length,
+    // The floor is applied before the sign: a net effect computed from eleven trials is not a
+    // finding, and reporting `no-transfer` for it would be as unfounded as reporting `transfers`.
+    verdict:
+      informative.length < TRANSFER_FLOOR ? 'unmeasured' : netPp <= 0 ? 'no-transfer' : 'transfers',
     rulesWithRepair: new Set(repaired.map((trial) => trial.itemId)).size,
   };
 }
