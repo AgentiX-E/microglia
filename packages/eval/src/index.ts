@@ -66,6 +66,7 @@ export {
   type MschemaTable,
   type RenderOptions,
 } from './m-schema.js';
+export { unionCeiling, type UnionCase, type UnionCeiling } from './union.js';
 export {
   poolReport,
   type PoolReport,
@@ -248,6 +249,7 @@ export {
   mentionsAny,
   mismatchNote,
   promptFor,
+  type GeneratorKind,
   relevanceSplit,
   sqlIdentifiers,
   retryPromptFor,

@@ -533,6 +533,30 @@ export type SqlArm =
    */
   | 'm-schema'
   /**
+   * The same question, written by a procedure that names its columns, grain and filters first.
+   *
+   * One of the three generators R7.1 needs, and the reason there are three rather than one: CHASE-SQL
+   * draws its 21 candidates from different generation *procedures*, and its pool carries +13.95pp of
+   * headroom where five draws from a single prompt carry +3.52pp. Sampling one prompt harder buys
+   * more of the same mistake.
+   *
+   * What it targets: the errors that survive a direct attempt because nobody wrote down what the
+   * answer had to look like — a join that multiplies rows because the grain was never stated, a
+   * `distinct` that was needed and never asked for.
+   */
+  | 'gen-plan'
+  /**
+   * The same question, split into its sub-questions and answered in one composition.
+   *
+   * What it targets: the multi-hop joins a single pass collapses into one wrong join, and the
+   * nested aggregates that a direct attempt flattens.
+   *
+   * The prompt requires the sub-answers outside any fence precisely so the extraction stays
+   * unambiguous: `extractSql` takes the first fenced block, so reasoning written inside one would
+   * be scored as the query.
+   */
+  | 'gen-decompose'
+  /**
    * The same question with the schema pruned to the tables it names.
    *
    * MCS-SQL measures +2.1 points from schema linking alone with the same model, and CHASE-SQL names
@@ -597,6 +621,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-5-model': true,
   values: true,
   'm-schema': true,
+  'gen-plan': true,
+  'gen-decompose': true,
   linked: true,
   'full-verified': true,
   'full-shuffled': true,
@@ -759,9 +785,47 @@ export type PromptInput = {
    * whole iteration to discover afterwards.
    */
   readonly packPosition?: 'before' | 'after';
+  /**
+   * Which procedure writes the query.
+   *
+   * `direct` is the incumbent and the default, and it adds nothing: every number this project has
+   * published was produced by that string, so a generator that changed it by default would move the
+   * baseline under every comparison in the record.
+   *
+   * The other two exist because of one measurement in someone else's ablation. CHASE-SQL's candidate
+   * pool carries +13.95pp of headroom over a single query, and it draws those candidates from three
+   * different *procedures*, not from one procedure at three temperatures. Five samples from one
+   * prompt are five versions of the same misreading — our own oracle over five homogeneous draws is
+   * worth +3.52pp, a quarter of theirs — so the pool is the thing to widen before any selector is
+   * built for it.
+   */
+  readonly generator?: GeneratorKind;
+};
+
+/** How a query is produced, as distinct from what it is shown. */
+export type GeneratorKind = 'direct' | 'plan' | 'decompose';
+
+/**
+ * What each procedure asks for before the query.
+ *
+ * Each ends with the same contract: the reasoning is plain text outside any fence, and the query is
+ * the only fenced block. `extractSql` takes the first fence it finds, so a plan written inside one
+ * would be extracted as the answer and the arm would score a paragraph as SQL.
+ */
+const GENERATOR_PREAMBLE: Record<GeneratorKind, string> = {
+  direct: '',
+  plan:
+    'Before writing the query, write at most three lines naming: the columns the answer needs, the ' +
+    'grain of one row of the answer, and every filter the question imposes. Write those lines as ' +
+    'plain text, outside any fence. Then write the query that follows from them.',
+  decompose:
+    'Before writing the query, split the question into the sub-questions it actually contains and ' +
+    'answer each in one short line. Write those lines as plain text, outside any fence. Then write ' +
+    'the single query that answers all of them at once.',
 };
 
 export function promptFor(input: PromptInput): string {
+  const preamble = GENERATOR_PREAMBLE[input.generator ?? 'direct'];
   const packBlock =
     input.pack === '' ? '' : `${PACK_LABEL[input.packKind ?? 'rule']}\n${input.pack}`;
   const critiqueBlock =
@@ -776,6 +840,7 @@ export function promptFor(input: PromptInput): string {
     'You write one SQLite query that answers the question exactly.',
     'Return the SQL only, in a ```sql fence, with no explanation.',
     'Use only the tables and columns in the schema. Prefer explicit JOINs. Do not invent columns.',
+    preamble,
     `Schema:\n${input.ddl}`,
     input.evidence ? `Evidence (may be wrong; it is external knowledge):\n${input.evidence}` : '',
     input.stated && input.convention !== undefined ? `Workspace convention:\n- ${input.convention.sentence}` : '',

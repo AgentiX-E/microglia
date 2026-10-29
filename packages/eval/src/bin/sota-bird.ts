@@ -128,6 +128,7 @@ import {
   schemaWithValues,
   poolSummary,
   signalReadings,
+  unionCeiling,
   execSignatureOf,
   shapeOf,
   collectMschema,
@@ -140,6 +141,7 @@ import {
   signatureOf,
   type Admission,
   type ExecSignature,
+  type GeneratorKind,
   type PackCell,
   type PoolQuestion,
   type ProbeSummary,
@@ -2047,6 +2049,8 @@ async function runFold(
     packPosition: 'before' | 'after' = 'before',
     /** The schema to show, when it is not the database's own. */
     schema?: string,
+    /** Which procedure writes the query; `direct` when an arm does not say. */
+    generator?: GeneratorKind,
   ): void => {
     const row = evalRows[position] as BirdRow;
     plans.push({
@@ -2062,6 +2066,7 @@ async function runFold(
         stated: arm === 'stated',
         convention: ACTIVE,
         packPosition,
+        ...(generator === undefined ? {} : { generator }),
         ...(critique ? { critique: true } : {}),
         // The block is labelled by what it holds. Rendering a repair note under the
         // rule heading would ask the reader to act on a story as if it were a fact, and
@@ -2388,6 +2393,15 @@ async function runFold(
       // The same question, the same pack position, one input changed: the schema now says what the
       // columns hold. Compared against `none`, which is the same prompt without the annotation.
       call(position, 'values', '', 0, false, 'before', valuesDdl(dataset.dbPath(row.db_id)).ddl);
+    }
+    if (ARMS.has('gen-plan')) {
+      // The same question, the same schema, a different procedure. R7.1's claim is that the pool is
+      // the constraint, and a generator that produces different candidates is the only thing that
+      // can test it — the selector arms all read one prompt's draws.
+      call(position, 'gen-plan', '', 0, false, 'before', undefined, 'plan');
+    }
+    if (ARMS.has('gen-decompose')) {
+      call(position, 'gen-decompose', '', 0, false, 'before', undefined, 'decompose');
     }
     if (ARMS.has('m-schema')) {
       // The same facts, written where a reader of tables expects them. One input changed against
@@ -4043,6 +4057,39 @@ async function main(): Promise<void> {
                   : Number((fold.probe.supplied / fold.probe.sourceQuestions).toFixed(4)),
             })),
           },
+      /**
+       * What the generators together could have scored.
+       *
+       * R7.1's criterion, computed from arms the run already measured: the union over generators is
+       * the score of a chooser that always picked right, and `ceilingPp` is what a selector would
+       * have to work with. A `dominant` generator means the pool is one procedure with two extra
+       * calls per question, which is a cost rather than a diversity.
+       */
+      union: (() => {
+        const measured = folds.flatMap((fold) => fold.cases);
+        const generators = ['gen-plan', 'gen-decompose'].filter((arm) =>
+          measured.some((item) => arm in item.arms),
+        );
+        if (generators.length === 0) return null;
+        const outcome = unionCeiling(
+          measured.map((item) => ({
+            id: item.id,
+            correct: { none: item.withoutMemoryCorrect, ...item.arms },
+          })),
+          'none',
+          ['none', ...generators],
+        );
+        return {
+          arms: outcome.arms,
+          questions: outcome.questions,
+          per_arm: outcome.perArm,
+          union: outcome.union,
+          control: outcome.control,
+          ceiling_pp: Number(outcome.ceilingPp.toFixed(2)),
+          disagreement_share: Number(outcome.disagreementShare.toFixed(4)),
+          dominant: outcome.dominant,
+        };
+      })(),
       /**
        * The candidate pool, described.
        *

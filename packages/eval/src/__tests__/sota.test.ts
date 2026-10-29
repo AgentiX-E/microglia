@@ -239,6 +239,8 @@ describe('parseArms', () => {
       'full-validated',
       'full-verified',
       'gated',
+      'gen-decompose',
+      'gen-plan',
       'linked',
       'm-schema',
       'none',
@@ -261,6 +263,67 @@ describe('parseArms', () => {
       'values',
       'wrong-scope',
     ]);
+  });
+
+  it('leaves the direct prompt byte-identical when no generator is named', () => {
+    // Every published number was produced by this string. A generator that changed it by default
+    // would move the baseline under every comparison in the file, so the default is the old text.
+    const base = {
+      question: 'Q',
+      evidence: 'E',
+      ddl: 'DDL',
+      pack: '',
+      stated: false,
+      convention: undefined,
+    };
+    expect(promptFor({ ...base, generator: 'direct' })).toBe(promptFor(base));
+  });
+
+  it('asks the plan generator for the columns, the grain and the filters before the query', () => {
+    const prompt = promptFor({
+      question: 'Q',
+      evidence: '',
+      ddl: 'DDL',
+      pack: '',
+      stated: false,
+      convention: undefined,
+      generator: 'plan',
+    });
+    expect(prompt).toContain('the grain of one row');
+    expect(prompt).toContain('every filter');
+    // The contract that keeps `extractSql` unambiguous: the reasoning is unfenced, the query is not.
+    expect(prompt).toContain('as plain text, outside any fence');
+  });
+
+  it('asks the decompose generator to split the question before answering it', () => {
+    const prompt = promptFor({
+      question: 'Q',
+      evidence: '',
+      ddl: 'DDL',
+      pack: '',
+      stated: false,
+      convention: undefined,
+      generator: 'decompose',
+    });
+    expect(prompt).toContain('sub-questions');
+    expect(prompt).toContain('as plain text, outside any fence');
+  });
+
+  it('keeps the schema and the question in every generator prompt', () => {
+    for (const generator of ['direct', 'plan', 'decompose'] as const) {
+      const prompt = promptFor({
+        question: 'Which district has the largest area',
+        evidence: 'the area is in square kilometres',
+        ddl: 'CREATE TABLE district (id INTEGER)',
+        pack: '',
+        stated: false,
+        convention: undefined,
+        generator,
+      });
+      expect(prompt).toContain('CREATE TABLE district (id INTEGER)');
+      expect(prompt).toContain('Question: Which district has the largest area');
+      expect(prompt).toContain('the area is in square kilometres');
+    }
   });
 
   it('keeps none and full even when the caller lists nothing', () => {
@@ -322,6 +385,8 @@ describe('parseArms', () => {
       'sample-5-model',
       'values',
       'm-schema',
+      'gen-plan',
+      'gen-decompose',
       'linked',
       'full-verified',
       'full-shuffled',
