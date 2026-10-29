@@ -38,6 +38,15 @@ type Artifact = {
       readonly ceiling_pp: number;
       readonly disagreement_share: number;
       readonly dominant: string | null;
+      readonly distinct: {
+        readonly measured: boolean;
+        readonly arms: number;
+        readonly mean: number;
+        readonly median: number;
+        readonly share: number;
+        readonly verdict: 'wide' | 'narrow' | 'between';
+        readonly histogram: Record<string, number>;
+      };
     } | null;
   };
   readonly config?: { readonly arms?: readonly string[] };
@@ -78,13 +87,25 @@ function main(): void {
             `[${row.ci_low_pp.toFixed(2)}, ${row.ci_high_pp.toFixed(2)}] p=${row.p_value.toFixed(4)}\n`),
     );
   }
+  const distinct = union.distinct;
   process.stdout.write(
     `[union] union ${(union.union * 100).toFixed(2)}% = ${union.ceiling_pp.toFixed(2)}pp over the ` +
       `control; disagreement ${union.disagreement_share.toFixed(4)}; ` +
       `dominant ${union.dominant ?? 'none'}\n` +
+      // The pool the ceiling was computed over. A ceiling over four arms that all execute to one
+      // answer is a ceiling of agreement, and a selector has nothing to rank in it however large the
+      // number looks.
+      (distinct.measured
+        ? `[union] distinct answers per question: mean ${distinct.mean.toFixed(2)}, ` +
+          `median ${distinct.median} of ${distinct.arms} arm(s) ` +
+          `(${distinct.share.toFixed(2)}), ${distinct.verdict.toUpperCase()}; ` +
+          `histogram ${JSON.stringify(distinct.histogram)}\n`
+        : '[union] no result keys in this artefact: the generator pool cannot be described, and an ' +
+          'undescribed pool is not a wide one\n') +
       `[union] ceiling >= ${CEILING_BAR_PP.toFixed(2)}pp ${verdict(union.ceiling_pp >= CEILING_BAR_PP)}` +
       `, disagreement >= ${DISAGREEMENT_BAR.toFixed(2)} ${verdict(union.disagreement_share >= DISAGREEMENT_BAR)}` +
-      `, no dominant generator ${verdict(union.dominant === null)}\n`,
+      `, no dominant generator ${verdict(union.dominant === null)}` +
+      `, pool not collapsed ${verdict(distinct.measured && distinct.verdict !== 'narrow')}\n`,
   );
 }
 

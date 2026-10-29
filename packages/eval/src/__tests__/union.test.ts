@@ -109,3 +109,129 @@ describe('unionCeiling', () => {
     expect(result.union).toBe(1);
   });
 });
+
+describe('unionCeiling distinctness', () => {
+  it('counts how many different answers the armed pool produced, not how many arms ran', () => {
+    // R7.1's criterion 3 in the terms that decide it. Four arms that write four different statements
+    // and execute to two different results are a pool of two: a selector has two objects to rank,
+    // and the other two arms are extra calls.
+    const result = unionCeiling(
+      [
+        {
+          id: 'a',
+          correct: at({ direct: false, plan: true, decompose: false }),
+          keys: at({ direct: 'r1', plan: 'r2', decompose: 'r1' }),
+        },
+        {
+          id: 'b',
+          correct: at({ direct: false, plan: true, decompose: true }),
+          keys: at({ direct: 'r1', plan: 'r1', decompose: 'r1' }),
+        },
+      ],
+      'direct',
+      ['direct', 'plan', 'decompose'],
+    );
+    expect(result.distinct.mean).toBeCloseTo(1.5, 6);
+    expect(result.distinct.median).toBe(1.5);
+    expect(result.distinct.histogram).toEqual({ '1': 1, '2': 1 });
+  });
+
+  it('calls a pool where most questions collapse to one answer narrow', () => {
+    // Two answers from six draws is the same collapse R7.0 measured on sampling draws, read on the
+    // generator pool with the same bar: the rule does not change because the arms changed.
+    const collapsed = Array.from({ length: 6 }, (_, index) => ({
+      id: `q${index}`,
+      correct: at({ direct: false, plan: false, decompose: false, extra: false }),
+      keys: at({ direct: 'r1', plan: 'r1', decompose: 'r1', extra: 'r1' }),
+    }));
+    const result = unionCeiling(collapsed, 'direct', ['direct', 'plan', 'decompose', 'extra']);
+    expect(result.distinct.median).toBe(1);
+    expect(result.distinct.share).toBeCloseTo(0.25, 6);
+    expect(result.distinct.verdict).toBe('narrow');
+  });
+
+  it('calls a pool wide when the arms mostly produce different answers', () => {
+    const varied = Array.from({ length: 6 }, (_, index) => ({
+      id: `q${index}`,
+      correct: at({ direct: false, plan: true, decompose: false, extra: false }),
+      keys: at({ direct: 'r1', plan: 'r2', decompose: 'r3', extra: 'r4' }),
+    }));
+    const result = unionCeiling(varied, 'direct', ['direct', 'plan', 'decompose', 'extra']);
+    expect(result.distinct.median).toBe(4);
+    expect(result.distinct.verdict).toBe('wide');
+  });
+
+  it('refuses to call it either way in between, the same refusal the sampling pool gets', () => {
+    // Half the questions collapse to one answer and half to two: a median of 1.5 from four arms is
+    // 0.375 of the pool, above the collapse bar and below the diversity bar.
+    const middle = Array.from({ length: 8 }, (_, index) => ({
+      id: `q${index}`,
+      correct: at({ direct: false, plan: true, decompose: false, extra: false }),
+      keys:
+        index < 4
+          ? at({ direct: 'r1', plan: 'r1', decompose: 'r1', extra: 'r1' })
+          : at({ direct: 'r1', plan: 'r2', decompose: 'r2', extra: 'r2' }),
+    }));
+    const result = unionCeiling(middle, 'direct', ['direct', 'plan', 'decompose', 'extra']);
+    expect(result.distinct.median).toBe(1.5);
+    expect(result.distinct.verdict).toBe('between');
+  });
+
+  it('does not count an arm that failed as a distinct answer', () => {
+    // A statement that did not run produced no answer. Counting its absence as one would let a pool
+    // of one answer and three errors look like a pool of four.
+    const result = unionCeiling(
+      [
+        {
+          id: 'a',
+          correct: at({ direct: false, plan: true }),
+          keys: at({ direct: null, plan: 'r1' }),
+        },
+      ],
+      'direct',
+      ['direct', 'plan'],
+    );
+    expect(result.distinct.median).toBe(1);
+  });
+
+  it('reports no distinctness at all when no case carries result keys', () => {
+    // An artefact written before this field existed must not report a pool of zero answers as a
+    // collapsed pool: the distinction between "not measured" and "measured as narrow" is the whole
+    // reason the field is optional.
+    const result = unionCeiling(
+      [{ id: 'a', correct: at({ direct: true, plan: false }) }],
+      'direct',
+      ['direct', 'plan'],
+    );
+    expect(result.distinct.measured).toBe(false);
+    expect(result.distinct.mean).toBe(0);
+    expect(result.distinct.verdict).toBe('between');
+  });
+
+  it('reports a share of zero rather than NaN when no arm was named', () => {
+    // A union over nothing is a caller's mistake, and the reading has to survive it: a NaN share
+    // would propagate into a verdict comparison and read as neither wide nor narrow.
+    const result = unionCeiling([{ id: 'a', correct: {} }], 'direct', []);
+    expect(result.distinct.arms).toBe(0);
+    expect(result.distinct.share).toBe(0);
+    expect(Number.isNaN(result.distinct.mean)).toBe(false);
+  });
+
+  it('counts only the arms that reported a key when the pool is partial', () => {
+    const result = unionCeiling(
+      [
+        {
+          id: 'a',
+          correct: at({ direct: true, plan: false }),
+          keys: at({ direct: 'r1', plan: 'r2' }),
+        },
+        { id: 'b', correct: at({ direct: true, plan: false }) },
+      ],
+      'direct',
+      ['direct', 'plan'],
+    );
+    expect(result.distinct.measured).toBe(true);
+    expect(result.distinct.arms).toBe(2);
+    expect(result.distinct.mean).toBeCloseTo(1, 6);
+  });
+});

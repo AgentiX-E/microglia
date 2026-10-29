@@ -26,12 +26,23 @@ import type { PoolQuestion } from './pool.js';
 import { poolSummary, signalReadings, type PoolSignalReading, type PoolSummary } from './pool.js';
 
 /** A median this share of the draws or more is a pool with a choice in it. */
-const WIDE_SHARE = 0.5;
+export const WIDE_SHARE = 0.5;
 
 /** A median at or below this share of the draws is one answer with several spellings. */
-const NARROW_SHARE = 1 / 3;
+export const NARROW_SHARE = 1 / 3;
 
 export type PoolVerdict = 'wide' | 'narrow' | 'between';
+
+/**
+ * The verdict for a collapse share, where one definition serves both pools.
+ *
+ * The incumbent pool is five draws from one prompt and the generator pool is three procedures; the
+ * bar is a share of whatever produced the candidates, so the same rule reads both. Two copies of
+ * these two numbers would let one pool be called wide and the other narrow on identical evidence.
+ */
+export function verdictOf(share: number): PoolVerdict {
+  return share >= WIDE_SHARE ? 'wide' : share <= NARROW_SHARE ? 'narrow' : 'between';
+}
 
 export type PoolReportQuestion = PoolQuestion;
 
@@ -70,8 +81,7 @@ export function poolReport(
   const signals = signalReadings(questions, options);
   const denominator = draws > 0 ? draws : 1;
   const distinctShare = summary.distinctMedian / denominator;
-  const verdict: PoolVerdict =
-    distinctShare >= WIDE_SHARE ? 'wide' : distinctShare <= NARROW_SHARE ? 'narrow' : 'between';
+  const verdict = verdictOf(distinctShare);
   const ceilingPp =
     summary.questions === 0 ? 0 : (summary.ceilingOnly / summary.questions) * 100;
   return {

@@ -20,10 +20,35 @@
  *    that diversity would be paying for a number rather than measuring one.
  */
 
+import { verdictOf, type PoolVerdict } from './pool-report.js';
+
 export type UnionCase = {
   readonly id: string;
   /** Whether each arm answered this question, keyed by arm name. */
   readonly correct: Readonly<Record<string, boolean>>;
+  /**
+   * The execution result each arm produced, keyed by arm name; null when it produced none.
+   *
+   * Correctness says how many arms were right, which is the ceiling. This says how many *answers*
+   * the pool contained, which is what a selector has to rank: three arms that are all wrong and all
+   * different are a pool of three, and three arms that are all wrong and all identical are a pool of
+   * one with three calls per question.
+   */
+  readonly keys?: Readonly<Record<string, string | null>>;
+};
+
+/** How many different answers the pool produced per question, and whether that is a pool at all. */
+export type UnionDistinct = {
+  /** False when no case carried result keys, which is not the same as a measured collapse. */
+  readonly measured: boolean;
+  /** Arms the share is taken against. */
+  readonly arms: number;
+  readonly mean: number;
+  readonly median: number;
+  /** Median distinct answers as a share of the arms: the quantity the verdict is read from. */
+  readonly share: number;
+  readonly verdict: PoolVerdict;
+  readonly histogram: Readonly<Record<string, number>>;
 };
 
 export type UnionCeiling = {
@@ -41,7 +66,54 @@ export type UnionCeiling = {
   readonly disagreementShare: number;
   /** The arm that alone answers every question the union answers, or null when none does. */
   readonly dominant: string | null;
+  /** Distinct answers the armed pool produced, which is what decides whether it is a pool. */
+  readonly distinct: UnionDistinct;
 };
+
+/** Middle of a list of counts, averaging the two middles when there is an even number of them. */
+function median(values: readonly number[]): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((left, right) => left - right);
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[middle] as number;
+  return ((sorted[middle - 1] as number) + (sorted[middle] as number)) / 2;
+}
+
+/**
+ * Distinct answers per question, counted from the result keys.
+ *
+ * An arm that produced nothing contributes nothing: a statement that did not run is not an answer,
+ * and counting its absence as one would let a pool of one answer and three errors report four.
+ */
+function distinctOf(cases: readonly UnionCase[], names: readonly string[]): UnionDistinct {
+  const measured = cases.some((item) => item.keys !== undefined);
+  const counts: number[] = [];
+  const histogram: Record<string, number> = {};
+  for (const item of cases) {
+    const seen = new Set<string>();
+    for (const name of names) {
+      const key = item.keys?.[name];
+      if (key !== undefined && key !== null) seen.add(key);
+    }
+    counts.push(seen.size);
+    const bucket = String(seen.size);
+    histogram[bucket] = (histogram[bucket] ?? 0) + 1;
+  }
+  const mid = median(counts);
+  const share = names.length === 0 ? 0 : mid / names.length;
+  return {
+    measured,
+    arms: names.length,
+    mean: counts.length === 0 ? 0 : counts.reduce((sum, count) => sum + count, 0) / counts.length,
+    median: mid,
+    share,
+    // Unmeasured is not a verdict. Reporting `narrow` for a file that predates the field would turn
+    // "we did not look" into "we looked and it collapsed", which is the error this whole stage is
+    // about.
+    verdict: measured ? verdictOf(share) : 'between',
+    histogram,
+  };
+}
 
 export function unionCeiling(
   cases: readonly UnionCase[],
@@ -86,5 +158,6 @@ export function unionCeiling(
     ceilingPp,
     disagreementShare: questions === 0 ? 0 : disagreed / questions,
     dominant,
+    distinct: distinctOf(cases, names),
   };
 }

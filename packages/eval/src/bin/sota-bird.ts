@@ -498,6 +498,14 @@ type CaseOutcome = {
    */
   readonly armSql: Partial<Record<Exclude<ArmName, 'none' | 'full'>, string>>;
   readonly armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>>;
+  /**
+   * The execution result each arm produced, control included.
+   *
+   * The union's ceiling is counted from the booleans above, but a ceiling says nothing about whether
+   * the pool it was computed over contained more than one answer. This field is what allows the
+   * generator pool to be described with the same collapse statistic the sampling pool gets.
+   */
+  readonly arm_keys: Record<string, string | null>;
   readonly armPackChars: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>>;
   /** The claims the `full` arm injected, as text: the input to the relevance audit. */
   readonly injected: readonly string[];
@@ -985,6 +993,14 @@ function scalarOf(dbPath: string, sql: string): number | undefined {
 
 type Judged = {
   readonly sql: string;
+  /**
+   * The execution result as a canonical key, or null when nothing ran.
+   *
+   * Two arms that execute to the same rows produced the same answer, whatever their statements look
+   * like. This is the field that lets the generator pool be described instead of counted: three
+   * procedures that all write a different-looking query executing to one result are a pool of one.
+   */
+  readonly resultKey: string | null;
   /** The configured reading, which is what every published number is scored by. */
   readonly correct: boolean;
   /** The other reading of the same execution, scored in the same run. */
@@ -1062,6 +1078,11 @@ function judgeReply(
   }
   return {
     sql,
+    // `canonicalRows` already sorts the rows and orders the columns, so joining them is an identity
+    // over the multiset: the same answer reached by two statements has one key. A failed execution
+    // has no key at all, deliberately — a statement that did not run is not an answer, and counting
+    // its absence as one would let a pool of one answer and three errors look like a pool of four.
+    resultKey: predicted.ok ? predicted.rows.join('\u0001') : null,
     correct,
     shadowCorrect,
     parseOk,
@@ -3062,6 +3083,7 @@ async function runFold(
     const pick = (arm: ArmName): Judged =>
       judged.get(`${position}:${arm}`) ?? {
         sql: '',
+        resultKey: null,
         correct: false,
         shadowCorrect: false,
         parseOk: false,
@@ -3078,6 +3100,9 @@ async function runFold(
     const armSql: Partial<Record<Exclude<ArmName, 'none' | 'full'>, string>> = {};
     const armPackIds: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
     const armPackChars: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
+    // Keyed by arm name with the control included, because the pool a chooser chooses from contains
+    // the control: a generator that reproduces the direct answer adds a call and no candidate.
+    const armKeys: Record<string, string | null> = { none: base.resultKey };
     for (const plan of plans) {
       if (plan.position !== position) continue;
       if (plan.arm === 'none' || plan.arm === 'full') continue;
@@ -3085,6 +3110,7 @@ async function runFold(
       arms[plan.arm] = result.correct;
       shadowArms[plan.arm] = result.shadowCorrect;
       armSql[plan.arm] = result.sql;
+      armKeys[plan.arm] = result.resultKey;
       armPackIds[plan.arm] = plan.packIds;
       armPackChars[plan.arm] = plan.packChars;
     }
@@ -3123,6 +3149,7 @@ async function runFold(
       latencyMs: full.latencyMs,
       arms,
       shadowArms,
+      arm_keys: armKeys,
       armSql,
       armPackIds,
       armPackChars,
@@ -4080,6 +4107,7 @@ async function main(): Promise<void> {
           measured.map((item) => ({
             id: item.id,
             correct: { none: item.withoutMemoryCorrect, ...item.arms },
+            keys: item.arm_keys,
           })),
           'none',
           ['none', ...generators],
@@ -4093,6 +4121,18 @@ async function main(): Promise<void> {
           ceiling_pp: Number(outcome.ceilingPp.toFixed(2)),
           disagreement_share: Number(outcome.disagreementShare.toFixed(4)),
           dominant: outcome.dominant,
+          // The pool the ceiling was computed over, in the same terms the sampling pool is described
+          // in: distinct execution results per question, and the same bar deciding whether that is a
+          // pool with a choice in it or one answer with several spellings.
+          distinct: {
+            measured: outcome.distinct.measured,
+            arms: outcome.distinct.arms,
+            mean: Number(outcome.distinct.mean.toFixed(3)),
+            median: outcome.distinct.median,
+            share: Number(outcome.distinct.share.toFixed(4)),
+            verdict: outcome.distinct.verdict,
+            histogram: outcome.distinct.histogram,
+          },
         };
       })(),
       /**
