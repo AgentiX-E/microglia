@@ -11,11 +11,12 @@
  * diverse, two from six is collapsed — expressed as a share of the draws taken so the same rule
  * applies to a three-draw run.
  *
- * The second answer is which execution signals are allowed to rank anything. `exec-signature.ts`
- * computes six and refuses to combine them, and this module keeps that refusal: a signal is
- * shortlisted only when its question-clustered **lower bound** clears one half. A point estimate of
- * 0.56 with an interval of [0.47, 0.65] is a coin flip with a decimal point, and eleven iterations of
- * this project have shipped composites whose parts could not be evaluated alone.
+ * The second answer is not this module's. It prices each signal and stops there, deliberately: the
+ * decision of which signal may rank anything lives in `signal-gate.ts`, under a bar that corrects for
+ * the family and floors the standard error. An earlier version of this file kept a `shortlist` of its
+ * own, on a weaker rule — lower bound above one half — which meant one artefact could report a signal
+ * as worth keeping in one line and removed in the next. A decision is computed once or it is two
+ * decisions.
  *
  * The third thing this module does is refuse. Between the two bars the verdict is `between`, which
  * is not a softened `narrow` — it is the statement that the measurement does not decide the question,
@@ -61,8 +62,6 @@ export type PoolReport = {
    * verdict means they produced several and they are all the same.
    */
   readonly ceilingPp: number;
-  /** Signals whose interval excludes one half, in the order they were read. */
-  readonly shortlist: readonly string[];
 };
 
 /**
@@ -90,10 +89,5 @@ export function poolReport(
     verdict,
     distinctShare,
     ceilingPp,
-    // Strictly above one half on the lower bound. The baseline is not shortlisted even if it clears,
-    // because it is the thing every signal is measured against.
-    shortlist: signals
-      .filter((reading) => reading.signal !== 'draw-order' && reading.aucLow > 0.5)
-      .map((reading) => reading.signal),
   };
 }

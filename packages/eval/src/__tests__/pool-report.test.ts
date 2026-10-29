@@ -74,10 +74,10 @@ describe('poolReport', () => {
     expect(three.verdict).toBe('wide');
   });
 
-  it('shortlists only the signals whose interval clears chance', () => {
-    // The R7.2a gate: a signal enters the composite only when its question-clustered lower bound is
-    // above one half. A point estimate above one half with an interval that straddles it is a coin
-    // flip with a decimal point.
+  it('prices every signal and licenses none of them', () => {
+    // The decision of which signal may rank anything belongs to `signal-gate.ts`, which corrects for
+    // the family and floors the standard error. A second verdict here would be a second rule, and the
+    // artefact would carry two answers to one question.
     const questions = [
       question('q1', [0, 1], [false, true]),
       question('q2', [0, 1], [false, true]),
@@ -85,11 +85,16 @@ describe('poolReport', () => {
       question('q4', [0, 1], [false, true]),
     ];
     const report = poolReport(questions, 2);
-    for (const signal of report.shortlist) {
-      const reading = report.signals.find((entry) => entry.signal === signal);
-      expect(reading?.aucLow).toBeGreaterThan(0.5);
-    }
-    expect(report.shortlist).not.toContain('duplicate-share');
+    expect(report.signals.map((entry) => entry.signal)).toEqual([
+      'draw-order',
+      'empty',
+      'row-shape',
+      'column-shape',
+      'null-share',
+      'duplicate-share',
+      'value-type',
+    ]);
+    expect('shortlist' in report).toBe(false);
   });
 
   it('reports the ceiling the pool offers, in points, as the share of questions it could move', () => {

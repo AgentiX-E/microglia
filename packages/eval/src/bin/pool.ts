@@ -58,10 +58,12 @@ function main(): void {
         `[${reading.aucLow.toFixed(3)}, ${reading.aucHigh.toFixed(3)}], ${reading.pairs} pair(s)\n`,
     );
   }
+  // No verdict here on purpose. Which of these may rank anything is decided once, by the gate step
+  // that runs next, under a bar that corrects for six tests and floors the standard error. A second
+  // verdict printed from this file could disagree with it, and a reader would have no way to tell
+  // which one the project meant.
   process.stdout.write(
-    report.shortlist.length === 0
-      ? '[pool] no signal clears one half on its lower bound, so no composite may be built from them\n'
-      : `[pool] shortlist ${report.shortlist.join(', ')} (lower bound above one half)\n`,
+    '[pool] the signals above are priced, not licensed: the gate step decides which may rank anything\n',
   );
 }
 
