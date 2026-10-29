@@ -54,6 +54,18 @@ describe('poolFromArtifact', () => {
     expect(pool.questions.map((question) => question.id)).toEqual(['q1']);
   });
 
+  it('distinguishes a file that never had the field from a run that produced no pool', () => {
+    // Both yield no questions and they mean different things. The commands print different lines
+    // because of this flag, and a reader deciding what to dispatch next needs to know which one they
+    // are looking at.
+    const old = poolFromArtifact([{ id: 'old', question: 'How many?' }], []);
+    const empty = poolFromArtifact([{ id: 'new', question: 'How many?', pool: null }], []);
+    expect(old.recorded).toBe(false);
+    expect(empty.recorded).toBe(true);
+    expect(old.questions).toEqual([]);
+    expect(empty.questions).toEqual([]);
+  });
+
   it('skips a case written before the field existed instead of throwing on it', () => {
     // The artefact this lane most needs to re-read is an old one: a file written before R7.0 has no
     // `pool` key at all, and a reader that assumes the key exists would make every past run

@@ -34,10 +34,13 @@ function main(): void {
   const artifact = JSON.parse(
     readFileSync(join(RESULTS, 'poc-sota-bird.json'), 'utf8'),
   ) as Artifact;
-  const { questions } = poolFromArtifact(artifact.per_case, artifact.config?.arms ?? []);
+  const { questions, recorded } = poolFromArtifact(artifact.per_case, artifact.config?.arms ?? []);
   if (questions.length === 0) {
     process.stdout.write(
-      '[signals] no pool in this artefact: the gate needs candidates, and this run produced none\n',
+      recorded
+        ? '[signals] no pool in this artefact: the gate needs candidates, and this run produced none\n'
+        : '[signals] this artefact predates the pool field: no signal can be gated on a pool the run ' +
+          'could not record\n',
     );
     return;
   }

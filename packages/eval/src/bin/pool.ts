@@ -29,10 +29,16 @@ function main(): void {
   const artifact = JSON.parse(
     readFileSync(join(RESULTS, 'poc-sota-bird.json'), 'utf8'),
   ) as Artifact;
-  const { questions, draws } = poolFromArtifact(artifact.per_case, artifact.config?.arms ?? []);
+  const { questions, draws, recorded } = poolFromArtifact(
+    artifact.per_case,
+    artifact.config?.arms ?? [],
+  );
   if (questions.length === 0) {
     process.stdout.write(
-      '[pool] no pool in this artefact: none of the sampling arms ran, so there is nothing to describe\n',
+      recorded
+        ? '[pool] no pool in this artefact: no sampling arm ran, so there is nothing to describe\n'
+        : '[pool] this artefact predates the pool field: the run could not have recorded candidates, ' +
+          'and nothing here is a reading of the pool\n',
     );
     return;
   }

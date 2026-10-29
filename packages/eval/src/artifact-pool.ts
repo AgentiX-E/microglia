@@ -39,6 +39,15 @@ export type ArtifactPoolCase = {
 export type ArtifactPool = {
   readonly questions: readonly PoolQuestion[];
   readonly draws: number;
+  /**
+   * Whether the file carries the field at all.
+   *
+   * A file written before R7.0 has no `pool` key anywhere; a file from a run without a sampling arm
+   * has the key and null in it. Both produce no questions, and they mean different things: the first
+   * is "we never looked", the second is "we looked and there was nothing". A reader that merges them
+   * turns an absence of instrumentation into a finding about the pool.
+   */
+  readonly recorded: boolean;
 };
 
 /**
@@ -86,5 +95,9 @@ export function poolFromArtifact(
       candidates,
     });
   }
-  return { questions, draws: drawsOf(arms) };
+  return {
+    questions,
+    draws: drawsOf(arms),
+    recorded: cases.some((entry) => entry.pool !== undefined),
+  };
 }
