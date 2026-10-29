@@ -72,7 +72,16 @@ export {
   type UnionCeiling,
   type UnionDistinct,
 } from './union.js';
-export { storeReport, type StoreRun, type StoreTotals } from './store-report.js';
+export {
+  discriminationOf,
+  ruleLedger,
+  storeReport,
+  type Discrimination,
+  type InjectedCase,
+  type RuleLedgerEntry,
+  type StoreRun,
+  type StoreTotals,
+} from './store-report.js';
 export {
   drawsOf,
   poolFromArtifact,

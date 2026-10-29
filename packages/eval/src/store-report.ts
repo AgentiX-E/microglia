@@ -126,3 +126,112 @@ export function storeReport(runs: readonly StoreRun[]): StoreTotals {
     perRun: runs,
   };
 }
+
+/**
+ * One case, reduced to what a rule ledger needs.
+ *
+ * `packIdList` is the ids of the rules the pack carried, in the order the prompt received them;
+ * `injected` is their text. Both are needed: the id is the key a rule is counted under, and the text
+ * is what a reader has to see to know what the count is about.
+ */
+export type InjectedCase = {
+  readonly id: string;
+  readonly injected: readonly string[];
+  readonly packIdList?: readonly string[];
+  readonly correct: boolean;
+  readonly withoutMemoryCorrect: boolean;
+};
+
+/** What one rule did, over every question it was shown on. */
+export type RuleLedgerEntry = {
+  readonly id: string;
+  readonly text: string;
+  /** Questions the rule was injected into. */
+  readonly shown: number;
+  /** Of those, the questions the treatment got right and the control got wrong. */
+  readonly helped: number;
+  /** Of those, the reverse. */
+  readonly harmed: number;
+};
+
+export type Discrimination = {
+  readonly rules: number;
+  /** Rule-injections: a rule shown twice counts twice. */
+  readonly injections: number;
+  /** Flip attributions, not rules. */
+  readonly helped: number;
+  readonly harmed: number;
+  /** Rules that moved at least one answer in one direction more than the other. */
+  readonly discriminating: number;
+  /** Share of rules that never moved an answer. */
+  readonly inertShare: number;
+  /**
+   * How many rules shared an injection on average.
+   *
+   * Attribution is not exclusive: a flip is credited to every rule that was in the prompt, so the
+   * count of discriminating rules is an upper bound on the number of distinct causes rather than a
+   * decomposition of the effect. A pack of two rules cannot be decomposed by this instrument at all.
+   */
+  readonly rulesPerInjection: number;
+  /** Cases with rules but no usable ids, which contribute nothing and are not silently dropped. */
+  readonly unkeyed: number;
+};
+
+/**
+ * Every rule's record, built from the flips that happened while it was in the prompt.
+ *
+ * A flip is a question where the treatment and the control disagreed. A rule shown only on questions
+ * both got right is *inert* here, and inert is the majority case — which is the whole reason this
+ * ledger exists: the accuracy delta of a pack is the sum of a few flips and a large silence, and the
+ * silence is invisible in every number the artefact has carried until now.
+ */
+export function ruleLedger(cases: readonly InjectedCase[]): readonly RuleLedgerEntry[] {
+  const entries = new Map<string, { text: string; shown: number; helped: number; harmed: number }>();
+  for (const entry of cases) {
+    if (!usablePack(entry)) continue;
+    for (const [at, id] of (entry.packIdList as readonly string[]).entries()) {
+      const record = entries.get(id) ?? { text: '', shown: 0, helped: 0, harmed: 0 };
+      entries.set(id, {
+        // `usablePack` guarantees the two lists have the same length, so the text is always there;
+        // a fallback to the previous text would be a branch no test could take.
+        text: entry.injected[at] as string,
+        shown: record.shown + 1,
+        helped: record.helped + (entry.correct && !entry.withoutMemoryCorrect ? 1 : 0),
+        harmed: record.harmed + (!entry.correct && entry.withoutMemoryCorrect ? 1 : 0),
+      });
+    }
+  }
+  return [...entries.entries()].map(([id, record]) => ({ id, ...record }));
+}
+
+/** A case is usable only when every id has a text; a partial pack has no reliable key for the rest. */
+function usablePack(entry: InjectedCase): boolean {
+  const ids = entry.packIdList;
+  return ids !== undefined && ids.length > 0 && ids.length === entry.injected.length;
+}
+
+/** The distribution of what the injected rules did, which is the question the deltas cannot answer. */
+export function discriminationOf(cases: readonly InjectedCase[]): Discrimination {
+  const ledger = ruleLedger(cases);
+  let injections = 0;
+  let helped = 0;
+  let harmed = 0;
+  let discriminating = 0;
+  for (const entry of ledger) {
+    injections += entry.shown;
+    helped += entry.helped;
+    harmed += entry.harmed;
+    if (entry.helped !== entry.harmed) discriminating += 1;
+  }
+  const unkeyed = cases.filter((entry) => entry.injected.length > 0 && !usablePack(entry)).length;
+  return {
+    rules: ledger.length,
+    injections,
+    helped,
+    harmed,
+    discriminating,
+    inertShare: shareOf(ledger.length - discriminating, ledger.length),
+    rulesPerInjection: shareOf(injections, cases.length - unkeyed),
+    unkeyed,
+  };
+}

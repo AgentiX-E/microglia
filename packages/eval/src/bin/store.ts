@@ -11,9 +11,9 @@
  * runs, and one run is a sample of it. Archived runs are included deliberately: an analysis that
  * quietly used only the newest file would be reporting the last run's luck.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { storeReport, type StoreRun } from '@agentix-e/microglia-eval';
+import { discriminationOf, storeReport, type InjectedCase, type StoreRun } from '@agentix-e/microglia-eval';
 
 type AttributionArtifact = {
   readonly id?: string;
@@ -26,6 +26,12 @@ type AttributionArtifact = {
     readonly neutral?: number;
     readonly harmfulShare?: number;
   };
+};
+
+type PoolArtifact = {
+  readonly source_generated_at?: string;
+  readonly generated_at?: string;
+  readonly per_case: readonly InjectedCase[];
 };
 
 const RESULTS = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 'results');
@@ -97,6 +103,22 @@ function main(): void {
         `harmful instances ${(entry.harmfulInstanceShare * 100).toFixed(1)}%\n`,
     );
   }
+
+  // The same question one level down, from the artefact that carries every injected rule's text and
+  // id beside the outcome it produced. The summary above counts rules the distiller kept; this
+  // counts what happened to the ones that were shown, and the difference is the silence.
+  const poolPath = join(RESULTS, 'poc-sota-bird.json');
+  if (!existsSync(poolPath)) return;
+  const artifact = JSON.parse(readFileSync(poolPath, 'utf8')) as PoolArtifact;
+  const reading = discriminationOf(artifact.per_case);
+  if (reading.rules === 0) return;
+  process.stdout.write(
+    `[store] newest run ${artifact.generated_at ?? 'undated'}: ${reading.rules} rule(s) shown ` +
+      `${reading.injections} time(s), ${reading.rulesPerInjection.toFixed(2)} per injection\n` +
+      `[store] ${(reading.inertShare * 100).toFixed(1)}% of them never moved an answer; the ` +
+      `${reading.discriminating} that did account for ${reading.helped} repaired attribution(s) and ` +
+      `${reading.harmed} broken ones\n`,
+  );
 }
 
 main();

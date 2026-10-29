@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { storeReport, type StoreRun } from '../store-report.js';
+import {
+  discriminationOf,
+  ruleLedger,
+  storeReport,
+  type InjectedCase,
+  type StoreRun,
+} from '../store-report.js';
 
 function run(over: Partial<StoreRun> = {}): StoreRun {
   return {
@@ -122,5 +128,99 @@ describe('storeReport', () => {
     const report = storeReport([run({ id: 'b' }), run({ id: 'a' })]);
     expect(report.perRun.map((entry) => entry.id)).toEqual(['b', 'a']);
     expect(report.runs).toBe(2);
+  });
+});
+
+function injectedCase(over: Partial<InjectedCase> = {}): InjectedCase {
+  return {
+    id: 'q1',
+    injected: ['rule a'],
+    packIdList: ['a'],
+    correct: true,
+    withoutMemoryCorrect: false,
+    ...over,
+  };
+}
+
+describe('ruleLedger', () => {
+  it('credits a rule with the flips that happened while it was in the prompt', () => {
+    const ledger = ruleLedger([
+      injectedCase(),
+      injectedCase({ id: 'q2', correct: false, withoutMemoryCorrect: true }),
+      injectedCase({ id: 'q3', correct: true, withoutMemoryCorrect: true }),
+    ]);
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0]?.shown).toBe(3);
+    expect(ledger[0]?.helped).toBe(1);
+    expect(ledger[0]?.harmed).toBe(1);
+  });
+
+  it('keeps a rule that never changed an answer, because most of them never do', () => {
+    // The point of the ledger is that inertness is the common case and has to be countable: a rule
+    // shown on three questions the control already answered right is not evidence of anything, and
+    // dropping it from the ledger would make the store look more decisive than it is.
+    const ledger = ruleLedger([
+      injectedCase({ id: 'q1', correct: true, withoutMemoryCorrect: true }),
+      injectedCase({ id: 'q2', correct: true, withoutMemoryCorrect: true }),
+    ]);
+    expect(ledger[0]?.helped).toBe(0);
+    expect(ledger[0]?.harmed).toBe(0);
+    expect(ledger[0]?.shown).toBe(2);
+  });
+
+  it('carries the last text it saw, so a reader can read the rule the count is about', () => {
+    const ledger = ruleLedger([
+      injectedCase({ id: 'q1', injected: ['early'], correct: true }),
+      injectedCase({ id: 'q2', injected: ['late'], correct: false, withoutMemoryCorrect: true }),
+    ]);
+    expect(ledger[0]?.text).toBe('late');
+  });
+
+  it('counts a case it cannot key rather than inventing an id for it', () => {
+    // Without the ids there is no way to tell which rule a flip belongs to, and a synthesised id
+    // would credit a rule that does not exist with an effect that may not be its.
+    expect(ruleLedger([injectedCase({ packIdList: undefined })])).toEqual([]);
+    expect(discriminationOf([injectedCase({ packIdList: undefined })]).unkeyed).toBe(1);
+  });
+
+  it('reports ids and texts that disagree in length as unkeyed, not as a partial pack', () => {
+    const cases = [injectedCase({ injected: ['a', 'b'], packIdList: ['a'] })];
+    expect(ruleLedger(cases)).toEqual([]);
+    expect(discriminationOf(cases).unkeyed).toBe(1);
+  });
+});
+
+describe('discriminationOf', () => {
+  it('separates the rules that moved an answer from the rules that did not', () => {
+    const reading = discriminationOf([
+      injectedCase({ id: 'q1', packIdList: ['a'], correct: true }),
+      injectedCase({ id: 'q2', packIdList: ['a'], correct: true }),
+      injectedCase({ id: 'q3', packIdList: ['b'], correct: true, withoutMemoryCorrect: true }),
+      injectedCase({ id: 'q4', packIdList: ['c'], correct: true, withoutMemoryCorrect: true }),
+    ]);
+    expect(reading.rules).toBe(3);
+    expect(reading.discriminating).toBe(1);
+    expect(reading.inertShare).toBeCloseTo(2 / 3, 10);
+    expect(reading.helped).toBe(2);
+    expect(reading.harmed).toBe(0);
+  });
+
+  it('says how many rules share one injection, because attribution is not exclusive', () => {
+    // Two rules in one pack: a flip is credited to both, so the count of discriminating rules is an
+    // upper bound on the number of distinct causes. Saying so in the reading is what keeps it from
+    // being read as a decomposition.
+    const reading = discriminationOf([
+      injectedCase({ id: 'q1', packIdList: ['a', 'b'], injected: ['x', 'y'], correct: true }),
+      injectedCase({ id: 'q2', packIdList: ['a', 'b'], injected: ['x', 'y'], correct: true }),
+    ]);
+    expect(reading.rulesPerInjection).toBe(2);
+    expect(reading.injections).toBe(4);
+  });
+
+  it('reports zero shares for an empty ledger rather than dividing by nothing', () => {
+    const reading = discriminationOf([]);
+    expect(reading.rules).toBe(0);
+    expect(reading.inertShare).toBe(0);
+    expect(reading.rulesPerInjection).toBe(0);
   });
 });
