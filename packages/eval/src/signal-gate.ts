@@ -148,29 +148,27 @@ export function gateOf(readings: readonly PoolSignalReading[]): readonly SignalV
     (reading): reading is PoolSignalReading & { signal: SignalName } =>
       reading.signal !== 'draw-order',
   );
-  const pvalues = measured.map((reading) => {
+  // Standardised once, then corrected. Computing z twice — once for the p-value and once for the
+  // verdict — is how the two get to disagree after somebody edits one of them.
+  const standardised = measured.map((reading) => {
     const se = seOf(reading);
+    // No standard error means nothing on one side of the comparison; a z of zero says "no evidence"
+    // rather than dividing by it and reporting an infinity.
     const z = se === 0 ? 0 : (reading.auc - 0.5) / se;
-    return normalUpper(z);
+    return { reading, se, z, p: normalUpper(z) };
   });
-  const adjusted = holmAdjust(pvalues);
-  return measured.map((reading, at) => {
-    const se = seOf(reading);
-    const z = se === 0 ? 0 : (reading.auc - 0.5) / se;
-    const p = pvalues[at] as number;
-    const holm = adjusted[at] as number;
-    return {
-      signal: reading.signal,
-      auc: reading.auc,
-      se,
-      z,
-      p,
-      holm,
-      // Strictly above both bars. A z of exactly two is the boundary the bar was written on, and
-      // rounding it in would be reading the criterion as "at least" after seeing the number.
-      survives: z > Z_BAR && holm < ALPHA,
-    };
-  });
+  const adjusted = holmAdjust(standardised.map((entry) => entry.p));
+  return standardised.map((entry, at) => ({
+    signal: entry.reading.signal,
+    auc: entry.reading.auc,
+    se: entry.se,
+    z: entry.z,
+    p: entry.p,
+    holm: adjusted[at] as number,
+    // Strictly above both bars. A z of exactly two is the boundary the bar was written on, and
+    // rounding it in would be reading the criterion as "at least" after seeing the number.
+    survives: entry.z > Z_BAR && (adjusted[at] as number) < ALPHA,
+  }));
 }
 
 /**
