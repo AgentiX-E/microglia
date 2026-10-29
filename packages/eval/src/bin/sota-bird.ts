@@ -4067,7 +4067,12 @@ async function main(): Promise<void> {
        */
       union: (() => {
         const measured = folds.flatMap((fold) => fold.cases);
-        const generators = ['gen-plan', 'gen-decompose'].filter((arm) =>
+        // Every arm that changes how the statement is produced, which is what a generator is here.
+        // `m-schema` belongs in the list even though its effect is published as a single-cell delta:
+        // it is a second representation of the same question, so on the questions where the DDL
+        // prompt misreads a table it can be the only arm that answers, and a chooser would have it
+        // to pick. Criterion 6 guards the case where it is the whole pool on its own.
+        const generators = ['gen-plan', 'gen-decompose', 'm-schema'].filter((arm) =>
           measured.some((item) => arm in item.arms),
         );
         if (generators.length === 0) return null;
