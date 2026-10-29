@@ -228,6 +228,18 @@ jobs:
             echo "no artefact, so no signals to gate"
           fi
 
+      # R7.1's ceiling, read off the artefact: three generators, the union over them, and the three
+      # bars that were fixed before the dispatch. It exits zero when a bar is refuted, because a
+      # refuted bar is the stage's result and not a broken step.
+      - name: Price the generator pool
+        if: always()
+        run: |
+          if [ -f eval/results/poc-sota-bird.json ]; then
+            pnpm eval:union
+          else
+            echo "no artefact, so no generator pool to price"
+          fi
+
       # The re-score runs on the answers this job just produced, which is the point: the
       # model is not asked anything new, only a different criterion is applied to what it
       # already said. It sits before the publish step so a failure here is visible in the

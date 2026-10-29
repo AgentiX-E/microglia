@@ -26,7 +26,14 @@ export type ArtifactPoolCase = {
   readonly id: string;
   readonly question: string;
   readonly evidence?: string;
-  readonly pool: readonly ArtifactPoolCandidate[] | null;
+  /**
+   * The candidates, or null when no sampling arm ran.
+   *
+   * Optional as well as nullable because an artefact written before this field existed is exactly
+   * the thing a re-analysis reads: the reading has to say "this run has no pool" about a file that
+   * predates the field, not throw on it.
+   */
+  readonly pool?: readonly ArtifactPoolCandidate[] | null;
 };
 
 export type ArtifactPool = {
@@ -65,8 +72,9 @@ export function poolFromArtifact(
 ): ArtifactPool {
   const questions: PoolQuestion[] = [];
   for (const entry of cases) {
-    if (entry.pool === null || entry.pool.length === 0) continue;
-    const candidates: PoolCandidate[] = entry.pool.map((candidate) => ({
+    const recorded = entry.pool ?? null;
+    if (recorded === null || recorded.length === 0) continue;
+    const candidates: PoolCandidate[] = recorded.map((candidate) => ({
       draw: candidate.draw,
       correct: candidate.correct,
       resultKey: candidate.resultKey,

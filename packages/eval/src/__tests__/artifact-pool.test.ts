@@ -54,6 +54,15 @@ describe('poolFromArtifact', () => {
     expect(pool.questions.map((question) => question.id)).toEqual(['q1']);
   });
 
+  it('skips a case written before the field existed instead of throwing on it', () => {
+    // The artefact this lane most needs to re-read is an old one: a file written before R7.0 has no
+    // `pool` key at all, and a reader that assumes the key exists would make every past run
+    // unanalysable by the measurement that was built to analyse them.
+    const pool = poolFromArtifact([{ id: 'old', question: 'How many?' }], ['sample-5-first']);
+    expect(pool.questions).toEqual([]);
+    expect(pool.draws).toBe(5);
+  });
+
   it('recomputes the question shape from the text rather than reading an interpretation', () => {
     const pool = poolFromArtifact([row({ question: 'How many accounts are there?' })], []);
     expect(pool.questions[0]?.shape.wantsCount).toBe(true);
