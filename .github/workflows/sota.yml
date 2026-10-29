@@ -20,9 +20,9 @@ on:
         required: false
         default: '5'
       max_calls:
-        description: 'Hard model-call budget'
+        description: 'Hard model-call budget; the lane forecasts the remaining folds and stops early rather than discarding a run'
         required: false
-        default: '4000'
+        default: '8000'
       generalize:
         description: 'Scope widening during distillation (false = ablation)'
         required: false
@@ -179,7 +179,7 @@ jobs:
           SOTA_RESAMPLES: '10000'
           SOTA_SAMPLE_TEMPERATURE: ${{ github.event.inputs.sample_temperature || '0.7' }}
           SOTA_TRANSFER_TARGETS: ${{ github.event.inputs.transfer_targets || '4' }}
-          POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '4000' }}
+          POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '8000' }}
         run: pnpm eval:sota
 
       - name: Attribute the flips to rules
@@ -187,6 +187,17 @@ jobs:
         run: |
           if [ -f eval/results/poc-sota-bird.json ]; then
             pnpm eval:attribute
+          elif [ -f eval/results/poc-sota-bird.partial.json ]; then
+            # The lane stopped before it could measure, and said why. Reporting that reason
+            # here is the difference between a run whose cause is on screen and one whose
+            # cause is forty-seven minutes into a log nobody scrolls to.
+            node -e "
+              const r = require('./eval/results/poc-sota-bird.partial.json');
+              console.log('::error::the lane stopped before measuring: ' + r.reason +
+                ' (spent ' + r.spent + ' of ' + r.cap + ', ' +
+                r.folds_completed + '/' + r.folds_planned + ' folds complete)');
+              process.exit(1);
+            "
           else
             echo "::error::no artefact: the attribution step cannot run"
             exit 1
@@ -273,6 +284,19 @@ jobs:
             eval/results/poc-sota-bird.json
             eval/results/poc-sota-attribution.json
           if-no-files-found: error
+
+      # Not evidence, and named so nobody reads it as evidence: when the budget stops a run,
+      # the folds that finished are still a measurement of what a fold costs, which is what
+      # sizes the next dispatch. The step stays optional because a run that completes has no
+      # partial record to carry, and failing there would punish the good case.
+      - name: Upload the partial record of a stopped run
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sota-bird-partial
+          path: eval/results/poc-sota-bird.partial.json
+          if-no-files-found: ignore
+          retention-days: 7
 
       # A separate step because `if-no-files-found: error` is the right default and the
       # wrong one here: the adjudication only runs when it was asked for, and folding it

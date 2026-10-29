@@ -7,6 +7,12 @@
  */
 export { comparePaired, type PairedResult } from './stats.js';
 export {
+  forecastBudget,
+  type BudgetForecast,
+  type BudgetLedger,
+  type FoldSpend,
+} from './call-budget.js';
+export {
   linkSchema,
   questionTokens,
   schemaBlocks,

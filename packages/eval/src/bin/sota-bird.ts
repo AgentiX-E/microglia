@@ -56,7 +56,7 @@
  *  - `SOTA_SEED`       bootstrap and memory seed; default 7
  *  - `SOTA_GENERALIZE` `false` to distil without scope widening (ablation)
  *  - `SOTA_RESAMPLES`  bootstrap resamples; default 10000, per the protocol
- *  - `POC_MAX_CALLS`   hard call budget; default 4000
+ *  - `POC_MAX_CALLS`   hard call budget; default 8000, sized from a measured five-fold run
  */
 import { writeJson } from './lib.js';
 import { execFileSync } from 'node:child_process';
@@ -109,6 +109,7 @@ import {
   choicePrompt,
   choicePromptWithResults,
   failureKind,
+  forecastBudget,
   interleaveByKey,
   judgeScalar,
   linkSchema,
@@ -194,7 +195,7 @@ const SAMPLE_TEMPERATURE = nonNegative(process.env['SOTA_SAMPLE_TEMPERATURE'], 0
 const GENERALIZE = (process.env['SOTA_GENERALIZE'] ?? 'true') !== 'false';
 const RESAMPLES = Math.max(1000, Math.trunc(nonNegative(process.env['SOTA_RESAMPLES'], 10_000)));
 const MODEL = process.env['SOTA_MODEL'] ?? 'deepseek-chat';
-const MAX_CALLS = nonNegative(process.env['POC_MAX_CALLS'], 4000);
+const MAX_CALLS = nonNegative(process.env['POC_MAX_CALLS'], 8000);
 
 /**
  * How many model calls are in flight at once.
@@ -3240,9 +3241,80 @@ async function main(): Promise<void> {
     FOLDS,
   );
 
+  /**
+   * What each fold cost, and the checkpoint that stops the run before it repeats a mistake.
+   *
+   * The lane used to discover its ceiling by hitting it. Four folds of an S2 dispatch completed,
+   * the fifth threw at call 4,197 of 4,200, and the publish step found no artefact: forty-seven
+   * minutes of calls discarded, from a configuration wrong by a factor of 1.5 that no part of the
+   * run could see coming. Between folds is the only place where the answer exists — the folds that
+   * just ran are a sample of the folds that are left — so each fold's spend is recorded, forecast
+   * against the ceiling, and a run that cannot finish writes down what it has before it stops.
+   *
+   * The partial artefact is not a substitute for the real one and is never published as evidence:
+   * it exists so that a budget stop costs minutes instead of the whole run, and so the next
+   * dispatch can be sized from measurements rather than from a guess.
+   */
   const folds: FoldResult[] = [];
+  const spend: { fold: number; calls: number }[] = [];
+  const writeBudgetStop = async (reason: string, callsInFlightFold: number): Promise<void> => {
+    await writeJson('poc-sota-bird.partial', {
+      partial: true,
+      reason,
+      cap: MAX_CALLS,
+      spent: llm.stats.calls,
+      folds_completed: folds.length,
+      folds_planned: FOLDS,
+      calls_in_flight_fold: callsInFlightFold,
+      per_fold: folds.map((fold, index) => ({
+        fold: fold.fold,
+        calls: spend[index]?.calls ?? 0,
+        eval: fold.eval,
+        learn: fold.learn,
+        active: fold.activeRules,
+      })),
+      arms: [...ARMS].sort(),
+      generated_at: new Date().toISOString(),
+    });
+  };
   for (let fold = 0; fold < FOLDS; fold += 1) {
-    folds.push(await runFold(fold, rows, foldOf, dataset, task));
+    const before = llm.stats.calls;
+    try {
+      folds.push(await runFold(fold, rows, foldOf, dataset, task));
+    } catch (error) {
+      if (!(error instanceof MicrogliaError) || error.code !== 'MG_E_BUDGET_EXCEEDED') throw error;
+      // The fold in flight is lost either way; what the completed folds measured is not.
+      await writeBudgetStop(
+        `fold ${fold + 1}/${FOLDS} ran out of calls at ${llm.stats.calls} of ${MAX_CALLS}`,
+        llm.stats.calls - before,
+      );
+      throw error;
+    }
+    spend.push({ fold, calls: llm.stats.calls - before });
+    const forecast = forecastBudget({
+      spent: llm.stats.calls,
+      cap: MAX_CALLS,
+      folds: spend,
+      totalFolds: FOLDS,
+    });
+    if (!forecast.ok) {
+      process.stdout.write(
+        `[sota] budget forecast after fold ${fold + 1}/${FOLDS}: the run needs about ` +
+          `${forecast.projected} calls, the cap is ${MAX_CALLS} (short by ${forecast.shortfall})\n`,
+      );
+      await writeBudgetStop(
+        `the remaining ${FOLDS - spend.length} folds cost about ` +
+          `${forecast.projected - llm.stats.calls} more calls at the dearest fold's price, ` +
+          `which the cap of ${MAX_CALLS} cannot cover`,
+        0,
+      );
+      throw new MicrogliaError('MG_E_BUDGET_EXCEEDED', 'the configured cap cannot finish the folds', {
+        cap: MAX_CALLS,
+        spent: llm.stats.calls,
+        projected: forecast.projected,
+        shortfall: forecast.shortfall,
+      });
+    }
   }
 
   const cases = folds.flatMap((fold) => fold.cases);
