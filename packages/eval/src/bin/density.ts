@@ -166,6 +166,22 @@ function main(): void {
     for (const row of transfer.strata) process.stdout.write(transferLine(row.kind, row));
     process.stdout.write(transferLine('all', transfer.overall));
   }
+  // R10: whether the rule was shown as a sentence or as a template bound to the target schema, and
+  // what the binder could not bind. A withheld share above 60% is the stage's own kill condition, so
+  // it is printed before the rates rather than left for a reader to divide.
+  if (report.templates !== undefined) {
+    const templates = report.templates;
+    process.stdout.write(
+      `[density] templates: ${templates.bound} bound + ${templates.slotless} slotless shown, ` +
+        `${templates.withheld} withheld (${(templates.withheldShare * 100).toFixed(1)}%) over ` +
+        `${templates.rules} rule(s)\n`,
+    );
+    for (const blocker of templates.blockers.slice(0, 8)) {
+      process.stdout.write(
+        `[density] templates: ${blocker.kind} '${blocker.name}' stopped ${blocker.attempts} attempt(s)\n`,
+      );
+    }
+  }
   // R9.5: how many observations a rule needs before the policy may believe its sign.
   for (const row of report.evidence ?? []) process.stdout.write(evidenceLine(row));
   const ledger = artifact.metrics?.density_ledger?.length ?? 0;

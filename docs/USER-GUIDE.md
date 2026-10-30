@@ -964,6 +964,42 @@ cell's — and the dev row can be `reproduced`. A run on the right 1,534 questio
 different split name stays `indicative` forever, which is why `splitNameOf('dev')` is asserted
 against the catalogue in `artefacts.test.ts` rather than written in a comment.
 
+### 13.2 Showing a rule where its words do not exist
+
+A rule is stored as a sentence: *"`price` is stored as text, cast it before comparing."* On the
+question that produced it, every word has a referent. On a question from another database, the
+sentence is still a sentence — and `price` may be `unit_price`, or `prize`, or nothing at all. The
+lane measures both forms:
+
+| `SOTA_TEMPLATE` | What the model is shown | When to use it |
+|---|---|---|
+| `prose` (default) | the statement as distilled | the incumbent form; every measurement before R10 used it |
+| `bound` | the statement read as a template, its schema identifiers replaced by the **target** database's names | testing whether a rule travels as structure rather than as wording |
+
+Under `bound`, the rule's identifiers that its *own* database has become slots, the rest of the
+sentence stays, and each slot is filled from the schema the rule is about to meet:
+
+```
+stored     Cast price to real when price is text
+template   Cast {price} to real when {price} is text
+shown      Cast unit_price to real when unit_price is text
+```
+
+A substitution is accepted on the Jaccard overlap of the two names' `snake_case` parts — identity
+scores 1, `price` → `unit_price` scores 0.5 — and nothing below 0.5 is bound, so `price` is never
+turned into `prize`. The binding is all or nothing per rule: one slot with no referent withholds the
+rule instead of showing it with `{price}` still in it. Withheld attempts make no call, are counted,
+and `V28` checks that the count reconciles with the ledger.
+
+```bash
+SOTA_TEMPLATE=bound SOTA_DENSITY_PANEL=20 SOTA_TRANSFER_PANEL=10 pnpm eval:sota
+pnpm eval:density    # prints the binding record before the rates
+```
+
+The reading this produces is deliberately narrow: it says whether a rule is obeyed more and broken
+less when its slots are bound, not whether templates are a good idea in general. `prereg/` carries
+the prediction and the refutation that were written before the run.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

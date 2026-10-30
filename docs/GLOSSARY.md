@@ -351,3 +351,18 @@ without memory carries no signal for a transfer experiment, and kept on `dev` be
 rewritten, because a row in the comparison table is only honest while the artefact behind it is in the
 repository to be recomputed. `chooseArtefact` resolves which one a downstream command reads, and
 `SOTA_ARTEFACT` overrides it.
+
+**Template slot** — An identifier in a rule's statement that the rule's *own* database has, lifted out
+of the sentence: `Cast {price} to real when {price} is text`. The structure is what survives a
+database boundary; the slot is the part that has to be replaced. A rule with no such identifier is
+*slotless* and travels as prose, because there is nothing in it a binding could touch.
+
+**Binding** — Filling a template's slots from the schema of the database the rule is about to be
+shown in, by the Jaccard overlap of the two names' `snake_case` parts (identity 1, `price` →
+`unit_price` 0.5, nothing below 0.5). Ties go to the shorter name. Two slots never bind to one
+candidate, and a slot with no candidate withholds the rule.
+
+**Withheld** — A rule the binder refused to show because at least one slot had no referent in the
+target schema. A withheld attempt makes no model call, contributes no trial, and is counted: `V28`
+holds `bound + slotless` equal to the rule-database pairs the foreign ledger carries, so a rule that
+vanishes is visible as a defect rather than plausible as a result.

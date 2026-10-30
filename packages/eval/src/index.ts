@@ -556,6 +556,25 @@ export {
 } from './density.js';
 
 export {
+  bindTemplate,
+  injectionFormOf,
+  nameScore,
+  templateCoverage,
+  templateOf,
+  transferStatement,
+  type Binding,
+  type BoundSlot,
+  type InjectionForm,
+  type RuleTemplate,
+  type SchemaNames,
+  type SlotKind,
+  type TemplateAttempt,
+  type TemplateCoverage,
+  type TemplateOutcome,
+  type TemplateSlot,
+} from './template.js';
+
+export {
   CANDIDATE_CONTRACT,
   DEFAULT_CASE_TIMEOUT_MS,
   assertGenerator,

@@ -142,8 +142,11 @@ import {
   densityGates,
   densityReport,
   foreignPanels,
+  injectionFormOf,
   selectDensityRules,
   targetPanels,
+  templateCoverage,
+  transferStatement,
   priorPicks,
   priorScopeOf,
   priorTable,
@@ -205,6 +208,8 @@ import {
   type ResultShape,
   type Selection,
   type SelectionStats,
+  type SchemaNames,
+  type TemplateAttempt,
 } from '@agentix-e/microglia-eval';
 
 const DATASET_REPO = 'https://huggingface.co/datasets/birdsql/bird_mini_dev';
@@ -1430,6 +1435,17 @@ const DENSITY_PANEL = nonNegative(process.env['SOTA_DENSITY_PANEL'], 0);
 const TRANSFER_PANEL = nonNegative(process.env['SOTA_TRANSFER_PANEL'], 10);
 
 /**
+ * R10's switch: how a foreign rule is shown.
+ *
+ * `prose` is the incumbent form and what every arm before this one measured. `bound` reads the rule
+ * as a template against the schema it was learned in, binds its slots against the schema it is about
+ * to be shown in, and withholds it when a slot has no referent — which is the construction ODIS and
+ * SQL-Exchange both point at, and the one R9.4's null result motivates. The two forms differ in one
+ * field of one rendered line, so the foreign reading compares like with like.
+ */
+const INJECTION_FORM = injectionFormOf(process.env['SOTA_TEMPLATE']);
+
+/**
  * Rules taken from each database, capped so the family stays affordable.
  *
  * Eight per database rather than the store's whole population: a full pass over a five-fold store's
@@ -1807,6 +1823,43 @@ async function densityPass(input: {
   );
   const itemById = new Map(input.items.map((item) => [item.id, item]));
 
+  /**
+   * Schema names by database, read once per database rather than once per injection.
+   *
+   * `schemaIndex` caches by path already; this map exists so the foreign arm can ask for the names
+   * of a database it is only passing through — a rule's own database is not necessarily one the
+   * panels cover, and a binding needs both schemas to be read the same way.
+   */
+  const namesByDb = new Map<string, SchemaNames>();
+  const namesOf = (dbId: string): SchemaNames => {
+    const hit = namesByDb.get(dbId);
+    if (hit !== undefined) return hit;
+    const index = schemaIndex(input.dataset.dbPath(dbId));
+    const names: SchemaNames = { tables: index.tables, columns: index.columns };
+    namesByDb.set(dbId, names);
+    return names;
+  };
+
+  /** Every binding attempt, so the withheld count is a record and not a subtraction. */
+  const attempts: TemplateAttempt[] = [];
+
+  /**
+   * The rule as it will be shown on a question from `dbId`, or `undefined` when it is withheld.
+   *
+   * One function for both foreign arms — the family's and the floor's — because the two must differ
+   * in whose rule they show and in nothing else. The rendered line is the whole intervention: the
+   * item's id, kind, confidence, scope and budget are untouched, so a difference between the two
+   * forms is a difference the statement made.
+   */
+  const shownPack = (rule: DensityRule, dbId: string): string | undefined => {
+    const item = itemById.get(rule.id) as KnowledgeItem;
+    if (INJECTION_FORM === 'prose') return makePack([item], { budget: PROBE_BUDGET }).rendered;
+    const outcome = transferStatement(rule.statement, namesOf(rule.domain), namesOf(dbId));
+    attempts.push({ key: `${rule.id}\u0000${dbId}`, outcome });
+    if (outcome.status === 'withheld') return undefined;
+    return makePack([{ ...item, statement: outcome.statement }], { budget: PROBE_BUDGET }).rendered;
+  };
+
   type Plan = {
     readonly ruleId: string;
     readonly domain: string;
@@ -1865,10 +1918,22 @@ async function densityPass(input: {
     // One foreign rule per panel, drawn from a rotating offset so the floor is not one donor
     // database measured ten times.
     const start = rules.length === 0 ? 0 : (at * 3) % rules.length;
-    const donor = [...rules.slice(start), ...rules.slice(0, start)].find((rule) => rule.domain !== dbId);
-    if (donor === undefined) continue;
-    const donorItem = itemById.get(donor.id) as KnowledgeItem;
-    const donorPack = makePack([donorItem], { budget: PROBE_BUDGET }).rendered;
+    const rotated = [...rules.slice(start), ...rules.slice(0, start)].filter((rule) => rule.domain !== dbId);
+    // The first donor that can be shown. Under `prose` every donor qualifies by definition, so the
+    // rotation is R9.4's; under `bound` a donor whose slots have no referent here is passed over,
+    // because a floor measured with prose against a family shown bound would confound the form with
+    // the content the floor is there to control for.
+    let chosen: { readonly donor: DensityRule; readonly pack: string } | undefined;
+    for (const candidate of rotated) {
+      const rendered = shownPack(candidate, dbId);
+      if (rendered !== undefined) {
+        chosen = { donor: candidate, pack: rendered };
+        break;
+      }
+    }
+    if (chosen === undefined) continue;
+    const donor = chosen.donor;
+    const donorPack = chosen.pack;
     for (const [order, target] of panel.entries()) {
       const entry = caseById.get(target.id) as CaseOutcome;
       const verdict = classify(donor, schema, target);
@@ -1917,7 +1982,12 @@ async function densityPass(input: {
       ddlByDb.set(draw.dbId, ddlOf(input.dataset.dbPath(draw.dbId)));
       schemaByDb.set(draw.dbId, new Set([...index.tables, ...index.columns]));
     }
-    const pack = makePack([itemById.get(rule.id) as KnowledgeItem], { budget: PROBE_BUDGET }).rendered;
+    const pack = shownPack(rule, draw.dbId);
+    // R10: a template whose slots have no referent in the schema it is about to meet is withheld,
+    // not shown unbound. The attempt is already in `attempts`, so the count is a record; skipping
+    // the plan is what makes the withholding real rather than a label on a prompt that still
+    // carried the sentence.
+    if (pack === undefined) continue;
     const verdict = classify(
       rule,
       schemaByDb.get(draw.dbId) as Set<string>,
@@ -1960,11 +2030,28 @@ async function densityPass(input: {
   }
 
   const calls = plans.length + floorPlans.length + crossPlans.length;
+  const templates = INJECTION_FORM === 'bound' ? templateCoverage(attempts) : undefined;
   process.stdout.write(
     `[sota] density: ${rules.length} rules x ${DENSITY_PANEL} questions from ` +
       `${panelDbs.length} databases, ${floorPlans.length} floor injections, ` +
       `${crossPlans.length} foreign injections, ${calls} calls\n`,
   );
+  // R10's bookkeeping, printed before the calls are paid for rather than after: a run whose binder
+  // withheld more than 60% of the family cannot answer the question it was dispatched with, and the
+  // cheapest moment to say so is now.
+  if (templates !== undefined) {
+    process.stdout.write(
+      `[sota] density templates: ${templates.bound} bound + ${templates.slotless} slotless = ` +
+        `${templates.bound + templates.slotless} shown, ${templates.withheld} withheld of ` +
+        `${templates.bound + templates.slotless + templates.withheld} attempt(s) ` +
+        `(${(templates.withheldShare * 100).toFixed(1)}%)\n`,
+    );
+    for (const blocker of templates.blockers.slice(0, 8)) {
+      process.stdout.write(
+        `[sota] density templates: ${blocker.kind} '${blocker.name}' stopped ${blocker.attempts} attempt(s)\n`,
+      );
+    }
+  }
 
   let moved = 0;
   let retried = 0;
@@ -2025,6 +2112,7 @@ async function densityPass(input: {
       // Absent rather than empty when the arm was not bought: a foreign reading over zero trials
       // would fail V24 and read as a finding about transfer instead of about the configuration.
       ...(crossPlans.length === 0 ? {} : { crossTrials, transferPanel: TRANSFER_PANEL }),
+      ...(templates === undefined ? {} : { templates }),
       holes: crossPlans.length + floorPlans.length + plans.length - trials.length - floorTrials.length - crossTrials.length,
     }),
     excluded,
@@ -4506,6 +4594,10 @@ async function main(): Promise<void> {
             density_unplaced: density.unplaced,
             density_unmeasured: density.unmeasured,
             density_calls: density.calls,
+            // R10: which form the foreign arm showed. Carried at the top level as well as inside the
+            // report, because a reader comparing two artefacts needs to know what they are comparing
+            // before reading forty fields of it.
+            density_injection_form: INJECTION_FORM,
           }),
       latency_p50_ms: percentile(cases.map((item) => item.latencyMs), 0.5),
       latency_p95_ms: percentile(cases.map((item) => item.latencyMs), 0.95),

@@ -240,6 +240,12 @@ The study is a package, not a script:
 - `l4.ts` — the τ²-bench result reader: both storage forms, and four named refusals taken from
   upstream's own rules (unscored trials leave the denominator, a short grid is refused, duplicate
   trials are an error, and a trial succeeds only on `reward == 1.0`).
+- `density.ts` — the one-rule-at-a-time family: what a rule does when it is given twenty chances, the
+  policies that decide whether to carry it, and the foreign arm that prices it away from home.
+- `template.ts` — a rule read as a structure: slots are its identifiers the home schema has, binding
+  substitutes the target schema's names, and a template whose slots do not bind is withheld rather
+  than shown unbound. Pure functions over schema name sets, so the reading is recomputable from an
+  artefact and costs no call.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

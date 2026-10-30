@@ -63,6 +63,10 @@ on:
         description: 'R9.4: questions from other databases each exercised rule is shown (0 disables the foreign arm; 10 is the pre-registered panel)'
         required: false
         default: '10'
+      template:
+        description: 'R10: how a foreign rule is shown — prose (the incumbent, what R9.4 measured) or bound (read as a template and its slots bound against the target schema, withheld when a slot has no referent)'
+        required: false
+        default: 'prose'
       sample_temperature:
         description: 'Temperature for the sample-N arms (0 would make every draw identical)'
         required: false
@@ -115,7 +119,9 @@ permissions:
 
 jobs:
   bird:
-    name: BIRD Mini-Dev (cross-fitted, memory on/off)
+    # The split is in the title, not only in the inputs: a run list that calls all of them Mini-Dev
+    # is a run list a reader has to open to tell apart, and the two splits measure different cells.
+    name: BIRD ${{ github.event.inputs.split == 'dev' && 'dev' || 'Mini-Dev' }} (cross-fitted, memory on/off)
     # A dispatch that only wants the L4 lane should not pay for a BIRD run it did
     # not ask for. Scheduled and push-triggered runs are unaffected.
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.bird != 'false'
@@ -234,6 +240,9 @@ jobs:
           SOTA_DENSITY_PANEL: ${{ github.event.inputs.density_panel || '0' }}
           SOTA_DENSITY_RULES_PER_DB: ${{ github.event.inputs.density_rules_per_db || '8' }}
           SOTA_TRANSFER_PANEL: ${{ github.event.inputs.transfer_panel || '10' }}
+          # R10. Empty on a schedule, which the lane reads as the incumbent form: a dispatch that
+          # says nothing repeats R9.4 rather than silently becoming the new arm.
+          SOTA_TEMPLATE: ${{ github.event.inputs.template || '' }}
           SOTA_SPLIT: ${{ github.event.inputs.split || 'minidev' }}
           SOTA_LEARN_SAMPLE: ${{ github.event.inputs.learn_sample || '0' }}
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '8000' }}

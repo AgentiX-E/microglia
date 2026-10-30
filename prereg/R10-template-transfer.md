@@ -4,7 +4,7 @@ step: R10
 opened: 2026-10-30
 arms: none,full
 sample: 20
-gates: V24
+gates: V24, V28
 ---
 
 # R10 — does a rule transfer when its structure does?
@@ -67,3 +67,36 @@ rule is shown, and a template whose slots cannot be bound is withheld rather tha
 It does not test whether a template generalises across model families — one model, the one the rest
 of the study uses. It does not test whether the template form helps *within* a database; the
 same-database arms are unchanged, and a win there would be a different finding reported separately.
+
+## Amendments, written before the first dispatch
+
+Three decisions the text above does not settle, fixed here on 2026-10-30 before arm B was run, in
+the order they change the reading. None of them moves a prediction; all of them say how one is
+counted.
+
+1. **The template is derived at use time, not by the distiller.** The distiller writes the prose
+   every other arm in this project stores, audits and reproduces. Making it emit templates would
+   change every artefact at once and leave arm B incomparable to arm A on anything but the template.
+   So the rule is stored as it always was and read structurally when it is shown
+   (`packages/eval/src/template.ts`): its identifiers that the *home* schema has become slots, its
+   other words stay words. Arm B therefore differs from arm A in one field of one rendered line.
+
+2. **A withheld attempt is absent from the ledger, not scored as zero.** The prediction above says a
+   withheld rule "shows a cross-database delta of exactly zero, by construction". That sentence
+   assumed the trials would be scored; they cannot honestly be, because no call was made. The
+   withheld attempt contributes no trial, its count is reported, and `V28` holds the identity that
+   makes the absence checkable: `bound + slotless` attempts equal the rule-database pairs the foreign
+   ledger carries. A rule withheld everywhere is therefore in no stratum, which is visible, where a
+   zero would have been indistinguishable from a rule that was shown and changed nothing.
+
+3. **`V24`'s coverage drops the withheld panels from its denominator.** The bar was written against a
+   selection of rules, and under arm B a withheld attempt is the pre-registered behaviour rather than
+   a lost injection: `(rules − withheld attempts) × panel` is the number of injections the family
+   planned. Counting the selection alone would fail the run for doing what the stage asks; counting
+   only the rules that reached the ledger would let seventy-nine of eighty rules vanish and still
+   pass. `V28` is what keeps the second from happening.
+
+The observations are 20 questions per rule from the rule's own database and 10 foreign questions per
+rule, on the minimum sample of rules that gives the repair and break rates a denominator worth
+reading: 8 rules per database over two arms. `none` and `full` are carried as the stage's arms,
+since the foreign reading needs a control for each question and this run supplies its own.

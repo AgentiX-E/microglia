@@ -41,6 +41,7 @@
 import { mcnemarExact } from '@agentix-e/microglia-core';
 import { clusterBootstrapCI } from './stats.js';
 import type { ValidityGate } from './sota.js';
+import type { TemplateCoverage } from './template.js';
 
 /** A stored rule, as the artefact lists it. Only the fields the family needs. */
 export type StoredRuleInput = {
@@ -845,6 +846,14 @@ export type TransferReading = {
   /** Distinct foreign questions, and the databases they came from. */
   readonly targets: number;
   readonly domains: number;
+  /**
+   * Distinct rule-database pairs the arm exercised.
+   *
+   * This is the unit R10's binding is attempted at — one rule meets one schema and either binds or
+   * is withheld — and it is the only denominator that can reconcile the attempts the binder made
+   * against the attempts that reached the ledger.
+   */
+  readonly pairs: number;
   /** Injections that landed on the rule's own database: the failure V24 exists to catch. */
   readonly offHome: number;
   readonly overall: TransferRow;
@@ -976,6 +985,7 @@ export function transferOf(input: {
     trials: input.trials.length,
     targets: new Set(input.trials.map((trial) => trial.targetId)).size,
     domains: new Set(input.trials.map((trial) => trial.domain)).size,
+    pairs: new Set(input.trials.map((trial) => `${trial.ruleId}\u0000${trial.domain}`)).size,
     // A rule whose home database is unknown cannot land on it, so it is not counted either way.
     offHome: input.trials.filter((trial) => domain.get(trial.ruleId) === trial.domain).length,
     overall: transferRow('all', input.trials, input.homeTrials, options),
@@ -1088,6 +1098,14 @@ export type DensityReport = {
   /** What a rule that worked at home does on a question from another database: R9.4's reading. */
   readonly transfer?: TransferReading;
   /**
+   * R10: what happened when each rule was read as a template and bound against the target schema.
+   *
+   * Absent when the run showed rules as prose, which is every artefact produced before R10. A zeroed
+   * coverage would read as a binding attempt that bound nothing, and the withheld count is the one
+   * number this stage's third prediction is stated in.
+   */
+  readonly templates?: TemplateCoverage;
+  /**
    * The cross-fit again with the fit pool capped, from four observations to the whole panel.
    *
    * Absent from artefacts written before the curve existed: it is recomputable from the carried
@@ -1115,6 +1133,8 @@ export type DensityInput = {
   readonly transferPanel?: number;
   /** Injections the lane planned and never measured, so a short panel can be priced. */
   readonly holes?: number;
+  /** R10's coverage, when the foreign arm bound templates instead of showing prose. */
+  readonly templates?: TemplateCoverage;
 };
 
 /**
@@ -1165,6 +1185,7 @@ export function densityReport(input: DensityInput): DensityReport {
             ...options,
           }),
         }),
+    ...(input.templates === undefined ? {} : { templates: input.templates }),
     evidence: evidenceCurve(input.trials, { ...options, caps: capsFor(input.panel) }),
     perRule,
     signs: signPersistence(perRule),
@@ -1230,7 +1251,7 @@ export function densityGates(report: DensityReport): readonly ValidityGate[] {
       blocking: false,
     },
     ...(report.crossFit === undefined ? [] : crossFitGates(report.crossFit, report.injections)),
-    ...(report.transfer === undefined ? [] : transferGates(report.transfer, report.rules)),
+    ...(report.transfer === undefined ? [] : transferGates(report.transfer, report.rules, report.templates)),
     ...(report.evidence === undefined ? [] : [evidenceGate(report.evidence, report.panel)]),
   ];
 }
@@ -1241,13 +1262,23 @@ export function densityGates(report: DensityReport): readonly ValidityGate[] {
  * Both are emitted only when the run bought a cross-database arm, for the same reason the cross-fit
  * bars are: a bar that cannot be evaluated is not a failed bar, and the artefacts published before
  * this reading existed still have to be readable.
+ *
+ * `V24`'s coverage is the injections the family planned: every selected rule on one foreign panel,
+ * less the panels the binder withheld. Counted over the rules that reached the ledger instead, a run
+ * where seventy-nine rules were selected and one was shown would pass its own coverage bar — which
+ * is the failure the bar exists for. Counted over the selection alone, arm B would fail for doing
+ * what R10 asks it to do. The withheld count is what separates the two, and `V28` is what keeps that
+ * count honest.
  */
-function transferGates(transfer: TransferReading, rules: number): readonly ValidityGate[] {
+function transferGates(
+  transfer: TransferReading,
+  rules: number,
+  templates: TemplateCoverage | undefined,
+): readonly ValidityGate[] {
   const stratified = transfer.strata.reduce((sum, row) => sum + row.trials, 0);
   const positive = transfer.strata[0];
-  // Counted over the rules the family *selected*, not over the ones that reached the ledger: a rule
-  // that was pointed nowhere would otherwise shrink the denominator it is measured against.
-  const coverage = rules * transfer.panel;
+  const carried = transfer.rules;
+  const coverage = Math.max(0, (rules - (templates?.withheld ?? 0)) * transfer.panel);
   return [
     {
       id: 'V24-density-transfer-covers',
@@ -1262,6 +1293,23 @@ function transferGates(transfer: TransferReading, rules: number): readonly Valid
         transfer.trials >= Math.floor(coverage * 0.9),
       blocking: true,
     },
+    ...(templates === undefined
+      ? []
+      : [
+          {
+            id: 'V28-density-withhold-reconciles',
+            criterion:
+              'every rule the binder read is either carried away from home or reported as withheld',
+            actual:
+              `${templates.bound} bound + ${templates.slotless} slotless = ${carried} carried, ` +
+              `${templates.withheld} withheld of ${transfer.pairs} attempt(s)`,
+            // The identity is the whole bar. A binder that drops an attempt without saying so is the
+            // failure under test: withholding is a result, losing an attempt is a defect, and from
+            // the trials alone the two look identical.
+            pass: templates.bound + templates.slotless === transfer.pairs,
+            blocking: true,
+          },
+        ]),
     {
       id: 'V25-density-transfer-holds',
       criterion: 'rules that worked at home earn a positive delta on foreign questions',

@@ -18,6 +18,7 @@ import {
   type DensityTarget,
   type DensityTrial,
   type StoredRuleInput,
+  type TemplateCoverage,
 } from '../density.js';
 
 function stored(overrides: Partial<StoredRuleInput> & { id: string }): StoredRuleInput {
@@ -1018,6 +1019,63 @@ describe('transfer gates', () => {
     const gates = densityGates(reading(worse));
     expect(gates[6]?.pass).toBe(true);
     expect(gates[7]?.pass).toBe(false);
+  });
+
+  /** A binding record over the two rules the arm carried, which is what R10's bar reads. */
+  function coverage(overrides: Partial<TemplateCoverage> = {}): TemplateCoverage {
+    return { bound: 2, slotless: 0, withheld: 0, rules: 2, withheldShare: 0, blockers: [], ...overrides };
+  }
+
+  it('carries the binding record into the report and adds the withholding bar', () => {
+    const report = densityReport({
+      rules,
+      panel: 2,
+      trials: home,
+      floorTrials: [],
+      crossTrials: away,
+      transferPanel: 2,
+      templates: coverage(),
+    });
+    expect(report.templates?.bound).toBe(2);
+    const gates = densityGates(report);
+    expect(gates.map((gate) => gate.id)).toEqual([
+      'V18-density-exercised',
+      'V19-density-discriminates',
+      'V20-density-reconciles',
+      'V21-density-floor',
+      'V22-density-crossfit-covers',
+      'V23-density-crossfit-beats-floor',
+      'V24-density-transfer-covers',
+      'V28-density-withhold-reconciles',
+      'V25-density-transfer-holds',
+      'V26-density-evidence-curve',
+    ]);
+    const withhold = gates.find((gate) => gate.id === 'V28-density-withhold-reconciles');
+    expect(withhold?.pass).toBe(true);
+    expect(withhold?.actual).toBe('2 bound + 0 slotless = 2 carried, 0 withheld of 2 attempt(s)');
+  });
+
+  it('fails when an attempt the binder read reached neither the ledger nor the withheld count', () => {
+    const gates = densityGates(
+      densityReport({
+        rules,
+        panel: 2,
+        trials: home,
+        floorTrials: [],
+        crossTrials: away,
+        transferPanel: 2,
+        // One attempt bound and one withheld: the ledger should carry one, and it carries two.
+        templates: coverage({ bound: 1, withheld: 1, withheldShare: 0.5 }),
+      }),
+    );
+    expect(gates.find((gate) => gate.id === 'V28-density-withhold-reconciles')?.pass).toBe(false);
+  });
+
+  it('counts the rule-database pairs a template is attempted at', () => {
+    const reading = transferOf({ trials: away, homeTrials: home, panel: 2 });
+    // Two rules, one foreign database, two trials each: four injections and two attempts.
+    expect(reading.trials).toBe(4);
+    expect(reading.pairs).toBe(2);
   });
 });
 
