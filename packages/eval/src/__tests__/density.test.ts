@@ -3,6 +3,8 @@ import {
   classify,
   crossFit,
   densityGates,
+  evidenceCurve,
+  foreignPanels,
   densityReport,
   policyTable,
   ruleDensityRows,
@@ -10,6 +12,7 @@ import {
   signPersistence,
   stratumOf,
   targetPanels,
+  transferOf,
   type CrossFitRow,
   type DensityRule,
   type DensityTarget,
@@ -564,8 +567,9 @@ describe('densityGates', () => {
       'V21-density-floor',
       'V22-density-crossfit-covers',
       'V23-density-crossfit-beats-floor',
+      'V26-density-evidence-curve',
     ]);
-    expect(gates.map((gate) => gate.pass)).toEqual([true, true, true, true, true, true]);
+    expect(gates.map((gate) => gate.pass)).toEqual([true, true, true, true, true, true, true]);
   });
 
   it('fails the density bar when a rule was shown fewer times than the panel', () => {
@@ -606,6 +610,7 @@ describe('densityGates', () => {
       'V19-density-discriminates',
       'V20-density-reconciles',
       'V21-density-floor',
+      'V26-density-evidence-curve',
     ]);
   });
 
@@ -758,5 +763,326 @@ describe('crossFit', () => {
   it('refuses a split that cannot separate fitting from scoring', () => {
     expect(() => crossFit(panel('r1', 4, () => 'helps'), { folds: 1 })).toThrow(RangeError);
     expect(() => crossFit(panel('r1', 4, () => 'helps'), { repeats: 0 })).toThrow(RangeError);
+  });
+});
+
+describe('transferOf', () => {
+  /** A rule's trials of one kind, so a stratum can be built to a stated net. */
+  function strand(
+    ruleId: string,
+    domain: string,
+    kind: 'helps' | 'hurts' | 'pass',
+    count: number,
+    offset = 0,
+  ): DensityTrial[] {
+    const out: DensityTrial[] = [];
+    for (let at = 0; at < count; at += 1) {
+      out.push(
+        trial({
+          ruleId,
+          domain,
+          targetId: `${domain}#${ruleId}#${offset + at}`,
+          order: offset + at,
+          baselineCorrect: kind !== 'helps',
+          correct: kind !== 'hurts',
+        }),
+      );
+    }
+    return out;
+  }
+
+  it('prices a rule that worked at home on questions from another database', () => {
+    const home = [...strand('r1', 'db_a', 'helps', 4), ...strand('r1', 'db_a', 'hurts', 2, 4)];
+    const away = [...strand('r1', 'db_b', 'helps', 2), ...strand('r1', 'db_b', 'pass', 1, 2)];
+    const reading = transferOf({ trials: away, homeTrials: home, panel: 3 });
+    const positive = reading.strata.find((row) => row.kind === 'positive');
+    expect(positive?.rules).toBe(1);
+    expect(positive?.trials).toBe(3);
+    expect(positive?.deltaPp).toBeCloseTo((2 / 3) * 100, 6);
+    expect(positive?.repaired).toBe(2);
+    expect(positive?.informative).toBe(2);
+    expect(positive?.repairRate).toBe(1);
+    expect(positive?.breakable).toBe(1);
+    expect(positive?.broke).toBe(0);
+    expect(positive?.breakRate).toBe(0);
+  });
+
+  it('keeps the home reading beside the foreign one, in the same units', () => {
+    const home = [...strand('r1', 'db_a', 'helps', 4), ...strand('r1', 'db_a', 'hurts', 2, 4)];
+    const away = [...strand('r1', 'db_b', 'helps', 2)];
+    const positive = transferOf({ trials: away, homeTrials: home, panel: 1 }).strata.find(
+      (row) => row.kind === 'positive',
+    );
+    expect(positive?.home.trials).toBe(6);
+    expect(positive?.home.deltaPp).toBeCloseTo((2 / 6) * 100, 6);
+    expect(positive?.home.repairRate).toBe(1);
+    expect(positive?.home.breakRate).toBe(1);
+  });
+
+  it('stratifies by the sign the rule had at home, not by what it did away', () => {
+    const home = [
+      ...strand('good', 'db_a', 'helps', 6),
+      ...strand('flat', 'db_a', 'helps', 3),
+      ...strand('flat', 'db_a', 'hurts', 3, 3),
+      ...strand('bad', 'db_a', 'hurts', 5),
+    ];
+    // Every rule repairs abroad, so a stratification by the foreign outcome would put them all in
+    // one stratum and the reading would be unable to say which home signs travel.
+    const away = [...strand('good', 'db_b', 'helps', 2), ...strand('flat', 'db_b', 'helps', 2, 2), ...strand('bad', 'db_b', 'helps', 2, 4)];
+    const reading = transferOf({ trials: away, homeTrials: home, panel: 2 });
+    expect(reading.strata.map((row) => [row.kind, row.rules, row.trials])).toEqual([
+      ['positive', 1, 2],
+      ['zero', 1, 2],
+      ['negative', 1, 2],
+    ]);
+    expect(reading.overall.trials).toBe(6);
+    expect(reading.overall.repaired).toBe(6);
+  });
+
+  it('counts an injection that landed on the rule own database, which is the failure the bar exists for', () => {
+    const home = strand('r1', 'db_a', 'helps', 3);
+    const away = [...strand('r1', 'db_b', 'helps', 1), ...strand('r1', 'db_a', 'helps', 1, 1)];
+    const reading = transferOf({ trials: away, homeTrials: home, panel: 2 });
+    expect(reading.offHome).toBe(1);
+    expect(reading.trials).toBe(2);
+  });
+
+  it('reports how many questions and how many databases the rules were pointed at', () => {
+    const home = strand('r1', 'db_a', 'helps', 3);
+    const away = [...strand('r1', 'db_b', 'helps', 2), ...strand('r1', 'db_c', 'pass', 3, 2)];
+    const reading = transferOf({ trials: away, homeTrials: home, panel: 5 });
+    expect(reading.targets).toBe(5);
+    expect(reading.domains).toBe(2);
+    expect(reading.panel).toBe(5);
+    expect(reading.rules).toBe(1);
+  });
+
+  it('treats a rule with no home trial as the zero case rather than dropping it', () => {
+    const reading = transferOf({ trials: strand('ghost', 'db_b', 'helps', 2), homeTrials: [], panel: 2 });
+    expect(reading.strata.find((row) => row.kind === 'zero')?.trials).toBe(2);
+    expect(reading.strata.find((row) => row.kind === 'positive')?.trials).toBe(0);
+  });
+
+  it('says nothing when nothing was measured, and still names the three strata', () => {
+    const reading = transferOf({ trials: [], homeTrials: [], panel: 10 });
+    expect(reading.trials).toBe(0);
+    expect(reading.rules).toBe(0);
+    expect(reading.strata.map((row) => row.kind)).toEqual(['positive', 'zero', 'negative']);
+    expect(reading.overall.deltaPp).toBe(0);
+    expect(reading.overall.repairRate).toBe(0);
+  });
+
+  it('brackets the delta with an interval over the questions, not the injections', () => {
+    const home = strand('r1', 'db_a', 'helps', 4);
+    const away = [...strand('r1', 'db_b', 'helps', 3), ...strand('r1', 'db_b', 'hurts', 2, 3)];
+    const reading = transferOf({ trials: away, homeTrials: home, panel: 5 });
+    expect(reading.overall.ciLowPp).toBeLessThanOrEqual(reading.overall.deltaPp);
+    expect(reading.overall.deltaPp).toBeLessThanOrEqual(reading.overall.ciHighPp);
+    expect(reading.overall.deltaPp).toBeCloseTo((1 / 5) * 100, 6);
+  });
+});
+
+describe('evidenceCurve', () => {
+  /** A rule that helped early and hurt late, so the cap decides what the fit can believe. */
+  function lateRule(ruleId: string, helped: number, hurt: number): DensityTrial[] {
+    const out: DensityTrial[] = [];
+    for (let order = 0; order < helped + hurt; order += 1) {
+      const helps = order < helped;
+      out.push(
+        trial({
+          ruleId,
+          targetId: `db_a#${order}`,
+          order,
+          // A repair is a trial the control failed and the rule got right; a break is the reverse.
+          baselineCorrect: !helps,
+          correct: helps,
+        }),
+      );
+    }
+    return out;
+  }
+
+  it('shows a rule the fit was allowed to see as helpful, and pays for what it does late', () => {
+    // Six repairs and fourteen breaks: a fit that may look at the first six believes the rule is
+    // good and pays 2 - 14 on the whole panel...
+    const trials = lateRule('r1', 6, 14);
+    const rows = evidenceCurve(trials, { caps: [6], folds: 5, repeats: 1, resamples: 200 });
+    expect(rows[0]?.shown).toBe(20);
+    expect(rows[0]?.gained).toBe(6);
+    expect(rows[0]?.lost).toBe(14);
+    expect(rows[0]?.deltaPp).toBeCloseTo(-40, 6);
+  });
+
+  it('hides the same rule once the fit may see all of it', () => {
+    const trials = lateRule('r1', 6, 14);
+    const rows = evidenceCurve(trials, { caps: [20], folds: 5, repeats: 1, resamples: 200 });
+    expect(rows[0]?.shown).toBe(0);
+    expect(rows[0]?.deltaPp).toBe(0);
+  });
+
+  it('scores every injection once per repeat on every row, so the rows are paired', () => {
+    const trials = lateRule('r1', 6, 14);
+    const rows = evidenceCurve(trials, { caps: [4, 8, 20], folds: 5, repeats: 3, resamples: 200 });
+    expect(rows.map((row) => row.cap)).toEqual([4, 8, 20]);
+    expect(rows.every((row) => row.injections === 60)).toBe(true);
+  });
+
+  it('reads the pre-registered caps by default', () => {
+    const rows = evidenceCurve(lateRule('r1', 6, 14), { resamples: 200 });
+    expect(rows.map((row) => row.cap)).toEqual([4, 6, 8, 10, 12, 16, 20]);
+  });
+
+  it('says nothing when there is nothing to score', () => {
+    const rows = evidenceCurve([], { caps: [4, 8], resamples: 200 });
+    expect(rows.map((row) => row.injections)).toEqual([0, 0]);
+    expect(rows.every((row) => row.deltaPp === 0)).toBe(true);
+  });
+
+  it('refuses a cap with no observation under it', () => {
+    expect(() => evidenceCurve(lateRule('r1', 2, 2), { caps: [0] })).toThrow(RangeError);
+  });
+});
+
+describe('transfer gates', () => {
+  const rules = [rule('r1'), rule('r2')];
+  const home = [
+    trial({ ruleId: 'r1', targetId: 'a1', order: 0, baselineCorrect: false, correct: true }),
+    trial({ ruleId: 'r1', targetId: 'a2', order: 1, baselineCorrect: false, correct: true }),
+    trial({ ruleId: 'r2', targetId: 'a1', order: 0, baselineCorrect: true, correct: false }),
+    trial({ ruleId: 'r2', targetId: 'a2', order: 1, baselineCorrect: true, correct: false }),
+  ];
+  const away = [
+    trial({ ruleId: 'r1', domain: 'db_b', targetId: 'b1', order: 0, baselineCorrect: false, correct: true }),
+    trial({ ruleId: 'r1', domain: 'db_b', targetId: 'b2', order: 1, baselineCorrect: false, correct: true }),
+    trial({ ruleId: 'r2', domain: 'db_b', targetId: 'b1', order: 0, baselineCorrect: true, correct: true }),
+    trial({ ruleId: 'r2', domain: 'db_b', targetId: 'b2', order: 1, baselineCorrect: true, correct: true }),
+  ];
+
+  /** The family with a foreign arm attached, which is what makes the two bars exist at all. */
+  function reading(cross: readonly DensityTrial[] = away) {
+    return densityReport({
+      rules,
+      panel: 2,
+      trials: home,
+      floorTrials: [],
+      crossTrials: cross,
+      transferPanel: 2,
+    });
+  }
+
+  it('emits the two transfer bars after the cross-fit bars, and passes both on a clean arm', () => {
+    const gates = densityGates(reading());
+    expect(gates.map((gate) => gate.id)).toEqual([
+      'V18-density-exercised',
+      'V19-density-discriminates',
+      'V20-density-reconciles',
+      'V21-density-floor',
+      'V22-density-crossfit-covers',
+      'V23-density-crossfit-beats-floor',
+      'V24-density-transfer-covers',
+      'V25-density-transfer-holds',
+      'V26-density-evidence-curve',
+    ]);
+    expect(gates[6]?.pass).toBe(true);
+    expect(gates[7]?.pass).toBe(true);
+  });
+
+  it('fails the coverage bar when an injection landed on the rule own database', () => {
+    const leaky = [
+      ...away.slice(0, 3),
+      trial({ ruleId: 'r2', domain: 'db_a', targetId: 'a9', order: 9, baselineCorrect: true, correct: true }),
+    ];
+    const gates = densityGates(reading(leaky));
+    expect(gates[6]?.pass).toBe(false);
+    expect(gates[6]?.actual).toContain('1 on the rule own');
+  });
+
+  it('fails the coverage bar when the foreign panels came back short', () => {
+    const gates = densityGates(reading([away[0] as DensityTrial]));
+    expect(gates[6]?.pass).toBe(false);
+  });
+
+  it('fails the claim when the rules that worked at home do not work away', () => {
+    const worse = [
+      trial({ ruleId: 'r1', domain: 'db_b', targetId: 'b1', order: 0, baselineCorrect: true, correct: false }),
+      trial({ ruleId: 'r1', domain: 'db_b', targetId: 'b2', order: 1, baselineCorrect: true, correct: false }),
+      trial({ ruleId: 'r2', domain: 'db_b', targetId: 'b1', order: 0, baselineCorrect: true, correct: false }),
+      trial({ ruleId: 'r2', domain: 'db_b', targetId: 'b2', order: 1, baselineCorrect: true, correct: false }),
+    ];
+    const gates = densityGates(reading(worse));
+    expect(gates[6]?.pass).toBe(true);
+    expect(gates[7]?.pass).toBe(false);
+  });
+});
+
+describe('foreignPanels', () => {
+  const cases = [
+    { id: 'a1', dbId: 'db_a' },
+    { id: 'a2', dbId: 'db_a' },
+    { id: 'b1', dbId: 'db_b' },
+    { id: 'b2', dbId: 'db_b' },
+    { id: 'c1', dbId: 'db_c' },
+    { id: 'c2', dbId: 'db_c' },
+  ];
+
+  it('never points a rule at a question from its own database', () => {
+    const drawn = foreignPanels([rule('r1', 'db_a')], cases, 6);
+    expect(drawn).toHaveLength(4);
+    expect(drawn.every((entry) => entry.dbId !== 'db_a')).toBe(true);
+    expect(drawn.map((entry) => entry.order)).toEqual([0, 1, 2, 3]);
+  });
+
+  it('takes the first question from each database before the second from any', () => {
+    // Which database comes first is decided by a hash of the rule's id, so the property under test
+    // is the rotation and not the order: positions 0 and 2 share a database, and 1 and 3 the other.
+    const drawn = foreignPanels([rule('r1', 'db_a')], cases, 4);
+    expect(new Set(drawn.slice(0, 2).map((entry) => entry.dbId)).size).toBe(2);
+    expect(drawn[0]?.dbId).toBe(drawn[2]?.dbId);
+    expect(drawn[1]?.dbId).toBe(drawn[3]?.dbId);
+  });
+
+  it('draws the same panel whatever order the cases arrive in', () => {
+    const straight = foreignPanels([rule('r1', 'db_a')], cases, 4);
+    const shuffled = foreignPanels([rule('r1', 'db_a')], [...cases].reverse(), 4);
+    expect(shuffled).toEqual(straight);
+  });
+
+  it('fills the panel as far as the other databases allow, rather than padding it', () => {
+    const drawn = foreignPanels([rule('r1', 'db_a')], cases, 10);
+    expect(drawn).toHaveLength(4);
+    expect(new Set(drawn.map((entry) => entry.targetId)).size).toBe(4);
+  });
+
+  it('draws nothing for a rule that has nowhere else to go', () => {
+    expect(foreignPanels([rule('r1', 'db_a')], [{ id: 'a1', dbId: 'db_a' }], 3)).toEqual([]);
+  });
+
+  it('draws nothing when the panel is zero', () => {
+    expect(foreignPanels([rule('r1', 'db_a')], cases, 0)).toEqual([]);
+  });
+
+  it('gives every rule its own draw, so one rule vocabulary cannot decide another', () => {
+    const drawn = foreignPanels([rule('r1', 'db_a'), rule('r2', 'db_a')], cases, 4);
+    expect(drawn).toHaveLength(8);
+    const first = drawn.filter((entry) => entry.ruleId === 'r1').map((entry) => entry.targetId);
+    const second = drawn.filter((entry) => entry.ruleId === 'r2').map((entry) => entry.targetId);
+    expect(first).not.toEqual(second);
+  });
+});
+
+describe('evidence bar on an artefact that predates the curve', () => {
+  it('emits no evidence bar when the curve was never written', () => {
+    const filled = densityReport({
+      rules: [rule('r1')],
+      panel: 2,
+      trials: [
+        trial({ ruleId: 'r1', targetId: 'a1', order: 0, baselineCorrect: false, correct: true }),
+        trial({ ruleId: 'r1', targetId: 'a2', order: 1, baselineCorrect: true, correct: true }),
+      ],
+      floorTrials: [],
+    });
+    const { evidence, ...legacy } = filled;
+    expect(evidence).toBeDefined();
+    expect(densityGates(legacy).map((gate) => gate.id)).not.toContain('V26-density-evidence-curve');
   });
 });

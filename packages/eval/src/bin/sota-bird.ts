@@ -141,6 +141,7 @@ import {
   classify,
   densityGates,
   densityReport,
+  foreignPanels,
   selectDensityRules,
   targetPanels,
   priorPicks,
@@ -156,6 +157,7 @@ import {
   signatureOf,
   type Admission,
   type DensityReport,
+  type DensityRule,
   type DensityTarget,
   type DensityTrial,
   type ExecSignature,
@@ -1346,6 +1348,12 @@ const TRANSFER_TARGETS = nonNegative(process.env['SOTA_TRANSFER_TARGETS'], 4);
  * opened. Zero keeps the stage off, because it costs a call per rule per question.
  */
 const DENSITY_PANEL = nonNegative(process.env['SOTA_DENSITY_PANEL'], 0);
+/**
+ * Foreign targets per rule: how many questions from *other* databases every exercised rule is put
+ * on. R9.4 fixed it at ten before the dispatch, in the same order of magnitude as the four foreign
+ * cases R6 used per rule.
+ */
+const TRANSFER_PANEL = nonNegative(process.env['SOTA_TRANSFER_PANEL'], 10);
 
 /**
  * Rules taken from each database, capped so the family stays affordable.
@@ -1651,6 +1659,8 @@ type DensityRun = {
    */
   readonly trials: readonly DensityTrial[];
   readonly floorTrials: readonly DensityTrial[];
+  /** The foreign arm's ledger, empty when the run bought no cross-database panel. */
+  readonly crossTrials: readonly DensityTrial[];
 };
 
 /**
@@ -1815,6 +1825,59 @@ async function densityPass(input: {
       });
     }
   }
+  // The foreign arm: every rule exercised at home is also pointed at questions from databases that
+  // are not its own. Nothing else in the family leaves the rule's schema, so without this arm the
+  // 1.33pp R9.3 measured is the value of a rule in the database it came from and nothing more.
+  const crossPlans: Plan[] = [];
+  const ddlByDb = new Map<string, string>();
+  const schemaByDb = new Map<string, Set<string>>();
+  for (const draw of foreignPanels(
+    rules,
+    input.cases.map((entry) => ({ id: entry.id, dbId: entry.dbId })),
+    TRANSFER_PANEL,
+  )) {
+    const entry = caseById.get(draw.targetId) as CaseOutcome;
+    const rule = rules.find((candidate) => candidate.id === draw.ruleId) as DensityRule;
+    if (!ddlByDb.has(draw.dbId)) {
+      const index = schemaIndex(input.dataset.dbPath(draw.dbId));
+      ddlByDb.set(draw.dbId, ddlOf(input.dataset.dbPath(draw.dbId)));
+      schemaByDb.set(draw.dbId, new Set([...index.tables, ...index.columns]));
+    }
+    const pack = makePack([itemById.get(rule.id) as KnowledgeItem], { budget: PROBE_BUDGET }).rendered;
+    const verdict = classify(
+      rule,
+      schemaByDb.get(draw.dbId) as Set<string>,
+      { question: entry.question, evidence: entry.evidence, goldSql: entry.goldSql },
+    );
+    crossPlans.push({
+      ruleId: rule.id,
+      // The database the injection landed in, not the rule's own: every reading downstream asks
+      // where a rule was shown, and `offHome` is the count of the times that was the wrong answer.
+      domain: draw.dbId,
+      targetId: draw.targetId,
+      order: draw.order,
+      row: {
+        question_id: entry.questionId,
+        db_id: entry.dbId,
+        question: entry.question,
+        evidence: entry.evidence,
+        SQL: entry.goldSql,
+        difficulty: entry.difficulty,
+      },
+      prompt: promptFor({
+        question: entry.question,
+        evidence: entry.evidence,
+        ddl: ddlByDb.get(draw.dbId) as string,
+        pack,
+        stated: false,
+        convention: ACTIVE,
+      }),
+      baselineCorrect: entry.withoutMemoryCorrect,
+      relevant: verdict.relevant,
+      cued: verdict.cued,
+    });
+  }
+
   // Counted over the store rather than over the selection: what a reader wants to know is how much
   // of the store the family could not reach, not how much of an already-filtered subset it dropped.
   for (const item of input.items) {
@@ -1822,10 +1885,11 @@ async function densityPass(input: {
     if (item.status === 'active' && domain !== '' && !covered.has(domain)) unplaced += 1;
   }
 
-  const calls = (plans.length + floorPlans.length);
+  const calls = plans.length + floorPlans.length + crossPlans.length;
   process.stdout.write(
     `[sota] density: ${rules.length} rules x ${DENSITY_PANEL} questions from ` +
-      `${panelDbs.length} databases, ${floorPlans.length} floor injections, ${calls} calls\n`,
+      `${panelDbs.length} databases, ${floorPlans.length} floor injections, ` +
+      `${crossPlans.length} foreign injections, ${calls} calls\n`,
   );
 
   let moved = 0;
@@ -1862,8 +1926,10 @@ async function densityPass(input: {
 
   const asked = await mapPool(plans, CONCURRENCY, ask);
   const askedFloor = await mapPool(floorPlans, CONCURRENCY, ask);
+  const askedCross = await mapPool(crossPlans, CONCURRENCY, ask);
   const trials = asked.filter((trial): trial is DensityTrial => trial !== undefined);
   const floorTrials = askedFloor.filter((trial): trial is DensityTrial => trial !== undefined);
+  const crossTrials = askedCross.filter((trial): trial is DensityTrial => trial !== undefined);
   return {
     report: densityReport({
       rules,
@@ -1872,14 +1938,19 @@ async function densityPass(input: {
       floorTrials,
       resamples: RESAMPLES,
       seed: SEED,
+      // Absent rather than empty when the arm was not bought: a foreign reading over zero trials
+      // would fail V24 and read as a finding about transfer instead of about the configuration.
+      ...(crossPlans.length === 0 ? {} : { crossTrials, transferPanel: TRANSFER_PANEL }),
     }),
     excluded,
     rules: rules.length,
     unplaced,
     calls,
-    unmeasured: asked.length + askedFloor.length - trials.length - floorTrials.length,
+    unmeasured:
+      asked.length + askedFloor.length + askedCross.length - trials.length - floorTrials.length - crossTrials.length,
     trials,
     floorTrials,
+    crossTrials,
   };
 }
 
@@ -4302,7 +4373,9 @@ async function main(): Promise<void> {
       corroboration_min: ARMS.has('full-corroborated') ? CORROBORATION : null,
       // The family's shape, so a reader can say which one produced the numbers above.
       density:
-        DENSITY_PANEL === 0 ? null : { panel: DENSITY_PANEL, rules_per_db: DENSITY_RULES_PER_DB },
+        DENSITY_PANEL === 0
+          ? null
+          : { panel: DENSITY_PANEL, rules_per_db: DENSITY_RULES_PER_DB, transfer_panel: TRANSFER_PANEL },
     },
     n: {
       total: rows.length,
@@ -4335,6 +4408,7 @@ async function main(): Promise<void> {
             density: density.report,
             density_ledger: density.trials,
             density_floor_ledger: density.floorTrials,
+            density_transfer_ledger: density.crossTrials,
             density_excluded: density.excluded,
             density_unplaced: density.unplaced,
             density_unmeasured: density.unmeasured,

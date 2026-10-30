@@ -21,8 +21,10 @@ import {
   densityGates,
   type CrossFitRow,
   type DensityReport,
+  type EvidenceRow,
   type PolicyRow,
   type StratumSummary,
+  type TransferRow,
 } from '@agentix-e/microglia-eval';
 
 type Artifact = {
@@ -34,6 +36,7 @@ type Artifact = {
     /** The trials themselves, carried so a different split can be read without new calls. */
     readonly density_ledger?: readonly unknown[];
     readonly density_floor_ledger?: readonly unknown[];
+    readonly density_transfer_ledger?: readonly unknown[];
   };
 };
 
@@ -75,6 +78,35 @@ function crossLine(label: string, row: CrossFitRow): string {
     `${signed(row.deltaPp)} [${row.ciLowPp.toFixed(2)}, ${row.ciHighPp.toFixed(2)}]  ` +
     `+${row.gained} / -${row.lost}  ` +
     `${row.folds} fold(s) x ${row.repeats} repeat(s)\n`
+  );
+}
+
+/**
+ * One stratum of the foreign arm, with its home counterpart beside it.
+ *
+ * The two rates travel together because R6 closed on the break rate: a repair rate whose denominator
+ * drops every trial the rule damages can only go up, and a foreign reading that quotes only the
+ * repair rate would repeat that mistake in a new place.
+ */
+function transferLine(label: string, row: TransferRow): string {
+  const rate = (part: number, whole: number): string =>
+    `${part}/${whole}=${(whole === 0 ? 0 : (part / whole) * 100).toFixed(1)}%`;
+  return (
+    `[density] transfer ${label.padEnd(9)} rules ${String(row.rules).padStart(3)}  ` +
+    `trials ${String(row.trials).padStart(4)}  ${signed(row.deltaPp)} ` +
+    `[${row.ciLowPp.toFixed(2)}, ${row.ciHighPp.toFixed(2)}]  ` +
+    `repair ${rate(row.repaired, row.informative)}  break ${rate(row.broke, row.breakable)}  ` +
+    `home ${signed(row.home.deltaPp)}\n`
+  );
+}
+
+/** One row of the evidence curve: how much the fit was allowed to see, and what it earned. */
+function evidenceLine(row: EvidenceRow): string {
+  return (
+    `[density] evidence m=${String(row.cap).padStart(2)}  ` +
+    `shows ${String(row.shown).padStart(6)} of ${row.injections}  ` +
+    `${signed(row.deltaPp)} [${row.ciLowPp.toFixed(2)}, ${row.ciHighPp.toFixed(2)}]  ` +
+    `+${row.gained} / -${row.lost}\n`
   );
 }
 
@@ -123,12 +155,26 @@ function main(): void {
     process.stdout.write(crossLine('xfit', report.crossFit.store));
     process.stdout.write(crossLine('xfit-fl', report.crossFit.floor));
   }
+  // R9.4: the same rules, pointed at questions from databases that are not their own.
+  if (report.transfer !== undefined) {
+    const transfer = report.transfer;
+    process.stdout.write(
+      `[density] transfer: ${transfer.trials} injection(s) over ${transfer.domains} database(s), ` +
+        `${transfer.offHome} on the rule own, ${transfer.targets} distinct question(s)\n`,
+    );
+    for (const row of transfer.strata) process.stdout.write(transferLine(row.kind, row));
+    process.stdout.write(transferLine('all', transfer.overall));
+  }
+  // R9.5: how many observations a rule needs before the policy may believe its sign.
+  for (const row of report.evidence ?? []) process.stdout.write(evidenceLine(row));
   const ledger = artifact.metrics?.density_ledger?.length ?? 0;
   if (ledger > 0) {
     const floorLedger = artifact.metrics?.density_floor_ledger?.length ?? 0;
+    const crossLedger = artifact.metrics?.density_transfer_ledger?.length ?? 0;
     process.stdout.write(
-      `[density] carried ${ledger} store trial(s) and ${floorLedger} floor trial(s): a different ` +
-        `split can be read from the artefact instead of re-bought\n`,
+      `[density] carried ${ledger} store trial(s), ${floorLedger} floor trial(s) and ` +
+        `${crossLedger} foreign trial(s): a different split can be read from the artefact instead ` +
+        `of re-bought\n`,
     );
   }
   for (const gate of densityGates(report)) {

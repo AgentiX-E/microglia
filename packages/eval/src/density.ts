@@ -205,6 +205,61 @@ export function targetPanels(
  * appears in more than half the targets is not evidence of applicability; the floor is the cheap
  * version of that filter, and it is applied before the schema intersection rather than after.
  */
+/** Where one rule is pointed away from home: the rule, the question, and the database it landed in. */
+export type ForeignTarget = {
+  readonly ruleId: string;
+  readonly targetId: string;
+  readonly dbId: string;
+  /** Position within the rule's foreign panel, which is the trial's `order`. */
+  readonly order: number;
+};
+
+/**
+ * Draw each rule's foreign panel: questions from databases that are not the rule's own.
+ *
+ * The draw has to be a function of the rule's identity and the question's, never of the order the
+ * cases arrive in, or two runs of the same store would measure two different experiments. It also
+ * has to spread: a rule shown ten questions that all came from one other database would measure one
+ * pair of schemas rather than "away from home". So the target databases are ranked by
+ * `hash(ruleId + dbId)`, the questions inside each by `hash(ruleId + id)`, and the panel is taken
+ * round-robin across the databases — the first question from each before the second from any.
+ *
+ * A rule whose panel cannot be filled is filled as far as it goes. The gate counts injections
+ * against `rules x panel` and fails when the shortfall is material, which is the only place a short
+ * panel should be visible.
+ */
+export function foreignPanels(
+  rules: readonly DensityRule[],
+  targets: readonly { readonly id: string; readonly dbId: string }[],
+  panel: number,
+): readonly ForeignTarget[] {
+  const byDb = new Map<string, string[]>();
+  for (const target of targets) {
+    const bucket = byDb.get(target.dbId) ?? [];
+    bucket.push(target.id);
+    byDb.set(target.dbId, bucket);
+  }
+  const out: ForeignTarget[] = [];
+  for (const rule of rules) {
+    const databases = [...byDb.keys()]
+      .filter((dbId) => dbId !== rule.domain)
+      .sort((left, right) => compareByHash(`${rule.id}\u0000${left}`, left, `${rule.id}\u0000${right}`, right));
+    if (databases.length === 0) continue;
+    const ranked = databases.map((dbId) =>
+      [...(byDb.get(dbId) as string[])].sort((left, right) =>
+        compareByHash(`${rule.id}\u0000${left}`, left, `${rule.id}\u0000${right}`, right),
+      ),
+    );
+    for (let at = 0; at < panel; at += 1) {
+      const which = at % databases.length;
+      const targetId = (ranked[which] as string[])[Math.floor(at / databases.length)];
+      if (targetId === undefined) continue;
+      out.push({ ruleId: rule.id, targetId, dbId: databases[which] as string, order: at });
+    }
+  }
+  return out;
+}
+
 export function identifierTokens(text: string): ReadonlySet<string> {
   const tokens = new Set<string>();
   for (const match of text.toLowerCase().matchAll(/[a-z_][a-z0-9_]{2,}/g)) tokens.add(match[0]);
@@ -557,14 +612,24 @@ export function crossFit(
     // how a caller says "use the pre-registered split".
     readonly folds?: number | undefined;
     readonly repeats?: number | undefined;
-    readonly resamples?: number;
-    readonly seed?: number;
+    readonly resamples?: number | undefined;
+    readonly seed?: number | undefined;
+    /**
+     * How many of each rule's observations the fit may look at, counted from the start of its panel.
+     *
+     * The cap restricts the evidence, never the scoring: every trial is still scored once per
+     * repeat, so two caps are two policies measured on the same injections rather than two samples.
+     * That is what makes the curve in `evidenceCurve` a curve and not seven experiments.
+     */
+    readonly evidenceCap?: number | undefined;
   } = {},
 ): CrossFitRow {
   const folds = Math.floor(options.folds ?? CROSS_FOLDS);
   const repeats = Math.floor(options.repeats ?? CROSS_REPEATS);
   if (folds < 2) throw new RangeError(`crossFit needs at least 2 folds, got ${folds}`);
   if (repeats < 1) throw new RangeError(`crossFit needs at least 1 repeat, got ${repeats}`);
+  const cap = options.evidenceCap ?? Number.POSITIVE_INFINITY;
+  if (Math.floor(cap) < 1) throw new RangeError(`crossFit needs at least 1 observation to fit on, got ${cap}`);
   let baseline = 0;
   let treatment = 0;
   let gained = 0;
@@ -577,6 +642,7 @@ export function crossFit(
     for (let fold = 0; fold < folds; fold += 1) {
       const outOfFold = new Map<string, number>();
       for (const trial of trials) {
+        if (trial.order >= cap) continue;
         if (assignment.get(`${trial.ruleId}\u0000${trial.order}`) === fold) continue;
         outOfFold.set(trial.ruleId, (outOfFold.get(trial.ruleId) ?? 0) + trialDelta(trial));
       }
@@ -736,6 +802,264 @@ export function signPersistence(rows: readonly RuleDensityRow[]): SignPersistenc
 }
 
 /** Everything one density run measured. */
+/** The four ways a foreign trial is grouped: all of them, or by what the rule did at home. */
+export type TransferKind = 'all' | 'positive' | 'zero' | 'negative';
+
+/** A rule's effect away from home, in the units R9.4 fixed before the dispatch. */
+export type TransferRow = {
+  readonly kind: TransferKind;
+  /** Distinct rules that contributed a trial to this row. */
+  readonly rules: number;
+  readonly trials: number;
+  readonly deltaPp: number;
+  readonly ciLowPp: number;
+  readonly ciHighPp: number;
+  /** Trials the control failed, and the ones the rule then got right: R6's repair rate. */
+  readonly repaired: number;
+  readonly informative: number;
+  readonly repairRate: number;
+  /** Trials the control passed, and the ones the rule then broke: the side R6 closed on. */
+  readonly broke: number;
+  readonly breakable: number;
+  readonly breakRate: number;
+  /**
+   * The same rules on their home questions, so a foreign rate has something to be a fraction of.
+   *
+   * R6's axis closed on the break rate because a repair rate whose denominator drops every trial
+   * the rule damages can only go up. A foreign reading that quotes only the repair rate would
+   * repeat that mistake in a new place, so both travel together.
+   */
+  readonly home: {
+    readonly trials: number;
+    readonly deltaPp: number;
+    readonly repairRate: number;
+    readonly breakRate: number;
+  };
+};
+
+export type TransferReading = {
+  /** Targets demanded per rule, which is the count V24 holds the reading to. */
+  readonly panel: number;
+  readonly rules: number;
+  readonly trials: number;
+  /** Distinct foreign questions, and the databases they came from. */
+  readonly targets: number;
+  readonly domains: number;
+  /** Injections that landed on the rule's own database: the failure V24 exists to catch. */
+  readonly offHome: number;
+  readonly overall: TransferRow;
+  /**
+   * Positive, zero and negative, in that order, as a tuple rather than a list.
+   *
+   * The three strata always exist — a rule's home net is above, below or at zero — and a caller that
+   * had to search for the positive one would be writing a branch that cannot be taken. The tuple
+   * says so in the type, so `strata[0]` is the positive stratum without a fallback that never runs.
+   */
+  readonly strata: readonly [TransferRow, TransferRow, TransferRow];
+};
+
+/** The counts a row is made of, so the delta and the two rates share one pass over the trials. */
+function countsOf(trials: readonly DensityTrial[]): {
+  readonly trials: number;
+  readonly repaired: number;
+  readonly informative: number;
+  readonly broke: number;
+  readonly breakable: number;
+  readonly delta: number;
+} {
+  let repaired = 0;
+  let informative = 0;
+  let broke = 0;
+  let breakable = 0;
+  let delta = 0;
+  for (const trial of trials) {
+    delta += trialDelta(trial);
+    if (trial.baselineCorrect) {
+      breakable += 1;
+      if (!trial.correct) broke += 1;
+    } else {
+      informative += 1;
+      if (trial.correct) repaired += 1;
+    }
+  }
+  return { trials: trials.length, repaired, informative, broke, breakable, delta };
+}
+
+/** One row of the transfer reading, over the foreign trials and the home trials of the same rules. */
+function transferRow(
+  kind: TransferKind,
+  trials: readonly DensityTrial[],
+  homeTrials: readonly DensityTrial[],
+  options: { readonly resamples: number; readonly seed: number },
+): TransferRow {
+  const counts = countsOf(trials);
+  const home = countsOf(homeTrials);
+  const interval = clusterBootstrapCI(
+    trials.map((trial) => trialDelta(trial)),
+    trials.map((trial) => trial.targetId),
+    options.resamples,
+    options.seed,
+  );
+  return {
+    kind,
+    rules: new Set(trials.map((trial) => trial.ruleId)).size,
+    trials: counts.trials,
+    deltaPp: share(counts.delta, counts.trials) * 100,
+    ciLowPp: interval.low * 100,
+    ciHighPp: interval.high * 100,
+    repaired: counts.repaired,
+    informative: counts.informative,
+    repairRate: share(counts.repaired, counts.informative),
+    broke: counts.broke,
+    breakable: counts.breakable,
+    breakRate: share(counts.broke, counts.breakable),
+    home: {
+      trials: home.trials,
+      deltaPp: share(home.delta, home.trials) * 100,
+      repairRate: share(home.repaired, home.informative),
+      breakRate: share(home.broke, home.breakable),
+    },
+  };
+}
+
+/**
+ * Does a rule that worked at home still work away from home?
+ *
+ * Every trial in the family before this one put a rule on a question from its own database, so the
+ * 1.33pp R9.3 measured is the value of a rule *in its own schema*. A deployment does not have that
+ * guarantee: a store that is retrieved across databases puts a rule about `financial` onto a
+ * question about `formula_1`, and nothing in this programme has measured what that does. The floor
+ * measures the mirror image — a foreign rule on a home question — and earns +0.05pp; this measures
+ * the rule's own direction.
+ *
+ * The strata are the point. A rule that never worked at home cannot "transfer", so the claim is
+ * about rules whose in-domain net was positive, and the zero and negative strata are carried beside
+ * it to show what the same material does when it was never worth showing. A stratification by the
+ * foreign outcome would be circular: it would sort rules by the very number it then reports.
+ *
+ * A rule with no home trial is placed in the zero stratum rather than dropped. It has no home
+ * evidence, which is precisely what zero means here, and dropping it would silently shrink the
+ * denominator of every rate in the reading.
+ */
+export function transferOf(input: {
+  readonly trials: readonly DensityTrial[];
+  readonly homeTrials: readonly DensityTrial[];
+  readonly panel: number;
+  readonly resamples?: number;
+  readonly seed?: number;
+}): TransferReading {
+  const options = { resamples: input.resamples ?? 10_000, seed: input.seed ?? 7 };
+  const net = new Map<string, number>();
+  const domain = new Map<string, string>();
+  for (const trial of input.homeTrials) {
+    net.set(trial.ruleId, (net.get(trial.ruleId) ?? 0) + trialDelta(trial));
+    domain.set(trial.ruleId, trial.domain);
+  }
+  const kindOf = (ruleId: string): TransferKind => {
+    const value = net.get(ruleId) ?? 0;
+    if (value > 0) return 'positive';
+    return value < 0 ? 'negative' : 'zero';
+  };
+  const rowOf = (kind: TransferKind): TransferRow => {
+    const held = input.trials.filter((trial) => kindOf(trial.ruleId) === kind);
+    const rules = new Set(held.map((trial) => trial.ruleId));
+    return transferRow(
+      kind,
+      held,
+      input.homeTrials.filter((trial) => rules.has(trial.ruleId)),
+      options,
+    );
+  };
+  return {
+    panel: input.panel,
+    rules: new Set(input.trials.map((trial) => trial.ruleId)).size,
+    trials: input.trials.length,
+    targets: new Set(input.trials.map((trial) => trial.targetId)).size,
+    domains: new Set(input.trials.map((trial) => trial.domain)).size,
+    // A rule whose home database is unknown cannot land on it, so it is not counted either way.
+    offHome: input.trials.filter((trial) => domain.get(trial.ruleId) === trial.domain).length,
+    overall: transferRow('all', input.trials, input.homeTrials, options),
+    strata: [rowOf('positive'), rowOf('zero'), rowOf('negative')],
+  };
+}
+
+/** One row of the evidence curve: the policy fitted on the first `cap` observations of each rule. */
+export type EvidenceRow = {
+  readonly cap: number;
+  readonly deltaPp: number;
+  readonly ciLowPp: number;
+  readonly ciHighPp: number;
+  readonly shown: number;
+  readonly injections: number;
+  readonly gained: number;
+  readonly lost: number;
+};
+
+/** The caps R9.5 fixed before the dispatch: four observations up to the whole panel. */
+const EVIDENCE_CAPS: readonly number[] = [4, 6, 8, 10, 12, 16, 20];
+
+/**
+ * The caps a panel can actually be read at.
+ *
+ * A cap larger than the panel is not a reading, it is the same reading twice, and a panel of two
+ * questions has no curve in it at all — so the default list is trimmed to what the panel can
+ * support, and a panel too small for two of them falls back to its own two halves rather than
+ * reporting a curve of one point.
+ */
+function capsFor(panel: number): readonly number[] {
+  const fits = EVIDENCE_CAPS.filter((cap) => cap <= panel);
+  return fits.length >= 2 ? fits : [Math.max(1, Math.floor(panel / 2)), panel];
+}
+
+/**
+ * How many observations does a rule need before its sign may be believed?
+ *
+ * The policy is "show the rule when its out-of-fold net is positive", and the fold count decides
+ * how much of the panel the fit may see: five folds leave sixteen observations, two folds leave ten
+ * and collapse the reading to nothing. So the amount of evidence is a parameter of the policy
+ * rather than a property of the workload, and a deployment that distils a rule has to pay for it
+ * before it may show the rule at all.
+ *
+ * Each row caps the fit at the first `cap` observations of every rule and scores the whole panel, so
+ * the rows are paired: same injections, same questions, same clusters, one knob. The interval is a
+ * bootstrap at a lower resample count than the headline readings — this is seven readings of one
+ * panel and four thousand resamples would only make the same interval slower to print.
+ */
+export function evidenceCurve(
+  trials: readonly DensityTrial[],
+  options: {
+    readonly caps?: readonly number[];
+    readonly folds?: number;
+    readonly repeats?: number;
+    readonly resamples?: number;
+    readonly seed?: number;
+  } = {},
+): readonly EvidenceRow[] {
+  const caps = options.caps ?? EVIDENCE_CAPS;
+  for (const cap of caps) {
+    if (Math.floor(cap) < 1) throw new RangeError(`a cap needs at least 1 observation, got ${cap}`);
+  }
+  return caps.map((cap) => {
+    const row = crossFit(trials, {
+      folds: options.folds,
+      repeats: options.repeats,
+      resamples: options.resamples ?? 2_000,
+      seed: options.seed,
+      evidenceCap: cap,
+    });
+    return {
+      cap: Math.floor(cap),
+      deltaPp: row.deltaPp,
+      ciLowPp: row.ciLowPp,
+      ciHighPp: row.ciHighPp,
+      shown: row.shown,
+      injections: row.injections,
+      gained: row.gained,
+      lost: row.lost,
+    };
+  });
+}
+
 export type DensityReport = {
   /** Questions each rule was shown, fixed before the run. */
   readonly panel: number;
@@ -759,6 +1083,16 @@ export type DensityReport = {
    * cross-fit actually ran.
    */
   readonly crossFit?: { readonly store: CrossFitRow; readonly floor: CrossFitRow };
+  /** What a rule that worked at home does on a question from another database: R9.4's reading. */
+  readonly transfer?: TransferReading;
+  /**
+   * The cross-fit again with the fit pool capped, from four observations to the whole panel.
+   *
+   * Absent from artefacts written before the curve existed: it is recomputable from the carried
+   * ledger at no cost, but a published report is a record of what was measured, not of what could
+   * be, so the field is absent rather than backfilled.
+   */
+  readonly evidence?: readonly EvidenceRow[];
   /** The ledger itself, so a policy's fit can be re-examined without the trials. */
   readonly perRule: readonly RuleDensityRow[];
   readonly signs: SignPersistence;
@@ -773,6 +1107,10 @@ export type DensityInput = {
   readonly seed?: number;
   readonly folds?: number;
   readonly repeats?: number;
+  /** The foreign trials, absent when the run bought no cross-database arm. */
+  readonly crossTrials?: readonly DensityTrial[];
+  /** Targets demanded per rule on the foreign panel, which is what V24 checks the count against. */
+  readonly transferPanel?: number;
 };
 
 /**
@@ -812,6 +1150,17 @@ export function densityReport(input: DensityInput): DensityReport {
       store: crossFit(input.trials, { ...options, folds: input.folds, repeats: input.repeats }),
       floor: crossFit(input.floorTrials, { ...options, folds: input.folds, repeats: input.repeats }),
     },
+    ...(input.crossTrials === undefined
+      ? {}
+      : {
+          transfer: transferOf({
+            trials: input.crossTrials,
+            homeTrials: input.trials,
+            panel: input.transferPanel ?? 0,
+            ...options,
+          }),
+        }),
+    evidence: evidenceCurve(input.trials, { ...options, caps: capsFor(input.panel) }),
     perRule,
     signs: signPersistence(perRule),
   };
@@ -864,7 +1213,66 @@ export function densityGates(report: DensityReport): readonly ValidityGate[] {
       blocking: false,
     },
     ...(report.crossFit === undefined ? [] : crossFitGates(report.crossFit, report.injections)),
+    ...(report.transfer === undefined ? [] : transferGates(report.transfer, report.rules)),
+    ...(report.evidence === undefined ? [] : [evidenceGate(report.evidence, report.panel)]),
   ];
+}
+
+/**
+ * R9.4's two bars: one for the bookkeeping, one for the claim.
+ *
+ * Both are emitted only when the run bought a cross-database arm, for the same reason the cross-fit
+ * bars are: a bar that cannot be evaluated is not a failed bar, and the artefacts published before
+ * this reading existed still have to be readable.
+ */
+function transferGates(transfer: TransferReading, rules: number): readonly ValidityGate[] {
+  const stratified = transfer.strata.reduce((sum, row) => sum + row.trials, 0);
+  const positive = transfer.strata[0];
+  // Counted over the rules the family *selected*, not over the ones that reached the ledger: a rule
+  // that was pointed nowhere would otherwise shrink the denominator it is measured against.
+  const coverage = rules * transfer.panel;
+  return [
+    {
+      id: 'V24-density-transfer-covers',
+      criterion: 'every injection landed on a database that is not the rule own, and the strata reconcile',
+      actual:
+        `${transfer.trials} of ${coverage} injection(s) over ${transfer.domains} ` +
+        `database(s), ${transfer.offHome} on the rule own`,
+      pass:
+        transfer.trials > 0 &&
+        transfer.offHome === 0 &&
+        stratified === transfer.trials &&
+        transfer.trials >= Math.floor(coverage * 0.9),
+      blocking: true,
+    },
+    {
+      id: 'V25-density-transfer-holds',
+      criterion: 'rules that worked at home earn a positive delta on foreign questions',
+      actual:
+        `${positive.deltaPp.toFixed(2)}pp [${positive.ciLowPp.toFixed(2)}, ${positive.ciHighPp.toFixed(2)}] ` +
+        `over ${positive.trials} injection(s), home ${positive.home.deltaPp.toFixed(2)}pp`,
+      pass: positive.deltaPp > 0,
+      blocking: false,
+    },
+  ];
+}
+
+/**
+ * R9.5's bar is that the curve is a curve.
+ *
+ * The reading itself is descriptive — there is no threshold a knee has to clear — but a curve whose
+ * largest cap equals its smallest is one point printed seven times, and a cap above the panel is the
+ * whole-panel reading wearing a different label. Both would look like a measurement in the summary.
+ */
+function evidenceGate(evidence: readonly EvidenceRow[], panel: number): ValidityGate {
+  const caps = evidence.map((row) => row.cap);
+  return {
+    id: 'V26-density-evidence-curve',
+    criterion: 'the curve spans at least two caps, all of them inside the panel',
+    actual: `caps ${caps.join(', ')} of a ${panel}-question panel`,
+    pass: caps.length >= 2 && Math.min(...caps) < panel && Math.max(...caps) <= panel,
+    blocking: true,
+  };
 }
 
 /**

@@ -47,6 +47,10 @@ on:
         description: 'R9.1: rules drawn from each database, by content hash (8 per database is ~1,400 calls at a panel of 20)'
         required: false
         default: '8'
+      transfer_panel:
+        description: 'R9.4: questions from other databases each exercised rule is shown (0 disables the foreign arm; 10 is the pre-registered panel)'
+        required: false
+        default: '10'
       sample_temperature:
         description: 'Temperature for the sample-N arms (0 would make every draw identical)'
         required: false
@@ -189,6 +193,7 @@ jobs:
           SOTA_TRANSFER_TARGETS: ${{ github.event.inputs.transfer_targets || '4' }}
           SOTA_DENSITY_PANEL: ${{ github.event.inputs.density_panel || '0' }}
           SOTA_DENSITY_RULES_PER_DB: ${{ github.event.inputs.density_rules_per_db || '8' }}
+          SOTA_TRANSFER_PANEL: ${{ github.event.inputs.transfer_panel || '10' }}
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '8000' }}
         run: pnpm eval:sota
 
@@ -372,6 +377,30 @@ jobs:
                     m.density.crossFit[k].ciLowPp.toFixed(2) + ', ' +
                     m.density.crossFit[k].ciHighPp.toFixed(2) + '] | ' +
                     m.density.crossFit[k].folds + ' x ' + m.density.crossFit[k].repeats + ' |'),
+                ]),
+                // R9.4: the same rules away from home. The two rates travel with the delta because
+                // R6 closed on the break rate: a repair rate whose denominator drops every trial the
+                // rule damages can only go up, and a foreign reading that quotes only the repair
+                // rate would repeat that mistake in a new place.
+                ...(m.density.transfer === undefined ? [] : [
+                  '',
+                  '| Transfer (R9.4) | rules | trials | delta | 95% CI | repair | break | home delta |',
+                  '| --- | --- | --- | --- | --- | --- | --- | --- |',
+                  ...[...m.density.transfer.strata, m.density.transfer.overall].map((t) => '| ' +
+                    t.kind + ' | ' + t.rules + ' | ' + t.trials + ' | ' + t.deltaPp.toFixed(2) +
+                    'pp | [' + t.ciLowPp.toFixed(2) + ', ' + t.ciHighPp.toFixed(2) + '] | ' +
+                    t.repaired + '/' + t.informative + ' | ' + t.broke + '/' + t.breakable + ' | ' +
+                    t.home.deltaPp.toFixed(2) + 'pp |'),
+                ]),
+                // R9.5: how many observations the fit was allowed to see, and what that was worth.
+                ...(m.density.evidence === undefined ? [] : [
+                  '',
+                  '| Evidence (R9.5) | fit sees | shown | delta | 95% CI | + / - |',
+                  '| --- | --- | --- | --- | --- | --- |',
+                  ...m.density.evidence.map((e) => '| m=' + e.cap + ' | ' + e.cap +
+                    ' observation(s) | ' + e.shown + '/' + e.injections + ' | ' +
+                    e.deltaPp.toFixed(2) + 'pp | [' + e.ciLowPp.toFixed(2) + ', ' +
+                    e.ciHighPp.toFixed(2) + '] | +' + e.gained + ' / -' + e.lost + ' |'),
                 ]),
               ]),
             ];
