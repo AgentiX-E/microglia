@@ -362,6 +362,14 @@ shown in, by the Jaccard overlap of the two names' `snake_case` parts (identity 
 `unit_price` 0.5, nothing below 0.5). Ties go to the shorter name. Two slots never bind to one
 candidate, and a slot with no candidate withholds the rule.
 
+**Link binding** — Filling a template's slots from the schema the *question* links rather than from
+the whole target schema: a table slot binds to a table the question names, and a column slot binds
+inside the table its template reached, by name overlap **and** agreement in kind (`integer`, `text`,
+`real`, `temporal`, `blob`, with an undeclared type agreeing with everything). It halves the withheld
+share of a store (66.8% → 48.6% of rules) and does not carry a rule across a schema boundary in
+practice: of the attempts it still refuses, six in ten are a column the target database does not have
+at all.
+
 **Withheld** — A rule the binder refused to show because at least one slot had no referent in the
 target schema. A withheld attempt makes no model call, contributes no trial, and is counted: `V28`
 holds `bound + slotless` equal to the rule-database pairs the foreign ledger carries, so a rule that
@@ -371,7 +379,9 @@ vanishes is visible as a defect rather than plausible as a result.
 no model call (`pnpm eval:template`). It is the number that decides whether a transfer arm is worth
 dispatching: at 66.8% withheld, an experiment on this store would measure the binder. `homeless`
 rules (no home database) and `unplaced` ones (no foreign schema to be shown in) are counted
-separately, because neither is a failure of the binder.
+separately, because neither is a failure of the binder. Two censuses run: `name` against whole
+schemas (one attempt per rule-database pair) and `link` against questions (one attempt per
+rule-question pair), and each writes its own artefact so the two readings cannot be confused.
 
 **Attempt timeout** — How long one request may take, derived from the reply it was allowed to
 produce: `25s + 140ms/token`, capped at 300s. A constant is a bug that hides until a run is long,

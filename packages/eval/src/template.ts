@@ -108,6 +108,16 @@ export type BoundSlot = {
   readonly target: string;
   /** 1 for the same name, less as the names diverge. Carried so a reader can audit the binding. */
   readonly score: number;
+  /**
+   * How the referent was found, when the caller can tell the two apart.
+   *
+   * `name` is this module's binder: the target happens to spell the object the way the rule does.
+   * `link` is R11's: the target question names the object, so the slot is a role the question fills
+   * and the score is 0 by construction — nothing in the spelling said so. Left optional because a
+   * caller that only compares names (R10's census, every unit test here) has nothing to say about it,
+   * and a required field would be filled with a constant that looks like evidence.
+   */
+  readonly via?: 'name' | 'link';
 };
 
 export type Binding =
@@ -150,7 +160,7 @@ export function nameScore(slot: string, candidate: string): number {
 }
 
 /** Below this, two names share too little to be the same element under another name. */
-const MIN_SCORE = 0.5;
+export const MIN_NAME_SCORE = 0.5;
 
 /**
  * The candidate a slot binds to, or `undefined` when the target has nothing close enough.
@@ -174,7 +184,7 @@ function pickForSlot(
     // rule never claimed.
     if (taken.has(`${slot.kind}\u0000${candidate}`)) continue;
     const score = nameScore(slot.name, candidate);
-    if (score < MIN_SCORE) continue;
+    if (score < MIN_NAME_SCORE) continue;
     if (
       best === undefined ||
       score > best.score ||
@@ -203,7 +213,7 @@ export function bindTemplate(template: RuleTemplate, target: SchemaNames): Bindi
     const picked = pickForSlot(slot, target, taken);
     if (picked === undefined) return { ok: false, slot };
     taken.add(`${slot.kind}\u0000${picked.target}`);
-    bindings.push({ slot, target: picked.target, score: picked.score });
+    bindings.push({ slot, target: picked.target, score: picked.score, via: 'name' });
   }
   let statement = template.text;
   for (const binding of bindings) {
@@ -213,10 +223,21 @@ export function bindTemplate(template: RuleTemplate, target: SchemaNames): Bindi
 }
 
 /** What one rule's binding produced: shown, withheld, or carried as prose because it named nothing. */
+/**
+ * Why a slot could not be bound, when the binder can say.
+ *
+ * A census that reports only "62% withheld" says the construction is partial; a census that says
+ * "31 points of it were columns whose names the target does not have, and 8 were columns it has under
+ * another kind" says which half of the idea to change. Optional, because the name binder has one
+ * reason and R10's record was taken without it.
+ */
+export type WithheldReason = 'no-table' | 'table-tie' | 'no-column' | 'column-kind';
+
 export type TemplateOutcome =
   | { readonly status: 'bound'; readonly statement: string; readonly bindings: readonly BoundSlot[] }
   | { readonly status: 'slotless'; readonly statement: string }
-  | { readonly status: 'withheld'; readonly slot: TemplateSlot };
+  | { readonly status: 'withheld'; readonly slot: TemplateSlot; readonly reason?: WithheldReason };
+
 
 /**
  * The one call a lane makes: a statement, the schema it was written in, the schema it is shown in.
@@ -253,6 +274,8 @@ export type TemplateCoverage = {
   readonly withheldShare: number;
   /** Every distinct slot name that stopped an attempt, with the count. A reader can check the binder. */
   readonly blockers: readonly { readonly name: string; readonly kind: SlotKind; readonly attempts: number }[];
+  /** Why the withheld attempts failed, when the binder said. `unstated` for a binder that cannot. */
+  readonly reasons: readonly { readonly reason: WithheldReason | 'unstated'; readonly attempts: number }[];
 };
 
 /**
@@ -289,6 +312,7 @@ export function templateCoverage(attempts: readonly TemplateAttempt[]): Template
   const seen = new Set<string>();
   const ruleIds = new Set<string>();
   const blockers = new Map<string, { name: string; kind: SlotKind; attempts: number }>();
+  const reasons = new Map<WithheldReason | 'unstated', number>();
   for (const attempt of attempts) {
     if (seen.has(attempt.key)) continue;
     seen.add(attempt.key);
@@ -304,6 +328,8 @@ export function templateCoverage(attempts: readonly TemplateAttempt[]): Template
         kind: attempt.outcome.slot.kind,
         attempts: (previous?.attempts ?? 0) + 1,
       });
+      const reason = attempt.outcome.reason ?? 'unstated';
+      reasons.set(reason, (reasons.get(reason) ?? 0) + 1);
     }
   }
   const total = bound + slotless + withheld;
@@ -316,6 +342,9 @@ export function templateCoverage(attempts: readonly TemplateAttempt[]): Template
     blockers: [...blockers.values()].sort(
       (left, right) => right.attempts - left.attempts || left.name.localeCompare(right.name),
     ),
+    reasons: [...reasons.entries()]
+      .map(([reason, count]) => ({ reason, attempts: count }))
+      .sort((left, right) => right.attempts - left.attempts || left.reason.localeCompare(right.reason)),
   };
 }
 

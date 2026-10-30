@@ -130,6 +130,7 @@ import {
   transferringItemIds,
   verdictOf,
   schemaWithValues,
+  schemaSql,
   poolSummary,
   readComposite,
   signalReadings,
@@ -629,7 +630,7 @@ type CaseOutcome = {
    * the pool it was computed over contained more than one answer. This field is what allows the
    * generator pool to be described with the same collapse statistic the sampling pool gets.
    */
-  readonly arm_keys: Record<string, string | null>;
+  readonly arm_result_digests: Record<string, string | null>;
   readonly armPackChars: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>>;
   /** The claims the `full` arm injected, as text: the input to the relevance audit. */
   readonly injected: readonly string[];
@@ -968,31 +969,6 @@ async function loadDataset(limit: number): Promise<Dataset> {
 }
 
 /**
- * The schema of a database, read once.
- *
- * Every prompt carries the DDL, so without a cache the lane opens the larger
- * databases (1.08 M rows for `financial`) once per arm per question — a thousand
- * opens to read eleven strings that cannot change during a run.
- */
-const schemaCache = new Map<string, string>();
-
-function ddlOf(dbPath: string): string {
-  const cached = schemaCache.get(dbPath);
-  if (cached !== undefined) return cached;
-  const db = new DatabaseSync(dbPath, { readOnly: true });
-  try {
-    const rows = db
-      .prepare("select sql from sqlite_master where type='table' and sql is not null order by name")
-      .all() as { sql: string }[];
-    const ddl = rows.map((row) => row.sql).join('\n');
-    schemaCache.set(dbPath, ddl);
-    return ddl;
-  } finally {
-    db.close();
-  }
-}
-
-/**
  * A few distinct values per column, read once per database.
  *
  * Cached for the same reason the DDL is: eleven databases, thirty-odd questions each, and a sample
@@ -1054,7 +1030,7 @@ function valuesDdl(dbPath: string): { ddl: string; stats: { tables: number; colu
     db.close();
   }
   const entry = {
-    ddl: schemaWithValues(ddlOf(dbPath), (table) => samples.get(table) ?? []),
+    ddl: schemaWithValues(schemaSql(dbPath), (table) => samples.get(table) ?? []),
     stats,
   };
   valuesCache.set(dbPath, entry);
@@ -1156,13 +1132,18 @@ function scalarOf(dbPath: string, sql: string): number | undefined {
 type Judged = {
   readonly sql: string;
   /**
-   * The execution result as a canonical key, or null when nothing ran.
+   * The execution result as a digest, or null when nothing ran.
    *
    * Two arms that execute to the same rows produced the same answer, whatever their statements look
    * like. This is the field that lets the generator pool be described instead of counted: three
    * procedures that all write a different-looking query executing to one result are a pool of one.
+   *
+   * A **digest**, because the key itself can be enormous: one `card_games` question returns 12 MB of
+   * rows, and the dev run that stored the keys whole wrote a 38 MB evidence file of which 37.9 MB was
+   * that single field. Equality is the only question anything here asks of the field, so a 128-bit
+   * prefix of its SHA-256 answers the same question at a fixed size.
    */
-  readonly resultKey: string | null;
+  readonly resultDigest: string | null;
   /** The configured reading, which is what every published number is scored by. */
   readonly correct: boolean;
   /** The other reading of the same execution, scored in the same run. */
@@ -1244,7 +1225,7 @@ function judgeReply(
     // over the multiset: the same answer reached by two statements has one key. A failed execution
     // has no key at all, deliberately — a statement that did not run is not an answer, and counting
     // its absence as one would let a pool of one answer and three errors look like a pool of four.
-    resultKey: predicted.ok ? predicted.rows.join('\u0001') : null,
+    resultDigest: predicted.ok ? digestOf(predicted.rows.join('\u0001')) : null,
     correct,
     shadowCorrect,
     parseOk,
@@ -1256,6 +1237,18 @@ function judgeReply(
 
 function idOfRow(row: BirdRow): string {
   return `${row.db_id}#${row.question_id}`;
+}
+
+/**
+ * A fixed-width identity for one execution result.
+ *
+ * Every comparison in the union and in the arm-pair analysis is equality, so 128 bits of SHA-256
+ * answers the question a 12 MB string answered — and costs 40 bytes to store instead of 12 MB. The
+ * width is set by the number of results a run holds (thousands), where a 128-bit collision is not a
+ * risk worth a byte.
+ */
+function digestOf(rows: string): string {
+  return createHash('sha256').update(rows).digest('hex').slice(0, 32);
 }
 
 /**
@@ -1368,7 +1361,7 @@ async function learn(
         promptFor({
           question: row.question,
           evidence: row.evidence,
-          ddl: ddlOf(dataset.dbPath(row.db_id)),
+          ddl: schemaSql(dataset.dbPath(row.db_id)),
           pack: '',
           stated: false,
           convention: ACTIVE,
@@ -1658,7 +1651,7 @@ async function probeMemory(
       bump(skipped, 'no-items');
       continue;
     }
-    const ddl = ddlOf(dataset.dbPath(row.db_id));
+    const ddl = schemaSql(dataset.dbPath(row.db_id));
     detailById.set(taskId, { row, attempt, failure, ddl, kind });
     const base = { question: row.question, evidence: row.evidence, ddl, attempt, failure };
     plans.push({
@@ -1955,7 +1948,7 @@ async function densityPass(input: {
     const dbPath = input.dataset.dbPath(dbId);
     const index = schemaIndex(dbPath);
     const schema = new Set([...index.tables, ...index.columns]);
-    const ddl = ddlOf(dbPath);
+    const ddl = schemaSql(dbPath);
     const here = rules.filter((rule) => rule.domain === dbId);
     for (const rule of here) {
       const item = itemById.get(rule.id) as KnowledgeItem;
@@ -2054,7 +2047,7 @@ async function densityPass(input: {
     const rule = rules.find((candidate) => candidate.id === draw.ruleId) as DensityRule;
     if (!ddlByDb.has(draw.dbId)) {
       const index = schemaIndex(input.dataset.dbPath(draw.dbId));
-      ddlByDb.set(draw.dbId, ddlOf(input.dataset.dbPath(draw.dbId)));
+      ddlByDb.set(draw.dbId, schemaSql(input.dataset.dbPath(draw.dbId)));
       schemaByDb.set(draw.dbId, new Set([...index.tables, ...index.columns]));
     }
     const pack = shownPack(rule, draw.dbId);
@@ -2574,7 +2567,7 @@ async function validateMemory(
         promptFor({
           question: row.question,
           evidence: row.evidence,
-          ddl: ddlOf(dataset.dbPath(row.db_id)),
+          ddl: schemaSql(dataset.dbPath(row.db_id)),
           pack,
           stated: false,
           convention: ACTIVE,
@@ -2784,7 +2777,7 @@ async function runFold(
       prompt: promptFor({
         question: row.question,
         evidence: row.evidence,
-        ddl: schema ?? ddlOf(dataset.dbPath(row.db_id)),
+        ddl: schema ?? schemaSql(dataset.dbPath(row.db_id)),
         pack: packText,
         stated: arm === 'stated',
         convention: ACTIVE,
@@ -3098,7 +3091,7 @@ async function runFold(
     }
     if (ARMS.has('linked')) {
       const linked = linkSchema(
-        ddlOf(dataset.dbPath(row.db_id)),
+        schemaSql(dataset.dbPath(row.db_id)),
         row.question,
         row.evidence,
       );
@@ -3259,7 +3252,7 @@ async function runFold(
           prompt: retryPromptFor({
             question: row.question,
             evidence: row.evidence,
-            ddl: ddlOf(dataset.dbPath(row.db_id)),
+            ddl: schemaSql(dataset.dbPath(row.db_id)),
             attempt: reply.text,
             failure,
             pack,
@@ -3311,7 +3304,7 @@ async function runFold(
             {
               question: row.question,
               evidence: row.evidence,
-              ddl: ddlOf(dataset.dbPath(row.db_id)),
+              ddl: schemaSql(dataset.dbPath(row.db_id)),
               draft: draft.text,
               pack: pack.rendered,
             },
@@ -3798,7 +3791,7 @@ async function runFold(
     const pick = (arm: ArmName): Judged =>
       judged.get(`${position}:${arm}`) ?? {
         sql: '',
-        resultKey: null,
+        resultDigest: null,
         correct: false,
         shadowCorrect: false,
         parseOk: false,
@@ -3817,7 +3810,7 @@ async function runFold(
     const armPackChars: Partial<Record<Exclude<ArmName, 'none' | 'full'>, number>> = {};
     // Keyed by arm name with the control included, because the pool a chooser chooses from contains
     // the control: a generator that reproduces the direct answer adds a call and no candidate.
-    const armKeys: Record<string, string | null> = { none: base.resultKey };
+    const armDigests: Record<string, string | null> = { none: base.resultDigest };
     for (const plan of plans) {
       if (plan.position !== position) continue;
       if (plan.arm === 'none' || plan.arm === 'full') continue;
@@ -3825,7 +3818,7 @@ async function runFold(
       arms[plan.arm] = result.correct;
       shadowArms[plan.arm] = result.shadowCorrect;
       armSql[plan.arm] = result.sql;
-      armKeys[plan.arm] = result.resultKey;
+      armDigests[plan.arm] = result.resultDigest;
       armPackIds[plan.arm] = plan.packIds;
       armPackChars[plan.arm] = plan.packChars;
     }
@@ -3865,7 +3858,7 @@ async function runFold(
       latencyMs: full.latencyMs,
       arms,
       shadowArms,
-      arm_keys: armKeys,
+      arm_result_digests: armDigests,
       armSql,
       armPackIds,
       armPackChars,
@@ -4978,7 +4971,7 @@ async function main(): Promise<void> {
           measured.map((item) => ({
             id: item.id,
             correct: { none: item.withoutMemoryCorrect, ...item.arms },
-            keys: item.arm_keys,
+            keys: item.arm_result_digests,
           })),
           'none',
           ['none', ...generators],

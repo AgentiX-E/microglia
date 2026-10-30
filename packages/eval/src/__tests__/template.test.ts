@@ -72,7 +72,7 @@ describe('bindTemplate', () => {
     expect(binding.ok).toBe(true);
     expect(binding).toMatchObject({ statement: 'Cast price to real' });
     expect(binding.ok && binding.bindings).toEqual([
-      { slot: { name: 'price', kind: 'column' }, target: 'price', score: 1 },
+      { slot: { name: 'price', kind: 'column' }, target: 'price', score: 1, via: 'name' },
     ]);
   });
 
@@ -129,7 +129,7 @@ describe('transferStatement', () => {
     expect(outcome).toEqual({
       status: 'bound',
       statement: 'Cast unit_price to real',
-      bindings: [{ slot: { name: 'price', kind: 'column' }, target: 'unit_price', score: 0.5 }],
+      bindings: [{ slot: { name: 'price', kind: 'column' }, target: 'unit_price', score: 0.5, via: 'name' }],
     });
   });
 
@@ -185,6 +185,7 @@ describe('templateCoverage', () => {
       rules: 0,
       withheldShare: 0,
       blockers: [],
+      reasons: [],
     });
   });
 });

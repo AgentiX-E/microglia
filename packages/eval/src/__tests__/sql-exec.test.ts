@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterAll, describe, expect, it } from 'vitest';
-import { executeQuery, groundedItems, resolveDatabase, rowsDiffer, schemaIndex } from '../sql-exec.js';
+import { executeQuery, groundedItems, resolveDatabase, rowsDiffer, schemaIndex, schemaSql, tableShapes } from '../sql-exec.js';
 
 const directory = mkdtempSync(join(tmpdir(), 'microglia-sql-'));
 const database = join(directory, 'fixture.sqlite');
@@ -173,6 +173,68 @@ describe('resolveDatabase', () => {
     expect(resolveDatabase(join(directory, 'absent-dir'), 'gone')).toBe(
       join(directory, 'absent-dir', 'gone.sqlite'),
     );
+  });
+});
+
+describe('schemaSql', () => {
+  it('joins the stored CREATE statements in name order, and remembers the answer', () => {
+    const path = join(directory, 'ordered.sqlite');
+    const db = new DatabaseSync(path);
+    db.exec('CREATE TABLE zulu (id INTEGER)');
+    db.exec('CREATE TABLE alpha (id INTEGER)');
+    db.close();
+    const ddl = schemaSql(path);
+    expect(ddl.indexOf('CREATE TABLE alpha')).toBeLessThan(ddl.indexOf('CREATE TABLE zulu'));
+    // Same string on the second call: a fold reads eleven schemas once, not once per question.
+    expect(schemaSql(path)).toBe(ddl);
+  });
+
+  it('returns an empty string for a file that is not a database', () => {
+    const path = join(directory, 'garbage3.sqlite');
+    writeFileSync(path, 'still not a database');
+    expect(schemaSql(path)).toBe('');
+  });
+});
+
+describe('tableShapes', () => {
+  it('reports each column with the type it was declared with, in declaration order', () => {
+    const shapes = tableShapes(database);
+    expect(shapes).toHaveLength(1);
+    expect(shapes[0]?.table).toBe('t');
+    expect(shapes[0]?.columns.map((column) => column.name)).toEqual(['id', 'label', 'amount']);
+    expect(shapes[0]?.columns.map((column) => column.type)).toEqual(['INTEGER', 'TEXT', 'REAL']);
+  });
+
+  it('keeps a parameterised declaration as written, because the family is a later question', () => {
+    const path = join(directory, 'typed.sqlite');
+    const db = new DatabaseSync(path);
+    db.exec('CREATE TABLE priced (amount DECIMAL(10,2), at DATETIME, note VARCHAR(20))');
+    db.close();
+    const columns = tableShapes(path)[0]?.columns ?? [];
+    expect(columns).toEqual([
+      { name: 'amount', type: 'DECIMAL(10,2)' },
+      { name: 'at', type: 'DATETIME' },
+      { name: 'note', type: 'VARCHAR(20)' },
+    ]);
+    // Cached like `schemaIndex`: a fold reads eleven schemas once, not once per question.
+    expect(tableShapes(path)).toBe(tableShapes(path));
+  });
+
+  it('reports an undeclared type as the empty string rather than inventing one', () => {
+    const path = join(directory, 'untyped.sqlite');
+    const db = new DatabaseSync(path);
+    db.exec('CREATE TABLE loose (a, b INTEGER)');
+    db.close();
+    expect(tableShapes(path)[0]?.columns).toEqual([
+      { name: 'a', type: '' },
+      { name: 'b', type: 'INTEGER' },
+    ]);
+  });
+
+  it('returns nothing for a file that is not a database, rather than guessing a shape', () => {
+    const path = join(directory, 'garbage2.sqlite');
+    writeFileSync(path, 'not a database either');
+    expect(tableShapes(path)).toEqual([]);
   });
 });
 

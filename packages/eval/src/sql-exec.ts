@@ -167,6 +167,100 @@ export function schemaIndex(dbPath: string): SchemaIndex {
   return index;
 }
 
+/** A column as the database declares it: the name, and the type text it was written with. */
+export type ColumnShape = {
+  readonly name: string;
+  /** As `PRAGMA table_info` reports it, which is the declared text — `INTEGER`, `VARCHAR(20)`. */
+  readonly type: string;
+};
+
+/** One table's declared shape, in declaration order. */
+export type TableShape = {
+  readonly table: string;
+  readonly columns: readonly ColumnShape[];
+};
+
+const shapeCache = new Map<string, readonly TableShape[]>();
+
+const sqlCache = new Map<string, string>();
+
+/**
+ * The `CREATE TABLE` statements a database stores, in name order.
+ *
+ * `sqlite_master.sql` is the text the database itself keeps, which is what the pruning linker reads.
+ * Cached for the reason `schemaIndex` is: every prompt carries the DDL, and a fold opens the larger
+ * databases once per arm per question if nothing remembers the answer.
+ */
+export function schemaSql(dbPath: string): string {
+  const hit = sqlCache.get(dbPath);
+  if (hit !== undefined) return hit;
+  let db: DatabaseSync | undefined;
+  let ddl = '';
+  try {
+    db = new DatabaseSync(dbPath, { readOnly: true });
+    const rows = db
+      .prepare("select sql from sqlite_master where type='table' and sql is not null order by name")
+      .all() as { sql: string }[];
+    ddl = rows.map((row) => row.sql).join('\n');
+  } catch {
+    // A database that will not open has no schema. The caller sees the empty string and a linker
+    // that declines to prune, which is the safe direction for a pruner and a visible one for a
+    // reader: an empty DDL in a prompt is not something a run can mistake for a pruned schema.
+    return '';
+  } finally {
+    if (db !== undefined) db.close();
+  }
+  sqlCache.set(dbPath, ddl);
+  return ddl;
+}
+
+/**
+ * The declared shape of every table, read from the database rather than from its DDL.
+ *
+ * The alternative is a second parser of `CREATE TABLE`, and this repository already has one
+ * (`schemaBlocks`) because pruning needs the text. Types are the one thing `PRAGMA` answers
+ * authoritatively and a text scan answers by guesswork: a column declared `DECIMAL(10,2)`, a
+ * dump that writes `INT` where another writes `INTEGER`, and a table whose clause order differs
+ * all round to the same answer here.
+ *
+ * A database that will not open returns nothing, for the reason `schemaIndex` gives: the caller
+ * then finds no candidate rather than a false one.
+ */
+export function tableShapes(dbPath: string): readonly TableShape[] {
+  const hit = shapeCache.get(dbPath);
+  if (hit !== undefined) return hit;
+  const shapes: TableShape[] = [];
+  let db: DatabaseSync | undefined;
+  try {
+    db = new DatabaseSync(dbPath, { readOnly: true });
+    const found = db
+      .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
+      .all() as { name: string }[];
+    for (const table of found) {
+      const listed = db.prepare(`PRAGMA table_info("${table.name.replace(/"/g, '""')}")`).all() as {
+        name: string;
+        type: string;
+      }[];
+      shapes.push({
+        table: table.name.toLowerCase(),
+        columns: listed.map((column) => ({
+          name: String(column.name).toLowerCase(),
+          // `String` rather than a default: a column with no declaration reports `''`, and a driver
+          // that answered null would report a word no type family recognises, which is the same
+          // answer — "unknown" — without a branch that no database can reach.
+          type: String(column.type),
+        })),
+      });
+    }
+  } catch {
+    return shapes;
+  } finally {
+    if (db !== undefined) db.close();
+  }
+  shapeCache.set(dbPath, shapes);
+  return shapes;
+}
+
 /**
  * The rules whose statement names a table or column of this database.
  *

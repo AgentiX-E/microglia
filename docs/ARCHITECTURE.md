@@ -246,6 +246,13 @@ The study is a package, not a script:
   substitutes the target schema's names, and a template whose slots do not bind is withheld rather
   than shown unbound. Pure functions over schema name sets, so the reading is recomputable from an
   artefact and costs no call.
+- `link-bind.ts` — the same construction with a different referent: a table slot binds to a table the
+  *question* links (`schema-link.ts`), a column slot binds only inside the table its template reached
+  and only to a column of the same kind, and every refusal carries a reason (`no-table`, `table-tie`,
+  `no-column`, `column-kind`) so the census reports which wall it hit rather than one number.
+- `sql-exec.ts` also carries `schemaSql` and `tableShapes` — a database's own answer to "what SQL
+  created these tables" and "what did you declare each column as", both cached per path, so a fold
+  reads eleven schemas once instead of once per question.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

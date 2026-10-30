@@ -33,6 +33,10 @@ export type UnionCase = {
    * the pool contained, which is what a selector has to rank: three arms that are all wrong and all
    * different are a pool of three, and three arms that are all wrong and all identical are a pool of
    * one with three calls per question.
+   *
+   * The artefact stores a **digest** of each result rather than the result: equality is the only
+   * question asked here, and one `card_games` answer is 12 MB of rows. A caller that has the keys
+   * themselves can pass them; nothing in this module distinguishes the two.
    */
   readonly keys?: Readonly<Record<string, string | null>>;
 };

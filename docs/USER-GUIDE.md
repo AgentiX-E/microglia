@@ -862,6 +862,14 @@ Be honest about the preconditions; the product is only useful inside them.
    ordering is a requirement, enforce it after generation or encode it in the schema — a sentence in the
    prompt is a hint, not a contract. (On discrete choices the same mechanism does move a strong model:
    0% to 75–89% on chart-type conventions, which is where item 4's number comes from.)
+9. **A rule is about one schema, and it does not travel.** Measured twice, without a model call, by
+   binding every rule's identifiers against every database (`pnpm eval:template`, §13.2): by name,
+   66.8% of a store cannot be bound outside its own database at all; by the tables the target question
+   names, 48.6% cannot, and of what is still refused, 60.0% is a column the target database does not
+   have. The referent of a rule is a *column*, and questions name tables, not columns. So the pack is
+   an **in-database prompt**: give a namespace one workspace, and expect it to steer that workspace's
+   questions. Do not expect a domain pack distilled on one product's schema to help a question written
+   against another, and do not build a product claim on it.
 
 ## 13. Measuring your own generator
 
@@ -989,6 +997,15 @@ lane measures both forms:
 | `prose` (default) | the statement as distilled | the incumbent form; every measurement before R10 used it |
 | `bound` | the statement read as a template, its schema identifiers replaced by the **target** database's names | testing whether a rule travels as structure rather than as wording |
 
+Two binders exist, because there are two ways to say what a slot's referent is: the **name** binder
+compares spellings against the whole target schema, and the **question** binder (`pnpm eval:template`
+runs both) takes a table slot from the tables the question names and searches for a column slot only
+inside the table it reached. Neither carries a rule across a schema boundary often enough to measure
+a transfer effect — the table half improves fivefold (3.9% → 22.0% of rules bind) and the column half
+is the wall, because three in five refusals are a column the target database does not have at all.
+The product statement that follows is in §12: the pack is an in-database prompt, and no claim in this
+repository says otherwise.
+
 Under `bound`, the rule's identifiers that its *own* database has become slots, the rest of the
 sentence stays, and each slot is filled from the schema the rule is about to meet:
 
@@ -1026,9 +1043,14 @@ dispatch at all. It also writes `eval/results/poc-template-census.json`, which i
 the number can be recomputed by somebody who does not trust the terminal: the rules, the databases,
 the attempts, the blockers, and the verdict the kill condition produces.
 
-The reading this produces is deliberately narrow: it says whether a rule is obeyed more and broken
-less when its slots are bound, not whether templates are a good idea in general. `prereg/` carries
-the prediction and the refutation that were written before the run.
+**What the census decided, and why it is the whole result.** Both binders are refused by the kill
+condition their pre-registrations fixed before the code existed — 66.8% of rules withheld by name,
+48.6% by question, 62.3% of all attempts at the question level against a 60% bar. No arm was
+dispatched, and the two artefacts (`poc-template-census.json`, `poc-template-linked-census.json`)
+carry the counts, the blockers and the reason each withheld attempt failed. The reading this licenses
+is deliberately narrow: a rule's referent is a column, and a schema boundary removes it — so a pack
+steers the workspace it was taught in and does not travel. `prereg/R10-template-transfer.md` and
+`prereg/R11-link-binding.md` carry the predictions and the refutations that were written first.
 
 ### 13.3 When a run takes longer than the model does
 

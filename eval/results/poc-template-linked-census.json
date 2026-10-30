@@ -1,0 +1,158 @@
+{
+  "id": "poc-template-linked-census",
+  "source": "poc-sota-bird.json",
+  "split": "minidev",
+  "binder": "link-role",
+  "questions_source": "mini_dev_sqlite.json",
+  "questions": 350,
+  "databases": [
+    "california_schools",
+    "card_games",
+    "codebase_community",
+    "debit_card_specializing",
+    "european_football_2",
+    "financial",
+    "formula_1",
+    "student_club",
+    "superhero",
+    "thrombosis_prediction",
+    "toxicology"
+  ],
+  "rules": 289,
+  "duplicates": 999,
+  "homeless": 30,
+  "unplaced": 0,
+  "rules_bound": 57,
+  "rules_slotless": 76,
+  "rules_withheld": 126,
+  "rules_withheld_share": 0.4865,
+  "withheld_share": 0.6228,
+  "attempts": {
+    "bound": 6922,
+    "slotless": 24056,
+    "withheld": 51159
+  },
+  "blockers": [
+    {
+      "name": "date",
+      "kind": "column",
+      "attempts": 2380
+    },
+    {
+      "name": "lap",
+      "kind": "column",
+      "attempts": 1976
+    },
+    {
+      "name": "name",
+      "kind": "column",
+      "attempts": 1895
+    },
+    {
+      "name": "consumption",
+      "kind": "column",
+      "attempts": 1782
+    },
+    {
+      "name": "element",
+      "kind": "column",
+      "attempts": 1527
+    },
+    {
+      "name": "posts",
+      "kind": "table",
+      "attempts": 1383
+    },
+    {
+      "name": "users",
+      "kind": "table",
+      "attempts": 1158
+    },
+    {
+      "name": "time",
+      "kind": "column",
+      "attempts": 1149
+    },
+    {
+      "name": "count",
+      "kind": "column",
+      "attempts": 1028
+    },
+    {
+      "name": "cards",
+      "kind": "table",
+      "attempts": 1020
+    },
+    {
+      "name": "results",
+      "kind": "table",
+      "attempts": 964
+    },
+    {
+      "name": "drivers",
+      "kind": "table",
+      "attempts": 916
+    },
+    {
+      "name": "amount",
+      "kind": "column",
+      "attempts": 910
+    },
+    {
+      "name": "status",
+      "kind": "column",
+      "attempts": 893
+    },
+    {
+      "name": "posthistory",
+      "kind": "table",
+      "attempts": 842
+    },
+    {
+      "name": "examination",
+      "kind": "table",
+      "attempts": 841
+    },
+    {
+      "name": "forename",
+      "kind": "column",
+      "attempts": 813
+    },
+    {
+      "name": "schools",
+      "kind": "table",
+      "attempts": 795
+    },
+    {
+      "name": "city",
+      "kind": "column",
+      "attempts": 774
+    },
+    {
+      "name": "tags",
+      "kind": "column",
+      "attempts": 765
+    }
+  ],
+  "withheld_by": [
+    {
+      "reason": "no-column",
+      "attempts": 30692
+    },
+    {
+      "reason": "no-table",
+      "attempts": 12114
+    },
+    {
+      "reason": "table-tie",
+      "attempts": 7541
+    },
+    {
+      "reason": "column-kind",
+      "attempts": 812
+    }
+  ],
+  "kill_share": 0.6,
+  "verdict": "refused",
+  "generated_at": "2026-10-30T16:37:48.939Z"
+}

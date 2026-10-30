@@ -502,9 +502,13 @@ export {
   resolveDatabase,
   rowsDiffer,
   schemaIndex,
+  schemaSql,
+  tableShapes,
+  type ColumnShape,
   type ExecuteOptions,
   type QueryOutcome,
   type SchemaIndex,
+  type TableShape,
 } from './sql-exec.js';
 
 export {
@@ -566,6 +570,7 @@ export {
   bindTemplate,
   bindingCensus,
   injectionFormOf,
+  MIN_NAME_SCORE,
   nameScore,
   templateCoverage,
   templateOf,
@@ -583,6 +588,19 @@ export {
   type TemplateOutcome,
   type TemplateSlot,
 } from './template.js';
+
+export {
+  bindLinked,
+  linkedCensus,
+  linkTargetOf,
+  namesOf,
+  transferLinked,
+  typeFamily,
+  type LinkedCensus,
+  type LinkedQuestion,
+  type LinkTarget,
+  type TypeFamily,
+} from './link-bind.js';
 
 export {
   CANDIDATE_CONTRACT,
