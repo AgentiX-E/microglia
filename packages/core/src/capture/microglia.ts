@@ -296,6 +296,14 @@ export class Microglia implements RunHost {
        * a guarantee.
        */
       accept?: (candidate: DistillCandidate) => boolean;
+      /**
+       * Which interpreter failures are about the run rather than the event.
+       *
+       * Forwarded rather than decided here: the interpreter is the host's own code, so the host
+       * is the only layer that can recognise a spent budget or an expired deadline coming back
+       * out of it.
+       */
+      fatal?: (error: unknown) => boolean;
     } = {},
   ): Promise<DistillReport> {
     this.assertOpen();
@@ -312,6 +320,7 @@ export class Microglia implements RunHost {
         ? {}
         : { resolveContradictions: options.resolveContradictions }),
       ...(options.accept === undefined ? {} : { accept: options.accept }),
+      ...(options.fatal === undefined ? {} : { fatal: options.fatal }),
     });
     this.knowledgeVersion += 1;
     return report;

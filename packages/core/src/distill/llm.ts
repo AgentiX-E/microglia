@@ -58,6 +58,17 @@ export type LlmInterpreterOptions = {
    * only way a note about a failure can be found by a failure.
    */
   readonly reasonCodeOf?: (context: InterpretContext) => string | undefined;
+  /**
+   * How many of the batch's prompts may be in flight at once when `prefetch` is used. Default 1,
+   * which makes `prefetch` a no-op and keeps every existing caller's behaviour.
+   *
+   * The unit of work here is one model call per event, and the loop that applies the results has to
+   * stay serial: a claim's effect on the store depends on what is already in it. The calls
+   * themselves do not — prompt *i* is built from event *i* alone — so paying them one after another
+   * makes the batch's wall clock the sum of its latencies, which is what a five-fold run spends its
+   * hours on.
+   */
+  readonly concurrency?: number;
 };
 
 const KINDS = new Set<KnowledgeKind>([
@@ -532,17 +543,18 @@ function balancedFrom(text: string, start: number): string | undefined {
  *
  * `maxCandidates` trims rather than rejects: a model returning six candidates
  * where four are good should not lose the four.
+ *
+ * With `concurrency > 1` the returned interpreter also carries a `prefetch` that asks for the
+ * batch's replies at that width. It is the same prompt, built by the same function, so the serial
+ * pass that follows either finds the reply already paid for or pays for it itself; the only thing
+ * the option changes is how many round trips are open at once.
  */
 export function createLlmInterpreter(options: LlmInterpreterOptions): Interpreter {
   const max = options.maxCandidates ?? 2;
-  return async (context: InterpretContext): Promise<readonly Candidate[]> => {
-    const prompt = buildDistillPrompt(
-      context,
-      options.taxonomy ?? [],
-      options.payloadHint,
-      options.form ?? 'lesson',
-    );
-    const raw = await options.llm.complete(prompt);
+  const remember = options.reasonCodeOf;
+  const promptOf = (context: InterpretContext): string =>
+    buildDistillPrompt(context, options.taxonomy ?? [], options.payloadHint, options.form ?? 'lesson');
+  const candidatesOf = (context: InterpretContext, raw: string): readonly Candidate[] => {
     const parsed = parseDistillResponse(raw, {
       namespace: context.event.namespace,
       task: context.event.task,
@@ -553,7 +565,7 @@ export function createLlmInterpreter(options: LlmInterpreterOptions): Interprete
       ...(context.event.taskId === undefined ? {} : { taskId: context.event.taskId }),
       ...(options.audit === undefined ? {} : { audit: options.audit }),
     });
-    const code = options.reasonCodeOf?.(context);
+    const code = remember?.(context);
     if (code === undefined) return parsed.slice(0, max);
     // The model's own code wins when it gave one: it saw the event, and the host's classifier is a
     // fallback for the field, not an override of an observation.
@@ -565,4 +577,31 @@ export function createLlmInterpreter(options: LlmInterpreterOptions): Interprete
       )
       .slice(0, max);
   };
+  const interpreter: Interpreter = async (context) =>
+    candidatesOf(context, await options.llm.complete(promptOf(context)));
+  const width = options.concurrency ?? 1;
+  if (width === 1) return interpreter;
+  if (!Number.isInteger(width) || width < 1) {
+    throw new RangeError(`concurrency must be a positive integer, received ${String(width)}`);
+  }
+  interpreter.prefetch = async (contexts) => {
+    let next = 0;
+    const runner = async (): Promise<void> => {
+      for (;;) {
+        const index = next;
+        next += 1;
+        if (index >= contexts.length) return;
+        const context = contexts[index] as InterpretContext;
+        try {
+          await options.llm.complete(promptOf(context));
+        } catch {
+          // Warming is best effort. The serial pass asks for the same prompt again, and that pass
+          // is where a failure is counted and where a fatal one — an expired deadline — stops the
+          // batch rather than being absorbed here.
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(width, contexts.length) }, runner));
+  };
+  return interpreter;
 }

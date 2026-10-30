@@ -57,6 +57,9 @@
  *  - `SOTA_GENERALIZE` `false` to distil without scope widening (ablation)
  *  - `SOTA_RESAMPLES`  bootstrap resamples; default 10000, per the protocol
  *  - `POC_MAX_CALLS`   hard call budget; default 8000, sized from a measured five-fold run
+ *  - `SOTA_DEADLINE_MIN` wall-clock limit for the lane; default 130, under the workflow's step
+ *                      timeout, so a run that cannot finish writes down what it measured
+ *  - `SOTA_DISTILL_CONCURRENCY` distillation replies in flight at once; default 8
  */
 import { writeJson } from './lib.js';
 import { execFileSync } from 'node:child_process';
@@ -238,6 +241,33 @@ const LIMIT = nonNegative(process.env['SOTA_LIMIT'], 0);
  * reader who compared the two would be comparing two different treatments.
  */
 const LEARN_SAMPLE = Math.trunc(nonNegative(process.env['SOTA_LEARN_SAMPLE'], 0));
+
+/**
+ * How long the whole lane may run, in minutes.
+ *
+ * The workflow step that runs this lane has a timeout, and until this iteration that timeout was the
+ * only limit the run had: 160 minutes after the start, the runner killed the process, and a run that
+ * had finished three of five folds and measured 1,964 calls left behind no artefact at all. A limit
+ * the lane owns is a different thing. It is checked between calls, it is set below the step timeout,
+ * and when it fires the lane writes the folds it completed and the reason it stopped — which is a
+ * result a reader can size the next dispatch from.
+ *
+ * 130 minutes against a 240-minute step: the gap is the tail of the last fold plus the publish step,
+ * and it is deliberately larger than one fold's worth of work, because stopping early is only useful
+ * if the stop is graceful.
+ */
+const DEADLINE_MIN = nonNegative(process.env['SOTA_DEADLINE_MIN'], 130);
+
+/**
+ * Distillation replies in flight at once.
+ *
+ * The batch is applied in corpus order but each prompt is independent, so the round trips can
+ * overlap. On the dev split a fold distils about twenty-five corrections, and a serial loop over
+ * them paid the sum of the latencies: the second fold's learning half took 43 minutes where the
+ * first took under four, which is a provider that got slower and a client that waited for it one
+ * call at a time.
+ */
+const DISTILL_CONCURRENCY = Math.trunc(nonNegative(process.env['SOTA_DISTILL_CONCURRENCY'], 8));
 
 /**
  * Which split of BIRD this run measures.
@@ -635,17 +665,39 @@ type Reply = ChatReply;
  */
 const ENDPOINT = process.env['DEEPSEEK_ENDPOINT'] ?? '';
 
+const DEADLINE_AT = DEADLINE_MIN > 0 ? Date.now() + DEADLINE_MIN * 60_000 : undefined;
+
 const llm = new LlmClient({
   apiKey: process.env['DEEPSEEK_API_KEY'] ?? '',
   model: MODEL,
   maxCalls: MAX_CALLS,
   breakerThreshold: BREAKER_THRESHOLD,
   ...(ENDPOINT === '' ? {} : { endpoint: ENDPOINT }),
+  ...(DEADLINE_AT === undefined ? {} : { deadline: DEADLINE_AT }),
 });
 
 const chat = (prompt: string, maxTokens = 700, temperature = 0): Promise<ChatReply> =>
   llm.chat(prompt, maxTokens, temperature);
 
+
+/**
+ * Whether a call failure says the run is over rather than that this call was.
+ *
+ * Three codes and one clock, in one predicate. Before this existed each site that called a model
+ * made its own decision about which errors to re-throw, so a stopped run would have had to stop at
+ * every one of them: the evaluation loop, the probe, the learning pass, and the distiller each
+ * caught failures and turned them into data. The distiller was the worst of the four — a spent
+ * budget arriving from inside `host.distill` was counted as "the model said nothing" and the fold
+ * went on to publish a store built from part of its corrections.
+ */
+function stoppedRun(error: unknown): boolean {
+  if (!(error instanceof MicrogliaError)) return false;
+  return (
+    error.code === 'MG_E_BUDGET_EXCEEDED' ||
+    error.code === 'MG_E_PROVIDER_FAILED' ||
+    error.code === 'MG_E_DEADLINE'
+  );
+}
 
 type Dataset = {
   readonly rows: readonly BirdRow[];
@@ -1254,6 +1306,16 @@ type LearningPass = {
   readonly rows: number;
   readonly edited: number;
   readonly goldFailed: number;
+  /**
+   * Questions whose first attempt never arrived.
+   *
+   * A correction is learned from two attempts; a question that produced no attempt contributes no
+   * correction and no evidence, and a fold measured on a store built from sixty of its sixty-four
+   * questions is a different treatment from one built from all of them. Until this count existed the
+   * difference was invisible: an unanswered generation was cached as an empty string and looked
+   * exactly like a model that had answered with nothing.
+   */
+  readonly unanswered: number;
 };
 
 /** Generated text per question id, spread across folds. */
@@ -1290,11 +1352,14 @@ async function learn(
   dataset: Dataset,
   task: Task,
 ): Promise<LearningPass> {
+  let unanswered = 0;
+  let asked = 0;
   const texts = await mapPool(rows, CONCURRENCY, async (row) => {
     const key = idOfRow(row);
     const cached = generations.get(key);
     if (cached !== undefined) {
       generations.count(true);
+      asked += 1;
       return cached;
     }
     generations.count(false);
@@ -1312,12 +1377,23 @@ async function learn(
       generations.set(key, reply.text);
       return reply.text;
     } catch (error) {
-      // Two failures end the run rather than becoming data: a spent budget and a
-      // provider that has stopped answering. A single unanswered prompt is data.
-      if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
-      if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+      // A spent budget, a provider that has stopped answering, an elapsed deadline: each ends the
+      // run rather than becoming data. A single unanswered prompt is data, and is counted.
+      if (stoppedRun(error)) throw error;
+      unanswered += 1;
       generations.set(key, '');
       return '';
+    } finally {
+      asked += 1;
+      // The learning half is the quiet one: the evaluation loop has printed every twenty calls
+      // since a ten-hour run went unnoticed, and this pass — which is where the dev split spent its
+      // hours — printed nothing at all until the fold was over.
+      if (asked % 16 === 0 || asked === rows.length) {
+        process.stdout.write(
+          `[sota] learn ${asked}/${rows.length} calls=${llm.stats.calls} ` +
+            `unanswered=${unanswered} retries=${llm.stats.retries} timeouts=${llm.stats.timeouts}\n`,
+        );
+      }
     }
   });
 
@@ -1363,7 +1439,7 @@ async function learn(
       edited += 1;
     }
   }
-  return { rows: rows.length, edited, goldFailed };
+  return { rows: rows.length, edited, goldFailed, unanswered };
 }
 
 /** A stable digest of what is stored, used to prove the pack was frozen. */
@@ -1601,8 +1677,7 @@ async function probeMemory(
       const reply = await chat(prompt);
       return judgeReply(row, dataset.dbPath(row.db_id), reply, task).correct;
     } catch (error) {
-      if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
-      if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+      if (stoppedRun(error)) throw error;
       return undefined;
     }
   };
@@ -2309,7 +2384,7 @@ type FoldResult = {
  * the wrong shape), and those need different repairs.
  */
 function recording(inner: Interpreter, sink: string[], lastReply: () => string): Interpreter {
-  return async (context) => {
+  const wrapped: Interpreter = async (context) => {
     try {
       return await inner(context);
     } catch (error) {
@@ -2320,6 +2395,10 @@ function recording(inner: Interpreter, sink: string[], lastReply: () => string):
       throw error;
     }
   };
+  // Forwarded, not swallowed: the wrapper is the interpreter the batch calls, so a pack that knows
+  // how to warm its prompts would otherwise be warmed only when it is used without a recorder.
+  if (inner.prefetch !== undefined) wrapped.prefetch = (contexts) => inner.prefetch?.(contexts) ?? Promise.resolve();
+  return wrapped;
 }
 
 type FoldMemory = {
@@ -2359,6 +2438,7 @@ async function buildFoldMemory(
   const failures: string[] = [];
   const drops: Record<string, number> = {};
   let lastReply = '';
+  let distilledSoFar = 0;
   const host = await openMicroglia({
     app: 'microglia-sota',
     namespace: 'bird',
@@ -2382,9 +2462,21 @@ async function buildFoldMemory(
               const reply = await chat(prompt, form === 'repair' ? 3000 : 2000);
               lastReply = reply.text;
               distillations.set(key, reply.text);
+              distilledSoFar += 1;
+              // The distillation half has no other voice. A fold spends minutes here, all of it
+              // waiting, and the dev dispatch that died at its step timeout printed nothing for the
+              // last 107 minutes of its life — which read as a hang and was in fact a client killing
+              // its own requests.
+              if (distilledSoFar % 4 === 0) {
+                process.stdout.write(
+                  `[sota] distill ${distilledSoFar} reply/replies ` +
+                    `(${String(form)}) calls=${llm.stats.calls} timeouts=${llm.stats.timeouts}\n`,
+                );
+              }
               return reply.text;
             },
           },
+          concurrency: DISTILL_CONCURRENCY,
           // The form is what the distiller is asked *for*, so it belongs here rather than
           // in the lane: two memories over the same corrections, differing in one string of
           // instruction, is the content half of the experiment.
@@ -2427,7 +2519,14 @@ async function buildFoldMemory(
           return !mentionsAny(text, named);
         }
       : undefined;
-  const distilled = await host.distill({ generalize, ...(accept === undefined ? {} : { accept }) });
+  const distilled = await host.distill({
+    generalize,
+    ...(accept === undefined ? {} : { accept }),
+    // A budget or deadline arriving from inside the batch stops it. Counted instead, it would leave
+    // a store built from part of the corrections and a report that said the model had nothing to
+    // say about the rest.
+    fatal: stoppedRun,
+  });
   const frozen = await knowledgeDigest(store);
   return { store, host, learning, distilled, frozen, distillFailures: failures, drops };
 }
@@ -3068,10 +3167,10 @@ async function runFold(
     try {
       reply = await chat(plan.prompt);
     } catch (error) {
-      // Two failures are not data: a spent budget and a provider that has stopped
-      // answering both mean the remaining replies would describe an outage.
-      if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
-      if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+      // Three failures are not data: a spent budget, a provider that has stopped answering, and an
+      // elapsed deadline all mean the remaining replies would describe the run rather than the
+      // rules.
+      if (stoppedRun(error)) throw error;
       reply = undefined;
     }
     completed += 1;
@@ -3842,7 +3941,9 @@ async function runFold(
   const packIds = cases.reduce((sum, item) => sum + item.packIds, 0);
   process.stdout.write(
     `[sota] fold ${fold + 1}/${FOLDS}: eval=${cases.length} learn=${learnRows.length} ` +
-      `edited=${learning.edited} active=${scoringFrozen.active} calls=${llm.stats.calls}\n`,
+      `edited=${learning.edited} unanswered=${learning.unanswered} ` +
+      `distillFailed=${distilled.failed} active=${scoringFrozen.active} ` +
+      `calls=${llm.stats.calls} timeouts=${llm.stats.timeouts}\n`,
   );
   return {
     fold,
@@ -4048,12 +4149,20 @@ async function main(): Promise<void> {
    */
   const folds: FoldResult[] = [];
   const spend: { fold: number; calls: number }[] = [];
-  const writeBudgetStop = async (reason: string, callsInFlightFold: number): Promise<void> => {
+  const writeStop = async (
+    reason: string,
+    callsInFlightFold: number,
+    stoppedBy: 'budget' | 'deadline',
+  ): Promise<void> => {
     await writeJson(`${ARTEFACT_ID}.partial`, {
       partial: true,
+      stopped_by: stoppedBy,
       reason,
       cap: MAX_CALLS,
       spent: llm.stats.calls,
+      deadline_min: DEADLINE_MIN,
+      timeouts: llm.stats.timeouts,
+      retries: llm.stats.retries,
       folds_completed: folds.length,
       folds_planned: FOLDS,
       calls_in_flight_fold: callsInFlightFold,
@@ -4062,6 +4171,9 @@ async function main(): Promise<void> {
         calls: spend[index]?.calls ?? 0,
         eval: fold.eval,
         learn: fold.learn,
+        edited: fold.learning.edited,
+        unanswered: fold.learning.unanswered,
+        distill_failed: fold.failedDistill,
         active: fold.activeRules,
       })),
       arms: [...ARMS].sort(),
@@ -4073,11 +4185,24 @@ async function main(): Promise<void> {
     try {
       folds.push(await runFold(fold, rows, foldOf, dataset, task));
     } catch (error) {
-      if (!(error instanceof MicrogliaError) || error.code !== 'MG_E_BUDGET_EXCEEDED') throw error;
+      if (!(error instanceof MicrogliaError)) throw error;
+      if (error.code === 'MG_E_DEADLINE') {
+        // The clock, not the budget. Both stops lose the fold in flight and keep the folds that
+        // finished; the difference is what the next dispatch should change, so it is written down.
+        await writeStop(
+          `fold ${fold + 1}/${FOLDS} reached the ${DEADLINE_MIN}-minute deadline at ` +
+            `${llm.stats.calls} of ${MAX_CALLS} calls`,
+          llm.stats.calls - before,
+          'deadline',
+        );
+        throw error;
+      }
+      if (error.code !== 'MG_E_BUDGET_EXCEEDED') throw error;
       // The fold in flight is lost either way; what the completed folds measured is not.
-      await writeBudgetStop(
+      await writeStop(
         `fold ${fold + 1}/${FOLDS} ran out of calls at ${llm.stats.calls} of ${MAX_CALLS}`,
         llm.stats.calls - before,
+        'budget',
       );
       throw error;
     }
@@ -4093,11 +4218,12 @@ async function main(): Promise<void> {
         `[sota] budget forecast after fold ${fold + 1}/${FOLDS}: the run needs about ` +
           `${forecast.projected} calls, the cap is ${MAX_CALLS} (short by ${forecast.shortfall})\n`,
       );
-      await writeBudgetStop(
+      await writeStop(
         `the remaining ${FOLDS - spend.length} folds cost about ` +
           `${forecast.projected - llm.stats.calls} more calls at the dearest fold's price, ` +
           `which the cap of ${MAX_CALLS} cannot cover`,
         0,
+        'budget',
       );
       throw new MicrogliaError('MG_E_BUDGET_EXCEEDED', 'the configured cap cannot finish the folds', {
         cap: MAX_CALLS,
@@ -4384,6 +4510,14 @@ async function main(): Promise<void> {
       channelBest === undefined
         ? undefined
         : { arm: channelBest.arm, deltaPp: channelBest.delta_pp },
+    // The learning half, summed over folds: a store built from part of its corrections is a
+    // different treatment, and the artefact has to say so rather than mentioning it in a report.
+    learning: {
+      rows: folds.reduce((sum, fold) => sum + fold.learn, 0),
+      unanswered: folds.reduce((sum, fold) => sum + fold.learning.unanswered, 0),
+      edited: folds.reduce((sum, fold) => sum + fold.learning.edited, 0),
+      distillFailed: folds.reduce((sum, fold) => sum + fold.failedDistill, 0),
+    },
     // The gate's own bookkeeping, so a store filtered by a miscount cannot publish a number.
     ...(folds.every((fold) => fold.probe === null)
       ? {}
@@ -4572,6 +4706,13 @@ async function main(): Promise<void> {
     retries: llm.stats.retries,
     prompts: llm.stats.prompts,
     call_failures: llm.stats.failures,
+    // What the wall clock went on. A retry after a 429 is the provider asking for patience; a
+    // timeout is this client having asked for more than it was willing to wait for, and the second
+    // count is the one that explains a fold whose evaluation took two minutes and whose learning
+    // took forty-three.
+    timeouts: llm.stats.timeouts,
+    deadline_min: DEADLINE_MIN,
+    distill_concurrency: DISTILL_CONCURRENCY,
     metrics: {
       accuracy_without_memory: paired.baselineAccuracy,
       accuracy_with_memory: paired.treatmentAccuracy,
@@ -5205,6 +5346,8 @@ async function main(): Promise<void> {
       eval: fold.eval,
       learn: fold.learn,
       edited: fold.learning.edited,
+      unanswered: fold.learning.unanswered,
+      distill_failed: fold.failedDistill,
       active: fold.activeRules,
       active_narrow: fold.narrowActive,
       active_repair: fold.repairActive,

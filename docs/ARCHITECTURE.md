@@ -272,6 +272,27 @@ model. `bin/protocol.ts` is the CI gate: it re-validates every committed artefac
 report and compares byte for byte, re-derives every cell comparison, and refuses a pre-registration
 that is not one. It runs offline in about a second.
 
+### 8.2 The call client is part of the measurement
+
+Every number in `eval/` is produced through `model-client.ts`, so its retry policy is not plumbing —
+it decides whether a run measures the mechanism or the network. Three rules, each learned from a
+dispatch:
+
+| Rule | What it replaced | What it prevents |
+|---|---|---|
+| the attempt timeout is a function of `max_tokens` | a constant 60s | killing a 2,000-token distillation reply that was about to arrive, four times over, and recording it as a prompt the model could not answer |
+| a timeout is retried once, a 429 or 5xx four times | four attempts for everything | spending the wall clock re-asking a question whose answer is "this is slow", while still giving a throttled provider the patience it asked for |
+| a deadline, checked before every attempt | the runner's step timeout | a killed process taking three finished folds with it |
+
+The failures stay named: `MG_E_CONFIG` for a refused payment, `MG_E_BUDGET_EXCEEDED` for a spent
+call budget, `MG_E_DEADLINE` for an elapsed clock, `MG_E_PROVIDER_FAILED` for an endpoint that has
+stopped answering, `MG_E_STORE_IO` for one prompt that failed after its retries. A caller that keeps
+going through the first four measures an outage; only the last is data.
+
+`timeouts` sits beside `retries` in the artefact because the two diagnose opposite faults: many
+retries and no timeouts is a provider throttling you, many timeouts and no retries is a client asking
+for more than it is willing to wait for.
+
 ## 9. What the architecture deliberately excludes
 
 | Excluded | Reason |

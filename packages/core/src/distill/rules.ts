@@ -119,13 +119,23 @@ export const ruleInterpreter: Interpreter = (context) => ruleBasedCandidates(con
  * Order matters only for determinism; candidates are deduped by claim, not by
  * position. A host that supplies a chart interpreter still gets negative
  * lessons from ratings and clarifications.
+ *
+ * `prefetch` is forwarded rather than dropped: a composition is the interpreter
+ * the batch sees, and an inner pack that knows how to warm its calls would
+ * otherwise be warmed only when used alone.
  */
 export function combineInterpreters(...interpreters: readonly Interpreter[]): Interpreter {
-  return async (context) => {
+  const combined: Interpreter = async (context) => {
     const out = [];
     for (const interpreter of interpreters) {
       out.push(...(await interpreter(context)));
     }
     return out;
   };
+  if (interpreters.some((interpreter) => interpreter.prefetch !== undefined)) {
+    combined.prefetch = async (contexts) => {
+      await Promise.all(interpreters.map((interpreter) => interpreter.prefetch?.(contexts)));
+    };
+  }
+  return combined;
 }

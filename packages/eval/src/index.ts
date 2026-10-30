@@ -285,7 +285,14 @@ export {
   mapPool,
 } from './concurrency.js';
 
-export { LlmClient, type ChatReply, type LlmClientOptions, type LlmStats } from './model-client.js';
+export {
+  LlmClient,
+  attemptTimeoutMs,
+  retryAfterMs,
+  type ChatReply,
+  type LlmClientOptions,
+  type LlmStats,
+} from './model-client.js';
 
 export {
   conditionText,

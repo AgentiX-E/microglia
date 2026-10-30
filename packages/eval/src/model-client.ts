@@ -37,8 +37,17 @@ export type LlmClientOptions = {
   /** Consecutive exhausted prompts that end the run. */
   readonly breakerThreshold?: number;
   readonly endpoint?: string;
-  /** Per-attempt timeout. */
+  /** Per-attempt timeout, when the caller wants to override the size-derived one. */
   readonly timeoutMs?: number;
+  /**
+   * Epoch milliseconds after which no further call is started. Absent means no limit.
+   *
+   * A wall-clock limit belongs to the run rather than to a request, so it cannot be expressed as a
+   * timeout: the same sixty seconds is generous for one prompt and a truncation for the next. The
+   * client checks it before every attempt, which is the last place a stopped run can still be
+   * graceful.
+   */
+  readonly deadline?: number;
   /** Injected in tests; the default is the global `fetch`. */
   readonly fetchImpl?: typeof fetch;
   readonly sleep?: (ms: number) => Promise<void>;
@@ -53,9 +62,53 @@ export type LlmStats = {
   readonly failures: number;
   readonly retries: number;
   readonly tokens: number;
+  /**
+   * Attempts the client abandoned because the reply did not arrive in time.
+   *
+   * Separate from `retries`: a retry after a 429 is the provider asking for patience, and a retry
+   * after a timeout is the client having asked for more than it was willing to wait for. The
+   * second was, for two dispatches, the whole of a fold's cost.
+   */
+  readonly timeouts: number;
 };
 
 const DEFAULT_ENDPOINT = 'https://api.deepseek.com/chat/completions';
+
+/** Whether an aborted call was abandoned by its own timeout, which is a different fact from a reset. */
+function isTimeoutError(error: unknown): boolean {
+  return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
+}
+
+/**
+ * How long one attempt may take, given what the reply was allowed to contain.
+ *
+ * A constant here is wrong in a way that is invisible until a run is long: the client asks for
+ * `max_tokens` and then waits a fixed sixty seconds, so a request allowed to produce 2,000 tokens
+ * — more than a minute of generation at the provider's own rate — is killed while it is succeeding,
+ * retried, killed again, and finally recorded as a prompt the model could not answer. That is what
+ * happened to the dev split's distillation half: 24 corrections, four attempts each, 43 minutes for
+ * a fold whose evaluation took two.
+ *
+ * The budget grows with the allowance and is capped, because the cap is what keeps a wedged request
+ * from consuming the run: 200 tokens get 53s, 700 get 123s, 2,000 get 300s.
+ */
+export function attemptTimeoutMs(maxTokens: number): number {
+  return Math.min(300_000, 25_000 + Math.max(0, maxTokens) * 140);
+}
+
+/**
+ * What the provider's own backoff advice says, in milliseconds.
+ *
+ * `Retry-After` is seconds or an HTTP date; the seconds form is what providers send. Capped at a
+ * minute: a header asking for longer is telling us the run is over, and sleeping through it spends
+ * the deadline on nothing.
+ */
+export function retryAfterMs(header: string | null): number | undefined {
+  if (header === null || header.trim() === '') return undefined;
+  const seconds = Number(header.trim());
+  if (!Number.isFinite(seconds) || seconds < 0) return undefined;
+  return Math.min(60_000, seconds * 1000);
+}
 
 export class LlmClient {
   private readonly breaker: CircuitBreaker;
@@ -63,6 +116,7 @@ export class LlmClient {
   private prompts = 0;
   private failures = 0;
   private retries = 0;
+  private timeouts = 0;
   private tokensUsed = 0;
 
   public constructor(private readonly options: LlmClientOptions) {
@@ -91,21 +145,44 @@ export class LlmClient {
     const sleep = this.options.sleep ?? (async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
     const random = this.options.random ?? Math.random;
     const endpoint = this.options.endpoint ?? DEFAULT_ENDPOINT;
-    const timeout = this.options.timeoutMs ?? 60_000;
+    const timeout = this.options.timeoutMs ?? attemptTimeoutMs(maxTokens);
+    const deadline = this.options.deadline;
 
     let last = '';
     let attempts = 0;
+    /** What the provider itself asked us to wait, when it said anything. */
+    let waitMs: number | undefined;
+    /** The last attempt was abandoned by the clock rather than answered with a status. */
+    let timedOut = false;
     this.prompts += 1;
-    for (let attempt = 0; attempt < 4; attempt += 1) {
-      if (attempt > 0) {
+    const assertLive = (): void => {
+      if (deadline === undefined || Date.now() < deadline) return;
+      throw new MicrogliaError(
+        'MG_E_DEADLINE',
+        `the run's deadline passed after ${attempts} attempt(s) of this prompt`,
+        { attempts, last, hint: 'Re-dispatch with a larger SOTA_DEADLINE_MIN, or a smaller run.' },
+      );
+    };
+    for (;;) {
+      assertLive();
+      // Two attempts after a timeout, four after a status. A prompt that did not arrive in its
+      // allowance is not made faster by asking again — the same request gets the same slowness —
+      // while a 429 or a 502 is the provider saying "not now", which is worth three more tries.
+      if (attempts >= (timedOut ? 2 : 4)) break;
+      if (attempts > 0) {
         this.retries += 1;
-        await sleep(backoffMs(attempt, 500, random));
+        await sleep(waitMs ?? backoffMs(attempts, 500, random));
+        // Checked again after the wait: the backoff is where a deadline passes, and a run that
+        // slept through its own limit would start one more attempt it has no time to finish.
+        assertLive();
       }
       if (this.calls >= this.options.maxCalls) {
         throw new MicrogliaError('MG_E_BUDGET_EXCEEDED', 'call budget reached');
       }
       this.calls += 1;
       attempts += 1;
+      waitMs = undefined;
+      timedOut = false;
 
       let response: Response;
       try {
@@ -122,10 +199,13 @@ export class LlmClient {
         });
       } catch (error) {
         last = `network: ${String(error)}`;
+        timedOut = isTimeoutError(error);
+        if (timedOut) this.timeouts += 1;
         continue;
       }
       if (response.status === 429 || response.status >= 500) {
         last = `status ${response.status}`;
+        waitMs = retryAfterMs(response.headers.get('retry-after'));
         continue;
       }
       if (!response.ok) {
@@ -167,6 +247,7 @@ export class LlmClient {
       failures: this.failures,
       retries: this.retries,
       tokens: this.tokensUsed,
+      timeouts: this.timeouts,
     };
   }
 }

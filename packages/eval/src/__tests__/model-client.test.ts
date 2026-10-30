@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { LlmClient } from '../model-client.js';
+import { LlmClient, attemptTimeoutMs, retryAfterMs } from '../model-client.js';
 
 const noSleep = async (): Promise<void> => undefined;
 
@@ -87,7 +87,14 @@ describe('LlmClient', () => {
   it('returns the text, the token count and the attempts it took', async () => {
     const { instance } = client([ok('SELECT 1', 42)]);
     await expect(instance.chat('hi')).resolves.toEqual({ text: 'SELECT 1', tokens: 42, attempts: 1 });
-    expect(instance.stats).toEqual({ calls: 1, prompts: 1, failures: 0, retries: 0, tokens: 42 });
+    expect(instance.stats).toEqual({
+      calls: 1,
+      prompts: 1,
+      failures: 0,
+      retries: 0,
+      timeouts: 0,
+      tokens: 42,
+    });
   });
 
   it('treats a missing choice as an empty reply rather than throwing', async () => {
@@ -188,5 +195,155 @@ describe('LlmClient', () => {
       temperature?: number;
     };
     expect(body.temperature).toBe(0.7);
+  });
+});
+
+describe('attemptTimeoutMs', () => {
+  it('grows with the allowance, because a 2,000-token reply is more than a minute of generation', () => {
+    // The number this replaced was a constant 60s for every request, and the dev split spent two
+    // dispatches discovering it: distillation asks for 2,000 tokens, the client killed the reply at
+    // 60 seconds, four times, and the fold's learning half took 43 minutes where its evaluation half
+    // took two.
+    expect(attemptTimeoutMs(200)).toBe(53_000);
+    expect(attemptTimeoutMs(700)).toBe(123_000);
+    expect(attemptTimeoutMs(2_000)).toBe(300_000);
+  });
+
+  it('caps, so one wedged request cannot consume the run', () => {
+    expect(attemptTimeoutMs(100_000)).toBe(300_000);
+  });
+
+  it('treats a negative allowance as nothing to wait for', () => {
+    expect(attemptTimeoutMs(-5)).toBe(25_000);
+  });
+
+  it('is what the request actually uses, not a default beside it', async () => {
+    // The signal is constructed per call. A test that only checked the formula would stay green if
+    // the client kept passing a constant.
+    const signals: AbortSignal[] = [];
+    const fetchImpl = (async (_url: string | URL | Request, init?: RequestInit) => {
+      if (init?.signal !== undefined && init.signal !== null) signals.push(init.signal);
+      return new Response(JSON.stringify(ok('x').body), { status: 200 });
+    }) as unknown as typeof fetch;
+    const instance = new LlmClient({ apiKey: 'k', model: 'm', maxCalls: 10, fetchImpl, sleep: noSleep });
+    await instance.chat('p', 2_000);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(false);
+  });
+});
+
+describe('retryAfterMs', () => {
+  it('reads the seconds a provider sends', () => {
+    expect(retryAfterMs('2')).toBe(2000);
+    expect(retryAfterMs(' 0 ')).toBe(0);
+  });
+
+  it('ignores a header that is not a number, rather than waiting NaN milliseconds', () => {
+    expect(retryAfterMs(null)).toBeUndefined();
+    expect(retryAfterMs('')).toBeUndefined();
+    expect(retryAfterMs('Wed, 21 Oct 2026 07:28:00 GMT')).toBeUndefined();
+    expect(retryAfterMs('-1')).toBeUndefined();
+  });
+
+  it('caps the wait, because a provider asking for minutes is telling us the run is over', () => {
+    expect(retryAfterMs('600')).toBe(60_000);
+  });
+});
+
+describe('a timeout is a different bet from a 429', () => {
+  it('abandons a timed-out attempt after two tries instead of four', async () => {
+    // Retrying a request the client itself killed doubles the wall clock and buys no evidence: the
+    // same prompt gets the same slowness. Four attempts is right for "not now" and wrong for
+    // "too slow".
+    const timeout = Object.assign(new Error('the operation timed out'), { name: 'TimeoutError' });
+    let attempts = 0;
+    const instance = new LlmClient({
+      apiKey: 'k',
+      model: 'm',
+      maxCalls: 100,
+      sleep: noSleep,
+      random: () => 0,
+      fetchImpl: (async () => {
+        attempts += 1;
+        throw timeout;
+      }) as unknown as typeof fetch,
+    });
+    await expect(instance.chat('p')).rejects.toMatchObject({ code: 'MG_E_STORE_IO' });
+    expect(attempts).toBe(2);
+    expect(instance.stats.timeouts).toBe(2);
+    expect(instance.stats.retries).toBe(1);
+  });
+
+  it('waits what the provider asked for before retrying a 429', async () => {
+    const waits: number[] = [];
+    let index = 0;
+    const instance = new LlmClient({
+      apiKey: 'k',
+      model: 'm',
+      maxCalls: 100,
+      random: () => 0,
+      sleep: async (ms: number) => {
+        waits.push(ms);
+      },
+      fetchImpl: (async () => {
+        index += 1;
+        return index === 1
+          ? new Response(null, { status: 429, headers: { 'retry-after': '3' } })
+          : new Response(JSON.stringify(ok('x').body), { status: 200 });
+      }) as unknown as typeof fetch,
+    });
+    await instance.chat('p');
+    expect(waits).toEqual([3000]);
+    expect(instance.stats.retries).toBe(1);
+    expect(instance.stats.timeouts).toBe(0);
+  });
+
+  it('still gives up after four attempts when the provider keeps refusing', async () => {
+    const instance = new LlmClient({
+      apiKey: 'k',
+      model: 'm',
+      maxCalls: 100,
+      sleep: noSleep,
+      random: () => 0,
+      fetchImpl: (async () => new Response(null, { status: 503 })) as unknown as typeof fetch,
+    });
+    await expect(instance.chat('p')).rejects.toMatchObject({ code: 'MG_E_STORE_IO' });
+    expect(instance.stats.calls).toBe(4);
+  });
+});
+
+describe('the deadline', () => {
+  it('refuses to start a call after it, and spends nothing', async () => {
+    const { instance } = client([ok('x')], { deadline: Date.now() - 1 });
+    await expect(instance.chat('p')).rejects.toMatchObject({ code: 'MG_E_DEADLINE' });
+    expect(instance.stats.calls).toBe(0);
+  });
+
+  it('stops between attempts when it passes during the retry', async () => {
+    // The check is per attempt rather than per prompt: a prompt that fails at minute 129 and would
+    // be retried at minute 131 must not be retried. The clock is moved inside `sleep`, which is what
+    // the backoff would have done.
+    let index = 0;
+    const instance = new LlmClient({
+      apiKey: 'k',
+      model: 'm',
+      maxCalls: 100,
+      random: () => 0,
+      deadline: Date.now() + 50,
+      sleep: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 120));
+      },
+      fetchImpl: (async () => {
+        index += 1;
+        return new Response(null, { status: 503 });
+      }) as unknown as typeof fetch,
+    });
+    await expect(instance.chat('p')).rejects.toMatchObject({ code: 'MG_E_DEADLINE' });
+    expect(instance.stats.calls).toBe(1);
+  });
+
+  it('is absent by default, so every existing lane keeps its behaviour', async () => {
+    const { instance } = client([ok('x')]);
+    await expect(instance.chat('p')).resolves.toMatchObject({ text: 'x' });
   });
 });

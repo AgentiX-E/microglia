@@ -1149,6 +1149,21 @@ export type GateInput = {
   readonly calls: number;
   readonly callFailures: number;
   /**
+   * The learning half's bookkeeping.
+   *
+   * A fold's treatment is a store distilled from its corrections, so a correction that never
+   * arrived is not a missing data point — it is a smaller store, and a store built from sixty of
+   * sixty-four questions is a different treatment from the one the arm was defined as. Before this
+   * existed the two were indistinguishable in the artefact: a generation that failed was cached as
+   * an empty string, and the distiller counted a failed reply as "the model said nothing".
+   */
+  readonly learning?: {
+    readonly rows: number;
+    readonly unanswered: number;
+    readonly edited: number;
+    readonly distillFailed: number;
+  };
+  /**
    * Present only when the run teaches a house convention.
    *
    * The S2b protocol fixes a floor before the result is read: below a hundred
@@ -1324,6 +1339,23 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       blocking: true,
     },
   ];
+  if (input.learning !== undefined) {
+    const { rows, unanswered, edited, distillFailed } = input.learning;
+    const unansweredShare = rows === 0 ? 0 : unanswered / rows;
+    const distillShare = rows === 0 ? 0 : distillFailed / rows;
+    gates.push({
+      id: 'V32-fold-learning-intact',
+      criterion:
+        'at most 10% of the learning questions went unanswered and at most 10% of the corrections ' +
+        'failed to distil, so the store is the one the fold paid for',
+      actual:
+        `${unanswered}/${rows} unanswered question(s) (${(unansweredShare * 100).toFixed(1)}%), ` +
+        `${edited} correction(s), ${distillFailed} distillation failure(s) ` +
+        `(${(distillShare * 100).toFixed(1)}%)`,
+      pass: unansweredShare <= 0.1 && distillShare <= 0.1,
+      blocking: true,
+    });
+  }
   if (input.packConditions !== undefined) {
     const { injected, withCondition } = input.packConditions;
     const share = injected === 0 ? 0 : withCondition / injected;

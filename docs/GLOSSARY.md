@@ -372,3 +372,23 @@ no model call (`pnpm eval:template`). It is the number that decides whether a tr
 dispatching: at 66.8% withheld, an experiment on this store would measure the binder. `homeless`
 rules (no home database) and `unplaced` ones (no foreign schema to be shown in) are counted
 separately, because neither is a failure of the binder.
+
+**Attempt timeout** — How long one request may take, derived from the reply it was allowed to
+produce: `25s + 140ms/token`, capped at 300s. A constant is a bug that hides until a run is long,
+because the client then aborts requests that are succeeding and retries them as though the provider
+had failed. `timeouts` and `retries` are counted separately for exactly that reason.
+
+**Deadline** — A wall-clock limit the run holds over itself (`MG_E_DEADLINE`), checked between
+attempts and set below the runner's step timeout. A step timeout kills the process and takes the
+measured folds with it; a deadline stops the run and writes what it has. The two are different
+answers to "the run cannot finish", and only one of them is a result.
+
+**Prefetch** — The optional second phase of an interpreter: told the batch's contexts before the first
+claim is applied, it may pay the calls' round trips concurrently, while the claims themselves are
+still applied in corpus order. The prompt for a claim depends only on its own event, which is what
+makes the split safe; the order of the claims matters because a claim's effect on the store depends
+on what is already in it.
+
+**Warm-up** — What a prefetch does when the model port memoises its replies. An interpreter with no
+prefetch and a prefetch that warms nothing both leave the serial pass unchanged, which is why the
+default width is one and why the option is invisible to every caller that does not set it.

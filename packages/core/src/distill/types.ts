@@ -28,10 +28,19 @@ export type InterpretContext = {
  * Returning `[]` is a valid answer and must not be treated as an error: most
  * feedback carries no reusable lesson, and a distiller that manufactures one
  * from every click is how a prompt becomes noise.
+ *
+ * `prefetch` is optional and carries no semantics: it is told the contexts the
+ * batch is about to be interpreted with, and is free to do nothing. An
+ * interpreter whose work is a model call uses it to pay the latency of the batch
+ * concurrently while the results are still applied in corpus order, because a
+ * serial loop over one call per event is dominated by the round trips rather
+ * than by the reasoning.
  */
-export type Interpreter = (
+export type Interpreter = ((
   context: InterpretContext,
-) => readonly DistillCandidate[] | Promise<readonly DistillCandidate[]>;
+) => readonly DistillCandidate[] | Promise<readonly DistillCandidate[]>) & {
+  prefetch?: (contexts: readonly InterpretContext[]) => Promise<void>;
+};;
 
 export type DistillOptions = {
   readonly memory: MemoryPort;
@@ -64,6 +73,15 @@ export type DistillOptions = {
    * lessons in the batch, and the count is reported either way.
    */
   readonly strict?: boolean;
+  /**
+   * Which interpreter failures are about the run rather than about the event.
+   *
+   * A spent budget, an expired deadline, a revoked credential: these stop the batch instead of
+   * becoming a `failed` count, because a batch that continued past one of them would write a
+   * thinner store and report it as a store. The distinction cannot be drawn here — only the host
+   * knows which errors its own interpreter raises — so the host supplies the test.
+   */
+  readonly fatal?: (error: unknown) => boolean;
 };
 
 export type DistillReport = {

@@ -600,6 +600,36 @@ describe('buildValidityGates', () => {
     expect(failing.actual).toBe('2.01% (36/1750 calls)');
   });
 
+  it('V32 fails when the store was built from part of its corrections', () => {
+    // The learning half's bookkeeping. A correction that never arrived is not a missing data point:
+    // it is a smaller store, and the arm was defined as a store distilled from all of them. A run
+    // measured on 60 of 64 questions has to fail a gate rather than become a footnote.
+    const learning = { rows: 64, unanswered: 6, edited: 25, distillFailed: 0 } as const;
+    expect(gate({ ...sound, learning }, 'V32-fold-learning-intact').pass).toBe(true);
+    const unanswered = gate({ ...sound, learning: { ...learning, unanswered: 7 } }, 'V32-fold-learning-intact');
+    expect(unanswered.pass).toBe(false);
+    expect(unanswered.blocking).toBe(true);
+    expect(unanswered.actual).toContain('7/64 unanswered question(s) (10.9%)');
+    const thin = gate({ ...sound, learning: { ...learning, distillFailed: 9 } }, 'V32-fold-learning-intact');
+    expect(thin.pass).toBe(false);
+    expect(thin.actual).toContain('9 distillation failure(s) (14.1%)');
+  });
+
+  it('V32 counts nothing when the run learned from nothing', () => {
+    // A run with no learning rows divides by a zero it never had: the gate reports 0% rather than
+    // NaN, and passes, because there is no treatment to have been shortened.
+    const empty = gate(
+      { ...sound, learning: { rows: 0, unanswered: 0, edited: 0, distillFailed: 0 } },
+      'V32-fold-learning-intact',
+    );
+    expect(empty.pass).toBe(true);
+    expect(empty.actual).toContain('0/0 unanswered');
+  });
+
+  it('omits the learning gate when the lane did not report one', () => {
+    expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V32-fold-learning-intact');
+  });
+
   it('omits the shape gate when nothing was injected to inspect', () => {
     expect(buildValidityGates(sound).map((entry) => entry.id)).not.toContain('V12-shape-present');
   });

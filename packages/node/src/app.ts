@@ -61,6 +61,9 @@ export function statusFor(code: MicrogliaErrorCode): 400 | 401 | 409 | 413 | 500
       return 413;
     case 'MG_E_PROVIDER_MISSING':
     case 'MG_E_PROVIDER_FAILED':
+    // The host's wall-clock limit: the work was not refused, it ran out of time, which is the one
+    // answer that invites the caller to try again rather than to change the request.
+    case 'MG_E_DEADLINE':
     case 'MG_E_NOT_OPEN':
       return 503;
     case 'MG_E_STORE_IO':

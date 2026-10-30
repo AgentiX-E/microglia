@@ -1017,6 +1017,54 @@ The reading this produces is deliberately narrow: it says whether a rule is obey
 less when its slots are bound, not whether templates are a good idea in general. `prereg/` carries
 the prediction and the refutation that were written before the run.
 
+### 13.3 When a run takes longer than the model does
+
+A cross-fitted run has two halves that cost very different things: an evaluation, where every call
+is short and the width of the pool is what matters, and a learning pass, where every call is long and
+the number of corrections is what matters. Ours spent 43 minutes on the second half of one fold and
+two minutes on its first, and the two numbers are the whole story of a dispatch that was killed at
+its step timeout with nothing to show.
+
+**The attempt timeout is derived from what the reply is allowed to contain.** Asking for 2,000 tokens
+and waiting a fixed minute is a client that kills its own successful requests: at the provider's
+throughput, 2,000 tokens is more than a minute of generation. The budget is `25s + 140ms/token`,
+capped at 300s — 53 seconds at 200 tokens, five minutes at 2,000 — and a timed-out attempt is
+retried once rather than three times, because the same request gets the same slowness.
+
+**The lane holds its own deadline.** `SOTA_DEADLINE_MIN` (default 130) is checked between attempts,
+and it is set under the step timeout on purpose: a run that reaches its own deadline writes
+`<artefact>.partial.json` with the folds it finished, the calls it spent, and which limit stopped it,
+instead of being killed by the runner with nothing.
+
+| Knob | Default | What it decides |
+|---|---|---|
+| `SOTA_DEADLINE_MIN` | 130 | wall clock the lane allows itself; `0` disables it |
+| `SOTA_DISTILL_CONCURRENCY` | 8 | distillation replies in flight at once |
+| `POC_MAX_CALLS` | 8000 | HTTP attempts the run may spend |
+
+**Distillation is paid concurrently and applied in order.** The prompts depend on their own events, so
+they can be asked in parallel; a claim's effect on the store depends on what is already in it, so the
+claims are still applied in corpus order. `distill()` asks the interpreter to *warm* the batch before
+the first claim is applied, and an interpreter that does not know how to warm anything ignores the
+request — which is why the default width of one leaves every existing caller untouched.
+
+**Two kinds of retry, counted separately.** A 429 or a 502 is the provider asking for patience and is
+retried four times, honouring `Retry-After` when it is sent. A timeout is the client having asked for
+more than it was willing to wait for, and is retried once. The artefact carries both counts:
+
+```jsonc
+// fold 3 of the run that was killed at its step timeout
+{ "calls": 1964, "retries": 15, "timeouts": 0, "call_failures": 0 }
+```
+
+`timeouts` near zero with `retries` high is a provider throttling you. `timeouts` high with `retries`
+near zero is a client asking for too much — the failure is in your timeout, not in the endpoint.
+
+**A short store is a different treatment, not a footnote.** `V32-fold-learning-intact` fails a run in
+which more than 10% of the learning questions went unanswered or more than 10% of the corrections
+failed to distil. A store built from 57 of 64 questions is not the store the arm was defined as, and
+the artefact has to fail rather than report a number nobody can compare.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

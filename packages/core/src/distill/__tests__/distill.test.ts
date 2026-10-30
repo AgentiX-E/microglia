@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MicrogliaError,
   defaultPolicy,
   fixedClock,
   mulberry32,
@@ -150,6 +151,91 @@ describe('rule interpreter', () => {
       }),
     );
     expect(candidates[0]?.kind).toBe('lexicon');
+  });
+});
+
+describe('the batch is interpreted in order, but not paid for in order', () => {
+  it('tells the interpreter what it is about to be asked, before the first claim is applied', async () => {
+    // Two phases, and the split is what makes a batch parallel without making the memory
+    // order-dependent: the prompts depend on the events alone, and only the application of their
+    // answers has to follow the corpus. Without the first phase a fold's distillation is the sum of
+    // its latencies, which is how 24 corrections came to cost 43 minutes.
+    const memory = await seed([event({ id: 'fb_1' }), event({ id: 'fb_2' })], [run()]);
+    const order: string[] = [];
+    const withPrefetch: Interpreter = (context) => {
+      order.push(`apply:${context.event.id}`);
+      return [candidate()];
+    };
+    withPrefetch.prefetch = async (contexts) => {
+      order.push(`warm:${contexts.map((entry) => entry.event.id).join(',')}`);
+    };
+    await distill({
+      memory,
+      policy: defaultPolicy,
+      clock: fixedClock(at),
+      random: mulberry32(1),
+      interpreter: withPrefetch,
+    });
+    expect(order).toEqual(['warm:fb_1,fb_2', 'apply:fb_1', 'apply:fb_2']);
+    await memory.close();
+  });
+
+  it('applies claims in corpus order even when the warming finishes out of order', async () => {
+    const memory = await seed([event({ id: 'fb_1' }), event({ id: 'fb_2' })], [run()]);
+    const applied: string[] = [];
+    const interp: Interpreter = async (context) => {
+      applied.push(context.event.id);
+      return [candidate()];
+    };
+    interp.prefetch = async (contexts) => {
+      // Deliberately finish the second one first: the prefetch order carries no meaning.
+      await Promise.all(
+        [...contexts].reverse().map(async (entry) => {
+          await Promise.resolve();
+          return entry.event.id;
+        }),
+      );
+    };
+    await distill({ memory, policy: defaultPolicy, clock: fixedClock(at), random: mulberry32(1), interpreter: interp });
+    expect(applied).toEqual(['fb_1', 'fb_2']);
+    await memory.close();
+  });
+
+  it('counts an ordinary interpreter failure and stops on a fatal one', async () => {
+    const memory = await seed([event({ id: 'fb_1' }), event({ id: 'fb_2' })], [run()]);
+    let calls = 0;
+    const failing: Interpreter = () => {
+      calls += 1;
+      throw new Error('the model said nothing');
+    };
+    const counted = await distill({
+      memory,
+      policy: defaultPolicy,
+      clock: fixedClock(at),
+      random: mulberry32(1),
+      interpreter: failing,
+    });
+    // Both events were attempted and both are reported: one unparseable reply is data.
+    expect(counted.failed).toBe(2);
+    expect(calls).toBe(2);
+
+    const fatal = new MicrogliaError('MG_E_BUDGET_EXCEEDED', 'call budget reached');
+    const stopping: Interpreter = () => {
+      throw fatal;
+    };
+    // A spent budget is a property of the run, not of the event. Counted, it would leave a store
+    // built from part of the corrections and a report that said the model had nothing to say.
+    await expect(
+      distill({
+        memory,
+        policy: defaultPolicy,
+        clock: fixedClock(at),
+        random: mulberry32(1),
+        interpreter: stopping,
+        fatal: (error) => error === fatal,
+      }),
+    ).rejects.toBe(fatal);
+    await memory.close();
   });
 });
 
@@ -446,5 +532,23 @@ describe('interpreter composition', () => {
     );
     const out = await composed({ event: event(), run: run() });
     expect(out.map((entry) => entry.statement)).toEqual(['A.', 'B.']);
+  });
+
+  it('carries no prefetch when no part of it has one', async () => {
+    const { combineInterpreters } = await import('../index.js');
+    const composed = combineInterpreters(() => [], async () => []);
+    expect(composed.prefetch).toBeUndefined();
+  });
+
+  it('forwards a prefetch from any part, because the composition is what the batch calls', async () => {
+    const { combineInterpreters } = await import('../index.js');
+    const warmed: string[] = [];
+    const withWarm = () => [];
+    withWarm.prefetch = async (contexts) => {
+      warmed.push(`inner:${contexts.length}`);
+    };
+    const composed = combineInterpreters(withWarm, () => []);
+    await composed.prefetch?.([{ event: event(), run: run() }]);
+    expect(warmed).toEqual(['inner:1']);
   });
 });

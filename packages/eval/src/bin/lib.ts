@@ -6,7 +6,7 @@
  * Nothing here is imported by a published package.
  */
 import { existsSync } from 'node:fs';
-import { chooseArtefact } from '@agentix-e/microglia-eval';
+import { attemptTimeoutMs, chooseArtefact, retryAfterMs } from '@agentix-e/microglia-eval';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
@@ -24,26 +24,107 @@ export function callCount(): number {
 
 export class BudgetExceeded extends Error {}
 
+/**
+ * The lane's own wall-clock limit lives in `LlmClient`, not here.
+ *
+ * It has to be checked between attempts, at the layer that knows what an attempt costs, and a
+ * second copy in this file would be a limit that half the lanes obeyed. `lib.chat` is used by two
+ * probe lanes; every lane that measures a benchmark goes through the client.
+ */
+
+/**
+ * How long one request may take.
+ *
+ * The formula lives in the client, which is the layer that knows what a reply costs: a lane that
+ * kept its own copy would drift from it, and the drift would show up as an unexplained timeout in
+ * whichever lane was edited second.
+ */
+const replyTimeout = attemptTimeoutMs;
+
+/** Wall clock the run spent waiting on retries, and the slowest single reply it saw. */
+export type CallMeter = {
+  readonly calls: number;
+  readonly retries: number;
+  readonly timeouts: number;
+  readonly waitedMs: number;
+  readonly slowestMs: number;
+};
+
+const meter = { calls: 0, retries: 0, timeouts: 0, waitedMs: 0, slowestMs: 0 };
+
+export function callMeter(): CallMeter {
+  return { ...meter };
+}
+
+/** A response the provider answered with a status we did not ask for. */
+class HttpError extends Error {
+  readonly status: number;
+  readonly retryAfterMs: number | undefined;
+
+  constructor(label: string, status: number, detail: string, retryAfterMs: number | undefined) {
+    super(`${label} ${status}: ${detail}`);
+    this.status = status;
+    this.retryAfterMs = retryAfterMs;
+  }
+}
+
+/**
+ * Whether a failure is worth asking again, and how long to wait first.
+ *
+ * The two classes are not the same bet. A 429 or a 502 is the provider saying "not now", and asking
+ * again is exactly right. A timeout is the provider being slow with this reply, and asking the same
+ * question again usually buys the same slowness — so it gets one more attempt, not two.
+ */
+function planFor(error: unknown, attempt: number): { retry: boolean; waitMs: number } {
+  const backoff = 500 * 2 ** attempt;
+  // Three attempts for the two statuses that mean "not now", two for the one that means "too slow".
+  // The cap is the same for both: unbounded retrying against a provider that is down turns a
+  // configured budget into an open-ended wait, and the deadline would be the thing that ended it.
+  const transient = attempt < 2;
+  if (error instanceof HttpError) {
+    if (error.status === 429) {
+      return { retry: transient, waitMs: error.retryAfterMs ?? backoff };
+    }
+    if (error.status >= 500) return { retry: transient, waitMs: error.retryAfterMs ?? backoff };
+    return { retry: false, waitMs: 0 };
+  }
+  const name = error instanceof Error ? error.name : '';
+  if (name === 'TimeoutError' || name === 'AbortError') {
+    meter.timeouts += 1;
+    return { retry: attempt < 1, waitMs: 0 };
+  }
+  const message = String(error);
+  if (/ECONNRESET|ETIMEDOUT|fetch failed|socket hang up/i.test(message)) {
+    return { retry: transient, waitMs: backoff };
+  }
+  return { retry: false, waitMs: 0 };
+}
+
+async function withRetry<T>(run: () => Promise<T>): Promise<T> {
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      return await run();
+    } catch (error) {
+      const plan = planFor(error, attempt);
+      if (!plan.retry) throw error;
+      meter.retries += 1;
+      meter.waitedMs += plan.waitMs;
+      if (plan.waitMs > 0) await new Promise((resolve) => setTimeout(resolve, plan.waitMs));
+    }
+  }
+}
+
 function key(name: 'DEEPSEEK_API_KEY' | 'ZHIPU_API_KEY'): string {
   const value = process.env[name];
   if (!value) throw new Error(`Missing ${name}`);
   return value;
 }
 
-async function withRetry<T>(fn: () => Promise<T>, attempts = 3): Promise<T> {
-  let last: unknown;
-  for (let i = 0; i < attempts; i += 1) {
-    try {
-      return await fn();
-    } catch (error) {
-      last = error;
-      const message = String(error);
-      const retryable = /429|5\d\d|timeout|ECONNRESET|fetch failed/i.test(message);
-      if (!retryable) break;
-      await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** i));
-    }
-  }
-  throw last;
+/** One call's admission: the budget is the only limit this lane can enforce on its own. */
+function admit(): void {
+  if (calls >= MAX_CALLS) throw new BudgetExceeded(`Call budget ${MAX_CALLS} exhausted`);
+  calls += 1;
+  meter.calls += 1;
 }
 
 export type ChatResult = {
@@ -57,11 +138,11 @@ export async function chat(
   messages: readonly { role: 'system' | 'user'; content: string }[],
   options: { maxTokens?: number; temperature?: number } = {},
 ): Promise<ChatResult> {
-  if (calls >= MAX_CALLS) throw new BudgetExceeded(`Call budget ${MAX_CALLS} exhausted`);
-  calls += 1;
+  admit();
+  const maxTokens = options.maxTokens ?? 200;
   const started = performance.now();
-  const response = await withRetry(() =>
-    fetch(DEEPSEEK_URL, {
+  const response = await withRetry(async () => {
+    const reply = await fetch(DEEPSEEK_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${key('DEEPSEEK_API_KEY')}`,
@@ -70,34 +151,41 @@ export async function chat(
       body: JSON.stringify({
         model: DEEPSEEK_MODEL,
         messages,
-        max_tokens: options.maxTokens ?? 200,
+        max_tokens: maxTokens,
         temperature: options.temperature ?? 0,
         response_format: { type: 'json_object' },
       }),
-      signal: AbortSignal.timeout(60_000),
-    }),
-  );
-  if (!response.ok) {
-    throw new Error(`DeepSeek ${response.status}: ${(await response.text()).slice(0, 300)}`);
-  }
+      signal: AbortSignal.timeout(replyTimeout(maxTokens)),
+    });
+    if (!reply.ok) {
+      throw new HttpError(
+        'DeepSeek',
+        reply.status,
+        (await reply.text()).slice(0, 300),
+        retryAfterMs(reply.headers.get('retry-after')),
+      );
+    }
+    return reply;
+  });
   const body = (await response.json()) as {
     choices: { message: { content: string } }[];
     usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
   const text = body.choices[0]?.message.content ?? '';
+  const latencyMs = performance.now() - started;
+  meter.slowestMs = Math.max(meter.slowestMs, latencyMs);
   return {
     text,
-    latencyMs: performance.now() - started,
+    latencyMs,
     promptTokens: body.usage?.prompt_tokens ?? 0,
     completionTokens: body.usage?.completion_tokens ?? 0,
   };
 }
 
 export async function embed(inputs: readonly string[]): Promise<number[][]> {
-  if (calls >= MAX_CALLS) throw new BudgetExceeded(`Call budget ${MAX_CALLS} exhausted`);
-  calls += 1;
-  const response = await withRetry(() =>
-    fetch(ZHIPU_URL, {
+  admit();
+  const response = await withRetry(async () => {
+    const reply = await fetch(ZHIPU_URL, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${key('ZHIPU_API_KEY')}`,
@@ -105,11 +193,17 @@ export async function embed(inputs: readonly string[]): Promise<number[][]> {
       },
       body: JSON.stringify({ model: ZHIPU_MODEL, input: inputs }),
       signal: AbortSignal.timeout(60_000),
-    }),
-  );
-  if (!response.ok) {
-    throw new Error(`Zhipu ${response.status}: ${(await response.text()).slice(0, 300)}`);
-  }
+    });
+    if (!reply.ok) {
+      throw new HttpError(
+        'Zhipu',
+        reply.status,
+        (await reply.text()).slice(0, 300),
+        retryAfterMs(reply.headers.get('retry-after')),
+      );
+    }
+    return reply;
+  });
   const body = (await response.json()) as { data: { embedding: number[]; index: number }[] };
   return [...body.data].sort((a, b) => a.index - b.index).map((entry) => entry.embedding);
 }

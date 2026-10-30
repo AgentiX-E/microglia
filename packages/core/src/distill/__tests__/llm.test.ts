@@ -326,3 +326,88 @@ describe('the host can supply the failure code', () => {
     expect(candidateItem?.scope.reasonCode).toBeUndefined();
   });
 });
+
+describe('paying the whole batch at once', () => {
+  /** A port that answers with an empty candidate list, counting in-flight requests. */
+  function counting(options: { readonly delay?: number } = {}) {
+    let inFlight = 0;
+    let peak = 0;
+    let calls = 0;
+    const seen: string[] = [];
+    return {
+      get peak() {
+        return peak;
+      },
+      get calls() {
+        return calls;
+      },
+      get seen() {
+        return seen;
+      },
+      port: {
+        complete: async (prompt: string): Promise<string> => {
+          calls += 1;
+          seen.push(prompt);
+          inFlight += 1;
+          peak = Math.max(peak, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, options.delay ?? 1));
+          inFlight -= 1;
+          return '{"candidates":[]}';
+        },
+      },
+    };
+  }
+
+  const contexts = [0, 1, 2, 3, 4, 5].map((index) => ({
+    event: { ...event, id: `fb_${index}` },
+    run,
+  }));
+
+  it('carries no prefetch at the default width, so every existing caller is unchanged', () => {
+    const interpreter = createLlmInterpreter({ llm: counting().port });
+    expect(interpreter.prefetch).toBeUndefined();
+  });
+
+  it('warms the whole batch at the requested width', async () => {
+    const fake = counting();
+    const interpreter = createLlmInterpreter({ llm: fake.port, concurrency: 3 });
+    await interpreter.prefetch?.(contexts);
+    expect(fake.calls).toBe(6);
+    expect(fake.peak).toBe(3);
+  });
+
+  it('asks for the same prompt the serial pass will ask for', async () => {
+    // The warming is only worth anything if it is the same request: a prompt built differently here
+    // would be a second call, paid twice, and the memo that makes it work would never hit.
+    const fake = counting();
+    const interpreter = createLlmInterpreter({ llm: fake.port, form: 'repair', concurrency: 2 });
+    await interpreter.prefetch?.(contexts.slice(0, 1));
+    const warmed = fake.seen[0];
+    fake.seen.length = 0;
+    await interpreter(contexts[0] as (typeof contexts)[number]);
+    expect(fake.seen[0]).toBe(warmed);
+  });
+
+  it('absorbs a failed warm-up rather than losing the batch to it', async () => {
+    // Best effort by construction: the serial pass asks again, and that pass is where a failure is
+    // counted and where a fatal one — an expired deadline — stops the run.
+    let attempt = 0;
+    const interpreter = createLlmInterpreter({
+      llm: {
+        complete: async () => {
+          attempt += 1;
+          if (attempt === 1) throw new Error('network');
+          return '{"candidates":[]}';
+        },
+      },
+      concurrency: 2,
+    });
+    await expect(interpreter.prefetch?.(contexts.slice(0, 1))).resolves.toBeUndefined();
+    await expect(interpreter(contexts[0] as (typeof contexts)[number])).resolves.toEqual([]);
+  });
+
+  it('refuses a width that is not a width', () => {
+    expect(() => createLlmInterpreter({ llm: counting().port, concurrency: 0 })).toThrow(RangeError);
+    expect(() => createLlmInterpreter({ llm: counting().port, concurrency: 1.5 })).toThrow(RangeError);
+  });
+});

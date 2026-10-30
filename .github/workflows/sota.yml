@@ -39,6 +39,14 @@ on:
         description: 'Questions each fold distils from (0 = all). Dev needs ~12,000 calls at full learning; a baseline reproduction needs the evaluation and not the flywheel'
         required: false
         default: '0'
+      deadline_min:
+        description: 'Wall-clock limit the lane enforces itself, below the step timeout, so a stopped run writes the folds it finished instead of being killed with nothing'
+        required: false
+        default: '130'
+      distill_concurrency:
+        description: 'Distillation replies in flight at once; the batch is still applied in corpus order'
+        required: false
+        default: '8'
       convention:
         description: 'House convention (empty, or thousands)'
         required: false
@@ -128,7 +136,7 @@ jobs:
     runs-on: ubuntu-latest
     # 1,534 questions x 2 arms at concurrency 8 is about 3,100 calls; the dev split needs the
     # headroom that the 350-question slice never did.
-    timeout-minutes: 240
+    timeout-minutes: 260
     env:
       # Which BIRD artefact this job reads and writes. Two splits produce two files, and every
       # reader downstream of the run — attribution, the pool, the signals, the density family, the
@@ -222,12 +230,17 @@ jobs:
             distill-${{ vars.SOTA_MODEL || 'deepseek-chat' }}-sql-prompt-3-
 
       - name: Run the benchmark
-        timeout-minutes: 160
+        # Above the lane's own deadline (130 minutes) with room for the last fold to finish
+        # writing, and below the job's. The step timeout is a backstop, not a plan: the run that
+        # died here at 160 minutes had finished three folds and left no artefact.
+        timeout-minutes: 200
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           SOTA_LIMIT: ${{ github.event.inputs.limit || '0' }}
           SOTA_FOLDS: ${{ github.event.inputs.folds || '5' }}
           SOTA_GENERALIZE: ${{ github.event.inputs.generalize || 'true' }}
+          SOTA_DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}
+          SOTA_DISTILL_CONCURRENCY: ${{ github.event.inputs.distill_concurrency || '8' }}
           SOTA_ARMS: ${{ github.event.inputs.arms || 'gated,oracle' }}
           SOTA_CONCURRENCY: ${{ github.event.inputs.concurrency || '6' }}
           SOTA_SEMANTICS: ${{ github.event.inputs.semantics || 'multiset' }}

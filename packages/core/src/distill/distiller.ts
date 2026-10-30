@@ -48,9 +48,20 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
     conditionConflicts: 0,
   };
 
+  const contexts: InterpretContext[] = [];
+
   for (const event of events) {
     const run = await options.memory.getRun(event.runId);
-    const context: InterpretContext = { event, run };
+    contexts.push({ event, run });
+  }
+  // The batch's round trips, paid once and in parallel. Nothing observable happens here: the
+  // interpreter is told what it will be asked, and an interpreter with nothing to warm ignores it.
+  // The loop below still applies every claim in corpus order, so the store a batch produces does
+  // not depend on which reply arrived first.
+  if (options.interpreter.prefetch !== undefined) await options.interpreter.prefetch(contexts);
+
+  for (const context of contexts) {
+    const { event } = context;
     let candidates: readonly DistillCandidate[];
     try {
       candidates = await options.interpreter(context);
@@ -58,7 +69,11 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
       // An interpreter is host code: a model call, a parser, a domain pack. One
       // unparseable response is a fact to count, not a reason to lose the rest of
       // the batch; a host that wants the old behaviour passes `strict`.
-      if (options.strict === true) throw error;
+      //
+      // An error the host calls fatal is not that fact. A spent budget and an expired deadline are
+      // properties of the run rather than of the event, and counting them as "the model said
+      // nothing" turns a stopped run into a thinner store that still reports a number.
+      if (options.strict === true || options.fatal?.(error) === true) throw error;
       report.failed += 1;
       continue;
     }

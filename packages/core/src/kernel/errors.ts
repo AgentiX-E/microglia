@@ -37,7 +37,12 @@ export type MicrogliaErrorCode =
   // several requests in a row. Distinct from MG_E_PROVIDER_MISSING (nothing is
   // configured) and from MG_E_STORE_IO (the local store): a caller that keeps
   // going through this spends its budget measuring an outage.
-  | 'MG_E_PROVIDER_FAILED';
+  | 'MG_E_PROVIDER_FAILED'
+  // The host's own wall-clock limit, reached while a call was about to be made. Distinct from
+  // MG_E_BUDGET_EXCEEDED (a count of calls) because a run can be stopped by the clock with most of
+  // its budget unspent, and the two stops need different responses: one buys more calls, the other
+  // buys a smaller run.
+  | 'MG_E_DEADLINE';
 
 export class MicrogliaError extends Error {
   public readonly code: MicrogliaErrorCode;
