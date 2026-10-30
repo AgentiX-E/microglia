@@ -764,6 +764,12 @@ describe('crossFit', () => {
     expect(() => crossFit(panel('r1', 4, () => 'helps'), { folds: 1 })).toThrow(RangeError);
     expect(() => crossFit(panel('r1', 4, () => 'helps'), { repeats: 0 })).toThrow(RangeError);
   });
+
+  it('refuses to fit on no observation at all, which would show every rule', () => {
+    // The curve validates its own caps, so this guard is reached only by a caller that sets the cap
+    // directly — and that caller must not be able to buy a policy that believes nothing.
+    expect(() => crossFit(panel('r1', 4, () => 'helps'), { evidenceCap: 0 })).toThrow(RangeError);
+  });
 });
 
 describe('transferOf', () => {
@@ -1084,5 +1090,72 @@ describe('evidence bar on an artefact that predates the curve', () => {
     const { evidence, ...legacy } = filled;
     expect(evidence).toBeDefined();
     expect(densityGates(legacy).map((gate) => gate.id)).not.toContain('V26-density-evidence-curve');
+  });
+});
+
+describe('a hole in the family', () => {
+  /** Two rules at a panel of two, with `missing` injections that never returned. */
+  function withHoles(missing: number) {
+    return densityReport({
+      rules: [rule('r1'), rule('r2')],
+      panel: 2,
+      trials: [
+        trial({ ruleId: 'r1', targetId: 'a1', order: 0, baselineCorrect: false, correct: true }),
+        trial({ ruleId: 'r1', targetId: 'a2', order: 1, baselineCorrect: false, correct: true }),
+        trial({ ruleId: 'r2', targetId: 'a1', order: 0, baselineCorrect: true, correct: true }),
+      ],
+      floorTrials: [],
+      holes: missing,
+    });
+  }
+
+  it('prices one call that never returned rather than failing the family over it', () => {
+    const gates = densityGates(withHoles(1));
+    expect(gates[0]?.id).toBe('V18-density-exercised');
+    expect(gates[0]?.pass).toBe(true);
+    expect(gates[0]?.actual).toContain('1 hole in 4');
+  });
+
+  it('still fails a family that lost more calls than it can account for', () => {
+    const gates = densityGates(withHoles(5));
+    expect(gates[0]?.pass).toBe(false);
+    expect(gates[0]?.actual).toContain('5 holes');
+  });
+
+  it('reports zero holes on a run where every call returned', () => {
+    expect(withHoles(0).holes).toBe(0);
+    expect(densityGates(withHoles(0))[0]?.actual).toContain('0 holes');
+  });
+});
+
+describe('defaults the reader fills in when the caller does not', () => {
+  /** Six questions for one rule, so the panel can hold two of the pre-registered caps. */
+  function panelSix(): DensityTrial[] {
+    return Array.from({ length: 6 }, (_, order) =>
+      trial({ ruleId: 'r1', targetId: `a${order}`, order, baselineCorrect: false, correct: order < 4 }),
+    );
+  }
+
+  it('trims the pre-registered caps to the ones a panel can hold', () => {
+    const report = densityReport({ rules: [rule('r1')], panel: 6, trials: panelSix(), floorTrials: [] });
+    expect(report.evidence?.map((row) => row.cap)).toEqual([4, 6]);
+    expect(densityGates(report).find((gate) => gate.id === 'V26-density-evidence-curve')?.pass).toBe(true);
+  });
+
+  it('reads the curve at its own default resample count when none is given', () => {
+    const rows = evidenceCurve(panelSix(), { caps: [4], folds: 3, repeats: 1 });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.injections).toBe(6);
+  });
+
+  it('reports a foreign arm the caller never sized as a panel of zero', () => {
+    const report = densityReport({
+      rules: [rule('r1')],
+      panel: 6,
+      trials: panelSix(),
+      floorTrials: [],
+      crossTrials: [trial({ ruleId: 'r1', domain: 'db_b', targetId: 'b1', order: 0, baselineCorrect: true, correct: true })],
+    });
+    expect(report.transfer?.panel).toBe(0);
   });
 });

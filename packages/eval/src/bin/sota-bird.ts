@@ -1893,25 +1893,35 @@ async function densityPass(input: {
   );
 
   let moved = 0;
+  let retried = 0;
   const ask = async (plan: Plan): Promise<DensityTrial | undefined> => {
-    let correct: boolean;
-    try {
-      const reply = await chat(plan.prompt);
-      correct = judgeReply(plan.row, input.dataset.dbPath(plan.domain), reply, input.task).correct;
-    } catch (error) {
-      // A call that never returned is a hole, and a hole scored as a wrong answer would turn an
-      // endpoint hiccup into a finding about the rule. It is dropped from the ledger and counted
-      // instead: the alternatives are to score it, which is a fabricated verdict, or to fail the
-      // run, which throws away the injections that did return.
-      if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
-      if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
-      moved += 1;
-      return undefined;
+    let correct: boolean | undefined;
+    // A call that never returned is a hole, and a hole scored as a wrong answer would turn an
+    // endpoint hiccup into a finding about the rule. It is dropped from the ledger and counted
+    // instead: the alternatives are to score it, which is a fabricated verdict, or to fail the
+    // run, which throws away the injections that did return.
+    //
+    // It is retried once first, because a hole is expensive in a way a duplicate is not: one lost
+    // call costs a rule one of its twenty chances, and the first dispatch of R9.4 was refused by
+    // its own bookkeeping gate over exactly one. A hole that survives the retry is real and is
+    // reported as one.
+    for (let attempt = 0; attempt < 2 && correct === undefined; attempt += 1) {
+      if (attempt > 0) retried += 1;
+      try {
+        const reply = await chat(plan.prompt);
+        correct = judgeReply(plan.row, input.dataset.dbPath(plan.domain), reply, input.task).correct;
+      } catch (error) {
+        if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+        if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+      }
     }
     moved += 1;
     if (moved % 100 === 0 || moved === calls) {
-      process.stdout.write(`[sota] density ${moved}/${calls} calls=${llm.stats.calls}\n`);
+      process.stdout.write(
+        `[sota] density ${moved}/${calls} calls=${llm.stats.calls} retried=${retried}\n`,
+      );
     }
+    if (correct === undefined) return undefined;
     return {
       ruleId: plan.ruleId,
       domain: plan.domain,
@@ -1941,6 +1951,7 @@ async function densityPass(input: {
       // Absent rather than empty when the arm was not bought: a foreign reading over zero trials
       // would fail V24 and read as a finding about transfer instead of about the configuration.
       ...(crossPlans.length === 0 ? {} : { crossTrials, transferPanel: TRANSFER_PANEL }),
+      holes: crossPlans.length + floorPlans.length + plans.length - trials.length - floorTrials.length - crossTrials.length,
     }),
     excluded,
     rules: rules.length,
