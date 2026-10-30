@@ -737,9 +737,15 @@ function loadManifest(): BirdManifest {
  * `unzip` because Node has no zip reader and adding one would put a dependency in
  * a lane that otherwise has none.
  */
-async function prepareArchive(url: string): Promise<string> {
+async function prepareArchive(): Promise<string> {
   const manifest = loadManifest();
   const dest = join(CACHE, `${manifest.name}.zip`);
+  // The URL comes from the manifest, not from the environment. When it came from the environment,
+  // two sources described one download — `BIRD_ARCHIVE_URL` pointed at Mini-Dev while the split
+  // selected the dev manifest — and the run failed with "the dataset archive failed its size check".
+  // That message blames the data for what is a configuration mismatch, and it is exactly what the
+  // first dev dispatch printed. One manifest, one URL, one digest.
+  const url = manifest.url;
   mkdirSync(CACHE, { recursive: true });
 
   if (!existsSync(dest) || statSync(dest).size !== manifest.bytes) {
@@ -748,7 +754,7 @@ async function prepareArchive(url: string): Promise<string> {
     if (!response.ok) {
       throw new MicrogliaError('MG_E_STORE_IO', `The dataset archive answered ${response.status}`, {
         url,
-        hint: 'Set BIRD_DIR to an extracted Mini-Dev directory instead.',
+        hint: 'Set BIRD_DIR to an extracted directory for this split instead.',
       });
     }
     writeFileSync(dest, Buffer.from(await response.arrayBuffer()));
@@ -763,7 +769,7 @@ async function prepareArchive(url: string): Promise<string> {
       url,
       expected_sha256: manifest.sha256,
       expected_bytes: manifest.bytes,
-      hint: 'Delete .cache/bird/minidev.zip and re-run; a mirror that differs is not this dataset.',
+      hint: `Delete .cache/bird/${manifest.name}.zip and re-run; a mirror that differs is not this dataset.`,
     });
   }
 
@@ -794,13 +800,7 @@ async function loadDataset(limit: number): Promise<Dataset> {
   // they were written against.
   let dbRoot = explicit;
   if (dbRoot === undefined) {
-    const archiveUrl = process.env['BIRD_ARCHIVE_URL'];
-    if (archiveUrl === undefined || archiveUrl === '') {
-      throw new MicrogliaError('MG_E_STORE_IO', 'No BIRD database source is configured', {
-        hint: 'Set BIRD_DIR to an extracted Mini-Dev directory, or BIRD_ARCHIVE_URL to the pinned archive (see eval/manifests/bird-minidev.json).',
-      });
-    }
-    dbRoot = await prepareArchive(archiveUrl);
+    dbRoot = await prepareArchive();
   }
   const root: string = dbRoot;
 

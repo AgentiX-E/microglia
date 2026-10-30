@@ -213,7 +213,6 @@ jobs:
         timeout-minutes: 160
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
-          BIRD_ARCHIVE_URL: ${{ vars.BIRD_ARCHIVE_URL }}
           SOTA_LIMIT: ${{ github.event.inputs.limit || '0' }}
           SOTA_FOLDS: ${{ github.event.inputs.folds || '5' }}
           SOTA_GENERALIZE: ${{ github.event.inputs.generalize || 'true' }}
