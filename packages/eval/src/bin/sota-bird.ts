@@ -2308,7 +2308,16 @@ type FoldResult = {
     readonly redundant: number;
     readonly broke: number;
     readonly useless: number;
+    /**
+     * The store the probe was given, which is the population the four admission buckets partition.
+     *
+     * Not the same number as `citations`: one correction can distil two rules and one rule can be
+     * cited by two corrections, so the counts diverge in both directions. The blocking gate V13
+     * compares the buckets against this field, and it was written against the other one.
+     */
     readonly rules: number;
+    /** Rule citations across the trials, which is how much of the store each case exercised. */
+    readonly citations: number;
     readonly blankFixRate: number;
     /** Source questions the gate never reached, by reason: a hole is not a verdict. */
     readonly skipped: Readonly<Record<string, number>>;
@@ -3988,6 +3997,15 @@ async function runFold(
         ? null
         : {
             ...probe.summary,
+            // The gate's `rules` is the store the probe was given, not the number of citations the
+            // trials carry. `summary.rules` sums `itemIds` over trials, so a rule cited by two of
+            // its own corrections counts twice; the four admission buckets partition *items*.
+            // These were the same number by accident in the first dry run and not in any fold that
+            // had a rule cited more than once, which made V13 — a blocking gate — impossible to
+            // pass. `citations` keeps the other reading, because "12 citations of 3 rules" is worth
+            // knowing when a store is dense.
+            rules: probe.rules,
+            citations: probe.summary.rules,
             skipped: probe.skipped,
             failureKinds: probe.failureKinds,
             kept: probe.admission.kept.length,

@@ -98,6 +98,30 @@ describe('probeSummary', () => {
     const summary = probeSummary([trial('a', ['k1', 'k2', 'k3'], 'supplied')]);
     expect(summary.rules).toBe(3);
   });
+
+  it('counts citations, which is not the size of the store the probe was given', () => {
+    // The two numbers answer different questions and were once wired into each other. A rule
+    // cited by two of its own corrections contributes two to `summary.rules` and one to the four
+    // admission buckets, so a gate that compares the buckets against the summary can only pass
+    // in a store where no rule is cited twice. V13 is blocking; the substitution would have
+    // failed every real run rather than an empty one.
+    const trials = [trial('a', ['k1', 'k2'], 'supplied'), trial('b', ['k1'], 'supplied')];
+    const summary = probeSummary(trials);
+    const admission = admissionOf(
+      [
+        { id: 'k1', evidence: [{ taskId: 'a' }, { taskId: 'b' }] },
+        { id: 'k2', evidence: [{ taskId: 'a' }] },
+      ],
+      trials,
+    );
+    expect(summary.rules).toBe(3);
+    const counted =
+      admission.kept.length +
+      admission.noVerifiedSource +
+      admission.brokeItsSource +
+      admission.unsupported;
+    expect(counted).toBe(2);
+  });
 });
 
 describe('admissionOf', () => {
