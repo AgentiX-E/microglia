@@ -35,6 +35,10 @@ on:
         description: 'R8.3b: BIRD split — minidev (350-question slice the transfer experiments use) or dev (all 1,534 questions, the only split that can reproduce a published dev cell)'
         required: false
         default: 'minidev'
+      learn_sample:
+        description: 'Questions each fold distils from (0 = all). Dev needs ~12,000 calls at full learning; a baseline reproduction needs the evaluation and not the flywheel'
+        required: false
+        default: '0'
       convention:
         description: 'House convention (empty, or thousands)'
         required: false
@@ -116,7 +120,9 @@ jobs:
     # not ask for. Scheduled and push-triggered runs are unaffected.
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.bird != 'false'
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    # 1,534 questions x 2 arms at concurrency 8 is about 3,100 calls; the dev split needs the
+    # headroom that the 350-question slice never did.
+    timeout-minutes: 240
     env:
       # Which BIRD artefact this job reads and writes. Two splits produce two files, and every
       # reader downstream of the run — attribution, the pool, the signals, the density family, the
@@ -229,6 +235,7 @@ jobs:
           SOTA_DENSITY_RULES_PER_DB: ${{ github.event.inputs.density_rules_per_db || '8' }}
           SOTA_TRANSFER_PANEL: ${{ github.event.inputs.transfer_panel || '10' }}
           SOTA_SPLIT: ${{ github.event.inputs.split || 'minidev' }}
+          SOTA_LEARN_SAMPLE: ${{ github.event.inputs.learn_sample || '0' }}
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '8000' }}
         run: pnpm eval:sota
 

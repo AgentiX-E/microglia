@@ -220,6 +220,21 @@ const CACHE = join(ROOT, '..', '.cache', 'bird');
 const LIMIT = nonNegative(process.env['SOTA_LIMIT'], 0);
 
 /**
+ * How many of a fold's learning questions to distil from, 0 meaning all of them.
+ *
+ * Distillation is the expensive half of a fold: on the 350-question slice a fold learns from 280
+ * questions for about 280 calls, and on the 1,534-question dev split it learns from 1,227 for
+ * about 1,227 — five folds of which project to 12,037 calls against a 8,000 cap. That projection
+ * is a measurement, not a guess: the first dev dispatch printed it after finishing its first fold.
+ *
+ * A reproduction of a no-memory number does not need a fully learned store, so a stage that only
+ * wants the baseline can cap the learning sample and say so. The cap travels in the artefact,
+ * because a store built from 64 questions is not the store the flywheel readings describe and a
+ * reader who compared the two would be comparing two different treatments.
+ */
+const LEARN_SAMPLE = Math.trunc(nonNegative(process.env['SOTA_LEARN_SAMPLE'], 0));
+
+/**
  * Which split of BIRD this run measures.
  *
  * Two splits, two purposes. `minidev` is the 350-question slice every transfer experiment in this
@@ -2474,7 +2489,10 @@ async function runFold(
 ): Promise<FoldResult> {
   const idOf = (row: BirdRow): string => `${row.db_id}#${row.question_id}`;
   const evalRows = rows.filter((row) => foldOf.get(idOf(row)) === fold);
-  const learnRows = rows.filter((row) => foldOf.get(idOf(row)) !== fold);
+  const learnPool = rows.filter((row) => foldOf.get(idOf(row)) !== fold);
+  // `rows` is interleaved across databases before it reaches a fold, so a prefix of it is a sample
+  // of every database rather than of whichever one sorts first.
+  const learnRows = LEARN_SAMPLE > 0 ? learnPool.slice(0, LEARN_SAMPLE) : learnPool;
 
   const widened = await buildFoldMemory(GENERALIZE, learnRows, dataset, task);
   // Scope widening is an arm here, not a second dispatch: the same corrections are
@@ -4417,6 +4435,7 @@ async function main(): Promise<void> {
       // published cell needs it before anything else: 53.71 on 350 questions and
       // 53.71 on 1,534 are not the same claim.
       split: SPLIT,
+      learn_sample: LEARN_SAMPLE,
       folds: FOLDS,
       seed: SEED,
       limit: LIMIT,
