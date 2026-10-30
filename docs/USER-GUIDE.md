@@ -956,13 +956,26 @@ Both archives are pinned by size and SHA-256 in `eval/manifests/`: `bird-minidev
 one verification. The eleven SQLite databases are the same in both archives — dev differs only in
 the question set — so a dev run reuses the databases it already has once either archive is unpacked.
 
+**What the dev run measured** (`eval/results/poc-sota-bird-dev.json`, 1,534 questions, no memory):
+
+| Reading | Value |
+|---|---|
+| execution accuracy | **57.63%** (884/1,534), Wilson [55.14, 60.08] |
+| published cell `xiyan-deepseek-ddl` | 53.52% [51.02, 56.02] on the same split |
+| difference | **+4.11pp**, inside the same-split tolerance of 4.97pp |
+| verdict | **`reproduced`** — the first row of the comparison table that is not a footnote |
+| calls / timeouts / failures | 3,190 / **0** / 0 across 3,174 prompts, 5 folds, 77 minutes |
+
 **Two rows, not one.** `eval/results/poc-cell-comparison.json` carries a row per artefact, because
 a table that replaced the Mini-Dev row with the dev row would delete the evidence for the reading
 that motivated it. Each row names its source file, and `pnpm eval:protocol` recomputes both from
-the JSON. The Mini-Dev row can only ever be `indicative` — its split name differs from the published
-cell's — and the dev row can be `reproduced`. A run on the right 1,534 questions filed under a
-different split name stays `indicative` forever, which is why `splitNameOf('dev')` is asserted
-against the catalogue in `artefacts.test.ts` rather than written in a comment.
+the JSON: `indicative` at +0.19pp from the 350-question artefact, `reproduced` at +4.11pp from the
+1,534-question one. The gate refuses a record whose verdict disagrees with the arithmetic, which is
+how the dev row replaced the Mini-Dev row's verdict the moment the artefact existed.
+
+A run on the right 1,534 questions filed under a different split name stays `indicative` forever,
+which is why `splitNameOf('dev')` is asserted against the catalogue in `artefacts.test.ts` rather
+than written in a comment.
 
 ### 13.2 Showing a rule where its words do not exist
 

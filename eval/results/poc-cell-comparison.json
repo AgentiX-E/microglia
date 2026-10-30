@@ -17,6 +17,22 @@
       "tolerancePp": 7.72,
       "verdict": "indicative",
       "source": "eval/results/poc-sota-bird.json"
+    },
+    {
+      "cell": "xiyan-deepseek-ddl",
+      "oursPp": 57.63,
+      "publishedPp": 53.52,
+      "diffPp": 4.11,
+      "ourSplit": "BIRD dev",
+      "publishedSplit": "BIRD dev",
+      "sameSplit": true,
+      "ourLowPp": 55.14,
+      "ourHighPp": 60.08,
+      "publishedLowPp": 51.02,
+      "publishedHighPp": 56.02,
+      "tolerancePp": 4.97,
+      "verdict": "reproduced",
+      "source": "eval/results/poc-sota-bird-dev.json"
     }
   ]
 }
