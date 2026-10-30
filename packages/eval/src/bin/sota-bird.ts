@@ -779,6 +779,18 @@ async function prepareArchive(): Promise<string> {
     process.stdout.write('[sota] extracting the archive\n');
     execFileSync('unzip', ['-q', '-o', dest, '-d', root], { stdio: 'inherit' });
   }
+
+  // `dev.zip` carries a second archive: `dev_databases.zip` holds the eleven SQLite files while
+  // `dev.json` sits beside it. Mini-Dev does not nest. Unpacking one level and stopping leaves
+  // hundreds of questions with no databases, which is how the second dev dispatch failed —
+  // "No database file for 'california_schools'" — after a successful 346 MB download and a digest
+  // that matched. The nesting is a property of the archive, so it is detected rather than listed:
+  // a manifest field would have to be maintained for one archive out of two.
+  const inner = join(extracted, 'dev_databases.zip');
+  if (existsSync(inner) && !existsSync(join(extracted, 'dev_databases'))) {
+    process.stdout.write('[sota] extracting the databases inside the archive\n');
+    execFileSync('unzip', ['-q', '-o', inner, '-d', extracted], { stdio: 'inherit' });
+  }
   return extracted;
 }
 
