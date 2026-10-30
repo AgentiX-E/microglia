@@ -17,7 +17,13 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { densityGates, type DensityReport, type PolicyRow, type StratumSummary } from '@agentix-e/microglia-eval';
+import {
+  densityGates,
+  type CrossFitRow,
+  type DensityReport,
+  type PolicyRow,
+  type StratumSummary,
+} from '@agentix-e/microglia-eval';
 
 type Artifact = {
   readonly metrics?: {
@@ -25,6 +31,9 @@ type Artifact = {
     readonly density_excluded?: Readonly<Record<string, number>>;
     readonly density_unplaced?: number;
     readonly density_unmeasured?: number;
+    /** The trials themselves, carried so a different split can be read without new calls. */
+    readonly density_ledger?: readonly unknown[];
+    readonly density_floor_ledger?: readonly unknown[];
   };
 };
 
@@ -50,6 +59,22 @@ function policyLine(row: PolicyRow): string {
     `${(row.baselineAccuracy * 100).toFixed(1)}% -> ${(row.treatmentAccuracy * 100).toFixed(1)}%  ` +
     `${signed(row.deltaPp)} [${row.ciLowPp.toFixed(2)}, ${row.ciHighPp.toFixed(2)}]  ` +
     `+${row.gained} / -${row.lost}\n`
+  );
+}
+
+/**
+ * One cross-fitted reading, printed next to the single-split policies so the two can be compared.
+ *
+ * The store and the floor are fitted by the same machinery: if foreign rules earn as much as the
+ * store's rules do, what is being measured is the machinery and not the content.
+ */
+function crossLine(label: string, row: CrossFitRow): string {
+  return (
+    `[density] ${label.padEnd(7)} shows ${String(row.shown).padStart(4)} of ${row.injections}  ` +
+    `${(row.baselineAccuracy * 100).toFixed(1)}% -> ${(row.treatmentAccuracy * 100).toFixed(1)}%  ` +
+    `${signed(row.deltaPp)} [${row.ciLowPp.toFixed(2)}, ${row.ciHighPp.toFixed(2)}]  ` +
+    `+${row.gained} / -${row.lost}  ` +
+    `${row.folds} fold(s) x ${row.repeats} repeat(s)\n`
   );
 }
 
@@ -91,6 +116,21 @@ function main(): void {
   process.stdout.write(stratumLine('cued', report.cued));
   process.stdout.write(stratumLine('floor', report.floor));
   for (const row of report.policies) process.stdout.write(policyLine(row));
+  // R9.3: the same policy fitted out of fold on repeated splits, and the floor fitted the same way.
+  // Guarded because an artefact produced before this reading existed carries the four single-split
+  // policies and no cross-fit, and pointing this command at one is not an error.
+  if (report.crossFit !== undefined) {
+    process.stdout.write(crossLine('xfit', report.crossFit.store));
+    process.stdout.write(crossLine('xfit-fl', report.crossFit.floor));
+  }
+  const ledger = artifact.metrics?.density_ledger?.length ?? 0;
+  if (ledger > 0) {
+    const floorLedger = artifact.metrics?.density_floor_ledger?.length ?? 0;
+    process.stdout.write(
+      `[density] carried ${ledger} store trial(s) and ${floorLedger} floor trial(s): a different ` +
+        `split can be read from the artefact instead of re-bought\n`,
+    );
+  }
   for (const gate of densityGates(report)) {
     process.stdout.write(
       `[density] ${gate.pass ? 'pass' : 'FAIL'} ${gate.id}${gate.blocking ? '' : ' (advisory)'}: ${gate.actual}\n`,

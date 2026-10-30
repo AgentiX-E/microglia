@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   classify,
+  crossFit,
   densityGates,
   densityReport,
   policyTable,
@@ -9,6 +10,7 @@ import {
   signPersistence,
   stratumOf,
   targetPanels,
+  type CrossFitRow,
   type DensityRule,
   type DensityTarget,
   type DensityTrial,
@@ -486,6 +488,14 @@ describe('densityReport', () => {
     const report = densityReport({ rules, panel: 2, trials, floorTrials: [] });
     expect(report.policies.map((row) => row.name)).toEqual(['always', 'fitted', 'cued', 'oracle']);
   });
+
+  it('reports zeros for a run that selected no rule, rather than dividing by an empty panel', () => {
+    const empty = densityReport({ rules: [], panel: 1, trials: [], floorTrials: [] });
+    expect(empty.shown).toEqual({ min: 0, median: 0, max: 0 });
+    expect(empty.targets).toBe(0);
+    expect(empty.crossFit.store.injections).toBe(0);
+    expect(densityGates(empty)[0]?.pass).toBe(false);
+  });
 });
 
 describe('densityGates', () => {
@@ -510,9 +520,52 @@ describe('densityGates', () => {
     };
   }
 
+  /** A cross-fit reading shaped by hand, so the two new bars can be failed one at a time. */
+  function crossRow(overrides: Partial<CrossFitRow> = {}): CrossFitRow {
+    return {
+      folds: 5,
+      repeats: 10,
+      shown: 20,
+      injections: 40,
+      baselineAccuracy: 0.5,
+      treatmentAccuracy: 0.55,
+      deltaPp: 5,
+      ciLowPp: 1,
+      ciHighPp: 9,
+      gained: 6,
+      lost: 1,
+      ...overrides,
+    };
+  }
+
+  /** `report()` plus the cross-fit reading the last two bars read, and nothing else changed. */
+  function fitted(
+    base: ReturnType<typeof report>,
+    cross: { store?: CrossFitRow; floor?: CrossFitRow } = {},
+  ): ReturnType<typeof report> {
+    // The default floor is the store's reading minus content: foreign rules fitted the same way.
+    return {
+      ...base,
+      crossFit: {
+        store: cross.store ?? crossRow(),
+        floor:
+          cross.floor ??
+          crossRow({ treatmentAccuracy: 0.49, deltaPp: -1, ciLowPp: -3, ciHighPp: 1, gained: 1, lost: 2 }),
+      },
+    };
+  }
+
   it('passes a family where every rule was exercised at the panel size', () => {
-    const gates = densityGates(report());
-    expect(gates.map((gate) => gate.pass)).toEqual([true, true, true, true]);
+    const gates = densityGates(fitted(report()));
+    expect(gates.map((gate) => gate.id)).toEqual([
+      'V18-density-exercised',
+      'V19-density-discriminates',
+      'V20-density-reconciles',
+      'V21-density-floor',
+      'V22-density-crossfit-covers',
+      'V23-density-crossfit-beats-floor',
+    ]);
+    expect(gates.map((gate) => gate.pass)).toEqual([true, true, true, true, true, true]);
   });
 
   it('fails the density bar when a rule was shown fewer times than the panel', () => {
@@ -539,9 +592,171 @@ describe('densityGates', () => {
   });
 
   it('keeps the floor advisory and fails it when the control never ran', () => {
-    const empty = densityReport({ rules: [], panel: 1, trials: [], floorTrials: [] });
-    const gates = densityGates(empty);
+    const empty = report();
+    const gates = densityGates({ ...empty, floor: { ...empty.floor, injections: 0 } });
     expect(gates[3]?.pass).toBe(false);
     expect(gates[3]?.blocking).toBe(false);
+  });
+
+  it('emits no cross-fit bars for an artefact that predates them', () => {
+    const { crossFit, ...legacy } = report();
+    expect(crossFit).toBeDefined();
+    expect(densityGates(legacy).map((gate) => gate.id)).toEqual([
+      'V18-density-exercised',
+      'V19-density-discriminates',
+      'V20-density-reconciles',
+      'V21-density-floor',
+    ]);
+  });
+
+  it('fails coverage when a trial was scored a different number of times', () => {
+    const gates = densityGates(fitted(report(), { store: crossRow({ injections: 39 }) }));
+    expect(gates[4]?.id).toBe('V22-density-crossfit-covers');
+    expect(gates[4]?.pass).toBe(false);
+    expect(gates[4]?.blocking).toBe(true);
+  });
+
+  it('fails coverage when the split was made once, which is the null R9.3 has to beat', () => {
+    const gates = densityGates(fitted(report(), { store: crossRow({ repeats: 1, injections: 4 }) }));
+    expect(gates[4]?.pass).toBe(false);
+    expect(gates[4]?.actual).toContain('1 repeat');
+  });
+
+  it('fails coverage when there is no fold to hold out', () => {
+    const gates = densityGates(fitted(report(), { store: crossRow({ folds: 1 }) }));
+    expect(gates[4]?.pass).toBe(false);
+    expect(gates[4]?.actual).toContain('1 fold');
+  });
+
+  it('passes the content bar only when the store clears zero and beats the foreign rules', () => {
+    const gates = densityGates(fitted(report(), { store: crossRow({ ciLowPp: 1 }), floor: crossRow({ deltaPp: 2 }) }));
+    expect(gates[5]?.id).toBe('V23-density-crossfit-beats-floor');
+    expect(gates[5]?.pass).toBe(true);
+    expect(gates[5]?.blocking).toBe(false);
+  });
+
+  it('fails the content bar when the interval still contains zero', () => {
+    const gates = densityGates(
+      fitted(report(), { store: crossRow({ ciLowPp: -0.5 }), floor: crossRow({ deltaPp: -2 }) }),
+    );
+    expect(gates[5]?.pass).toBe(false);
+  });
+
+  it('fails the content bar when foreign rules fitted the same way did better', () => {
+    const gates = densityGates(fitted(report(), { store: crossRow({ ciLowPp: 1 }), floor: crossRow({ deltaPp: 6 }) }));
+    expect(gates[5]?.pass).toBe(false);
+    expect(gates[5]?.actual).toContain('floor');
+  });
+});
+
+describe('crossFit', () => {
+  /**
+   * A rule shown on `count` consecutive positions, with the effect the caller decides per position.
+   *
+   * `helps` is a question the control got wrong and the rule got right, `hurts` the reverse, and
+   * `pass` a question both got right — the three states that matter to a flip.
+   */
+  function panel(
+    ruleId: string,
+    count: number,
+    effect: (order: number) => 'helps' | 'hurts' | 'pass',
+  ): DensityTrial[] {
+    const out: DensityTrial[] = [];
+    for (let order = 0; order < count; order += 1) {
+      const kind = effect(order);
+      out.push(
+        trial({
+          ruleId,
+          targetId: `${ruleId}-${order}`,
+          order,
+          baselineCorrect: kind !== 'helps',
+          correct: kind !== 'hurts',
+        }),
+      );
+    }
+    return out;
+  }
+
+  it('shows a rule that helped on every out-of-fold trial and earns every injection', () => {
+    const row = crossFit(panel('r1', 10, () => 'helps'), { folds: 5, repeats: 2 });
+    expect(row.shown).toBe(20);
+    expect(row.injections).toBe(20);
+    expect(row.gained).toBe(20);
+    expect(row.lost).toBe(0);
+    expect(row.deltaPp).toBe(100);
+    expect(row.ciLowPp).toBe(100);
+  });
+
+  it('hides a rule that never helped out of fold, rather than defaulting it into the prompt', () => {
+    const row = crossFit(panel('r1', 10, () => 'hurts'), { folds: 5, repeats: 2 });
+    expect(row.injections).toBe(20);
+    expect(row.shown).toBe(0);
+    expect(row.gained).toBe(0);
+    expect(row.lost).toBe(0);
+    expect(row.deltaPp).toBe(0);
+  });
+
+  it('treats a question both answers got right as no evidence either way', () => {
+    const row = crossFit(panel('r1', 10, () => 'pass'), { folds: 5, repeats: 2 });
+    expect(row.shown).toBe(0);
+    expect(row.baselineAccuracy).toBe(1);
+    expect(row.treatmentAccuracy).toBe(1);
+    expect(row.deltaPp).toBe(0);
+  });
+
+  it('leaves the trial it is scoring out of the rule own evidence', () => {
+    // Leave-one-out is the sharpest form of the question: a rule that helped on exactly one
+    // question must not be shown on that question, because the only thing that would justify
+    // showing it is the trial being scored.
+    const trials = panel('r1', 10, (order) => (order === 0 ? 'helps' : 'pass'));
+    const cross = crossFit(trials, { folds: 10, repeats: 1 });
+    expect(cross.injections).toBe(10);
+    expect(cross.shown).toBe(9);
+    expect(cross.gained).toBe(0);
+    expect(cross.deltaPp).toBe(0);
+  });
+
+  it('agrees with a single split when the effect is the same on every question', () => {
+    const trials = panel('r1', 10, () => 'helps');
+    const fittedRow = policyTable(trials, 5).find((row) => row.name === 'fitted');
+    const cross = crossFit(trials, { folds: 5, repeats: 1 });
+    expect(fittedRow?.deltaPp).toBe(100);
+    expect(cross.deltaPp).toBe(100);
+  });
+
+  it('scores every injection exactly once per repeat', () => {
+    const trials = [...panel('r1', 10, () => 'helps'), ...panel('r2', 10, () => 'pass')];
+    const once = crossFit(trials, { folds: 5, repeats: 1 });
+    const thrice = crossFit(trials, { folds: 5, repeats: 3 });
+    expect(once.injections).toBe(20);
+    expect(thrice.injections).toBe(60);
+    expect(once.shown).toBe(10);
+  });
+
+  it('does not depend on the order the trials arrive in', () => {
+    const trials = [
+      ...panel('r1', 10, (order) => (order % 3 === 0 ? 'helps' : 'hurts')),
+      ...panel('r2', 10, () => 'helps'),
+    ];
+    const straight = crossFit(trials, { folds: 5, repeats: 4, seed: 3 });
+    const shuffled = crossFit([...trials].reverse(), { folds: 5, repeats: 4, seed: 3 });
+    expect(shuffled).toEqual(straight);
+  });
+
+  it('says nothing when there is nothing to score', () => {
+    const row = crossFit([]);
+    expect(row).toMatchObject({ injections: 0, shown: 0, gained: 0, lost: 0, deltaPp: 0, ciLowPp: 0 });
+  });
+
+  it('reads its defaults off the pre-registered split', () => {
+    const row = crossFit(panel('r1', 10, () => 'helps'));
+    expect(row.folds).toBe(5);
+    expect(row.repeats).toBe(10);
+    expect(row.injections).toBe(100);
+  });
+
+  it('refuses a split that cannot separate fitting from scoring', () => {
+    expect(() => crossFit(panel('r1', 4, () => 'helps'), { folds: 1 })).toThrow(RangeError);
+    expect(() => crossFit(panel('r1', 4, () => 'helps'), { repeats: 0 })).toThrow(RangeError);
   });
 });

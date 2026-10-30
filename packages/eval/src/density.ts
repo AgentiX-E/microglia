@@ -281,6 +281,11 @@ export type StratumSummary = {
   readonly minShown: number;
 };
 
+/** A count with its noun, so a gate's reading can be read aloud. */
+function plural(count: number, noun: string): string {
+  return `${count} ${noun}${count === 1 ? '' : 's'}`;
+}
+
 function share(part: number, whole: number): number {
   return whole === 0 ? 0 : part / whole;
 }
@@ -436,9 +441,7 @@ export function policyTable(
   const net = (source: readonly DensityTrial[]): Map<string, number> => {
     const sums = new Map<string, number>();
     for (const trial of source) {
-      const delta =
-        (trial.correct && !trial.baselineCorrect ? 1 : 0) - (!trial.correct && trial.baselineCorrect ? 1 : 0);
-      sums.set(trial.ruleId, (sums.get(trial.ruleId) ?? 0) + delta);
+      sums.set(trial.ruleId, (sums.get(trial.ruleId) ?? 0) + trialDelta(trial));
     }
     return sums;
   };
@@ -466,6 +469,150 @@ export function policyTable(
     policyRow('cued', scored, (trial) => trial.cued, options),
     policyRow('oracle', scored, showsOracle, options),
   ];
+}
+
+/** What one trial did to the answer: +1 repaired, −1 broken, 0 unchanged either way. */
+function trialDelta(trial: DensityTrial): number {
+  return (trial.correct ? 1 : 0) - (trial.baselineCorrect ? 1 : 0);
+}
+
+/** A policy scored by repeated cross-fitting instead of on one half of the panel. */
+export type CrossFitRow = {
+  /** Folds each rule's panel is cut into: one is held out, the rest fit the rule's sign. */
+  readonly folds: number;
+  /** How many independent splits were drawn. Every trial is scored once per repeat. */
+  readonly repeats: number;
+  /** Injections the policy chose to make, summed over repeats. */
+  readonly shown: number;
+  /** Injections scored, which is every trial once per repeat. */
+  readonly injections: number;
+  readonly baselineAccuracy: number;
+  readonly treatmentAccuracy: number;
+  readonly deltaPp: number;
+  readonly ciLowPp: number;
+  readonly ciHighPp: number;
+  readonly gained: number;
+  readonly lost: number;
+};
+
+/** Folds per split, and splits per reading. Fixed here so a run cannot pick them after seeing one. */
+const CROSS_FOLDS = 5;
+const CROSS_REPEATS = 10;
+
+/**
+ * Cut every rule's panel into `folds` groups, freshly for each repeat.
+ *
+ * The cut ranks a rule's own trials by a hash of the repeat and the trial's position and takes the
+ * rank modulo the fold count: balanced by construction, independent of the order the trials arrive
+ * in — the artefact is read back from JSON, and a page of trials that happened to sort differently
+ * would otherwise be a different experiment — and different for every repeat, which is the whole
+ * reason repeats exist.
+ */
+function foldOf(trials: readonly DensityTrial[], folds: number, repeat: number): Map<string, number> {
+  const byRule = new Map<string, DensityTrial[]>();
+  for (const trial of trials) {
+    const bucket = byRule.get(trial.ruleId) ?? [];
+    bucket.push(trial);
+    byRule.set(trial.ruleId, bucket);
+  }
+  const out = new Map<string, number>();
+  for (const [ruleId, group] of byRule) {
+    const ranked = [...group].sort((left, right) =>
+      compareByHash(
+        `${ruleId}\u0000${repeat}\u0000${left.order}`,
+        left.targetId,
+        `${ruleId}\u0000${repeat}\u0000${right.order}`,
+        right.targetId,
+      ),
+    );
+    for (const [rank, trial] of ranked.entries()) {
+      out.set(`${ruleId}\u0000${trial.order}`, rank % folds);
+    }
+  }
+  return out;
+}
+
+/**
+ * The per-rule policy again, but fitted out of fold and scored on every trial.
+ *
+ * `policyTable`'s `fitted` row is one split: it decides a rule's sign on the first half of the panel
+ * and is scored on the second. That is the cheapest honest estimate and it is also the noisiest —
+ * the run that measured it found the two halves of the panel were not exchangeable (25 repairs and
+ * 25 breaks on the fit halves, 17 and 46 on the scoring halves), so one draw can carry a rule across
+ * the decision boundary on ten observations that say little.
+ *
+ * This repeats the split. Each repeat cuts every rule's panel into `folds` groups, fits the rule's
+ * sign on the other groups and scores the held-out one, so every trial is scored exactly once per
+ * repeat and no trial ever contributes to the decision made about itself. The result is the same
+ * policy asked `repeats` times with the answers averaged, which is what makes an interval over it
+ * mean what it says.
+ *
+ * A rule whose out-of-fold net is zero is not shown. That is the same reading `fitted` obeys: a rule
+ * with no evidence for it is not carried.
+ */
+export function crossFit(
+  trials: readonly DensityTrial[],
+  options: {
+    // `| undefined` because the report forwards its input's optional overrides verbatim, which is
+    // how a caller says "use the pre-registered split".
+    readonly folds?: number | undefined;
+    readonly repeats?: number | undefined;
+    readonly resamples?: number;
+    readonly seed?: number;
+  } = {},
+): CrossFitRow {
+  const folds = Math.floor(options.folds ?? CROSS_FOLDS);
+  const repeats = Math.floor(options.repeats ?? CROSS_REPEATS);
+  if (folds < 2) throw new RangeError(`crossFit needs at least 2 folds, got ${folds}`);
+  if (repeats < 1) throw new RangeError(`crossFit needs at least 1 repeat, got ${repeats}`);
+  let baseline = 0;
+  let treatment = 0;
+  let gained = 0;
+  let lost = 0;
+  let shown = 0;
+  const deltas: number[] = [];
+  const clusters: string[] = [];
+  for (let repeat = 0; repeat < repeats; repeat += 1) {
+    const assignment = foldOf(trials, folds, repeat);
+    for (let fold = 0; fold < folds; fold += 1) {
+      const outOfFold = new Map<string, number>();
+      for (const trial of trials) {
+        if (assignment.get(`${trial.ruleId}\u0000${trial.order}`) === fold) continue;
+        outOfFold.set(trial.ruleId, (outOfFold.get(trial.ruleId) ?? 0) + trialDelta(trial));
+      }
+      const positive = new Set<string>();
+      for (const [ruleId, delta] of outOfFold) {
+        if (delta > 0) positive.add(ruleId);
+      }
+      for (const trial of trials) {
+        if (assignment.get(`${trial.ruleId}\u0000${trial.order}`) !== fold) continue;
+        const shows = positive.has(trial.ruleId);
+        const withRule = shows ? trial.correct : trial.baselineCorrect;
+        if (shows) shown += 1;
+        if (trial.baselineCorrect) baseline += 1;
+        if (withRule) treatment += 1;
+        if (withRule && !trial.baselineCorrect) gained += 1;
+        if (!withRule && trial.baselineCorrect) lost += 1;
+        // A hidden rule carries the control's verdict, so its delta is zero by construction.
+        deltas.push(shows ? trialDelta(trial) : 0);
+        clusters.push(trial.targetId);
+      }
+    }
+  }
+  const interval = clusterBootstrapCI(deltas, clusters, options.resamples ?? 10_000, options.seed ?? 7);
+  return {
+    folds,
+    repeats,
+    shown,
+    injections: deltas.length,
+    baselineAccuracy: share(baseline, deltas.length),
+    treatmentAccuracy: share(treatment, deltas.length),
+    deltaPp: share(treatment - baseline, deltas.length) * 100,
+    ciLowPp: interval.low * 100,
+    ciHighPp: interval.high * 100,
+    gained,
+    lost,
+  };
 }
 
 /** One rule's record over the panel, split by half, because a policy may only learn from one. */
@@ -604,6 +751,14 @@ export type DensityReport = {
   /** The wrong-scope control: one foreign rule on the same panel, for the cost of a floor. */
   readonly floor: StratumSummary;
   readonly policies: readonly PolicyRow[];
+  /**
+   * The same policy fitted out of fold on repeated splits, and the foreign rules fitted the same way.
+   *
+   * Absent — not zeroed — when the artefact predates this reading. A zeroed row would read as a
+   * measurement that came back empty, and the two bars that read it are only meaningful when the
+   * cross-fit actually ran.
+   */
+  readonly crossFit?: { readonly store: CrossFitRow; readonly floor: CrossFitRow };
   /** The ledger itself, so a policy's fit can be re-examined without the trials. */
   readonly perRule: readonly RuleDensityRow[];
   readonly signs: SignPersistence;
@@ -616,6 +771,8 @@ export type DensityInput = {
   readonly floorTrials: readonly DensityTrial[];
   readonly resamples?: number;
   readonly seed?: number;
+  readonly folds?: number;
+  readonly repeats?: number;
 };
 
 /**
@@ -651,6 +808,10 @@ export function densityReport(input: DensityInput): DensityReport {
     cued: stratumOf(input.trials.filter((trial) => trial.cued), options),
     floor: stratumOf(input.floorTrials, options),
     policies: policyTable(input.trials, split, options),
+    crossFit: {
+      store: crossFit(input.trials, { ...options, folds: input.folds, repeats: input.repeats }),
+      floor: crossFit(input.floorTrials, { ...options, folds: input.folds, repeats: input.repeats }),
+    },
     perRule,
     signs: signPersistence(perRule),
   };
@@ -700,6 +861,45 @@ export function densityGates(report: DensityReport): readonly ValidityGate[] {
       criterion: 'a wrong-scope rule was measured on the same panels',
       actual: `${report.floor.injections} floor injections, ${(report.floor.flipRate * 100).toFixed(1)}% flips`,
       pass: report.floor.injections > 0,
+      blocking: false,
+    },
+    ...(report.crossFit === undefined ? [] : crossFitGates(report.crossFit, report.injections)),
+  ];
+}
+
+/**
+ * The two bars that read the cross-fit, emitted only when there is a cross-fit to read.
+ *
+ * Kept apart from `densityGates` because they are the only pair whose inputs can be missing: an
+ * artefact produced before R9.3 carries the four single-split policies and nothing to cross-fit, and
+ * a gate that cannot be evaluated is not a failed gate.
+ */
+function crossFitGates(
+  cross: { readonly store: CrossFitRow; readonly floor: CrossFitRow },
+  injections: number,
+): readonly ValidityGate[] {
+  return [
+    {
+      id: 'V22-density-crossfit-covers',
+      criterion: 'a repeated split scored every injection once per repeat, from rules fitted out of fold',
+      actual:
+        `${cross.store.injections} of ${injections * cross.store.repeats} ` +
+        `injections scored, ${plural(cross.store.folds, 'fold')} x ` +
+        `${plural(cross.store.repeats, 'repeat')}`,
+      pass:
+        cross.store.folds >= 2 &&
+        cross.store.repeats >= 2 &&
+        cross.store.injections === injections * cross.store.repeats,
+      blocking: true,
+    },
+    {
+      id: 'V23-density-crossfit-beats-floor',
+      criterion: 'the cross-fitted selection clears zero and beats foreign rules fitted the same way',
+      actual:
+        `store ${cross.store.deltaPp.toFixed(2)}pp ` +
+        `[${cross.store.ciLowPp.toFixed(2)}, ${cross.store.ciHighPp.toFixed(2)}] vs ` +
+        `floor ${cross.floor.deltaPp.toFixed(2)}pp`,
+      pass: cross.store.ciLowPp > 0 && cross.store.deltaPp > cross.floor.deltaPp,
       blocking: false,
     },
   ];

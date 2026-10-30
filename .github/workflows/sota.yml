@@ -358,6 +358,21 @@ jobs:
                 ...m.density.policies.map((a) => '| ' + a.name + ' | ' + a.shown + '/' + a.injections +
                   ' | ' + (a.treatmentAccuracy * 100).toFixed(2) + '% | ' + a.deltaPp.toFixed(2) +
                   'pp | [' + a.ciLowPp.toFixed(2) + ', ' + a.ciHighPp.toFixed(2) + '] |'),
+                // R9.3: the same policy fitted out of fold on repeated splits, and the foreign rules
+                // fitted by the same machinery. A store that does not beat its own floor has shown
+                // that the fit is doing the work rather than the content.
+                ...(m.density.crossFit === undefined ? [] : [
+                  '',
+                  '| Cross-fit (R9.3) | shown | accuracy | delta | 95% CI | splits |',
+                  '| --- | --- | --- | --- | --- | --- |',
+                  ...['store', 'floor'].map((k) => '| ' + k + ' | ' +
+                    m.density.crossFit[k].shown + '/' + m.density.crossFit[k].injections + ' | ' +
+                    (m.density.crossFit[k].treatmentAccuracy * 100).toFixed(2) + '% | ' +
+                    m.density.crossFit[k].deltaPp.toFixed(2) + 'pp | [' +
+                    m.density.crossFit[k].ciLowPp.toFixed(2) + ', ' +
+                    m.density.crossFit[k].ciHighPp.toFixed(2) + '] | ' +
+                    m.density.crossFit[k].folds + ' x ' + m.density.crossFit[k].repeats + ' |'),
+                ]),
               ]),
             ];
             const text = lines.join('\n');

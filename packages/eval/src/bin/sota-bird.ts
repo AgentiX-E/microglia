@@ -1640,6 +1640,17 @@ type DensityRun = {
   readonly calls: number;
   /** Injections whose call never returned: holes, not verdicts, and kept out of the ledger. */
   readonly unmeasured: number;
+  /**
+   * The ledger itself, carried out of the run.
+   *
+   * The reading already computes the cross-fit at the splits it was given, but the question R9.3
+   * asks — how much of a rule's apparent sign survives being fitted out of fold — is a question
+   * about splits, and a split chosen after seeing the answer is not a measurement. Carrying the
+   * trials makes every later reading free: a different fold count, or a leave-one-out reading, is
+   * recomputed from the artefact instead of re-bought.
+   */
+  readonly trials: readonly DensityTrial[];
+  readonly floorTrials: readonly DensityTrial[];
 };
 
 /**
@@ -1867,6 +1878,8 @@ async function densityPass(input: {
     unplaced,
     calls,
     unmeasured: asked.length + askedFloor.length - trials.length - floorTrials.length,
+    trials,
+    floorTrials,
   };
 }
 
@@ -4320,6 +4333,8 @@ async function main(): Promise<void> {
         ? {}
         : {
             density: density.report,
+            density_ledger: density.trials,
+            density_floor_ledger: density.floorTrials,
             density_excluded: density.excluded,
             density_unplaced: density.unplaced,
             density_unmeasured: density.unmeasured,

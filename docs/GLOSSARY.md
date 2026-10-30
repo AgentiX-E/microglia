@@ -159,6 +159,13 @@ nothing" from "this rule was shown twice".
 panel. It prices the possibility that any text in the pack block moves answers, which would make every
 per-rule attribution in this project an artefact of the block rather than of its content.
 
+**Cross-fit (density family)** — a per-rule policy fitted on the questions it is *not* being scored on.
+Each rule's panel is cut into five folds, the rule's sign is decided on four and scored on the fifth,
+and the whole cut is repeated ten times so every question is scored once per repeat. The single split it
+replaces decides on the first half and is scored on the second; that is one draw of a noisy estimate,
+and the run that measured it found the two halves were not exchangeable. A cross-fit that earns no more
+than the same machinery run on foreign rules says the fit is what moved the answers, not the content.
+
 **Power** — the sample size needed to detect an effect at a stated confidence. Stated per benchmark so
 a null result is not confused with an underpowered one.
 

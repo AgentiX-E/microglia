@@ -507,6 +507,7 @@ export { DistillCache, type DistillCacheStats } from './distill-cache.js';
 
 export {
   classify,
+  crossFit,
   densityGates,
   densityReport,
   identifierTokens,
@@ -518,6 +519,7 @@ export {
   signPersistence,
   stratumOf,
   targetPanels,
+  type CrossFitRow,
   type DensityInput,
   type DensityReport,
   type DensityRule,
