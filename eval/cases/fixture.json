@@ -1,0 +1,83 @@
+{
+  "id": "offline-fixture",
+  "comparison": "multiset",
+  "databases": [
+    {
+      "dbId": "shop",
+      "ddl": [
+        "CREATE TABLE customer (id INTEGER PRIMARY KEY, name TEXT NOT NULL, country TEXT NOT NULL)",
+        "CREATE TABLE orders (id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL, amount REAL NOT NULL, year INTEGER NOT NULL)"
+      ],
+      "rows": [
+        "INSERT INTO customer VALUES (1, 'ann', 'SE')",
+        "INSERT INTO customer VALUES (2, 'bo', 'NO')",
+        "INSERT INTO customer VALUES (3, 'cy', 'SE')",
+        "INSERT INTO orders VALUES (1, 1, 10.5, 2024)",
+        "INSERT INTO orders VALUES (2, 1, 20.0, 2024)",
+        "INSERT INTO orders VALUES (3, 2, 7.25, 2023)",
+        "INSERT INTO orders VALUES (4, 3, 99.0, 2024)",
+        "INSERT INTO orders VALUES (5, 3, 1.0, 2025)"
+      ]
+    },
+    {
+      "dbId": "library",
+      "ddl": [
+        "CREATE TABLE book (id INTEGER PRIMARY KEY, title TEXT NOT NULL, year INTEGER NOT NULL)",
+        "CREATE TABLE loan (id INTEGER PRIMARY KEY, book_id INTEGER NOT NULL, days INTEGER NOT NULL)"
+      ],
+      "rows": [
+        "INSERT INTO book VALUES (1, 'Dune', 1965)",
+        "INSERT INTO book VALUES (2, 'Solaris', 1961)",
+        "INSERT INTO book VALUES (3, 'Roadside Picnic', 1972)",
+        "INSERT INTO loan VALUES (1, 1, 5)",
+        "INSERT INTO loan VALUES (2, 1, 12)",
+        "INSERT INTO loan VALUES (3, 2, 20)",
+        "INSERT INTO loan VALUES (4, 3, 7)"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "id": "shop#1",
+      "dbId": "shop",
+      "question": "How many customers are from Sweden?",
+      "evidence": "country holds the ISO country code.",
+      "goldSql": "SELECT count(*) FROM customer WHERE country = 'SE'"
+    },
+    {
+      "id": "shop#2",
+      "dbId": "shop",
+      "question": "List every customer name.",
+      "evidence": "name is the customer's display name.",
+      "goldSql": "SELECT name FROM customer"
+    },
+    {
+      "id": "shop#3",
+      "dbId": "shop",
+      "question": "How many orders are there?",
+      "evidence": "One row per order, whatever its value.",
+      "goldSql": "SELECT count(*) FROM orders"
+    },
+    {
+      "id": "library#1",
+      "dbId": "library",
+      "question": "How many books are there?",
+      "evidence": "One row per title.",
+      "goldSql": "SELECT count(*) FROM book"
+    },
+    {
+      "id": "library#2",
+      "dbId": "library",
+      "question": "List every book title.",
+      "evidence": "title is the book's name.",
+      "goldSql": "SELECT title FROM book"
+    },
+    {
+      "id": "library#3",
+      "dbId": "library",
+      "question": "How many loans lasted more than 10 days?",
+      "evidence": "days is the loan length in whole days.",
+      "goldSql": "SELECT count(*) FROM loan WHERE days > 10"
+    }
+  ]
+}

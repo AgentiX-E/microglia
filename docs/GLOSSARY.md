@@ -312,3 +312,30 @@ failure is only findable by a failure if this is filled; measured on the public 
 a keyed recall from 0 hits in 22 attempts to 25 in 26, and the accuracy did not move.
 
 See also: scope, tier, reason code in `USER-GUIDE` §3.1.
+
+## Protocol terms
+
+**Candidate contract** — The interface between a generator and the harness: a module exporting
+`contract`, `name`, `version` and `generate(request)`, where the request carries the question, its
+evidence and the schema. Deliberately minimal, so a third party can be measured without porting their
+system into ours, and deliberately placed outside `packages/eval`, which the loader enforces.
+
+**Run artefact** — One run as a JSON document: the generator, every case with its answer or the reason
+there is none, the metrics those cases imply, and the gates that judged them. Published as a JSON
+Schema and validated by code that also checks the arithmetic — `accuracy` must be `correct / n`, the
+per-database rows must sum to the totals. The report beside it is rendered *from* the artefact, so a
+number in the prose that is not in the JSON fails the build.
+
+**Pre-registration** — A file, `prereg/<id>.md`, with a machine-readable header (arms, sample, gates)
+and two mandatory prose sections: the prediction and the refutation. The gate refuses a missing
+section, an unfilled placeholder, or an id that disagrees with the filename; the benchmark workflow
+refuses a dispatch that names none.
+
+**Published cell** — A competitor's reported number together with the four facts that make it
+comparable: model, schema representation, sample count and split. A cell without them is a headline.
+
+**Admissibility** — The rule that a comparison may be called `reproduced` only when it was measured on
+the same split, and is otherwise `indicative`. The difference between two estimates is judged against
+1.96 standard errors of *each*, added: our 53.71% on 350 questions and XiYan's 53.52% on 1,534 are
+`indicative`, and the 0.19pp between them is one fortieth of the 7.72pp band that would be needed to
+call them distinguishable.

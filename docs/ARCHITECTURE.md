@@ -247,6 +247,25 @@ The study is a package, not a script:
 Every gate is a predicate over that object. A failing gate fails the build; there is no advisory mode
 for safety gates.
 
+### 8.1 The protocol layer
+
+The evaluation package used to be readable only from inside: a generator, its prompt and its scoring
+lived in one binary, so the only way to measure another system was to port it. Four modules separate
+the measurement from the thing measured:
+
+| Module | Holds | Why it is separate |
+|---|---|---|
+| `plugin.ts` | the candidate contract: one request type, one reply, a loader that refuses a module inside this package | a generator somebody else wrote has to run without editing our code, and provenance is checkable rather than asserted |
+| `artifact-schema.ts` | the run artefact's types, a hand-written validator that checks the arithmetic, and the report renderer | a schema no code reads is documentation; a report written beside the JSON is a second source of truth |
+| `prereg.ts` | the pre-registration format and its gate | a prediction has to exist before the run and has to be refutable, or the number is a description |
+| `reproduction.ts` | published cells, the Wilson interval, and the admissibility rule | a comparison across splits is sampling error, and arithmetic is cheaper than trust |
+
+The runner (`bin/plugin-run.ts`) owns the I/O — it builds SQLite databases from a self-contained case
+file, executes gold and answers, and writes the artefact — so nothing above needs a filesystem or a
+model. `bin/protocol.ts` is the CI gate: it re-validates every committed artefact, re-renders its
+report and compares byte for byte, re-derives every cell comparison, and refuses a pre-registration
+that is not one. It runs offline in about a second.
+
 ## 9. What the architecture deliberately excludes
 
 | Excluded | Reason |

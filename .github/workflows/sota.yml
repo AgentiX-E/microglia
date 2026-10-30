@@ -27,6 +27,10 @@ on:
         description: 'Scope widening during distillation (false = ablation)'
         required: false
         default: 'true'
+      prereg:
+        description: 'R8.4: the pre-registration this dispatch executes, by id (prereg/<id>.md); a dispatch without one is refused'
+        required: false
+        default: ''
       convention:
         description: 'House convention (empty, or thousands)'
         required: false
@@ -145,6 +149,21 @@ jobs:
       # with `if: always()`, so a committed result from an earlier run would be
       # reported as this run's evidence. Deleting it first makes "nothing was
       # produced" visible instead of plausible.
+      # R8.4. A run whose prediction was not written down before it started is a run whose
+      # result can only be read as a description of what happened, so the dispatch refuses one.
+      # The check is a step rather than a gate inside the run because it has to fail before the
+      # first model call: a gate that fires at the end has already spent the budget.
+      - name: Require a pre-registration
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          PREREG: ${{ github.event.inputs.prereg || '' }}
+        run: |
+          if [ -z "$PREREG" ]; then
+            echo "::error::this dispatch names no pre-registration; set the 'prereg' input to a file in prereg/ (see prereg/TEMPLATE.md)"
+            exit 1
+          fi
+          pnpm eval:prereg "prereg/$PREREG.md"
+
       - name: Drop any committed artefact
         run: rm -f eval/results/poc-sota-bird.json eval/results/poc-sota-attribution.json
 

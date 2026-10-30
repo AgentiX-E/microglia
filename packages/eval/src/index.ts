@@ -540,3 +540,62 @@ export {
   type TransferReading,
   type TransferRow,
 } from './density.js';
+
+export {
+  CANDIDATE_CONTRACT,
+  DEFAULT_CASE_TIMEOUT_MS,
+  assertGenerator,
+  generatorProblems,
+  loadGenerator,
+  readReply,
+  runGenerator,
+  runOne,
+  sameRows,
+  type CandidateGenerator,
+  type CandidateReply,
+  type CandidateRequest,
+  type GeneratorProblem,
+  type LoadedGenerator,
+  type LoadOptions,
+  type PluginCase,
+  type RunInput,
+  type Scorer,
+} from './plugin.js';
+
+export {
+  RUN_ARTIFACT_SCHEMA,
+  runArtifactJson,
+  runArtifactReport,
+  validateRunArtifact,
+  type ArtifactProblem,
+  type ArtifactVerdict,
+  type RunArtifact,
+  type RunCase,
+  type RunGate,
+  type RunGenerator,
+  type RunMetrics,
+} from './artifact-schema.js';
+
+export {
+  preregGate,
+  readPrereg,
+  type Prereg,
+  type PreregProblem,
+  type PreregReading,
+} from './prereg.js';
+
+export {
+  PUBLISHED_CELLS,
+  cellGate,
+  compareCell,
+  publishedCell,
+  requireCell,
+  samplingSdPp,
+  wilsonInterval,
+  type CellComparison,
+  type CellGate,
+  type CellSplit,
+  type CellVerdict,
+  type Estimate,
+  type PublishedCell,
+} from './reproduction.js';

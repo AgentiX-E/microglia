@@ -1,0 +1,22 @@
+{
+  "schema": "microglia.cell-comparison/1",
+  "source": "eval/results/poc-sota-bird.json",
+  "note": "Derived, not measured: recomputed from the committed S2 artefact. A cross-split comparison is indicative by construction and the gate refuses any record that says otherwise.",
+  "cells": [
+    {
+      "cell": "xiyan-deepseek-ddl",
+      "oursPp": 53.71,
+      "publishedPp": 53.52,
+      "diffPp": 0.19,
+      "ourSplit": "BIRD Mini-Dev (sqlite)",
+      "publishedSplit": "BIRD dev",
+      "sameSplit": false,
+      "ourLowPp": 48.48,
+      "ourHighPp": 58.87,
+      "publishedLowPp": 51.02,
+      "publishedHighPp": 56.02,
+      "tolerancePp": 7.72,
+      "verdict": "indicative"
+    }
+  ]
+}

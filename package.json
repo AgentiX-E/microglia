@@ -2,7 +2,7 @@
   "name": "microglia",
   "version": "0.1.0",
   "private": true,
-  "description": "Microglia \u2014 a headless feedback flywheel SDK for agentic workflows",
+  "description": "Microglia — a headless feedback flywheel SDK for agentic workflows",
   "license": "MIT",
   "author": "Lambertyan",
   "type": "module",
@@ -22,7 +22,7 @@
     "test": "vitest run --coverage",
     "test:unit": "vitest run",
     "bench": "pnpm build && node packages/eval/dist/bench/run.js",
-    "check": "pnpm typecheck && pnpm typecheck:lanes && pnpm test && pnpm audit:repo && pnpm eval:integrity && pnpm eval:memform && pnpm eval:l0 && pnpm eval:pairs && pnpm eval:delivery && pnpm bench && pnpm bundle:size",
+    "check": "pnpm typecheck && pnpm typecheck:lanes && pnpm test && pnpm audit:repo && pnpm eval:integrity && pnpm eval:memform && pnpm eval:l0 && pnpm eval:pairs && pnpm eval:delivery && pnpm eval:protocol && pnpm bench && pnpm bundle:size",
     "eval:llm-reader": "tsx packages/eval/src/bin/llm-reader.ts",
     "eval:llm-distill": "tsx packages/eval/src/bin/llm-distill.ts",
     "eval:embedding": "tsx packages/eval/src/bin/embedding.ts",
@@ -50,7 +50,10 @@
     "eval:store": "tsx packages/eval/src/bin/store.ts",
     "eval:arm-pairs": "tsx packages/eval/src/bin/arm-pairs.ts",
     "eval:l4-pair": "tsx packages/eval/src/bin/l4-pair.ts",
-    "eval:probe": "tsx packages/eval/src/bin/embed-probe.ts"
+    "eval:probe": "tsx packages/eval/src/bin/embed-probe.ts",
+    "eval:plugin": "tsx packages/eval/src/bin/plugin-run.ts",
+    "eval:prereg": "tsx packages/eval/src/bin/prereg.ts",
+    "eval:protocol": "tsx packages/eval/src/bin/protocol.ts"
   },
   "devDependencies": {
     "@agentix-e/microglia-browser": "workspace:*",

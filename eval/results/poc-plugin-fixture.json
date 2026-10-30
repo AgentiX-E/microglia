@@ -1,0 +1,101 @@
+{
+  "schema": "microglia.run-artifact/1",
+  "id": "offline-fixture",
+  "generatedAt": "2026-10-30T04:00:00.000Z",
+  "prereg": "R8.1-offline-fixture",
+  "generator": {
+    "contract": "candidate-generator/1",
+    "name": "keyword-router",
+    "version": "1.0.0",
+    "source": "eval/plugins/keyword-router.mjs"
+  },
+  "protocol": {
+    "comparison": "multiset",
+    "cases": 6,
+    "concurrency": 1
+  },
+  "cases": [
+    {
+      "id": "shop#1",
+      "dbId": "shop",
+      "sql": "SELECT count(*) FROM customer",
+      "error": null,
+      "correct": false
+    },
+    {
+      "id": "shop#2",
+      "dbId": "shop",
+      "sql": "SELECT * FROM customer",
+      "error": null,
+      "correct": false
+    },
+    {
+      "id": "shop#3",
+      "dbId": "shop",
+      "sql": "SELECT count(*) FROM orders",
+      "error": null,
+      "correct": true
+    },
+    {
+      "id": "library#1",
+      "dbId": "library",
+      "sql": "SELECT count(*) FROM book",
+      "error": null,
+      "correct": true
+    },
+    {
+      "id": "library#2",
+      "dbId": "library",
+      "sql": "SELECT * FROM book",
+      "error": null,
+      "correct": false
+    },
+    {
+      "id": "library#3",
+      "dbId": "library",
+      "sql": "SELECT count(*) FROM loan",
+      "error": null,
+      "correct": false
+    }
+  ],
+  "metrics": {
+    "n": 6,
+    "answered": 6,
+    "correct": 2,
+    "accuracy": 0.3333333333333333,
+    "low": 0.09677141110578041,
+    "high": 0.700006684861608,
+    "byDatabase": [
+      {
+        "dbId": "shop",
+        "n": 3,
+        "correct": 1
+      },
+      {
+        "dbId": "library",
+        "n": 3,
+        "correct": 1
+      }
+    ]
+  },
+  "gates": [
+    {
+      "code": "V27",
+      "name": "third-party-module",
+      "ok": true,
+      "detail": "loaded from eval/plugins/keyword-router.mjs, outside packages/eval"
+    },
+    {
+      "code": "V30",
+      "name": "preregistration",
+      "ok": true,
+      "detail": "executes prereg/R8.1-offline-fixture.md"
+    },
+    {
+      "code": "V29",
+      "name": "answer-rate",
+      "ok": true,
+      "detail": "6/6 answered = 100.00%, floor 99.00%"
+    }
+  ]
+}

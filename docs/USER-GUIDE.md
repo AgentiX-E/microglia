@@ -69,7 +69,7 @@ Two consequences worth internalising:
    an interpreter that has your model client. There is a ready-made prompt builder and parser in
    `@agentix-e/microglia-core/distill`.
 2. **The library never decides what a correction means in your domain.** That is a *domain pack* you
-   own: an interpreter plus, optionally, a semantic edit distance. §14 shows how to write one in about
+   own: an interpreter plus, optionally, a semantic edit distance. §15 shows how to write one in about
    eighty lines. The chart pack used by this repository's benchmark lives in
    `packages/eval/src/workload` — a benchmark has to own the workload it scores.
 
@@ -863,7 +863,70 @@ Be honest about the preconditions; the product is only useful inside them.
    prompt is a hint, not a contract. (On discrete choices the same mechanism does move a strong model:
    0% to 75–89% on chart-type conventions, which is where item 4's number comes from.)
 
-## 13. Performance and limits
+## 13. Measuring your own generator
+
+The harness that produced every number in this repository is usable by someone else. Two files and
+one command:
+
+```bash
+pnpm eval:plugin --cases eval/cases/fixture.json \
+  --plugin eval/plugins/your-generator.mjs \
+  --prereg R8.1-offline-fixture \
+  --out eval/results/poc-plugin-fixture.json \
+  --report eval/results/poc-plugin-fixture.md
+```
+
+**The generator.** Any ECMAScript module outside `packages/eval` that default-exports:
+
+```js
+export default {
+  contract: 'candidate-generator/1',
+  name: 'your-generator',
+  version: '1.0.0',
+  generate(request) {          // request: { id, dbId, question, evidence, ddl }
+    return { sql: 'SELECT ...' };   // or a string
+  },
+};
+```
+
+Nothing else is imported from us. That is deliberate: the contract is the whole interface, and a
+generator that needs our types to compile is not a third-party generator. A module inside
+`packages/eval` is refused before it loads — the claim being tested is provenance, not behaviour.
+
+**The case file.** One JSON document with the databases (DDL plus rows), the questions, and the gold
+SQL for each. The runner builds the databases in a temporary directory, executes the gold to get the
+expected rows (a gold query that throws stops the run rather than silently dropping the case), asks
+the generator once per case, executes the answer, and compares the two as a multiset.
+
+**The artefact.** `eval/results/poc-plugin-fixture.json` — every case, the metrics those cases imply,
+and the gates. It validates against `packages/eval/schema/run-artifact.schema.json`, and the report
+beside it is rendered *from* that JSON, so the prose cannot drift from the numbers. `pnpm eval:protocol`
+fails if the committed report differs from the one the committed artefact renders.
+
+Three gates travel with the run:
+
+| Gate | Refuses a run whose |
+|---|---|
+| **V27** | generator resolved inside `packages/eval` |
+| **V29** | answer rate is below the registered floor — a broken generator, not an unlucky one |
+| **V30** | pre-registration is missing or malformed |
+
+**Write the prediction first.** `prereg/<id>.md` has a fixed header (id, step, opened, arms, sample,
+gates) and two mandatory prose sections, Prediction and Refutation. `pnpm eval:prereg` refuses a file
+with a missing section, a placeholder, or an id that disagrees with its filename, and the benchmark
+workflow refuses a dispatch that names none: a run whose prediction was not written down before it
+started can only ever be read as a description of what happened.
+
+**What a comparison is allowed to say.** `compareCell` in `packages/eval/src/reproduction.ts` refuses
+to call anything `reproduced` unless it was measured on the same split. A number from a 350-question
+subset and a published number on 1,534 questions differ by sampling error alone; the honest verdict is
+`indicative`, and the difference is reported with both intervals beside it. Our own no-memory baseline
+(53.71% on BIRD Mini-Dev) sits 0.19pp from XiYan's published 53.52% on BIRD dev — that is `indicative`,
+and the published cell's own standard error (±1.27pp) is seven times the gap. A gate re-derives every
+recorded comparison from the artefact and fails if the record disagrees with the arithmetic, so
+`indicative` cannot be edited into `reproduced`.
+
+## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:
 
@@ -893,7 +956,7 @@ Pack size is budgeted, not cumulative: 1k and 100k stores both inject ~258 token
 pack is chosen by relevance under a character budget. Distillation is O(events × rules); an LLM interpreter
 costs one model call per feedback event.
 
-## 14. Recipes
+## 15. Recipes
 
 ### 14.1 A domain pack in eighty lines
 
@@ -958,7 +1021,7 @@ const forTenant = async (tenant: string) => {
 Separate directories *and* separate namespaces. Retrieval never crosses a namespace, and a test in
 this repository asserts it, but defence in depth is cheap here.
 
-## 15. Server and browser
+## 16. Server and browser
 
 A single process needs `core` only. Once a browser has to capture feedback, the credentials and the
 journal belong on a server, and the library ships both halves.
