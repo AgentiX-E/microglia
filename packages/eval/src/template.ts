@@ -322,6 +322,114 @@ export function templateCoverage(attempts: readonly TemplateAttempt[]): Template
 /** How a rule is shown on a foreign question: as the sentence it was distilled as, or bound. */
 export type InjectionForm = 'prose' | 'bound';
 
+/** A stored rule, as the census needs it: what it says, and which database it was learned in. */
+export type CensusRule = {
+  readonly id: string;
+  readonly statement: string;
+  /** The rule's own database, or null when it generalised out of one. */
+  readonly domain: string | null;
+};
+
+/**
+ * What the binder would do with a store, before a single call is bought.
+ *
+ * `coverage` counts attempts, and the `rules*` counts answer R10's kill condition, which is stated
+ * over **rules**: more than 60% withheld means the measurement is about the binder and no verdict is
+ * issued. The two units are both carried because they can disagree — a rule that binds in one
+ * database out of ten is a bound rule and a 10% success rate — and a reader who has only one of
+ * them cannot tell those apart.
+ */
+export type BindingCensus = {
+  /** The rules read, after collapsing a store that lists the same rule once per fold. */
+  readonly rules: number;
+  /** Entries that named a rule already counted. A cross-fitted artefact carries one store per fold. */
+  readonly duplicates: number;
+  /** Rules that named no database: carried as prose everywhere, and impossible to withhold. */
+  readonly homeless: number;
+  /** Rules whose own database or whose targets left no attempt to make. */
+  readonly unplaced: number;
+  readonly coverage: TemplateCoverage;
+  readonly rulesBound: number;
+  readonly rulesSlotless: number;
+  readonly rulesWithheld: number;
+  /** Withheld over the rules that were attempted, which is the number the kill condition names. */
+  readonly withheldShare: number;
+};
+
+/**
+ * Run the binder over every rule and every target it could be shown in.
+ *
+ * Pure, and cheap on purpose: a census that costs one model call is a census nobody runs before
+ * spending the calls it exists to justify. The three exclusions are counted rather than dropped —
+ * a rule with no home database cannot be bound and is not a failure of the binder, and a rule whose
+ * home is not among the targets was never given a chance.
+ */
+export function bindingCensus(
+  rules: readonly CensusRule[],
+  targets: readonly string[],
+  names: (dbId: string) => SchemaNames,
+): BindingCensus {
+  const taken = new Set(targets);
+  const attempts: TemplateAttempt[] = [];
+  // A cross-fitted artefact lists the same rule once per fold — the distiller's id is a content
+  // hash, so five folds of overlapping evidence produce one id five times. Counting those as five
+  // rules would weight the census by fold overlap and make the withheld share a property of the
+  // artefact's shape rather than of the store.
+  const seen = new Set<string>();
+  const unique: CensusRule[] = [];
+  for (const rule of rules) {
+    if (seen.has(rule.id)) continue;
+    seen.add(rule.id);
+    unique.push(rule);
+  }
+  let homeless = 0;
+  let unplaced = 0;
+  let rulesBound = 0;
+  let rulesSlotless = 0;
+  let rulesWithheld = 0;
+  for (const rule of unique) {
+    if (rule.domain === null) {
+      homeless += 1;
+      continue;
+    }
+    if (!taken.has(rule.domain)) {
+      unplaced += 1;
+      continue;
+    }
+    const home = names(rule.domain);
+    let outside = 0;
+    let boundAny = false;
+    let slotlessAny = false;
+    for (const target of targets) {
+      if (target === rule.domain) continue;
+      outside += 1;
+      const outcome = transferStatement(rule.statement, home, names(target));
+      attempts.push({ key: `${rule.id}\u0000${target}`, outcome });
+      if (outcome.status === 'bound') boundAny = true;
+      else if (outcome.status === 'slotless') slotlessAny = true;
+    }
+    if (outside === 0) {
+      unplaced += 1;
+      continue;
+    }
+    if (boundAny) rulesBound += 1;
+    else if (slotlessAny) rulesSlotless += 1;
+    else rulesWithheld += 1;
+  }
+  const attempted = rulesBound + rulesSlotless + rulesWithheld;
+  return {
+    rules: unique.length,
+    duplicates: rules.length - unique.length,
+    homeless,
+    unplaced,
+    coverage: templateCoverage(attempts),
+    rulesBound,
+    rulesSlotless,
+    rulesWithheld,
+    withheldShare: attempted === 0 ? 0 : rulesWithheld / attempted,
+  };
+}
+
 /**
  * The stage's switch, parsed where it is read rather than at each use.
  *

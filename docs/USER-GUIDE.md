@@ -996,6 +996,21 @@ SOTA_TEMPLATE=bound SOTA_DENSITY_PANEL=20 SOTA_TRANSFER_PANEL=10 pnpm eval:sota
 pnpm eval:density    # prints the binding record before the rates
 ```
 
+**Price the binder before you buy the arm.** Whether a rule can be bound at all is a question about
+schemas, so it is answered without a model:
+
+```bash
+BIRD_DB_DIR=/data/dev_20240627 pnpm eval:template
+# [template] 289 rule(s) against 11 database(s): 30 homeless, 0 unplaced, 259 attempted ...
+# [template] rules: 10/259=3.9% bound, 76/259=29.3% slotless, 173/259=66.8% withheld
+# [template] blocker: table 'posts' stopped 103 attempt(s)
+```
+
+The command reads the store an artefact carries, opens each database it covers, and runs the binder
+over every rule-database pair. It exits zero whatever it finds, because a construction its own
+pre-registration rejects is a result; the number it prints is what decides whether arm B is worth a
+dispatch at all.
+
 The reading this produces is deliberately narrow: it says whether a rule is obeyed more and broken
 less when its slots are bound, not whether templates are a good idea in general. `prereg/` carries
 the prediction and the refutation that were written before the run.

@@ -366,3 +366,9 @@ candidate, and a slot with no candidate withholds the rule.
 target schema. A withheld attempt makes no model call, contributes no trial, and is counted: `V28`
 holds `bound + slotless` equal to the rule-database pairs the foreign ledger carries, so a rule that
 vanishes is visible as a defect rather than plausible as a result.
+
+**Binding census** — The withheld share of a store, computed from the artefact and the schemas with
+no model call (`pnpm eval:template`). It is the number that decides whether a transfer arm is worth
+dispatching: at 66.8% withheld, an experiment on this store would measure the binder. `homeless`
+rules (no home database) and `unplaced` ones (no foreign schema to be shown in) are counted
+separately, because neither is a failure of the binder.

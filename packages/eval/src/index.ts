@@ -557,13 +557,16 @@ export {
 
 export {
   bindTemplate,
+  bindingCensus,
   injectionFormOf,
   nameScore,
   templateCoverage,
   templateOf,
   transferStatement,
   type Binding,
+  type BindingCensus,
   type BoundSlot,
+  type CensusRule,
   type InjectionForm,
   type RuleTemplate,
   type SchemaNames,

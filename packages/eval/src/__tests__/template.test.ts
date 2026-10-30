@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   bindTemplate,
+  bindingCensus,
   injectionFormOf,
   nameScore,
   templateCoverage,
@@ -185,6 +186,93 @@ describe('templateCoverage', () => {
       withheldShare: 0,
       blockers: [],
     });
+  });
+});
+
+describe('bindingCensus', () => {
+  const schemas: Record<string, SchemaNames> = {
+    db_a: names(['price'], ['sales']),
+    db_b: names(['unit_price'], ['orders']),
+    db_c: names(['rating'], ['reviews']),
+  };
+  const lookup = (dbId: string): SchemaNames => schemas[dbId] as SchemaNames;
+
+  it('counts a rule once and an attempt per foreign database', () => {
+    const census = bindingCensus(
+      [{ id: 'r1', statement: 'Cast price to real', domain: 'db_a' }],
+      ['db_a', 'db_b', 'db_c'],
+      lookup,
+    );
+    // One rule, two foreign databases: it binds in db_b and has nothing to bind in db_c.
+    expect(census.rulesBound).toBe(1);
+    expect(census.coverage.bound).toBe(1);
+    expect(census.coverage.withheld).toBe(1);
+    expect(census.coverage.blockers).toEqual([{ name: 'price', kind: 'column', attempts: 1 }]);
+  });
+
+  it('separates a rule with no home database from one the binder failed on', () => {
+    const census = bindingCensus(
+      [
+        { id: 'r1', statement: 'Cast price to real', domain: null },
+        { id: 'r2', statement: 'Cast price to real', domain: 'db_elsewhere' },
+      ],
+      ['db_a', 'db_b'],
+      lookup,
+    );
+    expect(census.homeless).toBe(1);
+    expect(census.unplaced).toBe(1);
+    expect(census.coverage.bound + census.coverage.withheld + census.coverage.slotless).toBe(0);
+    // Nothing was attempted, so the share is zero rather than a division by nothing.
+    expect(census.withheldShare).toBe(0);
+  });
+
+  it('calls a rule unplaced when there is nowhere else to show it', () => {
+    const census = bindingCensus(
+      [{ id: 'r1', statement: 'Cast price to real', domain: 'db_a' }],
+      ['db_a'],
+      lookup,
+    );
+    expect(census.unplaced).toBe(1);
+    expect(census.rulesBound).toBe(0);
+  });
+
+  it('counts a rule with no schema identifier as slotless rather than withheld', () => {
+    const census = bindingCensus(
+      [{ id: 'r1', statement: 'Take the second highest value', domain: 'db_a' }],
+      ['db_a', 'db_b'],
+      lookup,
+    );
+    expect(census.rulesSlotless).toBe(1);
+    expect(census.withheldShare).toBe(0);
+  });
+
+  it('collapses a store that lists one rule per fold, because five folds are one rule', () => {
+    const census = bindingCensus(
+      [
+        { id: 'r1', statement: 'Cast price to real', domain: 'db_a' },
+        { id: 'r1', statement: 'Cast price to real', domain: 'db_a' },
+      ],
+      ['db_a', 'db_b'],
+      lookup,
+    );
+    expect(census.rules).toBe(1);
+    expect(census.duplicates).toBe(1);
+    expect(census.coverage.bound).toBe(1);
+  });
+
+  it('reads the kill condition over rules, so one lucky database does not save the family', () => {
+    const census = bindingCensus(
+      [
+        { id: 'r1', statement: 'Cast price to real', domain: 'db_a' },
+        { id: 'r2', statement: 'Count the school ranks', domain: 'db_a' },
+      ],
+      ['db_a', 'db_c'],
+      lookup,
+    );
+    // r1 binds nowhere (db_c has no price-like column) and r2 names nothing in db_a's schema.
+    expect(census.rulesWithheld).toBe(1);
+    expect(census.rulesSlotless).toBe(1);
+    expect(census.withheldShare).toBe(0.5);
   });
 });
 

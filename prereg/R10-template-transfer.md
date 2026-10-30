@@ -62,6 +62,35 @@ rule is shown, and a template whose slots cannot be bound is withheld rather tha
 - If B repairs more than A **and** breaks more than A, neither hypothesis is supported: the template changed what the model attends to without changing whether it is right, and the next stage is a different question rather than a bigger version of this one.
 - If more than 60% of rules are withheld as unbindable, the measurement is about the binder and not about transfer, and no verdict is issued from this run.
 
+## Outcome, before the dispatch
+
+The kill condition above was measured offline and it fired. `pnpm eval:template`
+(`bin/template-probe.ts`, zero model calls) reads every rule the committed artefact carries, opens
+each database the store covers, and puts the binder to work on every rule-database pair:
+
+| Reading | Value |
+|---|---|
+| rules in the store | 289 (1,288 entries; 999 named a rule one of five folds had already counted) |
+| with a home database / homeless | 259 / 30 |
+| **bound in at least one foreign database** | **10 (3.9%)** |
+| slotless — no schema identifier to bind | 76 (29.3%) |
+| **withheld** | **173 (66.8%)** |
+| attempts bound / slotless / withheld | 34 / 760 / 1,796 of 2,590 |
+
+`66.8%` is above the `60%` this file fixed as its own kill condition, and the blockers say why:
+`posts` (103 attempts), `cards` (91), `drivers` (86), `lap` (80), `patient` (70), `player` (57). Every
+one of them is a **domain element** — the word that makes a rule a rule about one database, and the
+exact class SQL-Exchange substitutes by mapping to the *target query*, which a name comparison cannot
+do. The construction was not tested and will not be dispatched: an arm-B run at this binding rate
+would measure the binder, and the pre-registration says so in advance.
+
+**What this is.** A construction rejected for zero calls instead of 2,600, by a condition written
+before the code existed. The R10 hypothesis — a rule travels as structure — remains **untested**;
+what is now measured is that *name identity* is not the substitution that carries it. A successor
+stage has to bind a slot to the target's own schema links (the tables and columns the question
+actually mentions) rather than to a similarly spelled name, and its kill condition is the same
+`60%`, computed by the same command before it spends anything.
+
 ## What this does not test
 
 It does not test whether a template generalises across model families — one model, the one the rest
