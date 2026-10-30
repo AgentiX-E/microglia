@@ -71,14 +71,11 @@ on:
         description: 'R9.4: questions from other databases each exercised rule is shown (0 disables the foreign arm; 10 is the pre-registered panel)'
         required: false
         default: '10'
-      template:
-        description: 'R10: how a foreign rule is shown — prose (the incumbent, what R9.4 measured) or bound (read as a template and its slots bound against the target schema, withheld when a slot has no referent)'
-        required: false
-        default: 'prose'
-      sample_temperature:
-        description: 'Temperature for the sample-N arms (0 would make every draw identical)'
-        required: false
-        default: '0.7'
+      # `template` and `sample_temperature` are not inputs. They belong to a pre-registration rather
+      # than to a dispatch menu: a foreign-rule form and a sampling temperature are properties of the
+      # experiment, not of the run, and a knob nobody sets from the menu is a knob whose default is
+      # the only value it ever has. Both still work, from repository variables, and the dispatch
+      # limit of twenty-five inputs is what made the distinction necessary.
       arms:
         description: 'Control arms beyond none+full (gated,duplicate,wrong-scope,stated,oracle)'
         required: false
@@ -248,14 +245,14 @@ jobs:
           SOTA_DISTILL_CACHE: ${{ github.workspace }}/.cache/distill/cache.json
           SOTA_CONVENTION: ${{ github.event.inputs.convention || '' }}
           SOTA_RESAMPLES: '10000'
-          SOTA_SAMPLE_TEMPERATURE: ${{ github.event.inputs.sample_temperature || '0.7' }}
+          SOTA_SAMPLE_TEMPERATURE: ${{ vars.SOTA_SAMPLE_TEMPERATURE || '0.7' }}
           SOTA_TRANSFER_TARGETS: ${{ github.event.inputs.transfer_targets || '4' }}
           SOTA_DENSITY_PANEL: ${{ github.event.inputs.density_panel || '0' }}
           SOTA_DENSITY_RULES_PER_DB: ${{ github.event.inputs.density_rules_per_db || '8' }}
           SOTA_TRANSFER_PANEL: ${{ github.event.inputs.transfer_panel || '10' }}
           # R10. Empty on a schedule, which the lane reads as the incumbent form: a dispatch that
           # says nothing repeats R9.4 rather than silently becoming the new arm.
-          SOTA_TEMPLATE: ${{ github.event.inputs.template || '' }}
+          SOTA_TEMPLATE: ${{ vars.SOTA_TEMPLATE || '' }}
           SOTA_SPLIT: ${{ github.event.inputs.split || 'minidev' }}
           SOTA_LEARN_SAMPLE: ${{ github.event.inputs.learn_sample || '0' }}
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '8000' }}
