@@ -16,9 +16,9 @@
  * condition is a result and not a build failure.
  */
 import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { bindingCensus, resolveDatabase, schemaIndex, type CensusRule, type SchemaNames } from '@agentix-e/microglia-eval';
-import { birdArtefactPath } from './lib.js';
+import { birdArtefactPath, writeJson } from './lib.js';
 
 type Artifact = {
   readonly items?: readonly { readonly id: string; readonly statement?: string; readonly domain?: string | null }[];
@@ -29,7 +29,7 @@ const DB_DIR = process.env['BIRD_DB_DIR'] ?? join(process.cwd(), 'eval', 'fixtur
 /** The share above which R10 issues no verdict, fixed in the pre-registration before this existed. */
 const KILL_SHARE = 0.6;
 
-function main(): void {
+async function main(): Promise<void> {
   const artifact = JSON.parse(readFileSync(birdArtefactPath(), 'utf8')) as Artifact;
   const stored = artifact.items ?? [];
   if (stored.length === 0) {
@@ -107,6 +107,32 @@ function main(): void {
       : `[template] ${(census.withheldShare * 100).toFixed(1)}% withheld, inside the pre-registration's ` +
           `${(KILL_SHARE * 100).toFixed(0)}% condition: arm B can be dispatched and read as a test of transfer\n`,
   );
+  // The number goes into an artefact before it goes into a sentence. A census quoted only from a
+  // terminal is a claim nobody can recompute, and this project has spent three iterations on what
+  // happens to those.
+  await writeJson('poc-template-census', {
+    id: 'poc-template-census',
+    source: basename(birdArtefactPath()),
+    binder: 'name-jaccard',
+    databases: [...paths.keys()],
+    rules: census.rules,
+    duplicates: census.duplicates,
+    homeless: census.homeless,
+    unplaced: census.unplaced,
+    bound: census.rulesBound,
+    slotless: census.rulesSlotless,
+    withheld: census.rulesWithheld,
+    withheld_share: Number(census.withheldShare.toFixed(4)),
+    attempts: {
+      bound: census.coverage.bound,
+      slotless: census.coverage.slotless,
+      withheld: census.coverage.withheld,
+    },
+    blockers: census.coverage.blockers.slice(0, 20),
+    kill_share: KILL_SHARE,
+    verdict: census.withheldShare > KILL_SHARE ? 'refused' : 'dispatchable',
+    generated_at: new Date().toISOString(),
+  });
 }
 
-main();
+await main();

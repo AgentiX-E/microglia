@@ -1,0 +1,136 @@
+{
+  "id": "poc-template-census",
+  "source": "poc-sota-bird.json",
+  "binder": "name-jaccard",
+  "databases": [
+    "california_schools",
+    "card_games",
+    "codebase_community",
+    "debit_card_specializing",
+    "european_football_2",
+    "financial",
+    "formula_1",
+    "student_club",
+    "superhero",
+    "thrombosis_prediction",
+    "toxicology"
+  ],
+  "rules": 289,
+  "duplicates": 999,
+  "homeless": 30,
+  "unplaced": 0,
+  "bound": 10,
+  "slotless": 76,
+  "withheld": 173,
+  "withheld_share": 0.668,
+  "attempts": {
+    "bound": 34,
+    "slotless": 760,
+    "withheld": 1796
+  },
+  "blockers": [
+    {
+      "name": "posts",
+      "kind": "table",
+      "attempts": 103
+    },
+    {
+      "name": "cards",
+      "kind": "table",
+      "attempts": 91
+    },
+    {
+      "name": "drivers",
+      "kind": "table",
+      "attempts": 86
+    },
+    {
+      "name": "lap",
+      "kind": "column",
+      "attempts": 80
+    },
+    {
+      "name": "patient",
+      "kind": "table",
+      "attempts": 70
+    },
+    {
+      "name": "player",
+      "kind": "table",
+      "attempts": 57
+    },
+    {
+      "name": "consumption",
+      "kind": "column",
+      "attempts": 50
+    },
+    {
+      "name": "element",
+      "kind": "column",
+      "attempts": 50
+    },
+    {
+      "name": "schools",
+      "kind": "table",
+      "attempts": 50
+    },
+    {
+      "name": "atom",
+      "kind": "table",
+      "attempts": 40
+    },
+    {
+      "name": "client",
+      "kind": "table",
+      "attempts": 40
+    },
+    {
+      "name": "school",
+      "kind": "column",
+      "attempts": 40
+    },
+    {
+      "name": "team",
+      "kind": "table",
+      "attempts": 40
+    },
+    {
+      "name": "users",
+      "kind": "table",
+      "attempts": 40
+    },
+    {
+      "name": "attribute",
+      "kind": "table",
+      "attempts": 35
+    },
+    {
+      "name": "district",
+      "kind": "table",
+      "attempts": 32
+    },
+    {
+      "name": "molecule",
+      "kind": "table",
+      "attempts": 30
+    },
+    {
+      "name": "player_attributes",
+      "kind": "table",
+      "attempts": 30
+    },
+    {
+      "name": "tags",
+      "kind": "column",
+      "attempts": 30
+    },
+    {
+      "name": "date",
+      "kind": "column",
+      "attempts": 27
+    }
+  ],
+  "kill_share": 0.6,
+  "verdict": "refused",
+  "generated_at": "2026-10-30T09:57:46.018Z"
+}

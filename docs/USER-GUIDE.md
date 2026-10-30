@@ -1009,7 +1009,9 @@ BIRD_DB_DIR=/data/dev_20240627 pnpm eval:template
 The command reads the store an artefact carries, opens each database it covers, and runs the binder
 over every rule-database pair. It exits zero whatever it finds, because a construction its own
 pre-registration rejects is a result; the number it prints is what decides whether arm B is worth a
-dispatch at all.
+dispatch at all. It also writes `eval/results/poc-template-census.json`, which is the form in which
+the number can be recomputed by somebody who does not trust the terminal: the rules, the databases,
+the attempts, the blockers, and the verdict the kill condition produces.
 
 The reading this produces is deliberately narrow: it says whether a rule is obeyed more and broken
 less when its slots are bound, not whether templates are a good idea in general. `prereg/` carries
