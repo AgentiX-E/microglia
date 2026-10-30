@@ -926,6 +926,44 @@ and the published cell's own standard error (±1.27pp) is seven times the gap. A
 recorded comparison from the artefact and fails if the record disagrees with the arithmetic, so
 `indicative` cannot be edited into `reproduced`.
 
+### 13.1 Reproducing a published number, and why it needs its own split
+
+A published accuracy is a claim about a sample. BIRD's dev split has **1,534 questions**; the
+Mini-Dev slice this project measures its transfer experiments on has **500**, of which the lane
+scores 350 after dropping the easiest third. Reproducing a 1,534-question number on 350 questions is
+not a reproduction, so the lane measures both splits and writes two artefacts.
+
+| Split | Questions scored | What it is for | Artefact |
+|---|---|---|---|
+| `minidev` | 350 (925-of-500 `simple` questions dropped) | transfer experiments: a question answered without memory carries no signal | `eval/results/poc-sota-bird.json` |
+| `dev` | all 1,534 | reproduction: the sample size *is* the claim | `eval/results/poc-sota-bird-dev.json` |
+
+The filter is split-dependent, and that is deliberate. On `minidev` dropping `simple` questions is
+a measurement decision; on `dev` the same filter leaves 609 questions and stops being the cell it
+claims to reproduce. `poolOf(rows, split)` owns that difference and `bird-data.test.ts` asserts both
+halves of it.
+
+```bash
+# the archive comes from the vendor's CDN, not from a dataset host
+curl -sI https://bird-bench.oss-cn-beijing.aliyuncs.com/dev.zip     # 346,207,293 bytes, 200 OK
+pnpm eval:sota                       # SOTA_SPLIT defaults to minidev
+SOTA_SPLIT=dev pnpm eval:sota        # 1,534 questions, writes poc-sota-bird-dev.json
+SOTA_SPLIT=dev BIRD_DIR=/data/dev_20240627 pnpm eval:sota   # if you already extracted it
+```
+
+Both archives are pinned by size and SHA-256 in `eval/manifests/`: `bird-minidev.json` and
+`bird-dev.json`. Two manifests rather than one with a switch, because a manifest is the record of
+one verification. The eleven SQLite databases are the same in both archives — dev differs only in
+the question set — so a dev run reuses the databases it already has once either archive is unpacked.
+
+**Two rows, not one.** `eval/results/poc-cell-comparison.json` carries a row per artefact, because
+a table that replaced the Mini-Dev row with the dev row would delete the evidence for the reading
+that motivated it. Each row names its source file, and `pnpm eval:protocol` recomputes both from
+the JSON. The Mini-Dev row can only ever be `indicative` — its split name differs from the published
+cell's — and the dev row can be `reproduced`. A run on the right 1,534 questions filed under a
+different split name stays `indicative` forever, which is why `splitNameOf('dev')` is asserted
+against the catalogue in `artefacts.test.ts` rather than written in a comment.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

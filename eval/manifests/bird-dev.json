@@ -1,0 +1,25 @@
+{
+  "name": "bird-dev",
+  "version": "v1-2024-06-27",
+  "url": "https://bird-bench.oss-cn-beijing.aliyuncs.com/dev.zip",
+  "bytes": 346207293,
+  "sha256": "cdd6d19faeb45a23970b98d3ef6c40a87987c95459c2cf12076897a60cf5a630",
+  "licence": "CC-BY-SA-4.0",
+  "attribution": "BIRD Benchmark (bird-bench contributors), https://bird-bench.github.io — data licence changed to CC BY-SA 4.0 on 2024-04-27",
+  "root": "dev_20240627",
+  "questions": "dev.json",
+  "databases": [
+    "california_schools",
+    "card_games",
+    "codebase_community",
+    "debit_card_specializing",
+    "european_football_2",
+    "financial",
+    "formula_1",
+    "student_club",
+    "superhero",
+    "thrombosis_prediction",
+    "toxicology"
+  ],
+  "retrievedAt": "2026-10-30"
+}

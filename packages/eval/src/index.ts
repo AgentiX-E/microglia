@@ -155,16 +155,30 @@ export {
   type ValueSample,
 } from './value-samples.js';
 export {
+  ARTEFACT_IDS,
+  DEV_SPLIT_NAME,
+  MINIDEV_SPLIT_NAME,
+  artefactIdOf,
+  artefactPathOf,
+  chooseArtefact,
+  splitNameOf,
+  type ArtefactChoice,
+} from './artefacts.js';
+
+export {
   BirdDataError,
   archiveVerdict,
   dedupeQuestions,
   missingDatabases,
   parseManifest,
+  poolOf,
   populationOf,
   requirePopulated,
   sha256OfFile,
+  splitFrom,
   type BirdDataErrorReason,
   type BirdManifest,
+  type Split,
   type Deduped,
   type QuestionIdentity,
 } from './bird-data.js';

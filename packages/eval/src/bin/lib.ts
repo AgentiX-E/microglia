@@ -5,6 +5,8 @@
  * their own spend, and write a single JSON artifact that the documents quote.
  * Nothing here is imported by a published package.
  */
+import { existsSync } from 'node:fs';
+import { chooseArtefact } from '@agentix-e/microglia-eval';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
@@ -188,6 +190,24 @@ export type PocResult = {
    */
   readonly per_task?: readonly unknown[];
 };
+
+/**
+ * The BIRD run artefact this process should read.
+ *
+ * Two splits, two artefacts: `poc-sota-bird.json` is the 350-question Mini-Dev run every earlier
+ * reading came from, `poc-sota-bird-dev.json` is the 1,534-question dev run. A reader that names
+ * one of them reads nothing once the other has run, and the failure is silent — every lane here
+ * starts with "if the artefact is missing, print a line and exit zero". `SOTA_ARTEFACT` names one
+ * explicitly; otherwise the first that exists wins, dev after mini-dev because a lane that
+ * happens to work on both should keep reporting the number the documents quote.
+ */
+export function birdArtefactPath(): string {
+  return chooseArtefact({
+    dir: process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 'results'),
+    explicit: process.env['SOTA_ARTEFACT'],
+    exists: existsSync,
+  });
+}
 
 /**
  * Write a lane's artefact where the gate, the workflow and the documents read it.

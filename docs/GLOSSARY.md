@@ -339,3 +339,15 @@ the same split, and is otherwise `indicative`. The difference between two estima
 1.96 standard errors of *each*, added: our 53.71% on 350 questions and XiYan's 53.52% on 1,534 are
 `indicative`, and the 0.19pp between them is one fortieth of the 7.72pp band that would be needed to
 call them distinguishable.
+
+**Split** — A division of a benchmark's questions. Two are measured here: `minidev`, the 350-question
+slice the transfer experiments use, and `dev`, all 1,534 questions. The split decides the manifest, the
+question file, and one filter — `simple` questions are dropped on `minidev` because a question answered
+without memory carries no signal for a transfer experiment, and kept on `dev` because the sample size
+*is* the claim being reproduced.
+
+**Split-dependent artefact** — A run writes the artefact of the split it measured:
+`poc-sota-bird.json` for Mini-Dev, `poc-sota-bird-dev.json` for dev. Two files rather than one
+rewritten, because a row in the comparison table is only honest while the artefact behind it is in the
+repository to be recomputed. `chooseArtefact` resolves which one a downstream command reads, and
+`SOTA_ARTEFACT` overrides it.

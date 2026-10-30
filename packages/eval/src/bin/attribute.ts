@@ -7,15 +7,16 @@
  * hypothesis — so it is computed from the artefact's per-case rows rather than
  * argued about.
  *
- * Reads `<results>/poc-sota-bird.json` and writes `poc-sota-attribution.json` beside
+ * Reads `<results>/poc-sota-bird*.json` (whichever split ran) and writes `poc-sota-attribution.json` beside
  * it, where `<results>` is `POC_RESULT_DIR` when set and `eval/results` otherwise —
  * the same rule every other lane follows, so the workflow's own steps can find both.
  * Association only: a rule present when a question flipped did not necessarily
  * cause the flip, and rules injected together share the credit.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { attributeRules, type AttributionCase, type AttributionItem } from '@agentix-e/microglia-eval';
+import { birdArtefactPath } from './lib.js';
 
 type CaseRow = {
   readonly fold: number;
@@ -42,7 +43,7 @@ const RESULTS = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 're
 
 function main(): void {
   const artifact = JSON.parse(
-    readFileSync(join(RESULTS, 'poc-sota-bird.json'), 'utf8'),
+    readFileSync(birdArtefactPath(), 'utf8'),
   ) as Artifact;
 
   const cases: AttributionCase[] = artifact.per_case.map((row) => ({
@@ -61,7 +62,7 @@ function main(): void {
   const summary = attributeRules(cases, items);
   const output = {
     id: 'poc-sota-attribution',
-    source_artifact: 'poc-sota-bird.json',
+    source_artifact: basename(birdArtefactPath()),
     source_generated_at: artifact.generated_at ?? null,
     n: cases.length,
     summary,

@@ -14,6 +14,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { discriminationOf, storeReport, type InjectedCase, type StoreRun } from '@agentix-e/microglia-eval';
+import { birdArtefactPath } from './lib.js';
 
 type AttributionArtifact = {
   readonly id?: string;
@@ -107,7 +108,7 @@ function main(): void {
   // The same question one level down, from the artefact that carries every injected rule's text and
   // id beside the outcome it produced. The summary above counts rules the distiller kept; this
   // counts what happened to the ones that were shown, and the difference is the silence.
-  const poolPath = join(RESULTS, 'poc-sota-bird.json');
+  const poolPath = birdArtefactPath();
   if (!existsSync(poolPath)) return;
   const artifact = JSON.parse(readFileSync(poolPath, 'utf8')) as PoolArtifact;
   const reading = discriminationOf(artifact.per_case);

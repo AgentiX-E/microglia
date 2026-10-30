@@ -13,8 +13,9 @@
  * paired per question.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { armPairsAgainstFull } from '@agentix-e/microglia-eval';
+import { birdArtefactPath } from './lib.js';
 
 type CaseRow = {
   readonly correct: boolean;
@@ -31,7 +32,7 @@ const RESULTS = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 're
 
 function main(): void {
   const artifact = JSON.parse(
-    readFileSync(join(RESULTS, 'poc-sota-bird.json'), 'utf8'),
+    readFileSync(birdArtefactPath(), 'utf8'),
   ) as Artifact;
 
   const pairs = armPairsAgainstFull(
@@ -40,7 +41,7 @@ function main(): void {
 
   const output = {
     id: 'poc-sota-arm-pairs',
-    source_artifact: 'poc-sota-bird.json',
+    source_artifact: basename(birdArtefactPath()),
     source_generated_at: artifact.generated_at ?? null,
     n: artifact.per_case.length,
     // `deltaPp` is `arm - full`. Negative means the control did worse than the

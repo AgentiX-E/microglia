@@ -44,6 +44,14 @@ export type BirdManifest = {
   readonly attribution: string;
   /** Directory the archive extracts to, relative to the extraction root. */
   readonly root: string;
+  /**
+   * The question file inside `root`.
+   *
+   * A field rather than a constant because the two splits name it differently —
+   * `mini_dev_sqlite.json` and `dev.json` — and the lane used to hard-code the first, which meant
+   * a second split could not be measured without editing code that has nothing to do with splits.
+   */
+  readonly questions: string;
   readonly databases: readonly string[];
   readonly retrievedAt: string;
 };
@@ -126,6 +134,7 @@ export function parseManifest(value: unknown): BirdManifest {
     licence: text(record, 'licence'),
     attribution: text(record, 'attribution'),
     root: text(record, 'root'),
+    questions: text(record, 'questions'),
     databases: ids,
     retrievedAt: text(record, 'retrievedAt'),
   };
@@ -139,6 +148,46 @@ export function archiveVerdict(
   if (observed.bytes !== manifest.bytes) return { ok: false, reason: 'size' };
   if (observed.sha256 !== manifest.sha256) return { ok: false, reason: 'digest' };
   return { ok: true, reason: 'ok' };
+}
+
+/**
+ * The splits this lane can measure.
+ *
+ * `minidev` is the 350-question slice the transfer experiments use: it filters the easiest third,
+ * because a question a model answers without help carries no signal for either arm. `dev` is the
+ * full 1,534-question split, and it exists for one purpose — reproducing a published number, which
+ * requires the sample size the published number was measured on.
+ */
+export type Split = 'minidev' | 'dev';
+
+/** A split name from configuration, refused rather than defaulted when it is not one of the two. */
+export function splitFrom(raw: string | undefined): Split {
+  const name = (raw ?? '').trim().toLowerCase();
+  if (name === '' || name === 'minidev') return 'minidev';
+  if (name === 'dev') return 'dev';
+  // `name` cannot be empty here, so the message quotes it rather than the raw input: a second
+  // `?? ''` would be a branch no caller can reach, and the value it would print is the one that
+  // was just rejected anyway.
+  throw new RangeError(`Unknown split '${name}'; known splits are minidev, dev`);
+}
+
+/**
+ * Which questions a split actually scores.
+ *
+ * The filter is split-dependent on purpose. On `minidev` it is a measurement decision: the
+ * experiment is about transfer, and a question answered correctly with no memory cannot show any.
+ * On `dev` the same filter would be a protocol violation: 925 of the 1,534 questions are marked
+ * `simple`, so dropping them leaves 609 and the run stops being a reproduction of a cell measured
+ * on 1,534. A filter that is right for one question is wrong for the other, so it belongs to the
+ * split rather than to the lane.
+ */
+export function poolOf<T extends { readonly difficulty: string }>(
+  rows: readonly T[],
+  split: Split,
+): readonly T[] {
+  if (split === 'dev') return rows;
+  const usable = rows.filter((row) => row.difficulty.toLowerCase() !== 'simple');
+  return usable.length > 0 ? usable : rows;
 }
 
 /** Database ids the questions use that the archive does not carry. */

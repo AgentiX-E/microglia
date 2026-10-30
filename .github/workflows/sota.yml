@@ -31,6 +31,10 @@ on:
         description: 'R8.4: the pre-registration this dispatch executes, by id (prereg/<id>.md); a dispatch without one is refused'
         required: false
         default: ''
+      split:
+        description: 'R8.3b: BIRD split — minidev (350-question slice the transfer experiments use) or dev (all 1,534 questions, the only split that can reproduce a published dev cell)'
+        required: false
+        default: 'minidev'
       convention:
         description: 'House convention (empty, or thousands)'
         required: false
@@ -113,6 +117,12 @@ jobs:
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.bird != 'false'
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    env:
+      # Which BIRD artefact this job reads and writes. Two splits produce two files, and every
+      # reader downstream of the run — attribution, the pool, the signals, the density family, the
+      # publish step — has to be pointed at the one this dispatch measured. Naming it once here is
+      # the difference between a job whose steps agree and fifteen places to forget.
+      SOTA_ARTEFACT: ${{ github.event.inputs.split == 'dev' && 'poc-sota-bird-dev.json' || 'poc-sota-bird.json' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -164,8 +174,14 @@ jobs:
           fi
           pnpm eval:prereg "prereg/$PREREG.md"
 
-      - name: Drop any committed artefact
-        run: rm -f eval/results/poc-sota-bird.json eval/results/poc-sota-attribution.json
+      # Only this split's artefact. Deleting the other one would erase the evidence for every
+      # reading that quotes it — the Mini-Dev rows in the comparison table are recomputed from
+      # their own artefact by the protocol gate, and a gate with nothing to recompute is a gate
+      # that silently passes.
+      - name: Drop the committed artefact for this split
+        run: |
+          rm -f "eval/results/$SOTA_ARTEFACT" "eval/results/poc-sota-attribution.json"
+          rm -f "eval/results/${SOTA_ARTEFACT%.json}.partial.json"
 
       # The full split is ~1,750 model calls: 350 questions × (none + full + gated +
       # oracle) once each, plus one learning generation per question (cached across
@@ -213,20 +229,21 @@ jobs:
           SOTA_DENSITY_PANEL: ${{ github.event.inputs.density_panel || '0' }}
           SOTA_DENSITY_RULES_PER_DB: ${{ github.event.inputs.density_rules_per_db || '8' }}
           SOTA_TRANSFER_PANEL: ${{ github.event.inputs.transfer_panel || '10' }}
+          SOTA_SPLIT: ${{ github.event.inputs.split || 'minidev' }}
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '8000' }}
         run: pnpm eval:sota
 
       - name: Attribute the flips to rules
         if: always()
         run: |
-          if [ -f eval/results/poc-sota-bird.json ]; then
+          if [ -f "eval/results/$SOTA_ARTEFACT" ]; then
             pnpm eval:attribute
-          elif [ -f eval/results/poc-sota-bird.partial.json ]; then
+          elif [ -f "eval/results/${SOTA_ARTEFACT%.json}.partial.json" ]; then
             # The lane stopped before it could measure, and said why. Reporting that reason
             # here is the difference between a run whose cause is on screen and one whose
             # cause is forty-seven minutes into a log nobody scrolls to.
             node -e "
-              const r = require('./eval/results/poc-sota-bird.partial.json');
+              const r = require('./eval/results/' + process.env.SOTA_ARTEFACT.replace(/\.json$/, '.partial.json'));
               console.log('::error::the lane stopped before measuring: ' + r.reason +
                 ' (spent ' + r.spent + ' of ' + r.cap + ', ' +
                 r.folds_completed + '/' + r.folds_planned + ' folds complete)');
@@ -243,7 +260,7 @@ jobs:
       - name: Describe the candidate pool
         if: always()
         run: |
-          if [ -f eval/results/poc-sota-bird.json ]; then
+          if [ -f "eval/results/$SOTA_ARTEFACT" ]; then
             pnpm eval:pool
           else
             echo "no artefact, so no pool to describe"
@@ -256,7 +273,7 @@ jobs:
       - name: Gate the execution signals
         if: always()
         run: |
-          if [ -f eval/results/poc-sota-bird.json ]; then
+          if [ -f "eval/results/$SOTA_ARTEFACT" ]; then
             pnpm eval:signals
           else
             echo "no artefact, so no signals to gate"
@@ -268,7 +285,7 @@ jobs:
       - name: Price the memory prior
         if: always()
         run: |
-          if [ -f eval/results/poc-sota-bird.json ]; then
+          if [ -f "eval/results/$SOTA_ARTEFACT" ]; then
             pnpm eval:prior
           else
             echo "no artefact, so no memory to price"
@@ -281,7 +298,7 @@ jobs:
       - name: Read the density family
         if: always()
         run: |
-          if [ -f eval/results/poc-sota-bird.json ]; then
+          if [ -f "eval/results/$SOTA_ARTEFACT" ]; then
             pnpm eval:density
           else
             echo "no artefact, so no family to read"
@@ -293,7 +310,7 @@ jobs:
       - name: Price the generator pool
         if: always()
         run: |
-          if [ -f eval/results/poc-sota-bird.json ]; then
+          if [ -f "eval/results/$SOTA_ARTEFACT" ]; then
             pnpm eval:union
           else
             echo "no artefact, so no generator pool to price"
@@ -317,15 +334,15 @@ jobs:
         run: |
           node -e "
             const fs = require('node:fs');
-            if (!fs.existsSync('./eval/results/poc-sota-bird.json')) {
+            if (!fs.existsSync('./eval/results/' + process.env.SOTA_ARTEFACT)) {
               console.log('::error::the lane produced no artefact; nothing is published');
               process.exit(1);
             }
-            const r = require('./eval/results/poc-sota-bird.json');
+            const r = require('./eval/results/' + process.env.SOTA_ARTEFACT);
             const m = r.metrics;
             const p = r.paired;
             const lines = [
-              '### BIRD Mini-Dev — cross-fitted, k=' + r.config.folds,
+              '### ' + r.dataset + ' — cross-fitted, k=' + r.config.folds,
               '',
               '| Arm | Execution accuracy | n |',
               '| --- | --- | --- |',
@@ -434,7 +451,7 @@ jobs:
         with:
           name: sota-bird
           path: |
-            eval/results/poc-sota-bird.json
+            eval/results/${{ env.SOTA_ARTEFACT }}
             eval/results/poc-sota-attribution.json
           if-no-files-found: error
 
@@ -447,7 +464,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: sota-bird-partial
-          path: eval/results/poc-sota-bird.partial.json
+          path: eval/results/poc-sota-bird*.partial.json
           if-no-files-found: ignore
           retention-days: 7
 
@@ -490,7 +507,7 @@ jobs:
       - name: Probe
         env:
           ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
-          SOTA_ARTEFACT: eval/results/poc-sota-bird.json
+          SOTA_ARTEFACT: eval/results/${{ github.event.inputs.split == 'dev' && 'poc-sota-bird-dev.json' || 'poc-sota-bird.json' }}
         run: pnpm eval:probe
       - uses: actions/upload-artifact@v4
         if: always()

@@ -101,31 +101,67 @@ function firstDifference(left: string, right: string): number {
  * arithmetic over a measurement that already exists, and re-running the benchmark to
  * reproduce arithmetic would be a way of making the check expensive enough to skip.
  */
-function checkCells(sourcePath: string, recordPath: string): readonly Failure[] {
-  const source = readJson<{
-    readonly dataset: string;
-    readonly n: { readonly total: number };
-    readonly metrics: { readonly accuracy_without_memory: number };
-  }>(sourcePath);
-  const estimate = { accuracy: source.metrics.accuracy_without_memory, n: source.n.total };
-  const split = { name: source.dataset, n: source.n.total };
-  const comparison = compareCell({ cell: 'xiyan-deepseek-ddl', estimate, split });
-  const gate = cellGate(comparison, estimate, split);
+/**
+ * Every BIRD artefact a cell can be derived from, in the order they are reported.
+ *
+ * Two splits, two rows: the 350-question Mini-Dev run can only ever be `indicative` — its split
+ * name differs from the published cell's — and the 1,534-question dev run can be `reproduced`.
+ * Keeping both rows is the point. A table that showed only the newer one would erase the reading
+ * that motivated the newer one, and a row is only honest if the artefact behind it is still in
+ * the repository to be recomputed.
+ */
+const CELL_SOURCES: readonly { readonly path: string; readonly cell: string }[] = [
+  { path: 'eval/results/poc-sota-bird.json', cell: 'xiyan-deepseek-ddl' },
+  { path: 'eval/results/poc-sota-bird-dev.json', cell: 'xiyan-deepseek-ddl' },
+];
+
+type SourcedComparison = CellComparison & { readonly source: string };
+
+function checkCells(recordPath: string): readonly Failure[] {
+  const failures: Failure[] = [];
+  const cells: SourcedComparison[] = [];
+  for (const source of CELL_SOURCES) {
+    let artifact: {
+      readonly dataset: string;
+      readonly n: { readonly total: number };
+      readonly metrics: { readonly accuracy_without_memory: number };
+    };
+    try {
+      artifact = readJson(source.path);
+    } catch {
+      // A split that has not been run yet is not a failure: the dev artefact exists only after a
+      // dispatch that cost 1,534 questions, and a repository that refused to build until then
+      // would make the gate a reason not to measure.
+      process.stdout.write(`[protocol] skip ${source.path} — no committed run for that split\n`);
+      continue;
+    }
+    const estimate = { accuracy: artifact.metrics.accuracy_without_memory, n: artifact.n.total };
+    const split = { name: artifact.dataset, n: artifact.n.total };
+    const comparison = compareCell({ cell: source.cell, estimate, split });
+    const gate = cellGate(comparison, estimate, split);
+    if (!gate.ok) failures.push({ check: source.path, detail: gate.detail });
+    cells.push({ ...comparison, source: source.path });
+  }
+
+  if (cells.length === 0) {
+    failures.push({ check: recordPath, detail: 'no BIRD artefact exists, so no cell can be derived' });
+    return failures;
+  }
+
   const record = {
     schema: 'microglia.cell-comparison/1',
-    source: sourcePath,
     note:
-      'Derived, not measured: recomputed from the committed S2 artefact. A cross-split comparison ' +
-      'is indicative by construction and the gate refuses any record that says otherwise.',
-    cells: [comparison] satisfies readonly CellComparison[],
+      'Derived, not measured: every row is recomputed from a committed BIRD artefact, and each row ' +
+      'names the file it came from. A cross-split comparison is indicative by construction and the ' +
+      'gate refuses any record that says otherwise.',
+    cells,
   };
-  const failures: Failure[] = [];
-  if (!gate.ok) failures.push({ check: 'cell-comparison', detail: gate.detail });
   const text = `${JSON.stringify(record, null, 2)}\n`;
   const path = join(ROOT, recordPath);
+  const summary = cells.map((cell) => `${cell.verdict} at ${cell.diffPp}pp`).join(', ');
   if (WRITE) {
     writeFileSync(path, text);
-    process.stdout.write(`[protocol] wrote ${recordPath} — ${comparison.verdict} at ${comparison.diffPp}pp\n`);
+    process.stdout.write(`[protocol] wrote ${recordPath} — ${summary}\n`);
     return failures;
   }
   let committed: string;
@@ -138,13 +174,15 @@ function checkCells(sourcePath: string, recordPath: string): readonly Failure[] 
   if (committed !== text) {
     failures.push({
       check: recordPath,
-      detail: `the recorded comparison differs from the arithmetic (${comparison.verdict} at ${comparison.diffPp}pp)`,
+      detail: `the recorded comparison differs from the arithmetic (${summary})`,
     });
   } else {
-    process.stdout.write(
-      `[protocol] pass ${recordPath} — ${comparison.cell} ${comparison.verdict}: ` +
-        `${comparison.oursPp}pp against ${comparison.publishedPp}pp on ${comparison.publishedSplit}\n`,
-    );
+    for (const cell of cells) {
+      process.stdout.write(
+        `[protocol] pass ${cell.source} — ${cell.cell} ${cell.verdict}: ` +
+          `${cell.oursPp}pp against ${cell.publishedPp}pp on ${cell.publishedSplit}\n`,
+      );
+    }
   }
   return failures;
 }
@@ -153,7 +191,7 @@ function main(): void {
   const failures = [
     ...checkPreregistrations(),
     ...checkReport('eval/results/poc-plugin-fixture.json', 'eval/results/poc-plugin-fixture.md'),
-    ...checkCells('eval/results/poc-sota-bird.json', 'eval/results/poc-cell-comparison.json'),
+    ...checkCells('eval/results/poc-cell-comparison.json'),
   ];
   if (failures.length > 0) {
     for (const failure of failures) process.stderr.write(`[protocol] FAIL ${failure.check}: ${failure.detail}\n`);

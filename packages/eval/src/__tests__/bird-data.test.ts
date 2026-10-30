@@ -9,10 +9,12 @@ import {
   archiveVerdict,
   missingDatabases,
   parseManifest,
+  poolOf,
   populationOf,
   requirePopulated,
   dedupeQuestions,
   sha256OfFile,
+  splitFrom,
   type BirdDataErrorReason,
 } from '../bird-data.js';
 
@@ -48,7 +50,23 @@ describe('the shipped manifest', () => {
     expect(manifest.sha256).toBe('cc48ba16838204e4e214512030cb572eeb5f7bcdd999bae4b9b6ff12ec13b92f');
     expect(manifest.licence).toBe('CC-BY-SA-4.0');
     expect(manifest.root).toBe('minidev/MINIDEV');
+    expect(manifest.questions).toBe('mini_dev_sqlite.json');
     expect(manifest.databases).toHaveLength(11);
+  });
+
+  it('ships a second manifest for the full dev split, pinned to its own archive', () => {
+    const devPath = new URL('../../../../eval/manifests/bird-dev.json', import.meta.url);
+    const dev = parseManifest(JSON.parse(readFileSync(devPath, 'utf8')));
+    // Two archives, two digests. A manifest that reused the Mini-Dev digest would
+    // accept a truncated dev download as long as the size happened to match.
+    expect(dev.name).toBe('bird-dev');
+    expect(dev.sha256).not.toBe(manifest.sha256);
+    expect(dev.bytes).toBe(346_207_293);
+    expect(dev.questions).toBe('dev.json');
+    expect(dev.root).toBe('dev_20240627');
+    // The same eleven databases: dev and Mini-Dev share them, and a dev run costs
+    // one download, not a second copy of the data.
+    expect(dev.databases).toEqual(manifest.databases);
   });
 
   it('lists the databases the archive holds, alphabetically, with no duplicates', () => {
@@ -71,6 +89,11 @@ describe('what a manifest refuses', () => {
     expect(reasonOf(() => parseManifest({ ...manifest, url: '' }))).toBe('manifest-field');
     expect(reasonOf(() => parseManifest({ ...manifest, databases: [] }))).toBe('manifest-field');
     expect(reasonOf(() => parseManifest({ ...manifest, databases: [''] }))).toBe('manifest-field');
+    // The question file is part of the manifest: a lane that hard-coded its name
+    // could not measure a second split, and a default would silently read the wrong
+    // file for whichever split forgot to declare one.
+    expect(reasonOf(() => parseManifest({ ...manifest, questions: undefined }))).toBe('manifest-field');
+    expect(reasonOf(() => parseManifest({ ...manifest, questions: '' }))).toBe('manifest-field');
   });
 
   it('refuses a digest that is not a digest', () => {
@@ -78,6 +101,51 @@ describe('what a manifest refuses', () => {
     // which is a worse failure than a refusal at read time.
     expect(reasonOf(() => parseManifest({ ...manifest, sha256: 'cc48ba16' }))).toBe('manifest-field');
     expect(reasonOf(() => parseManifest({ ...manifest, sha256: 'C'.repeat(64) }))).toBe('manifest-field');
+  });
+});
+
+describe('which split a run measures', () => {
+  it('reads the two known splits, case and padding included', () => {
+    expect(splitFrom(undefined)).toBe('minidev');
+    expect(splitFrom('')).toBe('minidev');
+    expect(splitFrom('  MINIDEV ')).toBe('minidev');
+    expect(splitFrom('dev')).toBe('dev');
+    expect(splitFrom('DEV')).toBe('dev');
+  });
+
+  it('refuses a split it does not have, rather than falling back', () => {
+    // A typo that silently measured Mini-Dev while the dispatch said `dev` would
+    // produce a 350-question number filed as a 1,534-question reproduction.
+    expect(() => splitFrom('test')).toThrow(/Unknown split/);
+    expect(() => splitFrom('mini')).toThrow(/known splits are minidev, dev/);
+  });
+});
+
+describe('which questions a split scores', () => {
+  const rows = [
+    { difficulty: 'simple', id: 'a' },
+    { difficulty: 'moderate', id: 'b' },
+    { difficulty: 'challenging', id: 'c' },
+  ];
+
+  it('drops the easiest third on mini-dev, where the question is transfer', () => {
+    expect(poolOf(rows, 'minidev').map((row) => row.id)).toEqual(['b', 'c']);
+  });
+
+  it('keeps every question on dev, where the question is sample size', () => {
+    // 925 of dev's 1,534 questions are marked `simple`. Filtering them leaves 609,
+    // and a run on 609 is not a reproduction of a cell measured on 1,534.
+    expect(poolOf(rows, 'dev').map((row) => row.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('keeps everything when every question is easy, rather than measuring nothing', () => {
+    const easy = [{ difficulty: 'simple', id: 'a' }];
+    expect(poolOf(easy, 'minidev')).toEqual(easy);
+  });
+
+  it('matches difficulty case-insensitively', () => {
+    const odd = [{ difficulty: 'Simple', id: 'a' }, { difficulty: 'MODERATE', id: 'b' }];
+    expect(poolOf(odd, 'minidev').map((row) => row.id)).toEqual(['b']);
   });
 });
 

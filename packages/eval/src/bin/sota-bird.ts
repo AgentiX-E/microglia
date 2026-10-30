@@ -178,6 +178,10 @@ import {
   parseArms,
   parseManifest,
   parseRetirementPolicy,
+  artefactIdOf,
+  poolOf,
+  splitFrom,
+  splitNameOf,
   retireeFrom,
   promptFor,
   reportedSql,
@@ -190,6 +194,7 @@ import {
   sha256OfFile,
   type AnchorMode,
   type BirdManifest,
+  type Split,
   type SqlArm,
   type ChatReply,
   type ResultComparison,
@@ -213,6 +218,44 @@ const REPO = join(ROOT, '..', '..', '..');
 const CACHE = join(ROOT, '..', '.cache', 'bird');
 
 const LIMIT = nonNegative(process.env['SOTA_LIMIT'], 0);
+
+/**
+ * Which split of BIRD this run measures.
+ *
+ * Two splits, two purposes. `minidev` is the 350-question slice every transfer experiment in this
+ * repository was measured on. `dev` is the full 1,534 questions, and its single purpose is
+ * reproduction: a published number measured on 1,534 can only be reproduced on 1,534. The split
+ * decides the manifest, the question file, and whether the easiest third is filtered out, so it is
+ * read once and carried in the artefact's configuration.
+ */
+const SPLIT: Split = splitOf(process.env['SOTA_SPLIT']);
+
+function splitOf(raw: string | undefined): Split {
+  try {
+    return splitFrom(raw);
+  } catch (error) {
+    throw new MicrogliaError('MG_E_CONFIG', (error as Error).message, { known: 'minidev, dev' });
+  }
+}
+
+/**
+ * Where this split's run is written.
+ *
+ * Two artefacts rather than one file rewritten: the two splits answer different questions —
+ * 350 questions about transfer, 1,534 about reproduction — and overwriting the smaller one to
+ * store the larger would delete the evidence for every reading that quotes it, including the
+ * `indicative` verdict whose whole point is that it can be recomputed.
+ */
+const ARTEFACT_ID = artefactIdOf(SPLIT);
+
+/**
+ * The name this run's split goes by in the artefact.
+ *
+ * `dev` carries the published cell's own spelling — `BIRD dev` — because the admissibility rule
+ * compares split names, and a run that measured the right 1,534 questions under a different name
+ * would be filed as `indicative` and never as the reproduction it is.
+ */
+const SPLIT_NAME = splitNameOf(SPLIT);
 const FOLDS = Math.max(2, Math.trunc(nonNegative(process.env['SOTA_FOLDS'], 5)));
 const SEED = Math.trunc(nonNegative(process.env['SOTA_SEED'], 7));
 /**
@@ -673,7 +716,13 @@ function databaseIn(directory: string, dbId: string): string {
   });
 }
 
-const MANIFEST = join(REPO, 'eval', 'manifests', 'bird-minidev.json');
+/**
+ * The pinned manifest for this split.
+ *
+ * Two files rather than one with a switch inside: each archive has its own URL, size and digest,
+ * and a manifest is the record of one verification, not a table of them.
+ */
+const MANIFEST = join(REPO, 'eval', 'manifests', SPLIT === 'dev' ? 'bird-dev.json' : 'bird-minidev.json');
 
 function loadManifest(): BirdManifest {
   return parseManifest(JSON.parse(readFileSync(MANIFEST, 'utf8')));
@@ -690,7 +739,7 @@ function loadManifest(): BirdManifest {
  */
 async function prepareArchive(url: string): Promise<string> {
   const manifest = loadManifest();
-  const dest = join(CACHE, 'minidev.zip');
+  const dest = join(CACHE, `${manifest.name}.zip`);
   mkdirSync(CACHE, { recursive: true });
 
   if (!existsSync(dest) || statSync(dest).size !== manifest.bytes) {
@@ -718,7 +767,7 @@ async function prepareArchive(url: string): Promise<string> {
     });
   }
 
-  const root = join(CACHE, 'minidev');
+  const root = join(CACHE, manifest.name);
   const extracted = join(root, manifest.root);
   if (!existsSync(extracted)) {
     process.stdout.write('[sota] extracting the archive\n');
@@ -737,6 +786,7 @@ async function prepareArchive(url: string): Promise<string> {
  */
 async function loadDataset(limit: number): Promise<Dataset> {
   const explicit = process.env['BIRD_DIR'];
+  const manifest = loadManifest();
   mkdirSync(CACHE, { recursive: true });
 
   // The database root first, because the archive also carries the questions: one
@@ -756,7 +806,7 @@ async function loadDataset(limit: number): Promise<Dataset> {
 
   let rows: BirdRow[];
   let source: string;
-  const local = join(root, 'mini_dev_sqlite.json');
+  const local = join(root, manifest.questions);
   if (existsSync(local)) {
     rows = parseRows(readFileSync(local, 'utf8'));
     source = local;
@@ -781,7 +831,7 @@ async function loadDataset(limit: number): Promise<Dataset> {
     if (rows.length === 0) {
       throw new MicrogliaError('MG_E_STORE_IO', 'No question file could be read', {
         attempted,
-        hint: 'The pinned archive carries mini_dev_sqlite.json; a directory without it needs a network.',
+        hint: `The pinned archive carries ${manifest.questions}; a directory without it needs a network.`,
       });
     }
   }
@@ -796,12 +846,10 @@ async function loadDataset(limit: number): Promise<Dataset> {
     process.stdout.write(`[sota] dropped ${deduped.duplicates} repeated question(s)\n`);
   }
 
-  // The lane measures transfer, so the slice skips the easiest third: a question a
-  // model answers without help carries no signal for either arm. The remainder is
-  // interleaved across databases, because a prefix of a database-sorted file is a
-  // sample of one database.
-  const usable = rows.filter((row) => row.difficulty.toLowerCase() !== 'simple');
-  const pool = usable.length > 0 ? usable : rows;
+  // What the split scores; see `poolOf`. The remainder is interleaved across
+  // databases, because a prefix of a database-sorted file is a sample of one
+  // database.
+  const pool = poolOf(rows, SPLIT);
   const ordered = interleaveByKey(pool, (row) => row.db_id);
   const slice = limit > 0 ? ordered.slice(0, limit) : ordered;
 
@@ -811,7 +859,6 @@ async function loadDataset(limit: number): Promise<Dataset> {
   // return no rows, so `matches` scores a runnable SELECT as correct — a number
   // about parse success wearing the name of execution accuracy.
   const used = new Set(slice.map((row) => row.db_id));
-  const manifest = loadManifest();
   const missing = missingDatabases(manifest, [...used]);
   if (missing.length > 0) {
     throw new MicrogliaError('MG_E_STORE_IO', 'The questions reference databases the archive does not carry', {
@@ -3884,7 +3931,7 @@ async function main(): Promise<void> {
   const folds: FoldResult[] = [];
   const spend: { fold: number; calls: number }[] = [];
   const writeBudgetStop = async (reason: string, callsInFlightFold: number): Promise<void> => {
-    await writeJson('poc-sota-bird.partial', {
+    await writeJson(`${ARTEFACT_ID}.partial`, {
       partial: true,
       reason,
       cap: MAX_CALLS,
@@ -4347,13 +4394,17 @@ async function main(): Promise<void> {
     fold.items.map((item) => ({ fold: fold.fold, ...item })),
   );
   const artifact = {
-    id: 'poc-sota-bird',
+    id: ARTEFACT_ID,
     protocol: 'cross-fitted-kfold/3',
-    dataset: 'BIRD Mini-Dev (sqlite)',
+    dataset: SPLIT_NAME,
     source: dataset.source,
     model: MODEL,
     prompt_version: PROMPT_VERSION,
     config: {
+      // Which split these numbers were measured on. A reader comparing against a
+      // published cell needs it before anything else: 53.71 on 350 questions and
+      // 53.71 on 1,534 are not the same claim.
+      split: SPLIT,
       folds: FOLDS,
       seed: SEED,
       limit: LIMIT,
@@ -5053,7 +5104,7 @@ async function main(): Promise<void> {
   // `eval/results` — the directory the workflow's publish and attribution steps read.
   // The lane used to write to `packages/eval/src/poc/results`, a path from before the
   // rename, so the artefact existed and the job could not find it.
-  await writeJson('poc-sota-bird', artifact);
+  await writeJson(ARTEFACT_ID, artifact);
   process.stdout.write(
     `[sota] n=${cases.length} without=${(paired.baselineAccuracy * 100).toFixed(2)}% ` +
       `with=${(paired.treatmentAccuracy * 100).toFixed(2)}% delta=${(paired.delta * 100).toFixed(2)}pp ` +

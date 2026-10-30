@@ -1,7 +1,7 @@
 /**
  * POC: what was in the pool, and what that allows the next step to be.
  *
- * Reads `<results>/poc-sota-bird.json` and prints the R7.0 measurement: how many distinct execution
+ * Reads `<results>/poc-sota-bird*.json` (whichever split ran) and prints the R7.0 measurement: how many distinct execution
  * results each question's draws produced, how the oracle ceiling decomposes, and every execution
  * signal priced alone against the base rate of taking the first draw.
  *
@@ -16,6 +16,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { poolFromArtifact, poolReport, type ArtifactPoolCase } from '@agentix-e/microglia-eval';
+import { birdArtefactPath } from './lib.js';
 
 type Artifact = {
   readonly per_case: readonly ArtifactPoolCase[];
@@ -27,7 +28,7 @@ const RESULTS = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 're
 
 function main(): void {
   const artifact = JSON.parse(
-    readFileSync(join(RESULTS, 'poc-sota-bird.json'), 'utf8'),
+    readFileSync(birdArtefactPath(), 'utf8'),
   ) as Artifact;
   const { questions, draws, recorded } = poolFromArtifact(
     artifact.per_case,
