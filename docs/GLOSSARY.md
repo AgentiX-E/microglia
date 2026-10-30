@@ -166,6 +166,22 @@ replaces decides on the first half and is scored on the second; that is one draw
 and the run that measured it found the two halves were not exchangeable. A cross-fit that earns no more
 than the same machinery run on foreign rules says the fit is what moved the answers, not the content.
 
+**Foreign panel (density family)** — the questions from *other* databases that every exercised rule is
+also shown, ten per rule, drawn round-robin across schemas. The family's own panel keeps a rule inside
+the database it was distilled from, which is the only setting in which a store that is retrieved across
+databases has ever been measured here; the foreign panel is the other setting.
+
+**Transfer stratum (density family)** — the group a rule is placed in by the net effect it had *at home*
+— positive, zero or negative — before its foreign injections are counted. Stratifying by what the rule
+did away from home instead would sort rules by the number the reading then reports. The claim under test
+is about the positive stratum: a rule that never worked at home cannot have kept working away.
+
+**Evidence curve (density family)** — the cross-fit re-read with the fit pool capped at the first *m*
+observations of each rule, for *m* from four to the whole panel, scoring every trial each time. It
+separates "this rule's sign is wrong" from "this rule has not been seen enough times to have a sign",
+and the smallest *m* at which the policy clears its floor is the number of chances a deployment has to
+pay for before it may show a rule at all.
+
 **Power** — the sample size needed to detect an effect at a stated confidence. Stated per benchmark so
 a null result is not confused with an underpowered one.
 
