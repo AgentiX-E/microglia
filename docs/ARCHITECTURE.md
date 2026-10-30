@@ -253,6 +253,11 @@ The study is a package, not a script:
 - `sql-exec.ts` also carries `schemaSql` and `tableShapes` — a database's own answer to "what SQL
   created these tables" and "what did you declare each column as", both cached per path, so a fold
   reads eleven schemas once instead of once per question.
+- `rule-probe.ts` — the own-case probe: the four verdicts of "retry alone" against "retry with the
+  rules own case produced" (`supplied`, `redundant`, `broke`, `useless`), the admission rule that
+  keeps only rules that reproduced a case and broke none, and the transfer ledger that points an
+  admitted rule at foreign questions. Pure functions over trials, so the verdict arithmetic is
+  testable without a model, and the lane that wires it reads learning rows only.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

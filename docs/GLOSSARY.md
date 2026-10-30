@@ -370,6 +370,32 @@ share of a store (66.8% → 48.6% of rules) and does not carry a rule across a s
 practice: of the attempts it still refuses, six in ten are a column the target database does not have
 at all.
 
+**Own-case probe** — The store asked to reproduce the correction it was built from: each corrected
+learning question is re-asked twice, once with a blank retry and once with the rules distilled from
+it, and the two answers give one of four verdicts. Two calls per corrected case, learning rows only,
+so it cannot see the questions it filters. The instrument decides whether a pack is a mechanism or a
+noise generator, which no pack-versus-no-pack comparison can.
+
+| | retry alone right | retry alone wrong |
+|---|---|---|
+| **with the rules right** | `redundant` | `supplied` |
+| **with the rules wrong** | `broke` | `useless` |
+
+**Supplied** — The rules turned a failure into the correction that a blank retry did not reach. The
+only verdict that shows the extraction doing work. Measured at 19 of 156 corrected BIRD cases (12.2%).
+
+**Useless** — Neither the blank retry nor the retry with its own rules reached the correction, so the
+experience did not reproduce its own case. 103 of 156 on the same run (66.0%), which is the number
+that makes the extraction, rather than retrieval or injection, the bottleneck.
+
+**Broke** — A retry alone was right and the same retry with the rules was wrong: the sharpest
+available evidence of a *wrong* rule rather than an unhelpful one. 3 of 156 cases, and 6 of 296 rules
+excluded from a store by it.
+
+**Admitted rule** — A rule that reproduced at least one of its own cases and broke none. The store a
+`full-verified` arm answers with: 38 of 296 rules on BIRD (12.8%). Admission is a filter on evidence,
+not a claim that the rule helps — the admitted store moved 342 of 350 packs and 0.00pp.
+
 **Withheld** — A rule the binder refused to show because at least one slot had no referent in the
 target schema. A withheld attempt makes no model call, contributes no trial, and is counted: `V28`
 holds `bound + slotless` equal to the rule-database pairs the foreign ledger carries, so a rule that

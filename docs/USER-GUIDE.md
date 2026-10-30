@@ -870,6 +870,28 @@ Be honest about the preconditions; the product is only useful inside them.
    an **in-database prompt**: give a namespace one workspace, and expect it to steer that workspace's
    questions. Do not expect a domain pack distilled on one product's schema to help a question written
    against another, and do not build a product claim on it.
+10. **A rule may not be able to reproduce the correction it came from.** This is the measurement the
+    loop rarely makes, and the one that decides whether the pack is a mechanism or a noise generator.
+    Ask each *corrected* case twice — once with a blank retry, once with the rules that correction
+    produced — and the four outcomes separate what the pack did from what a second attempt would have
+    done anyway:
+
+    | | retry alone right | retry alone wrong |
+    |---|---|---|
+    | **with the rules right** | `redundant` — the rules added nothing | `supplied` — the rules did the work |
+    | **with the rules wrong** | `broke` — the rules destroyed a case that needed no help | `useless` — neither attempt reached the correction |
+
+    Measured on BIRD Mini-Dev (156 corrected cases, 296 rules, 312 calls): **supplied 19 — 12.2%**,
+    redundant 31 — 19.9%, **broke 3 — 1.9%**, and **useless 103 — 66.0%**. Two corrections in three
+    cannot be reached even when the model is shown its own failure *and* the rules distilled from it.
+    A gate that keeps only rules that reproduced their own case and broke none keeps 38 of 296
+    (12.8%), and that store answers 350 held-out questions at **54.00% against 54.00% without it** —
+    `0.00pp`, pack of 0.39 rules per question. The admitted rules neither help nor hurt; the 85% that
+    cannot demonstrate anything are what a normal pack is made of.
+
+    So run this before you trust a store: `SOTA_ARMS=full-verified` (§13.4). If `supplied` is small and
+    `useless` dominates, the extraction is the bottleneck and no amount of retrieval work, injection
+    timing or budget tuning will reach it.
 
 ## 13. Measuring your own generator
 
@@ -1099,6 +1121,40 @@ near zero is a client asking for too much — the failure is in your timeout, no
 which more than 10% of the learning questions went unanswered or more than 10% of the corrections
 failed to distil. A store built from 57 of 64 questions is not the store the arm was defined as, and
 the artefact has to fail rather than report a number nobody can compare.
+
+### 13.4 Asking the store to prove itself
+
+Every arm this repository measures compares a pack against no pack on questions the store has never
+seen. That answers "does the pack change the score" and cannot answer "is the pack any good": a store
+of nonsense gets the same treatment as a store of facts. The own-case probe asks the other question,
+and it costs two calls per *corrected* case, on the learning half only, so it cannot see the questions
+it filters.
+
+```bash
+# the arm name is the whole switch: it probes, then answers with what survived
+SOTA_ARMS=full-verified pnpm eval:sota
+```
+
+Read the `rule_probe` block, which the run writes into its artefact and prints as gates
+`V13-probe-reconciles` (blocking: every rule lands in exactly one bucket) and `V14-probe-applied`
+(advisory: how many held-out packs the gate changed):
+
+```jsonc
+// poc-sota-bird-probe.json, 350 questions, 5 folds, 1,445 calls
+{ "source_questions": 156, "measured": 156, "supplied": 19, "redundant": 31,
+  "broke": 3, "useless": 103, "blank_fix_rate": 0.218,
+  "rules": 296, "kept": 38, "unsupported": 252, "broke_its_source": 6, "unprobed": 0 }
+```
+
+`blank_fix_rate` is the number that stops `supplied` being over-read: it is how often the retry alone
+repaired the case, so it is the ceiling a second attempt gives you for free. If `broke` is non-trivial,
+the rules are not merely unhelpful — they are destroying cases that needed no help, and that is the
+one verdict that should make you turn the pack off before measuring anything else.
+
+**What the gate is not.** A rule that survives keeps one demonstration and no counter-demonstration;
+it is not a rule that works. On BIRD the 38 survivors changed 342 of 350 packs and moved accuracy by
+`0.00pp`, so the honest reading of a passing gate is "this store is not demonstrably harmful", not
+"this store helps".
 
 ## 14. Performance and limits
 
