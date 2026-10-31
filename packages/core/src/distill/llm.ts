@@ -59,6 +59,22 @@ export type LlmInterpreterOptions = {
    */
   readonly reasonCodeOf?: (context: InterpretContext) => string | undefined;
   /**
+   * The domain the event happened in, when the host knows it and the model may not say it.
+   *
+   * The prompt tells the model never to guess a domain, and the payload it is shown carries one
+   * anyway — `{"question": …, "domain": …}` — so a model that follows the instruction omits
+   * `scope.domain` on every claim it returns. `V44-domain-accounted` measured the consequence four
+   * times: 184, 168, 156 and 168 items with no domain, every one of them *arrived* unscoped, and
+   * zero were ever widened. An item with no domain can never be pointed at a foreign question, so
+   * the zero was the ceiling on every transfer number the store could produce.
+   *
+   * The host wrote the domain into the payload. Supplying it here closes the loop without asking
+   * the model to guess anything, and — unlike `reasonCodeOf` — the host's value wins over the
+   * model's, because the only value the model can have is the one the host already stated. A
+   * different string from the model is a guess, and a guess is what the instruction forbids.
+   */
+  readonly domainOf?: (context: InterpretContext) => string | undefined;
+  /**
    * How many of the batch's prompts may be in flight at once when `prefetch` is used. Default 1,
    * which makes `prefetch` a no-op and keeps every existing caller's behaviour.
    *
@@ -552,6 +568,7 @@ function balancedFrom(text: string, start: number): string | undefined {
 export function createLlmInterpreter(options: LlmInterpreterOptions): Interpreter {
   const max = options.maxCandidates ?? 2;
   const remember = options.reasonCodeOf;
+  const scopeOf = options.domainOf;
   const promptOf = (context: InterpretContext): string =>
     buildDistillPrompt(context, options.taxonomy ?? [], options.payloadHint, options.form ?? 'lesson');
   const candidatesOf = (context: InterpretContext, raw: string): readonly Candidate[] => {
@@ -566,15 +583,35 @@ export function createLlmInterpreter(options: LlmInterpreterOptions): Interprete
       ...(options.audit === undefined ? {} : { audit: options.audit }),
     });
     const code = remember?.(context);
-    if (code === undefined) return parsed.slice(0, max);
-    // The model's own code wins when it gave one: it saw the event, and the host's classifier is a
-    // fallback for the field, not an override of an observation.
+    const domain = scopeOf?.(context);
+    if (code === undefined && domain === undefined) return parsed.slice(0, max);
     return parsed
-      .map((candidate) =>
-        candidate.scope.reasonCode === undefined
-          ? { ...candidate, scope: { ...candidate.scope, reasonCode: code } }
-          : candidate,
-      )
+      .map((candidate) => {
+        const scope: KnowledgeScope = {
+          ...candidate.scope,
+          // The model's own code wins when it gave one: it saw the event, and the host's classifier
+          // is a fallback for the field, not an override of an observation.
+          ...(code !== undefined && candidate.scope.reasonCode === undefined
+            ? { reasonCode: code }
+            : {}),
+          // The host's domain wins in the other direction: it is the only party that can observe
+          // it, and the prompt forbids the model from guessing one.
+          ...(domain === undefined ? {} : { domain }),
+        };
+        // The identity of a claim is its scope as much as its wording, and the parser computed it
+        // before either field was filled in. A stale key here would merge two databases' copies of
+        // one rule into a single item on the first database's scope.
+        return {
+          ...candidate,
+          scope,
+          dedupeKey: dedupeKeyOf({
+            namespace: candidate.namespace,
+            kind: candidate.kind,
+            scope,
+            statement: candidate.statement,
+          }),
+        };
+      })
       .slice(0, max);
   };
   const interpreter: Interpreter = async (context) =>

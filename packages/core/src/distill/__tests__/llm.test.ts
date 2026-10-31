@@ -327,6 +327,79 @@ describe('the host can supply the failure code', () => {
   });
 });
 
+describe('the host can supply the domain the model may not guess', () => {
+  /** The reply every case below is parsed from: one claim, scoped to the task and nothing else. */
+  const reply = JSON.stringify({
+    candidates: [{ kind: 'procedure', statement: 'A claim.', scope: { task: 'chart.recommend' } }],
+  });
+
+  it('fills domain when the model left it out', async () => {
+    const interpreter = createLlmInterpreter({
+      llm: { complete: async () => reply },
+      domainOf: () => 'california_schools',
+    });
+    const [candidateItem] = await interpreter({ event, run });
+    expect(candidateItem?.scope.domain).toBe('california_schools');
+  });
+
+  it('overrides a domain the model wrote, because the host is the one that observed it', async () => {
+    const interpreter = createLlmInterpreter({
+      llm: {
+        complete: async () =>
+          JSON.stringify({
+            candidates: [
+              { kind: 'procedure', statement: 'A claim.', scope: { task: 'chart.recommend', domain: 'guessed' } },
+            ],
+          }),
+      },
+      domainOf: () => 'california_schools',
+    });
+    const [candidateItem] = await interpreter({ event, run });
+    // The other direction from `reasonCodeOf`: the prompt forbids guessing a domain, so any value
+    // the model wrote is either an echo of the payload or a guess, and the host wrote the payload.
+    expect(candidateItem?.scope.domain).toBe('california_schools');
+  });
+
+  it('leaves the scope untouched when the host has no domain', async () => {
+    const interpreter = createLlmInterpreter({
+      llm: { complete: async () => reply },
+      domainOf: () => undefined,
+    });
+    const [candidateItem] = await interpreter({ event, run });
+    expect(candidateItem?.scope).toEqual({ task: 'chart.recommend' });
+  });
+
+  it('re-keys the claim, so two databases do not merge into one item', async () => {
+    // Identity includes the scope: a key computed before the domain was filled in would make the
+    // same rule learned on two databases a single item scoped to whichever arrived first.
+    const keys: string[] = [];
+    for (const domain of ['california_schools', 'financial']) {
+      const interpreter = createLlmInterpreter({
+        llm: { complete: async () => reply },
+        domainOf: () => domain,
+      });
+      const [candidateItem] = await interpreter({ event, run });
+      keys.push(candidateItem?.dedupeKey ?? '');
+    }
+    expect(keys[0]).not.toBe(keys[1]);
+    expect(keys[0]).not.toBe('');
+  });
+
+  it('supplies both fields when the host knows both', async () => {
+    const interpreter = createLlmInterpreter({
+      llm: { complete: async () => reply },
+      reasonCodeOf: () => 'no-rows',
+      domainOf: () => 'california_schools',
+    });
+    const [candidateItem] = await interpreter({ event, run });
+    expect(candidateItem?.scope).toEqual({
+      task: 'chart.recommend',
+      reasonCode: 'no-rows',
+      domain: 'california_schools',
+    });
+  });
+});
+
 describe('paying the whole batch at once', () => {
   /** A port that answers with an empty candidate list, counting in-flight requests. */
   function counting(options: { readonly delay?: number } = {}) {

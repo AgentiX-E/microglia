@@ -348,6 +348,18 @@ const SEED = Math.trunc(nonNegative(process.env['SOTA_SEED'], 7));
  */
 const SAMPLE_TEMPERATURE = nonNegative(process.env['SOTA_SAMPLE_TEMPERATURE'], 0.7);
 const GENERALIZE = (process.env['SOTA_GENERALIZE'] ?? 'true') !== 'false';
+/**
+ * Whether the host fills in the scope field the model is forbidden to guess.
+ *
+ * Off by default, and it has to be: an item with a domain is a different item — the claim's
+ * identity includes its scope, so the same rule learned on eleven databases becomes eleven claims
+ * instead of one, and the store every published number was measured on changes shape. What the
+ * switch buys is the only path to widening: a claim may only generalise away a domain it has, and
+ * `V44-domain-accounted` has reported `0 widened` beside `184/184`, `168/168`, `156/156` and
+ * `168/168` unscoped items across four dispatches. Off is the shipped configuration until an arm
+ * measures the difference.
+ */
+const DOMAIN_SCOPE = (process.env['SOTA_DOMAIN_SCOPE'] ?? 'false') === 'true';
 const RESAMPLES = Math.max(1000, Math.trunc(nonNegative(process.env['SOTA_RESAMPLES'], 10_000)));
 const MODEL = process.env['SOTA_MODEL'] ?? 'deepseek-chat';
 const MAX_CALLS = nonNegative(process.env['POC_MAX_CALLS'], 8000);
@@ -2953,6 +2965,21 @@ async function buildFoldMemory(
             const note = signal.note ?? '';
             return note === '' ? undefined : failureKind(note);
           },
+          // The other scope field the host knows and the model does not: the question was asked of
+          // one database, so the claim is about that database until generalisation earns the right
+          // to say otherwise. The run's input already states it (`learn` writes `domain: db_id`),
+          // and the prompt tells the model never to guess one — so without this the field is
+          // omitted on every claim and no claim can ever widen.
+          domainOf: DOMAIN_SCOPE
+            ? (context) => {
+                const input = context.run?.input;
+                if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+                  return undefined;
+                }
+                const domain = (input as Record<string, unknown>)['domain'];
+                return typeof domain === 'string' && domain !== '' ? domain : undefined;
+              }
+            : undefined,
         }),
         failures,
         () => lastReply,
