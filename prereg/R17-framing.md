@@ -190,9 +190,10 @@ than a size. Read against `none-advisory`, the two arms that add a paragraph are
 no memory, so the register — the one variable MemTrapBench's mechanism names — moved the cell by
 0.57pp. Whatever the harm is, it is not the register the block is written in.
 
-**`full` is negative for the seventh time, and the third by significance.** −4.00pp at p = 0.0201;
-the mean across seven dispatches is −3.2pp. That is now less a finding than a property of the lane,
-and it is the number the product statement has to survive.
+**`full` is negative again, and this is the third time it is significant on its own.** The five draws
+that measured this cell at the shipped budget read −3.71, −3.14, −2.00, −2.57 and −4.00pp: one sign,
+five draws, mean −3.08pp (this run p = 0.0201). That is less a finding than a property of the lane, and
+it is the number the product statement has to survive.
 
 **The instrument passed the check it was built for.** `V43-framing-delivered` reports
 `none: 0/350 expected none, full: 0/350 expected none, full-advisory: 350/350, none-advisory:

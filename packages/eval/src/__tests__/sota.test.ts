@@ -219,6 +219,7 @@ describe('parseArms', () => {
     const arms = parseArms(undefined);
     expect([...arms].sort()).toEqual([
       'anchor-blank',
+      'anchor-hold',
       'chars-150',
       'chars-1800',
       'chars-2400',
@@ -232,6 +233,7 @@ describe('parseArms', () => {
       'full-advisory',
       'full-anchored',
       'full-anchored-conditional',
+      'full-anchored-hold',
       'full-asked',
       'full-corroborated',
       'full-grounded',
@@ -376,6 +378,8 @@ describe('parseArms', () => {
       'full-late',
       'full-anchored',
       'full-anchored-conditional',
+      'full-anchored-hold',
+      'anchor-hold',
       'anchor-blank',
       'full-validated',
       'critique',
@@ -532,6 +536,14 @@ describe('ARM_STANDING', () => {
   it('leaves the two reference arms silent, which is what makes them the reference', () => {
     expect(ARM_STANDING.none).toBeUndefined();
     expect(ARM_STANDING.full).toBeUndefined();
+  });
+
+  it('leaves the anchored arms silent, because in that family the instruction is the framing', () => {
+    // `full-anchored-hold` and `full-anchored` differ in the sentence they close with, and that
+    // sentence is the variable; a standing on top would render a second sentence about the same
+    // block and the pair would differ in two things.
+    expect(ARM_STANDING['full-anchored-hold']).toBeUndefined();
+    expect(ARM_STANDING['full-anchored']).toBeUndefined();
   });
 });
 
@@ -1627,6 +1639,43 @@ describe('anchorPromptFor modes', () => {
       expect(prompt).not.toContain('first attempt unchanged');
       expect(prompt).not.toContain('Check that condition');
     }
+  });
+
+  it('renders the hold instruction with no block, which no other mode can', () => {
+    // The arm `full-anchored-hold` is the block's own instruction with the reference to the
+    // block removed, so that it can be shown a pack and still be compared with `full-anchored`
+    // as one sentence. Reading it with an empty pack is the same prompt `anchor-blank` plus
+    // that sentence would carry, which is how the permission is measured on its own.
+    const prompt = anchorPromptFor({ ...base, pack: '' }, 'hold');
+    expect(prompt).toContain('Change the first attempt only if it is wrong');
+    expect(prompt).toContain('return it unchanged');
+    expect(prompt).not.toContain('Conventions learned');
+  });
+
+  it('keeps the block and changes only the instruction against the conservative arm', () => {
+    const conservative = anchorPromptFor(base).split('\n\n');
+    const hold = anchorPromptFor(base, 'hold').split('\n\n');
+    expect(hold).toHaveLength(conservative.length);
+    expect(hold.slice(0, -1)).toEqual(conservative.slice(0, -1));
+    expect(hold.at(-1)).not.toBe(conservative.at(-1));
+  });
+
+  it('makes a change conditional on being wrong rather than on being justified', () => {
+    // The difference the arm exists for: conservative asks whether an item earns the change,
+    // hold asks whether the draft needs one. Both end at "return it unchanged".
+    expect(anchorPromptFor(base, 'hold')).toContain('only in the way that makes it right');
+    expect(anchorPromptFor(base, 'hold')).not.toContain('apply that item');
+  });
+
+  it('makes the four cells a square: the two hold prompts differ in the block alone', () => {
+    // `anchor-hold` and `full-anchored-hold` are the permissive row; `anchor-blank` and
+    // `full-anchored` are the conservative row. For the 2×2 to be readable as two main effects,
+    // moving along a row must change the block and nothing else — so the block is removable
+    // from one prompt and the rest must be the other prompt, block for block.
+    const withBlock = anchorPromptFor(base, 'hold').split('\n\n');
+    const withoutBlock = anchorPromptFor({ ...base, pack: '' }, 'hold').split('\n\n');
+    expect(withBlock).toHaveLength(withoutBlock.length + 1);
+    expect(withBlock.filter((block) => !block.startsWith('Conventions learned'))).toEqual(withoutBlock);
   });
 });
 

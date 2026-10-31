@@ -287,6 +287,13 @@ The study is a package, not a script:
   number until something counts. The standing is a table over the arm union in `sota.ts` rather than a
   parameter at the call site, so an arm's rendering can be tested without a database — the dispatch
   costs three thousand calls and the rendering costs nothing.
+- `sota.ts`'s `ANCHOR_INSTRUCTION` — the three sentences an anchored arm can close with, as a table over
+  the `AnchorMode` union rather than a branch at the call site. Two of them refer to items in the block
+  and are therefore suppressed when the pack is empty; `hold` is addressed to the draft and renders
+  anyway, which is what makes "the permission with nothing to permit" a cell rather than an absence. The
+  suppression rule is the one thing here with a real failure mode behind it: an instruction that says
+  "apply that item" over a prompt containing no items is not a weaker version of the arm, it is a
+  different question, and the control would silently stop being a control.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

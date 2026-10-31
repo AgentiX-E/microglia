@@ -1399,6 +1399,39 @@ SOTA_ARMS=none-advisory,full-advisory,full-prohibitive SOTA_LEARN_SAMPLE=128 \
   `350/350` for each of the three that declare a framing: a cell that measured its own control under a
   second name would show as a delivery failure rather than as a flat delta.
 
+### 13.10 Is the second pass worth anything on its own?
+
+§13.9 measured what a sentence does to a block. This one measures what the two-call delivery
+(`full-anchored`: draft with no pack, then revise with the pack) is worth against a second call that
+injects nothing (`anchor-blank`). It had never been run, so the anchored cell's positive reading against
+`full` could have been the second pass rather than the note.
+
+```bash
+# anchor control: the mechanism, the blind revision, and both reference arms
+SOTA_ARMS=anchor-blank,full-anchored SOTA_LEARN_SAMPLE=128 \
+  SOTA_PREREG=R18-anchored-control pnpm eval:sota
+```
+
+```jsonc
+// poc-sota-bird-anchor.json, 350 questions, 5 folds, 1,762 calls, `none` at 54.00%
+[
+  { "arm": "anchor-blank",   "mean_pack_ids": 0.00, "accuracy": 0.5000, "delta_pp": -4.00, "p_value": 0.0336 },
+  { "arm": "full-anchored",  "mean_pack_ids": 1.85, "accuracy": 0.5400, "delta_pp":  0.00, "p_value": 1.0000 },
+  { "arm": "full",           "mean_pack_ids": 1.85, "accuracy": 0.5343, "delta_pp": -0.57, "p_value": 0.8318 }
+]
+```
+
+- **The blind revision is not free.** Being shown your own draft and asked to revise it, with nothing
+  added, costs 4.00pp (12 gained, 26 lost, p = 0.0336) — one sign in all five folds.
+- **The note buys back exactly that.** `full-anchored` − `anchor-blank` is +4.00pp (27 gained, 13 lost,
+  p = 0.0385) and `full-anchored` sits at *exactly* no memory. The anchored cell is a repair, not a gain.
+- **The record's positive sign is smaller than the pooled figure.** Against `full` in the same run it is
+  +0.57pp, not the +2.86pp pooled over two earlier dispatches; in those, `full` was costing −4.00pp. The
+  gap is mostly the harm injection does, not a benefit anchoring confers.
+- **`V44-domain-accounted` answered a question it was built to ask.** `184 item(s) with no domain, 184
+  arrived unscoped, 0 widened`: nothing in this store became domain-free by generalisation, so the fix
+  belongs in the interpreter's prompt and not in the widening policy.
+
 
 ## 14. Performance and limits
 

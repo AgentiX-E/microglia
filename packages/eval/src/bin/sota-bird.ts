@@ -504,6 +504,8 @@ const ANCHORED: readonly { readonly arm: ArmName; readonly mode: AnchorMode; rea
     [
       { arm: 'full-anchored', mode: 'conservative', injects: true },
       { arm: 'full-anchored-conditional', mode: 'conditional', injects: true },
+      { arm: 'full-anchored-hold', mode: 'hold', injects: true },
+      { arm: 'anchor-hold', mode: 'hold', injects: false },
       { arm: 'anchor-blank', mode: 'conservative', injects: false },
     ] as const
   ).filter((entry) => ARMS.has(entry.arm));

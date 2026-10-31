@@ -103,3 +103,79 @@ exists and the reader has been told it may decline* — not "the store helps", a
 neutral". It would not license always-on injection, which six dispatches have measured between −2.0 and
 −4.0pp, and it would not license calling the note the mechanism until a second dispatch reproduces the
 ordering.
+
+## Outcome
+
+Dispatch `41188122217` (success, 1,762 calls, 6 retries, 0 timeouts, 0 call failures, eleven gates pass,
+`config.prereg` = this file). Artefact `eval/results/poc-sota-bird-anchor.json`. 350 questions, 5 folds,
+`none` at 54.00%, minimum detectable effect 3.76pp.
+
+| Arm | Items | Characters | Accuracy | Δ vs `none` | 95% CI | gained / lost | p |
+|---|---|---|---|---|---|---|---|
+| `anchor-blank` | 0.00 | 0 | 50.00% | **−4.00pp** | [−7.43, −0.57] | 12 / 26 | 0.0336 |
+| `full-anchored` | 1.85 | 1,088 | 54.00% | **+0.00pp** | [−1.71, +1.71] | 4 / 4 | 1.0000 |
+| `full` | 1.85 | 1,088 | 53.43% | −0.57pp | [−3.14, +2.00] | 10 / 12 | 0.8318 |
+
+Paired exact McNemar on the questions both arms answered — the comparison the iteration exists for:
+
+| Pair | Δ | gained / lost | discordant | p |
+|---|---|---|---|---|
+| `anchor-blank` − `none` | **−4.00pp** | 12 / 26 | 38 | 0.0336 |
+| `full-anchored` − `none` | +0.00pp | 4 / 4 | 8 | 1.0000 |
+| `full-anchored` − `anchor-blank` | **+4.00pp** | 27 / 13 | 40 | 0.0385 |
+
+**The first prediction is refuted and the refutation is the finding.** `anchor-blank` was predicted
+above `none` by 1 to 3pp because a second pass is worth something. It came back **4.00pp below** it,
+one sign in all five folds (−7.14, −4.29, −2.86, −4.29, −1.43pp), p = 0.0336. Being shown your own draft
+and asked to revise it, with nothing added, costs about as much as the note does — the same
+−4.00pp that `full` itself cost in R17. The second pass is not a free look at the question.
+
+**The second prediction holds, and it is worth exactly the size of the first one.** `full-anchored`
+minus `anchor-blank` is +4.00pp (27 gained, 13 lost, 40 discordant, p = 0.0385), while `full-anchored`
+sits at exactly no memory (54.00% both). So the cell that has been credited with the record's only
+positive sign is not above no memory at all in this run: the note, in the one position where it does no
+harm, puts back precisely what the blind revision took away.
+
+**What that means mechanistically, stated as narrowly as the design allows.** The two things
+`anchor-blank` lacks relative to `full-anchored` are the block and the block's closing instruction —
+"if none applies, return the first attempt unchanged". R18 cannot separate them, and it does not have
+to in order to say what changed here: a request to revise with nothing to revise *toward* and nothing
+saying the draft may stand is harmful; add a block whose instruction carries an explicit licence to
+stop, and the harm disappears completely, leaving no gain. The commentary version of this — "the note
+at anchor is worth the permission it carries to stop" — is the reading that survives the numbers, and
+it is also the one that makes a testable claim, which is why the next file tests it as a 2×2 rather
+than asserting it.
+
+**The record's own positive number is smaller than the pooled figure said.** `full-anchored` against
+`full` in the same run is +0.57pp, not the pooled +2.86pp over 700 questions from two earlier
+dispatches. Those dispatches compared the anchored cell against a `full` that was itself costing
+−4.00pp in one of them; in this run `full` costs −0.57pp and the gap between the two shrinks with it.
+Both statements are true and only one of them is about the note: **anchoring is reproducibly *not
+harmful* while injection is, and the difference between the two is mostly the harm injection does, not
+a benefit anchoring confers.** Every document that credits the anchored arm with a gain is narrowed in
+this commit.
+
+**The one prediction that moved without being about the mechanism.** `full` was expected around −3pp
+for the seventh consecutive dispatch. It is −0.57pp (CI [−3.14, +2.00], p = 0.8318) — the sign held and
+the size did not, and this is the first dispatch in six where that cell is not distinguishable from
+zero. Nothing in this iteration was designed to move it and no change was made to its prompt, so the
+honest reading is that the five draws before this one (mean −3.08pp) have a spread wide enough to
+produce an −0.57 without injection having stopped being costly; the six-draw mean is −2.67pp. It is
+recorded because a record that only reports the draws that agree with its own average is not a record.
+
+**The instrument did what it was built for, in the direction nobody asked for.** `V44-domain-accounted`
+reports `184 item(s) with no domain, 184 arrived unscoped, 0 widened`, and the inequality is an
+equality only because one of the two paths is doing all of the work: **not one domain-free item in this
+store was produced by generalisation widening a scoped claim.** The 14.6% of the store with no domain
+is the interpreter declining to scope at the door, which is a prompt to fix and not a policy to
+tighten. `V32-fold-learning-intact` reports 0/1400 unanswered questions, 648 corrections and 0
+distillation failures; `V12-shape-present` reports 647/647 injected rules carrying a condition.
+
+## What this leaves
+
+The 2×2 that R18 opens is registered as R20: four cells over (block, no block) × (permissive
+instruction, conservative instruction), of which R18 measured the conservative row. The question it
+answers is whether the permission is the active ingredient or the block is, and this iteration cannot
+distinguish them — which is the difference between a product that says "show the note and tell the
+model it may decline" and one that says "show the note".
+

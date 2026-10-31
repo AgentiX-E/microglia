@@ -342,6 +342,33 @@ export type SqlArm =
    */
   | 'full-anchored-conditional'
   /**
+   * The anchored cell with the permission to leave the draft alone, and nothing else added.
+   *
+   * R18 put the anchored reading on the two things it always conflated: `full-anchored` writes
+   * twice and shows the note, `anchor-blank` writes twice and shows nothing. The blank control
+   * came back 4.00pp below no memory (p = 0.0336) and the anchored cell came back at exactly no
+   * memory, so the note in that cell is worth +4.00pp against a control that also revises — but
+   * the comparison still cannot say which half of the note did it. The block can only be a
+   * candidate because of the instruction that tells the model it may ignore it; the instruction
+   * is also the only part that survives when there is no block at all. This arm shows the same
+   * block as `full-anchored` and swaps the instruction for the permissive one, so the two arms
+   * differ in one sentence and in nothing else.
+   */
+  | 'full-anchored-hold'
+  /**
+   * The same permissive instruction over a second pass that injects nothing.
+   *
+   * The fourth cell of the 2×2 R18 left open. R18 has `anchor-blank` (revise, no block, the
+   * instruction that refers to a block and is therefore absent) and `full-anchored` (revise, block,
+   * the same instruction). It has no cell that varies the instruction on its own, so the +4.00pp
+   * between those two is attributed to "the note" without anything separating the block from the
+   * permission that the block's instruction happens to carry. This arm and `full-anchored-hold`
+   * close the square: with them the four cells are (block, permissive) × (block, conservative),
+   * (no block, permissive) × (no block, conservative), and the two main effects can be read off
+   * separately for the first time.
+   */
+  | 'anchor-hold'
+  /**
    * The same pack after utility-based deletion.
    *
    * Xiong et al. (arXiv 2505.16067) report that a retrieved record is followed closely
@@ -801,6 +828,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-late': true,
   'full-anchored': true,
   'full-anchored-conditional': true,
+  'full-anchored-hold': true,
+  'anchor-hold': true,
   'anchor-blank': true,
   'full-validated': true,
   critique: true,
@@ -1937,7 +1966,7 @@ export type AnchorInput = {
  * rather than about the question that taught it, so it is the only basis on which a
  * revision can be asked to act against its own draft without asking it to imitate.
  */
-export type AnchorMode = 'conservative' | 'conditional';
+export type AnchorMode = 'conservative' | 'conditional' | 'hold';
 
 const ANCHOR_INSTRUCTION: Record<AnchorMode, string> = {
   conservative:
@@ -1948,6 +1977,17 @@ const ANCHOR_INSTRUCTION: Record<AnchorMode, string> = {
     'Each item may carry a "when" condition. Check that condition against the question above. ' +
     'If it holds, apply that item even where the first attempt disagrees with it, and change nothing else. ' +
     'If no item carries a condition that holds, return the first attempt unchanged.',
+  /**
+   * The licence to change nothing, with no block to justify it.
+   *
+   * The two modes above refer to items, so neither can render when there is no block; this one refers
+   * to the draft. R18 measured the blind revision — "revise this draft", nothing else — at −4.00pp
+   * against no memory, and the anchored arm at exactly no memory, so the two things that cell added
+   * were the note and the permission to leave the draft alone. This mode is the permission alone.
+   */
+  hold:
+    'Change the first attempt only if it is wrong, and only in the way that makes it right. ' +
+    'If it already answers the question, return it unchanged.',
 };
 
 export function anchorPromptFor(input: AnchorInput, mode: AnchorMode = 'conservative'): string {
@@ -1961,7 +2001,9 @@ export function anchorPromptFor(input: AnchorInput, mode: AnchorMode = 'conserva
     input.pack === '' ? '' : `Conventions learned from earlier corrections:\n${input.pack}`,
     // The instruction refers to a block that may not be there. With no pack the arm would
     // be asking the model to weigh nothing, which is a different question.
-    input.pack === '' ? '' : ANCHOR_INSTRUCTION[mode],
+    // `hold` is the one mode whose instruction does not refer to a block: it is addressed to the
+    // draft, so it renders with an empty pack, which is the arm.
+    input.pack === '' && mode !== 'hold' ? '' : ANCHOR_INSTRUCTION[mode],
   ]
     .filter((line) => line !== '')
     .join('\n\n');
