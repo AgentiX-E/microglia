@@ -879,6 +879,39 @@ describe('buildValidityGates', () => {
     expect(edited.pass).toBe(false);
   });
 
+  it('V17 reconciles at the precision it publishes, not at machine precision', () => {
+    // The first run to route this gate through the artefact's own projection failed on
+    // `(29 - 27) / 483 = 0.4141...`, which the file publishes as `0.41`. The gate had demanded
+    // equality to 1e-9 of a number the artefact rounds, so it could only pass runs whose ratio
+    // terminates at two decimals — a property of the arithmetic, not of the run. Both facts below
+    // are asserted because the fix must not turn the gate off: the rounding passes, a figure off by
+    // more than a rounding step is still refused.
+    const published = gate(
+      {
+        ...sound,
+        transfer: {
+          ...transferInput({ trials: 483, informative: 430, repaired: 29, broke: 27, blankRight: 53, unmeasured: 0 }),
+          netPp: 0.41,
+        },
+      },
+      'V17-transfer-net-reported',
+    );
+    expect(published.pass).toBe(true);
+    expect(published.blocking).toBe(true);
+
+    const wrong = gate(
+      {
+        ...sound,
+        transfer: {
+          ...transferInput({ trials: 483, informative: 430, repaired: 29, broke: 27, blankRight: 53, unmeasured: 0 }),
+          netPp: 0.45,
+        },
+      },
+      'V17-transfer-net-reported',
+    );
+    expect(wrong.pass).toBe(false);
+  });
+
   it('V39 through V42 hold the second substrate to the same four checks under their own ids', () => {
     // The repair store's transfer is measured by the same function as the rule store's, because the
     // only reason to measure the second one is to set it beside the first. What must not be shared

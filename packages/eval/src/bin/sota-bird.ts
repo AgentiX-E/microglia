@@ -3332,21 +3332,26 @@ async function runFold(
       call(position, 'none-replica', '', 0);
     }
     call(position, 'full', pack.rendered, pack.ids.length);
-    if (ARMS.has('full-verified') && probe !== undefined) {
-      // The same retrieval, the same order, the same budget, and only the rules that reproduced
-      // their own correction. A question whose every rule failed the gate therefore sees an empty
-      // pack, which is `none` for that question - counted in `verifiedSizes` rather than hidden.
+    if (probe !== undefined) {
+      // Measured whenever the probe ran, injected only when the arm asks for it. The gate's question
+      // is whether the admission rule changed a held-out pack, and a run that bought the probe for
+      // the transfer measurement used to answer "0 of 350" — which reads as "the gate admitted
+      // nothing", the one reading the pre-registration says would invalidate the run.
       const kept = new Set(probe.admission.kept);
       const surviving = pack.items.filter((item) => kept.has(item.id));
       const gatedPack = makePack(surviving, { budget: pack.budget });
       verifiedSizes.push({ all: pack.items.length, kept: surviving.length });
       if (gatedPack.ids.join('\u0000') !== pack.ids.join('\u0000')) verifiedDiffers += 1;
-      call(position, 'full-verified', gatedPack.rendered, gatedPack.ids.length);
+      if (ARMS.has('full-verified')) {
+        // The same retrieval, the same order, the same budget, and only the rules that reproduced
+        // their own correction. A question whose every rule failed the gate therefore sees an empty
+        // pack, which is `none` for that question - counted in `verifiedSizes` rather than hidden.
+        call(position, 'full-verified', gatedPack.rendered, gatedPack.ids.length);
+      }
     }
-    if (ARMS.has('full-repair-verified') && probeRepair !== undefined) {
-      // The repair store under its own gate: same retrieval, same order, same budget, and only the
-      // accounts that reproduced their own correction. A question whose every account failed the
-      // gate sees an empty pack, which is `none` for that question and counted rather than hidden.
+    if (probeRepair !== undefined) {
+      // Measured whenever the probe ran, for the reason the rule side gives above: the second
+      // substrate's gate is a fact about the store whether or not an arm reads it.
       const keptRepair = new Set(probeRepair.admission.kept);
       const repairPack = repairPacks.get(position);
       const surviving = (repairPack?.items ?? []).filter((item) => keptRepair.has(item.id));
@@ -3355,7 +3360,12 @@ async function runFold(
       if (gatedRepair.ids.join('\u0000') !== (repairPack?.ids.join('\u0000') ?? '')) {
         repairVerifiedDiffers += 1;
       }
-      call(position, 'full-repair-verified', gatedRepair.rendered, gatedRepair.ids.length);
+      if (ARMS.has('full-repair-verified')) {
+        // The repair store under its own gate: same retrieval, same order, same budget, and only the
+        // accounts that reproduced their own correction. A question whose every account failed the
+        // gate sees an empty pack, which is `none` for that question and counted rather than hidden.
+        call(position, 'full-repair-verified', gatedRepair.rendered, gatedRepair.ids.length);
+      }
     }
     if (ARMS.has('full-repair-transferred') && probeRepair?.transfer != null) {
       // The repair store's own intersection: an account that reproduced its own case and repaired a

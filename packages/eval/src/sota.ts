@@ -1150,6 +1150,17 @@ export class GenerationCache {
 }
 
 /**
+ * The last digit the artefact publishes for a transfer rate's net effect, in points.
+ *
+ * `net_pp` is rounded to two decimals when it is written to the file. The gate that reconciles the
+ * published figure against its own counts has to allow for that rounding, or it fails every run whose
+ * ratio does not terminate at two decimals — which is the common case, and which is exactly how this
+ * constant came to exist: the first run to route the gate through the published projection failed on
+ * `(29 - 27) / 483`.
+ */
+const NET_PUBLISHED_STEP = 0.01;
+
+/**
  * The four checks every transfer measurement is held to.
  *
  * Shared between the two substrates rather than written twice, because the second one exists only to
@@ -1204,6 +1215,12 @@ function transferGates(
     // where the rule could do damage. A summary that reports it without the break side is a
     // summary that can only look like progress, so the net marginal effect is a gate rather than a
     // column somebody may or may not read.
+    //
+    // The tolerance is half of the last published digit rather than machine epsilon. The artefact
+    // publishes this ratio at two decimals for a reader; a gate that then demanded 1e-9 of it failed
+    // every run whose ratio does not terminate at two decimals (`(29 - 27) / 483 = 0.4141...` is
+    // published as `0.41`), which is most of them. The check keeps its teeth: a fabricated value is
+    // wrong by more than a rounding step, and one that agrees with its own counts is wrong by none.
     {
       id: ids.net,
       criterion:
@@ -1211,7 +1228,9 @@ function transferGates(
       actual:
         `${netPp.toFixed(2)}pp net over ${measured} measured trial(s): ` +
         `${repaired} repaired, ${broke} broken, verdict \`${verdict}\``,
-      pass: measured > 0 && Math.abs(netPp - ((repaired - broke) / measured) * 100) < 1e-9,
+      pass:
+        measured > 0 &&
+        Math.abs(netPp - ((repaired - broke) / measured) * 100) <= NET_PUBLISHED_STEP / 2,
       blocking: true,
     },
   ];
