@@ -1096,8 +1096,20 @@ instead of being killed by the runner with nothing.
 | Knob | Default | What it decides |
 |---|---|---|
 | `SOTA_DEADLINE_MIN` | 130 | wall clock the lane allows itself; `0` disables it |
+| `SOTA_SQL_DEADLINE_MS` | 20000 | wall clock one executed statement may take before its process is killed |
+| `SOTA_SQL_ROW_CAP` | 10000 | rows a statement may return before the result is called truncated |
 | `SOTA_DISTILL_CONCURRENCY` | 8 | distillation replies in flight at once |
 | `POC_MAX_CALLS` | 8000 | HTTP attempts the run may spend |
+
+**Every statement runs in a process that can be killed.** The model writes the SQL, and the driver is
+synchronous: a statement that is slow to answer — a cross join is the easy way to write one — blocks the
+whole lane inside a native call, where no timer and no deadline can reach it. That is not hypothetical:
+the first dev dispatch of R24 spent its last 118 minutes there and published nothing. Statements therefore
+run in child processes with a deadline and a row cap, and a killed statement is reported as a *deadline*
+rather than as a wrong answer, because a query that cannot answer in twenty seconds says nothing about the
+model's knowledge. The artefact carries `statements: { statements, deadlines, truncations, deadline_ms,
+row_cap }`, and `V48-statements-answered` refuses a run in which more than 1% of statements hit the
+deadline — a score decided by the instrument is not a score about the model.
 
 **Distillation is paid concurrently and applied in order.** The prompts depend on their own events, so
 they can be asked in parallel; a claim's effect on the store depends on what is already in it, so the
