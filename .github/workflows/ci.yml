@@ -75,6 +75,13 @@ jobs:
       - name: Delivery lane (POC-19 signed, ordered, at-least-once)
         run: pnpm eval:delivery
 
+      # The gate that re-derives instead of quoting: every pre-registration's declared gates must
+      # equal the gates its artefact emitted, and every published cell is recomputed from the
+      # committed run rather than trusted. It is what found a dev artefact named after the split
+      # alone being overwritten by a second design on that split, which no schema check could see.
+      - name: Protocol (pre-registrations, artefacts, published cells)
+        run: pnpm eval:protocol
+
       - name: L4 reader (scores a full grid, refuses a short one)
         run: |
           set -euo pipefail
