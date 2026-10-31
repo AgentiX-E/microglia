@@ -294,6 +294,21 @@ The study is a package, not a script:
   suppression rule is the one thing here with a real failure mode behind it: an instruction that says
   "apply that item" over a prompt containing no items is not a weaker version of the arm, it is a
   different question, and the control would silently stop being a control.
+- `sota.ts`'s `clearanceFromDecisive` / `doseMatchedDrop` / `V45-clearance-dose-matched` — the pair that
+  makes "fewer and better" separable from "fewer". The clearance removes rules whose counterfactual
+  record shows more harms than helps and keeps every rule it has no record of; the control removes the
+  same count from the same pack over a seeded Fisher–Yates stream. The gate fails a run when any
+  question's two arms carried a different number of items *after the character budget* — `makePack`
+  admits whole items, so equal survivor counts can still render unequal packs — and again when no
+  question's pack changed at all. The rule lives in `validation.ts` beside its sibling rather than in the
+  lane, and the two are tested against each other on the only input where they disagree.
+- `sota.ts`'s `renderRawPack` / `rawEventVerbatim` / `V46-raw-is-verbatim` — the raw substrate. One
+  correction renders as three labelled lines whose payloads are the event's own strings, whole events
+  only (the budget skips rather than truncates, because half an event is a question with no correction),
+  and the gate fails the run if a single payload line is not byte-identical to the event it came from, or
+  if the arm rendered no payload at all. The verbatim check is a function over the rendered text rather
+  than a promise in a comment: a formatter that tidied a query would make the arm an interpreter under a
+  new name, and the arm's entire claim is that nothing was interpreted.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

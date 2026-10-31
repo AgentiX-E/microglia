@@ -1466,6 +1466,38 @@ SOTA_ARMS=anchor-blank,anchor-hold,full-anchored,full-anchored-hold SOTA_LEARN_S
   delivery order already shipped; the note's content is worth at most about a point and is not
   distinguishable from zero at this n.
 
+### 13.12 Can a filter make the note safe, and what does a raw correction do that a lesson cannot?
+
+Two questions, one dispatch each. The first asks whether the store can be *cleared* of the rules that
+measurably hurt; the second asks whether the prose the distiller writes is itself the thing that costs.
+
+```bash
+# a clearance against a control that removes the same number of rules at random
+SOTA_ARMS=full-cleared,full-cleared-sampled SOTA_PREREG=R21-clearance pnpm eval:sota
+# the same corrections, injected as the raw events rather than as distilled lessons
+SOTA_ARMS=full-raw,full-raw-shuffled SOTA_PREREG=R22-raw pnpm eval:sota
+```
+
+```jsonc
+// poc-sota-bird-clearance.json, 350 questions, 5 folds, 4,378 calls, `none` at 54.00%
+[
+  { "arm": "full",                  "mean_pack_ids": 1.83, "accuracy": 0.5200, "delta_pp": -2.00, "p_value": 0.2810 },
+  { "arm": "full-cleared",          "mean_pack_ids": 1.51, "accuracy": 0.5171, "delta_pp": -2.29, "p_value": 0.2005 },
+  { "arm": "full-cleared-sampled",  "mean_pack_ids": 1.51, "accuracy": 0.5171, "delta_pp": -2.29, "p_value": 0.1849 }
+]
+```
+
+- **Clearing the measured-harmful rules changed nothing, and the artefact says why.** The pair is
+  `+0.00pp` (6 gained, 6 lost, p = 1.0000) and `V45-clearance-dose-matched` reports **311 of 350
+  questions identical**: on 89% of questions a single-item pack lost its only item in *both* arms, so the
+  treatment was absent rather than null.
+- **77% of the store has no counterfactual record at all.** 104 of 1,400 learn questions were decisive
+  (the outcome changed with and without the pack), and they credited 143 of 628 rules. A perfect
+  clearance could have filtered at most 23% of this store.
+- **What to do instead if you are deploying this.** Do not build a per-rule utility filter on a store of
+  single-observation items: the signal it needs is not in the data yet. Either measure per rule over more
+  questions, or change what is stored — which is §13.13.
+
 
 ## 14. Performance and limits
 

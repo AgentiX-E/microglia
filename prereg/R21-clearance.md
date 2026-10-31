@@ -105,3 +105,66 @@ worth about 3pp of resolution at 350 questions with the discordant counts the do
 null is pre-registered as "the score carries nothing at this n", not as "clearance does not work": the
 two claims differ by exactly the quantity this lane cannot supply, which is a second store large enough
 to estimate a per-item effect with more than one observation behind it.
+
+## Outcome
+
+Dispatch `41203470612` (success, 4,378 calls, 6 retries, 0 timeouts, 0 call failures, eleven gates pass,
+26 minutes, `config.prereg` = this file). Artefact `eval/results/poc-sota-bird-clearance.json`. 350
+questions, 5 folds, `none` at 54.00%, minimum detectable effect 4.46pp.
+
+| Arm | Items | Chars | ACC | Δ vs `none` | 95% CI | gained / lost | p |
+|---|---|---|---|---|---|---|---|
+| `full` | 1.83 | 1,089 | 52.00% | −2.00pp | [−5.14, +1.14] | 12 / 19 | 0.2810 |
+| `full-cleared-sampled` | 1.51 | 905 | 51.71% | −2.29pp | [−5.43, +0.57] | 10 / 18 | 0.1849 |
+| `full-cleared` | 1.51 | 907 | 51.71% | −2.29pp | [−5.43, +0.86] | 11 / 19 | 0.2005 |
+
+The pair, which is what the registration was about: **`full-cleared` − `full-cleared-sampled` = +0.00pp,
+6 gained and 6 lost, 12 discordant, exact McNemar p = 1.0000.** Against `full` the two arms are each
+−0.29pp (5/6 and 3/4, p = 1.0000 both), and the shipped clearance removed 93 of the 628 rules the pass
+scored (14.8%), 115 items over 350 questions, 0.33 per question.
+
+**The confirmatory claim is refuted, and the refutation clause in the registration fires.** The
+prediction was +1 to +3pp for `full-cleared` over its control; the measured difference is exactly zero
+with an interval of zero, and the clause that was written down in advance for that case is explicit: the
+utility score carries no usable signal at this store size, and the record stops attacking selection.
+
+**Why it is zero, and why that is the finding rather than an excuse.** `V45-clearance-dose-matched`
+passed on the dose (0 mismatched of 350) and reported **311 identical**: on 88.9% of questions the two
+arms rendered *the same pack*. The structural reason is the store's own shape. A pack carries 1.83 items;
+when the clearance removes the one item a single-item pack holds, it leaves nothing, and a control that
+must drop the same count has only that item to drop, so the two cells coincide **exactly where the
+clearance acted most strongly**. The pair therefore differed on 39 questions, and on those it split
+6–6. The registered resolution was 3pp on 350 question-pairs; it was never going to be met by 39.
+
+**The number underneath is the one worth keeping.** The counterfactual pass answered 104 decisive
+questions across five folds — 7.4% of the 1,400 learn rows — because a question is only decisive when
+the outcome *changes* between the pack and no pack, and most questions are right both ways or wrong both
+ways. Those 104 questions credited 143 of the 628 scored rules, so **77% of the store has no
+counterfactual record at all**, and the rules that do have one average 1.2 comparisons. A perfect
+clearance could therefore have filtered at most 22.8% of this store, and a 3pp effect measured over the
+39 questions where a pack actually changed is not a thing this lane can resolve.
+
+**What the arm did measure, and it is consistent with everything before it.** Both clearance arms sit at
+1.51 items and −2.29pp while `full` sits at 1.83 items and −2.00pp: a third of an item less text, a third
+of a point worse, which is the dose axis's own noise. The clearance moved accuracy by nothing because it
+moved the pack by nothing, and the pack moved by nothing because the score had almost nothing to work
+with.
+
+**Two instrument readings.** `V44-domain-accounted` reports `180 item(s) with no domain, 180 arrived
+unscoped, 0 widened` — the third dispatch in a row in which generalisation widened nothing. `V32`
+reports 644 corrections from 1,400 learn rows with 0 unanswered and 4 distillation failures (0.3%), in a
+fold whose decisive count was 104.
+
+## What this leaves
+
+The prereg's refutation clause committed the record to one conclusion if this came back null: **the
+object is the problem, not the filter.** Every arm here varies a distilled store — its content, its size,
+its position, its framing, its delivery order, and now its membership at a fixed dose — and the one
+substrate no arm has injected is the raw correction itself. That is R22, registered as
+`prereg/R22-raw.md` and built in the same iteration, and its confirmatory claim is the mirror of this
+one: the interpretation is what costs, so removing it should pay.
+
+R21 also fixes a design defect for any future clearance experiment, and it is worth stating because it
+was invisible until the pair ran: **a control matched on item count is degenerate on single-item packs.**
+Dose matching has to be on characters, or the comparison restricted in advance to the questions where
+the two packs differ — a subset that must be declared before the run, not selected after it.

@@ -521,3 +521,26 @@ on what is already in it.
 **Warm-up** — What a prefetch does when the model port memoises its replies. An interpreter with no
 prefetch and a prefetch that warms nothing both leave the serial pass unchanged, which is why the
 default width is one and why the option is invisible to every caller that does not set it.
+
+**Clearance** — Removing records from a *pack* because their measured utility is negative, as opposed to
+retiring them from the *store*. The distinction decides what an experiment can conclude: a retirement
+shrinks every later pack and is therefore confounded with dose, while a clearance leaves the store
+intact and changes only what one question is shown. In this project a clearance removes a rule whose
+counterfactual record shows more harms than helps, keeps every rule it has no record of, and is always
+run against a control that drops the same amount at random.
+
+**Decisive comparison** — One learn-row question whose answer *changed* depending on whether the pack was
+present. Questions answered correctly both ways, or wrongly both ways, teach nothing about the pack and
+are excluded, which is what removes the difficulty confound: difficulty is the part that is identical in
+both halves of a pair. The count is small — 7.4% of this corpus's learn rows — and that scarcity is the
+binding constraint on every utility-based filter here.
+
+**Dose-matched control** — A control that removes the same *amount* of text as the treatment, so a delta
+is attributable to which items were kept rather than to how many. Matched on characters or on items
+whichever the treatment moves; matching on items alone is degenerate on a pack of one, where removing the
+single item leaves nothing for either arm to keep.
+
+**Raw event** — One correction as it happened: the question asked, the query that came back wrong, and the
+query that fixed it, all three verbatim. Everything the store holds is an interpretation of one of these,
+and the raw form is the only substrate in this project that adds no verb, no condition and no
+generalisation — nothing a reader can imitate as a rule.
