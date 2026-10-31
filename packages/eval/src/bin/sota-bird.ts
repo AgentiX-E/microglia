@@ -203,6 +203,7 @@ import {
   parseManifest,
   parseRetirementPolicy,
   artefactIdOf,
+  artefactWriteIdOf,
   poolOf,
   splitFrom,
   splitNameOf,
@@ -314,16 +315,6 @@ function splitOf(raw: string | undefined): Split {
 }
 
 /**
- * Where this split's run is written.
- *
- * Two artefacts rather than one file rewritten: the two splits answer different questions —
- * 350 questions about transfer, 1,534 about reproduction — and overwriting the smaller one to
- * store the larger would delete the evidence for every reading that quotes it, including the
- * `indicative` verdict whose whole point is that it can be recomputed.
- */
-const ARTEFACT_ID = artefactIdOf(SPLIT);
-
-/**
  * The pre-registration this run executes, by id, or the empty string when it was run by hand.
  *
  * The workflow reads the same value and refuses a dispatch without one; the lane carries it into
@@ -331,6 +322,23 @@ const ARTEFACT_ID = artefactIdOf(SPLIT);
  * conversation apart.
  */
 const PREREG = (process.env['SOTA_PREREG'] ?? '').trim();
+
+/**
+ * Where this split's run is written, and under which name.
+ *
+ * Two artefacts rather than one file rewritten: the two splits answer different questions —
+ * 350 questions about transfer, 1,534 about reproduction — and overwriting the smaller one to
+ * store the larger would delete the evidence for every reading that quotes it, including the
+ * `indicative` verdict whose whole point is that it can be recomputed.
+ *
+ * The split decided the name while one design ran per split. A second design on the same split
+ * would have written the same file, and R24 did: it re-ran the dev 2×2 with four arms over the
+ * artefact R8.3b's reproduction cell is recomputed from. Nothing failed at the write — the new
+ * file is a valid artefact — and the loss is only visible to the one gate that recomputes the
+ * cell, which is why the run now asks the file who wrote it and writes beside it when the answer
+ * is somebody else.
+ */
+const ARTEFACT_ID = artefactWriteIdOf({ split: SPLIT, prereg: PREREG });
 
 /**
  * The name this run's split goes by in the artefact.

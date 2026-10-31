@@ -122,6 +122,20 @@ on:
 permissions:
   contents: read
 
+# Which BIRD artefact a dispatch reads and writes, once for the whole workflow.
+#
+# Two splits produce two files, and every reader downstream of a run — attribution, the pool, the
+# signals, the density family, the publish step, the embedding probe in the other job — has to be
+# pointed at the one this dispatch measured. Naming it once is the difference between a workflow
+# whose steps agree and fifteen places to forget.
+#
+# The design is part of the name, not only the split. Two designs on one split used to write one
+# file, and R24 did: it re-ran the dev 2×2 over the artefact R8.3b's `reproduced` cell is
+# recomputed from. This expression is the rule `artefacts.ts` enforces, spelled once so a
+# dispatch's upload path and its write path cannot disagree.
+env:
+  SOTA_ARTEFACT: ${{ github.event.inputs.prereg != '' && format('{0}-{1}.json', github.event.inputs.split == 'dev' && 'poc-sota-bird-dev' || 'poc-sota-bird', github.event.inputs.prereg) || (github.event.inputs.split == 'dev' && 'poc-sota-bird-dev.json' || 'poc-sota-bird.json') }}
+
 jobs:
   bird:
     # The split is in the title, not only in the inputs: a run list that calls all of them Mini-Dev
@@ -134,12 +148,6 @@ jobs:
     # 1,534 questions x 2 arms at concurrency 8 is about 3,100 calls; the dev split needs the
     # headroom that the 350-question slice never did.
     timeout-minutes: 260
-    env:
-      # Which BIRD artefact this job reads and writes. Two splits produce two files, and every
-      # reader downstream of the run — attribution, the pool, the signals, the density family, the
-      # publish step — has to be pointed at the one this dispatch measured. Naming it once here is
-      # the difference between a job whose steps agree and fifteen places to forget.
-      SOTA_ARTEFACT: ${{ github.event.inputs.split == 'dev' && 'poc-sota-bird-dev.json' || 'poc-sota-bird.json' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -536,7 +544,6 @@ jobs:
       - name: Probe
         env:
           ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
-          SOTA_ARTEFACT: eval/results/${{ github.event.inputs.split == 'dev' && 'poc-sota-bird-dev.json' || 'poc-sota-bird.json' }}
         run: pnpm eval:probe
       - uses: actions/upload-artifact@v4
         if: always()

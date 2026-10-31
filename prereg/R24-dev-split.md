@@ -121,3 +121,97 @@ Three things changed, all of them instrument rather than hypothesis:
 
 Nothing in the design, the arms, the sample or the predictions changed. The run this file describes has still
 never been executed.
+
+## Outcome
+
+Dispatch `41245819288`, artefact **`eval/results/poc-sota-bird-dev-R24-dev-split.json`**: 1,534 questions, 5 folds, 6,571 calls,
+0 call failures, 13 gates pass (including `V48-statements-answered` at 16 of 10,160 statements, 0.16%), 32
+minutes. `V47-evidence-ablated`: `none` 1386/1386 and `full` 1386/1386 carrying the sentence,
+`none-noevidence` 0/1386 and `full-noevidence` 0/1386 — the 148 questions whose row carries no evidence are
+skipped in both directions, as the instrument specifies.
+
+| cell | accuracy | n |
+|---|---|---|
+| `none` | **57.43%** | 881/1534 |
+| `none-noevidence` | 39.83% | 611/1534 |
+| `full` | 56.84% | 872/1534 |
+| `full-noevidence` | 40.55% | 622/1534 |
+
+| contrast | pp | 95% CI | discordant | p |
+|---|---|---|---|---|
+| evidence, no pack (`none − none-noevidence`) | **+17.60** | [+15.38, +19.82] | 315/45 | <1e-4 |
+| evidence, with pack (`full − full-noevidence`) | **+16.30** | [+14.14, +18.58] | 300/50 | <1e-4 |
+| pack, with evidence (`none − full`) | +0.59 | [−0.91, +2.09] | 73/64 | 0.4944 |
+| pack, no evidence (`none-noevidence − full-noevidence`) | **−0.72** | [−2.15, +0.72] | 60/71 | 0.3824 |
+| interaction (DiD) | **−1.30** | [−3.06, +0.46] | 86 up / 105 down / 1343 flat | — |
+
+### Prediction by prediction
+
+1. **`none − none-noevidence` ≥ 8pp — held, at +17.60pp.** The bar was cleared by 9.6 points and the interval
+   is 2.14pp wide, half of what minidev's 350 questions could produce.
+2. **"The interval contains 24.86" — falsified on the whole panel.** [+15.38, +19.82] excludes it. **The
+   registered *explanation* for that falsification is also refuted.** The prediction said a dev interval
+   excluding 24.86 would mean "the minidev panel inflates the effect, which is plausible a priori since it
+   drops the simple third". Restricted to the mixture minidev actually keeps — moderate and challenging,
+   n = 609 — the same dispatch gives **+22.99pp [+19.21, +26.77]**, which contains 24.86. The difference
+   between 24.86 and 17.60 is therefore **composition, not inflation**: 60% of dev is `simple`, where the
+   sentence is worth 14.05pp, and minidev contains none of it. The 24.86 stands as an estimate for
+   moderate-and-challenging questions; **17.60 is the whole-split number and is what a cross-system
+   comparison must use.**
+3. **`full-noevidence − none-noevidence` ≥ 2pp — falsified.** Measured **−0.72pp [−2.15, +0.72]**. The
+   +1.14pp cell that reversed this record's conclusion in R23 does not replicate on 4.4× the sample; the
+   honest statement is that **the pack is null without a competitor**, not that it is positive.
+4. **Interaction ≤ −4pp with an interval excluding zero — falsified.** **−1.30pp [−3.06, +0.46]**, interval
+   containing zero, against R23's −6.00pp [−10.57, −1.71]. The registered refutation clause fires:
+   *"substitution does not replicate at 4.4× the sample and the competition reading is demoted from a
+   mechanism to a single-run observation."*
+5. **The effect rises across three levels — held, and it is the first time the shape was testable.**
+   `simple` n=925 **+14.05pp** [+11.24, +16.86], `moderate` n=464 **+22.63pp** [+18.32, +27.16],
+   `challenging` n=145 **+24.14pp** [+15.86, +32.41]. Monotone, `simple` inside the registered 5–15pp band
+   and `challenging` inside 18–30pp. The simple-to-moderate step is **+8.58pp ± 5.24**, resolved; the
+   moderate-to-challenging step is **+1.51pp ± 9.38**, not resolved — the gradient's top end is still open.
+6. **`none` between 50% and 58% — held**, at 57.43%. The environment did not move.
+
+### What the five cells say together
+
+**The hint is real, large and now measured in the units the literature uses.** 17.60pp on the whole split,
+22.99pp on the mixture every competitor's panel keeps. Against the manipulator prices the record already
+carries — 20.01 (BIRD GPT-4), 12.71–18.37 (RSL-SQL, CHESS, DAIL-SQL), 8.35–20.86 (SEED) — this is the top of
+the published range, not an outlier.
+
+**The pack never pays and never costs, on this split, in either condition.** +0.59pp with the hint and
+−0.72pp without it; neither interval excludes zero and neither is above the 2.14pp the design can detect.
+Twenty-three iterations have now measured the pack under eight varied axes, and this is the first that
+measured it with an instrument able to resolve 2pp and with the competitor both present and removed.
+
+**The interaction that motivated R25 does not replicate.** −1.30pp against −6.00pp, on the split the
+competitors used, with the same four cells. Per the clause registered above, the substitution reading is
+demoted to a single-run observation, and the line's next step is **selection work rather than the database**:
+the reason to ask "can a value index substitute for the hint" was that the pack was losing a competition, and
+on the larger panel it is not in one.
+
+**Store variance, again.** The evidence effect per fold runs 14.98 to 21.50pp and the pack's runs −2.28 to
++3.26pp across five stores rebuilt from the same corrections — the ±1.7pp band AUDIT 17.6 recorded, and the
+reason every claim here is within-dispatch.
+
+### Where the artefact is, and why it is not `poc-sota-bird-dev.json`
+
+The dispatch wrote the canonical dev path, because that is what the lane did: the artefact's name was
+the split's, and this is the second design to run on `dev`. The first is R8.3b, whose run is the file
+the protocol gate recomputes the `reproduced` cell from, and the write replaced it. Nothing failed at
+the time — the replacement is a valid artefact with a different number in it — and the loss was found
+by `pnpm check`, in the one gate that recomputes the cell rather than quoting it.
+
+R8.3b's artefact is restored, this run is committed under its own name, and the lane no longer names a
+file after the split alone: a run that names a pre-registration appends that id to the split's own, as
+`poc-sota-bird-dev-R24-dev-split.json` does here, so two designs on one split cannot share a path and a
+re-dispatch of one design still writes one file. The
+2026-11-01 amendment to `AUDIT` §19.9 and `TECH-DESIGN` §17.60 record the defect; the number in this
+file is unaffected, because it was always read from the artefact and not from its name.
+
+### The instrument
+
+`V48-statements-answered`: **16 of 10,160 statements hit the 20s deadline (0.16%)**, 130 results truncated at
+the 10,000-row cap (1.28%). Without the deadline this dispatch would not exist — the previous one spent 118
+minutes inside a single fold's judging phase and published nothing. The gate is what makes the difference
+between "the lane is slow" and "the lane is describing its own timeout" a number in the artefact.

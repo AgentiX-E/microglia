@@ -5,7 +5,9 @@ import {
   MINIDEV_SPLIT_NAME,
   artefactIdOf,
   artefactPathOf,
+  artefactWriteIdOf,
   chooseArtefact,
+  preregIdOf,
   splitNameOf,
 } from '../artefacts.js';
 import { publishedCell } from '../reproduction.js';
@@ -92,5 +94,56 @@ describe('which artefact a downstream lane reads', () => {
     expect(chooseArtefact({ dir: DIR, explicit: undefined, exists: present() })).toBe(
       `${DIR}/poc-sota-bird.json`,
     );
+  });
+});
+
+describe('which name a run writes', () => {
+  it('names the file after the design when a pre-registration is given', () => {
+    // The case this exists for. R24 measured four arms on the dev split, and the canonical dev
+    // artefact is the run R8.3b's `reproduced` cell is recomputed from; a write over it would
+    // replace a closed line's evidence with a different design's, and nothing would say so at the
+    // write because the new file is a valid artefact.
+    expect(artefactWriteIdOf({ split: 'dev', prereg: 'R24-dev-split' })).toBe(
+      'poc-sota-bird-dev-R24-dev-split',
+    );
+    expect(artefactWriteIdOf({ split: 'minidev', prereg: 'R23-evidence' })).toBe(
+      'poc-sota-bird-R23-evidence',
+    );
+  });
+
+  it('gives one design one file, however many times it is dispatched', () => {
+    // A second measurement of one claim is one file: a re-dispatch replaces the number a reader
+    // should see, while a different design can never touch it.
+    const first = artefactWriteIdOf({ split: 'dev', prereg: 'R24-dev-split' });
+    const again = artefactWriteIdOf({ split: 'dev', prereg: 'prereg/R24-dev-split.md' });
+    expect(again).toBe(first);
+  });
+
+  it('leaves a hand-run on the split name', () => {
+    // No pre-registration means no design to name: a by-hand run keeps the split's own file,
+    // which is the behaviour every lane had before this rule existed.
+    expect(artefactWriteIdOf({ split: 'minidev', prereg: '' })).toBe('poc-sota-bird');
+    expect(artefactWriteIdOf({ split: 'dev', prereg: '   ' })).toBe('poc-sota-bird-dev');
+  });
+
+  it('refuses an id that is a path', () => {
+    // A name that climbs out of the results directory is a run writing its evidence where no
+    // reader and no gate looks, which is the failure the artefact path exists to prevent.
+    expect(() => artefactWriteIdOf({ split: 'dev', prereg: '../escaped' })).toThrow(
+      /pre-registration id/,
+    );
+    expect(() => artefactWriteIdOf({ split: 'dev', prereg: 'R24/../../x' })).toThrow(
+      /pre-registration id/,
+    );
+  });
+});
+
+describe('the id a recorded artefact is compared under', () => {
+  it('reads an id out of either spelling', () => {
+    // `SOTA_PREREG` arrives as an id and is recorded as a path; the two are compared, so a rule
+    // that compared raw strings would suffix every name.
+    expect(preregIdOf('prereg/R24-dev-split.md')).toBe('R24-dev-split');
+    expect(preregIdOf(' R24-dev-split ')).toBe('R24-dev-split');
+    expect(preregIdOf('')).toBe('');
   });
 });

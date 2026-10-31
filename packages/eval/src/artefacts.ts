@@ -11,6 +11,7 @@
  * coverage by the repository's own rule — and a naming rule that decides a verdict should not be
  * the one piece of logic no test can reach.
  */
+import { MicrogliaError } from '@agentix-e/microglia-core';
 import { join } from 'node:path';
 import type { Split } from './bird-data.js';
 
@@ -43,6 +44,52 @@ export const DEV_SPLIT_NAME = 'BIRD dev';
 /** The artefact id for a split. */
 export function artefactIdOf(split: Split): string {
   return ARTEFACT_IDS[split];
+}
+
+/**
+ * A pre-registration's own id, from either spelling a caller may have.
+ *
+ * `SOTA_PREREG` is given as an id (`R24-dev-split`) and recorded in the artefact as a path
+ * (`prereg/R24-dev-split.md`), and the two are compared, so both are normalised to the id here. A
+ * rule that compared the raw strings would decide every artefact belongs to a different design and
+ * would suffix every name.
+ */
+export function preregIdOf(named: string): string {
+  return named.trim().replace(/^.*\//, '').replace(/\.md$/, '');
+}
+
+/**
+ * The id a run writes.
+ *
+ * A split's id was enough while one design ran per split. It stopped being enough when a second
+ * design ran on `dev`: R8.3b measured the published reproduction cell, R24 re-measured the same
+ * 2×2 with four arms, and both would write `poc-sota-bird-dev.json` — the file the protocol gate
+ * recomputes the `reproduced` row from. The second write is not an update of the first, it is the
+ * deletion of its evidence, and the deletion is silent because what replaces it is a valid
+ * artefact with a different number in it.
+ *
+ * So the file is named after the *design*, not only after the split: a run that names a
+ * pre-registration writes `poc-sota-bird-dev-R24-dev-split.json`, and a re-dispatch of the same
+ * pre-registration writes that same file, because a second measurement of one claim is one file.
+ * The suffix is the pre-registration's own id rather than a derived slug, so the workflow can
+ * spell the name without a second implementation of the rule.
+ */
+export function artefactWriteIdOf(input: {
+  readonly split: Split;
+  readonly prereg: string;
+}): string {
+  const base = ARTEFACT_IDS[input.split];
+  const id = preregIdOf(input.prereg);
+  if (id === '') return base;
+  // A separator is harmless — the id is reduced to its last component before it is used — but a
+  // `..` is not a typo, it is a name chosen to leave the directory, and the workflow spells this
+  // rule as a bare concatenation. Refusing is the only way the two stay the same rule.
+  if (input.prereg.includes('..') || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(id)) {
+    throw new MicrogliaError('MG_E_CONFIG', 'a pre-registration id must name a file, not a path', {
+      id: input.prereg,
+    });
+  }
+  return `${base}-${id}`;
 }
 
 /** The name a split reports as its dataset. */

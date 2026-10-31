@@ -172,7 +172,9 @@ export {
   MINIDEV_SPLIT_NAME,
   artefactIdOf,
   artefactPathOf,
+  artefactWriteIdOf,
   chooseArtefact,
+  preregIdOf,
   splitNameOf,
   type ArtefactChoice,
 } from './artefacts.js';

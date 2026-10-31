@@ -979,7 +979,13 @@ curl -sI https://bird-bench.oss-cn-beijing.aliyuncs.com/dev.zip     # 346,207,29
 pnpm eval:sota                       # SOTA_SPLIT defaults to minidev
 SOTA_SPLIT=dev pnpm eval:sota        # 1,534 questions, writes poc-sota-bird-dev.json
 SOTA_SPLIT=dev BIRD_DIR=/data/dev_20240627 pnpm eval:sota   # if you already extracted it
+SOTA_SPLIT=dev SOTA_PREREG=R24-dev-split pnpm eval:sota     # …and poc-sota-bird-dev-R24-dev-split.json
 ```
+
+**A second design on the same split gets its own file.** `SOTA_PREREG` is not only a label: the run
+appends it to the artefact's name, so a new experiment over the 1,534 questions cannot overwrite the
+run a published reproduction cell is recomputed from. A re-dispatch of the same pre-registration writes
+the same file again; a run with no pre-registration keeps the split's plain name, as before.
 
 Both archives are pinned by size and SHA-256 in `eval/manifests/`: `bird-minidev.json` and
 `bird-dev.json`. Two manifests rather than one with a switch, because a manifest is the record of
@@ -1599,6 +1605,53 @@ SOTA_ARMS=none-noevidence,full-noevidence SOTA_PREREG=R23-evidence pnpm eval:sot
   `full` 51.43% → 49.71% between two dispatches on identical questions, because the store is rebuilt from a
   live distillation pass each time (632 corrections here, 640 there). **Cross-dispatch comparisons on this
   lane carry one to two points of store variance.** Compare inside a run, or re-measure the anchor.
+
+
+### 13.15 The same 2×2 on the full split, and what the smaller panel was measuring
+
+13.14 reports 24.86 points on 350 questions. The obvious objection is that every competitor the number is
+compared with was measured on BIRD's full dev split, 1,534 questions — so R24 ran the identical four cells on
+1,534, holding the store size fixed at `learn_sample=280` so the split is the only difference.
+
+```bash
+SOTA_SPLIT=dev SOTA_LEARN_SAMPLE=280 SOTA_PREREG=R24-dev-split pnpm eval:sota
+# V48-statements-answered fails the run if >1% of executed statements hit the deadline
+```
+
+```jsonc
+// poc-sota-bird-dev-R24-dev-split.json — 1,534 questions, 5 folds, 6,571 calls, thirteen gates
+{ "none":            { "accuracy": 0.5743 },   // 881/1534
+  "none-noevidence": { "accuracy": 0.3983 },   // 611/1534
+  "full":            { "accuracy": 0.5684 },   // 872/1534
+  "full-noevidence": { "accuracy": 0.4055 } }  // 622/1534
+
+// evidence, no pack     +17.60pp  [15.38, 19.82]   315 gained / 45 lost   p < 1e-4
+// evidence, with pack   +16.30pp  [14.14, 18.58]   300 gained / 50 lost   p < 1e-4
+// pack, with evidence    +0.59pp  [ -0.91, +2.09]   73 gained / 64 lost   p = 0.4944
+// pack, no evidence      -0.72pp  [ -2.15, +0.72]   60 gained / 71 lost   p = 0.3824
+// interaction            -1.30pp  [ -3.06, +0.46]   86 up / 105 down / 1343 flat
+```
+
+- **The hint is worth 17.60 points on the full split, and 22.99 on the mixture the 350-question panel
+  keeps.** Stratified inside the same run: `simple` (n=925) **+14.05pp**, `moderate` (n=464) **+22.63pp**,
+  `challenging` (n=145) **+24.14pp**. The whole-split figure is a weighted average of those, exactly:
+  `925/1534 × 14.05 + 609/1534 × 22.99 = 17.60`. **24.86 was never inflated — the panel had no `simple`
+  questions in it.** Quote 17.60 against a system evaluated on the whole split, 22.99 against one evaluated on
+  moderate-and-challenging questions, and never mix the two.
+- **The pack is null, twice.** +0.59pp with the hint, −0.72pp without it, neither interval excluding zero, both
+  below the ±2.14pp this split resolves. The +1.14pp from 13.14 does not replicate at 4.4× the sample: the
+  defensible statement is *injecting a pack neither helps nor hurts*, and the abstention rule from 13.14 is
+  now justified by inertia rather than by a penalty.
+- **The interaction that explained the pack's cost did not replicate.** −1.30pp [−3.06, +0.46] against
+  −6.00pp on 350 questions. The registered clause fires: substitution is a single-run observation, not a
+  mechanism. If you are deciding whether to build a memory at all on this task, the evidence now says the
+  benchmark's own hint is the thing that matters and a pack of past corrections is inert either way.
+- **If you build the same measurement, budget for the judging phase.** A statement the model wrote can be a
+  three-way cross join, and a synchronous driver freezes the whole process inside it — the first attempt at
+  this run published nothing after 3.4 hours. Every statement here runs in a child process with a 20-second
+  deadline (`SOTA_SQL_DEADLINE_MS`) and a 10,000-row cap (`SOTA_SQL_ROW_CAP`); this dispatch hit the deadline
+  on **16 of 10,160 statements (0.16%)**. A deadline is not a wrong answer, and `V48` is what keeps the
+  difference visible.
 
 
 ## 14. Performance and limits

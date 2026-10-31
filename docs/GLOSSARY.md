@@ -422,6 +422,14 @@ rewritten, because a row in the comparison table is only honest while the artefa
 repository to be recomputed. `chooseArtefact` resolves which one a downstream command reads, and
 `SOTA_ARTEFACT` overrides it.
 
+**Design-suffixed artefact** — The split is not enough to name a file. A run that names a
+pre-registration appends that id to the split's own — `poc-sota-bird-dev-R24-dev-split.json` — so two
+designs measured on the same 1,534 questions cannot land on one path, while a re-dispatch of one design
+still writes one file. Without it the second design's write *replaces* the first's evidence and nothing
+fails, because what lands is a valid artefact with a different number in it; the only reader that
+notices is the one that re-derives a published cell instead of quoting it. A run with no
+pre-registration keeps the split's plain name.
+
 **Template slot** — An identifier in a rule's statement that the rule's *own* database has, lifted out
 of the sentence: `Cast {price} to real when {price} is text`. The structure is what survives a
 database boundary; the slot is the part that has to be replaced. A rule with no such identifier is
@@ -573,3 +581,11 @@ guessing one and the run's input already states it. Its presence is what makes t
 once: a claim can be withheld from a foreign question, and a claim that recurs across domains can earn
 the right to be widened beyond them. A store whose items all arrived without a domain has neither
 property, and `V44-domain-accounted` is the gate that says so.
+
+**Composition** — What a split's question mix does to an effect measured on it. A hint worth 22.99pp on
+moderate-and-challenging questions and 14.05pp on simple ones is worth 17.60pp on a panel that is 60% simple,
+and that weighted average is the number a whole-split comparison must use. It is the opposite of an
+**inflation**, which is the same effect measured wrong on a small sample: inflation shrinks when the sample
+grows, composition does not, because it is not an error. The distinction is decidable inside one dispatch —
+restrict both sides of a *paired* comparison to a subset of questions, and the pairing and the store are held
+while the population is not — and it is undecidable across two, because the store is rebuilt each run.
