@@ -1432,6 +1432,40 @@ SOTA_ARMS=anchor-blank,full-anchored SOTA_LEARN_SAMPLE=128 \
   arrived unscoped, 0 widened`: nothing in this store became domain-free by generalisation, so the fix
   belongs in the interpreter's prompt and not in the widening policy.
 
+### 13.11 Which half of the anchored prompt does the work?
+
+§13.10 left two candidates for the anchored cell's +4.00pp: the note, and the clause that grants the
+draft permission to stand. They differ along two dimensions, so the next iteration runs all four cells —
+one store, one budget, one dispatch.
+
+```bash
+# the square: (block, no block) x (conservative clause, permissive clause)
+SOTA_ARMS=anchor-blank,anchor-hold,full-anchored,full-anchored-hold SOTA_LEARN_SAMPLE=128 \
+  SOTA_PREREG=R20-anchored-hold pnpm eval:sota
+```
+
+```jsonc
+// poc-sota-bird-square.json, 350 questions, 5 folds, 2,460 calls, `none` at 54.57%
+[
+  { "arm": "anchor-blank",       "mean_pack_ids": 0.00, "accuracy": 0.5057, "delta_pp": -4.00, "p_value": 0.0336 },
+  { "arm": "anchor-hold",        "mean_pack_ids": 0.00, "accuracy": 0.5257, "delta_pp": -2.00, "p_value": 0.1892 },
+  { "arm": "full-anchored",      "mean_pack_ids": 1.83, "accuracy": 0.5343, "delta_pp": -1.14, "p_value": 0.3877 },
+  { "arm": "full-anchored-hold", "mean_pack_ids": 1.83, "accuracy": 0.5286, "delta_pp": -1.71, "p_value": 0.3075 }
+]
+```
+
+- **The clause and the note are substitutes, not partners.** The permissive sentence is worth +2.00pp
+  where there is no block and −0.57pp where there is one: an interaction of −2.57pp. `full-anchored`'s
+  own instruction already says "if none applies, return the first attempt unchanged", so the explicit
+  licence adds nothing; with no block, it is the only licence there is.
+- **The extra sentence is dropped.** `full-anchored-hold` − `full-anchored` is −0.57pp, inside the ±2pp
+  band registered before the run. A prompt that already contains a licence does not need a second one.
+- **The blind revision reproduced exactly.** −4.00pp, 12 gained, 26 lost, 38 discordant, p = 0.0336 —
+  identical to §13.10 on an independently distilled store (640 corrections against 648).
+- **Nothing in the square reaches no memory.** The best cell is `full-anchored` at −1.14pp, which is the
+  delivery order already shipped; the note's content is worth at most about a point and is not
+  distinguishable from zero at this n.
+
 
 ## 14. Performance and limits
 

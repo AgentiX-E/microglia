@@ -210,10 +210,11 @@ mechanisms that change *when* knowledge arrives rather than *how* it reads.
 **Anchored** — a delivery order in which the model drafts an answer first and then revises it against
 the block, instead of reading the block before the question. The only mechanism in this record that is
 not measurably harmful: +2.86pp against plain injection pooled over 700 questions (p = 0.0205), and
-against a second pass that injects nothing (measured once, R18, 350 questions) it is **+4.00pp
-(p = 0.0385)** while sitting at exactly no memory itself. Read together, those two numbers say the
-anchored cell repairs a loss rather than producing a gain, and that the store's usefulness is stated as
-conditional on an existing draft.
+against a second pass that injects nothing **+3.43pp pooled over 700 question-pairs (53 gained, 29 lost,
+p = 0.0106)** while sitting between no memory and a losing control. Read together, those numbers say the
+anchored cell repairs a loss rather than producing a gain, that most of the repair is a licence to stop
+rather than the note's content, and that the store's usefulness is stated as conditional on an existing
+draft.
 
 **Blind revision** — the second call of an anchored delivery with no block in it: show the model its own
 draft, ask it to revise, add nothing. It is 4.00pp *below* answering once (R18, p = 0.0336, one sign in
@@ -222,8 +223,15 @@ and the reason a revision request is never assumed to be free.
 
 **Licence to stop** — the clause that tells a revising model the draft may stand: "if none applies,
 return the first attempt unchanged". It is the only text in the anchored prompt that speaks about the
-draft rather than about the block, and R18 cannot separate it from the block it accompanies; the 2×2
-registered as R20 measures the two independently.
+draft rather than about the block. Measured once on its own (R20): 2.00pp better than a blind revision
+when there is no block, and 0.57pp *worse* than the conservative clause when there is one — the two are
+**substitutes**, because the conservative instruction already carries a licence of its own.
+
+**Substitutes (standing and licence)** — two interventions that deliver the same thing, so that running
+both is worth no more than running the better one. R20's interaction is −2.57pp: the permissive clause
+recovers half of a blind revision's cost when it is the only licence present and nothing when the block's
+own instruction supplies one. The practical rule this record now applies: adding a second sentence to a
+prompt that already contains the first is not a second improvement.
 
 **Precision (knowledge)** — the share of active rules whose payload matches the reference policy on a
 probe grid of every context they claim. Separates "learned a lot" from "learned the right thing".
