@@ -166,3 +166,100 @@ that text cannot help on a task whose question already carries its schema and it
 text cannot help because it is written for a different question; and that our text cannot help because we
 write it badly. Each of those predicts something different about this 2×2, and the first one predicts that
 the whole line is closed by 20 points of evidence that we never thought to remove.
+
+## Outcome
+
+Dispatch `41223844474` (success, 1,758 calls, 8 retries, 0 timeouts, 0 call failures, twelve gates pass,
+16 minutes, `config.prereg` = this file). Artefact `eval/results/poc-sota-bird-evidence.json`. 350
+questions, 5 folds, 11 databases, minimum detectable effect 4.87pp.
+
+| Cell | ACC | vs `none` |
+|---|---|---|
+| `none` | 54.57% (191/350) | — |
+| `full` | 49.71% (174/350) | −4.86pp [−8.29, −1.43], p = 0.0076 |
+| `full-noevidence` | 30.86% (108/350) | −23.71pp [−29.14, −18.57] |
+| `none-noevidence` | 29.71% (104/350) | −24.86pp [−30.00, −19.71] |
+
+| Contrast | Δ | 95% CI | gained / lost | p |
+|---|---|---|---|---|
+| evidence, no pack — `none` − `none-noevidence` | **+24.86pp** | [+19.71, +30.00] | 96 / 9 | < 0.0001 |
+| evidence, with pack — `full` − `full-noevidence` | **+18.86pp** | [+14.00, +24.00] | 80 / 14 | < 0.0001 |
+| pack, with evidence — `none` − `full` | +4.86pp | [+1.43, +8.29] | 27 / 10 | 0.0076 |
+| pack, no evidence — `none-noevidence` − `full-noevidence` | **−1.14pp** | [−4.29, +2.00] | 13 / 17 | 0.5847 |
+| interaction — (both evidence contrasts subtracted) | **−6.00pp** | [−10.57, −1.71] | 19 up / 37 down / 294 flat | — |
+
+**The confirmatory claim is confirmed, and the panel under-predicted itself by more than half.** The
+registered bar was ≥8pp with a point estimate near 12; the measurement is **+24.86pp**, 96 questions gained
+against 9 lost, exact p below 1e-4, and the interval lies entirely above the bar's upper end. The first
+positive control this record has ever run did not merely pass — it shows a panel that resolves an effect
+three times larger than the one it was asked to see. **The panel-is-the-finding clause does not fire, and
+the twenty-two nulls above it stay readable.**
+
+**The prediction the run refuted is the interesting one.** The registration said `full-noevidence` would
+still sit below `none-noevidence`, "because the pack's 2–4 point cost is not something a smaller prompt
+removes". It does not: **the pack is 1.14pp *above* no memory once the hint is gone** (13 gained, 17 lost,
+p = 0.5847) — the first cell in this record that is not negative, and the first evidence that the cost of
+showing a note is not a property of the note.
+
+**The interaction is the mechanism, and it fires.** `(full − full-noevidence) − (none − none-noevidence)` =
+**−6.00pp**, bootstrap 95% CI [−10.57, −1.71], which excludes zero and clears the registered |DiD| ≥ 4pp
+bar. A retrieved pack absorbs **6.00 of the hint's 24.86 points — 24.1%** — and the rest of the hint's value
+is stuff the pack cannot supply. Read against the two pack contrasts, the substitution is exact and
+one-directional: with the hint present the pack costs 4.86 points; with the hint absent it is worth 1.14
+points. **The deficit this record has spent eight iterations on is a competition, not a content problem.**
+
+**The difficulty prediction is neither confirmed nor refuted, and the panel cannot answer it.**
+Moderate `n = 248` at +25.00pp [18.95, 31.05]; challenging `n = 102` at +24.51pp [14.71, 34.31]. The two
+levels are 0.49pp apart, which is nothing, and **there are no simple questions on this panel at all** —
+`poolOf` filters the easiest third out. The literature's gradient (Simple −10 to −11, Moderate −15 to −19,
+Challenging −19 to −20) predicts a rise across three levels; this panel has two and they are flat. The
+prediction was about shape and the panel has one data point plus a copy.
+
+**The manipulation check passes without ambiguity.** Both ablated arms produced SQL on 350 of 350 prompts
+(100%), against `full`'s parse rate of 100% and execution rate of 99.43%. The 24.86pp is knowledge that
+left the prompt, not coherence.
+
+**Instrument readings.** `V47-evidence-ablated`: `none 350/350, full 350/350, none-noevidence 0/350
+expected none, full-noevidence 0/350 expected none`. `V12` 626/626 injected rules carried a condition.
+`V32` 632 corrections from 1,400 learn rows, 0 unanswered, 4 distillation failures (0.3%). `V44`
+168 item(s) with no domain, 168 arrived unscoped, 0 widened — the fifth dispatch running.
+
+**Two anchors moved, and that is a reading of its own.** `none` came in at 54.57% against 54.00% in every
+dispatch since R19 (+0.57pp, 2 questions), and `full` at 49.71% against R22's 51.43% (−1.72pp, 6 questions).
+Neither is a treatment: the store is rebuilt per dispatch and this one held 632 corrections and 1.79 items
+per question against R22's 640 and 1.82. **Cross-dispatch cells on this lane carry one to two points of
+store variance**, which is larger than several deltas this record has published; every claim in this file is
+within-dispatch and unaffected.
+
+## What this leaves
+
+The record's central negative now has a mechanism instead of a mystery, and the mechanism says the opposite
+of what eight iterations assumed. A note written for one question does not cost points because it is
+irrelevant, badly written, wrongly scoped, too long, too raw or badly framed — all six of those were varied
+and all six came back null. It costs points **because it competes with curated, per-question knowledge for
+the same job, and loses**, and when that competitor is removed the note stops costing anything and starts
+paying a little.
+
+Three consequences, in order of how much they change the plan:
+
+1. **The product rule is now conditional rather than absolute.** R22 concluded "abstention by default". This
+   run says abstention is correct **where the question already arrives with curated knowledge** — the
+   common case in an annotated enterprise warehouse — and wrong where it does not. The condition is
+   testable per deployment: does the incoming question carry a hint? That is a switch, not a policy
+   research programme.
+2. **4.6% is the number the memory line has to beat.** The pack supplies 1.14 of the 24.86 points a curated
+   hint supplies. Nothing in this record has ever measured a memory's ceiling against a known-good item
+   before, because there was never a known-good item in the prompt to measure against. There is now.
+3. **Most of the 24.86pp is not memory's job.** This lane's `none` prompt is thin: no examples, no
+   chain-of-thought, no schema linking, no value index. Systems that report −12.7 to −18.4 on the same
+   ablation (Companion Agents' RSL-SQL and CHESS rows) recover part of that dependence by extracting the
+   missing information *from the database* rather than from a hint. **The gap this record has been trying
+   to close with memory may be a schema-linking and value-indexing gap**, and that is measurable with
+   machinery the lane already has: `valuesDdl` annotates the schema with column contents, and the `values`
+   arm has only ever been run on the *unablated* prompt, where the hint was doing that job for it.
+
+The next registration is therefore a 2×2 of evidence {present, absent} × value annotation {present, absent}:
+how much of the hint's 24.86 points can be recovered from the database alone, and does the answer survive
+removing the competitor. It is cheap, it uses an arm that already exists, and it is the first experiment in
+this line whose success criterion is "recover a measured fraction of a measured effect" rather than "beat
+no memory".

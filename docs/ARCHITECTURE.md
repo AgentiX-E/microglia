@@ -316,6 +316,14 @@ The study is a package, not a script:
     15 single-line attempts. `rawEventVerbatim` now walks the payload and requires each position to start
     with a whole block it was given, counting a rejected span once however many lines it holds, and
     returning its first line as a sample the gate prints and never interprets.
+- `sota.ts`'s `EVIDENCE_LABEL` / `evidenceBlockOf` / `V47-evidence-ablated` — the ablation of the
+  benchmark's own knowledge, which is the one thing in the prompt this project did not write. `none` has
+  always carried BIRD's per-question `evidence` sentence; `none-noevidence` and `full-noevidence` render
+  `evidenceBlockOf('')` instead and change nothing else. The label lives in one constant because the gate
+  searches the *sent prompt* for it: `V47` counts, per arm and over the questions that had a sentence,
+  how many prompts contained `EVIDENCE_LABEL + "\n" + the row's evidence`, and fails the run if a shipped
+  arm missed one, if an ablated arm carried one anyway (an ablation that removed nothing is `none` under
+  a second name), or if the ablated arm reached fewer questions than the arm it ablates.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

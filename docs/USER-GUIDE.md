@@ -1541,6 +1541,54 @@ SOTA_ARMS=full-raw,full-raw-shuffled SOTA_PREREG=R22-raw pnpm eval:sota
   `rawEventVerbatim` is exported so the check travels with the renderer.
 
 
+### 13.14 What the benchmark's own hint is worth, and what it means for your deployment
+
+Every question in BIRD ships with a curated `evidence` sentence — a line of human-written domain knowledge
+attached to that question. This project's prompt has always carried it, on **350 of 350** questions at a mean
+of 142 characters, and every number in this guide was measured on top of it. R23 removed it, in a 2×2 that
+also turns a pack on and off, because three published ablations already price the removal at 8 to 21 points
+and no memory experiment here had ever been run against a manipulation anyone else had measured.
+
+```bash
+SOTA_ARMS=none-noevidence,full-noevidence SOTA_PREREG=R23-evidence pnpm eval:sota
+# V47-evidence-ablated fails the run if an ablated arm still carried the sentence, or a shipped arm lost it
+```
+
+```jsonc
+// poc-sota-bird-evidence.json, 350 questions, 5 folds, 1,758 calls, twelve gates
+{ "none":              { "accuracy": 0.5457 },                       // 191/350
+  "full":              { "accuracy": 0.4971, "delta_pp": -4.86 },    // 174/350, p = 0.0076
+  "full-noevidence":   { "accuracy": 0.3086 },                       // 108/350
+  "none-noevidence":   { "accuracy": 0.2971 } }                      // 104/350
+
+// evidence, no pack      +24.86pp  [19.71, 30.00]   96 gained /  9 lost  p < 0.0001
+// evidence, with pack    +18.86pp  [14.00, 24.00]   80 gained / 14 lost  p < 0.0001
+// pack, with evidence     -4.86pp  [ -8.29,  -1.43]  27 gained / 10 lost  p = 0.0076
+// pack, no evidence       +1.14pp  [ -4.29,  +2.00]  13 gained / 17 lost  p = 0.5847
+// interaction             -6.00pp  [-10.57,  -1.71]  19 up / 37 down / 294 flat
+```
+
+- **The hint is worth 24.86 points, and the panel can see it.** Ninety-six questions are right with the
+  sentence and wrong without it, nine the other way. Whatever else this project reports, its instrument is
+  calibrated: an effect three times the size of anything it has published came back at p < 0.0001.
+- **The pack costs 4.86 points *because the hint is there*.** With the sentence present, showing a pack is
+  −4.86pp and significant. With the sentence removed, the same pack is **+1.14pp** and indistinguishable
+  from zero — the first cell in this record that is not negative. The interaction is −6.00pp with an
+  interval that excludes zero: a retrieved note absorbs **24.1%** of what the hint supplies and loses the
+  competition for the rest.
+- **So the deployment rule is a switch, not a policy.** If the incoming question already carries curated,
+  per-question knowledge, do not inject — that is R22's abstention, now with a mechanism. If it does not,
+  inject: the note stops costing points and starts paying about one.
+- **4.6% is what a memory of past questions is worth against one curated sentence.** It is the first
+  measurable ceiling this project has had, and it is low. Most of the 24.86 points is knowledge about *this*
+  question — which columns, which values, which arithmetic — and a note written for another question cannot
+  supply it.
+- **If you are building the same measurement**, note what the anchors did: `none` moved 54.00% → 54.57% and
+  `full` 51.43% → 49.71% between two dispatches on identical questions, because the store is rebuilt from a
+  live distillation pass each time (632 corrections here, 640 there). **Cross-dispatch comparisons on this
+  lane carry one to two points of store variance.** Compare inside a run, or re-measure the anchor.
+
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

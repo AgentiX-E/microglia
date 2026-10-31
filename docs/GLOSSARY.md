@@ -388,6 +388,28 @@ the same split, and is otherwise `indicative`. The difference between two estima
 `indicative`, and the 0.19pp between them is one fortieth of the 7.72pp band that would be needed to
 call them distinguishable.
 
+**Evidence sentence** — The curated, human-written, per-question knowledge BIRD attaches to every
+question: 25 to 468 characters on this panel, mean 142. It is not written by this project and it is
+present in `none` as much as in `full`, so every published number here was measured on top of it. It is
+worth **24.86pp** on this panel, and removing it is the only *positive control* in the record.
+
+**Positive control** — A manipulation whose answer the literature already knows, run to prove the
+instrument can detect it. R23's is the evidence ablation, which three papers price at 8 to 21 points;
+it came back at 24.86pp, which is what licenses reading the twenty-two nulls above it as nulls about
+memory rather than about sensitivity.
+
+**Substitution** — A retrieved note competing with the curated evidence sentence for the same job. It is
+measured as a difference in differences, `(full − full-noevidence) − (none − none-noevidence)`, and it is
+**−6.00pp** on this panel with an interval excluding zero: the pack absorbs 24.1% of the sentence's value
+and costs 4.86 points when the sentence is present. Remove the sentence and the same pack is worth
++1.14pp — the cost belongs to the competition, not to the note.
+
+**Store variance** — The part of a cell's movement that is neither the treatment nor sampling noise under
+a fixed store. The store is rebuilt by a live distillation pass on every dispatch (632 corrections in
+R23, 640 in R22), so the anchors move between runs on identical questions: `none` 54.00 → 54.57, `full`
+51.43 → 49.71. It is **one to two points**, larger than several published deltas, and the reason every
+claim here is made *within* a dispatch.
+
 **Split** — A division of a benchmark's questions. Two are measured here: `minidev`, the 350-question
 slice the transfer experiments use, and `dev`, all 1,534 questions. The split decides the manifest, the
 question file, and one filter — `simple` questions are dropped on `minidev` because a question answered
