@@ -92,6 +92,9 @@ import {
   HOUSE_CONVENTIONS,
   armPairsAgainstFull,
   OPTIONAL_ARMS,
+  ADVISORY_SENTENCE,
+  ARM_STANDING,
+  PROHIBITIVE_HEADING,
   PROMPT_VERSION,
   admissionOf,
   anchorPromptFor,
@@ -214,7 +217,9 @@ import {
   type ConventionName,
   type ConventionSpec,
   type Candidate,
+  type FramingDelivery,
   type PackKind,
+  type PackStanding,
   type ResultShape,
   type Selection,
   type SelectionStats,
@@ -2612,6 +2617,8 @@ type FoldResult = {
   /** Rules injected into a prompt this fold, and how many named a condition. */
   readonly injectedRules: number;
   readonly injectedWithCondition: number;
+  /** Per arm, how many of its prompts carried the framing it declares. */
+  readonly framing: readonly FramingDelivery[];
   /** Digest of the store at the moment scoring began, which is what the guard checks. */
   readonly digest: string;
   /**
@@ -3135,6 +3142,7 @@ async function runFold(
    */
   const PACK_KIND: Partial<Record<ArmName, PackKind>> = { 'full-repair': 'repair' };
 
+
   const call = (
     position: number,
     arm: ArmName,
@@ -3167,6 +3175,10 @@ async function runFold(
         // rule heading would ask the reader to act on a story as if it were a fact, and
         // the arm would then measure the mismatch between label and content.
         ...(PACK_KIND[arm] === undefined ? {} : { packKind: PACK_KIND[arm] as PackKind }),
+        // How the block is addressed, read from the table in `sota.ts` so that the rendering can
+        // be tested without a database. Absent is the shipped wording, which is what every
+        // published number was produced with.
+        ...(ARM_STANDING[arm] === undefined ? {} : { standing: ARM_STANDING[arm] as PackStanding }),
       }),
     });
   };
@@ -3448,6 +3460,21 @@ async function runFold(
       // ids by construction - the comparison is the rendering, not the retrieval.
       const plain = makePack(pack.items, { budget: pack.budget, conditions: false });
       call(position, 'full-plain', plain.rendered, plain.ids.length);
+    }
+    if (ARMS.has('full-advisory')) {
+      // The pack exactly as `full` renders it, plus one sentence. Nothing is re-retrieved, nothing
+      // is re-cut: if this cell moves, the sentence moved it.
+      call(position, 'full-advisory', pack.rendered, pack.ids.length);
+    }
+    if (ARMS.has('none-advisory')) {
+      // The same sentence, no pack. This is what makes a recovery attributable, and it is loaded
+      // where it is because the difference between the two advisory cells has to be the pack.
+      call(position, 'none-advisory', '', 0);
+    }
+    if (ARMS.has('full-prohibitive')) {
+      // The same items under the error heading. The pack layer is not asked for anything new, so the
+      // comparison with `full` is one string of framing rather than a different retrieval.
+      call(position, 'full-prohibitive', pack.rendered, pack.ids.length);
     }
     if (ARMS.has('full-corroborated')) {
       // The same recall with the pack layer's corroboration floor - the product path,
@@ -4394,6 +4421,41 @@ async function runFold(
   distillations.save();
 
   const packIds = cases.reduce((sum, item) => sum + item.packIds, 0);
+  /**
+   * V43's measurement: did each arm's prompt carry the framing that arm declares?
+   *
+   * Counted at the prompt rather than at the arm, because the failure mode is a table entry that
+   * never matched — `full-advisory` would be `full` under a second name and "the sentence cost
+   * nothing" would be a reading about a sentence that was never sent. Both directions are counted:
+   * an arm that declares a framing and misses a prompt, and an arm that declares none and carries
+   * one anyway.
+   */
+  const framingDelivery: readonly FramingDelivery[] = (() => {
+    const counts = new Map<ArmName, { prompts: number; carrying: number }>();
+    for (const plan of plans) {
+      const declares = ARM_STANDING[plan.arm];
+      const wanted =
+        declares === 'advisory'
+          ? ADVISORY_SENTENCE
+          : declares === 'prohibitive'
+            ? PROHIBITIVE_HEADING
+            : undefined;
+      const entry = counts.get(plan.arm) ?? { prompts: 0, carrying: 0 };
+      entry.prompts += 1;
+      const carries =
+        wanted === undefined
+          ? plan.prompt.includes(ADVISORY_SENTENCE) || plan.prompt.includes(PROHIBITIVE_HEADING)
+          : plan.prompt.includes(wanted);
+      if (carries) entry.carrying += 1;
+      counts.set(plan.arm, entry);
+    }
+    return [...counts.entries()].map(([arm, entry]) => ({
+      arm,
+      prompts: entry.prompts,
+      carrying: entry.carrying,
+      expected: ARM_STANDING[arm] !== undefined,
+    }));
+  })();
   process.stdout.write(
     `[sota] fold ${fold + 1}/${FOLDS}: eval=${cases.length} learn=${learnRows.length} ` +
       `edited=${learning.edited} unanswered=${learning.unanswered} ` +
@@ -4414,6 +4476,7 @@ async function runFold(
     meanPackIds: cases.length === 0 ? 0 : packIds / cases.length,
     injectedRules,
     injectedWithCondition,
+    framing: framingDelivery,
     validatedPackDiffers,
     validatedPositions,
     anchoredSkipped,
@@ -4951,6 +5014,20 @@ async function main(): Promise<void> {
     rules: folds.reduce((sum, fold) => sum + fold.injectedRules, 0),
     conditions: folds.reduce((sum, fold) => sum + fold.injectedWithCondition, 0),
   };
+  // Summed per arm over folds, because a question is scored once per fold it appears in and the
+  // gate asks what the prompts contained, not what one fold's prompts contained.
+  const framing = (() => {
+    const counts = new Map<string, { prompts: number; carrying: number; expected: boolean }>();
+    for (const fold of folds) {
+      for (const entry of fold.framing) {
+        const held = counts.get(entry.arm) ?? { prompts: 0, carrying: 0, expected: entry.expected };
+        held.prompts += entry.prompts;
+        held.carrying += entry.carrying;
+        counts.set(entry.arm, held);
+      }
+    }
+    return [...counts.entries()].map(([arm, entry]) => ({ arm, ...entry }));
+  })();
   const callFailureRate = llm.stats.prompts === 0 ? 0 : llm.stats.failures / llm.stats.prompts;
   // One pooled comparison, computed once and read by both the gate and the artefact so the two
   // cannot report different directions for the same run.
@@ -5077,6 +5154,9 @@ async function main(): Promise<void> {
     ...(injected.rules === 0
       ? {}
       : { packConditions: { injected: injected.rules, withCondition: injected.conditions } }),
+    // Only when an arm actually declares a framing: a gate that always passes is a comment, and
+    // this one exists because a table entry that silently misses makes two arms one condition.
+    ...(framing.every((entry) => !entry.expected) ? {} : { framing }),
     // The protocol's oracle ceiling applies to the convention lane, where the
     // accepted answer has a form the model must reproduce.
     ...(ACTIVE === undefined || channelBest === undefined ? {} : { channelCeiling: channelBest.accuracy }),

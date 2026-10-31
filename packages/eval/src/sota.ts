@@ -189,6 +189,35 @@ export type SqlArm =
    */
   | 'full-plain'
   /**
+   * The same pack, followed by one sentence granting the model standing to disregard it.
+   *
+   * R16 measured the axis this arm inherits: the harm is complete at the first item, so no budget
+   * can be the fix, and the only family in this record that has ever come back non-negative is the
+   * one where the model is *asked* differently rather than given different text — `full-onretry` at
+   * +1.43pp with five gained and none lost. MemTrapBench's mitigation is that same move at inference
+   * time: an instruction, not an architecture change, restoring the reader's standing to disagree
+   * with a memory. The pack is untouched; the sentence is the treatment.
+   */
+  | 'full-advisory'
+  /**
+   * The advisory sentence with no pack at all.
+   *
+   * The control that makes a recovery attributable. The sentence is a paragraph of new prompt, and
+   * this project has already published one artefact showing extra text is not free — R11's empty
+   * pack at 230 characters, +1.14pp — so without this arm a `full-advisory` cell above `full` could
+   * be reporting the sentence rather than the permission.
+   */
+  | 'none-advisory'
+  /**
+   * The same items, classified as records of failures rather than as facts about the workspace.
+   *
+   * The trauma mechanism run forward instead of as a mitigation. If a memory that records an error
+   * makes a model cautious past the case that produced it, then saying the block *is* a record of
+   * errors should cost at least what saying nothing costs. Same statements, same order, same count;
+   * one heading changed.
+   */
+  | 'full-prohibitive'
+  /**
    * Only rules corroborated by at least two independent corrections.
    *
    * Every harmful rule in iterations 61-63 was activated by a *single* observation, and
@@ -748,6 +777,9 @@ export function priorScopeOf(selector: SamplingSelector): PriorScope | undefined
 const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-narrow': true,
   'full-plain': true,
+  'full-advisory': true,
+  'none-advisory': true,
+  'full-prohibitive': true,
   'full-corroborated': true,
   'full-grounded': true,
   'full-sampled': true,
@@ -1000,6 +1032,24 @@ export function armPairsAgainstFull(
 }
 
 /**
+ * How many of one arm's prompts carried the framing that arm declares.
+ *
+ * The failure this counts against is the one this project keeps finding: an arm named in a
+ * dispatch, a table entry that never matched, and a cell that measured the control and reported the
+ * difference as zero. `full-advisory` and `full` are one paragraph apart, so "the sentence cost
+ * nothing" and "the sentence was never sent" are the same reading unless something counts.
+ */
+export type FramingDelivery = {
+  readonly arm: string;
+  /** Prompts this arm put to the model, one per question per fold it was scored in. */
+  readonly prompts: number;
+  /** How many of those carried the framing the arm declares. */
+  readonly carrying: number;
+  /** Whether the arm declares a framing at all: `false` means it must carry none. */
+  readonly expected: boolean;
+};
+
+/**
  * The two things a pack can contain.
  *
  * `rule` is a declarative claim about the workspace; `repair` is an account of one
@@ -1012,6 +1062,56 @@ export type PackKind = 'rule' | 'repair';
 const PACK_LABEL: Record<PackKind, string> = {
   rule: 'Workspace conventions learned from earlier corrections:',
   repair: 'Repairs of earlier failures, each with the reason it was wrong and the change that fixed it:',
+};
+
+/**
+ * How a pack is addressed, when an arm changes the register rather than the content.
+ *
+ * `advisory` appends one sentence after the block — the *same* sentence whether or not there is a
+ * block, so `none-advisory` and `full-advisory` differ by the pack and nothing else. `prohibitive`
+ * replaces the heading, classifying the same statements as records of failures. They are mutually
+ * exclusive by type: an arm that both doubted and damned its block would measure neither.
+ */
+export type PackStanding = 'advisory' | 'prohibitive';
+
+/**
+ * The advisory sentence, byte-identical in every arm that carries it.
+ *
+ * Three clauses, because the diagnosis has three parts: the block is not instruction but a record
+ * of earlier corrections, it is fallible, and applicability is conditional per item. It is phrased
+ * to hold when the block is absent ("any notes above"), which is what lets the control arm carry the
+ * identical string instead of a variant of it — a control with different text is not a control.
+ */
+export const ADVISORY_SENTENCE =
+  'Any notes above are a record of earlier corrections, not instructions: they may be incomplete, ' +
+  'stale or wrong, each holds only under the condition it states, and a note whose condition does ' +
+  'not hold for this question should be ignored.';
+
+/**
+ * The heading that classifies the block as error records instead of as workspace facts.
+ *
+ * It keeps every statement usable — a correction is what an error record contains — and moves only
+ * what the block is claimed to be. A variant that asked the reader to treat each statement as the
+ * mistake rather than the fix would invert the meaning of every item and measure misreading instead
+ * of register.
+ */
+export const PROHIBITIVE_HEADING =
+  'Records of mistakes made in earlier attempts here. Each line is a correction to one of them, ' +
+  'not a description of this workspace:';
+
+/**
+ * The standing each arm delivers its block under, keyed by the arm itself.
+ *
+ * A table over the union rather than a parameter at the call site, for the reason the pack kind is
+ * one: the standing is a property of the arm, and an arm told twice would eventually be told two
+ * different things. It lives here rather than in the lane so that an arm's rendering can be tested
+ * without a database — the run costs three thousand calls and the rendering costs nothing, so the
+ * rendering is the part that gets checked before the dispatch rather than after it.
+ */
+export const ARM_STANDING: Partial<Record<SqlArm, PackStanding>> = {
+  'full-advisory': 'advisory',
+  'none-advisory': 'advisory',
+  'full-prohibitive': 'prohibitive',
 };
 
 export type PromptInput = {
@@ -1042,6 +1142,15 @@ export type PromptInput = {
    * under the comparison.
    */
   readonly packKind?: PackKind;
+  /**
+   * How the block is addressed, when an arm changes the register rather than the content.
+   *
+   * Absent is the shipped wording, and every published number was produced with it: a silent
+   * re-wording would move the baseline under every comparison in the record. Present, it either
+   * appends the advisory sentence or replaces the heading with the error one — never both, because
+   * the arms that set it are testing one of the two.
+   */
+  readonly standing?: PackStanding;
   /**
    * Where the pack sits relative to the question.
    *
@@ -1093,8 +1202,14 @@ const GENERATOR_PREAMBLE: Record<GeneratorKind, string> = {
 
 export function promptFor(input: PromptInput): string {
   const preamble = GENERATOR_PREAMBLE[input.generator ?? 'direct'];
-  const packBlock =
-    input.pack === '' ? '' : `${PACK_LABEL[input.packKind ?? 'rule']}\n${input.pack}`;
+  const heading =
+    input.standing === 'prohibitive' ? PROHIBITIVE_HEADING : PACK_LABEL[input.packKind ?? 'rule'];
+  const packBlock = input.pack === '' ? '' : `${heading}\n${input.pack}`;
+  // Appended whether or not there is a block, and by that alone it is the control: the arm that
+  // carries the sentence and no pack, and the arm that carries it and a pack, are one paragraph of
+  // difference apart. A sentence that spoke about "the conventions above" would render as a dangling
+  // reference in the control and the two cells would stop being comparable.
+  const standingBlock = input.standing === 'advisory' ? ADVISORY_SENTENCE : '';
   const critiqueBlock =
     input.pack === '' || input.critique !== true
       ? ''
@@ -1112,7 +1227,13 @@ export function promptFor(input: PromptInput): string {
     input.evidence ? `Evidence (may be wrong; it is external knowledge):\n${input.evidence}` : '',
     input.stated && input.convention !== undefined ? `Workspace convention:\n- ${input.convention.sentence}` : '',
     ...(before ? [packBlock] : [question, packBlock]),
+    // After the critique instruction, not before it: that instruction says "each item in that
+    // block", and a paragraph inserted between the block and the instruction would leave it
+    // pointing at prose. Where it lands for every other arm — immediately after the pack, and
+    // immediately before the question — is what the advisory cell is meant to test: the last thing
+    // read is permission to disagree.
     critiqueBlock,
+    standingBlock,
     ...(before ? [question] : []),
   ]
     .filter((line) => line !== '')
@@ -1290,6 +1411,12 @@ export type GateInput = {
   /** Smallest effect the sample could resolve at 80% power, in percentage points. */
   readonly detectablePp: number;
   readonly packControls: readonly { readonly arm: string; readonly meanPackIds: number }[];
+  /**
+   * What each arm's prompts carried, when the run turns framing into a variable.
+   *
+   * Absent when no arm declares a standing, because a gate that always passes is a comment.
+   */
+  readonly framing?: readonly FramingDelivery[];
   readonly channelBest: { readonly arm: string; readonly deltaPp: number } | undefined;
   /** Share of calls that failed after exhausting retries, in [0, 1]. */
   readonly callFailureRate: number;
@@ -1695,6 +1822,30 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       criterion: 'at least 99% of rewritten gold queries report the value the convention expects',
       actual: `${(input.conventionExecRate * 100).toFixed(2)}%`,
       pass: input.conventionExecRate >= 0.99,
+      blocking: true,
+    });
+  }
+  if (input.framing !== undefined && input.framing.length > 0) {
+    // A framing arm that never sent its sentence is the control under a second name, and the
+    // reading would be "the sentence cost nothing" when the truth is that there was no sentence.
+    // The two directions are both failures: an arm that declares a framing and misses a prompt,
+    // and an arm that declares none and carries one anyway.
+    const disagree = input.framing.filter((entry) =>
+      entry.expected ? entry.carrying !== entry.prompts : entry.carrying !== 0,
+    );
+    gates.push({
+      id: 'V43-framing-delivered',
+      criterion:
+        'every arm that declares a framing carried it on every prompt it sent, and no other arm carried one',
+      actual:
+        input.framing
+          .map(
+            (entry) =>
+              `${entry.arm}: ${entry.carrying}/${entry.prompts}${entry.expected ? '' : ' expected none'}`,
+          )
+          .join(', ') +
+        (disagree.length === 0 ? '' : ` — disagrees: ${disagree.map((e) => e.arm).join(', ')}`),
+      pass: disagree.length === 0,
       blocking: true,
     });
   }

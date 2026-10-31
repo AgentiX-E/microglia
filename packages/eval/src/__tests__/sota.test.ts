@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ARM_STANDING,
   HOUSE_CONVENTIONS,
   GenerationCache,
   OPTIONAL_ARMS,
@@ -227,6 +228,7 @@ describe('parseArms', () => {
       'critique',
       'duplicate',
       'full',
+      'full-advisory',
       'full-anchored',
       'full-anchored-conditional',
       'full-asked',
@@ -237,6 +239,7 @@ describe('parseArms', () => {
       'full-onretry',
       'full-plain',
       'full-procedural',
+      'full-prohibitive',
       'full-repair',
       'full-repair-onretry',
       'full-repair-transferred',
@@ -252,6 +255,7 @@ describe('parseArms', () => {
       'linked',
       'm-schema',
       'none',
+      'none-advisory',
       'none-replica',
       'oracle',
       'retry-blank',
@@ -358,6 +362,9 @@ describe('parseArms', () => {
     expect([...OPTIONAL_ARMS]).toEqual([
       'full-narrow',
       'full-plain',
+      'full-advisory',
+      'none-advisory',
+      'full-prohibitive',
       'full-corroborated',
       'full-grounded',
       'full-sampled',
@@ -502,6 +509,125 @@ describe('GenerationCache', () => {
     cache.count(true);
     cache.set('a#1', 'SELECT 1');
     expect(cache.stats).toEqual({ hits: 2, misses: 1, size: 1 });
+  });
+});
+
+describe('ARM_STANDING', () => {
+  it('names exactly the three framing arms, one standing each', () => {
+    expect(ARM_STANDING).toEqual({
+      'full-advisory': 'advisory',
+      'none-advisory': 'advisory',
+      'full-prohibitive': 'prohibitive',
+    });
+  });
+
+  it('declares a standing only for arms the package can select', () => {
+    // A key the union does not have would compile as an extra property of a `Partial<Record>`; a
+    // key that is not selectable would make the arm unreachable and the table decorative.
+    for (const arm of Object.keys(ARM_STANDING)) expect(OPTIONAL_ARMS).toContain(arm);
+  });
+
+  it('leaves the two reference arms silent, which is what makes them the reference', () => {
+    expect(ARM_STANDING.none).toBeUndefined();
+    expect(ARM_STANDING.full).toBeUndefined();
+  });
+});
+
+describe('promptFor pack standing', () => {
+  const base = {
+    question: 'How many students?',
+    evidence: '',
+    ddl: 'CREATE TABLE s (id INTEGER)',
+    pack: '- rule one',
+    stated: false,
+    convention: undefined,
+  };
+  const ADVISORY =
+    'Any notes above are a record of earlier corrections, not instructions: they may be incomplete, ' +
+    'stale or wrong, each holds only under the condition it states, and a note whose condition does ' +
+    'not hold for this question should be ignored.';
+  const ERROR_HEADING =
+    'Records of mistakes made in earlier attempts here. Each line is a correction to one of them, ' +
+    'not a description of this workspace:';
+  const paragraphs = (prompt: string): string[] => prompt.split('\n\n');
+
+  it('renders the shipped prompt unchanged when no arm sets a standing', () => {
+    // The baseline every published number was produced under, written out rather than described:
+    // adding a field to the input must not move it, and only a literal can prove that.
+    expect(promptFor(base)).toBe(
+      [
+        'You write one SQLite query that answers the question exactly.',
+        'Return the SQL only, in a ```sql fence, with no explanation.',
+        'Use only the tables and columns in the schema. Prefer explicit JOINs. Do not invent columns.',
+        'Schema:\nCREATE TABLE s (id INTEGER)',
+        'Workspace conventions learned from earlier corrections:\n- rule one',
+        'Question: How many students?',
+      ].join('\n\n'),
+    );
+  });
+
+  it('appends the advisory sentence after the pack and before the question', () => {
+    const prompt = promptFor({ ...base, standing: 'advisory' });
+    expect(prompt).toContain(ADVISORY);
+    expect(prompt.indexOf('- rule one')).toBeLessThan(prompt.indexOf(ADVISORY));
+    expect(prompt.indexOf(ADVISORY)).toBeLessThan(prompt.indexOf('Question: How many students?'));
+  });
+
+  it('adds exactly one paragraph to the same prompt, which is what makes the control a control', () => {
+    const reference = paragraphs(promptFor(base));
+    const advisory = paragraphs(promptFor({ ...base, standing: 'advisory' }));
+    expect(advisory).toHaveLength(reference.length + 1);
+    expect(advisory.filter((line) => line !== ADVISORY)).toEqual(reference);
+  });
+
+  it('carries the same sentence with no pack, and no heading above it', () => {
+    const prompt = promptFor({ ...base, pack: '', standing: 'advisory' });
+    expect(prompt).toContain(ADVISORY);
+    expect(prompt).not.toContain('learned from earlier corrections');
+    expect(paragraphs(prompt).filter((line) => line !== ADVISORY)).toEqual(
+      paragraphs(promptFor({ ...base, pack: '' })),
+    );
+  });
+
+  it('replaces the heading under the prohibitive register and keeps the items verbatim', () => {
+    const prompt = promptFor({ ...base, standing: 'prohibitive' });
+    expect(prompt).toContain(`${ERROR_HEADING}\n- rule one`);
+    expect(prompt).not.toContain('Workspace conventions learned from earlier corrections');
+    expect(prompt).not.toContain(ADVISORY);
+  });
+
+  it('keeps the error register off the repair content label, which is what a repair already is', () => {
+    // The heading describes how the block is addressed; a repair note under it still reads as a
+    // correction, so the arm that sets the register is not silently rendered as a rule block.
+    expect(promptFor({ ...base, packKind: 'repair', standing: 'prohibitive' })).toContain(
+      `${ERROR_HEADING}\n- rule one`,
+    );
+  });
+
+  it('changes one paragraph rather than adding one under the error register', () => {
+    // The claim the prohibitive arm makes is "same statements, same order, same count, different
+    // register", so the paragraph count must not move and exactly one paragraph may differ.
+    const reference = paragraphs(promptFor(base));
+    const prohibitive = paragraphs(promptFor({ ...base, standing: 'prohibitive' }));
+    expect(prohibitive).toHaveLength(reference.length);
+    expect(prohibitive.filter((line, at) => line !== reference[at])).toHaveLength(1);
+    expect(prohibitive.join('\n\n')).toContain('- rule one');
+  });
+
+  it('leaves the sentence last when the pack is placed after the question', () => {
+    const prompt = promptFor({ ...base, packPosition: 'after', standing: 'advisory' });
+    expect(prompt.trimEnd().endsWith(ADVISORY)).toBe(true);
+    expect(prompt.indexOf('Question: How many students?')).toBeLessThan(prompt.indexOf(ADVISORY));
+  });
+
+  it('keeps the critique instruction next to the block it names, and the sentence last', () => {
+    // Composition order, not wording: "each item in that block" points backwards, and a paragraph
+    // between the pack and that instruction would leave it pointing at prose instead of at items.
+    const lines = paragraphs(promptFor({ ...base, critique: true, standing: 'advisory' }));
+    const at = lines.findIndex((line) => line.startsWith('Workspace conventions'));
+    expect(lines[at + 1]?.startsWith('Before writing the query, decide for each item')).toBe(true);
+    expect(lines[at + 2]).toBe(ADVISORY);
+    expect(lines[at + 3]).toBe('Question: How many students?');
   });
 });
 
@@ -1222,6 +1348,55 @@ describe('buildValidityGates', () => {
     expect(failing.pass).toBe(false);
     expect(failing.blocking).toBe(true);
     expect(failing.actual).toBe('48.97%');
+  });
+
+  it('V43 is absent when no arm declares a framing, because a gate that always passes is a comment', () => {
+    expect(buildValidityGates(sound).some((entry) => entry.id === 'V43-framing-delivered')).toBe(false);
+    expect(
+      buildValidityGates({ ...sound, framing: [] }).some((entry) => entry.id === 'V43-framing-delivered'),
+    ).toBe(false);
+  });
+
+  it('V43 passes when every declared framing arrived and no other arm carried one', () => {
+    const entry = gate(
+      {
+        ...sound,
+        framing: [
+          { arm: 'full', prompts: 350, carrying: 0, expected: false },
+          { arm: 'full-advisory', prompts: 350, carrying: 350, expected: true },
+          { arm: 'none-advisory', prompts: 350, carrying: 350, expected: true },
+          { arm: 'full-prohibitive', prompts: 350, carrying: 350, expected: true },
+        ],
+      },
+      'V43-framing-delivered',
+    );
+    expect(entry.pass).toBe(true);
+    expect(entry.blocking).toBe(true);
+    expect(entry.actual).toBe(
+      'full: 0/350 expected none, full-advisory: 350/350, none-advisory: 350/350, ' +
+        'full-prohibitive: 350/350',
+    );
+  });
+
+  it('V43 fails when a declared arm missed a prompt, which is the arm becoming its control', () => {
+    const entry = gate(
+      {
+        ...sound,
+        framing: [{ arm: 'full-advisory', prompts: 350, carrying: 349, expected: true }],
+      },
+      'V43-framing-delivered',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toBe('full-advisory: 349/350 — disagrees: full-advisory');
+  });
+
+  it('V43 fails when a reference arm carried framing it does not declare', () => {
+    const entry = gate(
+      { ...sound, framing: [{ arm: 'full', prompts: 350, carrying: 1, expected: false }] },
+      'V43-framing-delivered',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toBe('full: 1/350 expected none — disagrees: full');
   });
 
   it('marks exactly V5 advisory and everything else blocking', () => {

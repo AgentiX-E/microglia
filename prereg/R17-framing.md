@@ -4,7 +4,7 @@ step: R17
 opened: 2026-10-31
 arms: none,none-advisory,full,full-advisory,full-prohibitive
 sample: 350
-gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32
+gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V43
 ---
 
 # R17 — does permission to ignore the note recover what the note costs?
@@ -69,9 +69,36 @@ mechanism has published support, and it is falsifiable in one dispatch.
    rather than as reference data — same statement, same order, same count, different register. It is
    the arm that tests the trauma mechanism *forward* rather than as a mitigation: if a note that
    records an error is over-applied, saying so should hurt more, not less.
-5. **No gate, no transfer arm, no new instrument.** Every reading here is a cell against `none` on the
-   same 350 questions, and the six gates that measure packs, folds, parsing, reliability and shape are
-   the ones that already exist.
+5. **No transfer arm and no new measurement.** Every reading here is a cell against `none` on the same
+   350 questions. One gate is added — `V43-framing-delivered`, which counts per arm how many of its
+   prompts carried the framing it declares — because the failure it prevents is the one this stage
+   cannot otherwise see: a table entry that silently fails to match leaves `full-advisory` as `full`
+   under a second name, and "the sentence cost nothing" becomes a reading about a sentence that was
+   never sent.
+
+## Amendment before dispatch (2026-10-31, written before the run)
+
+The prediction below was written at the resolution this lane was assumed to have. R16 measured that
+resolution and it is coarser than the prediction's clauses: 350 questions, paired, means the smallest
+cell that clears its own bar is about **4.0pp** (`chars-1800`: 26 discordant pairs, delta −4.00pp,
+p = 0.0094), and a 2.6pp cell did not clear it (0.1078). A paired difference of 2pp lives inside this
+instrument's noise, so four of the thresholds below are not measurable as written. They are re-levelled
+here, before the dispatch, rather than after the numbers land:
+
+| Clause as written | How it will be read |
+|---|---|
+| `full-advisory` at least 2pp above `full` | **Confirmed** if the point estimate is ≥ +3pp **and** p < 0.05; **partial** if the estimate is positive with the CI's lower bound below 0; **not supported** if the estimate is ≤ 0 |
+| `full-advisory` no more than 1pp below `none` | Recorded as a direction, not a criterion: 1pp is a quarter of the MDE and no cell in this record has ever resolved it |
+| `full-prohibitive` within 1pp of `full` | **Confirmed** if the CI on `full-prohibitive` − `full` contains 0; the 1pp band is reported but not adjudicated |
+| `none-advisory` within ±1.5pp of `none` | Same: the CI is the reading, the band is a description |
+| no arm above `none` by 2pp | Unchanged, and it is the one clause this lane *can* adjudicate in the negative: a cell 4pp above `none` is visible, and one that is not is not |
+
+**What a null means here.** With the effect this hypothesis predicts (recovering the default's −2.86pp,
+i.e. +2.86pp), this dispatch has roughly 60% power at α = 0.05. A null is therefore **not** evidence
+that framing does not matter unless the interval's upper bound on `full-advisory` − `full` sits below
++2.5pp. If it does not, the honest verdict is "inconclusive at this n", and the arm set is re-dispatched
+on a second draw before the refutation clause is allowed to fire. Writing the power down before the run
+is what stops a 60%-power null from being read as a discovery.
 
 ## Prediction
 
@@ -88,10 +115,13 @@ mechanism has published support, and it is falsifiable in one dispatch.
 
 ## Refutation
 
-- **`full-advisory` within 1pp of `full`.** Framing is not the channel. Then the variable is which
-  item was retrieved rather than how it was said, and the next iteration is selection — a pack that
-  picks the highest-ranked item that fits instead of taking rank order and stopping — with the
-  relevance strata as its readout.
+- **`full-advisory` no better than `full`, at this lane's resolution.** The registered form was "within
+  1pp", which is a quarter of the MDE and would fire on noise; the amendment above replaces it with the
+  one this instrument can prove — the interval on `full-advisory` − `full` has an **upper bound below
+  +2.5pp**, so a recovery large enough to matter is excluded rather than merely unproven. Framing is
+  then not the channel, and the variable is which item was retrieved rather than how it was said: the
+  next iteration is selection — a pack that picks the highest-ranked item that fits instead of taking
+  rank order and stopping — with the relevance strata as its readout.
 - **`full-prohibitive` at least 2pp above `full`.** The trauma mechanism runs the other way in this
   lane: the negative register is what makes a note usable. That would reopen the content axis through
   framing rather than through form, and it would be registered as a new stage rather than added here.
