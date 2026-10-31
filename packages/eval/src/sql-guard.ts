@@ -103,6 +103,7 @@ type Slot = {
 };
 
 const DEADLINE = 'statement deadline';
+const EXITED = 'the statement process exited';
 
 export class BoundedSql {
   readonly #deadlineMs: number;
@@ -157,6 +158,17 @@ export class BoundedSql {
         ms: performance.now() - started,
       };
     }
+    if (reply === 'exited') {
+      this.#retire(slot);
+      return {
+        ok: false,
+        rows: [],
+        truncated: false,
+        deadline: false,
+        error: EXITED,
+        ms: performance.now() - started,
+      };
+    }
     this.#release(slot);
     if (!reply.ok) {
       return {
@@ -208,27 +220,32 @@ export class BoundedSql {
   }
 
   /** Post one statement and wait for it, for the deadline, or for the process to die. */
-  #ask(slot: Slot, task: { dbPath: string; body: string; rowCap: number }): Promise<Reply | 'deadline'> {
-    return new Promise<Reply | 'deadline'>((resolve) => {
+  #ask(
+    slot: Slot,
+    task: { dbPath: string; body: string; rowCap: number },
+  ): Promise<Reply | 'deadline' | 'exited'> {
+    return new Promise<Reply | 'deadline' | 'exited'>((resolve) => {
       let settled = false;
-      const finish = (value: Reply | 'deadline'): void => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const finish = (value: Reply | 'deadline' | 'exited'): void => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
+        if (timer !== undefined) clearTimeout(timer);
         slot.child.off('message', onMessage);
         resolve(value);
       };
-      const timer = setTimeout(() => finish('deadline'), this.#deadlineMs);
-      const onMessage = (reply: Reply): void => finish(reply);
+      const onMessage = (value: Reply): void => finish(value);
+      timer = setTimeout(() => finish('deadline'), this.#deadlineMs);
       slot.child.on('message', onMessage);
-      // The callback rather than an `error` listener, and the only death handler there is: a child
-      // that is already gone makes `send` fail with EPIPE, which without a callback is an uncaught
-      // exception on a channel nobody is watching. A child that dies *after* the message was written
-      // is bounded by the deadline instead — the statement then reports as a deadline rather than as
-      // a death, which is a mislabel of one rare event, and the alternative is a second handler whose
-      // ordering against this one decides which of the two labels a normal shutdown gets.
+      // Death is a third outcome and it has to win over the deadline. Without it, `close` — or a
+      // child the runtime killed — leaves a statement waiting its full twenty seconds for an answer
+      // that cannot come, which is how a shutdown that should be immediate costs a fold.
+      void slot.exited.then(() => finish('exited'));
+      // The callback rather than an `error` listener: a child that is already gone makes `send` fail
+      // with EPIPE, which without a callback is an uncaught exception on a channel nobody is
+      // watching, and the statement would then wait out its deadline instead of failing.
       slot.child.send(task, (error) => {
-        if (error !== null) finish({ ok: false, error: 'the statement process exited', ms: 0 });
+        if (error !== null) finish({ ok: false, error: EXITED, ms: 0 });
       });
     });
   }

@@ -138,6 +138,10 @@ describe('a statement with a deadline', () => {
     // will never come.
     const sql = new BoundedSql({ deadlineMs: 30_000, workers: 1 });
     const running = sql.run(small, 'select count(*) as n from t, u, t as t2');
+    // Long enough that the statement has been written to the child and is running inside the driver:
+    // the failure this covers is "the process is gone while the statement is in flight", not "the
+    // message never left", and those two take different paths out of `#ask`.
+    await new Promise((resolve) => setTimeout(resolve, 150));
     await sql.close();
     const result = await running;
     expect(result.ok).toBe(false);
