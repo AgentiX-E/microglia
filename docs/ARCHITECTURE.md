@@ -257,7 +257,10 @@ The study is a package, not a script:
   rules own case produced" (`supplied`, `redundant`, `broke`, `useless`), the admission rule that
   keeps only rules that reproduced a case and broke none, and the transfer ledger that points an
   admitted rule at foreign questions. Pure functions over trials, so the verdict arithmetic is
-  testable without a model, and the lane that wires it reads learning rows only.
+  testable without a model, and the lane that wires it reads learning rows only. `transferLedgerOf`
+  is the projection from folds to pairs, and it is a function rather than a `flatMap` in the report
+  because the first version of it wrote the pairs into a record the artefact does not serialise —
+  `V33-transfer-ledger` now fails a run whose file carries the summary without them.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

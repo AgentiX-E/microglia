@@ -8,8 +8,10 @@ import {
   transferSummary,
   transferTargets,
   transferringItemIds,
+  transferLedgerOf,
   verdictOf,
   type ProbeTrial,
+  type TransferTrial,
 } from '../rule-probe.js';
 
 const trial = (
@@ -450,6 +452,33 @@ describe('transferSummary', () => {
     expect(summary.informative).toBe(200);
     expect(summary.netPp).toBeCloseTo(20, 6);
     expect(summary.verdict).toBe('transfers');
+  });
+});
+
+describe('transferLedgerOf', () => {
+  const row = (itemId: string, targetId: string): TransferTrial => ({
+    itemId,
+    targetId,
+    blankCorrect: false,
+    withRuleCorrect: true,
+  });
+
+  it('carries every pair across folds in fold order', () => {
+    // The projection is the part that can be wrong: the first version wrote the pairs into the fold
+    // record, which the artefact never serialises, so the run it was added for published a summary
+    // with no ledger behind it. This test is the difference between that happening silently and it
+    // failing here.
+    const ledger = transferLedgerOf([
+      { transfer: { trials: [row('k1', 'b')] } },
+      { transfer: null },
+      { transfer: { trials: [row('k2', 'c'), row('k3', 'd')] } },
+    ]);
+    expect(ledger.map((entry) => entry.targetId)).toEqual(['b', 'c', 'd']);
+  });
+
+  it('is empty when no fold measured transfer', () => {
+    expect(transferLedgerOf([{ transfer: null }, { transfer: null }])).toEqual([]);
+    expect(transferLedgerOf([])).toEqual([]);
   });
 });
 

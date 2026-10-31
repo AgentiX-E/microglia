@@ -128,6 +128,7 @@ import {
   transferSummary,
   transferTargets,
   transferringItemIds,
+  transferLedgerOf,
   type TransferTrial,
   verdictOf,
   schemaWithValues,
@@ -2358,8 +2359,8 @@ type FoldResult = {
     readonly summary: TransferSummary;
     readonly rules: number;
     readonly skipped: Readonly<Record<string, number>>;
-    /** Every pair, as `[rule, target, blank, withRule]`, with `null` for a call that never returned. */
-    readonly trials: readonly (readonly [string, string, boolean | null, boolean | null])[];
+    /** Every pair, so a later reading does not have to buy the run again. */
+    readonly trials: readonly TransferTrial[];
     readonly packAll: number;
     readonly packKept: number;
     readonly packDiffers: number;
@@ -4039,14 +4040,7 @@ async function runFold(
             summary: probe.transfer.summary,
             rules: probe.transfer.rules.length,
             skipped: probe.transfer.skipped,
-            // One line per pair rather than per field: the ledger is read by a person looking for
-            // the trials behind a number, and `null` is an absence that must stay visible.
-            trials: probe.transfer.trials.map((trial) => [
-              trial.itemId,
-              trial.targetId,
-              trial.blankCorrect ?? null,
-              trial.withRuleCorrect ?? null,
-            ]),
+            trials: probe.transfer.trials,
             packAll: transferSizes.reduce((sum, entry) => sum + entry.all, 0),
             packKept: transferSizes.reduce((sum, entry) => sum + entry.kept, 0),
             packDiffers: transferDiffers,
@@ -4576,6 +4570,7 @@ async function main(): Promise<void> {
             repaired: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0),
             blankRight: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.blankRight ?? 0), 0),
             unmeasured: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0),
+            ledger: transferLedgerOf(folds).length,
             unmeasuredBlank: folds.reduce(
               (sum, fold) => sum + (fold.transfer?.summary.unmeasuredBlank ?? 0),
               0,
@@ -5129,6 +5124,25 @@ async function main(): Promise<void> {
             blank_right: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.blankRight ?? 0), 0),
             unchanged: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unchanged ?? 0), 0),
             unmeasured: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0),
+            unmeasured_blank: folds.reduce(
+              (sum, fold) => sum + (fold.transfer?.summary.unmeasuredBlank ?? 0),
+              0,
+            ),
+            /**
+             * The pairs themselves, `[rule, target, blank, withRule]` per row, in fold order.
+             *
+             * The aggregate answers how often and the ledger answers where. The first version of
+             * this field was written into the fold record, which the artefact does not serialise,
+             * so the run it was added for carried the summary and none of the pairs. It is
+             * projected here, where the artefact reads, and pinned by a test on the projection.
+             */
+            ledger: transferLedgerOf(folds).map((trial) => [
+              trial.itemId,
+              trial.targetId,
+              // `null` rather than a missing key: an absence has to stay visible in the file.
+              trial.blankCorrect ?? null,
+              trial.withRuleCorrect ?? null,
+            ]),
             // Recomputed from the sums rather than averaged over folds: a per-fold mean of rates
             // would weight a fold with forty informative trials like one with four hundred.
             rate: (() => {

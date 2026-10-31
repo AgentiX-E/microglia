@@ -419,6 +419,23 @@ attempts and set below the runner's step timeout. A step timeout kills the proce
 measured folds with it; a deadline stops the run and writes what it has. The two are different
 answers to "the run cannot finish", and only one of them is a result.
 
+**Transfer trial** — One admitted rule shown one *other* corrected question from the same database,
+paired with the bare retry of that question. The pair yields four counts: `repaired` (a target the
+retry could not fix, which the rule fixed), `broke` (a target the retry already fixed, which the rule
+destroyed), `blank_right` (needed nothing, stayed right) and `unchanged` (needed help, got none).
+Repairs per question ≈ (admitted rules per pack) × `rate`, which is why the ratio and the pack size
+are published together: 0.42 × 7.3% is three questions in a hundred, and that is the whole claim.
+
+**Break rate** — Of the transfer targets a bare retry already repaired, the share the rule then
+broken: 28 of 56, 50%, on the BIRD store. It is the loss side that `rate` cannot see, and the reason
+`net_pp` is a gate (V17) rather than a column somebody may or may not read.
+
+**Control hole** — A transfer trial whose *blank* call never returned. It is not "the retry failed":
+without a control there is no denominator, so the trial is `unmeasured`, is counted in
+`unmeasured_blank`, and can never be a repair. The defect this rule closes was the opposite — a hole
+recorded as `false`, which put the trial in the informative set and credited the rule with work nobody
+measured.
+
 **Prefetch** — The optional second phase of an interpreter: told the batch's contexts before the first
 claim is applied, it may pay the calls' round trips concurrently, while the claims themselves are
 still applied in corpus order. The prompt for a claim depends only on its own event, which is what

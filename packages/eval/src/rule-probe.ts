@@ -363,6 +363,25 @@ export function transferringItemIds(trials: readonly TransferTrial[]): readonly 
   return kept;
 }
 
+/** A fold's transfer measurement, as far as the ledger is concerned. */
+export type LedgerFold = {
+  readonly transfer: { readonly trials: readonly TransferTrial[] } | null;
+};
+
+/**
+ * Every pair the run measured, in fold order.
+ *
+ * The aggregate answers *how often*; the ledger answers *where*. A reading that asks whether the
+ * repairs cluster in one database, or whether one rule repaired three targets, is a question about
+ * the pairs, and an artefact that carried only the aggregate would answer it by buying the run
+ * again. Written as a function rather than as a `flatMap` inside the report because the projection
+ * is the part that can be wrong — the first version of this landed in the fold record, which the
+ * artefact does not serialise, and the ledger was silently absent from the run it was written for.
+ */
+export function transferLedgerOf(folds: readonly LedgerFold[]): readonly TransferTrial[] {
+  return folds.flatMap((fold) => fold.transfer?.trials ?? []);
+}
+
 /**
  * How many foreign cases each rule is shown, and which.
  *

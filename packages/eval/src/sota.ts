@@ -1235,6 +1235,8 @@ export type GateInput = {
     readonly unmeasured: number;
     /** Trials whose control call is the missing half; a subset of `unmeasured`. */
     readonly unmeasuredBlank?: number;
+    /** Rows the artefact carries for the pairs themselves, which must be one per trial. */
+    readonly ledger?: number;
     readonly measured: number;
     readonly broke: number;
     readonly netPp: number;
@@ -1426,6 +1428,17 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       actual: `${informative} informative trial(s), ${repaired} repair(s)`,
       pass: informative >= 100,
       blocking: false,
+    });
+    // The aggregate answers how often and the ledger answers where. The first version of the ledger
+    // was written into the fold record, which the artefact never serialises, so a run published a
+    // rate with no pairs behind it and nothing failed. A field nobody checks is a field that can be
+    // absent: this gate makes "the ledger reached the file" a condition of the run being readable.
+    gates.push({
+      id: 'V33-transfer-ledger',
+      criterion: 'the artefact carries one row per trial, so the pairs behind the rate survive the run',
+      actual: `${input.transfer.ledger ?? 0}/${trials} pair(s) carried`,
+      pass: (input.transfer.ledger ?? 0) === trials,
+      blocking: true,
     });
     // The conditional rate cannot go down: its denominator excludes, by construction, every trial
     // where the rule could do damage. A summary that reports it without the break side is a

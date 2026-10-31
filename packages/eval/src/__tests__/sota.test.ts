@@ -814,6 +814,34 @@ describe('buildValidityGates', () => {
     expect(named.actual).toContain('17 with no control call');
   });
 
+  it('V33 refuses a run whose ledger never reached the artefact', () => {
+    // Exactly what happened on the first run that measured transfer: the pairs were written into a
+    // record the artefact does not serialise, so the file carried a rate and no rows behind it.
+    const dropped = gate(
+      {
+        ...sound,
+        transfer: transferInput({ trials: 523, informative: 467, repaired: 34, blankRight: 56, unmeasured: 0 }),
+      },
+      'V33-transfer-ledger',
+    );
+    expect(dropped.pass).toBe(false);
+    expect(dropped.blocking).toBe(true);
+    expect(dropped.actual).toContain('0/523');
+
+    const carried = gate(
+      {
+        ...sound,
+        transfer: {
+          ...transferInput({ trials: 523, informative: 467, repaired: 34, blankRight: 56, unmeasured: 0 }),
+          ledger: 523,
+        },
+      },
+      'V33-transfer-ledger',
+    );
+    expect(carried.pass).toBe(true);
+    expect(carried.actual).toContain('523/523');
+  });
+
   it('V17 refuses a transfer summary whose net effect does not reconcile with its counts', () => {
     // The gate exists because the conditional rate cannot go down. A summary that reports a rate
     // and no net effect is a summary that can only look like progress, so the reconciliation is

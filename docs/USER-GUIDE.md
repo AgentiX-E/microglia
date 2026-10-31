@@ -1156,6 +1156,56 @@ it is not a rule that works. On BIRD the 38 survivors changed 342 of 350 packs a
 `0.00pp`, so the honest reading of a passing gate is "this store is not demonstrably harmful", not
 "this store helps".
 
+### 13.5 Does an admitted rule travel?
+
+§13.4 keeps the rules that reproduced their own correction. That is evidence of *a* fact, not of a
+useful one: a rule that reproduces only the case it was written from is a lookup table with one row.
+The transfer measurement asks the other half — point each admitted rule at a **different** corrected
+question from the same database and see whether the rule repairs it.
+
+```bash
+# transfer runs whenever an arm asks for the rules that survived the own-case gate
+SOTA_ARMS=full-verified,full-transferred \
+SOTA_TRANSFER_TARGETS=8 SOTA_LEARN_SAMPLE=128 pnpm eval:sota
+```
+
+The control is a property of the target, not of the rule: whether a bare retry already repairs the
+target is measured once per target and reused by every rule pointed at it, which is what makes eight
+targets per rule affordable. Read the `rule_transfer` block:
+
+```jsonc
+// poc-sota-bird-transfer.json, 350 questions, 5 folds, 2,679 calls, 523 trials
+{ "rules": 98, "trials": 523, "informative": 467, "repaired": 34, "broke": 28,
+  "blank_right": 56, "rate": 0.0728, "break_rate": 0.5, "net_pp": 1.15,
+  "rules_with_repair": 30, "verdict": "transfers", "pack_kept": 10 }
+```
+
+- `rate` is `repaired / informative`: among targets a bare retry could **not** repair, 7.3% were
+  repaired by a rule. This ratio can only go up, because its denominator excludes every trial where a
+  rule can do damage, so it is never an answer on its own.
+- `break_rate` is the other half: of the 56 targets that needed nothing, **half came back wrong** once
+  a rule was in the prompt. That is the harm an earlier iteration measured at the rule level, here at
+  the level of one rule and one question.
+- `net_pp` is the only figure that answers "does a rule help": `(34 − 28) / 523 = +1.15pp`. Six trials
+  out of 523 is not a resolvable effect, and the artefact publishes the counts beside the ratio so a
+  reader cannot take it as one.
+
+**What the intersection is worth.** `full-transferred` keeps only the rules that did both — reproduced
+their own case and repaired a foreign one. That is 30 of 576 rules and **10 injected items across 350
+questions** (0.03 per question): the arm answered 53.71%, exactly the no-memory baseline (`0.00pp`,
+p = 1.00). A gate that leaves nothing is not a filter.
+
+**Three ways to misread it.**
+
+1. `verdict: "transfers"` means the net effect is positive, not that it is resolvable. Read `net_pp`,
+   `informative` and `repaired` together or not at all.
+2. A hole is not a negative. A blank call that never returned leaves its trial with no denominator, is
+   counted in `unmeasured` (and named in V15's `unmeasured_blank`), and can never be credited to a
+   rule.
+3. `V33-transfer-ledger` requires one row per trial in the artefact. The first run that measured
+   transfer wrote its pairs into a record the artefact does not serialise, and published a rate with
+   no pairs behind it; the gate exists so that this cannot happen silently again.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:
