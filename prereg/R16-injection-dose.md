@@ -4,7 +4,7 @@ step: R16
 opened: 2026-10-31
 arms: none-replica,full,chars-600,chars-1800,chars-2400
 sample: 350
-gates: V1,V13,V14,V15,V16,V17,V33
+gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32
 ---
 
 # R16 — is the harm a property of what is stored, or of how much of it arrives?
@@ -125,4 +125,93 @@ quietly when the curve looks good.
 
 ## Outcome
 
-Filled in when the dispatch lands.
+One dispatch, `41177896801`, artefact `eval/results/poc-sota-bird-dose.json`: 350 questions, 5 folds,
+2,263 calls, 1 retry, 0 timeouts, 0 call failures, `config.prereg` naming this file, and all ten gates
+that this arm set engages pass. Five points, one store, one ranking, one question, one number apart.
+
+| Reading | Value | Predicted | |
+|---|---|---|---|
+| dose order | 0.29 → 1.83 → 2.97 → 4.16 items/question (100, 639, 1,040, 1,456 rendered items) | increasing | ✓ |
+| characters inside the budget | 168 / 1,080 / 1,649 / 2,212 against 600 / 1,200 / 1,800 / 2,400 | under budget | ✓ |
+| coverage at 600 | one item on 100 of 350 questions (28.6%) | ≥ 70% | ✗ |
+| `chars-600` | 54.00%, **+0.00pp**, CI [−1.43, +1.71], p = 1.0000, 4 gained / 4 lost | within ±2pp of `none` | ✓ |
+| `full` (1,200) | 51.43%, −2.57pp, CI [−5.43, +0.29], p = 0.1078, 8 gained / 17 lost | −1 to −4pp, below 600 | ✓ |
+| `chars-1800` | 50.00%, **−4.00pp**, CI [−6.86, −1.14], **p = 0.0094**, 6 gained / 20 lost | not registered individually | the only point that clears |
+| `chars-2400` | 51.14%, −2.86pp, CI [−6.00, +0.29], p = 0.1102, 11 gained / 21 lost | ≤ `chars-600` − 3pp | ✗ by 0.14pp |
+| `none-replica` | 52.57%, −1.43pp, CI [−2.86, +0.00], p = 0.1250, 1 gained / 6 lost | ≤ 10 discordant | ✓ (7) |
+
+`none` is 54.00% and nothing on the curve is above it. The best arm is the one that injects nothing,
+at +0.00pp; the worst is 4.00pp below it, which is also this sample's minimum detectable effect
+(V5, 4.00pp at 80% power). One point clears its own bar, four do not, and the spread of the whole
+curve is the width of the instrument.
+
+**The instrument prediction failed, and the failure is the finding.** `chars-600` was registered as a
+one-item cell and it is a one-item cell on 100 of 350 questions: the pack layer takes items in rank
+order, adds a whole item or stops, and the top-ranked item renders to more than the 600-character
+budget on the other 250. So the flat cell at 600 is 71.4% `none` by construction, and a cell that is
+seven parts control cannot answer the question it was built for. Diluted by 0.286, a per-item cost of
+−5.0pp and a per-item gain of +6.0pp both land inside CI [−1.43, +1.71]: **the prediction that "one
+item is harmless" was checked against a cell that could not have shown otherwise.**
+
+**The one-item cell this run failed to build exists, in iteration 86.** That dispatch gave the same
+lane the same four low budgets against the same rules-with-the-case store, and its `chars-900` reached
+**exactly 1.00 item per question** at 718 characters. Read the two runs together:
+
+| Dispatch | Arm | Characters | Items | Accuracy | Δ vs `none` | gained / lost | p |
+|---|---|---|---|---|---|---|---|
+| 86 | `chars-300` | 0 | 0.00 | 53.71% | +0.29pp | 5 / 4 | 1.00 |
+| 86 | `chars-600` | 156 | 0.27 | 54.00% | +0.57pp | 6 / 4 | 0.75 |
+| R16 | `chars-600` | 168 | 0.29 | 54.00% | **+0.00pp** | 4 / 4 | 1.00 |
+| 86 | `chars-900` | 718 | **1.00** | 50.29% | **−3.14pp** [−6.29, −0.29] | 9 / 20 | 0.061 |
+| R16 | `full` | 1,080 | 1.83 | 51.43% | −2.57pp [−5.43, +0.29] | 8 / 17 | 0.108 |
+| 86 | `full` | 1,094 | 1.87 | 50.29% | **−3.14pp** [−6.00, −0.29] | 9 / 20 | 0.061 |
+| R16 | `chars-1800` | 1,649 | 2.97 | 50.00% | **−4.00pp** [−6.86, −1.14] | 6 / 20 | 0.009 |
+| R16 | `chars-2400` | 2,212 | 4.16 | 51.14% | −2.86pp [−6.00, +0.29] | 11 / 21 | 0.110 |
+
+Two things survive the join. The diluted cell is **reproducible across stores**: 0.27 items at +0.57pp
+then 0.29 items at +0.00pp, two distillations apart. And **the loss is already complete at one item**:
+1.00 item costs −3.14pp, 1.83 costs −2.57, 2.97 costs −4.00 and 4.16 costs −2.86 — an excursion of
+1.43pp across a fourfold range of injected text, with the whole of the step between 0.29 items and
+1.00. The registered prediction said the harm would be complete by the second item; it is complete by
+the **first**, and the second item adds nothing.
+
+**Which is the refutation clause, arriving by a door the file did not name.** The clause required all
+points within ±2pp of each other to declare that quantity is not the variable. Inside this run the
+spread is 4.00pp and the literal condition fails. Across the two runs, everything from one item up
+sits within 1.43pp and nothing above one item moves the number — which is the substance of the clause
+and the reason the next measurement is not another budget. R17's framing question is the main line now,
+not the follow-up.
+
+**The floor moved, and it moved against this run.** Iteration 86's `none-replica` was 3 gained and 3
+lost — the floor was three questions. This run's is 1 gained and 6 lost: seven discordant questions,
+−1.43pp, and the first clearly negative replica on record. Two consequences, and both cut against
+reading small cells. Everything at or below seven flips is noise here, which is `chars-600` (8) and the
+replica itself (7), so flatness at 600 is what an unchanged question looks like rather than evidence
+about one item. And because `none` is the luckier of two identical prompts, every delta in the table
+overstates the harm by up to 1.43pp — the sign of the finding does not depend on it, the size does.
+
+**Four dispatches, one sign, at the dose the product ships.** The default budget has been measured at
+−3.71pp (p = 0.0192), −3.14pp, −2.00pp (p = 0.3105) and −2.57pp (p = 0.1078) on four disjoint
+350-question draws of this lane. The sign has held four times and the size has not; the mean is
+**−2.86pp**. That is what the shipped configuration costs, and it is the one number here that has never
+come back positive.
+
+**The header was wrong, and the check that would have caught it now exists.** This file's `gates` line
+was copied from R15 and named seven transfer gates that a dose arm set cannot engage; the run emitted
+ten others and nothing refused the mismatch. That is the fourth instance of one defect — a field that
+was true when written and silently stopped being true (R12's admission, R13's ledger, R15's V14/V17) —
+and the first where both sides of the claim are files in the repository. `protocol` now recomputes the
+agreement for every artefact that names a pre-registration, and fails on a mismatch.
+
+**What this licenses, and what it closes.** Three axes are now measured: content (four forms inside
+±3pp), substrate (an 18.24pp reproduction gap buying 0.07pp of transfer) and quantity (a step at the
+first item, nothing above it, no point above `none`). The sentence this file was written to license —
+*the store is not harmful, the default budget is* — is in the Outcome as a refutation rather than a
+result, because the cell that would have carried it was 71% control and the cell that could have
+carried it, from iteration 86, came back at −3.14pp. **A budget cannot be the fix**: the smallest
+budget that injects anything already costs what the default costs. What is left is the item — which one
+is retrieved, and how it is said — and both are registered: `prereg/R17-framing.md` varies the framing
+of the same fact, and the pack layer's all-or-nothing prefix selection is the instrument defect this run
+exposed.
+
+

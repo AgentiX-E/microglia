@@ -185,6 +185,16 @@ pay for before it may show a rule at all.
 **Power** — the sample size needed to detect an effect at a stated confidence. Stated per benchmark so
 a null result is not confused with an underpowered one.
 
+**Dose** — the number of knowledge items a recall returns for a question, and the only quantity the pack
+layer's character budget actually controls. The layer adds whole items in rank order and returns an
+empty pack when none fits, so a budget is not a linear dial: on this project's store an item renders to
+500–824 characters, a 600-character budget admits one item on 29% of questions, and the 1,200-character
+default admits 1.83. A dose response is read in `mean_pack_ids`, never in the budget that produced it.
+
+**Coverage (dose)** — the share of questions on which a dose arm injected at least one item. A cell at
+0.29 items per question is 71% control, and its interval cannot bound a per-item effect better than
+about ±5pp; the number to read before any delta from a reduced budget.
+
 **Precision (knowledge)** — the share of active rules whose payload matches the reference policy on a
 probe grid of every context they claim. Separates "learned a lot" from "learned the right thing".
 

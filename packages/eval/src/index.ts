@@ -652,7 +652,9 @@ export {
 
 export {
   preregGate,
+  preregGateAgreement,
   readPrereg,
+  type GateAgreement,
   type Prereg,
   type PreregProblem,
   type PreregReading,

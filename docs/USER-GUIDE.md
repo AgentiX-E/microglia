@@ -1311,6 +1311,57 @@ moves a held-out cell.
    they carry 0.03 and 0.05 items per question. An arm that injects almost nothing is not a filtered
    memory, it is a memory with the filter's verdict and no content left.
 
+### 13.8 How much of it arrives?
+
+§13.4 filtered the pack, §13.6 changed what it is made of, §13.7 changed whether its items could be
+pointed at a foreign question. All three left the pack's *size* at the default. This one varies nothing
+but the character budget the pack layer is given, so the five cells are the same store, the same
+ranking and the same question, one number apart.
+
+```bash
+# the dose curve: 0, 1, 2, 3 and 4 items per question, plus a replica of the no-memory cell
+SOTA_ARMS=none,full,none-replica,chars-600,chars-1800,chars-2400 SOTA_LEARN_SAMPLE=128 pnpm eval:sota
+```
+
+```jsonc
+// poc-sota-bird-dose.json, 350 questions, 5 folds, 2,263 calls, `none` at 54.00%
+[
+  { "arm": "chars-600",  "mean_pack_ids": 0.29, "mean_pack_chars": 168,  "accuracy": 0.5400, "delta_pp":  0.00, "p_value": 1.0 },
+  { "arm": "full",       "mean_pack_ids": 1.83, "mean_pack_chars": 1080, "accuracy": 0.5143, "delta_pp": -2.57, "p_value": 0.1078 },
+  { "arm": "chars-1800", "mean_pack_ids": 2.97, "mean_pack_chars": 1649, "accuracy": 0.5000, "delta_pp": -4.00, "p_value": 0.0094 },
+  { "arm": "chars-2400", "mean_pack_ids": 4.16, "mean_pack_chars": 2212, "accuracy": 0.5114, "delta_pp": -2.86, "p_value": 0.1102 },
+  { "arm": "none-replica", "mean_pack_ids": 0.00, "mean_pack_chars": 0,  "accuracy": 0.5257, "delta_pp": -1.43, "p_value": 0.1250 }
+]
+```
+
+- **Read `mean_pack_ids` before any delta.** The pack layer adds whole items in rank order and returns
+  an empty pack when none fits, so a budget is not a dial: `chars-600` admits one item on 100 of 350
+  questions and nothing on the other 250. Its flat cell is 71% `none` by construction, and at that
+  dilution a per-item cost of −5.0pp or a per-item gain of +6.0pp both sit inside its interval.
+- **The curve is a step, not a slope.** Zero to 1.83 items costs 2.57pp; 1.83 to 4.16 items costs
+  0.29pp more. A dispatch that measured an actual one-item cell (`chars-900` at exactly 1.00 item, in
+  the iteration-86 run whose `full` cell is within 0.6pp of this one) cost −3.14pp, so the loss is
+  complete at the first item and no budget above it changes anything.
+- **No point is above `none`.** The best arm is the one that injects nothing, at +0.00pp, and the whole
+  spread of the curve — 4.00pp — equals this sample's minimum detectable effect at 80% power. One cell
+  clears its own bar; four do not.
+
+**A budget cannot be the fix, because the smallest budget that injects anything already costs what the
+default costs.** That is the product consequence, and it moves the work from quantity to the item: a
+pack that *chooses* an item that fits rather than taking rank order and stopping, and a note that says
+something about its own fallibility.
+
+**Three ways to misread it.**
+
+1. A flat cell at a small budget is usually an empty pack. `poc-sota-bird-dose.json` records
+   `mean_pack_ids` and `mean_pack_chars` per arm; an arm at 0.27–0.29 items per question is a diluted
+   control, not a one-item treatment.
+2. Compare the curve's spread with `V5-resolution`, not with the bigger numbers from other sections.
+   Here the spread and the floor are both 4.00pp, which is why only the worst cell clears.
+3. `none-replica` is the floor and it moves. It was 3 discordant questions in iteration 86 and 7 here,
+   negative for the first time (−1.43pp, 1 gained and 6 lost) — so `none` was the luckier of two
+   identical prompts and every delta in the table is, if anything, generous.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

@@ -295,7 +295,7 @@ the measurement from the thing measured:
 |---|---|---|
 | `plugin.ts` | the candidate contract: one request type, one reply, a loader that refuses a module inside this package | a generator somebody else wrote has to run without editing our code, and provenance is checkable rather than asserted |
 | `artifact-schema.ts` | the run artefact's types, a hand-written validator that checks the arithmetic, and the report renderer | a schema no code reads is documentation; a report written beside the JSON is a second source of truth |
-| `prereg.ts` | the pre-registration format and its gate | a prediction has to exist before the run and has to be refutable, or the number is a description |
+| `prereg.ts` | the pre-registration format, its gate, and the agreement between the gate list it names and the one its run emitted | a prediction has to exist before the run and has to be refutable, or the number is a description |
 | `reproduction.ts` | published cells, the Wilson interval, and the admissibility rule | a comparison across splits is sampling error, and arithmetic is cheaper than trust |
 
 The runner (`bin/plugin-run.ts`) owns the I/O — it builds SQLite databases from a self-contained case
@@ -303,6 +303,14 @@ file, executes gold and answers, and writes the artefact — so nothing above ne
 model. `bin/protocol.ts` is the CI gate: it re-validates every committed artefact, re-renders its
 report and compares byte for byte, re-derives every cell comparison, and refuses a pre-registration
 that is not one. It runs offline in about a second.
+
+The gate has a fourth claim since R16: **a pre-registration's gate list is the gate list its run
+emitted.** `preregGateAgreement` compares the header's `gates` against the artefact's `gates[].id`
+in both directions, and `bin/protocol.ts` applies it to every committed artefact that names a file in
+`config.prereg`. Neither side can check the other: a dispatch holds the artefact and not the header,
+`eval:prereg` holds the header and not the artefact, and R16 shipped a header copied from R15 that
+named seven transfer gates a dose arm set could never emit. Both halves are files in this repository,
+so the pairing is checked offline for every run rather than argued about afterwards.
 
 ### 8.2 The call client is part of the measurement
 

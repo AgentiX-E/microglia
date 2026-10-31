@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { preregGate, readPrereg } from '../prereg.js';
+import { preregGate, preregGateAgreement, readPrereg, type Prereg } from '../prereg.js';
 
 const HEADER = [
   '---',
@@ -216,5 +216,58 @@ describe('preregGate', () => {
 
   it('accepts a custom gate name', () => {
     expect(preregGate(readPrereg('no header', 'x.md'), 'dispatch').name).toBe('dispatch');
+  });
+});
+
+describe('preregGateAgreement', () => {
+  const registration = (gates: readonly string[]): Prereg => ({
+    id: 'R16-injection-dose',
+    step: 'R16',
+    opened: '2026-10-31',
+    arms: ['none'],
+    sample: 350,
+    gates,
+    prediction: [],
+    refutation: [],
+    file: 'prereg/R16-injection-dose.md',
+  });
+
+  it('accepts a file that names exactly what the run emitted', () => {
+    const agreement = preregGateAgreement(registration(['V1', 'V12', 'V32']), ['V32', 'V1', 'V12']);
+    expect(agreement.ok).toBe(true);
+    expect(agreement.detail).toBe('3 declared gate(s), every one emitted and none unannounced');
+  });
+
+  it('refuses a gate the file names and the run never emitted', () => {
+    const agreement = preregGateAgreement(registration(['V1', 'V17']), ['V1']);
+    expect(agreement.ok).toBe(false);
+    expect(agreement.detail).toBe('declares V17, which the run never emitted');
+  });
+
+  it('refuses a gate the run emitted and the file never named', () => {
+    const agreement = preregGateAgreement(registration(['V1']), ['V1', 'V8', 'V12']);
+    expect(agreement.ok).toBe(false);
+    expect(agreement.detail).toBe('does not name V8, V12, which the run emitted');
+  });
+
+  it('reports both directions when the lists have nothing in common', () => {
+    const agreement = preregGateAgreement(registration(['V13', 'V14']), ['V1', 'V2']);
+    expect(agreement.ok).toBe(false);
+    expect(agreement.detail).toBe(
+      'declares V13, V14, which the run never emitted; does not name V1, V2, which the run emitted',
+    );
+  });
+
+  it('refuses a run that emitted nothing against a file that names a gate', () => {
+    expect(preregGateAgreement(registration(['V1']), []).ok).toBe(false);
+  });
+
+  it('matches a slugged artefact id against the bare code in the header', () => {
+    const agreement = preregGateAgreement(
+      registration(['V1', 'V17']),
+      ['V1-pack-not-empty', 'V17-net-sign'],
+    );
+    expect(agreement.ok).toBe(true);
+    expect(agreement.detail).toBe('2 declared gate(s), every one emitted and none unannounced');
   });
 });

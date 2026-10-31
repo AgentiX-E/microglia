@@ -244,3 +244,60 @@ export function preregGate(reading: PreregReading, name = 'preregistration'): Ru
     detail: `${id} fixes ${arms.join(', ')} at n=${sample} with ${reading.prereg.gates.join(', ')}`,
   };
 }
+
+export type GateAgreement = {
+  readonly ok: boolean;
+  readonly detail: string;
+};
+
+/**
+ * The gate code out of the id an artefact records.
+ *
+ * An artefact names a gate `V17-net-sign` and a header names it `V17`: the code is the part the two
+ * files have in common and the slug is a reading aid for whoever opens the JSON. A gate whose id
+ * carries no slug is already a code, which is why the separator is searched for rather than assumed.
+ */
+function gateCode(gate: string): string {
+  const at = gate.indexOf('-');
+  return at === -1 ? gate : gate.slice(0, at);
+}
+
+/**
+ * The gate list a pre-registration names, against the gate list its run emitted.
+ *
+ * R16's header was written by copying R15's file: seven transfer gates, when the arm set was four
+ * dose points and a replica and the run could only emit the ten gates every dispatch emits. The
+ * pre-registration passed validation, the run passed its gates, and the two disagreed — which is
+ * the same defect as R12's admission, R13's ledger and R15's V14/V17, a field that was true when
+ * it was written and silently stopped being true when the thing it described changed.
+ *
+ * It is checked here, offline, because both sides of the claim are files: the header in `prereg/`
+ * and the `gates` array in the artefact. A dispatch cannot see this — it holds one of the two —
+ * but the repository holds both, and `eval:protocol` reads them for every artefact that names a
+ * pre-registration.
+ *
+ * Equality in both directions is the point. A gate the file names and the run never emits means
+ * the file describes a different experiment; a gate the run emits and the file does not name means
+ * the run was judged by a criterion it was not registered against.
+ */
+export function preregGateAgreement(prereg: Prereg, emitted: readonly string[]): GateAgreement {
+  const declared = new Set(prereg.gates);
+  // An artefact names a gate `V17-net-sign` and a header names it `V17`: the code is the part the
+  // two files have in common, and the slug is a reading aid for whoever opens the JSON. Comparing
+  // the two as written would fail every gate whose artefact id carries a name, which is all of
+  // them.
+  const ran = new Set(emitted.map(gateCode));
+  const absent = prereg.gates.filter((gate) => !ran.has(gate));
+  const unnamed = [...ran].filter((gate) => !declared.has(gate));
+  if (absent.length === 0 && unnamed.length === 0) {
+    return {
+      ok: true,
+      detail: `${declared.size} declared gate(s), every one emitted and none unannounced`,
+    };
+  }
+  const parts: string[] = [];
+  if (absent.length > 0) parts.push(`declares ${absent.join(', ')}, which the run never emitted`);
+  if (unnamed.length > 0) parts.push(`does not name ${unnamed.join(', ')}, which the run emitted`);
+  return { ok: false, detail: parts.join('; ') };
+}
+

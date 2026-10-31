@@ -1,7 +1,7 @@
 /**
  * The protocol gate: everything an artefact claims, checked from the artefact.
  *
- * Three claims, all offline, all deterministic:
+ * Four claims, all offline, all deterministic:
  *
  *  1. **Every pre-registration is one.** A file with a missing refutation section, an unfilled
  *     placeholder, or an id that disagrees with its name is refused here and by the workflow.
@@ -12,6 +12,9 @@
  *  3. **No comparison claims more than its arithmetic.** The cell comparison is recomputed
  *     from the S2 artefact, and the committed record must equal the recomputation — including
  *     the verdict, so "indicative" cannot be upgraded to "reproduced" by editing a file.
+ *  4. **A pre-registration is the one its run was judged by.** The gate list in the header and
+ *     the gate list in the artefact are equal, in both directions, for every committed artefact
+ *     that names a file. Neither side can check the other alone; this script holds both.
  *
  * `--write` regenerates the derived files instead of comparing, so the committed copies and
  * the check that guards them come from one code path.
@@ -22,6 +25,7 @@ import {
   compareCell,
   cellGate,
   preregGate,
+  preregGateAgreement,
   readPrereg,
   runArtifactReport,
   validateRunArtifact,
@@ -50,6 +54,65 @@ function checkPreregistrations(): readonly Failure[] {
     const gate = preregGate(reading);
     process.stdout.write(`[protocol] ${gate.ok ? 'pass' : 'FAIL'} prereg/${entry} — ${gate.detail}\n`);
     if (!gate.ok) failures.push({ check: `prereg/${entry}`, detail: gate.detail });
+  }
+  return failures;
+}
+
+/**
+ * Claim 4: a pre-registration's gate list is the gate list its run emitted.
+ *
+ * The artefact is the half of the claim the pre-registration cannot see, and `prereg/` is the
+ * half the artefact cannot see, so neither a dispatch nor `eval:prereg` can check this on its
+ * own. The repository holds both: every committed artefact that names a pre-registration in
+ * `config.prereg` is paired with that file here, and the two lists must be equal in both
+ * directions. An artefact that names no pre-registration is not a failure — most of them predate
+ * the field — but it is not silently counted either.
+ */
+function checkPreregAgreement(): readonly Failure[] {
+  const directory = join(ROOT, 'eval/results');
+  const files = readdirSync(directory)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort();
+  const failures: Failure[] = [];
+  let paired = 0;
+  for (const entry of files) {
+    const path = `eval/results/${entry}`;
+    let artifact: {
+      readonly config?: { readonly prereg?: unknown };
+      readonly gates?: readonly { readonly id: string }[];
+    };
+    try {
+      artifact = readJson(path);
+    } catch {
+      // A file this script cannot parse is a different check's problem; the artefact schema
+      // verdict owns it, and refusing here would report one defect twice.
+      continue;
+    }
+    const named = artifact.config?.prereg;
+    if (typeof named !== 'string' || named === '') continue;
+    paired += 1;
+    let source: string;
+    try {
+      source = readFileSync(join(ROOT, named), 'utf8');
+    } catch {
+      failures.push({ check: path, detail: `names ${named}, which is not in the repository` });
+      continue;
+    }
+    const reading = readPrereg(source, named);
+    if (reading.prereg === undefined) {
+      failures.push({
+        check: path,
+        detail: `${named} is not a pre-registration: ${reading.problems[0]?.problem ?? 'unreadable'}`,
+      });
+      continue;
+    }
+    const emitted = (artifact.gates ?? []).map((gate) => gate.id);
+    const agreement = preregGateAgreement(reading.prereg, emitted);
+    process.stdout.write(`[protocol] ${agreement.ok ? 'pass' : 'FAIL'} ${path} — ${named}: ${agreement.detail}\n`);
+    if (!agreement.ok) failures.push({ check: path, detail: `${named}: ${agreement.detail}` });
+  }
+  if (paired === 0) {
+    process.stdout.write('[protocol] skip prereg agreement — no artefact names a pre-registration\n');
   }
   return failures;
 }
@@ -190,6 +253,7 @@ function checkCells(recordPath: string): readonly Failure[] {
 function main(): void {
   const failures = [
     ...checkPreregistrations(),
+    ...checkPreregAgreement(),
     ...checkReport('eval/results/poc-plugin-fixture.json', 'eval/results/poc-plugin-fixture.md'),
     ...checkCells('eval/results/poc-cell-comparison.json'),
   ];
