@@ -361,6 +361,15 @@ export type SqlArm =
    */
   | 'full-repair-verified'
   /**
+   * The repair store, reduced to the accounts that repaired a case other than their own.
+   *
+   * R13's `full-transferred` for the other substrate, and the only arm that can answer the product
+   * question R14 raised: the pair reproduces twice as much of its own corrections, so if it also
+   * travels better, the memory line is alive on this benchmark; if it does not, the substrate was
+   * never the constraint and no fourth content form will be.
+   */
+  | 'full-repair-transferred'
+  /**
    * The same pack, with the model asked to *decide* applicability before answering.
    *
    * Iterations 63 and 64 showed that a rule can carry its condition and that the model
@@ -777,6 +786,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-shuffled': true,
   'full-transferred': true,
   'full-repair-verified': true,
+  'full-repair-transferred': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(
@@ -1139,6 +1149,92 @@ export class GenerationCache {
   }
 }
 
+/**
+ * The four checks every transfer measurement is held to.
+ *
+ * Shared between the two substrates rather than written twice, because the second one exists only to
+ * be compared with the first: a repair measured by a lighter rule would produce a number that cannot
+ * be set beside the rule's. The ids differ and the logic does not, and the ids are arguments so that
+ * the published ones (V15, V16, V17, V33) could not be renamed by a refactor.
+ */
+function transferGates(
+  input: TransferGateInput,
+  ids: {
+    readonly reconcile: string;
+    readonly resolvable: string;
+    readonly ledger: string;
+    readonly net: string;
+  },
+): readonly ValidityGate[] {
+  const { trials, informative, repaired, blankRight, unmeasured, measured, broke, netPp, verdict } =
+    input;
+  const blankHoles = input.unmeasuredBlank ?? 0;
+  const out: ValidityGate[] = [
+    {
+      id: ids.reconcile,
+      criterion: 'every transfer trial is measured, informative, or a target that needed nothing',
+      // The control-side holes are named separately because they are the ones that would have
+      // flattered the rate if they had been folded into "the retry failed".
+      actual:
+        `${unmeasured + blankRight + informative}/${trials} trial(s): ${informative} informative, ` +
+        `${blankRight} already repaired by the retry, ${unmeasured} unmeasured ` +
+        `(${blankHoles} with no control call)`,
+      pass: unmeasured + blankRight + informative === trials,
+      blocking: true,
+    },
+    {
+      id: ids.resolvable,
+      criterion: 'at least 100 informative trials, or the transfer rate is a direction rather than a rate',
+      actual: `${informative} informative trial(s), ${repaired} repair(s)`,
+      pass: informative >= 100,
+      blocking: false,
+    },
+    // The aggregate answers how often and the ledger answers where. The first version of the ledger
+    // was written into the fold record, which the artefact never serialises, so a run published a
+    // rate with no pairs behind it and nothing failed. A field nobody checks is a field that can be
+    // absent: this gate makes "the ledger reached the file" a condition of the run being readable.
+    {
+      id: ids.ledger,
+      criterion: 'the artefact carries one row per trial, so the pairs behind the rate survive the run',
+      actual: `${input.ledger ?? 0}/${trials} pair(s) carried`,
+      pass: (input.ledger ?? 0) === trials,
+      blocking: true,
+    },
+    // The conditional rate cannot go down: its denominator excludes, by construction, every trial
+    // where the rule could do damage. A summary that reports it without the break side is a
+    // summary that can only look like progress, so the net marginal effect is a gate rather than a
+    // column somebody may or may not read.
+    {
+      id: ids.net,
+      criterion:
+        'the transfer summary states its net marginal effect, and the repair and break counts reconcile with it',
+      actual:
+        `${netPp.toFixed(2)}pp net over ${measured} measured trial(s): ` +
+        `${repaired} repaired, ${broke} broken, verdict \`${verdict}\``,
+      pass: measured > 0 && Math.abs(netPp - ((repaired - broke) / measured) * 100) < 1e-9,
+      blocking: true,
+    },
+  ];
+  return out;
+}
+
+/** One substrate's transfer bookkeeping, as the gates read it. */
+export type TransferGateInput = {
+  readonly trials: number;
+  readonly informative: number;
+  readonly repaired: number;
+  readonly blankRight: number;
+  readonly unmeasured: number;
+  /** Trials whose control call is the missing half; a subset of `unmeasured`. */
+  readonly unmeasuredBlank?: number;
+  /** Rows the artefact carries for the pairs themselves, which must be one per trial. */
+  readonly ledger?: number;
+  readonly measured: number;
+  readonly broke: number;
+  readonly netPp: number;
+  readonly verdict: string;
+};
+
 export type ValidityGate = {
   readonly id: string;
   readonly criterion: string;
@@ -1260,21 +1356,15 @@ export type GateInput = {
    * forty informative trials cannot separate 2% from 8%, and publishing it beside one computed on
    * four hundred would give two numbers the same standing.
    */
-  readonly transfer?: {
-    readonly trials: number;
-    readonly informative: number;
-    readonly repaired: number;
-    readonly blankRight: number;
-    readonly unmeasured: number;
-    /** Trials whose control call is the missing half; a subset of `unmeasured`. */
-    readonly unmeasuredBlank?: number;
-    /** Rows the artefact carries for the pairs themselves, which must be one per trial. */
-    readonly ledger?: number;
-    readonly measured: number;
-    readonly broke: number;
-    readonly netPp: number;
-    readonly verdict: string;
-  };
+  readonly transfer?: TransferGateInput;
+  /**
+   * The same measurement over the second substrate, when a run asked for it.
+   *
+   * Checked by the same four gates with different ids rather than by a lighter version: a repair
+   * that transfers is a claim about the product, and a claim about the product is held to the same
+   * reconciliation its predecessor was.
+   */
+  readonly transferRepair?: TransferGateInput;
   /**
    * The two-substrate comparison, when a run built both stores.
    *
@@ -1486,56 +1576,27 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
     });
   }
   if (input.transfer !== undefined) {
-    const { trials, informative, repaired, blankRight, unmeasured } = input.transfer;
-    const blankHoles = input.transfer.unmeasuredBlank ?? 0;
-    gates.push({
-      id: 'V15-transfer-reconciles',
-      criterion: 'every transfer trial is measured, informative, or a target that needed nothing',
-      // The control-side holes are named separately because they are the ones that would have
-      // flattered the rate if they had been folded into "the retry failed".
-      actual:
-        `${unmeasured + blankRight + informative}/${trials} trial(s): ${informative} informative, ` +
-        `${blankRight} already repaired by the retry, ${unmeasured} unmeasured ` +
-        `(${blankHoles} with no control call)`,
-      pass: unmeasured + blankRight + informative === trials,
-      blocking: true,
-    });
-    gates.push({
-      id: 'V16-transfer-resolvable',
-      criterion: 'at least 100 informative trials, or the transfer rate is a direction rather than a rate',
-      actual: `${informative} informative trial(s), ${repaired} repair(s)`,
-      pass: informative >= 100,
-      blocking: false,
-    });
-    // The aggregate answers how often and the ledger answers where. The first version of the ledger
-    // was written into the fold record, which the artefact never serialises, so a run published a
-    // rate with no pairs behind it and nothing failed. A field nobody checks is a field that can be
-    // absent: this gate makes "the ledger reached the file" a condition of the run being readable.
-    gates.push({
-      id: 'V33-transfer-ledger',
-      criterion: 'the artefact carries one row per trial, so the pairs behind the rate survive the run',
-      actual: `${input.transfer.ledger ?? 0}/${trials} pair(s) carried`,
-      pass: (input.transfer.ledger ?? 0) === trials,
-      blocking: true,
-    });
-    // The conditional rate cannot go down: its denominator excludes, by construction, every trial
-    // where the rule could do damage. A summary that reports it without the break side is a
-    // summary that can only look like progress, so the net marginal effect is now a gate rather
-    // than a column somebody may or may not read.
-    const marginal = input.transfer;
-    gates.push({
-      id: 'V17-transfer-net-reported',
-      criterion:
-        'the transfer summary states its net marginal effect, and the repair and break counts reconcile with it',
-      actual:
-        `${marginal.netPp.toFixed(2)}pp net over ${marginal.measured} measured trial(s): ` +
-        `${marginal.repaired} repaired, ${marginal.broke} broken, verdict \`${marginal.verdict}\``,
-      pass:
-        marginal.measured > 0 &&
-        Math.abs(marginal.netPp - ((marginal.repaired - marginal.broke) / marginal.measured) * 100) <
-          1e-9,
-      blocking: true,
-    });
+    gates.push(
+      ...transferGates(input.transfer, {
+        reconcile: 'V15-transfer-reconciles',
+        resolvable: 'V16-transfer-resolvable',
+        ledger: 'V33-transfer-ledger',
+        net: 'V17-transfer-net-reported',
+      }),
+    );
+  }
+  // The same four checks over the second substrate. R14 established that a store which
+  // reproduces twice as much can still be inert; this is the measurement that says whether it
+  // also travels, and it is held to the same reconciliation rather than to a lighter one.
+  if (input.transferRepair !== undefined) {
+    gates.push(
+      ...transferGates(input.transferRepair, {
+        reconcile: 'V39-repair-transfer-reconciles',
+        resolvable: 'V40-repair-transfer-resolvable',
+        ledger: 'V41-repair-transfer-ledger',
+        net: 'V42-repair-transfer-net-reported',
+      }),
+    );
   }
   if (input.substrate !== undefined) {
     const s = input.substrate;

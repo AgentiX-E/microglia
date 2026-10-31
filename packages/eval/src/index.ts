@@ -369,6 +369,7 @@ export {
   type GateInput,
   type PromptInput,
   type SqlArm,
+  type TransferGateInput,
   type ValidityGate,
 } from './sota.js';
 

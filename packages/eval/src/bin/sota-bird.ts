@@ -130,7 +130,6 @@ import {
   transferSummary,
   transferTargets,
   transferringItemIds,
-  transferLedgerOf,
   type TransferTrial,
   verdictOf,
   schemaWithValues,
@@ -180,6 +179,7 @@ import {
   type ProbeSummary,
   type ProbeTrial,
   type SubstrateComparison,
+  type TransferGateInput,
   type TransferSummary,
   type ValueSample,
   matches,
@@ -2426,6 +2426,151 @@ function probeArtefact(
   };
 }
 
+/**
+ * One substrate's transfer measurement, as the artefact carries it and as the gates read it.
+ *
+ * Typed rather than a bag of unknown fields, because the same object now feeds both the file and
+ * the gates that reconcile it: a projection the gate cannot read would be a block of numbers whose
+ * only reader is a human.
+ */
+type TransferProjection = {
+  readonly rules: number;
+  readonly trials: number;
+  readonly informative: number;
+  readonly repaired: number;
+  readonly broke: number;
+  readonly blank_right: number;
+  readonly unchanged: number;
+  readonly unmeasured: number;
+  readonly unmeasured_blank: number;
+  readonly ledger: readonly (readonly (string | boolean | null)[])[];
+  readonly rate: number;
+  readonly measured: number;
+  readonly marginal_repair: number;
+  readonly marginal_break: number;
+  readonly net_pp: number;
+  readonly break_rate: number;
+  readonly verdict: string;
+  readonly rules_with_repair: number;
+  readonly skipped: Readonly<Record<string, number>>;
+  readonly pack_all: number;
+  readonly pack_kept: number;
+  readonly pack_differs: number;
+};
+
+/**
+ * Four reductions of the same folds — trials, measured, repairs, breaks — decide seven published
+ * ratios, and the first version of this block recomputed them inside every field. Reading them once
+ * means a field cannot be computed from one denominator and its neighbour from another, which is the
+ * defect V17 exists to catch after the fact.
+ */
+function transferArtefact(
+  folds: readonly FoldResult[],
+  pick: (fold: FoldResult) => FoldTransferRecord | null,
+): TransferProjection | null {
+  const runs = folds.map(pick);
+  if (runs.every((run) => run === null)) return null;
+  const total = (get: (run: FoldTransferRecord) => number): number =>
+    runs.reduce((sum, run) => sum + (run === null ? 0 : get(run)), 0);
+  const trials = total((run) => run.summary.trials);
+  const unmeasured = total((run) => run.summary.unmeasured);
+  const measured = trials - unmeasured;
+  const informative = total((run) => run.summary.informative);
+  const repaired = total((run) => run.summary.repaired);
+  const broke = total((run) => run.summary.broke);
+  const blankRight = total((run) => run.summary.blankRight);
+  return {
+    rules: total((run) => run.summary.rules),
+    trials,
+    informative,
+    repaired,
+    broke,
+    blank_right: blankRight,
+    unchanged: total((run) => run.summary.unchanged),
+    unmeasured,
+    unmeasured_blank: total((run) => run.summary.unmeasuredBlank),
+    /**
+     * The pairs themselves, `[rule, target, blank, withRule]` per row, in fold order.
+     *
+     * The aggregate answers how often and the ledger answers where. The first version of this field
+     * was written into the fold record, which the artefact does not serialise, so the run it was
+     * added for carried the summary and none of the pairs. It is projected here, where the artefact
+     * reads, and pinned by a test on the projection.
+     */
+    ledger: runs.flatMap((run) =>
+      run === null
+        ? []
+        : run.trials.map((trial) => [
+            trial.itemId,
+            trial.targetId,
+            // `null` rather than a missing key: an absence has to stay visible in the file.
+            trial.blankCorrect ?? null,
+            trial.withRuleCorrect ?? null,
+          ]),
+    ),
+    rate: informative === 0 ? 0 : Number((repaired / informative).toFixed(4)),
+    // The whole 2x2, because `rate` alone can only go up: its denominator is the targets a bare
+    // retry could not fix, which excludes every trial where the rule can do damage.
+    measured,
+    marginal_repair: measured === 0 ? 0 : Number((repaired / measured).toFixed(4)),
+    marginal_break: measured === 0 ? 0 : Number((broke / measured).toFixed(4)),
+    net_pp: measured === 0 ? 0 : Number((((repaired - broke) / measured) * 100).toFixed(2)),
+    break_rate: blankRight === 0 ? 0 : Number((broke / blankRight).toFixed(4)),
+    verdict:
+      informative < TRANSFER_FLOOR
+        ? 'unmeasured'
+        : measured === 0 || repaired - broke <= 0
+          ? 'no-transfer'
+          : 'transfers',
+    rules_with_repair: total((run) => run.summary.rulesWithRepair),
+    skipped: runs.reduce<Record<string, number>>((all, run) => {
+      for (const [reason, count] of Object.entries(run?.skipped ?? {})) {
+        all[reason] = (all[reason] ?? 0) + count;
+      }
+      return all;
+    }, {}),
+    pack_all: total((run) => run.packAll),
+    pack_kept: total((run) => run.packKept),
+    pack_differs: total((run) => run.packDiffers),
+  };
+}
+
+/**
+ * The gates' view of one projection.
+ *
+ * Written as a translation rather than as a second set of reductions, so that the file and the
+ * validity gates cannot report different directions for the same run: the totals are computed once
+ * in `transferArtefact` and every reader reads them. The first version of this block recomputed
+ * them inline, which is how a published rate once disagreed with the gate that was meant to pin it.
+ */
+function transferGateInput(projection: TransferProjection): TransferGateInput {
+  return {
+    trials: projection.trials,
+    informative: projection.informative,
+    repaired: projection.repaired,
+    blankRight: projection.blank_right,
+    unmeasured: projection.unmeasured,
+    unmeasuredBlank: projection.unmeasured_blank,
+    ledger: projection.ledger.length,
+    measured: projection.measured,
+    broke: projection.broke,
+    netPp: projection.net_pp,
+    verdict: projection.verdict,
+  };
+}
+
+/** One substrate's transfer measurement, as a fold carries it. */
+type FoldTransferRecord = {
+  readonly summary: TransferSummary;
+  readonly rules: number;
+  readonly skipped: Readonly<Record<string, number>>;
+  /** Every pair, so a later reading does not have to buy the run again. */
+  readonly trials: readonly TransferTrial[];
+  readonly packAll: number;
+  readonly packKept: number;
+  readonly packDiffers: number;
+};
+
 type FoldResult = {
   readonly fold: number;
   readonly learn: number;
@@ -2547,16 +2692,16 @@ type FoldResult = {
    * `summary.rate` is repairs over *informative* trials — targets a bare retry could not repair —
    * and it is the one number that converts a store's size into an expected number of repairs.
    */
-  readonly transfer: {
-    readonly summary: TransferSummary;
-    readonly rules: number;
-    readonly skipped: Readonly<Record<string, number>>;
-    /** Every pair, so a later reading does not have to buy the run again. */
-    readonly trials: readonly TransferTrial[];
-    readonly packAll: number;
-    readonly packKept: number;
-    readonly packDiffers: number;
-  } | null;
+  readonly transfer: FoldTransferRecord | null;
+  /**
+   * The same measurement over the second substrate, or null when it was not asked for.
+   *
+   * A repair and a rule travel for different reasons — one names the case, the other names the
+   * mechanism — and R13 measured only the first at 7.3% repair against 50% damage. The pair's
+   * transfer is the one reading that can say whether reproducing twice as much buys anything on a
+   * question the store was not written from.
+   */
+  readonly transferRepair: FoldTransferRecord | null;
   /**
    * What the shuffled arm did, or null when it did not run.
    *
@@ -2904,9 +3049,11 @@ async function runFold(
   // The content axis. A second store over the *same* corrections, differing in one
   // instruction string: rules say what is true, repairs say what failed and what fixed it.
   // Built only when an arm asks, because the distillation is the expensive half of a fold.
-  const wantsRepair = RETRY_ARMS.some((arm) => arm !== 'retry-blank' && ARMS.has(arm)) ||
+  const wantsRepair =
+    RETRY_ARMS.some((arm) => arm !== 'retry-blank' && ARMS.has(arm)) ||
     ARMS.has('full-repair') ||
-    ARMS.has('full-repair-verified');
+    ARMS.has('full-repair-verified') ||
+    ARMS.has('full-repair-transferred');
   const repaired = wantsRepair
     ? await buildFoldMemory(GENERALIZE, learnRows, dataset, task, 'repair')
     : undefined;
@@ -3033,6 +3180,9 @@ async function runFold(
   /** What the repair store's own gate left in each pack, and how many questions it changed. */
   const repairVerifiedSizes: { all: number; kept: number }[] = [];
   let repairVerifiedDiffers = 0;
+  /** The same, for the intersection of the two repair gates. */
+  const repairTransferredSizes: { all: number; kept: number }[] = [];
+  let repairTransferredDiffers = 0;
   /** What the gate did to each pack: items before and after, so a shrink is a number. */
   const verifiedSizes: { all: number; kept: number }[] = [];
   /** Questions where the gate changed the pack. Zero differences means it scored `full` twice. */
@@ -3096,13 +3246,19 @@ async function runFold(
   // Shared between the two probes: the control is the same call under both substrates, and paying
   // for it twice would put the endpoint's own sampling noise inside the comparison.
   const blankControls = new Map<string, boolean | undefined>();
-  if (ARMS.has('full-verified')) {
+  // An arm that injects a gated or transferred pack cannot run without the probe that decides what
+  // is in it. The probe used to be asked for by one arm and consumed by two, so a dispatch that
+  // named only `full-transferred` would have measured `none` under a second name and reported it as
+  // a reading. Both consumers ask for it here instead.
+  const wantsRuleProbe = ARMS.has('full-verified') || ARMS.has('full-transferred');
+  const wantsRepairProbe = ARMS.has('full-repair-verified') || ARMS.has('full-repair-transferred');
+  if (wantsRuleProbe) {
     probe = await probeMemory(store, learnRows, dataset, task, TRANSFER_TARGETS, blankControls);
   }
   // The other substrate, asked the same questions with the same controls. Its own admission gate
   // decides what `full-repair-verified` may inject; the pairing is what turns "these two rates look
   // different" into a test over the questions both stores covered.
-  if (ARMS.has('full-repair-verified') && repaired !== undefined) {
+  if (wantsRepairProbe && repaired !== undefined) {
     probeRepair = await probeMemory(
       repaired.store,
       learnRows,
@@ -3200,6 +3356,20 @@ async function runFold(
         repairVerifiedDiffers += 1;
       }
       call(position, 'full-repair-verified', gatedRepair.rendered, gatedRepair.ids.length);
+    }
+    if (ARMS.has('full-repair-transferred') && probeRepair?.transfer != null) {
+      // The repair store's own intersection: an account that reproduced its own case and repaired a
+      // different one. Nothing has ever measured this, because nothing had a repair store under the
+      // probe; its pack size is the finding if it is small.
+      const movingRepair = new Set(probeRepair.transfer.rules);
+      const repairPack = repairPacks.get(position);
+      const surviving = (repairPack?.items ?? []).filter((item) => movingRepair.has(item.id));
+      const movedPack = makePack(surviving, { budget: pack.budget });
+      repairTransferredSizes.push({ all: repairPack?.items.length ?? 0, kept: surviving.length });
+      if (movedPack.ids.join('\u0000') !== (repairPack?.ids.join('\u0000') ?? '')) {
+        repairTransferredDiffers += 1;
+      }
+      call(position, 'full-repair-transferred', movedPack.rendered, movedPack.ids.length);
     }
     if (ARMS.has('full-transferred') && probe?.transfer != null) {
       // The intersection of two gates: the rule reproduced its own correction, and it repaired a
@@ -4269,6 +4439,18 @@ async function runFold(
             packKept: transferSizes.reduce((sum, entry) => sum + entry.kept, 0),
             packDiffers: transferDiffers,
           },
+    transferRepair:
+      probeRepair?.transfer == null
+        ? null
+        : {
+            summary: probeRepair.transfer.summary,
+            rules: probeRepair.transfer.rules.length,
+            skipped: probeRepair.transfer.skipped,
+            trials: probeRepair.transfer.trials,
+            packAll: repairTransferredSizes.reduce((sum, entry) => sum + entry.all, 0),
+            packKept: repairTransferredSizes.reduce((sum, entry) => sum + entry.kept, 0),
+            packDiffers: repairTransferredDiffers,
+          },
     shuffled: ARMS.has('full-shuffled')
       ? { donors: shuffledDonors, identical: shuffledIdentical }
       : null,
@@ -4751,6 +4933,9 @@ async function main(): Promise<void> {
   const pairPooled: PooledSubstrate | null = poolSubstrates(
     folds.flatMap((fold) => (fold.substrate === null ? [] : [fold.substrate])),
   );
+  // One pooled projection per substrate, computed once and read by both the gate and the artefact.
+  const ruleTransfer = transferArtefact(folds, (fold) => fold.transfer);
+  const repairTransfer = transferArtefact(folds, (fold) => fold.transferRepair);
   const gates = buildValidityGates({
     meanPackIds,
     partition: {
@@ -4809,6 +4994,8 @@ async function main(): Promise<void> {
             questions: cases.length,
           },
         }),
+    // The second substrate's transfer, when the run asked for it.
+    ...(repairTransfer === null ? {} : { transferRepair: transferGateInput(repairTransfer) }),
     // The paired comparison of the two substrates, when both were measured.
     ...(pairPooled === null
       ? {}
@@ -4833,47 +5020,7 @@ async function main(): Promise<void> {
           },
         }),
     // The transfer measurement's own bookkeeping, when it ran.
-    ...(folds.every((fold) => fold.transfer === null)
-      ? {}
-      : {
-          transfer: {
-            trials: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0),
-            informative: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.informative ?? 0), 0),
-            repaired: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0),
-            blankRight: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.blankRight ?? 0), 0),
-            unmeasured: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0),
-            ledger: transferLedgerOf(folds).length,
-            unmeasuredBlank: folds.reduce(
-              (sum, fold) => sum + (fold.transfer?.summary.unmeasuredBlank ?? 0),
-              0,
-            ),
-            measured:
-              folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
-              folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0),
-            broke: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0),
-            netPp: (() => {
-              const measured =
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
-              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
-              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
-              return measured === 0 ? 0 : ((repaired - broke) / measured) * 100;
-            })(),
-            verdict: (() => {
-              const informative = folds.reduce(
-                (sum, fold) => sum + (fold.transfer?.summary.informative ?? 0),
-                0,
-              );
-              const measured =
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
-              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
-              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
-              if (informative < TRANSFER_FLOOR) return 'unmeasured';
-              return measured === 0 || repaired - broke <= 0 ? 'no-transfer' : 'transfers';
-            })(),
-          },
-        }),
+    ...(ruleTransfer === null ? {} : { transfer: transferGateInput(ruleTransfer) }),
     // The pool's own bookkeeping. A gate rather than a comment because instrumentation that
     // silently drops questions makes every number derived from it a number about the survivor set.
     ...(folds.every((fold) => fold.pool.length === 0)
@@ -5365,107 +5512,14 @@ async function main(): Promise<void> {
        * per question: `rate × mean_pack_ids`. Without it, a store that is too small and a store
        * that is useless are indistinguishable.
        */
-      rule_transfer: folds.every((fold) => fold.transfer === null)
-        ? null
-        : {
-            rules: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.rules ?? 0), 0),
-            trials: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0),
-            informative: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.informative ?? 0), 0),
-            repaired: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0),
-            broke: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0),
-            blank_right: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.blankRight ?? 0), 0),
-            unchanged: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unchanged ?? 0), 0),
-            unmeasured: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0),
-            unmeasured_blank: folds.reduce(
-              (sum, fold) => sum + (fold.transfer?.summary.unmeasuredBlank ?? 0),
-              0,
-            ),
-            /**
-             * The pairs themselves, `[rule, target, blank, withRule]` per row, in fold order.
-             *
-             * The aggregate answers how often and the ledger answers where. The first version of
-             * this field was written into the fold record, which the artefact does not serialise,
-             * so the run it was added for carried the summary and none of the pairs. It is
-             * projected here, where the artefact reads, and pinned by a test on the projection.
-             */
-            ledger: transferLedgerOf(folds).map((trial) => [
-              trial.itemId,
-              trial.targetId,
-              // `null` rather than a missing key: an absence has to stay visible in the file.
-              trial.blankCorrect ?? null,
-              trial.withRuleCorrect ?? null,
-            ]),
-            // Recomputed from the sums rather than averaged over folds: a per-fold mean of rates
-            // would weight a fold with forty informative trials like one with four hundred.
-            rate: (() => {
-              const informative = folds.reduce(
-                (sum, fold) => sum + (fold.transfer?.summary.informative ?? 0),
-                0,
-              );
-              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
-              return informative === 0 ? 0 : Number((repaired / informative).toFixed(4));
-            })(),
-            // The whole 2x2, because `rate` alone can only go up: its denominator is the targets a
-            // bare retry could not fix, which excludes every trial where the rule does damage.
-            measured: (() => {
-              const trials = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0);
-              const unmeasured = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
-              return trials - unmeasured;
-            })(),
-            marginal_repair: (() => {
-              const measured =
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
-              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
-              return measured === 0 ? 0 : Number((repaired / measured).toFixed(4));
-            })(),
-            marginal_break: (() => {
-              const measured =
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
-              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
-              return measured === 0 ? 0 : Number((broke / measured).toFixed(4));
-            })(),
-            net_pp: (() => {
-              const measured =
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
-              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
-              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
-              return measured === 0 ? 0 : Number((((repaired - broke) / measured) * 100).toFixed(2));
-            })(),
-            break_rate: (() => {
-              const blankRight = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.blankRight ?? 0), 0);
-              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
-              return blankRight === 0 ? 0 : Number((broke / blankRight).toFixed(4));
-            })(),
-            verdict: (() => {
-              const informative = folds.reduce(
-                (sum, fold) => sum + (fold.transfer?.summary.informative ?? 0),
-                0,
-              );
-              const measured =
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
-                folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0);
-              const repaired = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0);
-              const broke = folds.reduce((sum, fold) => sum + (fold.transfer?.summary.broke ?? 0), 0);
-              if (informative < TRANSFER_FLOOR) return 'unmeasured';
-              return measured === 0 || repaired - broke <= 0 ? 'no-transfer' : 'transfers';
-            })(),
-            rules_with_repair: folds.reduce(
-              (sum, fold) => sum + (fold.transfer?.summary.rulesWithRepair ?? 0),
-              0,
-            ),
-            skipped: folds.reduce<Record<string, number>>((all, fold) => {
-              for (const [reason, count] of Object.entries(fold.transfer?.skipped ?? {})) {
-                all[reason] = (all[reason] ?? 0) + count;
-              }
-              return all;
-            }, {}),
-            pack_all: folds.reduce((sum, fold) => sum + (fold.transfer?.packAll ?? 0), 0),
-            pack_kept: folds.reduce((sum, fold) => sum + (fold.transfer?.packKept ?? 0), 0),
-            pack_differs: folds.reduce((sum, fold) => sum + (fold.transfer?.packDiffers ?? 0), 0),
-          },
+      rule_transfer: ruleTransfer,
+      /**
+       * The same measurement over the second substrate.
+       *
+       * A number produced by the `repair` distiller is not comparable to one produced by the `rule`
+       * distiller, so the two blocks are never merged and the ledger of each is kept apart.
+       */
+      rule_transfer_repair: repairTransfer,
       /**
        * What the shuffled arm drew from, so a fallback to the question's own pack is visible.
        */

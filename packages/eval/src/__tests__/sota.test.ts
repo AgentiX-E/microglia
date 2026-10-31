@@ -237,6 +237,7 @@ describe('parseArms', () => {
       'full-procedural',
       'full-repair',
       'full-repair-onretry',
+      'full-repair-transferred',
       'full-repair-verified',
       'full-sampled',
       'full-shuffled',
@@ -405,6 +406,7 @@ describe('parseArms', () => {
       'full-shuffled',
       'full-transferred',
       'full-repair-verified',
+      'full-repair-transferred',
     ]);
   });
 
@@ -873,6 +875,69 @@ describe('buildValidityGates', () => {
         transfer: { ...transferInput({ trials: 900, informative: 820, repaired: 29, blankRight: 70, unmeasured: 10 }), netPp: 12 },
       },
       'V17-transfer-net-reported',
+    );
+    expect(edited.pass).toBe(false);
+  });
+
+  it('V39 through V42 hold the second substrate to the same four checks under their own ids', () => {
+    // The repair store's transfer is measured by the same function as the rule store's, because the
+    // only reason to measure the second one is to set it beside the first. What must not be shared
+    // is the naming: a run that reported the repair rate through the rule ids would be reconciled
+    // against the rule's trial count and could pass on the wrong numbers.
+    const ids = [
+      'V39-repair-transfer-reconciles',
+      'V40-repair-transfer-resolvable',
+      'V41-repair-transfer-ledger',
+      'V42-repair-transfer-net-reported',
+    ];
+    const measured = {
+      ...transferInput({ trials: 640, informative: 552, repaired: 61, broke: 29, blankRight: 88, unmeasured: 0 }),
+      ledger: 640,
+    };
+    const present = buildValidityGates({ ...sound, transferRepair: measured }).map(
+      (entry) => entry.id,
+    );
+    for (const id of ids) expect(present).toContain(id);
+    // The rule store's ids stay attached to the rule store, whatever else the run measured.
+    expect(present).not.toContain('V15-transfer-reconciles');
+
+    expect(gate({ ...sound, transferRepair: measured }, 'V39-repair-transfer-reconciles').pass).toBe(
+      true,
+    );
+    const resolvable = gate({ ...sound, transferRepair: measured }, 'V40-repair-transfer-resolvable');
+    expect(resolvable.actual).toContain('552 informative trial(s), 61 repair(s)');
+    expect(gate({ ...sound, transferRepair: measured }, 'V41-repair-transfer-ledger').pass).toBe(true);
+    expect(gate({ ...sound, transferRepair: measured }, 'V42-repair-transfer-net-reported').pass).toBe(
+      true,
+    );
+
+    // The ledger gate is the one R13's first transfer run failed, so it is asserted on the repair
+    // side as well rather than assumed to be shared: a rate with no rows behind it is not a rate.
+    const dropped = gate({ ...sound, transferRepair: { ...measured, ledger: 0 } }, 'V41-repair-transfer-ledger');
+    expect(dropped.pass).toBe(false);
+    expect(dropped.blocking).toBe(true);
+    expect(dropped.actual).toContain('0/640');
+
+    // Below the floor the repair rate is a direction, and the gate says so without failing the run:
+    // a fold can arrive with few informative pairs even when the run bought many.
+    const thin = gate(
+      {
+        ...sound,
+        transferRepair: {
+          ...transferInput({ trials: 60, informative: 40, repaired: 3, blankRight: 20, unmeasured: 0 }),
+          ledger: 60,
+        },
+      },
+      'V40-repair-transfer-resolvable',
+    );
+    expect(thin.pass).toBe(false);
+    expect(thin.blocking).toBe(false);
+
+    // And the net effect is recomputed rather than trusted: the same fixture with a `netPp` that
+    // disagrees with its own counts fails, on this substrate as on the other.
+    const edited = gate(
+      { ...sound, transferRepair: { ...measured, netPp: 12 } },
+      'V42-repair-transfer-net-reported',
     );
     expect(edited.pass).toBe(false);
   });
