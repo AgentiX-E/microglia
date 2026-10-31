@@ -1512,6 +1512,42 @@ describe('buildValidityGates', () => {
     expect(entry.actual).toBe('5 item(s) with no domain, 1 arrived unscoped, 0 widened');
   });
 
+  it('V48 is absent when the run does not report its statements', () => {
+    // Same rule as the gates above it: a run that executed no statement itself cannot report
+    // whether its statements were answered, and must not carry a green tick about it.
+    expect(buildValidityGates(sound).some((entry) => entry.id === 'V48-statements-answered')).toBe(false);
+  });
+
+  it('V48 passes while the deadline killed at most a hundredth of the statements', () => {
+    const entry = gate(
+      { ...sound, statements: { statements: 1228, deadlines: 1, truncations: 0 } },
+      'V48-statements-answered',
+    );
+    expect(entry.pass).toBe(true);
+    expect(entry.blocking).toBe(true);
+    expect(entry.actual).toBe('1 of 1228 statement(s) hit the deadline, 0 truncated');
+  });
+
+  it('V48 fails when the suite was describing its own timeout', () => {
+    // The failure this exists for: forty statements killed is not forty wrong answers, and a rate
+    // of accuracy computed from them is a rate of how long the queries take.
+    const entry = gate(
+      { ...sound, statements: { statements: 200, deadlines: 40, truncations: 3 } },
+      'V48-statements-answered',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toBe('40 of 200 statement(s) hit the deadline, 3 truncated');
+  });
+
+  it('V48 fails when the execution that would decide it never happened', () => {
+    // Zero statements is not "no deadlines". A lane that reports no execution has no reading to
+    // stand on, and 0/0 read as a share would pass every run that never reached the judging phase.
+    expect(
+      gate({ ...sound, statements: { statements: 0, deadlines: 0, truncations: 0 } }, 'V48-statements-answered')
+        .pass,
+    ).toBe(false);
+  });
+
   it('V45 is absent when the run scored no clearance pair', () => {
     // A gate that always passes is a comment: a run with no clearance arm has nothing to dose-match
     // and must not report a green tick about it.

@@ -4,7 +4,7 @@ step: R24
 opened: 2026-11-01
 arms: none-noevidence,full-noevidence
 sample: 1534
-gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V47
+gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V47,V48
 ---
 
 # R24 — the same 2×2 on the split the competitors used
@@ -91,3 +91,33 @@ registered.
   clause and none has needed it; it stays because the alternative is reading a score about something else.
 - **If the deadline truncates the run before five folds, the artefact is read as a partial run and no
   confirmatory claim is made**, because a split that changed mid-run is not a split.
+
+## Amendment 1 — before the re-dispatch, because the first dispatch produced no artefact
+
+Dispatch `41226847922` ran this design exactly as registered and published nothing. It printed its last
+progress line at 19:17:48, 82 minutes in, and then emitted nothing for the next 118 minutes until the step's
+own 200-minute timeout killed it. No artefact, no partial record, no number. **Nothing was read, and no
+claim in this file was tested by it.**
+
+The cause was not the split and not the provider. Judging a fold executes every statement the model wrote
+against a real database through a synchronous driver, so a query that is slow to answer — a three-way cross
+join is the easy way to write one — stops the whole process inside a native call. No timer runs, no deadline
+check runs, and the run is indistinguishable from a hang. The first fold's judging phase took 5.8 minutes,
+the second took 63, and the third never finished; the lane's own 130-minute wall clock could not fire because
+it is checked between model calls.
+
+Three things changed, all of them instrument rather than hypothesis:
+
+1. **Every statement runs in a child process with a deadline of 20 s and a row cap of 10,000**
+   (`SOTA_SQL_DEADLINE_MS`, `SOTA_SQL_ROW_CAP`). A statement that outlives the deadline is killed with
+   `SIGKILL` and recorded as a *deadline*, not as a wrong answer. The design was measured before it was
+   chosen: terminating a worker thread stuck inside the driver takes 50.5 seconds, killing a child process
+   takes 0 ms, and spawning one costs 19 ms.
+2. **`V48-statements-answered` is registered as a blocking gate**: at least 99% of executed statements must
+   answer inside the deadline. A score built mostly from killed statements is a score about how long queries
+   take, and the registered claims below would be readings of the instrument rather than of the model.
+3. **The judging phase now reports its progress**, and the fold line carries the statement counts, so a
+   phase that stops moving is visible in the log while it is happening rather than after a timeout.
+
+Nothing in the design, the arms, the sample or the predictions changed. The run this file describes has still
+never been executed.

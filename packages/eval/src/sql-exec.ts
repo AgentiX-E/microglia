@@ -38,9 +38,22 @@ export type ExecuteOptions = {
   readonly readOnly?: boolean;
 };
 
-export function executeQuery(dbPath: string, sql: string, options: ExecuteOptions = {}): QueryOutcome {
-  const readOnly = options.readOnly ?? true;
-  const failed = (error: unknown): QueryOutcome => ({
+/**
+ * The two encodings of one result set, from rows that have already been read.
+ *
+ * Separated from `executeQuery` because a caller that did not execute the statement in this thread
+ * still needs the same encodings: a lane that runs statements through a deadline (so that a query
+ * the model wrote cannot stop it for an hour) reads rows from a child process and must describe them
+ * exactly as this function does, or the two execution paths would score different things.
+ */
+/**
+ * A statement that produced no result, described the way a caller expects one.
+ *
+ * Exported because a lane that executes statements through a deadline has its own reason for the
+ * failure — the child was killed — and it must not invent a second shape for the same fact.
+ */
+export function unexecuted(error: unknown): QueryOutcome {
+  return {
     ok: false,
     tuples: [],
     canonical: [],
@@ -49,7 +62,22 @@ export function executeQuery(dbPath: string, sql: string, options: ExecuteOption
     // a branch in the error path, and an error path with an untested branch is where a
     // lane finds out at three in the morning that it reported nothing.
     error: `${error}`,
-  });
+  };
+}
+
+export function outcomeOf(rows: readonly Record<string, unknown>[]): QueryOutcome {
+  return {
+    ok: true,
+    tuples: rows.map((row) => Object.values(row)),
+    canonical: canonicalRows(rows),
+    columns: rows.length === 0 ? [] : Object.keys(rows[0] as Record<string, unknown>),
+    error: undefined,
+  };
+}
+
+export function executeQuery(dbPath: string, sql: string, options: ExecuteOptions = {}): QueryOutcome {
+  const readOnly = options.readOnly ?? true;
+  const failed = unexecuted;
 
   // Opening is separated from querying because the two failures mean different things: a
   // database that will not open is a broken run, a statement that will not prepare is one
@@ -62,13 +90,7 @@ export function executeQuery(dbPath: string, sql: string, options: ExecuteOption
   }
   try {
     const rows = db.prepare(sql).all() as Record<string, unknown>[];
-    const outcome: QueryOutcome = {
-      ok: true,
-      tuples: rows.map((row) => Object.values(row)),
-      canonical: canonicalRows(rows),
-      columns: rows.length === 0 ? [] : Object.keys(rows[0] as Record<string, unknown>),
-      error: undefined,
-    };
+    const outcome = outcomeOf(rows);
     db.close();
     return outcome;
   } catch (error) {

@@ -525,17 +525,21 @@ export {
 export {
   executeQuery,
   groundedItems,
+  outcomeOf,
   resolveDatabase,
   rowsDiffer,
   schemaIndex,
   schemaSql,
   tableShapes,
+  unexecuted,
   type ColumnShape,
   type ExecuteOptions,
   type QueryOutcome,
   type SchemaIndex,
   type TableShape,
 } from './sql-exec.js';
+
+export { BoundedSql, type BoundedSqlOptions, type StatementResult } from './sql-guard.js';
 
 export {
   DEFAULT_CLEARANCE,

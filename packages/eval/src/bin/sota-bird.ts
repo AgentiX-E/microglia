@@ -234,6 +234,10 @@ import {
   type SelectionStats,
   type SchemaNames,
   type TemplateAttempt,
+  BoundedSql,
+  outcomeOf,
+  unexecuted,
+  type QueryOutcome,
 } from '@agentix-e/microglia-eval';
 
 const DATASET_REPO = 'https://huggingface.co/datasets/birdsql/bird_mini_dev';
@@ -1127,17 +1131,35 @@ function mschemaDdl(
   }
 }
 
+/**
+ * Every statement this lane executes goes through here, in a process that can be killed.
+ *
+ * The driver is synchronous, so a query the model wrote can stop the entire lane inside a native
+ * call: no timer runs, no deadline check runs, and the run looks like a provider that stopped
+ * answering. That is what happened to the first dev dispatch — `41226847922` printed its last
+ * progress line at 19:17:48 and then nothing for 118 minutes, where judging a fold takes six.
+ *
+ * `BoundedSql` runs each statement in a child process with a deadline and a row cap, and reports a
+ * killed statement as a deadline rather than as a wrong answer. Both are counted, because a score
+ * decided by the instrument is not a score about the model.
+ */
+const STATEMENT_DEADLINE_MS = nonNegative(process.env['SOTA_SQL_DEADLINE_MS'], 20_000);
+const STATEMENT_ROW_CAP = nonNegative(process.env['SOTA_SQL_ROW_CAP'], 10_000);
+const statements = new BoundedSql({
+  deadlineMs: STATEMENT_DEADLINE_MS,
+  rowCap: STATEMENT_ROW_CAP,
+});
+
 /** Execute a statement and canonicalise its result set. */
-function execute(dbPath: string, sql: string): { ok: boolean; rows: string[] } {
-  const db = new DatabaseSync(dbPath, { readOnly: true });
-  try {
-    const rows = db.prepare(sql).all() as Record<string, unknown>[];
-    return { ok: true, rows: canonicalRows(rows) };
-  } catch {
-    return { ok: false, rows: [] };
-  } finally {
-    db.close();
-  }
+async function execute(dbPath: string, sql: string): Promise<{ ok: boolean; rows: string[] }> {
+  const outcome = await statements.run(dbPath, sql);
+  return outcome.ok ? { ok: true, rows: canonicalRows(outcome.rows) } : { ok: false, rows: [] };
+}
+
+/** The same outcome `executeQuery` builds, for a statement that ran under the deadline. */
+async function runQuery(dbPath: string, sql: string): Promise<QueryOutcome> {
+  const outcome = await statements.run(dbPath, sql);
+  return outcome.ok ? outcomeOf(outcome.rows) : unexecuted(outcome.error ?? 'the statement returned nothing');
 }
 
 /**
@@ -1149,11 +1171,14 @@ function execute(dbPath: string, sql: string): { ok: boolean; rows: string[] } {
  */
 const goldCache = new Map<string, { readonly ok: boolean; readonly rows: string[] }>();
 
-function goldFor(row: BirdRow, dbPath: string): { readonly ok: boolean; readonly rows: string[] } {
+async function goldFor(
+  row: BirdRow,
+  dbPath: string,
+): Promise<{ readonly ok: boolean; readonly rows: string[] }> {
   const key = idOfRow(row);
   const cached = goldCache.get(key);
   if (cached !== undefined) return cached;
-  const result = execute(dbPath, row.SQL);
+  const result = await execute(dbPath, row.SQL);
   goldCache.set(key, result);
   return result;
 }
@@ -1164,22 +1189,15 @@ function goldFor(row: BirdRow, dbPath: string): { readonly ok: boolean; readonly
  * The convention is defined only on one-row, one-column numeric answers, so the
  * subset is chosen by this function rather than by looking at outcomes.
  */
-function scalarOf(dbPath: string, sql: string): number | undefined {
-  const db = new DatabaseSync(dbPath, { readOnly: true });
-  try {
-    const rows = db.prepare(sql).all() as Record<string, unknown>[];
-    if (rows.length !== 1) return undefined;
-    const row = rows[0];
-    if (row === undefined) return undefined;
-    const values = Object.values(row);
-    if (values.length !== 1) return undefined;
-    const value = values[0];
-    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
-  } catch {
-    return undefined;
-  } finally {
-    db.close();
-  }
+async function scalarOf(dbPath: string, sql: string): Promise<number | undefined> {
+  const rows = (await statements.run(dbPath, sql)).rows;
+  if (rows.length !== 1) return undefined;
+  const row = rows[0];
+  if (row === undefined) return undefined;
+  const values = Object.values(row);
+  if (values.length !== 1) return undefined;
+  const value = values[0];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
 type Judged = {
@@ -1223,11 +1241,11 @@ type Judged = {
  * that says "it returned [name] where the corrected query returns [forename, surname]"
  * points at the change rather than at the rows.
  */
-function resultShapeOf(dbPath: string, sql: string | undefined): ResultShape {
+async function resultShapeOf(dbPath: string, sql: string | undefined): Promise<ResultShape> {
   if (sql === undefined) {
     return { ok: false, error: 'the reply contained no query', rows: 0, columns: [] };
   }
-  const outcome = executeQuery(dbPath, sql);
+  const outcome = await runQuery(dbPath, sql);
   return {
     ok: outcome.ok,
     ...(outcome.error === undefined ? {} : { error: outcome.error }),
@@ -1243,32 +1261,32 @@ function resultShapeOf(dbPath: string, sql: string | undefined): ResultShape {
  * run, or one that runs and returns no rows. Both are decidable from the database alone, so
  * the retry population is a property of the pipeline rather than of the benchmark.
  */
-function failureOf(dbPath: string, sql: string | undefined): string | undefined {
+async function failureOf(dbPath: string, sql: string | undefined): Promise<string | undefined> {
   if (sql === undefined) return 'it did not contain a query';
-  const outcome = executeQuery(dbPath, sql);
+  const outcome = await runQuery(dbPath, sql);
   if (!outcome.ok) return `it failed with: ${outcome.error ?? 'an error'}`;
   return outcome.tuples.length === 0 ? 'it returned no rows' : undefined;
 }
 
-function judgeReply(
+async function judgeReply(
   row: BirdRow,
   dbPath: string,
   reply: { readonly text: string; readonly tokens?: number } | undefined,
   task: Task,
-): Judged {
+): Promise<Judged> {
   const extracted = reply === undefined ? undefined : extractSql(reply.text);
   const sql = extracted ?? '';
   const parseOk = extracted !== undefined;
-  const predicted = sql === '' ? { ok: false, rows: [] } : execute(dbPath, sql);
+  const predicted = sql === '' ? { ok: false, rows: [] } : await execute(dbPath, sql);
   let correct = false;
   let shadowCorrect = false;
   if (task.convention) {
     // A scalar convention has one answer at one precision, so the two readings cannot
     // disagree and the shadow is not a second opinion but the same one.
-    correct = judgeScalar(scalarOf(dbPath, sql), task.expected.get(idOfRow(row)));
+    correct = judgeScalar(await scalarOf(dbPath, sql), task.expected.get(idOfRow(row)));
     shadowCorrect = correct;
   } else if (predicted.ok) {
-    const gold = goldFor(row, dbPath);
+    const gold = await goldFor(row, dbPath);
     correct = gold.ok && matches(predicted.rows, gold.rows, SEMANTICS);
     shadowCorrect = gold.ok && matches(predicted.rows, gold.rows, SHADOW_SEMANTICS);
   }
@@ -1487,7 +1505,7 @@ async function learn(
       goldFailed += 1;
       continue;
     }
-    const satisfied = judgeReply(row, dbPath, { text: texts[index] ?? '', tokens: 0 }, task).correct;
+    const satisfied = (await judgeReply(row, dbPath, { text: texts[index] ?? '', tokens: 0 }, task)).correct;
     if (!satisfied) {
       // The event, before any interpretation: what was asked, what came back, what fixed it. `sql` is
       // the statement as extracted (possibly empty, which the renderer omits rather than blanks) and
@@ -1497,7 +1515,7 @@ async function learn(
       // it states a fact about the workspace — and the repair form is built on it, because
       // "why the attempt was wrong" cannot be learned from two queries alone: a join that
       // multiplies rows and a join on the wrong key look the same in the SQL.
-      const note = mismatchNote(resultShapeOf(dbPath, attempted), resultShapeOf(dbPath, target));
+      const note = mismatchNote(await resultShapeOf(dbPath, attempted), await resultShapeOf(dbPath, target));
       await handle.edit({ sql: target }, { note });
       edited += 1;
     }
@@ -1732,7 +1750,7 @@ async function probeMemory(
     }
     const attempt = generations.get(taskId) ?? '';
     const sql = extractSql(attempt);
-    const outcome = sql === undefined ? undefined : executeQuery(dataset.dbPath(row.db_id), sql);
+    const outcome = sql === undefined ? undefined : await runQuery(dataset.dbPath(row.db_id), sql);
     let failure: string;
     let kind: string;
     if (outcome === undefined) {
@@ -1773,7 +1791,7 @@ async function probeMemory(
   const asked = async (row: BirdRow, prompt: string): Promise<boolean | undefined> => {
     try {
       const reply = await chat(prompt);
-      return judgeReply(row, dataset.dbPath(row.db_id), reply, task).correct;
+      return (await judgeReply(row, dataset.dbPath(row.db_id), reply, task)).correct;
     } catch (error) {
       if (stoppedRun(error)) throw error;
       return undefined;
@@ -2255,7 +2273,7 @@ async function densityPass(input: {
       if (attempt > 0) retried += 1;
       try {
         const reply = await chat(plan.prompt);
-        correct = judgeReply(plan.row, input.dataset.dbPath(plan.domain), reply, input.task).correct;
+        correct = (await judgeReply(plan.row, input.dataset.dbPath(plan.domain), reply, input.task)).correct;
       } catch (error) {
         if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
         if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
@@ -3095,7 +3113,7 @@ async function validateMemory(
           convention: ACTIVE,
         }),
       );
-      return judgeReply(row, dataset.dbPath(row.db_id), reply, task).correct;
+      return (await judgeReply(row, dataset.dbPath(row.db_id), reply, task)).correct;
     } catch {
       // A call that never returned says nothing about the rule it was carrying.
       return undefined;
@@ -3996,7 +4014,7 @@ async function runFold(
       }
       const row = evalRows[position] as BirdRow;
       const dbPath = dataset.dbPath(row.db_id);
-      const failure = failureOf(dbPath, extractSql(reply.text));
+      const failure = await failureOf(dbPath, extractSql(reply.text));
       if (failure === undefined) {
         notRetried += 1;
         continue;
@@ -4304,7 +4322,7 @@ async function runFold(
         const sql = reply === undefined ? undefined : extractSql(reply.text);
         // Executed once per draw and read by every arm: the selector's input is the result, and a
         // selector that executed its own copy would be measuring a different set of candidates.
-        const outcome = sql === undefined ? undefined : executeQuery(dbPath, sql);
+        const outcome = sql === undefined ? undefined : await runQuery(dbPath, sql);
         candidates.push({
           signature: outcome === undefined ? undefined : signatureOf(outcome),
           rows: outcome === undefined ? 0 : outcome.tuples.length,
@@ -4319,7 +4337,7 @@ async function runFold(
         results.push(renderRows(outcome === undefined ? false : outcome.ok, outcome?.tuples ?? []));
         // Every draw is scored, not only the chosen one, because the ceiling is the score of a
         // selector that always picked right and cannot be computed after the fact.
-        verdicts.push(judgeReply(row, dbPath, reply, task));
+        verdicts.push(await judgeReply(row, dbPath, reply, task));
         // A draw with no query and a draw whose query did not run are both `null` here — neither
         // produced a result a selector could pick — but only the second has a shape, and the shape
         // is what says whether the failure looked like a wrong answer or like a refusal.
@@ -4501,7 +4519,16 @@ async function runFold(
   for (const [index, plan] of plans.entries()) {
     const row = evalRows[plan.position] as BirdRow;
     const started = performance.now();
-    const result = judgeReply(row, dataset.dbPath(row.db_id), replies[index], task);
+    const result = await judgeReply(row, dataset.dbPath(row.db_id), replies[index], task);
+    // The judging half is the one that can stall without a model call, so it reports on its own
+    // clock. A phase that prints nothing is a phase whose silence is indistinguishable from a hang,
+    // which is exactly how a fold came to spend two hours in it with no line in the log.
+    if ((index + 1) % 200 === 0 || index + 1 === plans.length) {
+      process.stdout.write(
+        `[sota] fold ${fold + 1}/${FOLDS} judged ${index + 1}/${plans.length} ` +
+          `deadlines=${statements.stats().deadlines}\n`,
+      );
+    }
     judged.set(`${plan.position}:${plan.arm}`, {
       ...result,
       latencyMs: Math.round(performance.now() - started),
@@ -4514,7 +4541,7 @@ async function runFold(
   for (const entry of anchoredReplies.values()) {
     const row = evalRows[entry.position] as BirdRow;
     const started = performance.now();
-    const result = judgeReply(row, dataset.dbPath(row.db_id), entry.reply, task);
+    const result = await judgeReply(row, dataset.dbPath(row.db_id), entry.reply, task);
     judged.set(`${entry.position}:${entry.arm}`, {
       ...result,
       latencyMs: Math.round(performance.now() - started),
@@ -4554,7 +4581,7 @@ async function runFold(
   for (const entry of retryReplies.values()) {
     const row = evalRows[entry.position] as BirdRow;
     const started = performance.now();
-    const result = judgeReply(row, dataset.dbPath(row.db_id), entry.reply, task);
+    const result = await judgeReply(row, dataset.dbPath(row.db_id), entry.reply, task);
     judged.set(`${entry.position}:${entry.arm}`, {
       ...result,
       latencyMs: Math.round(performance.now() - started),
@@ -4806,7 +4833,8 @@ async function runFold(
     `[sota] fold ${fold + 1}/${FOLDS}: eval=${cases.length} learn=${learnRows.length} ` +
       `edited=${learning.edited} unanswered=${learning.unanswered} ` +
       `distillFailed=${distilled.failed} active=${scoringFrozen.active} ` +
-      `calls=${llm.stats.calls} timeouts=${llm.stats.timeouts}\n`,
+      `calls=${llm.stats.calls} timeouts=${llm.stats.timeouts} ` +
+      `statements=${statements.stats().statements} sqlDeadlines=${statements.stats().deadlines}\n`,
   );
   return {
     fold,
@@ -4965,12 +4993,17 @@ async function main(): Promise<void> {
   /** Share of rewritten gold queries that report the value the convention expects. */
   let conventionExecRate: number | undefined;
   if (ACTIVE !== undefined) {
-    rows = dataset.rows.filter((row) => {
-      const value = scalarOf(dataset.dbPath(row.db_id), row.SQL);
-      if (value === undefined || !ACTIVE.applies(value)) return false;
+    const kept: BirdRow[] = [];
+    for (const row of dataset.rows) {
+      // Sequentially, because the statement runs under a deadline in another process now: a
+      // `filter` callback cannot await it, and a `Promise.all` over the panel would open one child
+      // per question at once.
+      const value = await scalarOf(dataset.dbPath(row.db_id), row.SQL);
+      if (value === undefined || !ACTIVE.applies(value)) continue;
       expected.set(idOf(row), ACTIVE.transform(value));
-      return true;
-    });
+      kept.push(row);
+    }
+    rows = kept;
     // The convention lane's `gold_exec_rate`: rewrite each gold query to report the
     // way the workspace reports and check that the value it produces is the one the
     // scorer expects. Without this, a disagreement between the rewrite and the
@@ -4978,7 +5011,7 @@ async function main(): Promise<void> {
     // convention - and both read as "the mechanism does not work".
     let agrees = 0;
     for (const row of rows) {
-      const reported = scalarOf(dataset.dbPath(row.db_id), reportedSql(row.SQL, ACTIVE));
+      const reported = await scalarOf(dataset.dbPath(row.db_id), reportedSql(row.SQL, ACTIVE));
       if (judgeScalar(reported, expected.get(idOf(row)))) agrees += 1;
     }
     conventionExecRate = rows.length === 0 ? 1 : agrees / rows.length;
@@ -5042,6 +5075,7 @@ async function main(): Promise<void> {
       retries: llm.stats.retries,
       folds_completed: folds.length,
       folds_planned: FOLDS,
+      statements: statements.stats(),
       calls_in_flight_fold: callsInFlightFold,
       per_fold: folds.map((fold, index) => ({
         fold: fold.fold,
@@ -5436,6 +5470,9 @@ async function main(): Promise<void> {
     goldExecRate,
     detectablePp: detectable * 100,
     packControls: packControls.map((entry) => ({ arm: entry.arm, meanPackIds: entry.mean_pack_ids })),
+    // How much of the score was decided by the instrument: a statement killed by the deadline is not
+    // a wrong answer, and a run whose statements were mostly killed is describing its own timeout.
+    statements: statements.stats(),
     channelBest:
       channelBest === undefined
         ? undefined
@@ -6290,6 +6327,11 @@ async function main(): Promise<void> {
     arm_pairs_shadow: armPairsShadow,
     gates,
     assertions,
+    statements: {
+      ...statements.stats(),
+      deadline_ms: STATEMENT_DEADLINE_MS,
+      row_cap: STATEMENT_ROW_CAP,
+    },
     per_fold: folds.map((fold) => ({
       fold: fold.fold,
       eval: fold.eval,
@@ -6343,8 +6385,12 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : String(error);
-  process.stderr.write(`[sota] failed: ${message}\n`);
-  process.exitCode = 1;
-});
+main()
+  .catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    process.stderr.write(`[sota] failed: ${message}\n`);
+    process.exitCode = 1;
+  })
+  // The statement children outlive a fold by design, so they also outlive a failed one: without
+  // this the runner would wait on four idle processes until the step's own timeout.
+  .finally(() => statements.close());

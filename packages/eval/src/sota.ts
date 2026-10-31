@@ -1611,6 +1611,19 @@ export type GateInput = {
     readonly unscopedIn: number;
     readonly widenedIn: number;
   };
+  /**
+   * What the statement executor had to do to keep the lane alive.
+   *
+   * The driver is synchronous, so a query the model wrote can stop the whole run inside a native
+   * call. Every statement therefore runs in a process that can be killed, and this is the record of
+   * how often that was necessary: a statement killed by the deadline is not a wrong answer, and a
+   * run whose statements were mostly killed is describing its own timeout rather than the model.
+   */
+  readonly statements?: {
+    readonly statements: number;
+    readonly deadlines: number;
+    readonly truncations: number;
+  };
   readonly channelBest: { readonly arm: string; readonly deltaPp: number } | undefined;
   /**
    * How the clearance arm and its dose-matched control compared, when the run builds one.
@@ -2083,6 +2096,22 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
           .join(', ') +
         (disagree.length === 0 ? '' : ` — disagrees: ${disagree.map((e) => e.arm).join(', ')}`),
       pass: disagree.length === 0,
+      blocking: true,
+    });
+  }
+  if (input.statements !== undefined) {
+    // A statement that ran out of time is not evidence about the model, and a score built mostly
+    // from them is a score about how long a query takes. The bar is one percent: a pathological
+    // statement shows up once or twice in a panel of a thousand, so anything above that share is a
+    // systematic property of the lane — a database it cannot query, or a deadline set too low for
+    // the machine — and either way the number underneath it is not the model's.
+    const { statements, deadlines, truncations } = input.statements;
+    gates.push({
+      id: 'V48-statements-answered',
+      criterion:
+        'at least 99% of the statements the lane executed answered inside the statement deadline',
+      actual: `${deadlines} of ${statements} statement(s) hit the deadline, ${truncations} truncated`,
+      pass: statements > 0 && deadlines / statements <= 0.01,
       blocking: true,
     });
   }
