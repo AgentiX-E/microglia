@@ -107,6 +107,16 @@ export type DistillReport = {
    * can see that the rule was learned under two descriptions of when it applies.
    */
   readonly conditionConflicts: number;
+  /**
+   * Claims that arrived with no domain.
+   *
+   * The store's share of domain-free items used to be one number with two causes: the interpreter
+   * declined to scope the claim at the door, or generalisation earned the widening by finding it in
+   * a second domain. They call for opposite fixes — a prompt or a host default on one side, a
+   * widening policy on the other — so they are counted apart here and reconciled in the lane that
+   * reports the store's shape.
+   */
+  readonly incomingWithoutDomain: number;
 };
 
 export type { Clock, DistillCandidate, FeedbackEvent, KnowledgeItem, Policy, RandomSource, RunRecord };

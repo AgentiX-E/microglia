@@ -1399,6 +1399,39 @@ describe('buildValidityGates', () => {
     expect(entry.actual).toBe('full: 1/350 expected none — disagrees: full');
   });
 
+  it('V44 is absent when the run does not report its store shape', () => {
+    expect(buildValidityGates(sound).some((entry) => entry.id === 'V44-domain-accounted')).toBe(false);
+  });
+
+  it('V44 passes when every domain-free item is explained by the door or the widening', () => {
+    const entry = gate(
+      { ...sound, domainOrigin: { storedWithDomain: 78, storedWithoutDomain: 22, unscopedIn: 15, widenedIn: 9 } },
+      'V44-domain-accounted',
+    );
+    expect(entry.pass).toBe(true);
+    expect(entry.blocking).toBe(true);
+    expect(entry.actual).toBe('22 item(s) with no domain, 15 arrived unscoped, 9 widened');
+  });
+
+  it('V44 passes on a store that has no domain-free item at all', () => {
+    expect(
+      gate(
+        { ...sound, domainOrigin: { storedWithDomain: 100, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 } },
+        'V44-domain-accounted',
+      ).pass,
+    ).toBe(true);
+  });
+
+  it('V44 fails when an item lost its domain by a path nobody counted', () => {
+    // The failure this exists for: the number went up and neither of the two known sources moved.
+    const entry = gate(
+      { ...sound, domainOrigin: { storedWithDomain: 95, storedWithoutDomain: 5, unscopedIn: 1, widenedIn: 0 } },
+      'V44-domain-accounted',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toBe('5 item(s) with no domain, 1 arrived unscoped, 0 widened');
+  });
+
   it('marks exactly V5 advisory and everything else blocking', () => {
     const advisory = buildValidityGates({
       ...sound,

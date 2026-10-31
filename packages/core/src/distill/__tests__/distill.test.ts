@@ -257,6 +257,49 @@ describe('distillation', () => {
     await memory.close();
   });
 
+  it('counts a claim that arrives with no domain, and separates it from one that was widened', async () => {
+    // The store's share of domain-free items has two causes and they call for opposite fixes: the
+    // interpreter declined to scope the claim, or generalisation earned the widening. This is the
+    // first of the two counts; `generalized` is the second, and the lane reconciles them.
+    const memory = await seed([event()]);
+    const report = await distill({
+      memory,
+      policy: defaultPolicy,
+      clock: fixedClock(at),
+      random: mulberry32(1),
+      interpreter: () => [
+        candidate({ scope: { task: 'chart.recommend', intent: 'trend' } }),
+        candidate({
+          statement: 'For a trend question over headcount. Use a line chart.',
+          dedupeKey: 'k2',
+          scope: { task: 'chart.recommend', domain: 'hr', intent: 'trend' },
+          evidence: { feedbackId: 'fb_1', runId: 'run_1', at, weight: 0.9 },
+        }),
+      ],
+    });
+    expect(report.candidates).toBe(2);
+    expect(report.incomingWithoutDomain).toBe(1);
+    expect(report.generalized).toBe(0);
+    await memory.close();
+  });
+
+  it('does not count a claim the host refused, because it could never become an item', async () => {
+    // Counting refusals would make the reconciliation pass by arithmetic rather than by fact: a
+    // claim that never reached the store cannot explain an item that has no domain.
+    const memory = await seed([event()]);
+    const report = await distill({
+      memory,
+      policy: defaultPolicy,
+      clock: fixedClock(at),
+      random: mulberry32(1),
+      interpreter: () => [candidate({ scope: { task: 'chart.recommend', intent: 'trend' } })],
+      accept: () => false,
+    });
+    expect(report.rejectedByHost).toBe(1);
+    expect(report.incomingWithoutDomain).toBe(0);
+    await memory.close();
+  });
+
   it('merges a repeated claim instead of duplicating it', async () => {
     const memory = await seed([
       event(),

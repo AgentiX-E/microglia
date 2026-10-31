@@ -2619,6 +2619,13 @@ type FoldResult = {
   readonly injectedWithCondition: number;
   /** Per arm, how many of its prompts carried the framing it declares. */
   readonly framing: readonly FramingDelivery[];
+  /** Where the domain-free items came from: the door, or the widening. */
+  readonly domainOrigin: {
+    readonly storedWithDomain: number;
+    readonly storedWithoutDomain: number;
+    readonly unscopedIn: number;
+    readonly widenedIn: number;
+  };
   /** Digest of the store at the moment scoring began, which is what the guard checks. */
   readonly digest: string;
   /**
@@ -2781,7 +2788,13 @@ type FoldMemory = {
   readonly store: EmbeddedMemory;
   readonly host: Awaited<ReturnType<typeof openMicroglia>>;
   readonly learning: LearningPass;
-  readonly distilled: { readonly created: number; readonly failed: number };
+  readonly distilled: {
+    readonly created: number;
+    readonly failed: number;
+    /** Claims that reached the store with no domain, and items that lost theirs to widening. */
+    readonly incomingWithoutDomain: number;
+    readonly generalized: number;
+  };
   readonly frozen: { readonly active: number; readonly total: number; readonly digest: string };
   readonly distillFailures: readonly string[];
   /**
@@ -2904,7 +2917,22 @@ async function buildFoldMemory(
     fatal: stoppedRun,
   });
   const frozen = await knowledgeDigest(store);
-  return { store, host, learning, distilled, frozen, distillFailures: failures, drops };
+  return {
+    store,
+    host,
+    learning,
+    // The two counters the store's shape is made of. `created` and `failed` were the whole report
+    // once, which is why a store with a fifth of its items unscoped could not be explained.
+    distilled: {
+      created: distilled.created,
+      failed: distilled.failed,
+      incomingWithoutDomain: distilled.incomingWithoutDomain,
+      generalized: distilled.generalized,
+    },
+    frozen,
+    distillFailures: failures,
+    drops,
+  };
 }
 
 /**
@@ -4386,6 +4414,21 @@ async function runFold(
     }
   }
   const listed = await store.listKnowledge({ namespace: 'bird', status: 'all' });
+  /**
+   * Where the store's domain-free items came from.
+   *
+   * `scope.domain` is the one field the host knows and the model only echoes, and an item without
+   * one is invisible to transfer — so the count is the ceiling on every transfer number this store
+   * can produce. Two paths make one and they call for opposite fixes: the interpreter declined to
+   * scope the claim at the door, or generalisation earned the widening. Recorded apart, because one
+   * number with two causes is not a finding.
+   */
+  const domainOrigin = {
+    storedWithDomain: listed.filter((item) => item.scope.domain !== undefined).length,
+    storedWithoutDomain: listed.filter((item) => item.scope.domain === undefined).length,
+    unscopedIn: distilled.incomingWithoutDomain,
+    widenedIn: distilled.generalized,
+  };
   const items = listed.map((item) => ({
     id: item.id,
     status: item.status,
@@ -4477,6 +4520,7 @@ async function runFold(
     injectedRules,
     injectedWithCondition,
     framing: framingDelivery,
+    domainOrigin,
     validatedPackDiffers,
     validatedPositions,
     anchoredSkipped,
@@ -5028,6 +5072,14 @@ async function main(): Promise<void> {
     }
     return [...counts.entries()].map(([arm, entry]) => ({ arm, ...entry }));
   })();
+  // Summed over folds: each fold learns its own store from k−1 folds, so an item counted twice was
+  // learned twice. The gate is an invariant about each store; the totals let it read the run.
+  const domainOrigin = {
+    storedWithDomain: folds.reduce((sum, fold) => sum + fold.domainOrigin.storedWithDomain, 0),
+    storedWithoutDomain: folds.reduce((sum, fold) => sum + fold.domainOrigin.storedWithoutDomain, 0),
+    unscopedIn: folds.reduce((sum, fold) => sum + fold.domainOrigin.unscopedIn, 0),
+    widenedIn: folds.reduce((sum, fold) => sum + fold.domainOrigin.widenedIn, 0),
+  };
   const callFailureRate = llm.stats.prompts === 0 ? 0 : llm.stats.failures / llm.stats.prompts;
   // One pooled comparison, computed once and read by both the gate and the artefact so the two
   // cannot report different directions for the same run.
@@ -5157,6 +5209,12 @@ async function main(): Promise<void> {
     // Only when an arm actually declares a framing: a gate that always passes is a comment, and
     // this one exists because a table entry that silently misses makes two arms one condition.
     ...(framing.every((entry) => !entry.expected) ? {} : { framing }),
+    // Where the domain-free items came from. Emitted whenever a store exists, because the number is
+    // the ceiling on every transfer reading and a run that reports the ceiling without its causes
+    // cannot say whether to fix the interpreter or the widening policy.
+    ...(domainOrigin.storedWithDomain + domainOrigin.storedWithoutDomain === 0
+      ? {}
+      : { domainOrigin }),
     // The protocol's oracle ceiling applies to the convention lane, where the
     // accepted answer has a form the model must reproduce.
     ...(ACTIVE === undefined || channelBest === undefined ? {} : { channelCeiling: channelBest.accuracy }),

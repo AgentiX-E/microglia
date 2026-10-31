@@ -1417,6 +1417,20 @@ export type GateInput = {
    * Absent when no arm declares a standing, because a gate that always passes is a comment.
    */
   readonly framing?: readonly FramingDelivery[];
+  /**
+   * The provenance of the store's domain-free items, when the run reports its shape.
+   *
+   * `scope.domain` is the one scope field the host knows and the model only echoes, and an item
+   * without one can never be pointed at a foreign question — so this count is the ceiling on every
+   * transfer number the store can produce. Two paths produce one, and they call for opposite fixes:
+   * the interpreter declined to scope the claim, or generalisation widened the domain away.
+   */
+  readonly domainOrigin?: {
+    readonly storedWithDomain: number;
+    readonly storedWithoutDomain: number;
+    readonly unscopedIn: number;
+    readonly widenedIn: number;
+  };
   readonly channelBest: { readonly arm: string; readonly deltaPp: number } | undefined;
   /** Share of calls that failed after exhausting retries, in [0, 1]. */
   readonly callFailureRate: number;
@@ -1846,6 +1860,21 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
           .join(', ') +
         (disagree.length === 0 ? '' : ` — disagrees: ${disagree.map((e) => e.arm).join(', ')}`),
       pass: disagree.length === 0,
+      blocking: true,
+    });
+  }
+  if (input.domainOrigin !== undefined) {
+    // Two paths make a domain-free item: a claim that arrived unscoped, and a widening that earned
+    // the loss. Anything beyond those two is an item that lost its domain somewhere nobody
+    // instrumented, which is the shape of every instrument defect this audit has recorded — so the
+    // check is an inequality rather than an accounting identity, and a surplus fails the run.
+    const { storedWithoutDomain, unscopedIn, widenedIn } = input.domainOrigin;
+    gates.push({
+      id: 'V44-domain-accounted',
+      criterion:
+        'every item with no domain either arrived without one or lost it to a recorded widening',
+      actual: `${storedWithoutDomain} item(s) with no domain, ${unscopedIn} arrived unscoped, ${widenedIn} widened`,
+      pass: storedWithoutDomain <= unscopedIn + widenedIn,
       blocking: true,
     });
   }

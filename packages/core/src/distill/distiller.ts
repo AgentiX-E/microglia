@@ -46,6 +46,7 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
     rejectedByHost: 0,
     failed: 0,
     conditionConflicts: 0,
+    incomingWithoutDomain: 0,
   };
 
   const contexts: InterpretContext[] = [];
@@ -90,6 +91,11 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
         report.rejectedByHost += 1;
         continue;
       }
+      // Counted after the host's filter and before the store sees it: this is the population that
+      // could become an item, which is what the reconciliation in the lane asks about. A rejected
+      // claim cannot explain a domain-free item and counting it would make the check pass by
+      // arithmetic rather than by fact.
+      if (candidate.scope.domain === undefined) report.incomingWithoutDomain += 1;
       const result = await upsert(options, candidate);
       report[result.outcome] += 1;
       report.superseded += result.superseded;
