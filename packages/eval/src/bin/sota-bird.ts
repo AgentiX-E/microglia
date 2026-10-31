@@ -109,6 +109,8 @@ import {
   outcomeCredit,
   parseDecisivePolicy,
   retireeFromDecisive,
+  clearanceFromDecisive,
+  doseMatchedDrop,
   conventionOf,
   dedupeQuestions,
   detectableDelta,
@@ -133,6 +135,7 @@ import {
   transferSummary,
   transferTargets,
   transferringItemIds,
+  type DecisiveCredit,
   type TransferTrial,
   verdictOf,
   schemaWithValues,
@@ -2633,6 +2636,22 @@ type FoldResult = {
     readonly unscopedIn: number;
     readonly widenedIn: number;
   };
+  /**
+   * Per question, what the clearance removed and what each of the two arms then carried.
+   *
+   * Recorded per question rather than summed at the source because the gate is a *paired* claim:
+   * "the control dropped the same number" is a statement about each question, and two sums that
+   * happen to agree say nothing about whether any single question was dose-matched.
+   */
+  readonly clearance: readonly {
+    readonly position: number;
+    /** Rules the clearance removed from this question's pack, before the budget was applied. */
+    readonly dropped: number;
+    /** Items each arm carried after the budget, which is what the model actually read. */
+    readonly cleared: number;
+    readonly control: number;
+    readonly identical: boolean;
+  }[];
   /** Digest of the store at the moment scoring began, which is what the guard checks. */
   readonly digest: string;
   /**
@@ -2960,12 +2979,21 @@ async function buildFoldMemory(
  * The pass reads `learnRows`. Deleting on the basis of the questions being scored would
  * be leakage with a tidier name, and it would also make the arm unbeatable by
  * construction.
+ *
+ * Two callers read the same pass, and that is why it returns its credit rather than acting on
+ * it. `full-validated` retires the rules whose record is bad enough — a store mutation, paid for
+ * once per fold. `full-cleared` and its control want the same counterfactual counts without the
+ * mutation, because they remove rules from a *pack* rather than from the store, per question.
+ * The first version of this function called `host.forget` itself, which made the clearance arms
+ * impossible to build without either duplicating three hundred lines or pruning the store they
+ * were supposed to leave alone.
  */
 async function validateMemory(
   host: FoldMemory['host'],
   rows: readonly BirdRow[],
   dataset: Dataset,
   task: Task,
+  mode: CreditMode,
 ): Promise<{
   readonly mode: string;
   readonly rules: number;
@@ -2977,6 +3005,10 @@ async function validateMemory(
   readonly excluded: number;
   readonly helped: number;
   readonly harmed: number;
+  /** Rules the policy would remove. Applied by the caller, not here: see the note above. */
+  readonly doomed: readonly string[];
+  /** The counterfactual record, keyed by rule id, for callers that filter rather than delete. */
+  readonly credit: ReadonlyMap<string, DecisiveCredit>;
 }> {
   let excluded = 0;
   const judged = async (row: BirdRow, pack: string): Promise<boolean | undefined> => {
@@ -3019,7 +3051,7 @@ async function validateMemory(
         ? { ids: recalled.ids, rendered: recalled.rendered }
         : { ids: items.map((item) => item.id), rendered: makePack(items, { budget: recalled.budget }).rendered };
     if (pack.ids.length === 0) return { ids: [] as readonly string[], failed: false, helped: false, harmed: false };
-    if (CREDIT === 'absolute') {
+    if (mode === 'absolute') {
       const ok = await judged(row, pack.rendered);
       return { ids: pack.ids, failed: ok === false, helped: false, harmed: false };
     }
@@ -3061,20 +3093,21 @@ async function validateMemory(
     }
   }
   const doomed =
-    CREDIT === 'absolute' ? retireeFrom(absolute, RETIREMENT) : retireeFromDecisive(counterfactual, DECISIVE);
-  if (doomed.length > 0) await host.forget({ ids: doomed });
+    mode === 'absolute' ? retireeFrom(absolute, RETIREMENT) : retireeFromDecisive(counterfactual, DECISIVE);
   return {
-    mode: CREDIT,
+    mode,
     rules: absolute.size,
     injected,
     trials: [...absolute.values()].reduce((sum, entry) => sum + entry.trials, 0),
     retired: doomed.length,
-    histogram: CREDIT === 'absolute' ? creditHistogram(absolute) : decisiveHistogram(counterfactual),
+    histogram: mode === 'absolute' ? creditHistogram(absolute) : decisiveHistogram(counterfactual),
     decisive,
     /** Rules dropped because they were learned from the row being scored. */
     excluded,
     helped: [...counterfactual.values()].reduce((sum, entry) => sum + entry.helped, 0),
     harmed: [...counterfactual.values()].reduce((sum, entry) => sum + entry.harmed, 0),
+    doomed,
+    credit: counterfactual,
   };
 }
 
@@ -3273,6 +3306,14 @@ async function runFold(
   const observedCodes: Record<string, number> = {};
   /** How much of each pack survives the grounding filter, so the shrink is a number. */
   const groundedSizes: { all: number; grounded: number }[] = [];
+  /** What the clearance removed per question, and what each of the two arms then carried. */
+  const clearance: {
+    position: number;
+    dropped: number;
+    cleared: number;
+    control: number;
+    identical: boolean;
+  }[] = [];
   /** The pack each question would see, held for the anchored arm's second call. */
   const anchored = new Map<number, Pack>();
   /** The revision each question received for each anchored arm, judged after both rounds. */
@@ -3356,11 +3397,34 @@ async function runFold(
 
   // The deletion half of the literature's prescription, run on learn rows only, before
   // any held-out question is scored.
+  //
+  // The clearance arms buy the same pass and read it differently, and they need the *counterfactual*
+  // reading whether or not the caller asked for it: "was this rule present when the answer was wrong"
+  // is answered by the question's difficulty (iteration 76 fitted a single binomial across rules), so
+  // a filter built on it would be a random filter with a narrative. One pass serves both callers
+  // because the calls are the expensive part — 560 per fold — and the decision is the cheap part.
+  const clearanceWanted = ARMS.has('full-cleared') || ARMS.has('full-cleared-sampled');
   let validation: Awaited<ReturnType<typeof validateMemory>> | undefined;
-  if (ARMS.has('full-validated')) {
-    validation = await validateMemory(widened.host, learnRows, dataset, task);
+  if (ARMS.has('full-validated') || clearanceWanted) {
+    validation = await validateMemory(
+      widened.host,
+      learnRows,
+      dataset,
+      task,
+      clearanceWanted ? 'counterfactual' : CREDIT,
+    );
     validations.push({ fold, ...validation });
   }
+  // Retirement mutates the store; cleanup does not. Only the arm that names deletion is allowed to
+  // delete, so a run asking for clearance alone leaves every rule in place and `full` means the same
+  // thing it meant in the run before it.
+  if (ARMS.has('full-validated') && validation !== undefined && validation.doomed.length > 0) {
+    await widened.host.forget({ ids: validation.doomed });
+  }
+  // The rules the clearance drops, resolved once per fold: a rule's record is a property of the fold's
+  // learn rows, not of the held-out question it is removed from.
+  const clearedIds =
+    validation === undefined ? new Set<string>() : new Set(clearanceFromDecisive(validation.credit));
 
   // The guard below proves that scoring writes nothing. An arm that retires rules writes
   // during construction instead, so the digest it is held to has to be taken *after* the
@@ -3480,6 +3544,41 @@ async function runFold(
       // count is what turns that from an inference into a reading.
       if (pruned.ids.join('\u0000') !== pack.ids.join('\u0000')) validatedPackDiffers += 1;
       call(position, 'full-validated', pruned.rendered, pruned.ids.length);
+    }
+    if (ARMS.has('full-cleared') || ARMS.has('full-cleared-sampled')) {
+      // Both packs are built whether or not both are scored, because the control is what makes the
+      // other arm readable and a control that only exists when someone asks for it is a control that
+      // gets forgotten. Building it costs two set differences and a render; the calls are the
+      // expensive part and they are the part that is gated.
+      //
+      // The count removed is computed before the character budget, and the count *carried* is read
+      // after it: `makePack` admits whole items until the budget is spent, so two packs with the
+      // same number of survivors can still render a different number of items when the survivors
+      // differ in length. That is the one way this pair stops being dose-matched without anyone
+      // noticing, and it is why the counts recorded here are post-budget.
+      const droppedItems = pack.items.filter((item) => clearedIds.has(item.id));
+      const clearedPack = makePack(
+        pack.items.filter((item) => !clearedIds.has(item.id)),
+        { budget: pack.budget },
+      );
+      const controlDrop = doseMatchedDrop(pack.items, droppedItems.length, mulberry32(SEED + position));
+      const controlPack = makePack(
+        pack.items.filter((item) => !controlDrop.has(item.id)),
+        { budget: pack.budget },
+      );
+      clearance.push({
+        position,
+        dropped: droppedItems.length,
+        cleared: clearedPack.ids.length,
+        control: controlPack.ids.length,
+        identical: clearedPack.ids.join('\u0000') === controlPack.ids.join('\u0000'),
+      });
+      if (ARMS.has('full-cleared')) {
+        call(position, 'full-cleared', clearedPack.rendered, clearedPack.ids.length);
+      }
+      if (ARMS.has('full-cleared-sampled')) {
+        call(position, 'full-cleared-sampled', controlPack.rendered, controlPack.ids.length);
+      }
     }
     if (ARMS.has('full-narrow')) {
       // The same store, distilled without widening. `narrowed` is undefined when
@@ -4532,6 +4631,7 @@ async function runFold(
     injectedWithCondition,
     framing: framingDelivery,
     domainOrigin,
+    clearance,
     validatedPackDiffers,
     validatedPositions,
     anchoredSkipped,
@@ -5092,6 +5192,12 @@ async function main(): Promise<void> {
     widenedIn: folds.reduce((sum, fold) => sum + fold.domainOrigin.widenedIn, 0),
   };
   const callFailureRate = llm.stats.prompts === 0 ? 0 : llm.stats.failures / llm.stats.prompts;
+  // Every question the clearance pair scored, pooled across folds. The gate reads this list rather
+  // than the fold summaries because dose-matching is a per-question property.
+  const clearanceCells = folds.flatMap((fold) => fold.clearance);
+  // One mode for the whole run: every fold is validated the same way, and the field would otherwise
+  // have to be read out of a fold that a deadline may not have reached.
+  const validationMode: CreditMode = validations[0]?.mode === 'counterfactual' ? 'counterfactual' : CREDIT;
   // One pooled comparison, computed once and read by both the gate and the artefact so the two
   // cannot report different directions for the same run.
   const pairPooled: PooledSubstrate | null = poolSubstrates(
@@ -5226,6 +5332,29 @@ async function main(): Promise<void> {
     ...(domainOrigin.storedWithDomain + domainOrigin.storedWithoutDomain === 0
       ? {}
       : { domainOrigin }),
+    // Emitted only when both halves of the pair were scored, because a dose-matching claim about one
+    // arm is a claim about nothing. The counts are post-budget and per question: two sums that agree
+    // do not make any single question dose-matched, and the gate is about the questions.
+    ...(ARMS.has('full-cleared') && ARMS.has('full-cleared-sampled')
+      ? {
+          clearance: {
+            arm: 'full-cleared',
+            control: 'full-cleared-sampled',
+            questions: clearanceCells.length,
+            mismatched: clearanceCells.filter((cell) => cell.cleared !== cell.control).length,
+            identical: clearanceCells.filter((cell) => cell.identical).length,
+            dropped: clearanceCells.reduce((sum, cell) => sum + cell.dropped, 0),
+            meanCleared:
+              clearanceCells.length === 0
+                ? 0
+                : clearanceCells.reduce((sum, cell) => sum + cell.cleared, 0) / clearanceCells.length,
+            meanControl:
+              clearanceCells.length === 0
+                ? 0
+                : clearanceCells.reduce((sum, cell) => sum + cell.control, 0) / clearanceCells.length,
+          },
+        }
+      : {}),
     // The protocol's oracle ceiling applies to the convention lane, where the
     // accepted answer has a form the model must reproduce.
     ...(ACTIVE === undefined || channelBest === undefined ? {} : { channelCeiling: channelBest.accuracy }),
@@ -5375,6 +5504,27 @@ async function main(): Promise<void> {
       latency_p50_ms: percentile(cases.map((item) => item.latencyMs), 0.5),
       latency_p95_ms: percentile(cases.map((item) => item.latencyMs), 0.95),
       knowledge_active_mean: activeMean,
+      // What the clearance removed and what each half of the pair then carried. Reported beside
+      // `mean_pack_ids` because that number describes `full`, and the whole point of the pair is
+      // that it is scored at a smaller dose than the arm it is compared against.
+      ...(clearanceCells.length === 0
+        ? {}
+        : {
+            clearance_questions: clearanceCells.length,
+            clearance_dropped: clearanceCells.reduce((sum, cell) => sum + cell.dropped, 0),
+            clearance_mean_cleared:
+              clearanceCells.reduce((sum, cell) => sum + cell.cleared, 0) / clearanceCells.length,
+            clearance_mean_control:
+              clearanceCells.reduce((sum, cell) => sum + cell.control, 0) / clearanceCells.length,
+            clearance_identical: clearanceCells.filter((cell) => cell.identical).length,
+            clearance_rules_scored: validations.reduce((sum, entry) => sum + entry.credit.size, 0),
+            // Summed over folds because each fold has its own store and its own learn rows: a rule
+            // removed twice was learned twice, which is the same convention `domainOrigin` uses.
+            clearance_rules_removed: validations.reduce(
+              (sum, entry) => sum + clearanceFromDecisive(entry.credit).length,
+              0,
+            ),
+          }),
       // The shape experiment's two denominators: rules injected, and how many of
       // them said when they apply. `active_with_condition` counts the store, which
       // is where a reader looks to see whether the distiller changed behaviour.
@@ -5423,11 +5573,11 @@ async function main(): Promise<void> {
         }, {}),
       ),
       validation_policy:
-        CREDIT === 'absolute'
+        validationMode === 'absolute'
           ? `absolute share>=${RETIREMENT.failureRate} over >=${RETIREMENT.minTrials} trials`
           : `counterfactual harmShare>=${DECISIVE.harmShare.toFixed(4)} over >=${DECISIVE.minDecisive} decisive`,
       /** Which score decided the deletions, and what it saw. */
-      validation_credit: CREDIT,
+      validation_credit: validationMode,
       validation_decisive_questions: validations.reduce((sum, entry) => sum + entry.decisive, 0),
       validation_helped: validations.reduce((sum, entry) => sum + entry.helped, 0),
       /**

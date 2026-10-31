@@ -186,6 +186,46 @@ export function retireeFromDecisive(
   return out.sort();
 }
 
+/**
+ * The rules a *clearance* policy removes, which is not the same question as retirement.
+ *
+ * Retirement asks "has this rule earned removal", and answers only when the record is bad
+ * enough to survive a two-thirds threshold — a rule with one harm and no help is not retired,
+ * because one pair is one coin flip. Clearance asks the opposite question and can afford to be
+ * permissive in the other direction: **the set of rules that have a record of net harm is
+ * dropped, and everything else is kept.** A rule with no decisive comparison is kept, which is
+ * what makes the arm a clearance of the store rather than a rebuild of it: the pack shrinks by
+ * the items that were *measured* to hurt, and by nothing else.
+ *
+ * The difference matters for what the arm can conclude. A retirement arm that removes two
+ * thirds of the store and lands on `none` is confounded with dose — the record already knows
+ * that an empty pack is `none`. A clearance arm that removes a minority and still moves is not.
+ *
+ * `harmed > helped` rather than `harmed >= helped`: a tie is a record of exactly nothing, and
+ * dropping on a tie would be a prior ("unmeasured is bad") smuggled into a utility argument.
+ * The prior is available as `minDecisive: 1` and is not what this function means.
+ */
+export type ClearancePolicy = {
+  /** Decisive comparisons a rule needs before its record is allowed to remove it. */
+  readonly minDecisive: number;
+};
+
+export const DEFAULT_CLEARANCE: ClearancePolicy = { minDecisive: 1 };
+
+export function clearanceFromDecisive(
+  credit: ReadonlyMap<string, DecisiveCredit>,
+  policy: ClearancePolicy = DEFAULT_CLEARANCE,
+): readonly string[] {
+  const out: string[] = [];
+  for (const [id, entry] of credit) {
+    const decisive = entry.helped + entry.harmed;
+    if (decisive < policy.minDecisive) continue;
+    if (entry.harmed <= entry.helped) continue;
+    out.push(id);
+  }
+  return out.sort();
+}
+
 /** Rules by observed harm share, as `harmed/decisive`, for the same reason as its absolute twin. */
 export function decisiveHistogram(credit: ReadonlyMap<string, DecisiveCredit>): Record<string, number> {
   const out: Record<string, number> = {};

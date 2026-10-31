@@ -380,6 +380,38 @@ export type SqlArm =
    */
   | 'full-validated'
   /**
+   * The same pack with the rules that were measured to hurt removed, per question.
+   *
+   * `full-validated` retires rules whose record is *bad enough* — two decisive comparisons and a
+   * two-thirds harm share — and `full-verified` keeps only rules that reproduced their own
+   * correction, which in practice leaves 0.44 items per pack and therefore lands on `none` by
+   * emptiness. Both are store-level filters, and both have been read against `full` on the same
+   * questions, so neither can say whether a *smaller, filtered* pack is better than a smaller
+   * pack of the same size. That comparison is the one the dose axis made necessary: R16 measured
+   * the loss complete at the first item, so a filter that shrinks the pack has moved the dose as
+   * well as the content, and the two have never been separated.
+   *
+   * This arm is the minority-drop reading of the literature's prescription. The fold's learn rows
+   * score every rule by counterfactual (with it, without it), a rule whose record shows more harms
+   * than helps is dropped, and **a rule with no record is kept** — the arm clears what was
+   * measured to hurt and leaves the rest, which is what makes its dose comparable to `full`'s
+   * rather than comparable to `none`'s.
+   */
+  | 'full-cleared'
+  /**
+   * The same number of rules removed at random, which is the only control that makes clearance a
+   * treatment.
+   *
+   * Without it, `full-cleared` differs from `full` in two things at once: which rules survived and
+   * how many. The dose axis says the size alone moves accuracy by about a point per item, so a
+   * cleared cell above `full` could be reporting nothing more than "a smaller pack" — and this lane
+   * has published that shape of inference before and had to withdraw it. So for each held-out
+   * question this arm drops exactly the count `full-cleared` dropped for that question, chosen
+   * uniformly from the same pack, keeping the retrieval order. The pair is then one variable: which
+   * rules went.
+   */
+  | 'full-cleared-sampled'
+  /**
    * The same pack, reduced to the rules that reproduced their own correction.
    *
    * Every memory arm measured here is negative or null, and none of them asked the store to
@@ -832,6 +864,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'anchor-hold': true,
   'anchor-blank': true,
   'full-validated': true,
+  'full-cleared': true,
+  'full-cleared-sampled': true,
   critique: true,
   gated: true,
   duplicate: true,
@@ -1473,6 +1507,26 @@ export type GateInput = {
     readonly widenedIn: number;
   };
   readonly channelBest: { readonly arm: string; readonly deltaPp: number } | undefined;
+  /**
+   * How the clearance arm and its dose-matched control compared, when the run builds one.
+   *
+   * Absent when no clearance arm ran, because a gate that always passes is a comment. Present, it
+   * is the only thing standing between the pair and the inference this record has already had to
+   * withdraw once: a filtered pack is a *smaller* pack, and size alone moves accuracy here.
+   */
+  readonly clearance?: {
+    readonly arm: string;
+    readonly control: string;
+    readonly questions: number;
+    /** Questions where the two arms carried a different number of items. */
+    readonly mismatched: number;
+    /** Questions where they carried the same items, so the comparison has no content there. */
+    readonly identical: number;
+    /** Items the clearance removed, summed over questions. */
+    readonly dropped: number;
+    readonly meanCleared: number;
+    readonly meanControl: number;
+  };
   /** Share of calls that failed after exhausting retries, in [0, 1]. */
   readonly callFailureRate: number;
   readonly calls: number;
@@ -1919,7 +1973,57 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       blocking: true,
     });
   }
+  if (input.clearance !== undefined) {
+    // Two ways this pair stops being an experiment. If the control dropped a different number of
+    // items, the delta is dose as much as content and nothing can separate them afterwards. If no
+    // question's pack changed at all, the two arms are one condition with two names, and the delta
+    // between them is the provider's noise wearing a treatment's clothes. Both are failures of the
+    // instrument rather than of the hypothesis, so neither is allowed to reach a published number.
+    const { questions, mismatched, identical, dropped, meanCleared, meanControl, arm, control } =
+      input.clearance;
+    gates.push({
+      id: 'V45-clearance-dose-matched',
+      criterion:
+        'the clearance arm and its control carried the same number of items on every question, and clearance changed at least one pack',
+      actual:
+        `${mismatched} mismatched of ${questions} question(s), ${identical} identical, ` +
+        `${dropped} item(s) cleared, mean items ${meanCleared.toFixed(2)} (${arm}) vs ` +
+        `${meanControl.toFixed(2)} (${control})`,
+      pass: mismatched === 0 && identical < questions,
+      blocking: true,
+    });
+  }
   return gates;
+}
+
+/**
+ * Which items a dose-matched control drops.
+ *
+ * The control half of every clearance arm: given the pack a question would have received and the
+ * number of items the clearance removed from it, drop that many *at random* from the same pack. A
+ * uniform sample without replacement over a Fisher–Yates permutation driven by the injected stream,
+ * so two runs of the same fold drop the same items — the arm has to be reproducible for its delta to
+ * mean anything, and "random" in this repository always means "a stream with a seed in the artefact".
+ *
+ * Clamped in both directions rather than trusting the caller: a count above the pack size drops the
+ * whole pack (the control then carries nothing, which is a legitimate dose), and a count below zero
+ * drops nothing. Both clampings are counted by the caller's `identical` tally, so a clamp that makes
+ * the pair one condition is visible instead of silent.
+ */
+export function doseMatchedDrop<T extends { readonly id: string }>(
+  items: readonly T[],
+  count: number,
+  random: () => number,
+): ReadonlySet<string> {
+  const ids = items.map((item) => item.id);
+  for (let index = ids.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(random() * (index + 1));
+    const held = ids[index] as string;
+    ids[index] = ids[swap] as string;
+    ids[swap] = held;
+  }
+  const take = Math.max(0, Math.min(Math.trunc(count), ids.length));
+  return new Set(ids.slice(0, take));
 }
 
 /**

@@ -341,6 +341,7 @@ export {
   matches,
   parseArms,
   anchorPromptFor,
+  doseMatchedDrop,
   failureKind,
   ADVISORY_SENTENCE,
   ARM_STANDING,
@@ -530,13 +531,16 @@ export {
 } from './sql-exec.js';
 
 export {
+  DEFAULT_CLEARANCE,
   DEFAULT_DECISIVE,
   DEFAULT_RETIREMENT,
+  clearanceFromDecisive,
   creditHistogram,
   decisiveHistogram,
   parseDecisivePolicy,
   outcomeCredit,
   retireeFromDecisive,
+  type ClearancePolicy,
   type DecisiveCredit,
   type DecisivePolicy,
   type OutcomeCredit,

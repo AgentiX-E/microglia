@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { mulberry32 } from '@agentix-e/microglia-core';
 import {
   ARM_STANDING,
   HOUSE_CONVENTIONS,
@@ -23,6 +24,7 @@ import {
   sqlIdentifiers,
   parseArms,
   anchorPromptFor,
+  doseMatchedDrop,
   promptFor,
   retryPromptFor,
   retrySubset,
@@ -235,6 +237,8 @@ describe('parseArms', () => {
       'full-anchored-conditional',
       'full-anchored-hold',
       'full-asked',
+      'full-cleared',
+      'full-cleared-sampled',
       'full-corroborated',
       'full-grounded',
       'full-late',
@@ -382,6 +386,8 @@ describe('parseArms', () => {
       'anchor-hold',
       'anchor-blank',
       'full-validated',
+      'full-cleared',
+      'full-cleared-sampled',
       'critique',
       'gated',
       'duplicate',
@@ -1446,6 +1452,81 @@ describe('buildValidityGates', () => {
     expect(entry.actual).toBe('5 item(s) with no domain, 1 arrived unscoped, 0 widened');
   });
 
+  it('V45 is absent when the run scored no clearance pair', () => {
+    // A gate that always passes is a comment: a run with no clearance arm has nothing to dose-match
+    // and must not report a green tick about it.
+    expect(buildValidityGates(sound).some((entry) => entry.id === 'V45-clearance-dose-matched')).toBe(false);
+  });
+
+  it('V45 passes when every question was scored at the same dose in both arms', () => {
+    const entry = gate(
+      {
+        ...sound,
+        clearance: {
+          arm: 'full-cleared',
+          control: 'full-cleared-sampled',
+          questions: 350,
+          mismatched: 0,
+          identical: 90,
+          dropped: 412,
+          meanCleared: 1.21,
+          meanControl: 1.21,
+        },
+      },
+      'V45-clearance-dose-matched',
+    );
+    expect(entry.pass).toBe(true);
+    expect(entry.blocking).toBe(true);
+    expect(entry.actual).toBe(
+      '0 mismatched of 350 question(s), 90 identical, 412 item(s) cleared, mean items 1.21 (full-cleared) vs 1.21 (full-cleared-sampled)',
+    );
+  });
+
+  it('V45 fails when the budget admitted a different number of items in the two arms', () => {
+    // The failure this exists for. The two arms drop the same *count* before the character budget,
+    // and the budget then admits whole items: survivors of different lengths render as different
+    // numbers of items, which moves the dose and makes the delta uninterpretable after the fact.
+    const entry = gate(
+      {
+        ...sound,
+        clearance: {
+          arm: 'full-cleared',
+          control: 'full-cleared-sampled',
+          questions: 350,
+          mismatched: 7,
+          identical: 90,
+          dropped: 412,
+          meanCleared: 1.19,
+          meanControl: 1.23,
+        },
+      },
+      'V45-clearance-dose-matched',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toContain('7 mismatched of 350');
+  });
+
+  it('V45 fails when clearance changed no pack, which makes the two arms one condition', () => {
+    const entry = gate(
+      {
+        ...sound,
+        clearance: {
+          arm: 'full-cleared',
+          control: 'full-cleared-sampled',
+          questions: 350,
+          mismatched: 0,
+          identical: 350,
+          dropped: 0,
+          meanCleared: 1.85,
+          meanControl: 1.85,
+        },
+      },
+      'V45-clearance-dose-matched',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toContain('350 identical');
+  });
+
   it('marks exactly V5 advisory and everything else blocking', () => {
     const advisory = buildValidityGates({
       ...sound,
@@ -2157,5 +2238,45 @@ describe('contrastTable', () => {
 
   it('names a control for every pair that is not the arm itself', () => {
     for (const spec of CONTRASTS) expect(spec.control).not.toBe(spec.treatment);
+  });
+});
+
+describe('doseMatchedDrop', () => {
+  const items = ['a', 'b', 'c', 'd'].map((id) => ({ id }));
+
+  it('drops exactly the count it was asked for', () => {
+    for (const count of [0, 1, 2, 3, 4]) {
+      expect(doseMatchedDrop(items, count, () => 0.5).size).toBe(count);
+    }
+  });
+
+  it('is reproducible: the same stream drops the same items', () => {
+    // The arm's delta is only meaningful if the control is a function of the artefact's seed, and a
+    // control that redraws itself on every run is a second source of noise inside a paired test.
+    const first = doseMatchedDrop(items, 2, mulberry32(7));
+    const second = doseMatchedDrop(items, 2, mulberry32(7));
+    expect([...first].sort()).toEqual([...second].sort());
+  });
+
+  it('draws without replacement from the pack it was given', () => {
+    const dropped = doseMatchedDrop(items, 3, mulberry32(11));
+    expect([...dropped].every((id) => items.some((item) => item.id === id))).toBe(true);
+    expect(dropped.size).toBe(3);
+  });
+
+  it('drops the whole pack when asked for more than it has, rather than throwing', () => {
+    // A clearance that removed every item of a question's pack is a legitimate dose: the control has
+    // to reach the same empty pack, and a control that refused to would break the pairing on exactly
+    // the questions where the clearance was strongest.
+    expect(doseMatchedDrop(items, 9, mulberry32(3)).size).toBe(4);
+  });
+
+  it('drops nothing on an empty pack or a negative count', () => {
+    expect(doseMatchedDrop([], 2, mulberry32(3)).size).toBe(0);
+    expect(doseMatchedDrop(items, -1, mulberry32(3)).size).toBe(0);
+  });
+
+  it('takes a whole count, so a caller cannot ask for a fraction of an item', () => {
+    expect(doseMatchedDrop(items, 1.9, mulberry32(5)).size).toBe(1);
   });
 });

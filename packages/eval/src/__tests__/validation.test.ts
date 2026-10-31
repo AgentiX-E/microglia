@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DECISIVE,
   DEFAULT_RETIREMENT,
+  clearanceFromDecisive,
   creditHistogram,
   decisiveHistogram,
   parseDecisivePolicy,
@@ -154,6 +155,54 @@ describe('retireeFromDecisive', () => {
   it('retires a rule that lost three of four, and keeps one that lost two of five', () => {
     expect(retireeFromDecisive(new Map([['a', { helped: 1, harmed: 3 }]]))).toEqual(['a']);
     expect(retireeFromDecisive(new Map([['a', { helped: 3, harmed: 2 }]]))).toEqual([]);
+  });
+});
+
+describe('clearanceFromDecisive', () => {
+  it('removes a rule with a net harm record', () => {
+    expect(clearanceFromDecisive(new Map([['a', { helped: 0, harmed: 1 }]]))).toEqual(['a']);
+    expect(clearanceFromDecisive(new Map([['a', { helped: 1, harmed: 3 }]]))).toEqual(['a']);
+  });
+
+  it('keeps a rule with a net help record, which is the half retirement also keeps', () => {
+    expect(clearanceFromDecisive(new Map([['a', { helped: 2, harmed: 1 }]]))).toEqual([]);
+    expect(clearanceFromDecisive(new Map([['a', { helped: 1, harmed: 0 }]]))).toEqual([]);
+  });
+
+  it('keeps a tied record, because a tie is not evidence of harm', () => {
+    // The one place clearance and retirement part company on the same input. Retirement keeps a tie
+    // because two thirds is the bar for "earned removal"; clearance keeps it because the drop is a
+    // claim that an item *was measured* to hurt, and a tie is a measurement of nothing.
+    expect(clearanceFromDecisive(new Map([['a', { helped: 1, harmed: 1 }]]))).toEqual([]);
+    expect(retireeFromDecisive(new Map([['a', { helped: 1, harmed: 1 }]]), { minDecisive: 2, harmShare: 0.5 })).toEqual([
+      'a',
+    ]);
+  });
+
+  it('keeps a rule nothing was ever measured about, which is what makes the arm a clearance', () => {
+    // The difference from `full-verified`: an item with no record is not innocent, it is unmeasured,
+    // and dropping the unmeasured would shrink the pack to almost nothing and measure dose instead.
+    expect(clearanceFromDecisive(new Map([['a', { helped: 0, harmed: 0 }]]))).toEqual([]);
+  });
+
+  it('acts on a single decisive comparison, unlike retirement', () => {
+    expect(clearanceFromDecisive(new Map([['a', { helped: 0, harmed: 1 }]]))).toEqual(['a']);
+    expect(retireeFromDecisive(new Map([['a', { helped: 0, harmed: 1 }]]))).toEqual([]);
+  });
+
+  it('honours a raised floor, which is the setting that makes it stricter', () => {
+    const credit = new Map([['a', { helped: 1, harmed: 2 }]]);
+    expect(clearanceFromDecisive(credit, { minDecisive: 4 })).toEqual([]);
+    expect(clearanceFromDecisive(credit, { minDecisive: 3 })).toEqual(['a']);
+  });
+
+  it('sorts, for the same digest reason as its siblings', () => {
+    const credit = new Map([
+      ['c', { helped: 0, harmed: 1 }],
+      ['a', { helped: 0, harmed: 1 }],
+      ['b', { helped: 0, harmed: 2 }],
+    ]);
+    expect(clearanceFromDecisive(credit)).toEqual(['a', 'b', 'c']);
   });
 });
 
