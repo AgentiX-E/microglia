@@ -60,6 +60,16 @@ export {
   type TransferVerdict,
 } from './rule-probe.js';
 export {
+  SUBSTRATE_FLOOR,
+  compareSubstrates,
+  poolSubstrates,
+  reproducedBy,
+  type CompareOptions,
+  type PooledSubstrate,
+  type SubstrateComparison,
+  type SubstrateVerdict,
+} from './probe-pair.js';
+export {
   collectMschema,
   renderMschema,
   type CollectOptions,

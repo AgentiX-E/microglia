@@ -14,6 +14,7 @@
  * repository.
  */
 import type { PriorScope } from './memory-prior.js';
+import { SUBSTRATE_FLOOR } from './probe-pair.js';
 import { comparePaired } from './stats.js';
 
 /** Bumped whenever the prompt text changes; a result without it is unreproducible. */
@@ -343,6 +344,22 @@ export type SqlArm =
    * store that admits nothing is a finding about the corpus rather than an arm that did nothing.
    */
   | 'full-transferred'
+  /**
+   * The other substrate, measured by the same instrument.
+   *
+   * `full-verified` reduced the store to rules that reproduced their own correction, and R13 then
+   * showed what those rules do elsewhere: 7.3% of the questions that needed help, 50% of those that
+   * did not. The reading that followed — "a sentence about a correction loses the query pair that
+   * made the correction mechanical" — is a claim about the *substrate*, and it was measured on one
+   * substrate only.
+   *
+   * This arm runs the same probe, the same admission rule and the same pack budget over a store the
+   * `repair` distiller built from the same corrections: three sentences that state what the attempt
+   * did, why that returns the wrong answer, and what the correction changes. The two stores are then
+   * paired question by question, so the comparison does not depend on two independent rates
+   * agreeing to within the fold's noise.
+   */
+  | 'full-repair-verified'
   /**
    * The same pack, with the model asked to *decide* applicability before answering.
    *
@@ -759,6 +776,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-verified': true,
   'full-shuffled': true,
   'full-transferred': true,
+  'full-repair-verified': true,
 };
 
 export const OPTIONAL_ARMS: readonly Exclude<SqlArm, 'none' | 'full'>[] = Object.keys(
@@ -1220,6 +1238,21 @@ export type GateInput = {
     readonly questions: number;
   };
   /**
+   * The same bookkeeping for the second substrate, when a run built both stores.
+   *
+   * The admission buckets have to partition the repair store for the same reason they have to
+   * partition the rule store: a gate that miscounts turns an arm into a number nobody can check.
+   */
+  readonly probeRepair?: {
+    readonly rules: number;
+    readonly kept: number;
+    readonly noVerifiedSource: number;
+    readonly brokeItsSource: number;
+    readonly unsupported: number;
+    readonly packDiffers: number;
+    readonly questions: number;
+  };
+  /**
    * What the transfer measurement found, when it ran.
    *
    * The three buckets have to reconcile to the trials for the same reason the admission buckets
@@ -1240,6 +1273,32 @@ export type GateInput = {
     readonly measured: number;
     readonly broke: number;
     readonly netPp: number;
+    readonly verdict: string;
+  };
+  /**
+   * The two-substrate comparison, when a run built both stores.
+   *
+   * A paired reading is only a paired reading if the cells reconcile: every shared question is either
+   * a cell or a hole, and the shared set plus the two exclusive sets is the union. An artefact that
+   * published `both` and `onlyRight` without those identities would report a comparison over a
+   * denominator nobody can reconstruct.
+   */
+  readonly substrate?: {
+    readonly left: string;
+    readonly right: string;
+    readonly shared: number;
+    readonly leftExclusive: number;
+    readonly rightExclusive: number;
+    readonly holes: number;
+    readonly both: number;
+    readonly onlyLeft: number;
+    readonly onlyRight: number;
+    readonly neither: number;
+    readonly paired: number;
+    readonly leftRate: number;
+    readonly rightRate: number;
+    readonly deltaPp: number;
+    readonly p: number;
     readonly verdict: string;
   };
   /** The candidate pool, when a sampling arm recorded one. */
@@ -1407,6 +1466,25 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       blocking: false,
     });
   }
+  if (input.probeRepair !== undefined) {
+    const { rules, kept, noVerifiedSource, brokeItsSource, unsupported, packDiffers, questions } =
+      input.probeRepair;
+    const counted = kept + noVerifiedSource + brokeItsSource + unsupported;
+    gates.push({
+      id: 'V37-repair-probe-reconciles',
+      criterion: 'the second substrate accounts for every rule its gate was given',
+      actual: `${counted}/${rules} rule(s): ${kept} kept, ${unsupported} unsupported, ${brokeItsSource} broke its source, ${noVerifiedSource} unprobed`,
+      pass: counted === rules,
+      blocking: true,
+    });
+    gates.push({
+      id: 'V38-repair-probe-applied',
+      criterion: "the second substrate's gate changed at least one held-out pack",
+      actual: `${packDiffers}/${questions} question(s)`,
+      pass: packDiffers > 0,
+      blocking: false,
+    });
+  }
   if (input.transfer !== undefined) {
     const { trials, informative, repaired, blankRight, unmeasured } = input.transfer;
     const blankHoles = input.transfer.unmeasuredBlank ?? 0;
@@ -1457,6 +1535,47 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
         Math.abs(marginal.netPp - ((marginal.repaired - marginal.broke) / marginal.measured) * 100) <
           1e-9,
       blocking: true,
+    });
+  }
+  if (input.substrate !== undefined) {
+    const s = input.substrate;
+    const cells = s.both + s.onlyLeft + s.onlyRight + s.neither;
+    const union = s.shared + s.leftExclusive + s.rightExclusive;
+    gates.push({
+      id: 'V34-substrate-paired',
+      criterion:
+        'every shared question is a cell or a hole, and both rates and the delta reconcile with the cells',
+      actual:
+        `${cells} cell(s) + ${s.holes} hole(s) = ${s.shared} shared of ${union} question(s); ` +
+        `${s.left} ${(s.leftRate * 100).toFixed(2)}%, ${s.right} ${(s.rightRate * 100).toFixed(2)}%`,
+      pass:
+        cells + s.holes === s.shared &&
+        cells === s.paired &&
+        // The rates are computed from the cells, so a report that carried one without the other is
+        // caught here rather than by a reader who happens to divide.
+        Math.abs(s.leftRate * s.paired - (s.both + s.onlyLeft)) < 1e-9 &&
+        Math.abs(s.rightRate * s.paired - (s.both + s.onlyRight)) < 1e-9 &&
+        Math.abs(s.deltaPp - (s.rightRate - s.leftRate) * 100) < 1e-9,
+      blocking: true,
+    });
+    gates.push({
+      id: 'V35-substrate-resolvable',
+      criterion: `at least ${String(SUBSTRATE_FLOOR)} paired questions, or the difference is a direction rather than a measurement`,
+      actual: `${s.paired} paired question(s): ${s.left} ${(s.leftRate * 100).toFixed(2)}%, ${s.right} ${(s.rightRate * 100).toFixed(2)}%, ${s.deltaPp.toFixed(2)}pp, p = ${s.p.toFixed(4)}`,
+      pass: s.paired >= SUBSTRATE_FLOOR,
+      blocking: false,
+    });
+    // The rate the comparison reports is over the paired set, and the paired set is chosen by the
+    // stores rather than by the design: a store that holds a rule for a question the other one does
+    // not would otherwise contribute to one side's denominator only. This gate does not fail the
+    // run — an asymmetry is a property of the corpus — but it makes the size of the asymmetry a
+    // condition of reading the delta, so "paired on 300 of 296" cannot pass as paired.
+    gates.push({
+      id: 'V36-substrate-coverage',
+      criterion: 'the exclusion is small enough that the paired set still describes the corpus',
+      actual: `${s.leftExclusive} left-only, ${s.rightExclusive} right-only of ${union}`,
+      pass: s.leftExclusive + s.rightExclusive <= Math.max(10, Math.round(union * 0.1)),
+      blocking: false,
     });
   }
   if (input.pool !== undefined) {

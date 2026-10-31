@@ -237,6 +237,7 @@ describe('parseArms', () => {
       'full-procedural',
       'full-repair',
       'full-repair-onretry',
+      'full-repair-verified',
       'full-sampled',
       'full-shuffled',
       'full-transferred',
@@ -403,6 +404,7 @@ describe('parseArms', () => {
       'full-verified',
       'full-shuffled',
       'full-transferred',
+      'full-repair-verified',
     ]);
   });
 
@@ -873,6 +875,135 @@ describe('buildValidityGates', () => {
       'V17-transfer-net-reported',
     );
     expect(edited.pass).toBe(false);
+  });
+
+  /**
+   * A substrate comparison with its rates derived from its cells.
+   *
+   * Derived for the same reason the transfer fixture derives `netPp`: a fixture that restated the
+   * rates would agree with a gate that computed them wrongly.
+   */
+  const substrateInput = (cells: {
+    both: number;
+    onlyLeft: number;
+    onlyRight: number;
+    neither: number;
+    holes?: number;
+    leftExclusive?: number;
+    rightExclusive?: number;
+  }) => {
+    const holes = cells.holes ?? 0;
+    const paired = cells.both + cells.onlyLeft + cells.onlyRight + cells.neither;
+    const leftRate = paired === 0 ? 0 : (cells.both + cells.onlyLeft) / paired;
+    const rightRate = paired === 0 ? 0 : (cells.both + cells.onlyRight) / paired;
+    return {
+      left: 'rule',
+      right: 'repair',
+      shared: paired + holes,
+      leftExclusive: cells.leftExclusive ?? 0,
+      rightExclusive: cells.rightExclusive ?? 0,
+      holes,
+      both: cells.both,
+      onlyLeft: cells.onlyLeft,
+      onlyRight: cells.onlyRight,
+      neither: cells.neither,
+      paired,
+      leftRate,
+      rightRate,
+      deltaPp: (rightRate - leftRate) * 100,
+      p: 0.5,
+      verdict: 'tie',
+    };
+  };
+
+  it('V34 requires the paired cells and the two rates to reconcile', () => {
+    const balanced = gate(
+      { ...sound, substrate: substrateInput({ both: 60, onlyLeft: 4, onlyRight: 40, neither: 180, holes: 4 }) },
+      'V34-substrate-paired',
+    );
+    expect(balanced.pass).toBe(true);
+    expect(balanced.blocking).toBe(true);
+    expect(balanced.actual).toContain('284 cell(s) + 4 hole(s) = 288 shared');
+
+    // One shared question unaccounted for: either a cell or a hole, never neither.
+    const short = gate(
+      { ...sound, substrate: { ...substrateInput({ both: 60, onlyLeft: 4, onlyRight: 40, neither: 180, holes: 4 }), shared: 289 } },
+      'V34-substrate-paired',
+    );
+    expect(short.pass).toBe(false);
+  });
+
+  it('V34 refuses a rate that does not match the cells it was computed from', () => {
+    // The failure this catches is a report bug, not a measurement bug: the pair tests are computed
+    // from the same trials, so a file whose rate disagrees with its cells is a file nobody should
+    // quote, whatever the underlying numbers were.
+    const edited = gate(
+      { ...sound, substrate: { ...substrateInput({ both: 60, onlyLeft: 4, onlyRight: 40, neither: 180 }), leftRate: 0.9 } },
+      'V34-substrate-paired',
+    );
+    expect(edited.pass).toBe(false);
+  });
+
+  it('V35 calls the difference a direction below the floor and a measurement above it', () => {
+    const thin = gate(
+      { ...sound, substrate: substrateInput({ both: 2, onlyLeft: 0, onlyRight: 3, neither: 1 }) },
+      'V35-substrate-resolvable',
+    );
+    expect(thin.pass).toBe(false);
+    expect(thin.blocking).toBe(false);
+    expect(thin.actual).toContain('6 paired question(s)');
+
+    const thick = gate(
+      { ...sound, substrate: substrateInput({ both: 60, onlyLeft: 4, onlyRight: 40, neither: 180 }) },
+      'V35-substrate-resolvable',
+    );
+    expect(thick.pass).toBe(true);
+  });
+
+  it('V36 notices when the paired set has stopped describing the corpus', () => {
+    // The rates are over the questions both stores covered, and that set is chosen by the stores.
+    // A run where one store covers far fewer questions reports a comparison of two samples that are
+    // not the same sample, so the size of the exclusion has to be a reading.
+    const narrow = gate(
+      { ...sound, substrate: substrateInput({ both: 50, onlyLeft: 2, onlyRight: 3, neither: 40, leftExclusive: 0, rightExclusive: 200 }) },
+      'V36-substrate-coverage',
+    );
+    expect(narrow.pass).toBe(false);
+    expect(narrow.blocking).toBe(false);
+
+    const even = gate(
+      { ...sound, substrate: substrateInput({ both: 50, onlyLeft: 2, onlyRight: 3, neither: 40, leftExclusive: 2, rightExclusive: 3 }) },
+      'V36-substrate-coverage',
+    );
+    expect(even.pass).toBe(true);
+  });
+
+  it('omits the substrate gates when only one store was probed', () => {
+    const ids = buildValidityGates(sound).map((entry) => entry.id);
+    expect(ids).not.toContain('V34-substrate-paired');
+    expect(ids).not.toContain('V35-substrate-resolvable');
+    expect(ids).not.toContain('V37-repair-probe-reconciles');
+  });
+
+  it("V37 accounts for every rule the second substrate's gate was given", () => {
+    const probeRepair = { rules: 296, kept: 61, noVerifiedSource: 0, brokeItsSource: 9, unsupported: 226, packDiffers: 210, questions: 350 };
+    const balanced = gate({ ...sound, probeRepair }, 'V37-repair-probe-reconciles');
+    expect(balanced.pass).toBe(true);
+    expect(balanced.blocking).toBe(true);
+    expect(balanced.actual).toContain('296/296 rule(s)');
+
+    const short = gate({ ...sound, probeRepair: { ...probeRepair, unsupported: 200 } }, 'V37-repair-probe-reconciles');
+    expect(short.pass).toBe(false);
+  });
+
+  it('V38 reads a second-substrate gate that changed nothing as a second name for `full`', () => {
+    const noop = gate(
+      { ...sound, probeRepair: { rules: 296, kept: 0, noVerifiedSource: 0, brokeItsSource: 0, unsupported: 296, packDiffers: 0, questions: 350 } },
+      'V38-repair-probe-applied',
+    );
+    expect(noop.pass).toBe(false);
+    expect(noop.blocking).toBe(false);
+    expect(noop.criterion).toContain('changed at least one held-out pack');
   });
 
   it('omits the pool gates when no sampling arm ran', () => {

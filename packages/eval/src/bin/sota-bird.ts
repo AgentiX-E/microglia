@@ -125,6 +125,8 @@ import {
   schemaLinkSplit,
   shuffledSource,
   TRANSFER_FLOOR,
+  compareSubstrates,
+  poolSubstrates,
   transferSummary,
   transferTargets,
   transferringItemIds,
@@ -174,8 +176,10 @@ import {
   type PackCell,
   type PoolQuestion,
   type PriorScope,
+  type PooledSubstrate,
   type ProbeSummary,
   type ProbeTrial,
+  type SubstrateComparison,
   type TransferSummary,
   type ValueSample,
   matches,
@@ -1539,6 +1543,16 @@ type ProbeRun = {
   readonly trials: readonly ProbeTrial[];
   readonly summary: ProbeSummary;
   readonly admission: Admission;
+  /**
+   * How much of the store knows which database it was learned in.
+   *
+   * `scope.domain` is what lets a rule be pointed at a foreign question, and it is the one field the
+   * host knows and the model only echoes: an item without one is invisible to transfer, so the share
+   * without a domain is the ceiling on every transfer number computed from this store. Reported
+   * rather than repaired here, because filling the field would change which rules `full` injects and
+   * make every earlier reading incomparable.
+   */
+  readonly domain: { readonly withDomain: number; readonly withoutDomain: number };
   /** Source questions the probe never reached, by reason, because a hole is not a verdict. */
   readonly skipped: Readonly<Record<string, number>>;
   /** How the corrected cases failed, which is the population the probe can speak about. */
@@ -1596,8 +1610,24 @@ async function probeMemory(
   dataset: Dataset,
   task: Task,
   transferTargetsPerRule: number,
+  /**
+   * Control verdicts already measured for these source questions, and where to leave the ones this
+   * probe pays for.
+   *
+   * The blank prompt is built from the question, the attempt and the observed failure — none of
+   * which depend on the store — so the same source question has the same control under every
+   * substrate. Sharing it makes the two probes differ in exactly one thing and saves a call per
+   * case. Re-asking would also re-sample the endpoint: 16.4% of questions return a different query
+   * under the same prompt, so two controls for one case would put that noise inside the comparison
+   * the pairing exists to remove.
+   */
+  sharedBlanks?: Map<string, boolean | undefined>,
 ): Promise<ProbeRun> {
   const items = await store.listKnowledge({ namespace: 'bird', status: 'active' });
+  const domain = {
+    withDomain: items.filter((item) => item.scope.domain !== undefined).length,
+    withoutDomain: items.filter((item) => item.scope.domain === undefined).length,
+  };
   const itemById = new Map(items.map((item) => [item.id, item]));
   const rowById = new Map(learnRows.map((row) => [idOfRow(row), row]));
   const byTask = new Map<string, string[]>();
@@ -1693,10 +1723,18 @@ async function probeMemory(
   // with retries that belong to nobody's budget.
   const trials = await mapPool(plans, Math.max(1, Math.ceil(CONCURRENCY / 2)), async (plan) => {
     const [blankCorrect, withRulesCorrect] = await Promise.all([
-      asked(plan.row, plan.blank),
+      // A hole is carried as a hole. Re-asking a call that never returned would replace an absent
+      // measurement with a different one, and the two substrates would then be compared on controls
+      // that are not the same control.
+      sharedBlanks?.has(plan.taskId) === true
+        ? Promise.resolve(sharedBlanks.get(plan.taskId))
+        : asked(plan.row, plan.blank),
       asked(plan.row, plan.withRules),
     ]);
     blankByTask.set(plan.taskId, blankCorrect);
+    // Left for the next substrate rather than kept in this run only: the second store is the reason
+    // the control is shared, and it reads from here.
+    sharedBlanks?.set(plan.taskId, blankCorrect);
     completed += 1;
     if (completed % 20 === 0 || completed === plans.length) {
       process.stdout.write(
@@ -1801,6 +1839,7 @@ async function probeMemory(
     trials,
     summary: probeSummary(trials),
     admission,
+    domain,
     skipped,
     failureKinds,
     byKind,
@@ -2209,6 +2248,184 @@ async function densityPass(input: {
   };
 }
 
+type FoldProbeRecord = {
+  readonly sourceQuestions: number;
+  readonly measured: number;
+  readonly unmeasured: number;
+  readonly supplied: number;
+  readonly redundant: number;
+  readonly broke: number;
+  readonly useless: number;
+  /**
+   * The store the probe was given, which is the population the four admission buckets partition.
+   *
+   * Not the same number as `citations`: one correction can distil two rules and one rule can be
+   * cited by two corrections, so the counts diverge in both directions. The blocking gate V13
+   * compares the buckets against this field, and it was written against the other one.
+   */
+  readonly rules: number;
+  /** Rule citations across the trials, which is how much of the store each case exercised. */
+  readonly citations: number;
+  readonly blankFixRate: number;
+  /** Source questions the gate never reached, by reason: a hole is not a verdict. */
+  readonly skipped: Readonly<Record<string, number>>;
+  /** How the corrected cases failed, so the gate's population is described rather than implied. */
+  readonly failureKinds: Readonly<Record<string, number>>;
+  /** Rules kept, and the buckets the rest fell into. */
+  readonly kept: number;
+  readonly noVerifiedSource: number;
+  readonly brokeItsSource: number;
+  readonly unsupported: number;
+  /** Items per pack before and after the gate, and questions whose pack it changed. */
+  readonly packAll: number;
+  readonly packKept: number;
+  readonly packDiffers: number;
+  /** Verdicts beside failure kinds: `useless` means one thing with a symptom and another without. */
+  readonly byKind: Readonly<Record<string, Readonly<Record<string, number>>>>;
+  /**
+   * Rules that know the database they were learned in, and rules that do not.
+   *
+   * `scope.domain` is what points a rule at a foreign question, and it is the one field the host
+   * knows and the model only echoes. The share without one is the ceiling on transfer, so it is a
+   * reading rather than an implementation detail.
+   */
+  readonly domain: { readonly withDomain: number; readonly withoutDomain: number };
+};
+
+/**
+ * One probe run, as a fold carries it.
+ *
+ * A function rather than a literal in the fold's return statement, because the lane now runs the
+ * same probe over two stores: two hand-written literals is how a field ends up computed from one
+ * arm's pack sizes in one block and the other's in the next.
+ */
+function probeRecord(
+  probe: ProbeRun,
+  sizes: readonly { readonly all: number; readonly kept: number }[],
+  differs: number,
+): FoldProbeRecord {
+  return {
+    ...probe.summary,
+    // The gate's `rules` is the store the probe was given, not the number of citations the trials
+    // carry. `summary.rules` sums `itemIds` over trials, so a rule cited by two of its own
+    // corrections counts twice; the four admission buckets partition *items*. These were the same
+    // number by accident in the first dry run and not in any fold that had a rule cited more than
+    // once, which made V13 — a blocking gate — impossible to pass. `citations` keeps the other
+    // reading, because "12 citations of 3 rules" is worth knowing when a store is dense.
+    rules: probe.rules,
+    citations: probe.summary.rules,
+    skipped: probe.skipped,
+    failureKinds: probe.failureKinds,
+    kept: probe.admission.kept.length,
+    noVerifiedSource: probe.admission.noVerifiedSource,
+    brokeItsSource: probe.admission.brokeItsSource,
+    unsupported: probe.admission.unsupported,
+    packAll: sizes.reduce((sum, entry) => sum + entry.all, 0),
+    packKept: sizes.reduce((sum, entry) => sum + entry.kept, 0),
+    packDiffers: differs,
+    byKind: probe.byKind,
+    domain: probe.domain,
+  };
+}
+
+/**
+ * One probe run, as the artefact carries it.
+ *
+ * Shared by the two substrates so the two blocks cannot drift in a field name or a denominator: the
+ * instrument is the same instrument, and a report that computed `blank_fix_rate` from one store's
+ * buckets and the other's rates would make the two numbers look comparable when they were not.
+ */
+function probeArtefact(
+  folds: readonly FoldResult[],
+  pick: (fold: FoldResult) => FoldProbeRecord | null,
+): Record<string, unknown> | null {
+  const runs = folds.map(pick);
+  if (runs.every((run) => run === null)) return null;
+  const total = (get: (run: FoldProbeRecord) => number): number =>
+    runs.reduce((sum, run) => sum + (run === null ? 0 : get(run)), 0);
+  const measured = total((run) => run.measured);
+  const reproduced = total((run) => run.supplied) + total((run) => run.redundant);
+  // The retry's own ceiling on this population: the cases a bare second attempt already repaired.
+  const fixedByRetry = total((run) => run.redundant) + total((run) => run.broke);
+  return {
+    source_questions: total((run) => run.sourceQuestions),
+    measured,
+    unmeasured: total((run) => run.unmeasured),
+    supplied: total((run) => run.supplied),
+    redundant: total((run) => run.redundant),
+    broke: total((run) => run.broke),
+    useless: total((run) => run.useless),
+    /**
+     * The share of cases the store reproduced with itself in the prompt.
+     *
+     * `supplied + redundant`, which is what the pairing compares. It is here because the artefact
+     * should carry the same number the test used: a reader who had to derive it from two columns
+     * would be re-deriving the statistic that decides which store is better.
+     */
+    reproduced_rate: measured === 0 ? 0 : Number((reproduced / measured).toFixed(4)),
+    blank_fix_rate: measured === 0 ? 0 : Number((fixedByRetry / measured).toFixed(4)),
+    failure_kinds: runs.reduce<Record<string, number>>((all, run) => {
+      for (const [kind, count] of Object.entries(run?.failureKinds ?? {})) {
+        all[kind] = (all[kind] ?? 0) + count;
+      }
+      return all;
+    }, {}),
+    skipped: runs.reduce<Record<string, number>>((all, run) => {
+      for (const [reason, count] of Object.entries(run?.skipped ?? {})) {
+        all[reason] = (all[reason] ?? 0) + count;
+      }
+      return all;
+    }, {}),
+    rules: total((run) => run.rules),
+    kept: total((run) => run.kept),
+    no_verified_source: total((run) => run.noVerifiedSource),
+    broke_its_source: total((run) => run.brokeItsSource),
+    unsupported: total((run) => run.unsupported),
+    pack_all: total((run) => run.packAll),
+    pack_kept: total((run) => run.packKept),
+    pack_differs: total((run) => run.packDiffers),
+    /**
+     * How many of the store's rules know the database they were learned in.
+     *
+     * The ceiling on transfer: a rule without a home database cannot be pointed at a foreign
+     * question, so a store where this share is small cannot be measured for transfer however many
+     * rules it holds.
+     */
+    domain: {
+      with_domain: total((run) => run.domain.withDomain),
+      without_domain: total((run) => run.domain.withoutDomain),
+    },
+    /**
+     * Verdicts beside the kind of failure the case presented.
+     *
+     * 85% of this corpus's corrections have no mechanical symptom, and a rule distilled from one of
+     * those had nothing to work from but the fact of rejection. Reading `useless` without this table
+     * would blame the distiller for an absent signal.
+     */
+    by_kind: runs.reduce<Record<string, Record<string, number>>>((all, run) => {
+      for (const [kind, counts] of Object.entries(run?.byKind ?? {})) {
+        const row = all[kind] ?? (all[kind] = {});
+        for (const [verdict, count] of Object.entries(counts)) {
+          row[verdict] = (row[verdict] ?? 0) + count;
+        }
+      }
+      return all;
+    }, {}),
+    by_fold: folds.map((fold, index) => {
+      const run = runs[index] ?? null;
+      return {
+        fold: fold.fold,
+        source_questions: run?.sourceQuestions ?? 0,
+        supplied: run?.supplied ?? 0,
+        rate:
+          run === null || run.sourceQuestions === 0
+            ? 0
+            : Number((run.supplied / run.sourceQuestions).toFixed(4)),
+      };
+    }),
+  };
+}
+
 type FoldResult = {
   readonly fold: number;
   readonly learn: number;
@@ -2314,41 +2531,16 @@ type FoldResult = {
    * share a retry repairs without any memory at all — without which the first number would read as
    * the rules' contribution.
    */
-  readonly probe: {
-    readonly sourceQuestions: number;
-    readonly measured: number;
-    readonly unmeasured: number;
-    readonly supplied: number;
-    readonly redundant: number;
-    readonly broke: number;
-    readonly useless: number;
-    /**
-     * The store the probe was given, which is the population the four admission buckets partition.
-     *
-     * Not the same number as `citations`: one correction can distil two rules and one rule can be
-     * cited by two corrections, so the counts diverge in both directions. The blocking gate V13
-     * compares the buckets against this field, and it was written against the other one.
-     */
-    readonly rules: number;
-    /** Rule citations across the trials, which is how much of the store each case exercised. */
-    readonly citations: number;
-    readonly blankFixRate: number;
-    /** Source questions the gate never reached, by reason: a hole is not a verdict. */
-    readonly skipped: Readonly<Record<string, number>>;
-    /** How the corrected cases failed, so the gate's population is described rather than implied. */
-    readonly failureKinds: Readonly<Record<string, number>>;
-    /** Rules kept, and the buckets the rest fell into. */
-    readonly kept: number;
-    readonly noVerifiedSource: number;
-    readonly brokeItsSource: number;
-    readonly unsupported: number;
-    /** Items per pack before and after the gate, and questions whose pack it changed. */
-    readonly packAll: number;
-    readonly packKept: number;
-    readonly packDiffers: number;
-    /** Verdicts beside failure kinds: `useless` means one thing with a symptom and another without. */
-    readonly byKind: Readonly<Record<string, Readonly<Record<string, number>>>>;
-  } | null;
+  readonly probe: FoldProbeRecord | null;
+  /** The same probe over the repair store, or null when that arm was off. */
+  readonly probeRepair: FoldProbeRecord | null;
+  /**
+   * The two stores compared on the questions they share, or null when only one was measured.
+   *
+   * Here rather than in `probe` because it is not a property of either store: it is the statement
+   * of which substrate reproduces more of its own corrections, and it only exists while both do.
+   */
+  readonly substrate: SubstrateComparison | null;
   /**
    * What the admitted rules did to other questions, or null when transfer was not measured.
    *
@@ -2713,7 +2905,8 @@ async function runFold(
   // instruction string: rules say what is true, repairs say what failed and what fixed it.
   // Built only when an arm asks, because the distillation is the expensive half of a fold.
   const wantsRepair = RETRY_ARMS.some((arm) => arm !== 'retry-blank' && ARMS.has(arm)) ||
-    ARMS.has('full-repair');
+    ARMS.has('full-repair') ||
+    ARMS.has('full-repair-verified');
   const repaired = wantsRepair
     ? await buildFoldMemory(GENERALIZE, learnRows, dataset, task, 'repair')
     : undefined;
@@ -2833,6 +3026,13 @@ async function runFold(
   let validatedPositions = 0;
   /** The reproducibility gate's verdict for this fold, once it has run. */
   let probe: ProbeRun | undefined;
+  /** The same gate over the repair store, when the second substrate was asked for. */
+  let probeRepair: ProbeRun | undefined;
+  /** The two stores compared on the questions they share, once both have been probed. */
+  let substrate: SubstrateComparison | null = null;
+  /** What the repair store's own gate left in each pack, and how many questions it changed. */
+  const repairVerifiedSizes: { all: number; kept: number }[] = [];
+  let repairVerifiedDiffers = 0;
   /** What the gate did to each pack: items before and after, so a shrink is a number. */
   const verifiedSizes: { all: number; kept: number }[] = [];
   /** Questions where the gate changed the pack. Zero differences means it scored `full` twice. */
@@ -2893,8 +3093,37 @@ async function runFold(
   }
   // The gate on extraction, run before anything is scored and on learn rows only. Its verdicts
   // filter the store the held-out questions see, so it must not read them.
+  // Shared between the two probes: the control is the same call under both substrates, and paying
+  // for it twice would put the endpoint's own sampling noise inside the comparison.
+  const blankControls = new Map<string, boolean | undefined>();
   if (ARMS.has('full-verified')) {
-    probe = await probeMemory(store, learnRows, dataset, task, TRANSFER_TARGETS);
+    probe = await probeMemory(store, learnRows, dataset, task, TRANSFER_TARGETS, blankControls);
+  }
+  // The other substrate, asked the same questions with the same controls. Its own admission gate
+  // decides what `full-repair-verified` may inject; the pairing is what turns "these two rates look
+  // different" into a test over the questions both stores covered.
+  if (ARMS.has('full-repair-verified') && repaired !== undefined) {
+    probeRepair = await probeMemory(
+      repaired.store,
+      learnRows,
+      dataset,
+      task,
+      TRANSFER_TARGETS,
+      blankControls,
+    );
+    if (probe !== undefined) {
+      substrate = compareSubstrates(probe.trials, probeRepair.trials, {
+        left: 'rule',
+        right: 'repair',
+      });
+      process.stdout.write(
+        `[sota] substrate fold ${fold + 1}: ${substrate.paired} paired, ` +
+          `${substrate.left} ${(substrate.leftRate * 100).toFixed(1)}% vs ` +
+          `${substrate.right} ${(substrate.rightRate * 100).toFixed(1)}%, ` +
+          `delta=${substrate.deltaPp.toFixed(2)}pp p=${substrate.p.toFixed(4)} ` +
+          `verdict=${substrate.verdict}\n`,
+      );
+    }
   }
 
   // The size-matched donor library the shuffled arm draws from: every held-out question's own
@@ -2957,6 +3186,20 @@ async function runFold(
       verifiedSizes.push({ all: pack.items.length, kept: surviving.length });
       if (gatedPack.ids.join('\u0000') !== pack.ids.join('\u0000')) verifiedDiffers += 1;
       call(position, 'full-verified', gatedPack.rendered, gatedPack.ids.length);
+    }
+    if (ARMS.has('full-repair-verified') && probeRepair !== undefined) {
+      // The repair store under its own gate: same retrieval, same order, same budget, and only the
+      // accounts that reproduced their own correction. A question whose every account failed the
+      // gate sees an empty pack, which is `none` for that question and counted rather than hidden.
+      const keptRepair = new Set(probeRepair.admission.kept);
+      const repairPack = repairPacks.get(position);
+      const surviving = (repairPack?.items ?? []).filter((item) => keptRepair.has(item.id));
+      const gatedRepair = makePack(surviving, { budget: pack.budget });
+      repairVerifiedSizes.push({ all: repairPack?.items.length ?? 0, kept: surviving.length });
+      if (gatedRepair.ids.join('\u0000') !== (repairPack?.ids.join('\u0000') ?? '')) {
+        repairVerifiedDiffers += 1;
+      }
+      call(position, 'full-repair-verified', gatedRepair.rendered, gatedRepair.ids.length);
     }
     if (ARMS.has('full-transferred') && probe?.transfer != null) {
       // The intersection of two gates: the rule reproduced its own correction, and it repaired a
@@ -4008,31 +4251,12 @@ async function runFold(
             correctDraws,
             selectors: choiceAccounting.get(fold) ?? null,
           },
-    probe:
-      probe === undefined
+    probe: probe === undefined ? null : probeRecord(probe, verifiedSizes, verifiedDiffers),
+    probeRepair:
+      probeRepair === undefined
         ? null
-        : {
-            ...probe.summary,
-            // The gate's `rules` is the store the probe was given, not the number of citations the
-            // trials carry. `summary.rules` sums `itemIds` over trials, so a rule cited by two of
-            // its own corrections counts twice; the four admission buckets partition *items*.
-            // These were the same number by accident in the first dry run and not in any fold that
-            // had a rule cited more than once, which made V13 — a blocking gate — impossible to
-            // pass. `citations` keeps the other reading, because "12 citations of 3 rules" is worth
-            // knowing when a store is dense.
-            rules: probe.rules,
-            citations: probe.summary.rules,
-            skipped: probe.skipped,
-            failureKinds: probe.failureKinds,
-            kept: probe.admission.kept.length,
-            noVerifiedSource: probe.admission.noVerifiedSource,
-            brokeItsSource: probe.admission.brokeItsSource,
-            unsupported: probe.admission.unsupported,
-            packAll: verifiedSizes.reduce((sum, entry) => sum + entry.all, 0),
-            packKept: verifiedSizes.reduce((sum, entry) => sum + entry.kept, 0),
-            packDiffers: verifiedDiffers,
-            byKind: probe.byKind,
-          },
+        : probeRecord(probeRepair, repairVerifiedSizes, repairVerifiedDiffers),
+    substrate,
     transfer:
       probe?.transfer == null
         ? null
@@ -4522,6 +4746,11 @@ async function main(): Promise<void> {
     conditions: folds.reduce((sum, fold) => sum + fold.injectedWithCondition, 0),
   };
   const callFailureRate = llm.stats.prompts === 0 ? 0 : llm.stats.failures / llm.stats.prompts;
+  // One pooled comparison, computed once and read by both the gate and the artefact so the two
+  // cannot report different directions for the same run.
+  const pairPooled: PooledSubstrate | null = poolSubstrates(
+    folds.flatMap((fold) => (fold.substrate === null ? [] : [fold.substrate])),
+  );
   const gates = buildValidityGates({
     meanPackIds,
     partition: {
@@ -4558,6 +4787,49 @@ async function main(): Promise<void> {
             unsupported: folds.reduce((sum, fold) => sum + (fold.probe?.unsupported ?? 0), 0),
             packDiffers: folds.reduce((sum, fold) => sum + (fold.probe?.packDiffers ?? 0), 0),
             questions: cases.length,
+          },
+        }),
+    // The second substrate's own bookkeeping, so its arm cannot publish a number from a miscount.
+    ...(folds.every((fold) => fold.probeRepair === null)
+      ? {}
+      : {
+          probeRepair: {
+            rules: folds.reduce((sum, fold) => sum + (fold.probeRepair?.rules ?? 0), 0),
+            kept: folds.reduce((sum, fold) => sum + (fold.probeRepair?.kept ?? 0), 0),
+            noVerifiedSource: folds.reduce(
+              (sum, fold) => sum + (fold.probeRepair?.noVerifiedSource ?? 0),
+              0,
+            ),
+            brokeItsSource: folds.reduce(
+              (sum, fold) => sum + (fold.probeRepair?.brokeItsSource ?? 0),
+              0,
+            ),
+            unsupported: folds.reduce((sum, fold) => sum + (fold.probeRepair?.unsupported ?? 0), 0),
+            packDiffers: folds.reduce((sum, fold) => sum + (fold.probeRepair?.packDiffers ?? 0), 0),
+            questions: cases.length,
+          },
+        }),
+    // The paired comparison of the two substrates, when both were measured.
+    ...(pairPooled === null
+      ? {}
+      : {
+          substrate: {
+            left: pairPooled.left,
+            right: pairPooled.right,
+            shared: pairPooled.shared,
+            leftExclusive: pairPooled.leftExclusive,
+            rightExclusive: pairPooled.rightExclusive,
+            holes: pairPooled.holes,
+            both: pairPooled.both,
+            onlyLeft: pairPooled.onlyLeft,
+            onlyRight: pairPooled.onlyRight,
+            neither: pairPooled.neither,
+            paired: pairPooled.paired,
+            leftRate: pairPooled.leftRate,
+            rightRate: pairPooled.rightRate,
+            deltaPp: pairPooled.deltaPp,
+            p: pairPooled.p,
+            verdict: pairPooled.verdict,
           },
         }),
     // The transfer measurement's own bookkeeping, when it ran.
@@ -4924,70 +5196,50 @@ async function main(): Promise<void> {
        * `kept` and the three drop buckets have to sum to `rules`, and `packDiffers` has to be
        * non-zero for `full-verified` to be a treatment rather than a second name for `full`.
        */
-      rule_probe: folds.every((fold) => fold.probe === null)
-        ? null
-        : {
-            source_questions: folds.reduce((sum, fold) => sum + (fold.probe?.sourceQuestions ?? 0), 0),
-            measured: folds.reduce((sum, fold) => sum + (fold.probe?.measured ?? 0), 0),
-            unmeasured: folds.reduce((sum, fold) => sum + (fold.probe?.unmeasured ?? 0), 0),
-            supplied: folds.reduce((sum, fold) => sum + (fold.probe?.supplied ?? 0), 0),
-            redundant: folds.reduce((sum, fold) => sum + (fold.probe?.redundant ?? 0), 0),
-            broke: folds.reduce((sum, fold) => sum + (fold.probe?.broke ?? 0), 0),
-            useless: folds.reduce((sum, fold) => sum + (fold.probe?.useless ?? 0), 0),
-            blank_fix_rate: (() => {
-              const measured = folds.reduce((sum, fold) => sum + (fold.probe?.measured ?? 0), 0);
-              const fixed = folds.reduce(
-                (sum, fold) => sum + (fold.probe?.redundant ?? 0) + (fold.probe?.broke ?? 0),
-                0,
-              );
-              return measured === 0 ? 0 : Number((fixed / measured).toFixed(4));
-            })(),
-            failure_kinds: folds.reduce<Record<string, number>>((all, fold) => {
-              for (const [kind, count] of Object.entries(fold.probe?.failureKinds ?? {})) {
-                all[kind] = (all[kind] ?? 0) + count;
-              }
-              return all;
-            }, {}),
-            skipped: folds.reduce<Record<string, number>>((all, fold) => {
-              for (const [reason, count] of Object.entries(fold.probe?.skipped ?? {})) {
-                all[reason] = (all[reason] ?? 0) + count;
-              }
-              return all;
-            }, {}),
-            rules: folds.reduce((sum, fold) => sum + (fold.probe?.rules ?? 0), 0),
-            kept: folds.reduce((sum, fold) => sum + (fold.probe?.kept ?? 0), 0),
-            no_verified_source: folds.reduce((sum, fold) => sum + (fold.probe?.noVerifiedSource ?? 0), 0),
-            broke_its_source: folds.reduce((sum, fold) => sum + (fold.probe?.brokeItsSource ?? 0), 0),
-            unsupported: folds.reduce((sum, fold) => sum + (fold.probe?.unsupported ?? 0), 0),
-            pack_all: folds.reduce((sum, fold) => sum + (fold.probe?.packAll ?? 0), 0),
-            pack_kept: folds.reduce((sum, fold) => sum + (fold.probe?.packKept ?? 0), 0),
-            pack_differs: folds.reduce((sum, fold) => sum + (fold.probe?.packDiffers ?? 0), 0),
-            /**
-             * Verdicts beside the kind of failure the case presented.
-             *
-             * 85% of this corpus's corrections have no mechanical symptom, and a rule distilled
-             * from one of those had nothing to work from but the fact of rejection. Reading
-             * `useless` without this table would blame the distiller for an absent signal.
-             */
-            by_kind: folds.reduce<Record<string, Record<string, number>>>((all, fold) => {
-              for (const [kind, counts] of Object.entries(fold.probe?.byKind ?? {})) {
-                const row = all[kind] ?? (all[kind] = {});
-                for (const [verdict, count] of Object.entries(counts)) {
-                  row[verdict] = (row[verdict] ?? 0) + count;
-                }
-              }
-              return all;
-            }, {}),
-            by_fold: folds.map((fold) => ({
-              fold: fold.fold,
-              source_questions: fold.probe?.sourceQuestions ?? 0,
-              supplied: fold.probe?.supplied ?? 0,
-              rate:
-                fold.probe === null || fold.probe.sourceQuestions === 0
-                  ? 0
-                  : Number((fold.probe.supplied / fold.probe.sourceQuestions).toFixed(4)),
-            })),
-          },
+      rule_probe: probeArtefact(folds, (fold) => fold.probe),
+      /**
+       * The same instrument over the other substrate.
+       *
+       * Reported separately rather than merged, because a number produced by the `repair`
+       * distiller is not comparable to one produced by the `rule` distiller, and a single block
+       * would let a reader assume the two stores were the same store under two names.
+       */
+      rule_probe_repair: probeArtefact(folds, (fold) => fold.probeRepair),
+      /**
+       * The two substrates paired on the questions they share.
+       *
+       * The per-fold rows are the reading and the pooled row is a summary of them: folds are
+       * disjoint and each is learned from the others, so the counts add, but a pooled p assumes
+       * the folds agree on the direction. Both are here so neither can be quoted alone.
+       */
+      rule_probe_pair: (() => {
+        if (pairPooled === null) return null;
+        // The fold number travels with the comparison rather than being recovered from its index: a
+        // run where one fold could not pair would otherwise label the rest with the wrong fold.
+        const rows = folds.flatMap((fold) =>
+          fold.substrate === null ? [] : [{ fold: fold.fold, entry: fold.substrate }],
+        );
+        return {
+          // The same object the gates read, so the file and the gate cannot disagree.
+          ...pairPooled,
+          by_fold: rows.map(({ fold, entry }) => ({
+            fold,
+            shared: entry.shared,
+            paired: entry.paired,
+            both: entry.both,
+            only_left: entry.onlyLeft,
+            only_right: entry.onlyRight,
+            neither: entry.neither,
+            holes: entry.holes,
+            left_rate: Number(entry.leftRate.toFixed(4)),
+            right_rate: Number(entry.rightRate.toFixed(4)),
+            delta_pp: Number(entry.deltaPp.toFixed(2)),
+            p: Number(entry.p.toFixed(6)),
+            ci: entry.deltaCI,
+            verdict: entry.verdict,
+          })),
+        };
+      })(),
       /**
        * What the generators together could have scored.
        *
