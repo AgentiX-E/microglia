@@ -566,3 +566,10 @@ single item leaves nothing for either arm to keep.
 query that fixed it, all three verbatim. Everything the store holds is an interpretation of one of these,
 and the raw form is the only substrate in this project that adds no verb, no condition and no
 generalisation — nothing a reader can imitate as a rule.
+
+**Domain scope** — The `scope.domain` field on a claim: which database, site or tenant it was learned
+in. It is the one scope field a *host* must fill in, because the prompt forbids the distiller from
+guessing one and the run's input already states it. Its presence is what makes two things possible at
+once: a claim can be withheld from a foreign question, and a claim that recurs across domains can earn
+the right to be widened beyond them. A store whose items all arrived without a domain has neither
+property, and `V44-domain-accounted` is the gate that says so.

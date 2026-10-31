@@ -123,6 +123,14 @@ Two properties are load-bearing:
   the world, the second is when the system stopped believing it. They are different questions, and a
   memory that cannot tell them apart cannot express "that rule changed last quarter".
 
+**Two scope fields the host supplies rather than the model.** Both exist because a distiller reading one
+event is the wrong party to fill them in. `reasonCodeOf` names *what went wrong*, which is a taxonomy the
+host owns, and the model's own answer wins when it gives one. `domainOf` names *where the event happened*,
+which the host already wrote into the run's input; the prompt forbids the model from guessing a domain, so
+here the host's value wins and the claim is re-keyed on the finished scope. Leaving the second unset is
+legal and is what every published measurement did — it also means no claim can ever widen, since widening
+needs two domains to agree.
+
 ## 4. The request path, with timings
 
 Measured at 10k rules, 2 vCPU:
