@@ -412,6 +412,34 @@ export type SqlArm =
    */
   | 'full-cleared-sampled'
   /**
+   * The same corrections, injected as the raw events they are.
+   *
+   * Every memory arm in this record injects an *interpretation*: a rule states what is true about the
+   * workspace, a repair note states why an attempt was wrong, a procedure states how a class of
+   * questions is answered. All three are produced by a distiller that reads one correction and writes
+   * prose, and Raw-RAG (arXiv 2610.30755) reports that this step is where the loss is: naive retrieval
+   * over raw history beats the strongest agentic memory in six of seven benchmark-model settings, and
+   * even complete access to the transformed store leaves a gap against the raw evidence, because the
+   * relations and dependency paths an answer has to be derived from are the first thing summarising
+   * throws away.
+   *
+   * This arm injects the event instead: the question that was asked, the query that came back wrong,
+   * and the query that fixed it, all three verbatim. Nothing is phrased as a convention, so there is no
+   * convention to imitate; nothing is generalised, so nothing can be generalised wrongly. It is the
+   * same store, the same recall, the same character budget and the same position — one variable.
+   */
+  | 'full-raw'
+  /**
+   * Raw events from other questions on the same database, at the same size.
+   *
+   * The control that separates "this question's correction" from "raw SQL in the prompt". Without it a
+   * `full-raw` cell above `full` could be reporting the form — worked examples rather than prose —
+   * rather than the retrieval, and this record has already learned that the form alone can move a cell
+   * by three points (the repair substrate, R14). Chosen from the same database at the same event count,
+   * so vocabulary and size are held and only the subject changes.
+   */
+  | 'full-raw-shuffled'
+  /**
    * The same pack, reduced to the rules that reproduced their own correction.
    *
    * Every memory arm measured here is negative or null, and none of them asked the store to
@@ -866,6 +894,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-validated': true,
   'full-cleared': true,
   'full-cleared-sampled': true,
+  'full-raw': true,
+  'full-raw-shuffled': true,
   critique: true,
   gated: true,
   duplicate: true,
@@ -1132,11 +1162,12 @@ export type FramingDelivery = {
  * content half of the experiment, so it is a type rather than a convention: a lane that
  * grows a third form has to name it here and say which label it renders under.
  */
-export type PackKind = 'rule' | 'repair';
+export type PackKind = 'rule' | 'repair' | 'raw';
 
 const PACK_LABEL: Record<PackKind, string> = {
   rule: 'Workspace conventions learned from earlier corrections:',
   repair: 'Repairs of earlier failures, each with the reason it was wrong and the change that fixed it:',
+  raw: 'Earlier questions on this database, each with the query that returned a wrong result and the query that corrected it:',
 };
 
 /**
@@ -1526,6 +1557,21 @@ export type GateInput = {
     readonly dropped: number;
     readonly meanCleared: number;
     readonly meanControl: number;
+  };
+  /**
+   * What a raw arm's packs actually contained, when one ran.
+   *
+   * Absent when no arm injects verbatim text. Present, it is the arm's whole claim: the payload lines
+   * were not rewritten, reformatted or truncated on the way into the prompt.
+   */
+  readonly raw?: {
+    readonly arm: string;
+    /** Payload lines across every prompt the arm sent. */
+    readonly cells: number;
+    /** Of those, the ones byte-identical to the event they were rendered from. */
+    readonly verbatim: number;
+    /** Events that did not fit the budget whole, so the reader knows what was left out. */
+    readonly skipped: number;
   };
   /** Share of calls that failed after exhausting retries, in [0, 1]. */
   readonly callFailureRate: number;
@@ -1993,7 +2039,125 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       blocking: true,
     });
   }
+  if (input.raw !== undefined) {
+    // Two failures, and both of them end the claim rather than the run. A payload line that is not
+    // byte-identical to the event it came from means the renderer interpreted something, and the arm
+    // is then a third distiller with a new name — the one reading that would make its delta
+    // uninterpretable. No cells at all means the arm never showed a raw event, which is `none` under
+    // a second name: a run whose store produced no correction, or whose budget admitted none.
+    const { arm, cells, verbatim, skipped } = input.raw;
+    gates.push({
+      id: 'V46-raw-is-verbatim',
+      criterion:
+        'every payload line of a raw arm is byte-identical to the correction event it was rendered from, and the arm rendered at least one',
+      actual: `${verbatim}/${cells} payload line(s) byte-identical (${arm}), ${skipped} event(s) skipped as too long`,
+      pass: cells > 0 && verbatim === cells,
+      blocking: true,
+    });
+  }
   return gates;
+}
+
+/**
+ * One correction, exactly as it happened.
+ *
+ * The unit R22 injects. Everything a distilled item adds to this — the generalisation, the condition,
+ * the verb — is an interpretation, and the record's own attribution instrument prices the whole
+ * content of those interpretations at about +0.9pp against a −2 to −4pp cost of being shown them.
+ * Raw-RAG (arXiv 2610.30755) reports that even *complete* access to a transformed memory store leaves
+ * an accuracy gap against raw evidence, because summarising drops the relations and dependency paths an
+ * answer has to be derived from. This type is the raw form of the same event the distiller reads.
+ */
+export type RawEvent = {
+  /** The question the correction was learned from, which is also the item's evidence task. */
+  readonly taskId: string;
+  readonly question: string;
+  /** The query that was wrong, as it was written. Empty when the reply contained no query at all. */
+  readonly attempt: string;
+  /** The query that was right: what a user would type, not what the benchmark holds. */
+  readonly fixed: string;
+};
+
+/**
+ * One correction as three lines.
+ *
+ * The labels are the renderer's; every payload is the event's own string, byte for byte. That split
+ * is the arm's entire claim, so it is enforced by `rawEventVerbatim` and by a gate rather than by
+ * intent: a renderer that reformatted a query would be a third distiller under a new name.
+ *
+ * An empty attempt is omitted rather than shown as a blank line: "the reply contained no query" is a
+ * real and common failure in this corpus, and printing `Attempt: ` after it would read as a parse
+ * artefact rather than as the observation it is.
+ */
+export function rawEventBlock(event: RawEvent): string {
+  return [
+    `Question: ${event.question}`,
+    ...(event.attempt === '' ? [] : [`Attempt: ${event.attempt}`]),
+    `Correction: ${event.fixed}`,
+  ].join('\n');
+}
+
+/**
+ * The raw pack, and the count of what did not fit.
+ *
+ * Whole events only, greedy in the order the retrieval produced them, skipping any that does not fit
+ * whole. Truncation is not an option: half an event is a question with no correction, which is the one
+ * thing this arm must never show, and a cut query is exactly the misreading the arm exists to avoid.
+ * Skipping rather than stopping keeps the pack full instead of letting one long event empty it, and the
+ * count of skipped events is returned so a run in which most events were skipped can say so.
+ */
+export function renderRawPack(
+  events: readonly RawEvent[],
+  budget: number,
+): { readonly rendered: string; readonly ids: readonly string[]; readonly skipped: number } {
+  const blocks: string[] = [];
+  const ids: string[] = [];
+  let used = 0;
+  let skipped = 0;
+  for (const event of events) {
+    const block = rawEventBlock(event);
+    const cost = blocks.length === 0 ? block.length : block.length + 1;
+    if (used + cost > budget) {
+      skipped += 1;
+      continue;
+    }
+    blocks.push(block);
+    ids.push(event.taskId);
+    used += cost;
+  }
+  return { rendered: blocks.join('\n'), ids, skipped };
+}
+
+/**
+ * How many of a rendered pack's payload lines are byte-identical to the event they came from.
+ *
+ * The arm's validity condition, as a function rather than a promise. Each line is split on its label and
+ * matched against the corresponding field of *any* event in the set the renderer was given, so a
+ * paraphrase, a reflow, a truncation or a query rewritten by a formatter all fail the check even though
+ * the pack would still look plausible to a reader — and "it looks plausible" is precisely the failure
+ * mode this record has caught in its own instruments twice.
+ */
+export function rawEventVerbatim(
+  rendered: string,
+  events: readonly RawEvent[],
+): { readonly cells: number; readonly verbatim: number } {
+  const known: Record<string, ReadonlySet<string>> = {
+    Question: new Set(events.map((event) => event.question)),
+    Attempt: new Set(events.map((event) => event.attempt)),
+    Correction: new Set(events.map((event) => event.fixed)),
+  };
+  let cells = 0;
+  let verbatim = 0;
+  for (const line of rendered.split('\n')) {
+    const at = line.indexOf(': ');
+    if (at === -1) continue;
+    const label = line.slice(0, at);
+    const pool = known[label];
+    if (pool === undefined) continue;
+    cells += 1;
+    if (pool.has(line.slice(at + 2))) verbatim += 1;
+  }
+  return { cells, verbatim };
 }
 
 /**
@@ -2137,6 +2301,9 @@ export type RetryInput = {
 const RETRY_LABEL: Record<PackKind, string> = {
   rule: 'Conventions learned from earlier corrections:',
   repair: 'Repairs of earlier failures, each with the reason it was wrong and the change that fixed it:',
+  // The raw form reaches a retry only if an arm asks for it, and the label is what a reader of the
+  // prompt would need in order to know the block is evidence rather than advice.
+  raw: 'Earlier questions on this database, each with the query that returned a wrong result and the query that corrected it:',
 };
 
 /**
@@ -2155,6 +2322,10 @@ const RETRY_INSTRUCTION: Record<PackKind, string> = {
     'Each item states a failure, why it was wrong, and the change that fixed it. ' +
     'Check whether one of those failures is this failure. If one is, apply the same change. ' +
     'If none is, write a different query that answers the question.',
+  raw:
+    'Each item is a question that was asked here, the query that came back wrong, and the query that ' +
+    'fixed it. Check whether this failure is the one an item shows. If it is, the same change is the ' +
+    'repair. If none is, write a different query that answers the question.',
 };
 
 export function retryPromptFor(input: RetryInput): string {

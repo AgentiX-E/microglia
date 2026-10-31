@@ -111,6 +111,9 @@ import {
   retireeFromDecisive,
   clearanceFromDecisive,
   doseMatchedDrop,
+  renderRawPack,
+  rawEventVerbatim,
+  type RawEvent,
   conventionOf,
   dedupeQuestions,
   detectableDelta,
@@ -1335,6 +1338,18 @@ type LearningPass = {
   readonly edited: number;
   readonly goldFailed: number;
   /**
+   * The corrections themselves, verbatim, in corpus order.
+   *
+   * R22's substrate. Everything the store holds is an interpretation of one of these, and the raw arm
+   * injects the event instead of the interpretation. Kept here rather than read back out of the store
+   * because the store is exactly what discards it: the distiller's output is a sentence about the
+   * workspace, and the two queries that produced it are not part of the item.
+   *
+   * An eval question never appears here — the pass reads the fold's learn rows — so the raw arm cannot
+   * leak the answer to the question it is scoring, and neither can its shuffled control.
+   */
+  readonly events: readonly RawEvent[];
+  /**
    * Questions whose first attempt never arrived.
    *
    * A correction is learned from two attempts; a question that produced no attempt contributes no
@@ -1427,6 +1442,7 @@ async function learn(
 
   let edited = 0;
   let goldFailed = 0;
+  const events: RawEvent[] = [];
   for (const [index, row] of rows.entries()) {
     const dbPath = dataset.dbPath(row.db_id);
     // Kept un-defaulted: "the reply contained no query" and "the query returned nothing"
@@ -1458,6 +1474,10 @@ async function learn(
     }
     const satisfied = judgeReply(row, dbPath, { text: texts[index] ?? '', tokens: 0 }, task).correct;
     if (!satisfied) {
+      // The event, before any interpretation: what was asked, what came back, what fixed it. `sql` is
+      // the statement as extracted (possibly empty, which the renderer omits rather than blanks) and
+      // `target` is the correction as a user would type it, which is what the distiller was shown.
+      events.push({ taskId: idOfRow(row), question: row.question, attempt: sql, fixed: target });
       // The note is what was observed, not what we concluded. The rule form ignores it —
       // it states a fact about the workspace — and the repair form is built on it, because
       // "why the attempt was wrong" cannot be learned from two queries alone: a join that
@@ -1467,7 +1487,7 @@ async function learn(
       edited += 1;
     }
   }
-  return { rows: rows.length, edited, goldFailed, unanswered };
+  return { rows: rows.length, edited, goldFailed, unanswered, events };
 }
 
 /** A stable digest of what is stored, used to prove the pack was frozen. */
@@ -2637,6 +2657,18 @@ type FoldResult = {
     readonly widenedIn: number;
   };
   /**
+   * What the raw arm sent: payload lines, how many were verbatim, and how much did not fit.
+   *
+   * A validity counter rather than a measurement. The arm's claim is that the event reaches the prompt
+   * unaltered, and that claim is either true of every line or false of the arm.
+   */
+  readonly raw: {
+    readonly cells: number;
+    readonly verbatim: number;
+    readonly skipped: number;
+    readonly events: number;
+  };
+  /**
    * Per question, what the clearance removed and what each of the two arms then carried.
    *
    * Recorded per question rather than summed at the source because the gate is a *paired* claim:
@@ -3208,7 +3240,11 @@ async function runFold(
    * A table rather than a parameter: the kind is a property of the arm, and an arm that
    * had to be told twice what it was would eventually be told two different things.
    */
-  const PACK_KIND: Partial<Record<ArmName, PackKind>> = { 'full-repair': 'repair' };
+  const PACK_KIND: Partial<Record<ArmName, PackKind>> = {
+    'full-repair': 'repair',
+    'full-raw': 'raw',
+    'full-raw-shuffled': 'raw',
+  };
 
 
   const call = (
@@ -3306,6 +3342,11 @@ async function runFold(
   const observedCodes: Record<string, number> = {};
   /** How much of each pack survives the grounding filter, so the shrink is a number. */
   const groundedSizes: { all: number; grounded: number }[] = [];
+  /** Payload lines a raw arm sent, and how many were byte-identical to the event behind them. */
+  let rawCells = 0;
+  let rawVerbatim = 0;
+  let rawSkipped = 0;
+  let rawEvents = 0;
   /** What the clearance removed per question, and what each of the two arms then carried. */
   const clearance: {
     position: number;
@@ -3420,6 +3461,24 @@ async function runFold(
   // thing it meant in the run before it.
   if (ARMS.has('full-validated') && validation !== undefined && validation.doomed.length > 0) {
     await widened.host.forget({ ids: validation.doomed });
+  }
+  // The raw substrate's two indexes: the event behind an item (by the question it was learned from) and
+  // the pool a foreign arm draws from (by the database it was learned on). Both come from the fold's
+  // learn rows, which is what makes the arm leakage-free by construction rather than by a filter: an
+  // eval question's correction is never in this map, so no raw pack can show the answer it is scoring.
+  const rawByTask = new Map<string, RawEvent>();
+  const rawByDb = new Map<string, readonly RawEvent[]>();
+  if (ARMS.has('full-raw') || ARMS.has('full-raw-shuffled')) {
+    for (const event of widened.learning.events) rawByTask.set(event.taskId, event);
+    const pools = new Map<string, RawEvent[]>();
+    for (const learnRow of learnRows) {
+      const event = rawByTask.get(idOf(learnRow));
+      if (event === undefined) continue;
+      const list = pools.get(learnRow.db_id) ?? [];
+      list.push(event);
+      pools.set(learnRow.db_id, list);
+    }
+    for (const [dbId, list] of pools) rawByDb.set(dbId, list);
   }
   // The rules the clearance drops, resolved once per fold: a rule's record is a property of the fold's
   // learn rows, not of the held-out question it is removed from.
@@ -3578,6 +3637,47 @@ async function runFold(
       }
       if (ARMS.has('full-cleared-sampled')) {
         call(position, 'full-cleared-sampled', controlPack.rendered, controlPack.ids.length);
+      }
+    }
+    if (ARMS.has('full-raw') || ARMS.has('full-raw-shuffled')) {
+      // The event behind each recalled item, in the order the recall ranked the items: the store is
+      // still what finds the correction, and the arm changes only what is shown of it. An item whose
+      // evidence names no learned question is skipped rather than rendered empty, and the skip is
+      // counted by the renderer's `skipped` for the budget and by `rawEvents` for the join.
+      const own: RawEvent[] = [];
+      for (const item of pack.items) {
+        for (const ref of item.evidence) {
+          const event = ref.taskId === undefined ? undefined : rawByTask.get(ref.taskId);
+          if (event !== undefined) {
+            own.push(event);
+            break;
+          }
+        }
+      }
+      rawEvents += own.length;
+      const rendered = renderRawPack(own, pack.budget);
+      rawSkipped += rendered.skipped;
+      const counted = rawEventVerbatim(rendered.rendered, own);
+      rawCells += counted.cells;
+      rawVerbatim += counted.verbatim;
+      if (ARMS.has('full-raw')) {
+        call(position, 'full-raw', rendered.rendered, rendered.ids.length);
+      }
+      if (ARMS.has('full-raw-shuffled')) {
+        // Other questions on this database, the same number of events: the form and the vocabulary
+        // held, the subject changed. Drawn from a deterministic offset into the fold's own corpus
+        // order so two runs of the same fold inject the same events.
+        const pool = rawByDb.get(row.db_id) ?? [];
+        const taken: RawEvent[] = [];
+        const seen = new Set<string>();
+        for (let step = 0; step < pool.length && taken.length < rendered.ids.length; step += 1) {
+          const event = pool[(position + step) % pool.length];
+          if (event === undefined || seen.has(event.taskId)) continue;
+          seen.add(event.taskId);
+          taken.push(event);
+        }
+        const foreign = renderRawPack(taken, pack.budget);
+        call(position, 'full-raw-shuffled', foreign.rendered, foreign.ids.length);
       }
     }
     if (ARMS.has('full-narrow')) {
@@ -4631,6 +4731,7 @@ async function runFold(
     injectedWithCondition,
     framing: framingDelivery,
     domainOrigin,
+    raw: { cells: rawCells, verbatim: rawVerbatim, skipped: rawSkipped, events: rawEvents },
     clearance,
     validatedPackDiffers,
     validatedPositions,
@@ -5332,6 +5433,18 @@ async function main(): Promise<void> {
     ...(domainOrigin.storedWithDomain + domainOrigin.storedWithoutDomain === 0
       ? {}
       : { domainOrigin }),
+    // Emitted only when a verbatim arm ran, and it carries the whole of that arm's validity: a payload
+    // line that was rewritten makes the arm a third distiller under a new name.
+    ...(ARMS.has('full-raw')
+      ? {
+          raw: {
+            arm: 'full-raw',
+            cells: folds.reduce((sum, fold) => sum + fold.raw.cells, 0),
+            verbatim: folds.reduce((sum, fold) => sum + fold.raw.verbatim, 0),
+            skipped: folds.reduce((sum, fold) => sum + fold.raw.skipped, 0),
+          },
+        }
+      : {}),
     // Emitted only when both halves of the pair were scored, because a dose-matching claim about one
     // arm is a claim about nothing. The counts are post-budget and per question: two sums that agree
     // do not make any single question dose-matched, and the gate is about the questions.
@@ -5504,6 +5617,17 @@ async function main(): Promise<void> {
       latency_p50_ms: percentile(cases.map((item) => item.latencyMs), 0.5),
       latency_p95_ms: percentile(cases.map((item) => item.latencyMs), 0.95),
       knowledge_active_mean: activeMean,
+      // What the raw arm actually put in front of the model: events shown, events skipped as too long
+      // for the budget, and the payload lines that came from somewhere other than the event.
+      ...(ARMS.has('full-raw')
+        ? {
+            raw_events: folds.reduce((sum, fold) => sum + fold.raw.events, 0),
+            raw_skipped: folds.reduce((sum, fold) => sum + fold.raw.skipped, 0),
+            raw_cells: folds.reduce((sum, fold) => sum + fold.raw.cells, 0),
+            // Characters per question are in the arm table's `mean_pack_chars`, which the artefact
+            // computes for every arm; a second copy here would be a number that could drift from it.
+          }
+        : {}),
       // What the clearance removed and what each half of the pair then carried. Reported beside
       // `mean_pack_ids` because that number describes `full`, and the whole point of the pair is
       // that it is scored at a smaller dose than the arm it is compared against.

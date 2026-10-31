@@ -25,6 +25,9 @@ import {
   parseArms,
   anchorPromptFor,
   doseMatchedDrop,
+  rawEventBlock,
+  renderRawPack,
+  rawEventVerbatim,
   promptFor,
   retryPromptFor,
   retrySubset,
@@ -247,6 +250,8 @@ describe('parseArms', () => {
       'full-plain',
       'full-procedural',
       'full-prohibitive',
+      'full-raw',
+      'full-raw-shuffled',
       'full-repair',
       'full-repair-onretry',
       'full-repair-transferred',
@@ -388,6 +393,8 @@ describe('parseArms', () => {
       'full-validated',
       'full-cleared',
       'full-cleared-sampled',
+      'full-raw',
+      'full-raw-shuffled',
       'critique',
       'gated',
       'duplicate',
@@ -622,6 +629,15 @@ describe('promptFor pack standing', () => {
     expect(promptFor({ ...base, packKind: 'repair', standing: 'prohibitive' })).toContain(
       `${ERROR_HEADING}\n- rule one`,
     );
+  });
+
+  it('gives a raw block its own heading, so an event is never introduced as a convention', () => {
+    // R22's whole claim is that the block is evidence rather than advice. A raw pack under the rule
+    // heading would be the same text read as a lesson, which is the interpretation the arm removes.
+    const prompt = promptFor({ ...base, packKind: 'raw' });
+    expect(prompt).toContain('Earlier questions on this database, each with the query');
+    expect(prompt).not.toContain('Workspace conventions learned from earlier corrections');
+    expect(prompt).toContain('- rule one');
   });
 
   it('changes one paragraph rather than adding one under the error register', () => {
@@ -1527,6 +1543,42 @@ describe('buildValidityGates', () => {
     expect(entry.actual).toContain('350 identical');
   });
 
+
+  describe('V46-raw-is-verbatim', () => {
+    it('is absent when no arm injects raw events', () => {
+      expect(buildValidityGates(sound).some((entry) => entry.id === 'V46-raw-is-verbatim')).toBe(false);
+    });
+
+    it('passes when every payload line is byte-identical', () => {
+      const entry = gate(
+        { ...sound, raw: { arm: 'full-raw', cells: 1_050, verbatim: 1_050, skipped: 12 } },
+        'V46-raw-is-verbatim',
+      );
+      expect(entry.pass).toBe(true);
+      expect(entry.blocking).toBe(true);
+      expect(entry.actual).toBe(
+        '1050/1050 payload line(s) byte-identical (full-raw), 12 event(s) skipped as too long',
+      );
+    });
+
+    it('fails when a single payload line was rewritten', () => {
+      const entry = gate(
+        { ...sound, raw: { arm: 'full-raw', cells: 1_050, verbatim: 1_049, skipped: 0 } },
+        'V46-raw-is-verbatim',
+      );
+      expect(entry.pass).toBe(false);
+      expect(entry.actual).toContain('1049/1050');
+    });
+
+    it('fails when the arm rendered no payload at all, which is none under a second name', () => {
+      const entry = gate(
+        { ...sound, raw: { arm: 'full-raw', cells: 0, verbatim: 0, skipped: 340 } },
+        'V46-raw-is-verbatim',
+      );
+      expect(entry.pass).toBe(false);
+    });
+  });
+
   it('marks exactly V5 advisory and everything else blocking', () => {
     const advisory = buildValidityGates({
       ...sound,
@@ -1806,6 +1858,15 @@ describe('retryPromptFor', () => {
     const prompt = retryPromptFor({ ...base, packKind: 'repair' });
     expect(prompt).toContain('Repairs of earlier failures, each with the reason it was wrong');
     expect(prompt).toContain('Check whether one of those failures is this failure.');
+    expect(prompt).not.toContain('Check whether one of those conventions explains the failure.');
+  });
+
+  it('labels a raw block as evidence rather than as advice, and asks a retry to match it', () => {
+    // The raw form is the one block whose items are not statements about the workspace, so a retry
+    // prompt that called them conventions would be asking the model to generalise from an event.
+    const prompt = retryPromptFor({ ...base, packKind: 'raw' });
+    expect(prompt).toContain('Earlier questions on this database, each with the query');
+    expect(prompt).toContain('Check whether this failure is the one an item shows.');
     expect(prompt).not.toContain('Check whether one of those conventions explains the failure.');
   });
 
@@ -2278,5 +2339,94 @@ describe('doseMatchedDrop', () => {
 
   it('takes a whole count, so a caller cannot ask for a fraction of an item', () => {
     expect(doseMatchedDrop(items, 1.9, mulberry32(5)).size).toBe(1);
+  });
+});
+
+describe('rawEventBlock', () => {
+  const event = { taskId: 'db#1', question: 'How many schools?', attempt: 'SELECT count(*) FROM s', fixed: 'SELECT count(1) FROM schools' };
+
+  it('renders the event as three labelled lines, payload untouched', () => {
+    expect(rawEventBlock(event)).toBe(
+      'Question: How many schools?\nAttempt: SELECT count(*) FROM s\nCorrection: SELECT count(1) FROM schools',
+    );
+  });
+
+  it('omits the attempt when the reply contained no query', () => {
+    // The corpus's most common failure is a reply with no statement in it, and a rendered
+    // `Attempt: ` line would read as a parse artefact rather than as the observation.
+    expect(rawEventBlock({ ...event, attempt: '' })).toBe(
+      'Question: How many schools?\nCorrection: SELECT count(1) FROM schools',
+    );
+  });
+});
+
+describe('renderRawPack', () => {
+  const events = [
+    { taskId: 'a', question: 'Q one?', attempt: 'SELECT 1', fixed: 'SELECT 2' },
+    { taskId: 'b', question: 'Q two?', attempt: 'SELECT 3', fixed: 'SELECT 4' },
+    { taskId: 'c', question: 'Q three?', attempt: 'SELECT 5', fixed: 'SELECT 6' },
+  ];
+
+  it('admits whole events in retrieval order until the budget is spent', () => {
+    const one = rawEventBlock(events[0] as (typeof events)[number]).length;
+    const pack = renderRawPack(events, one + 1);
+    expect(pack.ids).toEqual(['a']);
+    expect(pack.rendered).toBe(rawEventBlock(events[0] as (typeof events)[number]));
+    expect(pack.skipped).toBe(2);
+  });
+
+  it('never truncates an event to make it fit', () => {
+    const one = rawEventBlock(events[0] as (typeof events)[number]).length;
+    const pack = renderRawPack(events, one - 1);
+    expect(pack.ids).toEqual([]);
+    expect(pack.rendered).toBe('');
+    expect(pack.skipped).toBe(3);
+  });
+
+  it('skips an event that does not fit and keeps going, rather than stopping', () => {
+    // One long event must not empty the pack: the budget is a character count, and an arm that
+    // rendered nothing because its first event was long would be `none` under a second name.
+    const long = { taskId: 'x', question: 'Q?', attempt: 'SELECT 1', fixed: 'SELECT '.repeat(200) };
+    const pack = renderRawPack([long, ...events], 400);
+    expect(pack.ids).toEqual(['a', 'b', 'c']);
+    expect(pack.skipped).toBe(1);
+  });
+
+  it('returns an empty pack for an empty event list', () => {
+    expect(renderRawPack([], 1200)).toEqual({ rendered: '', ids: [], skipped: 0 });
+  });
+});
+
+describe('rawEventVerbatim', () => {
+  const events = [{ taskId: 'a', question: 'Q one?', attempt: 'SELECT 1', fixed: 'SELECT 2' }];
+  const honest = renderRawPack(events, 1200);
+
+  it('counts every payload line of an honest pack as verbatim', () => {
+    expect(rawEventVerbatim(honest.rendered, events)).toEqual({ cells: 3, verbatim: 3 });
+  });
+
+  it('catches a reformatted query, which is the failure the gate exists for', () => {
+    const rewritten = honest.rendered.replace('SELECT 2', 'select 2');
+    expect(rawEventVerbatim(rewritten, events)).toEqual({ cells: 3, verbatim: 2 });
+  });
+
+  it('catches a truncated payload, so a formatter cannot pass by shortening', () => {
+    const cut = honest.rendered.replace('SELECT 1', 'SELECT');
+    expect(rawEventVerbatim(cut, events)).toEqual({ cells: 3, verbatim: 2 });
+  });
+
+  it('ignores text that is not a payload line, including the heading', () => {
+    const withHeading = `Earlier questions on this database:\n${honest.rendered}`;
+    expect(rawEventVerbatim(withHeading, events)).toEqual({ cells: 3, verbatim: 3 });
+  });
+
+  it('counts nothing in a pack that carries no payload', () => {
+    expect(rawEventVerbatim('', events)).toEqual({ cells: 0, verbatim: 0 });
+  });
+
+  it('ignores a labelled line that is not one of the three payloads', () => {
+    // The checker must not credit a line just for carrying a label: a renderer that added
+    // `Schema: ...` to a raw pack would otherwise pass the gate by going unrecognised.
+    expect(rawEventVerbatim('Schema: SELECT 1', events)).toEqual({ cells: 0, verbatim: 0 });
   });
 });
