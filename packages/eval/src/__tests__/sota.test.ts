@@ -1549,7 +1549,7 @@ describe('buildValidityGates', () => {
       expect(buildValidityGates(sound).some((entry) => entry.id === 'V46-raw-is-verbatim')).toBe(false);
     });
 
-    it('passes when every payload line is byte-identical', () => {
+    it('passes when every rendered block is byte-identical', () => {
       const entry = gate(
         { ...sound, raw: { arm: 'full-raw', cells: 1_050, verbatim: 1_050, skipped: 12 } },
         'V46-raw-is-verbatim',
@@ -1557,17 +1557,37 @@ describe('buildValidityGates', () => {
       expect(entry.pass).toBe(true);
       expect(entry.blocking).toBe(true);
       expect(entry.actual).toBe(
-        '1050/1050 payload line(s) byte-identical (full-raw), 12 event(s) skipped as too long',
+        '1050/1050 rendered event(s) byte-identical (full-raw), 12 event(s) skipped as too long',
       );
     });
 
-    it('fails when a single payload line was rewritten', () => {
+    it('fails when a single block was rewritten', () => {
       const entry = gate(
         { ...sound, raw: { arm: 'full-raw', cells: 1_050, verbatim: 1_049, skipped: 0 } },
         'V46-raw-is-verbatim',
       );
       expect(entry.pass).toBe(false);
       expect(entry.actual).toContain('1049/1050');
+    });
+
+    it('prints the block it rejected, because a count is a verdict and a sample is a diagnosis', () => {
+      // The first version of this gate reported `1103/1632` and cost a dispatch to explain: it could
+      // not say which of the three fields was being rewritten. The sample is never interpreted.
+      const entry = gate(
+        {
+          ...sound,
+          raw: {
+            arm: 'full-raw',
+            cells: 1_050,
+            verbatim: 1_049,
+            skipped: 0,
+            sample: 'Attempt: SELECT 1',
+          },
+        },
+        'V46-raw-is-verbatim',
+      );
+      expect(entry.pass).toBe(false);
+      expect(entry.actual).toContain('first mismatch: "Attempt: SELECT 1"');
     });
 
     it('fails when the arm rendered no payload at all, which is none under a second name', () => {
@@ -2401,32 +2421,96 @@ describe('rawEventVerbatim', () => {
   const events = [{ taskId: 'a', question: 'Q one?', attempt: 'SELECT 1', fixed: 'SELECT 2' }];
   const honest = renderRawPack(events, 1200);
 
-  it('counts every payload line of an honest pack as verbatim', () => {
-    expect(rawEventVerbatim(honest.rendered, events)).toEqual({ cells: 3, verbatim: 3 });
+  it('counts every block of an honest pack as verbatim', () => {
+    expect(rawEventVerbatim(honest.rendered, events)).toEqual({ cells: 1, verbatim: 1 });
   });
 
   it('catches a reformatted query, which is the failure the gate exists for', () => {
     const rewritten = honest.rendered.replace('SELECT 2', 'select 2');
-    expect(rawEventVerbatim(rewritten, events)).toEqual({ cells: 3, verbatim: 2 });
+    expect(rawEventVerbatim(rewritten, events)).toEqual({
+      cells: 1,
+      verbatim: 0,
+      sample: 'Question: Q one?',
+    });
   });
 
   it('catches a truncated payload, so a formatter cannot pass by shortening', () => {
     const cut = honest.rendered.replace('SELECT 1', 'SELECT');
-    expect(rawEventVerbatim(cut, events)).toEqual({ cells: 3, verbatim: 2 });
+    expect(rawEventVerbatim(cut, events).verbatim).toBe(0);
   });
 
-  it('ignores text that is not a payload line, including the heading', () => {
+  it('credits a multi-line query, which the line-split version could not represent', () => {
+    // R22's first dispatch failed on this and nothing else: every `Attempt:` in the corpus is SQL, and
+    // SQL is written over several lines, so a checker that splits on newlines reads a verbatim query as
+    // a rewritten one. The unit is the block for exactly that reason.
+    const multiline = [
+      { taskId: 'b', question: 'Q two?', attempt: 'SELECT a\nFROM t\nWHERE x = 1', fixed: 'SELECT a FROM t' },
+    ];
+    const pack = renderRawPack(multiline, 1200);
+    expect(rawEventVerbatim(pack.rendered, multiline)).toEqual({ cells: 1, verbatim: 1 });
+  });
+
+  it('catches one changed character inside a multi-line query', () => {
+    const multiline = [
+      { taskId: 'b', question: 'Q two?', attempt: 'SELECT a\nFROM t\nWHERE x = 1', fixed: 'SELECT a FROM t' },
+    ];
+    const pack = renderRawPack(multiline, 1200);
+    const rewritten = pack.rendered.replace('WHERE x = 1', 'WHERE x=1');
+    expect(rawEventVerbatim(rewritten, multiline).verbatim).toBe(0);
+  });
+
+  it('separates two blocks by the newline the join inserts and nothing else', () => {
+    const two = [
+      { taskId: 'a', question: 'Q one?', attempt: 'SELECT 1', fixed: 'SELECT 2' },
+      { taskId: 'b', question: 'Q two?', attempt: 'SELECT 3', fixed: 'SELECT 4' },
+    ];
+    const pack = renderRawPack(two, 1200);
+    expect(rawEventVerbatim(pack.rendered, two)).toEqual({ cells: 2, verbatim: 2 });
+  });
+
+  it('credits a pack against its events whatever order the events are handed over in', () => {
+    const two = [
+      { taskId: 'a', question: 'Q one?', attempt: 'SELECT 1', fixed: 'SELECT 2' },
+      { taskId: 'b', question: 'Q two?', attempt: 'SELECT 3', fixed: 'SELECT 4' },
+    ];
+    const pack = renderRawPack(two, 1200);
+    expect(rawEventVerbatim(pack.rendered, two)).toEqual({ cells: 2, verbatim: 2 });
+    expect(rawEventVerbatim(pack.rendered, [two[1]!, two[0]!])).toEqual({ cells: 2, verbatim: 2 });
+  });
+
+  it('does not credit a block whose lines were rearranged inside it', () => {
+    // The claim is about a block, not about a bag of strings: a renderer that shipped a correction
+    // above the attempt it corrects would put every byte of the event in the prompt and still be
+    // showing the wrong derivation first.
+    const scrambled = honest.rendered.replace(
+      'Attempt: SELECT 1\nCorrection: SELECT 2',
+      'Correction: SELECT 2\nAttempt: SELECT 1',
+    );
+    expect(rawEventVerbatim(scrambled, events).verbatim).toBe(0);
+  });
+
+  it('treats a heading as a cell it cannot credit, because the pack is what it is handed', () => {
+    // The prompt's label is added above the pack and is not part of it, so a caller that passed the
+    // whole prompt would fail loudly rather than quietly counting the label as an event.
     const withHeading = `Earlier questions on this database:\n${honest.rendered}`;
-    expect(rawEventVerbatim(withHeading, events)).toEqual({ cells: 3, verbatim: 3 });
+    expect(rawEventVerbatim(withHeading, events)).toEqual({
+      cells: 2,
+      verbatim: 1,
+      sample: 'Earlier questions on this database:',
+    });
   });
 
   it('counts nothing in a pack that carries no payload', () => {
     expect(rawEventVerbatim('', events)).toEqual({ cells: 0, verbatim: 0 });
   });
 
-  it('ignores a labelled line that is not one of the three payloads', () => {
-    // The checker must not credit a line just for carrying a label: a renderer that added
-    // `Schema: ...` to a raw pack would otherwise pass the gate by going unrecognised.
-    expect(rawEventVerbatim('Schema: SELECT 1', events)).toEqual({ cells: 0, verbatim: 0 });
+  it('counts a labelled line that is not an event as a cell it could not credit', () => {
+    // A renderer that added `Schema: ...` to a raw pack is showing something no event contains, and
+    // the count is the only place that shows up.
+    expect(rawEventVerbatim('Schema: SELECT 1', events)).toEqual({
+      cells: 1,
+      verbatim: 0,
+      sample: 'Schema: SELECT 1',
+    });
   });
 });

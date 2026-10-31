@@ -1566,12 +1566,20 @@ export type GateInput = {
    */
   readonly raw?: {
     readonly arm: string;
-    /** Payload lines across every prompt the arm sent. */
+    /** Blocks of rendered event across every prompt the arm sent. */
     readonly cells: number;
     /** Of those, the ones byte-identical to the event they were rendered from. */
     readonly verbatim: number;
     /** Events that did not fit the budget whole, so the reader knows what was left out. */
     readonly skipped: number;
+    /**
+     * The first block that was not byte-identical, cut to a readable length.
+     *
+     * Carried because a count is a verdict and a sample is a diagnosis: the gate's own first version
+     * reported `1103/1632` and could not say which of the three fields was being rewritten, so the
+     * failure cost a dispatch to explain. Never interpreted by the gate — printed beside the count.
+     */
+    readonly sample?: string;
   };
   /** Share of calls that failed after exhausting retries, in [0, 1]. */
   readonly callFailureRate: number;
@@ -2040,17 +2048,26 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
     });
   }
   if (input.raw !== undefined) {
-    // Two failures, and both of them end the claim rather than the run. A payload line that is not
+    // Two failures, and both of them end the claim rather than the run. A block that is not
     // byte-identical to the event it came from means the renderer interpreted something, and the arm
     // is then a third distiller with a new name — the one reading that would make its delta
     // uninterpretable. No cells at all means the arm never showed a raw event, which is `none` under
     // a second name: a run whose store produced no correction, or whose budget admitted none.
-    const { arm, cells, verbatim, skipped } = input.raw;
+    //
+    // The unit is the *event*, not the line, and that is a correction to this gate rather than a
+    // widening of it: the first version split the payload on newlines and matched each line against a
+    // field, which cannot represent a value that is itself multi-line — and a SQL query usually is.
+    // R22's first dispatch failed on exactly that: every `Question:` and `Correction:` cell matched,
+    // the short single-line `Attempt:` cells matched, and the multi-line ones could not. A block is
+    // the only unit that can carry the claim the arm makes.
+    const { arm, cells, verbatim, skipped, sample } = input.raw;
     gates.push({
       id: 'V46-raw-is-verbatim',
       criterion:
-        'every payload line of a raw arm is byte-identical to the correction event it was rendered from, and the arm rendered at least one',
-      actual: `${verbatim}/${cells} payload line(s) byte-identical (${arm}), ${skipped} event(s) skipped as too long`,
+        'every block of a raw pack is byte-identical to the correction event it was rendered from, and the arm rendered at least one',
+      actual:
+        `${verbatim}/${cells} rendered event(s) byte-identical (${arm}), ${skipped} event(s) ` +
+        `skipped as too long${sample === undefined ? '' : `, first mismatch: ${JSON.stringify(sample)}`}`,
       pass: cells > 0 && verbatim === cells,
       blocking: true,
     });
@@ -2129,35 +2146,58 @@ export function renderRawPack(
 }
 
 /**
- * How many of a rendered pack's payload lines are byte-identical to the event they came from.
+ * How many of a rendered pack's blocks are byte-identical to the event they came from.
  *
- * The arm's validity condition, as a function rather than a promise. Each line is split on its label and
- * matched against the corresponding field of *any* event in the set the renderer was given, so a
- * paraphrase, a reflow, a truncation or a query rewritten by a formatter all fail the check even though
- * the pack would still look plausible to a reader — and "it looks plausible" is precisely the failure
- * mode this record has caught in its own instruments twice.
+ * The arm's validity condition, as a function rather than a promise. The payload is walked left to
+ * right and at each position it must *start* with a whole event block the renderer was given; a step
+ * that does not is counted as a cell and not credited, and the rest of that line is skipped so a
+ * paraphrase, a reflow, a truncation or a query rewritten by a formatter all fail the check even
+ * though the pack would still look plausible to a reader — and "it looks plausible" is precisely the
+ * failure mode this record has caught in its own instruments three times.
+ *
+ * The unit is the block and not the line, which is the correction R22's first dispatch paid for: a
+ * line-level split cannot represent a value that is itself multi-line, and the `Attempt:` field is
+ * SQL, so in that dispatch every multi-line attempt read as a rewritten one. A block is also the
+ * stronger claim — it compares the whole event, so it cannot credit a payload whose three lines each
+ * appear somewhere in the pack in the wrong order or under the wrong question.
+ *
+ * `sample` is the first span that failed, cut to a readable length. It is a diagnosis and not an
+ * input: nothing below branches on it, and the gate only prints it.
  */
 export function rawEventVerbatim(
   rendered: string,
   events: readonly RawEvent[],
-): { readonly cells: number; readonly verbatim: number } {
-  const known: Record<string, ReadonlySet<string>> = {
-    Question: new Set(events.map((event) => event.question)),
-    Attempt: new Set(events.map((event) => event.attempt)),
-    Correction: new Set(events.map((event) => event.fixed)),
-  };
+): { readonly cells: number; readonly verbatim: number; readonly sample?: string } {
+  const blocks = events.map((event) => rawEventBlock(event));
+  // A span that does not match runs until the next block the renderer was given, so a rejected block
+  // counts once however many lines it holds: `cells` has to mean blocks on both sides of the verdict
+  // or the ratio it reports is not a ratio of the same thing.
+  const startsAt = (index: number): boolean =>
+    blocks.some((candidate) => rendered.startsWith(candidate, index));
+  let at = 0;
   let cells = 0;
   let verbatim = 0;
-  for (const line of rendered.split('\n')) {
-    const at = line.indexOf(': ');
-    if (at === -1) continue;
-    const label = line.slice(0, at);
-    const pool = known[label];
-    if (pool === undefined) continue;
+  let sample: string | undefined;
+  while (at < rendered.length) {
+    const block = blocks.find((candidate) => rendered.startsWith(candidate, at));
+    if (block !== undefined) {
+      cells += 1;
+      verbatim += 1;
+      at += block.length;
+      // One newline separates two blocks, and it belongs to the join rather than to either event.
+      if (rendered[at] === '\n') at += 1;
+      continue;
+    }
+    let next = at + 1;
+    while (next < rendered.length && !(rendered[next - 1] === '\n' && startsAt(next))) next += 1;
     cells += 1;
-    if (pool.has(line.slice(at + 2))) verbatim += 1;
+    if (sample === undefined) {
+      const span = rendered.slice(at, next);
+      sample = span.slice(0, span.indexOf('\n') === -1 ? undefined : span.indexOf('\n')).slice(0, 120);
+    }
+    at = next;
   }
-  return { cells, verbatim };
+  return sample === undefined ? { cells, verbatim } : { cells, verbatim, sample };
 }
 
 /**

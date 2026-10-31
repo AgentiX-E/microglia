@@ -108,7 +108,7 @@ to estimate a per-item effect with more than one observation behind it.
 
 ## Outcome
 
-Dispatch `41203470612` (success, 4,378 calls, 6 retries, 0 timeouts, 0 call failures, eleven gates pass,
+Dispatch `41203470612` (success, 4,378 calls, 6 retries, 0 timeouts, 0 call failures, twelve gates pass,
 26 minutes, `config.prereg` = this file). Artefact `eval/results/poc-sota-bird-clearance.json`. 350
 questions, 5 folds, `none` at 54.00%, minimum detectable effect 4.46pp.
 

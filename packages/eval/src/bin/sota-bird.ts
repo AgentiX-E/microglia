@@ -2667,6 +2667,8 @@ type FoldResult = {
     readonly verbatim: number;
     readonly skipped: number;
     readonly events: number;
+    /** The first block that was not byte-identical, for the gate to print rather than to judge. */
+    readonly sample?: string;
   };
   /**
    * Per question, what the clearance removed and what each of the two arms then carried.
@@ -3347,6 +3349,8 @@ async function runFold(
   let rawVerbatim = 0;
   let rawSkipped = 0;
   let rawEvents = 0;
+  /** The first block any fold could not match verbatim, kept so a failure explains itself. */
+  let rawSample: string | undefined;
   /** What the clearance removed per question, and what each of the two arms then carried. */
   const clearance: {
     position: number;
@@ -3660,6 +3664,7 @@ async function runFold(
       const counted = rawEventVerbatim(rendered.rendered, own);
       rawCells += counted.cells;
       rawVerbatim += counted.verbatim;
+      rawSample ??= counted.sample;
       if (ARMS.has('full-raw')) {
         call(position, 'full-raw', rendered.rendered, rendered.ids.length);
       }
@@ -4731,7 +4736,13 @@ async function runFold(
     injectedWithCondition,
     framing: framingDelivery,
     domainOrigin,
-    raw: { cells: rawCells, verbatim: rawVerbatim, skipped: rawSkipped, events: rawEvents },
+    raw: {
+      cells: rawCells,
+      verbatim: rawVerbatim,
+      skipped: rawSkipped,
+      events: rawEvents,
+      ...(rawSample === undefined ? {} : { sample: rawSample }),
+    },
     clearance,
     validatedPackDiffers,
     validatedPositions,
@@ -5304,6 +5315,9 @@ async function main(): Promise<void> {
   const pairPooled: PooledSubstrate | null = poolSubstrates(
     folds.flatMap((fold) => (fold.substrate === null ? [] : [fold.substrate])),
   );
+  // The first block that failed, taken from whichever fold failed first, so the gate can print what it
+  // rejected instead of only how many it rejected.
+  const rawMismatch = folds.find((fold) => fold.raw.sample !== undefined)?.raw.sample;
   // One pooled projection per substrate, computed once and read by both the gate and the artefact.
   const ruleTransfer = transferArtefact(folds, (fold) => fold.transfer);
   const repairTransfer = transferArtefact(folds, (fold) => fold.transferRepair);
@@ -5433,8 +5447,8 @@ async function main(): Promise<void> {
     ...(domainOrigin.storedWithDomain + domainOrigin.storedWithoutDomain === 0
       ? {}
       : { domainOrigin }),
-    // Emitted only when a verbatim arm ran, and it carries the whole of that arm's validity: a payload
-    // line that was rewritten makes the arm a third distiller under a new name.
+    // Emitted only when a verbatim arm ran, and it carries the whole of that arm's validity: a block
+    // that was rewritten makes the arm a third distiller under a new name.
     ...(ARMS.has('full-raw')
       ? {
           raw: {
@@ -5442,6 +5456,7 @@ async function main(): Promise<void> {
             cells: folds.reduce((sum, fold) => sum + fold.raw.cells, 0),
             verbatim: folds.reduce((sum, fold) => sum + fold.raw.verbatim, 0),
             skipped: folds.reduce((sum, fold) => sum + fold.raw.skipped, 0),
+            ...(rawMismatch === undefined ? {} : { sample: rawMismatch }),
           },
         }
       : {}),

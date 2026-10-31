@@ -95,3 +95,37 @@ whether the verdict is about content. Both intervals are reported; a null on the
 pre-registered as "the interpretation is not what costs", not as "raw evidence does not work", because the
 one difference between those readings is a store whose events are longer than a 1,200-character budget
 admits — and that is measurable before the next dispatch rather than argued after this one.
+
+## Instrument correction (2026-10-31, written before the re-dispatch)
+
+The first dispatch `41205745555` ran the benchmark to completion — 1,754 calls, 2 retries, 0 timeouts,
+0 call failures, 350 questions, 11 databases, 626 events collected and 82 skipped as too long for the
+budget — and failed `V46-raw-is-verbatim` with `1103/1632 payload line(s) byte-identical`. **The run is
+not read**: the refutation clause above says so in advance, and it is the right clause, because a
+checker that cannot recognise the arm's payload cannot certify it either.
+
+**What the number means is arithmetic, and it is in the artefact.** 544 events were rendered (626
+collected minus 82 skipped), each rendering three lines, so the payload held 1,632 cells exactly. Of
+those, 1,103 were credited: `2 × 544 = 1,088` `Question:` and `Correction:` cells plus **15** `Attempt:`
+cells. Every question and every correction was byte-identical; every multi-line attempt was not. The
+attempts are SQL, and 346 of the 350 replies in this run write their SQL over several lines.
+
+**So the arm was honest and the checker was not.** `rawEventVerbatim` split the payload on newlines and
+matched each line against a field, which cannot represent a value that is itself multi-line: it read a
+verbatim query as a rewritten one. This is the third time this record has caught a failure in its own
+instruments rather than in its treatment, and it is the same shape both times — a measurement that
+assumes its input is one line long.
+
+**The correction.** The unit is the **event block**. The checker walks the payload and requires each
+position to start with a whole block the renderer was given; a span that does not match is counted once,
+however many lines it holds, and its first line is kept as a sample the gate prints and never
+interprets. `V46`'s criterion is therefore **strictly stronger than the one registered**: it compares
+whole events instead of three independently matched lines, so a payload whose three lines each appear
+somewhere in the pack but in the wrong order now fails, and so does a pack whose blocks are correct but
+given under another question's heading.
+
+**What is unchanged.** The arms, the store, the recall, the 1,200-character budget, the position, the
+leakage argument, the predictions, the refutation clauses and the resolution. The run is re-dispatched
+under this file, and `V46` is the gate that says whether it may be read — with the difference that a
+second failure now reports the block it rejected rather than only how many it rejected, so the next
+reading costs a document instead of a dispatch.
