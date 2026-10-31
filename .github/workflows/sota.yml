@@ -238,6 +238,10 @@ jobs:
           SOTA_GENERALIZE: ${{ github.event.inputs.generalize || 'true' }}
           SOTA_DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}
           SOTA_DISTILL_CONCURRENCY: ${{ github.event.inputs.distill_concurrency || '8' }}
+          # The lane writes this into the artefact so the numbers and the prediction they test
+          # travel in one file. The step above refuses a dispatch that names no file; this is what
+          # makes the refusal leave a trace a reader can follow.
+          SOTA_PREREG: ${{ github.event.inputs.prereg || '' }}
           SOTA_ARMS: ${{ github.event.inputs.arms || 'gated,oracle' }}
           SOTA_CONCURRENCY: ${{ github.event.inputs.concurrency || '6' }}
           SOTA_SEMANTICS: ${{ github.event.inputs.semantics || 'multiset' }}

@@ -1259,6 +1259,58 @@ a store can reproduce is not what it can teach, and the next question is transfe
 3. `broke` did not fall (11 against 10 of 303). A better extraction is not a safer one, and the gate
    is what keeps the difference out of the product.
 
+### 13.7 Does the pair travel?
+
+§13.6 asks which substrate reproduces its own corrections better and finds the pair wins by 18.24pp.
+§13.5 asks whether a rule repairs a question it was not written from and finds 6.28% at 60% damage.
+The question neither answers is the one the product turns on: does the substrate that reproduces more
+than half also *travel* further than the one that reproduces under a third?
+
+```bash
+# both substrates' transfer in one run, with one shared control per source question
+SOTA_ARMS=full,full-transferred,full-repair-transferred \
+SOTA_LEARN_SAMPLE=128 SOTA_TRANSFER_TARGETS=8 pnpm eval:sota
+```
+
+Read `rule_transfer_repair` beside `rule_transfer`. They are the same measurement over the two
+stores, and V39–V42 hold the second to the same four checks as V15/V16/V17/V33 rather than to a
+lighter one — a repair measured by a lighter rule could not be set beside a rule.
+
+```jsonc
+// poc-sota-bird-transfer-repair.json, 350 questions, 5 folds, 3,298 calls
+{ "rules": 78, "trials": 416, "informative": 354, "repaired": 22, "broke": 32,
+  "blank_right": 62, "rate": 0.0621, "break_rate": 0.5161, "net_pp": -2.4,
+  "verdict": "no-transfer", "pack_kept": 19, "skipped": { "no-domain": 24 } }
+```
+
+- **`rate` ties across substrates.** 6.21% for the pair against 6.28% for the sentence, measured in
+  the same run on 354 and 366 informative trials. A difference of 0.07pp on 720 trials is smaller
+  than the standard error of either rate: whatever the account keeps that the sentence loses, it does
+  not keep it *across* questions.
+- **`break_rate` is lower for the pair in both dispatches** — 0.516 against 0.600 here, 0.304 against
+  0.509 before — so the account damages less per opportunity even while repairing no more often.
+- **`pack_kept` is the product answer, and it is 19 items across 350 questions.** Two gates — the
+  account reproduced its own case *and* repaired a foreign one — leave 0.054 items per question, which
+  is why the arm built from the intersection answers exactly what no memory answers.
+
+**Reproduction and transfer are different properties, and only the second is the product.** The pair
+reproduces 47.97% of its own corrections against 29.73% (+18.24pp, p = 1.8e-11, 296 paired) and
+transfers at the same rate. A form that recovers more of what it was shown does not recover more of
+what it was not shown; three content forms and two renderings have now been measured as arms, and none
+moves a held-out cell.
+
+**Three ways to misread it.**
+
+1. A tie in `rate` is not a tie in harm, and neither is a reason to deploy. `net_pp` is the only
+   figure that prices both: −2.40pp for the account and −1.68pp for the sentence over 416 trials each,
+   verdict `no-transfer` on both.
+2. `skipped.no-domain` is a ceiling, not a footnote. 24 accounts and 22 sentence rules could not be
+   pointed at any foreign question because they carry no `scope.domain`; the store's most general
+   claims are exactly the ones this instrument cannot ask about.
+3. `full-transferred` and `full-repair-transferred` look identical to `none` for a structural reason:
+   they carry 0.03 and 0.05 items per question. An arm that injects almost nothing is not a filtered
+   memory, it is a memory with the filter's verdict and no content left.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

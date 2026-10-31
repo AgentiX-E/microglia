@@ -306,6 +306,15 @@ function splitOf(raw: string | undefined): Split {
 const ARTEFACT_ID = artefactIdOf(SPLIT);
 
 /**
+ * The pre-registration this run executes, by id, or the empty string when it was run by hand.
+ *
+ * The workflow reads the same value and refuses a dispatch without one; the lane carries it into
+ * the artefact so that the prediction and the measurement are one file apart rather than one
+ * conversation apart.
+ */
+const PREREG = (process.env['SOTA_PREREG'] ?? '').trim();
+
+/**
  * The name this run's split goes by in the artefact.
  *
  * `dev` carries the published cell's own spelling — `BIRD dev` — because the admissibility rule
@@ -467,8 +476,13 @@ const RETRY_ARMS = ['full-onretry', 'full-repair-onretry', 'retry-blank', 'retry
  *
  * A table so the arm names in the union and the budgets in the lane cannot drift: the arm is
  * `chars-<n>`, and the number in its name is the number the pack layer is given.
+ *
+ * The points above 1,200 are not symmetric decoration. An item renders at about 590 characters and
+ * the pack layer adds whole items, so 150 and 300 admit nothing and 600 admits one: the low end of
+ * this table collapses to `none`, and only the high end can test whether harm grows with the number
+ * of items rather than merely shrinking when there are none.
  */
-const CHARS_ARMS = [150, 300, 600, 900] as const;
+const CHARS_ARMS = [150, 300, 600, 900, 1800, 2400] as const;
 type RetryArm = (typeof RETRY_ARMS)[number];
 
 /**
@@ -5129,6 +5143,13 @@ async function main(): Promise<void> {
       duplicate_multiplier: 2,
       min_coverage: MIN_COVERAGE,
       arms: [...ARMS],
+      // The pre-registration this run is evidence for, or null when it was run by hand.
+      //
+      // The workflow refuses a dispatch that names no file, but until now the file's name stopped
+      // at the workflow: the artefact did not carry it, so a reader holding the numbers could not
+      // find the prediction they were supposed to test. A prediction that is not attached to its
+      // measurement is a prediction the next reader has to take on trust.
+      prereg: PREREG === '' ? null : `prereg/${PREREG}.md`,
       convention: ACTIVE?.sentence ?? null,
       task: TASK,
       distill_prompt: 'distill-prompt/3',

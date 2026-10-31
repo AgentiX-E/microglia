@@ -427,8 +427,19 @@ Repairs per question ≈ (admitted rules per pack) × `rate`, which is why the r
 are published together: 0.42 × 7.3% is three questions in a hundred, and that is the whole claim.
 
 **Break rate** — Of the transfer targets a bare retry already repaired, the share the rule then
-broken: 28 of 56, 50%, on the BIRD store. It is the loss side that `rate` cannot see, and the reason
-`net_pp` is a gate (V17) rather than a column somebody may or may not read.
+broken: 30 of 50, 60%, on the BIRD store, against 32 of 62 for the repair substrate in the same run.
+It is the loss side that `rate` cannot see, and the reason `net_pp` is a gate (V17, V42) rather than a
+column somebody may or may not read.
+
+**Reproduction** — The share of a store's own corrections it can re-derive when the correction is in
+the prompt: 29.73% for the rule substrate, 47.97% for the repair one, paired at +18.24pp. It is a
+property of the *extraction*, and the measurement that shows it is not a property of the product is
+**transfer**: the same two stores repair a foreign question at 6.28% and 6.21%, a tie.
+
+**Transfer rate** — Repairs over informative trials: of the foreign targets a bare retry could not
+repair, the share the item repaired. The denominator excludes every trial where the item can do
+damage, so the ratio can only go up and is never an answer alone; `break_rate` and `net_pp` are read
+beside it. Measured per substrate and never merged: 6.28% for the sentence, 6.21% for the account.
 
 **Control hole** — A transfer trial whose *blank* call never returned. It is not "the retry failed":
 without a control there is no denominator, so the trial is `unmeasured`, is counted in

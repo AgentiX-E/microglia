@@ -218,6 +218,8 @@ describe('parseArms', () => {
     const arms = parseArms(undefined);
     expect([...arms].sort()).toEqual([
       'chars-150',
+      'chars-1800',
+      'chars-2400',
       'chars-300',
       'chars-600',
       'chars-900',
@@ -377,6 +379,8 @@ describe('parseArms', () => {
       'chars-300',
       'chars-600',
       'chars-900',
+      'chars-1800',
+      'chars-2400',
       'none-replica',
       'full-asked',
       'full-procedural',

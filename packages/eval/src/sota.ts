@@ -400,6 +400,18 @@ export type SqlArm =
   | 'chars-600'
   | 'chars-900'
   /**
+   * The other direction: two and four times the default budget.
+   *
+   * The store renders at about 590 characters per item, so an item is the unit the budget really
+   * controls: 150 and 300 admit nothing, 600 admits one, and the 1,200 default admits 1.84. Every
+   * existing dose arm therefore looked *down* the curve, where the points degenerate into `none`,
+   * and the only recoverable finding was that harm shrinks when nothing is injected. These two
+   * points make the axis 0, 1, 2, 3, 4 items so that harm can be tested as a function of quantity
+   * in both directions rather than only recovered at the empty end.
+   */
+  | 'chars-1800'
+  | 'chars-2400'
+  /**
    * The no-memory arm, asked twice.
    *
    * The prompt is byte-identical to `none`, so every difference between the two is noise: the
@@ -757,6 +769,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'chars-300': true,
   'chars-600': true,
   'chars-900': true,
+  'chars-1800': true,
+  'chars-2400': true,
   'none-replica': true,
   'full-asked': true,
   'full-procedural': true,

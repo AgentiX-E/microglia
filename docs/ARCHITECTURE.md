@@ -269,6 +269,15 @@ The study is a package, not a script:
   by the stores reports a rate over a subset nobody designed. `poolSubstrates` adds the folds up and
   recomputes the rates from the summed cells instead of averaging per-fold rates. `SUBSTRATE_FLOOR`
   keeps a small paired set a direction.
+- `sota.ts`'s `transferGates` — the four checks every transfer measurement is held to, written once
+  and applied twice. The repair substrate exists only to be compared with the rule one, so a second
+  substrate measured by a lighter rule would produce a number that cannot be set beside the first; the
+  ids (V15/V16/V17/V33 and V39/V40/V41/V42) are arguments, which is what keeps the published ones from
+  being renamed by a refactor of the shared body. The gate inputs are a translation of the artefact's
+  own typed projection (`transferGateInput` over `TransferProjection`), not a second set of
+  reductions — the first version of that block recomputed every total inline, and when the two were
+  finally unified the gate was found to be comparing a two-decimal publication against an exact
+  recomputation to 1e-9, which no run whose ratio fails to terminate could pass.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

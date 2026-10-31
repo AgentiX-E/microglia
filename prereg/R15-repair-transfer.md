@@ -115,4 +115,57 @@ arm's `pack_kept` is a prediction in this file precisely because a positive tran
 
 ## Outcome
 
-Filled in when the dispatch lands.
+Two dispatches. The first (`41169086124`) measured every fold and then refused its own artefact, and
+the refusal was an instrument defect rather than a finding: routing the gates through the published
+projection had left V17 comparing a two-decimal publication against an exact recomputation, so
+`(29 - 27) / 483` published as `0.41` failed a 1e-9 equality, and V14/V38 reported "0 of 350" for a
+probe that ran and an arm that was not named. Both were fixed before the second dispatch; the facts
+that exposed them are kept because they are what the defect looked like from outside. The run below
+is the one that counts: `41175676367`, artefact `eval/results/poc-sota-bird-transfer-repair.json`, 350
+questions, 5 folds, 3,298 calls, 1 retry, 0 timeouts, 0 call failures, every gate pass.
+
+| Reading | Value | Predicted | |
+|---|---|---|---|
+| informative trials | 354 repair, 366 rule | ≥ 400 repair | ✗ (above the 100 floor, below the prediction) |
+| transfer rate | **6.21%** repair (22/354), **6.28%** rule (23/366) | > 7.28%, expected 10–20% | ✗ |
+| `break_rate` | 0.516 repair (32/62), 0.600 rule (30/50) | not below 0.50 | ✓ (barely) |
+| `net_pp` | −2.40pp repair, −1.68pp rule | — | both `no-transfer` |
+| `pack_kept` / all | 19 of 350 repair, 10 of 622 rule | ≤ 35 of ~640 | ✓ |
+| arm cell | `full-repair-transferred` 53.71% (0.00pp), 0.054 items/question | \|Δ\| ≤ 3pp | ✓ |
+| items without `scope.domain` | 24 of 102 admitted repair, 22 of 100 rule | ≤ 12% | ✗ (23.5%) |
+
+Paired substrate, re-measured in the same run: 296 shared, 0 holes, 0 exclusive; both 80, only-rule 8,
+only-repair 62, neither 146; **+18.24pp, p = 1.83e-11**, verdict `right`. Five folds: +18.75, +18.64,
++17.54, +23.73, +12.28pp.
+
+`full` was 51.71% against 53.71% — **−2.00pp, p = 0.3105**, 14 gained and 21 lost at 1.78 items per
+question. The first dispatch had −3.71pp, p = 0.0192, 7 gained and 20 lost.
+
+**The refutation clause fired.** A repair store that reproduces 47.97% of its own corrections against
+the sentence's 29.73% transfers 6.21% against 6.28%. The difference is 0.07pp on 720 informative
+trials, which is smaller than the standard error of either rate. R14's +18.24pp and R15's tie are not
+in tension: they are the two halves of one finding, and the half that decides the product is this one.
+**Reproduction is not transfer.** A form that keeps more of what it was shown does not keep more of
+what it was not shown, and the extraction is not the constraint on either.
+
+**What survives, and what does not.** The pair's break rate was lower in both dispatches — 0.304
+against 0.509, then 0.516 against 0.600 — so the account damages less per opportunity as well as
+reproducing more. It does not repair more, and the net effect is negative for both substrates in this
+run. Two dispatches of the same measurement disagree on the net sign (run one: +0.41 and +1.20pp), and
+that disagreement is the honest size of the noise at 416 trials.
+
+**Two predictions were stated on the wrong base, and the record says so.** The informative count was
+predicted from R13's 467, which came from 98 pointable rules; this run admitted 100 rules of which 78
+carried a domain, and the trial count follows the pointable set. The domain-omission prediction was
+written as a share of *items* and measured against *admitted* items (24 of 102), which is not the same
+denominator R14 used for its 10.6% and cannot be compared with it without conversion.
+
+**The artefact does not carry a `prereg` field.** It was produced before the lane recorded one; the
+dispatch inputs are in the run's own record. The field is written from this iteration on, so the next
+preregistered run names its prediction from inside the file.
+
+**What this licenses.** The substrate axis is closed as a product lever: three content forms and two
+renderings, none of which moves a held-out cell, and now the one measurement that could have reopened
+it has come back a tie. The next iteration is the dose — the harm is in the delivery, and `full` is
+negative in both dispatches — and it is pre-registered as `prereg/R16-injection-dose.md` rather than
+described here.
