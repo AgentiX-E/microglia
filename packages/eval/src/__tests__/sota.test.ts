@@ -796,6 +796,24 @@ describe('buildValidityGates', () => {
     expect(short.actual).toContain('1120/1160 trial(s)');
   });
 
+  it('V15 names the control-side holes, because those are the ones that would have flattered the rate', () => {
+    // A trial whose blank never returned used to be filed as "the retry failed", which put it in
+    // the informative denominator. The gate still reconciles either way — the count is what changes
+    // — so the reading has to say how many of the holes are on the control side.
+    const named = gate(
+      {
+        ...sound,
+        transfer: {
+          ...transferInput({ trials: 400, informative: 280, repaired: 4, blankRight: 100, unmeasured: 20 }),
+          unmeasuredBlank: 17,
+        },
+      },
+      'V15-transfer-reconciles',
+    );
+    expect(named.pass).toBe(true);
+    expect(named.actual).toContain('17 with no control call');
+  });
+
   it('V17 refuses a transfer summary whose net effect does not reconcile with its counts', () => {
     // The gate exists because the conditional rate cannot go down. A summary that reports a rate
     // and no net effect is a summary that can only look like progress, so the reconciliation is

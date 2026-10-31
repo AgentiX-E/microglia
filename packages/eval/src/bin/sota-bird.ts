@@ -128,6 +128,7 @@ import {
   transferSummary,
   transferTargets,
   transferringItemIds,
+  type TransferTrial,
   verdictOf,
   schemaWithValues,
   schemaSql,
@@ -1557,6 +1558,15 @@ type ProbeRun = {
         readonly summary: TransferSummary;
         readonly rules: readonly string[];
         readonly skipped: Readonly<Record<string, number>>;
+        /**
+         * Every trial, kept so a later reading does not have to buy the run again.
+         *
+         * The summary is a fold-level aggregate; the question a reviewer asks next ("did any rule
+         * repair more than one target", "is the repair concentrated in one database") is a question
+         * about the ledger, and a dispatch that kept only the aggregate would answer it by
+         * re-measuring.
+         */
+        readonly trials: readonly TransferTrial[];
       }
     | null;
 };
@@ -1772,7 +1782,9 @@ async function probeMemory(
       return {
         itemId: plan.itemId,
         targetId: plan.targetId,
-        blankCorrect: blankByTask.get(plan.targetId) === true,
+        // Carried through as measured, holes included: a control that never returned is not a
+        // target the retry failed, and the summary is where that distinction has to survive.
+        blankCorrect: blankByTask.get(plan.targetId),
         withRuleCorrect: await asked(plan.row, plan.prompt),
       };
     });
@@ -1780,6 +1792,7 @@ async function probeMemory(
       summary: transferSummary(transferTrials),
       rules: transferringItemIds(transferTrials),
       skipped: skippedTransfer,
+      trials: transferTrials,
     };
   }
 
@@ -2345,6 +2358,8 @@ type FoldResult = {
     readonly summary: TransferSummary;
     readonly rules: number;
     readonly skipped: Readonly<Record<string, number>>;
+    /** Every pair, as `[rule, target, blank, withRule]`, with `null` for a call that never returned. */
+    readonly trials: readonly (readonly [string, string, boolean | null, boolean | null])[];
     readonly packAll: number;
     readonly packKept: number;
     readonly packDiffers: number;
@@ -4024,6 +4039,14 @@ async function runFold(
             summary: probe.transfer.summary,
             rules: probe.transfer.rules.length,
             skipped: probe.transfer.skipped,
+            // One line per pair rather than per field: the ledger is read by a person looking for
+            // the trials behind a number, and `null` is an absence that must stay visible.
+            trials: probe.transfer.trials.map((trial) => [
+              trial.itemId,
+              trial.targetId,
+              trial.blankCorrect ?? null,
+              trial.withRuleCorrect ?? null,
+            ]),
             packAll: transferSizes.reduce((sum, entry) => sum + entry.all, 0),
             packKept: transferSizes.reduce((sum, entry) => sum + entry.kept, 0),
             packDiffers: transferDiffers,
@@ -4553,6 +4576,10 @@ async function main(): Promise<void> {
             repaired: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.repaired ?? 0), 0),
             blankRight: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.blankRight ?? 0), 0),
             unmeasured: folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0),
+            unmeasuredBlank: folds.reduce(
+              (sum, fold) => sum + (fold.transfer?.summary.unmeasuredBlank ?? 0),
+              0,
+            ),
             measured:
               folds.reduce((sum, fold) => sum + (fold.transfer?.summary.trials ?? 0), 0) -
               folds.reduce((sum, fold) => sum + (fold.transfer?.summary.unmeasured ?? 0), 0),

@@ -294,11 +294,47 @@ describe('transferTargets', () => {
 });
 
 describe('transferSummary', () => {
-  const trial = (itemId: string, targetId: string, blankCorrect: boolean, withRuleCorrect: boolean | undefined) => ({
+  const trial = (
+    itemId: string,
+    targetId: string,
+    blankCorrect: boolean | undefined,
+    withRuleCorrect: boolean | undefined,
+  ) => ({
     itemId,
     targetId,
     blankCorrect,
     withRuleCorrect,
+  });
+
+  it('treats a control call that never returned as a hole, not as a target that needed help', () => {
+    // The blank is the denominator of everything a transfer trial claims: "the retry alone was
+    // wrong" is what makes a repair attributable to the rule. A hole folded into `false` would put
+    // the trial in the informative set and credit the rule with a repair it cannot have caused,
+    // which is the one direction this statistic must never be able to move in.
+    const summary = transferSummary([
+      trial('k1', 'b', undefined, true),
+      trial('k1', 'c', undefined, false),
+      trial('k1', 'd', false, true),
+    ]);
+    expect(summary.unmeasured).toBe(2);
+    expect(summary.unmeasuredBlank).toBe(2);
+    expect(summary.measured).toBe(1);
+    expect(summary.informative).toBe(1);
+    expect(summary.repaired).toBe(1);
+    expect(summary.netPp).toBeCloseTo(100, 6);
+  });
+
+  it('counts a blank hole and a treatment hole as the same absence', () => {
+    // Two different calls can fail, and both leave the trial unable to speak. They are counted
+    // apart only so a run can say which side of the pair its holes are on.
+    const summary = transferSummary([
+      trial('k1', 'b', undefined, true),
+      trial('k1', 'c', false, undefined),
+    ]);
+    expect(summary.unmeasured).toBe(2);
+    expect(summary.unmeasuredBlank).toBe(1);
+    expect(summary.measured).toBe(0);
+    expect(summary.netPp).toBe(0);
   });
 
   it('counts a repair only where the target needed one', () => {
@@ -418,6 +454,15 @@ describe('transferSummary', () => {
 });
 
 describe('transferringItemIds', () => {
+  it('never credits a rule with a repair whose control never returned', () => {
+    // Same defect as the summary's, one level down: this list decides which rules survive both
+    // gates, so a hole read as a repair would admit a rule on the strength of a missing call.
+    const kept = transferringItemIds([
+      { itemId: 'k1', targetId: 'b', blankCorrect: undefined, withRuleCorrect: true },
+      { itemId: 'k2', targetId: 'c', blankCorrect: false, withRuleCorrect: true },
+    ]);
+    expect(kept).toEqual(['k2']);
+  });
   it('keeps the rules that repaired at least one foreign case, in first-seen order', () => {
     expect(
       transferringItemIds([

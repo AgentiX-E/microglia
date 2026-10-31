@@ -1233,6 +1233,8 @@ export type GateInput = {
     readonly repaired: number;
     readonly blankRight: number;
     readonly unmeasured: number;
+    /** Trials whose control call is the missing half; a subset of `unmeasured`. */
+    readonly unmeasuredBlank?: number;
     readonly measured: number;
     readonly broke: number;
     readonly netPp: number;
@@ -1405,10 +1407,16 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
   }
   if (input.transfer !== undefined) {
     const { trials, informative, repaired, blankRight, unmeasured } = input.transfer;
+    const blankHoles = input.transfer.unmeasuredBlank ?? 0;
     gates.push({
       id: 'V15-transfer-reconciles',
       criterion: 'every transfer trial is measured, informative, or a target that needed nothing',
-      actual: `${unmeasured + blankRight + informative}/${trials} trial(s): ${informative} informative, ${blankRight} already repaired by the retry, ${unmeasured} unmeasured`,
+      // The control-side holes are named separately because they are the ones that would have
+      // flattered the rate if they had been folded into "the retry failed".
+      actual:
+        `${unmeasured + blankRight + informative}/${trials} trial(s): ${informative} informative, ` +
+        `${blankRight} already repaired by the retry, ${unmeasured} unmeasured ` +
+        `(${blankHoles} with no control call)`,
       pass: unmeasured + blankRight + informative === trials,
       blocking: true,
     });

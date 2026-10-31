@@ -227,8 +227,17 @@ export type TransferTrial = {
   readonly itemId: string;
   /** The foreign case the rule was shown. */
   readonly targetId: string;
-  /** Whether a bare retry already repaired the target, in which case the trial shows nothing. */
-  readonly blankCorrect: boolean;
+  /**
+   * Whether a bare retry already repaired the target, or `undefined` when that control call never
+   * returned.
+   *
+   * The control is what makes a repair attributable: a trial can only show work when the target
+   * needed some. A hole is therefore kept as a hole — folding it into `false` would file the trial
+   * under "the retry failed", and every rule that happened to repair it would be credited with a
+   * result nobody measured. This is not a symmetry of convenience: the same absence on the
+   * treatment side already resolves to `undefined`, and the two must read alike.
+   */
+  readonly blankCorrect: boolean | undefined;
   /** `undefined` when the call did not return, which is not a verdict about the rule. */
   readonly withRuleCorrect: boolean | undefined;
 };
@@ -247,8 +256,10 @@ export type TransferSummary = {
   readonly blankRight: number;
   /** Trials that changed nothing on a target that was wrong either way. */
   readonly unchanged: number;
-  /** Trials whose call never returned. */
+  /** Trials with at least one call that never returned, which says nothing about the rule. */
   readonly unmeasured: number;
+  /** Of those, the ones whose *control* call is the missing half: the denominator's own holes. */
+  readonly unmeasuredBlank: number;
   /** Trials that produced a verdict, which is the denominator of every marginal below. */
   readonly measured: number;
   /**
@@ -302,10 +313,15 @@ export const TRANSFER_FLOOR = 100;
  * `blankRight` rather than beside it, so nothing is counted twice.
  */
 export function transferSummary(trials: readonly TransferTrial[]): TransferSummary {
-  const measured = trials.filter((trial) => trial.withRuleCorrect !== undefined);
-  const informative = measured.filter((trial) => !trial.blankCorrect);
+  // Both halves of the pair have to have returned. A trial whose control is missing is not a
+  // negative result about the rule, and treating it as one is how a provider hiccup becomes a
+  // finding — the exact error this project's instruments exist to make impossible.
+  const measured = trials.filter(
+    (trial) => trial.blankCorrect !== undefined && trial.withRuleCorrect !== undefined,
+  );
+  const informative = measured.filter((trial) => trial.blankCorrect === false);
   const repaired = informative.filter((trial) => trial.withRuleCorrect === true);
-  const blankRight = measured.filter((trial) => trial.blankCorrect);
+  const blankRight = measured.filter((trial) => trial.blankCorrect === true);
   const broke = blankRight.filter((trial) => trial.withRuleCorrect === false).length;
   const netPp = measured.length === 0 ? 0 : ((repaired.length - broke) / measured.length) * 100;
   return {
@@ -317,6 +333,7 @@ export function transferSummary(trials: readonly TransferTrial[]): TransferSumma
     blankRight: blankRight.length,
     unchanged: informative.length - repaired.length,
     unmeasured: trials.length - measured.length,
+    unmeasuredBlank: trials.filter((trial) => trial.blankCorrect === undefined).length,
     measured: measured.length,
     rate: informative.length === 0 ? 0 : repaired.length / informative.length,
     marginalRepair: measured.length === 0 ? 0 : repaired.length / measured.length,
@@ -336,7 +353,9 @@ export function transferringItemIds(trials: readonly TransferTrial[]): readonly 
   const kept: string[] = [];
   const seen = new Set<string>();
   for (const trial of trials) {
-    if (trial.withRuleCorrect !== true || trial.blankCorrect) continue;
+    // `blankCorrect` must be an explicit `false`: a hole on the control side is the absence of a
+    // denominator, and a rule admitted through one would be admitted on a call that never happened.
+    if (trial.withRuleCorrect !== true || trial.blankCorrect !== false) continue;
     if (seen.has(trial.itemId)) continue;
     seen.add(trial.itemId);
     kept.push(trial.itemId);
