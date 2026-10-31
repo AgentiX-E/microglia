@@ -440,6 +440,34 @@ export type SqlArm =
    */
   | 'full-raw-shuffled'
   /**
+   * The same prompt as `none`, with the question's own evidence sentence removed.
+   *
+   * `none` is not a bare prompt: it carries the schema, the question, and BIRD's per-question
+   * `evidence` — about 142 characters of curated, human-written domain knowledge that the benchmark
+   * itself vouches for. Every number this project has published was measured on top of it, and it has
+   * never been removed. Three independent records price that removal on this benchmark: the BIRD paper
+   * reports GPT-4 falling from 54.89 to 34.88 without it, Companion Agents (arXiv 2601.08838) tabulates
+   * −12.7 to −18.4 points across three systems, and SEED (arXiv 2506.07423) −8.4 to −20.9.
+   *
+   * So this arm is not primarily a measurement of evidence. It is the **positive control this record
+   * has never run**: every negative result here was produced by an instrument that has never been shown
+   * to detect an effect anyone else can. If a manipulation with a replicated 8–20 point literature
+   * effect comes back at zero on this panel, the panel is the finding and every null above it is
+   * unreadable. If it comes back large, the panel is calibrated and the nulls are real.
+   */
+  | 'none-noevidence'
+  /**
+   * The same pack with the same abbreviation: `none-noevidence` plus the pack `full` carries.
+   *
+   * The fourth cell of the 2×2, and the reason the experiment is a factorial rather than two
+   * one-variable tests. Every arm in this record is measured *on top of* the evidence sentence, so a
+   * retrieved rule competes with a curated hint that already supplies the vocabulary and value mapping
+   * the rule is trying to supply. If the pack is a substitute for that hint, removing the hint hurts
+   * less where a pack is present; if the two are independent, it hurts the same. That interaction is
+   * `(full − full-noevidence) − (none − none-noevidence)`, and no one-variable design can compute it.
+   */
+  | 'full-noevidence'
+  /**
    * The same pack, reduced to the rules that reproduced their own correction.
    *
    * Every memory arm measured here is negative or null, and none of them asked the store to
@@ -896,6 +924,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-cleared-sampled': true,
   'full-raw': true,
   'full-raw-shuffled': true,
+  'none-noevidence': true,
+  'full-noevidence': true,
   critique: true,
   gated: true,
   duplicate: true,
@@ -1155,6 +1185,21 @@ export type FramingDelivery = {
 };
 
 /**
+ * How much of one arm's prompts carried the question's own evidence sentence.
+ *
+ * Deliberately the same shape as `FramingDelivery`, counting a block in the opposite direction. A
+ * framing arm adds a sentence and the instrument asks whether it arrived; an evidence arm *removes* a
+ * block the dataset supplies, and the instrument asks two questions at once — that the shipped arms
+ * still show it on every question that has one, and that the ablated arms show it on none. A separate
+ * type rather than a shared one because the two exist for different failures, and this record names
+ * its instruments after what they catch.
+ *
+ * `expected` here means "this arm is meant to carry the evidence block", which is every arm except the
+ * two that ablate it.
+ */
+export type EvidenceDelivery = FramingDelivery;
+
+/**
  * The two things a pack can contain.
  *
  * `rule` is a declarative claim about the workspace; `repair` is an account of one
@@ -1163,6 +1208,29 @@ export type FramingDelivery = {
  * grows a third form has to name it here and say which label it renders under.
  */
 export type PackKind = 'rule' | 'repair' | 'raw';
+
+/**
+ * What the dataset's own per-question knowledge is called in the prompt.
+ *
+ * A constant rather than a literal in three places, because `V47` has to look for the block it
+ * renders. The check reads the *sent prompt* for exactly this string followed by exactly the row's
+ * evidence, so a label and a check that drifted apart would report the ablation as broken when it was
+ * only renamed — and this record has spent two dispatches on instruments that could not recognise
+ * their own payload.
+ */
+export const EVIDENCE_LABEL = 'Evidence (may be wrong; it is external knowledge):';
+
+/**
+ * The evidence block for one question, or the empty string when it has none.
+ *
+ * BIRD attaches a curated sentence to every question in this panel (25 to 468 characters, mean 142),
+ * and the shipped prompt renders it above everything the arm adds. `none-noevidence` and
+ * `full-noevidence` render the empty string here and nothing else changes, which is what makes the
+ * ablation one variable rather than a new prompt.
+ */
+export function evidenceBlockOf(evidence: string): string {
+  return evidence === '' ? '' : `${EVIDENCE_LABEL}\n${evidence}`;
+}
 
 const PACK_LABEL: Record<PackKind, string> = {
   rule: 'Workspace conventions learned from earlier corrections:',
@@ -1330,7 +1398,7 @@ export function promptFor(input: PromptInput): string {
     'Use only the tables and columns in the schema. Prefer explicit JOINs. Do not invent columns.',
     preamble,
     `Schema:\n${input.ddl}`,
-    input.evidence ? `Evidence (may be wrong; it is external knowledge):\n${input.evidence}` : '',
+    evidenceBlockOf(input.evidence),
     input.stated && input.convention !== undefined ? `Workspace convention:\n- ${input.convention.sentence}` : '',
     ...(before ? [packBlock] : [question, packBlock]),
     // After the critique instruction, not before it: that instruction says "each item in that
@@ -1523,6 +1591,12 @@ export type GateInput = {
    * Absent when no arm declares a standing, because a gate that always passes is a comment.
    */
   readonly framing?: readonly FramingDelivery[];
+  /**
+   * Per arm, how much of what it sent carried the question's evidence sentence.
+   *
+   * Absent unless the run ablates it, because a gate that always passes is a comment.
+   */
+  readonly evidence?: readonly EvidenceDelivery[];
   /**
    * The provenance of the store's domain-free items, when the run reports its shape.
    *
@@ -2072,6 +2146,40 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       blocking: true,
     });
   }
+  if (input.evidence !== undefined && input.evidence.length > 0) {
+    // The ablation's validity, in both directions. An arm that removed nothing is `none` under a
+    // second name, and its difference from `none` would then be read as "the evidence costs nothing"
+    // when the truth is that the evidence was still there — the same defect this record has caught in
+    // a framing arm, a dose control and a verbatim checker. A shipped arm that lost the block is the
+    // mirror image and just as fatal: every published number in this record was measured on top of
+    // that block, so an arm that silently dropped it is not the baseline it claims to be.
+    //
+    // The third condition is the one a count alone cannot see: the ablated arm has to have sent as
+    // many prompts as the arm it ablates. An ablation that reached fewer questions is a smaller
+    // experiment wearing the same name.
+    const widest = Math.max(...input.evidence.map((entry) => entry.prompts));
+    const disagree = input.evidence.filter((entry) =>
+      entry.expected
+        ? entry.carrying !== entry.prompts
+        : entry.carrying !== 0 || entry.prompts !== widest,
+    );
+    gates.push({
+      id: 'V47-evidence-ablated',
+      criterion:
+        'every arm meant to show the evidence sentence showed it on every prompt that had one, ' +
+        'every ablated arm showed it on none, and the ablation covered as many questions as the arm it ablates',
+      actual:
+        input.evidence
+          .map(
+            (entry) =>
+              `${entry.arm}: ${entry.carrying}/${entry.prompts}${entry.expected ? '' : ' expected none'}`,
+          )
+          .join(', ') +
+        (disagree.length === 0 ? '' : ` — disagrees: ${disagree.map((e) => e.arm).join(', ')}`),
+      pass: widest > 0 && disagree.length === 0,
+      blocking: true,
+    });
+  }
   return gates;
 }
 
@@ -2303,7 +2411,7 @@ export function anchorPromptFor(input: AnchorInput, mode: AnchorMode = 'conserva
     'You revise one SQLite query that answers the question below.',
     'Return the SQL only, in a ```sql fence, with no explanation.',
     `Schema:\n${input.ddl}`,
-    input.evidence ? `Evidence (may be wrong; it is external knowledge):\n${input.evidence}` : '',
+    evidenceBlockOf(input.evidence),
     `Question: ${input.question}`,
     `A first attempt at this question:\n${input.draft}`,
     input.pack === '' ? '' : `Conventions learned from earlier corrections:\n${input.pack}`,
@@ -2374,7 +2482,7 @@ export function retryPromptFor(input: RetryInput): string {
     'You fix one SQLite query that answers the question below.',
     'Return the SQL only, in a ```sql fence, with no explanation.',
     `Schema:\n${input.ddl}`,
-    input.evidence ? `Evidence (may be wrong; it is external knowledge):\n${input.evidence}` : '',
+    evidenceBlockOf(input.evidence),
     `Question: ${input.question}`,
     `An earlier attempt at this question:\n${input.attempt}`,
     `That attempt did not work: ${input.failure}`,

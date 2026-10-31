@@ -94,7 +94,9 @@ import {
   OPTIONAL_ARMS,
   ADVISORY_SENTENCE,
   ARM_STANDING,
+  EVIDENCE_LABEL,
   PROHIBITIVE_HEADING,
+  evidenceBlockOf,
   PROMPT_VERSION,
   admissionOf,
   anchorPromptFor,
@@ -223,6 +225,7 @@ import {
   type ConventionName,
   type ConventionSpec,
   type Candidate,
+  type EvidenceDelivery,
   type FramingDelivery,
   type PackKind,
   type PackStanding,
@@ -2649,6 +2652,14 @@ type FoldResult = {
   readonly injectedWithCondition: number;
   /** Per arm, how many of its prompts carried the framing it declares. */
   readonly framing: readonly FramingDelivery[];
+  /**
+   * Per arm, how many of its prompts carried the question's own evidence sentence.
+   *
+   * Empty unless the run ablates it. Counted from the prompt text rather than from the flag that
+   * built it, because the ablation's whole claim is that the text changed and this record has twice
+   * published a number computed from a flag instead of from the thing the flag controls.
+   */
+  readonly evidence: readonly EvidenceDelivery[];
   /** Where the domain-free items came from: the door, or the widening. */
   readonly domainOrigin: {
     readonly storedWithDomain: number;
@@ -3248,6 +3259,19 @@ async function runFold(
     'full-raw-shuffled': 'raw',
   };
 
+  /**
+   * Which arms drop the question's own evidence sentence.
+   *
+   * A table rather than a parameter, for the reason `PACK_KIND` is one: the ablation is a property of
+   * the arm, and an arm told twice what it is would eventually be told two different things. It is
+   * also the only place the ablation touches the prompt, which is what `V47` verifies against the text
+   * that was actually sent.
+   */
+  const ARM_DROPS_EVIDENCE: Partial<Record<ArmName, true>> = {
+    'none-noevidence': true,
+    'full-noevidence': true,
+  };
+
 
   const call = (
     position: number,
@@ -3269,7 +3293,7 @@ async function runFold(
       packChars: packText.length,
       prompt: promptFor({
         question: row.question,
-        evidence: row.evidence,
+        evidence: ARM_DROPS_EVIDENCE[arm] === true ? '' : row.evidence,
         ddl: schema ?? schemaSql(dataset.dbPath(row.db_id)),
         pack: packText,
         stated: arm === 'stated',
@@ -3520,6 +3544,16 @@ async function runFold(
       call(position, 'none-replica', '', 0);
     }
     call(position, 'full', pack.rendered, pack.ids.length);
+    if (ARMS.has('none-noevidence')) {
+      // The positive control, planned through the same function as `none` with one argument changed.
+      // Reusing `call` rather than writing a second prompt builder is the whole guarantee that the
+      // two cells differ by the evidence block and nothing else.
+      call(position, 'none-noevidence', '', 0);
+    }
+    if (ARMS.has('full-noevidence')) {
+      // The other half of the 2×2: the same pack `full` carries, on the prompt `none-noevidence` sends.
+      call(position, 'full-noevidence', pack.rendered, pack.ids.length);
+    }
     if (probe !== undefined) {
       // Measured whenever the probe ran, injected only when the arm asks for it. The gate's question
       // is whether the admission rule changed a held-out pack, and a run that bought the probe for
@@ -4714,6 +4748,33 @@ async function runFold(
       expected: ARM_STANDING[arm] !== undefined,
     }));
   })();
+  /**
+   * The evidence instrument, read off the prompts that were sent.
+   *
+   * Only prompts that were actually put to the model are counted: a plan with an empty prompt is a
+   * registration for the case assembly, not a call, and counting it would report an arm as having
+   * dropped a block it never had a chance to send. Questions whose row carries no evidence are
+   * skipped in both directions so that `carrying` and `prompts` describe the same set.
+   */
+  const evidenceDelivery: readonly EvidenceDelivery[] = (() => {
+    if (!ARMS.has('none-noevidence') && !ARMS.has('full-noevidence')) return [];
+    const counts = new Map<ArmName, { prompts: number; carrying: number }>();
+    for (const plan of plans) {
+      if (plan.prompt === '') continue;
+      const row = evalRows[plan.position] as BirdRow;
+      if (row.evidence === '') continue;
+      const entry = counts.get(plan.arm) ?? { prompts: 0, carrying: 0 };
+      entry.prompts += 1;
+      if (plan.prompt.includes(evidenceBlockOf(row.evidence))) entry.carrying += 1;
+      counts.set(plan.arm, entry);
+    }
+    return [...counts.entries()].map(([arm, entry]) => ({
+      arm,
+      prompts: entry.prompts,
+      carrying: entry.carrying,
+      expected: ARM_DROPS_EVIDENCE[arm] !== true,
+    }));
+  })();
   process.stdout.write(
     `[sota] fold ${fold + 1}/${FOLDS}: eval=${cases.length} learn=${learnRows.length} ` +
       `edited=${learning.edited} unanswered=${learning.unanswered} ` +
@@ -4735,6 +4796,7 @@ async function runFold(
     injectedRules,
     injectedWithCondition,
     framing: framingDelivery,
+    evidence: evidenceDelivery,
     domainOrigin,
     raw: {
       cells: rawCells,
@@ -5295,6 +5357,20 @@ async function main(): Promise<void> {
     }
     return [...counts.entries()].map(([arm, entry]) => ({ arm, ...entry }));
   })();
+  // The evidence instrument, pooled the same way and for the same reason: the gate asks what the run
+  // sent, and one fold's prompts are a fifth of the answer.
+  const evidence = (() => {
+    const counts = new Map<string, { prompts: number; carrying: number; expected: boolean }>();
+    for (const fold of folds) {
+      for (const entry of fold.evidence) {
+        const held = counts.get(entry.arm) ?? { prompts: 0, carrying: 0, expected: entry.expected };
+        held.prompts += entry.prompts;
+        held.carrying += entry.carrying;
+        counts.set(entry.arm, held);
+      }
+    }
+    return [...counts.entries()].map(([arm, entry]) => ({ arm, ...entry }));
+  })();
   // Summed over folds: each fold learns its own store from k−1 folds, so an item counted twice was
   // learned twice. The gate is an invariant about each store; the totals let it read the run.
   const domainOrigin = {
@@ -5441,6 +5517,10 @@ async function main(): Promise<void> {
     // Only when an arm actually declares a framing: a gate that always passes is a comment, and
     // this one exists because a table entry that silently misses makes two arms one condition.
     ...(framing.every((entry) => !entry.expected) ? {} : { framing }),
+    // Emitted only when the run ablates the question's own evidence, because a gate that always passes
+    // is a comment. When it is emitted it carries the whole validity of the 2x2: that the shipped arms
+    // still show the block and the ablated ones show none of it.
+    ...(evidence.length === 0 ? {} : { evidence }),
     // Where the domain-free items came from. Emitted whenever a store exists, because the number is
     // the ceiling on every transfer reading and a run that reports the ceiling without its causes
     // cannot say whether to fix the interpreter or the widening policy.
@@ -5662,6 +5742,21 @@ async function main(): Promise<void> {
             clearance_rules_removed: validations.reduce(
               (sum, entry) => sum + clearanceFromDecisive(entry.credit).length,
               0,
+            ),
+          }),
+      // What the ablation did to the prompt, per arm, as counts over the questions that had an
+      // evidence sentence to lose. The gate turns this into a verdict; here it is the diagnosis, and
+      // the pair is worth reading side by side because a shipped arm's `carrying` falling below its
+      // `prompts` would mean the baseline moved under every number in this record.
+      ...(evidence.length === 0
+        ? {}
+        : {
+            evidence_questions: Math.max(...evidence.map((entry) => entry.prompts)),
+            evidence_carried: Object.fromEntries(
+              evidence.filter((entry) => entry.expected).map((entry) => [entry.arm, entry.carrying]),
+            ),
+            evidence_ablated: Object.fromEntries(
+              evidence.filter((entry) => !entry.expected).map((entry) => [entry.arm, entry.carrying]),
             ),
           }),
       // The shape experiment's two denominators: rules injected, and how many of

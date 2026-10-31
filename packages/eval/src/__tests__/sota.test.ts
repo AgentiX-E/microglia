@@ -25,6 +25,8 @@ import {
   parseArms,
   anchorPromptFor,
   doseMatchedDrop,
+  EVIDENCE_LABEL,
+  evidenceBlockOf,
   rawEventBlock,
   renderRawPack,
   rawEventVerbatim,
@@ -246,6 +248,7 @@ describe('parseArms', () => {
       'full-grounded',
       'full-late',
       'full-narrow',
+      'full-noevidence',
       'full-onretry',
       'full-plain',
       'full-procedural',
@@ -268,6 +271,7 @@ describe('parseArms', () => {
       'm-schema',
       'none',
       'none-advisory',
+      'none-noevidence',
       'none-replica',
       'oracle',
       'retry-blank',
@@ -395,6 +399,8 @@ describe('parseArms', () => {
       'full-cleared-sampled',
       'full-raw',
       'full-raw-shuffled',
+      'none-noevidence',
+      'full-noevidence',
       'critique',
       'gated',
       'duplicate',
@@ -664,6 +670,44 @@ describe('promptFor pack standing', () => {
     expect(lines[at + 1]?.startsWith('Before writing the query, decide for each item')).toBe(true);
     expect(lines[at + 2]).toBe(ADVISORY);
     expect(lines[at + 3]).toBe('Question: How many students?');
+  });
+});
+
+describe('evidenceBlockOf', () => {
+  it('renders the label the check looks for, then the sentence', () => {
+    expect(evidenceBlockOf('x means y')).toBe(`${EVIDENCE_LABEL}\nx means y`);
+  });
+
+  it('renders nothing for a question that carries no evidence', () => {
+    // Not a label with an empty payload: a dangling `Evidence:` heading is a block that promises
+    // knowledge and delivers none, and the ablation it is meant to be the absence of would then be
+    // distinguishable from `none` by a heading rather than by a sentence.
+    expect(evidenceBlockOf('')).toBe('');
+  });
+
+  it('is the only place the label is written, so the check cannot drift from the renderer', () => {
+    const prompt = promptFor({
+      question: 'Q',
+      evidence: 'x means y',
+      ddl: 'DDL',
+      pack: '',
+      stated: false,
+      convention: undefined,
+    });
+    expect(prompt).toContain(evidenceBlockOf('x means y'));
+    expect(prompt.split(EVIDENCE_LABEL)).toHaveLength(2);
+  });
+
+  it('leaves no trace when the prompt is built without a sentence', () => {
+    const prompt = promptFor({
+      question: 'Q',
+      evidence: '',
+      ddl: 'DDL',
+      pack: '',
+      stated: false,
+      convention: undefined,
+    });
+    expect(prompt).not.toContain(EVIDENCE_LABEL);
   });
 });
 
@@ -1594,6 +1638,78 @@ describe('buildValidityGates', () => {
       const entry = gate(
         { ...sound, raw: { arm: 'full-raw', cells: 0, verbatim: 0, skipped: 340 } },
         'V46-raw-is-verbatim',
+      );
+      expect(entry.pass).toBe(false);
+    });
+  });
+
+  describe('V47-evidence-ablated', () => {
+    const pair = [
+      { arm: 'none', prompts: 350, carrying: 350, expected: true },
+      { arm: 'none-noevidence', prompts: 350, carrying: 0, expected: false },
+      { arm: 'full', prompts: 350, carrying: 350, expected: true },
+      { arm: 'full-noevidence', prompts: 350, carrying: 0, expected: false },
+    ];
+
+    it('is absent when no arm ablates the sentence', () => {
+      // A gate that always passes is a comment, and this one would be worse than a comment: it would
+      // say the ablation was verified on runs that never ablated anything.
+      expect(buildValidityGates(sound).some((entry) => entry.id === 'V47-evidence-ablated')).toBe(false);
+    });
+
+    it('passes when the four cells are what they claim to be', () => {
+      const entry = gate({ ...sound, evidence: pair }, 'V47-evidence-ablated');
+      expect(entry.pass).toBe(true);
+      expect(entry.blocking).toBe(true);
+      expect(entry.actual).toBe(
+        'none: 350/350, none-noevidence: 0/350 expected none, full: 350/350, ' +
+          'full-noevidence: 0/350 expected none',
+      );
+    });
+
+    it('fails when the ablation left the sentence in, which is none under a second name', () => {
+      // The exact failure this record has caught in a framing arm, a dose control and a verbatim
+      // checker. Its difference from `none` would be read as "the evidence costs nothing" when the
+      // truth is that the evidence was still there.
+      const entry = gate(
+        {
+          ...sound,
+          evidence: pair.map((cell) =>
+            cell.arm === 'none-noevidence' ? { ...cell, carrying: 12 } : cell,
+          ),
+        },
+        'V47-evidence-ablated',
+      );
+      expect(entry.pass).toBe(false);
+      expect(entry.actual).toContain('disagrees: none-noevidence');
+    });
+
+    it('fails when a shipped arm lost the sentence, which would move every published baseline', () => {
+      const entry = gate(
+        { ...sound, evidence: pair.map((cell) => (cell.arm === 'none' ? { ...cell, carrying: 349 } : cell)) },
+        'V47-evidence-ablated',
+      );
+      expect(entry.pass).toBe(false);
+      expect(entry.actual).toContain('disagrees: none');
+    });
+
+    it('fails when the ablation reached fewer questions than the arm it ablates', () => {
+      // A count alone cannot see this: 0 of 300 is a perfect ablation of a smaller experiment.
+      const entry = gate(
+        {
+          ...sound,
+          evidence: pair.map((cell) => (cell.arm === 'full-noevidence' ? { ...cell, prompts: 300 } : cell)),
+        },
+        'V47-evidence-ablated',
+      );
+      expect(entry.pass).toBe(false);
+      expect(entry.actual).toContain('disagrees: full-noevidence');
+    });
+
+    it('fails when nothing carried the sentence at all, which is a broken 2x2 rather than a clean one', () => {
+      const entry = gate(
+        { ...sound, evidence: pair.map((cell) => (cell.expected ? { ...cell, carrying: 0 } : cell)) },
+        'V47-evidence-ablated',
       );
       expect(entry.pass).toBe(false);
     });
