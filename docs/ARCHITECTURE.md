@@ -305,10 +305,17 @@ The study is a package, not a script:
 - `sota.ts`'s `renderRawPack` / `rawEventVerbatim` / `V46-raw-is-verbatim` — the raw substrate. One
   correction renders as three labelled lines whose payloads are the event's own strings, whole events
   only (the budget skips rather than truncates, because half an event is a question with no correction),
-  and the gate fails the run if a single payload line is not byte-identical to the event it came from, or
-  if the arm rendered no payload at all. The verbatim check is a function over the rendered text rather
+  and the gate fails the run if a single rendered block is not byte-identical to the event it came from,
+  or if the arm rendered no payload at all. The verbatim check is a function over the rendered text rather
   than a promise in a comment: a formatter that tidied a query would make the arm an interpreter under a
   new name, and the arm's entire claim is that nothing was interpreted.
+  - **The unit is the block, and that cost a dispatch to learn.** The first version split the payload on
+    newlines and matched each line against a field, which cannot represent a value that is itself
+    multi-line — and the `Attempt:` field is SQL, so a verbatim multi-line query read as a rewritten one:
+    R22's first run reported 1103/1632, which is exactly the 1088 question and correction lines plus the
+    15 single-line attempts. `rawEventVerbatim` now walks the payload and requires each position to start
+    with a whole block it was given, counting a rejected span once however many lines it holds, and
+    returning its first line as a sample the gate prints and never interprets.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

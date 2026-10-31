@@ -1499,6 +1499,48 @@ SOTA_ARMS=full-raw,full-raw-shuffled SOTA_PREREG=R22-raw pnpm eval:sota
   questions, or change what is stored — which is §13.13.
 
 
+### 13.13 Does the raw event do what the distilled lesson cannot?
+
+The last content axis, and the only one that changes the *object* rather than a filter over it. Every
+earlier arm injected an interpretation — a rule, a repair note, a procedure — written by a distiller that
+read one correction. This one injects the correction itself: the question that was asked, the query that
+came back wrong, the query that fixed it, whole and unedited.
+
+```bash
+SOTA_ARMS=full-raw,full-raw-shuffled SOTA_PREREG=R22-raw pnpm eval:sota
+# V46-raw-is-verbatim fails the run if a single rendered block differs from the event it came from
+```
+
+```jsonc
+// poc-sota-bird-raw.json, 350 questions, 5 folds, 1,755 calls, `none` at 54.00%
+[
+  { "arm": "full",               "mean_pack_ids": 1.82, "mean_pack_chars": 1083, "accuracy": 0.5143, "delta_pp": -2.57, "p_value": 0.1078 },
+  { "arm": "full-raw",           "mean_pack_ids": 1.59, "mean_pack_chars":  864, "accuracy": 0.5057, "delta_pp": -3.43, "p_value": 0.1038 },
+  { "arm": "full-raw-shuffled",  "mean_pack_ids": 1.39, "mean_pack_chars":  763, "accuracy": 0.5200, "delta_pp": -2.00, "p_value": 0.3240 }
+]
+```
+
+- **Raw evidence is not better than a distilled note here.** `full-raw` − `full` = **−0.86pp** (20 gained,
+  23 lost, p = 0.7608, 95% CI [−4.57, +2.86]). The interval contains the +1pp the design was aiming at,
+  so the honest reading is not "the substrate is not the loss" but "350 questions cannot resolve 1pp":
+  the paired interval is ±3.7pp wide.
+- **The subject of the correction does not matter.** `full-raw` sits **1.43pp below** its own shuffled
+  control — the same form filled with other questions' SQL from the same database. Whatever the arm
+  measures, it is not knowledge about the question in front of it.
+- **All three text forms are indistinguishable and all three are below no memory.** Largest pairwise
+  difference 1.43pp, every p > 0.54; each 2.0–3.4pp under `none`. Pooled across the three arms and 1,050
+  arm-question cells, showing any text costs **−2.67pp** (40 gained, 68 lost, exact p = 0.0091) — an
+  exploratory number, since the registration spent its resolution on a 1pp claim instead.
+- **What to do if you are deploying this.** On a task where the question already carries its schema, its
+  evidence and its database, the retrieval layer does not pay for the attention it takes. Ship the store
+  and use it for audit, for diffing, for regression explanation — and gate injection behind evidence you
+  do not have yet, because the answer this lane gives for every text form it can render is: show nothing.
+- **If you build your own verbatim arm**, note what this one cost to get right: the gate's first version
+  split the payload into lines and matched each against a field, which read every multi-line SQL query as
+  a rewritten one. The unit has to be the block. `V46` now reports the block it rejected, and
+  `rawEventVerbatim` is exported so the check travels with the renderer.
+
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

@@ -129,3 +129,69 @@ leakage argument, the predictions, the refutation clauses and the resolution. Th
 under this file, and `V46` is the gate that says whether it may be read — with the difference that a
 second failure now reports the block it rejected rather than only how many it rejected, so the next
 reading costs a document instead of a dispatch.
+
+## Outcome
+
+Dispatch `41213200296` (success, 1,755 calls, 2 retries, 0 timeouts, 0 call failures, twelve gates pass,
+90 minutes, `config.prereg` = this file). Artefact `eval/results/poc-sota-bird-raw.json`. 350 questions,
+5 folds, `none` at 54.00%, minimum detectable effect 4.00pp. The first dispatch and its instrument
+correction are recorded above and are not part of this reading.
+
+| Arm | Events | Chars | ACC | Δ vs `none` | 95% CI | gained / lost | p |
+|---|---|---|---|---|---|---|---|
+| `full` | 1.82 | 1,083 | 51.43% | −2.57pp | [−5.43, +0.00] | 8 / 17 | 0.1078 |
+| `full-raw-shuffled` | 1.39 | 763 | 52.00% | −2.00pp | [−5.43, +1.43] | 15 / 22 | 0.3240 |
+| `full-raw` | 1.59 | 864 | 50.57% | −3.43pp | [−7.14, +0.29] | 17 / 29 | 0.1038 |
+
+The pairs, which is what the registration was about — `full-raw` − `full` = **−0.86pp** (20 gained, 23
+lost, 43 discordant, exact p = 0.7608, 95% CI [−4.57, +2.86]); `full-raw` − `full-raw-shuffled` =
+**−1.43pp** (19 / 24, 43 discordant, p = 0.5424, bootstrap 95% CI [−5.14, +2.29]); `full-raw-shuffled` −
+`full` = +0.57pp (19 / 17, p = 0.8679, CI [−2.86, +4.00]).
+
+**The confirmatory claim is not supported, and the first refutation clause does not fire either — that is
+the honest pair of sentences.** The registered difference was `full-raw` above `full` by ≥1pp; it is
+−0.86pp. The clause written down in advance for a null was "within ±1pp **with an interval that excludes
++1pp**", and this interval contains +1pp, so the registration does not license the sentence "the substrate
+is not the loss". What it licenses is narrower and more useful: **at 350 questions the paired interval is
+±3.7pp wide, so a 1pp claim was below this lane's resolution before the run started**. The registration
+asked for a difference the design could not see; the run answered at the size it has.
+
+**The second refutation clause fires cleanly, and it is the one that names what the arm measured.**
+`full-raw` is *below* its own shuffled control by 1.43pp: the subject of the correction does not matter.
+The arm put real SQL about other questions on the same database in front of the model and did no worse
+than the arm that put this question's own correction there, which means the deltas it produces are about
+form, length and vocabulary, not about knowledge.
+
+**Dose, and it does not rescue the form.** The raw arm carried 1.59 events and 864 characters against
+`full`'s 1.82 items and 1,083 — 219 characters *fewer*, and 0.86pp lower; the shuffled control carried the
+fewest, 763, and scored highest of the three at 52.00%. Ordering the three by characters does not order
+them by accuracy: 763 → 52.00, 864 → 50.57, 1,083 → 51.43. The three forms are indistinguishable from
+each other (largest pairwise difference 1.43pp, every p > 0.54) and each sits 2.0–3.4pp under no memory.
+
+**Pooled, and marked exploratory because it was not registered.** Against `none`, the three text arms
+gained 40 questions and lost 68 over 1,050 arm-question cells: **−2.67pp, exact p = 0.0091**. That is the
+record's first significant number in this line, and its sign is negative — *any* text, distilled or raw
+or foreign, costs about two and a half points on this benchmark with this model. It is reported as an
+observation and not as a verdict: pooling arms inside a question is not independent, and the
+pre-registration put its resolution into a 1pp claim instead.
+
+**Three instrument readings.** `V46-raw-is-verbatim`: **557/557 rendered events byte-identical**, with 81
+of 638 events (12.7%) skipped whole rather than truncated — the budget refused them, which is the
+behaviour the design asked for. `V32`: 640 corrections from 1,400 learn rows, 0 unanswered, 4 distillation
+failures (0.3%). `V44-domain-accounted`: `156 item(s) with no domain, 156 arrived unscoped, 0 widened` —
+the fourth dispatch in a row in which generalisation widened nothing.
+
+## What this leaves
+
+Every axis this record can vary on a distilled store has now been varied, and the last one — the store
+itself — is closed with a number rather than an opinion: **the interpretation is not what costs, and
+neither is the absence of interpretation.** The raw form was the field's strongest reported baseline and
+it transferred as a null against the distilled form and as a loss against no memory, with its own
+shuffled control above it.
+
+The line is therefore at the place the pre-registration predicted it would arrive at if the substrate did
+not carry the effect, and the product decision that follows is **abstention by default**: on this
+benchmark, with this model, showing a retrieved note is worth about −2.7pp over showing nothing, and no
+text form this record has built reverses it. That is a finding about a task where the question already
+carries its schema, its evidence and its database, and the next registration has to say which half of
+that sentence it is testing — the retrieval, or the question.
