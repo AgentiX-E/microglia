@@ -145,3 +145,72 @@ item is better than two.
 If the refutation fires on the first clause, the sequence that follows is already written: selection
 before framing, then relevance strata, and the product statement stays at "the store is inert at best
 and harmful at the shipped budget" until an arm beats `none` twice.
+
+## Outcome
+
+Dispatch `41185616121` (success, 2,110 calls, 5 retries, 0 timeouts, 0 call failures, eleven gates
+pass, `config.prereg` = this file). Artefact `eval/results/poc-sota-bird-framing.json`. `none` at
+54.86%, 350 questions, 5 folds, minimum detectable effect 4.53pp.
+
+| Arm | Items | Characters | Accuracy | Δ vs `none` | 95% CI | gained / lost | p |
+|---|---|---|---|---|---|---|---|
+| `none-advisory` | 0 | 0 | 52.86% | −2.00pp | [−4.00, +0.00] | 3 / 10 | 0.0923 |
+| `full` | 1.81 | 1,078 | 50.86% | −4.00pp | [−7.14, −0.86] | 9 / 23 | 0.0201 |
+| `full-advisory` | 1.81 | 1,078 | 50.29% | −4.57pp | [−7.71, −1.71] | 7 / 23 | 0.0052 |
+| `full-prohibitive` | 1.81 | 1,078 | 49.71% | −5.14pp | [−8.29, −2.00] | 7 / 25 | 0.0021 |
+
+Paired against `full` on the same questions — the numbers the decision rule is written on:
+
+| Arm | Δ vs `full` | 95% CI | gained / lost | p |
+|---|---|---|---|---|
+| `full-advisory` | **−0.57pp** | [−3.14, +2.00] | 10 / 12 | 0.832 |
+| `full-prohibitive` | −1.14pp | [−4.00, +1.71] | 10 / 14 | 0.541 |
+| `none-advisory` | +2.00pp | [−1.14, +5.14] | 19 / 12 | 0.281 |
+
+**The registered refutation fired.** `full-advisory` sits 0.57pp *below* `full` and its interval's
+upper bound is +2.00pp, under the pre-registered +2.5pp bar from the amendment. A sentence granting
+the model standing to disregard the block does not recover what the block costs, and the datum
+excludes any recovery large enough to have been worth the sentence. Framing is not the channel.
+
+**The sentence has a price, and it is the size of the effect it was meant to buy.** `none-advisory`
+— the sentence with no pack, the control this arm set was built around — is 2.00pp below `none`
+(p = 0.0923, 13 discordant). Four dispatches put the default pack's cost at −2.86pp on average, and
+two thirds of a chance to recover it was the claim; a paragraph of instruction against a block of
+1,078 characters came back at −2.00pp on its own. The two costs do not add — pack plus sentence would
+be −6.00pp and the cell is −4.57pp, so the interaction is +1.43pp — but this lane cannot resolve an
+interaction of that size, and the honest reading is the simpler one: **in this prompt, words cost
+about what the note costs**, which is why every mitigation that works by adding words has to clear a
+bar as high as the harm it repairs.
+
+**The trauma mechanism ran forward and stayed inside its interval.** `full-prohibitive` classifies the
+same 1.81 items as records of failures rather than as workspace facts and lands 1.14pp below `full`
+(CI [−4.00, +1.71]). The prediction was "not better than `full`" and it holds; the prediction was
+"within 1pp" and the point estimate is just outside it, which at this resolution is a direction rather
+than a size. Read against `none-advisory`, the two arms that add a paragraph are 4.57 and 5.14pp below
+no memory, so the register — the one variable MemTrapBench's mechanism names — moved the cell by
+0.57pp. Whatever the harm is, it is not the register the block is written in.
+
+**`full` is negative for the seventh time, and the third by significance.** −4.00pp at p = 0.0201;
+the mean across seven dispatches is −3.2pp. That is now less a finding than a property of the lane,
+and it is the number the product statement has to survive.
+
+**The instrument passed the check it was built for.** `V43-framing-delivered` reports
+`none: 0/350 expected none, full: 0/350 expected none, full-advisory: 350/350, none-advisory:
+350/350, full-prohibitive: 350/350`. This is the first run in this record where a prompt-level
+treatment's delivery is itself a gate, and it is what makes the three cells above readings about
+sentences rather than readings about tables.
+
+**What the refutation's own next step is, and why it is not the one written before the run.** The
+clause named selection — a pack that picks the highest-ranked item that fits. R16, one iteration
+earlier and after this file was drafted, measured that the loss is complete at the **first** item
+(−3.14pp at exactly 1.00 item per question) and that everything from one item to four moves the
+number by 1.43pp. Selecting *which* item arrives cannot remove a cost the first item already
+incurs, so selection is not the successor the evidence supports. What the record does support is the
+single mechanism with a positive sign: `full-anchored`, +2.86pp against `full` pooled over 700
+questions at p = 0.0205 — measured, however, without an arm that writes twice and injects nothing.
+That control is what `prereg/R18-anchored-control.md` registers, and it is the iteration that
+decides whether the note or the revision owns the only positive number this project has.
+
+**Reproducibility.** `prereg/R17-framing.md`, artefact `eval/results/poc-sota-bird-framing.json`,
+dispatch `41185616121`; `pnpm check` green with `sota.ts` and `prereg.ts` at 100 on all four
+coverage dimensions.

@@ -1362,6 +1362,44 @@ something about its own fallibility.
    negative for the first time (−1.43pp, 1 gained and 6 lost) — so `none` was the luckier of two
    identical prompts and every delta in the table is, if anything, generous.
 
+### 13.9 What if the prompt says the notes may be ignored?
+
+§13.8 closed the question of how much arrives; this one asks whether the block reads differently when
+the prompt grants the model standing to disregard it. Three cells, one store, one budget, one
+difference each: the same sentence appended to the pack (`full-advisory`), the same sentence with no
+pack at all (`none-advisory`, the control), and the same items under a heading that classifies them as
+records of failures rather than as workspace facts (`full-prohibitive`).
+
+```bash
+# framing: permission to ignore the note, the sentence alone, and the error register
+SOTA_ARMS=none-advisory,full-advisory,full-prohibitive SOTA_LEARN_SAMPLE=128 \
+  SOTA_PREREG=R17-framing pnpm eval:sota
+```
+
+```jsonc
+// poc-sota-bird-framing.json, 350 questions, 5 folds, 2,110 calls, `none` at 54.86%
+[
+  { "arm": "none-advisory",   "mean_pack_ids": 0.00, "accuracy": 0.5286, "delta_pp": -2.00, "p_value": 0.0923 },
+  { "arm": "full",            "mean_pack_ids": 1.81, "accuracy": 0.5086, "delta_pp": -4.00, "p_value": 0.0201 },
+  { "arm": "full-advisory",   "mean_pack_ids": 1.81, "accuracy": 0.5029, "delta_pp": -4.57, "p_value": 0.0052 },
+  { "arm": "full-prohibitive","mean_pack_ids": 1.81, "accuracy": 0.4971, "delta_pp": -5.14, "p_value": 0.0021 }
+]
+```
+
+- **Permission is not the missing ingredient.** Paired against `full`, `full-advisory` is −0.57pp
+  (10 gained, 12 lost, CI [−3.14, +2.00]): the sentence does not recover the block's cost, and the
+  interval excludes a recovery big enough to have been worth writing it.
+- **The sentence has a price.** `none-advisory` is 2.00pp below no memory on its own — a paragraph of
+  instruction costs about what the 1,078-character block costs. Any mitigation that works by adding
+  words has to clear a bar as high as the harm it repairs.
+- **The register moves almost nothing.** Calling the same items records of failures instead of
+  workspace facts lands 0.57pp below the advisory cell and 1.14pp below `full`, inside the interval.
+  What the block says about itself is not what makes it expensive.
+- **`V43-framing-delivered` is worth reading first.** It reports `0/350` for the two reference arms and
+  `350/350` for each of the three that declare a framing: a cell that measured its own control under a
+  second name would show as a delivery failure rather than as a flat delta.
+
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

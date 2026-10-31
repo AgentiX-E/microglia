@@ -218,6 +218,7 @@ describe('parseArms', () => {
   it('defaults to every optional arm plus the two required ones', () => {
     const arms = parseArms(undefined);
     expect([...arms].sort()).toEqual([
+      'anchor-blank',
       'chars-150',
       'chars-1800',
       'chars-2400',
@@ -375,6 +376,7 @@ describe('parseArms', () => {
       'full-late',
       'full-anchored',
       'full-anchored-conditional',
+      'anchor-blank',
       'full-validated',
       'critique',
       'gated',

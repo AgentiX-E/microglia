@@ -253,6 +253,17 @@ export type SqlArm =
    */
   | 'full-anchored'
   /**
+   * A draft, then a revision with nothing added.
+   *
+   * The control `full-anchored` never had. The anchored cell is the only mechanism in this record
+   * with a positive sign against `full` (+2.86pp pooled over 700 questions, McNemar p = 0.0205), and
+   * it was measured without an arm that writes twice and injects nothing — so the reading could
+   * always have been the second pass rather than the note. `full-onretry` shows why that is not a
+   * pedantic worry: the retry alone gains about a point, and once a blank retry was run the note's
+   * own contribution at retry was zero.
+   */
+  | 'anchor-blank'
+  /**
    * The pack restricted to rules whose statement names a table or column of this database.
    *
    * Across 1,320 rules distilled from BIRD, 77% name nothing in the schema: they are prose
@@ -790,6 +801,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-late': true,
   'full-anchored': true,
   'full-anchored-conditional': true,
+  'anchor-blank': true,
   'full-validated': true,
   critique: true,
   gated: true,

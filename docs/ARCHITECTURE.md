@@ -278,6 +278,15 @@ The study is a package, not a script:
   reductions — the first version of that block recomputed every total inline, and when the two were
   finally unified the gate was found to be comparing a two-decimal publication against an exact
   recomputation to 1e-9, which no run whose ratio fails to terminate could pass.
+- `sota.ts`'s `ARM_STANDING` and the two gates that read it — `V43-framing-delivered` counts, per arm
+  and per fold, how many of that arm's prompts carried the framing it declares, and fails when a
+  declared arm misses one prompt *and* when an undeclared arm carries one; `V44-domain-accounted` fails
+  a run whose store holds more domain-free items than the two instrumented sources of one. Both exist
+  for the same reason: an arm that changes the prompt by one paragraph sits one paragraph away from
+  being its own control, and "the sentence cost nothing" and "the sentence was never sent" are the same
+  number until something counts. The standing is a table over the arm union in `sota.ts` rather than a
+  parameter at the call site, so an arm's rendering can be tested without a database — the dispatch
+  costs three thousand calls and the rendering costs nothing.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

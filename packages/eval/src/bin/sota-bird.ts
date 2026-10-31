@@ -491,17 +491,22 @@ const CHARS_ARMS = [150, 300, 600, 900, 1800, 2400] as const;
 type RetryArm = (typeof RETRY_ARMS)[number];
 
 /**
- * The anchored arms this run was asked for, and how firmly each revises.
+ * The anchored arms this run was asked for, how firmly each revises, and whether it is shown a pack.
  *
- * A list rather than two booleans so the two modes cannot diverge in anything except the
- * instruction: they read the same pack, see the same draft, and differ in one sentence.
+ * A list rather than a set of booleans so the modes cannot diverge in anything except the
+ * instruction: they read the same pack, see the same draft, and differ in one sentence. `injects`
+ * is the third axis and exists because the mechanism's headline number has never had its control:
+ * `anchor-blank` writes the same second pass with no block, so the difference between it and
+ * `full-anchored` is the note rather than the revision.
  */
-const ANCHORED: readonly { readonly arm: ArmName; readonly mode: AnchorMode }[] = (
-  [
-    { arm: 'full-anchored', mode: 'conservative' },
-    { arm: 'full-anchored-conditional', mode: 'conditional' },
-  ] as const
-).filter((entry) => ARMS.has(entry.arm));
+const ANCHORED: readonly { readonly arm: ArmName; readonly mode: AnchorMode; readonly injects: boolean }[] =
+  (
+    [
+      { arm: 'full-anchored', mode: 'conservative', injects: true },
+      { arm: 'full-anchored-conditional', mode: 'conditional', injects: true },
+      { arm: 'anchor-blank', mode: 'conservative', injects: false },
+    ] as const
+  ).filter((entry) => ARMS.has(entry.arm));
 
 /** One entry per fold in which the deletion arm ran. */
 const validations: (Awaited<ReturnType<typeof validateMemory>> & { fold: number })[] = [];
@@ -3814,6 +3819,10 @@ async function runFold(
       }
       const row = evalRows[position] as BirdRow;
       for (const anchoredArm of ANCHORED) {
+        // The blank control shows the draft and nothing else. `anchorPromptFor` renders the empty
+        // pack as no block *and* no instruction about one, which is the question this arm asks:
+        // what is a second pass worth on its own?
+        const shown = anchoredArm.injects ? pack : undefined;
         batch.push({
           position,
           arm: anchoredArm.arm,
@@ -3823,12 +3832,12 @@ async function runFold(
               evidence: row.evidence,
               ddl: schemaSql(dataset.dbPath(row.db_id)),
               draft: draft.text,
-              pack: pack.rendered,
+              pack: shown?.rendered ?? '',
             },
             anchoredArm.mode,
           ),
-          packIds: pack.ids.length,
-          packChars: pack.rendered.length,
+          packIds: shown?.ids.length ?? 0,
+          packChars: shown?.rendered.length ?? 0,
         });
       }
     }

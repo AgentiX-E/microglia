@@ -195,6 +195,23 @@ default admits 1.83. A dose response is read in `mean_pack_ids`, never in the bu
 0.29 items per question is 71% control, and its interval cannot bound a per-item effect better than
 about ±5pp; the number to read before any delta from a reduced budget.
 
+**Standing** — what the prompt says the model may do with a block of knowledge: whether it is
+reference data it may disregard, or a record of failures it should avoid repeating. It is a property of
+the *prompt*, not of the store, so changing it changes nothing about what was learned. Measured once
+(R17): permission to disregard a block cost 0.57pp against the same block without it, and the sentence
+that grants permission cost 2.00pp on its own when there was no block to disregard.
+
+**Framing axis** — the set of dimensions along which the same knowledge can be presented: the register
+(fact or recorded error), the standing (asserted or defeasible), and the label. One of the four axes
+this project has closed, with content, quantity and position. That it is closed is itself a result: the
+harm survived every re-description of the same text, which is why the remaining candidates are
+mechanisms that change *when* knowledge arrives rather than *how* it reads.
+
+**Anchored** — a delivery order in which the model drafts an answer first and then revises it against
+the block, instead of reading the block before the question. The only mechanism in this record with a
+positive sign against plain injection (+2.86pp pooled over 700 questions, p = 0.0205), and the reason
+the store's usefulness is now stated as conditional on an existing draft.
+
 **Precision (knowledge)** — the share of active rules whose payload matches the reference policy on a
 probe grid of every context they claim. Separates "learned a lot" from "learned the right thing".
 
