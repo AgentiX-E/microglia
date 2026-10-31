@@ -1206,6 +1206,59 @@ p = 1.00). A gate that leaves nothing is not a filter.
    transfer wrote its pairs into a record the artefact does not serialise, and published a rate with
    no pairs behind it; the gate exists so that this cannot happen silently again.
 
+### 13.6 Which substrate: a sentence, or the pair it was read from?
+
+Everything above measures one substrate: the **rule**, one declarative sentence about the workspace.
+The other substrate is the **repair** — three sentences that compare the failed attempt with the
+correction: what it did, why that returns a different answer, what replaced it. Both are built from
+the same corrections by the same pipeline and differ in one instruction, which is what makes them
+comparable.
+
+```bash
+# both stores are probed, with one shared control per question
+SOTA_ARMS=full,full-verified,full-repair-verified \
+SOTA_LEARN_SAMPLE=128 SOTA_TRANSFER_TARGETS=0 pnpm eval:sota
+```
+
+Read `rule_probe_pair`. It is the same question asked of both stores, paired by source question:
+
+```jsonc
+// poc-sota-bird-substrate.json, 350 questions, 5 folds, 2,490 calls, 303 paired
+{ "left": "rule", "right": "repair", "shared": 303, "holes": 0,
+  "both": 83, "only_left": 10, "only_right": 80, "neither": 130,
+  "left_rate": 0.3069, "right_rate": 0.538, "delta_pp": 23.10, "p": 1.05e-14,
+  "verdict": "right", "left_exclusive": 0, "right_exclusive": 0 }
+```
+
+- **`left_rate` / `right_rate`** are the shares of the source cases each store reproduced with itself
+  in the prompt. The pair wins by **+23.1pp**: 80 cases the sentence could not reproduce and the
+  account could, against 10 the other way.
+- **Why paired.** Two independent rates of 31% and 54% would each carry an interval; on the same
+  questions the test uses only where the two disagree, which is what makes `p = 1e-14` a reading
+  rather than an arithmetic exercise.
+- **`holes` and the two exclusive counts** are the questions no test could pair. Here all three are
+  zero because both stores held a rule for all 303 corrected cases — when they are not, V36 makes the
+  size of the exclusion a reading, because the paired set is chosen by the stores.
+- **One control, shared.** The blank retry prompt does not depend on the store, so it is measured once
+  per question and reused. Re-asking would re-sample the endpoint, and 16.4% of questions come back
+  with a different query under the same prompt.
+
+**The two numbers have to be read together, because they point opposite ways.** The account
+reproduces twice as much of what it was learned from, and `full-repair-verified` — the repair store
+under the same admission rule — answered **52.86% against 53.14%** (−0.29pp, one question) while
+carrying 0.31 items per question. So the substrate fixes the *extraction* and not the *product*: what
+a store can reproduce is not what it can teach, and the next question is transfer, not distillation.
+
+**Three ways to misread it.**
+
+1. `verdict: "right"` is about reproduction, not accuracy. Both arms are within ±3pp of no memory, and
+   the paired comparison was never designed to answer the accuracy question.
+2. The 1,200-character pack budget is the controlled quantity, not the item count. An account is
+   longer than a sentence, so a pack holds fewer of them; that is the substrate's cost, and it is
+   counted in `pack_kept` (109 items against 127).
+3. `broke` did not fall (11 against 10 of 303). A better extraction is not a safer one, and the gate
+   is what keeps the difference out of the product.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

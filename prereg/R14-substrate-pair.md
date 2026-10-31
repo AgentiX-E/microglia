@@ -111,3 +111,37 @@ substrate that reproduces its own corrections better is still a substrate whose 
 be measured: R13 put the sentence at 7.3% repair against 50% damage, and nothing in this design says
 whether the pair does better on questions the store was not written from. That measurement is the one
 that follows, and it needs this one to be positive to be worth buying.
+
+## Outcome
+
+Dispatch `41165067200`, artefact `eval/results/poc-sota-bird-substrate.json`: 350 questions, 5 folds,
+2,490 calls, 1 retry, 0 timeouts, 0 call failures. Every gate passes, including the four this
+iteration added.
+
+| Reading | Value | Predicted | |
+|---|---|---|---|
+| paired source questions | 303 of 303 shared, 0 holes, 0 exclusive | V35 satisfied | ✅ |
+| rule substrate, reproduced | **30.69%** (93 of 303) | — | — |
+| repair substrate, reproduced | **53.80%** (163 of 303) | — | — |
+| paired delta | **+23.10pp**, p = 1.05e-14, verdict `right` | ≥ +10pp, p < 0.05 | ✅ |
+| discordant pairs | 10 to the rule, 80 to the repair | — | — |
+| `broke` | 11 rule, 10 repair | not lower under repair | ✅ (by one case) |
+| admission | 118 of 590 (20.0%) rule, 128 of 303 (42.2%) repair | — | — |
+| rules that broke their own source | 22 (3.7%) rule, 10 (3.3%) repair | — | — |
+| items without a home database | 96 of 590 (16.3%) rule, 32 of 303 (10.6%) repair | 8–20% | ✅ |
+| `full-repair-verified` | 52.86% vs 53.14% — −0.29pp, 0.31 items/question | \|Δ\| ≤ 3pp | ✅ |
+
+Five folds, five positive deltas: +23.08, +22.95, +22.03, +28.81, +18.64pp, each p < 0.01 on its own.
+
+**The prediction held and the product did not move.** The account reproduces nearly twice as much of
+what it was learned from, and the gated arm built from it answers one question differently out of 350.
+That is not a contradiction — it is the separation this iteration was designed to make: reproduction
+is a property of the extraction, and the arm's cell is a property of what the extraction is worth on
+questions the store was not written from. The refutation clause for Δ ≤ 0pp did not fire; the sentence
+that follows from a +23pp reading, *the substrate is the constraint*, does not survive the arm.
+
+**What this changes about R13's conclusion.** R13 wrote that a sentence about a correction loses the
+query pair, and R14 confirms that at the level the claim was made — a pair-rendered account
+reproduces 23pp more of its own cases. R13's *product* reading (7.3% repair against 50% damage) was
+not retested here and remains the number that matters for deployment. The next measurement is the
+repair substrate's transfer, because extraction is now the one explanation this iteration removes.

@@ -261,6 +261,14 @@ The study is a package, not a script:
   is the projection from folds to pairs, and it is a function rather than a `flatMap` in the report
   because the first version of it wrote the pairs into a record the artefact does not serialise —
   `V33-transfer-ledger` now fails a run whose file carries the summary without them.
+- `probe-pair.ts` — two stores over the same corrections, asked the same question. `compareSubstrates`
+  pairs the two probes on the source questions both stores covered and runs McNemar's exact test over
+  the discordant pairs; `reproducedBy` is the one place a verdict becomes a boolean, and it is a
+  `Record` over the verdict union so a new verdict cannot be silently absent from the count. The
+  exclusive questions and the holes are counted rather than absorbed, because an intersection chosen
+  by the stores reports a rate over a subset nobody designed. `poolSubstrates` adds the folds up and
+  recomputes the rates from the summed cells instead of averaging per-fold rates. `SUBSTRATE_FLOOR`
+  keeps a small paired set a direction.
 - `stats.ts` — paired McNemar with a bootstrap interval.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.

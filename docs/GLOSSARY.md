@@ -436,6 +436,23 @@ without a control there is no denominator, so the trial is `unmeasured`, is coun
 recorded as `false`, which put the trial in the informative set and credited the rule with work nobody
 measured.
 
+**Substrate** — What a correction is turned into before it is stored. The *rule* substrate is one
+declarative sentence about the workspace; the *repair* substrate is three sentences that compare the
+failed attempt with the correction — what it did, why that returns a different answer, what replaced
+it. Both are built from the same events by the same pipeline and differ in one instruction, which is
+what makes them comparable at all.
+
+**Paired substrate comparison** — Both stores asked to reproduce the *same* source question, with one
+shared control, and compared with McNemar's exact test over the discordant pairs. Two independent
+rates of 20% and 26% at n ≈ 300 carry intervals wide enough to overlap; on the same questions the test
+uses only where they disagree. The questions only one store covered are counted and gated (V36),
+because an intersection chosen by the stores is not a set anyone designed.
+
+**Shared control** — The blank retry verdict for a source question, measured once and reused by every
+substrate. The blank prompt is built from the question, the attempt and the observed failure — none of
+which depend on the store — so re-asking it would only re-sample the endpoint: 16.4% of questions come
+back with a different query under the same prompt. A hole is carried as a hole rather than re-asked.
+
 **Prefetch** — The optional second phase of an interpreter: told the batch's contexts before the first
 claim is applied, it may pay the calls' round trips concurrently, while the claims themselves are
 still applied in corpus order. The prompt for a claim depends only on its own event, which is what
