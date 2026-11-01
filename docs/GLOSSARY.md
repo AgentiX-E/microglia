@@ -122,6 +122,34 @@ clean test of generalisation, because everything else can be memorised per domai
 **McNemar test** — the exact paired test used to compare arms, because the outcomes are paired
 (correct/incorrect on the same question) and the sample is small.
 
+**Out-of-sample** — measured on questions the hypothesis was not formed on. In this project the split
+that supplies it is BIRD **train**: 9,428 questions over 69 databases, none of which dev or Mini-Dev
+contains, restricted by the manifest to 7,829 over 58 for wall-clock reasons and dispatched at 7,000.
+Mini-Dev is *not* out of sample — 496 of its 500 questions are dev questions — and neither is any
+subset of dev, because the hypothesis was formed on all 1,534.
+
+**Clustered interval** — a percentile interval whose resampling unit is the database rather than the
+question. Questions inside one database are not independent: one package of rules reaches all of them,
+so resampling them as if they were shrinks the interval by roughly the square root of the cluster size.
+This project reports the clustered interval for any claim that decides something, and keeps the
+question-level one only as a comparison. It is the check that closed R32's first axis and, separately,
+the one the out-of-sample headline had to pass before it was quoted.
+
+**Fold sign test** — the exact two-sided binomial over how many cross-fitted folds point in the pooled
+direction. Five folds cannot reach p < 0.05 however unanimous they are — the floor is 0.0625 — so this
+is reported beside the interval rather than instead of it, and the floor is stated rather than rounded.
+
+**Imported name** — a table or column that appears in a generated query and in neither the question nor
+the bare attempt at it. The one covariate in this project that separates help from harm: questions whose
+memory query imports one run −6.57pp out of sample against −0.22pp for the rest, and they are 7.8% of
+the corpus and 72% of the net harm.
+
+**Read-time filter (the gate)** — the product that survived: discard a generated statement that imports
+a name the request never implied, and execute the bare attempt instead. Chosen because it is a
+comparison against text you already have, not a judgement about a rule. Worth +0.51pp out of sample,
+stable under leave-one-database-out, split-half and a permutation null at p = 0.0002 — and still not a
+net gain, because it only recovers 72% of what the rules cost.
+
 **Mechanism study** — a controlled experiment that isolates whether feedback becomes transferable
 knowledge, holding the generator fixed. Not a benchmark result, and never quoted as one.
 

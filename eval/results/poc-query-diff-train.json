@@ -1,0 +1,646 @@
+{
+  "id": "poc-query-diff",
+  "title": "What the pack did to the query, and whether it separates help from harm",
+  "source": "eval/results/poc-sota-bird-train.json",
+  "sourceGeneratedAt": "2026-11-01T11:25:28.756Z",
+  "registered": "ROADMAP.md §R30 (microglia-docs 20e6154)",
+  "n": 7000,
+  "relation": {
+    "unchanged": 3294,
+    "reworded": 374,
+    "edited": 3332
+  },
+  "kinds": [
+    {
+      "kind": "unchanged",
+      "cell": {
+        "n": 3294,
+        "helped": 2,
+        "harmed": 2,
+        "deltaPp": 0,
+        "halfWidthPp": 0.11900425015179114,
+        "minDetectablePp": 0.17012750455373404,
+        "baselineCorrect": 2155,
+        "baselineAccuracy": 0.6542197935640559,
+        "harmedPerCorrectPp": 0.09280742459396751,
+        "helpedPerWrongPp": 0.17559262510974538,
+        "clusterLowPp": -0.1305909239307868,
+        "clusterHighPp": 0.1621183463928668
+      },
+      "share": 0.4705714285714286
+    },
+    {
+      "kind": "reworded",
+      "cell": {
+        "n": 374,
+        "helped": 1,
+        "harmed": 0,
+        "deltaPp": 0.267379679144385,
+        "halfWidthPp": 0.5240641711229945,
+        "minDetectablePp": 0.7491978609625668,
+        "baselineCorrect": 222,
+        "baselineAccuracy": 0.5935828877005348,
+        "harmedPerCorrectPp": 0,
+        "helpedPerWrongPp": 0.6578947368421052,
+        "clusterLowPp": 0,
+        "clusterHighPp": 0.8902077151335311
+      },
+      "share": 0.05342857142857143
+    },
+    {
+      "kind": "imported-name",
+      "cell": {
+        "n": 548,
+        "helped": 40,
+        "harmed": 76,
+        "deltaPp": -6.569343065693431,
+        "halfWidthPp": 3.8521616868553386,
+        "minDetectablePp": 5.5070189013105395,
+        "baselineCorrect": 247,
+        "baselineAccuracy": 0.45072992700729925,
+        "harmedPerCorrectPp": 30.76923076923077,
+        "helpedPerWrongPp": 13.2890365448505,
+        "clusterLowPp": -11.069418386491558,
+        "clusterHighPp": -2.1834061135371177
+      },
+      "share": 0.07828571428571429
+    },
+    {
+      "kind": "narrowed",
+      "cell": {
+        "n": 348,
+        "helped": 37,
+        "harmed": 29,
+        "deltaPp": 2.2988505747126435,
+        "halfWidthPp": 4.575607837093817,
+        "minDetectablePp": 6.54125161200861,
+        "baselineCorrect": 154,
+        "baselineAccuracy": 0.4425287356321839,
+        "harmedPerCorrectPp": 18.83116883116883,
+        "helpedPerWrongPp": 19.072164948453608,
+        "clusterLowPp": -2.8213166144200628,
+        "clusterHighPp": 7.479224376731302
+      },
+      "share": 0.04971428571428571
+    },
+    {
+      "kind": "widened",
+      "cell": {
+        "n": 542,
+        "helped": 57,
+        "harmed": 63,
+        "deltaPp": -1.107011070110701,
+        "halfWidthPp": 3.9613882387827517,
+        "minDetectablePp": 5.663168288300648,
+        "baselineCorrect": 271,
+        "baselineAccuracy": 0.5,
+        "harmedPerCorrectPp": 23.247232472324722,
+        "helpedPerWrongPp": 21.033210332103323,
+        "clusterLowPp": -5.579399141630901,
+        "clusterHighPp": 3.428571428571429
+      },
+      "share": 0.07742857142857143
+    },
+    {
+      "kind": "reshaped",
+      "cell": {
+        "n": 277,
+        "helped": 21,
+        "harmed": 25,
+        "deltaPp": -1.444043321299639,
+        "halfWidthPp": 4.799049374341345,
+        "minDetectablePp": 6.8606818096451265,
+        "baselineCorrect": 89,
+        "baselineAccuracy": 0.3212996389891697,
+        "harmedPerCorrectPp": 28.08988764044944,
+        "helpedPerWrongPp": 11.170212765957446,
+        "clusterLowPp": -5.9071729957805905,
+        "clusterHighPp": 2.867383512544803
+      },
+      "share": 0.03957142857142857
+    },
+    {
+      "kind": "rewritten",
+      "cell": {
+        "n": 1617,
+        "helped": 29,
+        "harmed": 42,
+        "deltaPp": -0.8039579468150896,
+        "halfWidthPp": 1.0213514876577403,
+        "minDetectablePp": 1.460115749192341,
+        "baselineCorrect": 937,
+        "baselineAccuracy": 0.5794681508967223,
+        "harmedPerCorrectPp": 4.482390608324439,
+        "helpedPerWrongPp": 4.264705882352941,
+        "clusterLowPp": -2.0338983050847457,
+        "clusterHighPp": 0.4010695187165776
+      },
+      "share": 0.231
+    }
+  ],
+  "features": [
+    {
+      "code": "F1",
+      "feature": "memory query introduces a name that neither the baseline query nor the question contains (strict grounding)",
+      "present": {
+        "n": 548,
+        "helped": 40,
+        "harmed": 76,
+        "deltaPp": -6.569343065693431,
+        "halfWidthPp": 3.8521616868553386,
+        "minDetectablePp": 5.5070189013105395,
+        "baselineCorrect": 247,
+        "baselineAccuracy": 0.45072992700729925,
+        "harmedPerCorrectPp": 30.76923076923077,
+        "helpedPerWrongPp": 13.2890365448505,
+        "clusterLowPp": -11.069418386491558,
+        "clusterHighPp": -2.1834061135371177
+      },
+      "absent": {
+        "n": 6452,
+        "helped": 147,
+        "harmed": 161,
+        "deltaPp": -0.21698698078115314,
+        "halfWidthPp": 0.5331348480870601,
+        "minDetectablePp": 0.7621652267040523,
+        "baselineCorrect": 3828,
+        "baselineAccuracy": 0.5933044017358958,
+        "harmedPerCorrectPp": 4.205851619644723,
+        "helpedPerWrongPp": 5.602134146341464,
+        "clusterLowPp": -0.7151196730881495,
+        "clusterHighPp": 0.30558789289871946
+      },
+      "gapPp": -6.3523560849122775,
+      "gapHalfWidthPp": 3.888879328022532,
+      "fisherP": 0.015840396304260013,
+      "clusterLowPp": -10.989105601459691,
+      "clusterHighPp": -1.9215082026647332,
+      "resolves": true
+    },
+    {
+      "code": "F2",
+      "feature": "the same, under morphological grounding — a question word of three letters is a prefix of the name",
+      "present": {
+        "n": 415,
+        "helped": 31,
+        "harmed": 59,
+        "deltaPp": -6.746987951807229,
+        "halfWidthPp": 4.480528347419294,
+        "minDetectablePp": 6.405326749729011,
+        "baselineCorrect": 180,
+        "baselineAccuracy": 0.43373493975903615,
+        "harmedPerCorrectPp": 32.77777777777778,
+        "helpedPerWrongPp": 13.191489361702127,
+        "clusterLowPp": -12.38390092879257,
+        "clusterHighPp": -1.3916500994035785
+      },
+      "absent": {
+        "n": 6585,
+        "helped": 156,
+        "harmed": 178,
+        "deltaPp": -0.3340926347760061,
+        "halfWidthPp": 0.5439682170037091,
+        "minDetectablePp": 0.7776525224716291,
+        "baselineCorrect": 3895,
+        "baselineAccuracy": 0.5914958238420653,
+        "harmedPerCorrectPp": 4.569961489088575,
+        "helpedPerWrongPp": 5.799256505576208,
+        "clusterLowPp": -0.809180520818008,
+        "clusterHighPp": 0.13566475731082303
+      },
+      "gapPp": -6.412895317031223,
+      "gapHalfWidthPp": 4.513428374654689,
+      "fisherP": 0.04214961372304018,
+      "clusterLowPp": -12.153522292260007,
+      "clusterHighPp": -0.8446166757552201,
+      "resolves": true
+    },
+    {
+      "code": "F3",
+      "feature": "memory query introduces a name that the question does contain (the comparison half of F1)",
+      "present": {
+        "n": 133,
+        "helped": 12,
+        "harmed": 17,
+        "deltaPp": -3.7593984962406015,
+        "halfWidthPp": 7.93603234735611,
+        "minDetectablePp": 11.345287059842766,
+        "baselineCorrect": 57,
+        "baselineAccuracy": 0.42857142857142855,
+        "harmedPerCorrectPp": 29.82456140350877,
+        "helpedPerWrongPp": 15.789473684210526,
+        "clusterLowPp": -13.461538461538462,
+        "clusterHighPp": 6.349206349206349
+      },
+      "absent": {
+        "n": 6867,
+        "helped": 175,
+        "harmed": 220,
+        "deltaPp": -0.655307994757536,
+        "halfWidthPp": 0.5672670678917943,
+        "minDetectablePp": 0.8109603695065344,
+        "baselineCorrect": 4018,
+        "baselineAccuracy": 0.5851172273190621,
+        "harmedPerCorrectPp": 5.47536087605774,
+        "helpedPerWrongPp": 6.142506142506143,
+        "clusterLowPp": -1.2290167865707433,
+        "clusterHighPp": -0.07550588945937783
+      },
+      "gapPp": -3.1040905014830655,
+      "gapHalfWidthPp": 7.956280622539472,
+      "fisherP": 0.8475014147525672,
+      "clusterLowPp": -12.895205748213332,
+      "clusterHighPp": 7.259167882763013,
+      "resolves": false
+    },
+    {
+      "code": "F4",
+      "feature": "memory query adds a table the baseline did not read",
+      "present": {
+        "n": 355,
+        "helped": 28,
+        "harmed": 45,
+        "deltaPp": -4.788732394366197,
+        "halfWidthPp": 4.717252772062636,
+        "minDetectablePp": 6.743746054754851,
+        "baselineCorrect": 152,
+        "baselineAccuracy": 0.428169014084507,
+        "harmedPerCorrectPp": 29.605263157894733,
+        "helpedPerWrongPp": 13.793103448275861,
+        "clusterLowPp": -11.89710610932476,
+        "clusterHighPp": 2.168021680216802
+      },
+      "absent": {
+        "n": 6645,
+        "helped": 159,
+        "harmed": 192,
+        "deltaPp": -0.4966139954853273,
+        "halfWidthPp": 0.5526047890230636,
+        "minDetectablePp": 0.7899992953278695,
+        "baselineCorrect": 3923,
+        "baselineAccuracy": 0.5903686982693754,
+        "harmedPerCorrectPp": 4.894213612031609,
+        "helpedPerWrongPp": 5.841293166789126,
+        "clusterLowPp": -1.0418153275296134,
+        "clusterHighPp": 0.07377895824110964
+      },
+      "gapPp": -4.29211839888087,
+      "gapHalfWidthPp": 4.749510055614563,
+      "fisherP": 0.3017646308507438,
+      "clusterLowPp": -11.491816040610146,
+      "clusterHighPp": 2.5075540380784562,
+      "resolves": false
+    },
+    {
+      "code": "F5",
+      "feature": "memory query adds at least one conjunction, which is the narrowing direction",
+      "present": {
+        "n": 237,
+        "helped": 18,
+        "harmed": 26,
+        "deltaPp": -3.375527426160337,
+        "halfWidthPp": 5.485725391642686,
+        "minDetectablePp": 7.842348238460617,
+        "baselineCorrect": 94,
+        "baselineAccuracy": 0.39662447257383965,
+        "harmedPerCorrectPp": 27.659574468085108,
+        "helpedPerWrongPp": 12.587412587412588,
+        "clusterLowPp": -9.31174089068826,
+        "clusterHighPp": 2.6515151515151514
+      },
+      "absent": {
+        "n": 6763,
+        "helped": 169,
+        "harmed": 211,
+        "deltaPp": -0.6210261718172408,
+        "halfWidthPp": 0.5649480087483534,
+        "minDetectablePp": 0.8076450614861664,
+        "baselineCorrect": 3981,
+        "baselineAccuracy": 0.5886440928581991,
+        "harmedPerCorrectPp": 5.300175835217282,
+        "helpedPerWrongPp": 6.074766355140187,
+        "clusterLowPp": -1.2017804154302671,
+        "clusterHighPp": -0.07153075822603719
+      },
+      "gapPp": -2.7545012543430962,
+      "gapHalfWidthPp": 5.5147392798845924,
+      "fisherP": 0.7489899137578889,
+      "clusterLowPp": -8.661346135155966,
+      "clusterHighPp": 3.1995919771685797,
+      "resolves": false
+    },
+    {
+      "code": "F6",
+      "feature": "the pack changed the query at all",
+      "present": {
+        "n": 3706,
+        "helped": 185,
+        "harmed": 235,
+        "deltaPp": -1.3491635186184565,
+        "halfWidthPp": 1.0838652726001516,
+        "minDetectablePp": 1.5494849458294007,
+        "baselineCorrect": 1920,
+        "baselineAccuracy": 0.5180787911494873,
+        "harmedPerCorrectPp": 12.239583333333332,
+        "helpedPerWrongPp": 10.358342665173573,
+        "clusterLowPp": -2.3829315599889167,
+        "clusterHighPp": -0.3249187703074231
+      },
+      "absent": {
+        "n": 3294,
+        "helped": 2,
+        "harmed": 2,
+        "deltaPp": 0,
+        "halfWidthPp": 0.11900425015179114,
+        "minDetectablePp": 0.17012750455373404,
+        "baselineCorrect": 2155,
+        "baselineAccuracy": 0.6542197935640559,
+        "harmedPerCorrectPp": 0.09280742459396751,
+        "helpedPerWrongPp": 0.17559262510974538,
+        "clusterLowPp": -0.1305909239307868,
+        "clusterHighPp": 0.1621183463928668
+      },
+      "gapPp": -1.3491635186184565,
+      "gapHalfWidthPp": 1.0903788060590645,
+      "fisherP": 1,
+      "clusterLowPp": -2.3884008359441307,
+      "clusterHighPp": -0.3139157051663924,
+      "resolves": true
+    }
+  ],
+  "discordant": {
+    "total": 424,
+    "importing": 116,
+    "unexplained": 308,
+    "unexplainedShare": 0.7264150943396226,
+    "largestBucket": "unexplained",
+    "largestCount": 308
+  },
+  "gates": [
+    {
+      "mode": "strict",
+      "discarded": 548,
+      "discardedShare": 0.07828571428571429,
+      "gated": {
+        "n": 7000,
+        "helped": 147,
+        "harmed": 161,
+        "deltaPp": -0.2,
+        "halfWidthPp": 0.4913980056939588,
+        "minDetectablePp": 0.7024985775277921,
+        "baselineCorrect": 4075,
+        "baselineAccuracy": 0.5821428571428572,
+        "harmedPerCorrectPp": 3.950920245398773,
+        "helpedPerWrongPp": 5.0256410256410255,
+        "clusterLowPp": -0.6667573819567287,
+        "clusterHighPp": 0.26702269692923897
+      },
+      "measured": {
+        "n": 7000,
+        "helped": 187,
+        "harmed": 237,
+        "deltaPp": -0.7142857142857143,
+        "halfWidthPp": 0.576555287895272,
+        "minDetectablePp": 0.8242387330013021,
+        "baselineCorrect": 4075,
+        "baselineAccuracy": 0.5821428571428572,
+        "harmedPerCorrectPp": 5.815950920245399,
+        "helpedPerWrongPp": 6.3931623931623935,
+        "clusterLowPp": -1.275121275121275,
+        "clusterHighPp": -0.18442332245708612
+      },
+      "improvementPp": 0.5142857142857142,
+      "p": 0.4589042530492732,
+      "significant95": false,
+      "resolvable": false
+    },
+    {
+      "mode": "morphological",
+      "discarded": 415,
+      "discardedShare": 0.05928571428571429,
+      "gated": {
+        "n": 7000,
+        "helped": 156,
+        "harmed": 178,
+        "deltaPp": -0.3142857142857143,
+        "halfWidthPp": 0.5117186727099179,
+        "minDetectablePp": 0.7315488372108111,
+        "baselineCorrect": 4075,
+        "baselineAccuracy": 0.5821428571428572,
+        "harmedPerCorrectPp": 4.368098159509202,
+        "helpedPerWrongPp": 5.333333333333334,
+        "clusterLowPp": -0.7669928590320021,
+        "clusterHighPp": 0.13757050488375291
+      },
+      "measured": {
+        "n": 7000,
+        "helped": 187,
+        "harmed": 237,
+        "deltaPp": -0.7142857142857143,
+        "halfWidthPp": 0.576555287895272,
+        "minDetectablePp": 0.8242387330013021,
+        "baselineCorrect": 4075,
+        "baselineAccuracy": 0.5821428571428572,
+        "harmedPerCorrectPp": 5.815950920245399,
+        "helpedPerWrongPp": 6.3931623931623935,
+        "clusterLowPp": -1.275121275121275,
+        "clusterHighPp": -0.18442332245708612
+      },
+      "improvementPp": 0.4,
+      "p": 0.2504901076410985,
+      "significant95": false,
+      "resolvable": false
+    }
+  ],
+  "multiplicity": {
+    "familySize": 5,
+    "alpha": 0.05,
+    "bonferroniAlpha": 0.01,
+    "survivors": []
+  },
+  "ruleLevel": {
+    "rules": 956,
+    "rulesNaming": 80,
+    "namingShare": 0.08368200836820083,
+    "sentences": 239,
+    "sentencesNaming": 20,
+    "present": {
+      "n": 456,
+      "helped": 16,
+      "harmed": 24,
+      "deltaPp": -1.7543859649122806,
+      "halfWidthPp": 2.7184492166359755,
+      "minDetectablePp": 3.886272808680614,
+      "baselineCorrect": 278,
+      "baselineAccuracy": 0.6096491228070176,
+      "harmedPerCorrectPp": 8.633093525179856,
+      "helpedPerWrongPp": 8.98876404494382,
+      "clusterLowPp": -3.821656050955414,
+      "clusterHighPp": 0.6578947368421052
+    },
+    "absent": {
+      "n": 6544,
+      "helped": 171,
+      "harmed": 213,
+      "deltaPp": -0.6418092909535452,
+      "halfWidthPp": 0.586919302671764,
+      "minDetectablePp": 0.8390550439215728,
+      "baselineCorrect": 3797,
+      "baselineAccuracy": 0.5802261613691931,
+      "harmedPerCorrectPp": 5.609691861996313,
+      "helpedPerWrongPp": 6.224972697488169,
+      "clusterLowPp": -1.2323658180638883,
+      "clusterHighPp": -0.08526360665056132
+    },
+    "agreement": {
+      "both": 58,
+      "queryOnly": 490,
+      "ruleOnly": 398,
+      "neither": 6054,
+      "precision": 0.12719298245614036,
+      "recall": 0.10583941605839416
+    }
+  },
+  "vocabulary": [
+    {
+      "name": "c",
+      "count": 27
+    },
+    {
+      "name": "person",
+      "count": 24
+    },
+    {
+      "name": "code",
+      "count": 18
+    },
+    {
+      "name": "bioguide_id",
+      "count": 17
+    },
+    {
+      "name": "name",
+      "count": 17
+    },
+    {
+      "name": "country",
+      "count": 14
+    },
+    {
+      "name": "id",
+      "count": 14
+    },
+    {
+      "name": "productid",
+      "count": 14
+    },
+    {
+      "name": "employees",
+      "count": 11
+    },
+    {
+      "name": "city",
+      "count": 10
+    },
+    {
+      "name": "firstname",
+      "count": 10
+    },
+    {
+      "name": "callcenterlogs",
+      "count": 9
+    },
+    {
+      "name": "characters",
+      "count": 9
+    },
+    {
+      "name": "description",
+      "count": 9
+    },
+    {
+      "name": "lastname",
+      "count": 9
+    },
+    {
+      "name": "complaint id",
+      "count": 8
+    },
+    {
+      "name": "employeeid",
+      "count": 8
+    },
+    {
+      "name": "film_id",
+      "count": 8
+    },
+    {
+      "name": "orderdetails",
+      "count": 8
+    },
+    {
+      "name": "rand client",
+      "count": 8
+    }
+  ],
+  "criteria": [
+    {
+      "code": "Q1",
+      "criterion": "The identifier covariate separates help from harm: the gap exceeds its own 95% half-width and p < 0.05",
+      "actual": "gap -6.35pp ±3.89, p=0.0158",
+      "ok": true
+    },
+    {
+      "code": "Q2",
+      "criterion": "Most discordant cases have no identifiable cause in the query diff",
+      "actual": "308 of 424 flips unexplained (72.6%), largest bucket unexplained at 308",
+      "ok": true
+    },
+    {
+      "code": "Q3",
+      "criterion": "The separation survives the looser grounding rule, so it is not an artefact of the tokeniser",
+      "actual": "gap -6.41pp ±4.51 over 415 questions",
+      "ok": true
+    },
+    {
+      "code": "Q4",
+      "criterion": "The separation is not a difficulty artefact: the memory arm destroys already-correct queries more often in the importing group",
+      "actual": "destroyed 30.77% vs 4.21% of already-correct queries; baseline accuracies differ by 14.26pp",
+      "ok": true
+    },
+    {
+      "code": "Q5",
+      "criterion": "A gate that discards every importing memory query would raise the paired delta",
+      "actual": "-0.71pp → -0.20pp (+0.51pp), discarding 548 of 7000",
+      "ok": true
+    }
+  ],
+  "confirmed": [
+    "Q1",
+    "Q2",
+    "Q3",
+    "Q4",
+    "Q5"
+  ],
+  "refuted": false,
+  "unmeasured": [
+    {
+      "category": "pruned-name",
+      "registered": "a table or column the rule named that the schema had pruned",
+      "reason": "the committed record predates the name fields; per_case carries schemaTables as counts (kept, total, pruned) only",
+      "nearest": "F4",
+      "difference": "F4 measures a table added to the query, not a name the pruning removed from the schema"
+    }
+  ],
+  "notes": [
+    "The classifier reads the two candidate queries, the question and the evidence — the same inputs the model saw — and never the gold SQL, the gold result or the scorer. A covariate that peeked would separate help from harm by construction.",
+    "F1 reads the emitted query and is therefore post-treatment: it can describe what happened but it cannot be applied before a query exists. ruleLevel is the pre-treatment version — does the pack text name an identifier the question does not — and it is the only form of the gate that could ship as an admission filter without a second generation. It is reported separately from features because it is a different hypothesis with a different implementation cost, not a seventh variant of F1.",
+    "Six features were tested and two survive a Bonferroni threshold of 0.05/5; F1 and F2 are one hypothesis under two grounding rules, so the family is five and not six. The registered criterion Q1 names 0.05 and is left at 0.05 — the adjusted threshold travels beside it rather than replacing it, because a bar lowered after the result is not a bar.",
+    "F1 is the primary test. F2 repeats it under a looser grounding rule so that the choice of rule is visible: a separation that survives both is not an artefact of the tokeniser, and one that survives only F1 is.",
+    "harmedPerCorrectPp is the stratified rate: damage as a share of questions the no-memory arm already answered correctly. Stratifying on a pre-treatment outcome removes the difficulty confound, because both groups are compared inside a fixed baseline outcome. The importing group is the harder one and still loses, so the confound points against the finding rather than for it.",
+    "Q5 is an in-sample estimate and is labelled as such. The filter was chosen by looking at these 1,534 questions; stage 2 buys the sample that can confirm it, and until then the gate is a measurement, not a shipped behaviour.",
+    "Cases whose two queries are identical cannot flip by construction, so the 129 discordant cases all come from the edited half. That is a property of the record, not a finding, and it is why every rate here is also reported over the whole corpus rather than over the edited subset.",
+    "A group with no discordant pair has an infinite minimum detectable difference rather than a missing one, and JSON renders infinity as null. The 692 questions the pack left untouched are the only place it occurs; helped + harmed === 0 is what distinguishes it from an empty group.",
+    "Regression is exact rather than modelled: for a discarded question the no-pack query and its outcome are already columns in the record, so the gated arm reads them instead of predicting them."
+  ]
+}

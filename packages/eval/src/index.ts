@@ -176,6 +176,7 @@ export {
   chooseArtefact,
   preregIdOf,
   splitNameOf,
+  splitOfName,
   type ArtefactChoice,
 } from './artefacts.js';
 
@@ -398,6 +399,20 @@ export {
 } from './referent.js';
 
 export {
+  OUT_OF_SAMPLE_PREDICTIONS,
+  adjudicateOutOfSample,
+  clusteredDeltaOf,
+  foldSignTestOf,
+  outOfSampleReadingOf,
+  sideBySideOf,
+  type CellPair,
+  type ClusteredDelta,
+  type FoldSignTest,
+  type OutOfSampleReading,
+  type PredictionVerdict,
+} from './out-of-sample.js';
+
+export {
   RELAXED_MARKERS,
   SEPARATION_BAR as RULE_FORM_SEPARATION_BAR,
   STRICT_MARKERS,
@@ -466,12 +481,15 @@ export {
 export {
   HALF_FLOOR_PP,
   halvesOf,
+  stabilityFramingOf,
   stabilityOf,
   type GateStability,
   type HalfReading,
   type JackknifeRow,
   type PermutationReading,
   type StabilityCriterion,
+  type StabilityFraming,
+  type StabilityGap,
   type StabilityOptions,
 } from './gate-stability.js';
 

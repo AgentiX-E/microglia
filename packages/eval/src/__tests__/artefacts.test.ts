@@ -9,6 +9,7 @@ import {
   chooseArtefact,
   preregIdOf,
   splitNameOf,
+  splitOfName,
   TRAIN_SPLIT_NAME,
 } from '../artefacts.js';
 import { PUBLISHED_CELLS, publishedCell } from '../reproduction.js';
@@ -65,8 +66,26 @@ describe('what a split calls itself', () => {
     expect(catalogue).toEqual([]);
   });
 
-  it('gives each split its own artefact file', () => {
-    // Three splits writing one name is how R24 lost a cell: the second run overwrote the file the
+  it('reads a split back out of the name an artefact reports about itself', () => {
+    // `splitNameOf` had no reader for a year and every reading that needed to know its corpus
+    // spelled the answer as a constant. Two of them spelled it as a claim about the corpus, and
+    // both claims were true only of dev — so a reading pointed at train asserted the opposite of
+    // what it had just measured, in its own artefact, where nothing checks prose.
+    for (const split of ['minidev', 'dev', 'train'] as const) {
+      expect(splitOfName(splitNameOf(split))).toBe(split);
+    }
+  });
+
+  it('answers unknown rather than dev when an artefact does not say', () => {
+    // A default of `dev` here would be the same defect in a new place: the reading would inherit
+    // an out-of-sample claim from a missing field.
+    expect(splitOfName(undefined)).toBe('unknown');
+    expect(splitOfName(null)).toBe('unknown');
+    expect(splitOfName('')).toBe('unknown');
+    expect(splitOfName('BIRD test')).toBe('unknown');
+  });
+
+  it('gives each split its own artefact file', () => {    // Three splits writing one name is how R24 lost a cell: the second run overwrote the file the
     // first one's recomputation gate reads, and nothing failed at the write.
     const ids = [artefactIdOf('minidev'), artefactIdOf('dev'), artefactIdOf('train')];
     expect(new Set(ids).size).toBe(3);

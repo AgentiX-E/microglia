@@ -7,7 +7,13 @@
  * corpus where only one half gains. A stability check that cannot fail is not a check.
  */
 import { describe, expect, it } from 'vitest';
-import { halvesOf, stabilityOf, HALF_FLOOR_PP, type GateStability } from '../gate-stability.js';
+import {
+  halvesOf,
+  stabilityFramingOf,
+  stabilityOf,
+  HALF_FLOOR_PP,
+  type GateStability,
+} from '../gate-stability.js';
 import { discardSetOf, gateReadingOf, improvementOf, type DiffCase } from '../query-diff.js';
 import { diffQueries } from '../sql-diff.js';
 
@@ -205,5 +211,61 @@ describe('stabilityOf', () => {
     expect(HALF_FLOOR_PP).toBe(0);
     const reading = stabilityOf(carried(), { permutations: 20, resamples: 50 });
     expect(reading.criteria.find((entry) => entry.code === 'S3')?.criterion).toContain('0.0pp');
+  });
+});
+
+describe('stabilityFramingOf', () => {
+  const base = { observedPp: 0.5142857142857142, discarded: 548, n: 7000, databases: 58 };
+
+  it('puts the number it read into the title, not the number the registration predicted', () => {
+    // The title used to be a constant: "Whether the read-time gate’s +1.30pp is …". Pointed at the
+    // out-of-sample split, the artefact then reported a correctly measured 0.51pp under a heading
+    // asserting 1.30pp, and no check looked at prose.
+    const framing = stabilityFramingOf({ ...base, split: 'train' });
+    expect(framing.title).toContain('0.51pp');
+    expect(framing.title).not.toContain('1.30pp');
+  });
+
+  it('refuses to call a dev reading out of sample', () => {
+    const framing = stabilityFramingOf({ ...base, split: 'dev' });
+    expect(framing.unmeasured).toHaveLength(1);
+    expect(framing.unmeasured[0]?.category).toBe('out-of-sample');
+    expect(framing.unmeasured[0]?.reason).toContain('every question here was in the corpus');
+  });
+
+  it('does not repeat the in-sample caveat over a corpus that is not the one the hypothesis came from', () => {
+    // Over train the old clause asserted that no split of the corpus is out of sample, which is the
+    // exact negation of what the split is for. The gap it should name there is the causal one: the
+    // reading measures how much the gate recovers, not through which mechanism.
+    const framing = stabilityFramingOf({ ...base, split: 'train' });
+    expect(framing.unmeasured).toHaveLength(1);
+    expect(framing.unmeasured[0]?.category).toBe('causal');
+    expect(framing.unmeasured[0]?.reason).not.toContain('every question here was in the corpus');
+  });
+
+  it('counts the databases it was given rather than the eleven dev has', () => {
+    const dev = stabilityFramingOf({ ...base, databases: 11, split: 'dev' });
+    const train = stabilityFramingOf({ ...base, databases: 58, split: 'train' });
+    expect(dev.notes.join(' ')).toContain('11 databases');
+    expect(train.notes.join(' ')).toContain('58 databases');
+    expect(train.notes.join(' ')).not.toContain('eleven databases');
+  });
+
+  it('says unmeasured rather than printing a number it does not have', () => {
+    const framing = stabilityFramingOf({ ...base, observedPp: null, split: 'dev' });
+    expect(framing.title).toContain('unmeasured');
+    expect(framing.title).not.toContain('null');
+  });
+
+  it('names the discarded count in the note that explains where the gated arm comes from', () => {
+    const framing = stabilityFramingOf({ ...base, split: 'train' });
+    expect(framing.notes.join(' ')).toContain('548 discarded questions');
+  });
+
+  it('treats an unnamed corpus as neither dev nor out of sample', () => {
+    // Neither branch may be taken on a guess: `unknown` gets the in-sample caveat because that is
+    // the weaker claim, and the weaker claim is the one that cannot mislead.
+    const framing = stabilityFramingOf({ ...base, split: 'unknown' });
+    expect(framing.unmeasured[0]?.category).toBe('out-of-sample');
   });
 });

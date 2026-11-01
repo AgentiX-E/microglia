@@ -4,7 +4,7 @@ step: R30
 opened: 2026-11-01
 arms: none,full
 sample: 7000
-gates: V31,V32
+gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48
 ---
 
 # R30 stage 2 — the sample that can see one percentage point
@@ -178,3 +178,28 @@ variable and write their artefact beside it. Pointing them at the train artefact
 `POC_RESULT_SUFFIX=train` produces `poc-query-diff-train.json` and its two companions without
 touching the dev evidence CI compares byte for byte. That is the whole analysis path for this
 dispatch: the same code, a different corpus, three readings that can be put side by side.
+
+## Amendment 2 — the registration declared a gate its own text says cannot apply
+
+The protocol gate rejected the first version of this file's front matter after the run:
+
+```
+FAIL eval/results/poc-sota-bird-train.json — prereg/R30-stage2.md: declares V31, which the run
+never emitted; does not name V1, V2, V3, V4, V5, V6, V7, V8, V12, V48, V44, which the run emitted
+```
+
+**V31 is `cell-comparison`.** It re-derives a recorded comparison against a published cell and
+refuses the record if the two disagree. This file's own section "What this run cannot say" says in
+the first line that BIRD publishes no test cell for train and that the split is named so `compareCell`
+cannot file it as a reproduction — so the gate V31 was declared for is the one gate this design has
+already argued cannot run. Declaring it was a copy of the front matter of a dev registration, and the
+contradiction sat in the file for a day because front matter is read by a program and prose is not.
+
+**Corrected to the twelve gates the run actually emitted**, which is the list the lane produces on
+every run of this shape: `V1, V2, V3, V4, V5, V6, V7, V8, V12, V32, V44, V48`. All twelve passed.
+
+**What this amendment does not touch.** The five predictions, the five refutation clauses, the
+selection, the sample, the arms and the cost are unchanged. A gate list says which instruments
+adjudicate a run; it is not an instrument. The audit trail is the point: this is the second
+amendment, both were about the harness rather than about the hypothesis, and both were written down
+with the run's own output beside them.

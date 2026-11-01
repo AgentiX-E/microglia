@@ -9,17 +9,30 @@
  *
  * It reads one committed artefact, writes one, calls no model, opens no database and records no
  * clock, so the workflow can recompute it byte for byte.
+ *
+ * The same file answers the same question on the out-of-sample split, where it is not a stability
+ * check but the estimate itself. Everything the artefact says about its corpus is therefore derived
+ * from the corpus — `stabilityFramingOf` holds that rule and is where the tests point — rather than
+ * written as the dev sentence it used to be.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { corpusOf, stabilityOf, type CommittedArtefact } from '@agentix-e/microglia-eval';
+import {
+  corpusOf,
+  splitOfName,
+  stabilityFramingOf,
+  stabilityOf,
+  type CommittedArtefact,
+} from '@agentix-e/microglia-eval';
 import { writeJson } from './lib.js';
 
 const SOURCE = process.env['STABILITY_SOURCE'] ?? join('eval', 'results', 'poc-sota-bird-dev-R26-channels.json');
 /** The documentation section this reading answers. */
 const REGISTERED = 'ROADMAP.md §R31-stability';
 
-const artefact = JSON.parse(readFileSync(SOURCE, 'utf8')) as CommittedArtefact;
+const artefact = JSON.parse(readFileSync(SOURCE, 'utf8')) as CommittedArtefact & {
+  readonly dataset?: string | null;
+};
 const corpus = corpusOf(artefact);
 
 // Two modes, because §140's headline is the strict one and its robustness check is the other. A
@@ -27,35 +40,26 @@ const corpus = corpusOf(artefact);
 const strict = stabilityOf(corpus.cases, { mode: 'strict' });
 const loose = stabilityOf(corpus.cases, { mode: 'morphological' });
 
+const framing = stabilityFramingOf({
+  observedPp: strict.observedPp,
+  discarded: strict.discarded,
+  n: strict.n,
+  databases: strict.jackknife.length,
+  split: splitOfName(artefact.dataset),
+});
+
 await writeJson('poc-gate-stability', {
   id: 'poc-gate-stability',
-  title: 'Whether the read-time gate’s +1.30pp is a property of the gate or of one database',
+  title: framing.title,
   source: SOURCE,
   sourceGeneratedAt: corpus.generatedAt,
+  dataset: artefact.dataset ?? null,
   registered: REGISTERED,
   n: corpus.cases.length,
   strict,
   loose,
-  /**
-   * What a split-half can and cannot say here, written down because the temptation to over-read it
-   * is strong: both halves were part of the corpus the hypothesis came from, so this is a
-   * stability check and not an out-of-sample test. Only stage 2 is that.
-   */
-  unmeasured: [
-    {
-      category: 'out-of-sample',
-      registered: 'the estimate on questions the hypothesis was not formed on',
-      reason: 'every question here was in the corpus that produced §140, so no split of it is out of sample',
-      nearest: 'S3 (the two halves)',
-      difference: 'S3 says the estimate is stable across sub-samples; it cannot say it reproduces on a new one',
-    },
-  ],
-  notes: [
-    'Leave-one-database-out is the clustering check. Questions within a database are not independent — a rule injected on one is injected on its neighbours — so an estimate carried by a single database would not reproduce at a different mixture, and stage 2 draws a different mixture by construction.',
-    'The permutation test redraws which questions the gate discards, keeping the number discarded fixed. It asks whether the gate finds damaged questions or merely pays the variance of dropping ten percent of the corpus. Sampling is without replacement: with replacement the null would describe a smaller subset than the gate discards, and a wider null flatters the gate.',
-    'The halves are balanced greedily by question count rather than split by hash, because dev has eleven databases of very different sizes and an arbitrary partition can leave one half too small to resolve anything.',
-    'Every number here comes from a closed form over the recorded outcomes: the gated arm reads the no-pack query that already exists for every discarded question. Nothing is resampled except the permutation null and the two bootstrap intervals.',
-  ],
+  unmeasured: framing.unmeasured,
+  notes: framing.notes,
 });
 
 const pct = (value: number | null): string => (value === null ? 'n/a' : value.toFixed(2));

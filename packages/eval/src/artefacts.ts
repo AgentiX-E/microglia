@@ -14,6 +14,7 @@
 import { MicrogliaError } from '@agentix-e/microglia-core';
 import { join } from 'node:path';
 import type { Split } from './bird-data.js';
+import { SPLITS } from './bird-data.js';
 
 /**
  * The artefact each split writes.
@@ -109,6 +110,23 @@ export const TRAIN_SPLIT_NAME = 'BIRD train (out-of-sample)';
 export function splitNameOf(split: Split): string {
   if (split === 'train') return TRAIN_SPLIT_NAME;
   return split === 'dev' ? DEV_SPLIT_NAME : MINIDEV_SPLIT_NAME;
+}
+
+/**
+ * The split an artefact's own `dataset` field names, or `unknown`.
+ *
+ * `splitNameOf` had no reader. Every reading that needed to know which corpus it was looking at
+ * spelled the answer as a constant, and two of them spelled it as a *claim* about the corpus —
+ * "every question here was in the corpus that produced this hypothesis" — which is true of dev and
+ * false of train. A reading pointed at train then asserted the opposite of what it had just
+ * measured, in its own artefact, where nothing checks prose.
+ *
+ * `unknown` is a real answer: an artefact written before the field existed, or by a lane that
+ * overstated its split, must not be silently assumed to be dev.
+ */
+export function splitOfName(name: string | null | undefined): Split | 'unknown' {
+  if (name === null || name === undefined || name === '') return 'unknown';
+  return SPLITS.find((split) => splitNameOf(split) === name) ?? 'unknown';
 }
 
 /** Where a lane's artefact lives, given the split it measured. */

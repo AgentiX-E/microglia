@@ -1,0 +1,522 @@
+{
+  "id": "poc-pack-mediation",
+  "title": "Where the imported name came from: the pack, the schema, or a statement that never ran",
+  "source": "eval/results/poc-sota-bird-train.json",
+  "sourceGeneratedAt": "2026-11-01T11:25:28.756Z",
+  "registered": "ROADMAP.md §R31-precondition",
+  "corpus": {
+    "cases": 7000,
+    "importing": 548,
+    "notImporting": 6452,
+    "reconstructedPackText": 0,
+    "withoutPackText": 0
+  },
+  "primary": {
+    "corpus": 7000,
+    "importing": 548,
+    "notImporting": 6452,
+    "detector": "exact",
+    "strata": [
+      {
+        "source": "pack",
+        "cell": {
+          "n": 107,
+          "helped": 11,
+          "harmed": 18,
+          "deltaPp": -6.5420560747663545,
+          "halfWidthPp": 9.864414039237035,
+          "minDetectablePp": 14.102085784664373,
+          "baselineCorrect": 44,
+          "baselineAccuracy": 0.411214953271028,
+          "harmedPerCorrectPp": 40.909090909090914,
+          "helpedPerWrongPp": 17.46031746031746,
+          "clusterLowPp": -24.489795918367346,
+          "clusterHighPp": 9.375
+        },
+        "share": 0.19525547445255476
+      },
+      {
+        "source": "schema",
+        "cell": {
+          "n": 412,
+          "helped": 29,
+          "harmed": 53,
+          "deltaPp": -5.825242718446602,
+          "halfWidthPp": 4.307901667657606,
+          "minDetectablePp": 6.158541057539088,
+          "baselineCorrect": 198,
+          "baselineAccuracy": 0.48058252427184467,
+          "harmedPerCorrectPp": 26.767676767676768,
+          "helpedPerWrongPp": 13.551401869158877,
+          "clusterLowPp": -9.90990990990991,
+          "clusterHighPp": -1.891891891891892
+        },
+        "share": 0.7518248175182481
+      },
+      {
+        "source": "unverifiable",
+        "cell": {
+          "n": 29,
+          "helped": 0,
+          "harmed": 5,
+          "deltaPp": -17.24137931034483,
+          "halfWidthPp": 15.112735296205475,
+          "minDetectablePp": 21.605043010187625,
+          "baselineCorrect": 5,
+          "baselineAccuracy": 0.1724137931034483,
+          "harmedPerCorrectPp": 100,
+          "helpedPerWrongPp": 0,
+          "clusterLowPp": -63.63636363636363,
+          "clusterHighPp": -4.3478260869565215
+        },
+        "share": 0.05291970802919708
+      }
+    ],
+    "split": {
+      "code": "M3",
+      "feature": "the pack names the identifier the query imported, against the query importing one the pack never named",
+      "present": {
+        "n": 107,
+        "helped": 11,
+        "harmed": 18,
+        "deltaPp": -6.5420560747663545,
+        "halfWidthPp": 9.864414039237035,
+        "minDetectablePp": 14.102085784664373,
+        "baselineCorrect": 44,
+        "baselineAccuracy": 0.411214953271028,
+        "harmedPerCorrectPp": 40.909090909090914,
+        "helpedPerWrongPp": 17.46031746031746,
+        "clusterLowPp": -24.489795918367346,
+        "clusterHighPp": 9.375
+      },
+      "absent": {
+        "n": 412,
+        "helped": 29,
+        "harmed": 53,
+        "deltaPp": -5.825242718446602,
+        "halfWidthPp": 4.307901667657606,
+        "minDetectablePp": 6.158541057539088,
+        "baselineCorrect": 198,
+        "baselineAccuracy": 0.48058252427184467,
+        "harmedPerCorrectPp": 26.767676767676768,
+        "helpedPerWrongPp": 13.551401869158877,
+        "clusterLowPp": -9.90990990990991,
+        "clusterHighPp": -1.891891891891892
+      },
+      "gapPp": -0.7168133563197525,
+      "gapHalfWidthPp": 10.764045759643718,
+      "fisherP": 0.824827018588286,
+      "clusterLowPp": -18.922305764411025,
+      "clusterHighPp": 15.764411027568922,
+      "resolves": false
+    },
+    "byName": {
+      "total": 895,
+      "exact": 132,
+      "flattened": 198
+    },
+    "contribution": {
+      "pack": 0.1,
+      "schema": 0.34285714285714286,
+      "unverifiable": 0.07142857142857142,
+      "total": 0.5142857142857142
+    },
+    "criteria": [
+      {
+        "code": "M1",
+        "criterion": "The pack's text supplies the name in at least 30% of the flagged questions (exact detector)",
+        "actual": "107 of 548 (19.5%)",
+        "ok": false
+      },
+      {
+        "code": "M2",
+        "criterion": "It supplies it in at least 60% once spelling is forgiven, so M1 is not a verdict about punctuation",
+        "actual": "29.7% under the flattened detector; 132 of 895 names",
+        "ok": false
+      },
+      {
+        "code": "M3",
+        "criterion": "The pack-named bucket is damaged more than the schema bucket, and the difference clears its own half-width",
+        "actual": "destroyed 40.91% vs 26.77%; delta -6.54pp vs -5.83pp, gap -0.72pp ±10.76",
+        "ok": false
+      },
+      {
+        "code": "M4",
+        "criterion": "The pack-named bucket carries at least half of what the gate buys, so the same filter running before generation would collect it",
+        "actual": "0.10pp of 0.51pp (19.4%)",
+        "ok": false
+      }
+    ],
+    "statementWithdrawn": true
+  },
+  "generous": {
+    "corpus": 7000,
+    "importing": 548,
+    "notImporting": 6452,
+    "detector": "flattened",
+    "strata": [
+      {
+        "source": "pack",
+        "cell": {
+          "n": 163,
+          "helped": 14,
+          "harmed": 26,
+          "deltaPp": -7.361963190184049,
+          "halfWidthPp": 7.604986765558311,
+          "minDetectablePp": 10.872026998517544,
+          "baselineCorrect": 80,
+          "baselineAccuracy": 0.49079754601226994,
+          "harmedPerCorrectPp": 32.5,
+          "helpedPerWrongPp": 16.867469879518072,
+          "clusterLowPp": -20.30075187969925,
+          "clusterHighPp": 3.7267080745341614
+        },
+        "share": 0.29744525547445255
+      },
+      {
+        "source": "schema",
+        "cell": {
+          "n": 359,
+          "helped": 26,
+          "harmed": 46,
+          "deltaPp": -5.571030640668524,
+          "halfWidthPp": 4.632632727996544,
+          "minDetectablePp": 6.622773930533836,
+          "baselineCorrect": 163,
+          "baselineAccuracy": 0.45403899721448465,
+          "harmedPerCorrectPp": 28.22085889570552,
+          "helpedPerWrongPp": 13.26530612244898,
+          "clusterLowPp": -10.966057441253264,
+          "clusterHighPp": -0.5405405405405406
+        },
+        "share": 0.6551094890510949
+      },
+      {
+        "source": "unverifiable",
+        "cell": {
+          "n": 26,
+          "helped": 0,
+          "harmed": 4,
+          "deltaPp": -15.384615384615385,
+          "halfWidthPp": 15.076923076923077,
+          "minDetectablePp": 21.553846153846155,
+          "baselineCorrect": 4,
+          "baselineAccuracy": 0.15384615384615385,
+          "harmedPerCorrectPp": 100,
+          "helpedPerWrongPp": 0,
+          "clusterLowPp": -60,
+          "clusterHighPp": -2.8169014084507045
+        },
+        "share": 0.04744525547445255
+      }
+    ],
+    "split": {
+      "code": "M3",
+      "feature": "the pack names the identifier the query imported, against the query importing one the pack never named",
+      "present": {
+        "n": 163,
+        "helped": 14,
+        "harmed": 26,
+        "deltaPp": -7.361963190184049,
+        "halfWidthPp": 7.604986765558311,
+        "minDetectablePp": 10.872026998517544,
+        "baselineCorrect": 80,
+        "baselineAccuracy": 0.49079754601226994,
+        "harmedPerCorrectPp": 32.5,
+        "helpedPerWrongPp": 16.867469879518072,
+        "clusterLowPp": -20.30075187969925,
+        "clusterHighPp": 3.7267080745341614
+      },
+      "absent": {
+        "n": 359,
+        "helped": 26,
+        "harmed": 46,
+        "deltaPp": -5.571030640668524,
+        "halfWidthPp": 4.632632727996544,
+        "minDetectablePp": 6.622773930533836,
+        "baselineCorrect": 163,
+        "baselineAccuracy": 0.45403899721448465,
+        "harmedPerCorrectPp": 28.22085889570552,
+        "helpedPerWrongPp": 13.26530612244898,
+        "clusterLowPp": -10.966057441253264,
+        "clusterHighPp": -0.5405405405405406
+      },
+      "gapPp": -1.7909325495155253,
+      "gapHalfWidthPp": 8.904892458464715,
+      "fisherP": 0.9999999999998747,
+      "clusterLowPp": -15.246238669283246,
+      "clusterHighPp": 10.736169467787114,
+      "resolves": false
+    },
+    "byName": {
+      "total": 895,
+      "exact": 132,
+      "flattened": 198
+    },
+    "contribution": {
+      "pack": 0.17142857142857143,
+      "schema": 0.2857142857142857,
+      "unverifiable": 0.05714285714285715,
+      "total": 0.5142857142857142
+    },
+    "criteria": [
+      {
+        "code": "M1",
+        "criterion": "The pack's text supplies the name in at least 30% of the flagged questions (exact detector)",
+        "actual": "163 of 548 (29.7%)",
+        "ok": false
+      },
+      {
+        "code": "M2",
+        "criterion": "It supplies it in at least 60% once spelling is forgiven, so M1 is not a verdict about punctuation",
+        "actual": "29.7% under the flattened detector; 132 of 895 names",
+        "ok": false
+      },
+      {
+        "code": "M3",
+        "criterion": "The pack-named bucket is damaged more than the schema bucket, and the difference clears its own half-width",
+        "actual": "destroyed 32.50% vs 28.22%; delta -7.36pp vs -5.57pp, gap -1.79pp ±8.90",
+        "ok": false
+      },
+      {
+        "code": "M4",
+        "criterion": "The pack-named bucket carries at least half of what the gate buys, so the same filter running before generation would collect it",
+        "actual": "0.17pp of 0.51pp (33.3%)",
+        "ok": false
+      }
+    ],
+    "statementWithdrawn": true
+  },
+  "unattributed": [
+    {
+      "name": "person",
+      "count": 22,
+      "databases": [
+        "olympics",
+        "simpson_episodes",
+        "student_loan",
+        "works_cycles"
+      ]
+    },
+    {
+      "name": "c",
+      "count": 19,
+      "databases": [
+        "legislator"
+      ]
+    },
+    {
+      "name": "id",
+      "count": 14,
+      "databases": [
+        "craftbeer",
+        "menu",
+        "music_tracker",
+        "software_company",
+        "university"
+      ]
+    },
+    {
+      "name": "productid",
+      "count": 11,
+      "databases": [
+        "regional_sales",
+        "retail_world",
+        "sales",
+        "works_cycles"
+      ]
+    },
+    {
+      "name": "callcenterlogs",
+      "count": 9,
+      "databases": [
+        "retail_complains"
+      ]
+    },
+    {
+      "name": "country",
+      "count": 8,
+      "databases": [
+        "address",
+        "books",
+        "car_retails",
+        "mondial_geo",
+        "movielens"
+      ]
+    },
+    {
+      "name": "film_id",
+      "count": 8,
+      "databases": [
+        "movie_3"
+      ]
+    },
+    {
+      "name": "rand client",
+      "count": 8,
+      "databases": [
+        "retail_complains"
+      ]
+    },
+    {
+      "name": "characters",
+      "count": 7,
+      "databases": [
+        "disney",
+        "shakespeare"
+      ]
+    },
+    {
+      "name": "complaint id",
+      "count": 7,
+      "databases": [
+        "retail_complains"
+      ]
+    },
+    {
+      "name": "lastname",
+      "count": 7,
+      "databases": [
+        "hockey",
+        "retail_world"
+      ]
+    },
+    {
+      "name": "cust_order",
+      "count": 6,
+      "databases": [
+        "books"
+      ]
+    },
+    {
+      "name": "district",
+      "count": 6,
+      "databases": [
+        "address",
+        "chicago_crime",
+        "retail_complains",
+        "world"
+      ]
+    },
+    {
+      "name": "firstname",
+      "count": 6,
+      "databases": [
+        "hockey",
+        "retail_world"
+      ]
+    },
+    {
+      "name": "m",
+      "count": 6,
+      "databases": [
+        "soccer_2016"
+      ]
+    },
+    {
+      "name": "orderdetails",
+      "count": 6,
+      "databases": [
+        "car_retails",
+        "retail_world"
+      ]
+    },
+    {
+      "name": "regions",
+      "count": 6,
+      "databases": [
+        "regional_sales",
+        "retail_world"
+      ]
+    },
+    {
+      "name": "statecode",
+      "count": 6,
+      "databases": [
+        "regional_sales",
+        "retail_complains"
+      ]
+    },
+    {
+      "name": "award",
+      "count": 5,
+      "databases": [
+        "law_episode",
+        "professional_basketball",
+        "simpson_episodes"
+      ]
+    },
+    {
+      "name": "city",
+      "count": 5,
+      "databases": [
+        "mondial_geo",
+        "public_review_platform",
+        "restaurant"
+      ]
+    },
+    {
+      "name": "current-terms",
+      "count": 5,
+      "databases": [
+        "legislator"
+      ]
+    },
+    {
+      "name": "customers",
+      "count": 5,
+      "databases": [
+        "car_retails",
+        "retail_world",
+        "sales",
+        "software_company"
+      ]
+    },
+    {
+      "name": "employeeid",
+      "count": 5,
+      "databases": [
+        "retail_world",
+        "sales"
+      ]
+    },
+    {
+      "name": "employees",
+      "count": 5,
+      "databases": [
+        "car_retails",
+        "retail_world",
+        "sales"
+      ]
+    },
+    {
+      "name": "id_restaurant",
+      "count": 5,
+      "databases": [
+        "restaurant"
+      ]
+    }
+  ],
+  "unmeasured": [
+    {
+      "category": "synonym",
+      "registered": "a rule that names the concept without naming the column",
+      "reason": "the record stores the pack text and the query, not the model’s reading of either",
+      "nearest": "M4 (flattened detector)",
+      "difference": "M4 forgives spelling and punctuation; \"county\" against `County Name` is a synonym, not a spelling"
+    },
+    {
+      "category": "pruned-name",
+      "registered": "a table or column the rule named that the schema had pruned",
+      "reason": "per_case stores schemaTables as counts; the lane now records the names (R30 stage 1b), and the committed record predates it",
+      "nearest": "M2 (the schema bucket)",
+      "difference": "M2 says the query named a real column the question did not; it does not say whether that column reached the prompt"
+    }
+  ],
+  "notes": [
+    "The three buckets are exhaustive by construction: a question whose query imported a name is attributed to the pack when the pack text carries the name, to the schema when it does not and the query executed, and to unverifiable otherwise. \"Executed\" is what licenses calling the name real — a statement that ran cannot have named a column the table does not have — and a statement that failed does not license the opposite, which is why the third bucket is not called invented.",
+    "M1 and M2 are the mechanism test and M3/M4 are the availability test. A mechanism that acts on 5% of the flagged questions is a curiosity; the product statement §140 licensed needs the pack to be the source in enough of them for a filter to have something to refuse.",
+    "The exact detector under-credits the pack on spacing and punctuation; the flattened detector over-credits it on short names inside longer words. M3 reads the lower bound and M4 the upper bound, and a pair that straddles 30% is a finding about the threshold rather than about the pack.",
+    "Nothing here re-reads the gold SQL or the scorer. The attribution is a substring test between two strings the model itself saw and produced."
+  ]
+}

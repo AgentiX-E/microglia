@@ -625,3 +625,48 @@ written against the split the code was written against. A field that exists in `
 `train.json` is invisible to a suite whose corpus has the field — 2,353 tests and four coverage dimensions
 above 99.6% do not help, because the thing that is wrong is the data. The only way to find this class of defect
 is to run the loader against a second dataset and stop before the expensive part.
+
+### 8.7 The out-of-sample verdict is an artefact, and it recomputes without a model call
+
+R30 stage 2 cost 14,479 calls once. Everything that can be said about it afterwards is arithmetic over
+`per_case`, so the verdict is a committed artefact recomputed on every push rather than a paragraph
+somebody remembers writing.
+
+```text
+  poc-sota-bird-dev-R26-channels.json ──┐
+  poc-sota-bird-train.json ─────────────┤
+                                        ▼
+                            diffCasesOf(run)        ← one join point, both corpora
+                                        │
+        ┌───────────────┬───────────────┼───────────────┬───────────────┐
+        ▼               ▼               ▼               ▼               ▼
+  clusteredDeltaOf  foldSignTestOf  gateReadingOf  featureOf(F1)  adjudicateOutOfSample
+   (databases)      (5 folds,       (the filter)   (imported      (P1–P5, as
+                     exact binomial)               name)          predicates)
+        └───────────────┴───────────────┼───────────────┴───────────────┘
+                                        ▼
+                              poc-out-of-sample.json   ← 19 assertions in CI
+```
+
+**Three design decisions in that pipeline are load-bearing.**
+
+*The registration is data.* `OUT_OF_SAMPLE_PREDICTIONS` holds P1–P5 as predicates over a reading, with
+the sentence each one was registered as. A prediction cannot be re-read once its number is in: the
+predicate decides, and the sentence that goes into the documentation is the one that was registered.
+
+*A corpus describes itself.* `splitOfName` reads the artefact's own `dataset` field, and
+`stabilityFramingOf` builds every corpus-dependent clause from the numbers it was given. Before this,
+the stability reading's title quoted dev's `+1.30pp` while the file was pointed at train, and its
+`unmeasured` block asserted that no split of this corpus could be out of sample — about the one corpus
+for which that is false. Prose in an artefact is not covered by tests, so it has to be generated.
+
+*The unit of resampling matches the unit of the claim.* Questions inside a database are not
+independent; a rule reaches all of them. `clusteredDeltaOf` resamples databases and returns `null`
+rather than a point estimate when the corpus has fewer than two, because one cluster resampled is the
+same cluster and every effect would "resolve".
+
+**What the pipeline cannot do** is as much a part of it. It compares no accuracy across splits — dev
+and train share no database, so only the paired differences are the same quantity — and it does not
+re-adjudicate a refuted prediction. P2 predicted the arm would be non-positive *and* not significantly
+different from the control. Out of sample it is −0.71pp with an interval that excludes zero, so P2 is
+reported as refuted, in the artefact, on every push, in the same table as the four that held.

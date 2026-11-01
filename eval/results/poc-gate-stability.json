@@ -1,8 +1,9 @@
 {
   "id": "poc-gate-stability",
-  "title": "Whether the read-time gate’s +1.30pp is a property of the gate or of one database",
+  "title": "Whether the read-time gate's 0.98pp is a property of the gate or of one database",
   "source": "eval/results/poc-sota-bird-dev-R26-channels.json",
   "sourceGeneratedAt": "2026-11-01T02:44:56.507Z",
+  "dataset": "BIRD dev",
   "registered": "ROADMAP.md §R31-stability",
   "n": 1534,
   "strict": {
@@ -291,9 +292,9 @@
     }
   ],
   "notes": [
-    "Leave-one-database-out is the clustering check. Questions within a database are not independent — a rule injected on one is injected on its neighbours — so an estimate carried by a single database would not reproduce at a different mixture, and stage 2 draws a different mixture by construction.",
-    "The permutation test redraws which questions the gate discards, keeping the number discarded fixed. It asks whether the gate finds damaged questions or merely pays the variance of dropping ten percent of the corpus. Sampling is without replacement: with replacement the null would describe a smaller subset than the gate discards, and a wider null flatters the gate.",
-    "The halves are balanced greedily by question count rather than split by hash, because dev has eleven databases of very different sizes and an arbitrary partition can leave one half too small to resolve anything.",
-    "Every number here comes from a closed form over the recorded outcomes: the gated arm reads the no-pack query that already exists for every discarded question. Nothing is resampled except the permutation null and the two bootstrap intervals."
+    "Leave-one-database-out is the clustering check. Questions within a database are not independent — a rule injected on one is injected on its neighbours — so an estimate carried by a single database would not reproduce at a different mixture, and an out-of-sample run draws a different mixture by construction.",
+    "The permutation test redraws which questions the gate discards, keeping the number discarded fixed. It asks whether the gate finds damaged questions or merely pays the variance of dropping a share of the corpus. Sampling is without replacement: with replacement the null would describe a smaller subset than the gate discards, and a wider null flatters the gate.",
+    "The halves are balanced greedily by question count rather than split by hash, because this corpus has 11 databases of very different sizes and an arbitrary partition can leave one half too small to resolve anything.",
+    "Every number here comes from a closed form over the recorded outcomes: the gated arm reads the no-pack query that already exists for each of the 155 discarded questions. Nothing is resampled except the permutation null and the two bootstrap intervals."
   ]
 }

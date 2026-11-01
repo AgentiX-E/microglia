@@ -1,0 +1,958 @@
+{
+  "id": "poc-gate-stability",
+  "title": "Whether the read-time gate's 0.51pp is a property of the gate or of one database",
+  "source": "eval/results/poc-sota-bird-train.json",
+  "sourceGeneratedAt": "2026-11-01T11:25:28.756Z",
+  "dataset": "BIRD train (out-of-sample)",
+  "registered": "ROADMAP.md §R31-stability",
+  "n": 7000,
+  "strict": {
+    "mode": "strict",
+    "n": 7000,
+    "discarded": 548,
+    "observedPp": 0.5142857142857142,
+    "jackknife": [
+      {
+        "dropped": "address",
+        "n": 6850,
+        "discarded": 532,
+        "improvementPp": 0.48175182481751827
+      },
+      {
+        "dropped": "airline",
+        "n": 6908,
+        "discarded": 541,
+        "improvementPp": 0.4921829762594094
+      },
+      {
+        "dropped": "app_store",
+        "n": 6937,
+        "discarded": 546,
+        "improvementPp": 0.5333717745423094
+      },
+      {
+        "dropped": "beer_factory",
+        "n": 6869,
+        "discarded": 534,
+        "improvementPp": 0.48041927500363957
+      },
+      {
+        "dropped": "book_publishing_company",
+        "n": 6927,
+        "discarded": 539,
+        "improvementPp": 0.490832972426736
+      },
+      {
+        "dropped": "books",
+        "n": 6802,
+        "discarded": 536,
+        "improvementPp": 0.5145545427815349
+      },
+      {
+        "dropped": "car_retails",
+        "n": 6874,
+        "discarded": 538,
+        "improvementPp": 0.5091649694501018
+      },
+      {
+        "dropped": "cars",
+        "n": 6916,
+        "discarded": 546,
+        "improvementPp": 0.5205320994794679
+      },
+      {
+        "dropped": "chicago_crime",
+        "n": 6812,
+        "discarded": 541,
+        "improvementPp": 0.5137991779213152
+      },
+      {
+        "dropped": "citeseer",
+        "n": 6981,
+        "discarded": 546,
+        "improvementPp": 0.5156854318865491
+      },
+      {
+        "dropped": "college_completion",
+        "n": 6924,
+        "discarded": 538,
+        "improvementPp": 0.5199306759098787
+      },
+      {
+        "dropped": "computer_student",
+        "n": 6928,
+        "discarded": 546,
+        "improvementPp": 0.5196304849884527
+      },
+      {
+        "dropped": "cookbook",
+        "n": 6931,
+        "discarded": 543,
+        "improvementPp": 0.5049776367046602
+      },
+      {
+        "dropped": "craftbeer",
+        "n": 6994,
+        "discarded": 547,
+        "improvementPp": 0.5147269087789533
+      },
+      {
+        "dropped": "cs_semester",
+        "n": 6887,
+        "discarded": 548,
+        "improvementPp": 0.5227239727021925
+      },
+      {
+        "dropped": "disney",
+        "n": 6885,
+        "discarded": 537,
+        "improvementPp": 0.4647785039941903
+      },
+      {
+        "dropped": "european_football_1",
+        "n": 6943,
+        "discarded": 547,
+        "improvementPp": 0.5185078496327237
+      },
+      {
+        "dropped": "food_inspection",
+        "n": 6917,
+        "discarded": 547,
+        "improvementPp": 0.5204568454532311
+      },
+      {
+        "dropped": "food_inspection_2",
+        "n": 6861,
+        "discarded": 542,
+        "improvementPp": 0.524704853519895
+      },
+      {
+        "dropped": "genes",
+        "n": 6977,
+        "discarded": 545,
+        "improvementPp": 0.5159810806937078
+      },
+      {
+        "dropped": "hockey",
+        "n": 6793,
+        "discarded": 527,
+        "improvementPp": 0.5446783453555131
+      },
+      {
+        "dropped": "human_resources",
+        "n": 6941,
+        "discarded": 547,
+        "improvementPp": 0.5330643999423714
+      },
+      {
+        "dropped": "ice_hockey_draft",
+        "n": 6916,
+        "discarded": 545,
+        "improvementPp": 0.5060728744939271
+      },
+      {
+        "dropped": "image_and_language",
+        "n": 6861,
+        "discarded": 541,
+        "improvementPp": 0.524704853519895
+      },
+      {
+        "dropped": "law_episode",
+        "n": 6886,
+        "discarded": 537,
+        "improvementPp": 0.5227998838222481
+      },
+      {
+        "dropped": "legislator",
+        "n": 6823,
+        "discarded": 505,
+        "improvementPp": 0.48365821486149785
+      },
+      {
+        "dropped": "mental_health_survey",
+        "n": 6950,
+        "discarded": 540,
+        "improvementPp": 0.4892086330935252
+      },
+      {
+        "dropped": "menu",
+        "n": 6892,
+        "discarded": 539,
+        "improvementPp": 0.5078351712130006
+      },
+      {
+        "dropped": "mondial_geo",
+        "n": 6788,
+        "discarded": 521,
+        "improvementPp": 0.6187389510901591
+      },
+      {
+        "dropped": "movie",
+        "n": 6954,
+        "discarded": 548,
+        "improvementPp": 0.5176876617773942
+      },
+      {
+        "dropped": "movie_3",
+        "n": 6788,
+        "discarded": 532,
+        "improvementPp": 0.5156157925751326
+      },
+      {
+        "dropped": "movielens",
+        "n": 6902,
+        "discarded": 541,
+        "improvementPp": 0.5360764995653433
+      },
+      {
+        "dropped": "movies_4",
+        "n": 6842,
+        "discarded": 543,
+        "improvementPp": 0.5115463314820228
+      },
+      {
+        "dropped": "music_tracker",
+        "n": 6955,
+        "discarded": 546,
+        "improvementPp": 0.5176132278936018
+      },
+      {
+        "dropped": "olympics",
+        "n": 6831,
+        "discarded": 543,
+        "improvementPp": 0.5123700775874689
+      },
+      {
+        "dropped": "professional_basketball",
+        "n": 6843,
+        "discarded": 531,
+        "improvementPp": 0.46763115592576354
+      },
+      {
+        "dropped": "public_review_platform",
+        "n": 6787,
+        "discarded": 531,
+        "improvementPp": 0.5451598644467365
+      },
+      {
+        "dropped": "regional_sales",
+        "n": 6836,
+        "discarded": 536,
+        "improvementPp": 0.497366881217086
+      },
+      {
+        "dropped": "restaurant",
+        "n": 6883,
+        "discarded": 537,
+        "improvementPp": 0.5084992009298271
+      },
+      {
+        "dropped": "retail_complains",
+        "n": 6832,
+        "discarded": 527,
+        "improvementPp": 0.4537470725995316
+      },
+      {
+        "dropped": "retail_world",
+        "n": 6787,
+        "discarded": 503,
+        "improvementPp": 0.5304258140562841
+      },
+      {
+        "dropped": "sales",
+        "n": 6893,
+        "discarded": 535,
+        "improvementPp": 0.5367764398665312
+      },
+      {
+        "dropped": "sales_in_weather",
+        "n": 6920,
+        "discarded": 544,
+        "improvementPp": 0.5202312138728323
+      },
+      {
+        "dropped": "shakespeare",
+        "n": 6890,
+        "discarded": 546,
+        "improvementPp": 0.5224963715529753
+      },
+      {
+        "dropped": "shipping",
+        "n": 6894,
+        "discarded": 542,
+        "improvementPp": 0.507687844502466
+      },
+      {
+        "dropped": "shooting",
+        "n": 6972,
+        "discarded": 547,
+        "improvementPp": 0.5163511187607573
+      },
+      {
+        "dropped": "simpson_episodes",
+        "n": 6790,
+        "discarded": 527,
+        "improvementPp": 0.48600883652430044
+      },
+      {
+        "dropped": "soccer_2016",
+        "n": 6787,
+        "discarded": 532,
+        "improvementPp": 0.48622366288492713
+      },
+      {
+        "dropped": "social_media",
+        "n": 6922,
+        "discarded": 545,
+        "improvementPp": 0.5056342097659636
+      },
+      {
+        "dropped": "software_company",
+        "n": 6925,
+        "discarded": 542,
+        "improvementPp": 0.5342960288808665
+      },
+      {
+        "dropped": "student_loan",
+        "n": 6797,
+        "discarded": 529,
+        "improvementPp": 0.5443578049139326
+      },
+      {
+        "dropped": "superstore",
+        "n": 6884,
+        "discarded": 539,
+        "improvementPp": 0.5084253341080768
+      },
+      {
+        "dropped": "synthea",
+        "n": 6815,
+        "discarded": 545,
+        "improvementPp": 0.5282465150403521
+      },
+      {
+        "dropped": "trains",
+        "n": 6960,
+        "discarded": 547,
+        "improvementPp": 0.5172413793103449
+      },
+      {
+        "dropped": "university",
+        "n": 6850,
+        "discarded": 544,
+        "improvementPp": 0.5255474452554744
+      },
+      {
+        "dropped": "video_games",
+        "n": 6799,
+        "discarded": 543,
+        "improvementPp": 0.5147815855272835
+      },
+      {
+        "dropped": "works_cycles",
+        "n": 6788,
+        "discarded": 524,
+        "improvementPp": 0.5303476723629935
+      },
+      {
+        "dropped": "world",
+        "n": 6901,
+        "discarded": 546,
+        "improvementPp": 0.5216635270250688
+      }
+    ],
+    "jackknifeMinPp": 0.4537470725995316,
+    "jackknifeMaxPp": 0.6187389510901591,
+    "halves": [
+      {
+        "half": "A",
+        "databases": [
+          "public_review_platform",
+          "soccer_2016",
+          "works_cycles",
+          "hockey",
+          "student_loan",
+          "books",
+          "legislator",
+          "retail_complains",
+          "movies_4",
+          "professional_basketball",
+          "food_inspection_2",
+          "image_and_language",
+          "car_retails",
+          "disney",
+          "cs_semester",
+          "menu",
+          "shipping",
+          "movielens",
+          "cars",
+          "ice_hockey_draft",
+          "sales_in_weather",
+          "college_completion",
+          "book_publishing_company",
+          "cookbook",
+          "european_football_1",
+          "movie",
+          "music_tracker",
+          "genes",
+          "citeseer"
+        ],
+        "n": 3506,
+        "discarded": 292,
+        "gatedDeltaPp": 0.057045065601825436,
+        "improvementPp": 0.6845407872219054,
+        "minDetectablePp": 0.9788177779917948
+      },
+      {
+        "half": "B",
+        "databases": [
+          "retail_world",
+          "mondial_geo",
+          "movie_3",
+          "simpson_episodes",
+          "video_games",
+          "chicago_crime",
+          "synthea",
+          "olympics",
+          "regional_sales",
+          "address",
+          "university",
+          "beer_factory",
+          "restaurant",
+          "superstore",
+          "law_episode",
+          "shakespeare",
+          "sales",
+          "world",
+          "airline",
+          "food_inspection",
+          "social_media",
+          "software_company",
+          "computer_student",
+          "app_store",
+          "human_resources",
+          "mental_health_survey",
+          "trains",
+          "shooting",
+          "craftbeer"
+        ],
+        "n": 3494,
+        "discarded": 256,
+        "gatedDeltaPp": -0.45792787635947335,
+        "improvementPp": 0.34344590726960506,
+        "minDetectablePp": 1.0080307344623425
+      }
+    ],
+    "permutation": {
+      "resamples": 5000,
+      "observedPp": 0.5142857142857142,
+      "nullMeanPp": 0.055445714285714015,
+      "nullLowPp": -0.1,
+      "nullHighPp": 0.2142857142857143,
+      "p": 0.0001999600079984003
+    },
+    "criteria": [
+      {
+        "code": "S1",
+        "criterion": "No single database carries the estimate: the improvement stays above zero with each one removed",
+        "actual": "leave-one-out 0.45pp to 0.62pp over 58 databases",
+        "ok": true
+      },
+      {
+        "code": "S2",
+        "criterion": "The placement matters: the observed improvement beats random subsets of its own size at p < 0.05",
+        "actual": "0.51pp against a null of 0.06pp [-0.10, 0.21], p=0.0002",
+        "ok": true
+      },
+      {
+        "code": "S3",
+        "criterion": "Both halves of the database split keep an improvement above 0.0pp",
+        "actual": "A 0.68pp (n=3506, 292 discarded); B 0.34pp (n=3494, 256 discarded)",
+        "ok": true
+      }
+    ],
+    "unstable": false
+  },
+  "loose": {
+    "mode": "morphological",
+    "n": 7000,
+    "discarded": 415,
+    "observedPp": 0.4,
+    "jackknife": [
+      {
+        "dropped": "address",
+        "n": 6850,
+        "discarded": 401,
+        "improvementPp": 0.36496350364963503
+      },
+      {
+        "dropped": "airline",
+        "n": 6908,
+        "discarded": 409,
+        "improvementPp": 0.37637521713954836
+      },
+      {
+        "dropped": "app_store",
+        "n": 6937,
+        "discarded": 413,
+        "improvementPp": 0.41804814761424247
+      },
+      {
+        "dropped": "beer_factory",
+        "n": 6869,
+        "discarded": 407,
+        "improvementPp": 0.40762847576066386
+      },
+      {
+        "dropped": "book_publishing_company",
+        "n": 6927,
+        "discarded": 407,
+        "improvementPp": 0.375342861267504
+      },
+      {
+        "dropped": "books",
+        "n": 6802,
+        "discarded": 405,
+        "improvementPp": 0.4116436342252279
+      },
+      {
+        "dropped": "car_retails",
+        "n": 6874,
+        "discarded": 408,
+        "improvementPp": 0.3927844050043643
+      },
+      {
+        "dropped": "cars",
+        "n": 6916,
+        "discarded": 413,
+        "improvementPp": 0.4048582995951417
+      },
+      {
+        "dropped": "chicago_crime",
+        "n": 6812,
+        "discarded": 411,
+        "improvementPp": 0.4110393423370522
+      },
+      {
+        "dropped": "citeseer",
+        "n": 6981,
+        "discarded": 413,
+        "improvementPp": 0.40108866924509384
+      },
+      {
+        "dropped": "college_completion",
+        "n": 6924,
+        "discarded": 409,
+        "improvementPp": 0.4043905257076834
+      },
+      {
+        "dropped": "computer_student",
+        "n": 6928,
+        "discarded": 415,
+        "improvementPp": 0.40415704387990764
+      },
+      {
+        "dropped": "cookbook",
+        "n": 6931,
+        "discarded": 411,
+        "improvementPp": 0.38955417688645216
+      },
+      {
+        "dropped": "craftbeer",
+        "n": 6994,
+        "discarded": 414,
+        "improvementPp": 0.4003431512725193
+      },
+      {
+        "dropped": "cs_semester",
+        "n": 6887,
+        "discarded": 415,
+        "improvementPp": 0.4065630898794831
+      },
+      {
+        "dropped": "disney",
+        "n": 6885,
+        "discarded": 405,
+        "improvementPp": 0.34858387799564267
+      },
+      {
+        "dropped": "european_football_1",
+        "n": 6943,
+        "discarded": 415,
+        "improvementPp": 0.4032838830476739
+      },
+      {
+        "dropped": "food_inspection",
+        "n": 6917,
+        "discarded": 415,
+        "improvementPp": 0.40479976868584644
+      },
+      {
+        "dropped": "food_inspection_2",
+        "n": 6861,
+        "discarded": 410,
+        "improvementPp": 0.4081037749599184
+      },
+      {
+        "dropped": "genes",
+        "n": 6977,
+        "discarded": 413,
+        "improvementPp": 0.4013186183173284
+      },
+      {
+        "dropped": "hockey",
+        "n": 6793,
+        "discarded": 399,
+        "improvementPp": 0.42691005446783453
+      },
+      {
+        "dropped": "human_resources",
+        "n": 6941,
+        "discarded": 415,
+        "improvementPp": 0.4034000864428756
+      },
+      {
+        "dropped": "ice_hockey_draft",
+        "n": 6916,
+        "discarded": 414,
+        "improvementPp": 0.4048582995951417
+      },
+      {
+        "dropped": "image_and_language",
+        "n": 6861,
+        "discarded": 408,
+        "improvementPp": 0.4081037749599184
+      },
+      {
+        "dropped": "law_episode",
+        "n": 6886,
+        "discarded": 406,
+        "improvementPp": 0.4211443508568109
+      },
+      {
+        "dropped": "legislator",
+        "n": 6823,
+        "discarded": 386,
+        "improvementPp": 0.38106404807269534
+      },
+      {
+        "dropped": "mental_health_survey",
+        "n": 6950,
+        "discarded": 408,
+        "improvementPp": 0.37410071942446044
+      },
+      {
+        "dropped": "menu",
+        "n": 6892,
+        "discarded": 407,
+        "improvementPp": 0.3772489843296576
+      },
+      {
+        "dropped": "mondial_geo",
+        "n": 6788,
+        "discarded": 390,
+        "improvementPp": 0.5008839127872717
+      },
+      {
+        "dropped": "movie",
+        "n": 6954,
+        "discarded": 415,
+        "improvementPp": 0.4026459591601955
+      },
+      {
+        "dropped": "movie_3",
+        "n": 6788,
+        "discarded": 399,
+        "improvementPp": 0.3977607542722451
+      },
+      {
+        "dropped": "movielens",
+        "n": 6902,
+        "discarded": 408,
+        "improvementPp": 0.42016806722689076
+      },
+      {
+        "dropped": "movies_4",
+        "n": 6842,
+        "discarded": 414,
+        "improvementPp": 0.3946214557147033
+      },
+      {
+        "dropped": "music_tracker",
+        "n": 6955,
+        "discarded": 413,
+        "improvementPp": 0.402588066139468
+      },
+      {
+        "dropped": "olympics",
+        "n": 6831,
+        "discarded": 412,
+        "improvementPp": 0.4098960620699751
+      },
+      {
+        "dropped": "professional_basketball",
+        "n": 6843,
+        "discarded": 402,
+        "improvementPp": 0.35072336694432266
+      },
+      {
+        "dropped": "public_review_platform",
+        "n": 6787,
+        "discarded": 405,
+        "improvementPp": 0.4272874613231177
+      },
+      {
+        "dropped": "regional_sales",
+        "n": 6836,
+        "discarded": 407,
+        "improvementPp": 0.39496781743709775
+      },
+      {
+        "dropped": "restaurant",
+        "n": 6883,
+        "discarded": 404,
+        "improvementPp": 0.3922708121458667
+      },
+      {
+        "dropped": "retail_complains",
+        "n": 6832,
+        "discarded": 399,
+        "improvementPp": 0.351288056206089
+      },
+      {
+        "dropped": "retail_world",
+        "n": 6787,
+        "discarded": 384,
+        "improvementPp": 0.4125534109326654
+      },
+      {
+        "dropped": "sales",
+        "n": 6893,
+        "discarded": 404,
+        "improvementPp": 0.4207166690845786
+      },
+      {
+        "dropped": "sales_in_weather",
+        "n": 6920,
+        "discarded": 412,
+        "improvementPp": 0.40462427745664736
+      },
+      {
+        "dropped": "shakespeare",
+        "n": 6890,
+        "discarded": 414,
+        "improvementPp": 0.3918722786647315
+      },
+      {
+        "dropped": "shipping",
+        "n": 6894,
+        "discarded": 409,
+        "improvementPp": 0.39164490861618795
+      },
+      {
+        "dropped": "shooting",
+        "n": 6972,
+        "discarded": 415,
+        "improvementPp": 0.4016064257028112
+      },
+      {
+        "dropped": "simpson_episodes",
+        "n": 6790,
+        "discarded": 398,
+        "improvementPp": 0.3829160530191458
+      },
+      {
+        "dropped": "soccer_2016",
+        "n": 6787,
+        "discarded": 410,
+        "improvementPp": 0.39781936054221306
+      },
+      {
+        "dropped": "social_media",
+        "n": 6922,
+        "discarded": 412,
+        "improvementPp": 0.3900606761051719
+      },
+      {
+        "dropped": "software_company",
+        "n": 6925,
+        "discarded": 412,
+        "improvementPp": 0.4043321299638989
+      },
+      {
+        "dropped": "student_loan",
+        "n": 6797,
+        "discarded": 396,
+        "improvementPp": 0.42665882006767697
+      },
+      {
+        "dropped": "superstore",
+        "n": 6884,
+        "discarded": 408,
+        "improvementPp": 0.39221382916908776
+      },
+      {
+        "dropped": "synthea",
+        "n": 6815,
+        "discarded": 413,
+        "improvementPp": 0.41085840058694056
+      },
+      {
+        "dropped": "trains",
+        "n": 6960,
+        "discarded": 414,
+        "improvementPp": 0.40229885057471265
+      },
+      {
+        "dropped": "university",
+        "n": 6850,
+        "discarded": 412,
+        "improvementPp": 0.4087591240875913
+      },
+      {
+        "dropped": "video_games",
+        "n": 6799,
+        "discarded": 413,
+        "improvementPp": 0.3971172231210472
+      },
+      {
+        "dropped": "works_cycles",
+        "n": 6788,
+        "discarded": 396,
+        "improvementPp": 0.3830288744843842
+      },
+      {
+        "dropped": "world",
+        "n": 6901,
+        "discarded": 413,
+        "improvementPp": 0.40573829879727574
+      }
+    ],
+    "jackknifeMinPp": 0.34858387799564267,
+    "jackknifeMaxPp": 0.5008839127872717,
+    "halves": [
+      {
+        "half": "A",
+        "databases": [
+          "public_review_platform",
+          "soccer_2016",
+          "works_cycles",
+          "hockey",
+          "student_loan",
+          "books",
+          "legislator",
+          "retail_complains",
+          "movies_4",
+          "professional_basketball",
+          "food_inspection_2",
+          "image_and_language",
+          "car_retails",
+          "disney",
+          "cs_semester",
+          "menu",
+          "shipping",
+          "movielens",
+          "cars",
+          "ice_hockey_draft",
+          "sales_in_weather",
+          "college_completion",
+          "book_publishing_company",
+          "cookbook",
+          "european_football_1",
+          "movie",
+          "music_tracker",
+          "genes",
+          "citeseer"
+        ],
+        "n": 3506,
+        "discarded": 218,
+        "gatedDeltaPp": -0.028522532800912718,
+        "improvementPp": 0.5989731888191672,
+        "minDetectablePp": 1.0265927463040414
+      },
+      {
+        "half": "B",
+        "databases": [
+          "retail_world",
+          "mondial_geo",
+          "movie_3",
+          "simpson_episodes",
+          "video_games",
+          "chicago_crime",
+          "synthea",
+          "olympics",
+          "regional_sales",
+          "address",
+          "university",
+          "beer_factory",
+          "restaurant",
+          "superstore",
+          "law_episode",
+          "shakespeare",
+          "sales",
+          "world",
+          "airline",
+          "food_inspection",
+          "social_media",
+          "software_company",
+          "computer_student",
+          "app_store",
+          "human_resources",
+          "mental_health_survey",
+          "trains",
+          "shooting",
+          "craftbeer"
+        ],
+        "n": 3494,
+        "discarded": 197,
+        "gatedDeltaPp": -0.6010303377218088,
+        "improvementPp": 0.20034344590726963,
+        "minDetectablePp": 1.042530051516886
+      }
+    ],
+    "permutation": {
+      "resamples": 5000,
+      "observedPp": 0.4,
+      "nullMeanPp": 0.04292857142857134,
+      "nullLowPp": -0.1,
+      "nullHighPp": 0.18571428571428572,
+      "p": 0.0001999600079984003
+    },
+    "criteria": [
+      {
+        "code": "S1",
+        "criterion": "No single database carries the estimate: the improvement stays above zero with each one removed",
+        "actual": "leave-one-out 0.35pp to 0.50pp over 58 databases",
+        "ok": true
+      },
+      {
+        "code": "S2",
+        "criterion": "The placement matters: the observed improvement beats random subsets of its own size at p < 0.05",
+        "actual": "0.40pp against a null of 0.04pp [-0.10, 0.19], p=0.0002",
+        "ok": true
+      },
+      {
+        "code": "S3",
+        "criterion": "Both halves of the database split keep an improvement above 0.0pp",
+        "actual": "A 0.60pp (n=3506, 218 discarded); B 0.20pp (n=3494, 197 discarded)",
+        "ok": true
+      }
+    ],
+    "unstable": false
+  },
+  "unmeasured": [
+    {
+      "category": "causal",
+      "registered": "that the gate acts through the imported name, which §141 proposed",
+      "reason": "this reading measures how much the gate recovers and from which databases, not why it recovers it",
+      "nearest": "the mediation reading (M1-M4)",
+      "difference": "the mediation splits the recovered points by where the name came from; this splits them by which database was dropped"
+    }
+  ],
+  "notes": [
+    "Leave-one-database-out is the clustering check. Questions within a database are not independent — a rule injected on one is injected on its neighbours — so an estimate carried by a single database would not reproduce at a different mixture, and an out-of-sample run draws a different mixture by construction.",
+    "The permutation test redraws which questions the gate discards, keeping the number discarded fixed. It asks whether the gate finds damaged questions or merely pays the variance of dropping a share of the corpus. Sampling is without replacement: with replacement the null would describe a smaller subset than the gate discards, and a wider null flatters the gate.",
+    "The halves are balanced greedily by question count rather than split by hash, because this corpus has 58 databases of very different sizes and an arbitrary partition can leave one half too small to resolve anything.",
+    "Every number here comes from a closed form over the recorded outcomes: the gated arm reads the no-pack query that already exists for each of the 548 discarded questions. Nothing is resampled except the permutation null and the two bootstrap intervals."
+  ]
+}

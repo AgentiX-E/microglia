@@ -429,6 +429,42 @@ jobs:
               '% where nothing is named against ' + o.all.harmedPerCorrectPp.toFixed(2) + '% where everything is');
           "
 
+      - name: Out of sample (recomputed, and four of the five registrations adjudicated)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/oos" pnpm eval:out-of-sample
+          diff -u eval/results/poc-out-of-sample.json "${RUNNER_TEMP}/oos/poc-out-of-sample.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/oos/poc-out-of-sample.json');
+            const verdict = (id) => a.verdicts.find((v) => v.id === id);
+            const checks = [
+              ['both corpora are the ones registered', a.datasets.dev === 'BIRD dev' && a.datasets.train === 'BIRD train (out-of-sample)'],
+              ['the out-of-sample corpus is the 7,000-question run over 58 databases', a.train.clustered.questions === 7000 && a.train.clustered.clusters === 58],
+              ['the memory arm is negative there', Math.abs(a.train.deltaPp + 0.7142857142857143) < 1e-9],
+              ['and stays negative when the interval is resampled over databases', a.train.clustered.resolved === true && a.train.clustered.highPp < 0],
+              ['which is the check that closed R32s first axis and this headline survives', a.train.clustered.lowPp > -1.4 && a.train.clustered.lowPp < -1.1],
+              ['all five folds point the same way', a.train.folds.negative === 5 && a.train.folds.positive === 0],
+              ['and five folds cannot reach p < 0.05 however unanimous they are', Math.abs(a.train.folds.p - 0.0625) < 1e-12],
+              ['on dev the same arm is positive and unresolved', a.dev.deltaPp > 0 && a.dev.clustered.resolved === false],
+              ['the gate recovered about half of what dev promised', Math.abs(a.dev.gate.improvementPp - 0.9778) < 0.001 && Math.abs(a.train.gate.improvementPp - 0.5143) < 0.001],
+              ['so the product is not better than no memory out of sample', a.train.gate.gatedDeltaPp < 0 && Math.abs(a.train.gate.gatedDeltaPp + 0.2) < 1e-9],
+              ['the statement says exactly that, from the numbers', a.statement.includes('not distinguishable from no memory') && a.statement.includes('0.71pp') && a.statement.includes('0.51pp')],
+              ['P1 holds: the run was measurable', verdict('P1').holds === true],
+              ['P2 is refuted: it is significantly different from the none arm', verdict('P2').holds === false],
+              ['P3 holds: the gate is inside the registered wide band', verdict('P3').holds === true && a.train.gate.improvementPp >= 0.2 && a.train.gate.improvementPp <= 2.0],
+              ['P4 holds: shrinkage of less than half, inside [0.49, 0.98]', verdict('P4').holds === true],
+              ['P5 holds: an imported name is still negative', verdict('P5').holds === true && a.train.imported.deltaPp < 0],
+              ['the imported cohort is 548 questions and carries most of the harm', a.train.imported.n === 548],
+              ['nothing in the table compares an accuracy across splits', a.table.some((row) => /accuracy/i.test(row.label)) === false],
+              ['seven rows, one per comparable quantity', a.table.length === 7],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('out-of-sample failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('out-of-sample: ' + checks.length + ' checks pass, delta ' + a.train.deltaPp.toFixed(2) +
+              'pp [' + a.train.clustered.lowPp.toFixed(2) + ', ' + a.train.clustered.highPp.toFixed(2) +
+              '], gate +' + a.train.gate.improvementPp.toFixed(2) + 'pp, net ' + a.train.gate.gatedDeltaPp.toFixed(2) + 'pp');
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

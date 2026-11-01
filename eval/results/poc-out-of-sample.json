@@ -1,0 +1,136 @@
+{
+  "id": "poc-out-of-sample",
+  "title": "Whether the read-time gate survives a corpus the hypothesis was not formed on",
+  "registered": "prereg/R30-stage2.md",
+  "sources": {
+    "dev": "eval/results/poc-sota-bird-dev-R26-channels.json",
+    "train": "eval/results/poc-sota-bird-train.json"
+  },
+  "datasets": {
+    "dev": "BIRD dev",
+    "train": "BIRD train (out-of-sample)"
+  },
+  "verdicts": [
+    {
+      "id": "P1",
+      "registered": "the run is measurable: every question evaluated once, gold executable, no leaks",
+      "observed": "both gates passed as registered",
+      "holds": true
+    },
+    {
+      "id": "P2",
+      "registered": "the full arm is not positive, and not significantly different from the none arm",
+      "observed": "-0.71pp clustered [-1.27pp, -0.18pp]",
+      "holds": false
+    },
+    {
+      "id": "P3",
+      "registered": "the read-time gate is worth between +0.2pp and +2.0pp on train",
+      "observed": "0.51pp",
+      "holds": true
+    },
+    {
+      "id": "P4",
+      "registered": "the gate shrinks and by less than half: a point estimate in [0.49, 0.98]",
+      "observed": "0.51pp",
+      "holds": true
+    },
+    {
+      "id": "P5",
+      "registered": "an imported identifier is still a negative covariate",
+      "observed": "-6.57pp against -0.22pp",
+      "holds": true
+    }
+  ],
+  "table": [
+    {
+      "label": "questions",
+      "dev": "1534",
+      "train": "7000"
+    },
+    {
+      "label": "databases",
+      "dev": "11",
+      "train": "58"
+    },
+    {
+      "label": "arm delta, clustered",
+      "dev": "0.33pp [-0.63, 1.36]",
+      "train": "-0.71pp [-1.27, -0.18]"
+    },
+    {
+      "label": "folds agreeing with the sign",
+      "dev": "n/a (no folds)",
+      "train": "5 of 5, p=0.0625"
+    },
+    {
+      "label": "gate improvement",
+      "dev": "0.98pp",
+      "train": "0.51pp"
+    },
+    {
+      "label": "gated arm delta",
+      "dev": "1.30pp",
+      "train": "-0.20pp"
+    },
+    {
+      "label": "imported-name delta",
+      "dev": "-9.68pp",
+      "train": "-6.57pp"
+    }
+  ],
+  "dev": {
+    "deltaPp": 0.3259452411994785,
+    "clustered": {
+      "questions": 1534,
+      "clusters": 11,
+      "pointPp": 0.3259452411994785,
+      "lowPp": -0.6264682850430697,
+      "highPp": 1.364522417153996,
+      "resolved": false
+    },
+    "gate": {
+      "discarded": 155,
+      "improvementPp": 0.9778357235984355,
+      "gatedDeltaPp": 1.303780964797914
+    },
+    "imported": {
+      "n": 155,
+      "deltaPp": -9.67741935483871,
+      "restDeltaPp": 1.4503263234227701
+    }
+  },
+  "train": {
+    "deltaPp": -0.7142857142857143,
+    "clustered": {
+      "questions": 7000,
+      "clusters": 58,
+      "pointPp": -0.7142857142857143,
+      "lowPp": -1.2731130645650197,
+      "highPp": -0.1793350807007863,
+      "resolved": true
+    },
+    "folds": {
+      "negative": 5,
+      "positive": 0,
+      "ties": 0,
+      "p": 0.0625
+    },
+    "gate": {
+      "discarded": 548,
+      "improvementPp": 0.5142857142857142,
+      "gatedDeltaPp": -0.2
+    },
+    "imported": {
+      "n": 548,
+      "deltaPp": -6.569343065693431,
+      "restDeltaPp": -0.21698698078115314
+    }
+  },
+  "statement": "Out of sample, memory costs 0.71pp. The read-time gate recovers 0.51pp of it, leaving -0.20pp, which is not distinguishable from no memory.",
+  "notes": [
+    "The clustered interval is the one that decides this round. Questions inside a database are not independent — one package of rules reaches all of them — so the interval resamples databases. The question-level interval is in the source artefact and is narrower on train by 0.03pp, which is why it was not the one quoted.",
+    "No accuracy is compared across the two splits. Dev and train share no database, so only the paired differences between arms are the same quantity.",
+    "The dev column of the table is the reading this round was registered against. It is recomputed here rather than quoted from the documentation, so the two cannot drift."
+  ]
+}

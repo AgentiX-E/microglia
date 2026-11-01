@@ -251,15 +251,40 @@ of the damaged questions the rule named nothing at all, and the query still went
 question never mentioned. `pnpm eval:mediation` reproduces the table, and the workflow asserts the number
 that withdrew the previous claim.
 
-What survives is the check on the query rather than on the rule. A read-time filter that discards a generated
-statement naming something neither the question nor the pack mentions would have been worth **+0.98pp**
-(+0.33 → +1.30pp), and that estimate is stable: removing any one of the eleven databases leaves it between
-+0.77 and +1.25pp, both halves of a database split gain (+0.76 and +1.22pp), and it sits outside a
-permutation null of random discards of the same size (p = 0.0002). It is still **not shipped**, for the reason
-that has not changed — it was chosen on these 1,534 questions, and its gated delta misses the sample's own
-80%-power bar of 1.77pp. **Read the whole section as the reason to verify the generated statement against the
-request before you execute it, which costs one comparison and is in your control** — and not as advice about
-how to word a rule, which is what it was until this measurement.
+What survives is the check on the query rather than on the rule — and it has now been tested on a corpus
+this project never touched. BIRD **train** shares no database with dev: **7,000 questions over 58 databases**,
+five cross-fitted folds, 14,479 model calls.
+
+| | dev (1,534 questions) | train (7,000 questions) |
+|---|---|---|
+| accuracy without memory | 57.43% | 58.21% |
+| accuracy with memory | 57.76% | **57.50%** |
+| **delta, clustered interval** | +0.33pp [−0.63, +1.36] | **−0.71pp [−1.27, −0.18]** |
+| the read-time filter recovers | +0.98pp | **+0.51pp** |
+| gated result | +1.30pp | **−0.20pp** |
+
+**Out of sample, the memory makes the product worse, and the filter recovers 72% of the cost without making
+it better than not using memory at all.** Five of five folds are negative. The filter itself is real — it
+discards 7.8% of the questions and those questions are the damaged ones (−6.57pp against −0.22pp, gap
+[−10.99, −1.92] at p = 0.0158), the improvement survives leave-one-database-out (0.45–0.62pp across 58
+databases), and it sits outside a permutation null of random discards of the same size (p = 0.0002). The
+gated arm's −0.20pp is simply not distinguishable from zero.
+
+That makes the recommendation narrower than it was, and it is the useful form of a negative result:
+
+> **Verify the generated statement against the request before you execute it.** That costs one comparison,
+> it is in your control, and out of sample it is worth +0.51pp of execution accuracy. Do not expect the rules
+> themselves to pay for the attention they cost — on a corpus that is not yours, they cost accuracy.
+
+**Why the filter works is not why we thought.** The damaged questions are those whose generated query names
+something neither the question nor the bare attempt mentions. On dev, 38.7% of those names were traceable to
+the rule's own text; on train, **19.5%** are, and only 19.4% of the filter's recovery comes from questions a
+rule named anything in. The rules do not have to name the column to push the model into over-specifying — so
+the filter is a property of the query, not of the rule, and it works without knowing what the rules said.
+
+You can reproduce all of it without a model call: `pnpm eval:out-of-sample` recomputes both columns from the
+two committed artefacts, `pnpm eval:query-diff` and `pnpm eval:gate-stability` produce the pieces, and the
+workflow asserts 19 numbers from them on every push.
 
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
 

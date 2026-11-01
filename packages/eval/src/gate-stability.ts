@@ -25,6 +25,7 @@
  * than left for a reader to assume.
  */
 import { mulberry32 } from '@agentix-e/microglia-core';
+import type { Split } from './bird-data.js';
 import { cellOf, discardSetOf, improvementOf, type DiffCase } from './query-diff.js';
 import type { GroundingMode } from './sql-diff.js';
 
@@ -93,6 +94,75 @@ export type StabilityOptions = {
   /** How many random subsets the permutation test draws. */
   readonly permutations?: number;
 };
+
+/** A criterion the reading cannot answer, with the nearest one it can and how they differ. */
+export type StabilityGap = {
+  readonly category: string;
+  readonly registered: string;
+  readonly reason: string;
+  readonly nearest: string;
+  readonly difference: string;
+};
+
+/**
+ * What a stability reading says about itself.
+ *
+ * Separated from the reading because the two were written as one and the prose was the half that
+ * did not travel. The title quoted `+1.30pp`, which is dev's number, and the `unmeasured` block
+ * asserted that "every question here was in the corpus that produced §140, so no split of it is out
+ * of sample" — true of dev, and exactly false of the train split this reading was pointed at next.
+ * The artefact then reported a correctly measured number under a heading that denied the
+ * measurement, which is the failure mode this repository keeps finding: not a crash, a plausible
+ * label.
+ *
+ * So every clause that depends on the corpus is derived from it: the number in the title is the
+ * one that was read, the database count is the one that was counted, and whether the corpus can
+ * support an out-of-sample claim is asked of the split name rather than assumed.
+ */
+export type StabilityFraming = {
+  readonly title: string;
+  readonly unmeasured: readonly StabilityGap[];
+  readonly notes: readonly string[];
+};
+
+/** The framing a stability reading of this corpus may use, given what it actually found. */
+export function stabilityFramingOf(input: {
+  readonly observedPp: number | null;
+  readonly discarded: number;
+  readonly n: number;
+  readonly databases: number;
+  readonly split: Split | 'unknown';
+}): StabilityFraming {
+  const improvement = input.observedPp === null ? 'unmeasured' : `${input.observedPp.toFixed(2)}pp`;
+  const outOfSample = input.split === 'train';
+  return {
+    title: `Whether the read-time gate's ${improvement} is a property of the gate or of one database`,
+    unmeasured: [
+      outOfSample
+        ? {
+            category: 'causal',
+            registered: 'that the gate acts through the imported name, which §141 proposed',
+            reason: 'this reading measures how much the gate recovers and from which databases, not why it recovers it',
+            nearest: 'the mediation reading (M1-M4)',
+            difference:
+              'the mediation splits the recovered points by where the name came from; this splits them by which database was dropped',
+          }
+        : {
+            category: 'out-of-sample',
+            registered: 'the estimate on questions the hypothesis was not formed on',
+            reason: 'every question here was in the corpus that produced §140, so no split of it is out of sample',
+            nearest: 'S3 (the two halves)',
+            difference: 'S3 says the estimate is stable across sub-samples; it cannot say it reproduces on a new one',
+          },
+    ],
+    notes: [
+      'Leave-one-database-out is the clustering check. Questions within a database are not independent — a rule injected on one is injected on its neighbours — so an estimate carried by a single database would not reproduce at a different mixture, and an out-of-sample run draws a different mixture by construction.',
+      'The permutation test redraws which questions the gate discards, keeping the number discarded fixed. It asks whether the gate finds damaged questions or merely pays the variance of dropping a share of the corpus. Sampling is without replacement: with replacement the null would describe a smaller subset than the gate discards, and a wider null flatters the gate.',
+      `The halves are balanced greedily by question count rather than split by hash, because this corpus has ${input.databases} databases of very different sizes and an arbitrary partition can leave one half too small to resolve anything.`,
+      `Every number here comes from a closed form over the recorded outcomes: the gated arm reads the no-pack query that already exists for each of the ${input.discarded} discarded questions. Nothing is resampled except the permutation null and the two bootstrap intervals.`,
+    ],
+  };
+}
 
 /** The share of the improvement the weakest half must keep before the effect is called stable. */
 export const HALF_FLOOR_PP = 0;
