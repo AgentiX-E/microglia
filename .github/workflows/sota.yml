@@ -20,7 +20,7 @@ on:
         required: false
         default: '5'
       max_calls:
-        description: 'Hard model-call budget; the lane forecasts the remaining folds and stops early rather than discarding a run'
+        description: 'Hard model-call budget; the lane forecasts the remaining folds and stops early rather than discarding a run (dev at four arms used 6,504; train at 6,600 questions over two arms needs about 14,600)'
         required: false
         default: '8000'
       generalize:
@@ -32,7 +32,7 @@ on:
         required: false
         default: ''
       split:
-        description: 'R8.3b: BIRD split — minidev (350-question slice the transfer experiments use) or dev (all 1,534 questions, the only split that can reproduce a published dev cell)'
+        description: 'BIRD split — minidev (350-question slice the transfer experiments use), dev (all 1,534 questions, the only split that can reproduce a published dev cell), or train (7,829 out-of-sample questions over 58 databases; not comparable to any leaderboard row)'
         required: false
         default: 'minidev'
       learn_sample:
@@ -134,22 +134,47 @@ permissions:
 # recomputed from. This expression is the rule `artefacts.ts` enforces, spelled once so a
 # dispatch's upload path and its write path cannot disagree.
 env:
-  SOTA_ARTEFACT: ${{ github.event.inputs.prereg != '' && format('{0}-{1}.json', github.event.inputs.split == 'dev' && 'poc-sota-bird-dev' || 'poc-sota-bird', github.event.inputs.prereg) || (github.event.inputs.split == 'dev' && 'poc-sota-bird-dev.json' || 'poc-sota-bird.json') }}
+  # The chain is spelled in full for each split, with `minidev` as the final fallback rather than
+  # as the default arm of a two-way choice: `split == 'dev' && A || B` answers B for `train`, and B
+  # is the Mini-Dev artefact — the file a train dispatch would have overwritten, which is exactly
+  # the loss this variable exists to prevent.
+  SOTA_ARTEFACT: ${{ github.event.inputs.prereg != '' && format('{0}-{1}.json', github.event.inputs.split == 'dev' && 'poc-sota-bird-dev' || (github.event.inputs.split == 'train' && 'poc-sota-bird-train' || 'poc-sota-bird'), github.event.inputs.prereg) || (github.event.inputs.split == 'dev' && 'poc-sota-bird-dev.json' || (github.event.inputs.split == 'train' && 'poc-sota-bird-train.json' || 'poc-sota-bird.json')) }}
 
 jobs:
   bird:
     # The split is in the title, not only in the inputs: a run list that calls all of them Mini-Dev
     # is a run list a reader has to open to tell apart, and the two splits measure different cells.
-    name: BIRD ${{ github.event.inputs.split == 'dev' && 'dev' || 'Mini-Dev' }} (cross-fitted, memory on/off)
+    name: BIRD ${{ github.event.inputs.split == 'dev' && 'dev' || (github.event.inputs.split == 'train' && 'train (out-of-sample)' || 'Mini-Dev') }} (cross-fitted, memory on/off)
     # A dispatch that only wants the L4 lane should not pay for a BIRD run it did
     # not ask for. Scheduled and push-triggered runs are unaffected.
     if: github.event_name != 'workflow_dispatch' || github.event.inputs.bird != 'false'
     runs-on: ubuntu-latest
-    # 1,534 questions x 2 arms at concurrency 8 is about 3,100 calls; the dev split needs the
-    # headroom that the 350-question slice never did.
-    timeout-minutes: 260
+    # Measured, not guessed: dev at 1,534 questions over four arms is 6,504 calls in 130 minutes,
+    # so the cap has to cover the largest dispatch anyone actually runs. Train at 6,600 questions
+    # over two arms is about 14,600 calls — 2.3x dev — and 340 minutes is that ratio applied to the
+    # measured dev wall clock, rounded up. The job limit is six hours, and the lane stops itself
+    # earlier than this on `deadline_min`, writing the folds it finished.
+    timeout-minutes: 340
     steps:
       - uses: actions/checkout@v4
+
+      # The train archive is 8.9 GB and unpacks to a 9.3 GB nested zip, whose databases come to
+      # 2.4 GB once the manifest's selection is applied. The peak is the download plus the nested
+      # archive — 18.3 GB — and a standard runner offers about 14 GB of free space with its
+      # preinstalled toolchains in place. Removing the ones this job never invokes is the
+      # documented way to get that space back, and it is why the split is runnable at all rather
+      # than an optimisation: without it the run fails at the unpack, after paying for the download.
+      #
+      # The tool cache is deliberately left alone. It holds the Node this job runs on, and deleting
+      # it to gain five gigabytes would trade a disk error at a known step for a missing interpreter
+      # at an unknown one.
+      - name: Free disk space for the train archive
+        if: github.event.inputs.split == 'train'
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL \
+                      /usr/local/share/boost /usr/share/swift
+          df -h /
 
       - uses: pnpm/action-setup@v4
         with:
@@ -175,11 +200,12 @@ jobs:
             exit 1
           fi
 
-      # No inventory step: the lane verifies its own data. It reads the pinned
-      # manifest (`eval/manifests/bird-minidev.json`), checks the download's size and
-      # SHA-256 before extracting, reads the questions from the same archive, and
-      # counts the rows of every database it is about to use. A pre-flight step that
-      # listed a different source would be a second opinion nobody asked for.
+      # No inventory step: the lane verifies its own data. It reads the pinned manifest for its
+      # split (`bird-minidev.json`, `bird-dev.json` or `bird-train.json`), checks the download's
+      # size and SHA-256 before extracting, reads the questions from the same archive, and counts
+      # the rows of every database it is about to use. A pre-flight step that listed a different
+      # source would be a second opinion nobody asked for — which is why the precheck in
+      # `bin/split-precheck.ts` reuses the lane's own loader rather than restating it.
       # A stale artefact is worse than no artefact: the publish and upload steps run
       # with `if: always()`, so a committed result from an earlier run would be
       # reported as this run's evidence. Deleting it first makes "nothing was

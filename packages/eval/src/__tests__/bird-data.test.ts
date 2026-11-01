@@ -14,7 +14,10 @@ import {
   requirePopulated,
   dedupeQuestions,
   sha256OfFile,
+  isSimple,
   splitFrom,
+  SPLITS,
+  withinDatabases,
   type BirdDataErrorReason,
 } from '../bird-data.js';
 
@@ -76,6 +79,41 @@ describe('the shipped manifest', () => {
   });
 });
 
+describe('the nested archive a split ships', () => {
+  const base = {
+    name: 'example',
+    version: 'v1',
+    url: 'https://example.invalid/a.zip',
+    bytes: 10,
+    sha256: 'a'.repeat(64),
+    licence: 'CC-BY-SA-4.0',
+    attribution: 'nobody',
+    root: 'root',
+    questions: 'questions.json',
+    databases: ['db'],
+    retrievedAt: '2026-11-01',
+  };
+
+  it('reads the archive and the directory it extracts to as one declaration', () => {
+    const parsed = parseManifest({ ...base, nested: 'x_databases.zip', nestedRoot: 'x_databases' });
+    expect(parsed.nested).toBe('x_databases.zip');
+    expect(parsed.nestedRoot).toBe('x_databases');
+  });
+
+  it('leaves both absent for an archive that does not nest', () => {
+    const parsed = parseManifest(base);
+    expect(parsed.nested).toBeUndefined();
+    expect(parsed.nestedRoot).toBeUndefined();
+  });
+
+  it('refuses half a declaration, because half of it extracts where nothing looks', () => {
+    // Naming the archive and not the directory unpacks the databases to a path the lane never
+    // opens, which is the same outcome as not unpacking them, one step later and harder to see.
+    expect(() => parseManifest({ ...base, nested: 'x_databases.zip' })).toThrow(/nestedRoot/);
+    expect(() => parseManifest({ ...base, nestedRoot: 'x_databases' })).toThrow();
+  });
+});
+
 describe('what a manifest refuses', () => {
   it('refuses a document that is not an object', () => {
     expect(reasonOf(() => parseManifest([]))).toBe('manifest-shape');
@@ -105,19 +143,29 @@ describe('what a manifest refuses', () => {
 });
 
 describe('which split a run measures', () => {
-  it('reads the two known splits, case and padding included', () => {
+  it('reads the three known splits, case and padding included', () => {
     expect(splitFrom(undefined)).toBe('minidev');
     expect(splitFrom('')).toBe('minidev');
     expect(splitFrom('  MINIDEV ')).toBe('minidev');
     expect(splitFrom('dev')).toBe('dev');
     expect(splitFrom('DEV')).toBe('dev');
+    expect(splitFrom('train')).toBe('train');
+    expect(splitFrom(' Train ')).toBe('train');
   });
 
   it('refuses a split it does not have, rather than falling back', () => {
     // A typo that silently measured Mini-Dev while the dispatch said `dev` would
     // produce a 350-question number filed as a 1,534-question reproduction.
     expect(() => splitFrom('test')).toThrow(/Unknown split/);
-    expect(() => splitFrom('mini')).toThrow(/known splits are minidev, dev/);
+    expect(() => splitFrom('mini')).toThrow(/known splits are minidev, dev, train/);
+    // `test` is a real BIRD split, and refusing it is the point: its gold labels are not published,
+    // so a run under that name could only ever report a number nobody can check.
+    expect(() => splitFrom('test')).toThrow(/known splits are/);
+  });
+
+  it('lists every split it accepts, so the message and the parser cannot drift', () => {
+    for (const split of SPLITS) expect(splitFrom(split)).toBe(split);
+    expect(SPLITS).toEqual(['minidev', 'dev', 'train']);
   });
 });
 
@@ -146,6 +194,66 @@ describe('which questions a split scores', () => {
   it('matches difficulty case-insensitively', () => {
     const odd = [{ difficulty: 'Simple', id: 'a' }, { difficulty: 'MODERATE', id: 'b' }];
     expect(poolOf(odd, 'minidev').map((row) => row.id)).toEqual(['b']);
+  });
+
+  it('keeps every train question, including the ones with no tier at all', () => {
+    // `train.json` carries `SQL`, `db_id`, `question` and `evidence` and no `difficulty` on any of
+    // its 9,428 rows (measured 2026-11-01). Reading the tier unconditionally throws a TypeError,
+    // and the throw lands after an 8.9 GB download and an unpack — a dispatch that dies at startup
+    // having already paid for everything. This test is that dispatch, in one line.
+    const untiered = [{ id: 'a' }, { id: 'b' }];
+    expect(poolOf(untiered, 'train').map((row) => row.id)).toEqual(['a', 'b']);
+    expect(poolOf(rows, 'train').map((row) => row.id)).toEqual(['a', 'b', 'c']);
+  });
+});
+
+describe('the selection a manifest declares', () => {
+  const rows = [
+    { db_id: 'a', id: 1 },
+    { db_id: 'a', id: 2 },
+    { db_id: 'b', id: 3 },
+    { db_id: 'c', id: 4 },
+  ];
+
+  it('keeps the questions whose database the manifest names', () => {
+    const scoped = withinDatabases(rows, ['a', 'b']);
+    expect(scoped.rows.map((row) => row.id)).toEqual([1, 2, 3]);
+    expect(scoped.dropped).toBe(1);
+  });
+
+  it('counts what the selection costs, so a smaller n is explained rather than discovered', () => {
+    // The number a train run reports is 7,829 where the file holds 9,428, and the difference is a
+    // choice about bytes per question — 30 GB of databases for 1,599 questions. A run that showed
+    // only the smaller figure would leave a reader to guess whether the data or the design shrank.
+    const scoped = withinDatabases(rows, ['c']);
+    expect(scoped.dropped).toBe(3);
+    expect(scoped.rows).toHaveLength(1);
+  });
+
+  it('reports a declared database with no questions, which is a cost to revisit', () => {
+    expect(withinDatabases(rows, ['a', 'b', 'ghost']).unused).toEqual(['ghost']);
+    expect(withinDatabases(rows, ['a', 'b', 'c']).unused).toEqual([]);
+  });
+
+  it('drops everything when the manifest names nothing, rather than keeping everything', () => {
+    // The opposite default would make an empty list mean "no selection", and an empty list is what
+    // a manifest with a typo in the key produces.
+    const scoped = withinDatabases(rows, []);
+    expect(scoped.rows).toEqual([]);
+    expect(scoped.dropped).toBe(4);
+  });
+});
+
+describe('isSimple', () => {
+  it('answers no for a row that carries no tier, rather than throwing', () => {
+    expect(isSimple('simple')).toBe(true);
+    expect(isSimple('Simple')).toBe(true);
+    expect(isSimple('moderate')).toBe(false);
+    expect(isSimple(undefined)).toBe(false);
+    expect(isSimple(null)).toBe(false);
+    // The field is read from JSON that this repository did not write. A number there is not a
+    // difficulty and must not crash a run that only wanted to know whether to drop the question.
+    expect(isSimple(3)).toBe(false);
   });
 });
 

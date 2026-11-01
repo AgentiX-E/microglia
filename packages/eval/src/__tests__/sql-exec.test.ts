@@ -157,6 +157,34 @@ describe('resolveDatabase', () => {
     expect(resolveDatabase(shallowDir, 'other')).toBe(placed);
   });
 
+  it('finds a root the caller names, which is how a split declares its own layout', () => {
+    // `train_databases` is not in the built-in list because it belongs to one split. The caller
+    // reads it from the manifest and passes it in, so a new archive layout is a manifest field
+    // rather than a fourth guess here — and a lane whose split ships an unlisted root used to fail
+    // question by question, after the download.
+    const trainDir = join(directory, 'train-root');
+    const nested = join(trainDir, 'train_databases', 'learner');
+    mkdirSync(nested, { recursive: true });
+    const placed = join(nested, 'learner.sqlite');
+    writeFileSync(placed, '');
+    expect(resolveDatabase(trainDir, 'learner', ['train_databases'])).toBe(placed);
+    // Without the root the caller found nothing, which is the failure the parameter removes.
+    expect(resolveDatabase(trainDir, 'learner')).toBe(join(trainDir, 'learner.sqlite'));
+  });
+
+  it('prefers the caller\'s root to the built-in layouts it would otherwise guess', () => {
+    const bothDir = join(directory, 'both-roots');
+    for (const root of ['dev_databases', 'train_databases']) {
+      const nested = join(bothDir, root, 'dual');
+      mkdirSync(nested, { recursive: true });
+      writeFileSync(join(nested, 'dual.sqlite'), root);
+    }
+    expect(resolveDatabase(bothDir, 'dual', ['train_databases'])).toBe(
+      join(bothDir, 'train_databases', 'dual', 'dual.sqlite'),
+    );
+    expect(resolveDatabase(bothDir, 'dual')).toBe(join(bothDir, 'dev_databases', 'dual', 'dual.sqlite'));
+  });
+
   it('finds the doubled nesting an extractor named minidev produces', () => {
     // The vendor archive contains minidev/MINIDEV/...; unpacking it into a directory that
     // is itself called minidev gives minidev/minidev/MINIDEV/... and a candidate list

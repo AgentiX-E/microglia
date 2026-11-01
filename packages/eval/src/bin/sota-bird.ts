@@ -64,7 +64,9 @@
 import { writeJson } from './lib.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
@@ -206,12 +208,16 @@ import {
   groundedItems,
   parseArms,
   parseManifest,
+  parseRows,
+  type BirdRow,
   parseRetirementPolicy,
   artefactIdOf,
   artefactWriteIdOf,
   poolOf,
+  SPLITS,
   splitFrom,
   splitNameOf,
+  withinDatabases,
   retireeFrom,
   promptFor,
   reportedSql,
@@ -315,7 +321,7 @@ function splitOf(raw: string | undefined): Split {
   try {
     return splitFrom(raw);
   } catch (error) {
-    throw new MicrogliaError('MG_E_CONFIG', (error as Error).message, { known: 'minidev, dev' });
+    throw new MicrogliaError('MG_E_CONFIG', (error as Error).message, { known: SPLITS.join(', ') });
   }
 }
 
@@ -625,15 +631,6 @@ function nonNegative(raw: string | undefined, fallback: number): number {
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
-type BirdRow = {
-  readonly question_id: number;
-  readonly db_id: string;
-  readonly question: string;
-  readonly evidence: string;
-  readonly SQL: string;
-  readonly difficulty: string;
-};
-
 /** One evaluated question, every arm, as the protocol requires. */
 type CaseOutcome = {
   readonly id: string;
@@ -831,58 +828,6 @@ async function fetchText(url: string): Promise<string | undefined> {
   }
 }
 
-function normaliseRow(raw: Record<string, unknown>, index: number): BirdRow | undefined {
-  const question = raw['question'];
-  const sql = raw['SQL'] ?? raw['sql'] ?? raw['query'] ?? raw['gold_sql'];
-  const db = raw['db_id'] ?? raw['database'] ?? raw['db'];
-  if (typeof question !== 'string' || typeof sql !== 'string' || typeof db !== 'string') return undefined;
-  if (question.trim() === '' || sql.trim() === '') return undefined;
-  return {
-    question_id: typeof raw['question_id'] === 'number' ? raw['question_id'] : index,
-    db_id: db,
-    question,
-    evidence: typeof raw['evidence'] === 'string' ? raw['evidence'] : '',
-    SQL: sql,
-    difficulty: typeof raw['difficulty'] === 'string' ? raw['difficulty'] : '',
-  };
-}
-
-/**
- * Accept both shapes the dataset has shipped in: a JSON array and JSON Lines.
- *
- * Hugging Face's `-00000-of-00001.json` files are line-delimited for table
- * datasets and arrays for others, and a parser that assumes one silently reads
- * zero rows from the other. It also tolerates a `{data: [...]}` wrapper, which is
- * what a converted export looks like.
- */
-function parseRows(text: string): BirdRow[] {
-  const trimmed = text.trim();
-  const records: unknown[] = [];
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (Array.isArray(parsed)) records.push(...parsed);
-    else if (parsed !== null && typeof parsed === 'object' && Array.isArray((parsed as { data?: unknown }).data)) {
-      records.push(...((parsed as { data: unknown[] }).data));
-    } else records.push(parsed);
-  } catch {
-    for (const line of trimmed.split('\n')) {
-      if (line.trim() === '') continue;
-      try {
-        records.push(JSON.parse(line) as unknown);
-      } catch {
-        // A truncated final line is not a reason to lose the rest of the file.
-      }
-    }
-  }
-  const rows: BirdRow[] = [];
-  for (const [index, record] of records.entries()) {
-    if (record === null || typeof record !== 'object') continue;
-    const row = normaliseRow(record as Record<string, unknown>, index);
-    if (row !== undefined) rows.push(row);
-  }
-  return rows;
-}
-
 /**
  * Locate a database inside an extracted Mini-Dev directory.
  *
@@ -892,22 +837,32 @@ function parseRows(text: string): BirdRow[] {
  * reported different rows and the evidenced criterion silently became the plain cascade.
  * One implementation, tested, and this function only adds the message.
  */
-function databaseIn(directory: string, dbId: string): string {
-  const resolved = resolveDatabase(directory, dbId);
+function databaseIn(directory: string, dbId: string, nestedRoot?: string): string {
+  const resolved = resolveDatabase(directory, dbId, nestedRoot === undefined ? [] : [nestedRoot]);
   if (existsSync(resolved)) return resolved;
+  // The roots are quoted from the manifest rather than listed here: the hint used to name two
+  // layouts out of three, and the third is the one a train run needs.
+  const roots = ['dev_databases', 'MINIDEV/dev_databases', nestedRoot ?? 'train_databases'];
   throw new MicrogliaError('MG_E_STORE_IO', `No database file for '${dbId}' under BIRD_DIR`, {
     looked_in: directory,
-    hint: 'Expected dev_databases/<db>/<db>.sqlite (the pinned archive), mini_dev_sqlite/<db>/<db>.sqlite, or a flat <db>.sqlite',
+    hint: `${roots.map((root) => `${root}/<db>/<db>.sqlite`).join(', ')}, or a flat <db>.sqlite`,
   });
 }
 
 /**
  * The pinned manifest for this split.
  *
- * Two files rather than one with a switch inside: each archive has its own URL, size and digest,
- * and a manifest is the record of one verification, not a table of them.
+ * Three files rather than one with a switch inside: each archive has its own URL, size and digest,
+ * and a manifest is the record of one verification, not a table of them. The lookup is exhaustive
+ * over `Split`, so a fourth split cannot be added without a manifest to point at — which is the
+ * compile-time half of the guard whose runtime half is `splitFrom` refusing an unknown name.
  */
-const MANIFEST = join(REPO, 'eval', 'manifests', SPLIT === 'dev' ? 'bird-dev.json' : 'bird-minidev.json');
+const MANIFEST_NAMES: Readonly<Record<Split, string>> = {
+  minidev: 'bird-minidev.json',
+  dev: 'bird-dev.json',
+  train: 'bird-train.json',
+};
+const MANIFEST = join(REPO, 'eval', 'manifests', MANIFEST_NAMES[SPLIT]);
 
 function loadManifest(): BirdManifest {
   return parseManifest(JSON.parse(readFileSync(MANIFEST, 'utf8')));
@@ -934,15 +889,37 @@ async function prepareArchive(): Promise<string> {
   mkdirSync(CACHE, { recursive: true });
 
   if (!existsSync(dest) || statSync(dest).size !== manifest.bytes) {
-    process.stdout.write(`[sota] downloading ${url}\n`);
-    const response = await fetch(url, { signal: AbortSignal.timeout(600_000) });
+    process.stdout.write(`[sota] downloading ${url} (${(manifest.bytes / 1e9).toFixed(2)} GB)\n`);
+    // The body is streamed to disk, not buffered. `arrayBuffer()` was the whole download in one
+    // allocation: 346 MB for dev, which worked, and 8.9 GB for train, which is most of a runner's
+    // memory before the databases are even unpacked. The streaming form is the same code for both
+    // and it is what makes the third split runnable at all.
+    //
+    // The timeout is forty minutes and covers the whole transfer: it is a hang detector, and a
+    // per-request deadline short enough to fire on a slow 8.9 GB download would turn a working run
+    // into a truncated file — which the digest would then blame on the dataset.
+    const response = await fetch(url, { signal: AbortSignal.timeout(2_400_000) });
     if (!response.ok) {
       throw new MicrogliaError('MG_E_STORE_IO', `The dataset archive answered ${response.status}`, {
         url,
         hint: 'Set BIRD_DIR to an extracted directory for this split instead.',
       });
     }
-    writeFileSync(dest, Buffer.from(await response.arrayBuffer()));
+    if (response.body === null) {
+      throw new MicrogliaError('MG_E_STORE_IO', 'The dataset archive answered with no body', { url });
+    }
+    // Written beside the target and renamed, so an interrupted transfer leaves a `.part` file and
+    // never a truncated file under the name the size check trusts.
+    const partial = `${dest}.part`;
+    // The cast is the boundary between two type universes: `fetch` types its body with the DOM's
+    // `ReadableStream`, and `Readable.fromWeb` wants `node:stream/web`'s. They are the same object at
+    // run time and incompatible declarations of it, so the assertion is a statement about the
+    // runtime rather than a loosening of the check.
+    await pipeline(
+      Readable.fromWeb(response.body as unknown as import('node:stream/web').ReadableStream<Uint8Array>),
+      createWriteStream(partial),
+    );
+    renameSync(partial, dest);
   }
 
   const verdict = archiveVerdict(manifest, {
@@ -965,16 +942,22 @@ async function prepareArchive(): Promise<string> {
     execFileSync('unzip', ['-q', '-o', dest, '-d', root], { stdio: 'inherit' });
   }
 
-  // `dev.zip` carries a second archive: `dev_databases.zip` holds the eleven SQLite files while
-  // `dev.json` sits beside it. Mini-Dev does not nest. Unpacking one level and stopping leaves
-  // hundreds of questions with no databases, which is how the second dev dispatch failed —
-  // "No database file for 'california_schools'" — after a successful 346 MB download and a digest
-  // that matched. The nesting is a property of the archive, so it is detected rather than listed:
-  // a manifest field would have to be maintained for one archive out of two.
-  const inner = join(extracted, 'dev_databases.zip');
-  if (existsSync(inner) && !existsSync(join(extracted, 'dev_databases'))) {
-    process.stdout.write('[sota] extracting the databases inside the archive\n');
-    execFileSync('unzip', ['-q', '-o', inner, '-d', extracted], { stdio: 'inherit' });
+  // The database archive is nested inside the outer one, and the nesting is declared by the
+  // manifest because its name differs per split: `dev_databases.zip` for dev, `train_databases.zip`
+  // for train, and Mini-Dev ships nothing nested. Unpacking one level and stopping leaves every
+  // question with no database, which is how the second dev dispatch failed — "No database file for
+  // 'california_schools'" — after a successful download and a digest that matched.
+  if (manifest.nested !== undefined && manifest.nestedRoot !== undefined) {
+    const inner = join(extracted, manifest.nested);
+    const innerRoot = join(extracted, manifest.nestedRoot);
+    if (existsSync(inner) && !existsSync(innerRoot)) {
+      process.stdout.write('[sota] extracting the databases inside the archive\n');
+      execFileSync('unzip', ['-q', '-o', inner, '-d', extracted], { stdio: 'inherit' });
+      // The nested archive is 9.3 GB on train and its contents are now on disk beside it. Keeping
+      // both would need 18.7 GB, which no standard runner has; the archive is a cache entry and the
+      // extraction is derived from it, so the archive is the one that goes.
+      rmSync(inner, { force: true });
+    }
   }
   return extracted;
 }
@@ -1047,7 +1030,25 @@ async function loadDataset(limit: number): Promise<Dataset> {
   // databases, because a prefix of a database-sorted file is a sample of one
   // database.
   const pool = poolOf(rows, SPLIT);
-  const ordered = interleaveByKey(pool, (row) => row.db_id);
+  // The manifest's database list is the split's *selection*, not a description of the archive.
+  // On dev and Mini-Dev the two are the same and this drops nothing. On train the archive holds 69
+  // databases that unpack to 32.4 GB while the questions are spread over the small ones, so the
+  // selection is a choice about bytes per question — and the number it costs travels with the run
+  // rather than being discovered later as a smaller `n`.
+  const scoped = withinDatabases(pool, manifest.databases);
+  if (scoped.dropped > 0) {
+    process.stdout.write(
+      `[sota] selection: ${scoped.rows.length} of ${pool.length} questions over ` +
+        `${manifest.databases.length} databases (${scoped.dropped} excluded by the manifest)\n`,
+    );
+  }
+  if (scoped.unused.length > 0) {
+    // Not an error: a conservative selection is allowed to carry a database no question uses. It is
+    // printed because a selected database costs disk and scores nothing, which is a choice to make
+    // again rather than one to leave in a manifest.
+    process.stdout.write(`[sota] selection: no questions for ${scoped.unused.join(', ')}\n`);
+  }
+  const ordered = interleaveByKey(scoped.rows, (row) => row.db_id);
   const slice = limit > 0 ? ordered.slice(0, limit) : ordered;
 
   // There is deliberately no third database source: the lane used to fall back to
@@ -1068,7 +1069,7 @@ async function loadDataset(limit: number): Promise<Dataset> {
   // makes every runnable query "correct", so this check is the difference between
   // a measurement and a plausible number.
   for (const dbId of used) {
-    const counted = requirePopulated(databaseIn(root, dbId), dbId);
+    const counted = requirePopulated(databaseIn(root, dbId, manifest.nestedRoot), dbId);
     process.stdout.write(`[sota] data ok: ${dbId} ${counted.tables} tables, ${counted.rows} rows\n`);
   }
 
@@ -1076,7 +1077,7 @@ async function loadDataset(limit: number): Promise<Dataset> {
     rows: slice,
     source,
     duplicates: deduped.duplicates,
-    dbPath: (dbId) => databaseIn(root, dbId),
+    dbPath: (dbId) => databaseIn(root, dbId, manifest.nestedRoot),
   };
 }
 

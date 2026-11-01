@@ -570,3 +570,58 @@ removed at a time, a permutation null of random discards of the same size, and a
 All three pass (leave-one-out +0.77 to +1.25pp, p = 0.0002, halves +0.76 and +1.22pp), which is a statement
 about stability across sub-samples and not about a new sample — both halves were in the corpus the hypothesis
 came from, and the artefact says so rather than leaving a reader to assume it.
+
+### 8.6 A split is a manifest, and the third one rewrote five assumptions
+
+The lane can measure three BIRD question sets. Adding the third looked like a constant and turned out to be
+five assumptions, each of them invisible because the first two splits happened to satisfy it.
+
+```text
+         eval/manifests/bird-<split>.json
+                    │
+     ┌──────────────┼───────────────┬────────────────┐
+     │              │               │                │
+  url + digest   questions      nested archive   databases
+     │              │               │                │
+  download       parse          extract          selection
+  (streamed)     (3 shapes)     (pair or none)   (what is scored)
+     │              │               │                │
+     └──────────────┴───────────────┴────────────────┘
+                    │
+              poolOf(rows, split)      ← the split's own scoring rule
+                    │
+              withinDatabases(...)      ← what the manifest selects
+                    │
+              requirePopulated(...)     ← refuse a schema-only database
+                    │
+                   stop  ← everything above runs in `pnpm eval:split-precheck`
+```
+
+**The five assumptions, and where each one now lives.**
+
+| assumption | how it was hidden | where it lives now |
+|---|---|---|
+| the archive has a nested database zip called `dev_databases.zip` | true of `dev`, absent from `minidev`, and the extractor's `existsSync` guard made the absence look like a design | `manifest.nested` + `nestedRoot`, read as a pair or not at all |
+| a question has a `difficulty` | true of `dev` and `minidev`; `train.json` has no such field on any of 9,428 rows | `isSimple(difficulty: unknown)`, whose answer for a non-string is **no** |
+| the archive is small enough to buffer | 346 MB is a large allocation and a survivable one | a stream to a `.part` file, then a rename |
+| databases live under one of three roots | all three roots were `dev`/`minidev` layouts | `resolveDatabase(dir, id, roots)`, with the root read from the manifest |
+| an artefact name is a two-way choice | there were two splits | `ARTEFACT_IDS: Record<Split, string>`, so a fourth split cannot compile without a name |
+
+**The precheck is the part worth reusing.** It runs everything above and stops before the first model call,
+which makes "can this split be measured" a question with an answer that costs nothing. Its output on the real
+archive:
+
+```text
+[precheck] train: 9428 questions, 7829 selected over 58 databases — ready
+[precheck] dev: 1534 questions, 1534 selected over 11 databases — ready
+[precheck] minidev: 500 questions, 350 selected over 11 databases — ready
+```
+
+The 350 is the check on the checker: it is the number every transfer experiment in this repository calls that
+slice, and it was reproduced from the file by the pool rule rather than supplied.
+
+**Why the unit tests could not have found any of it.** Every test loads a fixture, and every fixture was
+written against the split the code was written against. A field that exists in `dev.json` and not in
+`train.json` is invisible to a suite whose corpus has the field — 2,353 tests and four coverage dimensions
+above 99.6% do not help, because the thing that is wrong is the data. The only way to find this class of defect
+is to run the loader against a second dataset and stop before the expensive part.

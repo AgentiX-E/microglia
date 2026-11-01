@@ -310,12 +310,34 @@ export function birdArtefactPath(): string {
  * path from before the rename, so its artefact was written to a directory nothing
  * else looked at and the workflow's own publish step failed to find it.
  */
+/**
+ * The suffix a reading takes when it was computed from a different split's run.
+ *
+ * Three readings — the query diff, the mediation and the gate's stability — were written against
+ * one committed dev artefact and wrote one set of names. Re-pointing them at a train run (which is
+ * what R30 stage 2 exists to produce) would otherwise overwrite the dev evidence that CI compares
+ * byte for byte, so the split is spelled into the filename by an explicit variable rather than
+ * inferred: an inferred suffix would rename the dev artefacts the moment the dev file was renamed.
+ *
+ * Empty by default, so every existing path is unchanged.
+ */
+export function resultSuffix(): string {
+  const raw = (process.env['POC_RESULT_SUFFIX'] ?? '').trim();
+  if (raw === '') return '';
+  // A suffix becomes a filename component, so it may not be a path. `train` is the only value
+  // anyone needs; rejecting the rest is cheaper than deciding later which ones were safe.
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(raw)) {
+    throw new Error(`POC_RESULT_SUFFIX must be a lowercase filename component, not '${raw}'`);
+  }
+  return `-${raw}`;
+}
+
 export async function writeJson(id: string, value: unknown): Promise<void> {
   // The committed artefact lives in the repository; a self-check run redirects it
   // so a CI gate can exercise a lane without overwriting the evidence it ships.
   const dir = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 'results');
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, `${id}.json`), `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  await writeFile(join(dir, `${id}${resultSuffix()}.json`), `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 }
 
 export async function writeResult(result: PocResult): Promise<void> {

@@ -127,9 +127,15 @@ export function rowsDiffer(left: QueryOutcome, right: QueryOutcome): boolean {
  * exists, so the failure surfaces as the driver's message about that path rather than as
  * a second, less specific error about a missing file.
  */
-export function resolveDatabase(directory: string, dbId: string): string {
+export function resolveDatabase(directory: string, dbId: string, roots: readonly string[] = []): string {
   const candidates = [
     join(directory, `${dbId}.sqlite`),
+    // Roots named by the caller, before the built-in layouts. The archive decides where it puts its
+    // databases and each split decides it differently — `dev_databases`, `MINIDEV/dev_databases`,
+    // and `train_databases` — so the one layout the caller already knows is asked first rather than
+    // appended as a fourth guess. A lane whose split ships an unlisted root used to fail question by
+    // question with "No database file", after the download.
+    ...roots.map((root) => join(directory, root, dbId, `${dbId}.sqlite`)),
     join(directory, 'dev_databases', dbId, `${dbId}.sqlite`),
     join(directory, 'MINIDEV', 'dev_databases', dbId, `${dbId}.sqlite`),
     join(directory, 'minidev', 'MINIDEV', 'dev_databases', dbId, `${dbId}.sqlite`),

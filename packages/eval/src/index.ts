@@ -189,13 +189,25 @@ export {
   populationOf,
   requirePopulated,
   sha256OfFile,
+  isSimple,
+  SPLITS,
   splitFrom,
+  withinDatabases,
   type BirdDataErrorReason,
   type BirdManifest,
   type Split,
   type Deduped,
   type QuestionIdentity,
 } from './bird-data.js';
+
+export {
+  compareGold,
+  normaliseRow,
+  parseGoldLines,
+  parseRows,
+  type BirdRow,
+  type GoldAgreement,
+} from './bird-rows.js';
 
 export {
   DELIVERY_BOUND_MS,

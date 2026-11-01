@@ -441,6 +441,41 @@ build would fail if either stopped bundling without Node builtins, which is the 
 promise measured rather than asserted. `pnpm bundle:size -- --probe` halves a ceiling and must be
 rejected — a budget that cannot be exceeded is not a gate.
 
+### Which BIRD split you measure, and why none of them is a leaderboard entry
+
+Three splits, three different questions, and the lane refuses a fourth name rather than defaulting to
+one — a typo that silently measured Mini-Dev while the dispatch said `dev` would produce a real
+number under the wrong claim.
+
+| split | questions scored | databases | what it is for | comparable to a leaderboard row? |
+|---|---|---|---|---|
+| `minidev` | 350 | 11 | the transfer experiments: it drops the easiest third, because a question answered right without help carries no signal | no |
+| `dev` | 1,534 | 11 | reproduction: a published cell measured on 1,534 can only be reproduced on 1,534 | yes |
+| `train` | 7,829 | 58 | out-of-sample: questions and databases the other two do not touch | **no, deliberately** |
+
+**Run the precheck before you run the lane.** It loads a split exactly as the lane will — same
+manifest, same parser, same pool rule, same population check — and stops before the first model call:
+
+```bash
+BIRD_DIR=/path/to/extracted/train SOTA_SPLIT=train pnpm eval:split-precheck
+# [precheck] train: 9428 questions, 7829 selected over 58 databases — ready
+```
+
+It answers one question the lane can only answer by spending a dispatch: *can this split be measured
+at all*. On train it was worth five defects, four of which fail after an 8.9 GB download.
+
+**Two things about `train` that surprise people, both measured.** The archive is 8.9 GB and unpacks
+its databases to **32.4 GB**, which is more than a standard CI runner has — but the questions sit on
+the small databases, so the manifest selects 58 of 69 and scores 7,829 questions from 2.4 GB of
+data. And `train.json` has no `difficulty` field on any of its 9,428 rows, so any code that reads a
+tier unconditionally will throw on it.
+
+**`train` is not a leaderboard entry and the name says so.** BIRD publishes no test cell for it, and
+every system's train accuracy is measured on questions it may have trained on. The artefact calls the
+split `BIRD train (out-of-sample)`, which matches no catalogue entry, so the comparison code cannot
+file it as a reproduction of a published cell. Use it to ask whether an effect you measured on `dev`
+survives questions you did not choose — not to claim a position.
+
 Read the [user guide](docs/USER-GUIDE.md) for the integration contract, the
 [architecture](docs/ARCHITECTURE.md) for how the pieces fit, and the
 [glossary](docs/GLOSSARY.md) for the vocabulary.

@@ -9,8 +9,9 @@ import {
   chooseArtefact,
   preregIdOf,
   splitNameOf,
+  TRAIN_SPLIT_NAME,
 } from '../artefacts.js';
-import { publishedCell } from '../reproduction.js';
+import { PUBLISHED_CELLS, publishedCell } from '../reproduction.js';
 
 const DIR = '/repo/eval/results';
 
@@ -50,6 +51,26 @@ describe('what a split calls itself', () => {
     // be reported as a reproduction of a 1,534-question cell.
     expect(splitNameOf('minidev')).toBe(MINIDEV_SPLIT_NAME);
     expect(splitNameOf('minidev')).not.toBe(splitNameOf('dev'));
+  });
+
+  it('names the train split so that no published cell can be matched to it', () => {
+    // A train score is not comparable to a leaderboard row: BIRD publishes no test cell for train,
+    // and every system's train accuracy is measured on questions it may have trained on. The name
+    // is the mechanism — `compareCell` compares these strings — so the test asserts the property
+    // that matters (no catalogue entry matches) rather than the spelling alone.
+    expect(splitNameOf('train')).toBe(TRAIN_SPLIT_NAME);
+    expect(splitNameOf('train')).not.toBe(splitNameOf('dev'));
+    expect(splitNameOf('train')).not.toBe(splitNameOf('minidev'));
+    const catalogue = PUBLISHED_CELLS.filter((cell) => cell.split.name === splitNameOf('train'));
+    expect(catalogue).toEqual([]);
+  });
+
+  it('gives each split its own artefact file', () => {
+    // Three splits writing one name is how R24 lost a cell: the second run overwrote the file the
+    // first one's recomputation gate reads, and nothing failed at the write.
+    const ids = [artefactIdOf('minidev'), artefactIdOf('dev'), artefactIdOf('train')];
+    expect(new Set(ids).size).toBe(3);
+    expect(artefactIdOf('train')).toBe('poc-sota-bird-train');
   });
 });
 

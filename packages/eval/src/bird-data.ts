@@ -52,6 +52,17 @@ export type BirdManifest = {
    * a second split could not be measured without editing code that has nothing to do with splits.
    */
   readonly questions: string;
+  /**
+   * A second archive inside `root` that holds the databases, and the directory it extracts to.
+   *
+   * `dev.zip` ships `dev_databases.zip`; `train.zip` ships `train_databases.zip`; Mini-Dev ships
+   * nothing nested. The names are a property of the archive, so they belong to the manifest rather
+   * than to the extractor: the lane used to hard-code `dev_databases.zip`, which meant a train run
+   * would download 8.9 GB, extract it, find no nested archive under the name it was looking for,
+   * and then fail question by question with "No database file" — after the expensive part.
+   */
+  readonly nested?: string;
+  readonly nestedRoot?: string;
   readonly databases: readonly string[];
   readonly retrievedAt: string;
 };
@@ -98,6 +109,20 @@ function text(record: Record<string, unknown>, field: string): string {
 }
 
 /**
+ * The nested-archive pair, read as a pair.
+ *
+ * Both fields or neither: see the call site for why half a declaration is worse than none.
+ */
+function nestedFields(
+  record: Record<string, unknown>,
+): { readonly nested: string; readonly nestedRoot: string } | Record<string, never> {
+  const archive = record['nested'];
+  const root = record['nestedRoot'];
+  if (archive === undefined && root === undefined) return {};
+  return { nested: text(record, 'nested'), nestedRoot: text(record, 'nestedRoot') };
+}
+
+/**
  * Read a manifest, refusing anything incomplete.
  *
  * A manifest with a missing digest is worse than no manifest: it looks like
@@ -135,6 +160,12 @@ export function parseManifest(value: unknown): BirdManifest {
     attribution: text(record, 'attribution'),
     root: text(record, 'root'),
     questions: text(record, 'questions'),
+    // A nested archive is declared as a pair or not at all. Naming the archive and not the
+    // directory extracts the databases somewhere the lane never opens — the same failure as not
+    // extracting them, one step later. Naming the directory and not the archive is a manifest that
+    // believes it has a nested archive when it has nothing to unpack, which is the same failure
+    // again from the other side. Both are refused here rather than discovered on a runner.
+    ...nestedFields(record),
     databases: ids,
     retrievedAt: text(record, 'retrievedAt'),
   };
@@ -157,18 +188,51 @@ export function archiveVerdict(
  * because a question a model answers without help carries no signal for either arm. `dev` is the
  * full 1,534-question split, and it exists for one purpose — reproducing a published number, which
  * requires the sample size the published number was measured on.
+ *
+ * `train` is not a reproduction split and its accuracy is **not comparable to any leaderboard
+ * row**, because BIRD publishes no test cell for it and every system's train score would be
+ * measured on questions it may have trained on. It exists for one question the other two cannot
+ * answer: *does an effect estimated on dev survive on questions the hypothesis never saw?* Dev
+ * cannot answer it — the hypothesis was formed on all 1,534 — and Mini-Dev cannot either, because
+ * 496 of its 500 questions are dev questions (measured 2026-11-01, §ROADMAP R30 stage 2). Train is
+ * 9,428 questions over 69 databases that neither split touches.
  */
-export type Split = 'minidev' | 'dev';
+export type Split = 'minidev' | 'dev' | 'train';
 
-/** A split name from configuration, refused rather than defaulted when it is not one of the two. */
+/** Every split, in the order the documentation lists them. */
+export const SPLITS: readonly Split[] = ['minidev', 'dev', 'train'];
+
+/**
+ * A split name from configuration, refused rather than defaulted when it is not one of them.
+ *
+ * An unknown name is an error and not a fallback. The alternative — quietly measuring Mini-Dev
+ * because the name was mistyped — produces a valid artefact under the wrong claim, and the caller
+ * has no way to notice: this is the failure §R30 stage 2's registered prediction 4 is about.
+ */
 export function splitFrom(raw: string | undefined): Split {
   const name = (raw ?? '').trim().toLowerCase();
   if (name === '' || name === 'minidev') return 'minidev';
   if (name === 'dev') return 'dev';
+  if (name === 'train') return 'train';
   // `name` cannot be empty here, so the message quotes it rather than the raw input: a second
   // `?? ''` would be a branch no caller can reach, and the value it would print is the one that
   // was just rejected anyway.
-  throw new RangeError(`Unknown split '${name}'; known splits are minidev, dev`);
+  throw new RangeError(`Unknown split '${name}'; known splits are ${SPLITS.join(', ')}`);
+}
+
+/**
+ * Whether an archive row is marked as the easiest tier.
+ *
+ * Defensive on purpose, and the reason is a field that does not exist: `dev.json` and
+ * `mini_dev_sqlite.json` carry `difficulty`, and `train.json` does not — it carries `SQL`, `db_id`,
+ * `question` and `evidence`, and nothing else (measured 2026-11-01 on all 9,428 rows). Reading it as
+ * `row.difficulty.toLowerCase()` therefore throws on train, which is a run that dies at startup
+ * after downloading 8.9 GB. The read is narrowed here rather than at the call site so that the
+ * question "is this row easy" has one answer for all three splits, and so that the answer for a
+ * split that does not say is *no* — a question with no stated tier is not one to drop.
+ */
+export function isSimple(difficulty: unknown): boolean {
+  return typeof difficulty === 'string' && difficulty.toLowerCase() === 'simple';
 }
 
 /**
@@ -180,13 +244,17 @@ export function splitFrom(raw: string | undefined): Split {
  * `simple`, so dropping them leaves 609 and the run stops being a reproduction of a cell measured
  * on 1,534. A filter that is right for one question is wrong for the other, so it belongs to the
  * split rather than to the lane.
+ *
+ * `train` is not filtered either, and for a third reason: it has no tiers to filter by, and the
+ * 9,428 questions are the out-of-sample pool itself. Dropping a third of it would trade sample size
+ * — the only thing train has that dev does not — for a composition nobody asked for.
  */
-export function poolOf<T extends { readonly difficulty: string }>(
+export function poolOf<T extends { readonly difficulty?: string }>(
   rows: readonly T[],
   split: Split,
 ): readonly T[] {
-  if (split === 'dev') return rows;
-  const usable = rows.filter((row) => row.difficulty.toLowerCase() !== 'simple');
+  if (split !== 'minidev') return rows;
+  const usable = rows.filter((row) => !isSimple(row.difficulty));
   return usable.length > 0 ? usable : rows;
 }
 
@@ -197,6 +265,37 @@ export function missingDatabases(
 ): readonly string[] {
   const present = new Set(manifest.databases);
   return [...new Set(used)].filter((id) => !present.has(id)).sort();
+}
+
+/**
+ * The questions a split can score, given the databases its manifest declares.
+ *
+ * On `dev` and `minidev` this drops nothing: their manifests list every database their question
+ * file uses. On `train` it drops a great deal, and deliberately. The archive holds 69 databases
+ * that unpack to 32.4 GB — four of them are over 4 GB each — while the questions are spread almost
+ * evenly over the small ones: `works_cycles` carries 474 questions and 115 MB, `retail_world`
+ * carries 373 and 0.1 MB, and the largest database on disk carries 160. Measuring a subset is
+ * therefore not a compromise in sample size but a selection on bytes per question, and this
+ * function is where the selection becomes visible: the caller is told how many questions the
+ * manifest's database list excludes, rather than finding a smaller `n` in the artefact and having
+ * to guess why.
+ *
+ * `unused` is the other direction — a database the manifest declares for which no question exists.
+ * It is not an error (a selection is allowed to be conservative) but it is a number the caller
+ * should print: a database that costs 4 GB and scores nothing is a choice to revisit.
+ */
+export function withinDatabases<T extends { readonly db_id: string }>(
+  rows: readonly T[],
+  databases: readonly string[],
+): { readonly rows: readonly T[]; readonly dropped: number; readonly unused: readonly string[] } {
+  const wanted = new Set(databases);
+  const kept = rows.filter((row) => wanted.has(row.db_id));
+  const used = new Set(kept.map((row) => row.db_id));
+  return {
+    rows: kept,
+    dropped: rows.length - kept.length,
+    unused: databases.filter((id) => !used.has(id)),
+  };
 }
 
 /**

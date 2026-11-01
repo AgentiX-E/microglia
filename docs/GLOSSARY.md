@@ -722,3 +722,31 @@ that survives only the strict rule is.
 `1.96 · sqrt(SE₁² + SE₂²)` because the two groups are disjoint and their standard errors add in quadrature.
 It is the number that decides whether a covariate *separates*: a split whose gap is smaller than its own width
 is a split with nothing in it, and this project has measured four of those.
+
+**Split** — One of the three BIRD question sets the lane can measure, named `minidev`, `dev` or `train` and
+refused rather than defaulted when it is anything else. The three answer different questions and only one of
+them is comparable to a published cell: `minidev` (350 questions, the easiest third dropped) is for transfer,
+`dev` (1,534) reproduces a published measurement, and `train` (7,829 over 58 databases) is the only
+out-of-sample set this benchmark offers. **A split is a manifest**, not a constant: the archive, its digest, the
+question file, the nested-archive layout, the questions scored and the databases selected all live in
+`eval/manifests/bird-<split>.json`, because each of the three differs in at least one of them.
+
+**Selection** — The databases a manifest declares, which is not the same as the databases the archive carries.
+For `dev` and `minidev` the two coincide. For `train`, 69 databases unpack to 32.4 GB while the questions sit on
+the small ones, so the manifest names 58 and the lane scores **7,829 of 9,428** questions from 2.4 GB. The
+dropped count is printed and carried in the artefact: a smaller `n` is explained rather than discovered.
+
+**Out-of-sample** — A measurement on questions the hypothesis was not formed on. This project had none until
+R30 stage 2: every estimate it holds was formed and measured on the same 1,534 dev questions, and the two
+cheaper exits are both closed by measurement rather than by argument — a fresh split of `dev` is in-sample by
+construction, and **496 of Mini-Dev's 500 questions are dev questions**, so it is a slice and not a second
+sample. `train` is the only source, and its accuracy is deliberately **not comparable to any leaderboard row**:
+BIRD publishes no test cell for it, and every system's train accuracy is measured on questions it may have
+trained on.
+
+**Precheck** — `pnpm eval:split-precheck`. Loads a split through the lane's own manifest reader, question
+parser, pool rule, selection and population check, and stops before the first model call, returning `ready` or
+`blocked` with the reasons. It answers the one question a lane can otherwise only answer by spending a
+dispatch. On `train` it was worth five defects, four of which fail *after* the 8.9 GB download — and the reason
+no unit test found them is that every test loads a fixture written against the same split the code was written
+against.

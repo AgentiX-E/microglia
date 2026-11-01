@@ -26,6 +26,7 @@ import type { Split } from './bird-data.js';
 export const ARTEFACT_IDS: Readonly<Record<Split, string>> = {
   minidev: 'poc-sota-bird',
   dev: 'poc-sota-bird-dev',
+  train: 'poc-sota-bird-train',
 };
 
 /** How the Mini-Dev slice names itself in an artefact. */
@@ -92,8 +93,21 @@ export function artefactWriteIdOf(input: {
   return `${base}-${id}`;
 }
 
+/**
+ * How the train split names itself.
+ *
+ * Deliberately unlike any published cell's spelling, because the name is what `compareCell` uses to
+ * decide same-split: a train score is not comparable to a leaderboard row, and no spelling of "BIRD
+ * train" appears in the catalogue, so a train artefact can never be filed as a reproduction. It is
+ * also true in the other direction — BIRD publishes no test cell for train, and every system's
+ * train accuracy is measured on questions it may have trained on — so the incomparability is a
+ * property of the split rather than a limitation of this lane.
+ */
+export const TRAIN_SPLIT_NAME = 'BIRD train (out-of-sample)';
+
 /** The name a split reports as its dataset. */
 export function splitNameOf(split: Split): string {
+  if (split === 'train') return TRAIN_SPLIT_NAME;
   return split === 'dev' ? DEV_SPLIT_NAME : MINIDEV_SPLIT_NAME;
 }
 
