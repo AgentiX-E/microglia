@@ -33,6 +33,7 @@ const REGISTERED = 'ROADMAP.md §R30 (microglia-docs 20e6154)';
 
 type SourceCase = {
   readonly id: string;
+  readonly fold: number;
   readonly dbId: string;
   readonly question: string;
   readonly evidence?: string | null;
@@ -48,6 +49,7 @@ type SourceCase = {
 
 type SourceRule = {
   readonly id: string;
+  readonly fold: number;
   readonly statement: string;
   readonly when?: string | null;
 };
@@ -195,9 +197,19 @@ function namedIdentifiers(text: string): readonly string[] {
   return [...found];
 }
 
-const ruleById = new Map((source.items ?? []).map((entry) => [entry.id, entry]));
-const ruleNames = (id: string): readonly string[] => {
-  const rule = ruleById.get(id);
+/**
+ * A rule's identity, which is the pair and not the id.
+ *
+ * The `id` an `items` row carries is reused across folds: `k_01hf7uaqrd_550r9` names four
+ * unrelated rules in folds 0 to 3, one of them about numeric literals in `california_schools` and
+ * another about integer division in `toxicology`. Keying a lookup by `id` alone therefore collapses
+ * 1,066 rows into 229 keys and answers with whichever fold was read last, so every rule-text
+ * reading below was being taken over the wrong sentences. The fold is what makes the lookup exact.
+ */
+const ruleKey = (fold: number, id: string): string => `${fold}:${id}`;
+const ruleById = new Map((source.items ?? []).map((entry) => [ruleKey(entry.fold, entry.id), entry]));
+const ruleNames = (fold: number, id: string): readonly string[] => {
+  const rule = ruleById.get(ruleKey(fold, id));
   if (rule === undefined) return [];
   return namedIdentifiers(`${rule.statement} ${rule.when ?? ''}`);
 };
@@ -213,7 +225,7 @@ const ruleLevel = (() => {
   const byId = new Map(cases.map((entry) => [entry.id, entry]));
   const flags = rows.map((entry) => {
     const context = contextTokens(entry.question, entry.evidence);
-    const names = (entry.packIdList ?? []).flatMap((id) => ruleNames(id));
+    const names = (entry.packIdList ?? []).flatMap((id) => ruleNames(entry.fold, id));
     const query = byId.get(entry.id);
     return {
       ruleFlag: names.some((name) => !isGrounded(name, context, 'strict')),
@@ -226,11 +238,26 @@ const ruleLevel = (() => {
   const queryOnly = flags.filter((entry) => !entry.ruleFlag && entry.queryFlag).length;
   const ruleOnly = flags.filter((entry) => entry.ruleFlag && !entry.queryFlag).length;
   const allRules = source.items ?? [];
-  const namedRules = allRules.filter((entry) => ruleNames(entry.id).length > 0).length;
+  const namedRules = allRules.filter((entry) => ruleNames(entry.fold, entry.id).length > 0).length;
   return {
     rules: allRules.length,
     rulesNaming: namedRules,
     namingShare: allRules.length === 0 ? 0 : namedRules / allRules.length,
+    /**
+     * The same share over the distinct sentences rather than the rows.
+     *
+     * `rules` counts rows across five folds, and a row is one fold's copy of a rule, so the row
+     * count is about four times the number of rules a single run ever holds. The two shares are
+     * reported together because they answer different questions — how much of the *pool* names an
+     * identifier, and how much of what a *run sees* does — and here they agree, which is worth
+     * knowing rather than assuming.
+     */
+    sentences: new Set(allRules.map((entry) => entry.statement.toLowerCase().replace(/\s+/g, ' ').trim())).size,
+    sentencesNaming: new Set(
+      allRules
+        .filter((entry) => ruleNames(entry.fold, entry.id).length > 0)
+        .map((entry) => entry.statement.toLowerCase().replace(/\s+/g, ' ').trim()),
+    ).size,
     present: cellOf(withRule),
     absent: cellOf(withoutRule),
     agreement: {

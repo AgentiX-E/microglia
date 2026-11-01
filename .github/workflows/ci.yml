@@ -238,6 +238,8 @@ jobs:
               ['the pre-treatment version of the gate has the wrong sign', a.ruleLevel.present.deltaPp > 0],
               ['and it does not find what F1 finds', a.ruleLevel.agreement.recall < 0.5 && a.ruleLevel.agreement.precision < 0.5],
               ['most rules name nothing a detector can see', a.ruleLevel.namingShare < 0.2],
+              ['the pool is five folds of fewer sentences than rows', a.ruleLevel.rules === 1066 && a.ruleLevel.sentences === 271],
+              ['and both counts give the same naming share', Math.abs(a.ruleLevel.namingShare - a.ruleLevel.sentencesNaming / a.ruleLevel.sentences) < 0.01],
             ];
             const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
             if (bad.length > 0) { console.error('query diff failed: ' + bad.join(', ')); process.exit(1); }

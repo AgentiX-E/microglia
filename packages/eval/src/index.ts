@@ -389,6 +389,25 @@ export {
 } from './feature-overlap.js';
 
 export {
+  RELAXED_MARKERS,
+  SEPARATION_BAR as RULE_FORM_SEPARATION_BAR,
+  STRICT_MARKERS,
+  censusOf,
+  coverageOf,
+  formSplitOf,
+  packFormOf,
+  ruleFormOf,
+  rulePoolOf,
+  type FormCensus,
+  type FormCoverage,
+  type FormMarkers,
+  type FormSplit,
+  type PackForm,
+  type RuleForm,
+  type RulePool,
+} from './rule-form.js';
+
+export {
   cellOf,
   clusteredGap,
   clusteredGapOf,

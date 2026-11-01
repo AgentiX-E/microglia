@@ -45,6 +45,15 @@ export type DiffCase = {
   readonly delta: QueryDelta;
   readonly correct: boolean;
   readonly withoutMemoryCorrect: boolean;
+  /**
+   * The rules the model was shown for this question, when the lane recorded them.
+   *
+   * Optional because a reading about what the pack *did to the query* does not need to know what
+   * the pack *said*, and a corpus without it should be rejected by the reading that does rather
+   * than by every reading. It is here rather than in a second type so the two kinds of reading
+   * cannot end up over two different corpora.
+   */
+  readonly packIdList?: readonly string[];
 };
 
 /**

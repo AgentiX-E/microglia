@@ -1,0 +1,203 @@
+{
+  "id": "poc-rule-form",
+  "title": "Whether a rule is procedural or declarative, and whether this corpus can tell",
+  "source": "eval/results/poc-sota-bird-dev-R26-channels.json",
+  "sourceGeneratedAt": "2026-11-01T02:44:56.507Z",
+  "registered": "ROADMAP.md §R32 predictions 1 and 3, refutation (microglia-docs 20e6154)",
+  "n": 1534,
+  "pool": {
+    "rows": 1066,
+    "sentences": 271,
+    "slots": 229,
+    "cited": 220
+  },
+  "census": {
+    "strict": {
+      "markers": "strict",
+      "n": 271,
+      "both": 157,
+      "procedural": 68,
+      "declarative": 43,
+      "unmarked": 3,
+      "bothShare": 0.5793357933579336,
+      "pureShare": 0.4095940959409594
+    },
+    "relaxed": {
+      "markers": "relaxed",
+      "n": 271,
+      "both": 178,
+      "procedural": 47,
+      "declarative": 43,
+      "unmarked": 3,
+      "bothShare": 0.6568265682656826,
+      "pureShare": 0.33210332103321033
+    }
+  },
+  "coverage": {
+    "cases": 1534,
+    "procedural": 487,
+    "declarative": 330,
+    "mixed": 100,
+    "none": 617,
+    "unclassifiedShare": 0.40221642764015647
+  },
+  "bar": 0.5,
+  "axisUsable": false,
+  "residual": {
+    "whole": {
+      "procedural": {
+        "n": 487,
+        "helped": 26,
+        "harmed": 18,
+        "deltaPp": 1.642710472279261,
+        "halfWidthPp": 2.6696445951115333,
+        "minDetectablePp": 3.816502120154345,
+        "baselineCorrect": 262,
+        "baselineAccuracy": 0.5379876796714579,
+        "harmedPerCorrectPp": 6.870229007633588,
+        "helpedPerWrongPp": 11.555555555555555,
+        "clusterLowPp": -0.9041591320072333,
+        "clusterHighPp": 4.112554112554113
+      },
+      "declarative": {
+        "n": 330,
+        "helped": 13,
+        "harmed": 20,
+        "deltaPp": -2.1212121212121215,
+        "halfWidthPp": 3.4119220567316777,
+        "minDetectablePp": 4.877655919878654,
+        "baselineCorrect": 187,
+        "baselineAccuracy": 0.5666666666666667,
+        "harmedPerCorrectPp": 10.695187165775401,
+        "helpedPerWrongPp": 9.090909090909092,
+        "clusterLowPp": -5.2264808362369335,
+        "clusterHighPp": 0.3472222222222222
+      },
+      "proceduralClusters": 11,
+      "declarativeClusters": 11,
+      "gapPp": 3.7639225934913823,
+      "gapLowPp": 0.25069823114775897,
+      "gapHighPp": 7.760082821207515,
+      "resolved": true
+    },
+    "withoutImportedName": {
+      "procedural": {
+        "n": 422,
+        "helped": 22,
+        "harmed": 6,
+        "deltaPp": 3.7914691943127963,
+        "halfWidthPp": 2.457664724969951,
+        "minDetectablePp": 3.5134574282478597,
+        "baselineCorrect": 236,
+        "baselineAccuracy": 0.5592417061611374,
+        "harmedPerCorrectPp": 2.5423728813559325,
+        "helpedPerWrongPp": 11.827956989247312,
+        "clusterLowPp": 1.9067796610169492,
+        "clusterHighPp": 5.673758865248227
+      },
+      "declarative": {
+        "n": 294,
+        "helped": 11,
+        "harmed": 15,
+        "deltaPp": -1.3605442176870748,
+        "halfWidthPp": 3.39934634239519,
+        "minDetectablePp": 4.8596777813221035,
+        "baselineCorrect": 172,
+        "baselineAccuracy": 0.5850340136054422,
+        "harmedPerCorrectPp": 8.720930232558139,
+        "helpedPerWrongPp": 9.01639344262295,
+        "clusterLowPp": -3.5294117647058822,
+        "clusterHighPp": 0.6872852233676976
+      },
+      "gapPp": 5.152013411999871,
+      "gapLowPp": 2.444190805235936,
+      "gapHighPp": 7.965084560829242,
+      "resolved": true
+    },
+    "perDatabase": {
+      "databases": 11,
+      "positive": 6,
+      "negative": 4,
+      "rows": [
+        {
+          "dbId": "california_schools",
+          "procedural": 32,
+          "declarative": 17,
+          "gapPp": 12.132352941176471
+        },
+        {
+          "dbId": "card_games",
+          "procedural": 61,
+          "declarative": 57,
+          "gapPp": -1.639344262295082
+        },
+        {
+          "dbId": "codebase_community",
+          "procedural": 33,
+          "declarative": 38,
+          "gapPp": 16.586921850079744
+        },
+        {
+          "dbId": "debit_card_specializing",
+          "procedural": 25,
+          "declarative": 9,
+          "gapPp": -7.111111111111111
+        },
+        {
+          "dbId": "european_football_2",
+          "procedural": 42,
+          "declarative": 25,
+          "gapPp": 10.380952380952381
+        },
+        {
+          "dbId": "financial",
+          "procedural": 52,
+          "declarative": 6,
+          "gapPp": -7.6923076923076925
+        },
+        {
+          "dbId": "formula_1",
+          "procedural": 54,
+          "declarative": 62,
+          "gapPp": 5.555555555555555
+        },
+        {
+          "dbId": "student_club",
+          "procedural": 53,
+          "declarative": 34,
+          "gapPp": -1.0543840177580464
+        },
+        {
+          "dbId": "superhero",
+          "procedural": 40,
+          "declarative": 29,
+          "gapPp": 8.448275862068964
+        },
+        {
+          "dbId": "thrombosis_prediction",
+          "procedural": 60,
+          "declarative": 29,
+          "gapPp": 0
+        },
+        {
+          "dbId": "toxicology",
+          "procedural": 35,
+          "declarative": 24,
+          "gapPp": 7.023809523809524
+        }
+      ]
+    }
+  },
+  "verdict": "unmeasurable",
+  "reasons": [
+    "bothShare 0.5793 is at or above the registered bar of 0.5: 157 of 271 sentences state a consequence and give a construction in the same breath",
+    "unclassifiedShare 0.4022: 617 of 1534 questions carry no rule whose form is pure"
+  ],
+  "confirmed": [
+    "P1 as a negative: the two forms are not separable in this corpus, and the refutation clause applies",
+    "P3 is refuted in the residual reading: the declarative pack is the damaged one, not the procedural one"
+  ],
+  "refuted": [
+    "P1 as written: the split does not separate at least as well as the imported-name split, because it does not separate at all"
+  ]
+}

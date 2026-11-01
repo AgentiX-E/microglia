@@ -144,6 +144,33 @@ About 15,000 model calls: 7,000 × 2 arms, five folds of learning at the configu
 retries. One dispatch, `split=train`, `limit=7000`, `arms=` (none and full only), `max_calls=16000`,
 `deadline_min=300`, `prereg=R30-stage2`.
 
+## Amendment 1 — the call cap was wrong by 14%, and the first dispatch stopped on it
+
+The first dispatch of this registration (run `41294945557`, `2026-11-01T09:51:50Z`) finished fold 1
+of 5 and then refused to continue:
+
+```
+[sota] fold 1/5: eval=1400 learn=280 edited=95 unanswered=0 distillFailed=0 active=184 calls=3175
+[sota] budget forecast after fold 1/5: the run needs about 17145 calls, the cap is 16000 (short by 1145)
+[sota] failed: MG_E_BUDGET_EXCEEDED: the configured cap cannot finish the folds
+```
+
+**Corrected: 20,000.** `limit=7000`, `arms=none,full`, `folds=5`, `deadline_min=300`,
+`learn_sample=280` and `prereg=R30-stage2` are all unchanged, and so is every prediction and
+refutation above. The cap is a safety valve, not a parameter of the design.
+
+**Where the estimate went wrong.** 15,000 was 7,000 × 2 arms plus a guess at learning. The guess
+was made in questions and the meter counts calls: one fold of 1,400 questions over two arms is
+2,800 generations before any learning, its 280-question learning pass is another 280 distinct
+prompts, and the 95 edited queries the fold produced were re-asked rather than dropped. That is
+3,175 against a 3,000 estimate — 5.8% per fold, 14% over five. The forecast is the lane's own
+arithmetic on the first fold it completed, so the correction is its number, not mine.
+
+**What the aborted run may and may not be read for.** Fold 1 completed and printed
+`eval=1400 learn=280 edited=95`; none of it is evidence. A run that stopped because of a parameter I
+set is a truncated run, and the fold it finished is the first fold, so quoting it would be reading
+the one fold that happened to fit. It is discarded, and this dispatch replaces it whole.
+
 ## What happens to the three readings
 
 `pnpm eval:query-diff`, `pnpm eval:mediation` and `pnpm eval:stability` each take their input from a

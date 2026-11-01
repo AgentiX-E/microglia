@@ -54,5 +54,6 @@ export function diffCasesOf(run: CommittedRun, source = 'the artefact'): readonl
     delta: diffQueries(entry.baselineSql, entry.predictedSql, entry.question, entry.evidence ?? ''),
     correct: entry.correct,
     withoutMemoryCorrect: entry.withoutMemoryCorrect,
+    ...(entry.packIdList === undefined ? {} : { packIdList: entry.packIdList }),
   }));
 }

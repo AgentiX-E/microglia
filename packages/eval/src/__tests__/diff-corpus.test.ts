@@ -84,4 +84,20 @@ describe('diffCasesOf', () => {
     expect(cases).toHaveLength(1);
     expect(cases[0]?.delta.ungrounded).toEqual([]);
   });
+
+  it('carries the pack ids through when the lane recorded them', () => {
+    // The form reading groups questions by the rules their pack held, and a corpus that dropped the
+    // ids would report every question as carrying no pure rule — a verdict about the classifier
+    // produced by a missing field.
+    const cases = diffCasesOf({ per_case: [{ ...QUESTION, packIdList: ['k_a', 'k_b'] }] });
+    expect(cases[0]?.packIdList).toEqual(['k_a', 'k_b']);
+  });
+
+  it('leaves the pack ids absent rather than empty when the lane did not record them', () => {
+    // Absent and empty are different answers: empty says the pack held no rules, and absent says
+    // the run predates the field. The form reading has to be able to tell them apart.
+    const cases = diffCasesOf({ per_case: [QUESTION] });
+    expect(cases[0]?.packIdList).toBeUndefined();
+    expect('packIdList' in (cases[0] ?? {})).toBe(false);
+  });
 });
