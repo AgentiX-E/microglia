@@ -96,8 +96,13 @@ const pack = await mg.recall({ task: 'ticket.classify', text: subject, scope: { 
 browser unchanged. `protocol` is the exception to "the library is the product": it is the instrument that
 decides whether a claim about the library may be published, it has no runtime dependency either, and it is
 separate so that a second application scenario can be measured by the same apparatus instead of writing a
-weaker one beside it. Its modules are also reachable as subpaths, which is how a host that only needs
-retrieval keeps the distiller out of its bundle:
+weaker one beside it. **What the second scenario found is worth stating plainly, because it corrects an
+earlier version of this file**: the apparatus is scenario-agnostic — τ²-bench is scored by the same gate
+function, the same publication order and the same artefact schema with no edit to a gate — and the gate
+*set* is not. A gate fires when the lane ran the arm whose bookkeeping it reads, so τ² instantiates nine of
+the 39 and names the experiment each of the other thirty would need. That is a catalogue, not a universal
+instrument, and the audit that says so is committed beside the lane. Its modules are also reachable as
+subpaths, which is how a host that only needs retrieval keeps the distiller out of its bundle:
 
 ```ts
 import { buildPack } from '@agentix-e/microglia-core/apply';   // retrieval only

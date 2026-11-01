@@ -11,11 +11,17 @@
  *
  * ## What makes a gate portable
  *
- * One question, asked of the signature: *does it mention a scenario type?* Measured rather than
- * assumed — every gate below was read for the `input.*` fields it touches, and the result is **29 of
- * 31 gates depend on nothing scenario-specific at all**. The two that do are `V4-gold-executable` and
- * `V10-convention-executable`, and both take an *optional* field: a scenario that cannot execute its
- * own reference answer omits `goldExecRate` and the gate is then **absent**, not green.
+ * The first answer was a question asked of the signature: *does it mention a scenario type?* Measured
+ * rather than assumed — every gate was read for the `input.*` fields it touches — and it came out at
+ * **29 of 31 depend on nothing scenario-specific at all**. The two that do are `V4-gold-executable`
+ * and `V10-convention-executable`, and both take an *optional* field: a scenario that cannot execute
+ * its own reference answer omits `goldExecRate` and the gate is then **absent**, not green.
+ *
+ * Stage 2 of R27 showed that answer was measured on the wrong noun. A signature being scenario-free
+ * does not make a gate *evaluable*: `V45-clearance-dose-matched` names no scenario type and is
+ * unreachable for a lane that ran no clearance arm. **Portability is indexical — a gate is as portable
+ * as the arm behind it.** The second scenario's audit (`packages/eval/src/tau2-gates.ts`) is that
+ * index, and it found 9 supplyable, 30 arm-indexed, and 2 of the 9 vacuous.
  *
  * The two places where a scenario had leaked into this contract are now data:
  *
@@ -23,6 +29,18 @@
  *    they are now `floor` and `expects` on each entry, so the gate never learns a channel's name;
  *  - `goldExecRate` was a required field of the whole input; it is now the one field of
  *    `ScenarioGateInput`, which the scenario half supplies.
+ *
+ * Stage 2 removed the third: eight fields of `ProtocolGateInput` were mandatory, and two of them —
+ * `meanPackIds` and the call tally — are knowable only to a lane that runs its model in-process. A
+ * lane that could not state them could not call this function at all, so a scenario able to prove
+ * four gates proved none. All eight are optional now, and the rule that was already true of the
+ * scenario half applies to both: **a gate that cannot fire is absent, and an absent gate is a line in
+ * the report rather than a silent green.**
+ *
+ * One flag changed with it: `V5-resolution` is blocking. All seventeen published artefacts that carry
+ * it pass it, at 1.96pp to 4.87pp, so the advisory flag had never been exercised — and the first run
+ * it would have protected was the one that mattered, a design whose minimum detectable difference was
+ * 21.4pp against a 6pp bar.
  *
  * ## What is not here, on purpose
  *
@@ -232,17 +250,33 @@ export function inGateOrder(gates: readonly ValidityGate[]): ValidityGate[] {
 }
 
 export type ProtocolGateInput = {
-  /** Mean rules injected per question on the memory arm. */
-  readonly meanPackIds: number;
-  readonly partition: {
+  /**
+   * Mean rules injected per question on the memory arm.
+   *
+   * Optional, and the four below it are optional for a reason the second scenario supplied: the
+   * first version of this type made eight facts mandatory, and two of them — this one and the call
+   * tally — are knowable only to a lane that runs its model in-process. A lane whose agent is
+   * another program could therefore not call this function **at all**, not even to evaluate the
+   * thirty-one gates whose own fields were missing. The type was all-or-nothing, so a scenario that
+   * could prove four gates proved none. Making a requirement optional adds an absence to the
+   * report; leaving it mandatory added a refusal to the lane.
+   */
+  readonly meanPackIds?: number;
+  /**
+   * The fold accounting: evaluated, total, duplicated, leaked.
+   *
+   * Absent when the lane cannot show its split. A gate that guessed zero leaks would certify the
+   * one property the whole design rests on from a lane that never recorded it.
+   */
+  readonly partition?: {
     readonly evaluated: number;
     readonly total: number;
     readonly duplicated: number;
     readonly leaked: number;
   };
-  readonly parseRate: number;
+  readonly parseRate?: number;
   /** Smallest effect the sample could resolve at 80% power, in percentage points. */
-  readonly detectablePp: number;
+  readonly detectablePp?: number;
   readonly packControls: readonly { readonly arm: string; readonly meanPackIds: number }[];
   /**
    * What each arm's prompts carried, when the run turns framing into a variable.
@@ -394,10 +428,16 @@ export type ProtocolGateInput = {
      */
     readonly sample?: string;
   };
-  /** Share of calls that failed after exhausting retries, in [0, 1]. */
-  readonly callFailureRate: number;
-  readonly calls: number;
-  readonly callFailures: number;
+  /**
+   * Share of calls that failed after exhausting retries, in [0, 1], and the tally behind it.
+   *
+   * Optional together, because a rate and its counts are the same fact twice: a lane that knows one
+   * and not the other cannot be graded on reliability, and a default of zero would report perfect
+   * reliability for a lane that never looked.
+   */
+  readonly callFailureRate?: number;
+  readonly calls?: number;
+  readonly callFailures?: number;
   /**
    * The learning half's bookkeeping.
    *
@@ -553,15 +593,18 @@ export type ScenarioGateInput = {
 export function buildProtocolGates(
   input: ProtocolGateInput & ScenarioGateInput,
 ): ValidityGate[] {
-  const gates: ValidityGate[] = [
-    {
+  const gates: ValidityGate[] = [];
+  if (input.meanPackIds !== undefined) {
+    gates.push({
       id: 'V1-pack-not-empty',
       criterion: 'the memory arm injected at least one rule per question on average',
       actual: `${input.meanPackIds.toFixed(2)} rules/question`,
       pass: input.meanPackIds > 0,
       blocking: true,
-    },
-    {
+    });
+  }
+  if (input.partition !== undefined) {
+    gates.push({
       id: 'V2-fold-partition',
       criterion: 'every question is evaluated exactly once, by a memory that never learned from it',
       actual:
@@ -572,15 +615,19 @@ export function buildProtocolGates(
         input.partition.leaked === 0 &&
         input.partition.evaluated === input.partition.total,
       blocking: true,
-    },
-    {
+    });
+  }
+  if (input.parseRate !== undefined) {
+    gates.push({
       id: 'V3-parse-rate',
       criterion: 'at least 90% of replies contain a statement',
       actual: `${(input.parseRate * 100).toFixed(2)}%`,
       pass: input.parseRate >= 0.9,
       blocking: true,
-    },
-    {
+    });
+  }
+  if (input.detectablePp !== undefined) {
+    gates.push({
       id: 'V5-resolution',
       criterion: 'the sample can resolve a 6pp effect at 80% power',
       // A sample in which no question changed hands has no variance to estimate, so
@@ -591,36 +638,48 @@ export function buildProtocolGates(
         ? `minimum detectable ${input.detectablePp.toFixed(2)}pp`
         : 'not estimable: no question changed hands',
       pass: Number.isFinite(input.detectablePp) && input.detectablePp <= 6,
-      blocking: false,
-    },
-    {
-      id: 'V6-controls-inject',
-      criterion: 'every pack-based control arm injected at least one rule on average',
-      actual:
-        input.packControls
-          .map((entry) => `${entry.arm}: ${entry.meanPackIds.toFixed(2)} rules/question`)
-          .join(', ') || 'no pack-based controls configured',
-      pass: input.packControls.every((entry) => entry.meanPackIds > 0),
+      // Blocking as of the second scenario. The flag was carried from a period when a run could
+      // not estimate its own minimum detectable difference, and it has never once been exercised:
+      // all seventeen published artefacts that carry this gate pass it, at 1.96pp to 4.87pp. The
+      // first run it would have protected is the one that could resolve nothing — τ² at n = 68,
+      // where the minimum detectable difference is 21.4pp against a 6pp bar. A gate whose only
+      // failure case is the case it exists for is a gate that was recorded rather than enforced.
       blocking: true,
-    },
-    {
-      id: 'V7-channel',
-      criterion: 'a stated control moves accuracy by at least 10pp',
-      actual:
-        input.channelBest === undefined
-          ? 'no channel control was run'
-          : `${input.channelBest.deltaPp.toFixed(2)}pp with the ${input.channelBest.arm} control`,
-      pass: input.channelBest === undefined ? true : input.channelBest.deltaPp >= 10,
-      blocking: true,
-    },
-    {
+    });
+  }
+  gates.push({
+    id: 'V6-controls-inject',
+    criterion: 'every pack-based control arm injected at least one rule on average',
+    actual:
+      input.packControls
+        .map((entry) => `${entry.arm}: ${entry.meanPackIds.toFixed(2)} rules/question`)
+        .join(', ') || 'no pack-based controls configured',
+    pass: input.packControls.every((entry) => entry.meanPackIds > 0),
+    blocking: true,
+  });
+  gates.push({
+    id: 'V7-channel',
+    criterion: 'a stated control moves accuracy by at least 10pp',
+    actual:
+      input.channelBest === undefined
+        ? 'no channel control was run'
+        : `${input.channelBest.deltaPp.toFixed(2)}pp with the ${input.channelBest.arm} control`,
+    pass: input.channelBest === undefined ? true : input.channelBest.deltaPp >= 10,
+    blocking: true,
+  });
+  if (input.callFailureRate !== undefined) {
+    const tally =
+      input.calls === undefined || input.callFailures === undefined
+        ? ''
+        : ` (${input.callFailures}/${input.calls} calls)`;
+    gates.push({
       id: 'V8-call-reliability',
       criterion: 'at most 2% of calls failed after retries, so the outcome is about knowledge',
-      actual: `${(input.callFailureRate * 100).toFixed(2)}% (${input.callFailures}/${input.calls} calls)`,
+      actual: `${(input.callFailureRate * 100).toFixed(2)}%${tally}`,
       pass: input.callFailureRate <= 0.02,
       blocking: true,
-    },
-  ];
+    });
+  }
   if (input.learning !== undefined) {
     const { rows, unanswered, edited, distillFailed } = input.learning;
     const unansweredShare = rows === 0 ? 0 : unanswered / rows;

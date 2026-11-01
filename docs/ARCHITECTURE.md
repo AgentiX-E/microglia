@@ -357,10 +357,24 @@ the measurement from the thing measured:
 gates certify every number this project publishes, and for twenty-six iterations they had exactly one caller. The
 second scenario in this repository — τ²-bench — wrote three of its own instead, one of which failed at a 15pp
 half-width against a 5pp bar and was recorded as a note rather than as a verdict. **A protocol with one customer is
-a habit**, and the repair is a package boundary rather than more prose: of the 39 gates, **37 take no scenario
-type at all** and the 2 that do (`gold-executable`, `convention-executable`) read an *optional* field and are
-absent rather than green when a lane cannot supply it. The cut was made by reading the `input.*` fields each gate
-touches, not by reading its name — the first estimate, made from names, put nine portable gates on the wrong side.
+a habit**, and the repair is a package boundary rather than more prose.
+
+The boundary was cut on one rule — *does the gate's signature mention a scenario type?* — and the rule answered
+the wrong question. Of the 39 gates, **37 take no scenario type at all** and the 2 that do (`gold-executable`,
+`convention-executable`) read an *optional* field and are absent rather than green when a lane cannot supply it.
+But a signature being scenario-free does not make a gate **evaluable**: `V45-clearance-dose-matched` names no
+scenario type and cannot fire for a lane that ran no clearance arm. **A gate is as portable as the arm behind
+it.** When the second scenario was finally measured by the gates, nine of the 39 could fire, two of the nine
+passed with an empty arm behind them, and thirty needed an experiment τ² had never run. Portability is indexical,
+and the index is now a table in `packages/eval/src/tau2-gates.ts` rather than a paragraph in a design note.
+
+What the same run *did* establish is the claim the boundary existed for: the **apparatus** is scenario-agnostic.
+τ² is scored by the same `buildProtocolGates`, the same publication order and the same artefact schema with no
+edit to a gate. The one type change the second scenario forced was the opposite of an adaptation — eight fields
+that had been mandatory became optional, because two of them (`meanPackIds`, the call tally) are knowable only to
+a lane whose model runs in this process. A lane that could not state them could not call the function at all, so
+a scenario able to prove four gates proved none — the loss was a **type-level requirement, not a missing
+measurement**, and the two have different fixes.
 
 ```ts
 export interface LaneAdapter<Task, Candidate> {
@@ -436,10 +450,10 @@ for more than it is willing to wait for.
 | **Measure your own scenario** | `LaneAdapter` (load / prompt / parse / score / strata) | your own, beside the lane |
 
 **The last row is the only extension point that is about the *evidence* rather than the product**, and it exists
-because a claim of generality is only checkable from outside. A host that implements `LaneAdapter` gets the 39
-gates, the paired statistics, the artefact validator and the pre-registration check without
-writing any of them — which is what makes "this library is scenario-agnostic" a statement about the code rather
-than about the intent. The dependency direction is enforced: `core ← protocol ← adapter`, and `protocol` may not
+because a claim of generality is only checkable from outside. A host that implements `LaneAdapter` gets the
+protocol's gates that its own arms can support — named in the report, with the rest listed beside them and the
+arm each would need — plus the paired statistics, the artefact validator and the pre-registration check, without
+writing any of them. The dependency direction is enforced: `core ← protocol ← adapter`, and `protocol` may not
 import an adapter.
 
 

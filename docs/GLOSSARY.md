@@ -635,9 +635,28 @@ to a scenario: *does the function signature mention a scenario type?* A gate rea
 `arms[].discordant` or `folds[].partition` does not and belongs to the protocol; a gate executing gold SQL or
 parsing a fenced example does and belongs to the adapter. Of this project's 39 gates, **37 fall on the protocol
 side and 2 on the adapter side** — and the first estimate, made by reading gate *names*, put nine portable gates
-on the wrong side, which is why the rule is applied to field reads rather than to vocabulary. It is not a style
-preference: it is the only thing that makes the generality claim checkable, because a protocol with one customer
-is a habit.
+on the wrong side, which is why the rule is applied to field reads rather than to vocabulary.
+
+The rule is necessary and not sufficient, which the second scenario established: **a signature can be
+scenario-free and a gate still unreachable**, because the field it reads may exist only in an arm the lane never
+ran. The cut rule answers "does this belong to the protocol", not "will it fire here", and `V45` is the counter-
+example that made the difference visible. The second question belongs to the **arm index**.
+
+**Arm-indexed gate** — a gate whose firing depends on the lane having run the experiment whose bookkeeping it
+reads. Thirty of the 39 gates are arm-indexed for τ²-bench: `V46-raw-is-verbatim` needs a raw arm,
+`V45-clearance-dose-matched` needs a clearance arm and its dose-matched control, `V34`–`V36` need a second store.
+This is why "the gate set is scenario-agnostic" was a wrong claim and "the apparatus is scenario-agnostic" is a
+right one: the gates are a **catalogue of validity conditions**, and each lane instantiates the subset its arms
+can support. A lane reports that subset, plus the arm each remaining gate would need — which turns the gap into
+a work plan rather than into a number nobody can interpret.
+
+**Vacuous gate** — a gate that fires, passes, and certifies nothing, because the collection it quantifies is
+empty. `V6-controls-inject` evaluates `every` over the list of pack-based control arms: with no such arm the
+predicate is vacuously true, and the gate prints *"no pack-based controls configured"*. All seventeen published
+artefacts that carry `V6` carry that sentence, and sixteen of seventeen carry `V7-channel` the same way. They are
+kept rather than removed — the sentence is a true statement about the run, and deleting it would change seventeen
+published files — but every report that counts its gates counts these separately, because folding them into the
+informative ones would report four gates where two do work.
 
 **Lane adapter** — the five-method contract (`load`, `prompt`, `parse`, `score`, `strata`) a scenario implements
 to be measured by the shared protocol. It is deliberately small: anything more pushes a decision into the lane,
@@ -645,3 +664,8 @@ anything less makes the lane copy the protocol. Two properties are load-bearing 
 returns `undefined` rather than throwing, so a malformed reply is scored as unparseable instead of killing a
 fold, and `strata` receives a task and nothing else, so an **outcome-blind stratifier** is enforced by the type
 signature instead of by discipline.
+
+A third property was learned from the first implementation. The contract reads as though a lane sees the model's
+raw reply; a lane whose agent is a separate process does not. For τ²-bench, `parse` parses **the evaluator's
+receipt** and `score` reads the verdict out of it — and that is enough, because no gate inspects a candidate's
+shape, only its outcome. What the contract needs is a verdict per attempt, not a transcript.

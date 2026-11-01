@@ -779,10 +779,15 @@ describe('buildValidityGates', () => {
     expect(gate({ ...sound, goldExecRate: 0.99 }, 'V4-gold-executable').pass).toBe(true);
   });
 
-  it('V5 is advisory and fails above a 6pp minimum detectable difference', () => {
+  it('V5 fails above a 6pp minimum detectable difference, and stops the run', () => {
+    // Blocking since R27 stage 2. The advisory flag it carried had never been exercised: every one
+    // of the seventeen published artefacts that carries this gate passes it, from 1.96pp to 4.87pp.
+    // The first run it would have protected was τ² at n = 68, whose minimum detectable difference is
+    // 21.41pp — a design that could not have seen the effect it went looking for, publishing a delta
+    // anyway. A gate whose only failure case is the case it exists for was recorded, not enforced.
     const failing = gate({ ...sound, detectablePp: 6.01 }, 'V5-resolution');
     expect(failing.pass).toBe(false);
-    expect(failing.blocking).toBe(false);
+    expect(failing.blocking).toBe(true);
     expect(failing.actual).toBe('minimum detectable 6.01pp');
     expect(gate({ ...sound, detectablePp: 6 }, 'V5-resolution').pass).toBe(true);
   });
@@ -790,7 +795,7 @@ describe('buildValidityGates', () => {
   it('V5 says a sample with no discordant pairs cannot estimate anything', () => {
     const flat = gate({ ...sound, detectablePp: Number.POSITIVE_INFINITY }, 'V5-resolution');
     expect(flat.pass).toBe(false);
-    expect(flat.blocking).toBe(false);
+    expect(flat.blocking).toBe(true);
     expect(flat.actual).toBe('not estimable: no question changed hands');
   });
 
@@ -2011,14 +2016,17 @@ describe('buildValidityGates', () => {
     });
   });
 
-  it('marks exactly V5 advisory and everything else blocking', () => {
+  it('leaves exactly one advisory gate, and it is the one about a subset', () => {
+    // `V5-resolution` left this list in stage 2 for the reason recorded above it. `V9-subset-size`
+    // stays: a small qualifying subset describes how much of a corpus the claim reaches, and the
+    // artefact states it rather than refusing to publish the reach.
     const advisory = buildValidityGates({
       ...sound,
       subset: { qualifying: 140, minimum: 100 },
     })
       .filter((entry) => !entry.blocking)
       .map((entry) => entry.id);
-    expect(advisory).toEqual(['V5-resolution', 'V9-subset-size']);
+    expect(advisory).toEqual(['V9-subset-size']);
   });
 });
 

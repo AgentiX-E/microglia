@@ -101,6 +101,47 @@ jobs:
           POC_RESULT_DIR="${RUNNER_TEMP}/l4-empty" TAU_RESULTS= TAU_DRIVER= pnpm eval:l4
           grep -q '"status_not_run": 1' "${RUNNER_TEMP}/l4-empty/poc-l4.json"
 
+      # The second scenario, measured by the shared protocol rather than by three gates of its own.
+      #
+      # The lane is red on purpose and this step asserts *why*. τ²'s paired comparison at n = 68
+      # resolves a 21.41pp difference at 80% power against a 6pp bar, so `V5-resolution` now blocks
+      # and the run refuses to publish the 1.47pp delta it used to publish. A green run here would
+      # mean the protocol had been tuned to pass, which is the failure stage 2 was registered to
+      # catch. Everything else in the check is the audit's shape: four gates fire, two of them
+      # vacuous, thirty-five are absent, and the effect itself did not move.
+      - name: τ² lane measured by the protocol (second-scenario conformance)
+        run: |
+          set -euo pipefail
+          if POC_RESULT_DIR="${RUNNER_TEMP}/tau2-protocol" \
+            L4_FIRST=eval/results/history/l4-arm-reference-67.json \
+            L4_SECOND=eval/results/history/l4-arm-memory-67.json \
+            pnpm eval:l4-pair; then
+            echo "the τ² pair published a delta its own instrument says it cannot resolve"
+            exit 1
+          fi
+          node -e "
+            const a = require('${RUNNER_TEMP}/tau2-protocol/poc-l4-pair.json');
+            const ids = a.protocol.evaluable;
+            const resolution = a.gates.find((g) => g.id === 'V5-resolution');
+            const checks = [
+              ['four gates fire', ids.length === 4],
+              ['two of them are vacuous', a.protocol.vacuous.length === 2],
+              ['thirty-five are absent', a.protocol.absent.length === 35],
+              ['nine supplyable', a.protocol.supplyable === 9],
+              ['thirty arm-indexed', a.protocol.armIndexed === 30],
+              ['the resolution gate fired', resolution !== undefined],
+              ['and it blocks', resolution.blocking === true],
+              ['and it fails', resolution.pass === false],
+              ['at the minimum detectable difference', resolution.actual.includes('21.41pp')],
+              ['and the effect did not move', Math.abs(a.comparison.deltaPp - 1.4706) < 0.001],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) {
+              console.error('τ² protocol conformance failed: ' + bad.join(', '));
+              process.exit(1);
+            }
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

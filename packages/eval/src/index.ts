@@ -406,6 +406,33 @@ export {
 } from './tau2.js';
 
 export {
+  createTau2Adapter,
+  parseTau2Candidate,
+  renderTau2Pack,
+  scoreTau2Candidate,
+  tau2Strata,
+  tau2Tasks,
+  type Tau2Candidate,
+  type Tau2Pack,
+  type Tau2Task,
+} from './lanes/tau2.js';
+
+export {
+  TAU2_GATE_INDEX,
+  tau2ArmRecordOf,
+  tau2DetectablePp,
+  tau2GateAudit,
+  tau2ProtocolInput,
+  type Tau2ArmArtefact,
+  type Tau2ArmRecord,
+  type Tau2ComparisonRecord,
+  type Tau2Evidence,
+  type Tau2Field,
+  type Tau2GateAudit,
+  type Tau2Projection,
+} from './tau2-gates.js';
+
+export {
   assignFolds,
   detectableDelta,
   discordanceOf,

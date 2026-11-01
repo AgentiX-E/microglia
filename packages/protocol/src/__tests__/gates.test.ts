@@ -212,6 +212,118 @@ describe('the gate set', () => {
   });
 });
 
+/**
+ * The half of the input that used to be mandatory, and what the second scenario did to it.
+ *
+ * These five tests exist because of a measured failure rather than a hypothetical one. The first
+ * version of `ProtocolGateInput` made eight fields required, which meant a lane that could not count
+ * its recalled items or its agent's calls could not call `buildProtocolGates` **at all** — not even
+ * to evaluate the thirty-one gates whose own fields it had. τ², whose agent is another process,
+ * could prove four gates and was allowed to publish none. A requirement that turns a partial report
+ * into no report is not a standard; it is an all-or-nothing gate on the whole instrument.
+ */
+describe('a lane is graded on what it can prove, not on what it cannot state', () => {
+  /** The minimal input with some fields deleted, which is what an out-of-process lane produces. */
+  const without = (...keys: readonly (keyof ProtocolGateInput)[]): ProtocolGateInput => {
+    const input: Record<string, unknown> = { ...minimal };
+    for (const key of keys) delete input[key];
+    return input as unknown as ProtocolGateInput;
+  };
+  const ids = (input: ProtocolGateInput): readonly string[] =>
+    buildProtocolGates(input).map((entry) => entry.id);
+
+  it('omits the pack gate when the lane cannot count what it recalled', () => {
+    expect(ids(without('meanPackIds'))).not.toContain('V1-pack-not-empty');
+  });
+
+  it('omits the partition gate when the lane cannot show its split', () => {
+    expect(ids(without('partition'))).not.toContain('V2-fold-partition');
+  });
+
+  it('omits the parse gate when the lane reports no replies', () => {
+    expect(ids(without('parseRate'))).not.toContain('V3-parse-rate');
+  });
+
+  it('omits the resolution gate when the lane cannot estimate its detectable difference', () => {
+    expect(ids(without('detectablePp'))).not.toContain('V5-resolution');
+  });
+
+  it("omits the reliability gate when the lane's calls belong to another process", () => {
+    expect(ids(without('callFailureRate', 'calls', 'callFailures'))).not.toContain(
+      'V8-call-reliability',
+    );
+  });
+
+  it('still publishes every other gate, which is the point of the change', () => {
+    const five = [
+      'V1-pack-not-empty',
+      'V2-fold-partition',
+      'V3-parse-rate',
+      'V5-resolution',
+      'V8-call-reliability',
+    ];
+    const published = ids(
+      without(
+        'meanPackIds',
+        'partition',
+        'parseRate',
+        'detectablePp',
+        'callFailureRate',
+        'calls',
+        'callFailures',
+      ),
+    );
+    // Exactly five gates leave and nothing else moves: the cost of a lane that cannot state those
+    // seven fields is five gates, not the whole report.
+    expect(published).toEqual(ids(minimal).filter((id) => !five.includes(id)));
+    expect(published).toContain('V6-controls-inject');
+    expect(published).toContain('V7-channel');
+  });
+
+  it('keeps the reliability sentence readable when the rate arrives without its tally', () => {
+    // A lane may know the rate and not the counts — a provider that reports failures as a fraction.
+    // Printing `(NaN/undefined calls)` beside the rate would make a valid gate look like a bug.
+    const gate = buildProtocolGates(without('calls', 'callFailures')).find(
+      (entry) => entry.id === 'V8-call-reliability',
+    );
+    expect(gate?.actual).toBe('0.00%');
+  });
+});
+
+/**
+ * The resolution gate became blocking in stage 2, and this is the arithmetic that forced it.
+ *
+ * Every one of the seventeen published artefacts that carry `V5-resolution` passes it, at 1.96pp to
+ * 4.87pp, so the flag had never been exercised. The first run it would have protected is τ² at
+ * n = 68 with 27 discordant pairs, where the minimum detectable difference is 21.41pp against a 6pp
+ * bar — a design that could not have seen the effect it went looking for, publishing a delta anyway.
+ */
+describe('the resolution gate stops a run rather than annotating it', () => {
+  it('is blocking', () => {
+    const gate = buildProtocolGates(minimal).find((entry) => entry.id === 'V5-resolution');
+    expect(gate?.blocking).toBe(true);
+  });
+
+  it('fails a design that could not resolve the effect it reports', () => {
+    // 68 paired tasks with 27 discordant ones: sqrt(2.802² × 0.3971 / 68) = 0.2141, i.e. 21.41pp.
+    const gate = buildProtocolGates({ ...minimal, detectablePp: 21.41 }).find(
+      (entry) => entry.id === 'V5-resolution',
+    );
+    expect(gate?.pass).toBe(false);
+  });
+
+  it('passes the published BIRD readings it has always passed', () => {
+    // The change is falsifiable in one direction: no committed artefact may change its verdict.
+    // These are the two ends of the range the seventeen artefacts occupy.
+    for (const detectablePp of [1.96, 4.87]) {
+      const gate = buildProtocolGates({ ...minimal, detectablePp }).find(
+        (entry) => entry.id === 'V5-resolution',
+      );
+      expect(gate?.pass).toBe(true);
+    }
+  });
+});
+
 describe('the channel gate reads its floors from the data', () => {
   const withChannels = (
     entries: readonly { arm: string; kind: string; applied: number; asked: number; floor: number }[],

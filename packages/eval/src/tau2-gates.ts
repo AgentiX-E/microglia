@@ -1,0 +1,466 @@
+/**
+ * The τ² lane's projection onto the protocol: which of the thirty-nine gates it can fire, and why
+ * the other thirty cannot fire at all.
+ *
+ * ## The question this file answers, and the one it does not
+ *
+ * Stage 1 of R27 counted portability by asking one question of each gate's signature: *does it
+ * mention a scenario type?* Thirty-seven of thirty-nine said no, and the claim written from that
+ * count was "a second scenario is measured without editing a gate". Stage 2 put the claim in front
+ * of the second scenario and got a different answer, because the question was about the wrong
+ * noun. A gate's **signature** being scenario-free does not make the gate **evaluable**: a gate is
+ * evaluable when the lane ran the arm whose bookkeeping the gate reads. `V45-clearance-dose-matched`
+ * names no scenario type and is still unreachable for τ², because τ² ran no clearance arm.
+ *
+ * So portability is indexical, and this file is the index. It is deliberately a table rather than a
+ * predicate: prose that argues a gate is inapplicable can drift from the gate, while a table that
+ * must sum to `GATE_ORDER` cannot.
+ *
+ * ## The three buckets
+ *
+ * | bucket | meaning | today |
+ * |---|---|---|
+ * | **supplyable** | the lane's record type can carry the enabling field | 9 |
+ * | **arm-indexed** | the field exists, but only an arm this lane never ran produces it | 30 |
+ * | **informative** | supplied *and* present in the record that exists | 2 |
+ *
+ * The fourth bucket is the uncomfortable one and it is kept separate on purpose: **vacuous**. Two
+ * of the nine supplyable gates — `V6-controls-inject` and `V7-channel` — fire with an empty control
+ * list and a `undefined` channel, print "no pack-based controls configured" and pass. They are
+ * counted as evaluable by any honest reading of "did the gate run", and they certify nothing. All
+ * seventeen published BIRD artefacts carry `V6` with that exact sentence, and sixteen of seventeen
+ * carry `V7` the same way. A count that folded them into the two informative gates would report
+ * four gates where two do work.
+ *
+ * ## What is not decided here
+ *
+ * Whether two informative gates out of thirty-nine is a failure of the protocol or of this lane's
+ * instrumentation. The registration said the former if fewer than fifteen fired; the refutation is
+ * recorded, and the arm-index table is what makes the difference visible enough to argue about.
+ */
+import {
+  GATE_ORDER,
+  buildProtocolGates,
+  type ProtocolGateInput,
+  type ScenarioGateInput,
+  type ValidityGate,
+} from '@agentix-e/microglia-protocol';
+import { detectableDelta } from './protocol.js';
+
+/**
+ * One arm's records, as far as the protocol is concerned.
+ *
+ * Every field beside `arm` and the grid counts is optional because an artefact written before this
+ * file existed carries none of them, and a projection that required them would refuse to read the
+ * only τ² runs this repository has.
+ */
+export type Tau2ArmRecord = {
+  readonly arm: string;
+  /** Tasks the arm was scored on. */
+  readonly tasks: number;
+  /** Trials per task; a task with fewer than `k` is refused upstream, not here. */
+  readonly trials: number;
+  /** Tasks dropped from the denominator because a trial carried no verdict. */
+  readonly unscored: number;
+  /** Mean items the recall facade put in front of the agent, when the driver counted them. */
+  readonly meanPackIds?: number;
+  /** Agent calls the driver made, and how many exhausted their retries. */
+  readonly calls?: { readonly calls: number; readonly failures: number };
+  /** The learning half's bookkeeping: corrections written, unanswered, edited, failed to distil. */
+  readonly learning?: {
+    readonly rows: number;
+    readonly unanswered: number;
+    readonly edited: number;
+    readonly distillFailed: number;
+  };
+  /** Provenance of the stored items' `scope.domain`, which is the ceiling on every transfer claim. */
+  readonly domainOrigin?: {
+    readonly storedWithDomain: number;
+    readonly storedWithoutDomain: number;
+    readonly unscopedIn: number;
+    readonly widenedIn: number;
+  };
+  /**
+   * The split the arm was scored on.
+   *
+   * Present only when the driver recorded it. `leaked` — the number of evaluated tasks the store
+   * could have learned from — is a property of the intersection of these two lists, so a projection
+   * without them has no `partition` to state and `V2` is absent rather than green.
+   */
+  readonly split?: { readonly train: readonly string[]; readonly test: readonly string[] };
+};
+
+/** The paired comparison, reduced to the three numbers a gate reads. */
+export type Tau2ComparisonRecord = {
+  readonly paired: number;
+  readonly onlyFirst: number;
+  readonly onlySecond: number;
+  readonly lost: number;
+  readonly gained: number;
+  readonly deltaPp: number;
+};
+
+/** Everything a τ² run can tell the protocol. */
+export type Tau2Evidence = {
+  readonly domain: string;
+  /** Trials per task the run used; the `k` the grid was scored at. */
+  readonly trialCount: number;
+  readonly memory?: Tau2ArmRecord;
+  readonly reference?: Tau2ArmRecord;
+  readonly comparison?: Tau2ComparisonRecord;
+};
+
+/**
+ * The nine gates this lane's record type can feed, and the field that feeds each.
+ *
+ * Written as data so the audit and the tests read the same list. An entry here is a promise that
+ * `tau2ProtocolInput` can produce the field; a field the projection never sets is a lie the
+ * `supplied` set would expose on the first run.
+ */
+const SUPPLYABLE: readonly { readonly id: string; readonly field: Tau2Field }[] = [
+  { id: 'V1-pack-not-empty', field: 'meanPackIds' },
+  { id: 'V2-fold-partition', field: 'partition' },
+  { id: 'V3-parse-rate', field: 'parseRate' },
+  { id: 'V5-resolution', field: 'detectablePp' },
+  { id: 'V6-controls-inject', field: 'controls' },
+  { id: 'V7-channel', field: 'channel' },
+  { id: 'V8-call-reliability', field: 'callFailureRate' },
+  { id: 'V32-fold-learning-intact', field: 'learning' },
+  { id: 'V44-domain-accounted', field: 'domainOrigin' },
+];
+
+/**
+ * The thirty gates this lane cannot fire, and the arm each would need.
+ *
+ * This is the conformance checklist the second scenario produced: read it as the work plan for
+ * making τ² a lane the protocol can measure properly, and as the reason the protocol's portability
+ * is a property of the arm inventory rather than of the type signature.
+ */
+const ARM_INDEXED: readonly { readonly id: string; readonly needs: string }[] = [
+  {
+    id: 'V4-gold-executable',
+    needs: 'an oracle arm replaying each reference trajectory to reward 1, which no τ² agent provides',
+  },
+  {
+    id: 'V9-subset-size',
+    needs: 'a qualifying subset whose floor is fixed before the result is read',
+  },
+  {
+    id: 'V10-convention-executable',
+    needs: 'a house convention the gold answer can be rewritten to and re-executed under',
+  },
+  {
+    id: 'V11-channel-ceiling',
+    needs: 'an oracle control that states the accepted answer, to separate format from knowledge',
+  },
+  {
+    id: 'V12-shape-present',
+    needs: 'a distiller that can say when a rule applies, and a plain twin to compare it against',
+  },
+  {
+    id: 'V13-probe-reconciles',
+    needs: 'a reproducibility probe over the stored action plans, with its four buckets',
+  },
+  { id: 'V14-probe-applied', needs: 'the same probe, reporting how many held-out packs it changed' },
+  {
+    id: 'V15-transfer-reconciles',
+    needs: 'a transfer measurement: the store answering questions from a domain it never learned',
+  },
+  { id: 'V16-transfer-resolvable', needs: 'the same measurement, reaching a hundred informative trials' },
+  { id: 'V17-transfer-net-reported', needs: 'the same measurement, carrying its repair and break counts' },
+  { id: 'V18-pool-complete', needs: 'a sampling arm that records more than one candidate per task' },
+  { id: 'V19-pool-reconciles', needs: 'the same arm, signing or explicitly refusing each candidate' },
+  { id: 'V33-transfer-ledger', needs: 'the same measurement, carrying one row per trial' },
+  { id: 'V34-substrate-paired', needs: 'two stores built over one corpus, so the cells can be paired' },
+  { id: 'V35-substrate-resolvable', needs: 'the same comparison, reaching a hundred paired tasks' },
+  { id: 'V36-substrate-coverage', needs: 'the same comparison, reporting its exclusive sets' },
+  {
+    id: 'V37-repair-probe-reconciles',
+    needs: 'a reproducibility probe over the second substrate, with its four buckets',
+  },
+  { id: 'V38-repair-probe-applied', needs: 'the same probe, reporting how many packs it changed' },
+  {
+    id: 'V39-repair-transfer-reconciles',
+    needs: 'a transfer measurement over the second substrate',
+  },
+  { id: 'V40-repair-transfer-resolvable', needs: 'the same measurement, reaching a hundred trials' },
+  { id: 'V41-repair-transfer-ledger', needs: 'the same measurement, carrying one row per trial' },
+  { id: 'V42-repair-transfer-net-reported', needs: 'the same measurement, with its net marginal effect' },
+  {
+    id: 'V43-framing-delivered',
+    needs: 'a framing arm that declares a sentence per arm, and its ablation',
+  },
+  {
+    id: 'V45-clearance-dose-matched',
+    needs: 'a clearance arm paired with a dose-matched control that drops as many items',
+  },
+  { id: 'V46-raw-is-verbatim', needs: 'a raw arm injecting the correction events unchanged' },
+  { id: 'V47-evidence-ablated', needs: 'an arm that removes the evidence block, and its twin' },
+  {
+    id: 'V48-statements-answered',
+    needs: 'a statement executor with a deadline, which τ² delegates to its own environment',
+  },
+  { id: 'V49-dose-truncated', needs: 'a one-slot arm whose every pack carries at most one item' },
+  { id: 'V50-admission-engaged', needs: 'a per-question admission arm with a floor fitted per fold' },
+  { id: 'V51-channel-applied', needs: 'a channel arm that rewrites the prompt, and its share floor' },
+];
+
+/** The enabling fields, named as the audit reports them. */
+export type Tau2Field =
+  | 'meanPackIds'
+  | 'partition'
+  | 'parseRate'
+  | 'detectablePp'
+  | 'controls'
+  | 'channel'
+  | 'callFailureRate'
+  | 'learning'
+  | 'domainOrigin';
+
+/**
+ * The fields behind each gate, so an absence can name the fact rather than the gate.
+ *
+ * A record rather than a map with a fallback: adding a member to `Tau2Field` without saying what it
+ * is becomes a type error, and an absence that could fall back to its own field name would read
+ * `the lane's own record: partition` in a published report.
+ */
+const FIELD_OF: Readonly<Record<Tau2Field, string>> = {
+  meanPackIds: 'the mean number of recalled items per prompt',
+  partition: 'the split, so leaking and duplication can be counted',
+  parseRate: 'the share of trials that carried a verdict',
+  detectablePp: 'the paired comparison, from which the minimum detectable difference follows',
+  controls: 'the list of pack-based controls, which this lane states as empty',
+  channel: 'the strongest channel control, which this lane states as absent',
+  callFailureRate: 'the agent call tally, which a separate process owns',
+  learning: 'the correction bookkeeping: rows, unanswered, edited, failed to distil',
+  domainOrigin: "the provenance of each stored item's scope domain",
+};
+
+/**
+ * The projection, plus what it could not say.
+ *
+ * `input` is a legal `ProtocolGateInput` on every path — that is the point of making the eight
+ * mandatory fields optional in stage 2. `supplied` is what the record actually contained, so a
+ * caller can tell a gate that fired from a gate that was skipped over a field the lane never wrote.
+ */
+export type Tau2Projection = {
+  readonly input: ProtocolGateInput & ScenarioGateInput;
+  readonly supplied: readonly Tau2Field[];
+};
+
+function partitionOf(
+  memory: Tau2ArmRecord | undefined,
+  comparison: Tau2ComparisonRecord | undefined,
+): ProtocolGateInput['partition'] {
+  const split = memory?.split;
+  if (split === undefined || comparison === undefined) return undefined;
+  // The leak count is a property of the two lists, not of the comparison: an evaluated task the
+  // store could have learned from is the one failure the whole split exists to prevent, and it is
+  // invisible in the arm's own totals.
+  const trained = new Set(split.train);
+  const leaked = split.test.filter((id) => trained.has(id)).length;
+  const duplicated = split.test.length - new Set(split.test).size;
+  return {
+    evaluated: comparison.paired,
+    total: comparison.paired + comparison.onlyFirst + comparison.onlySecond,
+    duplicated,
+    leaked,
+  };
+}
+
+function parseRateOf(arm: Tau2ArmRecord | undefined): number | undefined {
+  if (arm === undefined || arm.tasks <= 0) return undefined;
+  return (arm.tasks - arm.unscored) / arm.tasks;
+}
+
+/**
+ * The minimum detectable difference the comparison could have resolved.
+ *
+ * In percentage points, through the same `detectableDelta` the BIRD lane uses: `z = 2.802` is α at
+ * 0.05 two-sided with 80% power, and the discordance is what both arms actually disagreed on. The
+ * number a τ² run produces this way is not the 95% half-width the lane has been quoting — that is
+ * `1.96·SE`, and 2.802/1.96 = 1.43, so the two differ by nearly half again. Both are in the
+ * artefact; the gate reads this one because it is the one the gate's own criterion names.
+ */
+export function tau2DetectablePp(comparison: Tau2ComparisonRecord | undefined): number | undefined {
+  if (comparison === undefined || comparison.paired <= 0) return undefined;
+  const discordance = (comparison.lost + comparison.gained) / comparison.paired;
+  const value = detectableDelta(comparison.paired, discordance);
+  return Number.isFinite(value) ? value * 100 : undefined;
+}
+
+/**
+ * Everything the evidence can put into a `ProtocolGateInput`, and nothing it cannot.
+ *
+ * The two statements that are always made — an empty control list and an absent channel control —
+ * are not defaults: τ² ran no pack-based control and no channel control, and saying so is what lets
+ * `V6` and `V7` fire and be recognised as vacuous rather than be silently omitted.
+ */
+export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
+  const memory = evidence.memory;
+  const supplied: Tau2Field[] = ['controls', 'channel'];
+  // A mutable bag rather than a cast per field: the gate input's properties are `readonly` for
+  // every consumer, and a projection that reassigned through a cast on the finished object would
+  // be able to overwrite a field after `supplied` had already been computed from it.
+  const extra: {
+    meanPackIds?: number;
+    partition?: NonNullable<ProtocolGateInput['partition']>;
+    parseRate?: number;
+    detectablePp?: number;
+    callFailureRate?: number;
+    calls?: number;
+    callFailures?: number;
+    learning?: NonNullable<ProtocolGateInput['learning']>;
+    domainOrigin?: NonNullable<ProtocolGateInput['domainOrigin']>;
+  } = {};
+
+  if (memory?.meanPackIds !== undefined) {
+    extra.meanPackIds = memory.meanPackIds;
+    supplied.push('meanPackIds');
+  }
+  const partition = partitionOf(memory, evidence.comparison);
+  if (partition !== undefined) {
+    extra.partition = partition;
+    supplied.push('partition');
+  }
+  const parseRate = parseRateOf(memory);
+  if (parseRate !== undefined) {
+    extra.parseRate = parseRate;
+    supplied.push('parseRate');
+  }
+  const detectablePp = tau2DetectablePp(evidence.comparison);
+  if (detectablePp !== undefined) {
+    extra.detectablePp = detectablePp;
+    supplied.push('detectablePp');
+  }
+  // A call tally of zero is not perfect reliability, it is a counter nobody incremented: the arm
+  // artefacts written before this field existed carry `calls: 0` beside sixty-eight scored tasks,
+  // which is impossible. Reading that as a rate would report the best possible score for the least
+  // possible evidence, so the guard is on the count rather than on the ratio.
+  if (memory?.calls !== undefined && memory.calls.calls > 0) {
+    extra.callFailureRate = memory.calls.failures / memory.calls.calls;
+    extra.calls = memory.calls.calls;
+    extra.callFailures = memory.calls.failures;
+    supplied.push('callFailureRate');
+  }
+  if (memory?.learning !== undefined) {
+    extra.learning = memory.learning;
+    supplied.push('learning');
+  }
+  if (memory?.domainOrigin !== undefined) {
+    extra.domainOrigin = memory.domainOrigin;
+    supplied.push('domainOrigin');
+  }
+  return { input: { packControls: [], channelBest: undefined, ...extra }, supplied };
+}
+
+/** What the audit found, in the four buckets the header describes. */
+export type Tau2GateAudit = {
+  /** The protocol's gates that fired, in publication order. */
+  readonly gates: readonly ValidityGate[];
+  /** Gates whose enabled field was present. */
+  readonly evaluable: readonly string[];
+  /** Gate ids that fired with an empty arm behind them: they pass and certify nothing. */
+  readonly vacuous: readonly string[];
+  /** Gates this lane cannot fire, each naming the arm that would make it fire. */
+  readonly absent: readonly { readonly id: string; readonly needs: string }[];
+  /** Gates the lane's record type can feed, present or not. */
+  readonly supplyable: number;
+  /** Gates that need an arm this lane never ran. */
+  readonly armIndexed: number;
+};
+
+/**
+ * Run the protocol over the evidence and account for every gate.
+ *
+ * The accounting is the deliverable: `evaluable + absent` must equal `GATE_ORDER` exactly, in both
+ * directions, and a gate that appears in neither is a gate the tables forgot. That invariant is
+ * enforced by a test rather than by the type system, because the tables are data.
+ */
+export function tau2GateAudit(evidence: Tau2Evidence): Tau2GateAudit {
+  const projection = tau2ProtocolInput(evidence);
+  const gates = buildProtocolGates(projection.input);
+  const evaluable = gates.map((gate) => gate.id);
+  const present = new Set(evaluable);
+
+  // Two gates fire on an empty list by construction — `every` over nothing is true — so they are
+  // separated from the ones that read a measurement. The test is on the input rather than on the
+  // gate's sentence, because a report that sniffed its own prose would break the day the prose did.
+  const vacuous: string[] = [];
+  if (projection.input.packControls.length === 0) vacuous.push('V6-controls-inject');
+  if (projection.input.channelBest === undefined) vacuous.push('V7-channel');
+
+  const absent = ARM_INDEXED.filter((entry) => !present.has(entry.id));
+  const unrecorded = SUPPLYABLE.filter(
+    (entry) => !projection.supplied.includes(entry.field) && !present.has(entry.id),
+  ).map((entry) => ({
+    id: entry.id,
+    needs: `the lane's own record, which this run did not carry: ${FIELD_OF[entry.field]}`,
+  }));
+
+  return {
+    gates,
+    evaluable,
+    vacuous: vacuous.filter((id) => present.has(id)),
+    absent: [...absent, ...unrecorded].sort(
+      (left, right) => GATE_ORDER.indexOf(left.id) - GATE_ORDER.indexOf(right.id),
+    ),
+    supplyable: SUPPLYABLE.length,
+    armIndexed: ARM_INDEXED.length,
+  };
+}
+
+/** The tables, for the test that holds them to `GATE_ORDER`. */
+export const TAU2_GATE_INDEX: {
+  readonly supplyable: typeof SUPPLYABLE;
+  readonly armIndexed: typeof ARM_INDEXED;
+} = { supplyable: SUPPLYABLE, armIndexed: ARM_INDEXED };
+
+/**
+ * An arm artefact, as much of it as the projection reads.
+ *
+ * Loose on purpose. The committed τ² arms were written before this module existed, so the required
+ * half is exactly the three numbers every version of `bin/l4.ts` has emitted, and everything the
+ * stage-2 instrumentation adds lives under `tau2`, which no committed artefact carries yet.
+ */
+export type Tau2ArmArtefact = {
+  readonly n?: number;
+  readonly metrics?: Readonly<Record<string, unknown>>;
+  readonly tau2?: {
+    readonly meanPackIds?: number;
+    readonly calls?: { readonly calls: number; readonly failures: number };
+    readonly learning?: Tau2ArmRecord['learning'];
+    readonly domainOrigin?: Tau2ArmRecord['domainOrigin'];
+    readonly split?: { readonly train: readonly string[]; readonly test: readonly string[] };
+  };
+};
+
+function countOf(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * One arm's artefact, read into the record the projection wants.
+ *
+ * `metrics.k` is the trial count the grid was scored at and `metrics.unscored_tasks` is the
+ * denominator the reader dropped; both are written by every version of the lane, and using them
+ * rather than re-deriving them keeps the projection from disagreeing with the reader that produced
+ * the score.
+ */
+export function tau2ArmRecordOf(arm: string, artefact: Tau2ArmArtefact): Tau2ArmRecord {
+  const metrics = artefact.metrics ?? {};
+  const tasks = countOf(metrics['tasks'], countOf(artefact.n, 0));
+  return {
+    arm,
+    tasks,
+    trials: countOf(metrics['k'], 0),
+    unscored: countOf(metrics['unscored_tasks'], 0),
+    ...(artefact.tau2?.meanPackIds === undefined ? {} : { meanPackIds: artefact.tau2.meanPackIds }),
+    ...(artefact.tau2?.calls === undefined ? {} : { calls: artefact.tau2.calls }),
+    ...(artefact.tau2?.learning === undefined ? {} : { learning: artefact.tau2.learning }),
+    ...(artefact.tau2?.domainOrigin === undefined
+      ? {}
+      : { domainOrigin: artefact.tau2.domainOrigin }),
+    ...(artefact.tau2?.split === undefined ? {} : { split: artefact.tau2.split }),
+  };
+}

@@ -77,8 +77,10 @@ describe('blockingFailure', () => {
   });
 
   it('ignores an advisory gate that failed', () => {
-    // `V5-resolution` is advisory on purpose: a sample that cannot resolve an effect still reports
-    // what it saw, and refusing to publish it would encourage sample-size shopping.
+    // The mechanism, on a gate that is advisory today — `V5-resolution` itself stopped being
+    // advisory in stage 2, when the second scenario showed that its only failure case was the case
+    // it existed for. What is tested here is the reader, not the flags: an advisory failure must not
+    // reach `blockingFailure`, or every lane would be refused over a note.
     const found = blockingFailure([entry('V5-resolution', false, false)]);
     expect(found).toBeUndefined();
   });

@@ -1,14 +1,15 @@
 {
   "id": "poc-l4-pair",
   "title": "L4 — memory arm against the reference arm on one split, paired per task",
-  "ranAt": "2026-10-25T04:19:31.944Z",
+  "ranAt": "2026-11-01T04:22:16.049Z",
+  "domain": "retail",
   "first": {
-    "path": "/tmp/l4pair/arms/reference/poc-l4.json",
+    "path": "eval/results/history/l4-arm-reference-67.json",
     "ranAt": "2026-10-25T03:43:49.150Z",
     "pass4": 0.5147058823529411
   },
   "second": {
-    "path": "/tmp/l4pair/arms/memory/poc-l4.json",
+    "path": "eval/results/history/l4-arm-memory-67.json",
     "ranAt": "2026-10-25T02:49:19.560Z",
     "pass4": 0.5294117647058824
   },
@@ -30,20 +31,198 @@
     "tasksForThreePp": 1695,
     "detectableAtFivePp": false
   },
+  "protocol": {
+    "detectablePp": 21.411204541799975,
+    "evaluable": [
+      "V3-parse-rate",
+      "V5-resolution",
+      "V6-controls-inject",
+      "V7-channel"
+    ],
+    "vacuous": [
+      "V6-controls-inject",
+      "V7-channel"
+    ],
+    "absent": [
+      {
+        "id": "V1-pack-not-empty",
+        "needs": "the lane's own record, which this run did not carry: the mean number of recalled items per prompt"
+      },
+      {
+        "id": "V2-fold-partition",
+        "needs": "the lane's own record, which this run did not carry: the split, so leaking and duplication can be counted"
+      },
+      {
+        "id": "V4-gold-executable",
+        "needs": "an oracle arm replaying each reference trajectory to reward 1, which no τ² agent provides"
+      },
+      {
+        "id": "V8-call-reliability",
+        "needs": "the lane's own record, which this run did not carry: the agent call tally, which a separate process owns"
+      },
+      {
+        "id": "V32-fold-learning-intact",
+        "needs": "the lane's own record, which this run did not carry: the correction bookkeeping: rows, unanswered, edited, failed to distil"
+      },
+      {
+        "id": "V12-shape-present",
+        "needs": "a distiller that can say when a rule applies, and a plain twin to compare it against"
+      },
+      {
+        "id": "V9-subset-size",
+        "needs": "a qualifying subset whose floor is fixed before the result is read"
+      },
+      {
+        "id": "V11-channel-ceiling",
+        "needs": "an oracle control that states the accepted answer, to separate format from knowledge"
+      },
+      {
+        "id": "V13-probe-reconciles",
+        "needs": "a reproducibility probe over the stored action plans, with its four buckets"
+      },
+      {
+        "id": "V14-probe-applied",
+        "needs": "the same probe, reporting how many held-out packs it changed"
+      },
+      {
+        "id": "V37-repair-probe-reconciles",
+        "needs": "a reproducibility probe over the second substrate, with its four buckets"
+      },
+      {
+        "id": "V38-repair-probe-applied",
+        "needs": "the same probe, reporting how many packs it changed"
+      },
+      {
+        "id": "V15-transfer-reconciles",
+        "needs": "a transfer measurement: the store answering questions from a domain it never learned"
+      },
+      {
+        "id": "V16-transfer-resolvable",
+        "needs": "the same measurement, reaching a hundred informative trials"
+      },
+      {
+        "id": "V33-transfer-ledger",
+        "needs": "the same measurement, carrying one row per trial"
+      },
+      {
+        "id": "V17-transfer-net-reported",
+        "needs": "the same measurement, carrying its repair and break counts"
+      },
+      {
+        "id": "V39-repair-transfer-reconciles",
+        "needs": "a transfer measurement over the second substrate"
+      },
+      {
+        "id": "V40-repair-transfer-resolvable",
+        "needs": "the same measurement, reaching a hundred trials"
+      },
+      {
+        "id": "V41-repair-transfer-ledger",
+        "needs": "the same measurement, carrying one row per trial"
+      },
+      {
+        "id": "V42-repair-transfer-net-reported",
+        "needs": "the same measurement, with its net marginal effect"
+      },
+      {
+        "id": "V34-substrate-paired",
+        "needs": "two stores built over one corpus, so the cells can be paired"
+      },
+      {
+        "id": "V35-substrate-resolvable",
+        "needs": "the same comparison, reaching a hundred paired tasks"
+      },
+      {
+        "id": "V36-substrate-coverage",
+        "needs": "the same comparison, reporting its exclusive sets"
+      },
+      {
+        "id": "V18-pool-complete",
+        "needs": "a sampling arm that records more than one candidate per task"
+      },
+      {
+        "id": "V19-pool-reconciles",
+        "needs": "the same arm, signing or explicitly refusing each candidate"
+      },
+      {
+        "id": "V10-convention-executable",
+        "needs": "a house convention the gold answer can be rewritten to and re-executed under"
+      },
+      {
+        "id": "V43-framing-delivered",
+        "needs": "a framing arm that declares a sentence per arm, and its ablation"
+      },
+      {
+        "id": "V48-statements-answered",
+        "needs": "a statement executor with a deadline, which τ² delegates to its own environment"
+      },
+      {
+        "id": "V44-domain-accounted",
+        "needs": "the lane's own record, which this run did not carry: the provenance of each stored item's scope domain"
+      },
+      {
+        "id": "V45-clearance-dose-matched",
+        "needs": "a clearance arm paired with a dose-matched control that drops as many items"
+      },
+      {
+        "id": "V46-raw-is-verbatim",
+        "needs": "a raw arm injecting the correction events unchanged"
+      },
+      {
+        "id": "V47-evidence-ablated",
+        "needs": "an arm that removes the evidence block, and its twin"
+      },
+      {
+        "id": "V49-dose-truncated",
+        "needs": "a one-slot arm whose every pack carries at most one item"
+      },
+      {
+        "id": "V50-admission-engaged",
+        "needs": "a per-question admission arm with a floor fitted per fold"
+      },
+      {
+        "id": "V51-channel-applied",
+        "needs": "a channel arm that rewrites the prompt, and its share floor"
+      }
+    ],
+    "supplyable": 9,
+    "armIndexed": 30
+  },
   "gates": [
     {
-      "id": "l4-paired",
-      "criterion": "memory - reference >= 0 at p < 0.05",
-      "actual": "1.47pp (p=1.0000, n=68)",
+      "id": "V3-parse-rate",
+      "criterion": "at least 90% of replies contain a statement",
+      "actual": "100.00%",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V5-resolution",
+      "criterion": "the sample can resolve a 6pp effect at 80% power",
+      "actual": "minimum detectable 21.41pp",
       "pass": false,
       "blocking": true
     },
     {
-      "id": "l4-resolution",
-      "criterion": "the design can detect a 5pp difference: 95% half-width <= 5pp",
-      "actual": "±15.0pp at n=68 (needs ~611 tasks)",
+      "id": "V6-controls-inject",
+      "criterion": "every pack-based control arm injected at least one rule on average",
+      "actual": "no pack-based controls configured",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V7-channel",
+      "criterion": "a stated control moves accuracy by at least 10pp",
+      "actual": "no channel control was run",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "l4-paired",
+      "criterion": "the memory does not cost accuracy: delta >= 0 at p < 0.05",
+      "actual": "1.47pp (p=1.0000, n=68)",
       "pass": false,
-      "blocking": false
+      "blocking": true
     },
     {
       "id": "l4-same-split",
@@ -57,6 +236,7 @@
     "`deltaPp` is second - first, so a negative number means the second arm (memory) did worse.",
     "pass^4 per task is the k=4 reading: a task counts only when all four trials passed.",
     "The pair is defined on the intersection of task ids; tasks scored by one arm only are counted, not dropped silently.",
-    "Published reference for scale: ALTK-Evolve pass^4 = 0.575 on tau2-retail."
+    "Published reference for scale: ALTK-Evolve pass^4 = 0.575 on tau2-retail.",
+    "The protocol gates are the shared thirty-nine, not a τ² copy of them; `absent` names the arm each of the rest would need."
   ]
 }
