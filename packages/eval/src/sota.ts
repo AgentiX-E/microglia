@@ -1744,6 +1744,21 @@ export type GateInput = {
   };
   readonly channelBest: { readonly arm: string; readonly deltaPp: number } | undefined;
   /**
+   * How often each channel arm actually rewrote the prompt, when one ran.
+   *
+   * Absent when no channel arm did. Present, it is the arm's validity condition: a value annotator
+   * that annotated no column and a pruner that pruned no table are both the control under another
+   * name, and the difference either reports is a difference of nothing. The two kinds need
+   * different floors — annotation is unconditional and pruning is not — so the kind travels with
+   * the count instead of being guessed from the arm's name.
+   */
+  readonly channels?: readonly {
+    readonly arm: string;
+    readonly kind: 'values' | 'linked';
+    readonly applied: number;
+    readonly asked: number;
+  }[];
+  /**
    * How the clearance arm and its dose-matched control compared, when the run builds one.
    *
    * Absent when no clearance arm ran, because a gate that always passes is a comment. Present, it
@@ -2381,6 +2396,34 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
         unevidenced.length === 0 &&
         input.admission.admitted > 0 &&
         input.admission.admitted < input.admission.questions,
+      blocking: true,
+    });
+  }
+  if (input.channels !== undefined && input.channels.length > 0) {
+    // A channel arm's null is about the channel only if the channel moved the prompt. `values`
+    // annotates every column unconditionally, so it is held to 95%: a tenth of prompts without the
+    // annotation is a different arm from the one the name describes. `linked` prunes only when the
+    // question names tables, so it is held to the weaker condition that it fired at all — thresholding
+    // a pruner's *share* would encode this record's guess about how often a linker binds.
+    const floors: Record<'values' | 'linked', number> = { values: 0.95, linked: 0.01 };
+    const readings = input.channels.map((entry) => ({
+      ...entry,
+      share: entry.asked === 0 ? 0 : entry.applied / entry.asked,
+    }));
+    gates.push({
+      id: 'V51-channel-applied',
+      criterion:
+        'every channel arm rewrote the prompt at least as often as its kind requires ' +
+        '(values at least 95% of prompts, linked at least 1%), so a null on it is a null about ' +
+        'the channel rather than about the arm carrying its name',
+      actual: readings
+        .map(
+          (entry) =>
+            `${entry.arm} (${entry.kind}): ${entry.applied}/${entry.asked} = ` +
+            `${(entry.share * 100).toFixed(1)}%`,
+        )
+        .join('; '),
+      pass: readings.every((entry) => entry.asked > 0 && entry.share >= floors[entry.kind]),
       blocking: true,
     });
   }

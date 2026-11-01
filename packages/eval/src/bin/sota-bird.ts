@@ -2713,6 +2713,19 @@ type FoldResult = {
   /** Questions the admission arm showed a note to, and how many it was asked. */
   readonly acceptedAdmitted: number;
   readonly acceptedPositions: number;
+  /**
+   * Prompts each channel arm rewrote, out of the questions it was asked.
+   *
+   * Empty when no channel arm ran. Non-empty, it is the arm's validity condition: `values` that
+   * annotated no column and `linked` that pruned no table are both `none` under another name, and
+   * the gate refuses to let either publish a null as if a channel had been measured.
+   */
+  readonly channelApplied: readonly {
+    readonly arm: string;
+    readonly kind: 'values' | 'linked';
+    readonly applied: number;
+    readonly asked: number;
+  }[];
   /** Questions the anchored arm could not revise because the first round had no answer. */
   readonly anchoredSkipped: number;
   /** How many rules each pack carried and how many survived the grounding filter. */
@@ -3447,6 +3460,21 @@ async function runFold(
   /** Questions the admission floor showed a note to, out of the questions that had one to show. */
   let acceptedAdmitted = 0;
   let acceptedPositions = 0;
+  /**
+   * Prompts each channel arm actually rewrote, out of the questions it was asked.
+   *
+   * A channel arm is a manipulation of the prompt that claims to add or remove knowledge: `values`
+   * annotates columns with the values they hold, `linked` prunes the schema to the tables the
+   * question names. Either one that rewrote nothing is `none` under a second name, and the
+   * difference it reports is a difference of nothing — which is how a null gets published as a
+   * finding. Counted here rather than inferred at the end, because the DDL comparison is cheap
+   * where the text is still in hand and impossible once the fold is scored.
+   */
+  const channelApplied = new Map<string, { readonly kind: 'values' | 'linked'; applied: number; asked: number }>();
+  const noteChannel = (arm: string, kind: 'values' | 'linked', applied: boolean): void => {
+    const entry = channelApplied.get(arm) ?? { kind, applied: 0, asked: 0 };
+    channelApplied.set(arm, { kind, applied: entry.applied + (applied ? 1 : 0), asked: entry.asked + 1 });
+  };
   /** The reproducibility gate's verdict for this fold, once it has run. */
   let probe: ProbeRun | undefined;
   /** The same gate over the repair store, when the second substrate was asked for. */
@@ -4033,12 +4061,15 @@ async function runFold(
         total: linked.total,
         pruned: linked.reason === 'linked',
       });
+      noteChannel('linked', 'linked', linked.reason === 'linked');
       call(position, 'linked', '', 0, false, 'before', linked.ddl);
     }
     if (ARMS.has('values')) {
       // The same question, the same pack position, one input changed: the schema now says what the
       // columns hold. Compared against `none`, which is the same prompt without the annotation.
-      call(position, 'values', '', 0, false, 'before', valuesDdl(dataset.dbPath(row.db_id)).ddl);
+      const annotatedDdl = valuesDdl(dataset.dbPath(row.db_id)).ddl;
+      noteChannel('values', 'values', annotatedDdl !== schemaSql(dataset.dbPath(row.db_id)));
+      call(position, 'values', '', 0, false, 'before', annotatedDdl);
     }
     if (ARMS.has('gen-plan')) {
       // The same question, the same schema, a different procedure. R7.1's claim is that the pool is
@@ -4992,6 +5023,7 @@ async function runFold(
     oneSlotOver,
     acceptedAdmitted,
     acceptedPositions,
+    channelApplied: [...channelApplied.entries()].map(([arm, entry]) => ({ arm, ...entry })),
     anchoredSkipped,
     retried,
     notRetried,
@@ -5519,8 +5551,7 @@ async function main(): Promise<void> {
       entry.arm === 'full-plain' ||
       entry.arm === 'critique',
   );
-  const channel = arms.filter((entry) => entry.arm === 'oracle' || entry.arm === 'stated');
-  const channelBest = channel.reduce<ArmSummary | undefined>(
+  const channel = arms.filter((entry) => entry.arm === 'oracle' || entry.arm === 'stated');  const channelBest = channel.reduce<ArmSummary | undefined>(
     (best, entry) => (best === undefined || entry.delta_pp > best.delta_pp ? entry : best),
     undefined,
   );
@@ -5587,6 +5618,33 @@ async function main(): Promise<void> {
   // One pooled projection per substrate, computed once and read by both the gate and the artefact.
   const ruleTransfer = transferArtefact(folds, (fold) => fold.transfer);
   const repairTransfer = transferArtefact(folds, (fold) => fold.transferRepair);
+  /**
+   * Sum each channel arm's rewrite counts across the folds.
+   *
+   * The numbers travel to the gate rather than to the log, because the question they answer is not
+   * how often a channel fired but whether it fired at all — and a reading that only exists in a log
+   * cannot refuse a claim. `values` that annotated no column and `linked` that pruned no table each
+   * publish a clean null, and the null is about the arm's name rather than about the channel.
+   */
+  const channels = ((): readonly {
+    readonly arm: string;
+    readonly kind: 'values' | 'linked';
+    readonly applied: number;
+    readonly asked: number;
+  }[] => {
+    const totals = new Map<string, { kind: 'values' | 'linked'; applied: number; asked: number }>();
+    for (const fold of folds) {
+      for (const entry of fold.channelApplied) {
+        const seen = totals.get(entry.arm) ?? { kind: entry.kind, applied: 0, asked: 0 };
+        totals.set(entry.arm, {
+          kind: entry.kind,
+          applied: seen.applied + entry.applied,
+          asked: seen.asked + entry.asked,
+        });
+      }
+    }
+    return [...totals.entries()].map(([arm, entry]) => ({ arm, ...entry }));
+  })();
   const gates = buildValidityGates({
     meanPackIds,
     partition: {
@@ -5602,6 +5660,10 @@ async function main(): Promise<void> {
     // How much of the score was decided by the instrument: a statement killed by the deadline is not
     // a wrong answer, and a run whose statements were mostly killed is describing its own timeout.
     statements: statements.stats(),
+    // A channel arm that rewrote nothing is `none` under a second name. The gate reads this rather
+    // than trusting the arm's name, because the two failures it catches — a value annotator with no
+    // values, a pruner that prunes nothing — both publish a clean null.
+    ...(folds.every((fold) => fold.channelApplied.length === 0) ? {} : { channels }),
     channelBest:
       channelBest === undefined
         ? undefined
@@ -6516,6 +6578,12 @@ async function main(): Promise<void> {
       admission_net: fold.admission === null ? null : fold.admission.helped - fold.admission.harmed,
       admission_reason: fold.admission?.reason ?? null,
       one_slot_differs: fold.oneSlotDiffers,
+      channel_applied:
+        fold.channelApplied.length === 0
+          ? null
+          : fold.channelApplied
+              .map((entry) => `${entry.arm} ${entry.applied}/${entry.asked}`)
+              .join(', '),
       accepted_admitted: fold.acceptedAdmitted,
       without_memory: rate(fold.cases.map((item) => item.withoutMemoryCorrect)),
       with_memory: rate(fold.cases.map((item) => item.correct)),

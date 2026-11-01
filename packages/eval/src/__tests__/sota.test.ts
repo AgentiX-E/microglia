@@ -1740,6 +1740,74 @@ describe('buildValidityGates', () => {
     expect(entry.pass).toBe(false);
   });
 
+  it('V51 is absent when no channel arm ran', () => {
+    // A gate that always passes is a comment. A run with no channel arm has no channel to certify
+    // and must not report a green tick about one.
+    expect(buildValidityGates(sound).some((entry) => entry.id === 'V51-channel-applied')).toBe(false);
+  });
+
+  it('V51 passes when the value annotator annotated and the pruner pruned', () => {
+    const entry = gate(
+      {
+        ...sound,
+        channels: [
+          { arm: 'values', kind: 'values', applied: 1534, asked: 1534 },
+          { arm: 'linked', kind: 'linked', applied: 41, asked: 1534 },
+        ],
+      },
+      'V51-channel-applied',
+    );
+    expect(entry.pass).toBe(true);
+    expect(entry.blocking).toBe(true);
+    expect(entry.actual).toContain('values (values): 1534/1534 = 100.0%');
+    expect(entry.actual).toContain('linked (linked): 41/1534 = 2.7%');
+  });
+
+  it('V51 fails when the value annotator reached too few prompts', () => {
+    // Half the prompts without the annotation is a different arm from the one the name describes,
+    // and the delta it reports is about the half it reached and not about the channel.
+    const entry = gate(
+      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 700, asked: 1534 }] },
+      'V51-channel-applied',
+    );
+    expect(entry.pass).toBe(false);
+  });
+
+  it('V51 holds the annotation to its floor exactly, not loosely', () => {
+    // 0.95 × 1534 is not an integer, so the boundary is exercised at the count that rounds to it:
+    // 1458/1534 is 95.04% and must pass, 1457 is 94.98% and must not.
+    const at = gate(
+      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 1458, asked: 1534 }] },
+      'V51-channel-applied',
+    );
+    const below = gate(
+      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 1457, asked: 1534 }] },
+      'V51-channel-applied',
+    );
+    expect(at.pass).toBe(true);
+    expect(below.pass).toBe(false);
+  });
+
+  it('V51 fails when the pruner never pruned', () => {
+    // A linker that keeps every table is the control under another name, and this record has
+    // published a pruning result once before without checking which of the two it had.
+    const entry = gate(
+      { ...sound, channels: [{ arm: 'linked', kind: 'linked', applied: 0, asked: 1534 }] },
+      'V51-channel-applied',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toContain('linked (linked): 0/1534 = 0.0%');
+  });
+
+  it('V51 reads a zero denominator as nothing rather than as a ratio', () => {
+    const entry = gate(
+      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 0, asked: 0 }] },
+      'V51-channel-applied',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toContain('0/0 = 0.0%');
+  });
+
   it('V45 is absent when the run scored no clearance pair', () => {
     // A gate that always passes is a comment: a run with no clearance arm has nothing to dose-match
     // and must not report a green tick about it.
