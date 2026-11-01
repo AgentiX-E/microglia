@@ -2,7 +2,7 @@
   "name": "microglia",
   "version": "0.1.0",
   "private": true,
-  "description": "Microglia — a headless feedback flywheel SDK for agentic workflows",
+  "description": "Microglia \u2014 a headless feedback flywheel SDK for agentic workflows",
   "license": "MIT",
   "author": "Lambertyan",
   "type": "module",
@@ -55,7 +55,9 @@
     "eval:probe": "tsx packages/eval/src/bin/embed-probe.ts",
     "eval:plugin": "tsx packages/eval/src/bin/plugin-run.ts",
     "eval:prereg": "tsx packages/eval/src/bin/prereg.ts",
-    "eval:protocol": "tsx packages/eval/src/bin/protocol.ts"
+    "eval:protocol": "tsx packages/eval/src/bin/protocol.ts",
+    "eval:harm": "tsx packages/eval/src/bin/harm-strata.ts",
+    "eval:power": "tsx packages/eval/src/bin/power-audit.ts"
   },
   "devDependencies": {
     "@agentix-e/microglia-browser": "workspace:*",

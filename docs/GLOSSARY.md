@@ -214,7 +214,20 @@ and the smallest *m* at which the policy clears its floor is the number of chanc
 pay for before it may show a rule at all.
 
 **Power** — the sample size needed to detect an effect at a stated confidence. Stated per benchmark so
-a null result is not confused with an underpowered one.
+a null result is not confused with an underpowered one. `detectableDelta` implements it; `n ≥ z²·d/δ²`
+with `d` the share of pairs that disagree and `z = 2.802` for 80% power at α = 0.05 two-sided.
+
+**Minimum detectable difference (resolution)** — the smallest true effect a given sample would detect 80%
+of the time: `2.802 · sqrt(b + c) / n` for `b` helped and `c` hurt among `n` paired cases. It is a
+property of the *design*, computed from the discordance, and it is the number that says whether a
+reported delta was worth reporting at all. On this project's record the sharpest design — 1,534
+questions, 115 discordant — resolves **1.96pp**, and every mechanism claim the project has made is
+smaller than that. `pnpm eval:power` prints every published delta beside its own resolution.
+
+**Half-width** — `1.96 · sqrt(b + c) / n`, the 95% interval around a paired delta. It is **not** the
+resolution: the ratio between them is a constant 1.43, so a report that says "±4.5pp" beside a gate that
+reads "6.4pp" is quoting two different measurements that share a name. Any number in this documentation
+that carries a `±` is a half-width; anything the word *resolvable* is applied to is a resolution.
 
 **Dose** — the number of knowledge items a recall returns for a question, and the only quantity the pack
 layer's character budget actually controls. The layer adds whole items in rank order and returns an

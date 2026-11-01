@@ -1,0 +1,321 @@
+{
+  "id": "poc-harm-strata",
+  "title": "Does the harm concentrate at intermediate query–rule overlap?",
+  "source": "eval/results/poc-sota-bird-dev-R26-channels.json",
+  "sourceGeneratedAt": "2026-11-01T02:44:56.507Z",
+  "registered": "ROADMAP.md §R28 (microglia-docs a3b303d)",
+  "n": 1534,
+  "paired": {
+    "helped": 67,
+    "harmed": 62,
+    "deltaPp": 0.3259452411994785
+  },
+  "edges": [
+    [
+      0,
+      0.2
+    ],
+    [
+      0.2,
+      0.4
+    ],
+    [
+      0.4,
+      0.6
+    ],
+    [
+      0.6,
+      null
+    ]
+  ],
+  "buckets": [
+    {
+      "index": 0,
+      "lower": 0,
+      "upper": 0.2,
+      "n": 725,
+      "helped": 27,
+      "harmed": 27,
+      "deltaPp": 0,
+      "halfWidthPp": 1.9866206465607017,
+      "minDetectablePp": 2.8400566590117786
+    },
+    {
+      "index": 1,
+      "lower": 0.2,
+      "upper": 0.4,
+      "n": 670,
+      "helped": 28,
+      "harmed": 30,
+      "deltaPp": -0.2985074626865672,
+      "halfWidthPp": 2.2278978041034714,
+      "minDetectablePp": 3.1849845138254738
+    },
+    {
+      "index": 2,
+      "lower": 0.4,
+      "upper": 0.6,
+      "n": 121,
+      "helped": 11,
+      "harmed": 2,
+      "deltaPp": 7.43801652892562,
+      "halfWidthPp": 5.840397107363156,
+      "minDetectablePp": 8.349384027975287
+    },
+    {
+      "index": 3,
+      "lower": 0.6,
+      "upper": null,
+      "n": 18,
+      "helped": 1,
+      "harmed": 3,
+      "deltaPp": -11.11111111111111,
+      "halfWidthPp": 21.777777777777775,
+      "minDetectablePp": 31.13333333333333
+    }
+  ],
+  "buckets_character_4gram": [
+    {
+      "index": 0,
+      "lower": 0,
+      "upper": 0.2,
+      "n": 444,
+      "helped": 13,
+      "harmed": 15,
+      "deltaPp": -0.45045045045045046,
+      "halfWidthPp": 2.3358885449038724,
+      "minDetectablePp": 3.3393671953166586
+    },
+    {
+      "index": 1,
+      "lower": 0.2,
+      "upper": 0.4,
+      "n": 835,
+      "helped": 34,
+      "harmed": 37,
+      "deltaPp": -0.3592814371257485,
+      "halfWidthPp": 1.9778746772964868,
+      "minDetectablePp": 2.827553492747324
+    },
+    {
+      "index": 2,
+      "lower": 0.4,
+      "upper": 0.6,
+      "n": 223,
+      "helped": 18,
+      "harmed": 9,
+      "deltaPp": 4.0358744394618835,
+      "halfWidthPp": 4.567021860316143,
+      "minDetectablePp": 6.528977169696853
+    },
+    {
+      "index": 3,
+      "lower": 0.6,
+      "upper": null,
+      "n": 32,
+      "helped": 2,
+      "harmed": 1,
+      "deltaPp": 3.125,
+      "halfWidthPp": 10.608811196359373,
+      "minDetectablePp": 15.166269883774982
+    }
+  ],
+  "by_difficulty": [
+    {
+      "difficulty": "challenging",
+      "buckets": [
+        {
+          "index": 0,
+          "lower": 0,
+          "upper": 0.2,
+          "n": 85,
+          "helped": 6,
+          "harmed": 1,
+          "deltaPp": 5.88235294117647,
+          "halfWidthPp": 6.100791258454821,
+          "minDetectablePp": 8.721641380709391
+        },
+        {
+          "index": 1,
+          "lower": 0.2,
+          "upper": 0.4,
+          "n": 47,
+          "helped": 4,
+          "harmed": 5,
+          "deltaPp": -2.127659574468085,
+          "halfWidthPp": 12.51063829787234,
+          "minDetectablePp": 17.885106382978723
+        },
+        {
+          "index": 2,
+          "lower": 0.4,
+          "upper": 0.6,
+          "n": 12,
+          "helped": 0,
+          "harmed": 0,
+          "deltaPp": 0,
+          "halfWidthPp": 0,
+          "minDetectablePp": null
+        },
+        {
+          "index": 3,
+          "lower": 0.6,
+          "upper": null,
+          "n": 1,
+          "helped": 0,
+          "harmed": 0,
+          "deltaPp": 0,
+          "halfWidthPp": 0,
+          "minDetectablePp": null
+        }
+      ]
+    },
+    {
+      "difficulty": "moderate",
+      "buckets": [
+        {
+          "index": 0,
+          "lower": 0,
+          "upper": 0.2,
+          "n": 260,
+          "helped": 6,
+          "harmed": 13,
+          "deltaPp": -2.6923076923076925,
+          "halfWidthPp": 3.2859392035922004,
+          "minDetectablePp": 4.6975518614619105
+        },
+        {
+          "index": 1,
+          "lower": 0.2,
+          "upper": 0.4,
+          "n": 180,
+          "helped": 7,
+          "harmed": 4,
+          "deltaPp": 1.6666666666666667,
+          "halfWidthPp": 3.6114358828314357,
+          "minDetectablePp": 5.162879256986573
+        },
+        {
+          "index": 2,
+          "lower": 0.4,
+          "upper": 0.6,
+          "n": 21,
+          "helped": 1,
+          "harmed": 0,
+          "deltaPp": 4.761904761904762,
+          "halfWidthPp": 9.333333333333334,
+          "minDetectablePp": 13.342857142857142
+        },
+        {
+          "index": 3,
+          "lower": 0.6,
+          "upper": null,
+          "n": 3,
+          "helped": 0,
+          "harmed": 1,
+          "deltaPp": -33.33333333333333,
+          "halfWidthPp": 65.33333333333333,
+          "minDetectablePp": 93.39999999999999
+        }
+      ]
+    },
+    {
+      "difficulty": "simple",
+      "buckets": [
+        {
+          "index": 0,
+          "lower": 0,
+          "upper": 0.2,
+          "n": 380,
+          "helped": 15,
+          "harmed": 13,
+          "deltaPp": 0.5263157894736842,
+          "halfWidthPp": 2.7293013524666305,
+          "minDetectablePp": 3.901786933475254
+        },
+        {
+          "index": 1,
+          "lower": 0.2,
+          "upper": 0.4,
+          "n": 443,
+          "helped": 17,
+          "harmed": 21,
+          "deltaPp": -0.9029345372460496,
+          "halfWidthPp": 2.7273705295302917,
+          "minDetectablePp": 3.8990266447672846
+        },
+        {
+          "index": 2,
+          "lower": 0.4,
+          "upper": 0.6,
+          "n": 88,
+          "helped": 10,
+          "harmed": 2,
+          "deltaPp": 9.090909090909092,
+          "halfWidthPp": 7.715499051897726,
+          "minDetectablePp": 11.030014460927259
+        },
+        {
+          "index": 3,
+          "lower": 0.6,
+          "upper": null,
+          "n": 14,
+          "helped": 1,
+          "harmed": 2,
+          "deltaPp": -7.142857142857142,
+          "halfWidthPp": 24.24871130596428,
+          "minDetectablePp": 34.665759734342814
+        }
+      ]
+    }
+  ],
+  "minimum": 3,
+  "maximum": 2,
+  "gapPp": 18.54912764003673,
+  "gapMinDetectablePp": 32.233471083503446,
+  "criteria": [
+    {
+      "code": "S1",
+      "criterion": "the minimum of the four buckets sits in a middle bucket, by at least 1pp",
+      "actual": "minimum -11.11pp at bucket 3, maximum 7.44pp at bucket 2, gap 18.55pp",
+      "ok": false
+    },
+    {
+      "code": "S2",
+      "criterion": "the minimum stays in a middle bucket within each difficulty band (floor 10 discordant pairs)",
+      "actual": "moderate: bucket 0, simple: bucket 1; undecided: challenging",
+      "ok": false
+    },
+    {
+      "code": "S3",
+      "criterion": "every bucket carries at least 100 questions and 10 discordant pairs",
+      "actual": "bucket 3: 18 questions, 4 discordant",
+      "ok": false
+    },
+    {
+      "code": "S4",
+      "criterion": "the ordering of the buckets is unchanged under a character 4-gram tokenisation",
+      "actual": "3 < 1 < 0 < 2 under words; 0 < 1 < 3 < 2 under 4-grams",
+      "ok": false
+    },
+    {
+      "code": "S5",
+      "criterion": "the gap around the minimum exceeds its own minimum detectable difference",
+      "actual": "gap 18.55pp against a minimum detectable 32.23pp",
+      "ok": false
+    }
+  ],
+  "refuted": true,
+  "populated": {
+    "buckets": 3,
+    "share": 0.9882659713168188,
+    "worstAbsDeltaPp": 7.43801652892562
+  },
+  "notes": [
+    "Overlap is the maximum of queryCoverage over the rules the question was actually shown — the store's own function behind minCoverage, not a second definition of the same quantity.",
+    "Outcome-blind by construction: the stratifier reads the question and the injected rule text, never a result, so a stratum cannot be conditioned on the outcome it explains.",
+    "S5 is an amendment to the registration, disclosed in the artefact: a minimum is only a minimum if the gap around it exceeds its own minimum detectable difference. The registered four criteria did not carry a power floor, and a bucket of four discordant pairs can otherwise be reported as the minimum of four and read as a shape.",
+    "S2 applies a floor of 10 discordant pairs per bucket; a band with no bucket above it is reported as undecided rather than as agreeing with the prediction.",
+    "The character 4-gram column exists only for S4. It is not a relevance signal and must not be wired to one."
+  ]
+}

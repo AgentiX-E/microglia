@@ -142,6 +142,63 @@ jobs:
             }
           "
 
+      # The audit the record never ran on itself: every published paired delta beside the smallest
+      # effect its own sample could have resolved. The arithmetic is re-derived here rather than
+      # trusted, because the whole point of the table is that the numbers in it were never put on a
+      # common scale — a row that disagreed with its own tally would be the defect it audits.
+      - name: Power audit (every published delta against its own resolution)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/power" pnpm eval:power
+          diff -u eval/results/poc-power-audit.json "${RUNNER_TEMP}/power/poc-power-audit.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/power/poc-power-audit.json');
+            const bad = [];
+            for (const r of a.rows) {
+              const d = r.helped + r.harmed;
+              const se = (Math.sqrt(d) / r.n) * 100;
+              if (Math.abs(r.deltaPp - ((r.helped - r.harmed) / r.n) * 100) > 1e-9) bad.push(r.artefact + ': delta');
+              if (Math.abs(r.halfWidthPp - 1.96 * se) > 1e-9) bad.push(r.artefact + ': half-width');
+              if (Math.abs(r.minDetectablePp - 2.802 * se) > 1e-9) bad.push(r.artefact + ': resolution');
+              if (r.resolvable && !r.significant95) bad.push(r.artefact + ': resolvable but not within 95%');
+            }
+            if (a.rows.length !== a.total) bad.push('row count disagrees with the total');
+            if (a.resolvable > a.significant95) bad.push('the stricter bar counted more rows than the looser one');
+            if (bad.length > 0) { console.error('power audit failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('power audit: ' + a.rows.length + ' artifacts, ' + a.resolvable + ' above 80% power, ' +
+              a.significant95 + ' above the 95% half-width');
+          "
+
+      # R28: the harm stratification, recomputed from the committed run rather than trusted.
+      #
+      # The artefact is a pure function of one committed file, so the check is a byte comparison —
+      # which is only possible because it records no clock of its own. The assertions beside it are
+      # there so that a change in the bucketing shows up as a named failure rather than as a diff
+      # nobody reads: the four buckets must still cover the whole corpus, the minimum must still sit
+      # where the reading says, and the criteria must still come out as they are published.
+      - name: Harm stratification (recomputed, and its verdict asserted)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/harm" pnpm eval:harm
+          diff -u eval/results/poc-harm-strata.json "${RUNNER_TEMP}/harm/poc-harm-strata.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/harm/poc-harm-strata.json');
+            const codes = a.criteria.map((c) => c.code).join(',');
+            const checks = [
+              ['four buckets', a.buckets.length === 4],
+              ['covering every question once', a.buckets.reduce((sum, b) => sum + b.n, 0) === a.n],
+              ['all 1,534 of them', a.n === 1534],
+              ['the paired delta is the artefact it re-reads', Math.abs(a.paired.deltaPp - 0.3259) < 0.001],
+              ['five criteria, always', codes === 'S1,S2,S3,S4,S5'],
+              ['the registration is refuted', a.refuted === true],
+              ['with the minimum at the top bucket', a.minimum === 3],
+              ['and a gap below its own resolution', a.gapPp < a.gapMinDetectablePp],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('harm stratification failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('harm stratification: ' + checks.length + ' checks pass');
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

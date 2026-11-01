@@ -323,6 +323,33 @@ export {
 export { parseContrastArgs, type ContrastPair } from './arm-contrast.js';
 
 export {
+  HALF_WIDTH_Z,
+  pairedWidths,
+  powerOf,
+  readPower,
+  type PairedCase,
+  type PairedWidths,
+  type PowerRow,
+  type PowerSummary,
+} from './power.js';
+
+export {
+  STRATUM_EDGES,
+  byDifficulty,
+  charGrams,
+  characterOverlapOf,
+  discordantOf,
+  overlapOf,
+  readStrata,
+  stratify,
+  type DifficultyStrata,
+  type Stratum,
+  type StratumCase,
+  type StratumCriterion,
+  type StratumReading,
+} from './strata.js';
+
+export {
   CONTRASTS,
   HOUSE_CONVENTIONS,
   OPTIONAL_ARMS,

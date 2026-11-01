@@ -427,6 +427,31 @@ going through the first four measures an outage; only the last is data.
 retries and no timeouts is a provider throttling you, many timeouts and no retries is a client asking
 for more than it is willing to wait for.
 
+### 8.3 Every published delta carries its resolution
+
+A delta without the smallest effect its sample could have seen is a sentence with the second half
+missing. The two widths are easy to confuse and they differ by a constant 43%: the **half-width**
+`1.96 · sqrt(b+c)/n` is a 95% interval, and the **resolution** `2.802 · sqrt(b + c)/n` is the smallest
+true effect the design detects four times in five. `pnpm eval:power` prints both for every committed
+artefact and puts them on one page:
+
+```text
+[power] poc-sota-bird-dev.json          n= 1534  47+/68-  delta=  -1.37pp ± 1.37  mde=  1.96pp  underpowered
+[power] poc-sota-bird-transfer.json     n=  350   8+/24-  delta=  -4.57pp ± 3.17  mde=  4.53pp  RESOLVABLE
+[power] 1 of 17 published deltas exceed their own minimum detectable difference (5.9%); 5 exceed
+        their own 95% half-width
+```
+
+Read the third line as the point of the table: **a record in which one comparison out of seventeen
+clears its own bar is a record that was measuring noise, not a record that found nothing.** The
+published product comparison survives it — 57.63% against a published cell's 53.52% on the same split
+is 3.2 unpaired standard errors — and the mechanism claim does not, which is a distinction the audit
+draws and this repository keeps.
+
+`packages/eval/src/power.ts` is the only place either width is computed. A second formula would be a
+second answer to a question this project has already answered once, which is exactly how the 95%
+half-width and the 80%-power resolution came to be quoted interchangeably in the first place.
+
 ## 9. What the architecture deliberately excludes
 
 | Excluded | Reason |

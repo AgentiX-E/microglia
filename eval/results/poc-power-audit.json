@@ -1,0 +1,226 @@
+{
+  "id": "poc-power-audit",
+  "title": "Every published paired delta beside the difference its sample could resolve",
+  "source": "eval/results",
+  "rows": [
+    {
+      "artefact": "poc-sota-bird-R26-channels.json",
+      "n": 350,
+      "helped": 8,
+      "harmed": 22,
+      "deltaPp": -4,
+      "halfWidthPp": 3.0672463220289305,
+      "minDetectablePp": 4.384910303227072,
+      "resolvable": false,
+      "significant95": true
+    },
+    {
+      "artefact": "poc-sota-bird-anchor.json",
+      "n": 350,
+      "helped": 10,
+      "harmed": 12,
+      "deltaPp": -0.5714285714285714,
+      "halfWidthPp": 2.6266328255011206,
+      "minDetectablePp": 3.755012845435786,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
+      "artefact": "poc-sota-bird-clearance.json",
+      "n": 350,
+      "helped": 12,
+      "harmed": 19,
+      "deltaPp": -2,
+      "halfWidthPp": 3.1179480431848123,
+      "minDetectablePp": 4.45739306989992,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
+      "artefact": "poc-sota-bird-dev-R24-dev-split.json",
+      "n": 1534,
+      "helped": 64,
+      "harmed": 73,
+      "deltaPp": -0.5867014341590613,
+      "halfWidthPp": 1.4955157643422727,
+      "minDetectablePp": 2.1379771284117597,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
+      "artefact": "poc-sota-bird-dev-R25-dose-and-admission.json",
+      "n": 1534,
+      "helped": 60,
+      "harmed": 61,
+      "deltaPp": -0.0651890482398957,
+      "halfWidthPp": 1.4054758800521512,
+      "minDetectablePp": 2.009256844850065,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
+      "artefact": "poc-sota-bird-dev-R26-channels.json",
+      "n": 1534,
+      "helped": 67,
+      "harmed": 62,
+      "deltaPp": 0.3259452411994785,
+      "halfWidthPp": 1.4511943100089355,
+      "minDetectablePp": 2.0746155391046113,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
+      "artefact": "poc-sota-bird-dev.json",
+      "n": 1534,
+      "helped": 47,
+      "harmed": 68,
+      "deltaPp": -1.3689700130378095,
+      "halfWidthPp": 1.3701863349241636,
+      "minDetectablePp": 1.9588071992130136,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
+      "artefact": "poc-sota-bird-dose.json",
+      "n": 350,
+      "helped": 8,
+      "harmed": 17,
+      "deltaPp": -2.571428571428571,
+      "halfWidthPp": 2.8,
+      "minDetectablePp": 4.002857142857143,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
+      "artefact": "poc-sota-bird-evidence.json",
+      "n": 350,
+      "helped": 10,
+      "harmed": 27,
+      "deltaPp": -4.857142857142857,
+      "halfWidthPp": 3.4063470169670027,
+      "minDetectablePp": 4.8696858885416034,
+      "resolvable": false,
+      "significant95": true
+    },
+    {
+      "artefact": "poc-sota-bird-framing.json",
+      "n": 350,
+      "helped": 9,
+      "harmed": 23,
+      "deltaPp": -4,
+      "halfWidthPp": 3.1678383797157332,
+      "minDetectablePp": 4.528715887736472,
+      "resolvable": false,
+      "significant95": true
+    },
+    {
+      "artefact": "poc-sota-bird-probe.json",
+      "n": 350,
+      "helped": 10,
+      "harmed": 20,
+      "deltaPp": -2.857142857142857,
+      "halfWidthPp": 3.0672463220289305,
+      "minDetectablePp": 4.384910303227072,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
+      "artefact": "poc-sota-bird-raw.json",
+      "n": 350,
+      "helped": 8,
+      "harmed": 17,
+      "deltaPp": -2.571428571428571,
+      "halfWidthPp": 2.8,
+      "minDetectablePp": 4.002857142857143,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
+      "artefact": "poc-sota-bird-square.json",
+      "n": 350,
+      "helped": 8,
+      "harmed": 23,
+      "deltaPp": -4.285714285714286,
+      "halfWidthPp": 3.1179480431848123,
+      "minDetectablePp": 4.45739306989992,
+      "resolvable": false,
+      "significant95": true
+    },
+    {
+      "artefact": "poc-sota-bird-substrate.json",
+      "n": 350,
+      "helped": 13,
+      "harmed": 18,
+      "deltaPp": -1.4285714285714286,
+      "halfWidthPp": 3.1179480431848123,
+      "minDetectablePp": 4.45739306989992,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
+      "artefact": "poc-sota-bird-transfer-repair.json",
+      "n": 350,
+      "helped": 14,
+      "harmed": 21,
+      "deltaPp": -2,
+      "halfWidthPp": 3.3130046785357847,
+      "minDetectablePp": 4.736244443498607,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
+      "artefact": "poc-sota-bird-transfer.json",
+      "n": 350,
+      "helped": 8,
+      "harmed": 24,
+      "deltaPp": -4.571428571428571,
+      "halfWidthPp": 3.1678383797157332,
+      "minDetectablePp": 4.528715887736472,
+      "resolvable": true,
+      "significant95": true
+    },
+    {
+      "artefact": "poc-sota-bird.json",
+      "n": 350,
+      "helped": 10,
+      "harmed": 20,
+      "deltaPp": -2.857142857142857,
+      "halfWidthPp": 3.0672463220289305,
+      "minDetectablePp": 4.384910303227072,
+      "resolvable": false,
+      "significant95": false
+    }
+  ],
+  "resolvable": 1,
+  "significant95": 5,
+  "total": 17,
+  "resolvableShare": 0.058823529411764705,
+  "largest": {
+    "artefact": "poc-sota-bird-evidence.json",
+    "n": 350,
+    "helped": 10,
+    "harmed": 27,
+    "deltaPp": -4.857142857142857,
+    "halfWidthPp": 3.4063470169670027,
+    "minDetectablePp": 4.8696858885416034,
+    "resolvable": false,
+    "significant95": true
+  },
+  "sharpest": {
+    "artefact": "poc-sota-bird-dev.json",
+    "n": 1534,
+    "helped": 47,
+    "harmed": 68,
+    "deltaPp": -1.3689700130378095,
+    "halfWidthPp": 1.3701863349241636,
+    "minDetectablePp": 1.9588071992130136,
+    "resolvable": false,
+    "significant95": false
+  },
+  "notes": [
+    "A row is resolvable when |delta| exceeds the minimum detectable difference at 80% power for that artefact's own n and discordance; equality counts as unresolved, because a result at the edge of what a design can see is not a detection. significant95 is the same comparison against the 95% half-width, the looser bar, and both travel so neither can be quoted alone.",
+    "The widths count only the discordant pairs. Two independent rates at these sample sizes would each carry an interval several times wider, which is why every comparison in this record is paired.",
+    "Coverage is whole-artefact deltas. An arm inside an artefact is not a row: the values channel at +1.17pp [−0.13, +2.48] is the record's one positive reading and it lives in an arm, not in a file. That gap is why the audit undercounts positives rather than overcounting them.",
+    "The audit reads committed files, so a new artefact on disk means a new row and the committed copy must be regenerated with `pnpm eval:power`."
+  ]
+}
