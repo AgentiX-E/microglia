@@ -563,6 +563,16 @@ export {
   type ValidationCredit,
 } from './validation.js';
 
+export {
+  DEFAULT_ADMISSION,
+  admissionFloor,
+  admitsAt,
+  parseAdmissionPolicy,
+  type AdmissionFit,
+  type AdmissionPolicy,
+  type AdmissionSample,
+} from './dose.js';
+
 export { DistillCache, type DistillCacheStats } from './distill-cache.js';
 
 export {

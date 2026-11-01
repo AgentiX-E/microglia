@@ -1105,6 +1105,9 @@ instead of being killed by the runner with nothing.
 | `SOTA_SQL_DEADLINE_MS` | 20000 | wall clock one executed statement may take before its process is killed |
 | `SOTA_SQL_ROW_CAP` | 10000 | rows a statement may return before the result is called truncated |
 | `SOTA_DISTILL_CONCURRENCY` | 8 | distillation replies in flight at once |
+| `SOTA_VALIDATION_CREDIT` | `absolute` | how a learning row's note is scored before a filter reads it: `absolute` asks whether the answer was wrong, `counterfactual` asks whether the note changed it |
+| `SOTA_ADMISSION_KEPT` | 0.5 | share of learning questions a per-question admission floor must keep, in (0, 1] |
+| `SOTA_ADMISSION_DECISIVE` | 8 | decisive learning rows a fold needs before it may fit a floor at all |
 | `POC_MAX_CALLS` | 8000 | HTTP attempts the run may spend |
 
 **Every statement runs in a process that can be killed.** The model writes the SQL, and the driver is

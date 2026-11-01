@@ -232,6 +232,35 @@ export type SqlArm =
    */
   | 'full-corroborated'
   /**
+   * The same retrieval, one slot instead of the pack's mean of 1.78.
+   *
+   * R16 measured a dose curve and reported "the harm is complete at the first item", and every
+   * arm built on that reading changed *which* items were in the pack. R24's dev artefact says
+   * something the dose curve never could, because it was computed per question rather than per
+   * arm: the 343 questions whose pack happened to hold one item moved **+2.62pp**, and the 1,191
+   * whose pack held two moved **−1.51pp**. That is a 4.13pp gap between two groups of questions
+   * and it is not yet causal — the store offered a second item on exactly the questions it had
+   * more to say about. Truncating every pack to its first item is the causal version of the same
+   * question, and it changes 77.6% of the split.
+   *
+   * The first item is the most *similar* one, not the best one: retrieval orders by relevance and
+   * MMR diversifies, so with one slot there is nothing to diversify against. That is why
+   * `full-accepted` exists beside it — truncation is a budget, and admission is a choice.
+   */
+  | 'full-one'
+  /**
+   * One slot, filled only where the question's own note is about the question.
+   *
+   * The per-question admission R25 asks about, in the only form the store can supply. Per-item
+   * counterfactual credit — the natural statistic, and the one `full-cleared` and `full-verified`
+   * use — is empty for 77% of a store distilled from 280 corrections, and restricting it to a
+   * lexical neighbourhood of the held-out question empties the rest; a rule fitted on it would be
+   * `full-one` under a second name. What is dense is the note's own coverage of the question, so
+   * the floor is fitted on that, on the fold's *learning* rows where the counterfactual was paid
+   * for, and applied to questions whose credit is unknown by construction.
+   */
+  | 'full-accepted'
+  /**
    * The same pack, moved after the question.
    *
    * `full` renders schema, evidence, pack, question. Every result this project has published
@@ -907,6 +936,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'none-advisory': true,
   'full-prohibitive': true,
   'full-corroborated': true,
+  'full-one': true,
+  'full-accepted': true,
   'full-grounded': true,
   'full-sampled': true,
   'full-onretry': true,
@@ -1624,6 +1655,47 @@ export type GateInput = {
     readonly deadlines: number;
     readonly truncations: number;
   };
+  /**
+   * What a one-slot arm carried, when the run truncates every pack.
+   *
+   * Absent when no such arm ran. Present, it is the arm's validity condition: a truncation that
+   * did not truncate is a second name for `full`, and the two would report a difference of zero
+   * as if something had been measured.
+   */
+  readonly dose?: {
+    readonly arm: string;
+    /** Prompts this arm built, which should equal the questions it was supposed to ask. */
+    readonly prompts: number;
+    /** Of those, the ones that still carried more than one item. */
+    readonly overBudget: number;
+    /** Questions whose truncated pack was a different pack from `full`'s. */
+    readonly differsFromFull: number;
+    readonly questions: number;
+  };
+  /**
+   * What a per-question admission arm admitted, when one ran.
+   *
+   * Absent when none did. Present, it is the difference between "admission did not help" and
+   * "admission never fired": an arm whose fitted floor keeps the whole population is its own
+   * control, and this record has published a null under the wrong name once already.
+   */
+  readonly admission?: {
+    readonly arm: string;
+    readonly control: string;
+    readonly folds: readonly {
+      readonly fold: number;
+      readonly floor: number;
+      readonly kept: number;
+      readonly total: number;
+      readonly helped: number;
+      readonly harmed: number;
+      readonly reason: string;
+    }[];
+    /** Questions this arm showed a note to. */
+    readonly admitted: number;
+    /** Questions it was asked, which is the denominator the share is read against. */
+    readonly questions: number;
+  };
   readonly channelBest: { readonly arm: string; readonly deltaPp: number } | undefined;
   /**
    * How the clearance arm and its dose-matched control compared, when the run builds one.
@@ -2209,6 +2281,64 @@ export function buildValidityGates(input: GateInput): ValidityGate[] {
       blocking: true,
     });
   }
+
+  if (input.dose !== undefined) {
+    // A truncation that did not truncate is not a null result, it is an arm nobody ran. The two
+    // readings it guards against are both silent: a pack that arrived with two items because the
+    // budget allowed them, and a pack that arrived with one because the store only had one — the
+    // second is legitimate and the gate accepts it, so the criterion is about the ceiling rather
+    // than the mean, and about whether the arm's prompts differ from `full`'s at all.
+    const share = input.dose.questions === 0 ? 0 : input.dose.differsFromFull / input.dose.questions;
+    gates.push({
+      id: 'V49-dose-truncated',
+      criterion:
+        'every prompt of the one-slot arm carried at most one item, it asked every question, ' +
+        'and its pack differed from full on at least a fifth of them',
+      actual:
+        `${input.dose.arm}: ${input.dose.prompts} prompts, ${input.dose.overBudget} over one item, ` +
+        `${input.dose.differsFromFull}/${input.dose.questions} differ from full ` +
+        `(${(share * 100).toFixed(1)}%)`,
+      pass:
+        input.dose.overBudget === 0 &&
+        input.dose.prompts === input.dose.questions &&
+        share >= 0.2,
+      blocking: true,
+    });
+  }
+
+  if (input.admission !== undefined) {
+    // The arm's own question, asked of the arm: did the fit admit anything, and did it refuse
+    // anything? A floor that keeps the whole population makes the arm its own control, and the
+    // difference it reports is then a difference of nothing. `no-evidence` is the same failure
+    // wearing a fitted floor of zero, so the gate reads the reason rather than the number.
+    const admittedShare =
+      input.admission.questions === 0 ? 0 : input.admission.admitted / input.admission.questions;
+    const unevidenced = input.admission.folds.filter((fold) => fold.reason !== 'fitted');
+    gates.push({
+      id: 'V50-admission-engaged',
+      criterion:
+        'every fold fitted its floor from decisive learning rows, and the arm both admitted and ' +
+        'refused questions, so its comparison with the one-slot control is a decision',
+      actual:
+        input.admission.folds
+          .map(
+            (fold) =>
+              `fold ${fold.fold}: floor ${fold.floor.toFixed(3)}, kept ${fold.kept}/${fold.total}, ` +
+              `net ${fold.helped - fold.harmed}, ${fold.reason}`,
+          )
+          .join('; ') +
+        ` — admitted ${input.admission.admitted}/${input.admission.questions} ` +
+        `(${(admittedShare * 100).toFixed(1)}%)` +
+        (unevidenced.length === 0 ? '' : `, unevidenced folds ${unevidenced.length}`),
+      pass:
+        input.admission.folds.length > 0 &&
+        unevidenced.length === 0 &&
+        input.admission.admitted > 0 &&
+        input.admission.admitted < input.admission.questions,
+      blocking: true,
+    });
+  }
+
   return gates;
 }
 

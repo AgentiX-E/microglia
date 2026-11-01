@@ -98,7 +98,9 @@ import {
   PROHIBITIVE_HEADING,
   evidenceBlockOf,
   PROMPT_VERSION,
+  admissionFloor,
   admissionOf,
+  admitsAt,
   anchorPromptFor,
   archiveVerdict,
   assignFolds,
@@ -109,6 +111,7 @@ import {
   creditHistogram,
   decisiveHistogram,
   outcomeCredit,
+  parseAdmissionPolicy,
   parseDecisivePolicy,
   retireeFromDecisive,
   clearanceFromDecisive,
@@ -177,6 +180,8 @@ import {
   selectionStats,
   signatureOf,
   type Admission,
+  type AdmissionFit,
+  type AdmissionSample,
   type DensityReport,
   type DensityRule,
   type DensityTarget,
@@ -491,6 +496,20 @@ function creditModeFrom(raw: string | undefined): CreditMode {
 }
 
 const CREDIT = creditModeFrom(process.env['SOTA_VALIDATION_CREDIT']);
+
+/**
+ * What a per-question admission may spend and must keep.
+ *
+ * R25's registration fixes both before the run: a half of the learning questions kept, so the
+ * floor cannot buy a net by admitting the handful of cases that went well, and eight decisive
+ * rows, so a fold whose learning pass priced nothing says so instead of fitting noise. The
+ * dev split's learning pass produces about a hundred decisive rows of 1,400, so the floor sits
+ * well inside the supply.
+ */
+const ADMISSION = parseAdmissionPolicy({
+  minKept: process.env['SOTA_ADMISSION_KEPT'],
+  minDecisive: process.env['SOTA_ADMISSION_DECISIVE'],
+});
 
 /** The counterfactual policy, which is stricter than the absolute one on purpose. */
 const DECISIVE = parseDecisivePolicy({
@@ -2678,6 +2697,22 @@ type FoldResult = {
    */
   readonly validatedPackDiffers: number;
   readonly validatedPositions: number;
+  /**
+   * What a per-question admission fitted on this fold's learning rows, when one ran.
+   *
+   * Null when no admission arm was configured, which is not the same as a fit that refused:
+   * `reason` inside the fit says whether the learning rows could price a floor, and an arm whose
+   * fit could not is `full-one` under a second name. The gate reads the reason, not the floor.
+   */
+  readonly admission: AdmissionFit | null;
+  /** Questions whose one-slot pack differed from the pack `full` carried, and how many were built. */
+  readonly oneSlotDiffers: number;
+  readonly oneSlotPositions: number;
+  /** Prompts of the one-slot arm that still carried more than one item. */
+  readonly oneSlotOver: number;
+  /** Questions the admission arm showed a note to, and how many it was asked. */
+  readonly acceptedAdmitted: number;
+  readonly acceptedPositions: number;
   /** Questions the anchored arm could not revise because the first round had no answer. */
   readonly anchoredSkipped: number;
   /** How many rules each pack carried and how many survived the grounding filter. */
@@ -3107,6 +3142,18 @@ async function validateMemory(
   readonly doomed: readonly string[];
   /** The counterfactual record, keyed by rule id, for callers that filter rather than delete. */
   readonly credit: ReadonlyMap<string, DecisiveCredit>;
+  /**
+   * The same pass, per row, reduced to what a coverage floor needs.
+   *
+   * The aggregate above answers "is this rule good"; a floor asks "is this question one where the
+   * note is about it", and that is a property of the row rather than of the rule. It is carried
+   * out of this function instead of recomputed by the caller because the coverage has to be of the
+   * item the row *actually* received — the same number the eval questions will be judged on — and
+   * a second computation elsewhere is where the two would drift apart. Rows whose pack was empty
+   * contribute nothing: there was no note to admit or refuse, and counting them would inflate the
+   * refusal rate by the store's own sparsity.
+   */
+  readonly samples: readonly AdmissionSample[];
 }> {
   let excluded = 0;
   const judged = async (row: BirdRow, pack: string): Promise<boolean | undefined> => {
@@ -3148,10 +3195,15 @@ async function validateMemory(
       items.length === recalled.items.length
         ? { ids: recalled.ids, rendered: recalled.rendered }
         : { ids: items.map((item) => item.id), rendered: makePack(items, { budget: recalled.budget }).rendered };
-    if (pack.ids.length === 0) return { ids: [] as readonly string[], failed: false, helped: false, harmed: false };
+    if (pack.ids.length === 0) {
+      return { ids: [] as readonly string[], failed: false, helped: false, harmed: false, coverage: 0 };
+    }
+    // The coverage the *held-out* questions will be judged on, measured the same way here as in
+    // the pack loop below, so the fitted floor and the arm it drives are the same statistic.
+    const coverage = queryCoverage(row.question, items[0]?.statement ?? '');
     if (mode === 'absolute') {
       const ok = await judged(row, pack.rendered);
-      return { ids: pack.ids, failed: ok === false, helped: false, harmed: false };
+      return { ids: pack.ids, failed: ok === false, helped: false, harmed: false, coverage };
     }
     const [withRule, withoutRule] = await Promise.all([judged(row, pack.rendered), judged(row, '')]);
     const credit = outcomeCredit(withRule, withoutRule);
@@ -3159,13 +3211,14 @@ async function validateMemory(
     // into `uninformative`, and the ids are dropped so the rule is not credited a trial it
     // did not have.
     if (credit === 'uninformative' && (withRule === undefined || withoutRule === undefined)) {
-      return { ids: [] as readonly string[], failed: false, helped: false, harmed: false };
+      return { ids: [] as readonly string[], failed: false, helped: false, harmed: false, coverage };
     }
     return {
       ids: pack.ids,
       failed: false,
       helped: credit === 'helped',
       harmed: credit === 'harmed',
+      coverage,
     };
   });
 
@@ -3173,9 +3226,14 @@ async function validateMemory(
   let decisive = 0;
   const absolute = new Map<string, { trials: number; failures: number }>();
   const counterfactual = new Map<string, { helped: number; harmed: number }>();
+  const samples: { coverage: number; credit: 'helped' | 'harmed' | 'uninformative' }[] = [];
   for (const outcome of outcomes) {
     if (outcome.ids.length === 0) continue;
     injected += 1;
+    samples.push({
+      coverage: outcome.coverage,
+      credit: outcome.helped ? 'helped' : outcome.harmed ? 'harmed' : 'uninformative',
+    });
     if (outcome.helped || outcome.harmed) decisive += 1;
     for (const id of outcome.ids) {
       const entry = absolute.get(id) ?? { trials: 0, failures: 0 };
@@ -3206,6 +3264,7 @@ async function validateMemory(
     harmed: [...counterfactual.values()].reduce((sum, entry) => sum + entry.harmed, 0),
     doomed,
     credit: counterfactual,
+    samples,
   };
 }
 
@@ -3380,6 +3439,14 @@ async function runFold(
   /** Questions where the pruned store produced a different pack from the unpruned one. */
   let validatedPackDiffers = 0;
   let validatedPositions = 0;
+  /** Questions where the one-slot truncation changed the pack, out of the questions it was built for. */
+  let oneSlotDiffers = 0;
+  let oneSlotPositions = 0;
+  /** One-slot prompts that still carried more than one item, which would make the arm `full`. */
+  let oneSlotOver = 0;
+  /** Questions the admission floor showed a note to, out of the questions that had one to show. */
+  let acceptedAdmitted = 0;
+  let acceptedPositions = 0;
   /** The reproducibility gate's verdict for this fold, once it has run. */
   let probe: ProbeRun | undefined;
   /** The same gate over the repair store, when the second substrate was asked for. */
@@ -3526,17 +3593,36 @@ async function runFold(
   // a filter built on it would be a random filter with a narrative. One pass serves both callers
   // because the calls are the expensive part — 560 per fold — and the decision is the cheap part.
   const clearanceWanted = ARMS.has('full-cleared') || ARMS.has('full-cleared-sampled');
+  /**
+   * The two arms that read the counterfactual rather than the absolute record.
+   *
+   * `full-accepted` joins `full-cleared` here for the reason iteration 76 gave for the clearance
+   * arms: "was the note present when the answer was wrong" is answered by the question's
+   * difficulty, so a floor fitted on it would be a floor fitted on difficulty. The probe is one
+   * pass, and the fit is the cheap part.
+   */
+  const admissionWanted = ARMS.has('full-accepted');
   let validation: Awaited<ReturnType<typeof validateMemory>> | undefined;
-  if (ARMS.has('full-validated') || clearanceWanted) {
+  if (ARMS.has('full-validated') || clearanceWanted || admissionWanted) {
     validation = await validateMemory(
       widened.host,
       learnRows,
       dataset,
       task,
-      clearanceWanted ? 'counterfactual' : CREDIT,
+      clearanceWanted || admissionWanted ? 'counterfactual' : CREDIT,
     );
     validations.push({ fold, ...validation });
   }
+  /**
+   * The floor, fitted before a single held-out question is scored.
+   *
+   * The order is the design: the fit sees only `learnRows`, and the questions it will decide for
+   * are the ones it has never been shown. A floor fitted afterwards on the same questions that
+   * produced the number would be a threshold chosen by its own result, which is the defect this
+   * record has refused pre-dispatch three times.
+   */
+  const admission =
+    admissionWanted && validation !== undefined ? admissionFloor(validation.samples, ADMISSION) : null;
   // Retirement mutates the store; cleanup does not. Only the arm that names deletion is allowed to
   // delete, so a run asking for clearance alone leaves every rule in place and `full` means the same
   // thing it meant in the run before it.
@@ -3597,6 +3683,35 @@ async function runFold(
       call(position, 'none-replica', '', 0);
     }
     call(position, 'full', pack.rendered, pack.ids.length);
+    if (ARMS.has('full-one') || ARMS.has('full-accepted')) {
+      // The same retrieval, the same order, the same first item, and no second one. Built from
+      // the pack `full` carries rather than recalled again, so the only difference between the
+      // two prompts is the number of items in the block — a second recall would put retrieval
+      // noise inside a comparison that is about a budget.
+      const oneSlot = makePack(pack.items.slice(0, 1), { budget: pack.budget });
+      oneSlotPositions += 1;
+      if (oneSlot.ids.length > 1) oneSlotOver += 1;
+      if (oneSlot.ids.join('\u0000') !== pack.ids.join('\u0000')) oneSlotDiffers += 1;
+      if (ARMS.has('full-one')) {
+        call(position, 'full-one', oneSlot.rendered, oneSlot.ids.length);
+      }
+      if (ARMS.has('full-accepted') && admission !== null) {
+        // The per-question decision, made on the coverage of the note this question would get.
+        // `packs` carries exactly that number for every question, computed the same way the fit
+        // computed it on the learning rows, so the threshold means one thing in both places.
+        const admitted = admitsAt(packs[position]?.coverage ?? 0, admission);
+        acceptedPositions += 1;
+        if (admitted) acceptedAdmitted += 1;
+        // A refused question is an empty block, which is `none` for that question and is counted
+        // rather than hidden: the arm's claim is the joint policy, not the note.
+        call(
+          position,
+          'full-accepted',
+          admitted ? oneSlot.rendered : '',
+          admitted ? oneSlot.ids.length : 0,
+        );
+      }
+    }
     if (ARMS.has('none-noevidence')) {
       // The positive control, planned through the same function as `none` with one argument changed.
       // Reusing `call` rather than writing a second prompt builder is the whole guarantee that the
@@ -4871,6 +4986,12 @@ async function runFold(
     clearance,
     validatedPackDiffers,
     validatedPositions,
+    admission,
+    oneSlotDiffers,
+    oneSlotPositions,
+    oneSlotOver,
+    acceptedAdmitted,
+    acceptedPositions,
     anchoredSkipped,
     retried,
     notRetried,
@@ -5485,6 +5606,41 @@ async function main(): Promise<void> {
       channelBest === undefined
         ? undefined
         : { arm: channelBest.arm, deltaPp: channelBest.delta_pp },
+    // A one-slot arm that carried two items is `full` under a second name, and a truncation that
+    // changed nothing is a null nobody measured. Both are silent without this.
+    ...(folds.every((fold) => fold.oneSlotPositions === 0)
+      ? {}
+      : {
+          dose: {
+            arm: 'full-one',
+            prompts: folds.reduce((sum, fold) => sum + fold.oneSlotPositions, 0),
+            overBudget: folds.reduce((sum, fold) => sum + fold.oneSlotOver, 0),
+            differsFromFull: folds.reduce((sum, fold) => sum + fold.oneSlotDiffers, 0),
+            questions: cases.length,
+          },
+        }),
+    // And the admission arm's own question: did the floor admit anything, and refuse anything?
+    ...(folds.every((fold) => fold.admission === null)
+      ? {}
+      : {
+          admission: {
+            arm: 'full-accepted',
+            control: 'full-one',
+            folds: folds
+              .filter((fold) => fold.admission !== null)
+              .map((fold) => ({
+                fold: fold.fold,
+                floor: fold.admission?.floor ?? 0,
+                kept: fold.admission?.kept ?? 0,
+                total: fold.admission?.total ?? 0,
+                helped: fold.admission?.helped ?? 0,
+                harmed: fold.admission?.harmed ?? 0,
+                reason: fold.admission?.reason ?? 'no-evidence',
+              })),
+            admitted: folds.reduce((sum, fold) => sum + fold.acceptedAdmitted, 0),
+            questions: folds.reduce((sum, fold) => sum + fold.acceptedPositions, 0),
+          },
+        }),
     // The learning half, summed over folds: a store built from part of its corrections is a
     // different treatment, and the artefact has to say so rather than mentioning it in a report.
     learning: {
@@ -6354,6 +6510,13 @@ async function main(): Promise<void> {
       distill_drops: fold.distillDrops,
       failed_distill: fold.failedDistill,
       mean_pack_ids: Number(fold.meanPackIds.toFixed(3)),
+      admission_floor: fold.admission === null ? null : Number(fold.admission.floor.toFixed(3)),
+      admission_kept: fold.admission?.kept ?? null,
+      admission_total: fold.admission?.total ?? null,
+      admission_net: fold.admission === null ? null : fold.admission.helped - fold.admission.harmed,
+      admission_reason: fold.admission?.reason ?? null,
+      one_slot_differs: fold.oneSlotDiffers,
+      accepted_admitted: fold.acceptedAdmitted,
       without_memory: rate(fold.cases.map((item) => item.withoutMemoryCorrect)),
       with_memory: rate(fold.cases.map((item) => item.correct)),
       delta_pp: (rate(fold.cases.map((item) => item.correct)) -

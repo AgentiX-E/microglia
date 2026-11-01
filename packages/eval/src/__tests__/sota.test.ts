@@ -237,6 +237,7 @@ describe('parseArms', () => {
       'critique',
       'duplicate',
       'full',
+      'full-accepted',
       'full-advisory',
       'full-anchored',
       'full-anchored-conditional',
@@ -249,6 +250,7 @@ describe('parseArms', () => {
       'full-late',
       'full-narrow',
       'full-noevidence',
+      'full-one',
       'full-onretry',
       'full-plain',
       'full-procedural',
@@ -382,6 +384,8 @@ describe('parseArms', () => {
       'none-advisory',
       'full-prohibitive',
       'full-corroborated',
+      'full-one',
+      'full-accepted',
       'full-grounded',
       'full-sampled',
       'full-onretry',
@@ -1546,6 +1550,193 @@ describe('buildValidityGates', () => {
       gate({ ...sound, statements: { statements: 0, deadlines: 0, truncations: 0 } }, 'V48-statements-answered')
         .pass,
     ).toBe(false);
+  });
+
+  it('V49 is absent when no arm truncates the pack', () => {
+    // A gate that always passes is a comment. A run with no one-slot arm has no truncation to
+    // check, and a green tick about it would be a tick about nothing.
+    expect(buildValidityGates(sound).some((entry) => entry.id === 'V49-dose-truncated')).toBe(false);
+  });
+
+  it('V49 passes when every prompt carried at most one item and the arm changed the pack', () => {
+    const entry = gate(
+      {
+        ...sound,
+        dose: { arm: 'full-one', prompts: 1534, overBudget: 0, differsFromFull: 1191, questions: 1534 },
+      },
+      'V49-dose-truncated',
+    );
+    expect(entry.pass).toBe(true);
+    expect(entry.blocking).toBe(true);
+    expect(entry.actual).toBe('full-one: 1534 prompts, 0 over one item, 1191/1534 differ from full (77.6%)');
+  });
+
+  it('V49 fails when a prompt of the one-slot arm still carried two items', () => {
+    // The failure this exists for: a budget applied after the render, or a pack that reached the
+    // prompt with the item the truncation was supposed to remove. The arm would then be `full`
+    // under a second name and its difference of zero would read as a null result.
+    const entry = gate(
+      {
+        ...sound,
+        dose: { arm: 'full-one', prompts: 1534, overBudget: 3, differsFromFull: 1191, questions: 1534 },
+      },
+      'V49-dose-truncated',
+    );
+    expect(entry.pass).toBe(false);
+  });
+
+  it('V49 fails when the truncation changed nothing', () => {
+    // Every store offered exactly one item, so the arm asked the same question `full` asked. A
+    // delta of zero here is a fact about the store, not about the budget.
+    const entry = gate(
+      {
+        ...sound,
+        dose: { arm: 'full-one', prompts: 1534, overBudget: 0, differsFromFull: 0, questions: 1534 },
+      },
+      'V49-dose-truncated',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toContain('(0.0%)');
+  });
+
+  it('V49 fails when the arm did not ask every question', () => {
+    // A prompt lost between the plan and the call is a question the arm never measured, and the
+    // pairing would silently narrow to the questions that survived.
+    const entry = gate(
+      {
+        ...sound,
+        dose: { arm: 'full-one', prompts: 1500, overBudget: 0, differsFromFull: 1191, questions: 1534 },
+      },
+      'V49-dose-truncated',
+    );
+    expect(entry.pass).toBe(false);
+  });
+
+  it('V49 reads a zero denominator as nothing rather than as a ratio', () => {
+    // A run that built the arm and lost every prompt to the fold loop would divide by zero here.
+    // The reading it must produce is a failure, not Infinity, so the guard is part of the gate.
+    const entry = gate(
+      { ...sound, dose: { arm: 'full-one', prompts: 0, overBudget: 0, differsFromFull: 0, questions: 0 } },
+      'V49-dose-truncated',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toContain('(0.0%)');
+  });
+
+  it('V50 is absent when no arm admits per question', () => {
+    expect(buildValidityGates(sound).some((entry) => entry.id === 'V50-admission-engaged')).toBe(false);
+  });
+
+  const admitted = { floor: 0.25, kept: 900, total: 1400, helped: 12, harmed: 9, reason: 'fitted' as const };
+
+  it('V50 passes when every fold fitted a floor that both admitted and refused', () => {
+    const entry = gate(
+      {
+        ...sound,
+        admission: {
+          arm: 'full-accepted',
+          control: 'full-one',
+          folds: [{ fold: 0, ...admitted }],
+          admitted: 966,
+          questions: 1534,
+        },
+      },
+      'V50-admission-engaged',
+    );
+    expect(entry.pass).toBe(true);
+    expect(entry.blocking).toBe(true);
+    expect(entry.actual).toContain('admitted 966/1534 (63.0%)');
+    expect(entry.actual).toContain('fold 0: floor 0.250, kept 900/1400, net 3, fitted');
+  });
+
+  it('V50 fails when a fold could not price a floor', () => {
+    // `no-evidence` is the same failure as a fitted floor of zero wearing a different label: the
+    // arm is `full-one` under a second name, and the comparison with `full-one` is a difference
+    // of nothing measured twice.
+    const entry = gate(
+      {
+        ...sound,
+        admission: {
+          arm: 'full-accepted',
+          control: 'full-one',
+          folds: [{ fold: 0, ...admitted, reason: 'no-evidence' as const }],
+          admitted: 966,
+          questions: 1534,
+        },
+      },
+      'V50-admission-engaged',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toContain('unevidenced folds 1');
+  });
+
+  it('V50 fails when the floor admitted every question', () => {
+    // A floor of zero keeps the whole population, so the arm is its own control. This is the
+    // reading that would otherwise be published as "admission does not help".
+    const entry = gate(
+      {
+        ...sound,
+        admission: {
+          arm: 'full-accepted',
+          control: 'full-one',
+          folds: [{ fold: 0, ...admitted, floor: 0 }],
+          admitted: 1534,
+          questions: 1534,
+        },
+      },
+      'V50-admission-engaged',
+    );
+    expect(entry.pass).toBe(false);
+  });
+
+  it('V50 fails when the floor admitted nothing', () => {
+    // The other degenerate case: an arm that sent no note at all is `none`, and its delta against
+    // `full-one` is the whole value of the memory wearing the name of a selection rule.
+    const entry = gate(
+      {
+        ...sound,
+        admission: {
+          arm: 'full-accepted',
+          control: 'full-one',
+          folds: [{ fold: 0, ...admitted }],
+          admitted: 0,
+          questions: 1534,
+        },
+      },
+      'V50-admission-engaged',
+    );
+    expect(entry.pass).toBe(false);
+  });
+
+  it('V50 reads a zero denominator as nothing rather than as a ratio', () => {
+    // The same guard as V49's, for the same reason: an admission arm that was asked no question
+    // has no admission rate, and 0/0 printed as a share would read as a clean zero.
+    const entry = gate(
+      {
+        ...sound,
+        admission: {
+          arm: 'full-accepted',
+          control: 'full-one',
+          folds: [{ fold: 0, ...admitted }],
+          admitted: 0,
+          questions: 0,
+        },
+      },
+      'V50-admission-engaged',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.actual).toContain('admitted 0/0 (0.0%)');
+  });
+
+  it('V50 fails when no fold ran at all', () => {
+    const entry = gate(
+      {
+        ...sound,
+        admission: { arm: 'full-accepted', control: 'full-one', folds: [], admitted: 10, questions: 100 },
+      },
+      'V50-admission-engaged',
+    );
+    expect(entry.pass).toBe(false);
   });
 
   it('V45 is absent when the run scored no clearance pair', () => {
