@@ -264,11 +264,27 @@ five cross-fitted folds, 14,479 model calls.
 | gated result | +1.30pp | **−0.20pp** |
 
 **Out of sample, the memory makes the product worse, and the filter recovers 72% of the cost without making
-it better than not using memory at all.** Five of five folds are negative. The filter itself is real — it
+it better than not using memory at all.** Five of five folds are negative. The interval excludes zero and the
+McNemar p is 0.0172; the magnitude, though, is 0.71pp against the 0.82pp this sample was sized to resolve,
+so the run is filed as *within 95% but under 80% power* — the same category as four of the seventeen earlier
+runs. The direction is settled. The size is at the edge of the instrument. The filter itself is real — it
 discards 7.8% of the questions and those questions are the damaged ones (−6.57pp against −0.22pp, gap
 [−10.99, −1.92] at p = 0.0158), the improvement survives leave-one-database-out (0.45–0.62pp across 58
 databases), and it sits outside a permutation null of random discards of the same size (p = 0.0002). The
 gated arm's −0.20pp is simply not distinguishable from zero.
+
+**The pack is a reshuffle, not a drag.** Split the same 7,000 questions by what memory did rather than by what
+it was worth: it repairs **6.39%** of the 2,925 questions the bare attempt got wrong and breaks **5.82%** of the
+4,075 it got right. Per question, help is the likelier outcome. Per corpus, harm wins, because there are 40%
+more right answers to break than wrong ones to repair — **0.79 repairs per break**. That is a base effect and
+not a severity effect, and it is why the arm can flip sign out of sample while both directions keep happening at
+rates of the same order on dev too (10.26% repaired, 7.04% broken).
+
+Which makes the filter's precision, not its existence, the thing that decides the product. A filter that could
+see every break would remove 237 questions and be worth **3.39pp**. This one removes 548, catches 32.1% of the
+breaks and throws away 21.4% of the repairs: **15.2 questions spent per net error prevented**, **15.2% of the
+ceiling** realised. In sample it was no better — 10.3 questions per net error, 24.2% of the ceiling — so the
+limit is the signal, not the corpus it was measured on.
 
 That makes the recommendation narrower than it was, and it is the useful form of a negative result:
 
@@ -284,7 +300,8 @@ the filter is a property of the query, not of the rule, and it works without kno
 
 You can reproduce all of it without a model call: `pnpm eval:out-of-sample` recomputes both columns from the
 two committed artefacts, `pnpm eval:query-diff` and `pnpm eval:gate-stability` produce the pieces, and the
-workflow asserts 19 numbers from them on every push.
+workflow asserts 36 numbers from them on every push — including the two rates, the exchange rate between
+them, and what fraction of its own ceiling the filter realises.
 
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
 

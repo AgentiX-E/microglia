@@ -638,17 +638,17 @@ somebody remembers writing.
                                         ▼
                             diffCasesOf(run)        ← one join point, both corpora
                                         │
-        ┌───────────────┬───────────────┼───────────────┬───────────────┐
-        ▼               ▼               ▼               ▼               ▼
-  clusteredDeltaOf  foldSignTestOf  gateReadingOf  featureOf(F1)  adjudicateOutOfSample
-   (databases)      (5 folds,       (the filter)   (imported      (P1–P5, as
-                     exact binomial)               name)          predicates)
-        └───────────────┴───────────────┼───────────────┴───────────────┘
+        ┌───────────────┬───────────────┼───────────────┬───────────────┬─────────────────┐
+        ▼               ▼               ▼               ▼               ▼                 ▼
+  clusteredDeltaOf  foldSignTestOf  gateReadingOf  featureOf(F1)  memoryDiscordance  adjudicate
+   (databases)      (5 folds,       (the filter)   (imported      Of (repairs        OutOfSample
+                     exact binomial)               name)          against breaks)    (P1–P5)
+        └───────────────┴───────────────┼───────────────┴───────────────┴─────────────────┘
                                         ▼
-                              poc-out-of-sample.json   ← 19 assertions in CI
+                              poc-out-of-sample.json   ← 36 assertions in CI
 ```
 
-**Three design decisions in that pipeline are load-bearing.**
+**Four design decisions in that pipeline are load-bearing.**
 
 *The registration is data.* `OUT_OF_SAMPLE_PREDICTIONS` holds P1–P5 as predicates over a reading, with
 the sentence each one was registered as. A prediction cannot be re-read once its number is in: the
@@ -664,6 +664,18 @@ for which that is false. Prose in an artefact is not covered by tests, so it has
 independent; a rule reaches all of them. `clusteredDeltaOf` resamples databases and returns `null`
 rather than a point estimate when the corpus has fewer than two, because one cluster resampled is the
 same cluster and every effect would "resolve".
+
+*The delta is not the whole reading.* One number invites "memory is bad", and the corpus can be split by
+what memory did instead of by what it was worth. `memoryDiscordanceOf` does that split and then asks the
+filter what it can see of each half. Out of sample the pack repairs 187 of 2,925 wrong answers and breaks
+237 of 4,075 right ones — 0.79 repairs per break — while the two *rates* (6.39% and 5.82%) point the other
+way, because the bases are not the same size: more questions are right without memory than wrong, so a
+break rate buys more breaks than the same repair rate buys repairs. That is a base effect, and it is why
+the arm can flip sign while both mechanisms stay put. A filter that could see every break would be worth
+3.39pp; this one discards 548 questions, catches a third of the breaks, gives up a fifth of the repairs and
+realises 15.2% of that ceiling. `realisedPp` is `gate.improvementPp` computed from the confusion matrix
+instead of by re-reading the corpus, and the test that holds them equal is the test that the two accounts
+of the filter are one account.
 
 **What the pipeline cannot do** is as much a part of it. It compares no accuracy across splits — dev
 and train share no database, so only the paired differences are the same quantity — and it does not

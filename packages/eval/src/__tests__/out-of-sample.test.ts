@@ -12,11 +12,14 @@ import {
   adjudicateOutOfSample,
   clusteredDeltaOf,
   foldSignTestOf,
+  memoryDiscordanceOf,
   outOfSampleReadingOf,
+  powerVerdictOf,
   sideBySideOf,
   type ClusteredDelta,
   type OutOfSampleReading,
 } from '../out-of-sample.js';
+import { gateReadingOf } from '../query-diff.js';
 import { diffQueries } from '../sql-diff.js';
 import type { DiffCase } from '../query-diff.js';
 
@@ -176,6 +179,20 @@ function satisfying(overrides: Partial<OutOfSampleReading> = {}): OutOfSampleRea
       resolves: true,
     },
     runsMeasured: true,
+    measured: {
+      n: 4,
+      helped: 1,
+      harmed: 0,
+      deltaPp: -0.5,
+      halfWidthPp: 0.6,
+      minDetectablePp: 0.9,
+      baselineCorrect: 2,
+      baselineAccuracy: 0.5,
+      harmedPerCorrectPp: 0,
+      helpedPerWrongPp: 50,
+      clusterLowPp: -1.1,
+      clusterHighPp: 0.1,
+    } as never,
     ...overrides,
   } as OutOfSampleReading;
 }
@@ -334,5 +351,192 @@ describe('sideBySideOf', () => {
     const reading = satisfying();
     const table = sideBySideOf({ dev: reading, train: reading });
     expect(table.find((row) => row.label.startsWith('folds'))?.dev).toBe('n/a (no folds)');
+  });
+});
+
+
+describe('memoryDiscordanceOf', () => {
+  // Four outcomes, each with a flagged and an unflagged case, so a test can move one cell at a time
+  // and the filter's precision is controlled independently of what memory did.
+  const repairedFlagged = (id: string, dbId = 'db_a') => importing(id, dbId, true, false);
+  const repairedKept = (id: string, dbId = 'db_a') => clean(id, dbId, true, false);
+  const brokenFlagged = (id: string, dbId = 'db_b') => importing(id, dbId, false, true);
+  const brokenKept = (id: string, dbId = 'db_b') => clean(id, dbId, false, true);
+  const untouchedRight = (id: string, dbId = 'db_a') => clean(id, dbId, true, true);
+  const untouchedWrong = (id: string, dbId = 'db_b') => clean(id, dbId, false, false);
+
+  it('splits the corpus by what memory did rather than by what it is worth', () => {
+    const reading = memoryDiscordanceOf([
+      repairedKept('r2'),
+      untouchedWrong('w1'),
+      brokenKept('b2'),
+      untouchedRight('c1'),
+    ]);
+    // Two questions were wrong without memory and one of them is now right: the repair rate is over
+    // the questions memory *could* help, not over the corpus.
+    expect(reading.attempted).toEqual({ n: 2, repaired: 1, ratePp: 50 });
+    expect(reading.correct).toEqual({ n: 2, broken: 1, ratePp: 50 });
+    expect(reading.net).toBe(0);
+    // One repair per break. Both rates at 50% and a net of zero is the point of the reading: the arm
+    // can be harmful in aggregate while the pack is doing as much good as harm.
+    expect(reading.helpPerHarm).toBe(1);
+    expect(reading.ceilingPp).toBeCloseTo(25, 8);
+    expect(reading.realisedPp).toBe(0);
+    expect(reading.shareOfCeiling).toBe(0);
+  });
+
+  it('reads a filter that sees every break and no repair as realising the whole ceiling', () => {
+    const reading = memoryDiscordanceOf([
+      brokenFlagged('b1'),
+      brokenFlagged('b2'),
+      repairedKept('r1'),
+      repairedKept('r2'),
+    ]);
+    expect(reading.filter).toEqual({
+      discarded: 2,
+      discardedShare: 0.5,
+      caughtOfBroken: 2,
+      caughtOfRepaired: 0,
+      caughtShareOfBroken: 1,
+      caughtShareOfRepaired: 0,
+      netRemoved: 2,
+      // Two questions thrown away for two net errors prevented.
+      discardedPerNetError: 1,
+    });
+    expect(reading.shareOfCeiling).toBe(1);
+  });
+
+  it('lets the share of the ceiling go negative when the filter only sees repairs', () => {
+    // The failure mode a precision number alone hides: a filter can be worth less than nothing while
+    // still removing mostly-bad-looking queries.
+    const reading = memoryDiscordanceOf([brokenKept('b1'), brokenKept('b2'), repairedFlagged('r1')]);
+    expect(reading.filter.netRemoved).toBe(-1);
+    expect(reading.realisedPp).toBeCloseTo(-33.333333, 5);
+    expect(reading.ceilingPp).toBeCloseTo(66.666666, 5);
+    expect(reading.helpPerHarm).toBe(0.5);
+    expect(reading.shareOfCeiling).toBeCloseTo(-0.5, 8);
+    expect(reading.filter.discardedPerNetError).toBe(-1);
+  });
+
+  it('reports no ratio when the filter removes nothing net, rather than an infinite one', () => {
+    // One break caught and one repair discarded. The filter is worthless here, and `Infinity` would
+    // be read as the strongest possible signal.
+    const reading = memoryDiscordanceOf([
+      brokenFlagged('b1'),
+      repairedFlagged('r1'),
+      untouchedRight('c1'),
+      untouchedWrong('w1'),
+    ]);
+    expect(reading.filter.netRemoved).toBe(0);
+    expect(reading.filter.discardedPerNetError).toBeNull();
+    expect(reading.realisedPp).toBe(0);
+  });
+
+  it('reports a null share when there is no ceiling to share', () => {
+    // Nothing was broken, so a perfect filter would be worth zero and the share of zero is not a
+    // number. The alternative — 0 or 1 — would both be read as a verdict on the filter.
+    const reading = memoryDiscordanceOf([repairedKept('r1'), untouchedRight('c1')]);
+    expect(reading.correct.broken).toBe(0);
+    expect(reading.ceilingPp).toBe(0);
+    expect(reading.shareOfCeiling).toBeNull();
+    // Nothing broken means no exchange rate to quote, which is not the same as an infinite one.
+    expect(reading.helpPerHarm).toBeNull();
+    // No breaks also means no denominator for the capture rate, which is a different null from the
+    // rate being zero: this corpus does have one repair and the filter missed it.
+    expect(reading.filter.caughtShareOfBroken).toBeNull();
+    expect(reading.filter.caughtOfRepaired).toBe(0);
+    expect(reading.filter.caughtShareOfRepaired).toBe(0);
+  });
+
+  it('reports the corpus with nothing to repair as unmeasured on that side', () => {
+    const reading = memoryDiscordanceOf([brokenKept('b1'), untouchedRight('c1')]);
+    expect(reading.attempted.n).toBe(0);
+    expect(reading.attempted.ratePp).toBeNull();
+    expect(reading.correct.ratePp).toBe(50);
+  });
+
+  it('reports an empty corpus as unmeasured in every ratio and zero in every count', () => {
+    const reading = memoryDiscordanceOf([]);
+    expect(reading.attempted).toEqual({ n: 0, repaired: 0, ratePp: null });
+    expect(reading.correct).toEqual({ n: 0, broken: 0, ratePp: null });
+    expect(reading.net).toBe(0);
+    expect(reading.helpPerHarm).toBeNull();
+    expect(reading.filter.discarded).toBe(0);
+    expect(reading.filter.discardedShare).toBeNull();
+    expect(reading.ceilingPp).toBeNull();
+    expect(reading.realisedPp).toBeNull();
+    expect(reading.shareOfCeiling).toBeNull();
+  });
+
+  it('agrees with the gate reading on what the filter is worth', () => {
+    // Two computations of one quantity: this one counts the two ways a discarded question can move,
+    // `gateReadingOf` re-reads the corpus with the fallback substituted. They must be equal, and the
+    // day one of them changes the other has to be shown to still agree.
+    const cases = [
+      brokenFlagged('b1'),
+      brokenKept('b2'),
+      repairedFlagged('r1'),
+      repairedKept('r2'),
+      untouchedRight('c1'),
+      untouchedWrong('w1'),
+      importing('i9', 'db_c', false, true),
+    ];
+    const reading = memoryDiscordanceOf(cases);
+    expect(reading.realisedPp).toBeCloseTo(gateReadingOf(cases, 'strict', 200).improvementPp as number, 10);
+  });
+});
+
+describe('powerVerdictOf', () => {
+  const cell = (input: Partial<Record<string, number | null>>) =>
+    ({
+      n: 7000,
+      helped: 187,
+      harmed: 237,
+      deltaPp: -0.7142857142857143,
+      halfWidthPp: 0.576555287895272,
+      minDetectablePp: 0.8242387330013021,
+      baselineCorrect: 0,
+      baselineAccuracy: 0,
+      harmedPerCorrectPp: 0,
+      helpedPerWrongPp: 0,
+      clusterLowPp: null,
+      clusterHighPp: null,
+      ...input,
+    }) as never;
+
+  it('files the out-of-sample arm under the category the power audit prints', () => {
+    // -0.71pp against a 0.58pp half-width and a 0.82pp resolution: it clears the interval and misses
+    // the bar the design was sized for. Reporting only the interval would upgrade this round relative
+    // to every other artefact in the repository.
+    const verdict = powerVerdictOf(cell({}));
+    expect(verdict.significant95).toBe(true);
+    expect(verdict.resolvable).toBe(false);
+    expect(verdict.label).toBe('within 95% but under 80% power');
+  });
+
+  it('calls an effect above both bars resolvable', () => {
+    const verdict = powerVerdictOf(cell({ deltaPp: -1.5 }));
+    expect(verdict.resolvable).toBe(true);
+    expect(verdict.label).toBe('resolvable');
+  });
+
+  it('calls an effect under both bars underpowered', () => {
+    const verdict = powerVerdictOf(cell({ deltaPp: -0.2 }));
+    expect(verdict.significant95).toBe(false);
+    expect(verdict.label).toBe('underpowered');
+  });
+
+  it('distinguishes no discordant pair from no measurement', () => {
+    // `helped + harmed === 0` means nothing changed, so the delta carries no information however
+    // small it is. An empty group is a different case and JSON writes both as null.
+    const none = powerVerdictOf(cell({ helped: 0, harmed: 0, halfWidthPp: null, minDetectablePp: null }));
+    expect(none.label).toBe('no discordant pair');
+    expect(none.resolvable).toBe(false);
+  });
+
+  it('never calls an infinity-resolution group resolvable', () => {
+    const infinite = powerVerdictOf(cell({ minDetectablePp: null, helped: 10, harmed: 4 }));
+    expect(infinite.resolvable).toBe(false);
+    expect(infinite.significant95).toBe(true);
   });
 });

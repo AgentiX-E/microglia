@@ -158,6 +158,17 @@
       "significant95": false
     },
     {
+      "artefact": "poc-sota-bird-train.json",
+      "n": 7000,
+      "helped": 187,
+      "harmed": 237,
+      "deltaPp": -0.7142857142857143,
+      "halfWidthPp": 0.576555287895272,
+      "minDetectablePp": 0.8242387330013021,
+      "resolvable": false,
+      "significant95": true
+    },
+    {
       "artefact": "poc-sota-bird-transfer-repair.json",
       "n": 350,
       "helped": 14,
@@ -192,9 +203,9 @@
     }
   ],
   "resolvable": 1,
-  "significant95": 5,
-  "total": 17,
-  "resolvableShare": 0.058823529411764705,
+  "significant95": 6,
+  "total": 18,
+  "resolvableShare": 0.05555555555555555,
   "largest": {
     "artefact": "poc-sota-bird-evidence.json",
     "n": 350,
@@ -207,15 +218,15 @@
     "significant95": true
   },
   "sharpest": {
-    "artefact": "poc-sota-bird-dev.json",
-    "n": 1534,
-    "helped": 47,
-    "harmed": 68,
-    "deltaPp": -1.3689700130378095,
-    "halfWidthPp": 1.3701863349241636,
-    "minDetectablePp": 1.9588071992130136,
+    "artefact": "poc-sota-bird-train.json",
+    "n": 7000,
+    "helped": 187,
+    "harmed": 237,
+    "deltaPp": -0.7142857142857143,
+    "halfWidthPp": 0.576555287895272,
+    "minDetectablePp": 0.8242387330013021,
     "resolvable": false,
-    "significant95": false
+    "significant95": true
   },
   "notes": [
     "A row is resolvable when |delta| exceeds the minimum detectable difference at 80% power for that artefact's own n and discordance; equality counts as unresolved, because a result at the edge of what a design can see is not a detection. significant95 is the same comparison against the 95% half-width, the looser bar, and both travel so neither can be quoted alone.",

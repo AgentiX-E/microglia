@@ -403,12 +403,16 @@ export {
   adjudicateOutOfSample,
   clusteredDeltaOf,
   foldSignTestOf,
+  memoryDiscordanceOf,
   outOfSampleReadingOf,
+  powerVerdictOf,
   sideBySideOf,
   type CellPair,
   type ClusteredDelta,
   type FoldSignTest,
+  type MemoryDiscordance,
   type OutOfSampleReading,
+  type PowerVerdict,
   type PredictionVerdict,
 } from './out-of-sample.js';
 

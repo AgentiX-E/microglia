@@ -429,7 +429,7 @@ jobs:
               '% where nothing is named against ' + o.all.harmedPerCorrectPp.toFixed(2) + '% where everything is');
           "
 
-      - name: Out of sample (recomputed, and four of the five registrations adjudicated)
+      - name: Out of sample (recomputed, the registrations adjudicated, and the filter priced)
         run: |
           set -euo pipefail
           POC_RESULT_DIR="${RUNNER_TEMP}/oos" pnpm eval:out-of-sample
@@ -449,6 +449,11 @@ jobs:
               ['the gate recovered about half of what dev promised', Math.abs(a.dev.gate.improvementPp - 0.9778) < 0.001 && Math.abs(a.train.gate.improvementPp - 0.5143) < 0.001],
               ['so the product is not better than no memory out of sample', a.train.gate.gatedDeltaPp < 0 && Math.abs(a.train.gate.gatedDeltaPp + 0.2) < 1e-9],
               ['the statement says exactly that, from the numbers', a.statement.includes('not distinguishable from no memory') && a.statement.includes('0.71pp') && a.statement.includes('0.51pp')],
+              ['the arm clears the 95% interval and misses the 80% bar', a.train.resolution.significant95 === true && a.train.resolution.resolvable === false],
+              ['and is filed under the name the power audit prints for it', a.train.resolution.label === 'within 95% but under 80% power'],
+              ['the resolution it misses is the 0.82pp one this sample was sized for', Math.abs(a.train.resolution.minDetectablePp - 0.8242) < 0.001],
+              ['the dev arm is filed as underpowered, which it always was', a.dev.resolution.label === 'underpowered'],
+              ['and the statement carries both bars rather than only the interval', a.statement.includes('80%-power resolution')],
               ['P1 holds: the run was measurable', verdict('P1').holds === true],
               ['P2 is refuted: it is significantly different from the none arm', verdict('P2').holds === false],
               ['P3 holds: the gate is inside the registered wide band', verdict('P3').holds === true && a.train.gate.improvementPp >= 0.2 && a.train.gate.improvementPp <= 2.0],
@@ -458,11 +463,30 @@ jobs:
               ['nothing in the table compares an accuracy across splits', a.table.some((row) => /accuracy/i.test(row.label)) === false],
               ['seven rows, one per comparable quantity', a.table.length === 7],
             ];
+            // The discordance block, asserted for the same reason the verdicts are: it is the reading
+            // the product decision rests on, and a corpus that moved under it would change the decision
+            // without failing anything else. Both splits, because the finding is the difference.
+            const d = a.discordance;
+            checks.push(
+              ['the out-of-sample corpus splits 2,925 that could only be helped against 4,075 that could only be harmed', d.train.attempted.n === 2925 && d.train.correct.n === 4075],
+              ['the pack repairs 6.39% of the wrong answers', Math.abs(d.train.attempted.ratePp - 6.3931623931623935) < 1e-9],
+              ['and breaks 5.82% of the right ones', Math.abs(d.train.correct.ratePp - 5.815950920245399) < 1e-9],
+              ['so help is likelier per question and harm is likelier per corpus', d.train.attempted.ratePp > d.train.correct.ratePp && Math.abs(d.train.helpPerHarm - 0.7890295358649789) < 1e-9],
+              ['a filter that saw every break would be worth 3.39pp', Math.abs(d.train.ceilingPp - 3.3857142857142857) < 1e-9],
+              ['this one discards 548 questions, catching 76 breaks and 40 repairs', d.train.filter.discarded === 548 && d.train.filter.caughtOfBroken === 76 && d.train.filter.caughtOfRepaired === 40],
+              ['which is 15.2 questions per net error and 15.2% of the ceiling', Math.abs(d.train.filter.discardedPerNetError - 15.222222222222221) < 1e-9 && Math.abs(d.train.shareOfCeiling - 0.15189873417721517) < 1e-9],
+              ['the filter reading and the gate reading are one number computed twice', Math.abs(d.train.realisedPp - a.train.gate.improvementPp) < 1e-9 && Math.abs(d.dev.realisedPp - a.dev.gate.improvementPp) < 1e-9],
+              ['dev sits the other side of one repair per break', d.dev.helpPerHarm > 1 && Math.abs(d.dev.helpPerHarm - 1.0806451612903225) < 1e-9],
+              ['and its filter was already weak in sample', Math.abs(d.dev.shareOfCeiling - 0.24193548387096775) < 1e-9 && Math.abs(d.dev.filter.discardedPerNetError - 10.333333333333334) < 1e-9],
+              ['the statement quotes both sides of the asymmetry', d.statement.includes('0.79 repairs per break') && d.statement.includes('base is not symmetric')],
+              ['and its ceiling, its realisation and the share between them', d.statement.includes('3.39pp') && d.statement.includes('0.51pp') && d.statement.includes('15.2% of the ceiling')],
+            );
             const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
             if (bad.length > 0) { console.error('out-of-sample failed: ' + bad.join(', ')); process.exit(1); }
             console.log('out-of-sample: ' + checks.length + ' checks pass, delta ' + a.train.deltaPp.toFixed(2) +
               'pp [' + a.train.clustered.lowPp.toFixed(2) + ', ' + a.train.clustered.highPp.toFixed(2) +
-              '], gate +' + a.train.gate.improvementPp.toFixed(2) + 'pp, net ' + a.train.gate.gatedDeltaPp.toFixed(2) + 'pp');
+              '], gate +' + a.train.gate.improvementPp.toFixed(2) + 'pp, net ' + a.train.gate.gatedDeltaPp.toFixed(2) +
+              'pp, filter realises ' + (d.train.shareOfCeiling * 100).toFixed(1) + '% of a ' + d.train.ceilingPp.toFixed(2) + 'pp ceiling');
           "
 
       - name: CPU scale and latency

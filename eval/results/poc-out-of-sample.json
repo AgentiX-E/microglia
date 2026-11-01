@@ -89,6 +89,13 @@
       "highPp": 1.364522417153996,
       "resolved": false
     },
+    "resolution": {
+      "halfWidthPp": 1.4511943100089355,
+      "minDetectablePp": 2.0746155391046113,
+      "significant95": false,
+      "resolvable": false,
+      "label": "underpowered"
+    },
     "gate": {
       "discarded": 155,
       "improvementPp": 0.9778357235984355,
@@ -116,6 +123,13 @@
       "ties": 0,
       "p": 0.0625
     },
+    "resolution": {
+      "halfWidthPp": 0.576555287895272,
+      "minDetectablePp": 0.8242387330013021,
+      "significant95": true,
+      "resolvable": false,
+      "label": "within 95% but under 80% power"
+    },
     "gate": {
       "discarded": 548,
       "improvementPp": 0.5142857142857142,
@@ -127,10 +141,70 @@
       "restDeltaPp": -0.21698698078115314
     }
   },
-  "statement": "Out of sample, memory costs 0.71pp. The read-time gate recovers 0.51pp of it, leaving -0.20pp, which is not distinguishable from no memory.",
+  "statement": "Out of sample, memory costs 0.71pp (interval excludes zero, below the design's 0.82pp 80%-power resolution). The read-time gate recovers 0.51pp of it, leaving -0.20pp, which is not distinguishable from no memory.",
+  "discordance": {
+    "dev": {
+      "attempted": {
+        "n": 653,
+        "repaired": 67,
+        "ratePp": 10.260336906584993
+      },
+      "correct": {
+        "n": 881,
+        "broken": 62,
+        "ratePp": 7.037457434733257
+      },
+      "net": 5,
+      "helpPerHarm": 1.0806451612903225,
+      "filter": {
+        "discarded": 155,
+        "discardedShare": 0.10104302477183832,
+        "caughtOfBroken": 25,
+        "caughtOfRepaired": 10,
+        "caughtShareOfBroken": 0.4032258064516129,
+        "caughtShareOfRepaired": 0.14925373134328357,
+        "netRemoved": 15,
+        "discardedPerNetError": 10.333333333333334
+      },
+      "ceilingPp": 4.041720990873533,
+      "realisedPp": 0.9778357235984355,
+      "shareOfCeiling": 0.24193548387096775
+    },
+    "train": {
+      "attempted": {
+        "n": 2925,
+        "repaired": 187,
+        "ratePp": 6.3931623931623935
+      },
+      "correct": {
+        "n": 4075,
+        "broken": 237,
+        "ratePp": 5.815950920245399
+      },
+      "net": -50,
+      "helpPerHarm": 0.7890295358649789,
+      "filter": {
+        "discarded": 548,
+        "discardedShare": 0.07828571428571429,
+        "caughtOfBroken": 76,
+        "caughtOfRepaired": 40,
+        "caughtShareOfBroken": 0.3206751054852321,
+        "caughtShareOfRepaired": 0.21390374331550802,
+        "netRemoved": 36,
+        "discardedPerNetError": 15.222222222222221
+      },
+      "ceilingPp": 3.3857142857142857,
+      "realisedPp": 0.5142857142857142,
+      "shareOfCeiling": 0.15189873417721517
+    },
+    "statement": "Memory repairs 6.39% of the 2,925 questions the bare attempt got wrong and breaks 5.82% of the 4,075 it got right: 0.79 repairs per break, so the arm is a reshuffle with a heavier bad side rather than a drag. The rates are close and the counts are not, because the base is not symmetric — 2,925 questions could only be helped and 4,075 could only be harmed. A filter that saw every break would be worth 3.39pp; this one discards 548 questions (7.8%), catches 32.1% of the breaks and throws away 21.4% of the repairs, spends 15.2 questions per net error it prevents, and realises 0.51pp of the 3.39pp available, which is 15.2% of the ceiling."
+  },
   "notes": [
     "The clustered interval is the one that decides this round. Questions inside a database are not independent — one package of rules reaches all of them — so the interval resamples databases. The question-level interval is in the source artefact and is narrower on train by 0.03pp, which is why it was not the one quoted.",
     "No accuracy is compared across the two splits. Dev and train share no database, so only the paired differences between arms are the same quantity.",
-    "The dev column of the table is the reading this round was registered against. It is recomputed here rather than quoted from the documentation, so the two cannot drift."
+    "The dev column of the table is the reading this round was registered against. It is recomputed here rather than quoted from the documentation, so the two cannot drift.",
+    "The discordance block splits the corpus by what memory did rather than by what it is worth. Both directions are present on both splits: the pack repairs some of what the bare attempt got wrong and breaks some of what it got right, and a negative delta is entirely consistent with both happening at once. What separates the two splits is the exchange rate between them, and the base the two rates act on. More questions are right without memory than wrong, so a break rate buys more breaks than the same repair rate buys repairs — a base effect, not a severity effect, and the reason the arm can flip sign while the mechanism stays put.",
+    "The filter column is the part that decides the product, and it tells the same story on both splits: the gate spends an order of magnitude more questions per net error it prevents than a filter that could see the breaks would, and realises a minority of its own ceiling. A read-time gate that catches a fraction of the breaks at the cost of a fraction of the repairs was never going to carry the product, in sample or out. That is a statement about the signal, not about the corpus it was measured on.",
+    "Each resolution block names which of the two bars the arm clears. A delta can exclude zero at 95% and still sit under the 80%-power resolution the design was sized for, and the train arm does: -0.71pp against 0.82pp. That is the same category eval:power assigns to the rest of this repository and it is not upgraded here for being the round that mattered."
   ]
 }

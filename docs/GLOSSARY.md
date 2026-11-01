@@ -150,6 +150,23 @@ comparison against text you already have, not a judgement about a rule. Worth +0
 stable under leave-one-database-out, split-half and a permutation null at p = 0.0002 — and still not a
 net gain, because it only recovers 72% of what the rules cost.
 
+**Repair rate and break rate** — of the questions the bare attempt got wrong, the share a memory query
+turns right; and of the ones it got right, the share the memory query turns wrong. Two rates over two
+different bases, so they have to be quoted together. Out of sample the pack repairs 6.39% of 2,925 and
+breaks 5.82% of 4,075: per question help is the likelier outcome, and per corpus harm still wins. A
+single delta cannot say which of the two moved, which is why the artefact carries both.
+
+**Exchange rate** — repairs per break, `repaired / broken`. Out of sample 0.79 (187 repairs against 237
+breaks); on dev 1.08 (67 against 62). The sign of the arm follows this ratio crossing one, and the
+mechanism does not change across the split: both directions run at rates of the same order on both
+corpora. Quoting the two rates without their bases is how a reshuffle gets read as a decline.
+
+**Perfect-filter ceiling** — what a filter that removed exactly the broken questions and none of the
+repaired ones would be worth, in percentage points of the corpus: 3.39pp out of sample, because 237 of
+7,000 questions were broken. Not the same object as *Ceiling* below, which is the accuracy an oracle
+selector could reach over the generated candidates. The read-time filter realises 0.51pp of this one,
+15.2% of it.
+
 **Mechanism study** — a controlled experiment that isolates whether feedback becomes transferable
 knowledge, holding the generator fixed. Not a benchmark result, and never quoted as one.
 

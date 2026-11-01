@@ -21,8 +21,11 @@
 import { mulberry32 } from '@agentix-e/microglia-core';
 import { comparePaired } from './stats.js';
 import {
+  cellOf,
+  discardSetOf,
   featureOf,
   gateReadingOf,
+  type CellReading,
   type DiffCase,
   type FeatureReading,
   type GateReading,
@@ -160,7 +163,45 @@ export type OutOfSampleReading = {
   readonly gate: GateReading;
   readonly imported: FeatureReading;
   readonly runsMeasured: boolean;
+  /** The arm contrast as the power audit sees it, so the two cannot disagree about resolution. */
+  readonly measured: CellReading;
 };
+
+/**
+ * Which of the two bars a delta clears, named the way `eval:power` names it.
+ *
+ * The project has two bars and they are not the same: a 95% interval that excludes zero, and the
+ * design's own 80%-power resolution (`2.802 · SE`). A delta can clear the first and miss the second,
+ * and every artefact in this repository is filed under exactly this vocabulary. The out-of-sample run
+ * is such a case — −0.71pp against a 0.82pp resolution — and it was briefly written up as though
+ * clearing the interval settled it. Naming the category in the artefact is the only way that mistake
+ * cannot be made twice.
+ */
+export type PowerVerdict = {
+  readonly halfWidthPp: number | null;
+  readonly minDetectablePp: number | null;
+  /** `|delta|` exceeds the 95% half-width. */
+  readonly significant95: boolean;
+  /** `|delta|` exceeds the design's 80%-power resolution. The stricter bar. */
+  readonly resolvable: boolean;
+  readonly label: 'resolvable' | 'within 95% but under 80% power' | 'underpowered' | 'no discordant pair';
+};
+
+/** Adjudicate an arm contrast against both bars, with the label the power audit would print. */
+export function powerVerdictOf(cell: CellReading): PowerVerdict {
+  const delta = cell.deltaPp;
+  const significant95 = delta !== null && cell.halfWidthPp !== null && Math.abs(delta) > cell.halfWidthPp;
+  const resolvable = delta !== null && cell.minDetectablePp !== null && Math.abs(delta) > cell.minDetectablePp;
+  const label =
+    cell.halfWidthPp === null && cell.minDetectablePp === null && cell.helped + cell.harmed === 0
+      ? 'no discordant pair'
+      : resolvable
+        ? 'resolvable'
+        : significant95
+          ? 'within 95% but under 80% power'
+          : 'underpowered';
+  return { halfWidthPp: cell.halfWidthPp, minDetectablePp: cell.minDetectablePp, significant95, resolvable, label };
+}
 
 const range = (value: number, low: number, high: number): boolean => value >= low && value <= high;
 const show = (value: number | null): string => (value === null ? 'n/a' : `${value.toFixed(2)}pp`);
@@ -237,6 +278,7 @@ export function outOfSampleReadingOf(
     gate: gateReadingOf(cases),
     imported: featureOf('F1', 'imported name', cases, (delta) => delta.ungrounded.length > 0),
     runsMeasured: options.runsMeasured,
+    measured: cellOf(cases),
   };
 }
 
@@ -284,4 +326,115 @@ export function sideBySideOf(input: {
       train: show(input.train.imported.present.deltaPp),
     },
   ];
+}
+
+/**
+ * The two ways a memory query can differ from the bare attempt, and what a filter can see of each.
+ *
+ * This is the reading that makes the out-of-sample result a product decision rather than a verdict.
+ * The arm's delta is one number, and one number invites "memory is bad". The two rates behind it say
+ * something quite different. On the out-of-sample corpus the pack repairs **6.39%** of the questions
+ * the bare attempt gets wrong and breaks **5.82%** of the ones it gets right: it is a reshuffle with
+ * a slightly heavier bad side, not a drag.
+ *
+ * Which then makes the filter's precision the thing that decides. A filter that could see every break
+ * would remove 237 of 7,000 questions and be worth 3.39pp. This one removes 548 and is worth 0.51pp:
+ * it catches a third of the breaks and throws away a fifth of the repairs, so it spends fifteen
+ * questions per net error it prevents, and realises **15%** of the ceiling.
+ *
+ * `discardedPerNetError` is `null` rather than infinite when the filter removes nothing net: a
+ * filter that catches no net error has no ratio, and JSON writes that as `null` for the same reason
+ * `minDetectablePp` does.
+ *
+ * The name carries a `memory` prefix because `protocol.discordanceOf` already means something else
+ * in this package: the rate at which two arms disagree on the same question, which is the input to
+ * every power calculation. That is a property of a *pair of arms*; this is a property of what a
+ * *filter* can see of that disagreement, and the two must not be conflated by a shared name.
+ */
+export type MemoryDiscordance = {
+  /** Questions the bare attempt got wrong, which the pack can only help. */
+  readonly attempted: { readonly n: number; readonly repaired: number; readonly ratePp: number | null };
+  /** Questions the bare attempt got right, which the pack can only harm. */
+  readonly correct: { readonly n: number; readonly broken: number; readonly ratePp: number | null };
+  /** `repaired − broken`, in questions. */
+  readonly net: number;
+  /**
+   * `repaired / broken`: how many questions the pack repairs for each one it breaks.
+   *
+   * This is the ratio of counts, not the ratio of the two rates, and on this corpus the two point
+   * different ways. Per question, help is the likelier outcome — 6.39% of the wrong answers are
+   * repaired against 5.82% of the right ones broken. Per hundred questions of the corpus, harm wins,
+   * because the bases are not the same size: 4,075 questions could only be harmed and 2,925 could
+   * only be helped. Dev sits on the other side of one (67 repairs against 62 breaks), which is how
+   * the arm flips sign while both mechanisms stay the same size.
+   *
+   * `null` when the pack breaks nothing, because then there is no exchange to quote.
+   */
+  readonly helpPerHarm: number | null;
+  readonly filter: {
+    readonly discarded: number;
+    readonly discardedShare: number | null;
+    readonly caughtOfBroken: number;
+    readonly caughtOfRepaired: number;
+    readonly caughtShareOfBroken: number | null;
+    readonly caughtShareOfRepaired: number | null;
+    readonly netRemoved: number;
+    readonly discardedPerNetError: number | null;
+  };
+  /** What removing every break and no repair would be worth, in percentage points of the corpus. */
+  readonly ceilingPp: number | null;
+  /** What the filter realises, in percentage points of the corpus. */
+  readonly realisedPp: number | null;
+  /** `realisedPp / ceilingPp`, which is how much of the available gain the signal finds. */
+  readonly shareOfCeiling: number | null;
+};
+
+/**
+ * Every ratio in this reading is `null` when its denominator is zero, for the reason the rest of the
+ * package writes `null`: a rate over nothing is not zero, and JSON has one spelling for "no ratio".
+ * The corpus that matters here has no such denominators, so the nulls cost nothing at the reading and
+ * stop a degenerate corpus from reporting a confident 0%.
+ *
+ * Split a corpus by what memory did, and ask the filter what it can see of each half.
+ *
+ * The gate mode is `strict`, the same one `outOfSampleReadingOf` measures through `gateReadingOf`,
+ * so `realisedPp` and the reading's own `gate.improvementPp` are the same quantity computed two
+ * ways. They are both kept: one says what the gate is worth, the other says what fraction of the
+ * available gain it is worth, and only the second is stable across corpora of different sizes.
+ */
+export function memoryDiscordanceOf(cases: readonly DiffCase[]): MemoryDiscordance {
+  const repaired = cases.filter((entry) => entry.correct && !entry.withoutMemoryCorrect);
+  const broken = cases.filter((entry) => !entry.correct && entry.withoutMemoryCorrect);
+  const attempted = cases.filter((entry) => !entry.withoutMemoryCorrect);
+  const correct = cases.filter((entry) => entry.withoutMemoryCorrect);
+  const discardSet = discardSetOf(cases, 'strict');
+  const flagged = (group: readonly DiffCase[]): number =>
+    group.filter((entry) => discardSet.has(entry.id)).length;
+  const caughtOfBroken = flagged(broken);
+  const caughtOfRepaired = flagged(repaired);
+  const netRemoved = caughtOfBroken - caughtOfRepaired;
+  const share = (part: number, whole: number): number | null => (whole === 0 ? null : part / whole);
+  const perHundred = (part: number, whole: number): number | null => (whole === 0 ? null : (part / whole) * 100);
+  const n = cases.length;
+  const ceilingPp = perHundred(broken.length, n);
+  const realisedPp = perHundred(netRemoved, n);
+  return {
+    attempted: { n: attempted.length, repaired: repaired.length, ratePp: perHundred(repaired.length, attempted.length) },
+    correct: { n: correct.length, broken: broken.length, ratePp: perHundred(broken.length, correct.length) },
+    net: repaired.length - broken.length,
+    helpPerHarm: share(repaired.length, broken.length),
+    filter: {
+      discarded: discardSet.size,
+      discardedShare: share(discardSet.size, n),
+      caughtOfBroken,
+      caughtOfRepaired,
+      caughtShareOfBroken: share(caughtOfBroken, broken.length),
+      caughtShareOfRepaired: share(caughtOfRepaired, repaired.length),
+      netRemoved,
+      discardedPerNetError: share(discardSet.size, netRemoved),
+    },
+    ceilingPp,
+    realisedPp,
+    shareOfCeiling: ceilingPp === null || realisedPp === null || ceilingPp === 0 ? null : realisedPp / ceilingPp,
+  };
 }
