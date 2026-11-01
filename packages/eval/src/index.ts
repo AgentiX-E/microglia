@@ -350,6 +350,40 @@ export {
 } from './strata.js';
 
 export {
+  SQL_KEYWORDS,
+  contextTokens,
+  diffQueries,
+  gateKeepsMemoryQuery,
+  isGrounded,
+  kindOf,
+  sqlShapeOf,
+  tokenizeSql,
+  type DeltaKind,
+  type GroundingMode,
+  type QueryDelta,
+  type SqlShape,
+  type SqlToken,
+} from './sql-diff.js';
+
+export {
+  cellOf,
+  clusteredGap,
+  featureOf,
+  fisherExact,
+  gateReadingOf,
+  readQueryDiff,
+  type CellReading,
+  type DiffCase,
+  type DiffCriterion,
+  type DiscordantReading,
+  type FeatureReading,
+  type GateReading,
+  type KindReading,
+  type QueryDiffInput,
+  type QueryDiffReading,
+} from './query-diff.js';
+
+export {
   CONTRASTS,
   HOUSE_CONVENTIONS,
   OPTIONAL_ARMS,

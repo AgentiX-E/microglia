@@ -513,3 +513,32 @@ What is deliberately absent: the whitepaper, the technical design, the roadmap, 
 progress log. Those describe the *project* rather than the library, they are written for an audience
 that is not a host developer, and they live in `microglia-docs`. `pnpm audit:repo` fails the build if
 one of them drifts back.
+
+### 8.4 What a rule did to the query, and why the corpus already holds it
+
+Every committed benchmark case carries two statements the same model wrote for the same question — one with
+the memory pack in the prompt and one without. The difference between those two strings is the pack's entire
+footprint, and until R30 nothing read it. `packages/eval/src/sql-diff.ts` tokenises both, extracts their shape
+(tables, columns, literals, select-list width, clause words, aggregates, nesting) and reports the diff; the
+same module decides whether a name in the memory query is **grounded** — present in the question or the
+evidence — or imported from a rule the question never asked about.
+
+```text
+[query-diff] 1534 cases: 692 unchanged, 73 reworded, 769 edited
+[query-diff] imported-name n= 155  10+/ 25-  delta=  -9.68pp ± 7.48
+[query-diff] F1 n= 155 delta=  -9.68pp vs    1.45pp gap= -11.13pp ± 7.61 p=0.0015 RESOLVES
+```
+
+Two properties make it a measurement rather than a story, and both are structural rather than promised: the
+classifier's input type has four string fields — the two queries, the question and the evidence — so it cannot
+reach the outcome it is later joined to, and it makes no model call, opens no database and records no clock, so
+the workflow recomputes the artefact byte for byte. `query-diff.ts` joins the deltas to the scored outcomes and
+reports each split with its own half-width, its database-clustered interval, an exact test and a Bonferroni
+threshold; `gateReadingOf` prices the read-time filter that the split would license, without installing it.
+
+The mechanism it isolates is narrow and worth stating plainly, because it is the reason the pack costs points:
+**a rule that puts a schema name into the query which the question never mentioned destroys an already-correct
+answer about seven times as often as it helps one.** 35.71% of already-correct queries in that group were broken,
+against 4.56% in the rest of the corpus, and the repair rate was flat. The whole accounting, and the two reasons
+the filter is measured rather than shipped, are in `README.md` §"On a public benchmark, the prefix form is worth less than nothing" and in
+the docs repository's `PROGRESS.md` §140.

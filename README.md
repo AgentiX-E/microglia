@@ -215,7 +215,28 @@ benchmark, measures the other case, and it is the one you should read first:
 | model selection over five draws | output | −2.43pp | 350 |
 | **oracle over five draws** | **ceiling** | **+3.52pp** | 350 |
 
-The reason is not a tuning problem, and it is worth stating before you integrate:
+The mechanism behind the negative rows is now measured rather than guessed, and it is specific enough to
+act on. Every committed case carries the query the model wrote **with** the pack and the one it wrote
+**without** it, so what the pack did to the query can be read directly, at zero cost and with no model
+call. On the 1,534-question dev split, 692 queries are byte-identical between the two arms and 155 contain a
+schema name that appears in neither the baseline query nor the question — a name the rule supplied and the
+question never asked for. Those 155 lose **9.68pp**; the rest of the corpus gains **1.45pp**. The harm is not
+"too much text", it is not relevance, and it is not the channel a rule arrived on (all three were measured and
+all three are flat). It is **an imported name**.
+
+| Group | Questions | Δ vs no memory | Already-correct queries destroyed |
+|---|---|---|---|
+| memory query names something the question does not | 155 | **−9.68pp** | **35.71%** |
+| memory query names only what the question does | 1,379 | +1.45pp | 4.56% |
+
+The repair rate is the same in both groups (11.76% against 10.04%); only the damage differs, by a factor of
+7.8. `pnpm eval:query-diff` reproduces the table from `eval/results/poc-sota-bird-dev-R26-channels.json` and
+the workflow compares it byte for byte. It is an explanation, not a fix: the filter it licenses has not been
+shipped, because it was chosen on the same 1,534 questions that it improves and its benefit (+0.98pp, to
++1.30pp) does not clear the sample's own 80%-power bar of 1.77pp. **Read it as the reason to scope your rules
+to what the request already names, which costs nothing and is in your control.**
+
+The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
 
 > A rule distilled from one correction repairs **22.6%** of the questions a bare retry cannot fix —
 > **on the question it came from**. Pointed at a foreign question it repairs 29 and breaks 29 out of
@@ -390,7 +411,7 @@ spent fourteen minutes failing a guard that was correct, and every other mechani
 locally first. The artefact records the endpoint host, so a rehearsal cannot be mistaken for a run.
 
 `pnpm bundle:size` bundles both published entry points for the browser and holds them to a ceiling:
-**3,009 B raw / 1,410 B gzipped** for the client and **42,762 B / 14,533 B gzipped** for the core. The
+**3,009 B raw / 1,410 B gzipped** for the client and **43,330 B / 14,684 B gzipped** for the core. The
 build would fail if either stopped bundling without Node builtins, which is the "no runtime dependency"
 promise measured rather than asserted. `pnpm bundle:size -- --probe` halves a ceiling and must be
 rejected — a budget that cannot be exceeded is not a gate.

@@ -22,7 +22,7 @@
     "test": "vitest run --coverage",
     "test:unit": "vitest run",
     "bench": "pnpm build && node packages/eval/dist/bench/run.js",
-    "check": "pnpm typecheck && pnpm typecheck:lanes && pnpm test && pnpm audit:repo && pnpm eval:integrity && pnpm eval:memform && pnpm eval:l0 && pnpm eval:pairs && pnpm eval:delivery && pnpm eval:protocol && pnpm bench && pnpm bundle:size",
+    "check": "pnpm typecheck && pnpm typecheck:lanes && pnpm test && pnpm audit:repo && pnpm eval:integrity && pnpm eval:memform && pnpm eval:l0 && pnpm eval:pairs && pnpm eval:delivery && pnpm eval:protocol && pnpm eval:query-diff && pnpm bench && pnpm bundle:size",
     "eval:llm-reader": "tsx packages/eval/src/bin/llm-reader.ts",
     "eval:llm-distill": "tsx packages/eval/src/bin/llm-distill.ts",
     "eval:embedding": "tsx packages/eval/src/bin/embedding.ts",
@@ -57,7 +57,8 @@
     "eval:prereg": "tsx packages/eval/src/bin/prereg.ts",
     "eval:protocol": "tsx packages/eval/src/bin/protocol.ts",
     "eval:harm": "tsx packages/eval/src/bin/harm-strata.ts",
-    "eval:power": "tsx packages/eval/src/bin/power-audit.ts"
+    "eval:power": "tsx packages/eval/src/bin/power-audit.ts",
+    "eval:query-diff": "tsx packages/eval/src/bin/query-diff.ts"
   },
   "devDependencies": {
     "@agentix-e/microglia-browser": "workspace:*",

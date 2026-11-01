@@ -682,3 +682,20 @@ A third property was learned from the first implementation. The contract reads a
 raw reply; a lane whose agent is a separate process does not. For τ²-bench, `parse` parses **the evaluator's
 receipt** and `score` reads the verdict out of it — and that is enough, because no gate inspects a candidate's
 shape, only its outcome. What the contract needs is a verdict per attempt, not a transcript.
+
+**Imported identifier** — A schema name that appears in the memory-assisted query and in neither the
+no-memory query nor the question. `pnpm eval:query-diff` counts them, and the count is the only covariate in
+this project that separates a rule that helped from a rule that hurt: questions with one or more lose 9.68pp
+while the rest of the corpus gains 1.45pp. The name is deliberate — the identifier is *imported* from the rule,
+which is to say the rule supplied a fact the question did not.
+
+**Grounded** — A name is grounded when the question or the evidence contains it. The check has two modes and
+both are reported: **strict** requires the name as a whole word (so `raceId` is *not* grounded against
+"qualifying race No.903", though it is the right column), and **morphological** also accepts a name that begins
+with a question word of three letters or more. A finding that survives both is not a tokeniser artefact; one
+that survives only the strict rule is.
+
+**Resolution gap** — The difference between two paired deltas, with a half-width of
+`1.96 · sqrt(SE₁² + SE₂²)` because the two groups are disjoint and their standard errors add in quadrature.
+It is the number that decides whether a covariate *separates*: a split whose gap is smaller than its own width
+is a split with nothing in it, and this project has measured four of those.

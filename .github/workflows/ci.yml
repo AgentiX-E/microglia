@@ -199,6 +199,52 @@ jobs:
             console.log('harm stratification: ' + checks.length + ' checks pass');
           "
 
+      # R30 stage 1: what the pack did to the query, recomputed from the committed run.
+      #
+      # The artefact is a pure function of one committed file — no model, no database, no clock — so
+      # the check is a byte comparison. The assertions beside it pin the five registered verdicts: a
+      # change in the classifier that flipped one of them would otherwise arrive as a diff nobody
+      # reads, and this round's entire claim is that those five numbers separate help from harm.
+      - name: Query diff (recomputed, and its verdict asserted)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/query-diff" pnpm eval:query-diff
+          diff -u eval/results/poc-query-diff.json "${RUNNER_TEMP}/query-diff/poc-query-diff.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/query-diff/poc-query-diff.json');
+            const f1 = a.features.find((f) => f.code === 'F1');
+            const f2 = a.features.find((f) => f.code === 'F2');
+            const strict = a.gates.find((g) => g.mode === 'strict');
+            const total = a.kinds.reduce((sum, k) => sum + k.cell.n, 0);
+            const unchanged = a.kinds.find((k) => k.kind === 'unchanged').cell;
+            const codes = a.criteria.map((c) => c.code).join(',');
+            const checks = [
+              ['every case lands in exactly one kind', total === a.n],
+              ['all 1,534 of them', a.n === 1534],
+              ['692 queries the pack did not touch', unchanged.n === 692],
+              ['not one of them flipped', unchanged.helped === 0 && unchanged.harmed === 0],
+              ['the paired delta is the artefact it re-reads', Math.abs(a.gates[0].measured.deltaPp - 0.3259) < 0.001],
+              ['the identifier covariate separates', f1.gapPp < 0 && Math.abs(f1.gapPp) > f1.gapHalfWidthPp],
+              ['and it separates under the looser rule too', f2.gapPp < 0 && Math.abs(f2.gapPp) > f2.gapHalfWidthPp],
+              ['both exact tests agree at 0.05', f1.fisherP < 0.05 && f2.fisherP < 0.05],
+              ['the clustered interval excludes zero', f1.clusterHighPp < 0],
+              ['the gate raises the delta', strict.gated.deltaPp > strict.measured.deltaPp],
+              ['the gate does not reach 80% power', strict.resolvable === false],
+              ['five criteria, always', codes === 'Q1,Q2,Q3,Q4,Q5'],
+              ['the registration is not refuted', a.refuted === false],
+              ['the pruned-name category is reported as unmeasured', a.unmeasured.length === 1 && a.unmeasured[0].category === 'pruned-name'],
+              ['one hypothesis out of five survives the multiplicity correction', a.multiplicity.familySize === 5 && a.multiplicity.survivors.join(',') === 'F1'],
+              ['and the corrected threshold is 0.05 over five', Math.abs(a.multiplicity.bonferroniAlpha - 0.01) < 1e-12],
+              ['the pre-treatment version of the gate has the wrong sign', a.ruleLevel.present.deltaPp > 0],
+              ['and it does not find what F1 finds', a.ruleLevel.agreement.recall < 0.5 && a.ruleLevel.agreement.precision < 0.5],
+              ['most rules name nothing a detector can see', a.ruleLevel.namingShare < 0.2],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('query diff failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('query diff: ' + checks.length + ' checks pass, F1 gap ' + f1.gapPp.toFixed(2) +
+              'pp over ' + f1.present.n + ' questions at p=' + f1.fisherP.toFixed(4));
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 
