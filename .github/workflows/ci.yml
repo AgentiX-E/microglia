@@ -356,6 +356,47 @@ jobs:
               '% overlap and ' + v['F1/F4'].kind + ', F1/F5 ' + (v['F1/F5'].overlapShare * 100).toFixed(1) + '% and ' + v['F1/F5'].kind);
           "
 
+      # R32 axis 1: whether a corpus can tell a procedural rule from a declarative one. The
+      # assertions pin the two things the reading found rather than only its arithmetic — the census
+      # that refused the axis, and the pool counts that made an id-keyed lookup impossible to miss.
+      - name: Rule form (recomputed, and the axis verdict asserted)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/rule-form" pnpm eval:rule-form
+          diff -u eval/results/poc-rule-form.json "${RUNNER_TEMP}/rule-form/poc-rule-form.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/rule-form/poc-rule-form.json');
+            const c = a.census.strict;
+            const r = a.census.relaxed;
+            const cov = a.coverage;
+            const whole = a.residual.whole;
+            const outside = a.residual.withoutImportedName;
+            const db = a.residual.perDatabase;
+            const checks = [
+              ['the corpus is the dev run', a.n === 1534],
+              ['the pool is rows, and rows are folds', a.pool.rows === 1066],
+              ['a rule id is a slot reused across folds, so sentences are fewer', a.pool.sentences === 271 && a.pool.slots === 229 && a.pool.sentences < a.pool.rows],
+              ['220 of the slots are cited by a question', a.pool.cited === 220],
+              ['most sentences carry both marker kinds', c.both === 157 && Math.abs(c.bothShare - 0.5793) < 0.001],
+              ['which is over the registered bar, so the axis is refused', c.bothShare > a.bar && a.axisUsable === false && a.verdict === 'unmeasurable'],
+              ['and a looser marker set does not save it', Math.abs(r.bothShare - 0.6568) < 0.001 && r.bothShare > a.bar],
+              ['the two censuses are over the same sentences', c.n === 271 && r.n === 271],
+              ['the four pack forms partition the corpus', cov.procedural + cov.declarative + cov.mixed + cov.none === a.n],
+              ['487 procedural and 330 declarative packs', cov.procedural === 487 && cov.declarative === 330 && cov.mixed === 100 && cov.none === 617],
+              ['both groups span every database, so neither is a single-cluster artefact', whole.proceduralClusters === 11 && whole.declarativeClusters === 11],
+              ['the residual points the opposite way to prediction 3', whole.gapPp > 0 && whole.declarative.deltaPp < 0],
+              ['and is larger where no name was imported', outside.gapPp > whole.gapPp],
+              ['the interval brackets its own point estimate', whole.gapLowPp <= whole.gapPp && whole.gapPp <= whole.gapHighPp],
+              ['four of eleven databases disagree with the pooled sign', db.databases === 11 && db.negative === 4 && db.positive === 6],
+              ['two reasons are recorded for the refusal', a.reasons.length === 2],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('rule form failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('rule form: ' + checks.length + ' checks pass, ' + c.both + '/' + c.n + ' sentences carry both (' +
+              (c.bothShare * 100).toFixed(1) + '% against a ' + (a.bar * 100) + '% bar), residual gap ' +
+              whole.gapPp.toFixed(2) + 'pp with ' + db.negative + ' of ' + db.databases + ' databases against it');
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 
