@@ -401,10 +401,12 @@ export {
 export {
   MEMORY_FILTER_YOUDEN,
   R33_BARS,
+  addedByPackOf,
   adjudicateR33,
   flagOf,
   importedNamesOf,
   validityReadingOf,
+  type AddedByPack,
   type R33Verdict,
   type ValidityArm,
   type ValidityCase,

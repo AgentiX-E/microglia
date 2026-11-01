@@ -282,3 +282,42 @@ export function adjudicateR33(input: { readonly train: ValiditySplit; readonly d
     },
   ];
 }
+
+/**
+ * What the pack adds, measured where there is room to see it.
+ *
+ * The registration asked whether the served query is flagged more often than the bare one, and on this
+ * corpus that question has no answer: the bare rule already fires on 94.8% of attempts, so the whole
+ * population the difference can move within is the remaining 5.2%. Asking it on that remainder is the
+ * same question with a denominator that is not saturated — of the questions the bare query passed, the
+ * share the served query fails.
+ *
+ * This is the second rule under which §146's imported-name finding is checked, and unlike P6 it is not
+ * bounded by the flag rate's ceiling.
+ */
+export type AddedByPack = {
+  /** Questions the bare rule left alone. */
+  readonly clean: number;
+  /** Of those, the ones the served rule flags. */
+  readonly flaggedAfter: number;
+  /** `flaggedAfter / clean`, or `null` when nothing was clean to begin with. */
+  readonly share: number | null;
+};
+
+export function addedByPackOf(
+  bare: readonly ValidityCase[],
+  served: readonly ValidityCase[],
+  rule: GroundingMode = 'strict',
+): AddedByPack {
+  const after = new Map(served.map((entry) => [entry.id, entry]));
+  const clean = bare.filter((entry) => !flagOf(entry, rule) && entry.sql.trim() !== '');
+  const flaggedAfter = clean.filter((entry) => {
+    const partner = after.get(entry.id);
+    return partner !== undefined && partner.sql.trim() !== '' && flagOf(partner, rule);
+  }).length;
+  return {
+    clean: clean.length,
+    flaggedAfter,
+    share: clean.length === 0 ? null : flaggedAfter / clean.length,
+  };
+}

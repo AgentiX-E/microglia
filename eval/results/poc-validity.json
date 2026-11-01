@@ -68,8 +68,13 @@
       "holds": false
     }
   ],
-  "statement": "Pointed at one query instead of at a difference, the grounding rule flags 94.8% of 6990 bare attempts under the strict rule and 75.8% under the morphological one. Flagged attempts are -12.58pp against clean ones, on a clustered interval that excludes zero, and Youden's index is 0.0257 against the memory filter's 0.1068, which the check does not clear.",
+  "statement": "Pointed at one query instead of at a difference, the grounding rule flags 94.8% of 6990 bare attempts under the strict rule and 75.8% under the morphological one. Flagged attempts are -12.58pp against clean ones, on a clustered interval that excludes zero, and Youden's index is 0.0257 against the memory filter's 0.1068, which the check does not clear. What cannot be seen in the flag rate is visible on the questions the bare rule passes: of 1693 of them the pack imports a name on 99 (5.8%), which is the imported-name finding under a second rule.",
   "train": {
+    "addedByPack": {
+      "clean": 1693,
+      "flaggedAfter": 99,
+      "share": 0.05847607796810396
+    },
     "bare": {
       "rule": "strict",
       "n": 6990,
@@ -188,6 +193,11 @@
     }
   },
   "dev": {
+    "addedByPack": {
+      "clean": 395,
+      "flaggedAfter": 24,
+      "share": 0.060759493670886074
+    },
     "bare": {
       "rule": "strict",
       "n": 1534,

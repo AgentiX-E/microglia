@@ -14,8 +14,10 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   MEMORY_FILTER_YOUDEN,
+  addedByPackOf,
   adjudicateR33,
   validityReadingOf,
+  type AddedByPack,
   type ValidityCase,
   type ValidityReading,
   type ValiditySplit,
@@ -64,7 +66,7 @@ const bareOf = (rows: readonly Row[]): readonly ValidityCase[] =>
 const servedOf = (rows: readonly Row[]): readonly ValidityCase[] =>
   armOf(rows, (row) => row.predictedSql ?? '', (row) => row.correct);
 
-function splitOf(rows: readonly Row[], expected: number): ValiditySplit {
+function splitOf(rows: readonly Row[], expected: number): { split: ValiditySplit; added: AddedByPack } {
   const bare = bareOf(rows);
   const served = servedOf(rows);
   const bareMissing = rows.filter((row) => (row.baselineSql ?? '') === '').length;
@@ -78,19 +80,27 @@ function splitOf(rows: readonly Row[], expected: number): ValiditySplit {
       ((row.predictedSql ?? '') !== '' || !row.correct),
   );
   return {
-    n: rows.length,
-    bareMissing,
-    servedMissing,
-    complete: rows.length === expected && consistent,
-    bare: validityReadingOf(bare, { rule: 'strict' }),
-    served: validityReadingOf(served, { rule: 'strict' }),
-    bareLoose: validityReadingOf(bare, { rule: 'morphological' }),
-    servedLoose: validityReadingOf(served, { rule: 'morphological' }),
+    split: {
+      n: rows.length,
+      bareMissing,
+      servedMissing,
+      complete: rows.length === expected && consistent,
+      bare: validityReadingOf(bare, { rule: 'strict' }),
+      served: validityReadingOf(served, { rule: 'strict' }),
+      bareLoose: validityReadingOf(bare, { rule: 'morphological' }),
+      servedLoose: validityReadingOf(served, { rule: 'morphological' }),
+    },
+    // What the pack adds, measured on the questions the bare rule passed: the only population in
+    // which a difference has room to show, given how much of the corpus the bare rule already flags.
+    // `added` here is the morphological rule, which leaves 1,693 questions clean.
+    added: addedByPackOf(bare, served, 'morphological'),
   };
 }
 
-const devSplit = splitOf(dev.rows, 1534);
-const trainSplit = splitOf(train.rows, 7000);
+const devRead = splitOf(dev.rows, 1534);
+const trainRead = splitOf(train.rows, 7000);
+const devSplit = devRead.split;
+const trainSplit = trainRead.split;
 const verdicts = adjudicateR33({ train: trainSplit, dev: devSplit });
 
 /**
@@ -159,6 +169,7 @@ const headline = (reading: ValidityReading): Record<string, unknown> => ({
 function statementOf(): string {
   const strict = trainSplit.bare;
   const loose = trainSplit.bareLoose;
+  const added = trainRead.added;
   const j = strict.youdenJ;
   const clears = j !== null && j >= MEMORY_FILTER_YOUDEN;
   return (
@@ -168,7 +179,9 @@ function statementOf(): string {
     `Flagged attempts are ${strict.gapPp === null ? 'n/a' : strict.gapPp.toFixed(2)}pp against clean ones, ` +
     `on a clustered interval that ${strict.resolves ? 'excludes' : 'covers'} zero, and Youden's index is ` +
     `${j === null ? 'n/a' : j.toFixed(4)} against the memory filter's ${MEMORY_FILTER_YOUDEN.toFixed(4)}, which ` +
-    `the check ${clears ? 'clears' : 'does not clear'}.`
+    `the check ${clears ? 'clears' : 'does not clear'}. What cannot be seen in the flag rate is visible on ` +
+    `the questions the bare rule passes: of ${added.clean} of them the pack imports a name on ${added.flaggedAfter} ` +
+    `(${((added.share ?? 0) * 100).toFixed(1)}%), which is the imported-name finding under a second rule.`
   );
 }
 
@@ -182,12 +195,14 @@ await writeJson('poc-validity', {
   verdicts,
   statement: statementOf(),
   train: {
+    addedByPack: trainRead.added,
     bare: headline(trainSplit.bare),
     served: headline(trainSplit.served),
     bareLoose: headline(trainSplit.bareLoose),
     servedLoose: headline(trainSplit.servedLoose),
   },
   dev: {
+    addedByPack: devRead.added,
     bare: headline(devSplit.bare),
     served: headline(devSplit.served),
     bareLoose: headline(devSplit.bareLoose),
@@ -201,6 +216,10 @@ await writeJson('poc-validity', {
 });
 
 const text = (value: number | null, digits = 2): string => (value === null ? 'n/a' : value.toFixed(digits));
+process.stdout.write(
+  `[validity] of the ${trainRead.added.clean} questions the bare morphological rule passes, the pack's query ` +
+    `imports a name on ${trainRead.added.flaggedAfter} (${((trainRead.added.share ?? 0) * 100).toFixed(1)}%)\n`,
+);
 process.stdout.write(`[validity] ${statementOf()}\n`);
 for (const split of [
   ['train', trainSplit] as const,

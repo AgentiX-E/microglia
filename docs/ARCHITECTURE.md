@@ -726,6 +726,13 @@ morphological one beside it, because a rule chosen after seeing both is not a ru
 inflected identifiers cuts the flag rate to 75.8% and lifts J to 0.0700 — still under the bar. That
 column is what forecloses the obvious next move ("fix the tokeniser") without spending a round on it.
 
+*A saturated flag rate hides what a conditional one shows.* P6 asked whether the pack imports a name
+more often than the bare query, and on this corpus that question has no room to answer: 94.8% of bare
+attempts are already flagged. Asked on the questions the bare rule *passes*, it does answer — of 1,693
+clean questions the pack's query imports a name on 99 (**5.8%**), against 24 of 395 on dev (**6.1%**).
+That is §8.7's imported-name finding reproduced under a second rule, and it is the one positive result
+this stage produced: the phenomenon is real, and the standalone check is not.
+
 *A case with no query is excluded, and counted.* Ten of the 7,000 train rows carry no `baselineSql` at
 all. The predicate is undefined on the empty string, and treating those rows as unflagged would put ten
 known failures into the clean group and pull the gap toward zero. `excluded` travels with every reading;

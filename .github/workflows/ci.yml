@@ -523,6 +523,10 @@ jobs:
               ['P4, P5 and P6 are refuted', v('P4').holds === false && v('P5').holds === false && v('P6').holds === false],
               ['the statement quotes the flag rate, the gap and the bar', a.statement.includes('94.8%') && a.statement.includes('12.58pp') && a.statement.includes('0.1068')],
               ['and says the check does not clear it', a.statement.includes('does not clear')],
+              ['what the flag rate cannot show is visible on the questions it passes', t.addedByPack.clean === 1693 && t.addedByPack.flaggedAfter === 99],
+              ['the pack imports a name on 5.8% of the questions that were clean', Math.abs(t.addedByPack.share - 0.05847607796810396) < 1e-12],
+              ['and on 6.1% of devs, which is the same finding on the in-sample split', Math.abs(d.addedByPack.share - 0.060759493670886074) < 1e-12],
+              ['which the statement quotes', a.statement.includes('5.8%')],
             ];
             const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
             if (bad.length > 0) { console.error('validity failed: ' + bad.join(', ')); process.exit(1); }

@@ -310,13 +310,16 @@ and columns the question does not spell out. Within that hit set it still separa
 interval [−22.15, −2.92]), but that is a *question-phrasing* effect: the 5.2% it leaves alone are the
 questions that name their own tables, and those are easier questions. Youden's index says what the raw gap
 cannot: **0.0257**, against **0.1068** for the diff-anchored filter. Loosening the rule to accept inflected
-identifiers cuts the flag rate to 75.8% and lifts J only to 0.0700 — still under the bar. What the filter
-measures is the *difference* between two statements, so a deployment that wants it has to generate twice:
-once with the rules, once without, and compare. That is a real cost and it is the reason the product claim
-stops here rather than at "a cheaper filter".
+identifiers cuts the flag rate to 75.8% and lifts J only to 0.0700 — still under the bar. What the flag
+rate cannot show is visible on the questions it passes: of the **1,693** the bare rule leaves clean, the
+pack's query imports a name on **99 (5.8%)**, and on dev 24 of 395 (**6.1%**). That is the imported-name
+finding reproduced under a second, independent rule — the phenomenon is real; the standalone check is not.
+What the filter measures is the *difference* between two statements, so a deployment that wants it has to
+generate twice: once with the rules, once without, and compare. That is a real cost and it is the reason
+the product claim stops here rather than at "a cheaper filter".
 
 `pnpm eval:validity` recomputes the whole reading from the same two artefacts, and the workflow asserts
-eighteen numbers from it, including the flag rate under both rules and the Youden index against the bar
+twenty-two numbers from it, including the flag rate under both rules and the Youden index against the bar
 the registration fixed before the number existed (`prereg/R33.md`).
 
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:

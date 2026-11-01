@@ -11,6 +11,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   MEMORY_FILTER_YOUDEN,
+  addedByPackOf,
   adjudicateR33,
   flagOf,
   importedNamesOf,
@@ -353,5 +354,69 @@ describe('adjudicateR33', () => {
     expect(verdicts.find((verdict) => verdict.id === 'P4')?.holds).toBe(false);
     expect(verdicts.find((verdict) => verdict.id === 'P4')?.observed).toContain('n/a');
     expect(verdicts.find((verdict) => verdict.id === 'P6')?.holds).toBe(false);
+  });
+});
+
+describe('addedByPackOf', () => {
+  const bareOf = (id: string, dbId: string, correct: boolean): ValidityCase => clean(id, dbId, correct);
+  const servedOf = (id: string, dbId: string, correct: boolean, importing: boolean): ValidityCase =>
+    importing
+      ? { ...importingCase(id, dbId, correct) }
+      : clean(id, dbId, correct);
+
+  /** The `importing` fixture under another name, so the two helpers read apart. */
+  function importingCase(id: string, dbId: string, correct: boolean): ValidityCase {
+    return { id, dbId, question: 'how many races were there', evidence: '', sql: 'SELECT count(*) FROM race WHERE prize > 1', correct };
+  }
+
+  it('divides by the questions the bare query passed, not by the corpus', () => {
+    // Three of the four bare queries pass the rule; the pack spoils one of those three. The corpus
+    // rate would be 25%, and the number that answers "what did the pack add" is 33.3%.
+    const bare = [
+      bareOf('a', 'db', true),
+      bareOf('b', 'db', true),
+      bareOf('c', 'db', false),
+      importingCase('d', 'db', false),
+    ];
+    const served = [
+      servedOf('a', 'db', true, true),
+      servedOf('b', 'db', true, false),
+      servedOf('c', 'db', false, false),
+      servedOf('d', 'db', false, false),
+    ];
+    const added = addedByPackOf(bare, served);
+    expect(added.clean).toBe(3);
+    expect(added.flaggedAfter).toBe(1);
+    expect(added.share).toBeCloseTo(1 / 3, 10);
+  });
+
+  it('reports a null share when the bare rule already flags everything', () => {
+    const bare = [importingCase('a', 'db', false), importingCase('b', 'db', false)];
+    const added = addedByPackOf(bare, bare);
+    expect(added.clean).toBe(0);
+    expect(added.share).toBeNull();
+  });
+
+  it('ignores a served case whose query is missing rather than counting it as flag-free', () => {
+    // The partner exists but has no text: the rule cannot be asked, and counting it as not flagged
+    // would credit the pack with an import it was never shown to make.
+    const bare = [bareOf('a', 'db', true)];
+    const served = [{ ...bareOf('a', 'db', true), sql: '' }];
+    const added = addedByPackOf(bare, served);
+    expect(added.clean).toBe(1);
+    expect(added.flaggedAfter).toBe(0);
+  });
+
+  it('ignores a bare case with no query, because it was never clean', () => {
+    const bare = [{ ...bareOf('a', 'db', true), sql: '' }];
+    const added = addedByPackOf(bare, bare);
+    expect(added.clean).toBe(0);
+  });
+
+  it('matches on id rather than on position, so a reordered artefact changes nothing', () => {
+    const bare = [bareOf('a', 'db', true), bareOf('b', 'db', true)];
+    const forward = addedByPackOf(bare, [servedOf('a', 'db', true, true), servedOf('b', 'db', true, false)]);
+    const backward = addedByPackOf(bare, [servedOf('b', 'db', true, false), servedOf('a', 'db', true, true)]);
+    expect(forward).toEqual(backward);
   });
 });
