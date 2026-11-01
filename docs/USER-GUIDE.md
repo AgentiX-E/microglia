@@ -893,6 +893,17 @@ Be honest about the preconditions; the product is only useful inside them.
     `useless` dominates, the extraction is the bottleneck and no amount of retrieval work, injection
     timing or budget tuning will reach it.
 
+11. **A validity check needs a control query, because the rule is differential.** The one filter that
+    survived out of sample — discard a statement that imports a name the request never implied — is
+    defined on the *difference* between two statements. Pointed at a single query, the same rule flags
+    **94.8%** of 6,990 attempts: every table and column a correct query needs and the question does not
+    spell out. The gap it shows between flagged and clean attempts (−12.58pp) is a question-phrasing
+    effect, and Youden's index — which corrects for the base rate — falls from the filter's **0.1068** to
+    **0.0257**; loosening the rule to accept inflected identifiers lifts it only to 0.0700. Measured on
+    the 7,000 out-of-sample questions with no model call, by `pnpm eval:validity`; the registration is
+    `prereg/R33.md`. **So budget for a second generation without the pack if you want the check** — it is
+    a paired comparison, not a validator, and the comparison is the thing that costs.
+
 ## 13. Measuring your own generator
 
 The harness that produced every number in this repository is usable by someone else. Two files and

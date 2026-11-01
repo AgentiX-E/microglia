@@ -489,6 +489,47 @@ jobs:
               'pp, filter realises ' + (d.train.shareOfCeiling * 100).toFixed(1) + '% of a ' + d.train.ceilingPp.toFixed(2) + 'pp ceiling');
           "
 
+      # R33 stage 0: whether the filter survives being pointed at one query instead of at a
+      # difference. The assertions pin the finding the product decision rests on — the flag fires on
+      # almost everything and its Youden index is a quarter of the filter's — rather than only the
+      # arithmetic, because a tokeniser change that moved any of it would have to be argued for here.
+      - name: Validity without a baseline (recomputed, and all six registrations adjudicated)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/validity" pnpm eval:validity
+          diff -u eval/results/poc-validity.json "${RUNNER_TEMP}/validity/poc-validity.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/validity/poc-validity.json');
+            const v = (id) => a.verdicts.find((x) => x.id === id);
+            const g = Object.fromEntries(a.gates.map((x) => [x.id, x.pass]));
+            const t = a.train;
+            const d = a.dev;
+            const checks = [
+              ['the artefact names the registration it was written before', a.registered === 'prereg/R33.md'],
+              ['both corpora are the ones the earlier rounds paid for', a.datasets.dev === 'BIRD dev' && a.datasets.train === 'BIRD train (out-of-sample)'],
+              ['ten train rows carry no bare query and two carry no served one', t.bare.excluded === 10 && t.served.excluded === 2 && t.bare.n === 6990],
+              ['and none of those absences claims to be an answer', g['V53-validity-queries-present'] === true],
+              ['both rules were read on both arms of both splits', g['V54-validity-rules-reported'] === true],
+              ['the strict rule flags 94.8% of bare attempts', Math.abs(t.bare.flagged.share - 0.9476394849785408) < 1e-12],
+              ['so the clean group is 366 questions, 5.2% of the corpus', t.bare.clean.n === 366],
+              ['the flagged group is 12.58pp less accurate, on an interval that excludes zero', Math.abs(t.bare.gapPp + 12.579690346083794) < 1e-9 && t.bare.clustered.resolves === true],
+              ['it catches 96.3% of failures by flagging 94.8% of everything', Math.abs(t.bare.sensitivity - 0.962607204116638) < 1e-12 && Math.abs(t.bare.specificity - 0.06306748466257668) < 1e-12],
+              ['which is a Youden index of 0.0257 against the memory filters 0.1068', Math.abs(t.bare.youdenJ - 0.02567468877921475) < 1e-12],
+              ['the morphological rule fires less and separates no better', Math.abs(t.bareLoose.flagged.share - 0.7577968526466381) < 1e-12 && t.bareLoose.youdenJ < 0.1068],
+              ['a 20pp lower flag rate buys 0.044 of Youden, which is not the tokeniser story', Math.abs(t.bareLoose.youdenJ - 0.07003883025181779) < 1e-12],
+              ['dev separates more than train, by 9.1pp, so P4 fails on distance rather than sign', Math.abs(d.bare.gapPp + 21.695060145325755) < 1e-9 && d.bare.gapPp < 0],
+              ['the pack adds 0.42pp of flag rate, which is not measurable under a 94.8% ceiling', Math.abs(t.served.flagged.share - t.bare.flagged.share - 0.004203898845408949) < 1e-12],
+              ['P1, P2 and P3 hold', v('P1').holds === true && v('P2').holds === true && v('P3').holds === true],
+              ['P4, P5 and P6 are refuted', v('P4').holds === false && v('P5').holds === false && v('P6').holds === false],
+              ['the statement quotes the flag rate, the gap and the bar', a.statement.includes('94.8%') && a.statement.includes('12.58pp') && a.statement.includes('0.1068')],
+              ['and says the check does not clear it', a.statement.includes('does not clear')],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('validity failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('validity: ' + checks.length + ' checks pass, strict flags ' + (t.bare.flagged.share * 100).toFixed(1) +
+              '%, gap ' + t.bare.gapPp.toFixed(2) + 'pp, J ' + t.bare.youdenJ.toFixed(4) + ' against ' + 0.1068);
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

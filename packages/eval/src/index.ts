@@ -399,6 +399,20 @@ export {
 } from './referent.js';
 
 export {
+  MEMORY_FILTER_YOUDEN,
+  R33_BARS,
+  adjudicateR33,
+  flagOf,
+  importedNamesOf,
+  validityReadingOf,
+  type R33Verdict,
+  type ValidityArm,
+  type ValidityCase,
+  type ValidityReading,
+  type ValiditySplit,
+} from './validity.js';
+
+export {
   OUT_OF_SAMPLE_PREDICTIONS,
   adjudicateOutOfSample,
   clusteredDeltaOf,

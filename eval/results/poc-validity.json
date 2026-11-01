@@ -1,0 +1,313 @@
+{
+  "id": "poc-validity",
+  "title": "Whether the read-time filter survives without a baseline to anchor on",
+  "registered": "prereg/R33.md",
+  "sources": {
+    "dev": "eval/results/poc-sota-bird-dev-R26-channels.json",
+    "train": "eval/results/poc-sota-bird-train.json"
+  },
+  "datasets": {
+    "dev": "BIRD dev",
+    "train": "BIRD train (out-of-sample)"
+  },
+  "gates": [
+    {
+      "id": "V52-validity-loaded",
+      "pass": true,
+      "criterion": "both committed artefacts load and carry the registered 1,534 and 7,000 cases",
+      "actual": "1534 dev, 7000 train"
+    },
+    {
+      "id": "V53-validity-queries-present",
+      "pass": true,
+      "criterion": "no case is missing a query it claims to have answered — a missing bare query must come with a bare arm recorded wrong, and a missing served query with a parse failure",
+      "actual": "0 dev and 10 train bare, 0 dev and 2 train served, none of them recorded as answered"
+    },
+    {
+      "id": "V54-validity-rules-reported",
+      "pass": true,
+      "criterion": "both grounding rules are read on both arms of both splits, so the rule cannot be chosen after the fact",
+      "actual": "strict and morphological, on bare and served, on dev and train"
+    }
+  ],
+  "verdicts": [
+    {
+      "id": "P1",
+      "claim": "both corpora load at the registered sizes, and every missing query is one the run already records as a failure",
+      "observed": "7000 train (10 bare, 2 served), 1534 dev (0 bare, 0 served)",
+      "holds": true
+    },
+    {
+      "id": "P2",
+      "claim": "the strict rule flags at least 60.0% of bare attempts and the loose rule 40.0%",
+      "observed": "94.8% strict, 75.8% morphological",
+      "holds": true
+    },
+    {
+      "id": "P3",
+      "claim": "flagged bare attempts are at least 5pp less accurate, on an interval that excludes zero",
+      "observed": "-12.58pp [-22.15pp, -2.92pp], excludes zero",
+      "holds": true
+    },
+    {
+      "id": "P4",
+      "claim": "dev's gap has the same sign and is within 4pp of train's",
+      "observed": "-21.70pp against -12.58pp",
+      "holds": false
+    },
+    {
+      "id": "P5",
+      "claim": "the question-only check clears the memory filter's Youden of 0.1068 on both splits",
+      "observed": "0.0257 train, 0.0556 dev",
+      "holds": false
+    },
+    {
+      "id": "P6",
+      "claim": "the served query is flagged at least 5.0% more often than the bare one",
+      "observed": "0.42pp",
+      "holds": false
+    }
+  ],
+  "statement": "Pointed at one query instead of at a difference, the grounding rule flags 94.8% of 6990 bare attempts under the strict rule and 75.8% under the morphological one. Flagged attempts are -12.58pp against clean ones, on a clustered interval that excludes zero, and Youden's index is 0.0257 against the memory filter's 0.1068, which the check does not clear.",
+  "train": {
+    "bare": {
+      "rule": "strict",
+      "n": 6990,
+      "excluded": 10,
+      "databases": 58,
+      "accuracyPp": 58.29756795422032,
+      "flagged": {
+        "n": 6624,
+        "share": 0.9476394849785408,
+        "wrong": 2806,
+        "accuracyPp": 57.638888888888886
+      },
+      "clean": {
+        "n": 366,
+        "share": 0.05236051502145923,
+        "wrong": 109,
+        "accuracyPp": 70.21857923497268
+      },
+      "gapPp": -12.579690346083794,
+      "clustered": {
+        "lowPp": -22.152908473286615,
+        "highPp": -2.9166666666666563,
+        "resolves": true
+      },
+      "fisherP": 0.000001506150033840777,
+      "sensitivity": 0.962607204116638,
+      "specificity": 0.06306748466257668,
+      "youdenJ": 0.02567468877921475
+    },
+    "served": {
+      "rule": "strict",
+      "n": 6998,
+      "excluded": 2,
+      "databases": 58,
+      "accuracyPp": 57.51643326664762,
+      "flagged": {
+        "n": 6661,
+        "share": 0.9518433838239497,
+        "wrong": 2870,
+        "accuracyPp": 56.913376369914424
+      },
+      "clean": {
+        "n": 337,
+        "share": 0.0481566161760503,
+        "wrong": 103,
+        "accuracyPp": 69.43620178041543
+      },
+      "gapPp": -12.522825410501007,
+      "clustered": {
+        "lowPp": -20.949744880128605,
+        "highPp": -4.468518827433465,
+        "resolves": true
+      },
+      "fisherP": 0.0000044160734839077114,
+      "sensitivity": 0.9653548604103599,
+      "specificity": 0.05813664596273292,
+      "youdenJ": 0.02349150637309272
+    },
+    "bareLoose": {
+      "rule": "morphological",
+      "n": 6990,
+      "excluded": 10,
+      "databases": 58,
+      "accuracyPp": 58.29756795422032,
+      "flagged": {
+        "n": 5297,
+        "share": 0.7577968526466381,
+        "wrong": 2328,
+        "accuracyPp": 56.050594676231825
+      },
+      "clean": {
+        "n": 1693,
+        "share": 0.24220314735336196,
+        "wrong": 587,
+        "accuracyPp": 65.32782043709392
+      },
+      "gapPp": -9.277225760862095,
+      "clustered": {
+        "lowPp": -16.028792084245257,
+        "highPp": -1.7692834477537,
+        "resolves": true
+      },
+      "fisherP": 1.2492494669277487e-11,
+      "sensitivity": 0.7986277873070325,
+      "specificity": 0.2714110429447853,
+      "youdenJ": 0.07003883025181779
+    },
+    "servedLoose": {
+      "rule": "morphological",
+      "n": 6998,
+      "excluded": 2,
+      "databases": 58,
+      "accuracyPp": 57.51643326664762,
+      "flagged": {
+        "n": 5354,
+        "share": 0.7650757359245499,
+        "wrong": 2387,
+        "accuracyPp": 55.416511019798286
+      },
+      "clean": {
+        "n": 1644,
+        "share": 0.23492426407545014,
+        "wrong": 586,
+        "accuracyPp": 64.35523114355232
+      },
+      "gapPp": -8.938720123754031,
+      "clustered": {
+        "lowPp": -15.96669953182841,
+        "highPp": -1.6898583109034582,
+        "resolves": true
+      },
+      "fisherP": 1.3149939583469498e-10,
+      "sensitivity": 0.8028927009754456,
+      "specificity": 0.26285714285714284,
+      "youdenJ": 0.06574984383258853
+    }
+  },
+  "dev": {
+    "bare": {
+      "rule": "strict",
+      "n": 1534,
+      "excluded": 0,
+      "databases": 11,
+      "accuracyPp": 57.43155149934811,
+      "flagged": {
+        "n": 1431,
+        "share": 0.9328552803129074,
+        "wrong": 630,
+        "accuracyPp": 55.9748427672956
+      },
+      "clean": {
+        "n": 103,
+        "share": 0.06714471968709257,
+        "wrong": 23,
+        "accuracyPp": 77.66990291262135
+      },
+      "gapPp": -21.695060145325755,
+      "clustered": {
+        "lowPp": -31.027667984189723,
+        "highPp": -12.07502616255669,
+        "resolves": true
+      },
+      "fisherP": 0.000011673268499288212,
+      "sensitivity": 0.9647779479326187,
+      "specificity": 0.09080590238365494,
+      "youdenJ": 0.055583850316273775
+    },
+    "served": {
+      "rule": "strict",
+      "n": 1534,
+      "excluded": 0,
+      "databases": 11,
+      "accuracyPp": 57.75749674054759,
+      "flagged": {
+        "n": 1444,
+        "share": 0.9413298565840938,
+        "wrong": 629,
+        "accuracyPp": 56.4404432132964
+      },
+      "clean": {
+        "n": 90,
+        "share": 0.05867014341590613,
+        "wrong": 19,
+        "accuracyPp": 78.88888888888889
+      },
+      "gapPp": -22.448445675592488,
+      "clustered": {
+        "lowPp": -31.34386053074083,
+        "highPp": -13.678648507851454,
+        "resolves": true
+      },
+      "fisherP": 0.00002237977353222902,
+      "sensitivity": 0.970679012345679,
+      "specificity": 0.08013544018058691,
+      "youdenJ": 0.05081445252626593
+    },
+    "bareLoose": {
+      "rule": "morphological",
+      "n": 1534,
+      "excluded": 0,
+      "databases": 11,
+      "accuracyPp": 57.43155149934811,
+      "flagged": {
+        "n": 1139,
+        "share": 0.742503259452412,
+        "wrong": 540,
+        "accuracyPp": 52.589991220368745
+      },
+      "clean": {
+        "n": 395,
+        "share": 0.25749674054758803,
+        "wrong": 113,
+        "accuracyPp": 71.39240506329114
+      },
+      "gapPp": -18.80241384292239,
+      "clustered": {
+        "lowPp": -27.518703539928772,
+        "highPp": -9.390914086829094,
+        "resolves": true
+      },
+      "fisherP": 4.567358208150036e-11,
+      "sensitivity": 0.8269525267993875,
+      "specificity": 0.32009080590238365,
+      "youdenJ": 0.14704333270177106
+    },
+    "servedLoose": {
+      "rule": "morphological",
+      "n": 1534,
+      "excluded": 0,
+      "databases": 11,
+      "accuracyPp": 57.75749674054759,
+      "flagged": {
+        "n": 1156,
+        "share": 0.7535853976531942,
+        "wrong": 537,
+        "accuracyPp": 53.54671280276817
+      },
+      "clean": {
+        "n": 378,
+        "share": 0.24641460234680573,
+        "wrong": 111,
+        "accuracyPp": 70.63492063492063
+      },
+      "gapPp": -17.088207832152463,
+      "clustered": {
+        "lowPp": -25.161680746237636,
+        "highPp": -8.411830204528137,
+        "resolves": true
+      },
+      "fisherP": 3.6688940065794676e-9,
+      "sensitivity": 0.8287037037037037,
+      "specificity": 0.3013544018058691,
+      "youdenJ": 0.13005810550957286
+    }
+  },
+  "notes": [
+    "The anchor is the whole of the difference from the covariate §146 used. diffQueries reports what the second query adds to the first, so against an empty baseline it reports every name the query uses, and the grounding rule then decides which of those the question supports. A second implementation of \"is this name implied\" would differ from the first by exactly the thing under test.",
+    "The strict rule grounds an identifier only when the identifier or one of its whitespace-separated parts is a token of the question or the evidence. The morphological rule additionally accepts a prefix match on de-underscored forms, which is what recognises an inflected schema name. Both are reported on both arms of both splits; the registration named strict as primary before either number existed.",
+    "Nothing here is a model call. Both queries are columns in the artefacts the earlier rounds already paid for, which is why a question that decides a product could be asked for the price of a script."
+  ]
+}

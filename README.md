@@ -303,6 +303,22 @@ two committed artefacts, `pnpm eval:query-diff` and `pnpm eval:gate-stability` p
 workflow asserts 36 numbers from them on every push — including the two rates, the exchange rate between
 them, and what fraction of its own ceiling the filter realises.
 
+**And the filter is a differential instrument, not a validity check.** Point it at one query — anchor the
+same grounding rule on the question alone, with no baseline to subtract — and it degenerates. It flags
+**94.8%** of the 6,990 bare attempts that have a query, because a correct query necessarily names tables
+and columns the question does not spell out. Within that hit set it still separates (−12.58pp, clustered
+interval [−22.15, −2.92]), but that is a *question-phrasing* effect: the 5.2% it leaves alone are the
+questions that name their own tables, and those are easier questions. Youden's index says what the raw gap
+cannot: **0.0257**, against **0.1068** for the diff-anchored filter. Loosening the rule to accept inflected
+identifiers cuts the flag rate to 75.8% and lifts J only to 0.0700 — still under the bar. What the filter
+measures is the *difference* between two statements, so a deployment that wants it has to generate twice:
+once with the rules, once without, and compare. That is a real cost and it is the reason the product claim
+stops here rather than at "a cheaper filter".
+
+`pnpm eval:validity` recomputes the whole reading from the same two artefacts, and the workflow asserts
+eighteen numbers from it, including the flag rate under both rules and the Youden index against the bar
+the registration fixed before the number existed (`prereg/R33.md`).
+
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
 
 > A rule distilled from one correction repairs **22.6%** of the questions a bare retry cannot fix —

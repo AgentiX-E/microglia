@@ -682,3 +682,59 @@ and train share no database, so only the paired differences are the same quantit
 re-adjudicate a refuted prediction. P2 predicted the arm would be non-positive *and* not significantly
 different from the control. Out of sample it is −0.71pp with an interval that excludes zero, so P2 is
 reported as refuted, in the artefact, on every push, in the same table as the four that held.
+
+### 8.8 The filter is differential, and stage 0 is the corpus read a third way
+
+The read-time filter's public definition is one sentence — *discard a statement that imports a name the
+request never implied* — and every reading of it through §8.7 compared two statements: the served query
+and the bare one. That leaves a question the definition cannot answer on its own and a deployment has to
+answer: does the *query* carry the signal, or only the *difference*?
+
+R33 stage 0 answers it from the same two artefacts, because `per_case` stores both queries. The rule is
+not re-implemented — `diffQueries('', sql, …)` is the same tokeniser and the same two grounding modes
+with an empty baseline — so the only thing that differs from §8.7's covariate is the anchor.
+
+```text
+  per_case.baselineSql ─┐
+  per_case.predictedSql ┤→ diffQueries('', sql, question, evidence) → ungrounded{,-Loose}
+  per_case.question     ┤        │                                        │
+  per_case.evidence     ┘        │                                        ▼
+                                 │                     flagged / clean, and the outcome of each
+                                 │                                        │
+                                 ▼                                        ▼
+                        the same rule, both arms      validityReadingOf: accuracy per group, clustered
+                        of both splits               gap over databases, Fisher, sensitivity,
+                                                     specificity, Youden's J
+```
+
+**Four decisions, and each one is a way the reading could have lied.**
+
+*An empty baseline is the experiment.* Reporting the flag rate of the served query with the anchor still
+in place would have reproduced §8.7 and measured nothing new. What the empty anchor buys is the one number
+that decides the product: the rule fires on **94.8%** of bare attempts, because a correct query names
+tables and columns no question spells out. A check that flags almost everything is not a check.
+
+*The gap and Youden are different claims, and only one of them survives.* The flagged group is 12.58pp
+less accurate on a clustered interval that excludes zero — that part of the signal is real. But 94.8% of
+the corpus is in that group, and the 5.2% left out are the questions whose tables appear in their own text.
+That is a difficulty proxy, not a validity proxy, and Youden's index — `sensitivity + specificity − 1` —
+is the statistic that ignores the base rate. It reads **0.0257** here against **0.1068** for the anchored
+filter. A reading that reported the gap alone would have called the question-only check a success.
+
+*Both rules, before either number.* The registration named the strict rule as primary and required the
+morphological one beside it, because a rule chosen after seeing both is not a rule. Loosening it to accept
+inflected identifiers cuts the flag rate to 75.8% and lifts J to 0.0700 — still under the bar. That
+column is what forecloses the obvious next move ("fix the tokeniser") without spending a round on it.
+
+*A case with no query is excluded, and counted.* Ten of the 7,000 train rows carry no `baselineSql` at
+all. The predicate is undefined on the empty string, and treating those rows as unflagged would put ten
+known failures into the clean group and pull the gap toward zero. `excluded` travels with every reading;
+`prereg/R33.md` Amendment 1 records both treatments and what the choice costs, including that it is the
+difference between P3 holding and P3 failing.
+
+**What the stage concluded.** Shape 1 of R33 — ship the check alone — is refuted as specified, and the
+reason is structural rather than a tuning shortfall: the filter measures a *difference*, so any deployment
+that wants it has to generate twice and compare. Combined with §8.7's ceiling of 3.39pp and its realised
+15.2%, that closes the product question. The lane stays in CI because the negative is now a number: a
+tokeniser change that moved the flag rate or J would have to argue with a workflow that asserts eighteen
+of them.

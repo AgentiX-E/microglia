@@ -167,6 +167,18 @@ repaired ones would be worth, in percentage points of the corpus: 3.39pp out of 
 selector could reach over the generated candidates. The read-time filter realises 0.51pp of this one,
 15.2% of it.
 
+**Baseline anchor** — the second query a grounding rule is compared against. The read-time filter is
+defined on the *difference* between two statements: a name is imported when it appears in the served
+query and in neither the question nor the bare attempt. Remove the anchor and the rule stops measuring
+imports and starts measuring the schema vocabulary any correct query must use — it then flags 94.8% of
+bare attempts. Every finding about the filter in this record is a finding about the anchored version.
+
+**Youden's index (J)** — `sensitivity + specificity − 1`, the share of the corpus a binary rule sorts
+correctly beyond chance. It is reported instead of a raw accuracy gap because the gap moves with the
+flag rate: a rule that flags 95% of a corpus will show a gap between its two leftovers that says
+nothing about the rule. Out of sample the question-only check scores **0.0257** and the diff-anchored
+filter **0.1068**, which is the comparison that decided R33.
+
 **Mechanism study** — a controlled experiment that isolates whether feedback becomes transferable
 knowledge, holding the generator fixed. Not a benchmark result, and never quoted as one.
 

@@ -548,12 +548,18 @@ export function clusteredGap(
  * depend on object identity rather than on the split the caller made.
  */
 export function clusteredGapOf(
-  present: readonly DiffCase[],
-  absent: readonly DiffCase[],
+  present: readonly ScoredRow[],
+  absent: readonly ScoredRow[],
   resamples = 10_000,
   seed = 12345,
 ): { readonly lowPp: number; readonly highPp: number } | null {
   if (present.length === 0 || absent.length === 0) return null;
+  // One database resampled is the same database: every draw returns the same mean and the interval
+  // collapses onto the point estimate, which reads as a resolved effect. `clusteredDeltaOf` refuses
+  // that case and so must this one — the two are quoted side by side and must not disagree about
+  // when a corpus has no interval to give.
+  const clusters = new Set([...present, ...absent].map((entry) => entry.dbId));
+  if (clusters.size < 2) return null;
   const draw = (buckets: Map<string, number[]>, random: () => number): number => {
     const groups = [...buckets.values()];
     let total = 0;
@@ -583,8 +589,21 @@ export function clusteredGapOf(
   };
 }
 
+/**
+ * The three fields a clustered resample needs from an outcome.
+ *
+ * Structural rather than `DiffCase`, because a reading can hold outcomes whose queries were never
+ * diffed — a validity check scores one query against a question, not two against each other — and
+ * fabricating a `delta` to satisfy a type is how a reading ends up carrying a field it never read.
+ */
+export type ScoredRow = {
+  readonly dbId: string;
+  readonly correct: boolean;
+  readonly withoutMemoryCorrect: boolean;
+};
+
 /** Bucket one group's signed outcomes by database, which is the unit the resample draws. */
-function group(rows: readonly DiffCase[]): Map<string, number[]> {
+function group(rows: readonly ScoredRow[]): Map<string, number[]> {
   const buckets = new Map<string, number[]>();
   for (const entry of rows) {
     const bucket = buckets.get(entry.dbId) ?? [];
