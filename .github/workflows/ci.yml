@@ -321,6 +321,39 @@ jobs:
               'pp to ' + s.jackknifeMaxPp.toFixed(2) + 'pp, permutation p=' + s.permutation.p.toFixed(4));
           "
 
+      # R32 prediction 2: whether the second-closest feature is a second cause or the first one
+      # counted twice. The assertions pin the finding — two `inert` verdicts — rather than only the
+      # arithmetic, because the verdicts are what the registration asked for and a change in the
+      # tokeniser that moved them would have to be argued for here.
+      - name: Feature overlap (recomputed, and both verdicts asserted)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/overlap" pnpm eval:feature-overlap
+          diff -u eval/results/poc-feature-overlap.json "${RUNNER_TEMP}/overlap/poc-feature-overlap.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/overlap/poc-feature-overlap.json');
+            const v = Object.fromEntries(a.verdicts.map((x) => [x.pair, x]));
+            const p = Object.fromEntries(a.pairs.map((x) => [x.pair, x.reading]));
+            const checks = [
+              ['the corpus is the dev run', a.n === 1534],
+              ['two pairs, always', a.verdicts.length === 2 && a.verdicts.map((x) => x.pair).join(',') === 'F1/F4,F1/F5'],
+              ['F1 and F4 share 70 questions', p['F1/F4'].both === 70],
+              ['85 carry F1 alone and 7 carry F4 alone', p['F1/F4'].leftOnly === 85 && p['F1/F4'].rightOnly === 7],
+              ['the overlap is 45.2%, inside the 50% bar', Math.abs(v['F1/F4'].overlapShare - 0.452) < 0.001 && v['F1/F4'].criterionMet === true],
+              ['but F4 is worth exactly nothing outside F1', p['F1/F4'].rightOutsideLeft.deltaPp === 0],
+              ['so the table-set axis is inert, not a second cause', v['F1/F4'].kind === 'inert'],
+              ['F5 overlaps F1 by only 7.7%', Math.abs(v['F1/F5'].overlapShare - 0.0774) < 0.001],
+              ['and is worth -3.57pp on the 28 it adds', Math.abs(p['F1/F5'].rightOutsideLeft.deltaPp + 3.571) < 0.01],
+              ['which does not resolve, so it is inert too', p['F1/F5'].rightOutsideLeft.n === 28 && v['F1/F5'].kind === 'inert'],
+              ['the four cells partition the corpus', a.pairs.every((x) => x.reading.both + x.reading.leftOnly + x.reading.rightOnly + x.reading.neither === 1534)],
+              ['and the criterion quotes its own bar', p['F1/F4'].criterion.includes('50%')],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('overlap failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('overlap: ' + checks.length + ' checks pass, F1/F4 ' + (v['F1/F4'].overlapShare * 100).toFixed(1) +
+              '% overlap and ' + v['F1/F4'].kind + ', F1/F5 ' + (v['F1/F5'].overlapShare * 100).toFixed(1) + '% and ' + v['F1/F5'].kind);
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

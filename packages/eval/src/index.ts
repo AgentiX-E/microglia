@@ -378,6 +378,17 @@ export {
 } from './sql-diff.js';
 
 export {
+  diffCasesOf,
+  type CommittedRun,
+  type QueryCaseRecord,
+} from './diff-corpus.js';
+
+export {
+  featureOverlapOf,
+  type FeatureOverlap,
+} from './feature-overlap.js';
+
+export {
   cellOf,
   clusteredGap,
   clusteredGapOf,
