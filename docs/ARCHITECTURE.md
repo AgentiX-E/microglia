@@ -444,9 +444,13 @@ artefact and puts them on one page:
 
 Read the third line as the point of the table: **a record in which one comparison out of seventeen
 clears its own bar is a record that was measuring noise, not a record that found nothing.** The
-published product comparison survives it — 57.63% against a published cell's 53.52% on the same split
-is 3.2 unpaired standard errors — and the mechanism claim does not, which is a distinction the audit
-draws and this repository keeps.
+comparison with a published cell is a different shape and is not in this table, because two
+independent samples cannot be paired: our no-memory cell at 57.63% against a published 53.52% on the
+same split is 2.30 unpaired standard errors, which clears its 95% bar (3.51pp) and not its 80% bar
+(5.02pp). The arm that carries a memory pack is 56.26% on that same run, so the pack costs 1.37pp of
+execution accuracy against a resolution of 1.96pp — **the gap to the published baseline is the
+harness, and the feature is inside its own noise.** Both sentences are needed: the first is what this
+project can defend, the second is what it must not claim.
 
 `packages/eval/src/power.ts` is the only place either width is computed. A second formula would be a
 second answer to a question this project has already answered once, which is exactly how the 95%
