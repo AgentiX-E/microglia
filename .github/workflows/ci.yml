@@ -245,6 +245,82 @@ jobs:
               'pp over ' + f1.present.n + ' questions at p=' + f1.fisherP.toFixed(4));
           "
 
+      # R31: where the imported name came from, recomputed from the same committed run.
+      #
+      # The reading decides whether the product statement §140 licensed survives, so the assertions
+      # pin the withdrawal itself rather than only the arithmetic: if a later change to the tokeniser
+      # or the detector flipped the verdict, this step is where it would have to be argued for.
+      - name: Pack mediation (recomputed, and the withdrawal asserted)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/mediation" pnpm eval:mediation
+          diff -u eval/results/poc-pack-mediation.json "${RUNNER_TEMP}/mediation/poc-pack-mediation.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/mediation/poc-pack-mediation.json');
+            const p = a.primary;
+            const code = (c) => p.criteria.find((e) => e.code === c);
+            const bucket = (s) => p.strata.find((e) => e.source === s).cell.n;
+            const sum = p.contribution.pack + p.contribution.schema + p.contribution.unverifiable;
+            const checks = [
+              ['the corpus is the dev run', a.corpus.cases === 1534],
+              ['155 of them import an ungrounded name', p.importing === 155 && p.notImporting === 1379],
+              ['the pack names the identifier in 60 of them', bucket('pack') === 60],
+              ['and says nothing alike in 94', bucket('schema') === 94],
+              ['one statement never ran', bucket('unverifiable') === 1],
+              ['the two buckets are damaged equally', Math.abs(p.split.gapPp - 1.24) < 0.02],
+              ['so the mechanism does not clear its own half-width', p.split.resolves === false],
+              ['four criteria, always', p.criteria.map((c) => c.code).join(',') === 'M1,M2,M3,M4'],
+              ['availability holds at 38.7%', code('M1').ok === true],
+              ['and fails the generous detector', code('M2').ok === false],
+              ['the mechanism is not shown', code('M3').ok === false],
+              ['the pack carries a third of the gate, not half', code('M4').ok === false],
+              ['so the product statement is withdrawn', p.statementWithdrawn === true],
+              ['the gate it refuses is worth +0.98pp', Math.abs(p.contribution.total - 0.98) < 0.01],
+              ['of which a third comes from questions the pack named', Math.abs(p.contribution.pack - 0.33) < 0.01],
+              ['and 60% from questions it never named', Math.abs(p.contribution.schema - 0.59) < 0.01],
+              ['the parts add up to the whole', Math.abs(sum - p.contribution.total) < 1e-9],
+              ['285 names, 79 of them spelled out by a rule', p.byName.total === 285 && p.byName.exact === 79],
+              ['the generous detector is reported too', a.generous.detector === 'flattened' && a.generous.statementWithdrawn === true],
+              ['the pack text was read, not reconstructed', a.corpus.reconstructedPackText === 0 && a.corpus.withoutPackText === 0],
+              ['the vocabulary of unattributed names is not empty', a.unattributed.length > 0],
+              ['the synonym gap is reported as unmeasured', a.unmeasured.some((u) => u.category === 'synonym')],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('mediation failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('mediation: ' + checks.length + ' checks pass, pack supplies ' + (60 / 155 * 100).toFixed(1) +
+              '% of the flagged names, damage equal in both buckets (' + p.split.gapPp.toFixed(2) + 'pp +/- ' +
+              p.split.gapHalfWidthPp.toFixed(2) + ')');
+          "
+
+      # R31b: the gate's estimate taken apart three ways, recomputed from the same committed run.
+      - name: Gate stability (recomputed, and the estimate asserted)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/stability" pnpm eval:stability
+          diff -u eval/results/poc-gate-stability.json "${RUNNER_TEMP}/stability/poc-gate-stability.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/stability/poc-gate-stability.json');
+            const s = a.strict;
+            const checks = [
+              ['the corpus is the dev run', a.n === 1534],
+              ['the gate discards 155', s.discarded === 155],
+              ['and is worth +0.98pp', Math.abs(s.observedPp - 0.98) < 0.01],
+              ['eleven databases, one removed at a time', s.jackknife.length === 11],
+              ['no single database carries it', s.jackknifeMinPp > 0],
+              ['the placement beats random subsets', s.permutation.p < 0.001],
+              ['five thousand draws', s.permutation.resamples === 5000],
+              ['both halves keep the improvement', s.halves.length === 2 && s.halves.every((h) => h.improvementPp > 0)],
+              ['three readings, always', s.criteria.map((c) => c.code).join(',') === 'S1,S2,S3'],
+              ['all three pass', s.unstable === false],
+              ['the looser grounding rule discards fewer', a.loose.discarded === 114],
+              ['and the split-half limitation is stated', a.unmeasured.some((u) => u.category === 'out-of-sample')],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('stability failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('stability: ' + checks.length + ' checks pass, leave-one-out ' + s.jackknifeMinPp.toFixed(2) +
+              'pp to ' + s.jackknifeMaxPp.toFixed(2) + 'pp, permutation p=' + s.permutation.p.toFixed(4));
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

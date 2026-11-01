@@ -409,7 +409,7 @@
         "clusterLowPp": -0.6106870229007634,
         "clusterHighPp": 1.362984218077475
       },
-      "improvementPp": 0.9778357235984354,
+      "improvementPp": 0.9778357235984355,
       "p": 0.0494500652531745,
       "significant95": true,
       "resolvable": false
@@ -627,7 +627,7 @@
     {
       "category": "pruned-name",
       "registered": "a table or column the rule named that the schema had pruned",
-      "reason": "per_case stores schemaTables as counts (kept, total, pruned) and not as names",
+      "reason": "the committed record predates the name fields; per_case carries schemaTables as counts (kept, total, pruned) only",
       "nearest": "F4",
       "difference": "F4 measures a table added to the query, not a name the pruning removed from the schema"
     }

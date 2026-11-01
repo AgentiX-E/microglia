@@ -231,10 +231,35 @@ all three are flat). It is **an imported name**.
 
 The repair rate is the same in both groups (11.76% against 10.04%); only the damage differs, by a factor of
 7.8. `pnpm eval:query-diff` reproduces the table from `eval/results/poc-sota-bird-dev-R26-channels.json` and
-the workflow compares it byte for byte. It is an explanation, not a fix: the filter it licenses has not been
-shipped, because it was chosen on the same 1,534 questions that it improves and its benefit (+0.98pp, to
-+1.30pp) does not clear the sample's own 80%-power bar of 1.77pp. **Read it as the reason to scope your rules
-to what the request already names, which costs nothing and is in your control.**
+the workflow compares it byte for byte.
+
+**Where the name comes from decides what you can do about it, and the answer is not the one this section
+gave in its previous revision.** The pack's text is stored for every question, so the two candidates are
+separable: a rule said the column, or the model read the `CREATE TABLE` statements and picked a real column
+nobody had asked for.
+
+| Where the imported name came from | Questions | Δ vs no memory | Already-correct queries destroyed |
+|---|---|---|---|
+| the pack's own text names it | 60 (38.7%) | −8.33pp | 36.36% |
+| the pack does not, and the query executed | 94 (60.6%) | −9.57pp | 34.04% |
+| the pack does not, and the query never ran | 1 (0.6%) | — | — |
+
+The two buckets are damaged by the same amount — 1.24pp apart, against a 14.74pp interval — so **the harm is
+not a rule naming a column. It is the pack changing what the model writes, and the imported name is the
+symptom.** Scoping a rule's vocabulary to words the request already uses therefore does not reach it: in 61%
+of the damaged questions the rule named nothing at all, and the query still went looking for a column the
+question never mentioned. `pnpm eval:mediation` reproduces the table, and the workflow asserts the number
+that withdrew the previous claim.
+
+What survives is the check on the query rather than on the rule. A read-time filter that discards a generated
+statement naming something neither the question nor the pack mentions would have been worth **+0.98pp**
+(+0.33 → +1.30pp), and that estimate is stable: removing any one of the eleven databases leaves it between
++0.77 and +1.25pp, both halves of a database split gain (+0.76 and +1.22pp), and it sits outside a
+permutation null of random discards of the same size (p = 0.0002). It is still **not shipped**, for the reason
+that has not changed — it was chosen on these 1,534 questions, and its gated delta misses the sample's own
+80%-power bar of 1.77pp. **Read the whole section as the reason to verify the generated statement against the
+request before you execute it, which costs one comparison and is in your control** — and not as advice about
+how to word a rule, which is what it was until this measurement.
 
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
 

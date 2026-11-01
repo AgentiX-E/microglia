@@ -537,8 +537,36 @@ reports each split with its own half-width, its database-clustered interval, an 
 threshold; `gateReadingOf` prices the read-time filter that the split would license, without installing it.
 
 The mechanism it isolates is narrow and worth stating plainly, because it is the reason the pack costs points:
-**a rule that puts a schema name into the query which the question never mentioned destroys an already-correct
-answer about seven times as often as it helps one.** 35.71% of already-correct queries in that group were broken,
-against 4.56% in the rest of the corpus, and the repair rate was flat. The whole accounting, and the two reasons
-the filter is measured rather than shipped, are in `README.md` §"On a public benchmark, the prefix form is worth less than nothing" and in
-the docs repository's `PROGRESS.md` §140.
+**a query that imports a schema name the question never mentioned destroys an already-correct answer about seven
+times as often as it helps one.** 35.71% of already-correct queries in that group were broken, against 4.56% in
+the rest of the corpus, and the repair rate was flat. The whole accounting, and the two reasons the filter is
+measured rather than shipped, are in `README.md` §"On a public benchmark, the prefix form is worth less than
+nothing" and in the docs repository's `PROGRESS.md` §140.
+
+### 8.5 Where the imported name came from, and why the answer moved the claim
+
+An imported name came from somewhere, and the corpus already knows which: the lane stores the rendered text of
+every rule that reached the prompt, so a name is either in that text or it is not. `packages/eval/src/corpus.ts`
+is the one join from a committed artefact to the readings — it resolves the pack's text (`injected` first, the
+store second, and it says which), and `pack-mediation.ts` sorts each importing question into one of three
+buckets.
+
+```text
+[mediation] 1534 cases, 155 importing an ungrounded name
+[mediation] pack         n=  60 (38.7%)   3+/  8- delta=  -8.33pp destroyed= 36.36% base=36.7%
+[mediation] schema       n=  94 (60.6%)   7+/ 16- delta=  -9.57pp destroyed= 34.04% base=50.0%
+[mediation] unverifiable n=   1 (0.6%)   0+/  1- delta=-100.00pp destroyed=100.00% base=100.0%
+```
+
+The third bucket is not *invented*: a statement that failed to execute may have named a real column and failed
+on something else, and collapsing it into "the model made a name up" would attribute a cause the record does
+not carry. The bucket that matters is the second one, and it is 60% of the damage: the pack said nothing like
+the name, the query ran, and the model took a real column out of the DDL. **The pack's damage is a trajectory
+change, not a dictation of names**, which is why a filter on rules cannot reach most of it — and why the filter
+that can is the read-time check on the query.
+
+`gate-stability.ts` then asks how much of the filter's estimate is an artefact of the corpus: one database
+removed at a time, a permutation null of random discards of the same size, and a balanced split by database.
+All three pass (leave-one-out +0.77 to +1.25pp, p = 0.0002, halves +0.76 and +1.22pp), which is a statement
+about stability across sub-samples and not about a new sample — both halves were in the corpus the hypothesis
+came from, and the artefact says so rather than leaving a reader to assume it.

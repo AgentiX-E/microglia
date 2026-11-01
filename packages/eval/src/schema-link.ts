@@ -28,6 +28,17 @@ export type LinkedSchema = {
   readonly dropped: number;
   readonly total: number;
   /**
+   * The tables the pruner removed, in the order the DDL declared them.
+   *
+   * A count is enough to say whether the pruner fired; it is not enough to ask the question the
+   * registration asks — *did the pack name a table or column the schema had pruned?* That question
+   * needs the names, and a run that stored only `dropped` cannot be re-read to answer it, which is
+   * why the field exists before the question does.
+   */
+  readonly prunedTables: readonly string[];
+  /** Every column those tables declared: the names the prompt no longer offered the model. */
+  readonly prunedColumns: readonly string[];
+  /**
    * Why the result is what it is.
    *
    * `nothing-matched` and `all-matched` both return the full schema, and they mean opposite things:
@@ -152,7 +163,15 @@ function keyLike(column: string): boolean {
 export function linkSchema(ddl: string, question: string, evidence: string): LinkedSchema {
   const blocks = schemaBlocks(ddl);
   if (blocks.length <= 1) {
-    return { ddl, kept: blocks.map((block) => block.table), dropped: 0, total: blocks.length, reason: 'single-table' };
+    return {
+      ddl,
+      kept: blocks.map((block) => block.table),
+      dropped: 0,
+      total: blocks.length,
+      prunedTables: [],
+      prunedColumns: [],
+      reason: 'single-table',
+    };
   }
   const tokens = questionTokens(`${question} ${evidence}`);
   const kept = new Set<string>();
@@ -161,7 +180,15 @@ export function linkSchema(ddl: string, question: string, evidence: string): Lin
     if (anchor) kept.add(block.table);
   }
   if (kept.size === 0) {
-    return { ddl, kept: blocks.map((block) => block.table), dropped: 0, total: blocks.length, reason: 'nothing-matched' };
+    return {
+      ddl,
+      kept: blocks.map((block) => block.table),
+      dropped: 0,
+      total: blocks.length,
+      prunedTables: [],
+      prunedColumns: [],
+      reason: 'nothing-matched',
+    };
   }
   const byColumn = new Map<string, string[]>();
   for (const block of blocks) {
@@ -189,8 +216,17 @@ export function linkSchema(ddl: string, question: string, evidence: string): Lin
   // possible join and saves a line of prompt, which is not a trade worth making inside a
   // measurement: the arm exists to test schema linking, not the absence of it.
   if (kept.size === blocks.length || kept.size > Math.ceil((blocks.length * 2) / 3)) {
-    return { ddl, kept: [...kept], dropped: 0, total: blocks.length, reason: 'all-matched' };
+    return {
+      ddl,
+      kept: [...kept],
+      dropped: 0,
+      total: blocks.length,
+      prunedTables: [],
+      prunedColumns: [],
+      reason: 'all-matched',
+    };
   }
+  const removed = blocks.filter((block) => !kept.has(block.table));
   return {
     ddl: blocks
       .filter((block) => kept.has(block.table))
@@ -199,6 +235,8 @@ export function linkSchema(ddl: string, question: string, evidence: string): Lin
     kept: [...kept],
     dropped: blocks.length - kept.size,
     total: blocks.length,
+    prunedTables: removed.map((block) => block.table),
+    prunedColumns: removed.flatMap((block) => block.columns),
     reason: 'linked',
   };
 }

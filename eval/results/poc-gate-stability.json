@@ -1,0 +1,299 @@
+{
+  "id": "poc-gate-stability",
+  "title": "Whether the read-time gate’s +1.30pp is a property of the gate or of one database",
+  "source": "eval/results/poc-sota-bird-dev-R26-channels.json",
+  "sourceGeneratedAt": "2026-11-01T02:44:56.507Z",
+  "registered": "ROADMAP.md §R31-stability",
+  "n": 1534,
+  "strict": {
+    "mode": "strict",
+    "n": 1534,
+    "discarded": 155,
+    "observedPp": 0.9778357235984355,
+    "jackknife": [
+      {
+        "dropped": "california_schools",
+        "n": 1445,
+        "discarded": 139,
+        "improvementPp": 1.1764705882352942
+      },
+      {
+        "dropped": "card_games",
+        "n": 1343,
+        "discarded": 134,
+        "improvementPp": 0.967982129560685
+      },
+      {
+        "dropped": "codebase_community",
+        "n": 1348,
+        "discarded": 143,
+        "improvementPp": 0.8902077151335311
+      },
+      {
+        "dropped": "debit_card_specializing",
+        "n": 1470,
+        "discarded": 144,
+        "improvementPp": 1.0204081632653061
+      },
+      {
+        "dropped": "european_football_2",
+        "n": 1405,
+        "discarded": 144,
+        "improvementPp": 0.99644128113879
+      },
+      {
+        "dropped": "financial",
+        "n": 1428,
+        "discarded": 140,
+        "improvementPp": 0.7703081232492998
+      },
+      {
+        "dropped": "formula_1",
+        "n": 1360,
+        "discarded": 135,
+        "improvementPp": 1.25
+      },
+      {
+        "dropped": "student_club",
+        "n": 1376,
+        "discarded": 140,
+        "improvementPp": 0.872093023255814
+      },
+      {
+        "dropped": "superhero",
+        "n": 1405,
+        "discarded": 150,
+        "improvementPp": 0.99644128113879
+      },
+      {
+        "dropped": "thrombosis_prediction",
+        "n": 1371,
+        "discarded": 146,
+        "improvementPp": 0.9482129832239241
+      },
+      {
+        "dropped": "toxicology",
+        "n": 1389,
+        "discarded": 135,
+        "improvementPp": 0.8639308855291578
+      }
+    ],
+    "jackknifeMinPp": 0.7703081232492998,
+    "jackknifeMaxPp": 1.25,
+    "halves": [
+      {
+        "half": "A",
+        "databases": [
+          "card_games",
+          "thrombosis_prediction",
+          "student_club",
+          "superhero",
+          "california_schools",
+          "debit_card_specializing"
+        ],
+        "n": 794,
+        "discarded": 77,
+        "gatedDeltaPp": 1.5113350125944585,
+        "improvementPp": 0.7556675062972292,
+        "minDetectablePp": 2.444940233152642
+      },
+      {
+        "half": "B",
+        "databases": [
+          "codebase_community",
+          "formula_1",
+          "toxicology",
+          "european_football_2",
+          "financial"
+        ],
+        "n": 740,
+        "discarded": 78,
+        "gatedDeltaPp": 1.0810810810810811,
+        "improvementPp": 1.2162162162162162,
+        "minDetectablePp": 2.5681200827995947
+      }
+    ],
+    "permutation": {
+      "resamples": 5000,
+      "observedPp": 0.9778357235984355,
+      "nullMeanPp": -0.03571056062581667,
+      "nullLowPp": -0.45632333767926986,
+      "nullHighPp": 0.3911342894393742,
+      "p": 0.0001999600079984003
+    },
+    "criteria": [
+      {
+        "code": "S1",
+        "criterion": "No single database carries the estimate: the improvement stays above zero with each one removed",
+        "actual": "leave-one-out 0.77pp to 1.25pp over 11 databases",
+        "ok": true
+      },
+      {
+        "code": "S2",
+        "criterion": "The placement matters: the observed improvement beats random subsets of its own size at p < 0.05",
+        "actual": "0.98pp against a null of -0.04pp [-0.46, 0.39], p=0.0002",
+        "ok": true
+      },
+      {
+        "code": "S3",
+        "criterion": "Both halves of the database split keep an improvement above 0.0pp",
+        "actual": "A 0.76pp (n=794, 77 discarded); B 1.22pp (n=740, 78 discarded)",
+        "ok": true
+      }
+    ],
+    "unstable": false
+  },
+  "loose": {
+    "mode": "morphological",
+    "n": 1534,
+    "discarded": 114,
+    "observedPp": 0.7170795306388527,
+    "jackknife": [
+      {
+        "dropped": "california_schools",
+        "n": 1445,
+        "discarded": 98,
+        "improvementPp": 0.8996539792387545
+      },
+      {
+        "dropped": "card_games",
+        "n": 1343,
+        "discarded": 101,
+        "improvementPp": 0.7446016381236039
+      },
+      {
+        "dropped": "codebase_community",
+        "n": 1348,
+        "discarded": 105,
+        "improvementPp": 0.6676557863501483
+      },
+      {
+        "dropped": "debit_card_specializing",
+        "n": 1470,
+        "discarded": 103,
+        "improvementPp": 0.7482993197278911
+      },
+      {
+        "dropped": "european_football_2",
+        "n": 1405,
+        "discarded": 109,
+        "improvementPp": 0.7829181494661922
+      },
+      {
+        "dropped": "financial",
+        "n": 1428,
+        "discarded": 100,
+        "improvementPp": 0.49019607843137253
+      },
+      {
+        "dropped": "formula_1",
+        "n": 1360,
+        "discarded": 97,
+        "improvementPp": 0.8088235294117648
+      },
+      {
+        "dropped": "student_club",
+        "n": 1376,
+        "discarded": 105,
+        "improvementPp": 0.5813953488372093
+      },
+      {
+        "dropped": "superhero",
+        "n": 1405,
+        "discarded": 111,
+        "improvementPp": 0.7829181494661922
+      },
+      {
+        "dropped": "thrombosis_prediction",
+        "n": 1371,
+        "discarded": 111,
+        "improvementPp": 0.6564551422319475
+      },
+      {
+        "dropped": "toxicology",
+        "n": 1389,
+        "discarded": 100,
+        "improvementPp": 0.7199424046076314
+      }
+    ],
+    "jackknifeMinPp": 0.49019607843137253,
+    "jackknifeMaxPp": 0.8996539792387545,
+    "halves": [
+      {
+        "half": "A",
+        "databases": [
+          "card_games",
+          "thrombosis_prediction",
+          "student_club",
+          "superhero",
+          "california_schools",
+          "debit_card_specializing"
+        ],
+        "n": 794,
+        "discarded": 55,
+        "gatedDeltaPp": 1.2594458438287155,
+        "improvementPp": 0.5037783375314862,
+        "minDetectablePp": 2.5932507276870775
+      },
+      {
+        "half": "B",
+        "databases": [
+          "codebase_community",
+          "formula_1",
+          "toxicology",
+          "european_football_2",
+          "financial"
+        ],
+        "n": 740,
+        "discarded": 59,
+        "gatedDeltaPp": 0.8108108108108109,
+        "improvementPp": 0.945945945945946,
+        "minDetectablePp": 2.730474236175702
+      }
+    ],
+    "permutation": {
+      "resamples": 5000,
+      "observedPp": 0.7170795306388527,
+      "nullMeanPp": -0.022372881355931365,
+      "nullLowPp": -0.3911342894393742,
+      "nullHighPp": 0.3911342894393742,
+      "p": 0.0003999200159968006
+    },
+    "criteria": [
+      {
+        "code": "S1",
+        "criterion": "No single database carries the estimate: the improvement stays above zero with each one removed",
+        "actual": "leave-one-out 0.49pp to 0.90pp over 11 databases",
+        "ok": true
+      },
+      {
+        "code": "S2",
+        "criterion": "The placement matters: the observed improvement beats random subsets of its own size at p < 0.05",
+        "actual": "0.72pp against a null of -0.02pp [-0.39, 0.39], p=0.0004",
+        "ok": true
+      },
+      {
+        "code": "S3",
+        "criterion": "Both halves of the database split keep an improvement above 0.0pp",
+        "actual": "A 0.50pp (n=794, 55 discarded); B 0.95pp (n=740, 59 discarded)",
+        "ok": true
+      }
+    ],
+    "unstable": false
+  },
+  "unmeasured": [
+    {
+      "category": "out-of-sample",
+      "registered": "the estimate on questions the hypothesis was not formed on",
+      "reason": "every question here was in the corpus that produced §140, so no split of it is out of sample",
+      "nearest": "S3 (the two halves)",
+      "difference": "S3 says the estimate is stable across sub-samples; it cannot say it reproduces on a new one"
+    }
+  ],
+  "notes": [
+    "Leave-one-database-out is the clustering check. Questions within a database are not independent — a rule injected on one is injected on its neighbours — so an estimate carried by a single database would not reproduce at a different mixture, and stage 2 draws a different mixture by construction.",
+    "The permutation test redraws which questions the gate discards, keeping the number discarded fixed. It asks whether the gate finds damaged questions or merely pays the variance of dropping ten percent of the corpus. Sampling is without replacement: with replacement the null would describe a smaller subset than the gate discards, and a wider null flatters the gate.",
+    "The halves are balanced greedily by question count rather than split by hash, because dev has eleven databases of very different sizes and an arbitrary partition can leave one half too small to resolve anything.",
+    "Every number here comes from a closed form over the recorded outcomes: the gated arm reads the no-pack query that already exists for every discarded question. Nothing is resampled except the permutation null and the two bootstrap intervals."
+  ]
+}

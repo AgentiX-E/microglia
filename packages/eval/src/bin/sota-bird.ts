@@ -716,7 +716,15 @@ type CaseOutcome = {
    * second group had a byte-identical prompt. Without this field a 7.4pp loss cannot be attributed
    * to pruning rather than to the run.
    */
-  readonly schemaTables: { readonly kept: number; readonly total: number; readonly pruned: boolean } | null;
+  readonly schemaTables: {
+    readonly kept: number;
+    readonly total: number;
+    readonly pruned: boolean;
+    /** Names rather than counts, so the registration's third category is answerable. */
+    readonly keptNames?: readonly string[];
+    readonly prunedTables?: readonly string[];
+    readonly prunedColumns?: readonly string[];
+  } | null;
   /** Optional arms, present only when configured. */
   readonly arms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
   readonly shadowArms: Partial<Record<Exclude<ArmName, 'none' | 'full'>, boolean>>;
@@ -3466,7 +3474,17 @@ async function runFold(
   /** What the lexical linker decided, per question: a pruner that never prunes measures nothing. */
   const linkReasons: Record<string, number> = {};
   /** Tables kept and offered, per question, so the arm's harm can be split by whether it pruned. */
-  const linkKept = new Map<number, { readonly kept: number; readonly total: number; readonly pruned: boolean }>();
+  const linkKept = new Map<
+    number,
+    {
+      readonly kept: number;
+      readonly total: number;
+      readonly pruned: boolean;
+      readonly keptNames: readonly string[];
+      readonly prunedTables: readonly string[];
+      readonly prunedColumns: readonly string[];
+    }
+  >();
   let linkDropped = 0;
   let linkTotal = 0;
   /** Questions where the pruned store produced a different pack from the unpruned one. */
@@ -4080,6 +4098,11 @@ async function runFold(
         kept: linked.kept.length,
         total: linked.total,
         pruned: linked.reason === 'linked',
+        // The names, so a later reading can ask whether the pack named something the pruner removed.
+        // Three counts cannot answer that, and the commit that records them cannot be re-run.
+        keptNames: linked.kept,
+        prunedTables: linked.prunedTables,
+        prunedColumns: linked.prunedColumns,
       });
       noteChannel('linked', 'linked', linked.reason === 'linked');
       call(position, 'linked', '', 0, false, 'before', linked.ddl);

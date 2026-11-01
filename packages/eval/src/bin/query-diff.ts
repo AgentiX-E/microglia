@@ -269,18 +269,20 @@ await writeJson('poc-query-diff', {
    * The registered third category, and why it is absent rather than approximated.
    *
    * `ROADMAP.md` §R30 asks for "a table or column the rule named that the schema had pruned". The
-   * committed record stores the schema candidate as `schemaTables: { kept, total, pruned }` — three
-   * numbers — and the pruned names are not among them, so the category cannot be evaluated here.
-   * F4 is adjacent and is not the same question: it says a *table was added*, not that the pack
-   * named one the pruning removed. Substituting it would answer a different question under the same
-   * name, which is the defect this project has spent a round removing elsewhere. The fix is one
-   * field in stage 2's `per_case`; until that field exists, the category is reported as unmeasured.
+   * record this file re-reads stores the schema candidate as `schemaTables: { kept, total, pruned }`
+   * — three numbers — so the category cannot be evaluated on it. F4 is adjacent and is not the same
+   * question: it says a *table was added*, not that the pack named one the pruning removed.
+   * Substituting it would answer a different question under the same name, which is the defect this
+   * project has spent a round removing elsewhere. The lane now writes `keptNames`, `prunedTables`
+   * and `prunedColumns` beside the counts (R30 stage 1b), so the category becomes readable on the
+   * next dispatch — this record predates the field, and a reading cannot borrow it retroactively.
    */
   unmeasured: [
     {
       category: 'pruned-name',
       registered: 'a table or column the rule named that the schema had pruned',
-      reason: 'per_case stores schemaTables as counts (kept, total, pruned) and not as names',
+      reason:
+        'the committed record predates the name fields; per_case carries schemaTables as counts (kept, total, pruned) only',
       nearest: 'F4',
       difference: 'F4 measures a table added to the query, not a name the pruning removed from the schema',
     },

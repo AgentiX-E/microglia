@@ -1,0 +1,494 @@
+{
+  "id": "poc-pack-mediation",
+  "title": "Where the imported name came from: the pack, the schema, or a statement that never ran",
+  "source": "eval/results/poc-sota-bird-dev-R26-channels.json",
+  "sourceGeneratedAt": "2026-11-01T02:44:56.507Z",
+  "registered": "ROADMAP.md §R31-precondition",
+  "corpus": {
+    "cases": 1534,
+    "importing": 155,
+    "notImporting": 1379,
+    "reconstructedPackText": 0,
+    "withoutPackText": 0
+  },
+  "primary": {
+    "corpus": 1534,
+    "importing": 155,
+    "notImporting": 1379,
+    "detector": "exact",
+    "strata": [
+      {
+        "source": "pack",
+        "cell": {
+          "n": 60,
+          "helped": 3,
+          "harmed": 8,
+          "deltaPp": -8.333333333333332,
+          "halfWidthPp": 10.834307648494306,
+          "minDetectablePp": 15.488637770959718,
+          "baselineCorrect": 22,
+          "baselineAccuracy": 0.36666666666666664,
+          "harmedPerCorrectPp": 36.36363636363637,
+          "helpedPerWrongPp": 7.894736842105263,
+          "clusterLowPp": -24.489795918367346,
+          "clusterHighPp": 5.714285714285714
+        },
+        "share": 0.3870967741935484
+      },
+      {
+        "source": "schema",
+        "cell": {
+          "n": 94,
+          "helped": 7,
+          "harmed": 16,
+          "deltaPp": -9.574468085106384,
+          "halfWidthPp": 9.999818920949926,
+          "minDetectablePp": 14.29565949821515,
+          "baselineCorrect": 47,
+          "baselineAccuracy": 0.5,
+          "harmedPerCorrectPp": 34.04255319148936,
+          "helpedPerWrongPp": 14.893617021276595,
+          "clusterLowPp": -18.27956989247312,
+          "clusterHighPp": 1.3157894736842104
+        },
+        "share": 0.6064516129032258
+      },
+      {
+        "source": "unverifiable",
+        "cell": {
+          "n": 1,
+          "helped": 0,
+          "harmed": 1,
+          "deltaPp": -100,
+          "halfWidthPp": 196,
+          "minDetectablePp": 280.2,
+          "baselineCorrect": 1,
+          "baselineAccuracy": 1,
+          "harmedPerCorrectPp": 100,
+          "helpedPerWrongPp": null,
+          "clusterLowPp": -100,
+          "clusterHighPp": -100
+        },
+        "share": 0.0064516129032258064
+      }
+    ],
+    "split": {
+      "code": "M3",
+      "feature": "the pack names the identifier the query imported, against the query importing one the pack never named",
+      "present": {
+        "n": 60,
+        "helped": 3,
+        "harmed": 8,
+        "deltaPp": -8.333333333333332,
+        "halfWidthPp": 10.834307648494306,
+        "minDetectablePp": 15.488637770959718,
+        "baselineCorrect": 22,
+        "baselineAccuracy": 0.36666666666666664,
+        "harmedPerCorrectPp": 36.36363636363637,
+        "helpedPerWrongPp": 7.894736842105263,
+        "clusterLowPp": -24.489795918367346,
+        "clusterHighPp": 5.714285714285714
+      },
+      "absent": {
+        "n": 94,
+        "helped": 7,
+        "harmed": 16,
+        "deltaPp": -9.574468085106384,
+        "halfWidthPp": 9.999818920949926,
+        "minDetectablePp": 14.29565949821515,
+        "baselineCorrect": 47,
+        "baselineAccuracy": 0.5,
+        "harmedPerCorrectPp": 34.04255319148936,
+        "helpedPerWrongPp": 14.893617021276595,
+        "clusterLowPp": -18.27956989247312,
+        "clusterHighPp": 1.3157894736842104
+      },
+      "gapPp": 1.2411347517730515,
+      "gapHalfWidthPp": 14.743764806656756,
+      "fisherP": 0.9999999999999764,
+      "clusterLowPp": -18.48644578313253,
+      "clusterHighPp": 17.828354670459934,
+      "resolves": false
+    },
+    "byName": {
+      "total": 285,
+      "exact": 79,
+      "flattened": 101
+    },
+    "contribution": {
+      "pack": 0.3259452411994785,
+      "schema": 0.5867014341590613,
+      "unverifiable": 0.0651890482398957,
+      "total": 0.9778357235984355
+    },
+    "criteria": [
+      {
+        "code": "M1",
+        "criterion": "The pack's text supplies the name in at least 30% of the flagged questions (exact detector)",
+        "actual": "60 of 155 (38.7%)",
+        "ok": true
+      },
+      {
+        "code": "M2",
+        "criterion": "It supplies it in at least 60% once spelling is forgiven, so M1 is not a verdict about punctuation",
+        "actual": "52.3% under the flattened detector; 79 of 285 names",
+        "ok": false
+      },
+      {
+        "code": "M3",
+        "criterion": "The pack-named bucket is damaged more than the schema bucket, and the difference clears its own half-width",
+        "actual": "destroyed 36.36% vs 34.04%; delta -8.33pp vs -9.57pp, gap 1.24pp ±14.74",
+        "ok": false
+      },
+      {
+        "code": "M4",
+        "criterion": "The pack-named bucket carries at least half of what the gate buys, so the same filter running before generation would collect it",
+        "actual": "0.33pp of 0.98pp (33.3%)",
+        "ok": false
+      }
+    ],
+    "statementWithdrawn": true
+  },
+  "generous": {
+    "corpus": 1534,
+    "importing": 155,
+    "notImporting": 1379,
+    "detector": "flattened",
+    "strata": [
+      {
+        "source": "pack",
+        "cell": {
+          "n": 81,
+          "helped": 4,
+          "harmed": 9,
+          "deltaPp": -6.172839506172839,
+          "halfWidthPp": 8.724543827048667,
+          "minDetectablePp": 12.472536634382836,
+          "baselineCorrect": 36,
+          "baselineAccuracy": 0.4444444444444444,
+          "harmedPerCorrectPp": 25,
+          "helpedPerWrongPp": 8.88888888888889,
+          "clusterLowPp": -16.3265306122449,
+          "clusterHighPp": 4.878048780487805
+        },
+        "share": 0.5225806451612903
+      },
+      {
+        "source": "schema",
+        "cell": {
+          "n": 73,
+          "helped": 6,
+          "harmed": 15,
+          "deltaPp": -12.32876712328767,
+          "halfWidthPp": 12.30390186590883,
+          "minDetectablePp": 17.58955766748803,
+          "baselineCorrect": 33,
+          "baselineAccuracy": 0.4520547945205479,
+          "harmedPerCorrectPp": 45.45454545454545,
+          "helpedPerWrongPp": 15,
+          "clusterLowPp": -22.61904761904762,
+          "clusterHighPp": 1.3888888888888888
+        },
+        "share": 0.47096774193548385
+      },
+      {
+        "source": "unverifiable",
+        "cell": {
+          "n": 1,
+          "helped": 0,
+          "harmed": 1,
+          "deltaPp": -100,
+          "halfWidthPp": 196,
+          "minDetectablePp": 280.2,
+          "baselineCorrect": 1,
+          "baselineAccuracy": 1,
+          "harmedPerCorrectPp": 100,
+          "helpedPerWrongPp": null,
+          "clusterLowPp": -100,
+          "clusterHighPp": -100
+        },
+        "share": 0.0064516129032258064
+      }
+    ],
+    "split": {
+      "code": "M3",
+      "feature": "the pack names the identifier the query imported, against the query importing one the pack never named",
+      "present": {
+        "n": 81,
+        "helped": 4,
+        "harmed": 9,
+        "deltaPp": -6.172839506172839,
+        "halfWidthPp": 8.724543827048667,
+        "minDetectablePp": 12.472536634382836,
+        "baselineCorrect": 36,
+        "baselineAccuracy": 0.4444444444444444,
+        "harmedPerCorrectPp": 25,
+        "helpedPerWrongPp": 8.88888888888889,
+        "clusterLowPp": -16.3265306122449,
+        "clusterHighPp": 4.878048780487805
+      },
+      "absent": {
+        "n": 73,
+        "helped": 6,
+        "harmed": 15,
+        "deltaPp": -12.32876712328767,
+        "halfWidthPp": 12.30390186590883,
+        "minDetectablePp": 17.58955766748803,
+        "baselineCorrect": 33,
+        "baselineAccuracy": 0.4520547945205479,
+        "harmedPerCorrectPp": 45.45454545454545,
+        "helpedPerWrongPp": 15,
+        "clusterLowPp": -22.61904761904762,
+        "clusterHighPp": 1.3888888888888888
+      },
+      "gapPp": 6.155927617114831,
+      "gapHalfWidthPp": 15.083224659071009,
+      "fisherP": 0.9999999999999747,
+      "clusterLowPp": -10.990247561890474,
+      "clusterHighPp": 21.428571428571427,
+      "resolves": false
+    },
+    "byName": {
+      "total": 285,
+      "exact": 79,
+      "flattened": 101
+    },
+    "contribution": {
+      "pack": 0.3259452411994785,
+      "schema": 0.5867014341590613,
+      "unverifiable": 0.0651890482398957,
+      "total": 0.9778357235984355
+    },
+    "criteria": [
+      {
+        "code": "M1",
+        "criterion": "The pack's text supplies the name in at least 30% of the flagged questions (exact detector)",
+        "actual": "81 of 155 (52.3%)",
+        "ok": true
+      },
+      {
+        "code": "M2",
+        "criterion": "It supplies it in at least 60% once spelling is forgiven, so M1 is not a verdict about punctuation",
+        "actual": "52.3% under the flattened detector; 79 of 285 names",
+        "ok": false
+      },
+      {
+        "code": "M3",
+        "criterion": "The pack-named bucket is damaged more than the schema bucket, and the difference clears its own half-width",
+        "actual": "destroyed 25.00% vs 45.45%; delta -6.17pp vs -12.33pp, gap 6.16pp ±15.08",
+        "ok": false
+      },
+      {
+        "code": "M4",
+        "criterion": "The pack-named bucket carries at least half of what the gate buys, so the same filter running before generation would collect it",
+        "actual": "0.33pp of 0.98pp (33.3%)",
+        "ok": false
+      }
+    ],
+    "statementWithdrawn": true
+  },
+  "unattributed": [
+    {
+      "name": "id",
+      "count": 15,
+      "databases": [
+        "card_games",
+        "codebase_community",
+        "european_football_2",
+        "superhero",
+        "thrombosis_prediction"
+      ]
+    },
+    {
+      "name": "m",
+      "count": 5,
+      "databases": [
+        "european_football_2"
+      ]
+    },
+    {
+      "name": "amount",
+      "count": 4,
+      "databases": [
+        "debit_card_specializing",
+        "financial"
+      ]
+    },
+    {
+      "name": "atom_id",
+      "count": 4,
+      "databases": [
+        "toxicology"
+      ]
+    },
+    {
+      "name": "account_id",
+      "count": 3,
+      "databases": [
+        "financial"
+      ]
+    },
+    {
+      "name": "balance",
+      "count": 3,
+      "databases": [
+        "financial"
+      ]
+    },
+    {
+      "name": "link_to_event",
+      "count": 3,
+      "databases": [
+        "student_club"
+      ]
+    },
+    {
+      "name": "member_id",
+      "count": 3,
+      "databases": [
+        "student_club"
+      ]
+    },
+    {
+      "name": "molecule_id",
+      "count": 3,
+      "databases": [
+        "toxicology"
+      ]
+    },
+    {
+      "name": "patient",
+      "count": 3,
+      "databases": [
+        "thrombosis_prediction"
+      ]
+    },
+    {
+      "name": "a3",
+      "count": 2,
+      "databases": [
+        "financial"
+      ]
+    },
+    {
+      "name": "bank",
+      "count": 2,
+      "databases": [
+        "financial"
+      ]
+    },
+    {
+      "name": "event",
+      "count": 2,
+      "databases": [
+        "student_club"
+      ]
+    },
+    {
+      "name": "high grade",
+      "count": 2,
+      "databases": [
+        "california_schools"
+      ]
+    },
+    {
+      "name": "home_player_10",
+      "count": 2,
+      "databases": [
+        "european_football_2"
+      ]
+    },
+    {
+      "name": "home_player_11",
+      "count": 2,
+      "databases": [
+        "european_football_2"
+      ]
+    },
+    {
+      "name": "home_player_2",
+      "count": 2,
+      "databases": [
+        "european_football_2"
+      ]
+    },
+    {
+      "name": "home_player_3",
+      "count": 2,
+      "databases": [
+        "european_football_2"
+      ]
+    },
+    {
+      "name": "home_player_4",
+      "count": 2,
+      "databases": [
+        "european_football_2"
+      ]
+    },
+    {
+      "name": "home_player_5",
+      "count": 2,
+      "databases": [
+        "european_football_2"
+      ]
+    },
+    {
+      "name": "home_player_6",
+      "count": 2,
+      "databases": [
+        "european_football_2"
+      ]
+    },
+    {
+      "name": "home_player_7",
+      "count": 2,
+      "databases": [
+        "european_football_2"
+      ]
+    },
+    {
+      "name": "home_player_8",
+      "count": 2,
+      "databases": [
+        "european_football_2"
+      ]
+    },
+    {
+      "name": "home_player_9",
+      "count": 2,
+      "databases": [
+        "european_football_2"
+      ]
+    },
+    {
+      "name": "income_id",
+      "count": 2,
+      "databases": [
+        "student_club"
+      ]
+    }
+  ],
+  "unmeasured": [
+    {
+      "category": "synonym",
+      "registered": "a rule that names the concept without naming the column",
+      "reason": "the record stores the pack text and the query, not the model’s reading of either",
+      "nearest": "M4 (flattened detector)",
+      "difference": "M4 forgives spelling and punctuation; \"county\" against `County Name` is a synonym, not a spelling"
+    },
+    {
+      "category": "pruned-name",
+      "registered": "a table or column the rule named that the schema had pruned",
+      "reason": "per_case stores schemaTables as counts; the lane now records the names (R30 stage 1b), and the committed record predates it",
+      "nearest": "M2 (the schema bucket)",
+      "difference": "M2 says the query named a real column the question did not; it does not say whether that column reached the prompt"
+    }
+  ],
+  "notes": [
+    "The three buckets are exhaustive by construction: a question whose query imported a name is attributed to the pack when the pack text carries the name, to the schema when it does not and the query executed, and to unverifiable otherwise. \"Executed\" is what licenses calling the name real — a statement that ran cannot have named a column the table does not have — and a statement that failed does not license the opposite, which is why the third bucket is not called invented.",
+    "M1 and M2 are the mechanism test and M3/M4 are the availability test. A mechanism that acts on 5% of the flagged questions is a curiosity; the product statement §140 licensed needs the pack to be the source in enough of them for a filter to have something to refuse.",
+    "The exact detector under-credits the pack on spacing and punctuation; the flattened detector over-credits it on short names inside longer words. M3 reads the lower bound and M4 the upper bound, and a pair that straddles 30% is a finding about the threshold rather than about the pack.",
+    "Nothing here re-reads the gold SQL or the scorer. The attribution is a substring test between two strings the model itself saw and produced."
+  ]
+}

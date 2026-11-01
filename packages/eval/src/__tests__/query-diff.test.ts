@@ -11,10 +11,14 @@ import { describe, expect, it } from 'vitest';
 import {
   cellOf,
   clusteredGap,
+  clusteredGapOf,
+  discardSetOf,
   featureOf,
   fisherExact,
   gateReadingOf,
+  improvementOf,
   readQueryDiff,
+  readingOf,
   type DiffCase,
   type FeatureReading,
   type GateReading,
@@ -317,5 +321,106 @@ describe('readQueryDiff', () => {
       gates: [gateReadingOf(clean, 'strict', 100)],
     });
     expect(reading.criteria.find((entry) => entry.code === 'Q5')?.ok).toBe(false);
+  });
+});
+
+/**
+ * The three helpers the R31 readings are built on.
+ *
+ * They exist so that a grouping which is *not* a function of the query diff — the pack's text — can
+ * reuse the same arithmetic. The tests therefore compare each one against the predicate-shaped
+ * function it was extracted from: two implementations of a gap are two answers to one question, and
+ * the only way to know they agree is to assert it on a corpus where the answer is not zero.
+ */
+describe('readingOf', () => {
+  it('produces the same reading as featureOf for the split it was handed', () => {
+    const cases = [
+      importing('1', false, true, 'a'),
+      importing('2', false, true, 'a'),
+      importing('3', true, true, 'b'),
+      still('4', true, true, 'b'),
+      still('5', false, false, 'c'),
+    ];
+    const predicate = (delta: { ungrounded: readonly string[] }): boolean => delta.ungrounded.length > 0;
+    const viaPredicate = featureOf('F1', 'imports', cases, predicate, 200);
+    const viaGroups = readingOf('F1', 'imports', cases.filter((c) => predicate(c.delta)), cases.filter((c) => !predicate(c.delta)), 200);
+    expect(viaGroups).toEqual(viaPredicate);
+  });
+
+  it('reports no gap when one of the two groups is empty', () => {
+    const cases = [still('1', true, false)];
+    const reading = readingOf('X', 'empty side', cases, [], 100);
+    expect(reading.present.n).toBe(1);
+    expect(reading.absent.n).toBe(0);
+    expect(reading.gapPp).toBeNull();
+    expect(reading.gapHalfWidthPp).toBeNull();
+    expect(reading.clusterLowPp).toBeNull();
+    expect(reading.resolves).toBe(false);
+  });
+
+  it('still reports an exact test when the gap itself is unmeasurable', () => {
+    // Fisher's test reads a 2×2 table of discordant counts, and an empty comparison group makes it
+    // 2×0 — a table with a zero column, whose p-value is 1 rather than undefined.
+    const reading = readingOf('X', 'one side', [importing('1', false, true)], [], 100);
+    expect(reading.fisherP).toBe(1);
+  });
+});
+
+describe('clusteredGapOf', () => {
+  it('agrees with the predicate form on the same split', () => {
+    const cases = [
+      importing('1', false, true, 'a'),
+      importing('2', false, true, 'b'),
+      still('3', true, false, 'a'),
+      still('4', true, false, 'b'),
+    ];
+    const predicate = (delta: { ungrounded: readonly string[] }): boolean => delta.ungrounded.length > 0;
+    expect(clusteredGapOf(cases.filter((c) => predicate(c.delta)), cases.filter((c) => !predicate(c.delta)), 200)).toEqual(
+      clusteredGap(cases, predicate, 200),
+    );
+  });
+
+  it('returns nothing when either side is empty', () => {
+    expect(clusteredGapOf([], [still('1', true, false)], 100)).toBeNull();
+    expect(clusteredGapOf([still('1', true, false)], [], 100)).toBeNull();
+  });
+});
+
+describe('discardSetOf and improvementOf', () => {
+  const corpus = [
+    importing('1', false, true, 'a'),
+    importing('2', false, true, 'a'),
+    importing('3', true, true, 'b'),
+    still('4', true, false, 'b'),
+  ];
+
+  it('selects by the grounding rule the gate would use', () => {
+    expect([...discardSetOf(corpus, 'strict')].sort()).toEqual(['1', '2', '3']);
+    expect([...discardSetOf(corpus)].sort()).toEqual(['1', '2', '3']);
+  });
+
+  it('is worth the negative of the discarded signed outcomes over n', () => {
+    // Cases 1 and 2 are correct queries the pack destroyed — signed −1 each — and case 3 is a
+    // correct query the pack left correct, which is signed 0. Discarding all three gives back the
+    // two points over a corpus of four: +50pp, the direction a filter is paid for.
+    expect(improvementOf(corpus, new Set(['1', '2', '3']))).toBeCloseTo(50, 10);
+    expect(improvementOf(corpus, new Set())).toBeCloseTo(0, 10);
+    // A gate that discards only the question the pack left alone buys nothing at all.
+    expect(improvementOf(corpus, new Set(['3']))).toBeCloseTo(0, 10);
+  });
+
+  it('agrees with the full reading it is an identity of', () => {
+    for (const mode of ['strict', 'morphological'] as const) {
+      const gate = gateReadingOf(corpus, mode, 200);
+      const set = discardSetOf(corpus, mode);
+      expect(gate.improvementPp).toBeCloseTo(improvementOf(corpus, set), 10);
+    }
+  });
+
+  it('reports an empty corpus as no improvement rather than as a division by zero', () => {
+    // Zero rather than `null`: there is no denominator, so there is nothing a gate could be worth,
+    // and `gateReadingOf` is what turns this into `improvementPp: null` for an empty corpus.
+    expect(improvementOf([], new Set(['anything']))).toBe(0);
+    expect(improvementOf([], new Set())).toBe(0);
   });
 });

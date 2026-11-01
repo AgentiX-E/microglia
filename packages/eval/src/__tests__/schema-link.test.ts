@@ -162,3 +162,40 @@ describe('the shapes a dump can take', () => {
     expect(linked.dropped).toBe(2);
   });
 });
+
+/**
+ * The pruned names, which exist so that a later reading can ask a question this one cannot.
+ *
+ * `dropped` says whether the pruner fired. The registration asks *did the pack name a table or
+ * column the pruning removed*, and that is a question about which names left the prompt — three
+ * counts cannot answer it, and a run that stores only counts cannot be re-read to answer it later.
+ */
+describe('pruned names', () => {
+  it('records the tables and columns the pruner removed', () => {
+    const linked = linkSchema(FORMULA_1, 'How many drivers are there?', '');
+    expect(linked.reason).toBe('linked');
+    expect(linked.prunedTables.length).toBe(linked.dropped);
+    expect(linked.prunedTables).not.toContain(linked.kept[0]);
+    expect(linked.prunedColumns.length).toBeGreaterThan(0);
+    // Every pruned column belongs to a pruned table, and the DDL no longer declares either.
+    for (const table of linked.prunedTables) expect(linked.ddl).not.toContain(`"${table}"`);
+  });
+
+  it('reports no pruned names when it declined to prune', () => {
+    for (const [ddl, question, evidence] of [
+      [FORMULA_1, 'What is the answer?', ''],
+      [FORMULA_1, 'Join races, results, drivers, circuits, lapTimes and pitStops', ''],
+      [FORMULA_1, 'races results drivers circuits lapTimes', ''],
+    ] as const) {
+      const linked = linkSchema(ddl, question, evidence);
+      expect(linked.reason).not.toBe('linked');
+      expect(linked.prunedTables).toEqual([]);
+      expect(linked.prunedColumns).toEqual([]);
+    }
+  });
+
+  it('reports no pruned names for a single-table database', () => {
+    const single = 'CREATE TABLE "atoms" ("atom_id" INTEGER, "element" TEXT);';
+    expect(linkSchema(single, 'how many atoms', '').prunedTables).toEqual([]);
+  });
+});

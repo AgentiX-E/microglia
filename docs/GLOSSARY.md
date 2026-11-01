@@ -686,8 +686,31 @@ shape, only its outcome. What the contract needs is a verdict per attempt, not a
 **Imported identifier** — A schema name that appears in the memory-assisted query and in neither the
 no-memory query nor the question. `pnpm eval:query-diff` counts them, and the count is the only covariate in
 this project that separates a rule that helped from a rule that hurt: questions with one or more lose 9.68pp
-while the rest of the corpus gains 1.45pp. The name is deliberate — the identifier is *imported* from the rule,
-which is to say the rule supplied a fact the question did not.
+while the rest of the corpus gains 1.45pp.
+
+The older wording of this entry said the identifier is imported *from the rule*, which is to say the rule
+supplied a fact the question did not. That is now measured and it is false in most cases — see
+**pack-supplied name** below.
+
+**Pack-supplied name** — An imported identifier that the text of the injected rules contains. Detected by
+`pnpm eval:mediation`, which holds the exact text the model read for every question. 60 of the 155 importing
+questions on dev are pack-supplied (38.7%; 79 of 285 names, 27.7%).
+
+**Schema-supplied name** — An imported identifier the pack's text does **not** contain, in a query that
+executed. Execution is what makes the name real: a statement that runs cannot have named a column its table
+does not have, so the model took a real column out of the `CREATE TABLE` block and the question never asked for
+it. 94 of the 155 are schema-supplied.
+
+**Unverifiable name** — An imported identifier the pack does not contain, in a query that did **not** execute.
+It is not called *invented*: a failed statement may have named a real column and failed on a date format, a
+function or an ambiguity, and the record does not say which. One question on dev is in this bucket.
+
+**Mediation** — The reading that separates the three above. Its result is that pack-supplied and schema-supplied
+questions are damaged by the same amount (−8.33pp against −9.57pp, a gap of 1.24pp with a 14.74pp half-width),
+so the damage is not caused by a rule naming a column; the pack changes what the model writes and the imported
+name is the symptom. The product consequence is that a filter on *rules* cannot reach it and a filter on
+*queries* can.
+
 
 **Grounded** — A name is grounded when the question or the evidence contains it. The check has two modes and
 both are reported: **strict** requires the name as a whole word (so `raceId` is *not* grounded against

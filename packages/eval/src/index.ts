@@ -368,10 +368,14 @@ export {
 export {
   cellOf,
   clusteredGap,
+  clusteredGapOf,
+  discardSetOf,
   featureOf,
   fisherExact,
   gateReadingOf,
+  improvementOf,
   readQueryDiff,
+  readingOf,
   type CellReading,
   type DiffCase,
   type DiffCriterion,
@@ -382,6 +386,43 @@ export {
   type QueryDiffInput,
   type QueryDiffReading,
 } from './query-diff.js';
+
+export {
+  corpusOf,
+  packTextOf,
+  type CommittedArtefact,
+  type CommittedCase,
+  type CommittedRule,
+  type LoadedCorpus,
+  type MediationEntry,
+  type PackTextSource,
+} from './corpus.js';
+
+export {
+  PACK_SHARE_FLOOR,
+  importSourceOf,
+  mediationOf,
+  mentionsOf,
+  type ImportSource,
+  type MediationCriterion,
+  type MediationReading,
+  type MediationStratum,
+  type MentionDetector,
+  type NameCounts,
+  type NameMention,
+} from './pack-mediation.js';
+
+export {
+  HALF_FLOOR_PP,
+  halvesOf,
+  stabilityOf,
+  type GateStability,
+  type HalfReading,
+  type JackknifeRow,
+  type PermutationReading,
+  type StabilityCriterion,
+  type StabilityOptions,
+} from './gate-stability.js';
 
 export {
   CONTRASTS,

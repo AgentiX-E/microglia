@@ -199,16 +199,22 @@ export type FeatureReading = {
   readonly resolves: boolean;
 };
 
-/** Build one feature reading from a predicate over the corpus. */
-export function featureOf(
+/**
+ * Build one feature reading from two groups that have already been separated.
+ *
+ * The split is taken as data rather than as a predicate so that a grouping the module cannot
+ * express — the pack's text, which is not a property of the query diff — reuses this arithmetic
+ * instead of restating it. `featureOf` is the predicate-shaped wrapper over this and nothing else,
+ * which is what keeps the gap, its interval, the exact test and the clustered resample defined in
+ * exactly one place.
+ */
+export function readingOf(
   code: string,
   feature: string,
-  cases: readonly DiffCase[],
-  predicate: (delta: QueryDelta) => boolean,
+  present: readonly DiffCase[],
+  absent: readonly DiffCase[],
   resamples = 10_000,
 ): FeatureReading {
-  const present = cases.filter((entry) => predicate(entry.delta));
-  const absent = cases.filter((entry) => !predicate(entry.delta));
   const presentCell = cellOf(present, resamples);
   const absentCell = cellOf(absent, resamples);
   const gapPp =
@@ -224,7 +230,7 @@ export function featureOf(
     presentCell.n === 0 || absentCell.n === 0
       ? null
       : 1.96 * Math.sqrt(standardError(presentCell) ** 2 + standardError(absentCell) ** 2);
-  const clustered = clusteredGap(cases, predicate, resamples);
+  const clustered = clusteredGapOf(present, absent, resamples);
   return {
     code,
     feature,
@@ -237,6 +243,23 @@ export function featureOf(
     clusterHighPp: clustered === null ? null : clustered.highPp,
     resolves: gapPp !== null && gapHalfWidthPp !== null && Math.abs(gapPp) > gapHalfWidthPp,
   };
+}
+
+/** Build one feature reading from a predicate over the corpus. */
+export function featureOf(
+  code: string,
+  feature: string,
+  entries: readonly DiffCase[],
+  predicate: (delta: QueryDelta) => boolean,
+  resamples = 10_000,
+): FeatureReading {
+  return readingOf(
+    code,
+    feature,
+    entries.filter((entry) => predicate(entry.delta)),
+    entries.filter((entry) => !predicate(entry.delta)),
+    resamples,
+  );
 }
 
 /** What the corpus looks like with a gate installed, beside what it looks like without one. */
@@ -259,6 +282,45 @@ export type GateReading = {
 };
 
 /**
+ * Which questions a read-time gate would discard, by id.
+ *
+ * Identity is the case id and not the object, so a caller can hold the set across a re-read of the
+ * corpus — the stability readings resample and re-partition, and a set of references would have to
+ * be rebuilt for each partition. It follows that ids must be unique, which they are: the lane keys
+ * a case `${db_id}#${question_id}` and a cross-fitted fold never evaluates one twice.
+ */
+export function discardSetOf(
+  entries: readonly DiffCase[],
+  mode: GroundingMode = 'strict',
+): ReadonlySet<string> {
+  const ids = new Set<string>();
+  for (const entry of entries) {
+    if ((mode === 'strict' ? entry.delta.ungrounded : entry.delta.ungroundedLoose).length > 0) ids.add(entry.id);
+  }
+  return ids;
+}
+
+/**
+ * What a discard set is worth, in percentage points of paired delta.
+ *
+ * Closed form rather than a second pass over the corpus. The fallback outcome is already a column,
+ * so the change a gate causes is exactly the negative of the signed outcomes of the questions it
+ * discards, divided by `n` — an identity, not an approximation. `gateReadingOf` reports the same
+ * number through a full `cellOf`, and the two agree by construction; the reason this function
+ * exists separately is that the permutation test in `gate-stability.ts` evaluates it 5,000 times,
+ * and a `cellOf` per draw would run a 10,000-resample bootstrap inside every one of them.
+ */
+export function improvementOf(entries: readonly DiffCase[], discarded: ReadonlySet<string>): number {
+  if (entries.length === 0) return 0;
+  let signed = 0;
+  for (const entry of entries) {
+    if (!discarded.has(entry.id)) continue;
+    signed += (entry.correct ? 1 : 0) - (entry.withoutMemoryCorrect ? 1 : 0);
+  }
+  return (-signed / entries.length) * 100;
+}
+
+/**
  * Score the corpus as if the gate had been installed.
  *
  * The fallback is not simulated. For a discarded question the record already holds the no-memory
@@ -268,36 +330,30 @@ export type GateReading = {
  * fallback query, and this corpus is the only place where that query already exists.
  */
 export function gateReadingOf(
-  cases: readonly DiffCase[],
+  entries: readonly DiffCase[],
   mode: GroundingMode = 'strict',
   resamples = 10_000,
 ): GateReading {
-  const discarded = cases.filter(
-    (entry) => (mode === 'strict' ? entry.delta.ungrounded : entry.delta.ungroundedLoose).length > 0,
-  );
-  const discardedIds = new Set(discarded.map((entry) => entry.id));
-  const gatedCases = cases.map((entry) =>
-    discardedIds.has(entry.id)
-      ? { ...entry, correct: entry.withoutMemoryCorrect }
-      : entry,
+  const discarded = discardSetOf(entries, mode);
+  const gatedCases = entries.map((entry) =>
+    discarded.has(entry.id) ? { ...entry, correct: entry.withoutMemoryCorrect } : entry,
   );
   const paired = comparePaired(
-    cases.map((entry) => entry.withoutMemoryCorrect),
+    entries.map((entry) => entry.withoutMemoryCorrect),
     gatedCases.map((entry) => entry.correct),
     12345,
     2000,
   );
   const gated = cellOf(gatedCases, resamples);
-  const measured = cellOf(cases, resamples);
+  const measured = cellOf(entries, resamples);
   const deltaPp = gated.deltaPp;
   return {
     mode,
-    discarded: discarded.length,
-    discardedShare: cases.length === 0 ? 0 : discarded.length / cases.length,
+    discarded: discarded.size,
+    discardedShare: entries.length === 0 ? 0 : discarded.size / entries.length,
     gated,
     measured,
-    improvementPp:
-      deltaPp === null || measured.deltaPp === null ? null : deltaPp - measured.deltaPp,
+    improvementPp: entries.length === 0 ? null : improvementOf(entries, discarded),
     p: paired.p,
     significant95: deltaPp !== null && gated.halfWidthPp !== null && Math.abs(deltaPp) > gated.halfWidthPp,
     resolvable:
@@ -454,23 +510,33 @@ export function readQueryDiff(input: QueryDiffInput): QueryDiffReading {
  * independence assumption.
  */
 export function clusteredGap(
-  cases: readonly DiffCase[],
+  entries: readonly DiffCase[],
   predicate: (delta: QueryDelta) => boolean,
   resamples = 10_000,
   seed = 12345,
 ): { readonly lowPp: number; readonly highPp: number } | null {
-  const present = cases.filter((entry) => predicate(entry.delta));
-  const absent = cases.filter((entry) => !predicate(entry.delta));
+  return clusteredGapOf(
+    entries.filter((entry) => predicate(entry.delta)),
+    entries.filter((entry) => !predicate(entry.delta)),
+    resamples,
+    seed,
+  );
+}
+
+/**
+ * The same interval for two groups that are already separated.
+ *
+ * `readingOf` needs this form because the grouping it reads — the pack's text — is not a function
+ * of the query diff, and re-partitioning a concatenated list by reference would make the resample
+ * depend on object identity rather than on the split the caller made.
+ */
+export function clusteredGapOf(
+  present: readonly DiffCase[],
+  absent: readonly DiffCase[],
+  resamples = 10_000,
+  seed = 12345,
+): { readonly lowPp: number; readonly highPp: number } | null {
   if (present.length === 0 || absent.length === 0) return null;
-  const group = (rows: readonly DiffCase[]): Map<string, number[]> => {
-    const buckets = new Map<string, number[]>();
-    for (const entry of rows) {
-      const bucket = buckets.get(entry.dbId) ?? [];
-      bucket.push((entry.correct ? 1 : 0) - (entry.withoutMemoryCorrect ? 1 : 0));
-      buckets.set(entry.dbId, bucket);
-    }
-    return buckets;
-  };
   const draw = (buckets: Map<string, number[]>, random: () => number): number => {
     const groups = [...buckets.values()];
     let total = 0;
@@ -498,4 +564,15 @@ export function clusteredGap(
     lowPp: samples[Math.floor(0.025 * (samples.length - 1))] as number,
     highPp: samples[Math.ceil(0.975 * (samples.length - 1))] as number,
   };
+}
+
+/** Bucket one group's signed outcomes by database, which is the unit the resample draws. */
+function group(rows: readonly DiffCase[]): Map<string, number[]> {
+  const buckets = new Map<string, number[]>();
+  for (const entry of rows) {
+    const bucket = buckets.get(entry.dbId) ?? [];
+    bucket.push((entry.correct ? 1 : 0) - (entry.withoutMemoryCorrect ? 1 : 0));
+    buckets.set(entry.dbId, bucket);
+  }
+  return buckets;
 }
