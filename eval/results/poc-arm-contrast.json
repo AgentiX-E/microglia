@@ -1,0 +1,44 @@
+{
+  "id": "poc-arm-contrast",
+  "source_artifact": "poc-sota-bird-dev-R25-dose-and-admission.json",
+  "source_generated_at": "2026-11-01T01:00:25.072Z",
+  "n": 1534,
+  "pairs": [
+    {
+      "left": "full-accepted",
+      "right": "full-one",
+      "arm": "full-accepted",
+      "deltaPp": 0.847457627118644,
+      "ciLowPp": -0.1303780964797914,
+      "ciHighPp": 1.8252933507170794,
+      "p": 0.11116111910399057,
+      "n": 1534,
+      "lost": 22,
+      "gained": 35
+    },
+    {
+      "left": "full-one",
+      "right": "full",
+      "arm": "full-one",
+      "deltaPp": -0.3259452411994785,
+      "ciLowPp": -1.564537157757497,
+      "ciHighPp": 0.847457627118644,
+      "p": 0.6718086491745341,
+      "n": 1534,
+      "lost": 47,
+      "gained": 42
+    },
+    {
+      "left": "full-accepted",
+      "right": "none",
+      "arm": "full-accepted",
+      "deltaPp": 0.45632333767926986,
+      "ciLowPp": -0.7822685788787485,
+      "ciHighPp": 1.694915254237288,
+      "p": 0.5426101580458337,
+      "n": 1534,
+      "lost": 45,
+      "gained": 52
+    }
+  ]
+}

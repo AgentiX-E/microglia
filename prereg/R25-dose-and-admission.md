@@ -115,3 +115,80 @@ the confirmatory bar below is the 2pp the line has never reached rather than eit
 Four arms on 1,534 questions is 6,136 calls; the counterfactual learning pass is 2,800 more (2 per learning
 row, 280 rows, 5 folds), and it is the pass `full-cleared` already pays for. The dispatch is expected to run
 inside R24's 32 minutes plus that pass.
+
+## Outcome
+
+Dispatch `41256898122`, artefact **`eval/results/poc-sota-bird-dev-R25-dose-and-admission.json`**: 1,534
+questions, 5 folds, **9,096 calls**, 0 call failures, 0 timeouts, **33 minutes**, **14 gates pass** — including
+both registered ones, `V49-dose-truncated` at 1,133 of 1,534 questions changed (73.9%) with no prompt over one
+item, and `V50-admission-engaged` at 1,027 of 1,534 questions admitted (66.9%) with all five folds fitted from
+decisive learning rows. `V48` read 18 of 12,774 statements at the deadline (0.14%) and 172 truncated (1.35%).
+`V17` was not needed: `V44-domain-accounted` read 165 unscoped items, all of them arrived that way, none
+widened.
+
+| arm | items/question | accuracy | n |
+|---|---|---|---|
+| `none` | 0 | **57.17%** | 877/1534 |
+| `full-one` | **1.00** | 56.78% | 871/1534 |
+| `full` | 1.74 | 57.11% | 876/1534 |
+| `full-accepted` | **0.67** | **57.63%** | 884/1534 |
+
+| contrast | pp | 95% CI | discordant | p |
+|---|---|---|---|---|
+| `full-one` − `full` | **−0.33** | [−1.56, +0.85] | 42/47 | 0.6718 |
+| `full-one` − `none` | −0.39 | [−1.76, +0.91] | 52/58 | 0.6338 |
+| `full` − `none` | −0.07 | [−1.50, +1.30] | 60/61 | 1.0000 |
+| `full-accepted` − `full-one` | **+0.85** | [−0.13, +1.83] | 35/22 | 0.1112 |
+| `full-accepted` − `none` | +0.46 | [−0.78, +1.69] | 52/45 | 0.5426 |
+| `full-accepted` − `full` | +0.52 | [−0.85, +1.83] | 58/50 | 0.5008 |
+
+### The two refutations that were the point of the run
+
+**The 4.13pp dose gap was selection, and truncating everyone to one item costs nothing.** `full-one − full` is
+**−0.33pp [−1.56, +0.85]**. The observational reading was 4.13pp in R24's store and 3.12pp in this one
+(dose-1 questions **+2.24pp** on 401, dose-2 **−0.88pp** on 1,133), and it does not survive being made causal.
+The store gave its second item to the questions it had more to say about, and those were the questions where a
+note of either length was worth more. **Prediction 1 is refuted and prediction 2 with it**: one note on its own
+is −0.39pp.
+
+**Per-question admission is the only arm in twenty-four iterations to point up, and it does not get there.**
+`full-accepted − full-one` is **+0.85pp [−0.13, +1.83], p = 0.1112, 35 gained against 22 lost**. That is the
+largest positive point estimate any pack arm has produced and the tightest interval against loss — the lower
+bound excludes any harm larger than a tenth of a point — and it still does not exclude zero, which is what
+prediction 3 said would happen. The decision it encodes is real and visible in the artefact: 507 questions were
+refused the note, and those questions moved **4 gained and 3 lost against `none` on a byte-identical prompt** —
+the endpoint's own test–retest floor, measured inside this run for free, at 1.4% of 507 and matching the
+1.4–2.6% band the `none-replica` arms established.
+
+### The registered refutation clause fired
+
+The clause reads: *"If `full-one` − `full` and `full-one` − `none` both have intervals containing zero, the pack
+line is closed at every budget … the honest record is that the mechanism is inert rather than mis-sized."* Both
+intervals contain zero, and by a wide margin. **The pack line is closed.** The product decision that follows is
+not a smaller pack: it is no pack before the question, which is what iteration 90 already shipped on weaker
+evidence and what this run now puts a dev-scale interval around.
+
+### Why nothing further can be measured here
+
+`V5-resolution` reads a minimum detectable effect of **2.01pp** on this split, and the two ceilings read from
+R24's artefact with the answer key in hand are **+2.35pp** for dropping every net-harmful item and **+4.17pp**
+for keeping the pack exactly where it helped. Every arm in this run lands inside **±1pp**. An effect that a
+perfect oracle prices at 2.35pp cannot be resolved by an instrument that needs 2.01pp to see anything, and the
+benchmark has no more dev questions to buy resolution with. **The line has reached the limit of what BIRD dev
+can measure**, and that is a statement about the instrument rather than about the mechanism.
+
+### What held
+
+`full − none` at **−0.07pp [−1.50, +1.30]** reproduces R24's −0.59pp inside one interval: the anchor is stable
+across two stores built from different learning passes. `V49` and `V50` both passed on their first run, the
+admission floor landing between 0.111 and 0.200 across five folds while keeping 51–84% of each fold's
+decisive-bearing learning rows. Per fold, `full-accepted − full-one` ran **−0.33, +3.26, −1.30, +0.98, +1.63**;
+`full-one − full` ran **0.00, −1.30, +1.30, −1.63, 0.00**. The admission effect is concentrated where the note
+is on the question — `moderate` **+2.16pp** (13/3), `simple` **+0.65pp**, `challenging` **−2.07pp** (0/3) — which
+is a shape, not a result, at 145 challenging questions.
+
+### Reproducibility
+
+`pnpm check` green: 2,044 tests, 107 files, 99.98 / 99.61 / 100 / 99.98; `dose.ts` and `arm-contrast.ts` at 100
+on all four dimensions. The registered cross-arm contrast is computed by `pnpm eval:arm-contrast` and committed
+at `eval/results/poc-arm-contrast.json`, so the number is re-derivable from a file in the repository.

@@ -133,7 +133,25 @@ computed from the answer key. A selector's delta is only meaningful beside the c
 at: retrieving one point of a seven-point ceiling and retrieving one point of a twenty-point ceiling
 are different results, and this project reports them as such.
 
-**Memory prior** — a table keyed on the shape of an executed result, holding how often results of that
+**Dose control** — an arm that receives the *same* ranked pack as the treatment, truncated to a fixed
+number of items, so that "more notes helped" can be separated from "the notes went to the questions that
+had more to say". The distinction is not academic: the store reported a 4.13pp advantage for two items
+over one, and the truncated arm measured **−0.33pp**, because the second item had been allocated to the
+questions where any note was worth more. Any retrieval budget that varies per question needs this arm.
+
+**Admission floor** — the per-question threshold above which a pack is shown at all, fitted on a fold's
+own learning rows by maximising `helped − harmed` subject to keeping a minimum share of decisions and a
+minimum number of decisive rows. Reported with the fold it was fitted on, because a floor that is not
+re-fitted per fold leaks the evaluation rows into the decision. It is the only allocation rule this
+record has measured that points up (+0.85pp) and the only one whose interval does not exclude harm.
+
+**Oracle ceiling** — what a mechanism would be worth if the answer key chose for it: drop every item that
+net-harmed, or keep the pack exactly where it helped. Compared against the run's minimum detectable
+effect, it answers a question no interval can: *is there anything here for a better selector to find?*
+A ceiling of 2.35pp against an instrument that resolves 2.01pp means no further experiment on that split
+can distinguish a perfect mechanism from an inert one — the line is closed by arithmetic, not by defeat.
+
+
 shape turned out to be correct, read from the other folds. It is the object a verifier reads when memory
 *judges* a candidate instead of proposing one: no rule text, no relevance filter, no embedding, only
 "on this shape, were we right before". The strength of the idea is that the key is a property of the

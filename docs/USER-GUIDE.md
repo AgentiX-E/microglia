@@ -1657,6 +1657,60 @@ SOTA_SPLIT=dev SOTA_LEARN_SAMPLE=280 SOTA_PREREG=R24-dev-split pnpm eval:sota
   difference visible.
 
 
+### 13.16 One item or four, and who decides — measuring a dose control and an admission rule
+
+13.15 ends with a null and no way to tell *which* null. R25 added the two arms that separate them, and both are
+useful to anyone running a retrieval-augmented generator: a **dose control** (`full-one` — the same ranked pack,
+truncated to its first item) and a **per-question admission rule** (`full-accepted` — one item, only where the
+question admits it).
+
+```bash
+SOTA_SPLIT=dev SOTA_LEARN_SAMPLE=280 SOTA_PREREG=R25-dose-and-admission \
+SOTA_ARMS=none,full,full-one,full-accepted pnpm eval:sota
+# the admission floor is fitted per fold on that fold's learning rows:
+#   SOTA_ADMISSION_KEPT=0.5      minimum share of decisions kept
+#   SOTA_ADMISSION_DECISIVE=8    minimum decisive rows for a threshold to be considered
+```
+
+```jsonc
+// poc-sota-bird-dev-R25-dose-and-admission.json — 1,534 questions, 5 folds, 9,096 calls, fourteen gates
+{ "none":          { "accuracy": 0.5717 },   // 877/1534, 0.00 rules/question
+  "full":          { "accuracy": 0.5711 },   // 876/1534, 1.74 rules/question
+  "full-one":      { "accuracy": 0.5678 },   // 871/1534, 1.00 rules/question
+  "full-accepted": { "accuracy": 0.5763 } }  // 884/1534, 0.67 rules/question, 1027/1534 admitted
+
+// full-one       - full            -0.33pp  [-1.56, +0.85]   42 gained / 47 lost   p = 0.6718
+// full-one       - none            -0.39pp  [-1.76, +0.91]   52 gained / 58 lost   p = 0.6338
+// full           - none            -0.07pp  [-1.50, +1.30]   60 gained / 61 lost   p = 1.0000
+// full-accepted  - full-one        +0.85pp  [-0.13, +1.83]   35 gained / 22 lost   p = 0.1112
+```
+
+- **A dose reading is not a dose effect until you truncate.** Questions that received two items scored 4.13pp
+  above questions that received one — and when the same order is truncated to one item for *every* question,
+  the difference is **−0.33pp**. The store was giving its second item to the questions it had more to say
+  about, and those were the questions where a note of either length was worth more. **If your retrieval
+  budget varies per question, that variation is an allocation decision and needs its own control.**
+- **`V49-dose-truncated` is the check that makes the control a control.** It fails the run unless the truncated
+  arm differs from the full arm on a substantial share of prompts (`≥20%`) *and* exceeds one item on **zero**
+  of them. Here: 1,133 of 1,534 (73.9%) differ, 0 over budget.
+- **An admission rule needs a verifiable record that it decided.** `V50-admission-engaged` requires, per fold,
+  that the floor was **fitted** (not defaulted), that something was admitted and something was refused. Here:
+  5/5 folds `fitted`, floors 0.111–0.200, admitted 66.9%. Without that gate a rule that admits everything and a
+  rule that works produce the same artefact.
+- **The best pack result in this repository is +0.85pp and it is still not a result.** The interval's lower
+  bound excludes harm above 0.13pp; it does not exclude zero. What makes it interpretable is a second number
+  the run produced for free: of 507 questions refused the note, all 507 got a **byte-identical** prompt and
+  moved **4 gained / 3 lost — 1.4%**. That is the endpoint's own noise floor, and 0.85pp is 3.4pp of gross
+  movement on top of it.
+- **Compute your own ceiling before designing the next arm.** With the answer key in hand, dropping every
+  net-harmful item is worth **+2.35pp** and keeping the pack exactly where it helped is worth **+4.17pp**, on a
+  split that resolves **2.01pp**. An oracle that prices the whole mechanism below your instrument is telling you
+  to stop measuring that mechanism here, not to run a bigger n on the same questions.
+- **Pairwise contrasts are re-derivable from the artefact**, so you never quote a lane's own arithmetic
+  unchecked: `SOTA_ARTEFACT=eval/results/<run>.json pnpm eval:arm-contrast --left full-accepted --right full-one`
+  reprints the contrast, the interval and the discordant pairs from the committed file.
+
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:
