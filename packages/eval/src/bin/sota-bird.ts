@@ -461,6 +461,26 @@ function armsFrom(raw: string | undefined): Set<ArmName> {
 const DISTILL_CACHE_PATH = process.env['SOTA_DISTILL_CACHE'] ?? '';
 const distillations = DistillCache.load(DISTILL_CACHE_PATH);
 
+/**
+ * How often each channel kind has to rewrite the prompt before its null is a null about the channel.
+ *
+ * The floors differ because the manipulations differ: `values` annotates every column unconditionally,
+ * so a tenth of prompts without the annotation is a different arm from the one the name describes,
+ * while `linked` prunes only when the question names tables and holds it to the weaker condition that
+ * it fired at all. They live here rather than inside the gate because they are facts about this lane's
+ * two manipulations, and a gate that knew them would be a gate that knew this lane.
+ *
+ * `expects` is the phrase each floor reads as inside `V51`'s own sentence, which keeps the published
+ * artefact's wording identical to the version whose gate hard-coded both.
+ */
+const CHANNEL_FLOORS: Record<
+  'values' | 'linked',
+  { readonly floor: number; readonly expects: string }
+> = {
+  values: { floor: 0.95, expects: 'values at least 95% of prompts' },
+  linked: { floor: 0.01, expects: 'linked at least 1%' },
+};
+
 const ARMS = armsFrom(process.env['SOTA_ARMS']);
 
 /**
@@ -5393,7 +5413,7 @@ async function main(): Promise<void> {
    * pack's relevance, and read as a 5pp loss that the arm's own total (+0.86pp) contradicted. The
    * numbers were in the artefact; they were just not each other's.
    */
-  const relevanceFor = (arm: ArmName) =>
+  const relevanceFor = (arm: Exclude<ArmName, 'none'>) =>
     relevanceSplit(
       cases.map((item) => ({
         correct: arm === 'full' ? item.correct : item.arms[arm] === true,
@@ -5415,7 +5435,10 @@ async function main(): Promise<void> {
    * recorded at +0.86pp. A block that cannot be reconciled with the total it is meant to explain
    * is worse than no block, because it reads as a finding.
    */
-  const reconcile = (arm: ArmName, split: ReturnType<typeof relevanceSplit>): void => {
+  const reconcile = (
+    arm: Exclude<ArmName, 'none'>,
+    split: ReturnType<typeof relevanceSplit>,
+  ): void => {
     const implied = split.onTopic * split.onTopicAccuracy + split.offTopic * split.offTopicAccuracy;
     const answered = cases.filter(
       (item) =>
@@ -5631,6 +5654,8 @@ async function main(): Promise<void> {
     readonly kind: 'values' | 'linked';
     readonly applied: number;
     readonly asked: number;
+    readonly floor: number;
+    readonly expects: string;
   }[] => {
     const totals = new Map<string, { kind: 'values' | 'linked'; applied: number; asked: number }>();
     for (const fold of folds) {
@@ -5643,7 +5668,11 @@ async function main(): Promise<void> {
         });
       }
     }
-    return [...totals.entries()].map(([arm, entry]) => ({ arm, ...entry }));
+    return [...totals.entries()].map(([arm, entry]) => ({
+      arm,
+      ...entry,
+      ...CHANNEL_FLOORS[entry.kind],
+    }));
   })();
   const gates = buildValidityGates({
     meanPackIds,

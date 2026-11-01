@@ -54,13 +54,13 @@ export function reproducedBy(verdict: ProbeVerdict | undefined): boolean | undef
 }
 
 /**
- * Paired source questions below this count make a difference a direction rather than a measurement.
- *
- * The same floor the transfer statistic uses, for the same reason: an exact test over eleven
- * discordant pairs cannot reject anything, and a report that called its sign a finding would be
- * reporting the sign of noise.
+ * The floor lives in `@agentix-e/microglia-protocol`, because the gate that enforces it and the
+ * statistic that reports against it have to be the same number. Re-exported here so this module's
+ * callers keep one import path, and so a reader looking for the threshold finds it where it is used.
  */
-export const SUBSTRATE_FLOOR = 100;
+import { SUBSTRATE_FLOOR } from '@agentix-e/microglia-protocol';
+
+export { SUBSTRATE_FLOOR };
 
 /** What a comparison of two stores supports. */
 export type SubstrateVerdict =

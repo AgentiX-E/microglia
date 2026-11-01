@@ -38,9 +38,9 @@ function makeItem(index: number) {
   const candidate: DistillCandidate = {
     namespace: 'acme',
     kind: 'constraint',
-    scope: { task: 'chart.recommend', domain, intent },
+    scope: { task: 'chart.recommend', domain, ...(intent === undefined ? {} : { intent }) },
     statement: `Rule ${index}: for ${intent} in ${domain}, prefer the documented mark ${index % 6}.`,
-    payload: { when: { intent }, then: { mark: 'line' } },
+    payload: { when: intent === undefined ? {} : { intent }, then: { mark: 'line' } },
     evidence: { feedbackId: `fb_${index}`, runId: `run_${index}`, at: AT, weight: 0.9 },
     trust: 0.9,
     dedupeKey: `k_${index}`,

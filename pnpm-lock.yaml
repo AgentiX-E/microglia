@@ -52,6 +52,9 @@ importers:
       '@agentix-e/microglia-core':
         specifier: workspace:*
         version: link:../core
+      '@agentix-e/microglia-protocol':
+        specifier: workspace:*
+        version: link:../protocol
 
   packages/node:
     dependencies:
@@ -68,6 +71,8 @@ importers:
       '@agentix-e/microglia-browser':
         specifier: workspace:*
         version: link:../browser
+
+  packages/protocol: {}
 
 packages:
 

@@ -16,6 +16,8 @@ export default defineConfig({
       { find: '@agentix-e/microglia-core/providers', replacement: here('./packages/core/src/providers/index.ts') },
       { find: '@agentix-e/microglia-core/kernel', replacement: here('./packages/core/src/kernel/index.ts') },
       { find: '@agentix-e/microglia-core', replacement: here('./packages/core/src/index.ts') },
+      { find: '@agentix-e/microglia-protocol/adapter', replacement: here('./packages/protocol/src/adapter.ts') },
+      { find: '@agentix-e/microglia-protocol', replacement: here('./packages/protocol/src/index.ts') },
       { find: '@agentix-e/microglia-eval', replacement: here('./packages/eval/src/index.ts') },
       { find: '@agentix-e/microglia-node', replacement: here('./packages/node/src/index.ts') },
       { find: '@agentix-e/microglia-browser', replacement: here('./packages/browser/src/index.ts') },

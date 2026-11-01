@@ -620,3 +620,28 @@ and that weighted average is the number a whole-split comparison must use. It is
 grows, composition does not, because it is not an error. The distinction is decidable inside one dispatch —
 restrict both sides of a *paired* comparison to a subset of questions, and the pairing and the store are held
 while the population is not — and it is undecidable across two, because the store is rebuilt each run.
+
+**Same-unit control** — a system cited not as an alternative product but because it published **one
+measurement in the unit we also measured in**. RSL-SQL is the clearest case: its 12.71pp schema-linking ablation
+and this project's 17.60pp evidence ablation are both Δpp on the same 1,534 questions at the same model family,
+so the two can be subtracted; its leaderboard EX cannot be subtracted from ours, because the systems differ in
+the generator's training, the candidate pool and the schema form at once. The distinction decides what a number
+licenses: a **product competitor**'s figure says where to spend engineering on the artefact, a same-unit
+control's says which of our own components is mispriced. Three misreadings in this project's own documents came
+from running the second comparison through the first question.
+
+**Adapter cut rule** — the single question that decides whether a measurement module belongs to the protocol or
+to a scenario: *does the function signature mention a scenario type?* A gate reading `pack.admitted`,
+`arms[].discordant` or `folds[].partition` does not and belongs to the protocol; a gate executing gold SQL or
+parsing a fenced example does and belongs to the adapter. Of this project's 39 gates, **37 fall on the protocol
+side and 2 on the adapter side** — and the first estimate, made by reading gate *names*, put nine portable gates
+on the wrong side, which is why the rule is applied to field reads rather than to vocabulary. It is not a style
+preference: it is the only thing that makes the generality claim checkable, because a protocol with one customer
+is a habit.
+
+**Lane adapter** — the five-method contract (`load`, `prompt`, `parse`, `score`, `strata`) a scenario implements
+to be measured by the shared protocol. It is deliberately small: anything more pushes a decision into the lane,
+anything less makes the lane copy the protocol. Two properties are load-bearing beyond convenience — `parse`
+returns `undefined` rather than throwing, so a malformed reply is scored as unparseable instead of killing a
+fold, and `strata` receives a task and nothing else, so an **outcome-blind stratifier** is enforced by the type
+signature instead of by discipline.

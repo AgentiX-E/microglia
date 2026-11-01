@@ -351,6 +351,32 @@ the measurement from the thing measured:
 | `artifact-schema.ts` | the run artefact's types, a hand-written validator that checks the arithmetic, and the report renderer | a schema no code reads is documentation; a report written beside the JSON is a second source of truth |
 | `prereg.ts` | the pre-registration format, its gate, and the agreement between the gate list it names and the one its run emitted | a prediction has to exist before the run and has to be refutable, or the number is a description |
 | `reproduction.ts` | published cells, the Wilson interval, and the admissibility rule | a comparison across splits is sampling error, and arithmetic is cheaper than trust |
+| `@agentix-e/microglia-protocol` — the 39 gates | partition, injection proof, resolution, call reliability, dose, admission, channel application, statement survival, transfer reconciliation | these read a run's shape, never its subject; a gate that reads a scenario type is not a gate, it is a check inside that scenario |
+
+**The gate layer is where the protocol claim is load-bearing, and it was the last to be separated.** Thirty-one
+gates certify every number this project publishes, and for twenty-six iterations they had exactly one caller. The
+second scenario in this repository — τ²-bench — wrote three of its own instead, one of which failed at a 15pp
+half-width against a 5pp bar and was recorded as a note rather than as a verdict. **A protocol with one customer is
+a habit**, and the repair is a package boundary rather than more prose: of the 39 gates, **37 take no scenario
+type at all** and the 2 that do (`gold-executable`, `convention-executable`) read an *optional* field and are
+absent rather than green when a lane cannot supply it. The cut was made by reading the `input.*` fields each gate
+touches, not by reading its name — the first estimate, made from names, put nine portable gates on the wrong side.
+
+```ts
+export interface LaneAdapter<Task, Candidate> {
+  load(): Promise<readonly Task[]>;                              // the task order the folds assume
+  prompt(task: Task, pack: Pack): string;                        // rendering belongs to the adapter
+  parse(raw: string): Candidate | undefined;                     // unreadable is a value, not a throw
+  score(task: Task, candidate: Candidate): Promise<boolean>;     // only the lane can execute or judge
+  strata(task: Task): readonly string[];                         // outcome-blind by signature
+}
+```
+
+**The `strata` signature is the one that encodes a rule rather than describing it.** Conditioning a stratum on an
+arm's outcome and then contrasting inside that stratum measures regression to the mean; the function receives a
+task and nothing else, so there is no outcome to condition on. A rule enforced by a signature survives an urgent
+patch; a rule written in a comment does not.
+
 
 The runner (`bin/plugin-run.ts`) owns the I/O — it builds SQLite databases from a self-contained case
 file, executes gold and answers, and writes the artefact — so nothing above needs a filesystem or a
@@ -407,6 +433,15 @@ for more than it is willing to wait for.
 | Use a model for free text | `LlmPort` (`complete(prompt)`) | your own client |
 | Change admission behaviour | `Policy` overrides per host | `capture` |
 | Project into a cognitive memory | `CortexProjection` in `@agentix-e/microglia-node` | your own |
+| **Measure your own scenario** | `LaneAdapter` (load / prompt / parse / score / strata) | your own, beside the lane |
+
+**The last row is the only extension point that is about the *evidence* rather than the product**, and it exists
+because a claim of generality is only checkable from outside. A host that implements `LaneAdapter` gets the 39
+gates, the paired statistics, the artefact validator and the pre-registration check without
+writing any of them — which is what makes "this library is scenario-agnostic" a statement about the code rather
+than about the intent. The dependency direction is enforced: `core ← protocol ← adapter`, and `protocol` may not
+import an adapter.
+
 
 Nothing else is extensible, on purpose. Every additional seam is a place where the guarantee about
 what reaches a prompt could be weakened.
@@ -417,7 +452,7 @@ This repository is **the product and the evidence that gates it**:
 
 | Here | Why |
 |---|---|
-| `packages/` | the library |
+| `packages/` | the library (`core`, `node`, `browser`) and the instrument that gates it (`eval`, `protocol`) |
 | `packages/eval/src/bin/` | executable lanes that measure the library — replay invariants, the attack harness, L0/L2b/L4, the live model probes |
 | `bench/` | the ablation study and its gate report |
 | `scripts/` | the quality audit, the bundle-size gate and the conformance check |

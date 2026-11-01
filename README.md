@@ -50,6 +50,39 @@ is strong enough to steer a prompt, and forgets it when it stops being true.
 | Recalls a bounded, diversified prompt block | Require GPU, CUDA, or a fine-tuning loop |
 | Reports why each rule is active, demoted, or retired | Send your data anywhere |
 
+## What this is, and what has been measured for it
+
+Three claims travel with the phrase *data flywheel*, and they have different amounts of evidence behind
+them. Keeping them apart is the difference between reading this repository correctly and reading it as
+a text-to-SQL system:
+
+| Claim | Status | Evidence |
+|---|---|---|
+| **The architecture is scenario-agnostic** | **holds** | `core` is 7.1k lines with no scenario type in any public signature; `task` is a free-form string; subpath exports let a host take retrieval without the distiller; two hosts already embed it |
+| **The mechanism transfers across scenarios** | **hypothesis** | one scenario has 26 registered iterations; the other has 68 tasks. Details below |
+| **It pays commercially in any scenario** | **untested** | no scenario has produced an effect this project would ship on |
+
+**The scenarios in this repository, and what each is for.** `nl2charts` (chart re-picking) is the one in
+the quick start and the one the mechanism was designed against: a correction is a preference, rules are
+about a vocabulary, and transfer is measurable across domains. **text-to-SQL on BIRD is the hostile
+case, not the product** — a per-question evidence hint the benchmark supplies competes with anything the
+memory has to say, and twenty-six iterations of measurement there are reported in full under
+[Does it actually work?](#does-it-actually-work). τ²-bench (tool calling) is the second harness, and its
+reading is a null at a resolution that cannot see one point.
+
+**So: this library is what a host embeds, and text-to-SQL is one host.** That matters for how
+comparisons should be read. Systems on the BIRD leaderboard — XiYan-SQL, CHASE-SQL and the rest — are
+not alternatives to this project; they are **hosts whose pipeline could embed it**, and the competitive
+question about them is whether a pack improves their generation, not whether our execution accuracy
+beats their execution accuracy. RSL-SQL and CHESS appear in this repository's documentation for a
+different reason again: they each published **one ablation on the same benchmark**, which is the only
+unit in which our number and theirs are the same quantity.
+
+```ts
+// The same loop, a third scenario: nothing in the API knows about charts or SQL.
+const pack = await mg.recall({ task: 'ticket.classify', text: subject, scope: { team } });
+```
+
 ## What is in the box
 
 | Package | Role | Runtime dependencies |
@@ -57,9 +90,13 @@ is strong enough to steer a prompt, and forgets it when it stops being true.
 | `@agentix-e/microglia-core` | The library: domain model, store, distillation, pack construction, facade, provider contracts | none |
 | `@agentix-e/microglia-node` | HTTP ingestion and recall on Hono, an MCP tool surface (`POST /v1/mcp`), DeepSeek and Zhipu providers | core, `hono` |
 | `@agentix-e/microglia-browser` | Client with an offline outbox; talks to the node server | core |
+| `@agentix-e/microglia-protocol` | The measurement apparatus: 39 validity gates, their publication order, and the `LaneAdapter` contract a scenario implements to be scored by it | none |
 
 `core` is the whole mechanism in one install and has **no runtime dependency**, so it bundles for the
-browser unchanged. Its modules are also reachable as subpaths, which is how a host that only needs
+browser unchanged. `protocol` is the exception to "the library is the product": it is the instrument that
+decides whether a claim about the library may be published, it has no runtime dependency either, and it is
+separate so that a second application scenario can be measured by the same apparatus instead of writing a
+weaker one beside it. Its modules are also reachable as subpaths, which is how a host that only needs
 retrieval keeps the distiller out of its bundle:
 
 ```ts

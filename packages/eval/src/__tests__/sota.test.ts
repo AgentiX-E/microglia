@@ -1751,8 +1751,8 @@ describe('buildValidityGates', () => {
       {
         ...sound,
         channels: [
-          { arm: 'values', kind: 'values', applied: 1534, asked: 1534 },
-          { arm: 'linked', kind: 'linked', applied: 41, asked: 1534 },
+          { arm: 'values', kind: 'values', applied: 1534, asked: 1534, floor: 0.95, expects: 'values at least 95% of prompts' },
+          { arm: 'linked', kind: 'linked', applied: 41, asked: 1534, floor: 0.01, expects: 'linked at least 1%' },
         ],
       },
       'V51-channel-applied',
@@ -1767,7 +1767,7 @@ describe('buildValidityGates', () => {
     // Half the prompts without the annotation is a different arm from the one the name describes,
     // and the delta it reports is about the half it reached and not about the channel.
     const entry = gate(
-      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 700, asked: 1534 }] },
+      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 700, asked: 1534, floor: 0.95, expects: 'values at least 95% of prompts' }] },
       'V51-channel-applied',
     );
     expect(entry.pass).toBe(false);
@@ -1777,11 +1777,11 @@ describe('buildValidityGates', () => {
     // 0.95 × 1534 is not an integer, so the boundary is exercised at the count that rounds to it:
     // 1458/1534 is 95.04% and must pass, 1457 is 94.98% and must not.
     const at = gate(
-      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 1458, asked: 1534 }] },
+      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 1458, asked: 1534, floor: 0.95, expects: 'values at least 95% of prompts' }] },
       'V51-channel-applied',
     );
     const below = gate(
-      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 1457, asked: 1534 }] },
+      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 1457, asked: 1534, floor: 0.95, expects: 'values at least 95% of prompts' }] },
       'V51-channel-applied',
     );
     expect(at.pass).toBe(true);
@@ -1792,7 +1792,7 @@ describe('buildValidityGates', () => {
     // A linker that keeps every table is the control under another name, and this record has
     // published a pruning result once before without checking which of the two it had.
     const entry = gate(
-      { ...sound, channels: [{ arm: 'linked', kind: 'linked', applied: 0, asked: 1534 }] },
+      { ...sound, channels: [{ arm: 'linked', kind: 'linked', applied: 0, asked: 1534, floor: 0.01, expects: 'linked at least 1%' }] },
       'V51-channel-applied',
     );
     expect(entry.pass).toBe(false);
@@ -1801,7 +1801,7 @@ describe('buildValidityGates', () => {
 
   it('V51 reads a zero denominator as nothing rather than as a ratio', () => {
     const entry = gate(
-      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 0, asked: 0 }] },
+      { ...sound, channels: [{ arm: 'values', kind: 'values', applied: 0, asked: 0, floor: 0.95, expects: 'values at least 95% of prompts' }] },
       'V51-channel-applied',
     );
     expect(entry.pass).toBe(false);

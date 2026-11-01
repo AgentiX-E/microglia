@@ -44,6 +44,12 @@
       "@agentix-e/microglia-core/delivery": [
         "packages/core/src/delivery/index.ts"
       ],
+      "@agentix-e/microglia-protocol": [
+        "packages/protocol/src/index.ts"
+      ],
+      "@agentix-e/microglia-protocol/adapter": [
+        "packages/protocol/src/adapter.ts"
+      ],
       "@agentix-e/microglia-eval": [
         "packages/eval/src/index.ts"
       ],
