@@ -399,6 +399,30 @@ export {
 } from './referent.js';
 
 export {
+  PRECISION_BAR_TOLERANCE,
+  R34_BARS,
+  admissionGainOf,
+  adjudicateR34,
+  admitsOf,
+  compareIds,
+  exchangeOf,
+  precisionBarOf,
+  quantilesOf,
+  selfKnowledgeOf,
+  similarityOf,
+  splitByDatabase,
+  tokensOf,
+  type AdmissionCase,
+  type AdmissionReading,
+  type ExchangeReading,
+  type GateId,
+  type GateThreshold,
+  type HalfShape,
+  type R34Input,
+  type R34Verdict,
+} from './admission.js';
+
+export {
   MEMORY_FILTER_YOUDEN,
   R33_BARS,
   addedByPackOf,

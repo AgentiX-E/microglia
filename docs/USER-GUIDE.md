@@ -904,6 +904,23 @@ Be honest about the preconditions; the product is only useful inside them.
     `prereg/R33.md`. **So budget for a second generation without the pack if you want the check** — it is
     a paired comparison, not a validator, and the comparison is the thing that costs.
 
+12. **Showing the pack to fewer questions does not rescue it, and the bar for doing so is arithmetic.**
+    A repair is only possible on a question the bare model got wrong and a break only on one it got
+    right, so memory pays for itself when `repairs / breaks` exceeds **the odds of the bare model being
+    right** — on this corpus **1.393**, not 1.0. The measured 0.789 is a 43% shortfall. Gating the pack
+    by question is the obvious response, and it has a clean ceiling: admit only the questions the bare
+    model would fail and the break rate is zero by construction, worth **+2.67pp**. The gate needs only
+    `b / (r + b)` = **47.6%** of its admitted questions to be future failures, against a 41.8% base rate.
+
+    Measured on the 7,000 out-of-sample questions, no model call, five registered gates: the best one
+    reaches **62.4%** precision — well past the bar — and returns **−0.05pp** on an interval covering
+    zero, because **the bar belongs to the admitted set and selection moves it**. Inside the gate's own
+    population the break rate climbs from 5.50% to **9.68%** while the repair rate stays flat, so the bar
+    rises 16.8pp alongside the gate's 20.6pp and never gets crossed. Thirty registered points reach
+    **+0.11pp** of the 2.67pp ceiling out of sample. **A question whose neighbours failed is one the model
+    is unstable on, not one the pack can fix** — so before you build a router, check whether the signal
+    you would route on predicts *ignorance* or *variance*. `pnpm eval:admission`, `prereg/R34-admission.md`.
+
 ## 13. Measuring your own generator
 
 The harness that produced every number in this repository is usable by someone else. Two files and

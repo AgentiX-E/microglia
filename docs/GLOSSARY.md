@@ -337,6 +337,42 @@ prompt that already contains the first is not a second improvement.
 **Precision (knowledge)** — the share of active rules whose payload matches the reference policy on a
 probe grid of every context they claim. Separates "learned a lot" from "learned the right thing".
 
+**Exchange rate (`helpPerHarm`)** — repairs per break: 187 / 237 = **0.789** out of sample. Never quoted
+alone, because the two rates sit on different bases and the ratio that matters is the one below.
+
+**Break-even exchange rate (the hurdle)** — the exchange rate at which memory pays for itself, which is
+the **bare odds of being right** rather than parity: 4,075 breakable / 2,925 repairable = **1.393**. A
+repair can only happen on a question the bare model got wrong and a break only on one it got right, so
+equal rates are a net loss. The measured 0.789 against this hurdle is a 43% shortfall, not a near miss.
+The same arithmetic gives the two ways out: repairs of 8.10% at fixed breaks, or breaks of 4.59% at fixed
+repairs.
+
+**Clearance** — the exchange rate divided by the hurdle. Below one is a memory that loses; 0.566 here.
+One number, so that "close to a wash" cannot be said again without contradicting a ratio.
+
+**Admission ceiling** — the most a gate that decides *which questions get memory* could be worth: admit
+every repairable question and nothing else, and the break rate is zero by construction, so the gain is
+the whole repair rate, **+2.67pp**. It is the mirror of the **removal ceiling** (+3.39pp, §8.7's filter),
+and the two sum to the 6.06pp an oracle that knows the outcome could reach. Ceilings are quoted with the
+share their mechanism realised, because a ceiling alone flatters every reading.
+
+**Admission gate** — a predicate evaluated *before* generation, on the question and the database's own
+history, that decides whether the pack is shown at all. Distinct from the read-time filter, which is
+evaluated after generation on the difference between two queries, and cheaper: it cannot destroy a
+correct answer, because it never touches one. Scored on **precision** — the share of admitted questions
+the bare model would have got wrong — against the bar `b / (r + b)` = 47.6%, not on accuracy.
+
+**Precision bar (admission)** — `b / (r + b)`, the share of an admitted set that must be repairable for
+the gain to be positive. 47.6% on the corpus against a 41.8% base rate. **It belongs to the admitted
+set, not to the corpus**: selecting questions moves their own repair and break rates, and on this corpus
+the bar rises 16.8pp across the self-knowledge gate's sweep while the gate's precision rises 20.6pp —
+close enough that the gate never crosses it.
+
+**Variance selection** — what a question-level gate actually does when it selects on neighbourhood
+failure. The admitted questions are ones the model is *unstable* on rather than ignorant of, so the break
+rate inside the set nearly doubles (5.50% → 9.68%) while the repair rate does not move. The mechanism
+that makes memory a wash — symmetry — is the same mechanism that defeats selection on a covariate.
+
 ## Terms this project avoids, and why
 
 | Avoided | Used instead | Why |

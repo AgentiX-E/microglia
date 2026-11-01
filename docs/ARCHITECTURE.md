@@ -745,3 +745,85 @@ that wants it has to generate twice and compare. Combined with §8.7's ceiling o
 15.2%, that closes the product question. The lane stays in CI because the negative is now a number: a
 tokeniser change that moved the flag rate or J would have to argue with a workflow that asserts eighteen
 of them.
+
+### 8.9 Admission, not dose: the bar is the bare odds, and the population is the variable
+
+§8.7 measured the exchange rate — repairs over breaks — as a property of what the pack *says*, and §8.8
+closed the last product shape that assumed a better item was the way back. Both compared that rate to
+parity. It is not measured against parity, and the correction is arithmetic rather than empirical.
+
+**A repair can only happen on a question the bare model got wrong, and a break only on one it got right.**
+Out of sample the corpus has 2,925 of the first kind and 4,075 of the second, so a memory that repairs as
+often as it breaks still loses: equal *rates* on unequal *bases* is a net cost. The rate at which memory
+breaks even is the bare odds of being right:
+
+| quantity | value | derivation |
+|---|---|---|
+| repairs | 187 = 6.39% of 2,925 | §8.7 |
+| breaks | 237 = 5.82% of 4,075 | §8.7 |
+| exchange rate | 0.789 | 187 / 237 |
+| **break-even exchange rate** | **1.393** | 4,075 / 2,925 |
+| repairs needed at fixed breaks | 8.10% (+1.71pp) | 5.816% × 1.393 |
+| breaks needed at fixed repairs | 4.59% (−1.23pp) | 6.393% / 1.393 |
+
+Memory is not 21% short of useful. It is **43% short**, and every sentence the project wrote about "close
+to a wash" was measuring against the wrong zero.
+
+**The asymmetry is in the population, and that makes admission a separate mechanism from dose.** A
+question the bare model already answered cannot be repaired and a question it got wrong cannot be broken,
+so a gate that admits memory only to the second kind has a break rate of zero *by construction* and
+receives the whole repair rate as net gain — **+2.67pp**, the largest number this programme has had in
+front of it. That is a different intervention from the read-time filter, which removes breaks after
+generation and is capped at 3.39pp; the two ceilings are the two halves of a 6.06pp oracle.
+
+```text
+  question ──► gate (question + this database's history) ──► admits? ──► memory ──► answer
+                  │                                              │
+                  │ no                                           │ yes
+                  ▼                                              ▼
+              bare answer                            breaks impossible by construction
+```
+
+**Four decisions, and each one is a way the reading could have lied.**
+
+*Precision, not accuracy, is the quantity a gate is scored on.* The admissible bar is
+`q > b / (r + b)` — 47.64% against a 41.79% base rate. A gate does not have to be accurate, calibrated or
+even good; it has to be six points better than random. That is a much lower bar than the filter's Youden,
+and it is why the reading was worth running at all.
+
+*Split by database, not by question.* A gate that admits one question in a schema and not its neighbour
+is not a deployment anyone can run, and §8.6's clustering argument means a question-level split would put
+the same correlation on both sides of the wall. 58 databases deal 29/29, and no database appears twice.
+
+*The gate score is a property of the whole corpus.* The neighbour set in the self-knowledge score stays
+whole; only the questions being judged are split. A leave-one-out estimate recomputed inside each half
+would answer a different question on each side and the confirmation number would confirm a rule that was
+never selected.
+
+*The control is a recorded arm, not an assumption.* Random admission at six shares has to scale with
+coverage, or the estimator is at fault and every other number in the artefact is void.
+
+**What the reading found, and the part that was not predicted.** The self-knowledge gate — SKR's kNN
+signal in lexical form, the share of a question's ten nearest neighbours in the same database that the
+bare model got wrong — reaches **62.4% precision** where the bar was 47.64%, and returns **−0.05pp**.
+The arithmetic was not wrong. It was about the wrong population: **the precision bar is a property of the
+admitted set, not of the corpus**, and selection moves it.
+
+| gate threshold | coverage | precision | bar inside the set | repair rate inside | break rate inside |
+|---|---|---|---|---|---|
+| 0.10 | 94.5% | 41.8% | 46.5% | 6.32% | 5.50% |
+| 0.30 | 64.5% | 50.8% | 52.3% | 6.23% | 6.84% |
+| 0.50 | 35.6% | 62.4% | 63.3% | 5.61% | **9.68%** |
+
+Precision climbs 20.6pp across the sweep and the bar climbs 16.8pp with it, because the break rate inside
+the admitted set nearly doubles while the repair rate does not move. A question whose neighbours failed
+is not a question the pack can repair; it is a question the model is **unstable** on, and an unstable
+answer is one the pack breaks as easily as it fixes. The gate is selecting variance, and variance is
+symmetric — the same property that makes memory a wash without a gate.
+
+**What it closes.** Thirty registered points across five gates reach **+0.11pp** of the 2.67pp ceiling out
+of sample — 4.0%, on an interval that covers zero. §8.7's filter realised 15.2% of its own ceiling and
+still did not pay, so the removal route was four times as efficient and also failed. The public product
+consequence is unchanged — nothing ships — but the reason is now three-layered rather than one: the item's
+content does not matter (§8.5), its quantity does not matter (§8.6), and the population cannot be selected
+by anything measurable before generation.

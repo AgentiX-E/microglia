@@ -534,6 +534,51 @@ jobs:
               '%, gap ' + t.bare.gapPp.toFixed(2) + 'pp, J ' + t.bare.youdenJ.toFixed(4) + ' against ' + 0.1068);
           "
 
+      - name: Admission, not dose (recomputed, and all seven registrations adjudicated)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/admission" pnpm eval:admission
+          diff -u eval/results/poc-admission.json "${RUNNER_TEMP}/admission/poc-admission.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/admission/poc-admission.json');
+            const v = (id) => a.verdicts.find((x) => x.id === id);
+            const g = Object.fromEntries(a.gates.map((x) => [x.id, x.pass]));
+            const e = a.exchange.all;
+            const c = a.control;
+            const checks = [
+              ['the artefact names the registration it was written before', a.registered === 'prereg/R34-admission.md'],
+              ['the corpus is the one R30 stage 2 paid for', a.corpus.questions === 7000 && a.corpus.databases === 58],
+              ['the split deals 29 databases to each half and shares none', g['V56-admission-split-disjoint'] === true && a.corpus.discovery.databases === 29 && a.corpus.confirmation.databases === 29],
+              ['2,925 questions could only be repaired and 4,075 only broken', e.repairable === 2925 && e.breakable === 4075],
+              ['memory repaired 187 of them and broke 237', e.repaired === 187 && e.broken === 237],
+              ['which is 6.39% and 5.82% on bases that are not symmetric', Math.abs(e.repairRatePp - 6.3931623931623935) < 1e-12 && Math.abs(e.breakRatePp - 5.815950920245399) < 1e-12],
+              ['an exchange of 0.789 against a hurdle of 1.393, which is the bare odds rather than parity', Math.abs(e.helpPerHarm - 0.7890295358649789) < 1e-12 && Math.abs(e.hurdle - 1.393162393162393) < 1e-12],
+              ['so the clearance is 0.566 and the memory is 43% short of paying', Math.abs(e.clearance - 0.5663586239030831) < 1e-12],
+              ['the repair rate that would break even is 8.10pp and the break rate 4.59pp', Math.abs(e.requiredRepairRatePp - 8.102564102564102) < 1e-12 && Math.abs(e.requiredBreakRatePp - 4.588957055214724) < 1e-12],
+              ['so a gate needs 47.64% of its admitted questions to be repairable, against a 41.79% base rate', Math.abs(a.precisionBar - 0.4763614499226937) < 1e-12],
+              ['admitting only the repairable questions is worth the whole 2.67pp repair rate with no breaks', Math.abs(a.ceiling.admissionPp - 2.6714285714285713) < 1e-12 && a.oracle.repairable.broken === 0 && a.oracle.repairable.repaired === 187],
+              ['and removing every break is worth 3.39pp, so the oracle is the sum', Math.abs(a.ceiling.removalPp - 3.3857142857142857) < 1e-12 && Math.abs(a.ceiling.combinedPp - 6.057142857142857) < 1e-12],
+              ['the two oracle identities hold, so the counts are the corpus counts', g['V57-admission-oracle'] === true && v('P4').holds === true],
+              ['random admission scales with coverage at every share, which is what makes the estimator usable', g['V58-admission-control'] === true && v('P3').holds === true && c.length === 6],
+              ['the widest deviation is 0.186pp at the smallest share, inside its own 0.264pp half-width', Math.abs(c[5].deviationPp - 0.18567639257294427) < 1e-9 && Math.abs(c[5].halfWidthPp - 0.2638641472929123) < 1e-6],
+              ['P1 and P2 hold: the halves carry the discords and the hurdle reproduces', v('P1').holds === true && v('P2').holds === true],
+              ['the self-knowledge gate reaches 62.4% precision on the confirmation half', Math.abs(a.selection['self-knowledge'].confirmation.precision - 0.6235119047619048) < 1e-12],
+              ['and still returns -0.05pp on an interval that covers zero', Math.abs(a.selection['self-knowledge'].confirmation.netPp + 0.05305039787798408) < 1e-12 && a.selection['self-knowledge'].confirmation.clears === false],
+              ['so P5 is refuted: the precision bar is met and the gain is not', v('P5').holds === false],
+              ['the bar moves with the selection: inside the admitted set breaks reach 9.68pp against repairs of 5.61pp', Math.abs(a.selection['self-knowledge'].within.confirmation.breakRatePp - 9.683794466403162) < 1e-12 && Math.abs(a.selection['self-knowledge'].within.confirmation.repairRatePp - 5.608591885441527) < 1e-12],
+              ['neither relevance gate clears, so the topic of what arrives is still not the variable', v('P6').holds === true && a.selection['coverage-high'].confirmation.clears === false && a.selection['coverage-low'].confirmation.clears === false],
+              ['P7 is refuted for a reason the file did not anticipate: it was written for a positive discovery gain', v('P7').holds === false && a.selection['self-knowledge'].discovery.netPp < 0],
+              ['the best point any registered curve reached out of sample is +0.11pp at 14.8% coverage', a.frontier.gate === 'conjunction' && Math.abs(a.frontier.reading.confirmation.netPp - 0.10610079575596816) < 1e-12 && Math.abs(a.frontier.reading.confirmation.share - 0.14774535809018569) < 1e-12],
+              ['on an interval that covers zero, which is 4% of the 2.67pp ceiling', a.frontier.reading.confirmation.clears === false && a.frontier.reading.confirmation.lowPp < 0 && a.frontier.shareOfCeiling < 0.04],
+              ['the statement quotes the hurdle, the precision and the share of the ceiling', a.statement.includes('1.393') && a.statement.includes('62.4%') && a.statement.includes('2.67pp') && a.statement.includes('4% of it')],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('admission failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('admission: ' + checks.length + ' checks pass, exchange ' + e.helpPerHarm.toFixed(3) +
+              ' against a hurdle of ' + e.hurdle.toFixed(3) + ', best gate ' + a.frontier.reading.confirmation.netPp.toFixed(2) +
+              'pp of a ' + a.ceiling.admissionPp.toFixed(2) + 'pp ceiling');
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

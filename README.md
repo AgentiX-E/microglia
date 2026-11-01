@@ -273,12 +273,15 @@ discards 7.8% of the questions and those questions are the damaged ones (−6.57
 databases), and it sits outside a permutation null of random discards of the same size (p = 0.0002). The
 gated arm's −0.20pp is simply not distinguishable from zero.
 
-**The pack is a reshuffle, not a drag.** Split the same 7,000 questions by what memory did rather than by what
-it was worth: it repairs **6.39%** of the 2,925 questions the bare attempt got wrong and breaks **5.82%** of the
-4,075 it got right. Per question, help is the likelier outcome. Per corpus, harm wins, because there are 40%
-more right answers to break than wrong ones to repair — **0.79 repairs per break**. That is a base effect and
-not a severity effect, and it is why the arm can flip sign out of sample while both directions keep happening at
-rates of the same order on dev too (10.26% repaired, 7.04% broken).
+**The pack is a reshuffle, and a reshuffle on unequal bases is a cost.** Split the same 7,000 questions by what
+memory did rather than by what it was worth: it repairs **6.39%** of the 2,925 questions the bare attempt got
+wrong and breaks **5.82%** of the 4,075 it got right — **0.79 repairs per break**. That ratio looks like a near
+miss against parity. Parity was never the bar. A repair can only happen on a question the bare model got wrong
+and a break only on one it got right, so memory breaks even when the exchange rate equals **the odds of the bare
+model being right**: 4,075 / 2,925 = **1.393**. Against that, 0.79 is a **43% shortfall**, and the two ways out
+are arithmetic rather than rhetorical — repairs of **8.10%** at fixed breaks, or breaks of **4.59%** at fixed
+repairs. Both directions keep happening at rates of the same order on dev too (10.26% repaired, 7.04% broken);
+the base effect is what decides the sign.
 
 Which makes the filter's precision, not its existence, the thing that decides the product. A filter that could
 see every break would remove 237 questions and be worth **3.39pp**. This one removes 548, catches 32.1% of the
@@ -321,6 +324,32 @@ the product claim stops here rather than at "a cheaper filter".
 `pnpm eval:validity` recomputes the whole reading from the same two artefacts, and the workflow asserts
 twenty-two numbers from it, including the flag rate under both rules and the Youden index against the bar
 the registration fixed before the number existed (`prereg/R33.md`).
+
+**And the population cannot rescue it either.** If memory cannot be made better, it might be shown less often:
+a repair is only possible on a question the bare model got wrong, so a gate that admits memory only to those
+would make the break rate zero by construction and collect the whole repair rate — **+2.67pp**, the largest
+number in this record. The gate does not have to be good, only better than random: it needs **47.6%** of its
+admitted questions to be ones the bare model would have failed, against a 41.8% base rate.
+
+A gate built from published selective-retrieval work (SKR's kNN signal, in lexical form: the share of a
+question's ten nearest neighbours in the same database that the bare model got wrong) reaches **62.4%
+precision** — 20.6pp over the base rate, three and a half times the lift the registration asked for — and
+returns **−0.05pp** on an interval that covers zero. The arithmetic was not wrong; it was about the wrong
+population. **The precision bar belongs to the admitted set, not to the corpus**, and selection moves it: as
+the gate tightens, the break rate *inside* the set climbs from 5.50% to **9.68%** while the repair rate stays
+flat, so the bar climbs 16.8pp alongside the gate's 20.6pp and the two never cross. A question whose
+neighbours failed is not one the pack can repair; it is one the model is *unstable* on, and an unstable
+answer breaks as easily as it is fixed.
+
+Across five gates and thirty registered points the best out-of-sample result is **+0.11pp** of that 2.67pp
+ceiling — **4.0%**, on an interval that covers zero. The read-time filter, by comparison, realised 15.2% of
+its own ceiling and still did not pay.
+
+> Nothing ships. The rules do not pay for what they cost, a smaller dose does not fix them, and no gate that
+> can run before generation selects the questions where they would help.
+
+`pnpm eval:admission` recomputes every number in that paragraph from the same artefact, and the workflow
+asserts twenty-five of them on every push (`prereg/R34-admission.md`).
 
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
 
