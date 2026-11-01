@@ -373,6 +373,35 @@ failure. The admitted questions are ones the model is *unstable* on rather than 
 rate inside the set nearly doubles (5.50% → 9.68%) while the repair rate does not move. The mechanism
 that makes memory a wash — symmetry — is the same mechanism that defeats selection on a covariate.
 
+**Injection** — one rule shown on one question. A pack of two rules over 7,000 questions is **13,578
+injections**, and a flip is counted once per rule in the prompt because attribution is not exclusive. The
+unit matters: 349 injections name a repaired question and 462 a broken one, against 424 flips.
+
+**Dispersion statistic (the ledger's)** — a χ² over per-rule counts, summed across rules, compared against
+a null that permutes **outcomes across questions** while every rule keeps the questions it was shown on.
+That null is the whole design: packs of two make rules correlate, and a binomial null would report the pack
+structure as heterogeneity. Observed 293.3 against a null whose 99th percentile is 280.4 — real, at
+p = 0.0047.
+
+**Rule reliability** — the split-half correlation of per-rule net rates across two disjoint sets of
+databases, extrapolated to full length by Spearman–Brown (`2r / (1 + r)`). It decides whether a prune is
+evidence or noise, and here it is **−0.31**: the second measurement would be better inverted. A reliability
+below roughly 0.7 means an item's measured value is mostly its own noise.
+
+**Per-item value** — the claim that a stored rule has a net effect which travels from the questions it was
+measured on to the questions it will be shown on. Pruning needs it. This store does not have it: the
+heterogeneity is an interaction between a rule and a database, not a quantity attached to the rule.
+
+**Prune flag** — the coarse, deployable form of the ledger: a rule whose net is negative over at least ten
+showings. It covers 58 rules and 2,545 questions which returned −0.55pp against −0.49pp for the rest — a
+0.06pp difference on [−1.97, +1.56], i.e. no signal rather than a weak one.
+
+**Pack size** — how many rules a prompt carries, which retrieval decides rather than the experiment. One
+rule returned **+3.07pp** and two returned **−0.96pp** on the same corpus, a difference of +4.03pp
+[+0.76, +6.62]; the contrast is positive on every artefact above a thousand questions and negative on
+every 350-question pilot. A **lead**, not a finding: the singleton questions are harder (47.3% unanswerable
+by the bare model against 41.4%) and pack size was not assigned.
+
 ## Terms this project avoids, and why
 
 | Avoided | Used instead | Why |

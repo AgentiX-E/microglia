@@ -827,3 +827,72 @@ still did not pay, so the removal route was four times as efficient and also fai
 consequence is unchanged — nothing ships — but the reason is now three-layered rather than one: the item's
 content does not matter (§8.5), its quantity does not matter (§8.6), and the population cannot be selected
 by anything measurable before generation.
+
+### 8.10 The ledger: a rule has a record, and the record is not a property of the rule
+
+§8.9 closed the population. What was left was the store itself, and it has one operational form: **prune**
+the rules that break and keep the ones that repair. Pruning presupposes that a rule's net effect travels
+from the questions it was measured on to the questions it will be shown on, and that presupposition had
+never been tested. It is false, and the way it is false is worth the section.
+
+**The unit had to be fixed before the question could be asked.** Attribution is not exclusive: a pack
+holds two rules, and a flip is credited to both. 7,000 questions therefore produce **13,578 injections**,
+349 of them on a repaired question and 462 on a broken one — counts that do not add to the 424 flips
+because each flip is named twice. Every number below is per injection.
+
+**Heterogeneity is real, and the null is the whole design.** A binomial null would compare each rule's
+rate to the corpus rate and find differences every time, because two rules in the same pack move together.
+The null used here permutes *outcomes across questions* — every rule keeps exactly the questions it was
+shown on and only what happened on them moves — so what survives is association that the pack structure
+cannot explain. It survives: χ² **293.3** against a null mean of **209.6** and a 99th percentile of
+**280.4**, p = **0.0047**.
+
+**And it does not replicate.** Databases are dealt 29/29 by a stable hash and each rule's net rate is
+measured twice, on questions the other measurement never saw:
+
+| | value |
+|---|---|
+| rules compared (≥ 5 showings in each half) | 135 |
+| correlation of the two measurements | **−0.134** [−0.296, +0.036] |
+| sign agreement, over the 53 rules that moved twice | **49.1%** |
+| Spearman–Brown, full length | **−0.309** |
+
+A negative reliability is not "no signal"; it is a signal whose second measurement would be better
+inverted. So the store's heterogeneity is an **interaction between a rule and a database** — 203 rules
+against 58 schemas, 11,774 cells over 424 flips — and not a per-item quantity anyone can rank.
+
+**The actionable form fails flatly.** A coarse flag is the version of the ledger a deployment could
+actually use: negative net over at least ten showings. It flags 58 rules covering 2,545 of the 3,770
+confirmation questions, and those returned **−0.55pp** against **−0.49pp** for the questions carrying no
+flagged rule — a difference of −0.06pp on [−1.97, +1.56]. The flag is not a noisier version of the ledger;
+it is no signal.
+
+**One structural variable does move, and it is not the content.** Pack size is assigned by retrieval —
+a question gets one rule when only one clears the threshold — and the two populations are not the same
+questions:
+
+| pack | questions | repair | break | net |
+|---|---|---|---|---|
+| one rule | 423 | 12.50% (25/200) | 5.38% (12/223) | **+3.07pp** |
+| two rules | 6,576 | 5.94% (162/2,725) | 5.84% (225/3,851) | −0.96pp |
+
+**+4.03pp [+0.76, +6.62]** on a database-clustered interval. On four other artefacts of at least 1,534
+questions the same contrast runs +4.14, +3.13, +0.62 and +0.36; on all twelve 350-question pilots it is
+negative, three of them with intervals excluding zero. The sign tracks the corpus, which is what a
+sample-size explanation predicts and what a mechanism explanation would have to argue against. It is
+recorded as a lead for R36, whose arm assigns pack size instead of observing it.
+
+```text
+  what was tested            what it showed                    what it licenses
+  ─────────────────────      ────────────────────────────      ────────────────────────
+  dispersion vs null         rules differ (p = 0.0047)         nothing
+  split-half replication     r = −0.13, sign 49.1%             nothing: a prune is a coin
+  coarse prune flag          −0.06pp [−1.97, +1.56]            nothing
+  pack size (observed)       +4.03pp [+0.76, +6.62]            one arm (R36)
+```
+
+**What it changes about the product statement.** The four earlier negatives were about *the same pack used
+differently*. This one is about the items themselves, and it is the strongest form the negative has taken:
+**a rule has no per-item value that transfers, so a store cannot be improved by editing its items one at a
+time.** Only two levers are left, and both are designs rather than edits — the grain at which memory is
+written, and the number of items a prompt carries.

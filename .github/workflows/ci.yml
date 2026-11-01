@@ -579,6 +579,53 @@ jobs:
               'pp of a ' + a.ceiling.admissionPp.toFixed(2) + 'pp ceiling');
           "
 
+      - name: The ledger does not travel (recomputed, and all seven registrations adjudicated)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/ledger" pnpm eval:ledger
+          diff -u eval/results/poc-ledger.json "${RUNNER_TEMP}/ledger/poc-ledger.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/ledger/poc-ledger.json');
+            const v = (id) => a.verdicts.find((x) => x.id === id);
+            const g = Object.fromEntries(a.gates.map((x) => [x.id, x.pass]));
+            const c = a.corpus;
+            const d = a.dispersion;
+            const r = a.replication;
+            const s = a.screening;
+            const p = a.packSize;
+            const checks = [
+              ['the artefact names the registration it was written before', a.registered === 'prereg/R35-ledger.md'],
+              ['the corpus is the one R30 stage 2 paid for, counted in injections', c.questions === 7000 && c.databases === 58 && c.rules === 203 && c.injections === 13578],
+              ['187 questions were repaired and 237 broken', c.repaired === 187 && c.broken === 237],
+              ['the split deals 29 databases each and holds every question', c.halves.databases === 29 && c.halves.discovery === 3230 && c.halves.confirmation === 3770 && g['V60-ledger-split'] === true],
+              ['135 rules were shown five times in each half', r.rules === 135 && g['V59-ledger-corpus'] === true],
+              ['the rules are not interchangeable: chi2 293.3 against a null of 209.6', Math.abs(d.repairStatistic - 293.2849546219891) < 1e-9 && Math.abs(d.nullMean - 209.57290886139242) < 1e-9],
+              ['at a 99th percentile of 280.4, so p is 0.0047 and P2 holds', Math.abs(d.nullP99 - 280.43834001379764) < 1e-9 && Math.abs(d.p - 0.0047488127968008) < 1e-12 && v('P2').holds === true],
+              ['the break side is dispersed too: chi2 236.2', Math.abs(d.breakStatistic - 236.18128302470151) < 1e-9],
+              ['and none of it travels: r = -0.134 over 135 rules', Math.abs(r.correlation + 0.13376495515487388) < 1e-12 && r.low < 0 && r.high > 0],
+              ['the sign agrees on 49.1% of the 53 rules that moved both times', Math.abs(r.signAgreement - 0.49056603773584906) < 1e-12 && r.signPairs === 53],
+              ['Spearman-Brown turns that into a negative reliability, which is worse than none', Math.abs(r.reliability + 0.30884216922622815) < 1e-12],
+              ['P3 and P4 hold: the value does not replicate, and the ledger cannot be pruned on', v('P3').holds === true && v('P4').holds === true],
+              ['58 rules looked harmful over at least ten showings', s.flaggedRules === 58 && s.flagged.questions === 2545],
+              ['they cover 2,545 of the 3,770 confirmation questions and 1,225 are clean', s.clean.questions === 1225 && s.flagged.injections === 4977 && s.clean.injections === 2322],
+              ['the flagged questions did no worse: -0.55pp against -0.49pp', Math.abs(s.flagged.netPp + 0.550098231827112) < 1e-12 && Math.abs(s.clean.netPp + 0.4897959183673469) < 1e-12],
+              ['a difference of -0.06pp on an interval that covers zero, so P5 holds', Math.abs(s.differencePp + 0.06030231345976511) < 1e-12 && s.lowPp < 0 && s.highPp > 0 && s.clears === false && v('P5').holds === true],
+              ['423 questions carried one rule and 6,576 carried two', p.single.questions === 423 && p.pair.questions === 6576],
+              ['the single-rule questions repaired 25 of 200 and broke 12 of 223', p.single.repairable === 200 && p.single.repaired === 25 && p.single.breakable === 223 && p.single.broken === 12],
+              ['which is +3.07pp against -0.96pp for the pairs', Math.abs(p.single.netPp - 3.0732860520094563) < 1e-12 && Math.abs(p.pair.netPp + 0.958029197080292) < 1e-12],
+              ['a difference of +4.03pp on [+0.76, +6.62], clustered by database', Math.abs(p.differencePp - 4.031315249089748) < 1e-12 && Math.abs(p.lowPp - 0.7633587786259541) < 1e-12 && Math.abs(p.highPp - 6.6228840821271495) < 1e-12 && p.excludesZero === true],
+              ['but the same contrast is negative in 12 of the 17 committed artefacts, so P7 holds', a.family.datasets === 17 && a.family.positive === 5 && a.family.negative === 12 && g['V61-ledger-family'] === true && v('P7').holds === true],
+              ['the power statement is 670 injections per rule, ten times what was measured', v('P6').holds === true && v('P6').observed.includes('670')],
+              ['all seven registrations hold and all three gates pass', a.verdicts.every((x) => x.holds) && a.gates.every((x) => x.pass)],
+              ['the statement quotes the null, the correlation and the reversal', a.statement.includes('0.0047') && a.statement.includes('-0.13') && a.statement.includes('+4.03pp') && a.statement.includes('12 of the 17')],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('ledger failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('ledger: ' + checks.length + ' checks pass, dispersion p ' + d.p.toFixed(4) + ' of ' + d.repairStatistic.toFixed(1) +
+              ' against ' + d.nullMean.toFixed(1) + ', split-half r ' + r.correlation.toFixed(3) + ', pack-size ' +
+              p.differencePp.toFixed(2) + 'pp in ' + a.family.positive + ' of ' + a.family.datasets + ' artefacts');
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

@@ -351,6 +351,29 @@ its own ceiling and still did not pay.
 `pnpm eval:admission` recomputes every number in that paragraph from the same artefact, and the workflow
 asserts twenty-five of them on every push (`prereg/R34-admission.md`).
 
+**And the store cannot be pruned either, for a reason that is now specific.** The obvious store-side
+intervention is to drop the rules that break and keep the ones that repair, which presupposes that a rule has
+a value that travels. It does not. Across 203 rules and 13,578 injections the per-rule records are more
+dispersed than the pack structure alone explains (χ² **293.3** against a permutation null of **209.6**,
+p = **0.0047**) — the first real structure this project has found in the store — and that structure
+**does not survive being measured somewhere else**: the same rules measured on two disjoint sets of
+databases correlate **−0.13**, agree in sign on **49.1%** of the 53 rules that moved in both halves, and a
+Spearman–Brown extrapolation gives a full-length reliability of **−0.31**. A prune built on that would
+remove rules at random. The actionable version fails too: flagging the 58 rules that looked harmful over at
+least ten showings covers 2,545 questions which returned **−0.55pp** against **−0.49pp** for the rest — a
+0.06pp difference on an interval of [−1.97, +1.56].
+
+**What does move is how many rules a prompt carries.** 423 questions whose pack held a single rule
+returned **+3.07pp** against **−0.96pp** for the 6,576 that held two: **+4.03pp [+0.76, +6.62]** on a
+database-clustered interval. It is a lead, not a finding — retrieval assigns pack size, the singleton
+questions are harder (47.3% unanswerable by the bare model against 41.4%), and the same contrast is
+negative on all twelve 350-question pilots in this repository while positive on all five artefacts with
+more than a thousand questions. Settling it needs an arm that *assigns* pack size rather than observing
+it, and that arm is half the prompt tokens of the run it replaces.
+
+`pnpm eval:ledger` recomputes every number in those two paragraphs from `poc-sota-bird-train.json`, and the
+workflow asserts twenty-four of them on every push (`prereg/R35-ledger.md`).
+
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
 
 > A rule distilled from one correction repairs **22.6%** of the questions a bare retry cannot fix —

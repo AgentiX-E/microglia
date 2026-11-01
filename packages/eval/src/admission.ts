@@ -330,9 +330,9 @@ function hashOf(text: string): number {
  * that questions inside a database are not independent, so a question-level split would put the same
  * correlation on both sides of the wall.
  */
-export function splitByDatabase(cases: readonly AdmissionCase[]): {
-  readonly discovery: readonly AdmissionCase[];
-  readonly confirmation: readonly AdmissionCase[];
+export function splitByDatabase<T extends { readonly dbId: string }>(cases: readonly T[]): {
+  readonly discovery: readonly T[];
+  readonly confirmation: readonly T[];
 } {
   // The hash is the ordering key and the id is appended to it, so two databases can never compare
   // equal and the deal cannot depend on the order the corpus was read in.

@@ -423,6 +423,25 @@ export {
 } from './admission.js';
 
 export {
+  R35_BARS,
+  adjudicateR35,
+  dispersionOf,
+  packSizeOf,
+  replicationOf,
+  screeningOf,
+  type Dispersion,
+  type LedgerCase,
+  type PackSize,
+  type PackSizeCell,
+  type PackSizeFamily,
+  type R35Input,
+  type R35Verdict,
+  type Replication,
+  type Screening,
+  type ScreeningArm,
+} from './ledger.js';
+
+export {
   MEMORY_FILTER_YOUDEN,
   R33_BARS,
   addedByPackOf,

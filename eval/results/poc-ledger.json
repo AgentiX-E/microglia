@@ -1,0 +1,571 @@
+{
+  "id": "poc-ledger",
+  "title": "Whether a stored rule has a value, and whether the value travels",
+  "registered": "prereg/R35-ledger.md",
+  "source": "eval/results/poc-sota-bird-train.json",
+  "corpus": {
+    "questions": 7000,
+    "databases": 58,
+    "rules": 203,
+    "injections": 13578,
+    "repaired": 187,
+    "broken": 237,
+    "halves": {
+      "databases": 29,
+      "discovery": 3230,
+      "confirmation": 3770
+    },
+    "rulesPerHalf": 135
+  },
+  "dispersion": {
+    "rules": 203,
+    "injections": 13578,
+    "repairs": 349,
+    "breaks": 462,
+    "repairStatistic": 293.2849546219891,
+    "breakStatistic": 236.18128302470151,
+    "nullMean": 209.57290886139242,
+    "nullP99": 280.43834001379764,
+    "p": 0.0047488127968008,
+    "permutations": 4000,
+    "unkeyed": 0
+  },
+  "replication": {
+    "rules": 135,
+    "correlation": -0.13376495515487388,
+    "low": -0.296034483637177,
+    "high": 0.03600907389882908,
+    "signAgreement": 0.49056603773584906,
+    "signPairs": 53,
+    "reliability": -0.30884216922622815
+  },
+  "screening": {
+    "flaggedRules": 58,
+    "flagged": {
+      "questions": 2545,
+      "injections": 4977,
+      "repaired": 55,
+      "broken": 69,
+      "netPp": -0.550098231827112
+    },
+    "clean": {
+      "questions": 1225,
+      "injections": 2322,
+      "repaired": 43,
+      "broken": 49,
+      "netPp": -0.4897959183673469
+    },
+    "differencePp": -0.06030231345976511,
+    "lowPp": -1.9707512102175337,
+    "highPp": 1.5637216575449568,
+    "clears": false
+  },
+  "packSize": {
+    "single": {
+      "questions": 423,
+      "repairable": 200,
+      "repaired": 25,
+      "breakable": 223,
+      "broken": 12,
+      "netPp": 3.0732860520094563
+    },
+    "pair": {
+      "questions": 6576,
+      "repairable": 2725,
+      "repaired": 162,
+      "breakable": 3851,
+      "broken": 225,
+      "netPp": -0.958029197080292
+    },
+    "differencePp": 4.031315249089748,
+    "lowPp": 0.7633587786259541,
+    "highPp": 6.6228840821271495,
+    "excludesZero": true
+  },
+  "family": {
+    "datasets": 17,
+    "positive": 5,
+    "negative": 12,
+    "flat": 0
+  },
+  "familyRows": [
+    {
+      "artefact": "poc-sota-bird-R26-channels.json",
+      "questions": 350,
+      "single": {
+        "questions": 65,
+        "repairable": 23,
+        "repaired": 0,
+        "breakable": 42,
+        "broken": 10,
+        "netPp": -15.384615384615385
+      },
+      "pair": {
+        "questions": 285,
+        "repairable": 139,
+        "repaired": 8,
+        "breakable": 146,
+        "broken": 12,
+        "netPp": -1.4035087719298245
+      },
+      "differencePp": -13.981106612685561,
+      "lowPp": -17.547792515100568,
+      "highPp": -10.603908838844932,
+      "verdict": "negative"
+    },
+    {
+      "artefact": "poc-sota-bird-anchor.json",
+      "questions": 350,
+      "single": {
+        "questions": 53,
+        "repairable": 24,
+        "repaired": 2,
+        "breakable": 29,
+        "broken": 3,
+        "netPp": -1.8867924528301887
+      },
+      "pair": {
+        "questions": 297,
+        "repairable": 137,
+        "repaired": 8,
+        "breakable": 160,
+        "broken": 9,
+        "netPp": -0.3367003367003367
+      },
+      "differencePp": -1.550092116129852,
+      "lowPp": -5.454545454545454,
+      "highPp": 2.112676056338028,
+      "verdict": "negative"
+    },
+    {
+      "artefact": "poc-sota-bird-clearance.json",
+      "questions": 350,
+      "single": {
+        "questions": 58,
+        "repairable": 22,
+        "repaired": 0,
+        "breakable": 36,
+        "broken": 4,
+        "netPp": -6.896551724137931
+      },
+      "pair": {
+        "questions": 292,
+        "repairable": 139,
+        "repaired": 12,
+        "breakable": 153,
+        "broken": 15,
+        "netPp": -1.0273972602739727
+      },
+      "differencePp": -5.869154463863958,
+      "lowPp": -10.158730158730158,
+      "highPp": -1.0955056179775282,
+      "verdict": "negative"
+    },
+    {
+      "artefact": "poc-sota-bird-dev-R24-dev-split.json",
+      "questions": 1534,
+      "single": {
+        "questions": 343,
+        "repairable": 169,
+        "repaired": 20,
+        "breakable": 174,
+        "broken": 11,
+        "netPp": 2.623906705539359
+      },
+      "pair": {
+        "questions": 1191,
+        "repairable": 484,
+        "repaired": 44,
+        "breakable": 707,
+        "broken": 62,
+        "netPp": -1.5113350125944585
+      },
+      "differencePp": 4.135241718133817,
+      "lowPp": 0.8385195330070557,
+      "highPp": 6.228604920478967,
+      "verdict": "positive"
+    },
+    {
+      "artefact": "poc-sota-bird-dev-R25-dose-and-admission.json",
+      "questions": 1534,
+      "single": {
+        "questions": 401,
+        "repairable": 189,
+        "repaired": 18,
+        "breakable": 212,
+        "broken": 9,
+        "netPp": 2.2443890274314215
+      },
+      "pair": {
+        "questions": 1133,
+        "repairable": 468,
+        "repaired": 42,
+        "breakable": 665,
+        "broken": 52,
+        "netPp": -0.8826125330979699
+      },
+      "differencePp": 3.1270015605293917,
+      "lowPp": 0.8657258397293061,
+      "highPp": 5.226173054358001,
+      "verdict": "positive"
+    },
+    {
+      "artefact": "poc-sota-bird-dev-R26-channels.json",
+      "questions": 1534,
+      "single": {
+        "questions": 380,
+        "repairable": 184,
+        "repaired": 15,
+        "breakable": 196,
+        "broken": 12,
+        "netPp": 0.7894736842105263
+      },
+      "pair": {
+        "questions": 1154,
+        "repairable": 469,
+        "repaired": 52,
+        "breakable": 685,
+        "broken": 50,
+        "netPp": 0.1733102253032929
+      },
+      "differencePp": 0.6161634589072335,
+      "lowPp": -1.8119266055045873,
+      "highPp": 2.729784690852078,
+      "verdict": "positive"
+    },
+    {
+      "artefact": "poc-sota-bird-dev.json",
+      "questions": 1534,
+      "single": {
+        "questions": 97,
+        "repairable": 50,
+        "repaired": 1,
+        "breakable": 47,
+        "broken": 2,
+        "netPp": -1.0309278350515463
+      },
+      "pair": {
+        "questions": 1437,
+        "repairable": 600,
+        "repaired": 46,
+        "breakable": 837,
+        "broken": 66,
+        "netPp": -1.3917884481558802
+      },
+      "differencePp": 0.3608606131043339,
+      "lowPp": -2.51856339088214,
+      "highPp": 3.241719520789288,
+      "verdict": "positive"
+    },
+    {
+      "artefact": "poc-sota-bird-dose.json",
+      "questions": 350,
+      "single": {
+        "questions": 61,
+        "repairable": 26,
+        "repaired": 1,
+        "breakable": 35,
+        "broken": 5,
+        "netPp": -6.557377049180328
+      },
+      "pair": {
+        "questions": 289,
+        "repairable": 135,
+        "repaired": 7,
+        "breakable": 154,
+        "broken": 12,
+        "netPp": -1.7301038062283738
+      },
+      "differencePp": -4.8272732429519545,
+      "lowPp": -16.908396946564885,
+      "highPp": 3.339157445156281,
+      "verdict": "negative"
+    },
+    {
+      "artefact": "poc-sota-bird-evidence.json",
+      "questions": 350,
+      "single": {
+        "questions": 74,
+        "repairable": 30,
+        "repaired": 0,
+        "breakable": 44,
+        "broken": 9,
+        "netPp": -12.162162162162161
+      },
+      "pair": {
+        "questions": 276,
+        "repairable": 129,
+        "repaired": 10,
+        "breakable": 147,
+        "broken": 18,
+        "netPp": -2.898550724637681
+      },
+      "differencePp": -9.26361143752448,
+      "lowPp": -14.204319069248546,
+      "highPp": -0.8598351001177857,
+      "verdict": "negative"
+    },
+    {
+      "artefact": "poc-sota-bird-framing.json",
+      "questions": 350,
+      "single": {
+        "questions": 65,
+        "repairable": 27,
+        "repaired": 1,
+        "breakable": 38,
+        "broken": 6,
+        "netPp": -7.6923076923076925
+      },
+      "pair": {
+        "questions": 285,
+        "repairable": 131,
+        "repaired": 8,
+        "breakable": 154,
+        "broken": 17,
+        "netPp": -3.1578947368421053
+      },
+      "differencePp": -4.534412955465587,
+      "lowPp": -11.3,
+      "highPp": 3.6885245901639343,
+      "verdict": "negative"
+    },
+    {
+      "artefact": "poc-sota-bird-probe.json",
+      "questions": 350,
+      "single": {
+        "questions": 33,
+        "repairable": 12,
+        "repaired": 1,
+        "breakable": 21,
+        "broken": 5,
+        "netPp": -12.121212121212121
+      },
+      "pair": {
+        "questions": 317,
+        "repairable": 149,
+        "repaired": 9,
+        "breakable": 168,
+        "broken": 15,
+        "netPp": -1.8927444794952681
+      },
+      "differencePp": -10.228467641716852,
+      "lowPp": -22.504708097928436,
+      "highPp": 5.367231638418079,
+      "verdict": "negative"
+    },
+    {
+      "artefact": "poc-sota-bird-raw.json",
+      "questions": 350,
+      "single": {
+        "questions": 62,
+        "repairable": 24,
+        "repaired": 0,
+        "breakable": 38,
+        "broken": 5,
+        "netPp": -8.064516129032258
+      },
+      "pair": {
+        "questions": 288,
+        "repairable": 137,
+        "repaired": 8,
+        "breakable": 151,
+        "broken": 12,
+        "netPp": -1.3888888888888888
+      },
+      "differencePp": -6.675627240143369,
+      "lowPp": -11.892736892736892,
+      "highPp": 2.476780185758514,
+      "verdict": "negative"
+    },
+    {
+      "artefact": "poc-sota-bird-square.json",
+      "questions": 350,
+      "single": {
+        "questions": 60,
+        "repairable": 25,
+        "repaired": 0,
+        "breakable": 35,
+        "broken": 5,
+        "netPp": -8.333333333333334
+      },
+      "pair": {
+        "questions": 290,
+        "repairable": 134,
+        "repaired": 8,
+        "breakable": 156,
+        "broken": 18,
+        "netPp": -3.4482758620689653
+      },
+      "differencePp": -4.885057471264369,
+      "lowPp": -9.926739926739925,
+      "highPp": 1.07395498392283,
+      "verdict": "negative"
+    },
+    {
+      "artefact": "poc-sota-bird-substrate.json",
+      "questions": 350,
+      "single": {
+        "questions": 65,
+        "repairable": 28,
+        "repaired": 2,
+        "breakable": 37,
+        "broken": 5,
+        "netPp": -4.615384615384615
+      },
+      "pair": {
+        "questions": 285,
+        "repairable": 136,
+        "repaired": 11,
+        "breakable": 149,
+        "broken": 13,
+        "netPp": -0.7017543859649122
+      },
+      "differencePp": -3.9136302294197027,
+      "lowPp": -11.989795918367346,
+      "highPp": 8.511488511488512,
+      "verdict": "negative"
+    },
+    {
+      "artefact": "poc-sota-bird-train.json",
+      "questions": 6999,
+      "single": {
+        "questions": 423,
+        "repairable": 200,
+        "repaired": 25,
+        "breakable": 223,
+        "broken": 12,
+        "netPp": 3.0732860520094563
+      },
+      "pair": {
+        "questions": 6576,
+        "repairable": 2725,
+        "repaired": 162,
+        "breakable": 3851,
+        "broken": 225,
+        "netPp": -0.958029197080292
+      },
+      "differencePp": 4.031315249089748,
+      "lowPp": 0.7633587786259541,
+      "highPp": 6.6228840821271495,
+      "verdict": "positive"
+    },
+    {
+      "artefact": "poc-sota-bird-transfer-repair.json",
+      "questions": 350,
+      "single": {
+        "questions": 78,
+        "repairable": 37,
+        "repaired": 2,
+        "breakable": 41,
+        "broken": 5,
+        "netPp": -3.8461538461538463
+      },
+      "pair": {
+        "questions": 272,
+        "repairable": 125,
+        "repaired": 12,
+        "breakable": 147,
+        "broken": 16,
+        "netPp": -1.4705882352941178
+      },
+      "differencePp": -2.3755656108597285,
+      "lowPp": -10.515873015873016,
+      "highPp": 7.180887748627549,
+      "verdict": "negative"
+    },
+    {
+      "artefact": "poc-sota-bird-transfer.json",
+      "questions": 350,
+      "single": {
+        "questions": 60,
+        "repairable": 27,
+        "repaired": 2,
+        "breakable": 33,
+        "broken": 6,
+        "netPp": -6.666666666666667
+      },
+      "pair": {
+        "questions": 290,
+        "repairable": 135,
+        "repaired": 6,
+        "breakable": 155,
+        "broken": 18,
+        "netPp": -4.137931034482759
+      },
+      "differencePp": -2.528735632183908,
+      "lowPp": -11.807975222609368,
+      "highPp": 3.131137422142417,
+      "verdict": "negative"
+    }
+  ],
+  "verdicts": [
+    {
+      "id": "P1",
+      "claim": "the instrument has the corpus it describes: 203 rules, 13,578 injections, both halves deep enough to compare rules",
+      "observed": "203 rules, 13578 injections, 29 databases per half, 135 rules seen five times in each",
+      "holds": true
+    },
+    {
+      "id": "P2",
+      "claim": "rule records are more dispersed than the pack structure alone can explain",
+      "observed": "chi2 293.3 against a null mean of 209.6 and a 99th percentile of 280.4, p = 0.0047",
+      "holds": true
+    },
+    {
+      "id": "P3",
+      "claim": "the dispersion does not replicate: a rule measured on one set of databases is not the same rule on another",
+      "observed": "r = -0.134 over 135 rules, sign agreement 49.1% over 53",
+      "holds": true
+    },
+    {
+      "id": "P4",
+      "claim": "the ledger is not reliable enough to prune on",
+      "observed": "Spearman-Brown reliability -0.309 at full length",
+      "holds": true
+    },
+    {
+      "id": "P5",
+      "claim": "a rule that looked harmful does not keep looking harmful where it was not measured",
+      "observed": "flagged 58 rules covering 2545 questions at -0.55pp against -0.49pp clean, difference -0.06pp [-1.97pp, +1.56pp]",
+      "holds": true
+    },
+    {
+      "id": "P6",
+      "claim": "a usable ledger is out of reach at this unit of memory",
+      "observed": "670 injections per rule (10x the measured 66.9); at a split-half correlation of -0.13 no multiple reaches 0.8",
+      "holds": true
+    },
+    {
+      "id": "P7",
+      "claim": "the pack-size lead is corpus-dependent and does not license a decision",
+      "observed": "+4.03pp [+0.76pp, +6.62pp] on this corpus, but 5 of 17 committed artefacts show it positively against 12 negatively",
+      "holds": true
+    }
+  ],
+  "gates": [
+    {
+      "id": "V59-ledger-corpus",
+      "pass": true,
+      "criterion": "the corpus is the one R30 stage 2 paid for: 7,000 questions, 58 databases, 203 rules, 13,578 injections",
+      "actual": "7000 questions, 58 databases, 203 rules, 13578 injections, 187 repaired, 237 broken"
+    },
+    {
+      "id": "V60-ledger-split",
+      "pass": true,
+      "criterion": "the two halves deal 29 databases each, share none, and between them hold every question",
+      "actual": "3230 + 3770 questions over 29 databases per half"
+    },
+    {
+      "id": "V61-ledger-family",
+      "pass": true,
+      "criterion": "the pack-size family was recomputed on at least fifteen committed artefacts and every row has a sign",
+      "actual": "17 artefacts: 5 positive, 12 negative, 0 flat"
+    }
+  ],
+  "statement": "Across 203 rules and 13578 injections, a rule's record is 293 against a permutation null of 210 (p = 0.0047), so the rules are not interchangeable — but the record does not travel: measured on one set of databases and again on another it correlates -0.13 over 135 rules with sign agreement of 49%. At 66.9 injections per rule the ledger is mostly its own noise, and a rule that looked harmful does not keep looking harmful where it was not measured (-0.06pp [-1.97pp, +1.56pp]). The one structural variable with a signal is how many rules the prompt carries: 423 questions served a single rule return +3.07pp against -0.96pp for the 6576 served two, a difference of +4.03pp [+0.76pp, +6.62pp] — and that contrast reverses on 12 of the 17 committed artefacts, so it is a corpus effect until an arm says otherwise.",
+  "notes": [
+    "The unit of the ledger is the injection, not the rule: a question with a two-rule pack credits both rules with the same flip, which is why the dispersion null permutes outcomes rather than resampling rules.",
+    "The split-half correlation is the reliability of a half-length ledger; Spearman-Brown turns it into the reliability of the full one, and that number is what a prune has to clear.",
+    "The pack-size contrast is not randomized. Retrieval serves one rule when only one clears the threshold, and those questions are harder (47.3% unanswerable by the bare model against 41.4%), so both arms are netted on their own questions and the interval is clustered by database."
+  ]
+}

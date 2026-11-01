@@ -921,6 +921,25 @@ Be honest about the preconditions; the product is only useful inside them.
     is unstable on, not one the pack can fix** — so before you build a router, check whether the signal
     you would route on predicts *ignorance* or *variance*. `pnpm eval:admission`, `prereg/R34-admission.md`.
 
+13. **Do not plan to prune the store by evidence, and do not assume two rules are better than one.**
+    Dropping the rules that break is the obvious maintenance job, and it needs something this store does
+    not have: a per-rule value that travels. Across 203 rules and 13,578 injections the records are more
+    dispersed than the pack structure explains (χ² **293.3** against a permutation null of 209.6,
+    p = **0.0047**), so rules genuinely differ — but measured again on a disjoint set of databases the same
+    rules correlate **−0.13**, agree in sign on **49.1%** of the 53 that moved twice, and extrapolate to a
+    reliability of **−0.31**. A pruned store is a randomly pruned store. The coarse flag a deployment could
+    actually run is no better: 58 rules covering 2,545 questions returned −0.55pp against −0.49pp for the
+    rest.
+
+    What *does* track the outcome is **how many rules the prompt carries**. Questions served one rule
+    returned **+3.07pp**; questions served two returned **−0.96pp** — a **+4.03pp** difference on a
+    database-clustered interval of [+0.76, +6.62]. Treat it as a lead rather than a setting, because
+    retrieval chose which questions got the single rule (they are harder: 47.3% unanswerable by the bare
+    model against 41.4%) and because the contrast is negative on every small pilot in this repository. If
+    you are wiring this into a product, **set the pack to one rule and measure**, which halves prompt
+    tokens; if you are maintaining a store, **fix the grain** rather than the items.
+    `pnpm eval:ledger`, `prereg/R35-ledger.md`.
+
 ## 13. Measuring your own generator
 
 The harness that produced every number in this repository is usable by someone else. Two files and
