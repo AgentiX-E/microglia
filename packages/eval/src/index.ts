@@ -320,13 +320,17 @@ export {
   type SimilarityPair,
 } from './embed-probe.js';
 
+export { parseContrastArgs, type ContrastPair } from './arm-contrast.js';
+
 export {
   CONTRASTS,
   HOUSE_CONVENTIONS,
   OPTIONAL_ARMS,
   PROMPT_VERSION,
   GenerationCache,
+  armPairBetween,
   armPairsAgainstFull,
+  type ArmOutcomes,
   contrastTable,
   SAMPLING_SELECTORS,
   priorScopeOf,

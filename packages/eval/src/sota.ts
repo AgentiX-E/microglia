@@ -1198,6 +1198,52 @@ export function armPairsAgainstFull(
 }
 
 /**
+ * One question's outcome under every arm it was asked, keyed by arm name.
+ *
+ * `ArmRow` above holds the same information in the shape the lane has: a fixed `full` column and a map
+ * of controls. That shape cannot express a contrast between two *controls*, and R25 registers one:
+ * `full-accepted` against `full-one`, because the question is whether the admission decision beats
+ * truncation, and `full` differs from both by an item. Widening `ArmRow` would change a type five call
+ * sites depend on; a second, narrower input does the job and says so.
+ */
+export type ArmOutcomes = Readonly<Record<string, boolean | undefined>>;
+
+/**
+ * Two named arms, paired on the questions both answered.
+ *
+ * The same estimator as `armPairsAgainstFull` and for the same reason: a difference of two deltas is a
+ * point estimate with no interval, and this record has already had to withdraw one comparison computed
+ * that way. `undefined` when no question carries both arms, which is the honest answer for a pair
+ * nothing measured — not a zero.
+ */
+export function armPairBetween(
+  rows: readonly ArmOutcomes[],
+  left: string,
+  right: string,
+  seed = 7,
+  resamples = 10_000,
+): ArmPair | undefined {
+  const scored = rows.filter((row) => row[left] !== undefined && row[right] !== undefined);
+  if (scored.length === 0) return undefined;
+  const comparison = comparePaired(
+    scored.map((row) => row[right] === true),
+    scored.map((row) => row[left] === true),
+    seed,
+    resamples,
+  );
+  return {
+    arm: left,
+    deltaPp: comparison.delta * 100,
+    ciLowPp: comparison.deltaCI.low * 100,
+    ciHighPp: comparison.deltaCI.high * 100,
+    p: comparison.p,
+    n: comparison.n,
+    lost: comparison.lost,
+    gained: comparison.gained,
+  };
+}
+
+/**
  * How many of one arm's prompts carried the framing that arm declares.
  *
  * The failure this counts against is the one this project keeps finding: an arm named in a

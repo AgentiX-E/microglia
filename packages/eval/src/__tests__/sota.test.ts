@@ -7,6 +7,7 @@ import {
   OPTIONAL_ARMS,
   PROMPT_VERSION,
   CONTRASTS,
+  armPairBetween,
   armPairsAgainstFull,
   buildValidityGates,
   contrastTable,
@@ -1991,6 +1992,71 @@ describe('armPairsAgainstFull', () => {
     expect(pair).toMatchObject({ n: 20, deltaPp: 0, lost: 0, gained: 0, p: 1 });
     expect(pair?.ciLowPp).toBe(0);
     expect(pair?.ciHighPp).toBe(0);
+  });
+});
+
+describe('armPairBetween', () => {
+  it('pairs two controls on the questions both answered', () => {
+    // The contrast R25 registers: neither side is `full`, so `armPairsAgainstFull` cannot express it
+    // and subtracting two deltas would give a point estimate with no interval.
+    const rows = [
+      { full: true, none: false, 'full-one': true, 'full-accepted': true },
+      { full: false, none: false, 'full-one': true, 'full-accepted': false },
+      { full: true, none: true, 'full-one': true, 'full-accepted': false },
+      { full: true, none: true, 'full-one': true, 'full-accepted': true },
+    ];
+    const pair = armPairBetween(rows, 'full-accepted', 'full-one');
+    expect(pair).toMatchObject({ arm: 'full-accepted', n: 4, gained: 0, lost: 2, deltaPp: -50 });
+  });
+
+  it('reads the left arm as the treatment', () => {
+    // The sign convention is the whole report: `deltaPp` is `left - right`, so a positive number
+    // means the admission arm beat truncation. A flipped sign here is a published error.
+    const rows = [
+      { 'full-one': false, 'full-accepted': true },
+      { 'full-one': false, 'full-accepted': true },
+      { 'full-one': true, 'full-accepted': true },
+    ];
+    expect(armPairBetween(rows, 'full-accepted', 'full-one')).toMatchObject({ gained: 2, lost: 0 });
+    expect(armPairBetween(rows, 'full-one', 'full-accepted')).toMatchObject({ gained: 0, lost: 2 });
+  });
+
+  it('skips questions where either side has no outcome', () => {
+    // A refused question has an outcome (it was asked with an empty block), but an arm the run never
+    // configured has none. The two must not be conflated, or a partially run arm reads as one that
+    // answered wrongly on every question it was not asked.
+    const rows = [
+      { 'full-one': true, 'full-accepted': undefined },
+      { 'full-one': false, 'full-accepted': true },
+    ];
+    expect(armPairBetween(rows, 'full-accepted', 'full-one')).toMatchObject({ n: 1, gained: 1 });
+  });
+
+  it('returns nothing when no question carries both arms', () => {
+    // Not a zero: a pair nothing measured has no estimate, and a fabricated interval around it would
+    // be the most confident possible statement about no data.
+    expect(armPairBetween([{ 'full-one': true }], 'full-accepted', 'full-one')).toBeUndefined();
+    expect(armPairBetween([], 'a', 'b')).toBeUndefined();
+  });
+
+  it('agrees with the against-full pairing when the pair is full and a control', () => {
+    // Two estimators over the same rows must give the same answer, or one of them is wrong for the
+    // pairs where both apply and a reader has to know which.
+    const rows = [
+      { full: true, arms: { gated: false } },
+      { full: true, arms: { gated: true } },
+      { full: false, arms: { gated: false } },
+    ];
+    const viaFull = armPairsAgainstFull(rows)[0];
+    const direct = armPairBetween(
+      rows.map((row) => ({ full: row.full, gated: row.arms.gated })),
+      'gated',
+      'full',
+    );
+    expect(direct?.deltaPp).toBe(viaFull?.deltaPp);
+    expect(direct?.n).toBe(viaFull?.n);
+    expect(direct?.lost).toBe(viaFull?.lost);
+    expect(direct?.gained).toBe(viaFull?.gained);
   });
 });
 
