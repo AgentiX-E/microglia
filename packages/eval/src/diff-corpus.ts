@@ -25,6 +25,8 @@ export type QueryCaseRecord = {
   readonly correct: boolean;
   readonly withoutMemoryCorrect: boolean;
   readonly difficulty?: string;
+  /** The reference query, which is what the answer required rather than what was produced. */
+  readonly goldSql?: string;
   readonly packIdList?: readonly string[];
   /** The rendered rule text the model read, when the lane stored it (R31 onwards). */
   readonly injected?: readonly string[];
@@ -54,6 +56,10 @@ export function diffCasesOf(run: CommittedRun, source = 'the artefact'): readonl
     delta: diffQueries(entry.baselineSql, entry.predictedSql, entry.question, entry.evidence ?? ''),
     correct: entry.correct,
     withoutMemoryCorrect: entry.withoutMemoryCorrect,
+    question: entry.question,
+    ...(entry.evidence === undefined ? {} : { evidence: entry.evidence }),
     ...(entry.packIdList === undefined ? {} : { packIdList: entry.packIdList }),
+    ...(entry.goldSql === undefined ? {} : { goldSql: entry.goldSql }),
+    ...(entry.difficulty === undefined ? {} : { difficulty: entry.difficulty }),
   }));
 }

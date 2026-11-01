@@ -22,7 +22,7 @@
     "test": "vitest run --coverage",
     "test:unit": "vitest run",
     "bench": "pnpm build && node packages/eval/dist/bench/run.js",
-    "check": "pnpm typecheck && pnpm typecheck:lanes && pnpm test && pnpm audit:repo && pnpm eval:integrity && pnpm eval:memform && pnpm eval:l0 && pnpm eval:pairs && pnpm eval:delivery && pnpm eval:protocol && pnpm eval:query-diff && pnpm eval:mediation && pnpm eval:stability && pnpm eval:feature-overlap && pnpm eval:rule-form && pnpm bench && pnpm bundle:size",
+    "check": "pnpm typecheck && pnpm typecheck:lanes && pnpm test && pnpm audit:repo && pnpm eval:integrity && pnpm eval:memform && pnpm eval:l0 && pnpm eval:pairs && pnpm eval:delivery && pnpm eval:protocol && pnpm eval:query-diff && pnpm eval:mediation && pnpm eval:stability && pnpm eval:feature-overlap && pnpm eval:rule-form && pnpm eval:referent && pnpm bench && pnpm bundle:size",
     "eval:llm-reader": "tsx packages/eval/src/bin/llm-reader.ts",
     "eval:llm-distill": "tsx packages/eval/src/bin/llm-distill.ts",
     "eval:embedding": "tsx packages/eval/src/bin/embedding.ts",
@@ -62,6 +62,7 @@
     "eval:split-precheck": "tsx packages/eval/src/bin/split-precheck.ts",
     "eval:feature-overlap": "tsx packages/eval/src/bin/feature-overlap.ts",
     "eval:rule-form": "tsx packages/eval/src/bin/rule-form.ts",
+    "eval:referent": "tsx packages/eval/src/bin/referent.ts",
     "eval:mediation": "tsx packages/eval/src/bin/mediation.ts",
     "eval:stability": "tsx packages/eval/src/bin/gate-stability.ts"
   },

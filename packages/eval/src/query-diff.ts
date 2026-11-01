@@ -54,6 +54,14 @@ export type DiffCase = {
    * cannot end up over two different corpora.
    */
   readonly packIdList?: readonly string[];
+  /** The question as the model read it, carried for readings about what it asked for. */
+  readonly question?: string;
+  /** The external-knowledge block, which a solver may read and which therefore grounds a name. */
+  readonly evidence?: string;
+  /** The reference query, carried for readings that need what the answer required. */
+  readonly goldSql?: string;
+  /** The benchmark's own difficulty label, which is the stratification variable the run supplies. */
+  readonly difficulty?: string;
 };
 
 /**

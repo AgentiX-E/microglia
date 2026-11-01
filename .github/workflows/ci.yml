@@ -397,6 +397,38 @@ jobs:
               whole.gapPp.toFixed(2) + 'pp with ' + db.negative + ' of ' + db.databases + ' databases against it');
           "
 
+      # R32 axis 3: whether the damage is a property of an ambiguous question. The assertion that
+      # matters is the one that refuses the prediction — the band naming none of its columns is
+      # destroyed least, and both difficulty strata that can be read say so independently.
+      - name: Referent coverage (recomputed, and the refutation asserted)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/referent" pnpm eval:referent
+          diff -u eval/results/poc-referent.json "${RUNNER_TEMP}/referent/poc-referent.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/referent/poc-referent.json');
+            const o = a.overall;
+            const sum = a.buckets.reduce((total, b) => total + o[b].n, 0);
+            const strata = (name) => a.byDifficulty.find((d) => d.difficulty === name).strata;
+            const checks = [
+              ['the corpus is the dev run', a.n === 1534],
+              ['the four bands partition it', sum === a.n],
+              ['nothing is named in 131 questions', o.none.n === 131],
+              ['everything is named in 181', o.all.n === 181],
+              ['the band that names nothing starts most correct than the middle band', o.none.baselineAccuracy > o.most.baselineAccuracy],
+              ['and is destroyed least of all four', o.none.harmedPerCorrectPp < Math.min(o.few.harmedPerCorrectPp, o.most.harmedPerCorrectPp, o.all.harmedPerCorrectPp)],
+              ['so the ambiguity axis is refuted', a.verdict === 'refuted'],
+              ['the simple stratum says the same', strata('simple').none.harmedPerCorrectPp < strata('simple').most.harmedPerCorrectPp],
+              ['and so does the moderate one', strata('moderate').none.harmedPerCorrectPp < strata('moderate').most.harmedPerCorrectPp],
+              ['the reading names the direction rather than only the verdict', a.reading.includes('least damaged')],
+              ['four bands, always', a.buckets.join(',') === 'none,few,most,all'],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('referent failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('referent: ' + checks.length + ' checks pass, destroyed ' + o.none.harmedPerCorrectPp.toFixed(2) +
+              '% where nothing is named against ' + o.all.harmedPerCorrectPp.toFixed(2) + '% where everything is');
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

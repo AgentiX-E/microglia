@@ -389,6 +389,15 @@ export {
 } from './feature-overlap.js';
 
 export {
+  bucketOf,
+  referentOf,
+  referentSplitOf,
+  type ReferentBucket,
+  type ReferentReading,
+  type ReferentStratum,
+} from './referent.js';
+
+export {
   RELAXED_MARKERS,
   SEPARATION_BAR as RULE_FORM_SEPARATION_BAR,
   STRICT_MARKERS,

@@ -1,0 +1,195 @@
+{
+  "id": "poc-referent",
+  "title": "Whether an ambiguous question is the kind a pack damages",
+  "source": "eval/results/poc-sota-bird-dev-R26-channels.json",
+  "sourceGeneratedAt": "2026-11-01T02:44:56.507Z",
+  "registered": "ROADMAP.md §R32 candidate 3 (microglia-docs 20e6154)",
+  "n": 1534,
+  "buckets": [
+    "none",
+    "few",
+    "most",
+    "all"
+  ],
+  "overall": {
+    "none": {
+      "n": 131,
+      "helped": 7,
+      "harmed": 1,
+      "deltaPp": 4.580152671755725,
+      "halfWidthPp": 4.231845163742392,
+      "baselineAccuracy": 0.5725190839694656,
+      "harmedPerCorrectPp": 1.3333333333333335,
+      "helpedPerWrongPp": 12.5
+    },
+    "few": {
+      "n": 444,
+      "helped": 22,
+      "harmed": 18,
+      "deltaPp": 0.9009009009009009,
+      "halfWidthPp": 2.7919208170855963,
+      "baselineAccuracy": 0.6036036036036037,
+      "harmedPerCorrectPp": 6.7164179104477615,
+      "helpedPerWrongPp": 12.5
+    },
+    "most": {
+      "n": 778,
+      "helped": 33,
+      "harmed": 35,
+      "deltaPp": -0.2570694087403599,
+      "halfWidthPp": 2.077451677689104,
+      "baselineAccuracy": 0.5347043701799485,
+      "harmedPerCorrectPp": 8.413461538461538,
+      "helpedPerWrongPp": 9.116022099447514
+    },
+    "all": {
+      "n": 181,
+      "helped": 5,
+      "harmed": 8,
+      "deltaPp": -1.6574585635359116,
+      "halfWidthPp": 3.90435386735327,
+      "baselineAccuracy": 0.6740331491712708,
+      "harmedPerCorrectPp": 6.557377049180328,
+      "helpedPerWrongPp": 8.47457627118644
+    }
+  },
+  "byDifficulty": [
+    {
+      "difficulty": "challenging",
+      "strata": {
+        "none": {
+          "n": 6,
+          "helped": 0,
+          "harmed": 0,
+          "deltaPp": 0,
+          "halfWidthPp": 0,
+          "baselineAccuracy": 0.8333333333333334,
+          "harmedPerCorrectPp": 0,
+          "helpedPerWrongPp": 0
+        },
+        "few": {
+          "n": 36,
+          "helped": 3,
+          "harmed": 3,
+          "deltaPp": 0,
+          "halfWidthPp": 13.336110821819524,
+          "baselineAccuracy": 0.5,
+          "harmedPerCorrectPp": 16.666666666666664,
+          "helpedPerWrongPp": 16.666666666666664
+        },
+        "most": {
+          "n": 93,
+          "helped": 6,
+          "harmed": 3,
+          "deltaPp": 3.225806451612903,
+          "halfWidthPp": 6.32258064516129,
+          "baselineAccuracy": 0.4838709677419355,
+          "harmedPerCorrectPp": 6.666666666666667,
+          "helpedPerWrongPp": 12.5
+        },
+        "all": {
+          "n": 10,
+          "helped": 1,
+          "harmed": 0,
+          "deltaPp": 10,
+          "halfWidthPp": 19.6,
+          "baselineAccuracy": 0.5,
+          "harmedPerCorrectPp": 0,
+          "helpedPerWrongPp": 20
+        }
+      }
+    },
+    {
+      "difficulty": "moderate",
+      "strata": {
+        "none": {
+          "n": 18,
+          "helped": 1,
+          "harmed": 0,
+          "deltaPp": 5.555555555555555,
+          "halfWidthPp": 10.888888888888888,
+          "baselineAccuracy": 0.2777777777777778,
+          "harmedPerCorrectPp": 0,
+          "helpedPerWrongPp": 7.6923076923076925
+        },
+        "few": {
+          "n": 130,
+          "helped": 5,
+          "harmed": 2,
+          "deltaPp": 2.307692307692308,
+          "halfWidthPp": 3.9889788997589215,
+          "baselineAccuracy": 0.5615384615384615,
+          "harmedPerCorrectPp": 2.73972602739726,
+          "helpedPerWrongPp": 8.771929824561402
+        },
+        "most": {
+          "n": 273,
+          "helped": 8,
+          "harmed": 14,
+          "deltaPp": -2.197802197802198,
+          "halfWidthPp": 3.3674779814116933,
+          "baselineAccuracy": 0.48717948717948717,
+          "harmedPerCorrectPp": 10.526315789473683,
+          "helpedPerWrongPp": 5.714285714285714
+        },
+        "all": {
+          "n": 43,
+          "helped": 0,
+          "harmed": 2,
+          "deltaPp": -4.651162790697675,
+          "halfWidthPp": 6.44618274942155,
+          "baselineAccuracy": 0.5813953488372093,
+          "harmedPerCorrectPp": 8,
+          "helpedPerWrongPp": 0
+        }
+      }
+    },
+    {
+      "difficulty": "simple",
+      "strata": {
+        "none": {
+          "n": 107,
+          "helped": 6,
+          "harmed": 1,
+          "deltaPp": 4.672897196261682,
+          "halfWidthPp": 4.846422962323923,
+          "baselineAccuracy": 0.6074766355140186,
+          "harmedPerCorrectPp": 1.5384615384615385,
+          "helpedPerWrongPp": 14.285714285714285
+        },
+        "few": {
+          "n": 278,
+          "helped": 14,
+          "harmed": 13,
+          "deltaPp": 0.3597122302158274,
+          "halfWidthPp": 3.663474369965827,
+          "baselineAccuracy": 0.6366906474820144,
+          "harmedPerCorrectPp": 7.344632768361582,
+          "helpedPerWrongPp": 13.861386138613863
+        },
+        "most": {
+          "n": 412,
+          "helped": 19,
+          "harmed": 18,
+          "deltaPp": 0.24271844660194172,
+          "halfWidthPp": 2.8937413979088613,
+          "baselineAccuracy": 0.5776699029126213,
+          "harmedPerCorrectPp": 7.563025210084033,
+          "helpedPerWrongPp": 10.919540229885058
+        },
+        "all": {
+          "n": 128,
+          "helped": 4,
+          "harmed": 6,
+          "deltaPp": -1.5625,
+          "halfWidthPp": 4.8422376671328315,
+          "baselineAccuracy": 0.71875,
+          "harmedPerCorrectPp": 6.521739130434782,
+          "helpedPerWrongPp": 11.11111111111111
+        }
+      }
+    }
+  ],
+  "verdict": "refuted",
+  "reading": "the band that names none of its columns is the least damaged, not the most"
+}
