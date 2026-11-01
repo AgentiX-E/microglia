@@ -151,7 +151,20 @@ effect, it answers a question no interval can: *is there anything here for a bet
 A ceiling of 2.35pp against an instrument that resolves 2.01pp means no further experiment on that split
 can distinguish a perfect mechanism from an inert one — the line is closed by arithmetic, not by defeat.
 
+**Channel arm** — an arm that changes what the model *knows* rather than what it is told about its own past
+mistakes: the schema annotated with the values each column holds (`values`), or pruned to the tables the
+question names (`linked`). Its validity condition is that it rewrote the prompt at all — an annotator that
+annotated no column and a pruner that pruned no table are the control under another name, and the null
+either publishes is about the name rather than about the channel. `V51-channel-applied` is the gate, and it
+holds the two kinds to different floors because annotation is unconditional and pruning is not.
 
+**Outcome-blind stratifier** — a division of the questions computed from the inputs alone — question, hint,
+schema — and never from any arm's result. A stratum defined by one arm's outcome cannot be used to estimate
+a contrast involving that arm: conditioning on "failed without the hint" pulls that arm's rate down inside
+the stratum, and part of the difference that follows is regression to the mean. Every stratification this
+record publishes is outcome-blind for that reason.
+
+**Memory prior** — a table keyed on the shape of an executed result, holding how often results of that
 shape turned out to be correct, read from the other folds. It is the object a verifier reads when memory
 *judges* a candidate instead of proposing one: no rule text, no relevance filter, no embedding, only
 "on this shape, were we right before". The strength of the idea is that the key is a property of the

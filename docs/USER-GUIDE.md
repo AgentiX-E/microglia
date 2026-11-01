@@ -1710,6 +1710,50 @@ SOTA_ARMS=none,full,full-one,full-accepted pnpm eval:sota
   unchecked: `SOTA_ARTEFACT=eval/results/<run>.json pnpm eval:arm-contrast --left full-accepted --right full-one`
   reprints the contrast, the interval and the discordant pairs from the committed file.
 
+### 13.17 Two channels that change the schema, and the gate that proves they fired
+
+Everything up to here changed *what the model was told about past mistakes*. R26 changed *what the model knows
+about the database*: `values` annotates every column with the values it holds, `linked` prunes the schema to
+the tables the question names. Both are one-flag arms, and one of them is the largest single effect in this
+guide's measurements — in the wrong direction.
+
+```bash
+SOTA_SPLIT=dev SOTA_LEARN_SAMPLE=280 SOTA_PREREG=R26-channels \
+SOTA_ARMS=none,full,values,linked pnpm eval:sota
+# V51-channel-applied fails the run unless each channel arm actually rewrote the prompt
+```
+
+```jsonc
+// poc-sota-bird-dev-R26-channels.json — 1,534 questions, 5 folds, 6,504 calls, thirteen gates
+{ "none":   { "accuracy": 0.5743 },   // 881/1534
+  "full":   { "accuracy": 0.5776 },   // 886/1534 — the pack, as the anchor
+  "values": { "accuracy": 0.5860 },   // 899/1534 — every column annotated with its values
+  "linked": { "accuracy": 0.4817 } }  // 739/1534 — schema pruned to the named tables
+
+// values - none   +1.17pp  [-0.13, +2.48]   64 gained / 46 lost   p = 0.1046
+// linked - none   -9.26pp  [-10.95, -7.63]  24 gained / 166 lost  p < 1e-4
+```
+
+- **Do not prune the schema to the tables the question names.** −9.26pp is 4.5 times this split's detection
+  floor, with 166 questions broken against 24 repaired, and the damage is worst on the easiest questions
+  (`simple` −10.2pp, `moderate` −8.4pp, `challenging` −5.5pp). The evidence sentence routinely names a table the
+  question does not, and a pruner deletes exactly that table. **The whole DDL is the better prompt**, and the
+  published schema-linking ablations (RSL-SQL 12.71pp) price the removal of a component those systems already
+  have, not the addition of one you do not.
+- **Column-value annotation is worth about a point and cannot be confirmed here.** +1.17pp, 64 gained against
+  46 lost, p = 0.10 — the largest positive prompt-side effect this project has measured — with an interval
+  [−0.13, +2.48] on a split that resolves 2.07pp. If your budget is one experiment, this is a candidate; if
+  your budget is one *claim*, it is not yet one.
+- **A channel arm that rewrote nothing is your control under another name.** `V51` is why the numbers above
+  mean something: `values` fired on **1534/1534** prompts and `linked` on **558/1534 (36.4%)**. Without that
+  reading, an annotator whose value sampler returned no rows would report `full`'s +0.33pp as "annotation is
+  inert". The gate holds the two kinds to different floors (95% and 1%) because annotation is unconditional and
+  pruning is not, and it prints the share rather than thresholding it.
+- **Measure the channel on the split that can see it.** The same two arms at n=350 read +1.43pp [−1.43, +4.29]
+  and −7.71pp [−11.14, −4.57] against a 4.87pp floor: the numbers are consistent, the *conclusions* are not,
+  and the 350-question panel cannot tell a one-point annotation from zero.
+
+
 
 ## 14. Performance and limits
 
