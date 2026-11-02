@@ -376,6 +376,24 @@ a lane whose model runs in this process. A lane that could not state them could 
 a scenario able to prove four gates proved none — the loss was a **type-level requirement, not a missing
 measurement**, and the two have different fixes.
 
+**Stage 1 of R29 is the fix for the first half.** The driver now exports `instrument()`, which returns the arm
+record the protocol reads: the mean items the recall facade served, the call tally, the learning bookkeeping and
+the domain ledger, all counted at the points where they actually happen. Four decisions in
+`packages/eval/src/tau2-instrument.ts` are worth knowing when you read a τ² artefact, because each of them is a
+way an instrument gate can lie:
+
+| the temptation | why it is refused |
+|---|---|
+| an empty pack set is "not applicable" | it is V1's failure case; `undefined` would turn "injected nothing" into "not asked" |
+| no calls is a 0% failure rate | `0/0` reported as `0` is the strongest reliability claim on no evidence, so the field is omitted |
+| an unobservable distillation count is `0` | `0` is a perfect V32 on a quantity nobody measured; the record is omitted instead |
+| de-duplicate the held-out list before the gate sees it | V2 asks whether every question was asked once; a record that tidies its own input answers its own question |
+
+The lane does not grade the protocol's gates itself: `l4` writes the record into the artefact and `l4-pair`
+grades the pair through `tau2GateAudit`, because most of those gates read two arms and one arm cannot answer
+them. That keeps the direction of the comparison honest — a single artefact can supply a reading, but only a
+pair can supply a verdict.
+
 ```ts
 export interface LaneAdapter<Task, Candidate> {
   load(): Promise<readonly Task[]>;                              // the task order the folds assume
