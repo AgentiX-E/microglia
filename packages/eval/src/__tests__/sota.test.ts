@@ -1532,7 +1532,7 @@ describe('buildValidityGates', () => {
     );
     expect(entry.pass).toBe(true);
     expect(entry.blocking).toBe(true);
-    expect(entry.actual).toBe('22 item(s) with no domain, 15 arrived unscoped, 9 widened');
+    expect(entry.actual).toBe('22 of 100 item(s) with no domain, 15 arrived unscoped, 9 widened');
   });
 
   it('V44 passes on a store that has no domain-free item at all', () => {
@@ -1551,7 +1551,21 @@ describe('buildValidityGates', () => {
       'V44-domain-accounted',
     );
     expect(entry.pass).toBe(false);
-    expect(entry.actual).toBe('5 item(s) with no domain, 1 arrived unscoped, 0 widened');
+    expect(entry.actual).toBe('5 of 100 item(s) with no domain, 1 arrived unscoped, 0 widened');
+  });
+
+  it('V44 fails on an empty store, which reconciles nothing', () => {
+    // `0 <= 0` is true, and it certified the first cross-domain dispatch: the store held no items,
+    // the ledger agreed with itself, and the gate appeared beside `V1`'s empty pack as if the two
+    // were independent findings. A blocking gate that passes over an empty population is a gate
+    // that certifies nothing, and it was the reason that pair looked valid enough to read.
+    const entry = gate(
+      { ...sound, domainOrigin: { storedWithDomain: 0, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 } },
+      'V44-domain-accounted',
+    );
+    expect(entry.pass).toBe(false);
+    expect(entry.blocking).toBe(true);
+    expect(entry.actual).toBe('the store holds no item, so there is no ledger to account for');
   });
 
   it('V48 is absent when the run does not report its statements', () => {

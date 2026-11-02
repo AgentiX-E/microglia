@@ -911,13 +911,23 @@ export function buildProtocolGates(
     // the loss. Anything beyond those two is an item that lost its domain somewhere nobody
     // instrumented, which is the shape of every instrument defect this audit has recorded — so the
     // check is an inequality rather than an accounting identity, and a surplus fails the run.
-    const { storedWithoutDomain, unscopedIn, widenedIn } = input.domainOrigin;
+    //
+    // The population is part of the criterion. `0 <= 0` is true, and the first cross-domain dispatch
+    // was certified by it: the store held no items at all, so the ledger reconciled nothing, passed,
+    // and appeared beside `V1`'s "the pack was empty" as if the two were different findings. A gate
+    // that certifies an empty population is a gate that certifies nothing, and it is blocking, so it
+    // was the reason the pair looked valid.
+    const { storedWithDomain, storedWithoutDomain, unscopedIn, widenedIn } = input.domainOrigin;
+    const stored = storedWithDomain + storedWithoutDomain;
     gates.push({
       id: 'V44-domain-accounted',
       criterion:
-        'every item with no domain either arrived without one or lost it to a recorded widening',
-      actual: `${storedWithoutDomain} item(s) with no domain, ${unscopedIn} arrived unscoped, ${widenedIn} widened`,
-      pass: storedWithoutDomain <= unscopedIn + widenedIn,
+        'the store holds at least one item, and every item with no domain either arrived without one or lost it to a recorded widening',
+      actual:
+        stored === 0
+          ? 'the store holds no item, so there is no ledger to account for'
+          : `${storedWithoutDomain} of ${stored} item(s) with no domain, ${unscopedIn} arrived unscoped, ${widenedIn} widened`,
+      pass: stored > 0 && storedWithoutDomain <= unscopedIn + widenedIn,
       blocking: true,
     });
   }
