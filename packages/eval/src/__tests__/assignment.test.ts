@@ -3,6 +3,7 @@ import {
   R36_BARS,
   adjudicateR36,
   assignmentOf,
+  foldPairsOf,
   foldsOf,
   packAssignCasesOf,
   singleSlotOf,
@@ -481,5 +482,65 @@ describe('foldsOf', () => {
       const net = fold.repairsGained + fold.breaksSaved - fold.repairsLost - fold.breaksGained;
       expect(net).toBe(fold.netChange);
     }
+  });
+
+  it('carries an interval per fold, and it contains the fold\u2019s own point estimate', () => {
+    // A per-fold sign without an interval invites reading four questions on 307 as a finding.
+    const cases = [
+      ...uniform(40, false, true, false).map((entry) => ({ ...entry, fold: 0 })),
+      ...uniform(40, false, false, true).map((entry, at) => ({ ...entry, dbId: `x${at % 3}`, fold: 1 })),
+    ];
+    for (const fold of foldsOf(cases)) {
+      expect(fold.clusteredLowPp).toBeLessThanOrEqual(fold.deltaPp);
+      expect(fold.clusteredHighPp).toBeGreaterThanOrEqual(fold.deltaPp);
+      expect(fold.p).toBeGreaterThanOrEqual(0);
+      expect(fold.p).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+describe('foldPairsOf', () => {
+  const fold = (id: number, netChange: number, low: number, high: number) => ({
+    fold: id,
+    questions: 307,
+    repairsGained: 0,
+    repairsLost: 0,
+    breaksGained: 0,
+    breaksSaved: 0,
+    netChange,
+    deltaPp: netChange / 3.07,
+    clusteredLowPp: low,
+    clusteredHighPp: high,
+    p: 0.5,
+  });
+
+  it('pairs the same fold across two store draws and reports whether the sign survived', () => {
+    const pairs = foldPairsOf(
+      [fold(0, 4, -2, 6), fold(1, -5, -9, -1)],
+      [fold(0, 5, -3, 8), fold(1, 2, -4, 7)],
+    );
+    expect(pairs.map((entry) => entry.fold)).toEqual([0, 1]);
+    expect(pairs[0]?.sameSign).toBe(true);
+    expect(pairs[1]?.sameSign).toBe(false);
+  });
+
+  it('drops a fold the other artefact does not carry instead of padding it', () => {
+    // A padded fold would compare two different question sets and call the difference a replication.
+    const pairs = foldPairsOf([fold(0, 1, -1, 2), fold(1, 1, -1, 2)], [fold(1, 1, -1, 2)]);
+    expect(pairs.map((entry) => entry.fold)).toEqual([1]);
+  });
+
+  it('says when both intervals span zero, which is what agreement on noise looks like', () => {
+    const spanning = foldPairsOf([fold(0, 4, -2, 6)], [fold(0, 5, -3, 8)]);
+    expect(spanning[0]?.bothSpanZero).toBe(true);
+    const decided = foldPairsOf([fold(0, 4, 1, 6)], [fold(0, 5, 2, 8)]);
+    expect(decided[0]?.bothSpanZero).toBe(false);
+  });
+
+  it('carries the two sides separately, which is what a fold that only looks decided needs', () => {
+    // The interesting fold is the one whose interval excluded zero on the first draw: a second draw that
+    // covers zero is a refuted fold, and a single combined flag could not say which side moved.
+    const pairs = foldPairsOf([fold(3, -5, -7, -1)], [fold(3, -1, -3, 2)]);
+    expect(pairs[0]).toMatchObject({ firstSpansZero: false, secondSpansZero: true, bothSpanZero: false });
   });
 });

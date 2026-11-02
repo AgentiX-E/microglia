@@ -937,19 +937,34 @@ the number of items — a budget, a top-k, a density panel — is tuning an inte
 the exchange rate says the same thing from the other side: the pair clears **0.737** of the bare model's
 1.335 hurdle and the single rule clears **0.672**, so truncation moves the arm *away* from paying.
 
-**Read per fold, the interaction does not keep one sign.** The store is distilled once per fold, so §8.11's
-four cells are five readings rather than one, and `foldsOf` returns them as a table: folds 0 and 4 are
-exactly flat, fold 2 is **+4**, and folds 1 and 3 are **−4** and **−5**. The five rows sum to the pooled −5
-by construction, and that identity is asserted alongside the pooled one. A cross-term that changes sign
-between folds of a single split belongs to the store that fold was given, not to packs — which is the
-strongest form of the argument, because the pooled table can only show that the interaction is not a
-subtraction, while the per-fold table shows it is not a stable quantity at all.
+**Read per fold, and then on a second store, the interaction is never decidable.** The store is distilled
+once per fold, so §8.11's four cells are five readings rather than one, and `foldsOf` returns them with an
+interval each. The split is seeded, so fold *k* holds the same questions in both store draws the project has,
+which makes the two tables **paired** — `foldPairsOf` reports, per fold, whether the sign survived and whether
+each draw's interval spans zero:
+
+| fold | questions | first draw | second draw | both span zero |
+|---|---|---|---|---|
+| 0 | 307 | 0 | −2 | yes |
+| 1 | 307 | −4 | −1 | yes |
+| 2 | 307 | +4 | +5 | yes |
+| 3 | 307 | −5 [−2.55, −0.66] | −1 [−2.93, +2.06] | first **no**, second yes |
+| 4 | 306 | 0 | −2 | yes |
+
+The rows sum to each draw's pooled net (−5 and −1) by construction, and that identity is asserted at both
+levels. Three folds keep their sign; the two that do not are exactly zero on the first draw and have none to
+keep. **The one fold that looked decided — fold 3, the only interval in either draw that excludes zero —
+covers zero on the second store**, and the fold that is positive twice spans zero both times. So the
+per-fold table's verdict is neither "the pack disagrees with itself" nor "the effect lives in one fold": it
+is that no fold in either draw clears noise, and the count lever therefore has nothing to be calibrated
+against. The architecture consequence is the same as the pooled one and better supported: no rule-count
+setting, and no prune, because both would be a decision on a quantity with no decidable fold.
 
 **Gates.** `V62-assignment-instrument` (the arm is a truncation: one item at most, every question asked,
 the block changed on at least seven tenths of them) and `V63-assignment-reproduces-the-lane` (this reading
 agrees with the lane's own `arm_pairs` entry to a hundredth of a point on the delta and exactly on both
 discordant counts). `pnpm eval:pack-assign` recomputes the artefact from the committed run and the workflow
-asserts twenty-four of its fields on every push; the module is at 100% on all four coverage dimensions.
+asserts thirty-two of its fields on every push; the module is at 100% on all four coverage dimensions.
 
 **What it changes about the product statement.** Both remaining levers were designs. One of them — how many
 items a prompt carries — is now measured, and it does not pay. What is left is the unit of memory itself:

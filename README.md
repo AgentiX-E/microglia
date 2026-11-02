@@ -385,28 +385,35 @@ in the block. The four cells sum to the measured −5 questions. An exchange rat
 the other side: the pair clears **0.737** of the bare model's 1.335 hurdle, the single rule clears
 **0.672**, so truncating the pack moves the arm away from paying.
 
-**The same four cells, one fold at a time, do not even keep one sign.** The store is distilled separately
-for each fold, so the interaction can be read five times instead of once:
+**Two independent store draws, and the same folds in both.** The store is distilled separately for each
+fold, and the split is seeded, so fold *k* is the same questions in every draw. That makes the per-fold table
+a paired measurement rather than a curiosity — the project has two draws of it:
 
-| fold | questions | repairs added | repairs given up | breaks added | breaks removed | net | Δpp |
-|---|---|---|---|---|---|---|---|
-| 0 | 307 | 5 | 7 | 4 | 6 | 0 | 0.00 |
-| 1 | 307 | 1 | 6 | 8 | 9 | −4 | −1.30 |
-| 2 | 307 | 5 | 4 | 4 | 7 | +4 | +1.30 |
-| 3 | 307 | 2 | 3 | 4 | 0 | −5 | −1.63 |
-| 4 | 306 | 2 | 3 | 4 | 5 | 0 | 0.00 |
+| fold | questions | first draw | second draw | both intervals span zero |
+|---|---|---|---|---|
+| 0 | 307 | 0 | −2 | yes |
+| 1 | 307 | −4 | −1 | yes |
+| 2 | 307 | +4 | +5 | yes |
+| 3 | 307 | **−5** [−2.55, −0.66] | −1 [−2.93, +2.06] | **no** on the first, yes on the second |
+| 4 | 306 | 0 | −2 | yes |
+| **pooled** | **1,534** | **−0.33pp [−1.65, +1.25]** | **−0.07pp [−1.34, +1.20]** | **yes** on both |
 
-The five rows sum to the pooled −5 — that sum is an assertion, not a remark — two folds are exactly flat,
-and the three that move alternate **+4, −4, −5**. A quantity that changes sign between five folds of one
-split is not a property of packs; it is a property of the store that fold happened to get. This is why the
-project does not ship a rule-count knob and does not ship a prune: both would be a decision made on a
-quantity whose sign is drawn per store.
+Three folds keep their sign; the two that do not are exactly zero on the first draw and have none to keep.
+The pooled null reproduces, and so do the two statements that matter for a product: the second item is a net
+harm in both draws (**23/27** and **20/23**, 0.85 and 0.87 repairs per break), and one rule clears less of
+the hurdle than the pair in both (**0.672 against 0.737**, then **0.708 against 0.721**).
+
+**What the second draw takes away is the one fold that looked decided.** Fold 3 is the only row in either
+draw whose interval excludes zero — **−5 questions, [−2.55, −0.66]** — and on the second store it covers zero
+at [−2.93, +2.06]. The fold that is positive twice (+4, +5) spans zero both times. So no fold in either draw
+yields an effect distinguishable from noise, which is why this README does not offer a rule-count setting
+with a caveat: there is nothing to set it against.
 
 > The item count is not a knob. Anything that tunes how many rules a prompt carries is tuning an
 > interaction it cannot observe.
 
 `pnpm eval:ledger` recomputes every number in the ledger paragraphs from `poc-sota-bird-train.json` and
-`pnpm eval:pack-assign` recomputes the assignment from the dev run; the workflow asserts forty-eight of
+`pnpm eval:pack-assign` recomputes the assignment from the dev run; the workflow asserts fifty-six of
 their fields on every push (`prereg/R35-ledger.md`, `prereg/R36-pack-assignment.md`).
 
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:

@@ -662,7 +662,15 @@ jobs:
               ['the observational contrast is the one R35 registered, recomputed here', Math.abs(a.lead.differencePp - 3.1270015605293917) < 1e-12 && a.lead.single.questions === 401 && a.lead.pair.questions === 1133],
               ['singleton questions break 9 of 212 against 52 of 665, which is the whole of it', a.lead.single.broken === 9 && a.lead.single.breakable === 212 && a.lead.pair.broken === 52 && a.lead.pair.breakable === 665],
               ['assignment reverses the sign the observation predicted', x.deltaPp < 0 && a.lead.differencePp > 0],
-              ['no replication is on disk yet, so P5 states its threshold instead of a verdict', a.replication === null && v('P5').holds === false && v('P5').observed.includes('+2pp')],
+              ['the replication landed on a second store draw of the same split', a.replication !== null && a.replication.contrast && a.source.replication !== null],
+              ['it reads -0.07pp [-1.34pp, +1.20pp] on the same 1,534 questions', Math.abs(a.replication.contrast.deltaPp + 0.0651890482398957) < 1e-12 && Math.abs(a.replication.contrast.clusteredLowPp + 1.3360053440213762) < 1e-12 && Math.abs(a.replication.contrast.clusteredHighPp - 1.198501872659176) < 1e-12],
+              ['so the upper bound is under the 2pp bar and P5 holds', a.replication.contrast.clusteredHighPp < 2 && v('P5').holds === true && v('P5').observed.includes('the lever is closed')],
+              ['the truncation is still a truncation on the new store: 76.2% of prompts changed', Math.abs(a.replication.instrument.changedShare - 0.7620599739243807) < 1e-12 && a.replication.instrument.maxItemsPerPrompt === 1],
+              ['the second item is a net harm on the second store too: 20 repairs against 23 breaks', a.replication.marginal.repairsLost === 20 && a.replication.marginal.breaksSaved === 23 && Math.abs(a.replication.marginal.helpPerHarm - 0.8695652173913043) < 1e-12],
+              ['and one rule again clears less of the hurdle than the pair: 0.708 against 0.721', Math.abs(a.replication.arms.removed.exchange.clearance - 0.7077922077922078) < 1e-12 && Math.abs(a.replication.arms.kept.exchange.clearance - 0.7209972862957937) < 1e-12],
+              ['both draws carry five folds over the same 1,534 questions', a.replication.folds.length === 5 && a.replication.folds.reduce((s, r) => s + r.questions, 0) === 1534 && a.reading.folds.length === 5],
+              ['three of five folds keep their sign, and the two that do not are exactly zero on the first draw', a.replication.foldPairs.filter((p) => p.sameSign).length === 3 && a.replication.foldPairs.filter((p) => p.firstNet === 0).length === 2],
+              ['the one fold that looked decided on the first draw covers zero on the second', a.replication.foldPairs.filter((p) => !p.firstSpansZero).length === 1 && a.replication.foldPairs.filter((p) => !p.firstSpansZero && !p.secondSpansZero).length === 0],
               ['the statement carries the assignment, the observation and the marginal item', a.statement.includes('assigning one rule') && a.statement.includes('+3.13pp') && a.statement.includes('23 repairs')],
             ];
             const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);

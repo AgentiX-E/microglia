@@ -154,7 +154,7 @@ it was registered to test.
 | P2 | the reading reproduces the lane's own contrast | −0.33pp [−1.65, +1.25] against the lane's −0.33pp; 42/47 discordant against 42/47 | ✓ |
 | P3 | the one-rule pack does not clear the hurdle | clearance **0.672** on a hurdle of 1.335, against **0.737** for the pair | ✓ |
 | P4 | the second item is worth more than two repairs per break | **23** repairs carried and **27** breaks caused — **0.85** per break | ✗ |
-| P5 | the null replicates on a fresh store | dispatched, not yet read | — |
+| P5 | the null replicates on a fresh store | **−0.07pp [−1.34, +1.20]**, 38/39, upper bound 0.80pp under the bar | ✓ |
 
 **The lead does not survive assignment.** `full-one` against `full` is **−0.33pp [−1.65, +1.25]**, so the
 cluster-robust interval excludes the +2pp this file registered as material by 3.7pp. The observation it
@@ -182,11 +182,39 @@ cells above are five readings rather than one, and the fix in advance was only t
 | 3 | 307 | 2 | 3 | 4 | 0 | −5 | −1.63 |
 | 4 | 306 | 2 | 3 | 4 | 5 | 0 | 0.00 |
 
-The rows sum to the pooled −5 (identity, asserted at both levels). Two folds are exactly flat and the three
-that move alternate **+4, −4, −5**, so the cross-term is not merely non-additive: **its sign is drawn per
-store**. That is a stronger refutation of the count lever than the pooled table can express — a knob whose
-effect changes sign between folds of one split cannot be calibrated at all, and it is why no rule-count
-setting exists in the product rather than a rule-count setting with a caveat.
+The rows sum to the pooled −5 (identity, asserted at both levels), and the per-fold intervals are reported
+beside them: every one of the five spans zero. The single row that comes closest to deciding anything is
+fold 3 at **−5 questions, [−2.55, −0.66]pp** — the only fold whose interval excludes zero on this draw.
+
+**The replication, and what it does to the per-fold reading.** The second store draw landed after the table
+above was first read, and it changes how the table should be described. It reads **−0.07pp [−1.34, +1.20]**
+on the same 1,534 questions, 38 gained against 39 lost, so **P5 holds**: the upper bound is 0.80pp under the
+2pp bar this file fixed in advance, and the null replicates. Two further facts carry over unchanged — the
+second item is a net harm again (**20 repairs against 23 breaks**, 0.87 per break, against 23/27 and 0.85),
+and one rule again clears less of the hurdle than the pair (**0.708 against 0.721**). The marginal item's
+sign is the stable quantity; the pooled contrast is not.
+
+The folds are the same questions in both artefacts — the split is seeded, 0 of 1,534 questions change fold —
+so the two per-fold tables are **paired**, and the pairing says more than either table alone:
+
+| fold | questions | first draw | second draw | keep sign | first spans zero | second spans zero |
+|---|---|---|---|---|---|---|
+| 0 | 307 | 0 | −2 | — (first is exactly zero) | yes | yes |
+| 1 | 307 | −4 | −1 | yes | yes | yes |
+| 2 | 307 | +4 | +5 | yes | yes | yes |
+| 3 | 307 | −5 | −1 | yes | **no** | **yes** |
+| 4 | 306 | 0 | −2 | — (first is exactly zero) | yes | yes |
+
+**This corrects the reading the table had on its own.** Three of five folds keep their sign and the two that
+do not are exactly zero on the first draw, so the per-fold sign is *not* a fresh draw per store — the folds
+are the same questions, and a fold that leans one way leans that way again. What does not survive is the one
+thing a per-fold table is for: **the only fold whose interval excluded zero (−5 questions, [−2.55, −0.66])
+covers zero on the second draw at [−2.93, +2.06]**, and the fold that is positive on both draws (+4, +5) spans
+zero both times at [−1.58, +4.33] and [−1.76, +5.37]. So the honest statement is narrower than "the sign is
+drawn per store" and, for the count lever, just as final: **no fold in either draw yields an effect
+distinguishable from zero, and the single fold that appeared to on one draw does not on the other.** A
+quantity with no decidable fold has nothing to calibrate against. Recorded as `AUDIT` §34.6, because the
+stronger wording was already written into four documents before the second draw was read.
 
 **Disclosed, because it was found while writing this and it changes a published interval.** R35's outcome
 table quotes the dev cell of this contrast as +3.13pp **[+0.62, +5.23]**; recomputing it here gives
@@ -198,5 +226,13 @@ restated, and R36 uses the default everywhere.
 **What a P4 refutation licenses, by the rules written above.** *"The second item is a net harm in its own
 record; capping at one should have helped the break rate and did not, which means the loss is not in the item
 count but in what the items say."* That is what happened: truncation removes 27 breaks and 23 repairs and
-instates 24 breaks and 15 repairs, and the two pairs almost cancel. The count lever is closed; the grain
-lever stays open, and P5 will be read when the replication lands.
+instates 24 breaks and 15 repairs, and the two pairs almost cancel — and the second store draw repeats the
+marginal item's record (20 against 23) while repeating none of the pooled contrast's magnitude. The count
+lever is closed on two draws; the grain lever is the only one left.
+
+**Verdict: four of five predictions hold and the refuted one is the round's result.** P1 and P2 hold the
+instrument, P3 holds that truncation does not pay, P5 holds that the null replicates on a second draw, and
+P4 is refuted — which is what licenses the sentence above. The gates this file
+registered are two — `V62` (the arm is a truncation) and `V63` (the reading reproduces the lane) — and they
+stay two: P5's threshold is a prediction, and its numbers are carried as CI assertions rather than promoted
+to a gate the file did not register.

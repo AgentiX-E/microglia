@@ -201,10 +201,11 @@ export function assignmentOf(
 /**
  * The four cells and the contrast, one row per cross-fitting fold.
  *
- * The interaction is the round's claim, and a claim about a mechanism has to survive being measured
- * fold by fold: a store is distilled per fold, so a cross-term that appears in one fold and not the
- * others is a property of that store rather than of packs. Grouped rather than pooled because pooling
- * is what would hide exactly that.
+ * A claim about a mechanism has to survive being measured fold by fold, and the folds are the same
+ * questions across store draws — the split is seeded — so five rows from one store and five from another
+ * are five paired readings. Grouped rather than pooled because pooling is what would hide a cross-term
+ * that lives in one fold: the interval is carried per fold for the same reason, since a sign that comes
+ * with an interval spanning zero is not a sign.
  */
 export type FoldReading = {
   readonly fold: number;
@@ -215,6 +216,9 @@ export type FoldReading = {
   readonly breaksSaved: number;
   readonly netChange: number;
   readonly deltaPp: number;
+  readonly clusteredLowPp: number;
+  readonly clusteredHighPp: number;
+  readonly p: number;
 };
 
 export function foldsOf(cases: readonly AssignmentCase[]): readonly FoldReading[] {
@@ -238,8 +242,63 @@ export function foldsOf(cases: readonly AssignmentCase[]): readonly FoldReading[
         breaksSaved: reading.marginal.breaksSaved,
         netChange: reading.marginal.netChange,
         deltaPp: reading.contrast.deltaPp,
+        clusteredLowPp: reading.contrast.clusteredLowPp,
+        clusteredHighPp: reading.contrast.clusteredHighPp,
+        p: reading.contrast.p,
       };
     });
+}
+
+/**
+ * One fold, read on two store draws.
+ *
+ * The split is seeded, so fold *k* is the same questions in both artefacts and the two rows are paired
+ * rather than independent. What the pairing buys is the only question that matters for a per-fold claim:
+ * whether a fold's sign survives a second draw. `bothSpanZero` is reported beside it because a sign of
+ * four questions on 307 is not a sign — two folds can agree and still agree on noise.
+ */
+export type FoldPair = {
+  readonly fold: number;
+  readonly questions: number;
+  readonly firstNet: number;
+  readonly secondNet: number;
+  readonly firstDeltaPp: number;
+  readonly secondDeltaPp: number;
+  readonly sameSign: boolean;
+  /** The first draw's interval covers zero: a fold that looks decided there is what a second draw tests. */
+  readonly firstSpansZero: boolean;
+  readonly secondSpansZero: boolean;
+  readonly bothSpanZero: boolean;
+};
+
+export function foldPairsOf(
+  first: readonly FoldReading[],
+  second: readonly FoldReading[],
+): readonly FoldPair[] {
+  const other = new Map(second.map((entry) => [entry.fold, entry]));
+  const pairs: FoldPair[] = [];
+  for (const left of first) {
+    const right = other.get(left.fold);
+    // A fold present in one artefact and not the other cannot be paired, and pairing it anyway would
+    // compare two different question sets. Dropped rather than padded.
+    if (right === undefined) continue;
+    const firstSpansZero = left.clusteredLowPp <= 0 && left.clusteredHighPp >= 0;
+    const secondSpansZero = right.clusteredLowPp <= 0 && right.clusteredHighPp >= 0;
+    pairs.push({
+      fold: left.fold,
+      questions: left.questions,
+      firstNet: left.netChange,
+      secondNet: right.netChange,
+      firstDeltaPp: left.deltaPp,
+      secondDeltaPp: right.deltaPp,
+      sameSign:
+        (left.netChange > 0 && right.netChange > 0) || (left.netChange < 0 && right.netChange < 0),
+      firstSpansZero,
+      secondSpansZero,
+      bothSpanZero: firstSpansZero && secondSpansZero,
+    });
+  }
+  return pairs;
 }
 
 export type R36Verdict = {

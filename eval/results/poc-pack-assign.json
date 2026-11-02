@@ -7,7 +7,11 @@
       "id": "poc-sota-bird-dev-R25-dose-and-admission",
       "generated_at": "2026-11-01T01:00:25.072Z"
     },
-    "replication": null
+    "replication": {
+      "path": "eval/results/poc-sota-bird-dev-R36-pack-assignment.json",
+      "id": "poc-sota-bird-dev-R36-pack-assignment",
+      "generated_at": "2026-11-02T01:23:20.131Z"
+    }
   },
   "corpus": {
     "questions": 1534,
@@ -88,7 +92,10 @@
         "breaksGained": 4,
         "breaksSaved": 6,
         "netChange": 0,
-        "deltaPp": 0
+        "deltaPp": 0,
+        "clusteredLowPp": -2.318840579710145,
+        "clusteredHighPp": 2.413793103448276,
+        "p": 1
       },
       {
         "fold": 1,
@@ -98,7 +105,10 @@
         "breaksGained": 8,
         "breaksSaved": 9,
         "netChange": -4,
-        "deltaPp": -1.3029315960912053
+        "deltaPp": -1.3029315960912053,
+        "clusteredLowPp": -4.672897196261682,
+        "clusteredHighPp": 1.702127659574468,
+        "p": 0.5412561893463032
       },
       {
         "fold": 2,
@@ -108,7 +118,10 @@
         "breaksGained": 4,
         "breaksSaved": 7,
         "netChange": 4,
-        "deltaPp": 1.3029315960912053
+        "deltaPp": 1.3029315960912053,
+        "clusteredLowPp": -1.5772870662460567,
+        "clusteredHighPp": 4.333333333333334,
+        "p": 0.5034446716308587
       },
       {
         "fold": 3,
@@ -118,7 +131,10 @@
         "breaksGained": 4,
         "breaksSaved": 0,
         "netChange": -5,
-        "deltaPp": -1.6286644951140066
+        "deltaPp": -1.6286644951140066,
+        "clusteredLowPp": -2.5547445255474455,
+        "clusteredHighPp": -0.6578947368421052,
+        "p": 0.17968749999999994
       },
       {
         "fold": 4,
@@ -128,7 +144,10 @@
         "breaksGained": 4,
         "breaksSaved": 5,
         "netChange": 0,
-        "deltaPp": 0
+        "deltaPp": 0,
+        "clusteredLowPp": -2.507836990595611,
+        "clusteredHighPp": 3.3707865168539324,
+        "p": 1
       }
     ]
   },
@@ -154,7 +173,223 @@
     "lowPp": 0.8657258397293061,
     "highPp": 5.226173054358001
   },
-  "replication": null,
+  "replication": {
+    "contrast": {
+      "gained": 38,
+      "lost": 39,
+      "deltaPp": -0.0651890482398957,
+      "iidLowPp": -1.1734028683181226,
+      "iidHighPp": 1.0430247718383312,
+      "clusteredLowPp": -1.3360053440213762,
+      "clusteredHighPp": 1.198501872659176,
+      "p": 0.9999999999999053
+    },
+    "marginal": {
+      "repairsGained": 15,
+      "repairsLost": 20,
+      "breaksGained": 19,
+      "breaksSaved": 23,
+      "netChange": -1,
+      "helpPerHarm": 0.8695652173913043
+    },
+    "arms": {
+      "bare": {
+        "arm": "bare",
+        "items": "none",
+        "exchange": {
+          "n": 1534,
+          "repairable": 654,
+          "breakable": 880,
+          "repaired": 0,
+          "broken": 0,
+          "repairRatePp": 0,
+          "breakRatePp": 0,
+          "net": 0,
+          "netPp": 0,
+          "helpPerHarm": null,
+          "hurdle": 1.345565749235474,
+          "clearance": null,
+          "requiredRepairRatePp": 0,
+          "requiredBreakRatePp": 0
+        }
+      },
+      "kept": {
+        "arm": "kept",
+        "items": "the pack retrieval returned",
+        "exchange": {
+          "n": 1534,
+          "repairable": 654,
+          "breakable": 880,
+          "repaired": 65,
+          "broken": 67,
+          "repairRatePp": 9.938837920489297,
+          "breakRatePp": 7.613636363636364,
+          "net": -2,
+          "netPp": -0.1303780964797914,
+          "helpPerHarm": 0.9701492537313433,
+          "hurdle": 1.345565749235474,
+          "clearance": 0.7209972862957937,
+          "requiredRepairRatePp": 10.244648318042815,
+          "requiredBreakRatePp": 7.386363636363637
+        }
+      },
+      "removed": {
+        "arm": "removed",
+        "items": "the same pack, first item only",
+        "exchange": {
+          "n": 1534,
+          "repairable": 654,
+          "breakable": 880,
+          "repaired": 60,
+          "broken": 63,
+          "repairRatePp": 9.174311926605505,
+          "breakRatePp": 7.159090909090909,
+          "net": -3,
+          "netPp": -0.1955671447196871,
+          "helpPerHarm": 0.9523809523809523,
+          "hurdle": 1.345565749235474,
+          "clearance": 0.7077922077922078,
+          "requiredRepairRatePp": 9.63302752293578,
+          "requiredBreakRatePp": 6.818181818181818
+        }
+      }
+    },
+    "instrument": {
+      "maxItemsPerPrompt": 1,
+      "meanItemsPerPrompt": 1,
+      "changedShare": 0.7620599739243807,
+      "basis": "count"
+    },
+    "folds": [
+      {
+        "fold": 0,
+        "questions": 307,
+        "repairsGained": 4,
+        "repairsLost": 6,
+        "breaksGained": 3,
+        "breaksSaved": 3,
+        "netChange": -2,
+        "deltaPp": -0.6514657980456027,
+        "clusteredLowPp": -3.3846153846153846,
+        "clusteredHighPp": 1.9607843137254901,
+        "p": 0.80361938476562
+      },
+      {
+        "fold": 1,
+        "questions": 307,
+        "repairsGained": 2,
+        "repairsLost": 5,
+        "breaksGained": 5,
+        "breaksSaved": 7,
+        "netChange": -1,
+        "deltaPp": -0.32573289902280134,
+        "clusteredLowPp": -3.257328990228013,
+        "clusteredHighPp": 1.9830028328611897,
+        "p": 0.999999999999997
+      },
+      {
+        "fold": 2,
+        "questions": 307,
+        "repairsGained": 5,
+        "repairsLost": 4,
+        "breaksGained": 4,
+        "breaksSaved": 8,
+        "netChange": 5,
+        "deltaPp": 1.6286644951140066,
+        "clusteredLowPp": -1.7605633802816902,
+        "clusteredHighPp": 5.369127516778524,
+        "p": 0.3833103179931594
+      },
+      {
+        "fold": 3,
+        "questions": 307,
+        "repairsGained": 3,
+        "repairsLost": 3,
+        "breaksGained": 3,
+        "breaksSaved": 2,
+        "netChange": -1,
+        "deltaPp": -0.32573289902280134,
+        "clusteredLowPp": -2.9315960912052117,
+        "clusteredHighPp": 2.0618556701030926,
+        "p": 0.9999999999999978
+      },
+      {
+        "fold": 4,
+        "questions": 306,
+        "repairsGained": 1,
+        "repairsLost": 2,
+        "breaksGained": 4,
+        "breaksSaved": 3,
+        "netChange": -2,
+        "deltaPp": -0.6535947712418301,
+        "clusteredLowPp": -2.464788732394366,
+        "clusteredHighPp": 1.1363636363636365,
+        "p": 0.7539062500000008
+      }
+    ],
+    "foldPairs": [
+      {
+        "fold": 0,
+        "questions": 307,
+        "firstNet": 0,
+        "secondNet": -2,
+        "firstDeltaPp": 0,
+        "secondDeltaPp": -0.6514657980456027,
+        "sameSign": false,
+        "firstSpansZero": true,
+        "secondSpansZero": true,
+        "bothSpanZero": true
+      },
+      {
+        "fold": 1,
+        "questions": 307,
+        "firstNet": -4,
+        "secondNet": -1,
+        "firstDeltaPp": -1.3029315960912053,
+        "secondDeltaPp": -0.32573289902280134,
+        "sameSign": true,
+        "firstSpansZero": true,
+        "secondSpansZero": true,
+        "bothSpanZero": true
+      },
+      {
+        "fold": 2,
+        "questions": 307,
+        "firstNet": 4,
+        "secondNet": 5,
+        "firstDeltaPp": 1.3029315960912053,
+        "secondDeltaPp": 1.6286644951140066,
+        "sameSign": true,
+        "firstSpansZero": true,
+        "secondSpansZero": true,
+        "bothSpanZero": true
+      },
+      {
+        "fold": 3,
+        "questions": 307,
+        "firstNet": -5,
+        "secondNet": -1,
+        "firstDeltaPp": -1.6286644951140066,
+        "secondDeltaPp": -0.32573289902280134,
+        "sameSign": true,
+        "firstSpansZero": false,
+        "secondSpansZero": true,
+        "bothSpanZero": false
+      },
+      {
+        "fold": 4,
+        "questions": 306,
+        "firstNet": 0,
+        "secondNet": -2,
+        "firstDeltaPp": 0,
+        "secondDeltaPp": -0.6535947712418301,
+        "sameSign": false,
+        "firstSpansZero": true,
+        "secondSpansZero": true,
+        "bothSpanZero": true
+      }
+    ]
+  },
   "verdicts": [
     {
       "id": "P1",
@@ -183,8 +418,8 @@
     {
       "id": "P5",
       "claim": "the null replicates on a fresh store: the truncation stays below +2pp",
-      "observed": "no replication yet; the threshold this will be read against is +2pp",
-      "holds": false
+      "observed": "replication -0.07pp [-1.34pp, +1.20pp] against a +2pp threshold: the lever is closed",
+      "holds": true
     }
   ],
   "gates": [
@@ -208,7 +443,8 @@
     "profit": "the one-rule pack clears 0.672 of its hurdle against 0.737 for the pair, so truncation moves the arm further from paying rather than closer",
     "marginal": "the second item carries 23 repairs and causes 27 breaks, 0.85 repairs per break, while preventing 15 repairs and 24 breaks: a net -5 questions",
     "leverage": "the arm is a strict truncation (73.9% of prompts changed, 1 item at most), so the comparison is one field of the prompt and not a second retrieval",
-    "replication": "no replication on disk yet: 2pp is the threshold the second store draw will be read against"
+    "replication": "a second store draw reads -0.07pp [-1.34pp, +1.20pp] on 1534 questions",
+    "replicationFolds": "the same 5 folds read on the second store: 3 keep their sign (2 are exactly zero on the first draw and have none to keep), and of the 1 whose interval excluded zero on the first draw 0 still exclude it"
   },
-  "statement": "assigning one rule to every question reads -0.33pp [-1.65pp, +1.25pp] against the pack retrieval returned, while the questions retrieval happened to serve one rule read +3.13pp [+0.87pp, +5.23pp] — the contrast is a property of the questions, not of the count. the one-rule pack clears 0.672 of its hurdle against 0.737 for the pair, so truncation moves the arm further from paying rather than closer. the second item carries 23 repairs and causes 27 breaks, 0.85 repairs per break, while preventing 15 repairs and 24 breaks: a net -5 questions. the arm is a strict truncation (73.9% of prompts changed, 1 item at most), so the comparison is one field of the prompt and not a second retrieval. no replication on disk yet: 2pp is the threshold the second store draw will be read against."
+  "statement": "assigning one rule to every question reads -0.33pp [-1.65pp, +1.25pp] against the pack retrieval returned, while the questions retrieval happened to serve one rule read +3.13pp [+0.87pp, +5.23pp] — the contrast is a property of the questions, not of the count. the one-rule pack clears 0.672 of its hurdle against 0.737 for the pair, so truncation moves the arm further from paying rather than closer. the second item carries 23 repairs and causes 27 breaks, 0.85 repairs per break, while preventing 15 repairs and 24 breaks: a net -5 questions. the arm is a strict truncation (73.9% of prompts changed, 1 item at most), so the comparison is one field of the prompt and not a second retrieval. a second store draw reads -0.07pp [-1.34pp, +1.20pp] on 1534 questions; the same 5 folds read on the second store: 3 keep their sign (2 are exactly zero on the first draw and have none to keep), and of the 1 whose interval excluded zero on the first draw 0 still exclude it."
 }

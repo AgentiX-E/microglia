@@ -1832,14 +1832,16 @@ R36 turns that into a rule you can use, and the rule is not "pick k".
   artefact — because an arm can be a wash in percentage points and still move away from paying.
 - **Reproduce it yourself.** `POC_PACK_ARTEFACT=eval/results/poc-sota-bird-dev-R25-dose-and-admission.json
   pnpm eval:pack-assign` recomputes the contrast, both exchange rates and the four-cell decomposition from the
-  committed run and writes `poc-pack-assign.json`; twenty-four of its fields are asserted in CI. The module is
+  committed run and writes `poc-pack-assign.json`; thirty-two of its fields are asserted in CI. The module is
   `packages/eval/src/assignment.ts`, 100% covered on all four dimensions.
-- **Before you trust any single number in your own store, split it by fold.** The artefact's `reading.folds`
-  is the same four cells recomputed on the questions each fold held out, and here they read 0, **−4**, **+4**,
-  **−5**, 0: two folds flat, the three that move alternating in sign. A pooled number is an average over five
-  stores, so if your own marginal effect changes sign between folds it is a property of the store that fold
-  happened to get, and no setting you choose can calibrate it. The cost of this check is zero — it is the same
-  artefact, grouped differently.
+- **Before you trust any single number in your own store, split it by fold — and if you can afford it, run the
+  split twice.** `reading.folds` is the same four cells recomputed on the questions each fold held out, with an
+  interval each; `replication.foldPairs` pairs those folds against a second store draw of the same seeded
+  split. Here the two draws read 0/−2, −4/−1, +4/+5, −5/−1, 0/−2: three folds keep their sign, and the only
+  fold that ever looked decided (−5, interval [−2.55, −0.66]) covers zero on the second draw. The lesson for
+  your own system is the one this project paid a dispatch to learn: **a fold with a decided-looking interval is
+  a hypothesis, not a result, until a second store reproduces it.** The per-fold table costs nothing — it is
+  the same artefact grouped differently — and the paired column costs one re-run of the distillation.
 - **If a dev dispatch fails at the first question**, check the manifest's `nested`/`nestedRoot` pair before
   anything else: `dev.zip` ships its databases as `dev_databases.zip`, and a manifest that does not say so
   extracts a directory holding only a zip. The lane now checks all eleven databases once, right after

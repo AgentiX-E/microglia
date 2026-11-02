@@ -20,6 +20,7 @@ import {
   R36_BARS,
   adjudicateR36,
   assignmentOf,
+  foldPairsOf,
   foldsOf,
   packAssignCasesOf,
   packSizeOf,
@@ -115,8 +116,12 @@ const lead = leadOf(discovery);
 const reported = discovery.arm_pairs?.find((entry) => entry.arm === 'full-one');
 
 const replica = load(REPLICATION);
-const replication = replica === undefined ? null : assignmentOf(packAssignCasesOf(replica.per_case ?? []).cases);
+const replicaCases = replica === undefined ? null : packAssignCasesOf(replica.per_case ?? []).cases;
+const replication = replicaCases === null ? null : assignmentOf(replicaCases);
 const replicationInstrument = replica === undefined ? null : slotOf(replica);
+const discoveryFolds = foldsOf(cases);
+const replicaFolds = replicaCases === null ? null : foldsOf(replicaCases);
+const foldPairs = replicaFolds === null ? null : foldPairsOf(discoveryFolds, replicaFolds);
 
 const verdicts = adjudicateR36({
   reading,
@@ -168,6 +173,23 @@ const armRow = (arm: 'bare' | 'kept' | 'removed') => {
   };
 };
 
+// What the paired folds say, computed rather than asserted in prose: a fold that looked decided on the
+// first draw and does not on the second is the one fact a pooled replication cannot report.
+const foldStatement =
+  foldPairs === null
+    ? 'no second store draw on disk, so no fold is paired'
+    : (() => {
+        const zeroFirst = foldPairs.filter((pair) => pair.firstNet === 0).length;
+        const agreed = foldPairs.filter((pair) => pair.sameSign).length;
+        const decided = foldPairs.filter((pair) => !pair.firstSpansZero);
+        const survived = decided.filter((pair) => !pair.secondSpansZero);
+        return (
+          `the same ${String(foldPairs.length)} folds read on the second store: ${String(agreed)} keep their sign` +
+          (zeroFirst === 0 ? '' : ` (${String(zeroFirst)} are exactly zero on the first draw and have none to keep)`) +
+          `, and of the ${String(decided.length)} whose interval excluded zero on the first draw ${String(survived.length)} still exclude it`
+        );
+      })();
+
 const statements = {
   headline:
     `assigning one rule to every question reads ${pp(reading.contrast.deltaPp)} ` +
@@ -190,6 +212,7 @@ const statements = {
     replication === null
       ? `no replication on disk yet: ${R36_BARS.materialPp}pp is the threshold the second store draw will be read against`
       : `a second store draw reads ${pp(replication.contrast.deltaPp)} [${pp(replication.contrast.clusteredLowPp)}, ${pp(replication.contrast.clusteredHighPp)}] on ${replication.n} questions`,
+  replicationFolds: foldStatement,
 };
 
 const payload = {
@@ -218,7 +241,7 @@ const payload = {
     marginal: reading.marginal,
     // Per fold, because the store is distilled per fold: a cross-term that lives in one fold and not
     // the others is a property of that store rather than of packs.
-    folds: foldsOf(cases),
+    folds: discoveryFolds,
   },
   lead: {
     source: 'questions retrieval served a single rule, on this artefact',
@@ -229,19 +252,26 @@ const payload = {
     highPp: lead.highPp,
   },
   replication:
-    replication === null || replicationInstrument === null
+    replication === null || replicationInstrument === null || replicaCases === null
       ? null
       : {
           contrast: replication.contrast,
           marginal: replication.marginal,
           arms: replication.arms,
           instrument: replicationInstrument,
+          // The same table on the second store draw: the pooled sign is the claim, and a claim about a
+          // mechanism has to be read on both draws before it is called one.
+          folds: replicaFolds,
+          // Paired, because the split is seeded: fold k is the same questions in both artefacts, so the
+          // question "does this fold's sign survive a second draw" has an answer rather than an opinion.
+          foldPairs,
         },
   verdicts,
   gates,
   statements,
   statement:
-    `${statements.headline}. ${statements.profit}. ${statements.marginal}. ${statements.leverage}. ${statements.replication}.`,
+    `${statements.headline}. ${statements.profit}. ${statements.marginal}. ${statements.leverage}. ` +
+    `${statements.replication}; ${statements.replicationFolds}.`,
 };
 
 await writeJson('poc-pack-assign', payload);
