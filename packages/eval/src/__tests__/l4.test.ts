@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   L4ParseError,
+  ceilingOf,
   compareArms,
   parseTauResults,
   perTaskRows,
@@ -322,5 +323,51 @@ describe('what a paired comparison could have detected', () => {
     const resolution = resolutionOf(comparison(0, 0, 0));
     expect(resolution.halfWidthPp).toBe(Number.POSITIVE_INFINITY);
     expect(resolution.detectableAtFivePp).toBe(false);
+  });
+});
+
+describe('ceilingOf', () => {
+  const comparison = (paired: number, lost: number, gained: number) => ({
+    paired,
+    onlyFirst: 0,
+    onlySecond: 0,
+    deltaPp: ((gained - lost) / paired) * 100,
+    ciLowPp: 0,
+    ciHighPp: 0,
+    p: 1,
+    lost,
+    gained,
+  });
+
+  it('says what the whole scenario could decide, at the discordance the pair observed', () => {
+    // R41's pair: 50 tasks, 7 lost and 2 gained, so 18% of tasks disagree. Every task the retail
+    // scenario holds is 115, and that is the largest paired sample any split of it can produce.
+    const ceiling = ceilingOf(comparison(50, 7, 2), 115);
+    expect(ceiling.tasks).toBe(115);
+    expect(ceiling.halfWidthPp).toBeCloseTo(7.75, 2);
+    // The protocol grades the 80%-power statistic, which is 1.43x the interval: this is the number
+    // that says a 5pp claim is out of reach for the benchmark rather than for the dispatch.
+    expect(ceiling.mde80Pp).toBeCloseTo(11.09, 2);
+    expect(ceiling.resolvesFivePp).toBe(false);
+  });
+
+  it('reaches the bar when the scenario is large enough, so the ceiling is not a constant', () => {
+    // The same discordance rate, six hundred tasks: a 5pp half-width is inside reach, which is what
+    // makes the τ² statement a statement about 115 and not about the instrument.
+    const ceiling = ceilingOf(comparison(50, 7, 2), 640);
+    expect(ceiling.halfWidthPp).toBeCloseTo(3.29, 1);
+    expect(ceiling.resolvesFivePp).toBe(true);
+  });
+
+  it('reports infinity for a scenario with no tasks, rather than dividing by zero', () => {
+    const ceiling = ceilingOf(comparison(50, 7, 2), 0);
+    expect(ceiling.halfWidthPp).toBe(Number.POSITIVE_INFINITY);
+    expect(ceiling.resolvesFivePp).toBe(false);
+  });
+
+  it('reports infinity when the pair is empty, because there is no rate to carry over', () => {
+    const ceiling = ceilingOf(comparison(0, 0, 0), 115);
+    expect(ceiling.mde80Pp).toBe(Number.POSITIVE_INFINITY);
+    expect(ceiling.resolvesFivePp).toBe(false);
   });
 });

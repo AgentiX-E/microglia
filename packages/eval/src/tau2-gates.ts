@@ -119,6 +119,14 @@ export type Tau2ArmRecord = {
    * load-bearing rather than cosmetic.
    */
   readonly scenario?: { readonly learn: string; readonly test: string; readonly recall: string };
+  /**
+   * How many tasks each scenario holds, when the driver listed it.
+   *
+   * The arm is scored on a *split*, and a split of fifty says nothing about whether the scenario had
+   * fifty tasks or a thousand. The pair reads this to state the smallest difference the whole
+   * scenario could decide — the ceiling a dispatch cannot lift by drawing a different sample.
+   */
+  readonly scenarioTasks?: { readonly learn: number; readonly test: number };
 };
 
 /** The paired comparison, reduced to the three numbers a gate reads. */

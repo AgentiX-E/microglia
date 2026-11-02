@@ -429,3 +429,57 @@ export function resolutionOf(comparison: ArmComparison): Resolution {
     detectableAtFivePp: halfWidthPp <= 5,
   };
 }
+
+/**
+ * The smallest difference a *whole scenario* could decide, at this pair's own discordance rate.
+ *
+ * `tasksForFivePp` answers "how many tasks would a 5pp half-width take" and leaves the reader to
+ * compare that against something. On τ² that comparison is the finding: the retail scenario carries
+ * 115 tasks, and a 5pp half-width at the discordance R41 and R42 observed takes about 550, so no
+ * split of that scenario can reach the bar however the sample is drawn. Stating the ceiling beside
+ * the requirement is the difference between "this round was underpowered" — which invites another
+ * dispatch — and "this benchmark cannot decide the effect it is being asked about".
+ *
+ * The discordance rate is held fixed, which is the same assumption `tasksForFivePp` already makes:
+ * the share of tasks the two arms disagree on is a property of the treatment and the task set, so it
+ * does not shrink as the task set grows.
+ *
+ * Two constants travel here and they are not the same number. `1.96` is the 95% interval this file
+ * has always quoted; `2.802` is the 80%-power minimum detectable difference the protocol's
+ * `V5-resolution` grades, and reporting only the first is how a 12pp half-width became a 17pp bar
+ * without anybody noticing.
+ */
+export type ResolutionCeiling = {
+  /** Tasks in the scenario, which is the largest paired sample any split of it can produce. */
+  readonly tasks: number;
+  /** 95% half-width at that sample, in percentage points. */
+  readonly halfWidthPp: number;
+  /** 80%-power minimum detectable difference at that sample, in percentage points. */
+  readonly mde80Pp: number;
+  /** Whether the scenario's own task set can reach a 5pp half-width. */
+  readonly resolvesFivePp: boolean;
+};
+
+/** The 80%-power multiplier on the standard error, as the protocol's resolution gate computes it. */
+const MDE_80 = 2.802;
+
+export function ceilingOf(comparison: ArmComparison, tasks: number): ResolutionCeiling {
+  const n = comparison.paired;
+  const discordant = comparison.lost + comparison.gained;
+  if (n === 0 || tasks <= 0) {
+    return {
+      tasks,
+      halfWidthPp: Number.POSITIVE_INFINITY,
+      mde80Pp: Number.POSITIVE_INFINITY,
+      resolvesFivePp: false,
+    };
+  }
+  const standardErrorPp = (Math.sqrt((discordant / n) * tasks) / tasks) * 100;
+  const halfWidthPp = 1.96 * standardErrorPp;
+  return {
+    tasks,
+    halfWidthPp,
+    mde80Pp: MDE_80 * standardErrorPp,
+    resolvesFivePp: halfWidthPp <= 5,
+  };
+}

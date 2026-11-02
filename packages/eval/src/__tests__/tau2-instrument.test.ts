@@ -50,6 +50,18 @@ describe('armRecordFromDriver', () => {
     expect(record.scenario).toEqual({ learn: 'retail', test: 'airline', recall: 'retail' });
   });
 
+  it('carries the scenario sizes when the driver listed them, and says nothing when it did not', () => {
+    // The arm is scored on a split, and a split of fifty says nothing about whether the scenario had
+    // fifty tasks or a thousand. The pair reads this to state the ceiling a dispatch cannot lift.
+    expect(armRecordFromDriver(raw({ scenarioTasks: { learn: 115, test: 115 } })).scenarioTasks).toEqual({
+      learn: 115,
+      test: 115,
+    });
+    // Absent on every artefact written before the field existed: the pair then reports no ceiling
+    // rather than one built from a guess about the scenario's size.
+    expect(armRecordFromDriver(raw()).scenarioTasks).toBeUndefined();
+  });
+
   it('counts distinct held-out tasks in the denominator and keeps repeats in the split', () => {
     // V2 asks whether every question was evaluated exactly once. A record that de-duplicated the list
     // before the gate saw it would answer its own question, and answer it yes.

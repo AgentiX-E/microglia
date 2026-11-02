@@ -508,6 +508,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         : { total: agentTurns, failed: episodeFailures(diagnostics), scope: 'run' as const },
     domains: { stored: knowledge.length, withoutDomain, unscopedIn: 0, widenedIn: 0 },
     scenario,
+    // The scenario's own size, not the split's: a dispatch cap hides it, and it is what bounds the
+    // resolution any split of this scenario can reach.
+    scenarioTasks: { learn: learnable.length, test: evaluated.length },
   };
 
   return scored.tasks;

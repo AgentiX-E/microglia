@@ -225,6 +225,7 @@ export {
 
 export {
   L4ParseError,
+  ceilingOf,
   compareArms,
   parseTauResults,
   perTaskRows,
@@ -235,6 +236,7 @@ export {
   type ArmTask,
   type L4ParseReason,
   type Resolution,
+  type ResolutionCeiling,
   type TauRun,
   type TauTrial,
   type TaskTrials,

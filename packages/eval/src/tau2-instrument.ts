@@ -42,6 +42,17 @@ export type Tau2Raw = {
   readonly test: readonly string[];
   /** Trials per task the grid was scored at. */
   readonly trials: number;
+  /**
+   * How many tasks each scenario holds, from the listing.
+   *
+   * The listing is the one place a run learns the size of the task set it was given a *cap* of, and
+   * the cap is what hides it: an artefact that records fifty evaluated tasks says nothing about
+   * whether the scenario had fifty or a thousand. The pair needs the difference, because the smallest
+   * difference any split of a scenario can decide is a function of how many tasks there are to split —
+   * see `ceilingOf`. Absent on artefacts written before this field existed, and the pair then says
+   * nothing about the ceiling rather than inventing one.
+   */
+  readonly scenarioTasks?: { readonly learn: number; readonly test: number };
   /** Tasks dropped from the denominator because a trial carried no verdict. */
   readonly unscored: number;
   /** Items in each pack the recall facade served, one entry per request. */
@@ -150,5 +161,8 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     // Repeats kept: see decision 4.
     split: { train: raw.train, test: raw.test },
     scenario: raw.scenario,
+    // Absent when the driver did not list the scenario it was capped against; the pair then reports
+    // no ceiling rather than a ceiling built on a guess.
+    ...(raw.scenarioTasks === undefined ? {} : { scenarioTasks: raw.scenarioTasks }),
   };
 }

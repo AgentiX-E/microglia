@@ -33,6 +33,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inGateOrder, mergeGates, type ValidityGate } from '@agentix-e/microglia-protocol';
 import {
+  ceilingOf,
   compareArms,
   resolutionOf,
   tau2ArmRecordOf,
@@ -66,6 +67,7 @@ type Artefact = {
     };
     readonly split?: { readonly train: readonly string[]; readonly test: readonly string[] };
     readonly scenario?: { readonly learn: string; readonly test: string; readonly recall: string };
+    readonly scenarioTasks?: { readonly learn: number; readonly test: number };
   };
   readonly per_task?: readonly TaskRow[];
   /** One row per evaluated episode; absent on artefacts written before R29 stage 2. */
@@ -112,6 +114,15 @@ const comparison = compareArms(
 
 const splitMatches = comparison.onlyFirst === 0 && comparison.onlySecond === 0;
 const resolution = resolutionOf(comparison);
+/**
+ * The ceiling the scenario imposes, read from whichever arm recorded the listing.
+ *
+ * Both arms list the same scenarios, so either arm's record answers it; the first one that has it
+ * wins rather than the two being compared, because a disagreement would be a defect in the listing
+ * and not a question this file can settle.
+ */
+const scenarioTasks = first.tau2?.scenarioTasks ?? second.tau2?.scenarioTasks;
+const ceiling = scenarioTasks === undefined ? undefined : ceilingOf(comparison, scenarioTasks.test);
 /**
  * Which scenario the pair ran, read from the arms rather than from the environment.
  *
@@ -194,6 +205,11 @@ await writeJson('poc-l4-pair', {
   second: { path: SECOND, ranAt: second.ranAt ?? null, pass4: second.metrics?.pass4 ?? null },
   comparison,
   resolution,
+  // What the scenario itself could decide, when the arms listed it. `tasksForFivePp` is a
+  // requirement; this is the supply, and on τ² the two do not meet: retail carries 115 tasks and a
+  // 5pp half-width at the observed discordance takes several hundred, so no split of it reaches the
+  // bar. Absent on artefacts that did not record the listing, which is every run before R42.
+  ...(ceiling === undefined ? {} : { ceiling }),
   // The statistic the protocol's resolution gate reads, beside the interval this lane has always
   // quoted. They differ by 2.802/1.96 = 1.43, and reporting only one of them is how a 15pp
   // half-width became a 21pp minimum detectable difference without anybody noticing.
