@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { LlmClient, attemptTimeoutMs, retryAfterMs } from '../model-client.js';
+import { LlmClient, attemptTimeoutMs, restModelOf, retryAfterMs } from '../model-client.js';
 
 const noSleep = async (): Promise<void> => undefined;
 
@@ -121,7 +121,9 @@ describe('LlmClient', () => {
     const { instance, seen } = client([{ status: 402, body: { error: 'insufficient balance' } }]);
     await expect(instance.chat('hi')).rejects.toThrow(/402/);
     expect(seen).toHaveLength(1);
-    expect(instance.stats).toMatchObject({ calls: 1, prompts: 1, failures: 0 });
+    // The prompt was sent and refused, so it is a failed prompt; what a 402 does not get is a retry.
+    // Counting it as zero failures is how a run with no credit reports perfect reliability.
+    expect(instance.stats).toMatchObject({ calls: 1, prompts: 1, failures: 1 });
   });
 
   it('turns any other refusal into a named store failure carrying the body', async () => {
@@ -130,6 +132,15 @@ describe('LlmClient', () => {
       code: 'MG_E_STORE_IO',
       details: { body: expect.stringContaining('bad prompt') },
     });
+  });
+
+  it('counts a refusal that is not retried as a failed prompt', async () => {
+    // A provider that rejects the request outright is the case that produced an empty store on a
+    // dispatch nobody could explain: 32 distillation prompts, 400 each, `failures: 0`. The prompt
+    // left, and it did not come back with a reply, which is what the count means.
+    const { instance } = client([{ status: 400, body: { error: 'model not found' } }]);
+    await expect(instance.chat('hi')).rejects.toThrow(/400/);
+    expect(instance.stats).toMatchObject({ calls: 1, prompts: 1, failures: 1, retries: 0 });
   });
 
   it('gives up after four attempts and reports the call as a failed prompt', async () => {
@@ -195,6 +206,48 @@ describe('LlmClient', () => {
       temperature?: number;
     };
     expect(body.temperature).toBe(0.7);
+  });
+
+  it('sends the model the endpoint serves, not the router name it was configured with', async () => {
+    // The τ² lane names its model the way litellm does — `deepseek/deepseek-chat` — because the
+    // Python side of that lane is a litellm caller. This client posts to
+    // `api.deepseek.com/chat/completions`, which serves `deepseek-chat` and rejects the prefixed
+    // form with a 400. One variable, two naming conventions, and the run that discovered it did so
+    // by storing nothing.
+    const { instance, seen } = client([ok('x')], { model: 'deepseek/deepseek-chat' });
+    await instance.chat('PROMPT');
+    const body = JSON.parse(seen[0]?.split(' ').slice(1).join(' ') ?? '{}') as { model?: string };
+    expect(body.model).toBe('deepseek-chat');
+    expect(instance.model).toBe('deepseek-chat');
+    expect(instance.configuredModel).toBe('deepseek/deepseek-chat');
+  });
+});
+
+describe('restModelOf', () => {
+  it('drops the provider alias litellm puts in front of the id', () => {
+    expect(restModelOf('deepseek/deepseek-chat')).toEqual({
+      sent: 'deepseek-chat',
+      stripped: 'deepseek',
+    });
+    expect(restModelOf('DeepSeek/deepseek-reasoner').sent).toBe('deepseek-reasoner');
+  });
+
+  it('leaves a bare id alone, which is what every artefact before this one used', () => {
+    expect(restModelOf('deepseek-chat')).toEqual({ sent: 'deepseek-chat' });
+    expect(restModelOf('  m  ')).toEqual({ sent: 'm' });
+  });
+
+  it('leaves another vendor\u2019s prefix alone, rather than mangling a name it does not know', () => {
+    // `openai/gpt-4o` is not this endpoint's shorthand for anything: stripping it would send `gpt-4o`
+    // to a DeepSeek endpoint and report a model-not-found for a configuration that named another
+    // provider on purpose. The request fails, and it fails saying what it was asked for.
+    expect(restModelOf('openai/gpt-4o')).toEqual({ sent: 'openai/gpt-4o' });
+    expect(restModelOf('deepseek-ai/DeepSeek-V3').sent).toBe('deepseek-ai/DeepSeek-V3');
+  });
+
+  it('refuses an empty id instead of posting one', async () => {
+    expect(() => restModelOf('   ')).toThrow(/model/);
+    expect(() => new LlmClient({ apiKey: 'k', model: '', maxCalls: 1 })).toThrow(/model/);
   });
 });
 

@@ -74,6 +74,45 @@ export type LlmStats = {
 
 const DEFAULT_ENDPOINT = 'https://api.deepseek.com/chat/completions';
 
+/**
+ * The model ids the endpoint serves under a `provider/` alias.
+ *
+ * One list, and only one entry, because it is a translation rather than a guess. The τ² lane is a
+ * litellm caller in its Python half and a REST caller in this one, so its model is named
+ * `deepseek/deepseek-chat` — litellm's spelling of the provider and the id. This client posts to
+ * `api.deepseek.com/chat/completions`, whose `model` field is `deepseek-chat`. Sending the router's
+ * spelling was rejected with a 400 on every call, and the lane read that as "the model said nothing
+ * about this correction": 32 prompts, 32 empty answers, a store with no knowledge in it.
+ *
+ * The list stays narrow on purpose. A prefix this file does not know is left alone, because
+ * `deepseek-ai/DeepSeek-V3` and `openai/gpt-4o` are names of other things rather than aliases of
+ * this one, and mangling them would report a provider mismatch for a configuration that made a
+ * different choice.
+ */
+const PROVIDER_ALIASES = new Set(['deepseek']);
+
+/**
+ * What this endpoint should be told the model is called.
+ *
+ * Returns the id to send and, when a prefix was removed, the prefix, so a caller can record both
+ * names: the artefact says what was configured, and the request says what was asked.
+ */
+export function restModelOf(configured: string): { readonly sent: string; readonly stripped?: string } {
+  const trimmed = configured.trim();
+  if (trimmed === '') {
+    throw new MicrogliaError('MG_E_CONFIG', 'A model id is required for the model endpoint');
+  }
+  const slash = trimmed.indexOf('/');
+  if (slash <= 0) return { sent: trimmed };
+  const alias = trimmed.slice(0, slash);
+  if (!PROVIDER_ALIASES.has(alias.toLowerCase())) return { sent: trimmed };
+  const rest = trimmed.slice(slash + 1).trim();
+  // `deepseek/` with nothing behind it is not a model id; keeping the raw text lets the endpoint
+  // answer, which is a better error than one this file invents.
+  return rest === '' ? { sent: trimmed } : { sent: rest, stripped: alias };
+}
+
+
 /** Whether an aborted call was abandoned by its own timeout, which is a different fact from a reset. */
 function isTimeoutError(error: unknown): boolean {
   return error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
@@ -111,6 +150,11 @@ export function retryAfterMs(header: string | null): number | undefined {
 }
 
 export class LlmClient {
+  /** What the endpoint is told, which is not always what the caller configured. */
+  public readonly model: string;
+  /** The configured name, kept so an artefact can say both. */
+  public readonly configuredModel: string;
+
   private readonly breaker: CircuitBreaker;
   private calls = 0;
   private prompts = 0;
@@ -126,6 +170,9 @@ export class LlmClient {
       // would make a second provider look unsupported when only its name was missing.
       throw new MicrogliaError('MG_E_CONFIG', 'An API key is required for the model endpoint');
     }
+    const resolved = restModelOf(options.model);
+    this.model = resolved.sent;
+    this.configuredModel = options.model;
     this.breaker = new CircuitBreaker(options.breakerThreshold ?? 8);
   }
 
@@ -190,7 +237,7 @@ export class LlmClient {
           method: 'POST',
           headers: { authorization: `Bearer ${this.options.apiKey}`, 'content-type': 'application/json' },
           body: JSON.stringify({
-            model: this.options.model,
+            model: this.model,
             messages: [{ role: 'user', content: prompt }],
             temperature,
             max_tokens: maxTokens,
@@ -210,6 +257,11 @@ export class LlmClient {
       }
       if (!response.ok) {
         const body = (await response.text()).slice(0, 400);
+        // A prompt that was sent and refused is a failed prompt, whoever refused it. The counter
+        // used to move only when four attempts had been spent, so an endpoint that rejected every
+        // request outright — a model id it does not serve, a key without the scope — reported
+        // `prompts: 32, failures: 0`, and the reliability gate certified the outage.
+        this.failures += 1;
         // 402 is neither transient nor a defect: the account has no balance.
         if (response.status === 402) {
           throw new MicrogliaError('MG_E_CONFIG', 'the provider refused the call for lack of credit (402)', {
