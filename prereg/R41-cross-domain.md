@@ -53,6 +53,10 @@ predicts one — the round has still bought the thing it was registered for.
   a transfer.
 - **The audit's index moves exactly four places**: supplyable 9 → 13, arm-indexed 30 → 26, and the
   fired set gains `V15`, `V16`, `V17`, `V33` with nothing else added or removed.
+- **The split floor is 40 tasks and the evaluation cap is the whole airline set.** The lane's
+  shipped floor is 60, chosen for retail's 68-task held-out half; a floor chosen for a larger
+  scenario reports a smaller one as short, so the dispatch states its own (`TAU_MIN_TASKS`), and the
+  artefact records the number it was run at.
 - **Every evaluated episode is paired.** The reference arm's episodes reach the ledger as the control
   half, so the treatment arm contributes no orphan and the ledger's length is the pair's length.
 - **If the foreign pack serves nothing**, `V1` fails and the round reports the mechanism rather than
@@ -89,6 +93,6 @@ number.
 
 ## Cost
 
-One τ² dispatch through `sota.yml`, both arms, one scenario pair, the airline task set at four
-trials against a thirty-two-task retail learn half. No new dataset, no new model family, no change
+One τ² dispatch through `sota.yml`, both arms, one scenario pair, the whole airline task set at four
+trials against a thirty-two-task retail learn half. Floor: 40 tasks. No new dataset, no new model family, no change
 to the merge gate.
