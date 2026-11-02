@@ -1,7 +1,7 @@
-import { mkdtempSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 /**
  * The L4 driver's orchestration, against a stand-in for τ²-bench.
@@ -38,11 +38,17 @@ if (phase === 'list') {
       simulations.push({ task_id: taskId, trial, reward_info: { reward } });
     }
   }
+  // Every task states the tool call it expects, which is what a correction is learned from: a task
+  // without criteria teaches nothing and would make the learning half look empty for a reason that
+  // has nothing to do with the provider.
   require('node:fs').writeFileSync(
     out,
     JSON.stringify({
       info: { environment_info: { domain_name: 'retail' } },
-      tasks: tasks.map((id) => ({ id })),
+      tasks: tasks.map((id) => ({
+        id,
+        evaluation_criteria: { actions: [{ name: 'lookup', arguments: { id } }] },
+      })),
       simulations,
     }),
   );
@@ -122,6 +128,46 @@ describe('the L4 driver', () => {
       delete process.env['TAU_TRAIN_DOMAIN'];
       delete process.env['TAU_TEST_DOMAIN'];
       delete process.env['TAU_WORKDIR'];
+    }
+  });
+
+  it('stops at distillation when the provider refuses every distiller call', async () => {
+    // The R41 shape, reproduced without a provider, a benchmark or an hour: the distiller's model is
+    // refused, so every correction comes back empty and the store is built out of nothing. Before
+    // R42 this ran the whole evaluation and published a memory arm whose pack was empty for all 200
+    // recall requests; the two things that made it invisible were the discarded distill report and
+    // the 400 being counted as a prompt that failed *after retries*, which it never had.
+    //
+    // What is asserted is the behaviour a reader needs: the run stops where the fault is, the message
+    // names the status and the model, and the evaluation is never paid for.
+    const { dir, executable } = stubRunner();
+    process.env['TAU_PYTHON'] = executable;
+    process.env['TAU_MEMORY'] = 'true';
+    process.env['TAU_TRIALS'] = '1';
+    process.env['TAU_TRAIN_SHARE'] = '0.5';
+    process.env['TAU_WORKDIR'] = dir;
+    process.env['DEEPSEEK_API_KEY'] = 'test-key';
+    process.env['TAU_DISTILL_MODEL'] = 'deepseek/deepseek-chat';
+    vi.stubGlobal('fetch', async () =>
+      new Response(JSON.stringify({ error: { message: 'Model Not Exist' } }), { status: 400 }),
+    );
+    try {
+      const driver = await import('../bin/tau2-driver.js?case=refused-model');
+      await expect(driver.run()).rejects.toThrow(/refused the request \(400\)/);
+      // The learning half ran and the evaluation did not: `learn.json` exists, `eval.json` does not.
+      expect(existsSync(join(dir, 'learn.json'))).toBe(true);
+      expect(existsSync(join(dir, 'eval.json'))).toBe(false);
+      // And the name the endpoint was sent is the one it serves, not the router's spelling.
+      expect(driver.instrument()).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env['TAU_PYTHON'];
+      delete process.env['TAU_MEMORY'];
+      delete process.env['TAU_TRIALS'];
+      delete process.env['TAU_TRAIN_SHARE'];
+      delete process.env['TAU_WORKDIR'];
+      delete process.env['DEEPSEEK_API_KEY'];
+      delete process.env['TAU_DISTILL_MODEL'];
     }
   });
 

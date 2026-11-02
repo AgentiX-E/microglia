@@ -126,12 +126,26 @@ describe('LlmClient', () => {
     expect(instance.stats).toMatchObject({ calls: 1, prompts: 1, failures: 1 });
   });
 
-  it('turns any other refusal into a named store failure carrying the body', async () => {
-    const { instance } = client([{ status: 400, body: { error: 'bad prompt' } }]);
+  it('treats a request the provider will refuse again as a configuration failure, not a lost prompt', async () => {
+    // A `400` is a property of what was sent: the same request fails identically next time. Reporting
+    // it as one lost prompt is what let thirty-two refusals arrive at the distiller as thirty-two
+    // corrections the model had nothing to say about, and a whole arm evaluate an empty store.
+    const { instance } = client([{ status: 400, body: { error: 'model not found' } }]);
     await expect(instance.chat('hi')).rejects.toMatchObject({
-      code: 'MG_E_STORE_IO',
-      details: { body: expect.stringContaining('bad prompt') },
+      code: 'MG_E_CONFIG',
+      details: { body: expect.stringContaining('model not found'), model: 'm' },
     });
+  });
+
+  it('keeps the four 4xx codes that ask for the same request again on the transient path', async () => {
+    for (const status of [408, 409, 425]) {
+      const { instance } = client([{ status }]);
+      await expect(instance.chat('hi')).rejects.toMatchObject({
+        code: 'MG_E_STORE_IO',
+        details: { last: `status ${status}` },
+      });
+      expect(instance.stats).toMatchObject({ calls: 4, prompts: 1, failures: 1 });
+    }
   });
 
   it('counts a refusal that is not retried as a failed prompt', async () => {
@@ -248,6 +262,17 @@ describe('restModelOf', () => {
   it('refuses an empty id instead of posting one', async () => {
     expect(() => restModelOf('   ')).toThrow(/model/);
     expect(() => new LlmClient({ apiKey: 'k', model: '', maxCalls: 1 })).toThrow(/model/);
+  });
+
+  it('keeps an id it cannot translate instead of inventing one', () => {
+    // `deepseek/` with nothing behind it is not this endpoint's spelling of any model. Strip the
+    // alias and the request would be sent with an empty `model`, which is a body the endpoint would
+    // refuse for a reason that has nothing to do with what the run configured; keeping the raw text
+    // lets the endpoint answer, and its answer names the id it was asked for.
+    expect(restModelOf('deepseek/')).toEqual({ sent: 'deepseek/' });
+    expect(restModelOf('deepseek/   ')).toEqual({ sent: 'deepseek/' });
+    // A leading slash has no alias in front of it, so there is nothing to strip.
+    expect(restModelOf('/deepseek-chat')).toEqual({ sent: '/deepseek-chat' });
   });
 });
 

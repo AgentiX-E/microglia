@@ -112,6 +112,32 @@ export function restModelOf(configured: string): { readonly sent: string; readon
   return rest === '' ? { sent: trimmed } : { sent: rest, stripped: alias };
 }
 
+/**
+ * What one status code means for the next attempt, which is the only thing this file does with one.
+ *
+ *  - `transient` — the provider is asking for the same request later: `5xx`, and the four `4xx`
+ *    codes that say "not now" rather than "not this": `408` timeout, `409` conflict, `425` too
+ *    early, `429` slow down.
+ *  - `unpaid` — the account behind the key has no balance (`402`). Sending the same request again
+ *    cannot help, and neither can sending a different one.
+ *  - `refusal` — everything else, which is every remaining `4xx`. A `4xx` is a property of what was
+ *    sent: a model id the endpoint does not serve, a key without the scope and a malformed body all
+ *    fail identically next time.
+ *
+ * The three cases are exhaustive on purpose. They used to be two plus a `MG_E_STORE_IO`
+ * fall-through for statuses that were neither transient nor refused, and nothing could reach that
+ * line — the two ranges between them cover every status an HTTP response can carry. An arm that
+ * cannot be taken is not a defensive default; it is a line the coverage report would have to be
+ * told to ignore, or a hole a reader has to re-derive before trusting the other two.
+ */
+type StatusVerdict = 'transient' | 'unpaid' | 'refusal';
+
+function verdictOf(status: number): StatusVerdict {
+  if (status >= 500 || status === 408 || status === 409 || status === 425 || status === 429) {
+    return 'transient';
+  }
+  return status === 402 ? 'unpaid' : 'refusal';
+}
 
 /** Whether an aborted call was abandoned by its own timeout, which is a different fact from a reset. */
 function isTimeoutError(error: unknown): boolean {
@@ -250,7 +276,8 @@ export class LlmClient {
         if (timedOut) this.timeouts += 1;
         continue;
       }
-      if (response.status === 429 || response.status >= 500) {
+      const verdict = verdictOf(response.status);
+      if (verdict === 'transient') {
         last = `status ${response.status}`;
         waitMs = retryAfterMs(response.headers.get('retry-after'));
         continue;
@@ -263,13 +290,20 @@ export class LlmClient {
         // `prompts: 32, failures: 0`, and the reliability gate certified the outage.
         this.failures += 1;
         // 402 is neither transient nor a defect: the account has no balance.
-        if (response.status === 402) {
+        if (verdict === 'unpaid') {
           throw new MicrogliaError('MG_E_CONFIG', 'the provider refused the call for lack of credit (402)', {
             hint: 'Top up the account behind the API key, then dispatch again.',
             body,
           });
         }
-        throw new MicrogliaError('MG_E_STORE_IO', `the provider returned ${response.status}`, { body });
+        // A refusal the provider will repeat. `4xx` is the client's request, not the provider's
+        // weather, so it is run-level rather than per-prompt: `stoppedRun` stops the run here
+        // instead of letting thirty-two refusals reach a reader as a store that had nothing to say.
+        throw new MicrogliaError(
+          'MG_E_CONFIG',
+          `the provider refused the request (${response.status}); it will refuse it again`,
+          { body, model: this.model, hint: 'Check the model id and the key the endpoint serves.' },
+        );
       }
       const body = (await response.json()) as {
         choices?: { message?: { content?: string } }[];
