@@ -872,3 +872,24 @@ parser, pool rule, selection and population check, and stops before the first mo
 dispatch. On `train` it was worth five defects, four of which fail *after* the 8.9 GB download — and the reason
 no unit test found them is that every test loads a fixture written against the same split the code was written
 against.
+
+**Assignment test** — A contrast measured by *giving* every unit the treatment, rather than by comparing the
+units that happened to receive it. R35 found that questions whose pack held one rule outscored questions whose
+pack held two by 4.03pp; that is an observation, because retrieval decides pack size and the two groups are
+different questions. R25 had already paid for the assignment: a `full-one` arm that serves the first rule to
+every question. It reads −0.33pp, so the contrast was the questions. **A variable a system assigns is a
+candidate mechanism; a variable its own retrieval assigns is a candidate confound**, and only an arm that
+assigns it can tell the two apart.
+
+**Marginal item** — What the item a prompt did not carry would have done, counted in the four cells the two
+arms can disagree in: repairs it carries (a question the bare model missed that only the pair fixes), repairs
+it prevents (only the single rule fixes it), breaks it prevents, and breaks it causes. On the 1,534-question
+dev split the second rule carries 23 repairs and causes 27 breaks — 0.85 per break — while preventing 15
+repairs and 24 breaks, so its net effect is **+5 questions** and its own record is a net harm. The two are not
+in contradiction: the item changes what the other item does.
+
+**Additive pack** — A pack whose effect is the sum of its items' effects. This one is not: removing an item
+changes the answers the remaining items produce, which is why an exchange rate computed per item does not
+predict the pack's, and why no budget, top-k or density threshold can be tuned by asking how many items fit.
+The identity that makes it checkable is that the four marginal cells sum to the measured contrast — −5
+questions on the dev split — and it is a test in `assignment.test.ts`.

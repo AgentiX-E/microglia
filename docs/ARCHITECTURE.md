@@ -879,8 +879,9 @@ questions:
 **+4.03pp [+0.76, +6.62]** on a database-clustered interval. On four other artefacts of at least 1,534
 questions the same contrast runs +4.14, +3.13, +0.62 and +0.36; on all twelve 350-question pilots it is
 negative, three of them with intervals excluding zero. The sign tracks the corpus, which is what a
-sample-size explanation predicts and what a mechanism explanation would have to argue against. It is
-recorded as a lead for R36, whose arm assigns pack size instead of observing it.
+sample-size explanation predicts and what a mechanism explanation would have to argue against — and §8.11
+is the arm that assigns pack size instead of observing it. The answer is that the contrast does not
+survive assignment.
 
 ```text
   what was tested            what it showed                    what it licenses
@@ -896,3 +897,60 @@ differently*. This one is about the items themselves, and it is the strongest fo
 **a rule has no per-item value that transfers, so a store cannot be improved by editing its items one at a
 time.** Only two levers are left, and both are designs rather than edits — the grain at which memory is
 written, and the number of items a prompt carries.
+
+### 8.11 The pack is not additive, so the item count is not a knob
+
+R35's one positive number was a property of the questions, and the arm that says so had already been paid
+for. R25 carried `full-one` as a *dose* control: the same retrieval, the same order, the first item and no
+second one, built from the pack `full` carries so that the two prompts differ in one field. Re-read as an
+assignment test on the same 1,534 questions it reads **−0.33pp [−1.65, +1.25]** clustered by database, 42
+gained against 47 lost, p = 0.67.
+
+**Why the observation reversed.** The +3.13pp came from questions retrieval happened to serve a single
+rule, and those questions are not the same questions:
+
+| | questions | repaired (of repairable) | broken (of breakable) |
+|---|---|---|---|
+| packs of one | 401 | 18 of 189 (9.5%) | **9 of 212 (4.2%)** |
+| packs of two | 1,133 | 42 of 468 (9.0%) | **52 of 665 (7.8%)** |
+
+The repair rates are the same to half a point; the break rate is nearly halved. Singleton questions are
+questions where the store had one relevant thing to say, and a store that says one thing breaks less.
+Giving every question a single rule hands back that break rate — and hands back the repairs with it.
+
+**The number nobody had: what the second item is worth.** The two arms differ by one rule, so the contrast
+decomposes into four cells, and the four do not look like a subtraction.
+
+```text
+  the question was …            pair right   pair wrong
+    bare model wrong (repairable)      23           15     ← the second item repairs 23, prevents 15
+    bare model right (breakable)       24           27     ← it prevents 24 breaks, causes 27
+```
+
+The second rule carries **23 repairs** and causes **27 breaks** — 0.85 per break, so on its own record it
+is a net harm, which is why a naive reading of R35 predicted truncation would help. It also *prevents 15
+repairs and 24 breaks*: the same first rule behaves differently when it is alone in the block. The four
+cells sum to the measured −5 questions, and the identity is a test (`assignment.test.ts`).
+
+**Why that matters more than the sign.** A pack's effect is not a sum over its items. Anything that tunes
+the number of items — a budget, a top-k, a density panel — is tuning an interaction it cannot observe, and
+the exchange rate says the same thing from the other side: the pair clears **0.737** of the bare model's
+1.335 hurdle and the single rule clears **0.672**, so truncation moves the arm *away* from paying.
+
+**Gates.** `V62-assignment-instrument` (the arm is a truncation: one item at most, every question asked,
+the block changed on at least seven tenths of them) and `V63-assignment-reproduces-the-lane` (this reading
+agrees with the lane's own `arm_pairs` entry to a hundredth of a point on the delta and exactly on both
+discordant counts). `pnpm eval:pack-assign` recomputes the artefact from the committed run and the workflow
+asserts twenty of its fields on every push; the module is at 100% on all four coverage dimensions.
+
+**What it changes about the product statement.** Both remaining levers were designs. One of them — how many
+items a prompt carries — is now measured, and it does not pay. What is left is the unit of memory itself:
+the grain at which a correction is written.
+
+```text
+  what was tested            what it showed                    what it licenses
+  ─────────────────────      ────────────────────────────      ────────────────────────
+  pack size (observed)       +3.13pp [+0.87, +5.23]            nothing: selection
+  pack size (assigned)       −0.33pp [−1.65, +1.25]            nothing: sign reversed
+  the second item            23 repairs / 27 breaks, 0.85       nothing: not additive
+```

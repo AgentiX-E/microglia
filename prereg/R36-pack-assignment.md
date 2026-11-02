@@ -134,3 +134,43 @@ The adjudication is zero model calls. The replication is one dispatch: 1,534 lea
 `none`, `full` and `full-one` on 1,534 questions — **6,136 calls**, against R25's 9,096 for the same
 split with four arms and an admission fit. The distillation cache is restored, so the store is replayed
 where its prompts recur.
+
+## Outcome — the adjudication half (read 2026-11-02, before the replication)
+
+Four of the five predictions are decidable on the artefact R25 paid for, and the reading reverses the lead
+it was registered to test.
+
+| | claim | observed | |
+|---|---|---|---|
+| P1 | instrument: one item, the split, more than one database | 1 item at most and 1.00 on average; 73.9% of prompts differ from the pair; 1,534 questions over 11 databases | ✓ |
+| P2 | the reading reproduces the lane's own contrast | −0.33pp [−1.65, +1.25] against the lane's −0.33pp; 42/47 discordant against 42/47 | ✓ |
+| P3 | the one-rule pack does not clear the hurdle | clearance **0.672** on a hurdle of 1.335, against **0.737** for the pair | ✓ |
+| P4 | the second item is worth more than two repairs per break | **23** repairs carried and **27** breaks caused — **0.85** per break | ✗ |
+| P5 | the null replicates on a fresh store | dispatched, not yet read | — |
+
+**The lead does not survive assignment.** `full-one` against `full` is **−0.33pp [−1.65, +1.25]**, so the
+cluster-robust interval excludes the +2pp this file registered as material by 3.7pp. The observation it
+contradicts is visible in the same artefact: the 401 questions retrieval served one rule broke **9 of 212**
+(4.2%) where the 1,133 served two broke **52 of 665** (7.8%), while both groups repaired at 9.5% and 9.0%.
+The +3.13pp was a break-rate difference between two populations, and giving the second population the first
+population's pack size does not give it the first population's break rate.
+
+**The fourth cell is the round's result.** The second rule carries 23 repairs and causes 27 breaks — a net
+harm on its own record, which is exactly what R35's contrast appeared to license removing — and it also
+**prevents 15 repairs and 24 breaks**, because the first rule answers differently alone. The four cells sum
+to the measured −5 questions, and the sum is a test rather than a remark (`assignment.test.ts`). A pack is
+therefore not a set of independent items, and "how many rules fit" is not a dial: the marginal item's effect
+depends on which items are already present.
+
+**Disclosed, because it was found while writing this and it changes a published interval.** R35's outcome
+table quotes the dev cell of this contrast as +3.13pp **[+0.62, +5.23]**; recomputing it here gives
+**[+0.87, +5.23]** at the module's default 2,000 resamples. The point estimate is identical to the digit and
+the upper bound to 0.004pp; the lower bound moves because R35's dev rows were produced at **400** resamples
+while everything else in that round used the default. It is recorded as `AUDIT` §34.2 rather than silently
+restated, and R36 uses the default everywhere.
+
+**What a P4 refutation licenses, by the rules written above.** *"The second item is a net harm in its own
+record; capping at one should have helped the break rate and did not, which means the loss is not in the item
+count but in what the items say."* That is what happened: truncation removes 27 breaks and 23 repairs and
+instates 24 breaks and 15 repairs, and the two pairs almost cancel. The count lever is closed; the grain
+lever stays open, and P5 will be read when the replication lands.

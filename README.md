@@ -363,16 +363,34 @@ remove rules at random. The actionable version fails too: flagging the 58 rules 
 least ten showings covers 2,545 questions which returned **−0.55pp** against **−0.49pp** for the rest — a
 0.06pp difference on an interval of [−1.97, +1.56].
 
-**What does move is how many rules a prompt carries.** 423 questions whose pack held a single rule
-returned **+3.07pp** against **−0.96pp** for the 6,576 that held two: **+4.03pp [+0.76, +6.62]** on a
-database-clustered interval. It is a lead, not a finding — retrieval assigns pack size, the singleton
-questions are harder (47.3% unanswerable by the bare model against 41.4%), and the same contrast is
-negative on all twelve 350-question pilots in this repository while positive on all five artefacts with
-more than a thousand questions. Settling it needs an arm that *assigns* pack size rather than observing
-it, and that arm is half the prompt tokens of the run it replaces.
+**And the one variable that did move turns out to be the questions, not the count.** 423 questions whose
+pack held a single rule returned **+3.07pp** against **−0.96pp** for the 6,576 that held two —
+**+4.03pp [+0.76, +6.62]** clustered by database — and the arm that settles it had already been paid for:
+R25 carried a `full-one` arm that gives the first rule to *every* question. On the same 1,534 it reads
+**−0.33pp [−1.65, +1.25]**. The sign reverses, and the reason is visible in the cells: singleton questions
+repair at the same rate as pairs (9.5% against 9.0%) but break at nearly half of it (4.2% against 7.8%).
+A store that has one relevant thing to say about a question says it without disturbing much.
 
-`pnpm eval:ledger` recomputes every number in those two paragraphs from `poc-sota-bird-train.json`, and the
-workflow asserts twenty-four of them on every push (`prereg/R35-ledger.md`).
+**The pack is not additive, which is the part that matters.** The two arms differ by one rule, so the
+contrast decomposes, and the second rule does not simply add its own effect:
+
+| the question was… | pair right | pair wrong | |
+|---|---|---|---|
+| one the bare model missed | 23 | 15 | it repairs 23, and prevents 15 that the single rule would have repaired |
+| one the bare model answered | 24 | 27 | it prevents 24 breaks, and causes 27 |
+
+The second rule carries **23 repairs and 27 breaks** — 0.85 per break, a net harm on its own record — but
+it also **prevents 15 repairs and 24 breaks**, because the first rule answers differently when it is alone
+in the block. The four cells sum to the measured −5 questions. An exchange rate says the same thing from
+the other side: the pair clears **0.737** of the bare model's 1.335 hurdle, the single rule clears
+**0.672**, so truncating the pack moves the arm away from paying.
+
+> The item count is not a knob. Anything that tunes how many rules a prompt carries is tuning an
+> interaction it cannot observe.
+
+`pnpm eval:ledger` recomputes every number in the ledger paragraphs from `poc-sota-bird-train.json` and
+`pnpm eval:pack-assign` recomputes the assignment from the dev run; the workflow asserts forty-four of
+their fields on every push (`prereg/R35-ledger.md`, `prereg/R36-pack-assignment.md`).
 
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
 

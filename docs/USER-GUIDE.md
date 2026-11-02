@@ -1802,6 +1802,43 @@ SOTA_ARMS=none,full,values,linked pnpm eval:sota
 
 
 
+### 13.18 How many rules to put in a prompt, and why the answer is not a number
+
+13.16 showed that truncating the pack to one item for every question is **−0.33pp** on 1,534 questions, and
+that the +4pp contrast the question belongs to is a property of *which questions* retrieval served one rule.
+R36 turns that into a rule you can use, and the rule is not "pick k".
+
+- **The pack is not additive.** Take the two arms apart on the questions where they disagree. The second rule
+  repairs 23 questions the single rule misses and breaks 27 the single rule gets right — a 0.85 ratio, i.e. a
+  net harm on its own record — and it *also* prevents **15 repairs** and **24 breaks** the single rule would
+  otherwise have made. Removing it is not a subtraction, because the first rule answers differently when it is
+  alone in the block.
+
+```text
+  the question was …              pair right   pair wrong
+    one the bare model missed           23           15
+    one the bare model answered         24           27
+  ─────────────────────────────────────────────────────
+  net effect of the second rule: +23 +24 −15 −27 = +5 questions (0.33pp on 1,534)
+```
+
+- **So do not tune the count; tune the retrieval.** A budget, a top-k or a density threshold moves the *set*
+  of rules a prompt carries, and the marginal rule's effect depends on which rules are already there. If you
+  want the knob to behave, ask what a rule says about *this* question (13.9's coverage, 13.12's ledger) rather
+  than how many of them fit.
+- **The exchange rate is the cheaper check.** The bare model answered 877 of 1,534 questions, so break-even is
+  not parity but 1.335 repairs per break. A two-item pack clears **0.737** of that; a one-item pack clears
+  **0.672**. Before designing an arm, compute your own hurdle — `repairable` and `breakable` are both in the
+  artefact — because an arm can be a wash in percentage points and still move away from paying.
+- **Reproduce it yourself.** `POC_PACK_ARTEFACT=eval/results/poc-sota-bird-dev-R25-dose-and-admission.json
+  pnpm eval:pack-assign` recomputes the contrast, both exchange rates and the four-cell decomposition from the
+  committed run and writes `poc-pack-assign.json`; twenty of its fields are asserted in CI. The module is
+  `packages/eval/src/assignment.ts`, 100% covered on all four dimensions.
+- **If a dev dispatch fails at the first question**, check the manifest's `nested`/`nestedRoot` pair before
+  anything else: `dev.zip` ships its databases as `dev_databases.zip`, and a manifest that does not say so
+  extracts a directory holding only a zip. The lane now checks all eleven databases once, right after
+  extraction, and names the missing field.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:
