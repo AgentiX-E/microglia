@@ -52,6 +52,50 @@ def task_ids(domain: str, wanted: list[str]) -> list[str]:
     return [task.id for task in tasks]
 
 
+def diagnostics_of(simulations) -> dict:
+    """What the caller needs for the protocol's reliability gate, or null where upstream hides it.
+
+    The driver grades `V8-call-reliability`, which asks how many of the run's model calls failed.
+    Those calls happen inside this process, in upstream's agent, and nothing about them crosses back
+    in `results.json` - so the count has to be reconstructed here or the gate cannot be graded at all
+    on this scenario.
+
+    Every read is wrapped: a field upstream renames must turn this into "not observable" (a null the
+    driver reports as an absent gate) rather than into a failed run. A diagnostic that can break a
+    benchmark is worse than no diagnostic.
+    """
+    if simulations is None:
+        return {"agent_turns": None, "simulations": None, "terminated": None}
+    turns = 0
+    terminated: dict[str, int] = {}
+    counted_turns = True
+    for simulation in simulations:
+        messages = None
+        reader = getattr(simulation, "get_messages", None)
+        if callable(reader):
+            try:
+                messages = reader()
+            except Exception:  # noqa: BLE001 - upstream shape, not our error
+                messages = None
+        if messages is None:
+            counted_turns = False
+        else:
+            turns += sum(
+                1
+                for message in messages
+                if getattr(message, "role", None) in ("assistant", "agent")
+            )
+        reason = getattr(simulation, "termination_reason", None)
+        if reason is not None:
+            key = getattr(reason, "name", None) or str(reason)
+            terminated[key] = terminated.get(key, 0) + 1
+    return {
+        "agent_turns": turns if counted_turns else None,
+        "simulations": len(simulations),
+        "terminated": terminated or None,
+    }
+
+
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     wanted = [entry for entry in args.tasks.split(",") if entry]
@@ -124,6 +168,7 @@ def main(argv: list[str]) -> int:
                 "simulations": len(simulations) if simulations is not None else None,
                 "agent": args.agent,
                 "memory_url": args.memory_url,
+                "diagnostics": diagnostics_of(simulations),
             }
         )
     )

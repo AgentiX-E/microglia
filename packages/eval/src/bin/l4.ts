@@ -31,6 +31,7 @@ import {
   toPassAtK,
   type PassAtKInput,
 } from '@agentix-e/microglia-eval';
+import type { Tau2ArmRecord } from '@agentix-e/microglia-eval';
 import { writeResult } from './lib.js';
 
 const PUBLISHED = 0.575; // ALTK-Evolve, τ²-retail, pass^4 on the same split.
@@ -131,6 +132,18 @@ type Measurement = {
   readonly domain?: string;
   readonly format: string;
   readonly inferredTrials: number;
+  /**
+   * What the driver could see, when it exports an `instrument()`.
+   *
+   * A re-scored results file has no such function: the run it describes happened elsewhere and the
+   * counts did not cross back. Absent is therefore the honest value for that path, and it is why the
+   * protocol's gates can be graded on a driver run and not on a re-scoring — a difference the artefact
+   * states in a field rather than leaving to the reader to notice.
+   *
+   * The lane does not grade them here. `l4-pair` does, through `tau2GateAudit`, because most of the
+   * protocol's gates read a *pair* of arms and one arm's artefact cannot answer them.
+   */
+  readonly instrumentation?: Tau2ArmRecord;
 };
 
 async function measureFromResults(path: string): Promise<Measurement> {
@@ -159,9 +172,15 @@ async function measureFromDriver(module: string): Promise<Measurement> {
   // environment variable's documentation says.
   const specifier =
     module.startsWith('.') || module.startsWith('/') ? pathToFileURL(resolve(module)).href : module;
-  let loaded: { run: () => Promise<readonly PassAtKInput[]> };
+  let loaded: {
+    run: () => Promise<readonly PassAtKInput[]>;
+    instrument?: () => Tau2ArmRecord | undefined;
+  };
   try {
-    loaded = (await import(specifier)) as { run: () => Promise<readonly PassAtKInput[]> };
+    loaded = (await import(specifier)) as {
+      run: () => Promise<readonly PassAtKInput[]>;
+      instrument?: () => Tau2ArmRecord | undefined;
+    };
   } catch (error) {
     // A driver that cannot be *resolved* is an absent environment, not a failed
     // measurement: the variable names a module that is not there. A driver that
@@ -173,7 +192,17 @@ async function measureFromDriver(module: string): Promise<Measurement> {
     }
     throw error;
   }
-  return { tasks: await loaded.run(), unscored: [], format: 'driver', inferredTrials: 0 };
+  const tasks = await loaded.run();
+  // Read after the run: the function reports what happened, and calling it before would describe a
+  // process that had not started.
+  const instrumentation = loaded.instrument?.();
+  return {
+    tasks,
+    unscored: [],
+    format: 'driver',
+    inferredTrials: 0,
+    ...(instrumentation === undefined ? {} : { instrumentation }),
+  };
 }
 
 if (resultsPath === undefined && driver === undefined) await notRun();
@@ -262,6 +291,10 @@ await writeResult({
   // Per-task outcomes, so the other arm can be paired against this artefact instead of
   // compared to its mean. Written by every run, used by `pnpm eval:l4-pair`.
   per_task: perTaskRows(measured.tasks),
+  // What the driver counted, so the pairing step can grade the protocol's gates on this arm. Written
+  // only when the driver exported an `instrument()`: an absent field is a run whose counts did not
+  // cross the process boundary, and `l4-pair` reports those gates as absent rather than green.
+  ...(measured.instrumentation === undefined ? {} : { tau2: measured.instrumentation }),
   samples: gates,
 });
 for (const gate of gates) {

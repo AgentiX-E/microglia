@@ -1,0 +1,93 @@
+import { describe, expect, it } from 'vitest';
+import { armRecordFromDriver, type Tau2Raw } from '../tau2-instrument.js';
+
+function raw(over: Partial<Tau2Raw> = {}): Tau2Raw {
+  return {
+    train: ['t1', 't2'],
+    test: ['e1', 'e2'],
+    trials: 4,
+    unscored: 0,
+    servedPackSizes: [1, 2],
+    learning: { rows: 2, unanswered: 0, edited: 2, distilled: 2, distillFailed: 0 },
+    calls: { total: 40, failed: 0 },
+    domains: { stored: 2, withoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
+    ...over,
+  };
+}
+
+describe('armRecordFromDriver', () => {
+  it('records what the four gate families read, on a clean run', () => {
+    const record = armRecordFromDriver(raw());
+    expect(record.arm).toBe('memory');
+    expect(record.tasks).toBe(2);
+    expect(record.trials).toBe(4);
+    expect(record.unscored).toBe(0);
+    expect(record.meanPackIds).toBeCloseTo(1.5, 12);
+    expect(record.calls).toEqual({ calls: 40, failures: 0 });
+    expect(record.learning).toEqual({ rows: 2, unanswered: 0, edited: 2, distillFailed: 0 });
+    expect(record.domainOrigin).toEqual({
+      storedWithDomain: 2,
+      storedWithoutDomain: 0,
+      unscopedIn: 0,
+      widenedIn: 0,
+    });
+  });
+
+  it('counts distinct held-out tasks in the denominator and keeps repeats in the split', () => {
+    // V2 asks whether every question was evaluated exactly once. A record that de-duplicated the list
+    // before the gate saw it would answer its own question, and answer it yes.
+    const record = armRecordFromDriver(raw({ test: ['e1', 'e2', 'e2'] }));
+    expect(record.tasks).toBe(2);
+    expect(record.split?.test).toEqual(['e1', 'e2', 'e2']);
+    expect(record.split?.train).toEqual(['t1', 't2']);
+  });
+
+  it('reports an empty pack set as zero items rather than as absent', () => {
+    // The lane ran and served nothing: that is V1's failure case, and reporting `undefined` would turn
+    // "the memory injected nothing" into "the gate was not applicable".
+    expect(armRecordFromDriver(raw({ servedPackSizes: [] })).meanPackIds).toBe(0);
+  });
+
+  it('omits the reliability record when the run made no call', () => {
+    // Zero calls is not perfect reliability, and a default of zero would say it was.
+    const record = armRecordFromDriver(raw({ calls: { total: 0, failed: 0 } }));
+    expect(record.calls).toBeUndefined();
+    expect(Object.hasOwn(record, 'calls')).toBe(false);
+  });
+
+  it('omits the learning record when the distiller\u2019s failure count was not observable', () => {
+    // A zero here would be a perfect V32 on a quantity nobody measured, which is the one thing an
+    // instrument gate must never say. Absent is a gate that does not appear; zero is a gate that passes.
+    const record = armRecordFromDriver(raw({ learning: { rows: 10, unanswered: 1, edited: 8, distilled: 8 } }));
+    expect(record.learning).toBeUndefined();
+    expect(Object.hasOwn(record, 'learning')).toBe(false);
+  });
+
+  it('splits the store into the two domain buckets the ledger compares', () => {
+    // V44's inequality is `storedWithoutDomain <= unscopedIn + widenedIn`, so the two sides have to be
+    // counted from the same population: an item is either carrying a domain or it is not.
+    const record = armRecordFromDriver(
+      raw({ domains: { stored: 5, withoutDomain: 2, unscopedIn: 1, widenedIn: 1 } }),
+    );
+    expect(record.domainOrigin).toEqual({
+      storedWithDomain: 3,
+      storedWithoutDomain: 2,
+      unscopedIn: 1,
+      widenedIn: 1,
+    });
+  });
+
+  it('never reports a negative count when the buckets disagree with the total', () => {
+    // A store that reports more domain-free items than items is broken, and a negative "with domain"
+    // would make V44's sum true for the wrong reason instead of exposing the disagreement.
+    const record = armRecordFromDriver(
+      raw({ domains: { stored: 1, withoutDomain: 3, unscopedIn: 0, widenedIn: 0 } }),
+    );
+    expect(record.domainOrigin?.storedWithDomain).toBe(0);
+    expect(record.domainOrigin?.storedWithoutDomain).toBe(3);
+  });
+
+  it('names the arm it was asked for, so one function serves both arms', () => {
+    expect(armRecordFromDriver(raw(), 'reference').arm).toBe('reference');
+  });
+});

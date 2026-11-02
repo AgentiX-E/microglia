@@ -443,6 +443,8 @@ export {
   type ScreeningArm,
 } from './ledger.js';
 
+export { armRecordFromDriver, type Tau2Raw } from './tau2-instrument.js';
+
 export {
   R36_BARS,
   adjudicateR36,

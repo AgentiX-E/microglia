@@ -39,6 +39,7 @@ import { steppingClock, mulberry32 } from '@agentix-e/microglia-core';
 import {
   LlmClient,
   driverArgs,
+  armRecordFromDriver,
   learnableCorrections,
   parseTauResults,
   parseTauTasks,
@@ -46,6 +47,8 @@ import {
   toPassAtK,
   type Correction,
   type PassAtKInput,
+  type Tau2ArmRecord,
+  type Tau2Raw,
 } from '@agentix-e/microglia-eval';
 
 const runFile = promisify(execFile);
@@ -86,7 +89,7 @@ const PYTHON = pythonPath();
 const TASK = 'tau2.act';
 
 /** One `run_split.py` invocation, with its stdout surfaced on failure. */
-async function phase(args: readonly string[]): Promise<void> {
+async function phase(args: readonly string[]): Promise<string> {
   try {
     const finished = await runFile(PYTHON, args as string[], {
       cwd: REPO,
@@ -102,6 +105,11 @@ async function phase(args: readonly string[]): Promise<void> {
       .map((text) => text.trim().split('\n').slice(-2).join('\n'))
       .join('\n');
     if (tail !== '') process.stdout.write(`[tau2] ${tail}\n`);
+    // The stdout is returned because the summary line is also the only channel on which the
+    // in-process diagnostics of a phase can reach this process: `results.json` is upstream's
+    // document and writing our own fields into it would make the reader parse a format nobody
+    // specified.
+    return finished.stdout;
   } catch (error) {
     const failure = error as { stdout?: string; stderr?: string; message: string };
     const detail = [failure.stderr, failure.stdout].filter(Boolean).join('\n').slice(-2000);
@@ -155,6 +163,54 @@ function startRecall(
   });
 }
 
+/**
+ * What `run()` saw, and the shape the protocol's gates read it in.
+ *
+ * Two functions rather than one return value because `l4.ts` was written against
+ * `run(): Promise<readonly PassAtKInput[]>` and a driver that changed that signature would be a
+ * driver the lane can no longer load. `instrument()` is additive: a caller that does not ask for it
+ * gets exactly the behaviour it had before, and a driver that does not export it (every driver before
+ * this one) is not a failure.
+ */
+let observed: Tau2Raw | undefined;
+
+/** The last JSON line a phase printed, which is the channel its in-process diagnostics arrive on. */
+function diagnosticsOf(stdout: string): Tau2PhaseDiagnostics | undefined {
+  for (const line of stdout.trim().split('\n').reverse()) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{')) continue;
+    try {
+      const parsed = JSON.parse(trimmed) as { diagnostics?: Tau2PhaseDiagnostics };
+      if (parsed.diagnostics !== undefined) return parsed.diagnostics;
+    } catch {
+      // A line that starts with `{` and is not JSON belongs to the benchmark's own output.
+      continue;
+    }
+  }
+  return undefined;
+}
+
+type Tau2PhaseDiagnostics = {
+  readonly agent_turns?: number | null;
+  readonly simulations?: number | null;
+  readonly terminated?: Readonly<Record<string, number>> | null;
+};
+
+/** How many of the run's episodes ended in something that is not a task outcome. */
+function episodeFailures(diagnostics: Tau2PhaseDiagnostics | undefined): number {
+  const terminated = diagnostics?.terminated ?? {};
+  let failed = 0;
+  for (const [reason, count] of Object.entries(terminated)) {
+    if (/error|fail|timeout|max_steps|too_many/i.test(reason)) failed += count;
+  }
+  return failed;
+}
+
+/** The arm record the protocol's gates read, or `undefined` before a run has happened. */
+export function instrument(): Tau2ArmRecord | undefined {
+  return observed === undefined ? undefined : armRecordFromDriver(observed);
+}
+
 export async function run(): Promise<readonly PassAtKInput[]> {
   const workdir = process.env['TAU_WORKDIR'] ?? mkdtempSync(join(tmpdir(), 'microglia-tau2-'));
   const listPath = join(workdir, 'tasks.json');
@@ -168,6 +224,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const drawn = MAX_TASKS > 0 ? ids.slice(0, MAX_TASKS) : ids;
   const { train, test } = splitTaskIds(drawn, TRAIN_SHARE);
   if (test.length === 0) throw new Error('tau2 split left no held-out task');
+
+  // What V1 grades. The pack is rendered in this process and read in another, so the size has to be
+  // counted at the boundary rather than reconstructed from the agent's transcript.
+  const servedPackSizes: number[] = [];
 
   const evalPath = join(workdir, 'eval.json');
   if (!MEMORY) {
@@ -200,6 +260,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
 
   const learned = readFileSync(learnPath, 'utf8');
   const corrections: Correction[] = learnableCorrections(parseTauTasks(JSON.parse(learned)), bestRewards(learned));
+  // A training task the driver could not turn into a correction is a smaller store, not a missing data
+  // point, and V32 grades that difference: a store built from sixty of sixty-four questions is a
+  // different treatment from the one the arm was defined as.
+  const learnedTasks = new Set(corrections.map((correction) => correction.taskId));
+  const unanswered = Math.max(0, train.length - learnedTasks.size);
 
   const store = await EmbeddedMemory.open(new MemoryJournal());
   const llm = new LlmClient({
@@ -238,10 +303,19 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     );
   }
   await host.distill({ generalize: false });
+  // The domain ledger, from the store rather than from the driver's intentions: an item that lost its
+  // domain somewhere nobody instrumented is exactly what V44 exists to catch.
+  const knowledge = await store.listKnowledge({});
+  const withoutDomain = knowledge.filter((item) => item.scope.domain === undefined).length;
 
-  const facade = await startRecall(async ({ text, domain }) => host.recall({ task: TASK, text, scope: { domain } }));
+  let evalStdout = '';
+  const facade = await startRecall(async ({ text, domain }) => {
+    const pack = await host.recall({ task: TASK, text, scope: { domain } });
+    servedPackSizes.push(pack.items.length);
+    return pack;
+  });
   try {
-    await phase(
+    evalStdout = await phase(
       driverArgs({
         script: SCRIPT,
         domain: DOMAIN,
@@ -257,6 +331,29 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     await facade.close();
     await host.close();
   }
+
+  const diagnostics = diagnosticsOf(evalStdout);
+  const agentTurns = diagnostics?.agent_turns ?? null;
+  observed = {
+    train,
+    test,
+    trials: TRIALS,
+    unscored: 0,
+    servedPackSizes,
+    learning: {
+      rows: train.length,
+      unanswered,
+      edited: corrections.length,
+      distilled: knowledge.length,
+      // Not observable from here: a correction that produced no rule and a distiller that failed on
+      // one are the same shape from outside the store, so V32 is omitted rather than handed a zero.
+    },
+    // The agent's calls happen in another process. Reporting the distillation calls alone would grade
+    // V8 against a denominator that omits every episode, so the gate is omitted unless the phase
+    // reported how many turns it took.
+    calls: agentTurns === null ? { total: 0, failed: 0 } : { total: agentTurns, failed: episodeFailures(diagnostics) },
+    domains: { stored: knowledge.length, withoutDomain, unscopedIn: 0, widenedIn: 0 },
+  };
 
   const run = parseTauResults(readFileSync(evalPath, 'utf8'));
   return toPassAtK(run, TRIALS).tasks;
