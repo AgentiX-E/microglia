@@ -4,7 +4,7 @@ step: R36
 opened: 2026-11-02
 arms: full-one
 sample: 1534
-gates: V62,V63
+gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V49
 ---
 
 # R36 — one rule per prompt, assigned rather than observed
@@ -34,6 +34,25 @@ Two things are registered here, and they are deliberately different in kind:
    every dispatch is a null with no error bar on its own reproducibility, and this programme has been
    burned by exactly that (three `full` deltas of −3.71, −4.00 and +0.86pp on identical code). One
    dispatch re-measures the same arm on a fresh store draw, and P5 is the replication test.
+
+## Which gates this file names, and why it names those
+
+The `gates` field above is the set this file's **dispatch** emits — the lane's own instrument and control
+checks, unchanged from R25's list minus `V50` because this round asks for no admission fit. It reads as a
+strange list for a round whose subject is an assignment test, so the reason is worth writing down: the two
+gates that decide this round, `V62-assignment-instrument` and `V63-assignment-reproduces-the-lane`, are
+produced by `pnpm eval:pack-assign` from an artefact that already exists, and **no dispatch emits them**. A
+field that claimed them would be claiming a run that never happened; the first version of this file did
+exactly that, `eval:protocol` refused it on the next push, and the correction is `AUDIT` §34.7.
+
+The two gates are still gates, and their criteria are fixed here rather than in the module:
+
+- **`V62-assignment-instrument`** — the arm is a truncation of the pack and not a second retrieval: one item
+  at most, every question of the split asked, and the block changed on at least seven tenths of the prompts.
+  Its criterion in code is `R36_BARS.minChangedShare`.
+- **`V63-assignment-reproduces-the-lane`** — this reading agrees with the lane's own `arm_pairs` entry for the
+  same pair to within a hundredth of a point on the delta and exactly on both discordant counts. Its
+  criterion in code is `R36_BARS.tolerancePp`.
 
 ## What is being tested, exactly
 

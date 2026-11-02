@@ -963,7 +963,10 @@ setting, and no prune, because both would be a decision on a quantity with no de
 **Gates.** `V62-assignment-instrument` (the arm is a truncation: one item at most, every question asked,
 the block changed on at least seven tenths of them) and `V63-assignment-reproduces-the-lane` (this reading
 agrees with the lane's own `arm_pairs` entry to a hundredth of a point on the delta and exactly on both
-discordant counts). `pnpm eval:pack-assign` recomputes the artefact from the committed run and the workflow
+discordant counts). Both are emitted by this module rather than by a dispatch, which has one consequence
+worth knowing when you read a registration: `prereg/R36-pack-assignment.md` names the lane's thirteen gates
+in its header, not these two, because that field states what the round's dispatch emits — see `AUDIT`
+§34.7 for the push that caught the difference. `pnpm eval:pack-assign` recomputes the artefact from the committed run and the workflow
 asserts thirty-two of its fields on every push; the module is at 100% on all four coverage dimensions.
 
 **What it changes about the product statement.** Both remaining levers were designs. One of them — how many
