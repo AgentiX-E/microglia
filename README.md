@@ -415,11 +415,12 @@ with a caveat: there is nothing to set it against.
 `pnpm eval:ledger` recomputes every number in the ledger paragraphs from `poc-sota-bird-train.json` and
 `pnpm eval:pack-assign` recomputes the assignment from the dev run, `pnpm eval:lexicon` recomputes the
 definitional grain's reach, licence, two deltas and exchange rate from its own artefact, `pnpm eval:frontier`
-recomputes the reach ceiling from the corpus's own annotations, and `pnpm eval:resolution` recomputes all 98
-arm rows and their prices from the twenty committed artefacts; the workflow asserts fifty-six fields of the
-first two on every push, thirty-one across the R37 round, sixteen of the frontier, and fifteen of the ledger
-(`prereg/R35-ledger.md`, `prereg/R36-pack-assignment.md`, `prereg/R37-lexicon-grain.md`,
-`prereg/R38-term-frontier.md`).
+recomputes the reach ceiling from the corpus's own annotations, `pnpm eval:resolution` recomputes all 98
+arm rows and their prices from the twenty committed artefacts, and `pnpm eval:coupling` recomputes the
+layer table from the source tree; the workflow asserts fifty-six fields of the first two on every push,
+thirty-one across the R37 round, sixteen of the frontier, fifteen of the ledger and eleven of the layer
+table (`prereg/R35-ledger.md`, `prereg/R36-pack-assignment.md`, `prereg/R37-lexicon-grain.md`,
+`prereg/R38-term-frontier.md`, `prereg/R39-arm-resolution.md`, `prereg/R40-layer-split.md`).
 
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
 
@@ -514,6 +515,42 @@ against the `full` arm — and a paragraph that quoted one number for "the chann
 effect while describing a control comparison, which is why every row now carries its `control`. And the
 first version of the replication table called a single decided run a replication, because with one decided
 row "the decided runs agree" is vacuously true; `decidedAgree` is now `null` below two.
+
+### Where the scenario actually is: 1,733 lines, seven modules, and a gate for the rest
+
+The library claims it is scenario-agnostic. That claim has been made in a paragraph since its first
+iteration, measured once by hand, and never recomputed — which is the shape of every number that quietly
+stops being true. `pnpm eval:coupling` recomputes it from the source tree on every push:
+
+| layer | production modules | lines | modules that name a scenario |
+|---|---|---|---|
+| `core` | 37 | 6,821 | **0** |
+| `protocol` | 2 | 1,215 | **0** |
+| `sql` (the adapter) | 7 | **1,733** | 5 |
+| `eval` | 76 | 24,799 | 12, each with a written reason |
+| `browser` | 2 | 280 | 0 |
+| `node` | 6 | 1,282 | 0 |
+
+**The scenario is a fifth of the production tree and none of it is in the library.** `core` names no
+database in code — every occurrence of `sql` in it is inside a test, where a scope string is free text —
+and the text-to-SQL surface is **1,733 lines in seven modules** that execute, guard, differ, link and
+render SQL. The twelve modules that keep a scenario word outside the adapter each carry a reason in the
+source, from *the dataset loader* to *the lane that has not been split yet*, and the gate fails if a
+thirteenth arrives without one.
+
+Three things make this a measurement rather than a claim:
+
+- **Comments are not coupling.** A module that explains in prose why it is *not* SQL-specific must not be
+  counted as SQL-specific, so the scan strips comments — with a lexer that survives a `//` inside a URL,
+  a quote inside a template literal, and a quote inside a regular expression, which is how the first
+  version of the scan silently ate a module's body and reported it as coupled.
+- **The import graph is checked, not drawn.** Five package edges, every one downward; any edge that points
+  at an equal or higher layer fails the build.
+- **The classification is data, not a verdict.** A new module in `eval` with `sqlite` in it fails until
+  somebody moves it into the adapter or writes down the dependency that keeps it out.
+
+The move itself changed no number: all 31 committed artefacts revalidate, and every reading in the `pnpm
+check` chain diffs clean. That is what a mechanical stage is for — it can be checked mechanically.
 
 
 So the library is worth integrating where corrections *repeat* — a workspace with a house convention,
@@ -733,6 +770,8 @@ Read the [user guide](docs/USER-GUIDE.md) for the integration contract, the
 
 ```
 packages/core     the library, five modules behind subpath exports
+packages/protocol the validity gates, paired statistics, artefact schema and lane contract
+packages/sql      the text-to-SQL adapter: execution, guards, schema linking, diffs — 1,733 lines
 packages/node     Hono routes, vendor providers, server bootstrap
 packages/browser  fetch client and offline outbox
 packages/eval     the benchmark instrument (private, not published); lanes in src/bin/

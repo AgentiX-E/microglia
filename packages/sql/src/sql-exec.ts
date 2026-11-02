@@ -19,7 +19,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { canonicalRows } from './sota.js';
+import { canonicalRows } from './canonical.js';
 
 export type QueryOutcome = {
   readonly ok: boolean;

@@ -8,7 +8,7 @@ import {
   type LinkedQuestion,
   type LinkTarget,
 } from '../link-bind.js';
-import type { TableShape } from '../sql-exec.js';
+import type { TableShape } from '@agentix-e/microglia-sql';
 import { templateOf } from '../template.js';
 import type { SchemaNames } from '../template.js';
 

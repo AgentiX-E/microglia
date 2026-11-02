@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linkSchema, questionTokens, schemaBlocks } from '../schema-link.js';
+import { linkSchema, questionTokens, schemaBlocks } from '@agentix-e/microglia-sql';
 
 /** BIRD's SQLite dumps: one CREATE per table, every name quoted, from `sqlite_master.sql`. */
 const RACES = `CREATE TABLE "races" ("raceId" INTEGER PRIMARY KEY, "year" INTEGER, "circuitId" INTEGER, "name" TEXT)`;

@@ -43,6 +43,10 @@ import { spawn, type ChildProcess } from 'node:child_process';
 const CHILD_SOURCE = `
 const { DatabaseSync } = require('node:sqlite');
 
+// Booting a process and loading SQLite is instrument overhead, not statement time. Announcing
+// readiness is what lets the parent start the deadline at the statement rather than at the spawn.
+process.send({ ready: true });
+
 process.on('message', (task) => {
   const started = Date.now();
   let db;
@@ -98,6 +102,15 @@ type Slot = {
   readonly child: ChildProcess;
   /** Settles when the child is gone, whatever killed it. Killing a dead child is a no-op on it. */
   readonly exited: Promise<void>;
+  /**
+   * Settles when the child can answer, or when it dies trying.
+   *
+   * A deadline that starts before the child is ready measures the machine rather than the query:
+   * a 250 ms deadline on a loaded box expired while `node` was still loading SQLite, and the
+   * statement was reported as a deadline rather than as the answer it would have given. This
+   * promise is what lets `#ask` start its clock at the statement.
+   */
+  readonly ready: Promise<void>;
   busy: boolean;
   dead: boolean;
 };
@@ -216,14 +229,34 @@ export class BoundedSql {
     // Recorded once, at birth, so `close` never has to ask whether a child is still alive: the
     // answer is a promise that is already settled if it is not.
     const exited = new Promise<void>((resolve) => child.once('exit', () => resolve()));
-    return { child, exited, busy: false, dead: false };
+    const ready = new Promise<void>((resolve) => {
+      // The child's first message is its readiness by construction: it sends `ready` before it
+      // registers the statement handler, and `#ask` attaches its own listener only after this
+      // promise settles, so no reply can be consumed here. Checking the payload instead would add
+      // a branch no message can reach.
+      const onReady = (): void => resolve();
+      child.once('message', onReady);
+      // A child that dies before it is ready must not leave a statement waiting on it.
+      void exited.then(() => {
+        child.off('message', onReady);
+        resolve();
+      });
+    });
+    return { child, exited, ready, busy: false, dead: false };
   }
 
-  /** Post one statement and wait for it, for the deadline, or for the process to die. */
-  #ask(
+  /**
+   * Post one statement and wait for it, for the deadline, or for the process to die.
+   *
+   * The wait for readiness comes before the timer on purpose. A deadline is a statement about how
+   * long an answer may take, and process startup is not part of the answer — counting it made a
+   * 250 ms deadline on a loaded machine expire before the child had loaded SQLite.
+   */
+  async #ask(
     slot: Slot,
     task: { dbPath: string; body: string; rowCap: number },
   ): Promise<Reply | 'deadline' | 'exited'> {
+    await slot.ready;
     return new Promise<Reply | 'deadline' | 'exited'>((resolve) => {
       let settled = false;
       let timer: ReturnType<typeof setTimeout> | undefined;

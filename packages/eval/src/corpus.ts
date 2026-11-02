@@ -23,7 +23,7 @@
  *    in that bucket, which is why the count is reported rather than assumed.
  */
 import type { DiffCase } from './query-diff.js';
-import { diffQueries, type QueryDelta } from './sql-diff.js';
+import { diffQueries, type QueryDelta } from '@agentix-e/microglia-sql';
 
 /** One case as the lane wrote it. Every field is optional except the ones a diff needs. */
 export type CommittedCase = {

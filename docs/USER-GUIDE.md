@@ -964,6 +964,15 @@ Be honest about the preconditions; the product is only useful inside them.
     against no memory and against the full pack gives two different numbers, both true), and **a single
     decided run is not a replication**. `pnpm eval:resolution`, `prereg/R39-arm-resolution.md`.
 
+    **And if you are going to claim your library is scenario-agnostic, meter it.** `pnpm eval:coupling`
+    recomputes the layer table from the source tree: production lines per package, the modules that name a
+    database in **code** (comments are stripped, because a module that explains why it is *not* SQL-specific
+    is not coupled to SQL), the package import graph, and a verdict for every coupled module — `adapter`,
+    `deferred` with a written reason, or `general`. Three gates decide whether the answer is publishable:
+    every coupled module has a verdict, no package imports upward, and the base library names no scenario at
+    all. In this repository that reads **1,733 lines in seven modules**, twelve deferred with a reason, and
+    **zero** in `core` — and it is a number rather than a paragraph, so it is checked on every push.
+
 ## 13. Measuring your own generator
 
 The harness that produced every number in this repository is usable by someone else. Two files and

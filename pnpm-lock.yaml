@@ -20,6 +20,9 @@ importers:
       '@agentix-e/microglia-node':
         specifier: workspace:*
         version: link:packages/node
+      '@agentix-e/microglia-sql':
+        specifier: workspace:*
+        version: link:packages/sql
       '@types/node':
         specifier: ^22.10.0
         version: 22.20.5
@@ -55,6 +58,9 @@ importers:
       '@agentix-e/microglia-protocol':
         specifier: workspace:*
         version: link:../protocol
+      '@agentix-e/microglia-sql':
+        specifier: workspace:*
+        version: link:../sql
 
   packages/node:
     dependencies:
@@ -73,6 +79,8 @@ importers:
         version: link:../browser
 
   packages/protocol: {}
+
+  packages/sql: {}
 
 packages:
 

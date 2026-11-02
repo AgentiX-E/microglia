@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import { featureOverlapOf } from '../feature-overlap.js';
 import type { DiffCase } from '../query-diff.js';
-import type { QueryDelta } from '../sql-diff.js';
+import type { QueryDelta } from '@agentix-e/microglia-sql';
 
 /** A case whose two features are given, and whose outcome is given too. */
 function entry(

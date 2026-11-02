@@ -36,8 +36,8 @@
  * says nothing about the second. The family comes from `PRAGMA table_info`, which is the database's
  * own answer, rather than from re-reading `CREATE TABLE` with a second grammar.
  */
-import type { TableShape } from './sql-exec.js';
-import { linkSchema, questionTokens } from './schema-link.js';
+import type { TableShape } from '@agentix-e/microglia-sql';
+import { linkSchema, questionTokens } from '@agentix-e/microglia-sql';
 import {
   MIN_NAME_SCORE,
   nameScore,

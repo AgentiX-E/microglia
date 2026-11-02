@@ -36,7 +36,7 @@
 import { mulberry32 } from '@agentix-e/microglia-core';
 import { clusterBootstrapCI, comparePaired } from './stats.js';
 import { pairedWidths } from './power.js';
-import type { QueryDelta, GroundingMode } from './sql-diff.js';
+import type { QueryDelta, GroundingMode } from '@agentix-e/microglia-sql';
 
 /** One question's contribution: what the two arms wrote, and how each of them scored. */
 export type DiffCase = {

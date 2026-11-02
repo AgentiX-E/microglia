@@ -1195,3 +1195,66 @@ one its own counts imply — one failure means that delta describes a population
 `requiredN`, because those are two spellings of one inequality and a disagreement means the formulas drifted.
 The module is at 100% on all four coverage dimensions and the workflow asserts fifteen fields of the
 reading on every push.
+### 8.15 The layer split: a package for the adapter, and a gate for the claim it licenses
+
+Stage 3 of the protocol/adapter refactor is the move that makes the library's central sentence
+checkable: *the measurement apparatus is scenario-agnostic and the scenario is a bounded set of
+modules*. Stage 1 moved the gates and the paired statistics into `protocol`; stage 2 made the τ² lane
+supply them and narrowed the claim to the apparatus. What was left was the SQL itself, sitting in
+`eval` beside the protocol with no line saying which module was which.
+
+**The cut is one question about a signature: does the function mention a database?** Six modules answer
+yes — `sql-exec` opens a SQLite connection and returns rows, `sql-guard` bounds a statement, `sql-diff`
+reads two statements and says how they differ, `schema-link` matches question words to schema names,
+`m-schema` renders a schema, `value-samples` reads column values — plus `canonical`, the one function
+that had been living inside `sota.ts` and defining what "the same rows" means. All seven are
+`packages/sql`, `@agentix-e/microglia-sql`, and the graph they complete is:
+
+```
+core ← protocol ← sql ← eval
+                ↖ browser ← node
+```
+
+**Three modules answer yes and stayed, and each has a reason rather than a shrug.** `bird-data` opens
+SQLite to read a *corpus* rather than to answer a question, and it depends on the artefact schema, which
+is the protocol's. `link-bind` needs the rule-template engine, which is a knowledge representation and
+not a SQL one. `exec-signature` is a measurement signal over execution shapes, read by the pool and the
+signal gate. The distinction is not "mentions SQL" — it is *which layer the module actually depends on*.
+
+**The move changed no number, and that is checkable.** All 31 committed artefacts revalidate through
+`pnpm eval:protocol`, and every reading in the `pnpm check` chain rewrites its artefact byte for byte.
+A mechanical stage is worth doing only if it can be verified mechanically, so this one is.
+
+**Then the table became a reading.** `PROGRESS` §136 published a coupling table — 11,764 lines of
+text-to-SQL, 37.2% of the repository, zero in `core` — measured once by hand. `packages/eval/src/coupling.ts`
+recomputes it on every push:
+
+| column | what it measures | why it is not a guess |
+|---|---|---|
+| lines | per production module, excluding `index.ts`, `bin/`, `__tests__/` | a re-export surface has no decision in it, and counting it makes the denominator depend on how many subpaths a package chose to expose |
+| scenario words | the strict list `sql`, `sqlite`, `nl2sql`, `text-to-sql`, `bird`, `m-schema` | `query`, `schema`, `table` and `column` are excluded because they are also a memory store's vocabulary, and a gate with false positives gets suppressed |
+| code vs comments | counted separately, comments stripped by a lexer | a module that explains in prose why it is *not* SQL-specific must not be counted as SQL-specific |
+| verdict | `adapter`, `deferred` (with a reason in the source), or `general` | the classification is data, so a thirteenth coupled module cannot arrive silently |
+| edges | package imports parsed from specifiers, with `upward` computed from a rank table | the direction is checked rather than drawn |
+
+**The lexer is load-bearing and it was wrong first.** The initial stripper tracked quotes and comments
+but not regular expressions, so `/^- "([^"]+)":/` in `lexicon.ts` put it inside a string it never left:
+the module's remaining comments were swallowed and the scan reported the module as SQL-coupled. The
+repair is the standard disambiguation — a `/` after a value divides, a `/` after an operator opens a
+regex — with `[...]` honoured inside a literal and flags consumed after it. Three tests exist because
+three shapes broke it, and one of them is that exact line.
+
+**Gates.** `V72-every-coupled-module-has-a-verdict` (blocking) fails when a module outside `packages/sql`
+carries a scenario word with no written reason, and also when the walker emitted fewer rows than it
+scanned — a short table looks exactly like a complete one. `V73-no-package-imports-upward` (blocking)
+fails on any edge to an equal or higher layer, because an unenforced direction is one urgent patch away
+from being wrong. `V74-core-is-scenario-free` (blocking) certifies the README's sentence: 37 core
+modules, **zero** scenario words in code, every hit in its tests.
+
+**The first bug the round found was not in the move.** Under full-suite load the queued-statement test
+in `sql-guard` failed intermittently, and the cause was a real design defect rather than a slow machine:
+the deadline timer started when a statement was posted to a child, and a freshly spawned child spends
+40–80 ms loading `node:sqlite` before it can answer anything. On a loaded box that overhead consumed a
+250 ms deadline, so the statement was reported as a deadline rather than as the answer it would have
+given. The child now announces readiness and `#ask` starts its clock after that — instrument overhead is
+not statement time, and a lane's accuracy must not depend on how busy the machine was.

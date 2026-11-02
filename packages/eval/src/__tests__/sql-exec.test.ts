@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterAll, describe, expect, it } from 'vitest';
-import { executeQuery, groundedItems, resolveDatabase, rowsDiffer, schemaIndex, schemaSql, tableShapes } from '../sql-exec.js';
+import { executeQuery, groundedItems, resolveDatabase, rowsDiffer, schemaIndex, schemaSql, tableShapes } from '@agentix-e/microglia-sql';
 
 const directory = mkdtempSync(join(tmpdir(), 'microglia-sql-'));
 const database = join(directory, 'fixture.sqlite');

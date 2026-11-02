@@ -16,7 +16,16 @@
 import type { PriorScope } from './memory-prior.js';
 import { buildProtocolGates } from '@agentix-e/microglia-protocol';
 import type { ProtocolGateInput, ValidityGate } from '@agentix-e/microglia-protocol';
+import { canonicalRows } from '@agentix-e/microglia-sql';
 import { comparePaired } from './stats.js';
+
+/**
+ * Re-exported rather than re-implemented: the canonical form of a result set is the
+ * SQL layer's, and a lane that parses a reply must compare rows the same way the
+ * executor that produced them did. Two copies of this function would drift on the
+ * first rounding rule either of them changed.
+ */
+export { canonicalRows };
 
 /** Bumped whenever the prompt text changes; a result without it is unreproducible. */
 export const PROMPT_VERSION = 'sql-prompt/3';
@@ -104,32 +113,6 @@ export function extractSql(raw: string): string | undefined {
   const fromLine = /(?:^|\n)\s*((?:select|with)\b[\s\S]*)/i.exec(stripped)?.[1];
   const statement = fromStart ?? fromLine;
   return statement?.replace(/;[\s\n]*$/, '').trim();
-}
-
-/**
- * A result set as a comparable sequence, sorted so row order does not matter.
- *
- * Values are serialised as JSON rather than joined with a separator: a string that
- * contains the separator would otherwise make two different answers look the same.
- * Floats are rounded to six decimals so a difference in the last bit of a division
- * does not read as a wrong answer.
- */
-export function canonicalRows(rows: readonly Record<string, unknown>[]): string[] {
-  return rows
-    .map((row) =>
-      JSON.stringify(
-        Object.keys(row)
-          .sort()
-          .map((key) => {
-            const value = row[key];
-            if (typeof value === 'number') {
-              return Number.isInteger(value) ? value : Number(value.toFixed(6));
-            }
-            return value === null || value === undefined ? null : String(value);
-          }),
-      ),
-    )
-    .sort();
 }
 
 /**

@@ -976,3 +976,28 @@ one contrast in the record a larger sample confirmed.
 the record publishes both for the same arm: `values` is **+1.17pp against `none`** and **+0.85pp against
 `full`**. Neither is wrong and they answer different questions, which is why every row in the resolution
 ledger carries its `control` in the row and in the contrast name.
+
+**Adapter (layer)** — The package that owns everything a scenario needs and nothing else:
+`@agentix-e/microglia-sql` holds the seven modules that execute, guard, differ, link and render SQL,
+**1,733 lines**. The cut is one question about a signature — *does the function mention a database?* —
+and the reason it is a package rather than a folder is that a rule can only be enforced across a
+boundary the compiler can see.
+
+**Layer rank** — `core ← protocol ← sql ← eval`, with `browser` beside `eval` and `node` above
+`browser`. A package may import only from a strictly lower rank, and `V73` fails the build on any edge
+that points at an equal or higher one. Five edges exist today and every one is downward.
+
+**Coupling (of a module)** — Whether the module names a database in **code**, by the strict list
+`sql`, `sqlite`, `nl2sql`, `text-to-sql`, `bird`, `m-schema`. Comments are excluded, because a module
+that explains why it is *not* SQL-specific is not coupled to SQL. `query`, `schema`, `table` and
+`column` are excluded on purpose: they are also a memory store's vocabulary, and a gate that cries wolf
+gets suppressed.
+
+**Deferral** — A module outside `packages/sql` that names a scenario anyway, with the dependency that
+keeps it there written into `DEFERRALS`. There are twelve, from *the dataset loader* through *the
+record field is a string* to *the lane that has not been split yet*. A thirteenth cannot arrive
+silently: `V72` fails until it is moved or a reason is written.
+
+**Verdict** — `adapter` (it lives in the adapter package), `deferred` (it names a scenario and has a
+reason), or `general` (it names none). The verdict is derived from the package and the word count, so a
+row cannot disagree with where the file is.

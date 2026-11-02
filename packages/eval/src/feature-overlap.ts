@@ -17,7 +17,7 @@
  * `both / left < 0.5`, i.e. fewer than half of the left feature's questions also carry the right.
  */
 import { cellOf, type CellReading, type DiffCase } from './query-diff.js';
-import type { QueryDelta } from './sql-diff.js';
+import type { QueryDelta } from '@agentix-e/microglia-sql';
 
 /** The four cells, and the one reading that decides the question. */
 export type FeatureOverlap = {

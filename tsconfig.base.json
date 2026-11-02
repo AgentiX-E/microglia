@@ -53,6 +53,9 @@
       "@agentix-e/microglia-eval": [
         "packages/eval/src/index.ts"
       ],
+      "@agentix-e/microglia-sql": [
+        "packages/sql/src/index.ts"
+      ],
       "@agentix-e/microglia-node": [
         "packages/node/src/index.ts"
       ],

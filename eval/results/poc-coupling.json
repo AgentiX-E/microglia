@@ -1,0 +1,484 @@
+{
+  "id": "poc-coupling",
+  "title": "The scenario's size, recomputed from the tree on every push",
+  "source": "worktree",
+  "scanned": 130,
+  "totals": {
+    "modules": 130,
+    "lines": 36163,
+    "adapterLines": 1766,
+    "deferredLines": 5643,
+    "coupledShare": 0.2014
+  },
+  "layers": [
+    {
+      "layer": "core",
+      "modules": 37,
+      "lines": 6821,
+      "adapterLines": 0,
+      "deferredLines": 0,
+      "coupled": 0
+    },
+    {
+      "layer": "protocol",
+      "modules": 2,
+      "lines": 1215,
+      "adapterLines": 0,
+      "deferredLines": 0,
+      "coupled": 0
+    },
+    {
+      "layer": "sql",
+      "modules": 7,
+      "lines": 1766,
+      "adapterLines": 1766,
+      "deferredLines": 0,
+      "coupled": 5
+    },
+    {
+      "layer": "eval",
+      "modules": 76,
+      "lines": 24799,
+      "adapterLines": 0,
+      "deferredLines": 5643,
+      "coupled": 12
+    },
+    {
+      "layer": "browser",
+      "modules": 2,
+      "lines": 280,
+      "adapterLines": 0,
+      "deferredLines": 0,
+      "coupled": 0
+    },
+    {
+      "layer": "node",
+      "modules": 6,
+      "lines": 1282,
+      "adapterLines": 0,
+      "deferredLines": 0,
+      "coupled": 0
+    }
+  ],
+  "edges": [
+    {
+      "from": "browser",
+      "to": "core",
+      "files": 2,
+      "upward": false
+    },
+    {
+      "from": "eval",
+      "to": "core",
+      "files": 31,
+      "upward": false
+    },
+    {
+      "from": "eval",
+      "to": "protocol",
+      "files": 4,
+      "upward": false
+    },
+    {
+      "from": "eval",
+      "to": "sql",
+      "files": 9,
+      "upward": false
+    },
+    {
+      "from": "node",
+      "to": "core",
+      "files": 6,
+      "upward": false
+    }
+  ],
+  "coupled": [
+    {
+      "pkg": "eval",
+      "module": "artefacts",
+      "path": "packages/eval/src/artefacts.ts",
+      "lines": 169,
+      "words": [
+        "sqlite",
+        "bird"
+      ],
+      "verdict": "deferred",
+      "reason": "names the dataset and split ids; typed by the loader rather than by SQL"
+    },
+    {
+      "pkg": "eval",
+      "module": "artifact-schema",
+      "path": "packages/eval/src/artifact-schema.ts",
+      "lines": 348,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "declares a record field called `sql`; the schema is the protocol's, the column is a string"
+    },
+    {
+      "pkg": "eval",
+      "module": "bird-data",
+      "path": "packages/eval/src/bird-data.ts",
+      "lines": 440,
+      "words": [
+        "sql",
+        "sqlite"
+      ],
+      "verdict": "deferred",
+      "reason": "the dataset loader; opens SQLite to read a corpus rather than to answer a question"
+    },
+    {
+      "pkg": "eval",
+      "module": "bird-rows",
+      "path": "packages/eval/src/bird-rows.ts",
+      "lines": 130,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "the corpus row shapes, not a query"
+    },
+    {
+      "pkg": "eval",
+      "module": "coupling",
+      "path": "packages/eval/src/coupling.ts",
+      "lines": 447,
+      "words": [
+        "sql",
+        "sqlite",
+        "nl2sql",
+        "text-to-sql",
+        "bird",
+        "m-schema"
+      ],
+      "verdict": "deferred",
+      "reason": "the scanner itself: it defines the word list, so it necessarily contains every word on it"
+    },
+    {
+      "pkg": "eval",
+      "module": "judge",
+      "path": "packages/eval/src/judge.ts",
+      "lines": 295,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "the LLM judge's prompt and record name the artefact being judged"
+    },
+    {
+      "pkg": "eval",
+      "module": "plugin",
+      "path": "packages/eval/src/plugin.ts",
+      "lines": 420,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "the plugin contract's worked example is a host that returns SQL"
+    },
+    {
+      "pkg": "eval",
+      "module": "reproduction",
+      "path": "packages/eval/src/reproduction.ts",
+      "lines": 271,
+      "words": [
+        "bird",
+        "m-schema"
+      ],
+      "verdict": "deferred",
+      "reason": "the reproduction config names the published BIRD cell and its M-Schema rendering"
+    },
+    {
+      "pkg": "eval",
+      "module": "rose-vec",
+      "path": "packages/eval/src/rose-vec.ts",
+      "lines": 220,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "the public adjudication set's record fields"
+    },
+    {
+      "pkg": "eval",
+      "module": "selector",
+      "path": "packages/eval/src/selector.ts",
+      "lines": 336,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "candidate selection over SQL strings; the selector is a policy, the strings are opaque"
+    },
+    {
+      "pkg": "eval",
+      "module": "sota",
+      "path": "packages/eval/src/sota.ts",
+      "lines": 2243,
+      "words": [
+        "sql",
+        "sqlite",
+        "m-schema"
+      ],
+      "verdict": "deferred",
+      "reason": "the mixed lane module: prompt, arms and gate inputs still share a file"
+    },
+    {
+      "pkg": "eval",
+      "module": "validity",
+      "path": "packages/eval/src/validity.ts",
+      "lines": 324,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "one gate diffs two statements, and it imports the differ from `sql` rather than copying it"
+    },
+    {
+      "pkg": "sql",
+      "module": "m-schema",
+      "path": "packages/sql/src/m-schema.ts",
+      "lines": 183,
+      "words": [
+        "sqlite"
+      ],
+      "verdict": "adapter",
+      "reason": null
+    },
+    {
+      "pkg": "sql",
+      "module": "schema-link",
+      "path": "packages/sql/src/schema-link.ts",
+      "lines": 243,
+      "words": [
+        "sql"
+      ],
+      "verdict": "adapter",
+      "reason": null
+    },
+    {
+      "pkg": "sql",
+      "module": "sql-diff",
+      "path": "packages/sql/src/sql-diff.ts",
+      "lines": 574,
+      "words": [
+        "sql"
+      ],
+      "verdict": "adapter",
+      "reason": null
+    },
+    {
+      "pkg": "sql",
+      "module": "sql-exec",
+      "path": "packages/sql/src/sql-exec.ts",
+      "lines": 324,
+      "words": [
+        "sql",
+        "sqlite"
+      ],
+      "verdict": "adapter",
+      "reason": null
+    },
+    {
+      "pkg": "sql",
+      "module": "sql-guard",
+      "path": "packages/sql/src/sql-guard.ts",
+      "lines": 316,
+      "words": [
+        "sql",
+        "sqlite"
+      ],
+      "verdict": "adapter",
+      "reason": null
+    }
+  ],
+  "commentOnly": [
+    {
+      "pkg": "protocol",
+      "module": "adapter",
+      "words": [
+        "sql"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "diff-corpus",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "embed-probe",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "exec-signature",
+      "words": [
+        "sql",
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "frontier",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "protocol",
+      "module": "gates",
+      "words": [
+        "sql",
+        "bird"
+      ]
+    },
+    {
+      "pkg": "core",
+      "module": "knowledge",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "lexicon",
+      "words": [
+        "sql"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "link-bind",
+      "words": [
+        "sqlite"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "memory-prior",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "core",
+      "module": "options",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "core",
+      "module": "pack",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "pack-mediation",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "core",
+      "module": "port",
+      "words": [
+        "sqlite"
+      ]
+    },
+    {
+      "pkg": "core",
+      "module": "render",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "study",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "tau2",
+      "words": [
+        "sql",
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "tau2",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "tau2-gates",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "tau2-instrument",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "template",
+      "words": [
+        "sql"
+      ]
+    },
+    {
+      "pkg": "core",
+      "module": "types",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "sql",
+      "module": "value-samples",
+      "words": [
+        "sqlite",
+        "bird"
+      ]
+    }
+  ],
+  "gates": [
+    {
+      "id": "V72-every-coupled-module-has-a-verdict",
+      "pass": true,
+      "blocking": true,
+      "detail": "130 modules, 12 deferred with a reason"
+    },
+    {
+      "id": "V73-no-package-imports-upward",
+      "pass": true,
+      "blocking": true,
+      "detail": "5 edges, every one downwards"
+    },
+    {
+      "id": "V74-core-is-scenario-free",
+      "pass": true,
+      "blocking": true,
+      "detail": "37 core modules, zero scenario words in code"
+    }
+  ],
+  "statement": "the scenario is 1766 of 36163 production lines across 130 modules: 7 adapter modules in `sql`, 12 deferred with a reason, and `core` at 0 coupled modules of 37; 5 package edges, 0 of them upward."
+}

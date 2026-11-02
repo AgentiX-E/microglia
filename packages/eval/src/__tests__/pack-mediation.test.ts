@@ -16,7 +16,7 @@ import {
   PACK_SHARE_FLOOR,
   type MediationReading,
 } from '../pack-mediation.js';
-import { diffQueries } from '../sql-diff.js';
+import { diffQueries } from '@agentix-e/microglia-sql';
 import type { MediationEntry } from '../corpus.js';
 
 /** One question, with the query the pack produced and the text the prompt carried. */

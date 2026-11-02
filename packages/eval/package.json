@@ -24,7 +24,8 @@
   },
   "dependencies": {
     "@agentix-e/microglia-core": "workspace:*",
-    "@agentix-e/microglia-protocol": "workspace:*"
+    "@agentix-e/microglia-protocol": "workspace:*",
+    "@agentix-e/microglia-sql": "workspace:*"
   },
   "engines": {
     "node": ">=20.11.0"

@@ -11,7 +11,7 @@
  * an empty corpus produces every downstream reading as a zero, and a zero that means "no data"
  * reads exactly like a zero that means "no effect".
  */
-import { diffQueries } from './sql-diff.js';
+import { diffQueries } from '@agentix-e/microglia-sql';
 import type { DiffCase } from './query-diff.js';
 
 /** The per-question record a run writes, as much of it as these readings use. */

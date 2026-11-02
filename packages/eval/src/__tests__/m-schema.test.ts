@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 import { describe, expect, it } from 'vitest';
-import { collectMschema, renderMschema, type MschemaTable } from '../m-schema.js';
+import { collectMschema, renderMschema, type MschemaTable } from '@agentix-e/microglia-sql';
 
 const column = (over: Partial<MschemaTable['columns'][number]>): MschemaTable['columns'][number] => ({
   name: 'c',

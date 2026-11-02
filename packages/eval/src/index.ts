@@ -18,7 +18,7 @@ export {
   schemaBlocks,
   type LinkedSchema,
   type SchemaBlock,
-} from './schema-link.js';
+} from '@agentix-e/microglia-sql';
 export {
   choicePrompt,
   choicePromptWithResults,
@@ -77,7 +77,7 @@ export {
   type MschemaForeignKey,
   type MschemaTable,
   type RenderOptions,
-} from './m-schema.js';
+} from '@agentix-e/microglia-sql';
 export {
   unionCeiling,
   type UnionCase,
@@ -165,7 +165,7 @@ export {
   schemaWithValues,
   type TableValues,
   type ValueSample,
-} from './value-samples.js';
+} from '@agentix-e/microglia-sql';
 export {
   ARTEFACT_IDS,
   DEV_SPLIT_NAME,
@@ -399,7 +399,7 @@ export {
   type QueryDelta,
   type SqlShape,
   type SqlToken,
-} from './sql-diff.js';
+} from '@agentix-e/microglia-sql';
 
 export {
   diffCasesOf,
@@ -887,9 +887,33 @@ export {
   type QueryOutcome,
   type SchemaIndex,
   type TableShape,
-} from './sql-exec.js';
+} from '@agentix-e/microglia-sql';
 
-export { BoundedSql, type BoundedSqlOptions, type StatementResult } from './sql-guard.js';
+export { BoundedSql, type BoundedSqlOptions, type StatementResult } from '@agentix-e/microglia-sql';
+
+export {
+  DEFERRALS,
+  LAYER_ORDER,
+  SCENARIO_WORDS,
+  coreGate,
+  coupledShare,
+  importEdges,
+  layerGate,
+  layerTotals,
+  moduleNameOf,
+  moduleRow,
+  scenarioWords,
+  stripComments,
+  totalityGate,
+  wordsOf,
+  type CouplingGate,
+  type ImportEdge,
+  type Layer,
+  type LayerTotal,
+  type ModuleRow,
+  type ModuleSource,
+  type Verdict,
+} from './coupling.js';
 
 export {
   DEFAULT_CLEARANCE,

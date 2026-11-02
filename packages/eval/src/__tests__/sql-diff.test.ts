@@ -18,7 +18,7 @@ import {
   sqlShapeOf,
   tokenizeSql,
   type QueryDelta,
-} from '../sql-diff.js';
+} from '@agentix-e/microglia-sql';
 
 describe('tokenizeSql', () => {
   it('drops line and block comments but keeps the literal around them', () => {

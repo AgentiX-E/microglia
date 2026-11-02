@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { BoundedSql } from '../sql-guard.js';
+import { BoundedSql } from '@agentix-e/microglia-sql';
 
 /**
  * A database small enough to build in a millisecond and awkward enough to hang a statement.
@@ -129,6 +129,11 @@ describe('a statement with a deadline', () => {
     const fast = sql.run(small, 'select 1 as one');
     const [killed, served] = await Promise.all([slow, fast]);
     expect(killed.deadline).toBe(true);
+    // The three assertions are deliberately not one: a replacement that is handed over before it
+    // can answer fails as `deadline`, as `exited`, and as empty rows, and a test that only checked
+    // the rows reported the first two as a value mismatch with no address.
+    expect(served.deadline).toBe(false);
+    expect(served.ok).toBe(true);
     expect(served.rows).toEqual([{ one: 1 }]);
   });
 

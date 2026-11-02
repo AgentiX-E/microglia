@@ -27,7 +27,7 @@
 import { mulberry32 } from '@agentix-e/microglia-core';
 import type { Split } from './bird-data.js';
 import { cellOf, discardSetOf, improvementOf, type DiffCase } from './query-diff.js';
-import type { GroundingMode } from './sql-diff.js';
+import type { GroundingMode } from '@agentix-e/microglia-sql';
 
 /** One database removed, and what the gate is still worth without it. */
 export type JackknifeRow = {

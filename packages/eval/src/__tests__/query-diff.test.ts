@@ -24,7 +24,7 @@ import {
   type GateReading,
   type KindReading,
 } from '../query-diff.js';
-import { diffQueries } from '../sql-diff.js';
+import { diffQueries } from '@agentix-e/microglia-sql';
 
 /** A case whose two queries were given, scored as asked. */
 function makeCase(

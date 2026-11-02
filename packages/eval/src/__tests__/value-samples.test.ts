@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { renderValue, schemaWithValues, type ValueSample } from '../value-samples.js';
+import { renderValue, schemaWithValues, type ValueSample } from '@agentix-e/microglia-sql';
 
 const none = (): readonly ValueSample[] => [];
 

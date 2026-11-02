@@ -1,0 +1,28 @@
+{
+  "name": "@agentix-e/microglia-sql",
+  "version": "0.1.0",
+  "description": "Microglia SQL \u2014 the text-to-SQL adapter: execution, guards, schema linking, M-Schema rendering, value samples, query diffs",
+  "license": "MIT",
+  "author": "Lambertyan",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b",
+    "clean": "tsc -b --clean"
+  },
+  "dependencies": {},
+  "engines": {
+    "node": ">=20.11.0"
+  }
+}

@@ -20,7 +20,7 @@ import {
   type OutOfSampleReading,
 } from '../out-of-sample.js';
 import { gateReadingOf } from '../query-diff.js';
-import { diffQueries } from '../sql-diff.js';
+import { diffQueries } from '@agentix-e/microglia-sql';
 import type { DiffCase } from '../query-diff.js';
 
 /** A case the pack left alone, which the imported-name feature must not claim. */

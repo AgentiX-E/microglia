@@ -18,7 +18,7 @@
  * coverage effect that is really a difficulty effect shows up as the same effect in every stratum
  * and is reported as such rather than as a finding.
  */
-import { contextTokens, isGrounded, sqlShapeOf } from './sql-diff.js';
+import { contextTokens, isGrounded, sqlShapeOf } from '@agentix-e/microglia-sql';
 import { cellOf, type CellReading, type DiffCase } from './query-diff.js';
 
 /** How much of what the answer required the question said, in four bands. */

@@ -15,7 +15,7 @@ import {
   type GateStability,
 } from '../gate-stability.js';
 import { discardSetOf, gateReadingOf, improvementOf, type DiffCase } from '../query-diff.js';
-import { diffQueries } from '../sql-diff.js';
+import { diffQueries } from '@agentix-e/microglia-sql';
 
 /** A case whose memory query imports a table the question never names. */
 function importing(id: string, dbId: string, correct: boolean, baselineOk: boolean): DiffCase {

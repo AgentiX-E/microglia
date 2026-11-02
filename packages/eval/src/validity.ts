@@ -16,7 +16,7 @@
  * implied" would differ from the first by exactly the thing that is under test.
  */
 import { clusteredGapOf, fisherExact, type ScoredRow } from './query-diff.js';
-import { diffQueries, type GroundingMode } from './sql-diff.js';
+import { diffQueries, type GroundingMode } from '@agentix-e/microglia-sql';
 
 /** One attempt, its question, and whether it was right. */
 export type ValidityCase = {
