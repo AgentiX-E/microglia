@@ -773,6 +773,42 @@ jobs:
               ' on the covered cells against ' + s.repaired + '/' + s.broken + ' across the split');
           "
 
+      - name: The ceiling is a number, and the arm was near it
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/frontier" pnpm eval:frontier
+          diff -u eval/results/poc-frontier.json "${RUNNER_TEMP}/frontier/poc-frontier.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/frontier/poc-frontier.json');
+            const v = (id) => a.verdicts.find((x) => x.id === id);
+            const band = (d) => a.vocabulary.find((x) => x.minDensity === d);
+            const g = Object.fromEntries(a.gates.map((x) => [x.id, x.pass]));
+            const l = a.ledger;
+            const raw = a.rawFrontier;
+            const checks = [
+              ['the reading executes the registration it names', a.title.includes('ceiling') && l.corrections === 547 && l.entries === 179],
+              ['it is the dev split the arm was scored on: 1,534 questions over 11 databases', a.questions === 1534 && a.databases === 11],
+              ['the corpus annotates 1,386 of them and the three shapes read 1,266, so the key universe is the corpus', l.annotated === 1386 && l.parsed === 1266 && Math.abs(l.parseShare - 0.9134) < 1e-12 && g['V68-the-annotations-were-parsed'] === true],
+              ['1,559 distinct keys, 346 of which recur, and 489 are generic', l.distinctKeys === 1559 && l.recurringKeys === 346 && l.genericKeys === 489],
+              ['the raw frontier is reached in two keys and both are English, not vocabulary', raw.keysForFloor === 2 && raw.topKeys[0] === 'list' && raw.topKeys[1] === 'name' && v('P1').holds === true],
+              ['so the raw ceiling is 95% and means nothing: it is the frequency of the words every question uses', Math.abs(raw.ceiling - 0.9524) < 1e-12],
+              ['the vocabulary band at density 0.5 holds 1,070 keys and reaches 53 keys to a quarter of the split', band(0.5).keys === 1070 && band(0.5).keysForFloor === 53 && Math.abs(band(0.5).ceiling - 0.6591) < 1e-12],
+              ['stricter bands reach less, so the threshold is doing the work rather than decorating it', band(0.8).ceiling === 0.5515 && band(1).ceiling === 0.5228 && band(0.8).atArmSize === 148 && band(1).atArmSize === 78],
+              ['at the arm own key count the frontier is 241 and the arm licensed 132, a factor of 1.83', band(0.5).atArmSize === 241 && l.armLicensed === 132 && Math.abs(241 / 132 - 1.83) < 0.01 && v('P2').holds === true],
+              ['the arm rendered every question its store licensed, so the budget ate nothing', l.armLicensed === 132 && l.renderedQuestions === 132 && v('P6').holds === true],
+              ['179 entries bought 13 distinct terms, 13.77 per term', l.armTerms.length === 13 && Math.abs(l.entriesPerTerm - 13.7692) < 1e-12 && v('P4').holds === true],
+              ['a key in three questions or fewer is annotated in 96.7% of them; one in fifty or more in 7.7%', Math.abs(l.meanDensityNiche - 0.9669) < 1e-12 && Math.abs(l.meanDensityCommon - 0.0773) < 1e-12 && v('P5').holds === true],
+              ['so holding every vocabulary key still leaves a third of the split unreachable', Math.abs(band(0.5).ceiling - 0.6591) < 1e-12 && v('P3').holds === true],
+              ['the arm reached 8 of 11 databases, and the frontier at its size reaches 8 too', a.concentration.databasesTouched === 8 && a.concentration.databases === 11],
+              ['every gate passes and the round is six of six', a.gates.length === 3 && Object.values(g).every(Boolean) && a.verdicts.filter((x) => x.holds).length === 6],
+              ['the statement quotes the arithmetic rather than a verdict', a.statement.includes('1,559 keys') === false && a.statement.includes('1559 keys') && a.statement.includes('65.9') && a.statement.includes('13.77') === false],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('frontier reading failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('frontier reading: ' + checks.length + ' checks pass, ' + l.distinctKeys + ' keys, ceiling ' +
+              band(0.5).ceiling + ' at density 0.5, frontier ' + band(0.5).atArmSize + ' against the arm ' + l.armLicensed);
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

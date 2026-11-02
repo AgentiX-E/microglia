@@ -1,0 +1,633 @@
+{
+  "id": "poc-frontier",
+  "title": "Whether the grain's reach was the corpus's ceiling or the store's construction",
+  "source": "eval/results/poc-sota-bird-dev-R37-lexicon-grain.json",
+  "sourceGeneratedAt": "2026-11-02T03:36:15.042Z",
+  "questions": 1534,
+  "databases": 11,
+  "ledger": {
+    "corrections": 547,
+    "entries": 179,
+    "entriesPerTerm": 13.7692,
+    "armTerms": [
+      "2010 season",
+      "How many clients",
+      "How many users",
+      "all the football player",
+      "approved",
+      "atom ID 2",
+      "atom IDs",
+      "cards",
+      "double bonds",
+      "drivers",
+      "eligible free rate",
+      "status is restricted",
+      "well-finished"
+    ],
+    "armLicensed": 132,
+    "armLicensedShare": 0.086,
+    "renderedQuestions": 132,
+    "renderedShare": 0.086,
+    "silentQuestions": 0,
+    "annotated": 1386,
+    "parsed": 1266,
+    "parseShare": 0.9134,
+    "distinctKeys": 1559,
+    "recurringKeys": 346,
+    "genericKeys": 489,
+    "meanDensityNiche": 0.9669,
+    "meanDensityCommon": 0.0773
+  },
+  "rawFrontier": {
+    "curve": [
+      {
+        "keys": 1,
+        "covered": 272,
+        "share": 0.1773142112125163
+      },
+      {
+        "keys": 3,
+        "covered": 565,
+        "share": 0.3683181225554107
+      },
+      {
+        "keys": 5,
+        "covered": 714,
+        "share": 0.4654498044328553
+      },
+      {
+        "keys": 8,
+        "covered": 867,
+        "share": 0.5651890482398957
+      },
+      {
+        "keys": 13,
+        "covered": 1026,
+        "share": 0.6688396349413298
+      },
+      {
+        "keys": 15,
+        "covered": 1044,
+        "share": 0.6805736636245111
+      },
+      {
+        "keys": 20,
+        "covered": 1077,
+        "share": 0.7020860495436767
+      },
+      {
+        "keys": 30,
+        "covered": 1178,
+        "share": 0.7679269882659713
+      },
+      {
+        "keys": 45,
+        "covered": 1232,
+        "share": 0.803129074315515
+      },
+      {
+        "keys": 50,
+        "covered": 1234,
+        "share": 0.8044328552803129
+      },
+      {
+        "keys": 100,
+        "covered": 1302,
+        "share": 0.848761408083442
+      },
+      {
+        "keys": 150,
+        "covered": 1340,
+        "share": 0.8735332464146024
+      },
+      {
+        "keys": 200,
+        "covered": 1356,
+        "share": 0.8839634941329857
+      },
+      {
+        "keys": 500,
+        "covered": 1406,
+        "share": 0.9165580182529335
+      },
+      {
+        "keys": 1559,
+        "covered": 1461,
+        "share": 0.9524119947848761
+      }
+    ],
+    "keysForFloor": 2,
+    "ceiling": 0.9524,
+    "topKeys": [
+      "list",
+      "name",
+      "who",
+      "number",
+      "average",
+      "user",
+      "post",
+      "percentage",
+      "set",
+      "type",
+      "superheroes",
+      "event",
+      "carcinogenic",
+      "element",
+      "users",
+      "atoms",
+      "district",
+      "full name",
+      "female",
+      "comment"
+    ]
+  },
+  "vocabulary": [
+    {
+      "minDensity": 0.5,
+      "keys": 1070,
+      "keysForFloor": 53,
+      "ceiling": 0.6591,
+      "atArmSize": 241,
+      "curve": [
+        {
+          "keys": 1,
+          "covered": 88,
+          "share": 0.05736636245110821
+        },
+        {
+          "keys": 3,
+          "covered": 154,
+          "share": 0.10039113428943937
+        },
+        {
+          "keys": 5,
+          "covered": 186,
+          "share": 0.121251629726206
+        },
+        {
+          "keys": 8,
+          "covered": 212,
+          "share": 0.13820078226857888
+        },
+        {
+          "keys": 13,
+          "covered": 241,
+          "share": 0.15710560625814862
+        },
+        {
+          "keys": 15,
+          "covered": 255,
+          "share": 0.16623207301173404
+        },
+        {
+          "keys": 20,
+          "covered": 278,
+          "share": 0.18122555410691005
+        },
+        {
+          "keys": 30,
+          "covered": 320,
+          "share": 0.20860495436766624
+        },
+        {
+          "keys": 45,
+          "covered": 366,
+          "share": 0.23859191655801826
+        },
+        {
+          "keys": 50,
+          "covered": 378,
+          "share": 0.24641460234680573
+        },
+        {
+          "keys": 100,
+          "covered": 465,
+          "share": 0.303129074315515
+        },
+        {
+          "keys": 150,
+          "covered": 526,
+          "share": 0.3428943937418514
+        },
+        {
+          "keys": 200,
+          "covered": 582,
+          "share": 0.379400260756193
+        },
+        {
+          "keys": 500,
+          "covered": 747,
+          "share": 0.4869621903520209
+        },
+        {
+          "keys": 1070,
+          "covered": 1011,
+          "share": 0.6590612777053455
+        }
+      ],
+      "topKeys": [
+        "percentage",
+        "full name",
+        "female",
+        "male",
+        "single bond",
+        "carbon",
+        "double bond",
+        "triple bond",
+        "k-12",
+        "reference name"
+      ]
+    },
+    {
+      "minDensity": 0.8,
+      "keys": 942,
+      "keysForFloor": 233,
+      "ceiling": 0.5515,
+      "atArmSize": 148,
+      "curve": [
+        {
+          "keys": 1,
+          "covered": 37,
+          "share": 0.024119947848761408
+        },
+        {
+          "keys": 3,
+          "covered": 84,
+          "share": 0.054758800521512385
+        },
+        {
+          "keys": 5,
+          "covered": 104,
+          "share": 0.06779661016949153
+        },
+        {
+          "keys": 8,
+          "covered": 124,
+          "share": 0.08083441981747067
+        },
+        {
+          "keys": 13,
+          "covered": 148,
+          "share": 0.09647979139504563
+        },
+        {
+          "keys": 15,
+          "covered": 155,
+          "share": 0.10104302477183832
+        },
+        {
+          "keys": 20,
+          "covered": 169,
+          "share": 0.11016949152542373
+        },
+        {
+          "keys": 30,
+          "covered": 190,
+          "share": 0.12385919165580182
+        },
+        {
+          "keys": 45,
+          "covered": 218,
+          "share": 0.1421121251629726
+        },
+        {
+          "keys": 50,
+          "covered": 226,
+          "share": 0.14732724902216426
+        },
+        {
+          "keys": 100,
+          "covered": 280,
+          "share": 0.18252933507170796
+        },
+        {
+          "keys": 150,
+          "covered": 320,
+          "share": 0.20860495436766624
+        },
+        {
+          "keys": 200,
+          "covered": 360,
+          "share": 0.23468057366362452
+        },
+        {
+          "keys": 500,
+          "covered": 583,
+          "share": 0.38005215123859193
+        },
+        {
+          "keys": 942,
+          "covered": 846,
+          "share": 0.5514993481095176
+        }
+      ],
+      "topKeys": [
+        "full name",
+        "female",
+        "single bond",
+        "carbon",
+        "double bond",
+        "triple bond",
+        "blue eyes",
+        "diagnosed with sle",
+        "label",
+        "superpowers"
+      ]
+    },
+    {
+      "minDensity": 1,
+      "keys": 937,
+      "keysForFloor": 318,
+      "ceiling": 0.5228,
+      "atArmSize": 78,
+      "curve": [
+        {
+          "keys": 1,
+          "covered": 11,
+          "share": 0.007170795306388526
+        },
+        {
+          "keys": 3,
+          "covered": 30,
+          "share": 0.01955671447196871
+        },
+        {
+          "keys": 5,
+          "covered": 44,
+          "share": 0.028683181225554105
+        },
+        {
+          "keys": 8,
+          "covered": 62,
+          "share": 0.04041720990873533
+        },
+        {
+          "keys": 13,
+          "covered": 78,
+          "share": 0.05084745762711865
+        },
+        {
+          "keys": 15,
+          "covered": 84,
+          "share": 0.054758800521512385
+        },
+        {
+          "keys": 20,
+          "covered": 99,
+          "share": 0.06453715775749674
+        },
+        {
+          "keys": 30,
+          "covered": 118,
+          "share": 0.07692307692307693
+        },
+        {
+          "keys": 45,
+          "covered": 146,
+          "share": 0.09517601043024772
+        },
+        {
+          "keys": 50,
+          "covered": 154,
+          "share": 0.10039113428943937
+        },
+        {
+          "keys": 100,
+          "covered": 206,
+          "share": 0.13428943937418514
+        },
+        {
+          "keys": 150,
+          "covered": 248,
+          "share": 0.16166883963494133
+        },
+        {
+          "keys": 200,
+          "covered": 291,
+          "share": 0.1897001303780965
+        },
+        {
+          "keys": 500,
+          "covered": 525,
+          "share": 0.34224250325945244
+        },
+        {
+          "keys": 937,
+          "covered": 802,
+          "share": 0.5228161668839635
+        }
+      ],
+      "topKeys": [
+        "single bond",
+        "double bond",
+        "triple bond",
+        "blue eyes",
+        "label",
+        "superpowers",
+        "eye colour",
+        "date of birth",
+        "admitted to the hospital",
+        "location coordinates"
+      ]
+    }
+  ],
+  "concentration": {
+    "arm": [
+      {
+        "database": "card_games",
+        "keys": 2,
+        "covered": 113,
+        "questions": 191
+      },
+      {
+        "database": "formula_1",
+        "keys": 1,
+        "covered": 36,
+        "questions": 174
+      },
+      {
+        "database": "financial",
+        "keys": 3,
+        "covered": 16,
+        "questions": 106
+      },
+      {
+        "database": "codebase_community",
+        "keys": 2,
+        "covered": 15,
+        "questions": 186
+      },
+      {
+        "database": "toxicology",
+        "keys": 3,
+        "covered": 9,
+        "questions": 145
+      },
+      {
+        "database": "california_schools",
+        "keys": 1,
+        "covered": 4,
+        "questions": 89
+      },
+      {
+        "database": "european_football_2",
+        "keys": 2,
+        "covered": 4,
+        "questions": 129
+      },
+      {
+        "database": "student_club",
+        "keys": 2,
+        "covered": 4,
+        "questions": 158
+      },
+      {
+        "database": "debit_card_specializing",
+        "keys": 0,
+        "covered": 0,
+        "questions": 64
+      },
+      {
+        "database": "superhero",
+        "keys": 0,
+        "covered": 0,
+        "questions": 129
+      },
+      {
+        "database": "thrombosis_prediction",
+        "keys": 0,
+        "covered": 0,
+        "questions": 163
+      }
+    ],
+    "frontier": [
+      {
+        "database": "toxicology",
+        "keys": 5,
+        "covered": 48,
+        "questions": 145
+      },
+      {
+        "database": "thrombosis_prediction",
+        "keys": 3,
+        "covered": 34,
+        "questions": 163
+      },
+      {
+        "database": "superhero",
+        "keys": 4,
+        "covered": 29,
+        "questions": 129
+      },
+      {
+        "database": "financial",
+        "keys": 3,
+        "covered": 25,
+        "questions": 106
+      },
+      {
+        "database": "student_club",
+        "keys": 2,
+        "covered": 23,
+        "questions": 158
+      },
+      {
+        "database": "formula_1",
+        "keys": 3,
+        "covered": 21,
+        "questions": 174
+      },
+      {
+        "database": "card_games",
+        "keys": 1,
+        "covered": 15,
+        "questions": 191
+      },
+      {
+        "database": "california_schools",
+        "keys": 3,
+        "covered": 10,
+        "questions": 89
+      },
+      {
+        "database": "codebase_community",
+        "keys": 1,
+        "covered": 9,
+        "questions": 186
+      },
+      {
+        "database": "debit_card_specializing",
+        "keys": 2,
+        "covered": 7,
+        "questions": 64
+      },
+      {
+        "database": "european_football_2",
+        "keys": 2,
+        "covered": 7,
+        "questions": 129
+      }
+    ],
+    "databasesTouched": 8,
+    "databases": 11
+  },
+  "verdicts": [
+    {
+      "id": "P1",
+      "claim": "the raw key set crosses the quarter floor within a handful of keys, and the keys that cross it are generic",
+      "observed": "2 keys cross it: list, name",
+      "holds": true
+    },
+    {
+      "id": "P2",
+      "claim": "at the arm's own key count the vocabulary frontier reaches less than twice what the arm's store licensed",
+      "observed": "241 against 132 at 13 keys, ratio 1.83",
+      "holds": true
+    },
+    {
+      "id": "P3",
+      "claim": "even holding every vocabulary key, a quarter of the split is never reached",
+      "observed": "65.9% with 1070 keys at density 0.5",
+      "holds": true
+    },
+    {
+      "id": "P4",
+      "claim": "the arm spent its entries redundantly rather than on distinct terms",
+      "observed": "179 entries on 13 terms, 13.77 per term",
+      "holds": true
+    },
+    {
+      "id": "P5",
+      "claim": "the corpus annotates the terms it mentions rarely more thoroughly than the words it mentions often",
+      "observed": "mean density 0.9669 at ≤3 questions against 0.0773 at ≥50",
+      "holds": true
+    },
+    {
+      "id": "P6",
+      "claim": "the licence and the renderer agree: every question the store licenses is served",
+      "observed": "132 licensed against 132 served",
+      "holds": true
+    }
+  ],
+  "gates": [
+    {
+      "id": "V66-frontier-is-a-curve",
+      "pass": true,
+      "blocking": true,
+      "detail": "15 points, monotone, last point is the union of 1559 keys"
+    },
+    {
+      "id": "V68-the-annotations-were-parsed",
+      "pass": true,
+      "blocking": true,
+      "detail": "1266 of 1386 annotated questions yielded a mapping (91.3%), so the key universe is the corpus's"
+    },
+    {
+      "id": "V67-the-store-was-redundant",
+      "pass": true,
+      "blocking": false,
+      "detail": "179 entries bought 13 distinct terms"
+    }
+  ],
+  "statement": "1559 keys annotated over 1534 questions, of which 489 are generic; 1070 carry a definition wherever they are used and reach 65.9% with every key held; at the arm's 13 terms the vocabulary frontier is 241 and the arm's own store licensed 132 and served 132; 1266 of 1386 annotations parsed."
+}

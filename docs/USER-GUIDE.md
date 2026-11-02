@@ -1860,6 +1860,17 @@ R36 turns that into a rule you can use, and the rule is not "pick k".
   extracts a directory holding only a zip. The lane now checks all eleven databases once, right after
   extraction, and names the missing field.
 
+**Why a definition pays less than it looks like it should.** If you have read that this project built a
+definitional memory and that it reached 8.6% of a benchmark, the natural next question is whether the store
+was built badly. It was not. The counterfactual is in the corpus: rank the keys the benchmark's own
+annotations use by how many questions they reach, and a store of the same size reaches 241 of 1,534 rather
+than 132 — near enough that no construction change closes the gap. The reason is a property of how questions
+are written: the phrases a corpus defines are the phrases it mentions once (96.7% of them are annotated in
+every question that uses them), and the phrases it mentions often are the ones it leaves undefined (7.7%).
+A memory that must be retrieved by the question's own words can only act on words that come back. Before
+building a definitional layer over your own corpus, measure that recurrence; the number is available without
+a model call.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

@@ -1074,3 +1074,64 @@ shared protocol, because no other lane has this representation: it fails a run w
 nothing, whose block rendered nothing, or whose renderer showed a term the question never used — three
 ways to publish a clean null without measuring anything. The module is at 100% on all four coverage
 dimensions and the workflow asserts fourteen fields of the reading on every push.
+
+### 8.13 Why 8.6% was a ceiling: the vocabulary a corpus defines is the vocabulary it says once
+
+§8.12 closes with a reach of 132 of 1,534 questions and an attribution — "a definition is reusable only
+where a corpus reuses a phrase, and this one does not." The attribution is testable without a model call,
+because the corpus ships a store of definitions of its own. BIRD attaches an `evidence` block to **90.35%
+of dev questions**, and the block is a mapping rather than prose:
+
+```
+  Eligible free rate for K-12 = `Free Meal Count (K-12)` / `Enrollment (K-12)`
+  driver reference name refers to driverRef
+```
+
+Read as `{key, value}` pairs, those annotations are the key universe a definitional memory could have had.
+`packages/eval/src/frontier.ts` reads them with three narrow shapes (91.3% of annotated questions yield a
+mapping), ranks the 1,559 distinct keys by the questions they reach, and returns reach as a function of
+store size.
+
+**The first frontier was a frontier of English.** Ranked raw, **two keys reach a quarter of the split**:
+`list` and `name`, each annotated exactly once and each occurring in hundreds of questions. They are not
+terms the corpus defines; they are words it happened to write a line about. The separator is the corpus's
+own judgement — **density**, annotations over occurrences — and it is decisive:
+
+| keys by the questions that mention them | mean density |
+|---|---|
+| three questions or fewer | **0.967** |
+| fifty questions or more | **0.077** |
+
+A phrase the corpus mentions once is annotated almost every time. A phrase it mentions fifty times is
+annotated one time in thirteen. That is the inversion this round found, and it is why a definitional store
+runs out of reach: **the words that need defining are the words a corpus says once**, and a memory applied
+across questions can only act on words that come back.
+
+| store size | raw keys | density ≥ 0.5 | density ≥ 0.8 | density = 1 |
+|---|---|---|---|---|
+| 13 keys (the arm's own count) | 1,026¹ | **241** | 148 | 78 |
+| keys to reach 25% | 2 | 53 | 233 | 318 |
+| ceiling, every key held | 95.2% | **65.9%** | 55.2% | 52.3% |
+
+¹ the raw figure at 13 keys is dominated by the same generic words and is not a vocabulary frontier.
+
+**So the arm was near the frontier and the frontier is low.** At its own 13 terms the vocabulary frontier is
+241 questions against the arm's licensed 132 — a factor of 1.83, inside the band the three thresholds
+produce. The arm therefore was not badly constructed, and §8.12's conclusion survives; what does not survive
+is its reason. The corpus does repeat phrases (346 keys recur). It simply does not repeat the ones it
+defines.
+
+**Two scopes decide the arm's own number, and a reading that misses one measures a store nobody built.** The
+lane keeps its lexicon per fold *and* per database (`lexiconByDomain.get(row.db_id)`). Scoped by fold only,
+the arm appears to license 141 questions and serve 132, which reads as nine silently dropped. Scoped by
+nothing, it appears to license 201, which reads as a third of its reach lost to a character budget. Neither
+is true: **132 licensed, 132 served**, and the difference was the reading's denominator rather than the
+lane's behaviour.
+
+**Gates.** `V66-frontier-is-a-curve` refuses a reading whose curve is not monotone, whose whole key set
+reaches nothing, or whose last point is not the union of every key — a reach curve that is not a curve is a
+matcher that disagrees with the corpus. `V68-the-annotations-were-parsed` refuses a key universe that came
+from the parser rather than from the corpus. `V67-the-store-was-redundant` is advisory and reports that 179
+entries bought 13 distinct terms. The module is at 100% on all four coverage dimensions and the workflow
+asserts sixteen fields of the reading on every push.
+

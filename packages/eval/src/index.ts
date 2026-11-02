@@ -391,6 +391,25 @@ export {
 } from './feature-overlap.js';
 
 export {
+  bridgesOf,
+  databaseShares,
+  frontierGate,
+  keysForShare,
+  keyStats,
+  keysOf,
+  orderedKeys,
+  reachCurve,
+  reachOf,
+  vocabularyKeys,
+  type Bridge,
+  type BridgeCase,
+  type CurvePoint,
+  type DatabaseShare,
+  type FrontierGate,
+  type KeyStat,
+} from './frontier.js';
+
+export {
   admitLexicon,
   lexiconGate,
   lexiconPackOf,

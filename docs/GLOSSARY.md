@@ -925,3 +925,28 @@ registered a feasibility clause before it ran.
 was not a refutation either: the store was built, the licence held, and the block rendered on too little of the
 split for the contrast to be about the hypothesis. It is a distinct outcome from "not met", and R37 shipped the
 clause *before* the run so that a feasibility failure could not later be read as evidence against the grain.
+
+**Bridge (annotation)** — One mapping the benchmark's `evidence` block carries: a phrase a question uses,
+and the database vocabulary that phrase denotes. `Eligible free rate for K-12 = \`Free Meal Count (K-12)\` /
+\`Enrollment (K-12)\`` is a bridge. 90.35% of BIRD's dev questions carry an evidence block and 91.3% of those
+parse into at least one bridge, so the annotations are the key universe a definitional memory could have
+had — which is what makes a reach ceiling measurable without a model.
+
+**Density (of a key)** — How often the corpus annotates a key, over how often its questions mention it. It
+is the corpus's own judgement about whether a phrase needs defining wherever it is used, and it is the only
+separator this project found between a term and a word: `single bond` is annotated every time it appears
+(density 1.0) and `list` is annotated once in 272 (0.004). Mean density is **0.967** for keys mentioned in
+three questions or fewer and **0.077** for keys mentioned in fifty or more — the inversion that explains why a
+definitional store runs out of reach.
+
+**Frontier (of a term store)** — Reach as a function of how many distinct keys a store holds, computed over
+the corpus's own keys. It answers a question a single reach number cannot: whether a low reach was the
+corpus's ceiling or the store's construction. At the 13-key size the definitional arm used, the frontier is
+**241 questions at density 0.5**, 148 at 0.8 and 78 at 1.0, against the arm's licensed 132 — so the arm was
+near the frontier and the frontier itself is the limit.
+
+**Reach ceiling** — The share of a split a representation can never render on, whatever its store. Holding
+every key the annotations treat as vocabulary, **34.1% of BIRD dev is never reached** at density 0.5 and
+**47.7%** at density 1.0. This is a property of the corpus and not of a store, which is why it closes a route
+rather than a round.
+

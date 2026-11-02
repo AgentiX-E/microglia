@@ -413,10 +413,12 @@ with a caveat: there is nothing to set it against.
 > interaction it cannot observe.
 
 `pnpm eval:ledger` recomputes every number in the ledger paragraphs from `poc-sota-bird-train.json` and
-`pnpm eval:pack-assign` recomputes the assignment from the dev run, and `pnpm eval:lexicon` recomputes the
-definitional grain's reach, licence, two deltas and exchange rate from its own artefact; the workflow asserts
-fifty-six fields of the first two on every push, and thirty-one more across the R37 rounds
-(`prereg/R35-ledger.md`, `prereg/R36-pack-assignment.md`, `prereg/R37-lexicon-grain.md`).
+`pnpm eval:pack-assign` recomputes the assignment from the dev run, `pnpm eval:lexicon` recomputes the
+definitional grain's reach, licence, two deltas and exchange rate from its own artefact, and `pnpm eval:frontier`
+recomputes the reach ceiling from the corpus's own annotations; the workflow asserts fifty-six fields of the
+first two on every push, thirty-one across the R37 round, and sixteen of the frontier
+(`prereg/R35-ledger.md`, `prereg/R36-pack-assignment.md`, `prereg/R37-lexicon-grain.md`,
+`prereg/R38-term-frontier.md`).
 
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
 
@@ -453,6 +455,31 @@ learned entry was a second copy of a hint the model already had.
 
 > A memory item can be a term with a referent. Whether that is a lever depends on how often the words come
 > back, and on this corpus they do not.
+
+### Why that was a ceiling and not a badly built store
+
+The obvious reply to the paragraph above is that the store was built badly, so the next round tested that
+reply against the corpus instead of against the store. BIRD's `evidence` block is itself a store of
+definitions — one per 90% of dev questions, keyed by phrases the questions use — so its keys are the key
+universe a definitional memory could have had. Ranked by the questions they reach:
+
+| store size | the corpus's own keys | the arm |
+|---|---|---|
+| 13 keys, the arm's own count | **241 questions** (density ≥ 0.5) | 132 |
+| keys needed to reach 25% of the split | 53 | never reached 25% |
+| ceiling with every vocabulary key held | **65.9%** | — |
+
+So the arm was within a factor of 1.8 of what its store size could do, and the limit is in the corpus:
+**the phrases a corpus defines are the phrases it mentions once.** A key used in three questions or fewer
+carries an annotation in **96.7%** of them; a key used in fifty or more carries one in **7.7%**. The corpus
+defines what it says once and says what it does not define. A memory retrieved by the question's own words
+can only act on words that come back, and holding every vocabulary key still leaves **34.1%** of the split
+unreachable.
+
+Ranked without that filter the frontier looks enormous — two keys, `list` and `name`, reach a quarter of the
+split — and it is the frequency of English rather than the reach of a definition, which is why the reading
+publishes a band of three thresholds and takes the most generous one for its verdicts.
+
 
 So the library is worth integrating where corrections *repeat* — a workspace with a house convention,
 a schema whose grain is not guessable, a chart style a team insists on — and it is worth nothing where
@@ -688,7 +715,7 @@ pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-**99.98 / 99.67 / 100 / 99.98** over **2,658 tests**; the branch arms that remain uncovered are
+**99.98 / 99.67 / 100 / 99.98** over **2,689 tests**; the branch arms that remain uncovered are
 listed with file, line, and reason in the internal technical design, and none is excluded with an ignore
 comment.
 
