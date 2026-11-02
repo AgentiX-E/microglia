@@ -108,6 +108,7 @@ import {
   archiveVerdict,
   assignFolds,
   LlmClient,
+  stoppedRun,
   buildValidityGates,
   canonicalRows,
   comparePaired,
@@ -811,21 +812,12 @@ const chat = (prompt: string, maxTokens = 700, temperature = 0): Promise<ChatRep
 /**
  * Whether a call failure says the run is over rather than that this call was.
  *
- * Three codes and one clock, in one predicate. Before this existed each site that called a model
- * made its own decision about which errors to re-throw, so a stopped run would have had to stop at
- * every one of them: the evaluation loop, the probe, the learning pass, and the distiller each
- * caught failures and turned them into data. The distiller was the worst of the four — a spent
- * budget arriving from inside `host.distill` was counted as "the model said nothing" and the fold
- * went on to publish a store built from part of its corrections.
+ * The predicate moved to `stopped-run.ts` when a second lane needed the same answer. It stayed a
+ * named import rather than a re-thrown check at each of this lane's four call sites, because the
+ * distiller is the expensive one: a spent budget arriving from inside `host.distill` was counted as
+ * "the model said nothing", and the fold went on to publish a store built from part of its
+ * corrections.
  */
-function stoppedRun(error: unknown): boolean {
-  if (!(error instanceof MicrogliaError)) return false;
-  return (
-    error.code === 'MG_E_BUDGET_EXCEEDED' ||
-    error.code === 'MG_E_PROVIDER_FAILED' ||
-    error.code === 'MG_E_DEADLINE'
-  );
-}
 
 type Dataset = {
   readonly rows: readonly BirdRow[];

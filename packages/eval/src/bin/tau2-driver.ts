@@ -34,7 +34,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
 import { openMicroglia } from '@agentix-e/microglia-core/capture';
-import { combineInterpreters, createLlmInterpreter, ruleInterpreter } from '@agentix-e/microglia-core/distill';
+import { createLlmInterpreter, ruleInterpreter } from '@agentix-e/microglia-core/distill';
 import { steppingClock, mulberry32 } from '@agentix-e/microglia-core';
 import {
   LlmClient,
@@ -45,6 +45,8 @@ import {
   parseTauResults,
   parseTauTasks,
   qualifiedId,
+  resilientInterpreter,
+  stoppedRun,
   toPassAtK,
   trialRowsOf,
   type Correction,
@@ -382,17 +384,26 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const store = await EmbeddedMemory.open(new MemoryJournal());
   const llm = new LlmClient({
     apiKey: process.env['DEEPSEEK_API_KEY'] ?? '',
-    model: process.env['TAU_MODEL'] ?? 'deepseek-chat',
+    // The distillation client speaks the endpoint's own REST shape, and `TAU_MODEL` names the model
+    // the way litellm does because τ²'s Python half is a litellm caller. `LlmClient` translates the
+    // alias, and `TAU_DISTILL_MODEL` exists for a caller that wants to say the REST id outright.
+    // Empty is read as unset: a workflow variable that is not configured renders as `''`, and `??`
+    // would have kept it.
+    model: process.env['TAU_DISTILL_MODEL']?.trim() || process.env['TAU_MODEL'] || 'deepseek-chat',
     maxCalls: Number(process.env['TAU_MAX_CALLS'] ?? 400) || 400,
   });
+  // The model first, the rules when the model fails on this event, and the run stopped when the
+  // model fails on every event. See `tau2-distill.ts` for why this is the host's decision rather
+  // than the combinator's.
+  const distiller = resilientInterpreter(
+    createLlmInterpreter({ llm: { complete: async (prompt) => (await llm.chat(prompt, 1200)).text } }),
+    ruleInterpreter,
+  );
   const host = await openMicroglia({
     app: 'microglia-l4',
     namespace: 'tau2',
     store,
-    interpreter: combineInterpreters(
-      createLlmInterpreter({ llm: { complete: async (prompt) => (await llm.chat(prompt, 1200)).text } }),
-      ruleInterpreter,
-    ),
+    interpreter: distiller.interpreter,
     budget: 1200,
     clock: steppingClock(1_700_000_000_000, 1),
     random: mulberry32(Number(process.env['TAU_SEED'] ?? 7) || 7),
@@ -402,7 +413,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     const handle = host.begin({
       task: TASK,
       input: { question: correction.taskId, domain: LEARN_DOMAIN, schemaDigest: LEARN_DOMAIN },
-      model: process.env['TAU_MODEL'] ?? 'deepseek-chat',
+      model: llm.model,
       promptVersion: 'tau2/1',
       domainPack: 'tau2',
     });
@@ -415,11 +426,22 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       { note: correction.statement },
     );
   }
-  await host.distill({ generalize: false });
+  // The report, not just the store: `failed` is the count that explains an empty store, and
+  // discarding it is what made the first cross-domain dispatch unreadable. `fatal` is passed so a
+  // provider that has stopped answering stops the run here — before an hour of evaluation is spent
+  // on a pack the store never built.
+  const distillReport = await host.distill({ generalize: false, fatal: stoppedRun });
+  const faults = distiller.faults();
   // The domain ledger, from the store rather than from the driver's intentions: an item that lost its
   // domain somewhere nobody instrumented is exactly what V44 exists to catch.
   const knowledge = await store.listKnowledge({});
   const withoutDomain = knowledge.filter((item) => item.scope.domain === undefined).length;
+  process.stdout.write(
+    `[tau2] learn: ${String(corrections.length)} correction(s), ${String(distillReport.created)} created, ` +
+      `${String(distillReport.failed)} failed, ${String(knowledge.length)} item(s) in the store, ` +
+      `${String(faults.events)} answered by the rule fallback\n`,
+  );
+  process.stdout.write(`[tau2] distill model: configured=${llm.configuredModel} sent=${llm.model}\n`);
 
   let evalStdout = '';
   const facade = await startRecall(async ({ text }) => {
@@ -451,6 +473,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const diagnostics = diagnosticsOf(evalStdout);
   const agentTurns = diagnostics?.agent_turns ?? null;
   const scored = scoredArm(evalPath);
+  const llmStats = llm.stats;
   observed = {
     train: plan.train,
     test: plan.test,
@@ -462,13 +485,20 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       unanswered,
       edited: corrections.length,
       distilled: knowledge.length,
-      // Not observable from here: a correction that produced no rule and a distiller that failed on
-      // one are the same shape from outside the store, so V32 is omitted rather than handed a zero.
+      // Every count here is the distiller's own, including the one that explains an empty store.
+      distillFailed: distillReport.failed,
+      candidates: distillReport.candidates,
+      events: distillReport.events,
+      llmFailed: faults.events,
     },
-    // The agent's calls happen in another process. Reporting the distillation calls alone would grade
-    // V8 against a denominator that omits every episode, so the gate is omitted unless the phase
-    // reported how many turns it took.
-    calls: agentTurns === null ? { total: 0, failed: 0 } : { total: agentTurns, failed: episodeFailures(diagnostics) },
+    // Whose tally this is, stated in the record: the episodes' calls belong to the agent process and
+    // arrive as a turn count, the distillation calls are this process's own. A rate over a subset is
+    // a rate over a subset, and the alternative — reporting nothing — is how a run whose every
+    // distillation call was refused reached a reader as a store that had nothing to say.
+    calls:
+      agentTurns === null
+        ? { total: llmStats.prompts, failed: llmStats.failures, scope: 'distillation' as const }
+        : { total: agentTurns, failed: episodeFailures(diagnostics), scope: 'run' as const },
     domains: { stored: knowledge.length, withoutDomain, unscopedIn: 0, widenedIn: 0 },
     scenario,
   };

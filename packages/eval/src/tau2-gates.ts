@@ -65,14 +65,35 @@ export type Tau2ArmRecord = {
   readonly unscored: number;
   /** Mean items the recall facade put in front of the agent, when the driver counted them. */
   readonly meanPackIds?: number;
-  /** Agent calls the driver made, and how many exhausted their retries. */
-  readonly calls?: { readonly calls: number; readonly failures: number };
-  /** The learning half's bookkeeping: corrections written, unanswered, edited, failed to distil. */
+  /**
+   * The model calls this arm made, and how many failed.
+   *
+   * `scope` names the population the tally covers. On τ² the episodes' calls happen in the agent
+   * process and are visible only as a turn count, so the tally the driver can always produce is its
+   * own distillation client's — a subset, stated as one, rather than a rate over everything with a
+   * numerator nobody counted.
+   */
+  readonly calls?: {
+    readonly calls: number;
+    readonly failures: number;
+    readonly scope?: 'run' | 'distillation';
+  };
+  /**
+   * The learning half's bookkeeping: corrections written, unanswered, edited, failed to distil.
+   *
+   * The four counts the protocol reconciles are required; the three after them are the lane's own
+   * detail, recorded because a store with no knowledge in it is otherwise indistinguishable from a
+   * store whose distillation was answered by the fallback interpreter.
+   */
   readonly learning?: {
     readonly rows: number;
     readonly unanswered: number;
     readonly edited: number;
     readonly distillFailed: number;
+    readonly distilled?: number;
+    readonly candidates?: number;
+    readonly events?: number;
+    readonly llmFailed?: number;
   };
   /** Provenance of the stored items' `scope.domain`, which is the ceiling on every transfer claim. */
   readonly domainOrigin?: {

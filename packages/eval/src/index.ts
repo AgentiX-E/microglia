@@ -316,6 +316,7 @@ export {
 export {
   LlmClient,
   attemptTimeoutMs,
+  restModelOf,
   retryAfterMs,
   type ChatReply,
   type LlmClientOptions,
@@ -503,6 +504,8 @@ export {
 } from './ledger.js';
 
 export { armRecordFromDriver, type Tau2Raw } from './tau2-instrument.js';
+export { resilientInterpreter, type InterpreterFaults, type ResilientInterpreter } from './tau2-distill.js';
+export { stoppedRun } from './stopped-run.js';
 export {
   DEFAULT_MIN_TASKS,
   PUBLISHED_PASS4,

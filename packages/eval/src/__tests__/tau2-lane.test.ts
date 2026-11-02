@@ -431,6 +431,62 @@ describe('the audit accounts for every gate in the protocol', () => {
     expect(audit.armIndexed).toBe(26);
   });
 
+  it('grades the record a failed learning half leaves behind, and fails it in four places', () => {
+    // The R41 dispatch's shape, as the projection sees it: thirty-two corrections, a distiller that
+    // failed on every one, a store with nothing in it, and a client that sent thirty-two prompts and
+    // got thirty-two refusals. All four readings were available at the time and none of them reached
+    // the artefact — `V32` and `V8` were absent, `V44` passed on `0 <= 0`, and only `V1` said
+    // anything was wrong. The gates are the deliverable: the same run now fails for four reasons,
+    // each naming a different part of the machinery.
+    const audit = tau2GateAudit({
+      domain: 'airline',
+      trialCount: 4,
+      memory: {
+        arm: 'memory',
+        tasks: 50,
+        trials: 4,
+        unscored: 0,
+        meanPackIds: 0,
+        calls: { calls: 32, failures: 32, scope: 'distillation' },
+        learning: { rows: 32, unanswered: 0, edited: 32, distilled: 0, distillFailed: 32 },
+        domainOrigin: { storedWithDomain: 0, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
+      },
+      comparison: { paired: 50, onlyFirst: 0, onlySecond: 0, lost: 7, gained: 2, deltaPp: -10 },
+    });
+    const byId = new Map(audit.gates.map((gate) => [gate.id, gate]));
+    expect(byId.get('V1-pack-not-empty')?.pass).toBe(false);
+    expect(byId.get('V32-fold-learning-intact')?.pass).toBe(false);
+    expect(byId.get('V44-domain-accounted')?.pass).toBe(false);
+    expect(byId.get('V8-call-reliability')?.pass).toBe(false);
+    expect(byId.get('V8-call-reliability')?.actual).toContain('32/32 calls');
+    expect(audit.absent.map((entry) => entry.id)).not.toContain('V32-fold-learning-intact');
+    expect(audit.absent.map((entry) => entry.id)).not.toContain('V8-call-reliability');
+  });
+
+  it('passes the same four when the store was built and the calls answered', () => {
+    // The other side of the same reading, so the four gates are not simply gates that always fail.
+    const audit = tau2GateAudit({
+      domain: 'airline',
+      trialCount: 4,
+      memory: {
+        arm: 'memory',
+        tasks: 50,
+        trials: 4,
+        unscored: 0,
+        meanPackIds: 2.1,
+        calls: { calls: 32, failures: 0, scope: 'distillation' },
+        learning: { rows: 32, unanswered: 0, edited: 32, distilled: 30, distillFailed: 0 },
+        domainOrigin: { storedWithDomain: 30, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
+      },
+      comparison: { paired: 50, onlyFirst: 0, onlySecond: 0, lost: 7, gained: 2, deltaPp: -10 },
+    });
+    const byId = new Map(audit.gates.map((gate) => [gate.id, gate]));
+    expect(byId.get('V1-pack-not-empty')?.pass).toBe(true);
+    expect(byId.get('V32-fold-learning-intact')?.pass).toBe(true);
+    expect(byId.get('V44-domain-accounted')?.pass).toBe(true);
+    expect(byId.get('V8-call-reliability')?.pass).toBe(true);
+  });
+
   it('grades the four transfer gates on a cross-domain reading, and fails the floor', () => {
     // What R29 stage 2 buys: the transfer family is graded on a second scenario rather than absent
     // from it. `V15` reconciles the three buckets, `V33` counts the pairs, `V17` re-derives the net

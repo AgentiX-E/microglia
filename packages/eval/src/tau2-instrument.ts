@@ -22,10 +22,12 @@
  *    "not applicable".
  * 2. **No calls is not perfect reliability.** `calls` is omitted when the run made none, because
  *    `0/0` reported as `0` is the strongest possible reliability claim made on no evidence.
- * 3. **An unobservable count omits its gate rather than defaulting.** The distillation failure count
- *    is not knowable from outside the store — "a correction produced no rule" and "the distiller
- *    failed on it" are the same shape — so the whole learning record is omitted rather than handed a
- *    zero that V32 would read as perfect.
+ * 3. **An unobservable count omits its gate rather than defaulting — and nothing here is
+ *    unobservable.** The first version of this file argued that the distillation failure count could
+ *    not be seen from outside the store, and omitted the whole learning record to avoid handing
+ *    `V32` a zero. `host.distill` returns that count; the driver was discarding it. A record that
+ *    omits `V32` is a record that cannot say "nothing was distilled", which is exactly what the
+ *    first cross-domain dispatch did.
  * 4. **The split is passed through with its repeats.** `tasks` counts distinct held-out tasks, which
  *    is the denominator a rate means; `split.test` keeps the evaluation order *including* repeats, so
  *    a driver that ran a task twice is visible to `V2` instead of being silently de-duplicated.
@@ -47,18 +49,39 @@ export type Tau2Raw = {
   /**
    * The learning half's bookkeeping.
    *
-   * `distillFailed` is optional because it is the one count this scenario cannot always observe:
-   * reporting zero would hand V32 a perfect score on a quantity nobody measured.
+   * Every count here is observed by the driver, so every count here is required. The first version
+   * made `distillFailed` optional on the argument that a correction producing no rule and a
+   * distiller failing on one are the same shape from outside the store — which was true of the
+   * driver that wrote it and false of `host.distill`, whose report says which of the two happened.
+   * Omitting the record then made `V32` absent on the one dispatch where it would have fired, and
+   * the empty store that `V1` reported had no explanation anywhere in the artefact.
    */
   readonly learning: {
     readonly rows: number;
     readonly unanswered: number;
     readonly edited: number;
     readonly distilled: number;
-    readonly distillFailed?: number;
+    readonly distillFailed: number;
+    /** Claims the distiller produced, before the store kept or merged them. */
+    readonly candidates?: number;
+    /** Feedback events the distiller was asked about. */
+    readonly events?: number;
+    /** Events the model interpreter threw on, answered by the rule interpreter instead. */
+    readonly llmFailed?: number;
   };
-  /** Calls the run made to the model, and how many of them failed after retries. */
-  readonly calls: { readonly total: number; readonly failed: number };
+  /**
+   * Calls the run made to the model, and how many of them failed after retries.
+   *
+   * `scope` says whose tally this is. The episodes' calls belong to the agent process, which reports
+   * a turn count rather than a call count and only when it feels like it; the distillation calls are
+   * the driver's own. A rate is only a rate over a stated population, and the two are not the same
+   * population.
+   */
+  readonly calls: {
+    readonly total: number;
+    readonly failed: number;
+    readonly scope?: 'run' | 'distillation';
+  };
   /**
    * Which scenario each half ran in, and the scope the facade recalled under.
    *
@@ -90,17 +113,25 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     meanPackIds,
     ...(raw.calls.total === 0
       ? {}
-      : { calls: { calls: raw.calls.total, failures: raw.calls.failed } }),
-    ...(raw.learning.distillFailed === undefined
-      ? {}
       : {
-          learning: {
-            rows: raw.learning.rows,
-            unanswered: raw.learning.unanswered,
-            edited: raw.learning.edited,
-            distillFailed: raw.learning.distillFailed,
+          calls: {
+            calls: raw.calls.total,
+            failures: raw.calls.failed,
+            ...(raw.calls.scope === undefined ? {} : { scope: raw.calls.scope }),
           },
         }),
+    // Always present: see the field's own comment. A run that distilled nothing is the reading this
+    // record exists to carry, and `undefined` would turn it into a run that did not report.
+    learning: {
+      rows: raw.learning.rows,
+      unanswered: raw.learning.unanswered,
+      edited: raw.learning.edited,
+      distilled: raw.learning.distilled,
+      distillFailed: raw.learning.distillFailed,
+      ...(raw.learning.candidates === undefined ? {} : { candidates: raw.learning.candidates }),
+      ...(raw.learning.events === undefined ? {} : { events: raw.learning.events }),
+      ...(raw.learning.llmFailed === undefined ? {} : { llmFailed: raw.learning.llmFailed }),
+    },
     domainOrigin: {
       storedWithDomain: Math.max(0, raw.domains.stored - raw.domains.withoutDomain),
       storedWithoutDomain: raw.domains.withoutDomain,

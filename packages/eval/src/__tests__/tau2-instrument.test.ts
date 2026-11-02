@@ -9,7 +9,7 @@ function raw(over: Partial<Tau2Raw> = {}): Tau2Raw {
     unscored: 0,
     servedPackSizes: [1, 2],
     learning: { rows: 2, unanswered: 0, edited: 2, distilled: 2, distillFailed: 0 },
-    calls: { total: 40, failed: 0 },
+    calls: { total: 40, failed: 0, scope: 'run' },
     domains: { stored: 2, withoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
     scenario: { learn: 'retail', test: 'retail', recall: 'retail' },
     ...over,
@@ -24,8 +24,14 @@ describe('armRecordFromDriver', () => {
     expect(record.trials).toBe(4);
     expect(record.unscored).toBe(0);
     expect(record.meanPackIds).toBeCloseTo(1.5, 12);
-    expect(record.calls).toEqual({ calls: 40, failures: 0 });
-    expect(record.learning).toEqual({ rows: 2, unanswered: 0, edited: 2, distillFailed: 0 });
+    expect(record.calls).toEqual({ calls: 40, failures: 0, scope: 'run' });
+    expect(record.learning).toEqual({
+      rows: 2,
+      unanswered: 0,
+      edited: 2,
+      distilled: 2,
+      distillFailed: 0,
+    });
     expect(record.domainOrigin).toEqual({
       storedWithDomain: 2,
       storedWithoutDomain: 0,
@@ -66,12 +72,56 @@ describe('armRecordFromDriver', () => {
     expect(Object.hasOwn(record, 'calls')).toBe(false);
   });
 
-  it('omits the learning record when the distiller\u2019s failure count was not observable', () => {
-    // A zero here would be a perfect V32 on a quantity nobody measured, which is the one thing an
-    // instrument gate must never say. Absent is a gate that does not appear; zero is a gate that passes.
-    const record = armRecordFromDriver(raw({ learning: { rows: 10, unanswered: 1, edited: 8, distilled: 8 } }));
-    expect(record.learning).toBeUndefined();
-    expect(Object.hasOwn(record, 'learning')).toBe(false);
+  it('reports the learning record even when it says nothing was learned', () => {
+    // The first version omitted the record whenever the distiller's failure count was unavailable,
+    // on the argument that a zero would hand V32 a perfect score for a quantity nobody measured. The
+    // count was measurable all along — `host.distill` returns it — so omission became the worse lie:
+    // the run whose store was empty reported no learning record at all, and `V32` was absent on the
+    // one dispatch where it would have fired.
+    const record = armRecordFromDriver(
+      raw({ learning: { rows: 32, unanswered: 0, edited: 32, distilled: 0, distillFailed: 32 } }),
+    );
+    expect(record.learning).toEqual({
+      rows: 32,
+      unanswered: 0,
+      edited: 32,
+      distilled: 0,
+      distillFailed: 32,
+    });
+  });
+
+  it('carries the distiller\u2019s own detail, and each count only when it was observed', () => {
+    const record = armRecordFromDriver(
+      raw({
+        learning: {
+          rows: 32,
+          unanswered: 0,
+          edited: 32,
+          distilled: 30,
+          distillFailed: 2,
+          candidates: 41,
+          events: 32,
+          llmFailed: 12,
+        },
+      }),
+    );
+    expect(record.learning).toMatchObject({ candidates: 41, events: 32, llmFailed: 12 });
+  });
+
+  it('names the population a call tally covers, because a subset is not a rate over everything', () => {
+    // The episodes' calls belong to the agent process; the distillation calls are the driver's own.
+    // Supplying the second as if it were the first is the mistake; supplying nothing was the mistake
+    // that let a run whose every distillation prompt was refused reach a reader as a quiet store.
+    const record = armRecordFromDriver(raw({ calls: { total: 32, failed: 32, scope: 'distillation' } }));
+    expect(record.calls).toEqual({ calls: 32, failures: 32, scope: 'distillation' });
+  });
+
+  it('leaves the scope unnamed when the arm did not name one', () => {
+    // Every artefact written before this field existed. Inventing a scope for them would be a claim
+    // about which calls the tally covered, and nobody made it.
+    const record = armRecordFromDriver(raw({ calls: { total: 40, failed: 1 } }));
+    expect(record.calls).toEqual({ calls: 40, failures: 1 });
+    expect(record.calls === undefined ? true : Object.hasOwn(record.calls, 'scope')).toBe(false);
   });
 
   it('splits the store into the two domain buckets the ledger compares', () => {
