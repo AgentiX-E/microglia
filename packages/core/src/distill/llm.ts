@@ -115,7 +115,7 @@ const KINDS = new Set<KnowledgeKind>([
  * changes what a *candidate is*, not only how it is worded: a repair must name a mechanism
  * and must not quote the case's values.
  */
-export type DistillForm = 'lesson' | 'repair' | 'procedure';
+export type DistillForm = 'lesson' | 'repair' | 'procedure' | 'lexicon';
 
 /**
  * The repair form's instructions.
@@ -154,6 +154,45 @@ const PROCEDURE_INSTRUCTION: readonly string[] = [
   '- At most 240 characters in the statement.',
 ];
 
+/**
+ * The definitional form: what a phrase in this question denotes, and nothing else.
+ *
+ * Every other form this package can ask for is *advice*, and advice has no referent: a statement
+ * about how queries of a kind are built cannot be checked against the question in front of the
+ * reader, so it is applied wherever it is read. The measured consequence is on the record — a pack
+ * of such statements costs 0.71pp out of sample while the benchmark's own 142-character definition
+ * of one term is worth 19–20pp on the same questions.
+ *
+ * This form asks for that second object. Three properties make it a *grain* rather than a wording,
+ * and each is enforced after the call instead of trusted from the reply:
+ *
+ *  1. **It has a key.** `payload.term` is a phrase copied from the question, so the entry can be
+ *     retrieved by the text it is about rather than by resemblance to a question it was learned on.
+ *     A term that does not occur in the source question cannot be looked up again and is refused.
+ *  2. **It has a referent.** The statement says what the term denotes — a column, an expression, a
+ *     unit, an entity — which is a claim a reader can check against the schema.
+ *  3. **It carries no case.** A statement containing a query is a demonstration, and demonstrations
+ *     are the substrate measured at −0.86pp in `full-raw`. Those are refused by the lane's screen.
+ *
+ * The instruction says all three, and says why, because a model that understands the constraint
+ * produces fewer candidates the screen has to throw away.
+ */
+const LEXICON_INSTRUCTION: readonly string[] = [
+  'You write dictionary entries for one database, from one correction.',
+  'Return JSON only, with this shape:',
+  '{"candidates":[{"kind":"lexicon","statement":"...","when":"...","scope":{"task":"...","domain":"..."},"payload":{"term":"..."}}]}',
+  'The event holds the question (`input`), the query that was wrong (`output`), and the query a reviewer saved as the correction (`signal.after`).',
+  'Rules:',
+  '- Return exactly one candidate and nothing outside the JSON object.',
+  '- `payload.term` is a phrase copied character for character from the question, between three and eighty characters. A term that does not occur in the question is discarded, because a definition that cannot be looked up cannot be found again.',
+  '- The statement says what that term denotes in this database: the column, the expression, the unit, or the entity it names. State the reading the correction establishes and, when the wrong query took the other reading, say so in one clause.',
+  '- The statement must not contain a query, a table name, a column name in backticks, or the values of this case. It is a definition, not a demonstration.',
+  '- `when` is the condition under which the definition applies: the question uses the term. Do not restate the statement.',
+  '- Choose the phrase whose reading the correction actually settled. If the correction settles nothing that this question names, return an empty array.',
+  '- Omit scope keys the event does not establish. Never guess a domain.',
+  '- No second-person instructions, no advice to the reader, no imperative mood.',
+];
+
 const REPAIR_INSTRUCTION: readonly string[] = [
   'You compare one wrong attempt with the correction that replaced it, and state what generalises.',
   'Return JSON only, with this shape:',
@@ -190,6 +229,11 @@ export function buildDistillPrompt(
       : form === 'repair'
       ? [
           ...REPAIR_INSTRUCTION,
+          taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '',
+        ]
+      : form === 'lexicon'
+      ? [
+          ...LEXICON_INSTRUCTION,
           taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '',
         ]
       : [

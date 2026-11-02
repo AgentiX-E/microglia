@@ -249,6 +249,7 @@ describe('parseArms', () => {
       'full-corroborated',
       'full-grounded',
       'full-late',
+      'full-lexicon',
       'full-narrow',
       'full-noevidence',
       'full-one',
@@ -312,6 +313,36 @@ describe('parseArms', () => {
       convention: undefined,
     };
     expect(promptFor({ ...base, generator: 'direct' })).toBe(promptFor(base));
+  });
+
+  it("labels a block of definitions as what the question's terms denote", () => {
+    const prompt = promptFor({
+      question: 'What is the eligible free rate?',
+      evidence: '',
+      ddl: 'DDL',
+      pack: '- "eligible free rate": free meal count over enrollment',
+      stated: false,
+      convention: undefined,
+      packKind: 'lexicon',
+    });
+    expect(prompt).toContain('What the terms in this question are known to denote');
+    // The rule heading would tell a reader to apply the block to the whole question, which is the
+    // reading this grain exists to make impossible.
+    expect(prompt).not.toContain('Workspace conventions learned from earlier corrections:');
+  });
+
+  it('tells a retry to read a definitional block as definitions', () => {
+    const prompt = retryPromptFor({
+      question: 'What is the eligible free rate?',
+      evidence: '',
+      ddl: 'DDL',
+      attempt: 'SELECT 1',
+      failure: 'no rows',
+      pack: '- "eligible free rate": free meal count over enrollment',
+      packKind: 'lexicon',
+    });
+    expect(prompt).toContain('Each item states what a term in this question denotes here');
+    expect(prompt).toContain('must be used with that reading');
   });
 
   it('asks the plan generator for the columns, the grain and the filters before the query', () => {
@@ -421,6 +452,7 @@ describe('parseArms', () => {
       'none-replica',
       'full-asked',
       'full-procedural',
+      'full-lexicon',
       'chars-proc-600',
       'retry-keyed',
       'sample-3',

@@ -637,6 +637,27 @@ export type SqlArm =
    */
   | 'full-procedural'
   /**
+   * The same corrections, stated as what a term denotes, and shown only where the term occurs.
+   *
+   * Every form above is advice, and advice has no referent: a sentence about how queries of a kind
+   * are built cannot be checked against the question in front of the reader, so it is applied
+   * wherever it is read. The corpus prices the alternative on the same questions — its own
+   * 142-character definition of one term is worth 19-20pp while a pack of rules costs 0.71pp — and
+   * the difference between those two objects is not wording, it is **grain**: a definition has a
+   * key, so it can be retrieved by the text it is about, and it can only speak on a question that
+   * contains that key.
+   *
+   * This arm stores that object. `payload.term` is a phrase copied from the question that taught
+   * the entry; an entry whose term is not in its source question is refused at the door, and an
+   * entry whose term is not in the held-out question is not rendered. Both predicates are over
+   * text, both are enforced by `lexicon.ts` rather than requested from the model, and the second is
+   * re-checked on the prompt that was actually sent (`V64`).
+   *
+   * It is the same corrections, the same folds and the same character budget as `full`. What
+   * differs is what a memory item *is*.
+   */
+  | 'full-lexicon'
+  /**
    * The procedural pack, cut to one item's worth of characters.
    *
    * The case-bearing pack has a measured dose: nothing under one item, 3.1pp at one item, the same
@@ -973,6 +994,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'none-replica': true,
   'full-asked': true,
   'full-procedural': true,
+  'full-lexicon': true,
   'chars-proc-600': true,
   'retry-keyed': true,
   'sample-3': true,
@@ -1263,7 +1285,7 @@ export type { EvidenceDelivery, FramingDelivery } from '@agentix-e/microglia-pro
  * content half of the experiment, so it is a type rather than a convention: a lane that
  * grows a third form has to name it here and say which label it renders under.
  */
-export type PackKind = 'rule' | 'repair' | 'raw';
+export type PackKind = 'rule' | 'repair' | 'raw' | 'lexicon';
 
 /**
  * What the dataset's own per-question knowledge is called in the prompt.
@@ -1292,6 +1314,10 @@ const PACK_LABEL: Record<PackKind, string> = {
   rule: 'Workspace conventions learned from earlier corrections:',
   repair: 'Repairs of earlier failures, each with the reason it was wrong and the change that fixed it:',
   raw: 'Earlier questions on this database, each with the query that returned a wrong result and the query that corrected it:',
+  // A definition is the only block in this lane whose scope is the words in front of the reader:
+  // every line names a phrase the question itself contains. The heading says so, because a reader
+  // who takes the block for advice applies it to the whole question.
+  lexicon: 'What the terms in this question are known to denote in this database:',
 };
 
 /**
@@ -1838,6 +1864,7 @@ const RETRY_LABEL: Record<PackKind, string> = {
   // The raw form reaches a retry only if an arm asks for it, and the label is what a reader of the
   // prompt would need in order to know the block is evidence rather than advice.
   raw: 'Earlier questions on this database, each with the query that returned a wrong result and the query that corrected it:',
+  lexicon: 'What the terms in this question are known to denote in this database:',
 };
 
 /**
@@ -1860,6 +1887,10 @@ const RETRY_INSTRUCTION: Record<PackKind, string> = {
     'Each item is a question that was asked here, the query that came back wrong, and the query that ' +
     'fixed it. Check whether this failure is the one an item shows. If it is, the same change is the ' +
     'repair. If none is, write a different query that answers the question.',
+  lexicon:
+    'Each item states what a term in this question denotes here. Read the definitions before ' +
+    'writing: a term with a stated reading must be used with that reading, and a term with none ' +
+    'carries no instruction.',
 };
 
 export function retryPromptFor(input: RetryInput): string {

@@ -391,6 +391,22 @@ export {
 } from './feature-overlap.js';
 
 export {
+  admitLexicon,
+  lexiconGate,
+  lexiconPackOf,
+  licensedLines,
+  looksLikeQuery,
+  occursIn,
+  questionTextOf,
+  termOf,
+  type LexiconEntry,
+  type LexiconPack,
+  type LexiconRefusal,
+  type LexiconRun,
+  type LexiconVerdict,
+} from './lexicon.js';
+
+export {
   bucketOf,
   referentOf,
   referentSplitOf,

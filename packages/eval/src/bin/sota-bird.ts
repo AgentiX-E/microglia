@@ -87,6 +87,7 @@ import {
   type DistillForm,
   type DropReason,
   type Interpreter,
+  type DistillCandidate,
 } from '@agentix-e/microglia-core/distill';
 import {
   DistillCache,
@@ -224,6 +225,14 @@ import {
   requirePopulated,
   retryPromptFor,
   retrySubset,
+  admitLexicon,
+  lexiconGate,
+  lexiconPackOf,
+  licensedLines,
+  questionTextOf,
+  termOf,
+  type LexiconEntry,
+  type LexiconRun,
   relevanceSplit,
   resolveDatabase,
   unreachableDatabases,
@@ -748,6 +757,14 @@ type CaseOutcome = {
   readonly injectedRepair: readonly string[];
   /** The same for the procedural memory, when that arm ran. */
   readonly injectedProcedural: readonly string[];
+  /**
+   * The definitions the lexicon arm rendered for this question, line by line.
+   *
+   * Carried for the reason every other injected text is carried: a later reading that wants to ask
+   * *which* definition a flip belongs to must be a computation over this file rather than another
+   * dispatch. Each line begins with its term, which is what makes the attribution mechanical.
+   */
+  readonly injectedLexicon: readonly string[];
   /** Characters the `full` arm injected, the 1,200-character end of the dose curve. */
   readonly packChars: number;
 };
@@ -1700,6 +1717,16 @@ const DENSITY_RULES_PER_DB = nonNegative(process.env['SOTA_DENSITY_RULES_PER_DB'
  * failure of the renderer as a failure of the extraction.
  */
 const PROBE_BUDGET = 1200;
+
+/**
+ * The characters a definitional pack may spend, and it is deliberately the rule pack's number.
+ *
+ * The two arms are meant to differ in what an item is, not in what it costs: a definition is shorter
+ * than a rule, so at equal budget the lexicon arm carries more items, and a reader comparing the two
+ * deltas is comparing two blocks of the same size. Setting this to whatever the definitions happened
+ * to need would put the dose axis back inside a comparison about grain.
+ */
+const LEXICON_BUDGET = 1200;
 
 /** What one fold's rule probe found. */
 type ProbeRun = {
@@ -2768,6 +2795,13 @@ type FoldResult = {
   readonly acceptedAdmitted: number;
   readonly acceptedPositions: number;
   /**
+   * What the definitional arm learned and showed, or null when no such arm was configured.
+   *
+   * Null rather than zeros: a fold with no lexicon arm has not measured an empty lexicon, and a gate
+   * that read zeros would fail every other run in this programme.
+   */
+  readonly lexicon: (LexiconRun & { readonly questions: number }) | null;
+  /**
    * Prompts each channel arm rewrote, out of the questions it was asked.
    *
    * Empty when no channel arm ran. Non-empty, it is the arm's validity condition: `values` that
@@ -3027,6 +3061,46 @@ type FoldMemory = {
  * construction costs local store writes and one distillation, not another 280
  * model calls.
  */
+/**
+ * The write-time half of the definitional grain.
+ *
+ * The recipe this round registered lives in `lexicon.ts`; this is the only part of it that needs an
+ * event, and the event is here. A candidate survives only if its payload names a phrase that occurs
+ * in the question the correction was about. Everything else is counted by the reason it was refused,
+ * because the interesting failure of a lexicon distiller is not that it said nothing — it is that it
+ * wrote a dictionary entry for a word the question never used, and a store full of those is a store
+ * of rules with a dictionary's layout.
+ *
+ * The wrapper is skipped for the other forms rather than generalised, because the other forms have
+ * no key: applying a predicate that needs `payload.term` to a lesson would refuse every lesson and
+ * write an empty store under a passing gate.
+ */
+function screenInterpretation(
+  form: DistillForm,
+  drops: Record<string, number>,
+  inner: Interpreter,
+): Interpreter {
+  if (form !== 'lexicon') return inner;
+  const screened: Interpreter = async (context) => {
+    const question = questionTextOf(context.run?.input);
+    const kept: DistillCandidate[] = [];
+    for (const candidate of await inner(context)) {
+      const verdict = admitLexicon(candidate, question);
+      if (verdict.admitted) {
+        kept.push(candidate);
+        continue;
+      }
+      const key = `lexicon-${verdict.reason}`;
+      drops[key] = (drops[key] ?? 0) + 1;
+    }
+    return kept;
+  };
+  // The batch pays its calls through `prefetch`, and a wrapper that dropped it would serialise the
+  // expensive half of a fold without changing a single number in the artefact.
+  if (inner.prefetch !== undefined) screened.prefetch = inner.prefetch;
+  return screened;
+};
+
 async function buildFoldMemory(
   generalize: boolean,
   learnRows: readonly BirdRow[],
@@ -3043,7 +3117,10 @@ async function buildFoldMemory(
     app: 'microglia-sota',
     namespace: 'bird',
     store,
-    interpreter: combineInterpreters(
+    interpreter: screenInterpretation(
+      form,
+      drops,
+      combineInterpreters(
       recording(
         createLlmInterpreter({
           llm: {
@@ -3112,7 +3189,12 @@ async function buildFoldMemory(
         failures,
         () => lastReply,
       ),
-      ruleInterpreter,
+      // The fallback interpreter reads a rating or an error code and writes a negative lesson.
+      // Those have no term, so in the definitional store they would be refused one by one and counted
+      // as a distiller failure — the counter would then be about the fallback rather than about the
+      // form. Left out here rather than filtered later: a store of one grain is the design.
+      ...(form === 'lexicon' ? [] : [ruleInterpreter]),
+      ),
     ),
     budget: 1200,
     clock: steppingClock(1_700_000_000_000, 1),
@@ -3374,6 +3456,12 @@ async function runFold(
   const procedural = ARMS.has('full-procedural') || ARMS.has('retry-keyed') || ARMS.has('chars-proc-600')
     ? await buildFoldMemory(GENERALIZE, learnRows, dataset, task, 'procedure')
     : undefined;
+  // The grain axis. A fourth store over the same corrections, differing in what an item is: a term
+  // with a referent rather than a sentence of advice. Built only when the arm asks, because the
+  // distillation is the expensive half of a fold and this one is paid for beside the rule store.
+  const lexicon = ARMS.has('full-lexicon')
+    ? await buildFoldMemory(GENERALIZE, learnRows, dataset, task, 'lexicon')
+    : undefined;
   const store = widened.store;
   const learning = widened.learning;
   const distilled = widened.distilled;
@@ -3383,7 +3471,27 @@ async function runFold(
     ...(narrowed === undefined ? [] : narrowed.distillFailures),
     ...(repaired === undefined ? [] : repaired.distillFailures),
     ...(procedural === undefined ? [] : procedural.distillFailures),
+    ...(lexicon === undefined ? [] : lexicon.distillFailures),
   ];
+  /**
+   * The fold's entries, grouped by the database they were learned in.
+   *
+   * Read once per fold rather than searched per question: a term memory is an index, and a lane that
+   * asked the store a question per prompt would be measuring the store's ranker rather than the
+   * grain. The grouping is the item's own scope, so an entry cannot speak about a database it was
+   * not learned in — the same rule the rule store's recall applies by scope.
+   */
+  const lexiconByDomain = new Map<string, LexiconEntry[]>();
+  if (lexicon !== undefined) {
+    for (const item of await lexicon.store.listKnowledge({ namespace: 'bird', status: 'active' })) {
+      const term = termOf(item.payload);
+      if (term === undefined) continue;
+      const domain = item.scope.domain ?? '';
+      const list = lexiconByDomain.get(domain) ?? [];
+      list.push({ term, statement: item.statement });
+      lexiconByDomain.set(domain, list);
+    }
+  }
 
   // The wrong-scope control must inject text, or it silently becomes a second
   // no-memory arm. It therefore rotates to the next database that actually holds
@@ -3436,6 +3544,7 @@ async function runFold(
     'full-repair': 'repair',
     'full-raw': 'raw',
     'full-raw-shuffled': 'raw',
+    'full-lexicon': 'lexicon',
   };
 
   /**
@@ -3521,6 +3630,13 @@ async function runFold(
   let oneSlotPositions = 0;
   /** One-slot prompts that still carried more than one item, which would make the arm `full`. */
   let oneSlotOver = 0;
+  /** What the definitional arm rendered, and what its gate re-checks in the rendered lines. */
+  let lexiconLines = 0;
+  let lexiconChecked = 0;
+  let lexiconUnlicensed = 0;
+  let lexiconQuestions = 0;
+  /** The definitions each question was shown, so a later reading can attribute a flip to one. */
+  const injectedLexiconByPosition = new Map<number, string[]>();
   /** Questions the admission floor showed a note to, out of the questions that had one to show. */
   let acceptedAdmitted = 0;
   let acceptedPositions = 0;
@@ -3775,6 +3891,21 @@ async function runFold(
       call(position, 'none-replica', '', 0);
     }
     call(position, 'full', pack.rendered, pack.ids.length);
+    if (lexicon !== undefined) {
+      // The same character budget as the rule pack, so the two arms differ in what the block holds
+      // and not in what it costs. The selection is the grain's own: an entry is present only if the
+      // question contains its term, which is the predicate the write-time screen already applied to
+      // the question that taught it.
+      const entries = lexiconByDomain.get(row.db_id) ?? [];
+      const rendered = lexiconPackOf(entries, row.question, LEXICON_BUDGET);
+      const check = licensedLines(rendered.lines, row.question);
+      lexiconLines += rendered.lines.length;
+      lexiconChecked += check.checked;
+      lexiconUnlicensed += check.unlicensed.length;
+      if (rendered.lines.length > 0) lexiconQuestions += 1;
+      injectedLexiconByPosition.set(position, [...rendered.lines]);
+      call(position, 'full-lexicon', rendered.lines.join('\n'), rendered.lines.length);
+    }
     if (ARMS.has('full-one') || ARMS.has('full-accepted')) {
       // The same retrieval, the same order, the same first item, and no second one. Built from
       // the pack `full` carries rather than recalled again, so the only difference between the
@@ -4892,6 +5023,7 @@ async function runFold(
       injected: injectedByPosition.get(position) ?? [],
       injectedRepair: injectedRepairByPosition.get(position) ?? [],
       injectedProcedural: injectedProceduralByPosition.get(position) ?? [],
+      injectedLexicon: injectedLexiconByPosition.get(position) ?? [],
       packIds: packIdsOf.get(`${position}:full`) ?? 0,
       packChars: packCharsOf.get(`${position}:full`) ?? 0,
       coverage: pack.coverage,
@@ -5092,6 +5224,19 @@ async function runFold(
     oneSlotOver,
     acceptedAdmitted,
     acceptedPositions,
+    lexicon:
+      lexicon === undefined
+        ? null
+        : {
+            entries: [...lexiconByDomain.values()].reduce((sum, list) => sum + list.length, 0),
+            lines: lexiconLines,
+            checked: lexiconChecked,
+            unlicensed: lexiconUnlicensed,
+            questions: lexiconQuestions,
+            refused: Object.fromEntries(
+              Object.entries(lexicon.drops).filter(([reason]) => reason.startsWith('lexicon-')),
+            ),
+          },
     channelApplied: [...channelApplied.entries()].map(([arm, entry]) => ({ arm, ...entry })),
     anchoredSkipped,
     retried,
@@ -5939,6 +6084,25 @@ async function main(): Promise<void> {
   // the *workload* can decide the question, and a family that cannot is a reason to rebuild the
   // family, not a reason to disbelieve the accuracy above.
   gates.push(...(density === null ? [] : densityGates(density.report)));
+  // The grain arm's own validity condition, emitted by the lane that measured it rather than by the
+  // shared protocol: it is about what this representation rendered, and no other lane has one.
+  const lexiconFolds = folds.filter((fold) => fold.lexicon !== null);
+  if (lexiconFolds.length > 0) {
+    gates.push(
+      lexiconGate({
+        entries: lexiconFolds.reduce((sum, fold) => sum + (fold.lexicon?.entries ?? 0), 0),
+        lines: lexiconFolds.reduce((sum, fold) => sum + (fold.lexicon?.lines ?? 0), 0),
+        checked: lexiconFolds.reduce((sum, fold) => sum + (fold.lexicon?.checked ?? 0), 0),
+        unlicensed: lexiconFolds.reduce((sum, fold) => sum + (fold.lexicon?.unlicensed ?? 0), 0),
+        refused: lexiconFolds.reduce<Record<string, number>>((all, fold) => {
+          for (const [reason, count] of Object.entries(fold.lexicon?.refused ?? {})) {
+            all[reason] = (all[reason] ?? 0) + count;
+          }
+          return all;
+        }, {}),
+      }),
+    );
+  }
 
   const assertions = {
     /**
@@ -6660,6 +6824,9 @@ async function main(): Promise<void> {
       // built and how many broke, so a reader of the artefact does not have to parse the gate's
       // sentence to know whether the arm was a truncation or a duplicate of `full`.
       one_slot_positions: fold.oneSlotPositions,
+      // The grain arm's own numbers, per fold: a store that learned nothing and a store whose
+      // entries were all refused by the licence look identical from the delta alone.
+      ...(fold.lexicon === null ? {} : { lexicon: fold.lexicon }),
       one_slot_over: fold.oneSlotOver,
       channel_applied:
         fold.channelApplied.length === 0
