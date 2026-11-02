@@ -503,6 +503,14 @@ export {
 } from './ledger.js';
 
 export { armRecordFromDriver, type Tau2Raw } from './tau2-instrument.js';
+export {
+  DEFAULT_MIN_TASKS,
+  PUBLISHED_PASS4,
+  PUBLISHED_SCENARIO,
+  minTasksOf,
+  scenarioBarOf,
+  type ScenarioBar,
+} from './l4-scenario.js';
 export { heldOutPlan, qualifiedId, type HeldOutPlan, type HeldOutPlanInput } from './tau2-plan.js';
 export {
   pairKey,

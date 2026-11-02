@@ -24,7 +24,6 @@ import {
   L4ParseError,
   comparePaired,
   compareToPublished,
-  l4Verdict,
   meanPassAtK,
   parseTauResults,
   perTaskRows,
@@ -33,11 +32,20 @@ import {
 } from '@agentix-e/microglia-eval';
 import type { Tau2ArmRecord, TauTrialRow } from '@agentix-e/microglia-eval';
 import { writeResult } from './lib.js';
+import { minTasksOf, scenarioBarOf } from '@agentix-e/microglia-eval';
 
-const PUBLISHED = 0.575; // ALTK-Evolve, τ²-retail, pass^4 on the same split.
 const BAR = 0.05;
 const K = 4;
-const MIN_TASKS = 60;
+/**
+ * The scenario this arm answered, and whether a published number is a bar for it.
+ *
+ * The lane shipped with one published reference — ALTK-Evolve on τ²-retail — and graded every arm
+ * against it. On a second scenario that is a category error rather than a strict bar: the delta
+ * would measure the two scenarios. `l4-scenario.ts` holds the rule and its reason.
+ */
+const SCENARIO = process.env['TAU_TEST_DOMAIN'] ?? process.env['TAU_DOMAIN'] ?? 'retail';
+const scenarioBar = scenarioBarOf(SCENARIO);
+const MIN_TASKS = minTasksOf(process.env['TAU_MIN_TASKS']);
 
 /**
  * An environment variable that a workflow did not set.
@@ -83,7 +91,7 @@ async function notRun(reason?: string): Promise<never> {
     calls: 0,
     metrics: {
       status_not_run: 1,
-      published_pass4: PUBLISHED,
+      published_bar_applies: scenarioBar.comparable ? 1 : 0,
       bar: BAR,
       k: K,
       ...(reason === undefined ? {} : { status_driver_missing: 1 }),
@@ -116,7 +124,7 @@ async function refuse(error: L4ParseError, source: string): Promise<never> {
     model: process.env['TAU_MODEL'] ?? 'unknown',
     n: 0,
     calls: 0,
-    metrics: { status_refused: 1, published_pass4: PUBLISHED, bar: BAR, k: K },
+    metrics: { status_refused: 1, published_bar_applies: scenarioBar.comparable ? 1 : 0, bar: BAR, k: K },
     notes: [
       `Refused with reason \`${error.reason}\`: ${error.message}`,
       `Source: ${source}. A refused run is neither a zero nor a not-run: the split was measured and cannot be scored as specified.`,
@@ -224,8 +232,9 @@ const measured =
   resultsPath === undefined ? await measureFromDriver(driver as string) : await measureFromResults(resultsPath);
 
 const mean = meanPassAtK(measured.tasks);
-const compared = compareToPublished(mean, PUBLISHED, BAR);
-const verdict = l4Verdict({ tasks: measured.tasks, published: PUBLISHED, bar: BAR, minTasks: MIN_TASKS });
+const compared =
+  scenarioBar.published === null ? undefined : compareToPublished(mean, scenarioBar.published, BAR);
+const coversSplit = measured.tasks.length >= MIN_TASKS;
 type ReferenceTask = { readonly id: string; readonly passed_all: boolean };
 let paired: { delta: number; low: number; high: number; p: number; n: number } | undefined;
 if (referencePath !== undefined) {
@@ -250,7 +259,11 @@ if (referencePath !== undefined) {
 }
 
 const gates = [
-  { id: 'l4-pass4', pass: compared.meets, actual: mean, criterion: `>= published + ${BAR}` },
+  // Only where a published number is a bar for this scenario. Omitting the gate is a statement, not
+  // a pass: the metric below carries `published_pass4: null`, and the note says why.
+  ...(compared === undefined
+    ? []
+    : [{ id: 'l4-pass4', pass: compared.meets, actual: mean, criterion: `>= published + ${BAR}` }]),
   {
     id: 'l4-paired',
     pass: paired === undefined ? true : paired.delta >= 0 && paired.p < 0.05,
@@ -282,8 +295,11 @@ await writeResult({
   calls: 0,
   metrics: {
     pass4: mean,
-    published_pass4: PUBLISHED,
-    delta: compared.delta,
+    // A bar that does not apply is reported as absent rather than as a number a reader could divide
+    // by: `published_bar_applies` says which of the two this file is.
+    ...(scenarioBar.published === null ? {} : { published_pass4: scenarioBar.published }),
+    published_bar_applies: scenarioBar.comparable ? 1 : 0,
+    ...(compared === undefined ? {} : { delta: compared.delta }),
     tasks: measured.tasks.length,
     unscored_tasks: measured.unscored.length,
     min_tasks: MIN_TASKS,
@@ -294,10 +310,11 @@ await writeResult({
     gates_passed: gates.filter((gate) => gate.pass).length,
   },
   notes: [
-    `Source: ${source} (${measured.format} form). Two arms must share the split; the reference number is ALTK-Evolve on τ²-retail.`,
+    `Source: ${source} (${measured.format} form). Two arms must share the split.`,
+    scenarioBar.note,
     `pass^4 is the unbiased C(c,4)/C(n,4) mean over ${measured.tasks.length} tasks, with success defined as \`reward == 1.0\` exactly, as upstream scores it.`,
-    verdict.coversSplit
-      ? `The split covers the minimum: ${measured.tasks.length} scored tasks.`
+    coversSplit
+      ? `The split covers the minimum: ${measured.tasks.length} scored tasks against a floor of ${MIN_TASKS}.`
       : `The split is short: ${measured.tasks.length} scored tasks against a minimum of ${MIN_TASKS}. Short splits and missed bars fail separately.`,
   ],
   // Per-task outcomes, so the other arm can be paired against this artefact instead of
