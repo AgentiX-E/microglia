@@ -30,6 +30,8 @@ import { exchangeOf, type ExchangeReading } from './admission.js';
 export type AssignmentCase = {
   readonly id: string;
   readonly dbId: string;
+  /** The cross-fitting fold the question was held out in, when the artefact records one. */
+  readonly fold?: number;
   /** The bare model, for the exchange reading only: it is the base both arms sit on. */
   readonly bare: boolean;
   /** `full`: the pack retrieval returned. */
@@ -196,6 +198,50 @@ export function assignmentOf(
   };
 }
 
+/**
+ * The four cells and the contrast, one row per cross-fitting fold.
+ *
+ * The interaction is the round's claim, and a claim about a mechanism has to survive being measured
+ * fold by fold: a store is distilled per fold, so a cross-term that appears in one fold and not the
+ * others is a property of that store rather than of packs. Grouped rather than pooled because pooling
+ * is what would hide exactly that.
+ */
+export type FoldReading = {
+  readonly fold: number;
+  readonly questions: number;
+  readonly repairsGained: number;
+  readonly repairsLost: number;
+  readonly breaksGained: number;
+  readonly breaksSaved: number;
+  readonly netChange: number;
+  readonly deltaPp: number;
+};
+
+export function foldsOf(cases: readonly AssignmentCase[]): readonly FoldReading[] {
+  const byFold = new Map<number, AssignmentCase[]>();
+  for (const entry of cases) {
+    const key = entry.fold ?? 0;
+    const bucket = byFold.get(key) ?? [];
+    bucket.push(entry);
+    byFold.set(key, bucket);
+  }
+  return [...byFold.entries()]
+    .sort((left, right) => left[0] - right[0])
+    .map(([fold, bucket]) => {
+      const reading = assignmentOf(bucket);
+      return {
+        fold,
+        questions: reading.n,
+        repairsGained: reading.marginal.repairsGained,
+        repairsLost: reading.marginal.repairsLost,
+        breaksGained: reading.marginal.breaksGained,
+        breaksSaved: reading.marginal.breaksSaved,
+        netChange: reading.marginal.netChange,
+        deltaPp: reading.contrast.deltaPp,
+      };
+    });
+}
+
 export type R36Verdict = {
   readonly id: 'P1' | 'P2' | 'P3' | 'P4' | 'P5';
   readonly claim: string;
@@ -302,6 +348,7 @@ export function adjudicateR36(input: R36Input): readonly R36Verdict[] {
 export type AssignRow = {
   readonly id: string;
   readonly dbId: string;
+  readonly fold?: number;
   readonly correct: boolean;
   readonly withoutMemoryCorrect: boolean;
   readonly arms?: Readonly<Record<string, boolean>> | null;
@@ -319,7 +366,14 @@ export function packAssignCasesOf(
       skipped += 1;
       continue;
     }
-    cases.push({ id: row.id, dbId: row.dbId, bare: row.withoutMemoryCorrect, kept: row.correct, removed });
+    cases.push({
+      id: row.id,
+      dbId: row.dbId,
+      ...(row.fold === undefined ? {} : { fold: row.fold }),
+      bare: row.withoutMemoryCorrect,
+      kept: row.correct,
+      removed,
+    });
   }
   return { cases, skipped };
 }

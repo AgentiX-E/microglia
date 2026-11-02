@@ -78,7 +78,59 @@
       "breaksSaved": 27,
       "netChange": -5,
       "helpPerHarm": 0.8518518518518519
-    }
+    },
+    "folds": [
+      {
+        "fold": 0,
+        "questions": 307,
+        "repairsGained": 5,
+        "repairsLost": 7,
+        "breaksGained": 4,
+        "breaksSaved": 6,
+        "netChange": 0,
+        "deltaPp": 0
+      },
+      {
+        "fold": 1,
+        "questions": 307,
+        "repairsGained": 1,
+        "repairsLost": 6,
+        "breaksGained": 8,
+        "breaksSaved": 9,
+        "netChange": -4,
+        "deltaPp": -1.3029315960912053
+      },
+      {
+        "fold": 2,
+        "questions": 307,
+        "repairsGained": 5,
+        "repairsLost": 4,
+        "breaksGained": 4,
+        "breaksSaved": 7,
+        "netChange": 4,
+        "deltaPp": 1.3029315960912053
+      },
+      {
+        "fold": 3,
+        "questions": 307,
+        "repairsGained": 2,
+        "repairsLost": 3,
+        "breaksGained": 4,
+        "breaksSaved": 0,
+        "netChange": -5,
+        "deltaPp": -1.6286644951140066
+      },
+      {
+        "fold": 4,
+        "questions": 306,
+        "repairsGained": 2,
+        "repairsLost": 3,
+        "breaksGained": 4,
+        "breaksSaved": 5,
+        "netChange": 0,
+        "deltaPp": 0
+      }
+    ]
   },
   "lead": {
     "source": "questions retrieval served a single rule, on this artefact",

@@ -937,11 +937,19 @@ the number of items — a budget, a top-k, a density panel — is tuning an inte
 the exchange rate says the same thing from the other side: the pair clears **0.737** of the bare model's
 1.335 hurdle and the single rule clears **0.672**, so truncation moves the arm *away* from paying.
 
+**Read per fold, the interaction does not keep one sign.** The store is distilled once per fold, so §8.11's
+four cells are five readings rather than one, and `foldsOf` returns them as a table: folds 0 and 4 are
+exactly flat, fold 2 is **+4**, and folds 1 and 3 are **−4** and **−5**. The five rows sum to the pooled −5
+by construction, and that identity is asserted alongside the pooled one. A cross-term that changes sign
+between folds of a single split belongs to the store that fold was given, not to packs — which is the
+strongest form of the argument, because the pooled table can only show that the interaction is not a
+subtraction, while the per-fold table shows it is not a stable quantity at all.
+
 **Gates.** `V62-assignment-instrument` (the arm is a truncation: one item at most, every question asked,
 the block changed on at least seven tenths of them) and `V63-assignment-reproduces-the-lane` (this reading
 agrees with the lane's own `arm_pairs` entry to a hundredth of a point on the delta and exactly on both
 discordant counts). `pnpm eval:pack-assign` recomputes the artefact from the committed run and the workflow
-asserts twenty of its fields on every push; the module is at 100% on all four coverage dimensions.
+asserts twenty-four of its fields on every push; the module is at 100% on all four coverage dimensions.
 
 **What it changes about the product statement.** Both remaining levers were designs. One of them — how many
 items a prompt carries — is now measured, and it does not pay. What is left is the unit of memory itself:

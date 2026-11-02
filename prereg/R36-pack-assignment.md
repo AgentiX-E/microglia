@@ -130,10 +130,18 @@ the round cannot choose its threshold after seeing which way the fresh run went.
 
 ## Cost
 
-The adjudication is zero model calls. The replication is one dispatch: 1,534 learning generations plus
-`none`, `full` and `full-one` on 1,534 questions — **6,136 calls**, against R25's 9,096 for the same
-split with four arms and an admission fit. The distillation cache is restored, so the store is replayed
-where its prompts recur.
+The adjudication is zero model calls. The replication is one dispatch at **`learn_sample = 280`**, the same
+learning budget R25 used, so that the two stores are distilled from the same number of corrections per fold:
+about 6,000 calls — 5 folds × 307 questions × 3 arms, plus the learning generations — against R25's 9,096
+for the same split with four arms and an admission fit. The distillation cache is restored, so the store is
+replayed where its prompts recur.
+
+**The first attempt at this dispatch is recorded rather than deleted.** It was issued with `learn_sample`
+left at its default, which the input description defines as *all*, so each fold learned from the whole
+split, the lane forecast 13,328 calls against a cap of 9,000, and it stopped after fold 1 instead of
+discarding the folds it had. The failure is a fact about this file: **a cost written down without the input
+that produces it is not a cost** — 6,136 was arithmetic for a setting the registration never named
+(`AUDIT` §34.4).
 
 ## Outcome — the adjudication half (read 2026-11-02, before the replication)
 
@@ -161,6 +169,24 @@ harm on its own record, which is exactly what R35's contrast appeared to license
 to the measured −5 questions, and the sum is a test rather than a remark (`assignment.test.ts`). A pack is
 therefore not a set of independent items, and "how many rules fit" is not a dial: the marginal item's effect
 depends on which items are already present.
+
+**Per fold, the interaction does not keep its sign.** The store is distilled one fold at a time, so the four
+cells above are five readings rather than one, and the fix in advance was only that they be reported —
+`foldsOf` groups rather than pools, because pooling is what would hide exactly this:
+
+| fold | questions | repairs added | repairs given up | breaks added | breaks removed | net | Δpp |
+|---|---|---|---|---|---|---|---|
+| 0 | 307 | 5 | 7 | 4 | 6 | 0 | 0.00 |
+| 1 | 307 | 1 | 6 | 8 | 9 | −4 | −1.30 |
+| 2 | 307 | 5 | 4 | 4 | 7 | +4 | +1.30 |
+| 3 | 307 | 2 | 3 | 4 | 0 | −5 | −1.63 |
+| 4 | 306 | 2 | 3 | 4 | 5 | 0 | 0.00 |
+
+The rows sum to the pooled −5 (identity, asserted at both levels). Two folds are exactly flat and the three
+that move alternate **+4, −4, −5**, so the cross-term is not merely non-additive: **its sign is drawn per
+store**. That is a stronger refutation of the count lever than the pooled table can express — a knob whose
+effect changes sign between folds of one split cannot be calibrated at all, and it is why no rule-count
+setting exists in the product rather than a rule-count setting with a caveat.
 
 **Disclosed, because it was found while writing this and it changes a published interval.** R35's outcome
 table quotes the dev cell of this contrast as +3.13pp **[+0.62, +5.23]**; recomputing it here gives

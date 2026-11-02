@@ -3,6 +3,7 @@ import {
   R36_BARS,
   adjudicateR36,
   assignmentOf,
+  foldsOf,
   packAssignCasesOf,
   singleSlotOf,
   type AssignmentCase,
@@ -302,11 +303,12 @@ describe('adjudicateR36', () => {
 });
 
 describe('packAssignCasesOf', () => {
-  const row = (id: string, arm: boolean | undefined, correct: boolean, bare: boolean) => ({
+  const row = (id: string, arm: boolean | undefined, correct: boolean, bare: boolean, fold?: number) => ({
     id,
     dbId: 'db1',
     correct,
     withoutMemoryCorrect: bare,
+    ...(fold === undefined ? {} : { fold }),
     ...(arm === undefined ? {} : { arms: { 'full-one': arm, full: correct } }),
   });
 
@@ -330,6 +332,20 @@ describe('packAssignCasesOf', () => {
       'other',
     );
     expect(cases[0]?.removed).toBe(false);
+  });
+
+  it('carries the fold through when the artefact records one', () => {
+    // Without this the per-fold table would silently pool: every case would land in fold 0 and the
+    // five rows would be one row repeated, which is the failure the table exists to rule out.
+    const { cases } = packAssignCasesOf([row('a', true, true, true, 3), row('b', true, true, true, 3)]);
+    expect(cases.map((entry) => entry.fold)).toEqual([3, 3]);
+  });
+
+  it('leaves the field absent rather than undefined when the artefact has no folds', () => {
+    // `exactOptionalPropertyTypes` is on: an explicit `fold: undefined` is a type error, so the case
+    // has to be built without the key at all. `typeof` would pass on both, hence the own-key check.
+    const { cases } = packAssignCasesOf([row('a', true, true, true)]);
+    expect(Object.hasOwn(cases[0] as object, 'fold')).toBe(false);
   });
 });
 
@@ -432,5 +448,38 @@ describe('assignmentOf defaults', () => {
     expect(reading.n).toBe(2);
     expect(reading.contrast.iidLowPp).toBeLessThanOrEqual(reading.contrast.deltaPp);
     expect(reading.contrast.clusteredLowPp).toBeLessThanOrEqual(reading.contrast.clusteredHighPp);
+  });
+});
+
+describe('foldsOf', () => {
+  it('reports the four cells per fold, in fold order', () => {
+    const cases = [
+      { ...caseOf('a', 'db1', false, true, false), fold: 1 },
+      { ...caseOf('b', 'db1', true, false, true), fold: 1 },
+      { ...caseOf('c', 'db2', true, true, true), fold: 0 },
+    ];
+    const folds = foldsOf(cases);
+    expect(folds.map((entry) => entry.fold)).toEqual([0, 1]);
+    expect(folds[1]).toMatchObject({ questions: 2, repairsLost: 1, breaksSaved: 1, netChange: 0 });
+    expect(folds[0]).toMatchObject({ questions: 1, repairsLost: 0, breaksSaved: 0, netChange: 0 });
+  });
+
+  it('treats a case with no fold as fold zero rather than dropping it', () => {
+    // The artefact records the fold; a hand-built corpus may not, and a silently dropped question is a
+    // fold whose four cells do not sum to its own delta.
+    expect(foldsOf([caseOf('a', 'db1', false, true, false)]).map((entry) => entry.fold)).toEqual([0]);
+  });
+
+  it('keeps the identity inside every fold', () => {
+    const cases = [
+      { ...caseOf('a', 'db1', false, true, false), fold: 0 },
+      { ...caseOf('b', 'db1', false, false, true), fold: 0 },
+      { ...caseOf('c', 'db2', true, false, false), fold: 0 },
+      { ...caseOf('d', 'db2', true, true, true), fold: 1 },
+    ];
+    for (const fold of foldsOf(cases)) {
+      const net = fold.repairsGained + fold.breaksSaved - fold.repairsLost - fold.breaksGained;
+      expect(net).toBe(fold.netChange);
+    }
   });
 });

@@ -20,6 +20,7 @@ import {
   R36_BARS,
   adjudicateR36,
   assignmentOf,
+  foldsOf,
   packAssignCasesOf,
   packSizeOf,
   singleSlotOf,
@@ -215,6 +216,9 @@ const payload = {
     contrast: reading.contrast,
     arms: [armRow('bare'), armRow('kept'), armRow('removed')],
     marginal: reading.marginal,
+    // Per fold, because the store is distilled per fold: a cross-term that lives in one fold and not
+    // the others is a property of that store rather than of packs.
+    folds: foldsOf(cases),
   },
   lead: {
     source: 'questions retrieval served a single rule, on this artefact',

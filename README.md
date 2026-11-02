@@ -385,11 +385,28 @@ in the block. The four cells sum to the measured −5 questions. An exchange rat
 the other side: the pair clears **0.737** of the bare model's 1.335 hurdle, the single rule clears
 **0.672**, so truncating the pack moves the arm away from paying.
 
+**The same four cells, one fold at a time, do not even keep one sign.** The store is distilled separately
+for each fold, so the interaction can be read five times instead of once:
+
+| fold | questions | repairs added | repairs given up | breaks added | breaks removed | net | Δpp |
+|---|---|---|---|---|---|---|---|
+| 0 | 307 | 5 | 7 | 4 | 6 | 0 | 0.00 |
+| 1 | 307 | 1 | 6 | 8 | 9 | −4 | −1.30 |
+| 2 | 307 | 5 | 4 | 4 | 7 | +4 | +1.30 |
+| 3 | 307 | 2 | 3 | 4 | 0 | −5 | −1.63 |
+| 4 | 306 | 2 | 3 | 4 | 5 | 0 | 0.00 |
+
+The five rows sum to the pooled −5 — that sum is an assertion, not a remark — two folds are exactly flat,
+and the three that move alternate **+4, −4, −5**. A quantity that changes sign between five folds of one
+split is not a property of packs; it is a property of the store that fold happened to get. This is why the
+project does not ship a rule-count knob and does not ship a prune: both would be a decision made on a
+quantity whose sign is drawn per store.
+
 > The item count is not a knob. Anything that tunes how many rules a prompt carries is tuning an
 > interaction it cannot observe.
 
 `pnpm eval:ledger` recomputes every number in the ledger paragraphs from `poc-sota-bird-train.json` and
-`pnpm eval:pack-assign` recomputes the assignment from the dev run; the workflow asserts forty-four of
+`pnpm eval:pack-assign` recomputes the assignment from the dev run; the workflow asserts forty-eight of
 their fields on every push (`prereg/R35-ledger.md`, `prereg/R36-pack-assignment.md`).
 
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
