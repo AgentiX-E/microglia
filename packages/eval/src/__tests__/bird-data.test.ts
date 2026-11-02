@@ -8,6 +8,7 @@ import {
   BirdDataError,
   archiveVerdict,
   missingDatabases,
+  unreachableDatabases,
   parseManifest,
   poolOf,
   populationOf,
@@ -70,6 +71,40 @@ describe('the shipped manifest', () => {
     // The same eleven databases: dev and Mini-Dev share them, and a dev run costs
     // one download, not a second copy of the data.
     expect(dev.databases).toEqual(manifest.databases);
+    // And the databases arrive in a second archive, which is a fact about `dev.zip` and not about
+    // the extractor. An artefact of omitting it: the run downloads 346 MB, verifies the digest,
+    // unpacks a directory that holds only a zip, and fails on the first question with "No database
+    // file" — which is what a dispatch did before this field existed.
+    expect(dev.nested).toBe('dev_databases.zip');
+    expect(dev.nestedRoot).toBe('dev_databases');
+  });
+
+  it('declares the archive layout of every split, because nothing else can', () => {
+    // Pinned as data rather than derived from the code: a manifest is the only description of an
+    // archive's shape, so a split that gains or loses a nested archive has to be a visible edit here
+    // and not a field that quietly stopped being read.
+    const layouts = [
+      { file: 'bird-minidev.json', nested: undefined, nestedRoot: undefined },
+      { file: 'bird-dev.json', nested: 'dev_databases.zip', nestedRoot: 'dev_databases' },
+      { file: 'bird-train.json', nested: 'train_databases.zip', nestedRoot: 'train_databases' },
+    ];
+    for (const layout of layouts) {
+      const path = new URL(`../../../../eval/manifests/${layout.file}`, import.meta.url);
+      const parsed = parseManifest(JSON.parse(readFileSync(path, 'utf8')));
+      expect({ file: layout.file, nested: parsed.nested, root: parsed.nestedRoot }).toEqual({
+        file: layout.file,
+        nested: layout.nested,
+        root: layout.nestedRoot,
+      });
+    }
+  });
+
+  it('names the databases an extraction cannot produce', () => {
+    const dev = parseManifest(
+      JSON.parse(readFileSync(new URL('../../../../eval/manifests/bird-dev.json', import.meta.url), 'utf8')),
+    );
+    expect(unreachableDatabases(dev, () => true)).toEqual([]);
+    expect(unreachableDatabases(dev, (dbId) => dbId !== 'toxicology')).toEqual(['toxicology']);
   });
 
   it('lists the databases the archive holds, alphabetically, with no duplicates', () => {

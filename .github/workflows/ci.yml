@@ -626,6 +626,49 @@ jobs:
               p.differencePp.toFixed(2) + 'pp in ' + a.family.positive + ' of ' + a.family.datasets + ' artefacts');
           "
 
+      - name: One rule per prompt does not pay (the assignment, against the observation)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/pack-assign" pnpm eval:pack-assign
+          diff -u eval/results/poc-pack-assign.json "${RUNNER_TEMP}/pack-assign/poc-pack-assign.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/pack-assign/poc-pack-assign.json');
+            const v = (id) => a.verdicts.find((x) => x.id === id);
+            const g = Object.fromEntries(a.gates.map((x) => [x.id, x.pass]));
+            const c = a.corpus;
+            const x = a.reading.contrast;
+            const m = a.reading.marginal;
+            const arms = Object.fromEntries(a.reading.arms.map((entry) => [entry.arm, entry]));
+            const checks = [
+              ['the artefact names the registration it executes', a.registered === 'prereg/R36-pack-assignment.md'],
+              ['the corpus is the dev split R25 paid for: 1,534 questions over 11 databases', c.questions === 1534 && c.databases === 11],
+              ['every question carried the arm, so nothing was skipped', c.skipped === 0 && c.questions === 1534],
+              ['the arm was a truncation: one item at most, 73.9% of prompts changed', a.instrument.maxItemsPerPrompt === 1 && Math.abs(a.instrument.changedShare - 0.7385919165580183) < 1e-12],
+              ['the V49 gate is what says so on an artefact that predates the count', a.instrument.basis === 'gate' && g['V62-assignment-instrument'] === true],
+              ['the recount reproduces the lane: 42/47 and -0.33pp', x.gained === 42 && x.lost === 47 && Math.abs(x.deltaPp + 0.3259452411994785) < 1e-12 && g['V63-assignment-reproduces-the-lane'] === true],
+              ['on a database-clustered interval that spans zero', Math.abs(x.clusteredLowPp + 1.6544117647058825) < 1e-12 && Math.abs(x.clusteredHighPp - 1.251840942562592) < 1e-12 && x.p > 0.05],
+              ['the bare model answers 877 of 1,534, so the hurdle is 1.335', arms.bare.hurdle !== null && Math.abs(arms.bare.hurdle - 1.334855403348554) < 1e-12],
+              ['the pair repairs 60 and breaks 61, clearing 0.737 of that hurdle', arms.kept.repaired === 60 && arms.kept.broken === 61 && Math.abs(arms.kept.clearance - 0.7368637493691235) < 1e-12],
+              ['one rule repairs 52 and breaks 58, clearing only 0.672', arms.removed.repaired === 52 && arms.removed.broken === 58 && Math.abs(arms.removed.clearance - 0.6716470727008218) < 1e-12],
+              ['so P3 holds: truncation moves the arm further from paying', v('P3').holds === true],
+              ['the second item carries 23 repairs and causes 27 breaks', m.repairsLost === 23 && m.breaksSaved === 27 && Math.abs(m.helpPerHarm - 0.8518518518518519) < 1e-12],
+              ['and prevents 15 repairs and 24 breaks, so the pack is not additive', m.repairsGained === 15 && m.breaksGained === 24],
+              ['the four cells sum to the contrast: -5 questions', m.netChange === -5 && x.gained + x.lost === 89],
+              ['so P4 is refuted: the second item is not worth two repairs per break', v('P4').holds === false],
+              ['the observational contrast is the one R35 registered, recomputed here', Math.abs(a.lead.differencePp - 3.1270015605293917) < 1e-12 && a.lead.single.questions === 401 && a.lead.pair.questions === 1133],
+              ['singleton questions break 9 of 212 against 52 of 665, which is the whole of it', a.lead.single.broken === 9 && a.lead.single.breakable === 212 && a.lead.pair.broken === 52 && a.lead.pair.breakable === 665],
+              ['assignment reverses the sign the observation predicted', x.deltaPp < 0 && a.lead.differencePp > 0],
+              ['no replication is on disk yet, so P5 states its threshold instead of a verdict', a.replication === null && v('P5').holds === false && v('P5').observed.includes('+2pp')],
+              ['the statement carries the assignment, the observation and the marginal item', a.statement.includes('assigning one rule') && a.statement.includes('+3.13pp') && a.statement.includes('23 repairs')],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('pack-assign failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('pack-assign: ' + checks.length + ' checks pass, assigned ' + x.deltaPp.toFixed(2) +
+              'pp against observed ' + a.lead.differencePp.toFixed(2) + 'pp, clearance ' +
+              arms.removed.clearance.toFixed(3) + ' against ' + arms.kept.clearance.toFixed(3) +
+              ', second item ' + m.repairsLost + '/' + m.breaksSaved);
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

@@ -8,6 +8,8 @@
   "attribution": "BIRD Benchmark (bird-bench contributors), https://bird-bench.github.io — data licence changed to CC BY-SA 4.0 on 2024-04-27",
   "root": "dev_20240627",
   "questions": "dev.json",
+  "nested": "dev_databases.zip",
+  "nestedRoot": "dev_databases",
   "databases": [
     "california_schools",
     "card_games",

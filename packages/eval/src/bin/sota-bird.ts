@@ -226,6 +226,7 @@ import {
   retrySubset,
   relevanceSplit,
   resolveDatabase,
+  unreachableDatabases,
   schemaIndex,
   sha256OfFile,
   type AnchorMode,
@@ -958,6 +959,30 @@ async function prepareArchive(): Promise<string> {
       // extraction is derived from it, so the archive is the one that goes.
       rmSync(inner, { force: true });
     }
+  }
+
+  // One pre-flight instead of eleven failures. The layout of the archive is described by the
+  // manifest and by nothing else, so a manifest that does not say an archive is nested produces a
+  // directory with no databases in it — and the lane then fails on the first question of the first
+  // fold, after the download, the digest and the unpack. Naming the missing field here turns that
+  // into a configuration error that says which field, at the one moment it can still be fixed.
+  const promised = unreachableDatabases(manifest, (dbId) =>
+    existsSync(resolveDatabase(extracted, dbId, manifest.nestedRoot === undefined ? [] : [manifest.nestedRoot])),
+  );
+  if (promised.length > 0) {
+    throw new MicrogliaError(
+      'MG_E_STORE_IO',
+      `the extraction is missing ${promised.length} of ${manifest.databases.length} databases (${promised.slice(0, 3).join(', ')})`,
+      {
+        manifest: MANIFEST_NAMES[SPLIT],
+        nested: manifest.nested ?? null,
+        nestedRoot: manifest.nestedRoot ?? null,
+        hint:
+          manifest.nested === undefined
+            ? 'if the archive ships its databases as a nested zip, the manifest must name it: `nested` and `nestedRoot` are a pair'
+            : 'the nested archive was extracted; check that `nestedRoot` is the directory it creates',
+      },
+    );
   }
   return extracted;
 }
@@ -6631,6 +6656,11 @@ async function main(): Promise<void> {
       admission_net: fold.admission === null ? null : fold.admission.helped - fold.admission.harmed,
       admission_reason: fold.admission?.reason ?? null,
       one_slot_differs: fold.oneSlotDiffers,
+      // The gate below says whether any prompt exceeded one item; these say how many prompts were
+      // built and how many broke, so a reader of the artefact does not have to parse the gate's
+      // sentence to know whether the arm was a truncation or a duplicate of `full`.
+      one_slot_positions: fold.oneSlotPositions,
+      one_slot_over: fold.oneSlotOver,
       channel_applied:
         fold.channelApplied.length === 0
           ? null

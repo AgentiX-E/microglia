@@ -47,6 +47,18 @@ export type AdmissionCase = {
 };
 
 /**
+ * The two facts an exchange rate is computed from, and nothing else.
+ *
+ * Narrower than `AdmissionCase` on purpose: a caller measuring an arm that never had a budget or a
+ * gate has the outcomes and not the treatment, and requiring it to invent a coverage would put a
+ * number in an artefact that means nothing.
+ */
+export type ExchangeCase = {
+  readonly correct: boolean;
+  readonly withoutMemoryCorrect: boolean;
+};
+
+/**
  * The exchange rate and the bar it has to clear.
  *
  * `hurdle` is the quantity §147 did not have: the ratio of questions that could only be broken to
@@ -77,7 +89,7 @@ export type ExchangeReading = {
 const perHundred = (part: number, whole: number): number | null => (whole === 0 ? null : (part / whole) * 100);
 const ratio = (part: number, whole: number): number | null => (whole === 0 ? null : part / whole);
 
-export function exchangeOf(cases: readonly AdmissionCase[]): ExchangeReading {
+export function exchangeOf(cases: readonly ExchangeCase[]): ExchangeReading {
   let repaired = 0;
   let broken = 0;
   let repairable = 0;

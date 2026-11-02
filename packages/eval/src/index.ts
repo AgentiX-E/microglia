@@ -185,6 +185,7 @@ export {
   archiveVerdict,
   dedupeQuestions,
   missingDatabases,
+  unreachableDatabases,
   parseManifest,
   poolOf,
   populationOf,
@@ -414,6 +415,7 @@ export {
   tokensOf,
   type AdmissionCase,
   type AdmissionReading,
+  type ExchangeCase,
   type ExchangeReading,
   type GateId,
   type GateThreshold,
@@ -440,6 +442,22 @@ export {
   type Screening,
   type ScreeningArm,
 } from './ledger.js';
+
+export {
+  R36_BARS,
+  adjudicateR36,
+  assignmentOf,
+  packAssignCasesOf,
+  singleSlotOf,
+  type ArmExchange,
+  type AssignRow,
+  type AssignmentCase,
+  type AssignmentReading,
+  type MarginalReading,
+  type R36Input,
+  type R36Verdict,
+  type SlotBasis,
+} from './assignment.js';
 
 export {
   MEMORY_FILTER_YOUDEN,

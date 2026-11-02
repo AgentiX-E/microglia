@@ -418,3 +418,22 @@ export function dedupeQuestions<T extends QuestionIdentity>(rows: readonly T[]):
   }
   return { rows: out, duplicates };
 }
+
+/**
+ * The databases a manifest promises that the extraction cannot produce.
+ *
+ * The archive's layout is only described by the manifest, so a manifest that omits the nested
+ * archive — `dev.zip` ships `dev_databases.zip`, and an earlier revision of `bird-dev.json` did not
+ * say so — extracts a directory with no databases in it and then fails question by question, after
+ * the download, the digest and the unpack. This check runs once, right after extraction, and names
+ * the field that is missing rather than the table that is not there.
+ *
+ * It takes a predicate rather than a path so the rule can be tested without an archive: whether a
+ * database is present is the caller's question, and how it answers it is the lane's.
+ */
+export function unreachableDatabases(
+  manifest: BirdManifest,
+  present: (dbId: string) => boolean,
+): readonly string[] {
+  return manifest.databases.filter((dbId) => !present(dbId));
+}
