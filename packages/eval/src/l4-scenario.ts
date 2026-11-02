@@ -24,7 +24,14 @@
 
 /** The scenario the published number belongs to. */
 export const PUBLISHED_SCENARIO = 'retail';
-/** ALTK-Evolve, τ²-retail, pass^4 on the split it published. */
+/**
+ * ALTK-Evolve, τ²-retail, `pass^4` on the split it published.
+ *
+ * A registered snapshot, not the board's current top: the τ²-retail leaderboard has since moved past it
+ * (an open submission reports 67.5), and a lane that chased the top would be re-registering its bar after
+ * every dispatch. What the number is *for* is the one thing a moving top cannot do — comparing a run to
+ * the row that was published for the scenario it ran.
+ */
 export const PUBLISHED_PASS4 = 0.575;
 /** The floor the lane shipped with, and the default for a dispatch that says nothing. */
 export const DEFAULT_MIN_TASKS = 60;
