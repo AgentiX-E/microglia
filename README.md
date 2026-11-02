@@ -516,7 +516,7 @@ effect while describing a control comparison, which is why every row now carries
 first version of the replication table called a single decided run a replication, because with one decided
 row "the decided runs agree" is vacuously true; `decidedAgree` is now `null` below two.
 
-### Where the scenario actually is: 1,733 lines, seven modules, and a gate for the rest
+### Where the scenario actually is: 1,766 lines, seven modules, and a gate for the rest
 
 The library claims it is scenario-agnostic. That claim has been made in a paragraph since its first
 iteration, measured once by hand, and never recomputed — which is the shape of every number that quietly
@@ -526,14 +526,14 @@ stops being true. `pnpm eval:coupling` recomputes it from the source tree on eve
 |---|---|---|---|
 | `core` | 37 | 6,821 | **0** |
 | `protocol` | 2 | 1,215 | **0** |
-| `sql` (the adapter) | 7 | **1,733** | 5 |
+| `sql` (the adapter) | 7 | **1,766** | 5 |
 | `eval` | 76 | 24,799 | 12, each with a written reason |
 | `browser` | 2 | 280 | 0 |
 | `node` | 6 | 1,282 | 0 |
 
 **The scenario is a fifth of the production tree and none of it is in the library.** `core` names no
 database in code — every occurrence of `sql` in it is inside a test, where a scope string is free text —
-and the text-to-SQL surface is **1,733 lines in seven modules** that execute, guard, differ, link and
+and the text-to-SQL surface is **1,766 lines in seven modules** that execute, guard, differ, link and
 render SQL. The twelve modules that keep a scenario word outside the adapter each carry a reason in the
 source, from *the dataset loader* to *the lane that has not been split yet*, and the gate fails if a
 thirteenth arrives without one.
@@ -771,7 +771,7 @@ Read the [user guide](docs/USER-GUIDE.md) for the integration contract, the
 ```
 packages/core     the library, five modules behind subpath exports
 packages/protocol the validity gates, paired statistics, artefact schema and lane contract
-packages/sql      the text-to-SQL adapter: execution, guards, schema linking, diffs — 1,733 lines
+packages/sql      the text-to-SQL adapter: execution, guards, schema linking, diffs — 1,766 lines
 packages/node     Hono routes, vendor providers, server bootstrap
 packages/browser  fetch client and offline outbox
 packages/eval     the benchmark instrument (private, not published); lanes in src/bin/

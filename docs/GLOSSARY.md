@@ -979,7 +979,7 @@ ledger carries its `control` in the row and in the contrast name.
 
 **Adapter (layer)** — The package that owns everything a scenario needs and nothing else:
 `@agentix-e/microglia-sql` holds the seven modules that execute, guard, differ, link and render SQL,
-**1,733 lines**. The cut is one question about a signature — *does the function mention a database?* —
+**1,766 lines**. The cut is one question about a signature — *does the function mention a database?* —
 and the reason it is a package rather than a folder is that a rule can only be enforced across a
 boundary the compiler can see.
 
