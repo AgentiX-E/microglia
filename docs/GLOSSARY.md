@@ -950,3 +950,29 @@ every key the annotations treat as vocabulary, **34.1% of BIRD dev is never reac
 **47.7%** at density 1.0. This is a property of the corpus and not of a store, which is why it closes a route
 rather than a round.
 
+
+**Resolution (of a contrast)** — The smallest difference a paired sample could detect at 80% power,
+`√(z²·d/n)` with `d` the share of discordant pairs and `z = 2.802`. It is a property of the design rather
+than of the result, and it is the column that decides whether a delta is a measurement or a number. The
+record's design sizes impose median floors of **4.38pp at 350 questions, 2.07pp at 1,534 and 0.82pp at
+7,000**.
+
+**Decided (a row)** — A published contrast whose delta is larger than its own resolution. Distinct from
+*significant*: the 80%-power bar is stricter than a 95% interval, so a row can clear the interval and still
+be undecided. The 7,000-question memory run is exactly that shape — −0.71pp against a 0.82pp floor. **18 of
+the record's 98 arm rows are decided, and the smallest of them is 4.57pp.**
+
+**Price (of a question)** — The number of questions it would take to decide an effect of the size a run
+found, at the discordance it observed: `n = z²·d / δ²`. A price is a reason to stop asking rather than a
+plan to ask: the cheapest undecided row in the record costs 352 questions and the dearest costs 1,457,294.
+A zero effect has no price and is reported as `null`.
+
+**Shrinkage** — Whether a contrast's median magnitude falls as the sample grows. A real effect does not
+shrink because more questions were asked, so a fall is evidence that a pilot exaggerated. `full − none`
+falls from **2.86pp at 350 questions to 0.33pp at 1,534**; `linked` rises from 7.71pp to 9.26pp and is the
+one contrast in the record a larger sample confirmed.
+
+**Two baselines** — An arm can be compared against the no-memory run (`none`) or against the `full` arm, and
+the record publishes both for the same arm: `values` is **+1.17pp against `none`** and **+0.85pp against
+`full`**. Neither is wrong and they answer different questions, which is why every row in the resolution
+ledger carries its `control` in the row and in the contrast name.

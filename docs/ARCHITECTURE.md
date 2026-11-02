@@ -1135,3 +1135,63 @@ from the parser rather than from the corpus. `V67-the-store-was-redundant` is ad
 entries bought 13 distinct terms. The module is at 100% on all four coverage dimensions and the workflow
 asserts sixteen fields of the reading on every push.
 
+### 8.14 Why the memory disagreement was a sample size: ninety-eight rows and eighteen decisions
+
+`power.ts` audits artefacts: one row per committed run, its memory contrast, and the difference that run
+could have detected. Twenty artefacts is twenty answers, and the record's claims are not twenty — they are
+the **ninety-eight arm rows** inside those artefacts. `values` at +1.17pp, `linked` at −9.26pp, `full-one`
+at −0.20pp, `full-lexicon` at −0.59pp: every one is an arm, none is an artefact, and none had ever been put
+beside its own resolution. `AUDIT` §25.7 carried the gap on a schema question — *is an arm an artefact?*
+
+**The answer is no, and an arm does not need to be one.** An artefact is the unit the validity gates
+certify: one dataset, one fold partition, one call budget, one set of vetted outcomes. An arm is a column of
+that same run. It inherits the gates and contributes one number the gates never read — how many questions
+changed hands between it and its control — so it needs `(helped, harmed, n)` read as a row rather than a
+validity schema of its own.
+
+**The ledger.** Three arithmetic columns over the committed artefacts:
+
+| column | what it is |
+|---|---|
+| delta | `(helped − harmed) / n`, recomputed, and compared with the delta the artefact printed |
+| half-width | `1.96 · √(helped + harmed) / n`, the 95% interval |
+| floor | `√(z²·d/n)` at `z = 2.802` — the smallest delta 80% power would have found |
+
+A row is **decided** when its delta clears the floor, which is `V5-resolution`'s bar and is strictly
+stricter than the 95% interval. The two bars are printed for every row because they disagree on real rows:
+the 7,000-question train run reads −0.71pp with a 0.82pp floor — inside the interval, outside the power bar —
+and a table with one column would have hidden exactly the run that matters most.
+
+**The price.** For every undecided row, `n = z²·d / δ²` with the run's own discordance: the questions it
+would take to decide an effect of the size it found. A zero effect has no price and is `null` rather than an
+enormous integer, because "infinitely many questions to decide whether nothing changed" is the true
+statement.
+
+**The replication.** Each contrast name across the runs that measured it, decided ones counted separately.
+Runs are **not** pooled — minidev, dev and train are different samples with different fold partitions and
+different stores — so what is reported is the count of runs, the count that could decide, and whether the
+decided ones agree. With one decided row the answer is `null` rather than `true`: a set of one has no
+agreement to report.
+
+**The shrinkage.** For each contrast measured at more than one size, the median `|delta|` at each size. A
+genuine effect does not shrink because more questions were asked. The confound is disclosed rather than
+corrected: rows at different `n` are different rounds with different stores, so a fall across sizes is a
+fall across experiment families and the row counts are published beside it.
+
+**What the ledger found.** Eighteen of ninety-eight rows are decided, and **every decided row is larger than
+4.5pp**. The three design sizes impose median floors of **4.38pp at 350 questions, 2.07pp at 1,534 and
+0.82pp at 7,000**, so the pilots that produced most of this record's beliefs could not have seen a 1pp effect
+had one been there. `full − none` has been measured **20 times: 18 negative, 2 positive, 1 decided, 6 inside
+a 95% interval**, and its median magnitude falls from **2.86pp on 350 questions to 0.33pp on 1,534** — which
+is what an exaggerated small-sample effect looks like. The counter-example is kept because it is why the
+instrument can be trusted: `linked`'s schema pruning reads **7.71pp at 350 and 9.26pp at 1,534**, the only
+contrast in the record whose effect grows with the sample, and it is decided at both sizes.
+
+**Gates.** `V69-every-arm-is-a-row` (blocking) compares the rows found while scanning with the rows emitted,
+because silent omission is the failure this record has made in four layers and a short table looks exactly
+like a complete one. `V70-the-ledger-reconciles` (blocking) refuses any row whose printed delta is not the
+one its own counts imply — one failure means that delta describes a population nobody ran.
+`V71-the-price-is-not-below-its-own-sample` (advisory) checks the biconditional between `decided` and
+`requiredN`, because those are two spellings of one inequality and a disagreement means the formulas drifted.
+The module is at 100% on all four coverage dimensions and the workflow asserts fifteen fields of the
+reading on every push.

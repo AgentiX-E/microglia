@@ -348,6 +348,28 @@ export {
 } from './power.js';
 
 export {
+  armReadingOf,
+  coverageGate,
+  designFloors,
+  priceGate,
+  readResolution,
+  reconcileGate,
+  replicationsOf,
+  median,
+  requiredSampleSize,
+  round4,
+  shrinkageOf,
+  type ArmReading,
+  type DesignFloor,
+  type PublishedArm,
+  type ContrastReplication,
+  type ResolutionGate,
+  type ResolutionLedger,
+  type Shrinkage,
+  type ShrinkagePoint,
+} from './resolution.js';
+
+export {
   STRATUM_EDGES,
   byDifficulty,
   charGrams,

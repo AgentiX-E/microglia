@@ -953,6 +953,17 @@ Be honest about the preconditions; the product is only useful inside them.
     entities in the same words it is the version worth testing. `pnpm eval:lexicon`,
     `eval/results/poc-sota-bird-dev-R37-lexicon-grain.json`.
 
+    **And measure the resolution of anything you intend to claim.** A delta is only a measurement if it is
+    larger than the smallest difference your sample could have detected at 80% power, `√(z²·d/n)` with `d`
+    the share of pairs that changed hands — and that floor is routinely four points on a few hundred
+    questions. In this repository **18 of 98 published arm rows are decided**, every one of them larger than
+    4.5pp, and the median floor is **4.38pp at 350 questions** and **2.07pp at 1,534**. The same arithmetic
+    prices what you cannot decide: an effect of 0.07pp on 1,534 questions would need **1,457,294** to settle,
+    so the honest response is to stop asking rather than to run it again. Two traps are worth knowing before
+    you read anyone's table, including this one's: **a channel can be two contrasts** (a filter measured
+    against no memory and against the full pack gives two different numbers, both true), and **a single
+    decided run is not a replication**. `pnpm eval:resolution`, `prereg/R39-arm-resolution.md`.
+
 ## 13. Measuring your own generator
 
 The harness that produced every number in this repository is usable by someone else. Two files and

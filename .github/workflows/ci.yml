@@ -809,6 +809,45 @@ jobs:
               band(0.5).ceiling + ' at density 0.5, frontier ' + band(0.5).atArmSize + ' against the arm ' + l.armLicensed);
           "
 
+      - name: The range was the instrument, and the ledger says so
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/resolution" pnpm eval:resolution
+          diff -u eval/results/poc-resolution.json "${RUNNER_TEMP}/resolution/poc-resolution.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/resolution/poc-resolution.json');
+            const l = a.ledger;
+            const m = a.memory;
+            const g = Object.fromEntries(a.gates.map((x) => [x.id, x.pass]));
+            const floor = (n) => a.floors.find((x) => x.n === n);
+            const shrink = a.shrinkage.find((x) => x.contrast === 'full \u2212 none');
+            const decided = a.readings.filter((x) => x.decided).map((x) => Math.abs(x.deltaPp));
+            const values = a.readings.filter((x) => x.arm === 'values');
+            const linked = a.readings.filter((x) => x.arm === 'linked' && x.control === 'none');
+            const priced = a.priceList.filter((x) => x.requiredN !== null);
+            const checks = [
+              ['the reading executes the registration it names', a.title.includes('resolve') && a.gates.length === 3 && a.prereg === undefined],
+              ['98 rows over 20 artefacts, and nothing was dropped between the scan and the table', l.rows === 98 && l.published === 98 && l.skipped === 0 && a.artefacts === 20 && g['V69-every-arm-is-a-row'] === true],
+              ['every printed delta is its own discordant counts, on all 98', l.reconciled === 98 && g['V70-the-ledger-reconciles'] === true],
+              ['18 rows decided at 80% power, 27 at a 95% interval', l.decided === 18 && l.significant95 === 27 && l.undecided === 80],
+              ['no decided row is smaller than 4pp, so nothing the product cares about was ever decided', Math.min(...decided) === 4.5714 && Math.max(...decided) === 32.5714 && decided.length === 18],
+              ['the largest claim is the oracle at +32.57pp, on a design resolving 8.62pp', l.largest.arm === 'oracle' && l.largest.deltaPp === 32.5714 && l.largest.minDetectablePp === 8.6224],
+              ['the sharpest design in the record is the 7,000-question run at 0.82pp, and its memory delta sits outside that bar', l.sharpest.artefact === 'poc-sota-bird-train.json' && l.sharpest.minDetectablePp === 0.8242 && l.sharpest.deltaPp === -0.7143 && a.readings.filter((x) => x.artefact === l.sharpest.artefact)[0].significant95 === true && a.readings.filter((x) => x.artefact === l.sharpest.artefact)[0].decided === false],
+              ['three design sizes impose floors of 4.38, 2.07 and 0.82pp', floor(350).medianPp === 4.3849 && floor(350).rows === 75 && floor(1534).medianPp === 2.0746 && floor(1534).rows === 22 && floor(7000).medianPp === 0.8242 && a.floors.length === 3],
+              ['full - none was measured 20 times: 18 negative, 2 positive, 1 decided, 6 inside a 95% interval', m.runs === 20 && m.negative === 18 && m.positive === 2 && m.decided === 1 && m.significant95 === 6],
+              ['its median magnitude falls from 2.86pp to 0.33pp when the sample grows 4.4x', shrink.points.length === 3 && shrink.points[0].medianAbsPp === 2.8571 && shrink.points[1].medianAbsPp === 0.3259 && shrink.direction === 'fell'],
+              ['the values channel is two contrasts and not one: +1.17pp against none, +0.85pp against full', values.length === 4 && values[0].deltaPp === 1.4286 && values[2].deltaPp === 1.1734 && values[3].deltaPp === 0.8475 && values[3].control === 'full'],
+              ['linked is the counter-example: its effect grows with the sample and is decided at both sizes', linked[0].deltaPp === -7.7143 && linked[1].deltaPp === -9.2568 && linked.every((x) => x.decided) && a.shrinkage.find((x) => x.contrast === 'linked \u2212 none').direction === 'rose'],
+              ['80 undecided rows are priced, five zero effects are not, and the dearest costs 1,457,294 questions', a.priceList.length === 80 && priced.length === 75 && Math.max(...priced.map((x) => x.requiredN)) === 1457294],
+              ['V71 is advisory and the two gates it depends on block', g['V71-the-price-is-not-below-its-own-sample'] === true && a.gates.find((x) => x.id.startsWith('V71')).blocking === false && a.gates.filter((x) => x.id !== 'V71-the-price-is-not-below-its-own-sample').every((x) => x.blocking)],
+              ['the statement quotes the arithmetic rather than a verdict', a.statement.includes('98 arm rows') && a.statement.includes('18 decided') && a.statement.includes('underpowered') === false && a.statement.includes('inconclusive') === false],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('resolution ledger failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('resolution ledger: ' + checks.length + ' checks pass, ' + l.rows + ' rows, ' + l.decided +
+              ' decided, 20 memory runs of which ' + m.decided + ' decided');
+          "
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

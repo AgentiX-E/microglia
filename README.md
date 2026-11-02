@@ -414,9 +414,10 @@ with a caveat: there is nothing to set it against.
 
 `pnpm eval:ledger` recomputes every number in the ledger paragraphs from `poc-sota-bird-train.json` and
 `pnpm eval:pack-assign` recomputes the assignment from the dev run, `pnpm eval:lexicon` recomputes the
-definitional grain's reach, licence, two deltas and exchange rate from its own artefact, and `pnpm eval:frontier`
-recomputes the reach ceiling from the corpus's own annotations; the workflow asserts fifty-six fields of the
-first two on every push, thirty-one across the R37 round, and sixteen of the frontier
+definitional grain's reach, licence, two deltas and exchange rate from its own artefact, `pnpm eval:frontier`
+recomputes the reach ceiling from the corpus's own annotations, and `pnpm eval:resolution` recomputes all 98
+arm rows and their prices from the twenty committed artefacts; the workflow asserts fifty-six fields of the
+first two on every push, thirty-one across the R37 round, sixteen of the frontier, and fifteen of the ledger
 (`prereg/R35-ledger.md`, `prereg/R36-pack-assignment.md`, `prereg/R37-lexicon-grain.md`,
 `prereg/R38-term-frontier.md`).
 
@@ -479,6 +480,40 @@ unreachable.
 Ranked without that filter the frontier looks enormous — two keys, `list` and `name`, reach a quarter of the
 split — and it is the frequency of English rather than the reach of a definition, which is why the reading
 publishes a band of three thresholds and takes the most generous one for its verdicts.
+
+
+### Why the memory numbers disagreed: eighty of them were never measurements
+
+Every claim in the paragraphs above is an arm inside a run, and until this round no arm had ever been put
+beside the difference its own sample could resolve. `pnpm eval:resolution` does that for all **98 published
+arm rows over 20 artefacts**, recomputing each delta from its discordant counts and printing the smallest
+delta 80% power would have found:
+
+| reading | what it says |
+|---|---|
+| rows decided by their own sample | **18 of 98** — and every one is larger than **4.5pp** |
+| median floor at 350 questions | **4.38pp** over 75 rows |
+| median floor at 1,534 questions | **2.07pp** over 22 rows |
+| the one 7,000-question design | **0.82pp** |
+| `full − none` | **20 runs, 18 negative, 2 positive, 1 decided, 6 inside a 95% interval** |
+| its median magnitude | **2.86pp** at 350 questions, **0.33pp** at 1,534 |
+
+So the range from +8pp to −9pp that this record has quoted since its first iteration is not a mechanism that
+moves. It is a design that could not see anything below 4.4pp, asked sixteen times whether a 1pp effect was
+there. The one contrast whose effect got **larger** when the sample grew is `linked`, the schema-pruning
+channel: **7.71pp at 350 questions and 9.26pp at 1,534**, decided both times. That is what a real effect
+looks like in this instrument, and nothing about memory looks like it.
+
+The round also prices what it cannot decide. An effect of 0.07pp on the dev split would need
+**1,457,294 questions**; the cheapest undecided question in the record costs 352. A question that costs a
+million questions is not a question this project can ask, and saying so is arithmetic rather than a shrug.
+
+Two defects were found while building the ledger, both by columns disagreeing with each other. The
+`values` channel is **two contrasts and not one** — +1.17pp against the no-memory baseline and +0.85pp
+against the `full` arm — and a paragraph that quoted one number for "the channel" was quoting a treatment
+effect while describing a control comparison, which is why every row now carries its `control`. And the
+first version of the replication table called a single decided run a replication, because with one decided
+row "the decided runs agree" is vacuously true; `decidedAgree` is now `null` below two.
 
 
 So the library is worth integrating where corrections *repeat* — a workspace with a house convention,
