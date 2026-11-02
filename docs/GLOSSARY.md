@@ -1001,3 +1001,34 @@ silently: `V72` fails until it is moved or a reason is written.
 **Verdict** — `adapter` (it lives in the adapter package), `deferred` (it names a scenario and has a
 reason), or `general` (it names none). The verdict is derived from the package and the word count, so a
 row cannot disagree with where the file is.
+
+**Cross-domain arm** — An arm that learns from one scenario and is scored on another: the store is
+built from τ²-retail corrections and answers τ²-airline tasks, with the same task set scored by a
+memory-free reference. It exists to put the protocol's transfer gates in front of a scenario they were
+not written for, not to improve a score.
+
+**Scenario-qualified id** — `airline/3`. τ² numbers every domain's tasks from zero, so a bare `3` is a
+name two scenarios can both claim; qualifying it is what keeps an evaluation set from intersecting the
+training set it was drawn from. The qualification happens where the result document is read, so the
+split, the pair and the ledger all use names that cannot collide.
+
+**Transfer trial (τ²)** — One evaluated episode, scored twice: once by the reference arm and once by
+the memory arm. **Informative** means the reference failed, so the pack had something to repair;
+**broke** means the reference passed and the memory failed; **unmeasured** means one of the two
+verdicts is `null`. It is the episode-level analogue of BIRD's rule-by-question trial, and it can say
+whether the pack helped but not which item in it did.
+
+**Informative floor** — 100 informative trials. Below it the transfer rate is a direction rather than a
+rate, and `V16-transfer-resolvable` fails rather than reporting a number. A foreign pack is expected to
+fail this floor; passing it on a cross-domain arm would mean the floor was being cleared by trials that
+were not informative.
+
+**Scenario bar** — The published `pass^4` a run is graded against **and the scenario it belongs to**.
+ALTK-Evolve's 0.575 is a τ²-retail number; grading an airline run against it would publish a difference
+between two scenarios as a difference the memory made, so the artefact records
+`published_bar_applies: 0` and the run's only comparison is the paired one.
+
+**Recall scope (of a store)** — The scenario an item was stored under, which recall filters by. A
+`retail` store serves nothing to an `airline` question unless the caller asks in the store's own terms,
+so a transfer arm recalls under the learned scenario deliberately — that recall is the treatment, not a
+configuration detail.

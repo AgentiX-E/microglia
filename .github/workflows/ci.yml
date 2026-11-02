@@ -868,7 +868,11 @@ jobs:
               ['the five adapter modules that name a database are the ones that execute, guard, differ, link and render', a.coupled.filter((x) => x.pkg === 'sql').map((x) => x.module).sort().join(',') === 'm-schema,schema-link,sql-diff,sql-exec,sql-guard'],
               ['the largest deferred module is the lane that has not been split yet', a.coupled.filter((x) => x.verdict === 'deferred').sort((x, y) => y.lines - x.lines)[0].module === 'sota'],
               ['the scenario is between a tenth and a third of the tree, and the library packages are clean', a.totals.coupledShare > 0.1 && a.totals.coupledShare < 0.33 && layer('protocol').coupled === 0 && layer('node').coupled === 0 && layer('browser').coupled === 0],
-              ['a comment is not a coupling: 23 modules name a scenario only in prose', a.commentOnly.length === 23 && a.commentOnly.every((x) => x.words.length > 0)],
+              // The count is a reading of the tree, not a constant: the first version of this
+              // assertion pinned 23 and failed the moment a module was added that explains, in
+              // prose, what a scenario's rule does not transfer to. What the check is for is that
+              // every hit has words in it and that the committed snapshot agrees with the walk.
+              ['a comment is not a coupling: every prose-only hit names a word', a.commentOnly.length === c.commentOnly.length && a.commentOnly.length > 0 && a.commentOnly.every((x) => x.words.length > 0)],
               ['the committed snapshot still describes the tree it was taken from', c.scanned === a.scanned && c.totals.modules === a.totals.modules && c.gates.every((x) => x.pass)],
               ['the statement quotes arithmetic rather than a verdict', a.statement.startsWith('the scenario is ') && a.statement.includes(' 0 of them upward') && a.statement.includes('agnostic') === false],
             ];

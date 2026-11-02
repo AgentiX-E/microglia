@@ -1258,3 +1258,50 @@ the deadline timer started when a statement was posted to a child, and a freshly
 250 ms deadline, so the statement was reported as a deadline rather than as the answer it would have
 given. The child now announces readiness and `#ask` starts its clock after that — instrument overhead is
 not statement time, and a lane's accuracy must not depend on how busy the machine was.
+
+### 8.16 A task id is a name inside a scenario, and a foreign pack is a measurement
+
+Every lane in this repository measures a memory against the corpus it learned from, and every claim
+that rests on those lanes is a claim about *that* corpus. The one thing they could not say until this
+section existed is whether the machinery underneath travels: the protocol's gates were written for
+text-to-SQL and a second scenario could only be measured by them if the lane could produce a foreign
+pack. The τ² lane now can, and the two defects that had to be fixed first are the reason this section
+is long.
+
+**A task id is only unique inside its scenario.** τ² numbers each domain's tasks from zero, so
+`retail`'s task `3` and `airline`'s task `3` are different tasks with the same name. A run that learns
+from one and answers the other therefore hands the protocol a training set and an evaluation set that
+intersect completely, and `V2-fold-partition` reports every evaluated task as leaked — a defect in the
+plan, published as a defect in the run. Ids are qualified (`airline/3`) at the boundary where the
+driver reads the result document, so the split, the pair and the ledger all speak names that cannot
+collide. The plan module re-checks disjointness where it is about to be paid for, because a leak is
+the one defect in this lane that produces a number rather than an error.
+
+**The transfer gates measure the pack, not a rule.** On the text-to-SQL lane a transfer trial is one
+rule shown to one foreign question, with a counterfactual call beside it. τ² has neither per-rule
+calls nor a retry inside an episode, so the unit is the episode: `(reference verdict, memory verdict)`
+for one `(task, trial)`, where the verdict is τ²'s own `reward == 1`. The gates read the same four
+numbers they always have — informative, repaired, broke, measured — and the same
+`transferSummary` computes them, because two implementations of one statistic diverge the first time
+one is fixed. The treatment is weaker than BIRD's and the artefact says so: `repaired > 0` means the
+pack fixed an episode and says nothing about which item in it did.
+
+| reading | meaning | what it costs a reader if it is wrong |
+|---|---|---|
+| informative | the control arm failed, so the pack had something to repair | the conditional repair rate can only go up, because its denominator excludes every episode where the pack could do damage |
+| broke | the control arm passed and the treatment failed | the loss side, which a rate without it hides |
+| unmeasured | either verdict is `null` (an infrastructure failure) | counting it as a failure credits or blames the memory for a call that never returned |
+| ledger | one row per episode, holes included | a rate whose pairs did not survive the run cannot be recomputed from the file |
+
+**The second defect was a bar from the wrong scenario.** The lane shipped with one published
+reference — a competitor's `pass^4` on τ²-retail — and graded every arm against it. On a second
+scenario that is not a strict bar but a category error: the delta measures the difference between two
+scenarios and reports it as the difference the memory made. The bar now belongs to the scenario it was
+published for (`l4-scenario.ts`), the artefact carries `published_bar_applies: 0` and a sentence
+saying why, and the comparison a foreign run supports is the paired one.
+
+**The recall scope is part of the treatment.** Items carry the scenario they were learned in, and
+recall filters by scope, so a `retail` store answers an `airline` question with nothing unless the
+facade asks in the store's own terms. Asking in the store's terms is what a transfer arm is; leaving
+the filter at the question's scenario would measure an empty pack and report a null. Both names are
+recorded, so a reader can tell a foreign pack from a pack the scenario filter emptied.
