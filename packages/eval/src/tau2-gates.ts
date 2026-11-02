@@ -20,8 +20,8 @@
  *
  * | bucket | meaning | today |
  * |---|---|---|
- * | **supplyable** | the lane's record type can carry the enabling field | 9 |
- * | **arm-indexed** | the field exists, but only an arm this lane never ran produces it | 30 |
+ * | **supplyable** | the lane's record type can carry the enabling field | 13 |
+ * | **arm-indexed** | the field exists, but only an arm this lane never ran produces it | 26 |
  * | **informative** | supplied *and* present in the record that exists | 2 |
  *
  * The fourth bucket is the uncomfortable one and it is kept separate on purpose: **vacuous**. Two
@@ -43,6 +43,7 @@ import {
   buildProtocolGates,
   type ProtocolGateInput,
   type ScenarioGateInput,
+  type TransferGateInput,
   type ValidityGate,
 } from '@agentix-e/microglia-protocol';
 import { detectableDelta } from './protocol.js';
@@ -88,6 +89,15 @@ export type Tau2ArmRecord = {
    * without them has no `partition` to state and `V2` is absent rather than green.
    */
   readonly split?: { readonly train: readonly string[]; readonly test: readonly string[] };
+  /**
+   * Which scenario each half came from.
+   *
+   * Absent on every artefact written before R29 stage 2, and those runs learned and answered in one
+   * scenario, so absence reads as "one scenario" rather than as an unknown. A cross-domain arm is
+   * the case where the two names differ, and it is the case in which `split`'s qualification is
+   * load-bearing rather than cosmetic.
+   */
+  readonly scenario?: { readonly learn: string; readonly test: string; readonly recall: string };
 };
 
 /** The paired comparison, reduced to the three numbers a gate reads. */
@@ -108,10 +118,18 @@ export type Tau2Evidence = {
   readonly memory?: Tau2ArmRecord;
   readonly reference?: Tau2ArmRecord;
   readonly comparison?: Tau2ComparisonRecord;
+  /**
+   * The transfer measurement, when the run answered a scenario it did not learn from.
+   *
+   * One reading supplies four gates: the reconciliation, the floor, the ledger and the net. It is
+   * absent on a within-scenario run, and absent is the honest value there — a store answering
+   * questions from the corpus it learned on has not transferred anything.
+   */
+  readonly transfer?: TransferGateInput;
 };
 
 /**
- * The nine gates this lane's record type can feed, and the field that feeds each.
+ * The thirteen gates this lane's record type can feed, and the field that feeds each.
  *
  * Written as data so the audit and the tests read the same list. An entry here is a promise that
  * `tau2ProtocolInput` can produce the field; a field the projection never sets is a lie the
@@ -127,10 +145,18 @@ const SUPPLYABLE: readonly { readonly id: string; readonly field: Tau2Field }[] 
   { id: 'V8-call-reliability', field: 'callFailureRate' },
   { id: 'V32-fold-learning-intact', field: 'learning' },
   { id: 'V44-domain-accounted', field: 'domainOrigin' },
+  // R29 stage 2: one cross-domain arm makes the transfer family reachable, and the four ids are
+  // supplied by one reading rather than by four arms. `V16` is expected to *fail* on a foreign
+  // domain — a hundred informative episodes is a floor this sample cannot clear — so the entry here
+  // is a promise that the gate can be graded, not that it passes.
+  { id: 'V15-transfer-reconciles', field: 'transfer' },
+  { id: 'V16-transfer-resolvable', field: 'transfer' },
+  { id: 'V33-transfer-ledger', field: 'transfer' },
+  { id: 'V17-transfer-net-reported', field: 'transfer' },
 ];
 
 /**
- * The thirty gates this lane cannot fire, and the arm each would need.
+ * The twenty-six gates this lane cannot fire, and the arm each would need.
  *
  * This is the conformance checklist the second scenario produced: read it as the work plan for
  * making τ² a lane the protocol can measure properly, and as the reason the protocol's portability
@@ -162,15 +188,8 @@ const ARM_INDEXED: readonly { readonly id: string; readonly needs: string }[] = 
     needs: 'a reproducibility probe over the stored action plans, with its four buckets',
   },
   { id: 'V14-probe-applied', needs: 'the same probe, reporting how many held-out packs it changed' },
-  {
-    id: 'V15-transfer-reconciles',
-    needs: 'a transfer measurement: the store answering questions from a domain it never learned',
-  },
-  { id: 'V16-transfer-resolvable', needs: 'the same measurement, reaching a hundred informative trials' },
-  { id: 'V17-transfer-net-reported', needs: 'the same measurement, carrying its repair and break counts' },
   { id: 'V18-pool-complete', needs: 'a sampling arm that records more than one candidate per task' },
   { id: 'V19-pool-reconciles', needs: 'the same arm, signing or explicitly refusing each candidate' },
-  { id: 'V33-transfer-ledger', needs: 'the same measurement, carrying one row per trial' },
   { id: 'V34-substrate-paired', needs: 'two stores built over one corpus, so the cells can be paired' },
   { id: 'V35-substrate-resolvable', needs: 'the same comparison, reaching a hundred paired tasks' },
   { id: 'V36-substrate-coverage', needs: 'the same comparison, reporting its exclusive sets' },
@@ -215,7 +234,8 @@ export type Tau2Field =
   | 'channel'
   | 'callFailureRate'
   | 'learning'
-  | 'domainOrigin';
+  | 'domainOrigin'
+  | 'transfer';
 
 /**
  * The fields behind each gate, so an absence can name the fact rather than the gate.
@@ -234,6 +254,7 @@ const FIELD_OF: Readonly<Record<Tau2Field, string>> = {
   callFailureRate: 'the agent call tally, which a separate process owns',
   learning: 'the correction bookkeeping: rows, unanswered, edited, failed to distil',
   domainOrigin: "the provenance of each stored item's scope domain",
+  transfer: 'a cross-domain arm: the store answering a scenario it never learned, with its pairs',
 };
 
 /**
@@ -312,6 +333,7 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
     callFailures?: number;
     learning?: NonNullable<ProtocolGateInput['learning']>;
     domainOrigin?: NonNullable<ProtocolGateInput['domainOrigin']>;
+    transfer?: TransferGateInput;
   } = {};
 
   if (memory?.meanPackIds !== undefined) {
@@ -350,6 +372,13 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
   if (memory?.domainOrigin !== undefined) {
     extra.domainOrigin = memory.domainOrigin;
     supplied.push('domainOrigin');
+  }
+  // The transfer reading is the pair's, not the arm's: it holds two verdicts per episode and neither
+  // artefact can produce it alone. Supplying it from `evidence` rather than from `memory` is what
+  // makes the absence of a cross-domain arm an absent gate instead of a fabricated one.
+  if (evidence.transfer !== undefined) {
+    extra.transfer = evidence.transfer;
+    supplied.push('transfer');
   }
   return { input: { packControls: [], channelBest: undefined, ...extra }, supplied };
 }
@@ -432,6 +461,7 @@ export type Tau2ArmArtefact = {
     readonly learning?: Tau2ArmRecord['learning'];
     readonly domainOrigin?: Tau2ArmRecord['domainOrigin'];
     readonly split?: { readonly train: readonly string[]; readonly test: readonly string[] };
+    readonly scenario?: Tau2ArmRecord['scenario'];
   };
 };
 
@@ -462,5 +492,6 @@ export function tau2ArmRecordOf(arm: string, artefact: Tau2ArmArtefact): Tau2Arm
       ? {}
       : { domainOrigin: artefact.tau2.domainOrigin }),
     ...(artefact.tau2?.split === undefined ? {} : { split: artefact.tau2.split }),
+    ...(artefact.tau2?.scenario === undefined ? {} : { scenario: artefact.tau2.scenario }),
   };
 }

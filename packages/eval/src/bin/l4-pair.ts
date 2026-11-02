@@ -38,7 +38,9 @@ import {
   tau2ArmRecordOf,
   tau2DetectablePp,
   tau2GateAudit,
+  transferReadingOf,
   type Tau2Evidence,
+  type TauTrialRow,
 } from '@agentix-e/microglia-eval';
 import { writeJson } from './lib.js';
 
@@ -63,8 +65,11 @@ type Artefact = {
       readonly widenedIn: number;
     };
     readonly split?: { readonly train: readonly string[]; readonly test: readonly string[] };
+    readonly scenario?: { readonly learn: string; readonly test: string; readonly recall: string };
   };
   readonly per_task?: readonly TaskRow[];
+  /** One row per evaluated episode; absent on artefacts written before R29 stage 2. */
+  readonly per_trial?: readonly TauTrialRow[];
   readonly ranAt?: string;
 };
 
@@ -108,8 +113,28 @@ const comparison = compareArms(
 const splitMatches = comparison.onlyFirst === 0 && comparison.onlySecond === 0;
 const resolution = resolutionOf(comparison);
 
+/**
+ * The transfer reading, when both artefacts carry their episodes.
+ *
+ * Absent on a within-scenario pair, and that absence is a statement rather than a gap: a store
+ * answering the corpus it learned from has not transferred anything, so the four gates it would
+ * supply do not apply. On a cross-domain pair it is the round's whole measurement — how many of the
+ * control arm's failures the foreign pack repaired, how many of its successes it broke, and whether
+ * either count is large enough to be a rate rather than a direction.
+ */
+const transfer =
+  first.per_trial === undefined || second.per_trial === undefined
+    ? undefined
+    : transferReadingOf({
+        reference: first.per_trial,
+        memory: second.per_trial,
+        store: second.tau2?.scenario?.learn ?? second.tau2?.scenario?.test ?? DOMAIN,
+      });
+
+const scenario = second.tau2?.scenario ?? first.tau2?.scenario;
+
 const evidence: Tau2Evidence = {
-  domain: DOMAIN,
+  domain: scenario?.test ?? DOMAIN,
   trialCount: first.metrics?.k ?? 4,
   reference: tau2ArmRecordOf('reference', first),
   memory: tau2ArmRecordOf('memory', second),
@@ -121,6 +146,7 @@ const evidence: Tau2Evidence = {
     gained: comparison.gained,
     deltaPp: comparison.deltaPp,
   },
+  ...(transfer === undefined ? {} : { transfer: transfer.gate }),
 };
 const audit = tau2GateAudit(evidence);
 const detectablePp = tau2DetectablePp(evidence.comparison);
@@ -172,12 +198,38 @@ await writeJson('poc-l4-pair', {
     armIndexed: audit.armIndexed,
   },
   gates,
+  // Where each half ran, when the arms recorded it. A reader of a cross-domain pair has to be able
+  // to see the two scenario names without opening both arm files.
+  ...(scenario === undefined ? {} : { scenario }),
+  // The transfer measurement with its ledger: the aggregate says how often, the rows say where. The
+  // ledger is committed with the artefact because the first version of it lived in a record the
+  // artefact never serialised, and a rate was published with no pairs behind it.
+  ...(transfer === undefined
+    ? {}
+    : {
+        transfer: {
+          store: second.tau2?.scenario?.learn ?? null,
+          paired: transfer.paired,
+          orphanMemory: transfer.orphanMemory,
+          informative: transfer.gate.informative,
+          repaired: transfer.gate.repaired,
+          broke: transfer.gate.broke,
+          blankRight: transfer.gate.blankRight,
+          unmeasured: transfer.gate.unmeasured,
+          measured: transfer.gate.measured,
+          netPp: transfer.gate.netPp,
+          verdict: transfer.gate.verdict,
+          // The rows, one per episode, which is what `V33` counts.
+          ledger: transfer.episodes,
+        },
+      }),
   notes: [
     '`deltaPp` is second - first, so a negative number means the second arm (memory) did worse.',
     'pass^4 per task is the k=4 reading: a task counts only when all four trials passed.',
     'The pair is defined on the intersection of task ids; tasks scored by one arm only are counted, not dropped silently.',
     'Published reference for scale: ALTK-Evolve pass^4 = 0.575 on tau2-retail.',
     'The protocol gates are the shared thirty-nine, not a τ² copy of them; `absent` names the arm each of the rest would need.',
+    '`transfer` pairs the two arms episode by episode, so a repair is one episode the control failed and the treatment passed. The treatment is the whole pack: `repaired` says the pack fixed an episode, not which item in it did.',
   ],
 });
 
@@ -186,6 +238,13 @@ process.stdout.write(
     `[${comparison.ciLowPp.toFixed(2)}, ${comparison.ciHighPp.toFixed(2)}] p=${comparison.p.toFixed(4)} ` +
     `lost=${comparison.lost} gained=${comparison.gained}\n`,
 );
+if (transfer !== undefined) {
+  process.stdout.write(
+    `[l4-pair] transfer: ${transfer.gate.repaired} repaired, ${transfer.gate.broke} broken of ` +
+      `${transfer.gate.measured} measured (${transfer.gate.informative} informative), ` +
+      `net ${transfer.gate.netPp.toFixed(2)}pp, verdict \`${transfer.gate.verdict}\`\n`,
+  );
+}
 process.stdout.write(
   `[l4-pair] protocol: ${audit.evaluable.length} gate(s) fired, ${audit.vacuous.length} vacuous, ` +
     `${audit.absent.length} absent (${audit.supplyable} supplyable, ${audit.armIndexed} arm-indexed), ` +

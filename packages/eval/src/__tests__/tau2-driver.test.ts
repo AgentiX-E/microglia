@@ -72,17 +72,55 @@ describe('the L4 driver', () => {
       // The held-out half is t3 and t4. Both alternate pass/fail across four
       // trials, so pass^4 is 0 for each - the estimator's answer, not an average
       // that would read 50%.
+      // Each task is named by the scenario that owns it. τ² numbers its tasks from zero in every
+      // domain, so a bare `t3` is a name two scenarios can both claim and the split's own overlap
+      // check would read one scenario's tasks as another's leaks.
       expect(tasks).toEqual([
-        { successes: 2, trials: 4, k: 4, taskId: 't3' },
-        { successes: 2, trials: 4, k: 4, taskId: 't4' },
+        { successes: 2, trials: 4, k: 4, taskId: 'retail/t3' },
+        { successes: 2, trials: 4, k: 4, taskId: 'retail/t4' },
       ]);
       const written = JSON.parse(readFileSync(join(dir, 'eval.json'), 'utf8')) as { simulations: unknown[] };
       expect(written.simulations).toHaveLength(8);
+      // The episodes the pairing step needs, one row per trial, named the same way.
+      expect(driver.trials()).toHaveLength(8);
+      expect(driver.trials()?.[0]).toEqual({ id: 'retail/t3', trial: 0, reward: 1 });
     } finally {
       delete process.env['TAU_PYTHON'];
       delete process.env['TAU_MEMORY'];
       delete process.env['TAU_TRIALS'];
       delete process.env['TAU_TRAIN_SHARE'];
+      delete process.env['TAU_WORKDIR'];
+    }
+  });
+
+  it('answers a second scenario without reading its task numbers as the first\'s', async () => {
+    // The cross-domain path, end to end, with the two scenarios deliberately sharing task ids: this
+    // is what τ² actually does, and the leak guard is what would fail if the plan carried bare ids.
+    const { dir, executable } = stubRunner();
+    process.env['TAU_PYTHON'] = executable;
+    process.env['TAU_MEMORY'] = 'false';
+    process.env['TAU_TRIALS'] = '1';
+    process.env['TAU_TRAIN_DOMAIN'] = 'retail';
+    process.env['TAU_TEST_DOMAIN'] = 'airline';
+    process.env['TAU_WORKDIR'] = dir;
+    try {
+      const driver = await import('../bin/tau2-driver.js?case=cross-domain');
+      const tasks = await driver.run();
+      // Cross-domain learns from one list and answers the whole other: there is nothing to hold
+      // back out of a scenario the store never saw.
+      expect(tasks.map((task) => task.taskId)).toEqual([
+        'airline/t1',
+        'airline/t2',
+        'airline/t3',
+        'airline/t4',
+      ]);
+      expect(driver.trials()).toHaveLength(4);
+    } finally {
+      delete process.env['TAU_PYTHON'];
+      delete process.env['TAU_MEMORY'];
+      delete process.env['TAU_TRIALS'];
+      delete process.env['TAU_TRAIN_DOMAIN'];
+      delete process.env['TAU_TEST_DOMAIN'];
       delete process.env['TAU_WORKDIR'];
     }
   });

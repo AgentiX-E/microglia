@@ -11,6 +11,7 @@ function raw(over: Partial<Tau2Raw> = {}): Tau2Raw {
     learning: { rows: 2, unanswered: 0, edited: 2, distilled: 2, distillFailed: 0 },
     calls: { total: 40, failed: 0 },
     domains: { stored: 2, withoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
+    scenario: { learn: 'retail', test: 'retail', recall: 'retail' },
     ...over,
   };
 }
@@ -31,6 +32,16 @@ describe('armRecordFromDriver', () => {
       unscopedIn: 0,
       widenedIn: 0,
     });
+  });
+
+  it('carries the three scenario names a cross-domain arm has', () => {
+    // Without this the record cannot say whether a transfer happened: a store learned in `retail`
+    // and recalled under `retail` while answering `airline` is a foreign pack by construction, and
+    // the difference between that and a `retail` run is one field.
+    const record = armRecordFromDriver(
+      raw({ scenario: { learn: 'retail', test: 'airline', recall: 'retail' } }),
+    );
+    expect(record.scenario).toEqual({ learn: 'retail', test: 'airline', recall: 'retail' });
   });
 
   it('counts distinct held-out tasks in the denominator and keeps repeats in the split', () => {

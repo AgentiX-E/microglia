@@ -59,6 +59,15 @@ export type Tau2Raw = {
   };
   /** Calls the run made to the model, and how many of them failed after retries. */
   readonly calls: { readonly total: number; readonly failed: number };
+  /**
+   * Which scenario each half ran in, and the scope the facade recalled under.
+   *
+   * Three names rather than one because a cross-domain arm has three: it learns in one scenario,
+   * answers in another, and asks the store for items under the scope the items were stored with. The
+   * third is what makes a foreign pack possible at all — recall is scoped, and a store scoped to
+   * `retail` serves nothing to an `airline` question unless the caller asks in the store's own terms.
+   */
+  readonly scenario: { readonly learn: string; readonly test: string; readonly recall: string };
   /** The domain ledger: what the store holds, and the two paths by which an item loses its domain. */
   readonly domains: {
     readonly stored: number;
@@ -100,5 +109,6 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     },
     // Repeats kept: see decision 4.
     split: { train: raw.train, test: raw.test },
+    scenario: raw.scenario,
   };
 }

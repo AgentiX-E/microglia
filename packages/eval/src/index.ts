@@ -503,6 +503,15 @@ export {
 } from './ledger.js';
 
 export { armRecordFromDriver, type Tau2Raw } from './tau2-instrument.js';
+export { heldOutPlan, qualifiedId, type HeldOutPlan, type HeldOutPlanInput } from './tau2-plan.js';
+export {
+  pairKey,
+  transferReadingOf,
+  trialRowsOf,
+  type TauTrialRow,
+  type PackTransferEpisode,
+  type PackTransferReading,
+} from './tau2-transfer.js';
 
 export {
   R36_BARS,

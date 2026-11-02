@@ -40,15 +40,18 @@ import {
   LlmClient,
   driverArgs,
   armRecordFromDriver,
+  heldOutPlan,
   learnableCorrections,
   parseTauResults,
   parseTauTasks,
-  splitTaskIds,
+  qualifiedId,
   toPassAtK,
+  trialRowsOf,
   type Correction,
   type PassAtKInput,
   type Tau2ArmRecord,
   type Tau2Raw,
+  type TauTrialRow,
 } from '@agentix-e/microglia-eval';
 
 const runFile = promisify(execFile);
@@ -57,7 +60,23 @@ const runFile = promisify(execFile);
 const REPO = fileURLToPath(new URL('../../../../', import.meta.url));
 const SCRIPT = join(REPO, 'eval', 'drivers', 'tau2', 'run_split.py');
 
-const DOMAIN = process.env['TAU_DOMAIN'] ?? 'retail';
+/**
+ * The three scenario names a run has.
+ *
+ * A within-scenario run has one name three times over, which is why one variable was enough until
+ * R29 stage 2. A cross-domain arm needs all three to differ in exactly one combination: it learns
+ * from `TAU_TRAIN_DOMAIN`, answers `TAU_TEST_DOMAIN`, and recalls under `TAU_RECALL_DOMAIN`, which
+ * defaults to the learned scenario because that is the scope the items were stored with.
+ *
+ * The recall scope is the treatment. τ² items written by this driver carry `scope.domain` of the
+ * scenario they were learned in, and recall filters by it, so a `retail` store answers an `airline`
+ * question with nothing unless the facade asks in the store's own terms. Asking in the store's terms
+ * is what a transfer arm *is*; the alternative — leaving the filter at the question's scenario —
+ * would measure an empty pack and call it a null.
+ */
+const TEST_DOMAIN = process.env['TAU_TEST_DOMAIN'] ?? process.env['TAU_DOMAIN'] ?? 'retail';
+const LEARN_DOMAIN = process.env['TAU_TRAIN_DOMAIN'] ?? process.env['TAU_DOMAIN'] ?? 'retail';
+const RECALL_DOMAIN = process.env['TAU_RECALL_DOMAIN'] ?? LEARN_DOMAIN;
 const MEMORY = (process.env['TAU_MEMORY'] ?? 'true') !== 'false';
 const TRIALS = Math.max(1, Number(process.env['TAU_TRIALS'] ?? 4) || 4);
 const TRAIN_SHARE = Number(process.env['TAU_TRAIN_SHARE'] ?? 0.5) || 0.5;
@@ -69,6 +88,16 @@ const TRAIN_SHARE = Number(process.env['TAU_TRAIN_SHARE'] ?? 0.5) || 0.5;
  * and the artefact records `n` so a small run cannot be read as a large one.
  */
 const MAX_TASKS = Math.max(0, Number(process.env['TAU_MAX_TASKS'] ?? 0) || 0);
+/**
+ * Tasks each half keeps, after whatever split produced it; `0` means all of them.
+ *
+ * Separate from `MAX_TASKS` because the two caps answer different questions and a cross-domain arm
+ * needs both at once: how large an evaluated sample the dispatch affords, and how many corrections
+ * the store is built from. One cap for both would have made the foreign pack's size a function of
+ * the evaluation budget.
+ */
+const TRAIN_TASKS = Math.max(0, Number(process.env['TAU_TRAIN_TASKS'] ?? 0) || 0);
+const TEST_TASKS = Math.max(0, Number(process.env['TAU_TEST_TASKS'] ?? 0) || 0);
 /**
  * The interpreter that can import `tau2`.
  *
@@ -128,9 +157,43 @@ function bestRewards(text: string): Map<string, number> {
   return rewards;
 }
 
-/** A one-endpoint facade: the agent process reads packs, and writes nothing. */
+/**
+ * One evaluated arm's document, read once and used for three things.
+ *
+ * The per-trial rows, the pass^k inputs and the unscored count all come from the same parse, so a
+ * run cannot report a denominator from one reading and a ledger from another. Task ids are
+ * qualified here, at the boundary, so everything downstream — the pair, the split, the ledger —
+ * speaks the same names.
+ */
+function scoredArm(path: string): {
+  readonly tasks: readonly PassAtKInput[];
+  readonly unscored: number;
+  readonly rows: readonly TauTrialRow[];
+} {
+  const run = parseTauResults(readFileSync(path, 'utf8'));
+  const scored = toPassAtK(run, TRIALS);
+  const rows = trialRowsOf(run.trials, TEST_DOMAIN);
+  observedTrials = rows;
+  return {
+    // A task the reader could not name is left unnamed rather than renamed into a name it does not
+    // have: `PassAtKInput.taskId` is optional, and qualifying `undefined` would invent a task.
+    tasks: scored.tasks.map((task) =>
+      task.taskId === undefined ? task : { ...task, taskId: qualifiedId(TEST_DOMAIN, task.taskId) },
+    ),
+    unscored: scored.unscored.length,
+    rows,
+  };
+}
+
+/**
+ * A one-endpoint facade: the agent process reads packs, and writes nothing.
+ *
+ * The agent states the scenario it is answering in and the facade does not use it. That is the
+ * treatment of a transfer arm rather than an oversight: the store's scope decides what can be
+ * served, and the episode's scenario would filter a foreign pack down to nothing.
+ */
 function startRecall(
-  recall: (input: { task: string; text: string; domain: string }) => Promise<{ rendered: string }>,
+  recall: (input: { task: string; text: string }) => Promise<{ rendered: string }>,
 ): Promise<{ url: string; close: () => Promise<void> }> {
   const server: Server = createServer((request, response) => {
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
@@ -140,8 +203,7 @@ function startRecall(
     }
     const task = url.searchParams.get('task') ?? TASK;
     const text = url.searchParams.get('text') ?? '';
-    const domain = url.searchParams.get('domain') ?? DOMAIN;
-    recall({ task, text, domain })
+    recall({ task, text })
       .then((pack) => {
         response.writeHead(200, { 'content-type': 'application/json' });
         response.end(JSON.stringify({ rendered: pack.rendered }));
@@ -206,24 +268,72 @@ function episodeFailures(diagnostics: Tau2PhaseDiagnostics | undefined): number 
   return failed;
 }
 
+/** Every episode the evaluated half produced, with its task named the way the record names it. */
+let observedTrials: readonly TauTrialRow[] | undefined;
+
 /** The arm record the protocol's gates read, or `undefined` before a run has happened. */
 export function instrument(): Tau2ArmRecord | undefined {
   return observed === undefined ? undefined : armRecordFromDriver(observed);
 }
 
-export async function run(): Promise<readonly PassAtKInput[]> {
-  const workdir = process.env['TAU_WORKDIR'] ?? mkdtempSync(join(tmpdir(), 'microglia-tau2-'));
-  const listPath = join(workdir, 'tasks.json');
+/**
+ * The evaluated half's episodes, one row per trial.
+ *
+ * Separate from `instrument()` because it is a different size of thing: the record is a summary the
+ * gates read, and this is the ledger the transfer measurement is paired over. A driver that returned
+ * only the summary would make the cross-domain reading impossible without buying the run again.
+ */
+export function trials(): readonly TauTrialRow[] | undefined {
+  return observedTrials;
+}
+
+/** The task ids one scenario holds, as τ² names them. */
+async function listTasks(domain: string, out: string): Promise<readonly string[]> {
   // The listing is its own call: `driverArgs` models the two *running* phases, and
   // "what is in this task set" is a different question with a different answer.
-  await phase([SCRIPT, '--domain', DOMAIN, '--phase', 'list', '--out', listPath]);
-  const listed = JSON.parse(readFileSync(listPath, 'utf8')) as { tasks?: string[] };
+  await phase([SCRIPT, '--domain', domain, '--phase', 'list', '--out', out]);
+  const listed = JSON.parse(readFileSync(out, 'utf8')) as { tasks?: string[] };
   const ids = listed.tasks ?? [];
-  if (ids.length === 0) throw new Error('tau2 returned no tasks');
+  if (ids.length === 0) throw new Error(`tau2 returned no tasks in ${domain}`);
+  return ids;
+}
 
-  const drawn = MAX_TASKS > 0 ? ids.slice(0, MAX_TASKS) : ids;
-  const { train, test } = splitTaskIds(drawn, TRAIN_SHARE);
-  if (test.length === 0) throw new Error('tau2 split left no held-out task');
+/** A qualified id back to the scenario's own name, which is what τ² is asked to run. */
+function unqualified(domain: string): (id: string) => string {
+  const prefix = `${domain}/`;
+  return (id) => (id.startsWith(prefix) ? id.slice(prefix.length) : id);
+}
+
+export async function run(): Promise<readonly PassAtKInput[]> {
+  const workdir = process.env['TAU_WORKDIR'] ?? mkdtempSync(join(tmpdir(), 'microglia-tau2-'));
+  const evaluated = await listTasks(TEST_DOMAIN, join(workdir, 'test-tasks.json'));
+  const drawn = MAX_TASKS > 0 ? evaluated.slice(0, MAX_TASKS) : evaluated;
+  // One listing serves both halves on one scenario; a cross-domain arm needs the second, and pays
+  // for it with a call that returns ids it will never evaluate.
+  const learnable =
+    LEARN_DOMAIN === TEST_DOMAIN ? drawn : await listTasks(LEARN_DOMAIN, join(workdir, 'learn-tasks.json'));
+
+  const plan = heldOutPlan({
+    learnIds: learnable,
+    evalIds: drawn,
+    learnScenario: LEARN_DOMAIN,
+    testScenario: TEST_DOMAIN,
+    trainShare: TRAIN_SHARE,
+    trainCap: TRAIN_TASKS,
+    evalCap: TEST_TASKS,
+  });
+  if (plan.test.length === 0) throw new Error('tau2 split left no held-out task');
+  // The plan's first invariant, re-checked where it is about to be paid for: a leak is the one
+  // defect in this lane that produces a number rather than an error, so the run stops instead.
+  const trained = new Set(plan.train);
+  const leaked = plan.test.filter((id) => trained.has(id));
+  if (leaked.length > 0) throw new Error(`tau2 plan leaked ${String(leaked.length)} task(s) into learning`);
+
+  // The record speaks in qualified ids and the benchmark in its own: both lists are kept because
+  // neither naming is right for the other's job.
+  const train = plan.train.map(unqualified(LEARN_DOMAIN));
+  const test = plan.test.map(unqualified(TEST_DOMAIN));
+  const scenario = { learn: LEARN_DOMAIN, test: TEST_DOMAIN, recall: RECALL_DOMAIN };
 
   // What V1 grades. The pack is rendered in this process and read in another, so the size has to be
   // counted at the boundary rather than reconstructed from the agent's transcript.
@@ -234,7 +344,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     await phase(
       driverArgs({
         script: SCRIPT,
-        domain: DOMAIN,
+        domain: TEST_DOMAIN,
         phase: 'eval',
         agent: 'llm_agent',
         taskIds: test,
@@ -242,14 +352,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         out: evalPath,
       }),
     );
-    return toPassAtK(parseTauResults(readFileSync(evalPath, 'utf8')), TRIALS).tasks;
+    // The reference arm's episodes are as much a part of the transfer ledger as the memory arm's:
+    // they are the control half of every pair, so they are recorded here rather than left in a
+    // temporary file the job deletes.
+    return scoredArm(evalPath).tasks;
   }
 
   const learnPath = join(workdir, 'learn.json');
   await phase(
     driverArgs({
       script: SCRIPT,
-      domain: DOMAIN,
+      domain: LEARN_DOMAIN,
       phase: 'learn',
       agent: 'llm_agent',
       taskIds: train,
@@ -288,7 +401,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   for (const correction of corrections) {
     const handle = host.begin({
       task: TASK,
-      input: { question: correction.taskId, domain: DOMAIN, schemaDigest: DOMAIN },
+      input: { question: correction.taskId, domain: LEARN_DOMAIN, schemaDigest: LEARN_DOMAIN },
       model: process.env['TAU_MODEL'] ?? 'deepseek-chat',
       promptVersion: 'tau2/1',
       domainPack: 'tau2',
@@ -309,8 +422,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const withoutDomain = knowledge.filter((item) => item.scope.domain === undefined).length;
 
   let evalStdout = '';
-  const facade = await startRecall(async ({ text, domain }) => {
-    const pack = await host.recall({ task: TASK, text, scope: { domain } });
+  const facade = await startRecall(async ({ text }) => {
+    // The recall scope is the *store's* scenario, not the question's: see the comment on
+    // `RECALL_DOMAIN`. The agent still states the scenario it is answering in, and the facade
+    // deliberately does not use it.
+    const pack = await host.recall({ task: TASK, text, scope: { domain: RECALL_DOMAIN } });
     servedPackSizes.push(pack.items.length);
     return pack;
   });
@@ -318,7 +434,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     evalStdout = await phase(
       driverArgs({
         script: SCRIPT,
-        domain: DOMAIN,
+        domain: TEST_DOMAIN,
         phase: 'eval',
         agent: 'microglia_agent',
         taskIds: test,
@@ -334,11 +450,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
 
   const diagnostics = diagnosticsOf(evalStdout);
   const agentTurns = diagnostics?.agent_turns ?? null;
+  const scored = scoredArm(evalPath);
   observed = {
-    train,
-    test,
+    train: plan.train,
+    test: plan.test,
     trials: TRIALS,
-    unscored: 0,
+    unscored: scored.unscored,
     servedPackSizes,
     learning: {
       rows: train.length,
@@ -353,8 +470,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // reported how many turns it took.
     calls: agentTurns === null ? { total: 0, failed: 0 } : { total: agentTurns, failed: episodeFailures(diagnostics) },
     domains: { stored: knowledge.length, withoutDomain, unscopedIn: 0, widenedIn: 0 },
+    scenario,
   };
 
-  const run = parseTauResults(readFileSync(evalPath, 'utf8'));
-  return toPassAtK(run, TRIALS).tasks;
+  return scored.tasks;
 }

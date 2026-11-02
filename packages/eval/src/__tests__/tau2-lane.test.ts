@@ -27,7 +27,7 @@ import { L4ParseError } from '../l4.js';
  *     scalars — each of those is a silent-empty defect waiting to happen.
  *  2. **The projection never invents a fact.** A field that is absent must produce an absent gate,
  *     and a call tally of zero must read as "nobody counted" rather than as perfect reliability.
- *  3. **The index covers the protocol exactly.** Nine supplyable plus thirty arm-indexed is
+ *  3. **The index covers the protocol exactly.** Thirteen supplyable plus twenty-six arm-indexed is
  *     thirty-nine, and a gate that appears in neither table is a gate the audit would silently drop
  *     from every future τ² report.
  */
@@ -389,10 +389,11 @@ describe('the audit accounts for every gate in the protocol', () => {
     expect(raw?.needs).toContain('raw arm');
   });
 
-  it('reaches nine gates when every field the lane can produce is present', () => {
+  it('reaches thirteen gates when every field the lane can produce is present', () => {
     // The lane's ceiling, measured on the record type rather than on a run: no τ² run has produced
-    // this artefact, and the audit says so by counting it as nine supplyable rather than as nine
-    // measured.
+    // this artefact, and the audit says so by counting it as thirteen supplyable rather than as
+    // thirteen measured. The four transfer ids arrived with R29 stage 2, and they come from one
+    // reading rather than from four arms.
     const instrumented: Tau2Evidence = {
       domain: 'retail',
       trialCount: 4,
@@ -409,12 +410,80 @@ describe('the audit accounts for every gate in the protocol', () => {
       },
       reference: { arm: 'reference', tasks: 68, trials: 4, unscored: 0 },
       comparison: { paired: 2, onlyFirst: 0, onlySecond: 0, lost: 1, gained: 0, deltaPp: -50 },
+      transfer: {
+        trials: 40,
+        informative: 12,
+        repaired: 3,
+        blankRight: 27,
+        unmeasured: 1,
+        unmeasuredBlank: 1,
+        ledger: 40,
+        measured: 39,
+        broke: 2,
+        netPp: 2.5641,
+        verdict: 'unmeasured',
+      },
     };
     const audit = tau2GateAudit(instrumented);
-    expect(audit.evaluable).toHaveLength(9);
-    expect(audit.absent).toHaveLength(30);
-    expect(audit.supplyable).toBe(9);
-    expect(audit.armIndexed).toBe(30);
+    expect(audit.evaluable).toHaveLength(13);
+    expect(audit.absent).toHaveLength(26);
+    expect(audit.supplyable).toBe(13);
+    expect(audit.armIndexed).toBe(26);
+  });
+
+  it('grades the four transfer gates on a cross-domain reading, and fails the floor', () => {
+    // What R29 stage 2 buys: the transfer family is graded on a second scenario rather than absent
+    // from it. `V15` reconciles the three buckets, `V33` counts the pairs, `V17` re-derives the net
+    // from its own counts, and `V16` is expected to fail — a foreign pack produces too few
+    // informative episodes to clear a hundred, and a pass there would mean the floor was being
+    // cleared by episodes that were not informative.
+    const audit = tau2GateAudit({
+      domain: 'airline',
+      trialCount: 4,
+      transfer: {
+        trials: 96,
+        informative: 21,
+        repaired: 4,
+        blankRight: 70,
+        unmeasured: 5,
+        unmeasuredBlank: 2,
+        ledger: 96,
+        measured: 91,
+        broke: 3,
+        netPp: 1.0989,
+        verdict: 'unmeasured',
+      },
+    });
+    const byId = new Map(audit.gates.map((gate) => [gate.id, gate]));
+    expect(byId.get('V15-transfer-reconciles')?.pass).toBe(true);
+    expect(byId.get('V33-transfer-ledger')?.pass).toBe(true);
+    expect(byId.get('V17-transfer-net-reported')?.pass).toBe(true);
+    expect(byId.get('V16-transfer-resolvable')?.pass).toBe(false);
+    expect(byId.get('V16-transfer-resolvable')?.blocking).toBe(false);
+    expect(audit.evaluable).toContain('V15-transfer-reconciles');
+  });
+
+  it('refuses a transfer summary whose net does not follow from its own counts', () => {
+    // The one arithmetic V17 exists for: a summary that reports a net the pairs cannot produce is
+    // the failure mode the gate was written after, so the projection must not launder it.
+    const audit = tau2GateAudit({
+      domain: 'airline',
+      trialCount: 4,
+      transfer: {
+        trials: 10,
+        informative: 2,
+        repaired: 2,
+        blankRight: 8,
+        unmeasured: 0,
+        ledger: 10,
+        measured: 10,
+        broke: 0,
+        netPp: 47,
+        verdict: 'unmeasured',
+      },
+    });
+    const net = audit.gates.find((gate) => gate.id === 'V17-transfer-net-reported');
+    expect(net?.pass).toBe(false);
   });
 
   it('fires only the two vacuous gates when the evidence is a domain and a trial count', () => {
@@ -468,6 +537,7 @@ describe('reading an arm artefact', () => {
     expect(bare.learning).toBeUndefined();
     expect(bare.domainOrigin).toBeUndefined();
     expect(bare.split).toBeUndefined();
+    expect(bare.scenario).toBeUndefined();
 
     const rich = tau2ArmRecordOf('memory', {
       n: 1,
@@ -478,10 +548,14 @@ describe('reading an arm artefact', () => {
         learning: { rows: 1, unanswered: 0, edited: 1, distillFailed: 0 },
         domainOrigin: { storedWithDomain: 1, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
         split: { train: ['a'], test: ['b'] },
+        scenario: { learn: 'retail', test: 'airline', recall: 'retail' },
       },
     });
     expect(rich.meanPackIds).toBe(3);
     expect(rich.calls).toEqual({ calls: 10, failures: 1 });
     expect(rich.split).toEqual({ train: ['a'], test: ['b'] });
+    // A cross-domain arm's provenance survives the file: without it a reader of one arm cannot tell
+    // which scenario the store learned in, and the transfer measurement's treatment is unnamed.
+    expect(rich.scenario).toEqual({ learn: 'retail', test: 'airline', recall: 'retail' });
   });
 });

@@ -31,7 +31,7 @@ import {
   toPassAtK,
   type PassAtKInput,
 } from '@agentix-e/microglia-eval';
-import type { Tau2ArmRecord } from '@agentix-e/microglia-eval';
+import type { Tau2ArmRecord, TauTrialRow } from '@agentix-e/microglia-eval';
 import { writeResult } from './lib.js';
 
 const PUBLISHED = 0.575; // ALTK-Evolve, τ²-retail, pass^4 on the same split.
@@ -144,6 +144,14 @@ type Measurement = {
    * protocol's gates read a *pair* of arms and one arm's artefact cannot answer them.
    */
   readonly instrumentation?: Tau2ArmRecord;
+  /**
+   * The evaluated half's episodes, when the driver exports a `trials()`.
+   *
+   * A re-scored document has them inside the file it read, and the cross-domain reading needs them
+   * on both sides of a pair; a run whose driver did not export them writes no ledger, and `l4-pair`
+   * reports the transfer family as absent rather than green.
+   */
+  readonly trialRows?: readonly TauTrialRow[];
 };
 
 async function measureFromResults(path: string): Promise<Measurement> {
@@ -175,11 +183,13 @@ async function measureFromDriver(module: string): Promise<Measurement> {
   let loaded: {
     run: () => Promise<readonly PassAtKInput[]>;
     instrument?: () => Tau2ArmRecord | undefined;
+    trials?: () => readonly TauTrialRow[] | undefined;
   };
   try {
     loaded = (await import(specifier)) as {
       run: () => Promise<readonly PassAtKInput[]>;
       instrument?: () => Tau2ArmRecord | undefined;
+      trials?: () => readonly TauTrialRow[] | undefined;
     };
   } catch (error) {
     // A driver that cannot be *resolved* is an absent environment, not a failed
@@ -196,12 +206,14 @@ async function measureFromDriver(module: string): Promise<Measurement> {
   // Read after the run: the function reports what happened, and calling it before would describe a
   // process that had not started.
   const instrumentation = loaded.instrument?.();
+  const trialRows = loaded.trials?.();
   return {
     tasks,
     unscored: [],
     format: 'driver',
     inferredTrials: 0,
     ...(instrumentation === undefined ? {} : { instrumentation }),
+    ...(trialRows === undefined ? {} : { trialRows }),
   };
 }
 
@@ -295,6 +307,9 @@ await writeResult({
   // only when the driver exported an `instrument()`: an absent field is a run whose counts did not
   // cross the process boundary, and `l4-pair` reports those gates as absent rather than green.
   ...(measured.instrumentation === undefined ? {} : { tau2: measured.instrumentation }),
+  // The episodes, so the other arm's artefact can be paired with this one rather than compared to
+  // its mean. One row per trial, which is the unit the transfer gates reconcile.
+  ...(measured.trialRows === undefined ? {} : { per_trial: measured.trialRows }),
   samples: gates,
 });
 for (const gate of gates) {

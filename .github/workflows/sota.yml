@@ -654,6 +654,20 @@ jobs:
       # They must share the split, the model, the trials and the concurrency, or their
       # difference is not the memory's. Running them in one job is also what makes them
       # comparable on the day: two dispatches a week apart measure two endpoints.
+      # What the two arms are about to measure, on the run's own page. A cross-domain dispatch is
+      # one line of variables away from a within-scenario run and the two produce different
+      # artefacts, so the configuration is printed rather than inferred from the file name.
+      - name: State the scenario pair
+        run: |
+          set -euo pipefail
+          LEARN="${{ vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}"
+          TEST="${{ vars.TAU_TEST_DOMAIN || vars.TAU_DOMAIN || 'retail' }}"
+          RECALL="${{ vars.TAU_RECALL_DOMAIN || vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}"
+          {
+            echo "### L4 — learn \`$LEARN\`, answer \`$TEST\`, recall under \`$RECALL\`"
+            echo "Tasks: train cap \`${{ vars.TAU_TRAIN_TASKS || '0' }}\`, evaluation cap \`${{ vars.TAU_TEST_TASKS || '0' }}\` (0 = all), ${{ vars.TAU_TRIALS || '4' }} trial(s)."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: L4 arm — memory
         if: github.event.inputs.l4_arms != 'reference'
         timeout-minutes: 120
@@ -663,7 +677,14 @@ jobs:
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}
           TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-chat' }}
           TAU_VERSION: ${{ vars.TAU_VERSION }}
-          TAU_DOMAIN: ${{ vars.TAU_DOMAIN || 'retail' }}
+          # The scenario pair, stated once per arm so both arms cannot disagree about it. An
+          # unset pair is a within-scenario run; a pair that differs is the transfer arm, whose
+          # treatment is the store recalled under its *own* scenario and served to another.
+          TAU_TRAIN_DOMAIN: ${{ vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
+          TAU_TEST_DOMAIN: ${{ vars.TAU_TEST_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
+          TAU_RECALL_DOMAIN: ${{ vars.TAU_RECALL_DOMAIN || vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
+          TAU_TRAIN_TASKS: ${{ vars.TAU_TRAIN_TASKS || '0' }}
+          TAU_TEST_TASKS: ${{ vars.TAU_TEST_TASKS || '0' }}
           TAU_TRIALS: ${{ vars.TAU_TRIALS || '4' }}
           TAU_MEMORY: 'true'
           TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
@@ -686,7 +707,14 @@ jobs:
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}
           TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-chat' }}
           TAU_VERSION: ${{ vars.TAU_VERSION }}
-          TAU_DOMAIN: ${{ vars.TAU_DOMAIN || 'retail' }}
+          # The scenario pair, stated once per arm so both arms cannot disagree about it. An
+          # unset pair is a within-scenario run; a pair that differs is the transfer arm, whose
+          # treatment is the store recalled under its *own* scenario and served to another.
+          TAU_TRAIN_DOMAIN: ${{ vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
+          TAU_TEST_DOMAIN: ${{ vars.TAU_TEST_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
+          TAU_RECALL_DOMAIN: ${{ vars.TAU_RECALL_DOMAIN || vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
+          TAU_TRAIN_TASKS: ${{ vars.TAU_TRAIN_TASKS || '0' }}
+          TAU_TEST_TASKS: ${{ vars.TAU_TEST_TASKS || '0' }}
           TAU_TRIALS: ${{ vars.TAU_TRIALS || '4' }}
           TAU_MEMORY: 'false'
           TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
