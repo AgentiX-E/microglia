@@ -70,6 +70,17 @@
       "significant95": false
     },
     {
+      "artefact": "poc-sota-bird-dev-R36-pack-assignment.json",
+      "n": 1534,
+      "helped": 65,
+      "harmed": 67,
+      "deltaPp": -0.1303780964797914,
+      "halfWidthPp": 1.4679716802105,
+      "minDetectablePp": 2.0986003305866436,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
       "artefact": "poc-sota-bird-dev.json",
       "n": 1534,
       "helped": 47,
@@ -204,8 +215,8 @@
   ],
   "resolvable": 1,
   "significant95": 6,
-  "total": 18,
-  "resolvableShare": 0.05555555555555555,
+  "total": 19,
+  "resolvableShare": 0.05263157894736842,
   "largest": {
     "artefact": "poc-sota-bird-evidence.json",
     "n": 350,
