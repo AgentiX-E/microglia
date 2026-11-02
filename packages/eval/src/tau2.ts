@@ -131,6 +131,18 @@ export type Correction = {
 };
 
 /**
+ * The statement one task teaches, or `undefined` when it teaches nothing.
+ *
+ * Both callers of this — the corrections and the unanswered ledger — ask the same question in
+ * different words, and they must answer it the same way: a task that teaches and a task that does
+ * not are the two halves of one decision, and two copies of the decision drift.
+ */
+function teachingOf(task: TauTask, reward: number | undefined, threshold: number): string | undefined {
+  if (reward === undefined || reward >= threshold) return undefined;
+  return taskCorrection(task);
+}
+
+/**
  * The corrections a split teaches, given the rewards it produced.
  *
  * A task contributes one correction when its reward is below `threshold`, and none
@@ -144,11 +156,43 @@ export function learnableCorrections(
 ): Correction[] {
   const out: Correction[] = [];
   for (const task of tasks) {
+    const teaching = teachingOf(task, rewards.get(task.id), threshold);
+    if (teaching === undefined) continue;
+    out.push({ taskId: task.id, statement: teaching, actions: task.actions });
+  }
+  return out;
+}
+
+/**
+ * The learning questions the driver could not read: the gap `V32` is about.
+ *
+ * Three ways a training task can leave the store empty, and only two of them are a gap.
+ *
+ *  - It **passed**. Nothing went wrong, so there is nothing to record, and a store built from every
+ *    failure is the store the fold paid for. Counting a pass here would turn the gate into a
+ *    statement about the model's skill: on a τ² training half where the model solves a third of the
+ *    tasks, a store built from every single failure would read as 33% unanswered and fail a
+ *    blocking gate — which is exactly what the driver's `train.length - corrections.length`
+ *    arithmetic did before this function existed.
+ *  - It **failed with no criteria**, or **was never scored**. The run knows something went wrong and
+ *    cannot say what, so the correction the failure should have become does not exist. That is the
+ *    question the record lost, and it is what `unanswered` counts.
+ *
+ * The threshold travels with the caller's, so a run that scores partial credit reads its own passes
+ * as passes here too.
+ */
+export function unansweredTasks(
+  tasks: readonly TauTask[],
+  rewards: ReadonlyMap<string, number>,
+  threshold = 1,
+): string[] {
+  const out: string[] = [];
+  for (const task of tasks) {
     const reward = rewards.get(task.id);
-    if (reward === undefined || reward >= threshold) continue;
-    const statement = taskCorrection(task);
-    if (statement === undefined) continue;
-    out.push({ taskId: task.id, statement, actions: task.actions });
+    const passed = reward !== undefined && reward >= threshold;
+    if (passed) continue;
+    if (teachingOf(task, reward, threshold) !== undefined) continue;
+    out.push(task.id);
   }
   return out;
 }

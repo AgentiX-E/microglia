@@ -49,6 +49,7 @@ import {
   stoppedRun,
   toPassAtK,
   trialRowsOf,
+  unansweredTasks,
   type Correction,
   type PassAtKInput,
   type Tau2ArmRecord,
@@ -374,12 +375,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   );
 
   const learned = readFileSync(learnPath, 'utf8');
-  const corrections: Correction[] = learnableCorrections(parseTauTasks(JSON.parse(learned)), bestRewards(learned));
-  // A training task the driver could not turn into a correction is a smaller store, not a missing data
-  // point, and V32 grades that difference: a store built from sixty of sixty-four questions is a
-  // different treatment from the one the arm was defined as.
-  const learnedTasks = new Set(corrections.map((correction) => correction.taskId));
-  const unanswered = Math.max(0, train.length - learnedTasks.size);
+  const learnedTasks = parseTauTasks(JSON.parse(learned));
+  const rewards = bestRewards(learned);
+  const corrections: Correction[] = learnableCorrections(learnedTasks, rewards);
+  // The two ways a training task can leave the store without a correction are not the same fact, and
+  // V32 grades the difference: a task the model *passed* needed nothing, so a store built from every
+  // failure is the store the arm was defined as; a task that *failed* and still taught nothing is a
+  // question the record lost. The arithmetic here used to be `train.length - corrections.length`,
+  // which counted every pass as a gap and would have failed a blocking gate on a run whose store was
+  // exactly right; `unansweredTasks` is the same decision `learnableCorrections` makes, read the
+  // other way round.
+  const unanswered = unansweredTasks(learnedTasks, rewards).length;
 
   const store = await EmbeddedMemory.open(new MemoryJournal());
   const llm = new LlmClient({
@@ -437,7 +443,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const knowledge = await store.listKnowledge({});
   const withoutDomain = knowledge.filter((item) => item.scope.domain === undefined).length;
   process.stdout.write(
-    `[tau2] learn: ${String(corrections.length)} correction(s), ${String(distillReport.created)} created, ` +
+    `[tau2] learn: ${String(corrections.length)} correction(s) from ${String(train.length)} task(s), ` +
+      `${String(unanswered)} unreadable, ${String(distillReport.created)} created, ` +
       `${String(distillReport.failed)} failed, ${String(knowledge.length)} item(s) in the store, ` +
       `${String(faults.events)} answered by the rule fallback\n`,
   );

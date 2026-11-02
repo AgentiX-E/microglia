@@ -736,6 +736,7 @@ export {
   learnableCorrections,
   parseTauTasks,
   splitTaskIds,
+  unansweredTasks,
   type Correction,
   type DriverCommand,
   type TauAction,

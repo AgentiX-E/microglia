@@ -6,6 +6,7 @@ import {
   learnableCorrections,
   parseTauTasks,
   splitTaskIds,
+  unansweredTasks,
   type TauTask,
 } from '../tau2.js';
 
@@ -154,6 +155,44 @@ describe('learnableCorrections', () => {
       ['b', 0.4],
     ]);
     expect(learnableCorrections(tasks, rewards, 0.8).map((entry) => entry.taskId)).toEqual(['b']);
+  });
+});
+
+describe('unansweredTasks', () => {
+  it('does not count a task the model already passed', () => {
+    // The difference `V32` grades. A pass needs no correction and leaves the store smaller without
+    // leaving a gap in the record, so counting it as unanswered would make the gate a statement
+    // about the model's skill rather than about the learning the store was built from: on a τ²
+    // training half where the model solves a third of the tasks, a store built from every failure
+    // would still have read as 33% unanswered and failed a blocking gate.
+    const tasks = [task({ id: 'a' }), task({ id: 'b' })];
+    const rewards = new Map([
+      ['a', 1],
+      ['b', 0],
+    ]);
+    expect(unansweredTasks(tasks, rewards)).toEqual([]);
+  });
+
+  it('counts a failure whose criteria say nothing about what should have happened', () => {
+    const tasks = [task({ id: 'a', actions: [] }), task({ id: 'b' })];
+    expect(unansweredTasks(tasks, new Map([['a', 0], ['b', 0]]))).toEqual(['a']);
+  });
+
+  it('counts a task the run never scored, because a missing measurement is not a pass', () => {
+    // `bestRewards` only holds tasks that produced a scored trial. A task with none is a question
+    // the driver cannot say anything about, and calling that "learned" would be the opposite error
+    // to the one above: an empty store reported as a full one.
+    expect(unansweredTasks([task({ id: 'a' })], new Map())).toEqual(['a']);
+  });
+
+  it('takes the threshold, so a run that scores partial credit reads its own passes', () => {
+    const tasks = [task({ id: 'a' }), task({ id: 'b' }), task({ id: 'c', actions: [] })];
+    const rewards = new Map([
+      ['a', 0.8],
+      ['b', 0.4],
+      ['c', 0.4],
+    ]);
+    expect(unansweredTasks(tasks, rewards, 0.8)).toEqual(['c']);
   });
 });
 

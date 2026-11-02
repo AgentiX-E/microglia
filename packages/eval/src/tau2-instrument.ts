@@ -58,6 +58,15 @@ export type Tau2Raw = {
    */
   readonly learning: {
     readonly rows: number;
+    /**
+     * Training tasks the driver could not read: unscored, or failed with no criteria.
+     *
+     * Not `rows - corrections`, which is the arithmetic this field had first and which counts every
+     * task the model *passed* as a question the record lost. A pass needs no correction, so on a
+     * training half where the model solves a third of the tasks a store built from every failure
+     * read as 33% unanswered and failed a blocking gate. `unansweredTasks` holds the decision, and
+     * it is the same one `learnableCorrections` makes, read the other way round.
+     */
     readonly unanswered: number;
     readonly edited: number;
     readonly distilled: number;
