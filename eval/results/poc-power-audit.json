@@ -81,6 +81,17 @@
       "significant95": false
     },
     {
+      "artefact": "poc-sota-bird-dev-R37-lexicon-grain.json",
+      "n": 1534,
+      "helped": 78,
+      "harmed": 67,
+      "deltaPp": 0.7170795306388527,
+      "halfWidthPp": 1.5385609761690286,
+      "minDetectablePp": 2.1995142118498054,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
       "artefact": "poc-sota-bird-dev.json",
       "n": 1534,
       "helped": 47,
@@ -215,8 +226,8 @@
   ],
   "resolvable": 1,
   "significant95": 6,
-  "total": 19,
-  "resolvableShare": 0.05263157894736842,
+  "total": 20,
+  "resolvableShare": 0.05,
   "largest": {
     "artefact": "poc-sota-bird-evidence.json",
     "n": 350,

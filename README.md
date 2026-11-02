@@ -413,14 +413,46 @@ with a caveat: there is nothing to set it against.
 > interaction it cannot observe.
 
 `pnpm eval:ledger` recomputes every number in the ledger paragraphs from `poc-sota-bird-train.json` and
-`pnpm eval:pack-assign` recomputes the assignment from the dev run; the workflow asserts fifty-six of
-their fields on every push (`prereg/R35-ledger.md`, `prereg/R36-pack-assignment.md`).
+`pnpm eval:pack-assign` recomputes the assignment from the dev run, and `pnpm eval:lexicon` recomputes the
+definitional grain's reach, licence, two deltas and exchange rate from its own artefact; the workflow asserts
+fifty-six fields of the first two on every push, and thirty-one more across the R37 rounds
+(`prereg/R35-ledger.md`, `prereg/R36-pack-assignment.md`, `prereg/R37-lexicon-grain.md`).
 
 The other half of the reason is not a tuning problem, and it is worth stating before you integrate:
 
 > A rule distilled from one correction repairs **22.6%** of the questions a bare retry cannot fix —
 > **on the question it came from**. Pointed at a foreign question it repairs 29 and breaks 29 out of
 > 892 trials: **+0.00pp net**. A rule and its case are one object.
+
+### The grain of a memory write: a term, and the answer belongs to the corpus
+
+Six rounds changed *which* sentences a prompt carried, how many, and what they were called. R37 changed what
+a memory item **is**: instead of a sentence of advice, a store of `{term, statement}` pairs where the term is a
+phrase copied from the question that taught it. A definition has a referent and can be checked against the
+question in front of the reader; advice has none, so it is applied wherever it is read. Two predicates enforce
+that: a candidate whose term is not in its own question is refused at write time, and an entry is rendered at
+read time only on a question that contains its term.
+
+The arm is licensed, and it is almost never renderable. 179 entries were distilled from 547 corrections — 0.33
+per correction — and those 179 carried **13 distinct terms** a held-out question repeats, so the block rendered
+on **132 of 1,534 questions (8.6%)**, with two of them (`cards`, `drivers`) accounting for 107 of the 132. Every
+rendered line's term was re-found in its own question: **132 of 132**, zero unlicensed.
+
+| contrast, dev split, 1,534 questions | reading |
+|---|---|
+| definitional grain − rule grain | **−0.59pp** [−2.09, +0.91], 65 gained / 74 lost |
+| definitional grain − no memory | **+0.13pp** [−0.59, +0.85], 17 / 15 |
+| its exchange rate across the split | 0.854 against the 1.335 hurdle |
+| the same rate on the 132 questions it reached | 5 repairs / 4 breaks, clearance 1.18 |
+
+The registration said in advance that a reach under a quarter of the split makes the round **inconclusive by
+feasibility** rather than a refutation of the grain, and that clause fired. So the close is not "definitions do
+not pay". It is the arithmetic: a definition is reusable only where a corpus reuses a phrase, and this one does
+not. 127 of the 132 covered questions already carried a curated definition from the benchmark itself, so the
+learned entry was a second copy of a hint the model already had.
+
+> A memory item can be a term with a referent. Whether that is a lever depends on how often the words come
+> back, and on this corpus they do not.
 
 So the library is worth integrating where corrections *repeat* — a workspace with a house convention,
 a schema whose grain is not guessable, a chart style a team insists on — and it is worth nothing where
@@ -651,12 +683,12 @@ docs/         user guide, architecture, glossary
 
 ```bash
 pnpm install
-pnpm check      # typecheck → lanes → tests → audit → integrity → memform → L0 → L2b → delivery → study → bundle size
+pnpm check      # typecheck → lanes → tests → audit → integrity → memform → L0 → L2b → delivery → every reading → study → bundle size
 pnpm bench      # study only, writes bench/results/study.json
 ```
 
 Coverage is enforced at 95% on lines, statements, functions **and** branches. It currently reports
-**99.97 / 99.62 / 100 / 99.97** over **1,081 tests**; the branch arms that remain uncovered are
+**99.98 / 99.67 / 100 / 99.98** over **2,658 tests**; the branch arms that remain uncovered are
 listed with file, line, and reason in the internal technical design, and none is excluded with an ignore
 comment.
 

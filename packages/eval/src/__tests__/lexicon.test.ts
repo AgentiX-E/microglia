@@ -20,7 +20,9 @@ import {
   MIN_TERM,
   occursIn,
   questionTextOf,
+  screenLexicon,
   termOf,
+  termOfLine,
 } from '../lexicon.js';
 
 function candidate(statement: string, payload?: unknown): DistillCandidate {
@@ -244,5 +246,58 @@ describe('lexiconGate', () => {
     });
     expect(gate.actual).toContain('no-term=2, term-not-in-question=1');
     expect(gate.pass).toBe(true);
+  });
+});
+
+describe('screenLexicon', () => {
+  it('keeps what the licence admits and counts the rest by reason', () => {
+    const question = 'What is the highest eligible free rate in Alameda County?';
+    const result = screenLexicon(
+      [
+        candidate('"eligible free rate" denotes free meal count over enrollment.', {
+          term: 'eligible free rate',
+        }),
+        candidate('"absent phrase" denotes nothing here.', { term: 'absent phrase' }),
+        candidate('a lesson with no payload'),
+        candidate('select a from t', { term: 'county' }),
+      ],
+      question,
+    );
+    expect(result.kept).toHaveLength(1);
+    expect(result.kept[0]?.statement).toContain('free meal count');
+    expect(result.refused).toEqual({
+      'lexicon-term-not-in-question': 1,
+      'lexicon-no-term': 1,
+      'lexicon-looks-like-query': 1,
+    });
+  });
+
+  it('returns an empty screen rather than undefined when the model said nothing', () => {
+    expect(screenLexicon([], 'any question')).toEqual({ kept: [], refused: {} });
+  });
+});
+
+describe('the term a rendered line declares', () => {
+  it('reads the term out of the renderer\'s own format', () => {
+    expect(termOfLine('- "cards": the table that holds one row per card, not per account')).toBe('cards');
+  });
+
+  it('keeps a phrase that carries punctuation, because terms come from questions', () => {
+    expect(termOfLine('- "2010 season": the season labelled 2009/2010')).toBe('2010 season');
+    expect(termOfLine('- "K-12": kindergarten through twelfth grade')).toBe('K-12');
+  });
+
+  it('returns undefined for a line the gate could not license', () => {
+    expect(termOfLine('cards: the table that holds one row per card')).toBeUndefined();
+    expect(termOfLine('- the table that holds one row per card')).toBeUndefined();
+    expect(termOfLine('')).toBeUndefined();
+  });
+
+  it('is the same reader the gate uses, so an unreadable line is a line nobody licensed', () => {
+    const lines = ['- "cards": one row per card', 'cards: one row per card'];
+    const read = licensedLines(lines, 'How many cards are there?');
+    expect(read.checked).toBe(1);
+    expect(read.unlicensed).toEqual([]);
+    expect(read.checked).not.toBe(lines.length);
   });
 });

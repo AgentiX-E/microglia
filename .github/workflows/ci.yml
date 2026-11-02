@@ -614,10 +614,10 @@ jobs:
               ['the single-rule questions repaired 25 of 200 and broke 12 of 223', p.single.repairable === 200 && p.single.repaired === 25 && p.single.breakable === 223 && p.single.broken === 12],
               ['which is +3.07pp against -0.96pp for the pairs', Math.abs(p.single.netPp - 3.0732860520094563) < 1e-12 && Math.abs(p.pair.netPp + 0.958029197080292) < 1e-12],
               ['a difference of +4.03pp on [+0.76, +6.62], clustered by database', Math.abs(p.differencePp - 4.031315249089748) < 1e-12 && Math.abs(p.lowPp - 0.7633587786259541) < 1e-12 && Math.abs(p.highPp - 6.6228840821271495) < 1e-12 && p.excludesZero === true],
-              ['but the same contrast is negative in 12 of the 17 committed artefacts, so P7 holds', a.family.datasets === 17 && a.family.positive === 5 && a.family.negative === 12 && g['V61-ledger-family'] === true && v('P7').holds === true],
+              ['but the same contrast is negative in 12 of the 18 committed artefacts, so P7 holds', a.family.datasets === 18 && a.family.positive === 6 && a.family.negative === 12 && g['V61-ledger-family'] === true && v('P7').holds === true],
               ['the power statement is 670 injections per rule, ten times what was measured', v('P6').holds === true && v('P6').observed.includes('670')],
               ['all seven registrations hold and all three gates pass', a.verdicts.every((x) => x.holds) && a.gates.every((x) => x.pass)],
-              ['the statement quotes the null, the correlation and the reversal', a.statement.includes('0.0047') && a.statement.includes('-0.13') && a.statement.includes('+4.03pp') && a.statement.includes('12 of the 17')],
+              ['the statement quotes the null, the correlation and the reversal', a.statement.includes('0.0047') && a.statement.includes('-0.13') && a.statement.includes('+4.03pp') && a.statement.includes('12 of the 18')],
             ];
             const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
             if (bad.length > 0) { console.error('ledger failed: ' + bad.join(', ')); process.exit(1); }
@@ -679,6 +679,98 @@ jobs:
               'pp against observed ' + a.lead.differencePp.toFixed(2) + 'pp, clearance ' +
               arms.removed.clearance.toFixed(3) + ' against ' + arms.kept.clearance.toFixed(3) +
               ', second item ' + m.repairsLost + '/' + m.breaksSaved);
+          "
+
+      - name: The definitional grain renders on 8.6% of questions (R37, and that is the finding)
+        run: |
+          set -euo pipefail
+          node -e "
+            const a = require('./eval/results/poc-sota-bird-dev-R37-lexicon-grain.json');
+            const arm = (name) => a.arms.find((x) => x.arm === name);
+            const lex = arm('full-lexicon');
+            const full = arm('full');
+            const pair = a.arm_pairs.find((x) => x.arm === 'full-lexicon');
+            const gate = Object.fromEntries(a.gates.map((x) => [x.id, x.pass]));
+            const folds = a.per_fold.map((f) => f.lexicon);
+            const covered = a.per_case.filter((c) => (c.injectedLexicon || []).length > 0);
+            // The licence, re-checked here from the rendered lines rather than trusted from the gate:
+            // a term shown on a question that does not contain it is the one thing this grain cannot do.
+            // Token match rather than a regex with a Unicode property class, because this file is a
+            // shell double-quoted string long before it is JavaScript, and a backslash-escaped class
+            // reaches node as a different expression than the one that was written. Tokens are the
+            // same rule the module enforces, reached without a backslash.
+            const tokens = (text) => text.toLowerCase().split(/[^a-z0-9]+/).filter((x) => x !== '');
+            const occurs = (term, text) => {
+              const t = tokens(term);
+              const w = tokens(text);
+              if (t.length === 0) return false;
+              return w.some((_, i) => t.every((x, j) => w[i + j] === x || (j === t.length - 1 && w[i + j] === x + 's')));
+            };
+            const unlicensed = covered.flatMap((c) => (c.injectedLexicon || [])
+              .map((line) => ({ line, term: (line.match(/^- \"([^\"]+)\":/) || [])[1], q: c.question }))
+              .filter((x) => x.term === undefined || !occurs(x.term, x.q)));
+            const helped = covered.filter((c) => c.arms['full-lexicon'] && !c.withoutMemoryCorrect).length;
+            const harmed = covered.filter((c) => !c.arms['full-lexicon'] && c.withoutMemoryCorrect).length;
+            const checks = [
+              ['the artefact names the registration it executes', a.config.prereg === 'prereg/R37-lexicon-grain.md'],
+              ['the corpus is the dev split: 1,534 questions over 11 databases, 280 learned per fold', a.n.total === 1534 && a.n.databases === 11 && a.n.learn_mean === 280],
+              ['both treated arms ran in one dispatch, so the two grains share a store draw', a.arms.length === 2 && full !== undefined && lex !== undefined],
+              ['the rule grain is the anchor the record has measured five times before', Math.abs(full.delta_pp - 0.7170795306388527) < 1e-12 && full.gained === 78 && full.lost === 67],
+              ['the definitional block is 12 characters against the rule block 1,062, so it is not a dose', Math.abs(lex.mean_pack_chars - 11.855280312907432) < 1e-12 && Math.abs(full.mean_pack_chars - 1061.8878748370273) < 1e-12],
+              ['and it renders on 132 of 1,534 questions, 8.6%, so P1 is refuted by feasibility', covered.length === 132 && Math.abs(lex.mean_pack_ids - 0.08604954367666232) < 1e-12],
+              ['the store learned 34, 33, 37, 38 and 37 entries across the five folds', folds.map((f) => f.entries).join(',') === '34,33,37,38,37'],
+              ['and rendered 16, 26, 24, 32 and 34 lines from them', folds.map((f) => f.lines).join(',') === '16,26,24,32,34'],
+              ['every line was read back and every term licensed, so V64 passes', gate['V64-lexicon-is-licensed'] === true && folds.every((f) => f.unlicensed === 0 && f.checked === f.lines)],
+              ['each line is licensed against its own question, re-checked here', unlicensed.length === 0],
+              ['the only refusal was a candidate with no term at all: 12 of them, and none for a term the question lacked', folds.reduce((s, f) => s + (f.refused['lexicon-no-term'] || 0), 0) === 12 && folds.every((f) => (f.refused['lexicon-term-not-in-question'] || 0) === 0)],
+              ['on the 132 questions it reached, it repaired 5 and broke 4', helped === 5 && harmed === 4],
+              ['and against the rule grain the grain costs 0.59pp on an interval that spans zero', Math.abs(pair.deltaPp + 0.5867014341590613) < 1e-12 && pair.ciLowPp < 0 && pair.ciHighPp > 0 && pair.gained === 65 && pair.lost === 74],
+              ['so the round is inconclusive by feasibility, not a refutation of the grain', covered.length / a.n.total < 0.25 && pair.p > 0.05],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('lexicon failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('lexicon: ' + checks.length + ' checks pass, ' + covered.length + '/' + a.n.total +
+              ' questions reached (' + (100 * covered.length / a.n.total).toFixed(1) + '%), ' +
+              folds.reduce((s, f) => s + f.entries, 0) + ' entries, ' + helped + ' repaired and ' + harmed +
+              ' broken on them, ' + pair.deltaPp.toFixed(2) + 'pp against the rule grain');
+          "
+
+      - name: The reach is the finding, and it is arithmetic over the artefact
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/lexicon" pnpm eval:lexicon
+          diff -u eval/results/poc-lexicon.json "${RUNNER_TEMP}/lexicon/poc-lexicon.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/lexicon/poc-lexicon.json');
+            const v = (id) => a.verdicts.find((x) => x.id === id);
+            const g = Object.fromEntries(a.gates.map((x) => [x.id, x.pass]));
+            const l = a.ledger;
+            const s = a.exchange.split;
+            const c = a.exchange.covered;
+            const checks = [
+              ['the reading names the registration it executes', a.registered === 'prereg/R37-lexicon-grain.md'],
+              ['it is the dev split the arm was scored on: 1,534 questions over 11 databases', l.questions === 1534 && l.databases === 11],
+              ['547 corrections became 179 entries, so the distiller yielded 0.33 per correction', l.corrections === 547 && l.entries === 179 && Math.abs(l.entriesPerCorrection - 0.3272) < 1e-12],
+              ['those 179 entries carried only 13 distinct terms the corpus repeats', l.distinctTerms === 13],
+              ['so the block reached 132 of 1,534 questions, 8.6%, and P1 is refuted by feasibility', l.coveredQuestions === 132 && Math.abs(l.coverageShare - 0.086) < 1e-12 && v('P1').holds === false],
+              ['two terms account for 107 of the 132 covered questions, and the first is the table itself', l.topTwoQuestions === 107 && l.topTerms[0].term === 'cards' && l.topTerms[0].questions === 87],
+              ['127 of the 132 already carried a curated definition from the corpus, so the arm was a second copy', l.coveredWithEvidence === 127],
+              ['every rendered line was licensed, and the blocking gate says so', a.gates.length === 2 && g['V64-lexicon-is-licensed'] === true && l.renderedLines === 132],
+              ['the gate that decides this round is the advisory one, not the blocking one', g['V65-lexicon-is-feasible'] === false && a.gates.find((x) => x.id === 'V65-lexicon-is-feasible').blocking === false],
+              ['across the split it repairs 17 and breaks 15, clearing 0.854 of the 1.335 hurdle', s.repaired === 17 && s.broken === 15 && Math.abs(s.clearance - 0.8536) < 1e-12 && Math.abs(s.hurdle - 1.3278) < 1e-12],
+              ['but the arm only acted on 132 questions, where the same ratio is 5 to 4 and the hurdle is 1.063', c.questions === 132 && c.repaired === 5 && c.broken === 4 && Math.abs(c.hurdle - 1.0625) < 1e-12 && Math.abs(c.clearance - 1.1765) < 1e-12],
+              ['so P4 is still not met, on the reading the registration fixed', v('P4').holds === false && v('P4').observed.includes('0.8536')],
+              ['against no memory the grain is +0.13pp on an interval that spans zero', a.arms.lexicon.gained === 17 && a.arms.lexicon.lost === 15 && v('P2').holds === false],
+              ['against the rule grain it is -0.59pp on an interval that spans zero', Math.abs(a.arms.pair.deltaPp + 0.5867) < 1e-12 && a.arms.pair.lowPp < 0 && a.arms.pair.highPp > 0 && v('P3').holds === false],
+              ['one of six predictions holds, and it is the licence rather than an effect', a.verdicts.filter((x) => x.holds).length === 1 && v('P5').holds === true],
+              ['the statement quotes the arithmetic rather than a verdict about the grain', a.statement.includes('179 entries from 547 corrections') && a.statement.includes('13 terms') && a.statement.includes('8.6%')],
+              ['and it says the round is inconclusive rather than refuted', a.feasibility.clause === 'inconclusive by feasibility' && a.feasibility.tested === false],
+            ];
+            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            if (bad.length > 0) { console.error('lexicon reading failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('lexicon reading: ' + checks.length + ' checks pass, ' + l.coveredQuestions + '/' + l.questions +
+              ' reached, ' + l.entries + ' entries from ' + l.corrections + ' corrections, ' + c.repaired + '/' + c.broken +
+              ' on the covered cells against ' + s.repaired + '/' + s.broken + ' across the split');
           "
 
       - name: CPU scale and latency

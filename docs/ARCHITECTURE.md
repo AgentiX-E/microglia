@@ -998,3 +998,79 @@ the grain at which a correction is written.
   pack size (assigned)       −0.33pp [−1.65, +1.25]            nothing: sign reversed
   the second item            23 repairs / 27 breaks, 0.85       nothing: not additive
 ```
+
+### 8.12 The grain of a write: a definition has a key, and this corpus does not reuse one
+
+Six routes closed with the corpus held fixed — which rules are stored, how many reach the prompt, which
+survive a filter, which questions they are shown to, whether an item carries a value that travels, and
+what a correction is rendered as. Every one of them changed *which* sentences arrived, or how many, or
+what they were called. None changed what an item **is**, and that is what this section measures.
+
+**The record already contains the comparison, and it is not close.** BIRD attaches a curated sentence to
+most questions — 142 characters, mean, of what one term means in this database — and removing it costs
+**17.01pp** on the dev split, paired, clustered by database (`R24`, n = 1,534). The distilled rule pack
+on the same split costs **−0.59pp**. Two objects in one prompt slot, and the difference is neither the
+author nor the wording:
+
+```
+  what was measured                       what it showed     what it licenses
+  ─────────────────────────────           ────────────────   ─────────────────────────────
+  the corpus's own definition, removed    −17.01pp           a definition is worth a lot here
+  the distilled rule pack, added           −0.59pp           advice is worth nothing here
+  the two together (the interaction)        none              they are not substitutes (R24)
+```
+
+**Why a definition and a rule are different objects.** A rule states something about a class of
+questions and has no referent in the one in front of the reader, so it is applied wherever it is read —
+which is what §8.10 measures when it finds the pack naming entities the question never mentioned. A
+definition has a **key**: the term. It can be retrieved by the word it is about, and it can speak only
+on a question that contains that word. Both properties are mechanical predicates over text, and
+`packages/eval/src/lexicon.ts` enforces them rather than asking a model to respect them:
+
+```
+  write time   admit only when payload.term occurs in the question that taught the entry
+  read time    render only when the held-out question still contains the term
+  V64          re-reads every rendered line and fails the run if a term is not in its question
+```
+
+**What the arm read, and why the round is inconclusive rather than negative.** `full-lexicon` is a
+second store distilled from the same corrections under a different instruction, rendered under a heading
+that says what the block is, at the same 1,200-character budget and in the same position. It rendered on
+**132 of 1,534 questions — 8.6%**, below the 25% the registration fixed before the run, so the first
+refutation clause fires: **inconclusive by feasibility**. The reason is arithmetic:
+
+| step | count |
+|---|---|
+| corrections the lexicon store distilled | 547 (≈110 per fold) |
+| entries written | 179 (**0.33 per correction**) |
+| distinct terms among the 179 | **13** |
+| held-out questions containing one of them | **132 (8.6%)** |
+| reached by the two most common terms (`cards`, `drivers`) | 107 of 132 (**81%**) |
+
+A definition is reusable only where the corpus reuses a phrase, and this corpus does not. The entries
+themselves are the right knowledge — `"2010 season" denotes the season labeled 2009/2010, not the
+calendar year 2010` — and 127 of the 132 questions they reached already carried a curated definition from
+the corpus. So the object is right and the reach is the problem, which is the same structural fact R6
+reached from the transfer side ("the units are demonstrations"), now measured without a probe.
+
+**What it does to the product statement.** On this corpus the grain is **not refused and not reachable**:
+nothing a host can do moves the phrase-reuse rate of questions written independently, and the only lever
+that remains on the write side is the distiller's yield, which is a property of the model rather than of
+the memory. A deployment whose questions *do* share vocabulary — a product with a stable schema and
+recurring phrasing — is the setting in which this representation would be testable at all, and that is
+the product face (S1), not this benchmark.
+
+```
+  what was tested                 what it showed                      what it licenses
+  ──────────────────────────      ──────────────────────────────      ────────────────────────────
+  definition grain, coverage      132/1,534 questions, 8.6%          nothing: below the 25% bar
+  entries per correction          0.33                                 a definition is rare
+  terms reused by held-out        13 of 179                           the corpus has no reuse
+  on the questions it reached     5 repaired, 4 broken                nothing: n = 132
+```
+
+**Gates.** `V64-lexicon-is-licensed` is emitted by the lane that measured the arm rather than by the
+shared protocol, because no other lane has this representation: it fails a run whose store learned
+nothing, whose block rendered nothing, or whose renderer showed a term the question never used — three
+ways to publish a clean null without measuring anything. The module is at 100% on all four coverage
+dimensions and the workflow asserts fourteen fields of the reading on every push.

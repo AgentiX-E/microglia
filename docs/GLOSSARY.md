@@ -893,3 +893,35 @@ changes the answers the remaining items produce, which is why an exchange rate c
 predict the pack's, and why no budget, top-k or density threshold can be tuned by asking how many items fit.
 The identity that makes it checkable is that the four marginal cells sum to the measured contrast — −5
 questions on the dev split — and it is a test in `assignment.test.ts`.
+
+**Grain (of a memory write)** — What a stored item *is*, as opposed to what it says. Every earlier round of
+this programme changed the wording, the count, the filter or the audience of a memory item; the grain is the
+object itself. The rule grain is a sentence of advice about how to build a query: it has no referent, so a
+reader cannot check it against the question in front of them, and it is applied wherever it is read. The
+definitional grain is `{term, statement}`, where the term is a phrase copied from the question that taught the
+entry, so the item can only be retrieved by that term and can only speak on a question that contains it. R37
+measured the second against the first on the same store, the same folds, the same budget and the same model:
+**−0.59pp [−2.09, +0.91]**.
+
+**Referent** — The thing a term names in this database. A definition has one; advice does not. This is why the
+licence below is enforceable at all: if an item names a referent, the question either contains that name or the
+item does not apply.
+
+**Licence (lexicon)** — The pair of predicates that make the definitional grain a grain and not a second block
+of advice. At write time `admitLexicon` refuses a candidate whose term does not occur in the question that
+taught it (reasons: `lexicon-no-term`, `lexicon-term-not-in-question`, `lexicon-term-too-short`,
+`lexicon-looks-like-query`). At read time `lexiconPackOf` renders an entry only on a question that contains its
+term, matched on word boundaries with an optional plural and no substring matching, so `rate` cannot be licensed
+by `separate`. `V64-lexicon-is-licensed` re-checks the *rendered lines* rather than the store, because a
+licensed store and a renderer that ignores the licence produce the same store and a different prompt.
+
+**Reach (of a representation)** — The share of held-out questions on which a representation renders at all.
+R37's arm was licensed and reached **132 of 1,534 questions (8.6%)**, because 179 entries distilled from 547
+corrections collapsed to **13 distinct terms** the corpus repeats, with two terms covering 107 of the 132. A
+representation that reaches a twelfth of a split cannot be measured on that split; this is why the round
+registered a feasibility clause before it ran.
+
+**Inconclusive by feasibility** — The adjudication for a round whose arm was not `none` under a second name and
+was not a refutation either: the store was built, the licence held, and the block rendered on too little of the
+split for the contrast to be about the hypothesis. It is a distinct outcome from "not met", and R37 shipped the
+clause *before* the run so that a feasibility failure could not later be read as evidence against the grain.

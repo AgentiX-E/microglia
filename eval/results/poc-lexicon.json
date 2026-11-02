@@ -1,0 +1,156 @@
+{
+  "id": "poc-lexicon",
+  "title": "Whether a definitional memory is reachable at all, read from the arm that tried it",
+  "source": "eval/results/poc-sota-bird-dev-R37-lexicon-grain.json",
+  "sourceGeneratedAt": "poc-sota-bird-dev-R37-lexicon-grain",
+  "registered": "prereg/R37-lexicon-grain.md",
+  "dataset": "BIRD dev",
+  "calls": 5103,
+  "ledger": {
+    "questions": 1534,
+    "databases": 11,
+    "learnPerFold": 280,
+    "corrections": 547,
+    "entries": 179,
+    "entriesPerCorrection": 0.3272,
+    "distinctTerms": 13,
+    "coveredQuestions": 132,
+    "coverageShare": 0.086,
+    "renderedLines": 132,
+    "topTwoQuestions": 107,
+    "topTerms": [
+      {
+        "term": "cards",
+        "questions": 87
+      },
+      {
+        "term": "drivers",
+        "questions": 20
+      },
+      {
+        "term": "How many users",
+        "questions": 11
+      },
+      {
+        "term": "double bonds",
+        "questions": 3
+      },
+      {
+        "term": "eligible free rate",
+        "questions": 2
+      }
+    ],
+    "coveredWithEvidence": 127
+  },
+  "arms": {
+    "rule": {
+      "arm": "full",
+      "deltaPp": 0.7171,
+      "lowPp": -0.8475,
+      "highPp": 2.2816,
+      "gained": 78,
+      "lost": 67,
+      "meanItems": 1.7542,
+      "meanChars": 1061.89
+    },
+    "lexicon": {
+      "arm": "full-lexicon",
+      "deltaPp": 0.1304,
+      "lowPp": -0.5867,
+      "highPp": 0.8475,
+      "gained": 17,
+      "lost": 15,
+      "meanItems": 0.086,
+      "meanChars": 11.86
+    },
+    "pair": {
+      "deltaPp": -0.5867,
+      "lowPp": -2.086,
+      "highPp": 0.9126,
+      "p": 0.497564,
+      "gained": 65,
+      "lost": 74
+    }
+  },
+  "exchange": {
+    "split": {
+      "questions": 1534,
+      "repaired": 17,
+      "broken": 15,
+      "repairable": 659,
+      "breakable": 875,
+      "hurdle": 1.3278,
+      "helpPerHarm": 1.1333,
+      "clearance": 0.8536
+    },
+    "covered": {
+      "questions": 132,
+      "repaired": 5,
+      "broken": 4,
+      "repairable": 64,
+      "breakable": 68,
+      "hurdle": 1.0625,
+      "helpPerHarm": 1.25,
+      "clearance": 1.1765
+    }
+  },
+  "verdicts": [
+    {
+      "id": "P1",
+      "claim": "the arm renders on at least a quarter of the split",
+      "observed": "132 of 1534 questions (8.6%)",
+      "holds": false
+    },
+    {
+      "id": "P2",
+      "claim": "the definitional grain beats no memory, clustered",
+      "observed": "0.13pp [-0.59, 0.85]",
+      "holds": false
+    },
+    {
+      "id": "P3",
+      "claim": "it beats the rule grain by at least one point",
+      "observed": "-0.59pp [-2.09, 0.91]",
+      "holds": false
+    },
+    {
+      "id": "P4",
+      "claim": "its exchange rate clears the bare model hurdle",
+      "observed": "0.8536 against 1.335",
+      "holds": false
+    },
+    {
+      "id": "P5",
+      "claim": "every rendered term occurs in the question it was rendered for",
+      "observed": "132 of 132 lines licensed",
+      "holds": true
+    },
+    {
+      "id": "P6",
+      "claim": "the arm cost within a fifth of the rule block, so a delta is not a dose",
+      "observed": "1062 chars against 12",
+      "holds": false
+    }
+  ],
+  "feasibility": {
+    "tested": false,
+    "clause": "inconclusive by feasibility"
+  },
+  "gates": [
+    {
+      "id": "V64-lexicon-is-licensed",
+      "criterion": "the store holds at least one entry, the arm rendered at least one line, every rendered line carries a readable term, and every term occurs in the question it was rendered for",
+      "actual": "entries=179 lines=132 unlicensed=0 refused(lexicon-no-term=12)",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V65-lexicon-is-feasible",
+      "criterion": "the arm renders on at least 25% of the split, which the registration fixed before the run",
+      "actual": "132 of 1534 questions",
+      "pass": false,
+      "blocking": false
+    }
+  ],
+  "statement": "The grain is not refused and not tested: 132 of 1534 questions (8.6%) carried a definition, because 179 entries from 547 corrections collapsed to 13 terms a held-out question repeats. On the 132 questions it reached it repaired 5 and broke 4 (clearance 1.1765 there, 0.8536 across the split against the 1.335 hurdle)."
+}

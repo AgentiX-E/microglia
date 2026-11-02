@@ -4,7 +4,7 @@ step: R37
 opened: 2026-11-02
 arms: full-lexicon
 sample: 1534
-gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V49,V64
+gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V64
 ---
 
 # R37 — the grain of a memory write: a term and its referent, not advice about a query
@@ -152,3 +152,45 @@ and `full` cells.
   the block.
 - The five adjudications above are `arm_pairs` entries over the same artefact; P1/P5 are the emitted
   `V64-lexicon-is-licensed` gate, which is blocking.
+
+## Outcome (read 2026-11-02, run `41381789619`, 5,103 calls)
+
+| # | Prediction | Reading | Result |
+|---|---|---|---|
+| P1 | the arm is not `none` under a second name | the block rendered on **132 of 1,534** questions (**8.6%**), mean 0.09 items and 12 characters; `V64` passed with 179 entries, 132 lines, 132 terms read back, 0 unlicensed | **refuted — feasibility** |
+| P2 | it beats no memory | `full-lexicon − none` **+0.13pp [−0.59, +0.85]**, 17 gained / 15 lost | not met |
+| P3 | it beats the rule grain by ≥ 1.0pp | `full-lexicon − full` **−0.59pp [−2.09, +0.91]**, 65 / 74 | not met |
+| P4 | clearance ≥ 1.335 | **0.854** (help-per-harm 1.133 on a hurdle of 1.328) | not met |
+| P5 | every shown term is in its question | **132 of 132**, 0 unlicensed, and the only refusals were 12 candidates with no term at all | **holds** |
+| P6 | the arm's cost is held within ±20% of `full` | 12 characters against 1,062 — **1.1%** | not met, by construction |
+
+**The first refutation clause fires, and it is the round's finding.** The arm rendered on 8.6% of the
+split, below the 25% the file fixed in advance, so the round is **inconclusive by feasibility** and not
+a refutation of the grain. The reason is in the artefact and it is arithmetic rather than an opinion:
+
+| step | count |
+|---|---|
+| corrections the lexicon store was distilled from | 547 (≈110 per fold) |
+| entries it wrote | 179 (**0.33 per correction**) |
+| distinct terms among the 179 | **13** |
+| held-out questions that contain one of those terms | **132 of 1,534 (8.6%)** |
+| of those, questions reached by the two most common terms (`cards`, `drivers`) | 107 of 132 (81%) |
+
+A definition is reusable only where the corpus reuses a phrase, and this corpus does not: 179 entries
+written from 547 corrections meet 13 terms that any held-out question repeats, and two of them account
+for four fifths of the coverage. That is the same structural fact R6 measured from the other side ("the
+units are demonstrations"), reached here without a transfer probe.
+
+**What the definitions themselves are worth, on the questions they reached.** 5 repaired, 4 broken
+(+0.76pp on n = 132, which resolves nothing). Their text is the knowledge the benchmark's own `evidence`
+field carries — `"2010 season" denotes the season labeled 2009/2010, not the calendar year 2010`;
+`"double bonds"` denotes the double-bond symbol, not the spaced string `' = '` — so the object is the
+right one and the reach is the problem: **127 of the 132 covered questions already carried a curated
+definition from the corpus**, and the learned one is a second copy of a hint the model already had.
+
+**What would license a second round, stated before it is run.** The two numbers that bound the reach are
+the distiller's yield (0.33 entries per correction) and the corpus's phrase reuse (13 terms from 179
+entries). A round that learned from every correction rather than 280 sampled questions could move the
+first; nothing this project can do moves the second, because the questions are written independently and
+share no terms by design. So the grain is **not refused, and it is not reachable on this corpus** — and
+the honest close is to record both numbers rather than to keep buying corrections.

@@ -131,6 +131,38 @@ describe('exchangeOf', () => {
   });
 });
 
+describe('exchangeOf over a chosen set of cells', () => {
+  it('reads the same arms differently depending on which rows it is given', () => {
+    // R37's shape in miniature, and the reason the reading is named after its rows: four questions the
+    // block reached, six it did not. The uncovered questions cannot change, but they still move the
+    // hurdle's denominator, so the same three repairs read as 9.0 of clearance or 4.5.
+    const covered = [
+      entry('a', 'db1', false, true),
+      entry('b', 'db1', false, true),
+      entry('c', 'db1', false, true),
+      entry('d', 'db1', true, false),
+    ];
+    const rest = [
+      entry('e', 'db1', true, true),
+      entry('f', 'db1', true, true),
+      entry('g', 'db1', true, true),
+      entry('h', 'db1', false, false),
+      entry('i', 'db1', false, false),
+      entry('j', 'db1', false, false),
+    ];
+    const onCovered = exchangeOf(covered);
+    const split = exchangeOf([...covered, ...rest]);
+    expect(onCovered).toMatchObject({ n: 4, repaired: 3, broken: 1, repairable: 3, breakable: 1 });
+    expect(split).toMatchObject({ n: 10, repaired: 3, broken: 1, repairable: 6, breakable: 4 });
+    expect(onCovered.helpPerHarm).toBeCloseTo(3, 10);
+    expect(split.helpPerHarm).toBeCloseTo(3, 10);
+    expect(onCovered.hurdle).toBeCloseTo(1 / 3, 10);
+    expect(split.hurdle).toBeCloseTo(2 / 3, 10);
+    expect(onCovered.clearance).toBeCloseTo(9, 10);
+    expect(split.clearance).toBeCloseTo(4.5, 10);
+  });
+});
+
 describe('precisionBarOf', () => {
   it('is the share of admitted questions that must be repairable for the gain to be positive', () => {
     // 4 repairs of 100 repairable is r = 4%; 3 breaks of 100 breakable is b = 3%. The bar is

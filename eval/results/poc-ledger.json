@@ -83,8 +83,8 @@
     "excludesZero": true
   },
   "family": {
-    "datasets": 17,
-    "positive": 5,
+    "datasets": 18,
+    "positive": 6,
     "negative": 12,
     "flat": 0
   },
@@ -231,6 +231,30 @@
       "differencePp": 0.6161634589072335,
       "lowPp": -1.8119266055045873,
       "highPp": 2.729784690852078,
+      "verdict": "positive"
+    },
+    {
+      "artefact": "poc-sota-bird-dev-R37-lexicon-grain.json",
+      "questions": 1534,
+      "single": {
+        "questions": 377,
+        "repairable": 180,
+        "repaired": 22,
+        "breakable": 197,
+        "broken": 14,
+        "netPp": 2.1220159151193636
+      },
+      "pair": {
+        "questions": 1157,
+        "repairable": 479,
+        "repaired": 56,
+        "breakable": 678,
+        "broken": 53,
+        "netPp": 0.25929127052722556
+      },
+      "differencePp": 1.862724644592138,
+      "lowPp": -2.507097075120429,
+      "highPp": 5.275900332896197,
       "verdict": "positive"
     },
     {
@@ -538,7 +562,7 @@
     {
       "id": "P7",
       "claim": "the pack-size lead is corpus-dependent and does not license a decision",
-      "observed": "+4.03pp [+0.76pp, +6.62pp] on this corpus, but 5 of 17 committed artefacts show it positively against 12 negatively",
+      "observed": "+4.03pp [+0.76pp, +6.62pp] on this corpus, but 6 of 18 committed artefacts show it positively against 12 negatively",
       "holds": true
     }
   ],
@@ -559,10 +583,10 @@
       "id": "V61-ledger-family",
       "pass": true,
       "criterion": "the pack-size family was recomputed on at least fifteen committed artefacts and every row has a sign",
-      "actual": "17 artefacts: 5 positive, 12 negative, 0 flat"
+      "actual": "18 artefacts: 6 positive, 12 negative, 0 flat"
     }
   ],
-  "statement": "Across 203 rules and 13578 injections, a rule's record is 293 against a permutation null of 210 (p = 0.0047), so the rules are not interchangeable — but the record does not travel: measured on one set of databases and again on another it correlates -0.13 over 135 rules with sign agreement of 49%. At 66.9 injections per rule the ledger is mostly its own noise, and a rule that looked harmful does not keep looking harmful where it was not measured (-0.06pp [-1.97pp, +1.56pp]). The one structural variable with a signal is how many rules the prompt carries: 423 questions served a single rule return +3.07pp against -0.96pp for the 6576 served two, a difference of +4.03pp [+0.76pp, +6.62pp] — and that contrast reverses on 12 of the 17 committed artefacts, so it is a corpus effect until an arm says otherwise.",
+  "statement": "Across 203 rules and 13578 injections, a rule's record is 293 against a permutation null of 210 (p = 0.0047), so the rules are not interchangeable — but the record does not travel: measured on one set of databases and again on another it correlates -0.13 over 135 rules with sign agreement of 49%. At 66.9 injections per rule the ledger is mostly its own noise, and a rule that looked harmful does not keep looking harmful where it was not measured (-0.06pp [-1.97pp, +1.56pp]). The one structural variable with a signal is how many rules the prompt carries: 423 questions served a single rule return +3.07pp against -0.96pp for the 6576 served two, a difference of +4.03pp [+0.76pp, +6.62pp] — and that contrast reverses on 12 of the 18 committed artefacts, so it is a corpus effect until an arm says otherwise.",
   "notes": [
     "The unit of the ledger is the injection, not the rule: a question with a two-rule pack credits both rules with the same flip, which is why the dispersion null permutes outcomes rather than resampling rules.",
     "The split-half correlation is the reliability of a half-length ledger; Spearman-Brown turns it into the reliability of the full one, and that number is what a prune has to clear.",

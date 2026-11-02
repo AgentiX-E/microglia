@@ -225,11 +225,11 @@ import {
   requirePopulated,
   retryPromptFor,
   retrySubset,
-  admitLexicon,
   lexiconGate,
   lexiconPackOf,
   licensedLines,
   questionTextOf,
+  screenLexicon,
   termOf,
   type LexiconEntry,
   type LexiconRun,
@@ -3083,17 +3083,11 @@ function screenInterpretation(
   if (form !== 'lexicon') return inner;
   const screened: Interpreter = async (context) => {
     const question = questionTextOf(context.run?.input);
-    const kept: DistillCandidate[] = [];
-    for (const candidate of await inner(context)) {
-      const verdict = admitLexicon(candidate, question);
-      if (verdict.admitted) {
-        kept.push(candidate);
-        continue;
-      }
-      const key = `lexicon-${verdict.reason}`;
-      drops[key] = (drops[key] ?? 0) + 1;
+    const screen = screenLexicon(await inner(context), question);
+    for (const [reason, count] of Object.entries(screen.refused) as [string, number][]) {
+      drops[reason] = (drops[reason] ?? 0) + count;
     }
-    return kept;
+    return screen.kept;
   };
   // The batch pays its calls through `prefetch`, and a wrapper that dropped it would serialise the
   // expensive half of a fold without changing a single number in the artefact.

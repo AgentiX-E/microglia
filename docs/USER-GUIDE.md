@@ -940,6 +940,19 @@ Be honest about the preconditions; the product is only useful inside them.
     tokens; if you are maintaining a store, **fix the grain** rather than the items.
     `pnpm eval:ledger`, `prereg/R35-ledger.md`.
 
+    **What "fix the grain" turned out to mean, and where it stops.** The grain was measured
+    (`R37`, `prereg/R37-lexicon-grain.md`): a memory written as a **term and what it denotes**,
+    retrieved by the term and shown only on a question that contains it, with both predicates
+    enforced over text rather than requested from a model. It behaves as designed — every one of the
+    132 lines it rendered named a term its own question used — and it reached **8.6% of the split**,
+    because a corpus of independently written questions reuses almost no phrasing: 179 entries written
+    from 547 corrections collapsed to **13 terms** that any held-out question repeats, and two of them
+    accounted for four fifths of the coverage. That is below the 25% the registration fixed in
+    advance, so the round is **inconclusive by feasibility** rather than a refutation: on a corpus with
+    no reuse the representation cannot be tested, and on a product whose users ask about the same
+    entities in the same words it is the version worth testing. `pnpm eval:lexicon`,
+    `eval/results/poc-sota-bird-dev-R37-lexicon-grain.json`.
+
 ## 13. Measuring your own generator
 
 The harness that produced every number in this repository is usable by someone else. Two files and

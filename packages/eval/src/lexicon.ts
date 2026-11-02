@@ -131,6 +131,33 @@ export function admitLexicon(candidate: DistillCandidate, question: string): Lex
 }
 
 /**
+ * The write-time screen over a whole reply, with its refusals counted by reason.
+ *
+ * Separated from the interpreter wrapper so it can be tested without a model: the wrapper's only job
+ * is to hold the event, and the arithmetic — which candidates survive, and why the others do not — is
+ * the part that decides what the store contains. A store whose refusals are not counted looks exactly
+ * like a model that had nothing to say, which is the failure this project has already paid for once
+ * (`distill_drops` exists because a 640-character cap was silently discarding a whole content form).
+ */
+export function screenLexicon(
+  candidates: readonly DistillCandidate[],
+  question: string,
+): { readonly kept: readonly DistillCandidate[]; readonly refused: Readonly<Record<string, number>> } {
+  const kept: DistillCandidate[] = [];
+  const refused: Record<string, number> = {};
+  for (const candidate of candidates) {
+    const verdict = admitLexicon(candidate, question);
+    if (verdict.admitted) {
+      kept.push(candidate);
+      continue;
+    }
+    const key = `lexicon-${verdict.reason}`;
+    refused[key] = (refused[key] ?? 0) + 1;
+  }
+  return { kept, refused };
+}
+
+/**
  * The read-time selection: the definitions whose term the question actually uses.
  *
  * Longest term first, then alphabetical, and every ordering that is not a design decision is fixed
@@ -204,6 +231,19 @@ export function questionTextOf(input: unknown): string {
 }
 
 /**
+ * The term a rendered line declares, read back out of the line the model actually saw.
+ *
+ * The renderer writes `- "term": statement`, and this is the only reader of that shape, shared by the
+ * gate and by any later reading, because two regexes over one format drift: a line the gate cannot
+ * read is a line whose licence nobody checked, and a second implementation that reads it differently
+ * would let a term through that the gate rejected.
+ */
+export function termOfLine(line: string): string | undefined {
+  const match = /^- "([^"]+)":/.exec(line);
+  return match === null ? undefined : (match[1] as string);
+}
+
+/**
  * The gate: every term shown to the model occurs in the question it was shown for.
  *
  * `V64` reads the rendered lines rather than the entries, because the claim is about the prompt:
@@ -217,10 +257,9 @@ export function licensedLines(lines: readonly string[], question: string): {
   const unlicensed: string[] = [];
   let checked = 0;
   for (const line of lines) {
-    const match = /^- "([^"]+)":/.exec(line);
-    if (match === null) continue;
+    const term = termOfLine(line);
+    if (term === undefined) continue;
     checked += 1;
-    const term = match[1] as string;
     if (!occursIn(term, question)) unlicensed.push(term);
   }
   return { checked, unlicensed };
@@ -277,3 +316,4 @@ export function lexiconGate(run: LexiconRun): {
     blocking: true,
   };
 }
+
