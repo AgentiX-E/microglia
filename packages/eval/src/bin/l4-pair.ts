@@ -112,6 +112,15 @@ const comparison = compareArms(
 
 const splitMatches = comparison.onlyFirst === 0 && comparison.onlySecond === 0;
 const resolution = resolutionOf(comparison);
+/**
+ * Which scenario the pair ran, read from the arms rather than from the environment.
+ *
+ * `TAU_DOMAIN` used to supply this, and on the cross-domain dispatch it was unset while both arms
+ * were answering `airline`: the pair's own `domain` field said `retail` about a run that never
+ * scored a retail task. An artefact that names the wrong scenario is the same defect as a gate that
+ * grades one scenario against another's bar, one step earlier.
+ */
+const scenario = second.tau2?.scenario ?? first.tau2?.scenario;
 
 /**
  * The transfer reading, when both artefacts carry their episodes.
@@ -130,8 +139,6 @@ const transfer =
         memory: second.per_trial,
         store: second.tau2?.scenario?.learn ?? second.tau2?.scenario?.test ?? DOMAIN,
       });
-
-const scenario = second.tau2?.scenario ?? first.tau2?.scenario;
 
 const evidence: Tau2Evidence = {
   domain: scenario?.test ?? DOMAIN,
@@ -181,7 +188,8 @@ await writeJson('poc-l4-pair', {
   id: 'poc-l4-pair',
   title: 'L4 — memory arm against the reference arm on one split, paired per task',
   ranAt: new Date().toISOString(),
-  domain: DOMAIN,
+  // The scenario the arms answered, which is the only domain this pair can be about.
+  domain: scenario?.test ?? DOMAIN,
   first: { path: FIRST, ranAt: first.ranAt ?? null, pass4: first.metrics?.pass4 ?? null },
   second: { path: SECOND, ranAt: second.ranAt ?? null, pass4: second.metrics?.pass4 ?? null },
   comparison,
@@ -209,6 +217,12 @@ await writeJson('poc-l4-pair', {
     : {
         transfer: {
           store: second.tau2?.scenario?.learn ?? null,
+          // What the store held when recall began. A `repaired` count of zero means one thing when
+          // the store carried forty items and another when it carried none, and the pair used to
+          // leave a reader to open the arm file to tell them apart.
+          storeItems:
+            (second.tau2?.domainOrigin?.storedWithDomain ?? 0) +
+            (second.tau2?.domainOrigin?.storedWithoutDomain ?? 0),
           paired: transfer.paired,
           orphanMemory: transfer.orphanMemory,
           informative: transfer.gate.informative,
@@ -229,6 +243,7 @@ await writeJson('poc-l4-pair', {
     'The pair is defined on the intersection of task ids; tasks scored by one arm only are counted, not dropped silently.',
     'Published reference for scale: ALTK-Evolve pass^4 = 0.575 on tau2-retail.',
     'The protocol gates are the shared thirty-nine, not a τ² copy of them; `absent` names the arm each of the rest would need.',
+    'Call reliability is graded over the population the arm recorded: `calls.scope` is `distillation` when the episodes\u2019 tally came from a process that does not report one.',
     '`transfer` pairs the two arms episode by episode, so a repair is one episode the control failed and the treatment passed. The treatment is the whole pack: `repaired` says the pack fixed an episode, not which item in it did.',
   ],
 });

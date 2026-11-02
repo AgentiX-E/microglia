@@ -676,6 +676,11 @@ jobs:
           TAU_DRIVER: ${{ vars.TAU_DRIVER || './packages/eval/src/bin/tau2-driver.ts' }}
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}
           TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-chat' }}
+          # The distiller's model, in the REST id the endpoint serves. τ²'s Python half is a litellm
+          # caller and names its model `deepseek/deepseek-chat`; the TypeScript client that distils
+          # the corrections posts that name to `api.deepseek.com`, which answers 400 to it. Empty
+          # means "read TAU_MODEL and translate the provider alias", which is the default.
+          TAU_DISTILL_MODEL: ${{ vars.TAU_DISTILL_MODEL }}
           TAU_VERSION: ${{ vars.TAU_VERSION }}
           # The scenario pair, stated once per arm so both arms cannot disagree about it. An
           # unset pair is a within-scenario run; a pair that differs is the transfer arm, whose
