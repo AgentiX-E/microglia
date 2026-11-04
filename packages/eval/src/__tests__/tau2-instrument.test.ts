@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { armRecordFromDriver, type Tau2Raw } from '../tau2-instrument.js';
+import { armRecordFromDriver, storeCensus, type Tau2Raw } from '../tau2-instrument.js';
 
 function raw(over: Partial<Tau2Raw> = {}): Tau2Raw {
   return {
@@ -15,6 +15,50 @@ function raw(over: Partial<Tau2Raw> = {}): Tau2Raw {
     ...over,
   };
 }
+
+describe('storeCensus', () => {
+  const item = (status: string, domain?: string) => ({ status, scope: domain === undefined ? {} : { domain } });
+
+  it('counts the store by status and by what the recall scope can reach', () => {
+    const census = storeCensus(
+      [
+        item('active', 'retail'),
+        item('active', 'retail'),
+        item('active', 'airline'),
+        item('quarantined', 'retail'),
+        item('retired'),
+      ],
+      'retail',
+    );
+    expect(census.stored).toBe(5);
+    expect(census.active).toBe(3);
+    // Two of the three active items were stored under the scenario this run recalls in; the third
+    // is active and unreachable, which is a different defect from being inactive.
+    expect(census.servable).toBe(2);
+    expect(census.statuses).toEqual({ active: 3, candidate: 0, quarantined: 1, retired: 1, other: 0 });
+  });
+
+  it('separates "nothing active" from "nothing in scope"', () => {
+    expect(storeCensus([item('candidate', 'retail')], 'retail')).toMatchObject({ active: 0, servable: 0 });
+    expect(storeCensus([item('active', 'airline')], 'retail')).toMatchObject({ active: 1, servable: 0 });
+  });
+
+  it('counts a status it does not know as other rather than as active', () => {
+    const census = storeCensus([item('archived', 'retail')], 'retail');
+    expect(census.statuses.other).toBe(1);
+    expect(census.active).toBe(0);
+    expect(census.servable).toBe(0);
+  });
+
+  it('reads an empty store as zero everywhere', () => {
+    expect(storeCensus([], 'retail')).toEqual({
+      stored: 0,
+      active: 0,
+      servable: 0,
+      statuses: { active: 0, candidate: 0, quarantined: 0, retired: 0, other: 0 },
+    });
+  });
+});
 
 describe('armRecordFromDriver', () => {
   it('records what the four gate families read, on a clean run', () => {
@@ -60,6 +104,28 @@ describe('armRecordFromDriver', () => {
     // Absent on every artefact written before the field existed: the pair then reports no ceiling
     // rather than one built from a guess about the scenario's size.
     expect(armRecordFromDriver(raw()).scenarioTasks).toBeUndefined();
+  });
+
+  it('carries the store census and the recall tally, so a zero rate has a population', () => {
+    const record = armRecordFromDriver(
+      raw({
+        store: {
+          stored: 14,
+          active: 14,
+          servable: 14,
+          statuses: { active: 14, candidate: 0, quarantined: 0, retired: 0, other: 0 },
+        },
+        recall: { requests: 200, served: 0, empty: 200 },
+      }),
+    );
+    expect(record.store).toMatchObject({ stored: 14, servable: 14 });
+    expect(record.recall).toEqual({ requests: 200, served: 0, empty: 200 });
+  });
+
+  it('omits both when the driver did not count them, rather than reporting zeros', () => {
+    const record = armRecordFromDriver(raw());
+    expect(record.store).toBeUndefined();
+    expect(record.recall).toBeUndefined();
   });
 
   it('counts distinct held-out tasks in the denominator and keeps repeats in the split', () => {

@@ -127,6 +127,31 @@ export type Tau2ArmRecord = {
    * scenario could decide — the ceiling a dispatch cannot lift by drawing a different sample.
    */
   readonly scenarioTasks?: { readonly learn: number; readonly test: number };
+  /**
+   * What the store held, by status and by reachability.
+   *
+   * The population behind `meanPackIds`: without it a zero rate cannot say whether the agent never
+   * asked, the store had nothing active, or the items were stored under a key the recall path does
+   * not ask in. Absent on artefacts written before R42's reading exposed that silence.
+   */
+  readonly store?: {
+    readonly stored: number;
+    readonly active: number;
+    readonly servable: number;
+    readonly statuses: {
+      readonly active: number;
+      readonly candidate: number;
+      readonly quarantined: number;
+      readonly retired: number;
+      readonly other: number;
+    };
+  };
+  /** What the recall facade was asked for, and how many answers carried an item. */
+  readonly recall?: {
+    readonly requests: number;
+    readonly served: number;
+    readonly empty: number;
+  };
 };
 
 /** The paired comparison, reduced to the three numbers a gate reads. */
@@ -354,6 +379,7 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
   // be able to overwrite a field after `supplied` had already been computed from it.
   const extra: {
     meanPackIds?: number;
+    packPopulation?: NonNullable<ProtocolGateInput['packPopulation']>;
     partition?: NonNullable<ProtocolGateInput['partition']>;
     parseRate?: number;
     detectablePp?: number;
@@ -368,6 +394,18 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
   if (memory?.meanPackIds !== undefined) {
     extra.meanPackIds = memory.meanPackIds;
     supplied.push('meanPackIds');
+    // The same field supplies the population behind the rate: a rate over no requests is not a rate.
+    // Both halves of the census travel together or neither does, because one of them alone is the
+    // number that could not explain R42's empty pack.
+    if (memory.store !== undefined && memory.recall !== undefined) {
+      extra.packPopulation = {
+        stored: memory.store.stored,
+        active: memory.store.active,
+        servable: memory.store.servable,
+        requests: memory.recall.requests,
+        served: memory.recall.served,
+      };
+    }
   }
   const partition = partitionOf(memory, evidence.comparison);
   if (partition !== undefined) {

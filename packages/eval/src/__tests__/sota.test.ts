@@ -790,6 +790,48 @@ describe('buildValidityGates', () => {
     expect(gate(sound, 'V1-pack-not-empty').actual).toBe('2.40 rules/question');
   });
 
+  it('V1 names which zero it is: never asked, nothing active, nothing in scope', () => {
+    // Three defects, one rate. The sentence is the only place a reader can tell them apart, and R42
+    // published the rate alone: 0.00 rules/question beside a store of fourteen items.
+    const never = gate(
+      {
+        ...sound,
+        meanPackIds: 0,
+        packPopulation: { stored: 14, active: 14, servable: 14, requests: 0, served: 0 },
+      },
+      'V1-pack-not-empty',
+    );
+    expect(never.actual).toBe(
+      '0.00 rules/question: the store held 14 item(s), 14 of them active, and the agent made no recall request',
+    );
+    expect(never.pass).toBe(false);
+
+    const noActive = gate(
+      {
+        ...sound,
+        meanPackIds: 0,
+        packPopulation: { stored: 14, active: 0, servable: 0, requests: 200, served: 0 },
+      },
+      'V1-pack-not-empty',
+    );
+    expect(noActive.actual).toBe(
+      '0.00 rules/question: 0 of 200 request(s) carried an item, from a store of 14 (0 active, 0 in scope)',
+    );
+
+    const served = gate(
+      {
+        ...sound,
+        meanPackIds: 2.4,
+        packPopulation: { stored: 14, active: 14, servable: 9, requests: 200, served: 200 },
+      },
+      'V1-pack-not-empty',
+    );
+    expect(served.actual).toBe(
+      '2.40 rules/question: 200 of 200 request(s) carried an item, from a store of 14 (14 active, 9 in scope)',
+    );
+    expect(served.pass).toBe(true);
+  });
+
   it('V2 fails on a duplicate, a leak, or a short evaluation', () => {
     expect(gate({ ...sound, partition: { ...sound.partition, duplicated: 1 } }, 'V2-fold-partition').pass).toBe(
       false,

@@ -46,7 +46,9 @@ import {
   parseTauTasks,
   qualifiedId,
   resilientInterpreter,
+  stampDomain,
   stoppedRun,
+  storeCensus,
   toPassAtK,
   trialRowsOf,
   unansweredTasks,
@@ -341,6 +343,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // What V1 grades. The pack is rendered in this process and read in another, so the size has to be
   // counted at the boundary rather than reconstructed from the agent's transcript.
   const servedPackSizes: number[] = [];
+  /**
+   * How many times the agent asked, and how many of those answers carried an item.
+   *
+   * `meanPackIds` is the mean of what was served, and a mean over no request is `0` — which is the
+   * same number as a mean over two hundred empty answers. R42's arm made two hundred requests and
+   * served none; the record could not say so, and the gate's sentence was a rate with no population.
+   */
+  let recallRequests = 0;
+  let recallServed = 0;
 
   const evalPath = join(workdir, 'eval.json');
   if (!MEMORY) {
@@ -405,11 +416,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     createLlmInterpreter({ llm: { complete: async (prompt) => (await llm.chat(prompt, 1200)).text } }),
     ruleInterpreter,
   );
+  // The domain on every claim is the host's, not the interpreter's: `parseScope` takes it from the
+  // model's JSON, recall filters on it, and an item stored under a spelling no question asks in is
+  // stored, counted, and unreachable. Both branches of the fallback are stamped, because the rules
+  // write a scope of their own and a store half-keyed by the model and half by nobody is worse than
+  // either. See `stampDomain` for why this is an override rather than a default.
+  const interpreter = stampDomain(distiller.interpreter, LEARN_DOMAIN);
   const host = await openMicroglia({
     app: 'microglia-l4',
     namespace: 'tau2',
     store,
-    interpreter: distiller.interpreter,
+    interpreter,
     budget: 1200,
     clock: steppingClock(1_700_000_000_000, 1),
     random: mulberry32(Number(process.env['TAU_SEED'] ?? 7) || 7),
@@ -442,10 +459,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // domain somewhere nobody instrumented is exactly what V44 exists to catch.
   const knowledge = await store.listKnowledge({});
   const withoutDomain = knowledge.filter((item) => item.scope.domain === undefined).length;
+  // The population behind `V1`, counted at the boundary the gate grades: a store of fourteen items
+  // that serves nothing is a different defect depending on whether they are active and whether the
+  // recall scope can reach them, and R42's record carried neither number.
+  const census = storeCensus(knowledge, RECALL_DOMAIN);
   process.stdout.write(
     `[tau2] learn: ${String(corrections.length)} correction(s) from ${String(train.length)} task(s), ` +
       `${String(unanswered)} unreadable, ${String(distillReport.created)} created, ` +
-      `${String(distillReport.failed)} failed, ${String(knowledge.length)} item(s) in the store, ` +
+      `${String(distillReport.failed)} failed, ${String(census.stored)} item(s) in the store ` +
+      `(${String(census.active)} active, ${String(census.servable)} servable in ${RECALL_DOMAIN}), ` +
       `${String(faults.events)} answered by the rule fallback\n`,
   );
   process.stdout.write(`[tau2] distill model: configured=${llm.configuredModel} sent=${llm.model}\n`);
@@ -456,6 +478,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // `RECALL_DOMAIN`. The agent still states the scenario it is answering in, and the facade
     // deliberately does not use it.
     const pack = await host.recall({ task: TASK, text, scope: { domain: RECALL_DOMAIN } });
+    recallRequests += 1;
+    if (pack.items.length > 0) recallServed += 1;
     servedPackSizes.push(pack.items.length);
     return pack;
   });
@@ -507,6 +531,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         ? { total: llmStats.prompts, failed: llmStats.failures, scope: 'distillation' as const }
         : { total: agentTurns, failed: episodeFailures(diagnostics), scope: 'run' as const },
     domains: { stored: knowledge.length, withoutDomain, unscopedIn: 0, widenedIn: 0 },
+    store: census,
+    recall: { requests: recallRequests, served: recallServed, empty: recallRequests - recallServed },
     scenario,
     // The scenario's own size, not the split's: a dispatch cap hides it, and it is what bounds the
     // resolution any split of this scenario can reach.

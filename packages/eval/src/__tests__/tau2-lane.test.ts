@@ -487,6 +487,56 @@ describe('the audit accounts for every gate in the protocol', () => {
     expect(byId.get('V8-call-reliability')?.pass).toBe(true);
   });
 
+  it('gives V1 the population behind the rate when the arm recorded one', () => {
+    // The R42 shape: fourteen items, all active, all inside the recall scope, and two hundred
+    // requests that carried none of them. That is the facade dropping what the store offered — a
+    // different defect from R41's empty store — and the gate's sentence now says which.
+    const audit = tau2GateAudit({
+      domain: 'airline',
+      trialCount: 4,
+      memory: {
+        arm: 'memory',
+        tasks: 50,
+        trials: 4,
+        unscored: 0,
+        meanPackIds: 0,
+        calls: { calls: 7, failures: 0, scope: 'distillation' },
+        learning: { rows: 32, unanswered: 25, edited: 7, distilled: 14, distillFailed: 0 },
+        domainOrigin: { storedWithDomain: 14, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
+        store: {
+          stored: 14,
+          active: 14,
+          servable: 14,
+          statuses: { active: 14, candidate: 0, quarantined: 0, retired: 0, other: 0 },
+        },
+        recall: { requests: 200, served: 0, empty: 200 },
+      },
+      comparison: { paired: 50, onlyFirst: 0, onlySecond: 0, lost: 2, gained: 4, deltaPp: 4 },
+    });
+    const v1 = audit.gates.find((gate) => gate.id === 'V1-pack-not-empty');
+    expect(v1?.pass).toBe(false);
+    expect(v1?.actual).toBe(
+      '0.00 rules/question: 0 of 200 request(s) carried an item, from a store of 14 (14 active, 14 in scope)',
+    );
+  });
+
+  it('leaves V1 as a bare rate on an arm that did not record the population', () => {
+    const audit = tau2GateAudit({
+      domain: 'airline',
+      trialCount: 4,
+      memory: {
+        arm: 'memory',
+        tasks: 50,
+        trials: 4,
+        unscored: 0,
+        meanPackIds: 0,
+        learning: { rows: 32, unanswered: 0, edited: 32, distilled: 0, distillFailed: 32 },
+      },
+      comparison: { paired: 50, onlyFirst: 0, onlySecond: 0, lost: 7, gained: 2, deltaPp: -10 },
+    });
+    expect(audit.gates.find((gate) => gate.id === 'V1-pack-not-empty')?.actual).toBe('0.00 rules/question');
+  });
+
   it('grades the four transfer gates on a cross-domain reading, and fails the floor', () => {
     // What R29 stage 2 buys: the transfer family is graded on a second scenario rather than absent
     // from it. `V15` reconciles the three buckets, `V33` counts the pairs, `V17` re-derives the net

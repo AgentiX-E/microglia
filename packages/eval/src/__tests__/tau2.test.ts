@@ -14,6 +14,7 @@ const task = (overrides: Partial<TauTask> = {}): TauTask => ({
   id: 't1',
   actions: [{ name: 'get_order', arguments: { order_id: '#W1' } }],
   communicate: [],
+  assertions: [],
   ...overrides,
 });
 
@@ -26,6 +27,7 @@ describe('parseTauTasks', () => {
           evaluation_criteria: {
             actions: [{ name: 'get_order', arguments: { order_id: '#W1' }, compare_args: ['order_id'] }],
             communicate_info: ['the order ships Monday'],
+            nl_assertions: ['The order status is pending.'],
           },
         },
       ],
@@ -35,6 +37,7 @@ describe('parseTauTasks', () => {
         id: 't1',
         actions: [{ name: 'get_order', arguments: { order_id: '#W1' }, compareArgs: ['order_id'] }],
         communicate: ['the order ships Monday'],
+        assertions: ['The order status is pending.'],
       },
     ]);
   });
@@ -49,12 +52,14 @@ describe('parseTauTasks', () => {
 
   it('treats criteria with a non-array actions field as nothing to check', () => {
     expect(parseTauTasks({ tasks: [{ id: 't4', evaluation_criteria: { actions: null } }] })).toEqual([
-      { id: 't4', actions: [], communicate: [] },
+      { id: 't4', actions: [], communicate: [], assertions: [] },
     ]);
   });
 
   it('keeps a task with no criteria as a task with nothing to check', () => {
-    expect(parseTauTasks({ tasks: [{ id: 't2' }] })).toEqual([{ id: 't2', actions: [], communicate: [] }]);
+    expect(parseTauTasks({ tasks: [{ id: 't2' }] })).toEqual([
+      { id: 't2', actions: [], communicate: [], assertions: [] },
+    ]);
   });
 
   it('drops non-string entries in the arrays instead of inventing them', () => {
@@ -126,8 +131,30 @@ describe('taskCorrection', () => {
     ).toBe('A request of this shape is resolved by calling get_order(order_id="#W1"), then cancel(order_id="#W1", reason="late"), in that order.');
   });
 
-  it('teaches nothing when the criteria name no action', () => {
-    expect(taskCorrection(task({ actions: [] }))).toBeUndefined();
+  it('teaches the rubric when the criteria name no action', () => {
+    // τ²'s retail domain checks database state instead of naming calls, and in R42 twenty-five of
+    // thirty-two failed tasks named no action at all: the store learned from seven of them and `V32`
+    // reported the other twenty-five as questions the record lost. The assertion text is the same
+    // fact in the other admissible form — what must be true at the end rather than which call makes
+    // it true — and a learner that can read only the second form discards two thirds of its failures.
+    expect(
+      taskCorrection(
+        task({
+          actions: [],
+          assertions: ['The order status is cancelled.', 'The payment is refunded to the gift card.'],
+        }),
+      ),
+    ).toBe(
+      'A request of this shape is resolved when: The order status is cancelled. The payment is refunded to the gift card.',
+    );
+  });
+
+  it('prefers the calls when a task states both, because they are the sharper lesson', () => {
+    expect(taskCorrection(task({ assertions: ['The order is cancelled.'] }))).toContain('resolved by calling');
+  });
+
+  it('teaches nothing when the criteria name neither an action nor an assertion', () => {
+    expect(taskCorrection(task({ actions: [], assertions: [] }))).toBeUndefined();
   });
 });
 
@@ -146,6 +173,16 @@ describe('learnableCorrections', () => {
 
   it('skips a failure whose criteria are empty', () => {
     expect(learnableCorrections([task({ id: 'a', actions: [] })], new Map([['a', 0]]))).toEqual([]);
+  });
+
+  it('keeps a rubric-only correction, with the empty call list it really has', () => {
+    const [only] = learnableCorrections(
+      [task({ id: 'a', actions: [], assertions: ['The order is cancelled.'] })],
+      new Map([['a', 0]]),
+    );
+    expect(only?.taskId).toBe('a');
+    expect(only?.actions).toEqual([]);
+    expect(only?.statement).toBe('A request of this shape is resolved when: The order is cancelled.');
   });
 
   it('honours a threshold below one, for runs that score partial credit', () => {
@@ -176,6 +213,13 @@ describe('unansweredTasks', () => {
   it('counts a failure whose criteria say nothing about what should have happened', () => {
     const tasks = [task({ id: 'a', actions: [] }), task({ id: 'b' })];
     expect(unansweredTasks(tasks, new Map([['a', 0], ['b', 0]]))).toEqual(['a']);
+  });
+
+  it('does not count a failure whose rubric states what should have happened', () => {
+    // The reading R42 needed: 25 of 32 failures named no calls, and every one of them stated a
+    // rubric. Counting those as lost questions measured the lane's reader rather than the record.
+    const tasks = [task({ id: 'a', actions: [], assertions: ['The order is cancelled.'] })];
+    expect(unansweredTasks(tasks, new Map([['a', 0]]))).toEqual([]);
   });
 
   it('counts a task the run never scored, because a missing measurement is not a pass', () => {

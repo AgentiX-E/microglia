@@ -31,6 +31,10 @@
  * 4. **The split is passed through with its repeats.** `tasks` counts distinct held-out tasks, which
  *    is the denominator a rate means; `split.test` keeps the evaluation order *including* repeats, so
  *    a driver that ran a task twice is visible to `V2` instead of being silently de-duplicated.
+ * 5. **A zero says which zero it is.** `meanPackIds` is the mean of what the facade served, and both
+ *    "the agent never asked" and "the store had nothing to serve" produce `0.00` from it. R42 served
+ *    zero items from a store of fourteen and the record could not say which of the two it was, so the
+ *    arm's census (`storeCensus`) and the request tally (`recall`) travel beside the rate.
  */
 import type { Tau2ArmRecord } from './tau2-gates.js';
 
@@ -118,7 +122,71 @@ export type Tau2Raw = {
     readonly unscopedIn: number;
     readonly widenedIn: number;
   };
+  /** What the store holds by status, and how much of it the recall scope can reach. */
+  readonly store?: StoreCensus;
+  /** What the facade was asked for, and how often it had an answer. */
+  readonly recall?: RecallTally;
 };
+
+/**
+ * One store, counted by the question `V1` cannot answer alone.
+ *
+ * `active` and `servable` are different questions and the difference is the whole point: an item is
+ * *active* if the policy has cleared it for injection, and *servable* if it additionally matches the
+ * scope `/v1/recall` asks in. A store of fourteen active items of which none is servable is a
+ * retrieval-key defect; a store of fourteen items of which none is active is a confidence defect; a
+ * store of fourteen servable items that served nothing is a defect in the facade. `0.00
+ * rules/question` is the same number for all three.
+ */
+export type StoreCensus = {
+  readonly stored: number;
+  readonly active: number;
+  readonly servable: number;
+  readonly statuses: {
+    readonly active: number;
+    readonly candidate: number;
+    readonly quarantined: number;
+    readonly retired: number;
+    readonly other: number;
+  };
+};
+
+/** What the recall endpoint saw: how many requests, and how many of them carried at least one item. */
+export type RecallTally = {
+  readonly requests: number;
+  readonly served: number;
+  readonly empty: number;
+};
+
+/** The two fields `storeCensus` reads, so a caller can pass items from any store implementation. */
+type CensusItem = {
+  readonly status: string;
+  readonly scope: { readonly domain?: string };
+};
+
+/**
+ * Count a store so that an empty pack has a cause.
+ *
+ * The scope question is asked the way `MemoryStore.search` asks it — `active`, and the domain the
+ * caller recalls under — rather than by inspecting how the item was written. A census that used its
+ * own definition of "reachable" would be able to agree with a broken retrieval path and disagree with
+ * a working one, which is the failure mode the census exists to rule out.
+ */
+export function storeCensus(items: readonly CensusItem[], recallDomain: string): StoreCensus {
+  const statuses = { active: 0, candidate: 0, quarantined: 0, retired: 0, other: 0 };
+  for (const item of items) {
+    const key = item.status;
+    if (key === 'active' || key === 'candidate' || key === 'quarantined' || key === 'retired') {
+      statuses[key] += 1;
+    } else {
+      statuses.other += 1;
+    }
+  }
+  const servable = items.filter(
+    (item) => item.status === 'active' && item.scope.domain === recallDomain,
+  ).length;
+  return { stored: items.length, active: statuses.active, servable, statuses };
+}
 
 export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord {
   const served = raw.servedPackSizes;
@@ -164,5 +232,9 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     // Absent when the driver did not list the scenario it was capped against; the pair then reports
     // no ceiling rather than a ceiling built on a guess.
     ...(raw.scenarioTasks === undefined ? {} : { scenarioTasks: raw.scenarioTasks }),
+    // See decision 5: the rate is one field and the population is the other, and a record that
+    // carried only the first turned R42's empty pack into a number with no cause.
+    ...(raw.store === undefined ? {} : { store: raw.store }),
+    ...(raw.recall === undefined ? {} : { recall: raw.recall }),
   };
 }

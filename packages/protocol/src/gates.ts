@@ -263,6 +263,21 @@ export type ProtocolGateInput = {
    */
   readonly meanPackIds?: number;
   /**
+   * The population behind `meanPackIds`: what the store held, and what the facade was asked for.
+   *
+   * `0.00 rules/question` is the same number for three different defects — the agent never asked, the
+   * store held nothing active, or the items were stored under a key the recall path does not ask in —
+   * and a gate whose sentence cannot separate them sends its reader to the wrong layer. Supplied
+   * beside the rate rather than as its own gate, because it grades nothing: it explains.
+   */
+  readonly packPopulation?: {
+    readonly stored: number;
+    readonly active: number;
+    readonly servable: number;
+    readonly requests: number;
+    readonly served: number;
+  };
+  /**
    * The fold accounting: evaluated, total, duplicated, leaked.
    *
    * Absent when the lane cannot show its split. A gate that guessed zero leaks would certify the
@@ -590,6 +605,35 @@ export type ScenarioGateInput = {
   readonly conventionExecRate?: number;
 };
 
+/**
+ * `V1`'s sentence, with the population behind the rate when the lane recorded one.
+ *
+ * The three zeros are distinct facts and the sentence is the only place they can be told apart:
+ *
+ *   - no request at all — the treatment was never delivered, and no amount of distillation fixes it;
+ *   - requests, nothing servable — the store's items are stored under a key this recall does not ask
+ *     in (`scope.domain`), which is a write-side defect wearing a read-side symptom;
+ *   - requests, items servable, nothing served — the facade is dropping what the store offered.
+ */
+function packReading(
+  mean: number,
+  population: ProtocolGateInput['packPopulation'],
+): string {
+  const rate = `${mean.toFixed(2)} rules/question`;
+  if (population === undefined) return rate;
+  if (population.requests === 0) {
+    return (
+      `${rate}: the store held ${String(population.stored)} item(s), ` +
+      `${String(population.active)} of them active, and the agent made no recall request`
+    );
+  }
+  return (
+    `${rate}: ${String(population.served)} of ${String(population.requests)} request(s) carried an item, ` +
+    `from a store of ${String(population.stored)} (${String(population.active)} active, ` +
+    `${String(population.servable)} in scope)`
+  );
+}
+
 export function buildProtocolGates(
   input: ProtocolGateInput & ScenarioGateInput,
 ): ValidityGate[] {
@@ -598,7 +642,7 @@ export function buildProtocolGates(
     gates.push({
       id: 'V1-pack-not-empty',
       criterion: 'the memory arm injected at least one rule per question on average',
-      actual: `${input.meanPackIds.toFixed(2)} rules/question`,
+      actual: packReading(input.meanPackIds, input.packPopulation),
       pass: input.meanPackIds > 0,
       blocking: true,
     });

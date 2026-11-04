@@ -37,6 +37,16 @@ export type TauTask = {
   readonly actions: readonly TauAction[];
   /** Facts the agent is supposed to tell the user. */
   readonly communicate: readonly string[];
+  /**
+   * The task's own success criteria in prose, when it states them instead of naming calls.
+   *
+   * τ²'s domains disagree about how to write a rubric: `retail` checks database state and says what
+   * should be true, `airline` names the calls. A learner that could only read the second kind left
+   * twenty-five of thirty-two failed tasks in R42 with nothing to learn — `V32` reported 78%
+   * unanswered for a store that held every failure it could read — so the assertion text is carried
+   * here as the other admissible form of the same fact.
+   */
+  readonly assertions: readonly string[];
 };
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -97,6 +107,7 @@ export function parseTauTasks(document: unknown): TauTask[] {
       id,
       actions: Array.isArray(actions) ? actions.map((action) => parseAction(action, id)) : [],
       communicate: asStringArray(criteria?.['communicate_info']),
+      assertions: asStringArray(criteria?.['nl_assertions']),
     };
   });
 }
@@ -112,16 +123,27 @@ export function actionSentence(action: TauAction): string {
 }
 
 /**
- * What a failed episode teaches: the calls that were expected.
+ * What a failed episode teaches: the calls that were expected, or the rubric that names no calls.
  *
- * Deliberately the *actions* and not the reward. A reward of 0.4 says an episode
- * went badly; the criteria say which tool calls were missing, and that is the only
- * form in which a correction can be learned and later applied.
+ * Deliberately the criteria and not the reward. A reward of 0.4 says an episode went badly; the
+ * criteria say what should have happened, and that is the only form in which a correction can be
+ * learned and later applied.
+ *
+ * The calls come first because they are the sharper lesson — an order of tool names with their
+ * arguments can be followed without interpretation. The prose rubric is the fallback for the domains
+ * that check state rather than calls, and it is a *different* statement, not a weaker copy of the
+ * first: it says what must be true at the end, which the distiller turns into a procedure the model
+ * can act on. A task that states neither teaches nothing and is counted as such by `unansweredTasks`.
  */
 export function taskCorrection(task: TauTask): string | undefined {
-  if (task.actions.length === 0) return undefined;
-  const calls = task.actions.map(actionSentence).join(', then ');
-  return `A request of this shape is resolved by calling ${calls}, in that order.`;
+  if (task.actions.length > 0) {
+    const calls = task.actions.map(actionSentence).join(', then ');
+    return `A request of this shape is resolved by calling ${calls}, in that order.`;
+  }
+  if (task.assertions.length > 0) {
+    return `A request of this shape is resolved when: ${task.assertions.join(' ')}`;
+  }
+  return undefined;
 }
 
 export type Correction = {

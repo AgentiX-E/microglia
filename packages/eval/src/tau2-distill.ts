@@ -1,5 +1,5 @@
 /**
- * The two things the τ² lane's learning half needs from its model interpreter.
+ * The things the τ² lane's learning half needs from its model interpreter.
  *
  * ## Why this is not `combineInterpreters`
  *
@@ -21,6 +21,12 @@
  * so the arm's artefact can say "12 of 32 corrections were distilled by the fallback" instead of
  * "the store has 32 rules in it". Without that count the two substrates are indistinguishable from
  * outside, which is the defect this module exists to close.
+ *
+ * ## What the second export is for
+ *
+ * `stampDomain` closes the other half of the same door: a store whose items carry a domain the
+ * recall path never asks in. Its symptom is a pack of zero items beside fourteen stored ones, which
+ * is a number that names no cause until both facts sit in one sentence.
  */
 import type { Interpreter } from '@agentix-e/microglia-core/distill';
 import { MicrogliaError } from '@agentix-e/microglia-core';
@@ -79,4 +85,36 @@ export function resilientInterpreter(
   }
 
   return { interpreter, faults: () => ({ events, reasons: [...reasons] }) };
+}
+
+/**
+ * Stamp the host's observed domain onto every claim an interpreter returns.
+ *
+ * `parseScope` keeps the task from the event — the model cannot rename it — but takes `domain` from
+ * the model's own JSON. The prompt forbids a guess and nothing validates one, so a claim can be
+ * stored under a spelling no reader will ever ask in: recall filters items by `scope.task` *and*
+ * `scope.domain`, and an item whose domain is `retail domain` or `retail_domain` is stored, counted
+ * by `V44` (it has a domain), and unreachable. The pack is then empty for every question, which the
+ * record reports as `0.00 rules/question` beside a store of fourteen items — a number that names no
+ * cause, because the two facts live in different fields and neither explains the other.
+ *
+ * The host is the only party that observes the scenario, so its spelling wins, and it wins as an
+ * override rather than a default: a model that answers `airline` for a run that learned in `retail`
+ * has produced an item this lane will never serve, and leaving that value in place would file a
+ * modelling mistake under "the memory does not work".
+ *
+ * `prefetch` is forwarded for the reason `resilientInterpreter` forwards it: what this wraps is the
+ * interpreter that pays for round trips, and a wrapper that dropped `prefetch` would turn a batched
+ * prompt into one prompt per event.
+ */
+export function stampDomain(interpreter: Interpreter, domain: string): Interpreter {
+  const stamped: Interpreter = async (context) =>
+    (await interpreter(context)).map((candidate) => ({
+      ...candidate,
+      scope: { ...candidate.scope, domain },
+    }));
+  if (interpreter.prefetch !== undefined) {
+    stamped.prefetch = interpreter.prefetch;
+  }
+  return stamped;
 }
