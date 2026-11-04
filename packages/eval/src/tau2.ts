@@ -153,6 +153,27 @@ export type Correction = {
 };
 
 /**
+ * The corrected output one correction is recorded as.
+ *
+ * `complete` states what the agent did — the call names, in order — and `edit` states what should
+ * have happened. The two must differ, because the capture layer refuses an edit that changes nothing
+ * (`MG_E_INVALID_SIGNAL`, "Edit does not change the output"), and a correction that names no calls
+ * would produce that refusal for every rubric-only task: twenty-five of thirty-two on R42's training
+ * half. The rubric travels as `expectation` beside the empty call list, which is the same fact in
+ * the form the event can carry, and it is what the distiller reads.
+ */
+export function correctionEdit(correction: Correction): Record<string, Json> {
+  const actions = correction.actions.map((action) => ({
+    name: action.name,
+    // A mutable copy: the store's payload type is JSON, and a readonly tuple of readonly actions is
+    // not assignable to it, which is the type system asking for a value that cannot be aliased into
+    // the record.
+    arguments: { ...action.arguments },
+  }));
+  return correction.actions.length > 0 ? { actions } : { actions, expectation: correction.statement };
+}
+
+/**
  * The statement one task teaches, or `undefined` when it teaches nothing.
  *
  * Both callers of this — the corrections and the unanswered ledger — ask the same question in

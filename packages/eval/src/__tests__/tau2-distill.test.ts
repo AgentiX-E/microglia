@@ -5,6 +5,7 @@ import { MicrogliaError, mulberry32, steppingClock } from '@agentix-e/microglia-
 import { createLlmInterpreter, ruleInterpreter } from '@agentix-e/microglia-core/distill';
 import type { DistillCandidate } from '@agentix-e/microglia-core';
 import type { InterpretContext } from '@agentix-e/microglia-core/distill';
+import { correctionEdit } from '../tau2.js';
 import { resilientInterpreter, stampDomain } from '../tau2-distill.js';
 import { stoppedRun } from '../stopped-run.js';
 
@@ -253,6 +254,61 @@ describe('the learning half end to end', () => {
     });
     expect(pack.ids).toEqual([items[0]?.id]);
     expect(pack.rendered).toContain('Confirm the order status');
+  });
+
+  it('records a rubric-only correction, and the rubric reaches the distiller', async () => {
+    // The end-to-end shape of a retail failure: no calls named, a prose rubric, and an edit that has
+    // to differ from the completion or the capture layer refuses it. What the test watches is the
+    // prompt: the point of the fallback is that the model *sees* the rubric, not that a field exists.
+    const prompts: string[] = [];
+    const store = await EmbeddedMemory.open(new MemoryJournal());
+    const llm = createLlmInterpreter({
+      llm: {
+        complete: (prompt: string) => {
+          prompts.push(prompt);
+          return Promise.resolve(
+            JSON.stringify([
+              {
+                kind: 'procedure',
+                statement: 'Cancel a pending order before promising a refund it cannot pay.',
+                scope: { field: 'status' },
+              },
+            ]),
+          );
+        },
+      },
+    });
+    const host = await openMicroglia({
+      app: 'microglia-l4',
+      namespace: 'tau2',
+      store,
+      interpreter: stampDomain(resilientInterpreter(llm, ruleInterpreter, { fatal: stoppedRun }).interpreter, 'retail'),
+      budget: 1200,
+      clock: steppingClock(1_700_000_000_000, 1),
+      random: mulberry32(7),
+    });
+
+    const correction = {
+      taskId: '9',
+      statement: 'A request of this shape is resolved when: the order is cancelled.',
+      actions: [],
+    };
+    const handle = host.begin({
+      task: 'tau2.act',
+      input: { question: correction.taskId, domain: 'retail', schemaDigest: 'retail' },
+      model: 'deepseek-chat',
+      promptVersion: 'tau2/1',
+      domainPack: 'tau2',
+    });
+    await handle.complete({ actions: correction.actions.map((action: { name: string }) => action.name) });
+    await handle.edit(correctionEdit(correction), { note: correction.statement });
+    const report = await host.distill({ generalize: false, fatal: stoppedRun });
+
+    expect(report.events).toBe(1);
+    expect(report.created).toBe(1);
+    expect(prompts).toHaveLength(1);
+    expect(prompts[0]).toContain('the order is cancelled');
+    expect((await store.listKnowledge({}))[0]?.scope.domain).toBe('retail');
   });
 
   it('and serves nothing without the stamp, which is the reading R42 published', async () => {

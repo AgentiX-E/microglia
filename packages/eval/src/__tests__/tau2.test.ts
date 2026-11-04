@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   actionSentence,
+  correctionEdit,
   taskCorrection,
   driverArgs,
   learnableCorrections,
@@ -155,6 +156,33 @@ describe('taskCorrection', () => {
 
   it('teaches nothing when the criteria name neither an action nor an assertion', () => {
     expect(taskCorrection(task({ actions: [], assertions: [] }))).toBeUndefined();
+  });
+});
+
+describe('correctionEdit', () => {
+  it('states the calls for a correction that names them', () => {
+    expect(
+      correctionEdit({
+        taskId: 'a',
+        statement: 'A request of this shape is resolved by calling get_order(order_id="#W1"), in that order.',
+        actions: [{ name: 'get_order', arguments: { order_id: '#W1' } }],
+      }),
+    ).toEqual({ actions: [{ name: 'get_order', arguments: { order_id: '#W1' } }] });
+  });
+
+  it('carries the rubric for a correction that names none, so the edit is not a no-op', () => {
+    // The capture layer refuses an edit that does not change the output, so this payload is the
+    // difference between recording 32 lessons and recording 7 -- and the refusal would have been
+    // thrown in the driver's loop, ending the run at the first rubric-only task.
+    const payload = correctionEdit({
+      taskId: 'a',
+      statement: 'A request of this shape is resolved when: the order is cancelled.',
+      actions: [],
+    });
+    expect(payload).toEqual({
+      actions: [],
+      expectation: 'A request of this shape is resolved when: the order is cancelled.',
+    });
   });
 });
 

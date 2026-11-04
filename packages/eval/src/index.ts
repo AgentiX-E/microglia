@@ -745,6 +745,7 @@ export {
 export {
   actionSentence,
   taskCorrection,
+  correctionEdit,
   driverArgs,
   learnableCorrections,
   parseTauTasks,

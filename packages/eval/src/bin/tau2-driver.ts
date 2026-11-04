@@ -40,6 +40,7 @@ import {
   LlmClient,
   driverArgs,
   armRecordFromDriver,
+  correctionEdit,
   heldOutPlan,
   learnableCorrections,
   parseTauResults,
@@ -441,13 +442,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       domainPack: 'tau2',
     });
     await handle.complete({ actions: correction.actions.map((action) => action.name) });
-    // A mutable copy: the store's payload type is JSON, and a readonly tuple of
-    // readonly actions is not assignable to it, which is the type system asking
-    // for a value that cannot be aliased into the record.
-    await handle.edit(
-      { actions: correction.actions.map((action) => ({ name: action.name, arguments: { ...action.arguments } })) },
-      { note: correction.statement },
-    );
+    // The corrected output differs from the completion by construction -- an edit that changes
+    // nothing is refused by the capture layer, and a rubric-only correction would be refused for
+    // every such task. See `correctionEdit`.
+    await handle.edit(correctionEdit(correction), { note: correction.statement });
   }
   // The report, not just the store: `failed` is the count that explains an empty store, and
   // discarding it is what made the first cross-domain dispatch unreadable. `fatal` is passed so a
