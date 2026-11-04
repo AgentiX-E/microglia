@@ -38,13 +38,13 @@ export type TauTask = {
   /** Facts the agent is supposed to tell the user. */
   readonly communicate: readonly string[];
   /**
-   * The task's own success criteria in prose, when it states them instead of naming calls.
+   * The task's own success criteria in prose, for the tasks that state a rubric instead of calls.
    *
-   * τ²'s domains disagree about how to write a rubric: `retail` checks database state and says what
-   * should be true, `airline` names the calls. A learner that could only read the second kind left
-   * twenty-five of thirty-two failed tasks in R42 with nothing to learn — `V32` reported 78%
-   * unanswered for a store that held every failure it could read — so the assertion text is carried
-   * here as the other admissible form of the same fact.
+   * Both scenarios write both forms, in different proportions: at v0.2.0 `retail` names calls on 112
+   * of 114 tasks and states prose on 8, while `airline` states prose on all 50 and names calls on 43
+   * (`label-census.ts` counts them out of the files). A learner that could read only the first form
+   * would have nothing to learn from 15 of the 164 tasks, so the assertion text is carried here as
+   * the other admissible form of the same fact.
    */
   readonly assertions: readonly string[];
 };
@@ -157,10 +157,13 @@ export type Correction = {
  *
  * `complete` states what the agent did — the call names, in order — and `edit` states what should
  * have happened. The two must differ, because the capture layer refuses an edit that changes nothing
- * (`MG_E_INVALID_SIGNAL`, "Edit does not change the output"), and a correction that names no calls
- * would produce that refusal for every rubric-only task: twenty-five of thirty-two on R42's training
- * half. The rubric travels as `expectation` beside the empty call list, which is the same fact in
- * the form the event can carry, and it is what the distiller reads.
+ * (`MG_E_INVALID_SIGNAL`, "Edit does not change the output"). That refusal is reachable: a rubric-only
+ * task recorded against a completion that made no calls would state an empty call list on both sides,
+ * and the event would stop the learning loop rather than teach it. It is 15 of the 164 shipped tasks,
+ * not the twenty-five of thirty-two an earlier reading of R42 attributed to it — that count was the
+ * driver's arithmetic, not the corpus (§17.83 bounds every corpus claim at 2 of 114). The rubric
+ * travels as `expectation` beside the empty call list, which is the same fact in the form the event
+ * can carry, and it is what the distiller reads.
  */
 export function correctionEdit(correction: Correction): Record<string, Json> {
   const actions = correction.actions.map((action) => ({
