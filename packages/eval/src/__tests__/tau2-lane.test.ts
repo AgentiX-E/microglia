@@ -371,6 +371,32 @@ describe('the audit accounts for every gate in the protocol', () => {
     expect(resolution?.actual).toContain('21.41pp');
   });
 
+  it('gives V1 its population when the arm record carries the census', () => {
+    // The sentence the pair report could not print in R43: the artefact held `24 stored / 0 active`
+    // and `1,518 requests / 0 served`, `tau2ArmRecordOf` dropped both, and the gate fell back to the
+    // bare rate. The reading that separates "never asked" from "asked and served nothing" is the whole
+    // difference between a memory that was not used and a memory that could not be reached.
+    const audit = tau2GateAudit({
+      domain: 'airline',
+      trialCount: 4,
+      reference: tau2ArmRecordOf('reference', { n: 50, metrics: { tasks: 50, k: 4 } }),
+      memory: tau2ArmRecordOf('memory', {
+        n: 50,
+        metrics: { tasks: 50, k: 4 },
+        tau2: {
+          meanPackIds: 0,
+          store: { stored: 24, active: 0, servable: 0, statuses: { active: 0, candidate: 24 } },
+          recall: { requests: 1518, served: 0, empty: 1518 },
+        },
+      }),
+      comparison: { paired: 50, onlyFirst: 0, onlySecond: 0, lost: 8, gained: 6, deltaPp: -4 },
+    });
+    const pack = audit.gates.find((entry) => entry.id === 'V1-pack-not-empty');
+    expect(pack?.actual).toBe(
+      '0.00 rules/question: 0 of 1518 request(s) carried an item, from a store of 24 (0 active, 0 in scope)',
+    );
+  });
+
   it('names an arm for every gate it cannot fire', () => {
     const audit = tau2GateAudit(committed);
     expect(audit.absent).toHaveLength(35);
@@ -644,6 +670,8 @@ describe('reading an arm artefact', () => {
     expect(bare.domainOrigin).toBeUndefined();
     expect(bare.split).toBeUndefined();
     expect(bare.scenario).toBeUndefined();
+    expect(bare.store).toBeUndefined();
+    expect(bare.recall).toBeUndefined();
 
     const rich = tau2ArmRecordOf('memory', {
       n: 1,
@@ -655,6 +683,8 @@ describe('reading an arm artefact', () => {
         domainOrigin: { storedWithDomain: 1, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
         split: { train: ['a'], test: ['b'] },
         scenario: { learn: 'retail', test: 'airline', recall: 'retail' },
+        store: { stored: 24, active: 0, servable: 0, statuses: { active: 0, candidate: 24, quarantined: 0, retired: 0, other: 0 } },
+        recall: { requests: 1518, served: 0, empty: 1518 },
       },
     });
     expect(rich.meanPackIds).toBe(3);
@@ -663,5 +693,23 @@ describe('reading an arm artefact', () => {
     // A cross-domain arm's provenance survives the file: without it a reader of one arm cannot tell
     // which scenario the store learned in, and the transfer measurement's treatment is unnamed.
     expect(rich.scenario).toEqual({ learn: 'retail', test: 'airline', recall: 'retail' });
+  });
+
+  it('carries the store census into the record, because the gate that prints it reads the record', () => {
+    // R43's pair report printed `0.00 rules/question` with no population -- the sentence this round
+    // added. The artefact had the census and this function dropped it, so the gate could not say how
+    // many items the zero came from. A block that is present in the file and absent from the record is
+    // invisible to every consumer downstream of the record, which is all of them.
+    const record = tau2ArmRecordOf('memory', {
+      n: 50,
+      metrics: { tasks: 50, k: 4 },
+      tau2: {
+        meanPackIds: 0,
+        store: { stored: 24, active: 0, servable: 0, statuses: { active: 0, candidate: 24 } },
+        recall: { requests: 1518, served: 0, empty: 1518 },
+      },
+    });
+    expect(record.store).toMatchObject({ stored: 24, active: 0, servable: 0 });
+    expect(record.recall).toEqual({ requests: 1518, served: 0, empty: 1518 });
   });
 });

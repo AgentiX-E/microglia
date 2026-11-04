@@ -40,6 +40,7 @@ import {
   tau2DetectablePp,
   tau2GateAudit,
   transferReadingOf,
+  type Tau2ArmRecord,
   type Tau2Evidence,
   type TauTrialRow,
 } from '@agentix-e/microglia-eval';
@@ -68,6 +69,9 @@ type Artefact = {
     readonly split?: { readonly train: readonly string[]; readonly test: readonly string[] };
     readonly scenario?: { readonly learn: string; readonly test: string; readonly recall: string };
     readonly scenarioTasks?: { readonly learn: number; readonly test: number };
+    /** The store's census and the recall tally, when the arm recorded them (R43 onward). */
+    readonly store?: Tau2ArmRecord['store'];
+    readonly recall?: Tau2ArmRecord['recall'];
   };
   readonly per_task?: readonly TaskRow[];
   /** One row per evaluated episode; absent on artefacts written before R29 stage 2. */

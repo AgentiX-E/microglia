@@ -529,6 +529,8 @@ export type Tau2ArmArtefact = {
     readonly domainOrigin?: Tau2ArmRecord['domainOrigin'];
     readonly split?: { readonly train: readonly string[]; readonly test: readonly string[] };
     readonly scenario?: Tau2ArmRecord['scenario'];
+    readonly store?: Tau2ArmRecord['store'];
+    readonly recall?: Tau2ArmRecord['recall'];
   };
 };
 
@@ -560,5 +562,10 @@ export function tau2ArmRecordOf(arm: string, artefact: Tau2ArmArtefact): Tau2Arm
       : { domainOrigin: artefact.tau2.domainOrigin }),
     ...(artefact.tau2?.split === undefined ? {} : { split: artefact.tau2.split }),
     ...(artefact.tau2?.scenario === undefined ? {} : { scenario: artefact.tau2.scenario }),
+    // The census travels with the rate, because `V1`'s sentence is built from these two and a record
+    // that dropped them printed `0.00 rules/question` with no population -- the reading this round
+    // added to distinguish "never asked" from "asked 1,518 times and was served nothing".
+    ...(artefact.tau2?.store === undefined ? {} : { store: artefact.tau2.store }),
+    ...(artefact.tau2?.recall === undefined ? {} : { recall: artefact.tau2.recall }),
   };
 }
