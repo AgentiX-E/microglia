@@ -246,7 +246,8 @@ describe('unansweredTasks', () => {
   it('does not count a failure whose rubric states what should have happened', () => {
     // The shape this exists for: a failure that names no calls and states a rubric. Counting it as a
     // lost question would measure the lane's reader rather than the record. How often that shape occurs
-    // is a property of the corpus, not of a run: 15 of the 164 shipped tasks, per `label-census.ts`.
+    // is a property of the corpus, not of a run: 7 of the 164 shipped tasks state a rubric and name no
+    // calls, per `label-census.ts`.
     const tasks = [task({ id: 'a', actions: [], assertions: ['The order is cancelled.'] })];
     expect(unansweredTasks(tasks, new Map([['a', 0]]))).toEqual([]);
   });

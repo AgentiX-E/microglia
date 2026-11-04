@@ -43,8 +43,9 @@ export type TauTask = {
    * Both scenarios write both forms, in different proportions: at v0.2.0 `retail` names calls on 112
    * of 114 tasks and states prose on 8, while `airline` states prose on all 50 and names calls on 43
    * (`label-census.ts` counts them out of the files). A learner that could read only the first form
-   * would have nothing to learn from 15 of the 164 tasks, so the assertion text is carried here as
-   * the other admissible form of the same fact.
+   * would have nothing to learn from 7 of the 164 tasks -- the airline tasks that state a rubric and
+   * name no calls, of which there are seven -- so the assertion text is carried here as the other
+   * admissible form of the same fact.
    */
   readonly assertions: readonly string[];
 };
@@ -159,9 +160,10 @@ export type Correction = {
  * have happened. The two must differ, because the capture layer refuses an edit that changes nothing
  * (`MG_E_INVALID_SIGNAL`, "Edit does not change the output"). That refusal is reachable: a rubric-only
  * task recorded against a completion that made no calls would state an empty call list on both sides,
- * and the event would stop the learning loop rather than teach it. It is 15 of the 164 shipped tasks,
- * not the twenty-five of thirty-two an earlier reading of R42 attributed to it — that count was the
- * driver's arithmetic, not the corpus (§17.83 bounds every corpus claim at 2 of 114). The rubric
+ * and the event would stop the learning loop rather than teach it. It is the 7 of 164 shipped tasks that
+ * state a rubric and name no calls, not the twenty-five of thirty-two an earlier reading of R42
+ * attributed to it — that count was the driver's arithmetic, not the corpus (the census bounds every
+ * corpus claim: 2 of 114 retail tasks state neither form, 7 airline tasks state prose alone). The rubric
  * travels as `expectation` beside the empty call list, which is the same fact in the form the event
  * can carry, and it is what the distiller reads.
  */
