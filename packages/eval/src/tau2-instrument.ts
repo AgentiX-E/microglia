@@ -149,6 +149,8 @@ export type StoreCensus = {
     readonly retired: number;
     readonly other: number;
   };
+  /** How many items carry each admission reason, keyed by the reason the store wrote. */
+  readonly reasons: Readonly<Record<string, number>>;
 };
 
 /** What the recall endpoint saw: how many requests, and how many of them carried at least one item. */
@@ -158,10 +160,12 @@ export type RecallTally = {
   readonly empty: number;
 };
 
-/** The two fields `storeCensus` reads, so a caller can pass items from any store implementation. */
+/** The fields `storeCensus` reads, so a caller can pass items from any store implementation. */
 type CensusItem = {
   readonly status: string;
   readonly scope: { readonly domain?: string };
+  /** Why the admission gate left the item where it is. `undefined` on items that record none. */
+  readonly statusReason?: string;
 };
 
 /**
@@ -185,7 +189,16 @@ export function storeCensus(items: readonly CensusItem[], recallDomain: string):
   const servable = items.filter(
     (item) => item.status === 'active' && item.scope.domain === recallDomain,
   ).length;
-  return { stored: items.length, active: statuses.active, servable, statuses };
+  // The reason travels with the status because one status covers several decisions: `candidate` is what
+  // an item that missed `minSupport`, an item whose confidence fell short, and a prose claim awaiting a
+  // second task all read as, and the three have nothing in common but the word.
+  const reasons: Record<string, number> = {};
+  for (const item of items) {
+    if (item.statusReason !== undefined && item.statusReason !== '') {
+      reasons[item.statusReason] = (reasons[item.statusReason] ?? 0) + 1;
+    }
+  }
+  return { stored: items.length, active: statuses.active, servable, statuses, reasons };
 }
 
 export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord {

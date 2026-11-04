@@ -264,6 +264,12 @@ type Tau2PhaseDiagnostics = {
   readonly terminated?: Readonly<Record<string, number>> | null;
 };
 
+/** The admission reasons, most frequent first, for the one line a run prints about its own store. */
+function reasonsLine(reasons: Readonly<Record<string, number>>): string {
+  const ranked = Object.entries(reasons).sort((left, right) => right[1] - left[1]);
+  return ranked.length === 0 ? 'none recorded' : ranked.map(([reason, count]) => `${reason}=${String(count)}`).join(', ');
+}
+
 /** How many of the run's episodes ended in something that is not a task outcome. */
 function episodeFailures(diagnostics: Tau2PhaseDiagnostics | undefined): number {
   const terminated = diagnostics?.terminated ?? {};
@@ -466,7 +472,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       `${String(unanswered)} unreadable, ${String(distillReport.created)} created, ` +
       `${String(distillReport.failed)} failed, ${String(census.stored)} item(s) in the store ` +
       `(${String(census.active)} active, ${String(census.servable)} servable in ${RECALL_DOMAIN}), ` +
-      `${String(faults.events)} answered by the rule fallback\n`,
+      `${String(faults.events)} answered by the rule fallback, reasons ` +
+      `${reasonsLine(census.reasons)}\n`,
   );
   process.stdout.write(`[tau2] distill model: configured=${llm.configuredModel} sent=${llm.model}\n`);
 

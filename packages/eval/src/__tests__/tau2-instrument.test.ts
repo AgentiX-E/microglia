@@ -17,7 +17,11 @@ function raw(over: Partial<Tau2Raw> = {}): Tau2Raw {
 }
 
 describe('storeCensus', () => {
-  const item = (status: string, domain?: string) => ({ status, scope: domain === undefined ? {} : { domain } });
+  const item = (status: string, domain?: string, statusReason?: string) => ({
+    status,
+    scope: domain === undefined ? {} : { domain },
+    ...(statusReason === undefined ? {} : { statusReason }),
+  });
 
   it('counts the store by status and by what the recall scope can reach', () => {
     const census = storeCensus(
@@ -50,11 +54,38 @@ describe('storeCensus', () => {
     expect(census.servable).toBe(0);
   });
 
+  it('counts why an item was not activated, because the status alone does not say', () => {
+    // R43's store held 24 items, none active, and the status could not say whether the admission gate
+    // refused them for evidence, for confidence, or for the corroboration rule that prose needs two
+    // tasks to clear. Three different repairs wear one status; the reason is what makes the next round
+    // a hypothesis rather than a guess.
+    const census = storeCensus(
+      [
+        item('candidate', 'retail', 'insufficient-evidence'),
+        item('candidate', 'retail', 'insufficient-evidence'),
+        item('candidate', 'retail', 'needs-corroboration'),
+        item('active', 'retail', 'confidence-cleared'),
+        item('retired'),
+      ],
+      'retail',
+    );
+    expect(census.reasons).toEqual({
+      'insufficient-evidence': 2,
+      'needs-corroboration': 1,
+      'confidence-cleared': 1,
+    });
+  });
+
+  it('invents no reason for an item that records none', () => {
+    expect(storeCensus([item('active', 'retail')], 'retail').reasons).toEqual({});
+  });
+
   it('reads an empty store as zero everywhere', () => {
     expect(storeCensus([], 'retail')).toEqual({
       stored: 0,
       active: 0,
       servable: 0,
+      reasons: {},
       statuses: { active: 0, candidate: 0, quarantined: 0, retired: 0, other: 0 },
     });
   });
