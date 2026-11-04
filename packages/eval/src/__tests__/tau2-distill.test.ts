@@ -384,3 +384,68 @@ describe('stoppedRun', () => {
     expect(stoppedRun(undefined)).toBe(false);
   });
 });
+
+
+describe('what a correction weighs as evidence', () => {
+  it('clears admission in the shape the driver writes, so a store of candidates has another cause', async () => {
+    // R43's store held 24 items, none active and none servable. The obvious suspect is the shape of the
+    // evidence the driver writes: it has no transcript of the failed episode, so it states the completion
+    // as the *reference call names* and the edit as those names with their arguments. `trustFor('edit')`
+    // derives trust from how far that edit moved the completion (`capture/trust.ts`), and admission needs
+    // 0.8 (`minSupport`), so a payload that reads as a small change would be held as a candidate forever.
+    //
+    // Measured rather than assumed, and the measurement rejects it: every shape the driver writes clears
+    // the floor on its own. Three conditions, one store each, same interpreter, same task.
+    const run = async (
+      complete: unknown,
+      edit: Record<string, unknown>,
+    ): Promise<{ status: string | undefined; trust: number | undefined }> => {
+      const store = await EmbeddedMemory.open(new MemoryJournal());
+      const llm = createLlmInterpreter({
+        llm: {
+          complete: () =>
+            Promise.resolve(
+              JSON.stringify([
+                { kind: 'procedure', statement: 'Cancel the pending order before refunding it.', scope: {} },
+              ]),
+            ),
+        },
+      });
+      const host = await openMicroglia({
+        app: 'microglia-l4',
+        namespace: 'tau2',
+        store,
+        interpreter: stampDomain(resilientInterpreter(llm, ruleInterpreter, { fatal: stoppedRun }).interpreter, 'retail'),
+        budget: 1200,
+        clock: steppingClock(1_700_000_000_000, 1),
+        random: mulberry32(7),
+      });
+      const handle = host.begin({
+        task: 'tau2.act',
+        input: { question: 'q', domain: 'retail', schemaDigest: 'retail' },
+        model: 'deepseek-chat',
+        promptVersion: 'tau2/1',
+      });
+      await handle.complete(complete);
+      await handle.edit(edit, { note: 'the order is cancelled' });
+      await host.distill({ generalize: false, fatal: stoppedRun });
+      const [item] = await store.listKnowledge({});
+      return { status: item?.status, trust: item?.trust };
+    };
+
+    const referenceCall = { name: 'cancel_pending_order', arguments: { order_id: 'W1' } };
+    // The shape the driver writes for a call-shaped correction: names, then names with arguments.
+    expect(await run({ actions: ['cancel_pending_order'] }, { actions: [referenceCall] })).toEqual({
+      status: 'active',
+      trust: 0.9,
+    });
+    // A rubric-only correction: nothing in the completion, an expectation in the edit.
+    expect((await run({ actions: [] }, { actions: [], expectation: 'the order is cancelled' })).status).toBe('active');
+    // And against a completion that names a different call.
+    expect((await run({ actions: ['get_order_details'] }, { actions: [referenceCall] })).status).toBe('active');
+    // So the ceiling is not in this file. The next dispatch prints `store.reasons` (the histogram of what
+    // the admission gate wrote) and that is the reading that decides which of the three decisions holds
+    // the items: `minSupport` on the merged evidence, `activationThreshold` on confidence, or the
+    // corroboration rule that prose needs two tasks to clear.
+  });
+});

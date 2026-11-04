@@ -118,3 +118,4 @@ export function stampDomain(interpreter: Interpreter, domain: string): Interpret
   }
   return stamped;
 }
+
