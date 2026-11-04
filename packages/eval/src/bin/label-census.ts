@@ -13,6 +13,7 @@
  * Only the flag parsing and the printing live here; every decision about what a label is lives in
  * `label-census.ts`, where it is covered by tests that state the distinction being made.
  */
+import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 
 import { labelCensus, readLabelCensusTasks, type LabelCensus } from '@agentix-e/microglia-eval';
@@ -71,11 +72,18 @@ function row(name: string, census: LabelCensus): string {
 
 function main(): void {
   const args = parseArgs(process.argv.slice(2));
-  const counted = args.corpora.map((corpus) => ({
-    name: corpus.name,
-    path: corpus.path,
-    census: labelCensus(readLabelCensusTasks(JSON.parse(readFileSync(corpus.path, 'utf8')) as unknown)),
-  }));
+  const counted = args.corpora.map((corpus) => {
+    const raw = readFileSync(corpus.path, 'utf8');
+    return {
+      name: corpus.name,
+      path: corpus.path,
+      // The bytes are recorded with the counts, because a census is only auditable if the reader can
+      // fetch the file that produced it and get the same numbers back.
+      sha256: createHash('sha256').update(raw).digest('hex'),
+      bytes: Buffer.byteLength(raw),
+      census: labelCensus(readLabelCensusTasks(JSON.parse(raw) as unknown)),
+    };
+  });
 
   const header = [
     'corpus',

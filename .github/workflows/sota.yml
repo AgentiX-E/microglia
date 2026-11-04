@@ -666,6 +666,8 @@ jobs:
           {
             echo "### What the corpus carries"
             echo
+            echo "Pinned at \`$(git -C .tau2-bench rev-parse HEAD)\`."
+            echo
             cat eval/results/tau2-label-census.md
           } >> "$GITHUB_STEP_SUMMARY"
 
