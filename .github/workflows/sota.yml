@@ -649,9 +649,10 @@ jobs:
       # sentences about τ² already had the two scenarios' shapes the wrong way round — a claim made
       # from a run's counters that the corpus itself contradicts. Counting the files at the pinned ref
       # beside the run that consumes them makes the corpus a measurement: at v0.2.0 no task in either
-      # scenario declares `reward_basis`, so the shipped call lists sit outside the basis the evaluator
-      # defaults to (`[DB, COMMUNICATE]`). A step rather than a paragraph, so the next reader inherits
-      # the number instead of the recollection.
+      # scenario declares `reward_basis`, so the grade is `DB` (a hash compared to a target derived by
+      # replaying the reference calls) times `COMMUNICATE`; the prose rubrics and the call list *as a
+      # trajectory* never enter it. A step rather than a paragraph, so the next reader inherits the
+      # number instead of the recollection.
       - name: Count the corpus's labels
         run: |
           set -euo pipefail

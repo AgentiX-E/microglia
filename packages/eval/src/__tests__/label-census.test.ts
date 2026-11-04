@@ -38,7 +38,8 @@ describe('labelCensus', () => {
       unteachable: 0,
       silent: 0,
       declaredBasis: 0,
-      unscoredCalls: 0,
+      pathScored: 0,
+      rubricGraded: 0,
     });
   });
 
@@ -65,35 +66,38 @@ describe('labelCensus', () => {
     expect(census).toMatchObject({ calls: 1, rubric: 1, teachable: 1, silent: 0 });
   });
 
-  it('counts a call list as unscored when the basis inherits the upstream default', () => {
-    // The point of the field: `actions` is a label for `ACTION`, and `ACTION` is not in upstream's
-    // default basis, so an undeclared basis means the calls in this corpus are not measured.
+  it('does not call a call list trajectory-graded unless the basis asks for ACTION', () => {
+    // `actions` still defines the target DB state on the default basis -- it is replayed to derive the
+    // hash -- so this field is not "unread calls". It is the narrower fact: the label does not constrain
+    // the path the agent walks, only where it ends up.
     const census = labelCensus([task('a', { actions: 2 }), task('b', { actions: 1, basis: ['DB'] })]);
-    expect(census.unscoredCalls).toBe(2);
+    expect(census).toMatchObject({ calls: 2, pathScored: 0, declaredBasis: 1 });
     expect(UPSTREAM_DEFAULT_BASIS).not.toContain('ACTION');
   });
 
-  it('counts a call list as scored when the task declares ACTION itself', () => {
+  it('counts a call list as trajectory-graded when the task declares ACTION itself', () => {
     const census = labelCensus([task('a', { actions: 2, basis: ['ACTION'] })]);
-    expect(census.unscoredCalls).toBe(0);
+    expect(census.pathScored).toBe(1);
   });
 
-  it('does not count a task without calls as an unscored call list', () => {
-    const census = labelCensus([task('a', { assertions: 2 }), task('b', { actions: 1, basis: ['ACTION'] })]);
-    expect(census.unscoredCalls).toBe(0);
+  it('counts a prose rubric as graded only when the basis asks for NL_ASSERTION', () => {
+    // The label that really is read by nothing by default: `nl_assertions` gates the reward only under
+    // `NL_ASSERTION`, so a lesson distilled from prose is a claim about commentary, not about the score.
+    const census = labelCensus([task('a', { assertions: 1 }), task('b', { assertions: 1, basis: ['NL_ASSERTION'] })]);
+    expect(census).toMatchObject({ rubric: 2, rubricGraded: 1 });
   });
 
   it('reads a declared empty basis as scoring nothing, not as inheriting the default', () => {
     // `[]` is a statement; `undefined` is silence. Collapsing them would let a task that explicitly
     // opted out of every reward be reported as if it were measuring the database.
-    const census = labelCensus([task('a', { actions: 1, basis: [] })]);
-    expect(census.declaredBasis).toBe(1);
-    expect(census.unscoredCalls).toBe(1);
+    const census = labelCensus([task('a', { actions: 1, assertions: 1, basis: [] })]);
+    expect(census).toMatchObject({ declaredBasis: 1, pathScored: 0, rubricGraded: 0 });
   });
 
   it('counts only the tasks that state a basis as declared', () => {
     const census = labelCensus([task('a', { basis: ['DB'] }), task('b'), task('c', { basis: [] })]);
     expect(census.declaredBasis).toBe(2);
+    expect(census).toMatchObject({ pathScored: 0, rubricGraded: 0 });
   });
 
   it('separates a corpus that states no calls from one that states no text at all', () => {

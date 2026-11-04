@@ -1,26 +1,37 @@
 /**
  * What a published benchmark's labels carry, counted.
  *
- * The reason this exists as code rather than as a paragraph: two of this repository's own claims
- * about τ²-bench were made from a run's counters and turned out to be backwards. The corpus is the
- * part of the experiment we do not control, so its shape gets measured out of the file itself, at
- * the pinned ref, and printed beside the run that consumes it.
+ * The reason this exists as code rather than as a paragraph: two of this repository's own claims about
+ * τ²-bench were made from a run's counters, and the corpus disagrees with both of them. The corpus is
+ * the part of the experiment we do not control, so its shape is measured out of the files themselves,
+ * at the pinned ref, and printed beside the run that consumes it.
  *
- * Three distinctions the census keeps, because collapsing any of them produced a wrong sentence:
+ * ## What the pinned ref establishes
  *
- *  - **Calls versus prose.** A task can name the tool calls that resolve it, state a rubric in
- *    natural language, do both, or do neither. `retail` and `airline` at v0.2.0 sit at opposite ends
- *    of this axis, so a statement that starts "the benchmark states X" is a statement about one
- *    domain wearing the other's name.
- *  - **Present versus scored.** `EvaluationCriteria.reward_basis` defaults to `[DB, COMMUNICATE]`
- *    (`src/tau2/data_model/tasks.py`, v0.2.0). `actions` is the label for `ACTION`, which is not in
- *    that default, so a corpus that never declares a basis carries call lists the reward does not
- *    read. That is a fact about the benchmark, and a learner trained on those lists is learning
- *    something the evaluator never checks — which is worth knowing before attributing a null to the
- *    memory.
- *  - **Silent versus rubric-only.** A rubric-only task can be learned as a procedure. A task that
- *    states nothing cannot be learned at all, and is the only shape that can justify an "unanswered"
- *    count. The difference bounds how much of a run's `unanswered` the corpus can explain.
+ * At `sierra-research/tau2-bench` v0.2.0, three facts decide what a label is worth, and none of them is
+ * a matter of interpretation:
+ *
+ *  - `EvaluationCriteria.reward_basis` defaults to `[DB, COMMUNICATE]` (`src/tau2/data_model/tasks.py`,
+ *    `default_factory`).
+ *  - The reward is the product of exactly the components whose `RewardType` appears in that basis
+ *    (`src/tau2/evaluator/evaluator.py:92-118`). `NL_ASSERTION` and `ACTION` are components like any
+ *    other, so a task that does not declare them is not graded on them.
+ *  - `actions` is nonetheless *consumed* on the `DB` path: `EnvironmentEvaluator` replays the reference
+ *    trajectory onto a fresh environment and compares DB hashes
+ *    (`src/tau2/evaluator/evaluator_env.py:93-111`). The call list is therefore the definition of the
+ *    target end state, not a trajectory the agent has to walk — which is why `pathScored` and `calls`
+ *    are different numbers, and why "the reward does not read these calls" would be the wrong sentence.
+ *
+ * The prose rubric is the label that *is* read by nothing in the default configuration: `nl_assertions`
+ * gates the reward only under `NL_ASSERTION`, and no task in either shipped scenario declares it. A
+ * learner that turns that prose into a lesson is learning from commentary on the graded outcome, which
+ * is admissible and is a weaker claim about the benchmark than a replay-derived end state.
+ *
+ * ## Three distinctions the census keeps
+ *
+ * Collapsing any of them produced a wrong sentence somewhere in this repository's history: **calls
+ * versus prose**, **present versus graded**, and **silent versus rubric-only** — the third bounds how
+ * much of a run's `unanswered` a corpus can explain; the others bound nothing.
  */
 
 /** The basis upstream applies when a task does not state one (`EvaluationCriteria.reward_basis`). */
@@ -39,8 +50,8 @@ export type LabelCensusTask = {
    * The task's own reward basis.
    *
    * `undefined` is silence and inherits {@link UPSTREAM_DEFAULT_BASIS}; `[]` is a statement that
-   * nothing is scored. The two are not merged, because a corpus that opted out of every reward and
-   * one that took the default are different measurements.
+   * nothing is scored. The two are not merged, because a corpus that opted out of every reward and one
+   * that took the default are different measurements.
    */
   readonly rewardBasis?: readonly string[];
 };
@@ -62,8 +73,10 @@ export interface LabelCensus {
   readonly silent: number;
   /** Tasks that declare a basis of their own. */
   readonly declaredBasis: number;
-  /** Tasks whose call list is outside the basis the reward is computed over. */
-  readonly unscoredCalls: number;
+  /** Tasks whose call list is graded as a trajectory (`ACTION` in the basis). */
+  readonly pathScored: number;
+  /** Tasks whose prose rubric is graded (`NL_ASSERTION` in the basis). */
+  readonly rubricGraded: number;
 }
 
 /** Count one corpus. */
@@ -75,7 +88,8 @@ export function labelCensus(tasks: readonly LabelCensusTask[]): LabelCensus {
   let unteachable = 0;
   let silent = 0;
   let declaredBasis = 0;
-  let unscoredCalls = 0;
+  let pathScored = 0;
+  let rubricGraded = 0;
   for (const task of tasks) {
     const named = task.actions.length > 0;
     const stated = task.assertions.length > 0;
@@ -89,7 +103,8 @@ export function labelCensus(tasks: readonly LabelCensusTask[]): LabelCensus {
     const declared = task.rewardBasis;
     if (declared !== undefined) declaredBasis += 1;
     const basis = declared ?? UPSTREAM_DEFAULT_BASIS;
-    if (named && !basis.includes('ACTION')) unscoredCalls += 1;
+    if (basis.includes('ACTION')) pathScored += 1;
+    if (basis.includes('NL_ASSERTION')) rubricGraded += 1;
   }
   return {
     tasks: tasks.length,
@@ -100,7 +115,8 @@ export function labelCensus(tasks: readonly LabelCensusTask[]): LabelCensus {
     unteachable,
     silent,
     declaredBasis,
-    unscoredCalls,
+    pathScored,
+    rubricGraded,
   };
 }
 
@@ -120,13 +136,12 @@ function stringsOf(value: unknown): string[] {
  *
  * Both storage forms are accepted because both are quoted in this repository: the domain files ship a
  * bare list (`data/tau2/domains/retail/tasks.json` at v0.2.0), and a run's results file wraps the same
- * tasks in `tasks` (`Results.tasks`, `src/tau2/data_model/results`). A reader that took only one of
- * them would have to be duplicated to compare the corpus against the run, which is the comparison
- * that makes the census worth printing.
+ * tasks in `tasks` (`Results.tasks`). A reader that took only one of them would have to be duplicated to
+ * compare the corpus against the run, which is the comparison that makes the census worth printing.
  *
  * Absent is not the same as empty here: `reward_basis` missing means the task inherits upstream's
- * default, and `reward_basis: []` means it scores nothing. Feeding both through `stringsOf` would
- * have reported the first as the second.
+ * default, and `reward_basis: []` means it scores nothing. Feeding both through `stringsOf` would have
+ * reported the first as the second.
  */
 export function readLabelCensusTasks(document: unknown): LabelCensusTask[] {
   const listed = Array.isArray(document) ? document : asRecord(document)?.['tasks'];

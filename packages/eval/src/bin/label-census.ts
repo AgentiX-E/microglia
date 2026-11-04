@@ -63,7 +63,8 @@ function row(name: string, census: LabelCensus): string {
     `${String(census.unteachable)} (${percent(census.unteachable, census.tasks)})`,
     `${String(census.silent)}`,
     String(census.declaredBasis),
-    `${String(census.unscoredCalls)} (${percent(census.unscoredCalls, census.tasks)})`,
+    String(census.pathScored),
+    String(census.rubricGraded),
   ];
   return `| ${cells.join(' | ')} |`;
 }
@@ -85,7 +86,8 @@ function main(): void {
     'unteachable',
     'silent',
     'basis declared',
-    'unscored calls',
+    'path scored',
+    'rubric graded',
   ];
   process.stdout.write(
     [`| ${header.join(' | ')} |`, `| ${header.map(() => '---').join(' | ')} |`]
