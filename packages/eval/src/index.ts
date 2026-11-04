@@ -527,6 +527,13 @@ export {
   scenarioBarOf,
   type ScenarioBar,
 } from './l4-scenario.js';
+export {
+  labelCensus,
+  readLabelCensusTasks,
+  UPSTREAM_DEFAULT_BASIS,
+  type LabelCensus,
+  type LabelCensusTask,
+} from './label-census.js';
 export { heldOutPlan, qualifiedId, type HeldOutPlan, type HeldOutPlanInput } from './tau2-plan.js';
 export {
   pairKey,

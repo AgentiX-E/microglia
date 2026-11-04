@@ -643,6 +643,31 @@ jobs:
           uv pip install mcp || { echo "tau2-mcp-missing:$REF"; exit 24; }
           uv run tau2 check-data || { echo "tau2-data-missing:$REF"; exit 23; }
 
+      # What the corpus carries, counted before anything is learned from it.
+      #
+      # The labels are the part of this experiment the repository does not control, and two published
+      # sentences about τ² already had the two scenarios' shapes the wrong way round — a claim made
+      # from a run's counters that the corpus itself contradicts. Counting the files at the pinned ref
+      # beside the run that consumes them makes the corpus a measurement: at v0.2.0 no task in either
+      # scenario declares `reward_basis`, so the shipped call lists sit outside the basis the evaluator
+      # defaults to (`[DB, COMMUNICATE]`). A step rather than a paragraph, so the next reader inherits
+      # the number instead of the recollection.
+      - name: Count the corpus's labels
+        run: |
+          set -euo pipefail
+          DATA="$GITHUB_WORKSPACE/.tau2-bench/data"
+          mkdir -p eval/results
+          pnpm eval:label-census \
+            --corpus "retail=$DATA/tau2/domains/retail/tasks.json" \
+            --corpus "airline=$DATA/tau2/domains/airline/tasks.json" \
+            --out eval/results/tau2-label-census.json \
+            | tee eval/results/tau2-label-census.md
+          {
+            echo "### What the corpus carries"
+            echo
+            cat eval/results/tau2-label-census.md
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # The lane, with the repository's own driver unless a variable overrides it.
       #
       # The job itself is gated on `TAU_ENV_READY`, so this does not make L4 run by

@@ -52,6 +52,7 @@
     "eval:arm-pairs": "tsx packages/eval/src/bin/arm-pairs.ts",
     "eval:arm-contrast": "tsx packages/eval/src/bin/arm-contrast.ts",
     "eval:l4-pair": "tsx packages/eval/src/bin/l4-pair.ts",
+    "eval:label-census": "tsx packages/eval/src/bin/label-census.ts",
     "eval:probe": "tsx packages/eval/src/bin/embed-probe.ts",
     "eval:plugin": "tsx packages/eval/src/bin/plugin-run.ts",
     "eval:prereg": "tsx packages/eval/src/bin/prereg.ts",
