@@ -55,6 +55,31 @@ import { detectableDelta } from './protocol.js';
  * file existed carries none of them, and a projection that required them would refuse to read the
  * only τ² runs this repository has.
  */
+/**
+ * The three numbers behind `insufficient-evidence`, at item level.
+ *
+ * R44's reason histogram named the decision but not the half that fired:
+ * confidence below `activationThreshold` and support below `minSupport` write
+ * the same string. A record without these numbers makes the next round dispatch
+ * again just to separate them. `supportOnly` is the population a `minSupport`
+ * repair cannot reach. Optional because artefacts written before R45 have none.
+ */
+export type AdmissionCensus = {
+  /** Items that reported all three numbers. */
+  readonly measured: number;
+  readonly trustMin: number;
+  readonly trustMax: number;
+  readonly trustMean: number;
+  readonly supportMin: number;
+  readonly supportMax: number;
+  readonly supportMean: number;
+  readonly confidenceMin: number;
+  readonly confidenceMax: number;
+  readonly confidenceMean: number;
+  /** `support >= minSupport` and `confidence < activationThreshold`. */
+  readonly supportOnly: number;
+};
+
 export type Tau2ArmRecord = {
   readonly arm: string;
   /** Tasks the arm was scored on. */
@@ -145,6 +170,10 @@ export type Tau2ArmRecord = {
       readonly retired: number;
       readonly other: number;
     };
+    /** Present on artefacts written from R44 onward; absent on older ones. */
+    readonly reasons?: Readonly<Record<string, number>>;
+    /** Present on artefacts written from R45 onward; absent on older ones. */
+    readonly admission?: AdmissionCensus;
   };
   /** What the recall facade was asked for, and how many answers carried an item. */
   readonly recall?: {

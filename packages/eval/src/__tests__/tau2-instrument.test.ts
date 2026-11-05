@@ -87,6 +87,19 @@ describe('storeCensus', () => {
       servable: 0,
       reasons: {},
       statuses: { active: 0, candidate: 0, quarantined: 0, retired: 0, other: 0 },
+      admission: {
+        measured: 0,
+        trustMin: 0,
+        trustMax: 0,
+        trustMean: 0,
+        supportMin: 0,
+        supportMax: 0,
+        supportMean: 0,
+        confidenceMin: 0,
+        confidenceMax: 0,
+        confidenceMean: 0,
+        supportOnly: 0,
+      },
     });
   });
 });

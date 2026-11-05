@@ -50,6 +50,7 @@ import {
   stampDomain,
   stoppedRun,
   storeCensus,
+  tau2EditSemantics,
   toPassAtK,
   trialRowsOf,
   unansweredTasks,
@@ -437,6 +438,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     budget: 1200,
     clock: steppingClock(1_700_000_000_000, 1),
     random: mulberry32(Number(process.env['TAU_SEED'] ?? 7) || 7),
+    // A τ² correction is gold-verified by `evaluation_criteria.actions`, not judged
+    // by a reviewer. `editDistance` would price it by how many arguments the tool
+    // takes, which is what held all of R44's items as candidates. See
+    // `tau2-admission.ts` for the measurement and the guarded condition.
+    editSemantics: tau2EditSemantics,
   });
 
   for (const correction of corrections) {
@@ -474,6 +480,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       `(${String(census.active)} active, ${String(census.servable)} servable in ${RECALL_DOMAIN}), ` +
       `${String(faults.events)} answered by the rule fallback, reasons ` +
       `${reasonsLine(census.reasons)}\n`,
+  );
+  process.stdout.write(
+    `[tau2] admission: measured=${String(census.admission.measured)} ` +
+      `trust=${census.admission.trustMean.toFixed(4)} ` +
+      `support=${census.admission.supportMean.toFixed(4)} ` +
+      `confidence=${census.admission.confidenceMean.toFixed(4)} ` +
+      `supportOnly=${String(census.admission.supportOnly)}\n`,
   );
   process.stdout.write(`[tau2] distill model: configured=${llm.configuredModel} sent=${llm.model}\n`);
 

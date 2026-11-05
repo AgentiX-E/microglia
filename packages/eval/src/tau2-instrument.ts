@@ -36,7 +36,33 @@
  *    zero items from a store of fourteen and the record could not say which of the two it was, so the
  *    arm's census (`storeCensus`) and the request tally (`recall`) travel beside the rate.
  */
-import type { Tau2ArmRecord } from './tau2-gates.js';
+import { defaultPolicy } from '@agentix-e/microglia-core/kernel';
+import type { AdmissionCensus, Tau2ArmRecord } from './tau2-gates.js';
+
+export type { AdmissionCensus } from './tau2-gates.js';
+
+const emptyAdmission = (): AdmissionCensus => ({
+  measured: 0,
+  trustMin: 0,
+  trustMax: 0,
+  trustMean: 0,
+  supportMin: 0,
+  supportMax: 0,
+  supportMean: 0,
+  confidenceMin: 0,
+  confidenceMax: 0,
+  confidenceMean: 0,
+  supportOnly: 0,
+});
+
+const spread = (values: readonly number[]): { min: number; max: number; mean: number } =>
+  values.length === 0
+    ? { min: 0, max: 0, mean: 0 }
+    : {
+        min: Math.min(...values),
+        max: Math.max(...values),
+        mean: values.reduce((sum, value) => sum + value, 0) / values.length,
+      };
 
 /** What the driver observed, exactly as it observed it. */
 export type Tau2Raw = {
@@ -151,6 +177,8 @@ export type StoreCensus = {
   };
   /** How many items carry each admission reason, keyed by the reason the store wrote. */
   readonly reasons: Readonly<Record<string, number>>;
+  /** The three numbers behind the reason, so a dispatch can verify a repair instead of repeating it. */
+  readonly admission: AdmissionCensus;
 };
 
 /** What the recall endpoint saw: how many requests, and how many of them carried at least one item. */
@@ -166,6 +194,10 @@ type CensusItem = {
   readonly scope: { readonly domain?: string };
   /** Why the admission gate left the item where it is. `undefined` on items that record none. */
   readonly statusReason?: string;
+  /** Optional on stores written before R45; `admission.measured` says how many reported them. */
+  readonly trust?: number;
+  readonly support?: number;
+  readonly confidence?: number;
 };
 
 /**
@@ -198,7 +230,36 @@ export function storeCensus(items: readonly CensusItem[], recallDomain: string):
       reasons[item.statusReason] = (reasons[item.statusReason] ?? 0) + 1;
     }
   }
-  return { stored: items.length, active: statuses.active, servable, statuses, reasons };
+  // Only items that reported all three numbers are measured. A legacy store with
+  // none of them yields an all-zero admission block, which says "not recorded"
+  // rather than inventing a mean over a population that does not exist.
+  const measured = items.filter(
+    (item) => item.trust !== undefined && item.support !== undefined && item.confidence !== undefined,
+  );
+  const trust = spread(measured.map((item) => item.trust as number));
+  const support = spread(measured.map((item) => item.support as number));
+  const confidence = spread(measured.map((item) => item.confidence as number));
+  const admission: AdmissionCensus =
+    measured.length === 0
+      ? emptyAdmission()
+      : {
+          measured: measured.length,
+          trustMin: trust.min,
+          trustMax: trust.max,
+          trustMean: trust.mean,
+          supportMin: support.min,
+          supportMax: support.max,
+          supportMean: support.mean,
+          confidenceMin: confidence.min,
+          confidenceMax: confidence.max,
+          confidenceMean: confidence.mean,
+          supportOnly: measured.filter(
+            (item) =>
+              (item.support as number) >= defaultPolicy.minSupport &&
+              (item.confidence as number) < defaultPolicy.activationThreshold,
+          ).length,
+        };
+  return { stored: items.length, active: statuses.active, servable, statuses, reasons, admission };
 }
 
 export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord {

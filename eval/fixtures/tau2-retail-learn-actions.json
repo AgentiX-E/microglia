@@ -1,0 +1,1526 @@
+{
+ "source": {
+  "corpus": "tau2-bench v0.2.0 retail tasks.json",
+  "sha256": "76e1fa649a359bef2d2fd30eae834b99d261d84e2e5d364856f6632fdf778dfd",
+  "bytes": 328166,
+  "split": "first 32 ids in lexical order, matching R44 arms/memory/poc-l4.json split.train"
+ },
+ "tasks": [
+  {
+   "id": "0",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Yusuf",
+      "last_name": "Rossi",
+      "zip": "19122"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W2378156"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "1656367028"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "4896585277"
+     }
+    },
+    {
+     "name": "exchange_delivered_order_items",
+     "arguments": {
+      "order_id": "#W2378156",
+      "item_ids": [
+       "1151293680",
+       "4983901480"
+      ],
+      "new_item_ids": [
+       "7706410293",
+       "7747408585"
+      ],
+      "payment_method_id": "credit_card_9513926"
+     }
+    }
+   ]
+  },
+  {
+   "id": "1",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Yusuf",
+      "last_name": "Rossi",
+      "zip": "19122"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W2378156"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "1656367028"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "4896585277"
+     }
+    },
+    {
+     "name": "exchange_delivered_order_items",
+     "arguments": {
+      "order_id": "#W2378156",
+      "item_ids": [
+       "4983901480"
+      ],
+      "new_item_ids": [
+       "7747408585"
+      ],
+      "payment_method_id": "credit_card_9513926"
+     }
+    }
+   ]
+  },
+  {
+   "id": "10",
+   "actions": [
+    {
+     "name": "find_user_id_by_email",
+     "arguments": {
+      "email": "mia.garcia2723@example.com"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "mia_garcia_4516"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W5490111"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W7387996"
+     }
+    },
+    {
+     "name": "transfer_to_human_agents",
+     "arguments": {
+      "summary": "The user wants to refund each order to the opposite order's payment method, but the agent cannot help."
+     }
+    }
+   ]
+  },
+  {
+   "id": "100",
+   "actions": [
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W3295833",
+      "item_ids": [
+       "8926329222",
+       "5312063289"
+      ],
+      "new_item_ids": [
+       "7160999700",
+       "6956751343"
+      ],
+      "payment_method_id": "credit_card_3261838"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W8488728",
+      "item_ids": [
+       "5676696062"
+      ],
+      "payment_method_id": "paypal_3650980"
+     }
+    }
+   ]
+  },
+  {
+   "id": "101",
+   "actions": [
+    {
+     "name": "modify_pending_order_address",
+     "arguments": {
+      "order_id": "#W4219264",
+      "address1": "144 Lakeview Drive",
+      "address2": "Suite 925",
+      "city": "New York",
+      "country": "USA",
+      "state": "NY",
+      "zip": "10228"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W4219264",
+      "item_ids": [
+       "8886009523"
+      ],
+      "new_item_ids": [
+       "2407258246"
+      ],
+      "payment_method_id": "credit_card_1620755"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W6729841",
+      "item_ids": [
+       "3076708684"
+      ],
+      "new_item_ids": [
+       "8302289002"
+      ],
+      "payment_method_id": "credit_card_1620755"
+     }
+    }
+   ]
+  },
+  {
+   "id": "102",
+   "actions": [
+    {
+     "name": "modify_pending_order_address",
+     "arguments": {
+      "order_id": "#W4219264",
+      "address1": "144 Lakeview Drive",
+      "address2": "Suite 925",
+      "city": "New York",
+      "country": "USA",
+      "state": "NY",
+      "zip": "10228"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W4219264",
+      "item_ids": [
+       "8886009523"
+      ],
+      "new_item_ids": [
+       "2407258246"
+      ],
+      "payment_method_id": "credit_card_1620755"
+     }
+    },
+    {
+     "name": "exchange_delivered_order_items",
+     "arguments": {
+      "order_id": "#W3445693",
+      "item_ids": [
+       "6341716129"
+      ],
+      "new_item_ids": [
+       "8302289002"
+      ],
+      "payment_method_id": "credit_card_1620755"
+     }
+    }
+   ]
+  },
+  {
+   "id": "103",
+   "actions": [
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W6239298",
+      "item_ids": [
+       "4900661478",
+       "3614853563"
+      ],
+      "payment_method_id": "credit_card_2112420"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W9218746",
+      "item_ids": [
+       "7824298782"
+      ],
+      "payment_method_id": "credit_card_2112420"
+     }
+    },
+    {
+     "name": "modify_pending_order_address",
+     "arguments": {
+      "order_id": "#W4860251",
+      "address1": "921 Park Avenue",
+      "address2": "Suite 892",
+      "city": "Chicago",
+      "country": "USA",
+      "state": "IL",
+      "zip": "60612"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W4860251",
+      "item_ids": [
+       "5209958006"
+      ],
+      "new_item_ids": [
+       "8964750292"
+      ],
+      "payment_method_id": "credit_card_2112420"
+     }
+    }
+   ]
+  },
+  {
+   "id": "104",
+   "actions": [
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W8660475",
+      "item_ids": [
+       "8479046075"
+      ],
+      "payment_method_id": "credit_card_2112420"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W9218746",
+      "item_ids": [
+       "7824298782"
+      ],
+      "payment_method_id": "credit_card_2112420"
+     }
+    },
+    {
+     "name": "modify_pending_order_address",
+     "arguments": {
+      "order_id": "#W4860251",
+      "address1": "921 Park Avenue",
+      "address2": "Suite 892",
+      "city": "Chicago",
+      "country": "USA",
+      "state": "IL",
+      "zip": "60612"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W4860251",
+      "item_ids": [
+       "5209958006"
+      ],
+      "new_item_ids": [
+       "8964750292"
+      ],
+      "payment_method_id": "credit_card_2112420"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W6239298",
+      "item_ids": [
+       "4900661478",
+       "3614853563"
+      ],
+      "payment_method_id": "credit_card_2112420"
+     }
+    }
+   ]
+  },
+  {
+   "id": "105",
+   "actions": [
+    {
+     "name": "exchange_delivered_order_items",
+     "arguments": {
+      "order_id": "#W4316152",
+      "item_ids": [
+       "7292993796",
+       "7292993796"
+      ],
+      "new_item_ids": [
+       "3761330360",
+       "9647374798"
+      ],
+      "payment_method_id": "gift_card_7245904"
+     }
+    }
+   ]
+  },
+  {
+   "id": "106",
+   "actions": [
+    {
+     "name": "exchange_delivered_order_items",
+     "arguments": {
+      "order_id": "#W3388163",
+      "item_ids": [
+       "9354168549"
+      ],
+      "new_item_ids": [
+       "2060066974"
+      ],
+      "payment_method_id": "paypal_5334408"
+     }
+    }
+   ]
+  },
+  {
+   "id": "107",
+   "actions": [
+    {
+     "name": "exchange_delivered_order_items",
+     "arguments": {
+      "order_id": "#W1304208",
+      "item_ids": [
+       "1615379700"
+      ],
+      "new_item_ids": [
+       "1615379700"
+      ],
+      "payment_method_id": "paypal_1679017"
+     }
+    },
+    {
+     "name": "exchange_delivered_order_items",
+     "arguments": {
+      "order_id": "#W8353027",
+      "item_ids": [
+       "6245746168"
+      ],
+      "new_item_ids": [
+       "3112842858"
+      ],
+      "payment_method_id": "paypal_1679017"
+     }
+    }
+   ]
+  },
+  {
+   "id": "108",
+   "actions": [
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W1679211",
+      "item_ids": [
+       "9612497925",
+       "7127170374",
+       "6268080249"
+      ],
+      "payment_method_id": "paypal_3022415"
+     }
+    }
+   ]
+  },
+  {
+   "id": "109",
+   "actions": [
+    {
+     "name": "modify_pending_order_address",
+     "arguments": {
+      "order_id": "#W1603792",
+      "address1": "592 Elm Avenue",
+      "address2": "Suite 978",
+      "city": "Houston",
+      "country": "USA",
+      "state": "TX",
+      "zip": "77242"
+     }
+    },
+    {
+     "name": "modify_user_address",
+     "arguments": {
+      "user_id": "sophia_martin_8570",
+      "address1": "592 Elm Avenue",
+      "address2": "Suite 978",
+      "city": "Houston",
+      "country": "USA",
+      "state": "TX",
+      "zip": "77242"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W1603792",
+      "item_ids": [
+       "6501071631"
+      ],
+      "new_item_ids": [
+       "2106335193"
+      ],
+      "payment_method_id": "credit_card_5694100"
+     }
+    }
+   ]
+  },
+  {
+   "id": "11",
+   "actions": [
+    {
+     "name": "find_user_id_by_email",
+     "arguments": {
+      "email": "mia.garcia2723@example.com"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "mia_garcia_4516"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W5490111"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W7387996"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W5490111",
+      "item_ids": [
+       "4579334072",
+       "1421289881",
+       "6117189161",
+       "4947717507"
+      ],
+      "payment_method_id": "credit_card_3124723"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W7387996",
+      "item_ids": [
+       "5796612084"
+      ],
+      "payment_method_id": "paypal_9497703"
+     }
+    }
+   ]
+  },
+  {
+   "id": "110",
+   "actions": [
+    {
+     "name": "modify_pending_order_address",
+     "arguments": {
+      "order_id": "#W1092119",
+      "address1": "760 Elm Avenue",
+      "address2": "Suite 564",
+      "city": "Houston",
+      "state": "TX",
+      "country": "USA",
+      "zip": "77034"
+     }
+    },
+    {
+     "name": "modify_user_address",
+     "arguments": {
+      "user_id": "sophia_martin_8570",
+      "address1": "760 Elm Avenue",
+      "address2": "Suite 564",
+      "city": "Houston",
+      "state": "TX",
+      "country": "USA",
+      "zip": "77034"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W1603792",
+      "item_ids": [
+       "6501071631"
+      ],
+      "new_item_ids": [
+       "2106335193"
+      ],
+      "payment_method_id": "credit_card_5694100"
+     }
+    }
+   ]
+  },
+  {
+   "id": "111",
+   "actions": [
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W9810810",
+      "item_ids": [
+       "1355937109"
+      ],
+      "new_item_ids": [
+       "9949163720"
+      ],
+      "payment_method_id": "gift_card_7252880"
+     }
+    },
+    {
+     "name": "modify_pending_order_address",
+     "arguments": {
+      "order_id": "#W3730488",
+      "address1": "555 Highland Drive",
+      "address2": "Suite 872",
+      "city": "New York",
+      "country": "USA",
+      "state": "NY",
+      "zip": "10116"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W3730488",
+      "item_ids": [
+       "2913673670"
+      ],
+      "new_item_ids": [
+       "2216662955"
+      ],
+      "payment_method_id": "gift_card_7252880"
+     }
+    }
+   ]
+  },
+  {
+   "id": "112",
+   "actions": [
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W9810810",
+      "item_ids": [
+       "1355937109"
+      ],
+      "new_item_ids": [
+       "9949163720"
+      ],
+      "payment_method_id": "gift_card_7252880"
+     }
+    },
+    {
+     "name": "modify_pending_order_address",
+     "arguments": {
+      "order_id": "#W3730488",
+      "address1": "555 Highland Drive",
+      "address2": "Suite 872",
+      "city": "New York",
+      "country": "USA",
+      "state": "NY",
+      "zip": "10116"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W3730488",
+      "item_ids": [
+       "2913673670"
+      ],
+      "new_item_ids": [
+       "9844888101"
+      ],
+      "payment_method_id": "gift_card_7252880"
+     }
+    }
+   ]
+  },
+  {
+   "id": "113",
+   "actions": [
+    {
+     "name": "cancel_pending_order",
+     "arguments": {
+      "order_id": "#W5056519",
+      "reason": "ordered by mistake"
+     }
+    },
+    {
+     "name": "cancel_pending_order",
+     "arguments": {
+      "order_id": "#W5995614",
+      "reason": "ordered by mistake"
+     }
+    }
+   ]
+  },
+  {
+   "id": "12",
+   "actions": [
+    {
+     "name": "find_user_id_by_email",
+     "arguments": {
+      "email": "mia.garcia2723@example.com"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "mia_garcia_4516"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W5490111"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W7387996"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W5490111",
+      "item_ids": [
+       "4579334072",
+       "6117189161",
+       "4947717507"
+      ],
+      "payment_method_id": "paypal_9497703"
+     }
+    },
+    {
+     "name": "transfer_to_human_agents",
+     "arguments": {
+      "summary": "The user prefers PayPal for refund, but the agent cannot help."
+     }
+    }
+   ]
+  },
+  {
+   "id": "13",
+   "actions": [
+    {
+     "name": "find_user_id_by_email",
+     "arguments": {
+      "email": "mia.garcia2723@example.com"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "mia_garcia_4516"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W5490111"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W7387996"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W5490111",
+      "item_ids": [
+       "4579334072",
+       "6117189161",
+       "4947717507"
+      ],
+      "payment_method_id": "paypal_9497703"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W5490111",
+      "item_ids": [
+       "4579334072",
+       "6117189161",
+       "4947717507"
+      ],
+      "payment_method_id": "credit_card_3124723"
+     }
+    }
+   ]
+  },
+  {
+   "id": "14",
+   "actions": [
+    {
+     "name": "find_user_id_by_email",
+     "arguments": {
+      "email": "mia.garcia2723@example.com"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "mia_garcia_4516"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W5490111"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W7387996"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W5490111",
+      "item_ids": [
+       "1421289881"
+      ],
+      "payment_method_id": "credit_card_3124723"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W7387996",
+      "item_ids": [
+       "5796612084"
+      ],
+      "payment_method_id": "paypal_9497703"
+     }
+    }
+   ]
+  },
+  {
+   "id": "15",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Fatima",
+      "last_name": "Johnson",
+      "zip": "78712"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "fatima_johnson_7581"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W9389413"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W8665881"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W5199551"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "7363354090"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W5199551",
+      "item_ids": [
+       "1615379700"
+      ],
+      "new_item_ids": [
+       "3613716226"
+      ],
+      "payment_method_id": "paypal_5364164"
+     }
+    }
+   ]
+  },
+  {
+   "id": "16",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Fatima",
+      "last_name": "Johnson",
+      "zip": "78712"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "fatima_johnson_7581"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W5199551"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W8665881"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W9389413"
+     }
+    },
+    {
+     "name": "calculate",
+     "arguments": {
+      "expression": "3131.1 + 4777.75 + 367.38"
+     }
+    },
+    {
+     "name": "cancel_pending_order",
+     "arguments": {
+      "order_id": "#W5199551",
+      "reason": "no longer needed"
+     }
+    },
+    {
+     "name": "cancel_pending_order",
+     "arguments": {
+      "order_id": "#W8665881",
+      "reason": "no longer needed"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W9389413",
+      "item_ids": [
+       "2554056026"
+      ],
+      "payment_method_id": "paypal_5364164"
+     }
+    }
+   ]
+  },
+  {
+   "id": "17",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Fatima",
+      "last_name": "Johnson",
+      "zip": "78712"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "fatima_johnson_7581"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W5199551"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W8665881"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W9389413"
+     }
+    },
+    {
+     "name": "modify_pending_order_address",
+     "arguments": {
+      "order_id": "#W8665881",
+      "address1": "123 Elm Street",
+      "address2": "Suite 641",
+      "city": "Austin",
+      "state": "TX",
+      "country": "USA",
+      "zip": "78712"
+     }
+    }
+   ]
+  },
+  {
+   "id": "18",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Mei",
+      "last_name": "Davis",
+      "zip": "80217"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "mei_davis_8935"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W2890441"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "4794339885"
+     }
+    },
+    {
+     "name": "exchange_delivered_order_items",
+     "arguments": {
+      "order_id": "#W2890441",
+      "item_ids": [
+       "8069050545"
+      ],
+      "new_item_ids": [
+       "8069050545"
+      ],
+      "payment_method_id": "credit_card_1061405"
+     }
+    }
+   ]
+  },
+  {
+   "id": "19",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Mei",
+      "last_name": "Davis",
+      "zip": "80217"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "mei_davis_8935"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W2890441"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W1267569"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "2747247837"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "4794339885"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W2890441",
+      "item_ids": [
+       "2366567022"
+      ],
+      "payment_method_id": "credit_card_1061405"
+     }
+    }
+   ]
+  },
+  {
+   "id": "2",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Yusuf",
+      "last_name": "Rossi",
+      "zip": "19122"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "6086499569"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "9523456873"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "yusuf_rossi_9620"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W6247578"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W9711842"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W4776164"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W6679257"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W2378156"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "9523456873"
+     }
+    },
+    {
+     "name": "return_delivered_order_items",
+     "arguments": {
+      "order_id": "#W2378156",
+      "item_ids": [
+       "4602305039",
+       "4202497723",
+       "9408160950"
+      ],
+      "payment_method_id": "credit_card_9513926"
+     }
+    }
+   ]
+  },
+  {
+   "id": "20",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Ethan",
+      "last_name": "Garcia",
+      "zip": "80280"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "ethan_garcia_1261"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W4967593"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W9911714"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "8310926033"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "1656367028"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "6938111410"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "5149340237"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W9911714",
+      "item_ids": [
+       "2366567022",
+       "1340995114",
+       "9791469541",
+       "1763705424"
+      ],
+      "new_item_ids": [
+       "4579334072",
+       "1151293680",
+       "4107812777",
+       "2882812427"
+      ],
+      "payment_method_id": "gift_card_4332117"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W5733668"
+     }
+    }
+   ]
+  },
+  {
+   "id": "21",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Ethan",
+      "last_name": "Garcia",
+      "zip": "80280"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "ethan_garcia_1261"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W4967593"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W9911714"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W5733668"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "4107812777"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "1421289881"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "1656367028"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "4107812777"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "6938111410"
+     }
+    },
+    {
+     "name": "calculate",
+     "arguments": {
+      "expression": "155.33 - 147.05 + 268.77 - 235.13"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W9911714",
+      "item_ids": [
+       "9791469541",
+       "1340995114"
+      ],
+      "new_item_ids": [
+       "4107812777",
+       "1421289881"
+      ],
+      "payment_method_id": "gift_card_4332117"
+     }
+    }
+   ]
+  },
+  {
+   "id": "22",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Ethan",
+      "last_name": "Garcia",
+      "zip": "80280"
+     }
+    },
+    {
+     "name": "modify_user_address",
+     "arguments": {
+      "user_id": "ethan_garcia_1261",
+      "address1": "101 Highway",
+      "address2": "",
+      "city": "New York",
+      "state": "NY",
+      "country": "USA",
+      "zip": "10001"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W4967593"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W9911714"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W5733668"
+     }
+    },
+    {
+     "name": "modify_pending_order_address",
+     "arguments": {
+      "order_id": "#W9911714",
+      "address1": "101 Highway",
+      "address2": "",
+      "city": "New York",
+      "state": "NY",
+      "country": "USA",
+      "zip": "10001"
+     }
+    },
+    {
+     "name": "modify_user_address",
+     "arguments": {
+      "user_id": "ethan_garcia_1261",
+      "address1": "667 Highland Drive",
+      "address2": "Suite 865",
+      "city": "Denver",
+      "state": "CO",
+      "country": "USA",
+      "zip": "80280"
+     }
+    }
+   ]
+  },
+  {
+   "id": "23",
+   "actions": [
+    {
+     "name": "find_user_id_by_name_zip",
+     "arguments": {
+      "first_name": "Sofia",
+      "last_name": "Hernandez",
+      "zip": "98193"
+     }
+    },
+    {
+     "name": "get_user_details",
+     "arguments": {
+      "user_id": "sofia_hernandez_5364"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W3561391"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W6876713"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W9609649"
+     }
+    },
+    {
+     "name": "get_order_details",
+     "arguments": {
+      "order_id": "#W3947049"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "7765186836"
+     }
+    },
+    {
+     "name": "exchange_delivered_order_items",
+     "arguments": {
+      "order_id": "#W3947049",
+      "item_ids": [
+       "3358616356"
+      ],
+      "new_item_ids": [
+       "8573379326"
+      ],
+      "payment_method_id": "credit_card_7901829"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "5426915165"
+     }
+    },
+    {
+     "name": "exchange_delivered_order_items",
+     "arguments": {
+      "order_id": "#W6876713",
+      "item_ids": [
+       "6301799585"
+      ],
+      "new_item_ids": [
+       "8926329222"
+      ],
+      "payment_method_id": "credit_card_7901829"
+     }
+    },
+    {
+     "name": "get_product_details",
+     "arguments": {
+      "product_id": "6819683148"
+     }
+    },
+    {
+     "name": "modify_pending_order_items",
+     "arguments": {
+      "order_id": "#W3561391",
+      "item_ids": [
+       "5946177616"
+      ],
+      "new_item_ids": [
+       "7082455361"
+      ],
+      "payment_method_id": "credit_card_7901829"
+     }
+    }
+   ]
+  },
+  {
+   "id": "24",
+   "actions": []
+  }
+ ]
+}

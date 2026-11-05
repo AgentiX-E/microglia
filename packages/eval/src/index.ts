@@ -508,10 +508,12 @@ export {
 export {
   armRecordFromDriver,
   storeCensus,
+  type AdmissionCensus,
   type RecallTally,
   type StoreCensus,
   type Tau2Raw,
 } from './tau2-instrument.js';
+export { isGoldVerifiedCorrection, tau2EditSemantics } from './tau2-admission.js';
 export {
   resilientInterpreter,
   stampDomain,
