@@ -515,6 +515,15 @@ export {
 } from './tau2-instrument.js';
 export { isGoldVerifiedCorrection, tau2EditSemantics } from './tau2-admission.js';
 export {
+  coverageProfile,
+  useCensus,
+  zeroCoverageShare,
+  type CoverageProfile,
+  type UseArm,
+  type UseCensus,
+  type UseObservation,
+} from './tau2-use-census.js';
+export {
   resilientInterpreter,
   stampDomain,
   type InterpreterFaults,

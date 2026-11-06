@@ -172,6 +172,49 @@ describe('armRecordFromDriver', () => {
     expect(record.recall).toBeUndefined();
   });
 
+  it('builds the use census from the facade observations, beside V1', () => {
+    // Real kernel values: 'cancel my reservation' vs 'cancel reservation' is full
+    // coverage, 'refund order' vs it is zero, and a content-free query is reported
+    // as unmeasurable by the profile. The census counts zero-coverage pairs.
+    const record = armRecordFromDriver(
+      raw({
+        useObservations: [
+          { query: 'cancel my reservation', statements: ['cancel reservation'] },
+          { query: 'refund order', statements: ['cancel reservation'] },
+        ],
+        widenedItems: 3,
+      }),
+    );
+    expect(record.use).toEqual({
+      arm: 'as-is',
+      recallRequests: 2,
+      recallServed: 2,
+      meanPackIds: 1,
+      injectedPairs: 2,
+      zeroCoveragePairs: 1,
+      widenedItems: 3,
+    });
+  });
+
+  it('names a non-default use arm when the driver collected under one', () => {
+    const record = armRecordFromDriver(
+      raw({
+        useObservations: [{ query: 'cancel', statements: [] }],
+        useArm: 'coverage-floored',
+      }),
+    );
+    expect(record.use?.arm).toBe('coverage-floored');
+    expect(record.use?.recallServed).toBe(0);
+    expect(record.use?.widenedItems).toBe(0); // absent widenedItems defaults to 0
+  });
+
+  it('reports no use census at all when the driver did not instrument it', () => {
+    // Every artefact before R46 has none. An older run is "not measured", never a
+    // run that served a perfectly relevant empty pack.
+    expect(armRecordFromDriver(raw()).use).toBeUndefined();
+    expect(armRecordFromDriver(raw({ store: undefined })).use).toBeUndefined();
+  });
+
   it('counts distinct held-out tasks in the denominator and keeps repeats in the split', () => {
     // V2 asks whether every question was evaluated exactly once. A record that de-duplicated the list
     // before the gate saw it would answer its own question, and answer it yes.

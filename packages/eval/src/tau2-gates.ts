@@ -47,6 +47,7 @@ import {
   type ValidityGate,
 } from '@agentix-e/microglia-protocol';
 import { detectableDelta } from './protocol.js';
+import type { UseCensus } from './tau2-use-census.js';
 
 /**
  * One arm's records, as far as the protocol is concerned.
@@ -181,6 +182,16 @@ export type Tau2ArmRecord = {
     readonly served: number;
     readonly empty: number;
   };
+  /**
+   * The use-side census: what the delivered packs actually contained, and how
+   * much of it was lexically reachable from the question. `V1` grades only the
+   * pack's size; a served pack of unrelated rules passes it. R45 (run
+   * 42131391874) was the first dispatch to serve a pack, and its artefact could
+   * not distinguish an underpowered effect from an unrelated pack. Absent on
+   * every artefact written before this instrument existed, so old runs read as
+   * "not measured" rather than as a zero. Registered in TECH-DESIGN §17.89.
+   */
+  readonly use?: UseCensus;
 };
 
 /** The paired comparison, reduced to the three numbers a gate reads. */
@@ -560,6 +571,7 @@ export type Tau2ArmArtefact = {
     readonly scenario?: Tau2ArmRecord['scenario'];
     readonly store?: Tau2ArmRecord['store'];
     readonly recall?: Tau2ArmRecord['recall'];
+    readonly use?: Tau2ArmRecord['use'];
   };
 };
 
@@ -596,5 +608,9 @@ export function tau2ArmRecordOf(arm: string, artefact: Tau2ArmArtefact): Tau2Arm
     // added to distinguish "never asked" from "asked 1,518 times and was served nothing".
     ...(artefact.tau2?.store === undefined ? {} : { store: artefact.tau2.store }),
     ...(artefact.tau2?.recall === undefined ? {} : { recall: artefact.tau2.recall }),
+    // The use census travels with V1's rate: a record that kept the pack size
+    // but dropped what was in the pack would still be unable to say whether a
+    // served pack was relevant. Older artefacts carry none and stay silent.
+    ...(artefact.tau2?.use === undefined ? {} : { use: artefact.tau2.use }),
   };
 }

@@ -59,6 +59,7 @@ import {
   type Tau2ArmRecord,
   type Tau2Raw,
   type TauTrialRow,
+  type UseObservation,
 } from '@agentix-e/microglia-eval';
 
 const runFile = promisify(execFile);
@@ -360,6 +361,16 @@ export async function run(): Promise<readonly PassAtKInput[]> {
    */
   let recallRequests = 0;
   let recallServed = 0;
+  /**
+   * What each served pack actually contained, at the facade boundary.
+   *
+   * V1 grades the size of a pack; this records its content, so a served pack of
+   * rules that share no term with the question can be told apart from a served
+   * pack of relevant ones. Pure observation: the recall scope, the floor and the
+   * pack itself are exactly as R45 ran them. See `tau2-use-census.ts` and the
+   * registered USE experiment in TECH-DESIGN §17.89.
+   */
+  const useObservations: UseObservation[] = [];
 
   const evalPath = join(workdir, 'eval.json');
   if (!MEMORY) {
@@ -499,6 +510,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     recallRequests += 1;
     if (pack.items.length > 0) recallServed += 1;
     servedPackSizes.push(pack.items.length);
+    // Record what was actually put in front of the agent. This reads the same
+    // `pack` that is returned; it does not re-run recall, change its scope, or
+    // filter the items. The census is computed in `armRecordFromDriver`.
+    useObservations.push({
+      query: text,
+      statements: pack.items.map((item) => item.statement),
+    });
     return pack;
   });
   try {
@@ -551,6 +569,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     domains: { stored: knowledge.length, withoutDomain, unscopedIn: 0, widenedIn: 0 },
     store: census,
     recall: { requests: recallRequests, served: recallServed, empty: recallRequests - recallServed },
+    // What the served packs contained. `withoutDomain` is the store's count of
+    // `domain === undefined` items, from the same domain ledger V44 reads.
+    useObservations,
+    widenedItems: withoutDomain,
     scenario,
     // The scenario's own size, not the split's: a dispatch cap hides it, and it is what bounds the
     // resolution any split of this scenario can reach.

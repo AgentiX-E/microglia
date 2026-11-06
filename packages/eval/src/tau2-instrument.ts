@@ -38,6 +38,7 @@
  */
 import { defaultPolicy } from '@agentix-e/microglia-core/kernel';
 import type { AdmissionCensus, Tau2ArmRecord } from './tau2-gates.js';
+import { useCensus, type UseArm, type UseObservation } from './tau2-use-census.js';
 
 export type { AdmissionCensus } from './tau2-gates.js';
 
@@ -152,6 +153,20 @@ export type Tau2Raw = {
   readonly store?: StoreCensus;
   /** What the facade was asked for, and how often it had an answer. */
   readonly recall?: RecallTally;
+  /**
+   * What the delivered packs actually contained, one row per recall request.
+   *
+   * Absent on drivers that did not instrument the use side (every artefact
+   * before R46). `armRecordFromDriver` turns these into the `use` census; a raw
+   * record without them reports no census rather than a census full of zeros.
+   * The driver collects statements at the facade boundary, so this is what the
+   * agent was shown, not what the store happens to hold.
+   */
+  readonly useObservations?: readonly UseObservation[];
+  /** The use policy the observations were collected under. Defaults to `as-is`. */
+  readonly useArm?: UseArm;
+  /** Widened (`domain === undefined`) items in the store, from its domain ledger. */
+  readonly widenedItems?: number;
 };
 
 /**
@@ -310,5 +325,19 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     // carried only the first turned R42's empty pack into a number with no cause.
     ...(raw.store === undefined ? {} : { store: raw.store }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),
+    // The use census rides beside V1's rate. It is computed here, from the raw
+    // observations the driver collected at the facade, so the driver carries
+    // only what it saw and the arithmetic stays in one tested function. A raw
+    // record with no observations reports no census at all — an older run is
+    // "not measured", never a run that served a perfectly relevant empty pack.
+    ...(raw.useObservations === undefined
+      ? {}
+      : {
+          use: useCensus(
+            raw.useObservations,
+            raw.useArm ?? 'as-is',
+            raw.widenedItems ?? 0,
+          ),
+        }),
   };
 }

@@ -672,6 +672,7 @@ describe('reading an arm artefact', () => {
     expect(bare.scenario).toBeUndefined();
     expect(bare.store).toBeUndefined();
     expect(bare.recall).toBeUndefined();
+    expect(bare.use).toBeUndefined(); // pre-R46 artefacts report no use census
 
     const rich = tau2ArmRecordOf('memory', {
       n: 1,
@@ -711,5 +712,26 @@ describe('reading an arm artefact', () => {
     });
     expect(record.store).toMatchObject({ stored: 24, active: 0, servable: 0 });
     expect(record.recall).toEqual({ requests: 1518, served: 0, empty: 1518 });
+  });
+
+  it('carries the use census forward, so a served pack can be read for relevance', () => {
+    // R45 served 1480 of 1480 requests and its artefact could not say what was in
+    // them. A projection that dropped `use` would keep that silence forever: the
+    // gate layer reads the record, never the file.
+    const census = {
+      arm: 'as-is' as const,
+      recallRequests: 1480,
+      recallServed: 1480,
+      meanPackIds: 1.84,
+      injectedPairs: 2723,
+      zeroCoveragePairs: 2066,
+      widenedItems: 0,
+    };
+    const record = tau2ArmRecordOf('memory', {
+      n: 50,
+      metrics: { tasks: 50, k: 4 },
+      tau2: { meanPackIds: 1.84, use: census },
+    });
+    expect(record.use).toEqual(census);
   });
 });
