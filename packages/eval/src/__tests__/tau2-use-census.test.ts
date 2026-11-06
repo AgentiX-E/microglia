@@ -12,15 +12,18 @@
  *
  * This test is written BEFORE the instrument. It implements the UseCensus type
  * shape registered in §17.89 verbatim (seven fields), plus a derived coverage
- * profile for the finer diagnosis. It uses the pinned 32-task retail fixture,
- * the real tau2 corpora, and the real `queryCoverage` / `tokenize` kernel
- * functions. No mocks, no model call, no new threshold. Two structural proxies
- * bracket the (unavailable offline) LLM statements; the census measures lexical
- * reachability, which is exactly what `buildPack`'s default floor of 0 uses.
- * Only the direction is claimed, never an accuracy effect.
+ * profile for the finer diagnosis. It uses a fingerprinted, repository-local
+ * fixture (see `tau2-use-census-queries.json`) and the real `queryCoverage` /
+ * `tokenize` kernel functions. No mocks, no model call, no new threshold, and
+ * no dependency on a scratchpad corpus: the first version read `/tmp/tau2/*.json`
+ * and passed locally while failing CI with ENOENT (AUDIT §34.25). Two structural
+ * proxies bracket the (unavailable offline) LLM statements; the census measures
+ * lexical reachability, which is exactly what `buildPack`'s default floor of 0
+ * uses. Only the direction is claimed, never an accuracy effect.
  */
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { queryCoverage, tokenize } from '@agentix-e/microglia-core/kernel';
 import {
@@ -31,35 +34,26 @@ import {
   type UseObservation,
 } from '../tau2-use-census.js';
 
-type Action = { name: string; arguments: Record<string, unknown> };
-type Task = {
-  id: string;
-  user_scenario: { instructions: { reason_for_call?: string } };
+const QUERIES = join(process.cwd(), 'eval/fixtures/tau2-use-census-queries.json');
+const LEARN = join(process.cwd(), 'eval/fixtures/tau2-retail-learn-actions.json');
+
+const queriesBytes = readFileSync(QUERIES);
+const learnBytes = readFileSync(LEARN);
+const queries = JSON.parse(queriesBytes.toString('utf8')) as {
+  readonly source: {
+    readonly corpora: readonly { readonly name: string; readonly sha256: string; readonly bytes: number }[];
+  };
+  readonly learnStatements: readonly string[];
+  readonly airlineQueries: readonly string[];
+  readonly heldOutRetailQueries: readonly string[];
+};
+const learn = JSON.parse(learnBytes.toString('utf8')) as {
+  readonly tasks: readonly { readonly id: string; readonly actions: unknown[] }[];
 };
 
-const FIXTURE = 'eval/fixtures/tau2-retail-learn-actions.json';
-const RETAIL = '/tmp/tau2/retail.json';
-const AIRLINE = '/tmp/tau2/airline.json';
-
-const fixtureBytes = readFileSync(FIXTURE);
-const fixtureHash = createHash('sha256').update(fixtureBytes).digest('hex');
-const fixture = JSON.parse(fixtureBytes.toString('utf8')) as {
-  tasks: { id: string; actions: Action[] }[];
-};
-const retail = JSON.parse(readFileSync(RETAIL, 'utf8')) as Task[];
-const airline = JSON.parse(readFileSync(AIRLINE, 'utf8')) as Task[];
-
-const reasonFor = (t: Task): string => t.user_scenario.instructions.reason_for_call ?? '';
-const structural = (t: { actions: Action[] }): string =>
-  t.actions
-    .map((a) => [a.name, ...Object.keys(a.arguments ?? {})].join(' '))
-    .join(' ')
-    .replace(/_/g, ' ');
-
-const learnIds = new Set(fixture.tasks.map((t) => t.id));
-const statements = fixture.tasks.map((t) => structural(t));
-const heldOutRetail = retail.filter((t) => !learnIds.has(t.id)).map(reasonFor);
-const airlineQueries = airline.map(reasonFor);
+const statements = queries.learnStatements;
+const airlineQueries = queries.airlineQueries;
+const heldOutRetail = queries.heldOutRetailQueries;
 
 /**
  * One recall request as the facade saw it: a question, and the statements of
@@ -67,15 +61,33 @@ const airlineQueries = airline.map(reasonFor);
  * question is paired with every statement in the store, which is the population
  * `buildPack` selects from when `minCoverage` is 0.
  */
-function observations(queries: readonly string[], docs: readonly string[]): UseObservation[] {
-  return queries.map((query) => ({ query, statements: docs }));
+function observations(qs: readonly string[], docs: readonly string[]): UseObservation[] {
+  return qs.map((query) => ({ query, statements: docs }));
 }
 
 describe('useCensus — the population V1 cannot see', () => {
-  it('is pinned to the exact R45 learn split', () => {
-    expect(fixtureHash).toBe('b5e49bb793731ec107754452e70e608c54b309c54f3be2ad049c82ffb40c87a0');
-    expect(fixture.tasks).toHaveLength(32);
+  it('is pinned to the exact R45 learn split and the two real corpora', () => {
+    // Self-contained: both fixtures are fingerprinted and live in the repository,
+    // so CI reproduces exactly the population the offline census measured.
+    expect(createHash('sha256').update(learnBytes).digest('hex')).toBe(
+      'b5e49bb793731ec107754452e70e608c54b309c54f3be2ad049c82ffb40c87a0',
+    );
+    expect(createHash('sha256').update(queriesBytes).digest('hex')).toBe(
+      '54f79dbf5994bb898e9ca7c9ab7ce5e4dbf32c588c0b0a69edc126e866ca5e75',
+    );
+    expect(learn.tasks).toHaveLength(32);
     expect(statements).toHaveLength(32);
+    expect(airlineQueries).toHaveLength(50);
+    expect(heldOutRetail).toHaveLength(82);
+    const retail = queries.source.corpora.find((c) => c.name.includes('retail'));
+    const airline = queries.source.corpora.find((c) => c.name.includes('airline'));
+    expect(retail?.sha256).toBe('76e1fa649a359bef2d2fd30eae834b99d261d84e2e5d364856f6632fdf778dfd');
+    expect(retail?.bytes).toBe(328166);
+    expect(airline?.sha256).toBe('40d692b3fca780f46b56d48b447fd8db79a653f216667b8ed7c1a88380544532');
+    expect(airline?.bytes).toBe(149096);
+    // No content-free query: this is why the paired populations are exactly
+    // 50 x 32 and 82 x 32, with no silently skipped questions.
+    expect([...airlineQueries, ...heldOutRetail].filter((q) => tokenize(q).length === 0)).toHaveLength(0);
   });
 
   it('returns a zeroed census that says which zero it is, not undefined', () => {
