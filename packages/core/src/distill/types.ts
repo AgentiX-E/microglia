@@ -7,6 +7,7 @@
  * screening, dedupe, generalisation, and the merge that accumulates evidence.
  */
 import type {
+  WriteAdmissionOptions,
   Clock,
   DistillCandidate,
   FeedbackEvent,
@@ -74,6 +75,23 @@ export type DistillOptions = {
    */
   readonly strict?: boolean;
   /**
+   * Write-side admission: decide against the nearest stored memories before an
+   * item is created. Absent means off, which is the behaviour every lane before
+   * this one measured, so an upgrade changes nothing until a host asks.
+   *
+   * On, it is asked only for a claim that would otherwise become a new item — the
+   * exact-key merge and generalisation have already had it — and its pool is the
+   * whole namespace rather than the candidate's task. That is the point: the
+   * exact key carries the scope, so the same lesson re-derived on a second task
+   * used to arrive as a second item, and two items carrying one observation each
+   * corroborate nothing while a pack pays for both.
+   *
+   * The report counts what it decided: `merged` (an observation was added to an
+   * existing item, with `rephrased` counting the cross-task ones) and `suppressed`
+   * (the write changed nothing and was refused).
+   */
+  readonly admission?: WriteAdmissionOptions;
+  /**
    * Which interpreter failures are about the run rather than about the event.
    *
    * A spent budget, an expired deadline, a revoked credential: these stop the batch instead of
@@ -117,6 +135,23 @@ export type DistillReport = {
    * reports the store's shape.
    */
   readonly incomingWithoutDomain: number;
+  /**
+   * Writes refused because the claim was already stored under other words.
+   *
+   * Only non-zero with `admission` on. It is the write-side counterpart of the
+   * census the pair lane reports: a number that says how much paraphrase pressure
+   * the store absorbed without growing, and therefore how much of the pack the
+   * old path would have spent twice.
+   */
+  readonly suppressed: number;
+  /**
+   * Claims merged into an item that another task had already stated.
+   *
+   * A subset of `merged`, and the one number that shows admission working across
+   * the boundary the exact key cannot cross: one survivor, two tasks of support,
+   * which is also what a corroboration gate asks for.
+   */
+  readonly rephrased: number;
 };
 
 export type { Clock, DistillCandidate, FeedbackEvent, KnowledgeItem, Policy, RandomSource, RunRecord };

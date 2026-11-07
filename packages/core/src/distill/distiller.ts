@@ -7,10 +7,12 @@
  * a flywheel that silently drops input cannot be debugged.
  */
 import {
+  admitWrite,
   createKnowledgeItem,
   dedupeKeyOf,
   hasHighSeverity,
   jsonEqual,
+  neighbourhood,
   recordContradiction,
   scopeKey,
   mergeEvidence as mergeItemEvidence,
@@ -25,7 +27,6 @@ import { tierFor } from '../kernel/index.js';
 import type { DistillCandidate, FeedbackEvent, KnowledgeItem } from '../kernel/index.js';
 import { generalizationPlan, mergeEvidence as mergeSiblingEvidence } from './generalize.js';
 import type { DistillOptions, DistillReport, InterpretContext } from './types.js';
-
 export async function distill(options: DistillOptions): Promise<DistillReport> {
   const events = await options.memory.listEvents({
     since: options.since ?? 0,
@@ -41,6 +42,8 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
     superseded: 0,
     contradicted: 0,
     quarantined: 0,
+    suppressed: 0,
+    rephrased: 0,
     rejectedUnsafe: 0,
     rejectedBorrowed: 0,
     rejectedByHost: 0,
@@ -101,13 +104,14 @@ export async function distill(options: DistillOptions): Promise<DistillReport> {
       report.superseded += result.superseded;
       report.contradicted += result.contradicted;
       report.conditionConflicts += result.conditionConflicts;
+      report.rephrased += result.rephrased ?? 0;
     }
   }
 
   return report;
 }
 
-type UpsertOutcome = 'created' | 'merged' | 'generalized' | 'quarantined';
+type UpsertOutcome = 'created' | 'merged' | 'generalized' | 'quarantined' | 'suppressed';
 
 type UpsertResult = {
   readonly outcome: UpsertOutcome;
@@ -115,6 +119,8 @@ type UpsertResult = {
   readonly contradicted: number;
   /** Later observations that named a condition the stored item already had. */
   readonly conditionConflicts: number;
+  /** A cross-task paraphrase merged into an item another task already stated. */
+  readonly rephrased?: number;
 };
 
 async function upsert(options: DistillOptions, candidate: DistillCandidate): Promise<UpsertResult> {
@@ -196,6 +202,47 @@ async function upsert(options: DistillOptions, candidate: DistillCandidate): Pro
     return { outcome: 'generalized', superseded, contradicted, conditionConflicts: 0 };
   }
 
+  /**
+   * Admission is asked last, and only for a claim that would otherwise be created.
+   *
+   * The exact key above already absorbs a repeat inside one scope, and
+   * generalisation absorbs a recurrence across domains. Running admission before
+   * either would let it swallow the very claims those two mechanisms are measured
+   * by, and the ablation of admission would then be an ablation of all three. The
+   * pool it sees is the whole namespace rather than the task, because that
+   * blindness is the thing it exists to fix.
+   */
+  if (options.admission !== undefined) {
+    const wide = await options.memory.listKnowledge({
+      namespace: candidate.namespace,
+      status: 'all',
+    });
+    const decision = admitWrite(
+      candidate,
+      neighbourhood(candidate, wide),
+      options.policy,
+      options.admission,
+    );
+    if (decision.op === 'update') {
+      await options.memory.putKnowledge(
+        mergeItemEvidence(decision.target, candidate, options.policy, now),
+      );
+      return {
+        outcome: 'merged',
+        superseded: 0,
+        contradicted,
+        conditionConflicts: 0,
+        rephrased: 1,
+      };
+    }
+    if (decision.op === 'noop') {
+      // The write is refused rather than performed and then merged. A second copy
+      // of one rule is what a pack pays twice for, and an item whose `updatedAt`
+      // moved without changing reads as a rewrite to the delivery log.
+      return { outcome: 'suppressed', superseded: 0, contradicted, conditionConflicts: 0 };
+    }
+  }
+
   const item = createKnowledgeItem(candidate, options.policy, now, newId('k', now, options.random));
   await options.memory.putKnowledge(item);
   return {
@@ -204,9 +251,7 @@ async function upsert(options: DistillOptions, candidate: DistillCandidate): Pro
     contradicted,
     conditionConflicts: 0,
   };
-}
-
-/**
+}/**
  * A trusted correction that contradicts an active rule in the *same* scope is
  * evidence against that rule, not a second rule to run in parallel.
  *

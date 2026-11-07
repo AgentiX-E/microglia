@@ -60,6 +60,7 @@ import {
   parseTauTasks,
   qualifiedId,
   resilientInterpreter,
+  resolveWriteAdmissionPlan,
   resolveRecallFloor,
   stampDomain,
   stoppedRun,
@@ -134,6 +135,12 @@ const PREREG_ID = process.env['TAU_PREREG'] ?? '';
  * dispatch, and an infrastructure failure must not be confused with a result.
  */
 const PROVIDER_PROBE = (process.env['TAU_PROVIDER_PROBE'] ?? '').trim() === 'true';
+/**
+ * U6's write-side switch, resolved at module load and off unless a dispatch names
+ * it. Off is the store every earlier artefact was produced by: an upgrade must
+ * not change the meaning of a committed number.
+ */
+const WRITE_ADMISSION_PLAN = resolveWriteAdmissionPlan(process.env);
 const TRIALS = Math.max(1, Number(process.env['TAU_TRIALS'] ?? 4) || 4);
 const TRAIN_SHARE = Number(process.env['TAU_TRAIN_SHARE'] ?? 0.5) || 0.5;
 /**
@@ -549,7 +556,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // discarding it is what made the first cross-domain dispatch unreadable. `fatal` is passed so a
   // provider that has stopped answering stops the run here — before an hour of evaluation is spent
   // on a pack the store never built.
-  const distillReport = await host.distill({ generalize: false, fatal: stoppedRun });
+  const distillReport = await host.distill({
+    generalize: false,
+    fatal: stoppedRun,
+    ...(WRITE_ADMISSION_PLAN.mode === 'off' ? {} : { admission: WRITE_ADMISSION_PLAN.options }),
+  });
   const faults = distiller.faults();
   // The domain ledger, from the store rather than from the driver's intentions: an item that lost its
   // domain somewhere nobody instrumented is exactly what V44 exists to catch.
@@ -573,6 +584,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       `support=${census.admission.supportMean.toFixed(4)} ` +
       `confidence=${census.admission.confidenceMean.toFixed(4)} ` +
       `supportOnly=${String(census.admission.supportOnly)}\n`,
+  );
+  // What the write path decided, on the same line as what it produced: a store of N items
+  // built from M claims is only interpretable beside the count that was refused. Off prints
+  // zeros, because 'not measured' and 'measured zero' are different facts everywhere else in
+  // this lane and must be here too.
+  process.stdout.write(
+    `[tau2] write-admission: mode=${WRITE_ADMISSION_PLAN.mode} ` +
+      `rephrased=${String(distillReport.rephrased)} ` +
+      `suppressed=${String(distillReport.suppressed)}\n`,
   );
   process.stdout.write(`[tau2] distill model: configured=${llm.configuredModel} sent=${llm.model}\n`);
 

@@ -541,6 +541,13 @@ export {
   committedFloor,
   resolveRecallFloor,
 } from './tau2-recall-floor.js';
+
+export {
+  WRITE_ADMISSION_MODE,
+  resolveWriteAdmissionPlan,
+  type WriteAdmissionMode,
+  type WriteAdmissionPlan,
+} from './write-admission-plan.js';
 export {
   REVERT_DELTA_BAR_PP,
   REVERT_P_BAR,

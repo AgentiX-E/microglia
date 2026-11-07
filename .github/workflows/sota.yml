@@ -749,6 +749,12 @@ jobs:
           TAU_PROVIDER_PROBE: ${{ steps.recall_floor.outputs.pair == 'true' && 'true' || 'false' }}
           # Common random numbers: both facades get the same explicit seed.
           TAU_EVAL_SEED: '300'
+          # U6's write-side switch. A repository variable rather than a dispatch
+          # input for the same reason `template` is: which claims a store admits is
+          # a property of the experiment, not a menu item, and the dispatch input
+          # count is already at the platform's limit of twenty-five. Unset means
+          # off, which is the store every artefact before this switch measured.
+          TAU_WRITE_ADMISSION: ${{ vars.TAU_WRITE_ADMISSION }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           TAU_DRIVER: ${{ vars.TAU_DRIVER || './packages/eval/src/bin/tau2-driver.ts' }}
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}

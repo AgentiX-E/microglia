@@ -36,10 +36,20 @@ import { build } from 'esbuild';
  *
  * Written down instead of adjusted silently, because a ceiling nobody argues about is a
  * ceiling that only ever moves one way by accident.
+ *
+ * Raised once on 2026-11-07, 44,000 -> 46,000 raw (gzip untouched: 15,191 measured
+ * against a 16,000 ceiling):
+ *
+ *   `kernel/admission.ts` — the write-time decision (`add` / `update` / `noop` against
+ *   the top-s nearest memories), its two configurable bounds, the validation that makes
+ *   a bad bound a thrown error rather than a silent default, and the lexical
+ *   neighbourhood that a store without embeddings uses. Measured 45,309 raw at this
+ *   commit. It ships because the distiller calls it and the next arm varies it; a
+ *   mechanism that only exists in a document is not a mechanism.
  */
 const BUDGETS = [
   { name: 'browser', entry: 'packages/browser/dist/index.js', raw: 3200, gzip: 1600 },
-  { name: 'core', entry: 'packages/core/dist/index.js', raw: 44000, gzip: 16000 },
+  { name: 'core', entry: 'packages/core/dist/index.js', raw: 46000, gzip: 16000 },
 ];
 
 const probe = process.argv.includes('--probe');

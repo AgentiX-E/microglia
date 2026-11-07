@@ -18,6 +18,7 @@ import {
   systemClock,
 } from '../kernel/index.js';
 import type {
+  WriteAdmissionOptions,
   Clock,
   ErasureReport,
   ErasureSelector,
@@ -304,6 +305,11 @@ export class Microglia implements RunHost {
        * out of it.
        */
       fatal?: (error: unknown) => boolean;
+      /**
+       * Write-side admission, forwarded verbatim. Absent means off, so a host that
+       * does not ask for it keeps the store-growing behaviour it had.
+       */
+      admission?: WriteAdmissionOptions;
     } = {},
   ): Promise<DistillReport> {
     this.assertOpen();
@@ -321,6 +327,7 @@ export class Microglia implements RunHost {
         : { resolveContradictions: options.resolveContradictions }),
       ...(options.accept === undefined ? {} : { accept: options.accept }),
       ...(options.fatal === undefined ? {} : { fatal: options.fatal }),
+      ...(options.admission === undefined ? {} : { admission: options.admission }),
     });
     this.knowledgeVersion += 1;
     return report;

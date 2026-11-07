@@ -240,6 +240,56 @@ export function createKnowledgeItem(
 }
 
 /**
+ * Would merging this observation change the item at all?
+ *
+ * Extracted from `mergeEvidence` so the two callers that need this answer share
+ * one definition. The merge asks it to decide *what* to write; admission asks it
+ * to decide *whether to write at all*, and a second copy of five conditions would
+ * drift from the first the moment either is edited.
+ *
+ * False only when nothing would move:
+ *
+ *  - the observation is new (`feedbackId` not already cited) — more support;
+ *  - the item is retired and the observation is trusted enough to rehabilitate
+ *    it — the empirical ledger is reset, which is a change even with no new
+ *    evidence;
+ *  - the observation names a condition the item does not have yet;
+ *  - the payloads disagree (a merge replaces the payload, so this is a change);
+ *  - the observation is a stronger tier (an outcome measured on the same claim).
+ */
+export function wouldChange(
+  item: KnowledgeItem,
+  candidate: DistillCandidate,
+  policy: Policy,
+): boolean {
+  const rehabilitate =
+    item.status === 'retired' && candidate.trust >= policy.singleObservationTrust;
+  const duplicate = item.evidence.some(
+    (entry) => entry.feedbackId === candidate.evidence.feedbackId,
+  );
+  const tier = strongestTier(item.tier, candidate.tier);
+  const samePayload = jsonEqual(item.payload ?? null, candidate.payload ?? null);
+  /**
+   * A condition is adopted once and then held.
+   *
+   * The first observation that names a condition is the one the rule was learned
+   * under; a later event restating the same claim is not evidence about scope, it is
+   * the same claim again. An existing condition is therefore never overwritten, and a
+   * *different* condition arriving later is counted by the distiller as a conflict
+   * rather than silently replacing one of the two. Nothing to adopt means nothing
+   * changed, which keeps this a no-op like any other repeat.
+   */
+  const adopts = item.when === undefined && candidate.when !== undefined;
+  return (
+    !duplicate ||
+    rehabilitate ||
+    adopts ||
+    !samePayload ||
+    (tier !== undefined && tier !== item.tier)
+  );
+}
+
+/**
  * Merge a new observation into an existing item.
  *
  * Identity is `dedupeKey`, not statement text: two phrasings of the same rule
@@ -253,24 +303,6 @@ export function mergeEvidence(
   now: number,
 ): KnowledgeItem {
   /**
-   * Rehabilitation: a direct, trusted correction resets the empirical ledger.
-   *
-   * The failures counted against a retired item are failures of *application*,
-   * and the host may have applied it to the wrong case. Letting three bad
-   * applications veto every future human correction would make the store
-   * permanently deaf to the person it exists to learn from. The reset is
-   * recorded implicitly by `applied: 0`, and the retirement can recur if the
-   * fresh evidence also fails.
-   */
-  const rehabilitate =
-    item.status === 'retired' && candidate.trust >= policy.singleObservationTrust;
-  const base: KnowledgeItem = rehabilitate
-    ? { ...item, applied: 0, succeeded: 0, status: 'candidate', statusReason: 'rehabilitated' }
-    : item;
-  const duplicate = base.evidence.some(
-    (entry) => entry.feedbackId === candidate.evidence.feedbackId,
-  );
-  /**
    * Nothing new: the same evidence, the same claim, the same tier.
    *
    * Distillation reprocesses the event log from the beginning when the caller
@@ -280,32 +312,20 @@ export function mergeEvidence(
    * exactly what a delivery log reads to decide what to send. A no-op has to look
    * like one.
    */
-  const tier = strongestTier(base.tier, candidate.tier);
-  const samePayload = jsonEqual(base.payload ?? null, candidate.payload ?? null);
-  /**
-   * A condition is adopted once and then held.
-   *
-   * The first observation that names a condition is the one the rule was learned
-   * under; a later event restating the same claim is not evidence about scope, it is
-   * the same claim again. An existing condition is therefore never overwritten, and a
-   * *different* condition arriving later is counted by the distiller as a conflict
-   * rather than silently replacing one of the two. Nothing to adopt means nothing
-   * changed, which keeps this a no-op like any other repeat.
-   */
-  const adopts = base.when === undefined && candidate.when !== undefined;
-  if (
-    duplicate &&
-    !rehabilitate &&
-    !adopts &&
-    samePayload &&
-    (tier === undefined || tier === base.tier)
-  ) {
-    return item;
-  }
+  if (!wouldChange(item, candidate, policy)) return item;
+  const rehabilitate =
+    item.status === 'retired' && candidate.trust >= policy.singleObservationTrust;
+  const base: KnowledgeItem = rehabilitate
+    ? { ...item, applied: 0, succeeded: 0, status: 'candidate', statusReason: 'rehabilitated' }
+    : item;
+  const duplicate = base.evidence.some(
+    (entry) => entry.feedbackId === candidate.evidence.feedbackId,
+  );
   const evidence: readonly EvidenceRef[] = duplicate
     ? base.evidence
     : [...base.evidence, candidate.evidence];
   const support = duplicate ? base.support : base.support + candidate.evidence.weight;
+  const adopts = base.when === undefined && candidate.when !== undefined;
   const merged: KnowledgeItem = {
     ...base,
     evidence,

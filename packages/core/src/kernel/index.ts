@@ -102,6 +102,16 @@ export {
 export { defaultPolicy, resolvePolicy } from './policy.js';
 
 export {
+  WRITE_ADMISSION_THRESHOLD,
+  WRITE_ADMISSION_TOP_S,
+  admitWrite,
+  neighbourhood,
+  type WriteAdmissionOptions,
+  type WriteDecision,
+  type WriteNeighbour,
+} from './write-admission.js';
+
+export {
   applyOutcome,
   corroborationShare,
   createKnowledgeItem,
@@ -118,6 +128,7 @@ export {
   scoreKnowledge,
   specificity,
   statementIdentity,
+  wouldChange,
   validityDecay,
   type AdmissionDecision,
 } from './knowledge.js';
