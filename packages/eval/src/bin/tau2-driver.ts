@@ -613,6 +613,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     readonly recallRequests: number;
     readonly recallServed: number;
     readonly useObservations: UseObservation[];
+    /**
+     * The observations the coverage curve is built from.
+     *
+     * The same as `useObservations` unless this facade ran behind another one: a
+     * paired dispatch grades the gated facade, and its observations have already
+     * passed the floor, so a histogram over them prices every floor at or below it
+     * as free. R49 is the case in point — 0 and 0.01 both retain 1164 pairs in the
+     * floored facade, while the as-is facade of the same run served 1435 packs
+     * against 949.
+     */
+    readonly coverageObservations?: UseObservation[];
     /** Whether the agent acted at all in each episode, reduced to per-task counts. */
     readonly inaction: InactionCensus;
   };
@@ -730,7 +741,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       };
       // The registered (floored) facade is the memory arm the rest of the lane
       // grades, so `l4-paired` against the reference stays exactly as R48 had it.
-      primary = floored;
+      // Its coverage curve, however, comes from the ungated facade: the floor under
+      // test must be priced against the population it was applied to, not against
+      // the population that already survived it.
+      primary = { ...floored, coverageObservations: asIs.useObservations };
       process.stdout.write(`[tau2] paired facades: ${facadePairSummary(observedPair)}\n`);
     } else {
       primary = await evaluateFacade(MIN_COVERAGE, evalPath);
@@ -781,6 +795,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // What the served packs contained. `withoutDomain` is the store's count of
     // `domain === undefined` items, from the same domain ledger V44 reads.
     useObservations: primary.useObservations,
+    // The curve from the ungated facade when there is one: the graded facade's
+    // observations are already filtered at the floor under test, and a histogram
+    // built from them prices that floor as free.
+    coverageObservations: primary.coverageObservations ?? primary.useObservations,
     widenedItems: withoutDomain,
     scenario,
     // The scenario's own size, not the split's: a dispatch cap hides it, and it is what bounds the

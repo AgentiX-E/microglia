@@ -167,6 +167,19 @@ export type Tau2Raw = {
   readonly useArm?: UseArm;
   /** Widened (`domain === undefined`) items in the store, from its domain ledger. */
   readonly widenedItems?: number;
+  /**
+   * The observations the coverage curve is computed from, when they are not the
+   * ones the `use` census describes.
+   *
+   * A paired dispatch grades the *gated* facade, so `useObservations` is the
+   * population after the floor — and a histogram built from a filtered population
+   * prices every floor at or below the applied one as free. R49's artefact shows
+   * it: floors 0 and 0.01 both retain 1164 pairs, because 0.01 was already
+   * applied when the pairs were recorded, while the as-is facade in the same run
+   * served 1435 packs against 949. The curve has to come from the ungated facade,
+   * or the next floor is chosen from a table that says it costs nothing.
+   */
+  readonly coverageObservations?: readonly UseObservation[];
   /** The write path's own census, when the driver ran with admission switched on. */
   readonly writeAdmission?: {
     readonly mode: 'off' | 'neighbours';
@@ -350,7 +363,7 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
           // dispatch (AUDIT 34.22), so reduce the SAME facade observations to
           // the retention curve here, while they still exist in this process.
           // An older artefact has neither field and reads as "not measured".
-          coverage: coverageHistogram(raw.useObservations),
+          coverage: coverageHistogram(raw.coverageObservations ?? raw.useObservations),
         }),
   };
 }

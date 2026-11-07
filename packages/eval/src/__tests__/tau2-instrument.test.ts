@@ -364,3 +364,33 @@ describe('the write path is recorded beside its result', () => {
     expect(armRecordFromDriver(raw()).writeAdmission).toBeUndefined();
   });
 });
+
+describe('the coverage curve is not computed from a filtered population', () => {
+  const observed = [
+    { query: 'q1', statements: ['a'] },
+    { query: 'q2', statements: [] },
+  ];
+  const ungated = [
+    { query: 'q1', statements: ['a'] },
+    { query: 'q2', statements: ['b'] },
+    { query: 'q3', statements: [] },
+  ];
+
+  it('prices the floor against the observations it was applied to', () => {
+    // The graded facade of a paired run has already passed the floor, so a curve
+    // over its own observations reports the floor as free. The `use` census keeps
+    // describing the graded facade; only the curve moves to the ungated one.
+    const record = armRecordFromDriver(
+      raw({ useObservations: observed, coverageObservations: ungated }),
+    );
+    expect(record.coverage?.measuredPairs).toBe(2);
+    expect(record.use?.recallRequests).toBe(2);
+    expect(record.use?.injectedPairs).toBe(1);
+  });
+
+  it('falls back to the graded facade when no ungated population was recorded', () => {
+    const record = armRecordFromDriver(raw({ useObservations: observed }));
+    expect(record.coverage?.measuredPairs).toBe(1);
+    expect(record.use?.recallRequests).toBe(2);
+  });
+});
