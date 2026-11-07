@@ -562,6 +562,7 @@ export {
 export {
   FACADE_FLOOR_ENV,
   FACADE_PAIR_ENV,
+  attestPairScope,
   facadeArmTasks,
   facadePairState,
   facadePairSummary,
@@ -580,16 +581,20 @@ export {
   type PairedFacadeReading,
 } from './facade-pair.js';
 export {
+  NO_MEASUREMENT_ERROR_NAME,
   PROBE_MIN_SUCCESSES,
   ProviderNoMeasurementError,
   classifyProviderProbe,
+  isNoMeasurementRefusal,
   isProviderOutage,
   noMeasurementMarker,
+  noMeasurementRefusal,
   probeGate,
   type NoMeasurementMarker,
   type ProbeAttempt,
   type ProbeGate,
   type ProbeOutage,
+  type NoMeasurementRefusal,
   type ProviderProbeVerdict,
 } from './provider-probe.js';
 export {

@@ -712,8 +712,22 @@ jobs:
           PREREG: ${{ github.event.inputs.prereg }}
         run: |
           set -euo pipefail
-          FLOOR=$(pnpm --silent eval:prereg-floor "prereg/$PREREG.md")
-          PAIR=$(pnpm --silent eval:prereg-pair "prereg/$PREREG.md")
+          # The input is the registration ID, not the file name. A stray `.md`
+          # once produced `prereg/<id>.md.md`, failed here with an opaque
+          # ENOENT and silently skipped the memory arm while the reference arm
+          # still paid for an hour. Refuse it with the fix in the message, and
+          # check the file before any model call is made.
+          if [[ "$PREREG" == *.md ]]; then
+            echo "::error::prereg must be the registration id without the .md suffix, received '$PREREG'"
+            exit 1
+          fi
+          FILE="prereg/$PREREG.md"
+          if [ ! -f "$FILE" ]; then
+            echo "::error::no such pre-registration: $FILE"
+            exit 1
+          fi
+          FLOOR=$(pnpm --silent eval:prereg-floor "$FILE")
+          PAIR=$(pnpm --silent eval:prereg-pair "$FILE")
           echo "floor=$FLOOR" >> "$GITHUB_OUTPUT"
           echo "pair=$PAIR" >> "$GITHUB_OUTPUT"
           echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`." >> "$GITHUB_STEP_SUMMARY"
@@ -770,7 +784,11 @@ jobs:
         run: pnpm eval:l4
 
       - name: L4 arm — reference
-        if: always() && github.event.inputs.l4_arms != 'memory'
+        # A failed registration check must not buy an hour of reference calls:
+        # that is a configuration error, not an arm that failed to measure.
+        if: >-
+          !cancelled() && github.event.inputs.l4_arms != 'memory' &&
+          steps.recall_floor.outcome != 'failure'
         timeout-minutes: 120
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}

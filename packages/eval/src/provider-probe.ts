@@ -210,12 +210,64 @@ export function probeGate(verdict: ProviderProbeVerdict): ProbeGate {
 }
 
 /**
+ * The error shape every refusal carries across the driver boundary.
+ *
+ * A provider outage is not the only way a run stops before measuring. R48's
+ * own history supplies the second one: R41 scored 36.0 from a store that held
+ * nothing, and the reading looked like a result. An empty store, an
+ * unattestable pair scope and a refused pre-flight probe are the same thing to
+ * a reader -- an instrument that did not measure -- so they must reach the
+ * lane as the same labelled refusal instead of one of them arriving as an
+ * unhandled stack trace.
+ */
+export type NoMeasurementRefusal = Error & { readonly marker: NoMeasurementMarker };
+
+/** The name `l4.ts` recognises; structure is the contract, not the class. */
+export const NO_MEASUREMENT_ERROR_NAME = 'NoMeasurementError';
+
+/**
+ * Build a refusal for any pre-measurement stop.
+ *
+ * An empty reason is refused: an unlabelled refusal is a bare crash, and the
+ * whole point of the marker is that the lane can say what it did not measure.
+ */
+export function noMeasurementRefusal(reason: string): NoMeasurementRefusal {
+  const marker = noMeasurementMarker(reason);
+  const error = new Error(marker.reason) as Error & { marker: NoMeasurementMarker };
+  error.name = NO_MEASUREMENT_ERROR_NAME;
+  error.marker = marker;
+  return error as NoMeasurementRefusal;
+}
+
+/**
+ * Is this a deliberate refusal, as opposed to a bug in the driver?
+ *
+ * Structural on purpose. The driver is dynamically imported, so this file's
+ * class identity is not guaranteed to be the one the driver used, and a
+ * refusal that crossed a JSON boundary has no prototype at all. A well-formed
+ * marker is the contract; `status_no_measurement === 1` is what keeps a
+ * `status_not_run` (a missing environment) from being reported as a stopped
+ * measurement, and the reverse.
+ */
+export function isNoMeasurementRefusal(value: unknown): value is NoMeasurementRefusal {
+  if (typeof value !== 'object' || value === null) return false;
+  const marker = (value as { marker?: unknown }).marker;
+  if (typeof marker !== 'object' || marker === null) return false;
+  const record = marker as Record<string, unknown>;
+  return (
+    record['status_no_measurement'] === 1 &&
+    record['status_not_run'] === 0 &&
+    typeof record['reason'] === 'string' &&
+    record['reason'].trim() !== ''
+  );
+}
+
+/**
  * Thrown by the driver when the pre-flight gate refuses to start a run.
  *
- * `l4.ts` catches this by `name` (the driver is dynamically imported, so the
- * class identity is not shared across the module boundary) and writes the
- * marker instead of a zero, a delta or a not-run. Carrying the marker on the
- * error keeps the decision and the artefact in one place.
+ * Kept as its own class because the reason is worth naming, but it is one case
+ * of the `NoMeasurementRefusal` contract: `l4.ts` recognises the marker shape,
+ * so a new pre-measurement refusal does not need a new catch clause.
  */
 export class ProviderNoMeasurementError extends Error {
   readonly marker: NoMeasurementMarker;

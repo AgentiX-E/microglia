@@ -9,6 +9,7 @@ import {
   resolveFacadePairPlan,
   storeFingerprintOf,
   treatmentDelivered,
+  attestPairScope,
   facadePairState,
   facadePairSummary,
   pairedFacadeArtifact,
@@ -17,6 +18,7 @@ import {
   type PairedFacadeReading,
 } from '../facade-pair.js';
 import { AS_IS_FLOOR } from '../tau2-recall-floor.js';
+import { isNoMeasurementRefusal } from '../provider-probe.js';
 import { COVERAGE_FLOORS } from '../tau2-use-census.js';
 import type { PassAtKInput } from '../passk.js';
 import type { RunScope, WithinRunPairVerdict } from '../within-run-pair.js';
@@ -588,5 +590,61 @@ describe('the paired-facade artefact and its readback', () => {
     const document = artifact();
     expect(JSON.stringify(document)).not.toContain('-6.00pp');
     expect(readFacadePairArtifact(document).deltaPp).toBe(0);
+  });
+});
+
+describe('attestPairScope turns an unattestable pair into a labelled refusal', () => {
+  const shared = {
+    dispatchId: 'dispatch-1',
+    preregId: 'R49-within-run-pair',
+    storeStatements: ['a distillation statement'],
+    learnSplit: ['retail/001'],
+    testSplit: ['airline/001'],
+    seed: 300,
+    trials: 4,
+    model: 'deepseek-chat',
+  };
+
+  it('returns the attested scope unchanged when the pair is well formed', () => {
+    const scope = attestPairScope(shared);
+    expect(scope.storeFingerprint).toBe(storeFingerprintOf(shared.storeStatements));
+    expect(scope.dispatchId).toBe('dispatch-1');
+  });
+
+  it('refuses an empty store as no measurement, naming what was missing', () => {
+    let caught: unknown;
+    try {
+      attestPairScope({ ...shared, storeStatements: [] });
+    } catch (error) {
+      caught = error;
+    }
+    expect(isNoMeasurementRefusal(caught)).toBe(true);
+    if (!isNoMeasurementRefusal(caught)) return;
+    expect(caught.marker.status_no_measurement).toBe(1);
+    expect(caught.marker.reason).toMatch(/distilled store/);
+  });
+
+  it('refuses a half-split, a bad seed and a blank model the same way', () => {
+    for (const broken of [
+      { ...shared, testSplit: [] },
+      { ...shared, seed: Number.NaN },
+      { ...shared, model: '  ' },
+      { ...shared, trials: 0 },
+    ]) {
+      let caught: unknown;
+      try {
+        attestPairScope(broken);
+      } catch (error) {
+        caught = error;
+      }
+      expect(isNoMeasurementRefusal(caught)).toBe(true);
+    }
+  });
+
+  it('keeps the strict scope builder strict, so a caller cannot skip the refusal', () => {
+    expect(() => facadeScope({ ...shared, storeStatements: [] })).toThrow(/distilled store/);
+    expect(() => facadeScope({ ...shared, storeStatements: [] })).not.toThrow(
+      /no measurement/i,
+    );
   });
 });

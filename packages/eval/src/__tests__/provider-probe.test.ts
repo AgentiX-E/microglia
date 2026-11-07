@@ -6,6 +6,8 @@ import {
   classifyProviderProbe,
   isProviderOutage,
   noMeasurementMarker,
+  isNoMeasurementRefusal,
+  noMeasurementRefusal,
   probeGate,
   ProviderNoMeasurementError,
   type ProbeAttempt,
@@ -204,5 +206,51 @@ describe('ProviderNoMeasurementError', () => {
   it('is recognisable by name alone, the way l4.ts must catch it', () => {
     const error = new ProviderNoMeasurementError(noMeasurementMarker('the provider answered 5xx'));
     expect((error as { name: string }).name).toBe('ProviderNoMeasurementError');
+  });
+});
+
+describe('the no-measurement refusal is a structural contract', () => {
+  it('builds a refusal that carries the marker and a distinct name', () => {
+    const error = noMeasurementRefusal('the distilled store is empty: no treatment existed');
+    expect(error.name).toBe('NoMeasurementError');
+    expect(error.message).toMatch(/distilled store is empty/);
+    expect(error.marker.status_no_measurement).toBe(1);
+    expect(error.marker.status_not_run).toBe(0);
+    expect(error.marker.claim).toBe('none');
+  });
+
+  it('refuses an empty reason, because an unlabelled refusal is a bare crash', () => {
+    expect(() => noMeasurementRefusal('   ')).toThrow(/needs a reason/);
+  });
+
+  it('recognises every refusal the lane may raise, by structure rather than by class', () => {
+    expect(isNoMeasurementRefusal(noMeasurementRefusal('empty store'))).toBe(true);
+    // The provider refusal is one case of the contract, not the contract itself.
+    const gate = probeGate(classifyProviderProbe(outage));
+    expect(gate.proceed).toBe(false);
+    if (gate.proceed) return;
+    expect(isNoMeasurementRefusal(new ProviderNoMeasurementError(gate.marker))).toBe(true);
+    // A marker-shaped object that crossed a JSON boundary must still count:
+    // the driver is dynamically imported, so class identity is not a contract.
+    expect(
+      isNoMeasurementRefusal({
+        name: 'NoMeasurementError',
+        marker: { status_no_measurement: 1, status_not_run: 0, claim: 'none', reason: 'x' },
+      }),
+    ).toBe(true);
+  });
+
+  it('does not mistake an ordinary failure, a not-run or a fake marker for a refusal', () => {
+    expect(isNoMeasurementRefusal(new Error('boom'))).toBe(false);
+    expect(isNoMeasurementRefusal({ name: 'NoMeasurementError' })).toBe(false);
+    expect(
+      isNoMeasurementRefusal({
+        name: 'NoMeasurementError',
+        marker: { status_no_measurement: 0, status_not_run: 1, claim: 'none', reason: 'x' },
+      }),
+    ).toBe(false);
+    for (const value of [null, undefined, 'NoMeasurementError', 42, []]) {
+      expect(isNoMeasurementRefusal(value)).toBe(false);
+    }
   });
 });

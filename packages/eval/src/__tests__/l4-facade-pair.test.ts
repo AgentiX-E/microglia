@@ -163,3 +163,46 @@ export async function run() { return [{ taskId: 'airline/001', successes: 4, tri
     expect(notes.join(' ')).toMatch(/Claim: none/);
   });
 });
+
+describe('any refusal the driver raises becomes an explicit no-measurement', () => {
+  /**
+   * An empty store is R41's exact failure mode: 36.0 was scored from a store
+   * that held nothing, and the reading looked like a result. The pair cannot
+   * attest a store fingerprint it does not have, so the refusal must reach the
+   * lane as a labelled artefact rather than an unhandled stack trace.
+   */
+  const DRIVER_EMPTY_STORE = `
+export async function run() {
+  const error = new Error('the distilled store is empty: no treatment existed to serve');
+  error.name = 'NoMeasurementError';
+  error.marker = {
+    status_no_measurement: 1,
+    status_not_run: 0,
+    claim: 'none',
+    reason: error.message,
+  };
+  throw error;
+}
+`;
+
+  it('writes status_no_measurement for a non-provider refusal too', async () => {
+    const { stdout, dir } = await lane(DRIVER_EMPTY_STORE);
+    const metrics = read(dir, 'poc-l4.json')['metrics'] as Record<string, unknown>;
+    expect(metrics['status_no_measurement']).toBe(1);
+    expect(metrics['status_not_run']).toBe(0);
+    expect(metrics).not.toHaveProperty('pass4');
+    expect(read(dir, 'poc-l4.json')['per_task']).toBeUndefined();
+    expect(existsSync(join(dir, 'poc-l4-facade-pair.json'))).toBe(false);
+    expect(stdout).toContain('distilled store is empty');
+    const notes = (read(dir, 'poc-l4.json')['notes'] as readonly string[]).join(' ');
+    expect(notes).toMatch(/Claim: none/);
+  });
+
+  it('still rethrows an ordinary driver crash, because that is a bug and not an instrument', async () => {
+    await expect(
+      lane(`
+export async function run() { throw new Error('a genuine programming error'); }
+`),
+    ).rejects.toThrow(/genuine programming error/);
+  });
+});

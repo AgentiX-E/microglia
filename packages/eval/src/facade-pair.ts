@@ -32,6 +32,7 @@
 import type { PassAtKInput } from './passk.js';
 import type { ArmTask } from './l4.js';
 import { AS_IS_FLOOR, resolveRecallFloor } from './tau2-recall-floor.js';
+import { noMeasurementRefusal } from './provider-probe.js';
 import {
   withinRunPair,
   type FacadeArm,
@@ -199,6 +200,25 @@ export function facadeScope(shared: FacadeShared): RunScope {
     trials: shared.trials,
     model: shared.model,
   };
+}
+
+/**
+ * Attest the pair scope, or refuse as a no-measurement.
+ *
+ * `facadeScope` is strict on purpose -- an unattestable pair is not a pair --
+ * but a thrown error at the driver boundary reaches the lane as an unhandled
+ * crash, and a crash is indistinguishable from a bug. R41 is why this matters:
+ * 36.0 was scored from a store that held nothing and the reading looked like a
+ * result. The lane therefore gets the same labelled refusal it gets for a
+ * provider outage, so an empty store is reported as an instrument that did not
+ * measure rather than as a stack trace or a number.
+ */
+export function attestPairScope(shared: FacadeShared): RunScope {
+  try {
+    return facadeScope(shared);
+  } catch (error) {
+    throw noMeasurementRefusal((error as Error).message);
+  }
 }
 
 /** One facade's reading as the driver produced it. */

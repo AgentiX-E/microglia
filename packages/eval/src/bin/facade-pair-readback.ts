@@ -38,8 +38,8 @@ function summaryLine(text: string): void {
 
 function main(): void {
   if (!existsSync(PATH)) {
-    process.stdout.write('[facade-pair-readback] no paired-facade artefact: single-facade dispatch\n');
-    summaryLine('### Paired facade\n\nNo paired-facade artefact: this dispatch ran one facade.');
+    process.stdout.write('[facade-pair-readback] no paired-facade artefact for this arm\n');
+    summaryLine('### Paired facade\n\nNo paired-facade artefact was written for this arm.');
     return;
   }
 

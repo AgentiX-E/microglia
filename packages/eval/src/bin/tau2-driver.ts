@@ -39,6 +39,7 @@ import { steppingClock, mulberry32 } from '@agentix-e/microglia-core';
 import {
   AS_IS_FLOOR,
   LlmClient,
+  attestPairScope,
   ProviderNoMeasurementError,
   classifyProviderProbe,
   driverArgs,
@@ -647,7 +648,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // Attest the single store before either facade recalls. A second learning
   // phase would produce a second fingerprint and be refused by the invariant.
   const sharedScope = PAIR_PLAN.enabled
-    ? facadeScope({
+    ? attestPairScope({
         dispatchId: DISPATCH_ID,
         preregId: PREREG_ID,
         storeStatements: knowledge.map((item) => item.statement),

@@ -26,6 +26,7 @@ import {
   compareToPublished,
   meanPassAtK,
   facadePairState,
+  isNoMeasurementRefusal,
   pairedFacadeArtifact,
   parseTauResults,
   perTaskRows,
@@ -263,9 +264,12 @@ async function measureFromDriver(module: string): Promise<Measurement> {
     tasks = await loaded.run();
   } catch (error) {
     // The driver is dynamically imported, so the error's class identity is not
-    // shared across the module boundary. `name` is the contract.
-    if ((error as { name?: string }).name === 'ProviderNoMeasurementError') {
-      await noMeasurement((error as { marker: NoMeasurementMarker }).marker);
+    // shared across the module boundary: the marker's STRUCTURE is the
+    // contract. That covers the pre-flight provider refusal and every other
+    // stop before measuring (an empty store, an unattestable pair scope), which
+    // must not reach a reader as an unhandled stack trace.
+    if (isNoMeasurementRefusal(error)) {
+      await noMeasurement(error.marker);
     }
     throw error;
   }
