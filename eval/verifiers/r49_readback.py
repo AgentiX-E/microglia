@@ -6,6 +6,11 @@ seven refutations. This verifier checks them mechanically so a reader does not
 have to hold eight claims in their head, and so a run that violated the design
 cannot be read as a result by accident.
 
+A ninth prediction grades the write path's own census when the artefact reports
+one (`tau2.writeAdmission`). It is `n/a` on every artefact written before the
+switch existed, because "this run never asked" and "this run asked and refused
+nothing" are different facts and only one of them is evidence.
+
 Three outcomes are possible for the arm, and they are not interchangeable:
 
   GRADED            every prediction holds and no refutation fires. A delta is
@@ -168,6 +173,35 @@ def grade(pair: dict[str, Any], main: dict[str, Any], *, arms_written: bool) -> 
         f"status_no_measurement={stopped} status_not_run={metrics.get('status_not_run')}",
     )
 
+    # --- P9: the write path reports a census that agrees with its own switch ---
+    tau2 = main.get("tau2") if isinstance(main.get("tau2"), dict) else {}
+    census = tau2.get("writeAdmission") if isinstance(tau2, dict) else None
+    if not isinstance(census, dict):
+        report.predict(
+            "P9 the write path reports a census consistent with the mode it states",
+            None,
+            "not reported: this artefact predates the write-admission switch",
+        )
+    else:
+        mode = census.get("mode")
+        rephrased = census.get("rephrased")
+        suppressed = census.get("suppressed")
+        # `off` with refusals is not a weak result, it is a contradiction: the store
+        # cannot have refused a write it was never allowed to judge.
+        consistent = (
+            mode in ("off", "neighbours")
+            and _is_number(rephrased)
+            and _is_number(suppressed)
+            and rephrased >= 0
+            and suppressed >= 0
+            and (mode != "off" or (rephrased == 0 and suppressed == 0))
+        )
+        report.predict(
+            "P9 the write path reports a census consistent with the mode it states",
+            consistent,
+            f"mode={mode!r} rephrased={rephrased} suppressed={suppressed}",
+        )
+
     # --- refutations ---
     scope_fields = ("dispatchId", "preregId", "learnSplit", "testSplit", "seed", "trials", "model")
     missing = [field for field in scope_fields if not scope.get(field)]
@@ -282,6 +316,24 @@ def self_test(fixture: Path) -> int:
 
     print("self-test:")
     case("a clean PAIRED artefact grades", "GRADED")
+
+    # The census is `n/a` above because the fixture predates the switch; these two
+    # cases are the ones that make it a prediction rather than a paragraph.
+    measured = json.loads(json.dumps(base_main))
+    measured.setdefault("tau2", {})["writeAdmission"] = {
+        "mode": "neighbours",
+        "rephrased": 2,
+        "suppressed": 5,
+    }
+    case("a write census that agrees with its switch grades", "GRADED", main=measured)
+
+    contradicted = json.loads(json.dumps(base_main))
+    contradicted.setdefault("tau2", {})["writeAdmission"] = {
+        "mode": "off",
+        "rephrased": 0,
+        "suppressed": 3,
+    }
+    case("an off switch that refused three writes abandons", "ABANDONED", main=contradicted)
 
     mutated = json.loads(json.dumps(base_pair))
     mutated["scope"]["dispatchId"] = ""
