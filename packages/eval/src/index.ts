@@ -550,6 +550,16 @@ export {
   type RevertVerdict,
 } from './l4-revert.js';
 export {
+  PAIR_RESAMPLES,
+  PAIR_SEED,
+  scopeDifference,
+  withinRunPair,
+  type FacadeArm,
+  type FacadeContrast,
+  type WithinRunPairVerdict,
+  type RunScope,
+} from './within-run-pair.js';
+export {
   resilientInterpreter,
   stampDomain,
   type InterpreterFaults,

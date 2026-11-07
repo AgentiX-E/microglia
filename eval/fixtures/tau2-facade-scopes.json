@@ -1,0 +1,40 @@
+{
+  "description": "Committed R47 and R48 readings used to prove that two dispatches are not a within-run pair. Sources: AUDIT 34.35, TECH-DESIGN 17.98, COMPETITIVE L.16, prereg/R48-u3-coverage-floor.md and prereg/R47-coverage-histogram.md. The storeFingerprint values here are the documented store identities ('8 distilled items' vs '12 distilled items'), not sha256 digests: a real dispatch must attest the actual digest of its one distilled store. The l4Paired rows are the within-run memory-vs-reference gate, NEVER the facade contribution: R48's -6.00pp gate fired the R45 revert rule while the cross-run contribution was a different quantity.",
+  "r47": {
+    "run": "42337250684",
+    "prereg": "R47-coverage-histogram",
+    "store": "R47:8-distilled-items",
+    "referencePass4": 0.30,
+    "recallServed": 1491,
+    "meanPackIds": 1.4675,
+    "zeroCoveragePairs": 750,
+    "l4Paired": { "scope": "within-run", "deltaPp": 12, "p": 0.1093749999999998, "paired": 50 }
+  },
+  "r48": {
+    "run": "42353229972",
+    "prereg": "R48-u3-coverage-floor",
+    "store": "R48:12-distilled-items",
+    "referencePass4": 0.44,
+    "recallServed": 965,
+    "meanPackIds": 1.0,
+    "zeroCoveragePairs": 0,
+    "l4Paired": { "scope": "within-run", "deltaPp": -6, "p": 0.4531250000000005, "paired": 50 }
+  },
+  "identityControl": {
+    "description": "Structural identity control, NOT a measurement. Both facades carry the same scope, the same task ids and the same outcomes, so a valid pair must report a zero delta. It exists to prove the invariant admits a within-run pair without inventing an experimental result.",
+    "dispatchId": "within-run-pair-identity-control",
+    "preregId": "identity-control",
+    "storeFingerprint": "identity:one-store",
+    "learnSplit": ["retail/001", "retail/002"],
+    "testSplit": ["airline/001", "airline/002", "airline/003"],
+    "seed": 7,
+    "trials": 4,
+    "model": "deepseek/deepseek-chat",
+    "servedPacks": 3,
+    "tasks": [
+      { "id": "airline/001", "passedAll": true },
+      { "id": "airline/002", "passedAll": false },
+      { "id": "airline/003", "passedAll": true }
+    ]
+  }
+}
