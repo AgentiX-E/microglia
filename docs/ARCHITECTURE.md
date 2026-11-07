@@ -75,9 +75,23 @@ startup.
 
 An interpreter takes one feedback event and a run, and returns zero or more `DistillCandidate`
 values. It cannot write to the store. Everything a candidate must survive — redaction, the injection
-screen, deduplication, contradiction resolution, admission — happens in the distiller, once, for every
-interpreter. That is what makes an LLM-backed interpreter safe to enable: the model's output is
-untrusted input to a pipeline that already exists.
+screen, the exact-key merge, generalisation, write admission, contradiction resolution, evidence
+admission — happens in the distiller, once, for every interpreter. That is what makes an LLM-backed
+interpreter safe to enable: the model's output is untrusted input to a pipeline that already exists.
+
+The order of those four store decisions is load-bearing rather than incidental:
+
+| Step | Asks | Runs when |
+|---|---|---|
+| exact-key merge | is this the same claim in the same scope? | always |
+| generalisation | is this the same claim seen from another domain? | `generalize` on |
+| write admission | does this resemble a stored rule closely enough to merge, and would merging change it? | `admission` passed |
+| contradiction resolution | does this claim deny an active rule? | `resolveContradictions` on |
+
+Admission runs after the other two on purpose: placed earlier it would absorb the cross-domain
+recurrence generalisation exists to widen, and an ablation that switched it off would then be
+measuring two mechanisms. It asks only about claims that would otherwise be *created*, so its
+contribution is the set of items that do not exist.
 
 ### 2.4 `apply` owns the injection boundary
 

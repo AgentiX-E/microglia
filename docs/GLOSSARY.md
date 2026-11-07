@@ -101,6 +101,12 @@ the host. Never derived from the actor's identity.
 **Trust ceiling** — a per-call cap on trust, for feedback arriving through a channel the host trusts
 less. Below the quarantine floor, the resulting knowledge is stored but never injected.
 
+**Write admission** — the decision a store makes *before* storing a claim: add it, merge it into a
+neighbouring rule, or decline to write. Distinct from **evidence admission**, which decides whether a
+stored rule may be injected; one is about the door, the other about the shelf. Similarity to the
+nearest stored rules is what the decision reads, and refusal (`noop`) is a result worth counting: it
+is how much repetition the store declined to keep.
+
 ## Evaluation terms
 
 **Ablation** — an arm or micro-experiment that disables exactly one module so its contribution is

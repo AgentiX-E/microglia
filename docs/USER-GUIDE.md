@@ -556,6 +556,8 @@ const report = await mg.distill({ since, limit, generalize: true, resolveContrad
 | `rejectedUnsafe` | dropped by the injection screen |
 | `failed` | events whose interpreter threw (a model returning prose, a parser rejection) |
 | `conditionConflicts` | claims that named a `when` condition the stored rule already had, and a different one — the stored one is kept, so this count is where a second description of the same scope is visible |
+| `suppressed` | writes refused because the rule was already stored under other words (only non-zero with `admission` on) |
+| `rephrased` | claims merged into a rule another task had already stated — a subset of `merged` |
 
 An interpreter that throws is counted and skipped rather than aborting the batch: one unparseable
 model response should not discard the other two hundred lessons. Pass `strict: true` if you want the
@@ -645,6 +647,46 @@ The lane reports `order_invariance`, `replay_determinism`, `stale_schema_injecte
 that makes the other three worth reading — `control_invariance`. The control replays the log through a
 view that returns events newest-first, bypassing the sort; it **must** disagree. A harness whose control
 also passes is measuring nothing, and the lane fails rather than report a vacuous 1.00.
+
+### 8.3 Admission: deciding what *not* to write
+
+```ts
+const report = await mg.distill({
+  admission: { topS: 10, threshold: 0.85 },   // omit the key to keep the pre-8.3 behaviour
+});
+```
+
+By default the store writes every claim it cannot match to an existing item **exactly** — same
+namespace, kind, scope and normalised sentence. That key contains the scope, so the same lesson
+learned on a second task arrives as a second item. Two items carrying one rule spend two slots of a
+pack whose limit is eight, and neither corroborates the other: the pair stands on one observation
+each, and a promotion gate that asks for two independent tasks sees one task twice.
+
+`admission` compares the claim against its `topS` nearest live items in the same namespace and kind
+and decides one of three things:
+
+| Decision | When | What is written |
+|---|---|---|
+| `add` | nothing comparable is stored | a new item |
+| `update` | a comparable item exists and this observation changes it (new evidence, a new `when`, a stronger tier) | the existing item, merged |
+| `noop` | a comparable item exists and this observation changes nothing | **nothing** |
+
+Two properties worth knowing before you turn it on:
+
+- **A payload disagreement is an `add`.** Same sentence, different payload is two rules, and merging
+  would let the survivor's payload inherit the other's evidence.
+- **`noop` does not touch the item.** A write that changed nothing would advance `updatedAt`, and
+  every delivery log downstream reads a moving timestamp as a rewrite.
+
+The counts land in the report: `suppressed` is how much paraphrase pressure the store absorbed
+without growing, and `rephrased` is how much of it crossed a task boundary. Read them before the
+accuracy delta — an arm that turned admission on and suppressed nothing has measured nothing, and
+that is a different finding from a mechanism that did not help.
+
+There is deliberately no `delete` decision. A similarity score says two sentences look alike; it is
+not evidence about which of them is true, and retiring a rule on resemblance would let a paraphrase
+replace the rule it paraphrases. Retirement goes through `curate`, `recordContradiction` and
+`decideStatus`, all of which keep the closed item and the reason it was closed.
 
 ## 9. Exporting a dataset
 
