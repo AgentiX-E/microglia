@@ -167,6 +167,12 @@ export type Tau2Raw = {
   readonly useArm?: UseArm;
   /** Widened (`domain === undefined`) items in the store, from its domain ledger. */
   readonly widenedItems?: number;
+  /** The write path's own census, when the driver ran with admission switched on. */
+  readonly writeAdmission?: {
+    readonly mode: 'off' | 'neighbours';
+    readonly rephrased: number;
+    readonly suppressed: number;
+  };
 };
 
 /**
@@ -323,6 +329,7 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     ...(raw.scenarioTasks === undefined ? {} : { scenarioTasks: raw.scenarioTasks }),
     // See decision 5: the rate is one field and the population is the other, and a record that
     // carried only the first turned R42's empty pack into a number with no cause.
+    ...(raw.writeAdmission === undefined ? {} : { writeAdmission: raw.writeAdmission }),
     ...(raw.store === undefined ? {} : { store: raw.store }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),
     // The use census rides beside V1's rate. It is computed here, from the raw

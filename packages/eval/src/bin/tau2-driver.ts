@@ -768,6 +768,14 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         ? { total: llmStats.prompts, failed: llmStats.failures, scope: 'distillation' as const }
         : { total: agentTurns, failed: episodeFailures(primary.diagnostics), scope: 'run' as const },
     domains: { stored: knowledge.length, withoutDomain, unscopedIn: 0, widenedIn: 0 },
+    // The treatment, recorded beside its result: an artefact cannot otherwise tell an arm
+    // that switched write admission on from one that never asked, and the counters are the
+    // only place the mechanism's own population appears.
+    writeAdmission: {
+      mode: WRITE_ADMISSION_PLAN.mode,
+      rephrased: distillReport.rephrased,
+      suppressed: distillReport.suppressed,
+    },
     store: census,
     recall: { requests: primary.recallRequests, served: primary.recallServed, empty: primary.recallRequests - primary.recallServed },
     // What the served packs contained. `withoutDomain` is the store's count of

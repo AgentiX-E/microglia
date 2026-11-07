@@ -345,3 +345,22 @@ describe('armRecordFromDriver', () => {
     expect(armRecordFromDriver(raw(), 'reference').arm).toBe('reference');
   });
 });
+
+describe('the write path is recorded beside its result', () => {
+  it('carries the mode and the census when the driver reported them', () => {
+    const record = armRecordFromDriver(
+      raw({ writeAdmission: { mode: 'neighbours', rephrased: 3, suppressed: 5 } }),
+    );
+    // Without this field an arm that switched admission on and an arm that never
+    // asked produce indistinguishable artefacts, and the delta between them is the
+    // whole experiment.
+    expect(record.writeAdmission).toEqual({ mode: 'neighbours', rephrased: 3, suppressed: 5 });
+  });
+
+  it('reports nothing on an artefact written before the switch existed', () => {
+    // Absent is not `off`: every artefact before the switch ran a store that accepted
+    // every claim, but none of them measured what that accepted, and a default here
+    // would publish a census for a run that never took one.
+    expect(armRecordFromDriver(raw()).writeAdmission).toBeUndefined();
+  });
+});

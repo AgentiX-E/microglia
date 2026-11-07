@@ -111,6 +111,20 @@ export type Tau2ArmRecord = {
    * detail, recorded because a store with no knowledge in it is otherwise indistinguishable from a
    * store whose distillation was answered by the fallback interpreter.
    */
+  /**
+   * What the store's write path was allowed to decide, and what it refused.
+   *
+   * Absent on every artefact written before the switch existed. `mode: 'off'` is
+   * the store those artefacts measured, so a reader needs the field to tell an arm
+   * that turned admission on from an arm that never asked — and `suppressed` is the
+   * mechanism's own census, without which a null result cannot be told apart from a
+   * run that had nothing to refuse.
+   */
+  readonly writeAdmission?: {
+    readonly mode: 'off' | 'neighbours';
+    readonly rephrased: number;
+    readonly suppressed: number;
+  };
   readonly learning?: {
     readonly rows: number;
     readonly unanswered: number;
