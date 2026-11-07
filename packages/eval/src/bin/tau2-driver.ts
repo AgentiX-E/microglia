@@ -47,6 +47,7 @@ import {
   parseTauTasks,
   qualifiedId,
   resilientInterpreter,
+  resolveRecallFloor,
   stampDomain,
   stoppedRun,
   storeCensus,
@@ -86,6 +87,14 @@ const TEST_DOMAIN = process.env['TAU_TEST_DOMAIN'] ?? process.env['TAU_DOMAIN'] 
 const LEARN_DOMAIN = process.env['TAU_TRAIN_DOMAIN'] ?? process.env['TAU_DOMAIN'] ?? 'retail';
 const RECALL_DOMAIN = process.env['TAU_RECALL_DOMAIN'] ?? LEARN_DOMAIN;
 const MEMORY = (process.env['TAU_MEMORY'] ?? 'true') !== 'false';
+/**
+ * U3's only treatment knob. Unset (every dispatch before U3) resolves to zero,
+ * so the facade keeps every hit and the as-is artefact stays comparable. A
+ * non-zero value must be a registered grid rung declared by the dispatch's own
+ * pre-registration; `resolveRecallFloor` refuses anything else rather than
+ * silently clamping a floor that was chosen after the readout.
+ */
+const MIN_COVERAGE = resolveRecallFloor(process.env);
 const TRIALS = Math.max(1, Number(process.env['TAU_TRIALS'] ?? 4) || 4);
 const TRAIN_SHARE = Number(process.env['TAU_TRAIN_SHARE'] ?? 0.5) || 0.5;
 /**
@@ -506,7 +515,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // The recall scope is the *store's* scenario, not the question's: see the comment on
     // `RECALL_DOMAIN`. The agent still states the scenario it is answering in, and the facade
     // deliberately does not use it.
-    const pack = await host.recall({ task: TASK, text, scope: { domain: RECALL_DOMAIN } });
+    const pack = await host.recall({
+      task: TASK,
+      text,
+      scope: { domain: RECALL_DOMAIN },
+      minCoverage: MIN_COVERAGE,
+    });
     recallRequests += 1;
     if (pack.items.length > 0) recallServed += 1;
     servedPackSizes.push(pack.items.length);

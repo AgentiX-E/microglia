@@ -1,0 +1,94 @@
+{
+  "coverage": {
+    "floors": [
+      {
+        "emptiedPacks": 0,
+        "minCoverage": 0,
+        "retainedPacks": 1483,
+        "retainedPairs": 2180
+      },
+      {
+        "emptiedPacks": 414,
+        "minCoverage": 0.01,
+        "retainedPacks": 1069,
+        "retainedPairs": 1438
+      },
+      {
+        "emptiedPacks": 449,
+        "minCoverage": 0.02,
+        "retainedPacks": 1034,
+        "retainedPairs": 1395
+      },
+      {
+        "emptiedPacks": 686,
+        "minCoverage": 0.03,
+        "retainedPacks": 797,
+        "retainedPairs": 981
+      },
+      {
+        "emptiedPacks": 960,
+        "minCoverage": 0.05,
+        "retainedPacks": 523,
+        "retainedPairs": 680
+      },
+      {
+        "emptiedPacks": 1273,
+        "minCoverage": 0.08,
+        "retainedPacks": 210,
+        "retainedPairs": 335
+      },
+      {
+        "emptiedPacks": 1325,
+        "minCoverage": 0.1,
+        "retainedPacks": 158,
+        "retainedPairs": 265
+      },
+      {
+        "emptiedPacks": 1388,
+        "minCoverage": 0.15,
+        "retainedPacks": 95,
+        "retainedPairs": 169
+      },
+      {
+        "emptiedPacks": 1413,
+        "minCoverage": 0.2,
+        "retainedPacks": 70,
+        "retainedPairs": 129
+      },
+      {
+        "emptiedPacks": 1482,
+        "minCoverage": 0.3,
+        "retainedPacks": 1,
+        "retainedPairs": 2
+      }
+    ],
+    "measuredPairs": 2180,
+    "nonzeroQuantiles": {
+      "max": 0.3333333333333333,
+      "min": 0.01694915254237288,
+      "p10": 0.022727272727272728,
+      "p25": 0.027777777777777776,
+      "p50": 0.045454545454545456,
+      "p75": 0.07692307692307693,
+      "p90": 0.16666666666666666
+    },
+    "unmeasurablePacks": 8,
+    "unmeasurablePairs": 8
+  },
+  "source": {
+    "arm": "memory",
+    "artefact": "l4-evidence",
+    "note": "Committed coverage histogram and seven-field use census from the R47 as-is observation round. This is a measurement fixture, not a leaderboard result.",
+    "pinnedCommit": "bc0a39eb",
+    "run": "42337250684"
+  },
+  "use": {
+    "arm": "as-is",
+    "injectedPairs": 2188,
+    "meanPackIds": 1.4674714956405097,
+    "recallRequests": 1491,
+    "recallServed": 1491,
+    "widenedItems": 0,
+    "zeroCoveragePairs": 750
+  }
+}

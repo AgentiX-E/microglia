@@ -529,6 +529,19 @@ export {
   type UseObservation,
 } from './tau2-use-census.js';
 export {
+  decideFloor,
+  type CostWeights,
+  type FloorCostRow,
+  type FloorDecision,
+  type FloorTieBreak,
+} from './u3-decision.js';
+export {
+  AS_IS_FLOOR,
+  U3_COST_WEIGHTS,
+  committedFloor,
+  resolveRecallFloor,
+} from './tau2-recall-floor.js';
+export {
   resilientInterpreter,
   stampDomain,
   type InterpreterFaults,

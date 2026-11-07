@@ -696,10 +696,28 @@ jobs:
             echo "Tasks: train cap \`${{ vars.TAU_TRAIN_TASKS || '0' }}\`, evaluation cap \`${{ vars.TAU_TEST_TASKS || '0' }}\` (0 = all), ${{ vars.TAU_TRIALS || '4' }} trial(s), floor \`${{ vars.TAU_MIN_TASKS || '60' }}\`."
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # U3's only treatment knob comes from the run's own pre-registration, not
+      # from the dispatch menu. A registration with no recallFloor header emits
+      # 0, so every earlier dispatch keeps the as-is configuration. The checker
+      # recomputes a declared floor from the committed R47 histogram under the
+      # registered cost weights and refuses a mismatch, so a floor cannot be
+      # supplied or revised after the readout. Only the memory arm consumes it;
+      # the reference arm is memory-free and stays untouched.
+      - name: Read the registered recall floor
+        id: recall_floor
+        if: github.event.inputs.prereg != ''
+        env:
+          PREREG: ${{ github.event.inputs.prereg }}
+        run: |
+          set -euo pipefail
+          FLOOR=$(pnpm --silent eval:prereg-floor "prereg/$PREREG.md")
+          echo "floor=$FLOOR" >> "$GITHUB_OUTPUT"
+
       - name: L4 arm — memory
         if: github.event.inputs.l4_arms != 'reference'
         timeout-minutes: 120
         env:
+          TAU_MIN_COVERAGE: ${{ steps.recall_floor.outputs.floor }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           TAU_DRIVER: ${{ vars.TAU_DRIVER || './packages/eval/src/bin/tau2-driver.ts' }}
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}

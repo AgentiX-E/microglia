@@ -185,6 +185,36 @@ describe('readPrereg', () => {
     );
     expect(reading.prereg?.prediction).toEqual(['the first claim is long enough to count']);
   });
+
+  it('leaves the optional recall floor absent on a registration that does not declare one', () => {
+    expect(readPrereg(VALID, 'R8.3-xiyan-cell.md').prereg?.recallFloor).toBeUndefined();
+  });
+
+  it('reads a declared recall floor', () => {
+    const header = HEADER.replace('gates: V31', 'gates: V31\nrecallFloor: 0.01');
+    const reading = readPrereg(`${header}${PREDICTION}${REFUTATION}`, 'R8.3-xiyan-cell.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.recallFloor).toBe(0.01);
+  });
+
+  it('accepts the as-is floor declared explicitly', () => {
+    const header = HEADER.replace('gates: V31', 'gates: V31\nrecallFloor: 0');
+    expect(readPrereg(`${header}${PREDICTION}${REFUTATION}`, 'R8.3-xiyan-cell.md').prereg?.recallFloor).toBe(0);
+  });
+
+  it('refuses a recall floor that is not a number', () => {
+    const header = HEADER.replace('gates: V31', 'gates: V31\nrecallFloor: high');
+    expect(problemsOf(`${header}${PREDICTION}${REFUTATION}`)).toContain(
+      "header 'recallFloor': is not a finite number in the unit interval",
+    );
+  });
+
+  it('refuses a recall floor outside the unit interval', () => {
+    const header = HEADER.replace('gates: V31', 'gates: V31\nrecallFloor: 1.5');
+    expect(problemsOf(`${header}${PREDICTION}${REFUTATION}`)).toContain(
+      "header 'recallFloor': is not a finite number in the unit interval",
+    );
+  });
 });
 
 describe('preregGate', () => {

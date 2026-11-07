@@ -24,6 +24,13 @@ export type Prereg = {
   readonly arms: readonly string[];
   readonly sample: number;
   readonly gates: readonly string[];
+  /**
+   * The recall floor this dispatch applies, when it is a use-side arm. Absent
+   * means the as-is configuration. A declared floor is a registration, not a
+   * knob: `prereg-floor.ts` recomputes it from the committed histogram before
+   * the lane may apply it.
+   */
+  readonly recallFloor?: number;
   /** One bullet per prediction: a claim that can be checked against the artefact. */
   readonly prediction: readonly string[];
   /** One bullet per condition under which the stage is abandoned. */
@@ -41,7 +48,9 @@ export type PreregReading = {
   readonly problems: readonly PreregProblem[];
 };
 
-const HEADER_KEYS = ['id', 'step', 'opened', 'arms', 'sample', 'gates'] as const;
+const REQUIRED_KEYS = ['id', 'step', 'opened', 'arms', 'sample', 'gates'] as const;
+/** `recallFloor` is optional: every registration opened before U3 stays valid. */
+const HEADER_KEYS = [...REQUIRED_KEYS, 'recallFloor'] as const;
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
 /** A bullet has to carry a claim; ten characters is a draft marker with punctuation. */
@@ -142,8 +151,22 @@ export function readPrereg(markdown: string, file: string): PreregReading {
   const collected: PreregProblem[] = [...problems];
   const values = readHeader(header, collected);
 
-  for (const key of HEADER_KEYS) {
+  for (const key of REQUIRED_KEYS) {
     if (!values.has(key)) collected.push({ where: `header '${key}'`, problem: 'is required' });
+  }
+
+  const floorText = values.get('recallFloor');
+  let recallFloor: number | undefined;
+  if (floorText !== undefined) {
+    const parsed = Number(floorText);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+      collected.push({
+        where: `header 'recallFloor'`,
+        problem: 'is not a finite number in the unit interval',
+      });
+    } else {
+      recallFloor = parsed;
+    }
   }
 
   const id = values.get('id') ?? '';
@@ -199,7 +222,18 @@ export function readPrereg(markdown: string, file: string): PreregReading {
   const refutation = sectionBullets(body, 'Refutation') ?? [];
   if (collected.length > 0) return { prereg: undefined, problems: collected };
   return {
-    prereg: { id, step, opened, arms, sample, gates, prediction, refutation, file },
+    prereg: {
+      id,
+      step,
+      opened,
+      arms,
+      sample,
+      gates,
+      ...(recallFloor === undefined ? {} : { recallFloor }),
+      prediction,
+      refutation,
+      file,
+    },
     problems: [],
   };
 }
