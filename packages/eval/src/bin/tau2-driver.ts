@@ -37,8 +37,18 @@ import { openMicroglia } from '@agentix-e/microglia-core/capture';
 import { createLlmInterpreter, ruleInterpreter } from '@agentix-e/microglia-core/distill';
 import { steppingClock, mulberry32 } from '@agentix-e/microglia-core';
 import {
+  AS_IS_FLOOR,
   LlmClient,
+  ProviderNoMeasurementError,
+  classifyProviderProbe,
   driverArgs,
+  facadePairSummary,
+  facadePairVerdict,
+  facadeScope,
+  meanPassAtK,
+  probeGate,
+  resolveFacadePairPlan,
+  treatmentDelivered,
   armRecordFromDriver,
   correctionEdit,
   heldOutPlan,
@@ -61,6 +71,8 @@ import {
   type Tau2Raw,
   type TauTrialRow,
   type UseObservation,
+  type PairedFacadeReading,
+  type ProbeAttempt,
 } from '@agentix-e/microglia-eval';
 
 const runFile = promisify(execFile);
@@ -95,6 +107,29 @@ const MEMORY = (process.env['TAU_MEMORY'] ?? 'true') !== 'false';
  * silently clamping a floor that was chosen after the readout.
  */
 const MIN_COVERAGE = resolveRecallFloor(process.env);
+/**
+ * R49's paired-facade switch, resolved once at module load. An unset variable
+ * keeps the single-facade path verbatim, so every committed artefact before R49
+ * stays comparable. The floored rung comes from `TAU_MIN_COVERAGE`, which the
+ * workflow reads from the dispatch's own pre-registration.
+ */
+const PAIR_PLAN = resolveFacadePairPlan(process.env);
+/**
+ * The seed both facades must share. `run_split.py --seed` defaults to 300; in a
+ * paired dispatch we pass it explicitly so common random numbers are an
+ * attested property of the run rather than an accident of a Python default.
+ * `Var(A - B) = 2 * sigma^2 * (1 - rho)` is why two dispatches of one
+ * configuration are never a paired comparison (AUDIT 34.36).
+ */
+const PAIR_SEED = Number(process.env['TAU_EVAL_SEED'] ?? 300) || 300;
+const DISPATCH_ID = process.env['GITHUB_RUN_ID'] ?? '';
+const PREREG_ID = process.env['TAU_PREREG'] ?? '';
+/**
+ * Defect 27's pre-flight gate. Opt-in and registered by the R49 dispatch:
+ * turning it on by default would change the call sequence of every earlier
+ * dispatch, and an infrastructure failure must not be confused with a result.
+ */
+const PROVIDER_PROBE = (process.env['TAU_PROVIDER_PROBE'] ?? '').trim() === 'true';
 const TRIALS = Math.max(1, Number(process.env['TAU_TRIALS'] ?? 4) || 4);
 const TRAIN_SHARE = Number(process.env['TAU_TRAIN_SHARE'] ?? 0.5) || 0.5;
 /**
@@ -299,6 +334,19 @@ export function instrument(): Tau2ArmRecord | undefined {
   return observed === undefined ? undefined : armRecordFromDriver(observed);
 }
 
+/** The one paired-facade record, when this dispatch registered a pair. */
+let observedPair: PairedFacadeReading | undefined;
+
+/**
+ * Additive, like `instrument()`: `l4.ts` was written against a driver exporting
+ * `run()`, and a driver that does not export this (every driver before R49) is
+ * not a failure. A caller that asks for it gets the graded three-terminal
+ * verdict, never a mean that still needs interpreting.
+ */
+export function pairedFacades(): PairedFacadeReading | undefined {
+  return observedPair;
+}
+
 /**
  * The evaluated half's episodes, one row per trial.
  *
@@ -358,28 +406,40 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const test = plan.test.map(unqualified(TEST_DOMAIN));
   const scenario = { learn: LEARN_DOMAIN, test: TEST_DOMAIN, recall: RECALL_DOMAIN };
 
-  // What V1 grades. The pack is rendered in this process and read in another, so the size has to be
-  // counted at the boundary rather than reconstructed from the agent's transcript.
-  const servedPackSizes: number[] = [];
-  /**
-   * How many times the agent asked, and how many of those answers carried an item.
-   *
-   * `meanPackIds` is the mean of what was served, and a mean over no request is `0` — which is the
-   * same number as a mean over two hundred empty answers. R42's arm made two hundred requests and
-   * served none; the record could not say so, and the gate's sentence was a rate with no population.
-   */
-  let recallRequests = 0;
-  let recallServed = 0;
-  /**
-   * What each served pack actually contained, at the facade boundary.
-   *
-   * V1 grades the size of a pack; this records its content, so a served pack of
-   * rules that share no term with the question can be told apart from a served
-   * pack of relevant ones. Pure observation: the recall scope, the floor and the
-   * pack itself are exactly as R45 ran them. See `tau2-use-census.ts` and the
-   * registered USE experiment in TECH-DESIGN §17.89.
-   */
-  const useObservations: UseObservation[] = [];
+  // Defect 27: the provider that distils the corrections and serves the agent
+  // must answer before an hour of evaluation is spent on a store that was
+  // never built. The probe is opt-in and registered by the R49 dispatch:
+  // turning it on by default would change the call sequence of every earlier
+  // dispatch, and an infrastructure failure must never become a zero. A
+  // refusal throws `ProviderNoMeasurementError`, which `l4.ts` records as an
+  // explicit artefact instead of a result.
+  if (PROVIDER_PROBE) {
+    const probeLlm = new LlmClient({
+      apiKey: process.env['DEEPSEEK_API_KEY'] ?? '',
+      model:
+        process.env['TAU_DISTILL_MODEL']?.trim() || process.env['TAU_MODEL'] || 'deepseek-chat',
+      maxCalls: 3,
+    });
+    const attempts: ProbeAttempt[] = [];
+    for (let index = 0; index < 3; index += 1) {
+      const started = Date.now();
+      try {
+        await probeLlm.chat('Reply with the single word ready.', 8);
+        attempts.push({ ok: true, status: 200, latencyMs: Date.now() - started });
+      } catch (error) {
+        const matched = /\((\d{3})\)/.exec((error as Error).message);
+        attempts.push({
+          ok: false,
+          ...(matched === null ? {} : { status: Number(matched[1]) }),
+          latencyMs: Date.now() - started,
+        });
+      }
+    }
+    const verdict = classifyProviderProbe(attempts);
+    const gate = probeGate(verdict);
+    if (!gate.proceed) throw new ProviderNoMeasurementError(gate.marker);
+    process.stdout.write(`[tau2] provider probe: ${verdict.state} over ${attempts.length} calls\n`);
+  }
 
   const evalPath = join(workdir, 'eval.json');
   if (!MEMORY) {
@@ -510,57 +570,140 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   );
   process.stdout.write(`[tau2] distill model: configured=${llm.configuredModel} sent=${llm.model}\n`);
 
-  let evalStdout = '';
-  const facade = await startRecall(async ({ text }) => {
-    // The recall scope is the *store's* scenario, not the question's: see the comment on
-    // `RECALL_DOMAIN`. The agent still states the scenario it is answering in, and the facade
-    // deliberately does not use it.
-    const pack = await host.recall({
-      task: TASK,
-      text,
-      scope: { domain: RECALL_DOMAIN },
-      minCoverage: MIN_COVERAGE,
+  /**
+   * One facade's evaluation over the same held-out split, against the ONE
+   * distilled store.
+   *
+   * Every counter belongs to this facade alone. R48's defect was that two
+   * readings came from different dispatches; mixing their counters here would
+   * recreate the same defect one layer down. In paired mode the seed is passed
+   * explicitly to `driverArgs`, so common random numbers are an attested
+   * property rather than an accident of `run_split.py`'s default of 300.
+   */
+  type FacadeEvaluation = {
+    readonly scored: ReturnType<typeof scoredArm>;
+    readonly diagnostics: Tau2PhaseDiagnostics | undefined;
+    readonly servedPackSizes: number[];
+    readonly recallRequests: number;
+    readonly recallServed: number;
+    readonly useObservations: UseObservation[];
+  };
+
+  const evaluateFacade = async (floor: number, out: string): Promise<FacadeEvaluation> => {
+    // What V1 grades: the pack is rendered in this process and read in another,
+    // so its size is counted at the boundary rather than reconstructed from the
+    // agent's transcript. A mean over no request and a mean over two hundred
+    // empty answers are both 0, which is why the served tally is kept too.
+    const servedPackSizes: number[] = [];
+    let recallRequests = 0;
+    let recallServed = 0;
+    // What each served pack actually contained, at the facade boundary. The
+    // recall scope, the floor and the pack are exactly as R45 ran them.
+    const useObservations: UseObservation[] = [];
+    const facade = await startRecall(async ({ text }) => {
+      const pack = await host.recall({
+        task: TASK,
+        text,
+        scope: { domain: RECALL_DOMAIN },
+        minCoverage: floor,
+      });
+      recallRequests += 1;
+      if (pack.items.length > 0) recallServed += 1;
+      servedPackSizes.push(pack.items.length);
+      useObservations.push({
+        query: text,
+        statements: pack.items.map((item) => item.statement),
+      });
+      return pack;
     });
-    recallRequests += 1;
-    if (pack.items.length > 0) recallServed += 1;
-    servedPackSizes.push(pack.items.length);
-    // Record what was actually put in front of the agent. This reads the same
-    // `pack` that is returned; it does not re-run recall, change its scope, or
-    // filter the items. The census is computed in `armRecordFromDriver`.
-    useObservations.push({
-      query: text,
-      statements: pack.items.map((item) => item.statement),
-    });
-    return pack;
-  });
-  try {
-    evalStdout = await phase(
-      driverArgs({
-        script: SCRIPT,
-        domain: TEST_DOMAIN,
-        phase: 'eval',
-        agent: 'microglia_agent',
-        taskIds: test,
+    let evalStdout = '';
+    try {
+      evalStdout = await phase(
+        driverArgs({
+          script: SCRIPT,
+          domain: TEST_DOMAIN,
+          phase: 'eval',
+          agent: 'microglia_agent',
+          taskIds: test,
+          trials: TRIALS,
+          out,
+          memoryUrl: facade.url,
+          ...(PAIR_PLAN.enabled ? { seed: PAIR_SEED } : {}),
+        }),
+      );
+    } finally {
+      await facade.close();
+    }
+    return {
+      scored: scoredArm(out),
+      diagnostics: diagnosticsOf(evalStdout),
+      servedPackSizes,
+      recallRequests,
+      recallServed,
+      useObservations,
+    };
+  };
+
+  // Attest the single store before either facade recalls. A second learning
+  // phase would produce a second fingerprint and be refused by the invariant.
+  const sharedScope = PAIR_PLAN.enabled
+    ? facadeScope({
+        dispatchId: DISPATCH_ID,
+        preregId: PREREG_ID,
+        storeStatements: knowledge.map((item) => item.statement),
+        learnSplit: plan.train,
+        testSplit: plan.test,
+        seed: PAIR_SEED,
         trials: TRIALS,
-        out: evalPath,
-        memoryUrl: facade.url,
-      }),
-    );
+        model: llm.model,
+      })
+    : undefined;
+
+  let primary: FacadeEvaluation;
+  try {
+    if (PAIR_PLAN.enabled && sharedScope !== undefined) {
+      const asIs = await evaluateFacade(AS_IS_FLOOR, join(workdir, 'eval-as-is.json'));
+      const floored = await evaluateFacade(PAIR_PLAN.flooredFloor, evalPath);
+      const verdict = facadePairVerdict({
+        plan: PAIR_PLAN,
+        asIs: { scope: sharedScope, tasks: asIs.scored.tasks, servedPacks: asIs.recallServed },
+        floored: { scope: sharedScope, tasks: floored.scored.tasks, servedPacks: floored.recallServed },
+      });
+      observedPair = {
+        dispatchId: DISPATCH_ID,
+        preregId: PREREG_ID,
+        floors: { asIs: AS_IS_FLOOR, floored: PAIR_PLAN.flooredFloor },
+        scope: sharedScope,
+        servedPacks: { asIs: asIs.recallServed, floored: floored.recallServed },
+        pass4: {
+          asIs: meanPassAtK(asIs.scored.tasks),
+          floored: meanPassAtK(floored.scored.tasks),
+        },
+        verdict,
+        treatmentDelivered: treatmentDelivered(verdict),
+        seed: PAIR_SEED,
+        model: llm.model,
+      };
+      // The registered (floored) facade is the memory arm the rest of the lane
+      // grades, so `l4-paired` against the reference stays exactly as R48 had it.
+      primary = floored;
+      process.stdout.write(`[tau2] paired facades: ${facadePairSummary(observedPair)}\n`);
+    } else {
+      primary = await evaluateFacade(MIN_COVERAGE, evalPath);
+    }
   } finally {
-    await facade.close();
     await host.close();
   }
 
-  const diagnostics = diagnosticsOf(evalStdout);
-  const agentTurns = diagnostics?.agent_turns ?? null;
-  const scored = scoredArm(evalPath);
+  const agentTurns = primary.diagnostics?.agent_turns ?? null;
+  const scored = primary.scored;
   const llmStats = llm.stats;
   observed = {
     train: plan.train,
     test: plan.test,
     trials: TRIALS,
     unscored: scored.unscored,
-    servedPackSizes,
+    servedPackSizes: primary.servedPackSizes,
     learning: {
       rows: train.length,
       unanswered,
@@ -579,13 +722,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     calls:
       agentTurns === null
         ? { total: llmStats.prompts, failed: llmStats.failures, scope: 'distillation' as const }
-        : { total: agentTurns, failed: episodeFailures(diagnostics), scope: 'run' as const },
+        : { total: agentTurns, failed: episodeFailures(primary.diagnostics), scope: 'run' as const },
     domains: { stored: knowledge.length, withoutDomain, unscopedIn: 0, widenedIn: 0 },
     store: census,
-    recall: { requests: recallRequests, served: recallServed, empty: recallRequests - recallServed },
+    recall: { requests: primary.recallRequests, served: primary.recallServed, empty: primary.recallRequests - primary.recallServed },
     // What the served packs contained. `withoutDomain` is the store's count of
     // `domain === undefined` items, from the same domain ledger V44 reads.
-    useObservations,
+    useObservations: primary.useObservations,
     widenedItems: withoutDomain,
     scenario,
     // The scenario's own size, not the split's: a dispatch cap hides it, and it is what bounds the

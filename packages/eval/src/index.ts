@@ -560,6 +560,39 @@ export {
   type RunScope,
 } from './within-run-pair.js';
 export {
+  FACADE_FLOOR_ENV,
+  FACADE_PAIR_ENV,
+  facadeArmTasks,
+  facadePairState,
+  facadePairSummary,
+  facadePairVerdict,
+  pairedFacadeArtifact,
+  readFacadePairArtifact,
+  facadeScope,
+  resolveFacadePairPlan,
+  storeFingerprintOf,
+  treatmentDelivered,
+  type FacadePairPlan,
+  type FacadeReading,
+  type FacadeShared,
+  type PairedFacadeArtifact,
+  type FacadePairReadback,
+  type PairedFacadeReading,
+} from './facade-pair.js';
+export {
+  PROBE_MIN_SUCCESSES,
+  ProviderNoMeasurementError,
+  classifyProviderProbe,
+  isProviderOutage,
+  noMeasurementMarker,
+  probeGate,
+  type NoMeasurementMarker,
+  type ProbeAttempt,
+  type ProbeGate,
+  type ProbeOutage,
+  type ProviderProbeVerdict,
+} from './provider-probe.js';
+export {
   resilientInterpreter,
   stampDomain,
   type InterpreterFaults,
@@ -1144,6 +1177,7 @@ export {
 } from './artifact-schema.js';
 
 export {
+  facadePairSwitch,
   preregGate,
   preregGateAgreement,
   readPrereg,

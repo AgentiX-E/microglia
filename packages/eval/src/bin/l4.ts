@@ -25,13 +25,20 @@ import {
   comparePaired,
   compareToPublished,
   meanPassAtK,
+  facadePairState,
+  pairedFacadeArtifact,
   parseTauResults,
   perTaskRows,
   toPassAtK,
   type PassAtKInput,
 } from '@agentix-e/microglia-eval';
-import type { Tau2ArmRecord, TauTrialRow } from '@agentix-e/microglia-eval';
-import { writeResult } from './lib.js';
+import type {
+  NoMeasurementMarker,
+  PairedFacadeReading,
+  Tau2ArmRecord,
+  TauTrialRow,
+} from '@agentix-e/microglia-eval';
+import { writeJson, writeResult } from './lib.js';
 import { minTasksOf, scenarioBarOf } from '@agentix-e/microglia-eval';
 
 const BAR = 0.05;
@@ -116,6 +123,39 @@ async function notRun(reason?: string): Promise<never> {
  * missing environment, and a lane that exited 0 here would appear in the record
  * as a run that happened and produced nothing.
  */
+/**
+ * Record a run that was stopped by the pre-flight provider gate.
+ *
+ * `status_no_measurement` is distinct from `status_not_run`: an endpoint that
+ * refused every call is not an environment that was never configured, and a
+ * green skip would be exactly the quiet failure R48's first dispatch produced.
+ * Exit 0 because nothing was measured, not because something passed.
+ */
+async function noMeasurement(marker: NoMeasurementMarker): Promise<never> {
+  await writeResult({
+    id: 'poc-l4',
+    title: 'L4 — τ²-bench pass^4 (no measurement: the provider failed its pre-flight probe)',
+    ranAt: new Date().toISOString(),
+    model: process.env['TAU_MODEL'] ?? 'unknown',
+    n: 0,
+    calls: 0,
+    metrics: {
+      status_no_measurement: marker.status_no_measurement,
+      status_not_run: marker.status_not_run,
+      published_bar_applies: scenarioBar.comparable ? 1 : 0,
+      bar: BAR,
+      k: K,
+    },
+    notes: [
+      `The run stopped before any task was scored: ${marker.reason}`,
+      `Claim: ${marker.claim}. No pass^4, no paired delta and no revert is produced by this run.`,
+      'A provider outage is an infrastructure failure, not a missing environment and not a result.',
+    ],
+  });
+  process.stdout.write(`[poc-l4] no measurement: ${marker.reason}\n`);
+  process.exit(0);
+}
+
 async function refuse(error: L4ParseError, source: string): Promise<never> {
   await writeResult({
     id: 'poc-l4',
@@ -160,6 +200,12 @@ type Measurement = {
    * reports the transfer family as absent rather than green.
    */
   readonly trialRows?: readonly TauTrialRow[];
+  /**
+   * One driver run's paired-facade verdict, when the driver exports
+   * `pairedFacades()`. Absent on a re-scored document and on every driver
+   * before R49; an absent field is a single-facade run, not a failed pair.
+   */
+  readonly pairedFacades?: PairedFacadeReading;
 };
 
 async function measureFromResults(path: string): Promise<Measurement> {
@@ -192,12 +238,14 @@ async function measureFromDriver(module: string): Promise<Measurement> {
     run: () => Promise<readonly PassAtKInput[]>;
     instrument?: () => Tau2ArmRecord | undefined;
     trials?: () => readonly TauTrialRow[] | undefined;
+    pairedFacades?: () => PairedFacadeReading | undefined;
   };
   try {
     loaded = (await import(specifier)) as {
       run: () => Promise<readonly PassAtKInput[]>;
       instrument?: () => Tau2ArmRecord | undefined;
       trials?: () => readonly TauTrialRow[] | undefined;
+      pairedFacades?: () => PairedFacadeReading | undefined;
     };
   } catch (error) {
     // A driver that cannot be *resolved* is an absent environment, not a failed
@@ -210,11 +258,22 @@ async function measureFromDriver(module: string): Promise<Measurement> {
     }
     throw error;
   }
-  const tasks = await loaded.run();
+  let tasks: readonly PassAtKInput[];
+  try {
+    tasks = await loaded.run();
+  } catch (error) {
+    // The driver is dynamically imported, so the error's class identity is not
+    // shared across the module boundary. `name` is the contract.
+    if ((error as { name?: string }).name === 'ProviderNoMeasurementError') {
+      await noMeasurement((error as { marker: NoMeasurementMarker }).marker);
+    }
+    throw error;
+  }
   // Read after the run: the function reports what happened, and calling it before would describe a
   // process that had not started.
   const instrumentation = loaded.instrument?.();
   const trialRows = loaded.trials?.();
+  const pairedFacades = loaded.pairedFacades?.();
   return {
     tasks,
     unscored: [],
@@ -222,6 +281,7 @@ async function measureFromDriver(module: string): Promise<Measurement> {
     inferredTrials: 0,
     ...(instrumentation === undefined ? {} : { instrumentation }),
     ...(trialRows === undefined ? {} : { trialRows }),
+    ...(pairedFacades === undefined ? {} : { pairedFacades }),
   };
 }
 
@@ -284,6 +344,20 @@ const gates = [
     actual: measured.unscored.length,
     criterion: '= 0 unscored tasks',
   },
+  // A registered pair must not be a cross-run comparison. NO_MEASUREMENT is
+  // not a failure here: it is an instrument that did not measure, and the
+  // workflow's readback step annotates it explicitly. REFUSED_CROSS_RUN is a
+  // broken design and blocks.
+  ...(measured.pairedFacades === undefined
+    ? []
+    : [
+        {
+          id: 'l4-facade-pair',
+          pass: facadePairState(measured.pairedFacades) !== 'REFUSED_CROSS_RUN',
+          actual: facadePairState(measured.pairedFacades),
+          criterion: 'a registered within-run pair is never a cross-run comparison',
+        },
+      ]),
 ];
 
 await writeResult({
@@ -329,6 +403,17 @@ await writeResult({
   ...(measured.trialRows === undefined ? {} : { per_trial: measured.trialRows }),
   samples: gates,
 });
+
+// R49: the paired-facade reading is its OWN artefact. The main artefact above
+// grades the registered memory facade against the memory-free reference; this
+// one grades floor against floor inside one dispatch. Merging the two is how
+// defect 28 and defect 29 became representable in the first place.
+if (measured.pairedFacades !== undefined) {
+  const artefact = pairedFacadeArtifact(measured.pairedFacades, new Date().toISOString());
+  await writeJson('poc-l4-facade-pair', artefact);
+  process.stdout.write(`[poc-l4-facade-pair] ${artefact.summary}\n`);
+}
+
 for (const gate of gates) {
   process.stdout.write(`  ${gate.pass ? 'PASS' : 'FAIL'} ${gate.id} ${gate.actual} (${gate.criterion})\n`);
 }

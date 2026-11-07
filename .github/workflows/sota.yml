@@ -591,8 +591,10 @@ jobs:
     # a lane that costs hours of model calls switched off.
     if: vars.TAU_ENV_READY == 'true' || github.event.inputs.l4 == 'true'
     runs-on: ubuntu-latest
-    # Two arms of the same split, each ~60 minutes at concurrency 2, plus the pairing.
-    timeout-minutes: 300
+    # R49 runs TWO recall facades inside the memory arm's single driver run,
+    # so that arm pays for two evaluations against one shared store. Two arms of
+    # the same split plus the pairing, with headroom for a provider retry.
+    timeout-minutes: 360
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -711,13 +713,28 @@ jobs:
         run: |
           set -euo pipefail
           FLOOR=$(pnpm --silent eval:prereg-floor "prereg/$PREREG.md")
+          PAIR=$(pnpm --silent eval:prereg-pair "prereg/$PREREG.md")
           echo "floor=$FLOOR" >> "$GITHUB_OUTPUT"
+          echo "pair=$PAIR" >> "$GITHUB_OUTPUT"
+          echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: L4 arm — memory
         if: github.event.inputs.l4_arms != 'reference'
-        timeout-minutes: 120
+        # Two facades of ONE run: one learn, one store, two evaluations.
+        timeout-minutes: 240
         env:
           TAU_MIN_COVERAGE: ${{ steps.recall_floor.outputs.floor }}
+          # Both values come from the dispatch's own pre-registration. A push
+          # run has no prereg input, so both render empty and the single-facade
+          # path is preserved verbatim. `TAU_PREREG` is what `facadeScope`
+          # attests as the one registration both facades execute.
+          TAU_FACADE_PAIR: ${{ steps.recall_floor.outputs.pair }}
+          TAU_PREREG: ${{ github.event.inputs.prereg }}
+          # Defect 27: a bounded pre-flight probe, registered by R49. An
+          # outage writes an explicit no-measurement artefact instead of a zero.
+          TAU_PROVIDER_PROBE: ${{ steps.recall_floor.outputs.pair == 'true' && 'true' || 'false' }}
+          # Common random numbers: both facades get the same explicit seed.
+          TAU_EVAL_SEED: '300'
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           TAU_DRIVER: ${{ vars.TAU_DRIVER || './packages/eval/src/bin/tau2-driver.ts' }}
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}
@@ -757,6 +774,9 @@ jobs:
         timeout-minutes: 120
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # The reference arm is memory-free and never runs a paired facade, but
+          # it uses the same provider, so it takes the same pre-flight gate.
+          TAU_PROVIDER_PROBE: ${{ steps.recall_floor.outputs.pair == 'true' && 'true' || 'false' }}
           TAU_DRIVER: ${{ vars.TAU_DRIVER || './packages/eval/src/bin/tau2-driver.ts' }}
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}
           TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-chat' }}
@@ -792,6 +812,17 @@ jobs:
         timeout-minutes: 10
         run: pnpm eval:l4-pair
 
+      # R49: the floor's contribution has its OWN artefact and its own three
+      # terminal states. This is a facade-contrast, never the l4-paired
+      # memory-versus-reference gate the R45 revert rule grades. The readback
+      # refuses a missing or unknown state rather than defaulting to PAIRED.
+      - name: Read back the paired facades
+        if: always()
+        timeout-minutes: 5
+        env:
+          POC_RESULT_DIR: eval/results/arms/memory
+        run: pnpm eval:facade-pair-readback
+
       # A not-run that nobody notices is a skip. The annotation is the notice: it
       # names the variable that points at nothing, and the job stays green because
       # nothing was measured rather than because something failed quietly.
@@ -803,7 +834,10 @@ jobs:
             const path = 'eval/results/arms/memory/poc-l4.json';
             if (!fs.existsSync(path)) { console.log('::warning::L4 wrote no artefact'); process.exit(0); }
             const r = require('./' + path);
-            if (r.metrics.status_not_run === 1) {
+            if (r.metrics.status_no_measurement === 1) {
+              console.log('::warning::L4 stopped before measuring: the provider failed its pre-flight probe');
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'L4 produced NO MEASUREMENT: the provider failed its pre-flight probe. No result is claimed.\n');
+            } else if (r.metrics.status_not_run === 1) {
               const why = r.metrics.status_driver_missing === 1
                 ? 'TAU_DRIVER names a module that does not exist'
                 : 'neither TAU_RESULTS nor TAU_DRIVER is set';

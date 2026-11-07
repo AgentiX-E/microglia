@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { preregGate, preregGateAgreement, readPrereg, type Prereg } from '../prereg.js';
+import { facadePairSwitch, preregGate, preregGateAgreement, readPrereg, type Prereg } from '../prereg.js';
 
 const HEADER = [
   '---',
@@ -299,5 +299,69 @@ describe('preregGateAgreement', () => {
     );
     expect(agreement.ok).toBe(true);
     expect(agreement.detail).toBe('2 declared gate(s), every one emitted and none unannounced');
+  });
+});
+
+describe('the facadePair header', () => {
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${PREDICTION}${REFUTATION}`;
+  }
+
+  it('registers a within-run paired facade', () => {
+    const reading = readPrereg(
+      withHeader('recallFloor: 0.01\nfacadePair: as-is-floored'),
+      'R8.3-xiyan-cell.md',
+    );
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.facadePair).toBe('as-is-floored');
+  });
+
+  it('registers the explicit single-facade value', () => {
+    const reading = readPrereg(withHeader('facadePair: off'), 'R8.3-xiyan-cell.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.facadePair).toBe('off');
+  });
+
+  it('leaves every registration opened before R49 on the single-facade path', () => {
+    expect(readPrereg(VALID, 'R8.3-xiyan-cell.md').prereg?.facadePair).toBeUndefined();
+  });
+
+  it('refuses a value the protocol never declared', () => {
+    const reported = problemsOf(withHeader('facadePair: maybe'));
+    expect(reported.some((entry) => entry.includes("header 'facadePair'"))).toBe(true);
+    expect(readPrereg(withHeader('facadePair: maybe'), 'R8.3-xiyan-cell.md').prereg).toBeUndefined();
+  });
+
+  it('keeps recallFloor and facadePair independent', () => {
+    const reading = readPrereg(
+      withHeader('recallFloor: 0.01\nfacadePair: as-is-floored'),
+      'R8.3-xiyan-cell.md',
+    );
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.recallFloor).toBe(0.01);
+    expect(reading.prereg?.facadePair).toBe('as-is-floored');
+  });
+});
+
+describe('a paired facade must register its floor', () => {
+  it('refuses as-is-floored with no recallFloor', () => {
+    const markdown = `${HEADER.replace(/^---\n/, "---\nfacadePair: as-is-floored\n")}${PREDICTION}${REFUTATION}`;
+    const reading = readPrereg(markdown, 'R8.3-xiyan-cell.md');
+    expect(reading.prereg).toBeUndefined();
+    expect(problemsOf(markdown).some((entry) => entry.includes('positive recallFloor'))).toBe(true);
+  });
+
+  it('refuses as-is-floored with the as-is floor of zero', () => {
+    const markdown = `${HEADER.replace(/^---\n/, "---\nrecallFloor: 0\nfacadePair: as-is-floored\n")}${PREDICTION}${REFUTATION}`;
+    expect(problemsOf(markdown).some((entry) => entry.includes('positive recallFloor'))).toBe(true);
+  });
+
+  it('exposes a pair switch that is false for absent, off and invalid registrations', () => {
+    const base = readPrereg(VALID, 'R8.3-xiyan-cell.md').prereg;
+    expect(base).toBeDefined();
+    if (base === undefined) return;
+    expect(facadePairSwitch(base)).toBe(false);
+    expect(facadePairSwitch({ ...base, facadePair: 'off' })).toBe(false);
+    expect(facadePairSwitch({ ...base, facadePair: 'as-is-floored', recallFloor: 0.01 })).toBe(true);
   });
 });

@@ -31,6 +31,14 @@ export type Prereg = {
    * the lane may apply it.
    */
   readonly recallFloor?: number;
+  /**
+   * Whether this registration measures a WITHIN-RUN pair of recall facades:
+   * one dispatch, one store, two `minCoverage` rungs. `off` (or an absent key)
+   * keeps every earlier registration on the single-facade path. The value is a
+   * declaration, not a knob: `prereg-pair.ts` refuses a pair with no
+   * non-zero registered `recallFloor`.
+   */
+  readonly facadePair?: 'as-is-floored' | 'off';
   /** One bullet per prediction: a claim that can be checked against the artefact. */
   readonly prediction: readonly string[];
   /** One bullet per condition under which the stage is abandoned. */
@@ -49,8 +57,8 @@ export type PreregReading = {
 };
 
 const REQUIRED_KEYS = ['id', 'step', 'opened', 'arms', 'sample', 'gates'] as const;
-/** `recallFloor` is optional: every registration opened before U3 stays valid. */
-const HEADER_KEYS = [...REQUIRED_KEYS, 'recallFloor'] as const;
+/** Both optional keys keep every registration opened before U3 and R49 valid. */
+const HEADER_KEYS = [...REQUIRED_KEYS, 'recallFloor', 'facadePair'] as const;
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
 /** A bullet has to carry a claim; ten characters is a draft marker with punctuation. */
@@ -169,6 +177,26 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  const pairText = values.get('facadePair');
+  let facadePair: Prereg['facadePair'];
+  if (pairText !== undefined) {
+    if (pairText !== 'as-is-floored' && pairText !== 'off') {
+      collected.push({
+        where: `header 'facadePair'`,
+        problem: `must be 'as-is-floored' or 'off', received '${pairText}'`,
+      });
+    } else {
+      facadePair = pairText;
+    }
+  }
+
+  if (facadePair === 'as-is-floored' && (recallFloor === undefined || recallFloor <= 0)) {
+    collected.push({
+      where: `header 'facadePair'`,
+      problem: 'a paired facade needs a positive recallFloor declared in the same registration',
+    });
+  }
+
   const id = values.get('id') ?? '';
   const stem = file.slice(file.lastIndexOf('/') + 1).replace(/\.md$/, '');
   if (id !== '' && id !== stem) {
@@ -230,6 +258,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       sample,
       gates,
       ...(recallFloor === undefined ? {} : { recallFloor }),
+      ...(facadePair === undefined ? {} : { facadePair }),
       prediction,
       refutation,
       file,
@@ -335,3 +364,15 @@ export function preregGateAgreement(prereg: Prereg, emitted: readonly string[]):
   return { ok: false, detail: parts.join('; ') };
 }
 
+
+/**
+ * Whether a registration enables the within-run paired facade.
+ *
+ * The workflow feeds this straight into `TAU_FACADE_PAIR`. A registration that
+ * is absent, `off`, or was refused by `readPrereg` can never enable a pair, so
+ * a dispatch cannot turn on two facades without a pre-registration that also
+ * declares the floor it will apply.
+ */
+export function facadePairSwitch(prereg: Prereg): boolean {
+  return prereg.facadePair === 'as-is-floored';
+}

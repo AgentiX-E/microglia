@@ -57,6 +57,8 @@
     "eval:plugin": "tsx packages/eval/src/bin/plugin-run.ts",
     "eval:prereg": "tsx packages/eval/src/bin/prereg.ts",
     "eval:prereg-floor": "tsx packages/eval/src/bin/prereg-floor.ts",
+    "eval:prereg-pair": "tsx packages/eval/src/bin/prereg-pair.ts",
+    "eval:facade-pair-readback": "tsx packages/eval/src/bin/facade-pair-readback.ts",
     "eval:protocol": "tsx packages/eval/src/bin/protocol.ts",
     "eval:harm": "tsx packages/eval/src/bin/harm-strata.ts",
     "eval:power": "tsx packages/eval/src/bin/power-audit.ts",

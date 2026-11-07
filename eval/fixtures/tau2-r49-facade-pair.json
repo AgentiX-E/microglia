@@ -1,0 +1,70 @@
+{
+  "description": "Committed readings and a structural identity control for the R49 within-run paired facade. Sources: AUDIT 34.35-34.37, TECH-DESIGN 17.98 / 17.101, prereg/R48-u3-coverage-floor.md and the offline verifier in /workspace/r48-readback.py. R48's -6.00pp was a CROSS-RUN difference: two dispatches, 8 vs 12 distilled items, and a memory-free reference that drifted from 0.30 to 0.44. It is not a measurement of the floor. The per-task rows of R48 are not committed here; the identity control is explicitly structural, NOT an experimental result. It exists so the invariant can be exercised on a valid within-run pair without inventing one.",
+  "r48": {
+    "run": "42353229972",
+    "failedFirstRun": "42350304597",
+    "prereg": "R48-u3-coverage-floor",
+    "floor": 0.01,
+    "store": "R48:12-distilled-items",
+    "memoryPass4": 0.38,
+    "referencePass4": 0.44,
+    "recallServed": 965,
+    "zeroCoveragePairs": 0,
+    "l4Paired": {
+      "scope": "within-run-memory-vs-reference",
+      "deltaPp": -6.0,
+      "ciLowPp": -16.0,
+      "ciHighPp": 4.0,
+      "p": 0.4531,
+      "paired": 50
+    },
+    "revertRuleFired": true,
+    "verdict": "GATE_RED"
+  },
+  "r47": {
+    "run": "42337250684",
+    "prereg": "R47-coverage-histogram",
+    "store": "R47:8-distilled-items",
+    "referencePass4": 0.3,
+    "recallServed": 1491,
+    "zeroCoveragePairs": 750
+  },
+  "identityControl": {
+    "description": "Structural identity control, NOT a measurement. Both facades carry one scope, one task set and identical outcomes, so a valid pair must report a zero delta.",
+    "dispatchId": "r49-identity-control",
+    "preregId": "R49-within-run-pair",
+    "storeStatements": [
+      "Use the order id from the customer message before calling lookup.",
+      "Confirm the refund destination before issuing a refund.",
+      "Ask for the booking reference before changing a flight."
+    ],
+    "learnSplit": ["retail/001", "retail/002"],
+    "testSplit": ["retail/101", "retail/102", "retail/103", "retail/104"],
+    "seed": 300,
+    "trials": 4,
+    "model": "deepseek/deepseek-chat",
+    "servedPacks": 4,
+    "tasks": [
+      { "id": "retail/101", "successes": 4, "trials": 4 },
+      { "id": "retail/102", "successes": 3, "trials": 4 },
+      { "id": "retail/103", "successes": 4, "trials": 4 },
+      { "id": "retail/104", "successes": 0, "trials": 4 }
+    ]
+  },
+  "providerOutage": {
+    "description": "R48's first dispatch, 42350304597: DeepSeek answered 500 on every call. Both arms failed and the evidence zip carried zero arm entries. This is an infrastructure failure, never a measurement and never a revert.",
+    "attempts": [
+      { "ok": false, "status": 500, "latencyMs": 1203 },
+      { "ok": false, "status": 500, "latencyMs": 1187 },
+      { "ok": false, "status": 500, "latencyMs": 1240 }
+    ]
+  },
+  "healthyProbe": {
+    "description": "Three consecutive successful pre-flight completions. A synthetic healthy shape, not a recorded run: no provider probe existed before R49.",
+    "attempts": [
+      { "ok": true, "status": 200, "latencyMs": 210 },
+      { "ok": true, "status": 200, "latencyMs": 198 },
+      { "ok": true, "status": 200, "latencyMs": 205 }
+    ]
+  }
+}
