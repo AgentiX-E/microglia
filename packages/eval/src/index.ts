@@ -542,6 +542,14 @@ export {
   resolveRecallFloor,
 } from './tau2-recall-floor.js';
 export {
+  REVERT_DELTA_BAR_PP,
+  REVERT_P_BAR,
+  revertRule,
+  type PairedReading,
+  type RevertBranch,
+  type RevertVerdict,
+} from './l4-revert.js';
+export {
   resilientInterpreter,
   stampDomain,
   type InterpreterFaults,

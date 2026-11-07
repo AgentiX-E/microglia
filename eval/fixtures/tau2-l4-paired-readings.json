@@ -1,0 +1,21 @@
+{
+  "description": "Committed within-run l4-paired gate readings from real sota.yml artefacts. The l4-paired gate in packages/eval/src/bin/l4-pair.ts pairs the memory arm against the memory-free reference arm INSIDE ONE DISPATCH; it is the only reading the R45 revert rule consumes. A cross-run delta between two dispatches measures a treatment's contribution and is NOT this gate.",
+  "readings": [
+    {
+      "id": "R47",
+      "run": "42337250684",
+      "artefact": "poc-l4-pair.json",
+      "l4Paired": { "scope": "within-run", "deltaPp": 12, "p": 0.1093749999999998, "paired": 50 },
+      "servedPacks": 1491,
+      "expected": { "fires": false, "branch": "clear" }
+    },
+    {
+      "id": "R48",
+      "run": "42353229972",
+      "artefact": "poc-l4-pair.json",
+      "l4Paired": { "scope": "within-run", "deltaPp": -6, "p": 0.4531250000000005, "paired": 50 },
+      "servedPacks": 965,
+      "expected": { "fires": true, "branch": "below-bar-with-served-pack" }
+    }
+  ]
+}
