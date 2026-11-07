@@ -862,7 +862,13 @@ jobs:
             const checks = [
               ['every coupled module has a verdict, and the walk emitted what it scanned', g['V72-every-coupled-module-has-a-verdict'].pass === true && a.scanned === a.totals.modules && unclassified.length === 0],
               ['no package imports upward: five edges, all downwards', g['V73-no-package-imports-upward'].pass === true && a.edges.length === 5 && upward.length === 0],
-              ['core is scenario-free: 37 modules, zero coupled', g['V74-core-is-scenario-free'].pass === true && layer('core').modules === 37 && layer('core').coupled === 0],
+              // The module count is a reading of the tree, not a constant, for the same reason
+              // the comment-only count below is not one: adding a module to core is not a
+              // regression, and a check that fails when the library grows teaches the project to
+              // edit the check. What is asserted is the property — every core module has a verdict
+              // and none of them is coupled to a scenario — and the snapshot comparison underneath
+              // is what notices the walk and the committed ledger describing different trees.
+              ['core is scenario-free: every module classified, zero coupled', g['V74-core-is-scenario-free'].pass === true && layer('core').modules > 0 && layer('core').coupled === 0],
               ['the adapter is a package: seven modules, every line of them classified adapter', layer('sql').modules === 7 && layer('sql').adapterLines === layer('sql').lines],
               ['twelve modules keep their scenario words with a written reason, and none is blank', a.coupled.filter((x) => x.verdict === 'deferred').length === 12 && a.coupled.filter((x) => x.verdict === 'deferred').every((x) => typeof x.reason === 'string' && x.reason.length > 20)],
               ['the five adapter modules that name a database are the ones that execute, guard, differ, link and render', a.coupled.filter((x) => x.pkg === 'sql').map((x) => x.module).sort().join(',') === 'm-schema,schema-link,sql-diff,sql-exec,sql-guard'],
