@@ -1,0 +1,64 @@
+{
+  "id": "poc-l4",
+  "title": "L4 — τ²-bench pass^4 against ALTK-Evolve",
+  "ranAt": "2026-11-07T14:52:47.799Z",
+  "model": "stub-model",
+  "n": 2,
+  "calls": 0,
+  "metrics": {
+    "pass4": 1,
+    "published_bar_applies": 0,
+    "tasks": 2,
+    "unscored_tasks": 0,
+    "min_tasks": 1,
+    "k": 4,
+    "inferred_trials": 0,
+    "gates_passed": 4
+  },
+  "notes": [
+    "Source: /workspace/r49-fixtures/stub-paired.ts (driver form). Two arms must share the split.",
+    "No published pass^4 exists for τ²-airline, so this run is not graded against a leaderboard: ALTK-Evolve's 0.575 is a τ²-retail number, and comparing a airline run to it would report a difference between two scenarios as a difference the memory made. The comparison this run supports is the paired one.",
+    "pass^4 is the unbiased C(c,4)/C(n,4) mean over 2 tasks, with success defined as `reward == 1.0` exactly, as upstream scores it.",
+    "The split covers the minimum: 2 scored tasks against a floor of 1."
+  ],
+  "per_task": [
+    {
+      "id": "airline/001",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    },
+    {
+      "id": "airline/002",
+      "successes": 4,
+      "trials": 4,
+      "passed_all": true
+    }
+  ],
+  "samples": [
+    {
+      "id": "l4-paired",
+      "pass": true,
+      "actual": "no reference arm",
+      "criterion": "against the same agent without the memory: delta >= 0 at p<0.05"
+    },
+    {
+      "id": "l4-coverage",
+      "pass": true,
+      "actual": 2,
+      "criterion": ">= 1 tasks"
+    },
+    {
+      "id": "l4-fully-scored",
+      "pass": true,
+      "actual": 0,
+      "criterion": "= 0 unscored tasks"
+    },
+    {
+      "id": "l4-facade-pair",
+      "pass": true,
+      "actual": "PAIRED",
+      "criterion": "a registered within-run pair is never a cross-run comparison"
+    }
+  ]
+}

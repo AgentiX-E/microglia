@@ -1,0 +1,69 @@
+{
+  "id": "poc-l4-facade-pair",
+  "title": "R49 — within-run paired recall facades on one distilled store",
+  "ranAt": "2026-11-07T14:52:47.802Z",
+  "state": "PAIRED",
+  "summary": "PAIRED: floor 0.01 delta 0.00pp [0.00, 0.00] p=1.0000 n=2 served 2/2 delivered=true",
+  "dispatchId": "42383057251",
+  "preregId": "R49-within-run-pair",
+  "floors": {
+    "asIs": 0,
+    "floored": 0.01
+  },
+  "scope": {
+    "dispatchId": "42383057251",
+    "preregId": "R49-within-run-pair",
+    "storeFingerprint": "store:0000beef",
+    "learnSplit": [
+      "retail/001"
+    ],
+    "testSplit": [
+      "airline/001",
+      "airline/002"
+    ],
+    "seed": 300,
+    "trials": 4,
+    "model": "deepseek/deepseek-chat"
+  },
+  "servedPacks": {
+    "asIs": 2,
+    "floored": 2
+  },
+  "pass4": {
+    "asIs": 1,
+    "floored": 1
+  },
+  "verdict": {
+    "state": "PAIRED",
+    "contrast": {
+      "kind": "facade-contrast",
+      "comparison": {
+        "paired": 2,
+        "onlyFirst": 0,
+        "onlySecond": 0,
+        "deltaPp": 0,
+        "ciLowPp": 0,
+        "ciHighPp": 0,
+        "p": 1,
+        "lost": 0,
+        "gained": 0
+      },
+      "floor": 0.01,
+      "servedPacks": {
+        "asIs": 2,
+        "floored": 2
+      }
+    },
+    "reason": "within-run pair on 2 tasks; floor 0.01 delivered 2 packs against 2 as-is"
+  },
+  "treatmentDelivered": true,
+  "seed": 300,
+  "model": "deepseek/deepseek-chat",
+  "notes": [
+    "Two facades of ONE driver run: one dispatch, one learning phase, one distilled store, one held-out split, one common seed stream and one model; only buildPack minCoverage differs.",
+    "This is a facade-contrast, NOT the l4-paired memory-versus-reference gate the R45 revert rule grades. No revert rule is consulted here.",
+    "Only PAIRED reports a contribution; REFUSED_CROSS_RUN and NO_MEASUREMENT report none.",
+    "The main poc-l4 artefact still grades the registered (floored) facade against the memory-free reference arm.",
+    "No accuracy, l4-paired value or offline proxy was used to choose, justify or revise the floor."
+  ]
+}
