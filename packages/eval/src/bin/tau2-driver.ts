@@ -46,6 +46,8 @@ import {
   facadePairSummary,
   facadePairVerdict,
   facadeScope,
+  inactionCensusOf,
+  inactionContrastOrNull,
   meanPassAtK,
   probeGate,
   resolveFacadePairPlan,
@@ -73,6 +75,7 @@ import {
   type TauTrialRow,
   type UseObservation,
   type PairedFacadeReading,
+  type InactionCensus,
   type ProbeAttempt,
 } from '@agentix-e/microglia-eval';
 
@@ -309,6 +312,8 @@ type Tau2PhaseDiagnostics = {
   readonly agent_turns?: number | null;
   readonly simulations?: number | null;
   readonly terminated?: Readonly<Record<string, number>> | null;
+  /** Per-episode action record; absent on every run before the abstention instrument. */
+  readonly inaction?: unknown;
 };
 
 /** The admission reasons, most frequent first, for the one line a run prints about its own store. */
@@ -588,6 +593,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     readonly recallRequests: number;
     readonly recallServed: number;
     readonly useObservations: UseObservation[];
+    /** Whether the agent acted at all in each episode, reduced to per-task counts. */
+    readonly inaction: InactionCensus;
   };
 
   const evaluateFacade = async (floor: number, out: string): Promise<FacadeEvaluation> => {
@@ -635,13 +642,18 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     } finally {
       await facade.close();
     }
+    const diagnostics = diagnosticsOf(evalStdout);
     return {
       scored: scoredArm(out),
-      diagnostics: diagnosticsOf(evalStdout),
+      diagnostics,
       servedPackSizes,
       recallRequests,
       recallServed,
       useObservations,
+      // The census is taken from THIS facade's phase, for the same reason every counter above is:
+      // R48's defect was two readings from different dispatches, and sharing one census between two
+      // facades would recreate it one layer down.
+      inaction: inactionCensusOf(diagnostics, TEST_DOMAIN),
     };
   };
 
@@ -684,6 +696,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         treatmentDelivered: treatmentDelivered(verdict),
         seed: PAIR_SEED,
         model: llm.model,
+        // The mechanism beside the delta: a floor that changes pass^4 by making the agent stop
+        // acting is a different finding from one that changes it by making the agent act wrongly,
+        // and only this field tells them apart. `inactionContrast` refuses two censuses over
+        // different populations, which is the right contract for a pure function and the wrong way
+        // to lose an hour of evaluation here: the refusal becomes a `null` contrast while both
+        // censuses stay in the artefact for a reader to compare.
+        inaction: {
+          asIs: asIs.inaction,
+          floored: floored.inaction,
+          contrast: inactionContrastOrNull(asIs.inaction, floored.inaction),
+        },
       };
       // The registered (floored) facade is the memory arm the rest of the lane
       // grades, so `l4-paired` against the reference stays exactly as R48 had it.

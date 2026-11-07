@@ -560,6 +560,16 @@ export {
   type RunScope,
 } from './within-run-pair.js';
 export {
+  inactionCensusOf,
+  inactionContrast,
+  inactionContrastOrNull,
+  inactionRate,
+  inactionSummary,
+  type InactionCensus,
+  type InactionContrast,
+  type TaskInaction,
+} from './inaction.js';
+export {
   FACADE_FLOOR_ENV,
   FACADE_PAIR_ENV,
   attestPairScope,

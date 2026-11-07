@@ -33,6 +33,7 @@ import type { PassAtKInput } from './passk.js';
 import type { ArmTask } from './l4.js';
 import { AS_IS_FLOOR, resolveRecallFloor } from './tau2-recall-floor.js';
 import { noMeasurementRefusal } from './provider-probe.js';
+import { inactionSummary, type InactionCensus, type InactionContrast } from './inaction.js';
 import {
   withinRunPair,
   type FacadeArm,
@@ -304,6 +305,18 @@ export type PairedFacadeReading = {
   /** The common seed both facades were evaluated with; CRN is an attested fact. */
   readonly seed: number;
   readonly model: string;
+  /**
+   * Whether the agent acted at all, per facade.
+   *
+   * Optional because every artefact written before this instrument carries no census, and a reader
+   * must not mistake their absence for "nothing abstained". A dispatch that measured it says so;
+   * `contrast` is `null` when either side is unobservable, never a zero.
+   */
+  readonly inaction?: {
+    readonly asIs: InactionCensus;
+    readonly floored: InactionCensus;
+    readonly contrast: InactionContrast | null;
+  };
 };
 
 /**
@@ -317,11 +330,14 @@ export type PairedFacadeReading = {
  */
 export function facadePairSummary(reading: PairedFacadeReading): string {
   const verdict = reading.verdict;
+  // The census travels with every terminal state, because "the agent stopped acting" is evidence
+  // about the pack even on a run whose pair was refused. Absent means unmeasured, not zero.
+  const tail = reading.inaction === undefined ? '' : ` | ${inactionSummary(reading.inaction.asIs, reading.inaction.floored)}`;
   if (verdict.state === 'REFUSED_CROSS_RUN') {
-    return `REFUSED_CROSS_RUN: ${verdict.reason}`;
+    return `REFUSED_CROSS_RUN: ${verdict.reason}${tail}`;
   }
   if (verdict.state === 'NO_MEASUREMENT') {
-    return `NO_MEASUREMENT: ${verdict.reason}`;
+    return `NO_MEASUREMENT: ${verdict.reason}${tail}`;
   }
   const comparison = verdict.contrast.comparison;
   return (
@@ -329,7 +345,7 @@ export function facadePairSummary(reading: PairedFacadeReading): string {
     `[${comparison.ciLowPp.toFixed(2)}, ${comparison.ciHighPp.toFixed(2)}] ` +
     `p=${comparison.p.toFixed(4)} n=${comparison.paired} ` +
     `served ${reading.servedPacks.floored}/${reading.servedPacks.asIs} ` +
-    `delivered=${reading.treatmentDelivered}`
+    `delivered=${reading.treatmentDelivered}${tail}`
   );
 }
 
@@ -370,6 +386,7 @@ export function pairedFacadeArtifact(
       'This is a facade-contrast, NOT the l4-paired memory-versus-reference gate the R45 revert rule grades. No revert rule is consulted here.',
       'Only PAIRED reports a contribution; REFUSED_CROSS_RUN and NO_MEASUREMENT report none.',
       'The main poc-l4 artefact still grades the registered (floored) facade against the memory-free reference arm.',
+      '`inaction` counts episodes in which the agent never called a tool: abstention is the response to noise the published ablated memory work measures, and a delta without it is not attributable. Absent means unmeasured, never zero.',
       'No accuracy, l4-paired value or offline proxy was used to choose, justify or revise the floor.',
     ],
   };

@@ -18,6 +18,7 @@ import {
   type PairedFacadeReading,
 } from '../facade-pair.js';
 import { AS_IS_FLOOR } from '../tau2-recall-floor.js';
+import { inactionCensusOf } from '../inaction.js';
 import { isNoMeasurementRefusal } from '../provider-probe.js';
 import { COVERAGE_FLOORS } from '../tau2-use-census.js';
 import type { PassAtKInput } from '../passk.js';
@@ -484,7 +485,10 @@ describe('PairedFacadeReading and its readback', () => {
 describe('the paired-facade artefact and its readback', () => {
   const RAN_AT = '2026-11-07T13:00:00.000Z';
 
-  function artifact(verdict: WithinRunPairVerdict = verdictOf()) {
+  function artifact(
+    verdict: WithinRunPairVerdict = verdictOf(),
+    inaction?: PairedFacadeReading['inaction'],
+  ) {
     const reading: PairedFacadeReading = {
       dispatchId: control.dispatchId,
       preregId: control.preregId,
@@ -496,6 +500,7 @@ describe('the paired-facade artefact and its readback', () => {
       treatmentDelivered: treatmentDelivered(verdict),
       seed: control.seed,
       model: control.model,
+      ...(inaction === undefined ? {} : { inaction }),
     };
     return pairedFacadeArtifact(reading, RAN_AT);
   }
@@ -508,7 +513,7 @@ describe('the paired-facade artefact and its readback', () => {
     expect(document.summary).toBe(facadePairSummary({ ...document, verdict: document.verdict }));
     expect(document.scope.storeFingerprint).toBe(storeFingerprintOf(control.storeStatements));
     expect(document.floors).toEqual({ asIs: 0, floored: fixture.r48.floor });
-    expect(document.notes).toHaveLength(5);
+    expect(document.notes).toHaveLength(6);
   });
 
   it('round-trips a PAIRED artefact into a readback with the full interval', () => {
@@ -522,6 +527,41 @@ describe('the paired-facade artefact and its readback', () => {
     expect(back.treatmentDelivered).toBe(true);
     expect(back.floor).toBe(fixture.r48.floor);
     expect(back.servedPacks).toEqual({ asIs: 4, floored: 4 });
+  });
+
+  it('carries the abstention census beside the delta, and stays readable back', () => {
+    // Structural episodes, not a measurement: the point is that a census travels in the artefact
+    // and appears on the one line the workflow reads, so a delta can be attributed to a mechanism.
+    const episodes = (acted: boolean) => ({
+      inaction: {
+        observable: true,
+        episodes: [
+          { task: '1', trial: 0, acted },
+          { task: '2', trial: 0, acted },
+        ],
+      },
+    });
+    const document = artifact(verdictOf(), {
+      asIs: inactionCensusOf(episodes(true), 'retail'),
+      floored: inactionCensusOf(episodes(false), 'retail'),
+      contrast: null,
+    });
+
+    expect(document.summary).toContain('inaction: as-is 0/2 floored 2/2');
+    expect(document.inaction?.floored).toEqual({
+      state: 'OBSERVED',
+      tasks: [
+        { id: 'retail/1', inactive: 1, trials: 1 },
+        { id: 'retail/2', inactive: 1, trials: 1 },
+      ],
+      inactiveTrials: 2,
+      totalTrials: 2,
+    });
+    // A reader of the flat document still gets the terminal state and the interval.
+    expect(readFacadePairArtifact(document).state).toBe('PAIRED');
+
+    // And a run that did not measure it says nothing rather than zero.
+    expect(artifact().summary).not.toContain('inaction:');
   });
 
   it('gives the two non-measurement states no delta, p-value or paired count', () => {

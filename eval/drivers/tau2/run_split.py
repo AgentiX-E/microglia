@@ -52,6 +52,49 @@ def task_ids(domain: str, wanted: list[str]) -> list[str]:
     return [task.id for task in tasks]
 
 
+def inaction_of(simulations) -> dict | None:
+    """Whether the agent ever acted, per episode.
+
+    τ²'s message model gives a participant message either text or tool calls, and an assistant
+    message continues an episode only by calling a tool. An episode whose assistant messages carry no
+    tool call therefore ended with the agent declining to act, which is the τ² form of the abstention
+    LongMemEval measures. It is reported as a *mechanism* fact beside the reward, never folded into
+    it: a reward stays whatever upstream's evaluator said.
+
+    `observable` is a field rather than something the reader infers, because a census that upstream
+    could not expose must not reach a reader as "no abstention". One simulation whose messages are
+    hidden, or whose trial number upstream did not set, makes the whole census unobservable: half a
+    census silently reported as a whole one is the defect this field exists to prevent.
+
+    The reduction to per-task counts happens in TypeScript (`packages/eval/src/inaction.ts`), which
+    is the half with tests. This function reports the episodes exactly as it saw them.
+    """
+    if simulations is None:
+        return None
+    episodes = []
+    for simulation in simulations:
+        messages = None
+        reader = getattr(simulation, "get_messages", None)
+        if callable(reader):
+            try:
+                messages = reader()
+            except Exception:  # noqa: BLE001 - upstream shape, not our error
+                messages = None
+        if messages is None:
+            return {"observable": False, "episodes": []}
+        task = getattr(simulation, "task_id", None)
+        trial = getattr(simulation, "trial", None)
+        if not isinstance(task, str) or not isinstance(trial, int) or isinstance(trial, bool) or trial < 0:
+            return {"observable": False, "episodes": []}
+        acted = any(
+            getattr(message, "role", None) in ("assistant", "agent")
+            and bool(getattr(message, "tool_calls", None))
+            for message in messages
+        )
+        episodes.append({"task": task, "trial": trial, "acted": acted})
+    return {"observable": True, "episodes": episodes}
+
+
 def diagnostics_of(simulations) -> dict:
     """What the caller needs for the protocol's reliability gate, or null where upstream hides it.
 
@@ -65,7 +108,7 @@ def diagnostics_of(simulations) -> dict:
     benchmark is worse than no diagnostic.
     """
     if simulations is None:
-        return {"agent_turns": None, "simulations": None, "terminated": None}
+        return {"agent_turns": None, "simulations": None, "terminated": None, "inaction": None}
     turns = 0
     terminated: dict[str, int] = {}
     counted_turns = True
@@ -93,6 +136,7 @@ def diagnostics_of(simulations) -> dict:
         "agent_turns": turns if counted_turns else None,
         "simulations": len(simulations),
         "terminated": terminated or None,
+        "inaction": inaction_of(simulations),
     }
 
 
