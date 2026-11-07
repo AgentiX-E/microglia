@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { COVERAGE_FLOORS } from '../tau2-use-census.js';
 import { armRecordFromDriver, storeCensus, type Tau2Raw } from '../tau2-instrument.js';
 
 function raw(over: Partial<Tau2Raw> = {}): Tau2Raw {
@@ -208,11 +209,38 @@ describe('armRecordFromDriver', () => {
     expect(record.use?.widenedItems).toBe(0); // absent widenedItems defaults to 0
   });
 
-  it('reports no use census at all when the driver did not instrument it', () => {
+  it('commits a coverage histogram beside the census from the same observations', () => {
+    // The seven-field census is a scalar U3 cannot compute a floor from. The
+    // histogram is reduced here, in-process, from the very observations that
+    // produced the census, so the two readings cannot describe two populations.
+    const record = armRecordFromDriver(
+      raw({
+        useObservations: [
+          { query: 'cancel my reservation', statements: ['cancel reservation'] },
+          { query: 'refund order', statements: ['cancel reservation'] },
+        ],
+      }),
+    );
+    expect(record.use?.injectedPairs).toBe(2);
+    expect(record.coverage?.measuredPairs).toBe(2);
+    expect(record.coverage?.floors).toHaveLength(COVERAGE_FLOORS.length);
+    // floor 0 keeps every measurable pair; the first nonzero point empties the
+    // one pack whose rule shares none of its question's content terms.
+    expect(record.coverage?.floors[0]?.retainedPairs).toBe(2);
+    const first = COVERAGE_FLOORS.find((f) => f > 0) as number;
+    const row = record.coverage?.floors.find((r) => r.minCoverage === first);
+    expect(row?.emptiedPacks).toBe(1);
+    expect(row?.retainedPacks).toBe(1);
+  });
+
+  it('reports neither census nor histogram when the driver did not instrument it', () => {
     // Every artefact before R46 has none. An older run is "not measured", never a
-    // run that served a perfectly relevant empty pack.
+    // run that served a perfectly relevant empty pack, and never a histogram
+    // full of zeros standing in for a population that was never observed.
     expect(armRecordFromDriver(raw()).use).toBeUndefined();
+    expect(armRecordFromDriver(raw()).coverage).toBeUndefined();
     expect(armRecordFromDriver(raw({ store: undefined })).use).toBeUndefined();
+    expect(armRecordFromDriver(raw({ store: undefined })).coverage).toBeUndefined();
   });
 
   it('counts distinct held-out tasks in the denominator and keeps repeats in the split', () => {

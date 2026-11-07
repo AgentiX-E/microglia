@@ -734,4 +734,34 @@ describe('reading an arm artefact', () => {
     });
     expect(record.use).toEqual(census);
   });
+
+  it('carries the coverage histogram forward beside the census', () => {
+    // U3's floor is computed from the committed histogram before its dispatch.
+    // A projection that kept the seven-field census but dropped the histogram
+    // would leave the floor uncomputable at the gate layer, which reads the
+    // record and never the file.
+    const histogram = {
+      measuredPairs: 2723,
+      unmeasurablePairs: 0,
+      unmeasurablePacks: 0,
+      nonzeroQuantiles: { min: 0.03, p10: 0.04, p25: 0.05, p50: 0.07, p75: 0.1, p90: 0.15, max: 0.33 },
+      floors: [
+        { minCoverage: 0, retainedPairs: 2723, retainedPacks: 1480, emptiedPacks: 0 },
+        { minCoverage: 0.05, retainedPairs: 900, retainedPacks: 610, emptiedPacks: 870 },
+      ],
+    };
+    const record = tau2ArmRecordOf('memory', {
+      n: 50,
+      metrics: { tasks: 50, k: 4 },
+      tau2: { coverage: histogram },
+    });
+    expect(record.coverage).toEqual(histogram);
+    // The registered census stays untouched: the histogram is additive.
+    expect(record.use).toBeUndefined();
+  });
+
+  it('reports no histogram for a pre-R47 artefact, not a zeroed one', () => {
+    const bare = tau2ArmRecordOf('memory', { n: 50, metrics: { tasks: 50, k: 4 } });
+    expect(bare.coverage).toBeUndefined();
+  });
 });

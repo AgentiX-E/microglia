@@ -47,7 +47,7 @@ import {
   type ValidityGate,
 } from '@agentix-e/microglia-protocol';
 import { detectableDelta } from './protocol.js';
-import type { UseCensus } from './tau2-use-census.js';
+import type { CoverageHistogram, UseCensus } from './tau2-use-census.js';
 
 /**
  * One arm's records, as far as the protocol is concerned.
@@ -192,6 +192,14 @@ export type Tau2ArmRecord = {
    * "not measured" rather than as a zero. Registered in TECH-DESIGN §17.89.
    */
   readonly use?: UseCensus;
+  /**
+   * The committed coverage histogram behind the census, reduced from the same
+   * facade observations. Additive and optional: an artefact written before
+   * this instrument (R45, R46) carries none and reads as "not measured", never
+   * as a zero. U3's registered floor is computed from this population before
+   * its own dispatch, as AUDIT 34.22 requires; a scalar cannot support it.
+   */
+  readonly coverage?: CoverageHistogram;
 };
 
 /** The paired comparison, reduced to the three numbers a gate reads. */
@@ -572,6 +580,7 @@ export type Tau2ArmArtefact = {
     readonly store?: Tau2ArmRecord['store'];
     readonly recall?: Tau2ArmRecord['recall'];
     readonly use?: Tau2ArmRecord['use'];
+    readonly coverage?: Tau2ArmRecord['coverage'];
   };
 };
 
@@ -610,7 +619,10 @@ export function tau2ArmRecordOf(arm: string, artefact: Tau2ArmArtefact): Tau2Arm
     ...(artefact.tau2?.recall === undefined ? {} : { recall: artefact.tau2.recall }),
     // The use census travels with V1's rate: a record that kept the pack size
     // but dropped what was in the pack would still be unable to say whether a
-    // served pack was relevant. Older artefacts carry none and stay silent.
+    // served pack was relevant. The coverage histogram travels beside it: a
+    // scalar cannot say what a floor would empty. Older artefacts carry neither
+    // and stay silent.
     ...(artefact.tau2?.use === undefined ? {} : { use: artefact.tau2.use }),
+    ...(artefact.tau2?.coverage === undefined ? {} : { coverage: artefact.tau2.coverage }),
   };
 }

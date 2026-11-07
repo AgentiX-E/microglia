@@ -38,7 +38,7 @@
  */
 import { defaultPolicy } from '@agentix-e/microglia-core/kernel';
 import type { AdmissionCensus, Tau2ArmRecord } from './tau2-gates.js';
-import { useCensus, type UseArm, type UseObservation } from './tau2-use-census.js';
+import { coverageHistogram, useCensus, type UseArm, type UseObservation } from './tau2-use-census.js';
 
 export type { AdmissionCensus } from './tau2-gates.js';
 
@@ -338,6 +338,12 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
             raw.useArm ?? 'as-is',
             raw.widenedItems ?? 0,
           ),
+          // The seven-field census commits one scalar about coverage. U3's
+          // floor must be computed from a committed histogram BEFORE its own
+          // dispatch (AUDIT 34.22), so reduce the SAME facade observations to
+          // the retention curve here, while they still exist in this process.
+          // An older artefact has neither field and reads as "not measured".
+          coverage: coverageHistogram(raw.useObservations),
         }),
   };
 }

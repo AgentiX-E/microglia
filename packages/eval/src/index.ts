@@ -515,10 +515,15 @@ export {
 } from './tau2-instrument.js';
 export { isGoldVerifiedCorrection, tau2EditSemantics } from './tau2-admission.js';
 export {
+  COVERAGE_FLOORS,
+  coverageHistogram,
   coverageProfile,
   useCensus,
   zeroCoverageShare,
+  type CoverageFloorRow,
+  type CoverageHistogram,
   type CoverageProfile,
+  type CoverageQuantiles,
   type UseArm,
   type UseCensus,
   type UseObservation,
