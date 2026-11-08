@@ -1,5 +1,5 @@
 {
-  "description": "Committed within-run l4-paired gate readings from real sota.yml artefacts. The l4-paired gate in packages/eval/src/bin/l4-pair.ts pairs the memory arm against the memory-free reference arm INSIDE ONE DISPATCH; it is the only reading the R45 revert rule consumes. A cross-run delta between two dispatches measures a treatment's contribution and is NOT this gate.",
+  "description": "Committed within-run l4-paired gate readings from real sota.yml artefacts. The l4-paired gate in packages/eval/src/bin/l4-pair.ts pairs the memory arm against the memory-free reference arm INSIDE ONE DISPATCH; it is the only reading the R45 revert rule consumes. A cross-run delta between two dispatches measures a treatment's contribution and is NOT this gate. `detectablePp` is the minimum detectable difference the pair reported, and is null where the run predates the field: the state those rows expect is invariant to it, which the R50 test asserts rather than assumes.",
   "readings": [
     {
       "id": "R47",
@@ -7,7 +7,8 @@
       "artefact": "poc-l4-pair.json",
       "l4Paired": { "scope": "within-run", "deltaPp": 12, "p": 0.1093749999999998, "paired": 50 },
       "servedPacks": 1491,
-      "expected": { "fires": false, "branch": "clear" }
+      "detectablePp": null,
+      "expected": { "fires": false, "branch": "clear", "state": "UNRESOLVED", "claim": null }
     },
     {
       "id": "R48",
@@ -15,7 +16,22 @@
       "artefact": "poc-l4-pair.json",
       "l4Paired": { "scope": "within-run", "deltaPp": -6, "p": 0.4531250000000005, "paired": 50 },
       "servedPacks": 965,
-      "expected": { "fires": true, "branch": "below-bar-with-served-pack" }
+      "detectablePp": null,
+      "expected": {
+        "fires": true,
+        "branch": "below-bar-with-served-pack",
+        "state": "HARM",
+        "claim": "the memory costs accuracy: -6.00pp"
+      }
+    },
+    {
+      "id": "R49",
+      "run": "3ea349af",
+      "artefact": "poc-l4-pair.json",
+      "l4Paired": { "scope": "within-run", "deltaPp": -4, "p": 0.6875, "paired": 50 },
+      "servedPacks": 949,
+      "detectablePp": 13.73,
+      "expected": { "fires": false, "branch": "clear", "state": "UNRESOLVED", "claim": null }
     }
   ]
 }

@@ -557,6 +557,12 @@ export {
   type RevertVerdict,
 } from './l4-revert.js';
 export {
+  pairedVerdict,
+  type PairedVerdict,
+  type PairedVerdictInput,
+  type PairedVerdictState,
+} from './paired-verdict.js';
+export {
   PAIR_RESAMPLES,
   PAIR_SEED,
   scopeDifference,

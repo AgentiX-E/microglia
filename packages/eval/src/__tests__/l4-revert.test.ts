@@ -55,8 +55,11 @@ describe('revertRule — the registered R45 invariant', () => {
     expect(REVERT_P_BAR).toBe(0.05);
   });
 
-  it('reproduces both real committed readings exactly', () => {
-    expect(fixture.readings).toHaveLength(2);
+  it('reproduces every real committed reading exactly', () => {
+    // R49 (-4.00pp at p=0.6875 with 949 served packs) joined the fixture with
+    // R50: it is the reading that fires neither branch, and the one that made
+    // the old `delta >= 0 && p < 0.05` gate unreachable.
+    expect(fixture.readings).toHaveLength(3);
     for (const row of fixture.readings) {
       const verdict = revertRule(row.l4Paired, row.servedPacks);
       expect({ id: row.id, fires: verdict.fires }, row.id).toEqual({

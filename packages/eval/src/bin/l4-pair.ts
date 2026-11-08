@@ -45,6 +45,7 @@ import {
   type TauTrialRow,
 } from '@agentix-e/microglia-eval';
 import { writeJson } from './lib.js';
+import { pairedVerdict } from '../paired-verdict.js';
 
 type TaskRow = { readonly id: string; readonly passed_all: boolean };
 
@@ -84,8 +85,6 @@ const FIRST = process.env['L4_FIRST'] ?? join(RESULTS, 'arms', 'reference', 'poc
 const SECOND = process.env['L4_SECOND'] ?? join(RESULTS, 'arms', 'memory', 'poc-l4.json');
 /** The domain the run was scored in; the protocol's strata never read it, but the artefact names it. */
 const DOMAIN = process.env['TAU_DOMAIN'] ?? 'retail';
-/** The bar the paired gate holds: the memory must not cost accuracy, at p<0.05. */
-const BAR = 0.05;
 
 function load(path: string): Artefact {
   if (!existsSync(path)) {
@@ -174,19 +173,55 @@ const audit = tau2GateAudit(evidence);
 const detectablePp = tau2DetectablePp(evidence.comparison);
 
 /**
- * The two conditions that belong to this pair rather than to the instrument.
+ * What this pair is allowed to say, decided before the gates are written.
  *
- * Both block, and both already did: a treatment that cost accuracy is the finding, and two arms on
- * different splits are not a pair. What changed is that the third, advisory one is no longer here
- * to be ignored.
+ * R50: `l4-paired` used to pass only on `delta >= 0 && p < 0.05`, a condition the
+ * pair's own minimum detectable difference made unreachable. R49 graded it FAIL
+ * at -4.00pp against an MDE of 13.73pp — a verdict that says the memory is broken
+ * when what it actually says is that 50 paired tasks cannot see an effect that
+ * small. The gate now mirrors the R45 revert rule (harm) and the readout carries
+ * the resolution it can honestly claim. See `paired-verdict.ts`.
+ */
+const served = second.tau2?.recall?.served ?? 0;
+const verdict = pairedVerdict({
+  deltaPp: comparison.deltaPp,
+  p: comparison.p,
+  paired: comparison.paired,
+  servedPacks: served,
+  detectablePp: detectablePp ?? Number.POSITIVE_INFINITY,
+});
+
+/**
+ * The three conditions that belong to this pair rather than to the instrument.
+ *
+ * `l4-paired` blocks on harm, and only on harm. `l4-effect-resolved` reports
+ * whether the pair can support the claim it is making; it does not block,
+ * because an unresolvable effect is a statement about the sample rather than
+ * about the memory — and `V5-resolution` already blocks on the same fact from
+ * the protocol's side, so a second blocking copy would be the same red line
+ * printed twice. `l4-same-split` blocks: two arms on different splits are not a
+ * pair.
  */
 const scenarioGates: readonly ValidityGate[] = [
   {
     id: 'l4-paired',
-    criterion: `the memory does not cost accuracy: delta >= 0 at p < ${BAR}`,
-    actual: `${comparison.deltaPp.toFixed(2)}pp (p=${comparison.p.toFixed(4)}, n=${comparison.paired})`,
-    pass: comparison.deltaPp >= 0 && comparison.p < BAR,
+    criterion: 'the memory does not cost accuracy: neither R45 revert branch fires',
+    actual:
+      `${comparison.deltaPp.toFixed(2)}pp (p=${comparison.p.toFixed(4)}, n=${comparison.paired}, ` +
+      `${served} served pack(s)): ${verdict.state}`,
+    pass: verdict.state !== 'HARM',
     blocking: true,
+  },
+  {
+    id: 'l4-effect-resolved',
+    criterion:
+      'the pair resolves the effect it reports: |delta| >= minimum detectable difference, or no direction is claimed',
+    actual:
+      verdict.state === 'UNRESOLVED'
+        ? `UNRESOLVED: |${comparison.deltaPp.toFixed(2)}pp| against ${detectablePp === undefined ? 'an unestimable' : `${detectablePp.toFixed(2)}pp`} minimum detectable difference`
+        : (verdict.claim ?? verdict.state),
+    pass: verdict.state !== 'UNRESOLVED',
+    blocking: false,
   },
   {
     id: 'l4-same-split',
@@ -208,6 +243,17 @@ await writeJson('poc-l4-pair', {
   first: { path: FIRST, ranAt: first.ranAt ?? null, pass4: first.metrics?.pass4 ?? null },
   second: { path: SECOND, ranAt: second.ranAt ?? null, pass4: second.metrics?.pass4 ?? null },
   comparison,
+  // R50: what the pair establishes, in one of three states, decided by the same
+  // two numbers the report prints. `claim` is null unless a direction is
+  // supported, so a reader cannot concatenate an unsupported sentence into a
+  // result.
+  verdict: {
+    state: verdict.state,
+    claim: verdict.claim,
+    reason: verdict.reason,
+    excludedAbovePp: verdict.excludedAbovePp,
+    servedPacks: served,
+  },
   resolution,
   // What the scenario itself could decide, when the arms listed it. `tasksForFivePp` is a
   // requirement; this is the supply, and on τ² the two do not meet: retail carries 115 tasks and a
@@ -273,6 +319,7 @@ process.stdout.write(
     `[${comparison.ciLowPp.toFixed(2)}, ${comparison.ciHighPp.toFixed(2)}] p=${comparison.p.toFixed(4)} ` +
     `lost=${comparison.lost} gained=${comparison.gained}\n`,
 );
+process.stdout.write(`[l4-pair] verdict ${verdict.state}: ${verdict.claim ?? verdict.reason}\n`);
 if (transfer !== undefined) {
   process.stdout.write(
     `[l4-pair] transfer: ${transfer.gate.repaired} repaired, ${transfer.gate.broke} broken of ` +
