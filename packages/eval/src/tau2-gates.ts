@@ -647,6 +647,15 @@ export type Tau2ArmArtefact = {
     readonly recall?: Tau2ArmRecord['recall'];
     readonly use?: Tau2ArmRecord['use'];
     readonly coverage?: Tau2ArmRecord['coverage'];
+    /**
+     * R54/R56: the pipeline from a correction to a servable rule.
+     *
+     * This type is the second hand-written projection in the lane, and it dropped this field -- so
+     * `V0-instrument-ready`, whose only subject it is, was absent on every pair artefact ever
+     * written, including the one R56 published. A gate cannot fire on a field the bridge to it does
+     * not carry, and nothing in the failing artefact said the field was missing.
+     */
+    readonly funnel?: FunnelInput;
   };
 };
 
@@ -690,5 +699,9 @@ export function tau2ArmRecordOf(arm: string, artefact: Tau2ArmArtefact): Tau2Arm
     // and stay silent.
     ...(artefact.tau2?.use === undefined ? {} : { use: artefact.tau2.use }),
     ...(artefact.tau2?.coverage === undefined ? {} : { coverage: artefact.tau2.coverage }),
+    // The pipeline, which `V0` grades: five stages and two reconciliations, recorded by the driver
+    // rather than derived here. A projection that carried the counts but not the chain would let a
+    // zero be reported without the stage it happened at.
+    ...(artefact.tau2?.funnel === undefined ? {} : { funnel: artefact.tau2.funnel }),
   };
 }

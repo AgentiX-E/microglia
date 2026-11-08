@@ -201,6 +201,53 @@ describe('the adapter implements the five-method contract', () => {
   });
 });
 
+describe('the arm artefact reaches the protocol through one projection', () => {
+  // Every protocol gate in this lane is graded on the *pair* artefact, and `tau2ArmRecordOf` is the
+  // only bridge from an arm's file to the record the gates read. It is a second hand-written
+  // projection, and it dropped `funnel` -- so `V0-instrument-ready`, added to grade exactly that
+  // field, was absent on every pair this lane has ever written, including the one R56 published.
+  const funnel = {
+    corrections: 32,
+    candidates: 30,
+    admitted: 12,
+    stored: 12,
+    servable: 12,
+    refused: 18,
+    failed: 0,
+  };
+
+  it("carries the funnel, which is the fortieth gate's only subject", () => {
+    const record = tau2ArmRecordOf('memory', { tau2: { funnel } });
+    expect(record.funnel).toEqual(funnel);
+  });
+
+  it('makes the fortieth gate supplyable, which it cannot be without the funnel', () => {
+    const memory = tau2ArmRecordOf('memory', { tau2: { funnel } });
+    const { supplied } = tau2ProtocolInput({ domain: 'retail', trialCount: 4, memory });
+    expect(supplied).toContain('funnel');
+    // And a pair whose arm carries none still reports it absent rather than green: the gate reads
+    // the driver's counts or it says it could not, and it never infers them.
+    const silent = tau2ProtocolInput({
+      domain: 'retail',
+      trialCount: 4,
+      memory: tau2ArmRecordOf('memory', { tau2: {} }),
+    });
+    expect(silent.supplied).not.toContain('funnel');
+  });
+
+  it('leaves out what no gate reads, so the projection stays a statement about grading', () => {
+    // `writeAdmission`, `storeItems`, `distillForm` and `injectionNote` are readback subjects, not
+    // gate inputs. A projection that carried them would grow a second copy of every field the
+    // artefact already holds, and the copies would drift.
+    const record = tau2ArmRecordOf('memory', {
+      tau2: {
+        writeAdmission: { mode: 'off', rephrased: 0, suppressed: 0 },
+      } as never,
+    });
+    expect(record.writeAdmission).toBeUndefined();
+  });
+});
+
 describe('the projection supplies what the record holds and nothing else', () => {
   it('states the two facts that are always true of this lane', () => {
     const { input, supplied } = tau2ProtocolInput({ domain: 'retail', trialCount: 4 });
