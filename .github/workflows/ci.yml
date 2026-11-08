@@ -135,9 +135,9 @@ jobs:
               ['the resolution gate fired', resolution !== undefined],
               ['and it blocks', resolution.blocking === true],
               ['and it names the minimum detectable difference', resolution.actual.includes('21.41pp')],
-              // R52: green here means "the pair claimed nothing", and the artefact has to say so
-              // in words. A run cannot pass by staying silent, because silence is `undefined` and
-              // `undefined` is graded by the 6pp bar this sample cannot meet.
+              // R52: green here means the pair claimed nothing, and the artefact has to say so in
+              // words. A run cannot pass by staying silent: silence is an absent field, and an
+              // absent field is graded by the 6pp bar this sample cannot meet.
               ['and it passes because no direction was claimed', resolution.pass === true],
               ['which the sentence states', resolution.actual.includes('the run claims no direction')],
               ['the pair states its verdict', a.verdict.state === 'UNRESOLVED'],
