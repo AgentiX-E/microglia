@@ -17,9 +17,9 @@
  * way the census would be describing a corroboration that the store it ships does not contain, which
  * is the R48 defect one field over.
  */
-import type { ConsolidationCensus } from '@agentix-e/microglia-core/distill';
-import type { StoreItemSample } from './store-items.js';
-import type { DistillUnitRecord } from './tau2-instrument.js';
+import type { ConsolidationCensus } from "@agentix-e/microglia-core/distill";
+import type { StoreItemSample } from "./store-items.js";
+import type { DistillUnitRecord } from "./tau2-instrument.js";
 
 export type RecurrenceGate = {
   readonly pass: boolean;
@@ -39,10 +39,13 @@ const sum = (distribution: Readonly<Record<number, number>>): number =>
  *    different stores;
  *  - the pass reports a `retained` that is not the count of survivors it also reports.
  */
-export function recurrenceGate(record: DistillUnitRecord, store?: StoreItemSample): RecurrenceGate {
+export function recurrenceGate(
+  record: DistillUnitRecord,
+  store?: StoreItemSample,
+): RecurrenceGate {
   const criterion =
-    'a trace arm reports both support distributions, and they describe the store it reports — ' +
-    'including the item the pass says it corroborated';
+    "a trace arm reports both support distributions, and they describe the store it reports — " +
+    "including the item the pass says it corroborated";
   const census: ConsolidationCensus | undefined = record.consolidation;
   if (census === undefined) {
     return {
@@ -58,21 +61,38 @@ export function recurrenceGate(record: DistillUnitRecord, store?: StoreItemSampl
   // one outside the window, and failing a gate for that would be failing it for the sample's limit
   // rather than for the run's arithmetic — so an incomplete sample reports the reading as ungraded
   // instead of as a violation.
-  const corroborated = store === undefined || store.omitted > 0
-    ? undefined
-    : store.items.filter((item) => item.supportTasks >= 2).length;
-  const consistent = census.groups === 0 || corroborated === undefined || corroborated >= 1;
+  const corroborated =
+    store === undefined || store.omitted > 0
+      ? undefined
+      : store.items.filter((item) => item.supportTasks >= 2).length;
+  // The census and the store have to agree about the maximum, and this is the reading that makes
+  // them: `maxSupportAfter` is computed by the pass over survivors it wrote back, so a store that
+  // reports a different maximum was sampled at a different moment or from a different store. The
+  // previous check only asked whether *any* item was corroborated, which a store whose baseline was
+  // already 2 satisfies without the pass having done anything.
+  const storeMax =
+    store === undefined || store.omitted > 0
+      ? undefined
+      : store.items.reduce(
+          (most, item) => Math.max(most, item.supportTasks),
+          0,
+        );
+  const consistent =
+    storeMax === undefined || storeMax === census.maxSupportAfter;
   return {
     pass: reconciled && consistent,
     actual:
       `${String(census.considered)}→${String(census.retained)} item(s), ` +
-      `${String(census.groups)} group(s), max support ${String(census.maxSupportBefore)}→${String(
-        census.maxSupportAfter,
-      )}, distributions ${String(before)}/${String(census.considered)} and ` +
+      `${String(census.groups)} group(s) of which ${String(census.crossTaskGroups)} bought a task, ` +
+      `max support ${String(census.maxSupportBefore)}→${String(census.maxSupportAfter)}, ` +
+      `weakest pair ${census.weakestPair.toFixed(2)}, distributions ` +
+      `${String(before)}/${String(census.considered)} and ` +
       `${String(after)}/${String(census.retained)}, floors ` +
-      `${String(census.threshold)}/${String(census.conditionMinShared)} shared term(s)` +
+      (census.conditionMinShared === 0
+        ? `${String(census.threshold)} with no condition veto`
+        : `${String(census.threshold)}/${String(census.conditionMinShared)} shared term(s)`) +
       (corroborated === undefined
-        ? ', store not sampled whole'
+        ? ", store not sampled whole"
         : `, ${String(corroborated)} item(s) backed by two or more tasks`),
     criterion,
   };

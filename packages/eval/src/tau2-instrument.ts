@@ -36,17 +36,23 @@
  *    zero items from a store of fourteen and the record could not say which of the two it was, so the
  *    arm's census (`storeCensus`) and the request tally (`recall`) travel beside the rate.
  */
-import { defaultPolicy } from '@agentix-e/microglia-core/kernel';
-import type { FunnelInput } from '@agentix-e/microglia-protocol';
-import type { AdmissionCensus, Tau2ArmRecord } from './tau2-gates.js';
-import type { StoreItemSample } from './store-items.js';
-import type { ConsolidationCensus } from '@agentix-e/microglia-core/distill';
-import type { InactionCensus } from './inaction.js';
-import type { YieldCensus } from './tau2-yield.js';
-import type { PlantCensus } from './plant.js';
-import { coverageHistogram, useCensus, type UseArm, type UseObservation } from './tau2-use-census.js';
+import { defaultPolicy } from "@agentix-e/microglia-core/kernel";
+import type { FunnelInput } from "@agentix-e/microglia-protocol";
+import type { AdmissionCensus, Tau2ArmRecord } from "./tau2-gates.js";
+import type { StoreItemSample } from "./store-items.js";
+import type { ConsolidationCensus } from "@agentix-e/microglia-core/distill";
+import type { InactionCensus } from "./inaction.js";
+import type { YieldCensus } from "./tau2-yield.js";
+import type { PlantCensus } from "./plant.js";
+import type { ConsolidationSweep } from "./consolidation-sweep.js";
+import {
+  coverageHistogram,
+  useCensus,
+  type UseArm,
+  type UseObservation,
+} from "./tau2-use-census.js";
 
-export type { AdmissionCensus } from './tau2-gates.js';
+export type { AdmissionCensus } from "./tau2-gates.js";
 
 const emptyAdmission = (): AdmissionCensus => ({
   measured: 0,
@@ -62,7 +68,9 @@ const emptyAdmission = (): AdmissionCensus => ({
   supportOnly: 0,
 });
 
-const spread = (values: readonly number[]): { min: number; max: number; mean: number } =>
+const spread = (
+  values: readonly number[],
+): { min: number; max: number; mean: number } =>
   values.length === 0
     ? { min: 0, max: 0, mean: 0 }
     : {
@@ -91,7 +99,7 @@ export type DistillFormRecord = {
  * asks about.
  */
 export type DistillUnitRecord = {
-  readonly unit: 'correction' | 'trace';
+  readonly unit: "correction" | "trace";
   /** Traces the learning document carried. */
   readonly traces: number;
   /** Corrections that carried one, and were therefore distilled from a trace. */
@@ -104,7 +112,7 @@ export type DistillUnitRecord = {
 
 /** The sentence every pack opened with. See `Tau2Raw.injectionNote`. */
 export type InjectionNoteRecord = {
-  readonly mode: 'none' | 'standard' | 'hardened';
+  readonly mode: "none" | "standard" | "hardened";
   readonly declared: boolean;
 };
 
@@ -174,7 +182,7 @@ export type Tau2Raw = {
   readonly calls: {
     readonly total: number;
     readonly failed: number;
-    readonly scope?: 'run' | 'distillation';
+    readonly scope?: "run" | "distillation";
   };
   /**
    * Which scenario each half ran in, and the scope the facade recalled under.
@@ -184,7 +192,11 @@ export type Tau2Raw = {
    * third is what makes a foreign pack possible at all — recall is scoped, and a store scoped to
    * `retail` serves nothing to an `airline` question unless the caller asks in the store's own terms.
    */
-  readonly scenario: { readonly learn: string; readonly test: string; readonly recall: string };
+  readonly scenario: {
+    readonly learn: string;
+    readonly test: string;
+    readonly recall: string;
+  };
   /** The domain ledger: what the store holds, and the two paths by which an item loses its domain. */
   readonly domains: {
     readonly stored: number;
@@ -262,7 +274,10 @@ export type Tau2Raw = {
    * ceiling decides the yield and the yield is the thing R60 measures, so a readback that cannot
    * recover it would compare a store of 31 claims against a store of 60 without knowing why.
    */
-  readonly traceClaims?: { readonly ceiling: number; readonly declared: boolean };
+  readonly traceClaims?: {
+    readonly ceiling: number;
+    readonly declared: boolean;
+  };
   /**
    * R60: how many claims each correction yielded. See `YieldCensus`.
    *
@@ -280,6 +295,16 @@ export type Tau2Raw = {
    * `declared` inside it tells an arm from a dispatch that never heard of the switch.
    */
   readonly plant?: PlantCensus;
+  /**
+   * R61: every consolidation floor in the grid, and the point the pass actually ran at.
+   *
+   * Absent on a lane that does not consolidate. Present, it answers the question R60 could not: the
+   * ceiling was binding and corroboration still did not move, so the population or the floor is the
+   * constraint — and this says which, because a floor that produces three-task groups at 0.55 and
+   * none at 0.60 is a floor chosen too high, while a grid that never produces one at any floor is a
+   * population that does not corroborate.
+   */
+  readonly consolidationSweep?: ConsolidationSweep;
   readonly injectionNote?: InjectionNoteRecord;
   /**
    * How far the pipeline from a correction to a servable rule got.
@@ -291,7 +316,7 @@ export type Tau2Raw = {
   readonly funnel?: FunnelInput;
   /** The write path's own census, when the driver ran with admission switched on. */
   readonly writeAdmission?: {
-    readonly mode: 'off' | 'neighbours';
+    readonly mode: "off" | "neighbours";
     readonly rephrased: number;
     readonly suppressed: number;
   };
@@ -365,25 +390,39 @@ type CensusItem = {
  * own definition of "reachable" would be able to agree with a broken retrieval path and disagree with
  * a working one, which is the failure mode the census exists to rule out.
  */
-export function storeCensus(items: readonly CensusItem[], recallDomain: string): StoreCensus {
-  const statuses = { active: 0, candidate: 0, quarantined: 0, retired: 0, other: 0 };
+export function storeCensus(
+  items: readonly CensusItem[],
+  recallDomain: string,
+): StoreCensus {
+  const statuses = {
+    active: 0,
+    candidate: 0,
+    quarantined: 0,
+    retired: 0,
+    other: 0,
+  };
   for (const item of items) {
     const key = item.status;
-    if (key === 'active' || key === 'candidate' || key === 'quarantined' || key === 'retired') {
+    if (
+      key === "active" ||
+      key === "candidate" ||
+      key === "quarantined" ||
+      key === "retired"
+    ) {
       statuses[key] += 1;
     } else {
       statuses.other += 1;
     }
   }
   const servable = items.filter(
-    (item) => item.status === 'active' && item.scope.domain === recallDomain,
+    (item) => item.status === "active" && item.scope.domain === recallDomain,
   ).length;
   // The reason travels with the status because one status covers several decisions: `candidate` is what
   // an item that missed `minSupport`, an item whose confidence fell short, and a prose claim awaiting a
   // second task all read as, and the three have nothing in common but the word.
   const reasons: Record<string, number> = {};
   for (const item of items) {
-    if (item.statusReason !== undefined && item.statusReason !== '') {
+    if (item.statusReason !== undefined && item.statusReason !== "") {
       reasons[item.statusReason] = (reasons[item.statusReason] ?? 0) + 1;
     }
   }
@@ -391,7 +430,10 @@ export function storeCensus(items: readonly CensusItem[], recallDomain: string):
   // none of them yields an all-zero admission block, which says "not recorded"
   // rather than inventing a mean over a population that does not exist.
   const measured = items.filter(
-    (item) => item.trust !== undefined && item.support !== undefined && item.confidence !== undefined,
+    (item) =>
+      item.trust !== undefined &&
+      item.support !== undefined &&
+      item.confidence !== undefined,
   );
   const trust = spread(measured.map((item) => item.trust as number));
   const support = spread(measured.map((item) => item.support as number));
@@ -420,7 +462,7 @@ export function storeCensus(items: readonly CensusItem[], recallDomain: string):
   // recall scope cannot reach is unconditioned for a different reason, and adding
   // the two populations together would let one defect hide behind the other.
   const servableItems = items.filter(
-    (item) => item.status === 'active' && item.scope.domain === recallDomain,
+    (item) => item.status === "active" && item.scope.domain === recallDomain,
   );
   const conditioned = servableItems.filter(
     (item) => item.when !== undefined && item.when.trim().length > 0,
@@ -458,39 +500,47 @@ export function storeCensus(items: readonly CensusItem[], recallDomain: string):
  * It costs nothing at run time and it is not read by the function; `tsc` is the reader. That is
  * deliberate. A check that has to be invoked can be skipped in the one dispatch that matters.
  */
-export const PROJECTION: { readonly [K in keyof Tau2Raw]-?: 'carried' | 'reduced' } = {
-  train: 'reduced',
-  test: 'reduced',
-  trials: 'carried',
-  scenarioTasks: 'carried',
-  unscored: 'carried',
-  servedPackSizes: 'reduced',
-  learning: 'carried',
-  calls: 'carried',
-  scenario: 'carried',
-  domains: 'reduced',
-  store: 'carried',
-  recall: 'carried',
-  useObservations: 'reduced',
-  coverageObservations: 'reduced',
-  inaction: 'carried',
-  useArm: 'reduced',
-  widenedItems: 'reduced',
-  storeItems: 'carried',
-  distillForm: 'carried',
-  distillUnit: 'carried',
-  traceClaims: 'carried',
-  yieldCensus: 'carried',
-  plant: 'carried',
-  injectionNote: 'carried',
-  funnel: 'carried',
-  writeAdmission: 'carried',
+export const PROJECTION: {
+  readonly [K in keyof Tau2Raw]-?: "carried" | "reduced";
+} = {
+  train: "reduced",
+  test: "reduced",
+  trials: "carried",
+  scenarioTasks: "carried",
+  unscored: "carried",
+  servedPackSizes: "reduced",
+  learning: "carried",
+  calls: "carried",
+  scenario: "carried",
+  domains: "reduced",
+  store: "carried",
+  recall: "carried",
+  useObservations: "reduced",
+  coverageObservations: "reduced",
+  inaction: "carried",
+  useArm: "reduced",
+  widenedItems: "reduced",
+  storeItems: "carried",
+  distillForm: "carried",
+  distillUnit: "carried",
+  traceClaims: "carried",
+  yieldCensus: "carried",
+  consolidationSweep: "carried",
+  plant: "carried",
+  injectionNote: "carried",
+  funnel: "carried",
+  writeAdmission: "carried",
 };
 
-export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord {
-
+export function armRecordFromDriver(
+  raw: Tau2Raw,
+  arm = "memory",
+): Tau2ArmRecord {
   const served = raw.servedPackSizes;
-  const meanPackIds = served.length === 0 ? 0 : served.reduce((sum, size) => sum + size, 0) / served.length;
+  const meanPackIds =
+    served.length === 0
+      ? 0
+      : served.reduce((sum, size) => sum + size, 0) / served.length;
   const distinct = new Set(raw.test);
   // One observation list for every use-side reading: the census, the retention
   // curve and the two medians. They are three reductions of one population, and
@@ -500,7 +550,7 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
   // A function rather than a local, so the list arrives non-optional and no
   // defensive `?? []` has to stand in for a branch that cannot be taken.
   const useSide = (observations: readonly UseObservation[]) => ({
-    use: useCensus(observations, raw.useArm ?? 'as-is', raw.widenedItems ?? 0),
+    use: useCensus(observations, raw.useArm ?? "as-is", raw.widenedItems ?? 0),
     // The seven-field census commits one scalar about coverage. U3's floor must be
     // computed from a committed histogram BEFORE its own dispatch (AUDIT 34.22), so
     // reduce the SAME facade observations to the retention curve here, while they
@@ -521,7 +571,9 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
           calls: {
             calls: raw.calls.total,
             failures: raw.calls.failed,
-            ...(raw.calls.scope === undefined ? {} : { scope: raw.calls.scope }),
+            ...(raw.calls.scope === undefined
+              ? {}
+              : { scope: raw.calls.scope }),
           },
         }),
     // Always present: see the field's own comment. A run that distilled nothing is the reading this
@@ -532,12 +584,21 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
       edited: raw.learning.edited,
       distilled: raw.learning.distilled,
       distillFailed: raw.learning.distillFailed,
-      ...(raw.learning.candidates === undefined ? {} : { candidates: raw.learning.candidates }),
-      ...(raw.learning.events === undefined ? {} : { events: raw.learning.events }),
-      ...(raw.learning.llmFailed === undefined ? {} : { llmFailed: raw.learning.llmFailed }),
+      ...(raw.learning.candidates === undefined
+        ? {}
+        : { candidates: raw.learning.candidates }),
+      ...(raw.learning.events === undefined
+        ? {}
+        : { events: raw.learning.events }),
+      ...(raw.learning.llmFailed === undefined
+        ? {}
+        : { llmFailed: raw.learning.llmFailed }),
     },
     domainOrigin: {
-      storedWithDomain: Math.max(0, raw.domains.stored - raw.domains.withoutDomain),
+      storedWithDomain: Math.max(
+        0,
+        raw.domains.stored - raw.domains.withoutDomain,
+      ),
       storedWithoutDomain: raw.domains.withoutDomain,
       unscopedIn: raw.domains.unscopedIn,
       widenedIn: raw.domains.widenedIn,
@@ -547,10 +608,14 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     scenario: raw.scenario,
     // Absent when the driver did not list the scenario it was capped against; the pair then reports
     // no ceiling rather than a ceiling built on a guess.
-    ...(raw.scenarioTasks === undefined ? {} : { scenarioTasks: raw.scenarioTasks }),
+    ...(raw.scenarioTasks === undefined
+      ? {}
+      : { scenarioTasks: raw.scenarioTasks }),
     // See decision 5: the rate is one field and the population is the other, and a record that
     // carried only the first turned R42's empty pack into a number with no cause.
-    ...(raw.writeAdmission === undefined ? {} : { writeAdmission: raw.writeAdmission }),
+    ...(raw.writeAdmission === undefined
+      ? {}
+      : { writeAdmission: raw.writeAdmission }),
     ...(raw.store === undefined ? {} : { store: raw.store }),
     // R56 lost three fields here: the driver wrote the store's text, the form and the note, and this
     // projection dropped all three, so two of the four predictions could not be graded and the third
@@ -561,8 +626,13 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     ...(raw.distillUnit === undefined ? {} : { distillUnit: raw.distillUnit }),
     ...(raw.traceClaims === undefined ? {} : { traceClaims: raw.traceClaims }),
     ...(raw.yieldCensus === undefined ? {} : { yieldCensus: raw.yieldCensus }),
+    ...(raw.consolidationSweep === undefined
+      ? {}
+      : { consolidationSweep: raw.consolidationSweep }),
     ...(raw.plant === undefined ? {} : { plant: raw.plant }),
-    ...(raw.injectionNote === undefined ? {} : { injectionNote: raw.injectionNote }),
+    ...(raw.injectionNote === undefined
+      ? {}
+      : { injectionNote: raw.injectionNote }),
     ...(raw.funnel === undefined ? {} : { funnel: raw.funnel }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),
     ...(raw.inaction === undefined ? {} : { inaction: raw.inaction }),

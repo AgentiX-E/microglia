@@ -63,6 +63,10 @@ function stubRunner(): { dir: string; executable: string } {
   return { dir, executable };
 }
 
+// Every case here spawns a runner and drives a full evaluation loop. The suite's 20s default is a
+// budget for a unit test, and at 172 files a parallel run starves one; the same cases take 1.4s
+// alone. 60s is the convention the other end-to-end cases in this package already use, so a failure
+// here means the driver hung rather than that the machine was busy.
 describe('the L4 driver', () => {
   it('lists, splits, and scores the reference arm end to end', async () => {
     const { dir, executable } = stubRunner();
@@ -97,7 +101,7 @@ describe('the L4 driver', () => {
       delete process.env['TAU_TRAIN_SHARE'];
       delete process.env['TAU_WORKDIR'];
     }
-  });
+  }, 60_000);
 
   it('answers a second scenario without reading its task numbers as the first\'s', async () => {
     // The cross-domain path, end to end, with the two scenarios deliberately sharing task ids: this

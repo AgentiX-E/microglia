@@ -72,8 +72,8 @@ import {
   jsonEqual,
   scopeKey,
   scoreKnowledge,
-} from '../kernel/index.js';
-import type { KnowledgeItem, Policy, ProvenanceTier } from '../kernel/index.js';
+} from "../kernel/index.js";
+import type { KnowledgeItem, Policy, ProvenanceTier } from "../kernel/index.js";
 
 export type ConsolidationOptions = {
   readonly now: number;
@@ -89,13 +89,55 @@ export type ConsolidationOptions = {
    */
   readonly threshold?: number;
   /**
-   * Shared content terms below which two conditions are held to disagree. Default 3.
+   * Shared content terms below which two conditions are held to disagree. Default 0, no veto.
    *
-   * A count and not a ratio, because the ratio does not separate at this sample: a paraphrased
-   * trigger and an unrelated one both read 0.400. A count separates them — a paraphrase shares
-   * more than the subject it is paraphrasing, a conflict shares the subject and nothing else.
+   * It was 3, on the argument that a count separates a paraphrased trigger from an unrelated one
+   * where a ratio does not. Measured over the 37-item store R60 produced — 666 pairs — neither
+   * measure separates: for pairs whose statements match (containment >= 0.60) the shared condition
+   * count has median 1, and for pairs whose statements are unrelated (< 0.40) it also has median 1,
+   * with 75% and 82% of each band sharing at least one term. The ratio behaves the same way, median
+   * 0.11 in both bands.
+   *
+   * What a floor of 3 therefore did was admit roughly the top decile of pairs by condition overlap
+   * regardless of whether their statements said the same thing. On that store it refused the most
+   * similar pair it held — containment 0.88, Jaccard 0.70, conditions sharing one term — while
+   * admitting a pair at 0.64 whose conditions shared five. A gate that is non-monotonic in the
+   * measure that does separate (statement containment reads 0.88 / 0.64 / 0.62 / 0.62, then a clean
+   * gap to 0.50) is not testing what it claims to test.
+   *
+   * The condition is still measured and still reported, per group, because two items with disjoint
+   * triggers are weaker corroboration than two with the same trigger and a readback should see that.
+   * It is no longer a veto: the decision it was vetoing had already been made, with better
+   * separation, by the statement.
    */
   readonly conditionMinShared?: number;
+};
+
+/** One group of items the pass folded into one, and the two readings that say how strong it is. */
+export type ConsolidatedGroup = {
+  /** Member ids, survivor first, in store order after it. */
+  readonly ids: readonly string[];
+  /** Distinct tasks behind the group once their evidence is unioned. */
+  readonly supportTasks: number;
+  /**
+   * The weakest pair inside the group.
+   *
+   * Complete linkage makes this >= the threshold by construction, so a readback can assert it
+   * instead of hoping. It is the reading that separates "three tasks said the same thing" from
+   * "A resembles B and B resembles C": under single linkage the second shape was reported as the
+   * first, with a group whose extreme members shared nothing.
+   */
+  readonly weakestPair: number;
+  /** The fewest condition terms any two members share. Zero means two triggers were disjoint. */
+  readonly conditionShared: number;
+  /**
+   * Whether the union covers a task that no single member held.
+   *
+   * A merge of two items from one task is not corroboration, it is the same failure stated twice —
+   * `sameEvidence` refuses that pair, but three items from two tasks can still group in a shape
+   * where the union adds nothing. This is the count that says the merge bought support.
+   */
+  readonly crossTask: boolean;
 };
 
 /** What consolidation did, in the numbers a readback reads. */
@@ -118,12 +160,22 @@ export type ConsolidationCensus = {
   readonly refusedPayload: number;
   /** Pairs that overlapped and held the same evidence, so a merge would buy no support. */
   readonly refusedDuplicateEvidence: number;
+  /** Pairs that overlapped and were refused because merging them would break complete linkage. */
+  readonly refusedLinkage: number;
   /** Items by distinct tasks before the pass. */
   readonly supportBefore: Readonly<Record<number, number>>;
   /** Items by distinct tasks after it. */
   readonly supportAfter: Readonly<Record<number, number>>;
   readonly maxSupportBefore: number;
   readonly maxSupportAfter: number;
+  /** Every group, in the order the pass formed them. Empty when nothing merged. */
+  readonly groupDetail: readonly ConsolidatedGroup[];
+  /** The weakest pair across every group; 1 when there are none. */
+  readonly weakestPair: number;
+  /** The largest group's member count; 1 when nothing merged. */
+  readonly largestGroup: number;
+  /** Groups whose evidence union covers more tasks than any one member did — merges that bought support. */
+  readonly crossTaskGroups: number;
 };
 
 export type ConsolidationResult = {
@@ -140,13 +192,41 @@ export type ConsolidationResult = {
  * key of a *pair* that differs by it — which is the case this list must not decide.
  */
 const STOPWORDS = new Set([
-  'a', 'an', 'the', 'and', 'or', 'of', 'to', 'in', 'on', 'for', 'with', 'is', 'are', 'be', 'been',
-  'that', 'this', 'these', 'those', 'it', 'its', 'you', 'your', 'they', 'their', 'when', 'from',
+  "a",
+  "an",
+  "the",
+  "and",
+  "or",
+  "of",
+  "to",
+  "in",
+  "on",
+  "for",
+  "with",
+  "is",
+  "are",
+  "be",
+  "been",
+  "that",
+  "this",
+  "these",
+  "those",
+  "it",
+  "its",
+  "you",
+  "your",
+  "they",
+  "their",
+  "when",
+  "from",
 ]);
 
 export function claimTokens(text: string): ReadonlySet<string> {
   const out = new Set<string>();
-  for (const raw of text.normalize('NFKC').toLowerCase().split(/[^a-z0-9]+/)) {
+  for (const raw of text
+    .normalize("NFKC")
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)) {
     if (raw.length === 0 || STOPWORDS.has(raw)) continue;
     out.add(raw);
   }
@@ -159,7 +239,10 @@ export function claimTokens(text: string): ReadonlySet<string> {
  * The unit the condition test is written in: a paraphrase shares more than the subject it restates,
  * and a conflict shares the subject and nothing else, which a ratio over two short sets hides.
  */
-export function sharedTerms(left: ReadonlySet<string>, right: ReadonlySet<string>): number {
+export function sharedTerms(
+  left: ReadonlySet<string>,
+  right: ReadonlySet<string>,
+): number {
   let shared = 0;
   for (const token of left) if (right.has(token)) shared += 1;
   return shared;
@@ -180,7 +263,10 @@ export function sharedTerms(left: ReadonlySet<string>, right: ReadonlySet<string
  * treating it as one would fold an unreadable item into a readable one and report a corroboration
  * that no task contributed to.
  */
-export function claimContainment(left: ReadonlySet<string>, right: ReadonlySet<string>): number {
+export function claimContainment(
+  left: ReadonlySet<string>,
+  right: ReadonlySet<string>,
+): number {
   if (left.size === 0 || right.size === 0) return 0;
   return sharedTerms(left, right) / Math.min(left.size, right.size);
 }
@@ -188,7 +274,8 @@ export function claimContainment(left: ReadonlySet<string>, right: ReadonlySet<s
 /** Distinct tasks behind an item, with the score's own grouping. */
 function tasksOf(item: KnowledgeItem): number {
   const seen = new Set<string>();
-  for (const entry of item.evidence) seen.add(entry.taskId ?? `run:${entry.runId}`);
+  for (const entry of item.evidence)
+    seen.add(entry.taskId ?? `run:${entry.runId}`);
   return seen.size;
 }
 
@@ -196,7 +283,7 @@ function tasksOf(item: KnowledgeItem): number {
 function liveRank(item: KnowledgeItem): number {
   // Quarantined last: it is not cleared for injection, and making it the survivor of a merge would
   // launder a status the policy set.
-  return item.status === 'quarantined' ? 0 : 1;
+  return item.status === "quarantined" ? 0 : 1;
 }
 
 type Ranked = { readonly index: number; readonly item: KnowledgeItem };
@@ -206,7 +293,8 @@ function better(left: Ranked, right: Ranked): Ranked {
   if (liveDifference !== 0) return liveDifference > 0 ? left : right;
   const taskDifference = tasksOf(left.item) - tasksOf(right.item);
   if (taskDifference !== 0) return taskDifference > 0 ? left : right;
-  const evidenceDifference = left.item.evidence.length - right.item.evidence.length;
+  const evidenceDifference =
+    left.item.evidence.length - right.item.evidence.length;
   if (evidenceDifference !== 0) return evidenceDifference > 0 ? left : right;
   // Last resort, and the one that makes two runs over one store produce one store.
   return left.item.id <= right.item.id ? left : right;
@@ -215,9 +303,9 @@ function better(left: Ranked, right: Ranked): Ranked {
 /** The union of two items' evidence, without the rows both already hold. */
 function unionEvidence(
   members: readonly KnowledgeItem[],
-): readonly KnowledgeItem['evidence'][number][] {
+): readonly KnowledgeItem["evidence"][number][] {
   const seen = new Set<string>();
-  const out: KnowledgeItem['evidence'][number][] = [];
+  const out: KnowledgeItem["evidence"][number][] = [];
   for (const member of members) {
     for (const entry of member.evidence) {
       const key = `${entry.feedbackId}\u0000${entry.runId}`;
@@ -230,8 +318,12 @@ function unionEvidence(
 }
 
 function sameEvidence(left: KnowledgeItem, right: KnowledgeItem): boolean {
-  const keys = new Set(left.evidence.map((entry) => `${entry.feedbackId}\u0000${entry.runId}`));
-  return right.evidence.every((entry) => keys.has(`${entry.feedbackId}\u0000${entry.runId}`));
+  const keys = new Set(
+    left.evidence.map((entry) => `${entry.feedbackId}\u0000${entry.runId}`),
+  );
+  return right.evidence.every((entry) =>
+    keys.has(`${entry.feedbackId}\u0000${entry.runId}`),
+  );
 }
 
 function distribution(items: readonly KnowledgeItem[]): Record<number, number> {
@@ -252,21 +344,55 @@ export function consolidateKnowledge(
   options: ConsolidationOptions,
 ): ConsolidationResult {
   const threshold = options.threshold ?? 0.6;
-  const conditionMinShared = options.conditionMinShared ?? 3;
+  const conditionMinShared = options.conditionMinShared ?? 0;
   const consideredIndexes: number[] = [];
   for (let index = 0; index < items.length; index += 1) {
-    if (items[index]?.status !== 'retired') consideredIndexes.push(index);
+    if (items[index]?.status !== "retired") consideredIndexes.push(index);
   }
-  const considered = consideredIndexes.map((index) => items[index] as KnowledgeItem);
+  const considered = consideredIndexes.map(
+    (index) => items[index] as KnowledgeItem,
+  );
   const tokensOf = new Map<number, ReadonlySet<string>>();
+  const conditionOf = new Map<number, ReadonlySet<string>>();
   for (const index of consideredIndexes) {
-    tokensOf.set(index, claimTokens((items[index] as KnowledgeItem).statement));
+    const item = items[index] as KnowledgeItem;
+    tokensOf.set(index, claimTokens(item.statement));
+    conditionOf.set(index, claimTokens(item.when ?? ""));
   }
+  // Every pair score the pass needs, computed once. Complete linkage asks about pairs the outer
+  // loop never reaches — the two oldest members of a group it is about to extend — so a score
+  // recomputed on demand would be recomputed quadratically at best.
+  const overlapCache = new Map<string, number>();
+  // Normalised with min/max rather than a comparison, so the key is order-independent without a
+  // branch: both sides of a ternary here would be the same cache miss for a caller that passed the
+  // pair the other way round, and one of them would be a line no test can reach.
+  const overlapOf = (left: number, right: number): number => {
+    const key = `${Math.min(left, right)}:${Math.max(left, right)}`;
+    const cached = overlapCache.get(key);
+    if (cached !== undefined) return cached;
+    const value = claimContainment(
+      tokensOf.get(left) as ReadonlySet<string>,
+      tokensOf.get(right) as ReadonlySet<string>,
+    );
+    overlapCache.set(key, value);
+    return value;
+  };
+  const conditionSharedOf = (left: number, right: number): number =>
+    sharedTerms(
+      conditionOf.get(left) as ReadonlySet<string>,
+      conditionOf.get(right) as ReadonlySet<string>,
+    );
 
-  // Union-find over store order, so the grouping is a function of the store and not of the order
-  // in which pairs happened to be examined.
+  // Union-find over store order. The grouping is a function of the store, but complete linkage makes
+  // it a function of the order pairs are examined too: the first pair that admits a member decides
+  // the group it lands in. The order is the store's, which is stable, so the result is reproducible
+  // for a given store even though it is not order-invariant in the abstract.
   const parent = new Map<number, number>();
-  for (const index of consideredIndexes) parent.set(index, index);
+  const membersOf = new Map<number, number[]>();
+  for (const index of consideredIndexes) {
+    parent.set(index, index);
+    membersOf.set(index, [index]);
+  }
   // Path compression is deliberately absent: a union always attaches a root to a root, so a chain
   // is at most as deep as the number of groups, and this pass runs once over a store of tens of
   // items. The compression loop it would buy is a branch no store this lane produces can reach —
@@ -280,6 +406,7 @@ export function consolidateKnowledge(
   let refusedCondition = 0;
   let refusedPayload = 0;
   let refusedDuplicateEvidence = 0;
+  let refusedLinkage = 0;
 
   for (let left = 0; left < consideredIndexes.length; left += 1) {
     const leftIndex = consideredIndexes[left] as number;
@@ -289,20 +416,20 @@ export function consolidateKnowledge(
       const rightItem = items[rightIndex] as KnowledgeItem;
       if (leftItem.kind !== rightItem.kind) continue;
       if (scopeKey(leftItem.scope) !== scopeKey(rightItem.scope)) continue;
-      const overlap = claimContainment(
-        tokensOf.get(leftIndex) as ReadonlySet<string>,
-        tokensOf.get(rightIndex) as ReadonlySet<string>,
-      );
+      const overlap = overlapOf(leftIndex, rightIndex);
       if (overlap < threshold) continue;
       if (
-        leftItem.when !== undefined &&
-        rightItem.when !== undefined &&
-        sharedTerms(claimTokens(leftItem.when), claimTokens(rightItem.when)) < conditionMinShared
+        conditionMinShared > 0 &&
+        conditionSharedOf(leftIndex, rightIndex) < conditionMinShared
       ) {
         refusedCondition += 1;
         continue;
       }
-      if (leftItem.payload !== undefined && rightItem.payload !== undefined && !jsonEqual(leftItem.payload, rightItem.payload)) {
+      if (
+        leftItem.payload !== undefined &&
+        rightItem.payload !== undefined &&
+        !jsonEqual(leftItem.payload, rightItem.payload)
+      ) {
         refusedPayload += 1;
         continue;
       }
@@ -310,9 +437,36 @@ export function consolidateKnowledge(
         refusedDuplicateEvidence += 1;
         continue;
       }
+      // Complete linkage: the pair joins only if every member of one group matches every member of
+      // the other. Single linkage admitted A-B and B-C and then reported one group of three whose
+      // extreme members could share nothing, which is the shape a readback reads as "three tasks
+      // agreed" when only the middle item ever agreed with both. The cost is stated rather than
+      // hidden: a genuine chain of paraphrases now stays two groups instead of becoming one, and
+      // `refusedLinkage` counts how often that happened.
       const leftRoot = find(leftIndex);
       const rightRoot = find(rightIndex);
-      if (leftRoot !== rightRoot) parent.set(rightRoot, leftRoot);
+      if (leftRoot === rightRoot) continue;
+      const leftMembers = membersOf.get(leftRoot) as number[];
+      const rightMembers = membersOf.get(rightRoot) as number[];
+      let linked = true;
+      for (const one of leftMembers) {
+        for (const other of rightMembers) {
+          if (overlapOf(one, other) >= threshold) continue;
+          linked = false;
+          break;
+        }
+        if (!linked) break;
+      }
+      if (!linked) {
+        refusedLinkage += 1;
+        continue;
+      }
+      parent.set(rightRoot, leftRoot);
+      membersOf.set(
+        leftRoot,
+        [...leftMembers, ...rightMembers].sort((a, b) => a - b),
+      );
+      membersOf.delete(rightRoot);
     }
   }
 
@@ -327,6 +481,7 @@ export function consolidateKnowledge(
   const output: KnowledgeItem[] = [...items];
   let groups = 0;
   let merged = 0;
+  const groupDetail: ConsolidatedGroup[] = [];
   for (const bucket of components.values()) {
     if (bucket.length < 2) continue;
     groups += 1;
@@ -336,15 +491,60 @@ export function consolidateKnowledge(
     let best = members[0] as Ranked;
     for (const member of members.slice(1)) best = better(best, member);
 
+    // Complete linkage already guarantees the first, so asserting it in a readback costs nothing
+    // and catches a linkage change that silently went back to single. Seeded from the first pair
+    // rather than from a sentinel: a group has at least two members by construction, so a sentinel
+    // would be a branch no store can reach — a line that claims to be tested.
+    const [firstMember, secondMember] = bucket as [number, number, ...number[]];
+    let weakestPair = overlapOf(firstMember, secondMember);
+    let conditionShared = conditionSharedOf(firstMember, secondMember);
+    for (let one = 0; one < bucket.length; one += 1) {
+      for (let other = one + 1; other < bucket.length; other += 1) {
+        weakestPair = Math.min(
+          weakestPair,
+          overlapOf(bucket[one] as number, bucket[other] as number),
+        );
+        conditionShared = Math.min(
+          conditionShared,
+          conditionSharedOf(bucket[one] as number, bucket[other] as number),
+        );
+      }
+    }
     const evidence = unionEvidence(members.map((member) => member.item));
+    const supportTasks = new Set(
+      evidence.map((entry) => entry.taskId ?? `run:${entry.runId}`),
+    ).size;
+    const widestMember = members.reduce(
+      (most, member) => Math.max(most, tasksOf(member.item)),
+      0,
+    );
+    groupDetail.push({
+      ids: [
+        best.item.id,
+        ...members
+          .filter((member) => member.index !== best.index)
+          .map((member) => member.item.id),
+      ],
+      supportTasks,
+      weakestPair,
+      conditionShared,
+      crossTask: supportTasks > widestMember,
+    });
     const support = evidence.reduce((sum, entry) => sum + entry.weight, 0);
-    const adoptedWhen = best.item.when ?? members.find((member) => member.item.when !== undefined)?.item.when;
-    const adoptedPayload = best.item.payload ?? members.find((member) => member.item.payload !== undefined)?.item.payload;
+    const adoptedWhen =
+      best.item.when ??
+      members.find((member) => member.item.when !== undefined)?.item.when;
+    const adoptedPayload =
+      best.item.payload ??
+      members.find((member) => member.item.payload !== undefined)?.item.payload;
     const tier = members
       .map((member) => member.item.tier)
       .filter((value): value is ProvenanceTier => value !== undefined)
       .sort((a, b) => TIER_RANK[b] - TIER_RANK[a])[0];
-    const contradictions = members.reduce((sum, member) => sum + member.item.contradictions, 0);
+    const contradictions = members.reduce(
+      (sum, member) => sum + member.item.contradictions,
+      0,
+    );
     const trust = Math.max(...members.map((member) => member.item.trust));
 
     const fused: KnowledgeItem = {
@@ -359,7 +559,10 @@ export function consolidateKnowledge(
       updatedAt: options.now,
     };
     const decision = decideStatus(
-      { ...fused, confidence: scoreKnowledge(fused, options.policy, options.now) },
+      {
+        ...fused,
+        confidence: scoreKnowledge(fused, options.policy, options.now),
+      },
       options.policy,
       options.now,
     );
@@ -373,7 +576,7 @@ export function consolidateKnowledge(
       if (member.index === best.index) continue;
       output[member.index] = {
         ...member.item,
-        status: 'retired',
+        status: "retired",
         statusReason: `consolidated:${best.item.id}`,
         systemUntil: options.now,
         updatedAt: options.now,
@@ -382,7 +585,7 @@ export function consolidateKnowledge(
     }
   }
 
-  const survivors = output.filter((item) => item.status !== 'retired');
+  const survivors = output.filter((item) => item.status !== "retired");
   return {
     items: output,
     report: {
@@ -395,10 +598,21 @@ export function consolidateKnowledge(
       refusedCondition,
       refusedPayload,
       refusedDuplicateEvidence,
+      refusedLinkage,
       supportBefore: distribution(considered),
       supportAfter: distribution(survivors),
       maxSupportBefore: maxSupport(considered),
       maxSupportAfter: maxSupport(survivors),
+      groupDetail,
+      weakestPair: groupDetail.reduce(
+        (low, group) => Math.min(low, group.weakestPair),
+        1,
+      ),
+      largestGroup: groupDetail.reduce(
+        (most, group) => Math.max(most, group.ids.length),
+        1,
+      ),
+      crossTaskGroups: groupDetail.filter((group) => group.crossTask).length,
     },
   };
 }

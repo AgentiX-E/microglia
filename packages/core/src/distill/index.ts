@@ -38,6 +38,7 @@ export {
   claimTokens,
   sharedTerms,
   consolidateKnowledge,
+  type ConsolidatedGroup,
   type ConsolidationCensus,
   type ConsolidationOptions,
   type ConsolidationResult,
