@@ -87,21 +87,35 @@ def main() -> int:
     parser.add_argument("--out", required=True)
     args = parser.parse_args()
 
+    # `--artifact` selects by NAME, and the first version assigned it to `artifact_id`, so passing the
+    # name the flag documents looked up `/actions/artifacts/l4-evidence` and died on a missing
+    # `size_in_bytes`. A run now carries more than one archive — R61 uploaded both `l4-evidence` and
+    # `sota-bird` — which is what makes selection necessary and what made the wrong guess visible.
+    listing = call(f"/repos/{OWNER}/{args.repo}/actions/runs/{args.run}/artifacts")
+    live = [a for a in listing.get("artifacts", []) if not a.get("expired")]
     if args.artifact:
-        artifact_id, name, size = args.artifact, args.artifact, None
-    else:
-        listing = call(f"/repos/{OWNER}/{args.repo}/actions/runs/{args.run}/artifacts")
-        artefacts = [a for a in listing.get("artifacts", []) if not a.get("expired")]
-        if len(artefacts) != 1:
-            names = ", ".join(f"{a['name']}({a['id']})" for a in artefacts) or "none"
-            print(f"expected exactly one artefact on run {args.run}, found: {names}", file=sys.stderr)
+        chosen = [a for a in live if a.get("name") == args.artifact]
+        if len(chosen) != 1:
+            names = ", ".join(f"{a['name']}({a['id']})" for a in live) or "none"
+            print(
+                f"no unexpired artefact named '{args.artifact}' on run {args.run}; "
+                f"this run holds: {names}",
+                file=sys.stderr,
+            )
             return 2
-        artifact_id = str(artefacts[0]["id"])
-        name = artefacts[0]["name"]
-        size = artefacts[0]["size_in_bytes"]
-
-    if size is None:
-        size = call(f"/repos/{OWNER}/{args.repo}/actions/artifacts/{artifact_id}")["size_in_bytes"]
+    else:
+        if len(live) != 1:
+            names = ", ".join(f"{a['name']}({a['id']})" for a in live) or "none"
+            print(
+                f"expected exactly one artefact on run {args.run}, found: {names}; "
+                "name one with --artifact",
+                file=sys.stderr,
+            )
+            return 2
+        chosen = live
+    artifact_id = str(chosen[0]["id"])
+    name = chosen[0]["name"]
+    size = chosen[0]["size_in_bytes"]
 
     url = signed_url(f"/repos/{OWNER}/{args.repo}/actions/artifacts/{artifact_id}/zip")
     os.makedirs(args.out, exist_ok=True)
