@@ -36,8 +36,16 @@ Amendment records why the delivered median is the number a future registration
 should ask for.
 
 Usage:
-  python3 r54_readback.py --dir <extracted-arm-dir>
+  python3 eval/tools/fetch_evidence.py --repo microglia --run <run-id> --out /tmp/evidence
+  python3 r54_readback.py --dir /tmp/evidence
   python3 r54_readback.py --self-test
+
+The download is a committed tool rather than a command someone types: the evidence
+archive is 20 MB behind a signed URL that this environment fetches at about 24 KB/s
+per connection, so it is pulled in parallel ranges and the assembled length is
+checked against the size the API reported. R49 and R51 were read from archives that
+were fetched by an expression nobody wrote down, which is how a readback becomes
+unrepeatable.
 """
 
 from __future__ import annotations
