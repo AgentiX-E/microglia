@@ -94,3 +94,34 @@ stops deciding whether a scenario is allowed to have produced a measurement.
 - If a lane can pass V5 by reporting nothing at all — a run that measured nothing —
   the replacement has reproduced the vacuous pass R50 spent an iteration removing,
   and it is abandoned.
+
+## Amendment, 2026-11-08, before any dispatch
+
+Written before the code was pushed and before the arm ran, which is the only condition
+under which an amendment is worth anything.
+
+The registration above proposes `protocol.powerTarget` as an *input*, supplied by the
+scenario and defaulting to 6pp. Implementing it showed that the input is the third
+refutation in this very file wearing a different name: a bar a caller can pass is a bar
+a caller can raise, and the only scenarios in the repository that would pass one are the
+two that cannot reach 6pp — the target would be typed by the party it constrains, and
+the number typed would be the observed resolution, making the condition `detectablePp <=
+detectablePp` and therefore always true.
+
+So the target is a **constant** (`POWER_TARGET_PP = 6`), not an input. It is reported in
+the gate's sentence, it is not meetable by a lane that cannot meet it, and no caller can
+move it. τ² supplies its *claim* instead, which is the thing that differs per run.
+
+The one thing this makes untrue is the sentence "who supplies the target: the scenario,
+defaulting to 6pp". Everything else in the registration stands as written, including all
+four refutations — the fourth of which is the reason `claimPp` has three states rather
+than two: a lane that reports no claims at all keeps the old condition, so silence cannot
+pass the gate.
+
+The prediction about committed artefacts is also corrected here rather than at readback
+time. BIRD's cells do not move: they pass at 1.96–4.87pp on the target, and none of them
+supplies `claimPp`, which is the fallback path. τ²'s **verdicts** do not move either —
+HARM stays HARM, UNRESOLVED stays UNRESOLVED — but its `V5-resolution` line does change
+state, from FAIL to PASS, on every dispatch whose pair concluded nothing. That is the
+change, not a side effect of it: the gate now grades the claim, and a pair that claims
+nothing is not claiming an effect its sample cannot resolve.

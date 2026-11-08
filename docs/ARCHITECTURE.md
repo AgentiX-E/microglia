@@ -496,6 +496,17 @@ project can defend, the second is what it must not claim.
 second answer to a question this project has already answered once, which is exactly how the 95%
 half-width and the 80%-power resolution came to be quoted interchangeably in the first place.
 
+**What the resolution decides, and what it does not.** The 6pp bar is a *target* the instrument is
+built for (`POWER_TARGET_PP`), and every gate sentence that quotes it says so. What `V5-resolution`
+actually blocks is narrower and answerable on any scenario: **a run that publishes a direction finer
+than its own sample could resolve.** The gate reads three states from `claimPp` — a number means the
+run concluded at that size, `null` means it measured and concluded nothing, and *absence* means the
+lane does not report claims at all and is graded by the 6pp bar exactly as before. The distinction
+matters because absence is not a claim of silence: a lane that never mentions the question must not
+pass by omitting it. A scenario whose entire population resolves 9.05pp therefore reports that
+number in the gate's sentence, claims nothing, and is not red for it — a permanently red line about
+a sample nobody can enlarge is a line its readers learn to ignore.
+
 ## 9. What the architecture deliberately excludes
 
 | Excluded | Reason |

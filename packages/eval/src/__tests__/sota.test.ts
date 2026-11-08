@@ -859,11 +859,60 @@ describe('buildValidityGates', () => {
     // The first run it would have protected was τ² at n = 68, whose minimum detectable difference is
     // 21.41pp — a design that could not have seen the effect it went looking for, publishing a delta
     // anyway. A gate whose only failure case is the case it exists for was recorded, not enforced.
+    //
+    // A lane that reports no claim keeps exactly this condition after R52: the sentence names the
+    // target so a reader can see which bar it failed, and the failure itself does not move.
     const failing = gate({ ...sound, detectablePp: 6.01 }, 'V5-resolution');
     expect(failing.pass).toBe(false);
     expect(failing.blocking).toBe(true);
-    expect(failing.actual).toBe('minimum detectable 6.01pp');
+    expect(failing.actual).toBe(
+      'minimum detectable 6.01pp against a 6.00pp target; this lane reports no claims',
+    );
     expect(gate({ ...sound, detectablePp: 6 }, 'V5-resolution').pass).toBe(true);
+  });
+
+  it('V5 grades the claim, and a run that claims nothing passes a sample that cannot reach the target', () => {
+    // R52. `detectablePp <= 6` was unreachable for any scenario whose whole population cannot
+    // resolve 6pp at pass^4, so the gate was red for a reason no mechanism could fix. It now asks the
+    // question a run can answer: did this run publish a direction its sample could not have seen?
+    const unresolvable = gate(
+      { ...sound, detectablePp: 13.73, claimPp: null },
+      'V5-resolution',
+    );
+    expect(unresolvable.pass).toBe(true);
+    expect(unresolvable.actual).toBe(
+      'minimum detectable 13.73pp against a 6.00pp target; the run claims no direction',
+    );
+  });
+
+  it('V5 fails a claim finer than the sample can resolve, in either direction', () => {
+    const gain = gate({ ...sound, detectablePp: 13.73, claimPp: 4 }, 'V5-resolution');
+    expect(gain.pass).toBe(false);
+    expect(gain.actual).toBe(
+      'minimum detectable 13.73pp against a 6.00pp target; claims 4.00pp, which is finer than the sample can resolve',
+    );
+    // Symmetry is the point: a 4pp loss is as unclaimable as a 4pp gain. The revert rule that fires
+    // on a loss is a safety rule and is graded elsewhere; this gate is about resolution.
+    const loss = gate({ ...sound, detectablePp: 13.73, claimPp: -4 }, 'V5-resolution');
+    expect(loss.pass).toBe(false);
+    expect(loss.actual).toContain('claims -4.00pp, which is finer than the sample can resolve');
+  });
+
+  it('V5 passes a claim at or above the resolution, and at the boundary', () => {
+    expect(gate({ ...sound, detectablePp: 13.73, claimPp: 14 }, 'V5-resolution').pass).toBe(true);
+    expect(gate({ ...sound, detectablePp: 13.73, claimPp: 13.73 }, 'V5-resolution').pass).toBe(true);
+    expect(gate({ ...sound, detectablePp: 13.73, claimPp: -20 }, 'V5-resolution').pass).toBe(true);
+  });
+
+  it('V5 refuses a claim it cannot grade against an estimate it does not have', () => {
+    // No discordant pairs means no resolution, so a claimed direction there is a claim about a
+    // quantity the run never estimated — the failure N1 recorded as "reports nothing, concludes".
+    const flat = gate(
+      { ...sound, detectablePp: Number.POSITIVE_INFINITY, claimPp: 3 },
+      'V5-resolution',
+    );
+    expect(flat.pass).toBe(false);
+    expect(flat.actual).toBe('not estimable: no question changed hands');
   });
 
   it('V5 says a sample with no discordant pairs cannot estimate anything', () => {

@@ -42,6 +42,7 @@ export {
   buildProtocolGates,
   inGateOrder,
   GATE_ORDER,
+  POWER_TARGET_PP,
   SUBSTRATE_FLOOR,
   transferGates,
   type EvidenceDelivery,

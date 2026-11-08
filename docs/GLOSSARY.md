@@ -971,6 +971,11 @@ than of the result, and it is the column that decides whether a delta is a measu
 record's design sizes impose median floors of **4.38pp at 350 questions, 2.07pp at 1,534 and 0.82pp at
 7,000**.
 
+**Power target** — The effect size the instrument is built to certify: **6pp at 80% power**, exported as
+`POWER_TARGET_PP`. It is a target and not a pass condition, and it cannot be supplied by a caller — a bar
+a caller can type is a bar that will be typed to pass. `V5-resolution` reports every run against it and
+blocks only on a claim finer than the run's own resolution.
+
 **Decided (a row)** — A published contrast whose delta is larger than its own resolution. Distinct from
 *significant*: the 80%-power bar is stricter than a 95% interval, so a row can clear the interval and still
 be undecided. The 7,000-question memory run is exactly that shape — −0.71pp against a 0.82pp floor. **18 of

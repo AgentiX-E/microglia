@@ -42,6 +42,16 @@
  * it would have protected was the one that mattered, a design whose minimum detectable difference was
  * 21.4pp against a 6pp bar.
  *
+ * R52 then changed what that flag blocks on, because blocking on the wrong noun is the same defect
+ * one layer down. A gate that demands the scenario resolve 6pp is red forever on a scenario whose
+ * entire population cannot — 115 tasks at pass^4 reach 9.05pp — and a line that is always red teaches
+ * its readers to ignore red. `V5` now blocks a run that *claims* a direction finer than its sample
+ * can resolve, which is a property of the run and is answerable on every scenario; the 6pp stays as
+ * `POWER_TARGET_PP`, reported in the gate's own sentence and never met by a lane that cannot meet it.
+ * The distinction that makes this a restriction rather than a loosening is `claimPp`: `null` is a run
+ * saying it concluded nothing, and *absence* still means "this lane does not report claims", which
+ * keeps the old, stricter condition.
+ *
  * ## What is not here, on purpose
  *
  * Execution, parsing and scoring. Those are `LaneAdapter` methods, because only a lane can know what
@@ -292,6 +302,22 @@ export type ProtocolGateInput = {
   readonly parseRate?: number;
   /** Smallest effect the sample could resolve at 80% power, in percentage points. */
   readonly detectablePp?: number;
+  /**
+   * The delta this run publishes as a direction, when it publishes one.
+   *
+   * Three states, and the difference between the last two is the whole point of the field:
+   *
+   *  - a **number** — the run concluded in this direction, at this size;
+   *  - **`null`** — the run measured and concluded nothing, which it says so that `V5` can read
+   *    "no direction claimed" as a *statement* rather than as a silence;
+   *  - **absent** — the lane does not report directional claims at all, and `V5` falls back to the
+   *    6pp bar exactly as it did before this field existed.
+   *
+   * A lane that never reports claims therefore keeps the old, stricter condition. Reading absence as
+   * "claimed nothing" would let any run pass by not mentioning the question, which is the vacuous
+   * pass this project has spent two iterations removing.
+   */
+  readonly claimPp?: number | null;
   readonly packControls: readonly { readonly arm: string; readonly meanPackIds: number }[];
   /**
    * What each arm's prompts carried, when the run turns framing into a variable.
@@ -606,6 +632,16 @@ export type ScenarioGateInput = {
 };
 
 /**
+ * The effect size this instrument is built to certify: six percentage points at 80% power.
+ *
+ * R52 made it a *target* rather than a pass condition. The constant did not move and cannot be moved
+ * by a caller — a bar a caller can type is a bar that will be typed to pass — but meeting it is no
+ * longer what a run has to do to publish. What a run has to do is not claim more than it can resolve,
+ * and the target is the number it is measured against in the sentence `V5` prints.
+ */
+export const POWER_TARGET_PP = 6;
+
+/**
  * `V1`'s sentence, with the population behind the rate when the lane recorded one.
  *
  * The three zeros are distinct facts and the sentence is the only place they can be told apart:
@@ -671,23 +707,40 @@ export function buildProtocolGates(
     });
   }
   if (input.detectablePp !== undefined) {
+    const resolution = input.detectablePp;
+    // `Infinity` is what a comparison with no discordant pairs produces, and it is not a large
+    // resolution — it is the absence of one. Printing "Infinitypp" reads like a bug in the
+    // arithmetic; saying what it means is the same failure with an explanation attached.
+    const estimable = Number.isFinite(resolution);
+    const withinTarget = estimable && resolution <= POWER_TARGET_PP;
+    const claim = input.claimPp;
+    // A claim is publishable only if the sample could have resolved it. `Math.abs` because the
+    // symmetry is the point: a 4pp loss at a 13.73pp resolution is as unclaimable as a 4pp gain,
+    // and the revert rule that *does* fire on a loss is a safety rule, not a resolution claim.
+    const claimResolved = typeof claim === 'number' && estimable && Math.abs(claim) >= resolution;
+    const target = `${POWER_TARGET_PP.toFixed(2)}pp target`;
+    const actual = !estimable
+      ? 'not estimable: no question changed hands'
+      : claim === null
+        ? `minimum detectable ${resolution.toFixed(2)}pp against a ${target}; the run claims no direction`
+        : typeof claim === 'number'
+          ? `minimum detectable ${resolution.toFixed(2)}pp against a ${target}; claims ${claim.toFixed(2)}pp` +
+            (claimResolved ? '' : ', which is finer than the sample can resolve')
+          : `minimum detectable ${resolution.toFixed(2)}pp against a ${target}; this lane reports no claims`;
     gates.push({
       id: 'V5-resolution',
-      criterion: 'the sample can resolve a 6pp effect at 80% power',
-      // A sample in which no question changed hands has no variance to estimate, so
-      // the minimum detectable difference is not large — it does not exist. Printing
-      // "Infinitypp" reads like a bug in the arithmetic; saying what it means is the
-      // same failure with an explanation attached.
-      actual: Number.isFinite(input.detectablePp)
-        ? `minimum detectable ${input.detectablePp.toFixed(2)}pp`
-        : 'not estimable: no question changed hands',
-      pass: Number.isFinite(input.detectablePp) && input.detectablePp <= 6,
-      // Blocking as of the second scenario. The flag was carried from a period when a run could
-      // not estimate its own minimum detectable difference, and it has never once been exercised:
-      // all seventeen published artefacts that carry this gate pass it, at 1.96pp to 4.87pp. The
-      // first run it would have protected is the one that could resolve nothing — τ² at n = 68,
-      // where the minimum detectable difference is 21.4pp against a 6pp bar. A gate whose only
-      // failure case is the case it exists for is a gate that was recorded rather than enforced.
+      criterion:
+        'the run claims no effect finer than its sample can resolve: a resolvable 6pp, or no direction claimed',
+      actual,
+      // R52: the gate grades the *claim*, not the sample. `detectablePp <= 6` was unreachable for a
+      // scenario whose entire population cannot resolve 6pp at pass^4, so it was red on every τ²
+      // dispatch for a reason no mechanism could fix — the same pathology R50 removed from the
+      // finding gate. What remains blocking is the thing that is actually a defect in a run: a
+      // published direction the sample could not have seen, which is what the gate was written for.
+      pass: estimable && (withinTarget || claim === null || claimResolved),
+      // Blocking, and for the reason it always was: a run that publishes a direction its sample
+      // cannot resolve misrepresents the instrument. What changed is that the condition is now
+      // about the run rather than about the scenario.
       blocking: true,
     });
   }

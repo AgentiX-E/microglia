@@ -338,6 +338,52 @@ describe('the projection supplies what the record holds and nothing else', () =>
     expect(input.parseRate).toBeUndefined();
     expect(supplied).not.toContain('parseRate');
   });
+
+  it('carries the claim a pair publishes, and only a pair can publish one', () => {
+    // R52. The three states of `claimPp` are the protocol's, and this is the boundary that produces
+    // two of them: a pair that concluded nothing says `null`, a pair that concluded says the delta.
+    // An arm artefact has no reference arm and therefore no verdict, so it says nothing — which the
+    // protocol reads as "this lane does not report claims" and grades by the 6pp bar.
+    const concluded = tau2ProtocolInput({
+      domain: 'retail',
+      trialCount: 4,
+      comparison: { paired: 50, onlyFirst: 0, onlySecond: 0, lost: 2, gained: 3, deltaPp: 2 },
+      claimPp: null,
+    });
+    expect(concluded.input.claimPp).toBeNull();
+
+    const claimed = tau2ProtocolInput({
+      domain: 'retail',
+      trialCount: 4,
+      comparison: { paired: 50, onlyFirst: 0, onlySecond: 0, lost: 2, gained: 3, deltaPp: 2 },
+      claimPp: 2,
+    });
+    expect(claimed.input.claimPp).toBe(2);
+
+    const arm = tau2ProtocolInput({
+      domain: 'retail',
+      trialCount: 4,
+      memory: { arm: 'memory', tasks: 68, trials: 4, unscored: 0 },
+    });
+    expect(arm.input.claimPp).toBeUndefined();
+  });
+
+  it('lets a pair that concluded nothing pass a resolution its scenario cannot narrow', () => {
+    // The gate R52 was registered to fix: τ² retail's full population reaches 9.05pp, so
+    // `detectablePp <= 6` was unreachable and the line was red on every dispatch. It is green here
+    // for the reason it should be — the pair published no direction — and the sentence records both
+    // numbers so a reader sees what the sample could have resolved.
+    const audit = tau2GateAudit({
+      domain: 'retail',
+      trialCount: 4,
+      comparison: { paired: 50, onlyFirst: 0, onlySecond: 0, lost: 5, gained: 4, deltaPp: -2 },
+      claimPp: null,
+    });
+    const resolution = audit.gates.find((entry) => entry.id === 'V5-resolution');
+    expect(resolution?.pass).toBe(true);
+    expect(resolution?.actual).toContain('the run claims no direction');
+    expect(resolution?.actual).toMatch(/minimum detectable \d+\.\d\dpp/);
+  });
 });
 
 describe('the audit accounts for every gate in the protocol', () => {

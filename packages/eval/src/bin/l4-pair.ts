@@ -41,6 +41,7 @@ import {
   tau2GateAudit,
   transferReadingOf,
   type Tau2ArmRecord,
+  type Tau2ComparisonRecord,
   type Tau2Evidence,
   type TauTrialRow,
 } from '@agentix-e/microglia-eval';
@@ -154,23 +155,16 @@ const transfer =
         store: second.tau2?.scenario?.learn ?? second.tau2?.scenario?.test ?? DOMAIN,
       });
 
-const evidence: Tau2Evidence = {
-  domain: scenario?.test ?? DOMAIN,
-  trialCount: first.metrics?.k ?? 4,
-  reference: tau2ArmRecordOf('reference', first),
-  memory: tau2ArmRecordOf('memory', second),
-  comparison: {
-    paired: comparison.paired,
-    onlyFirst: comparison.onlyFirst,
-    onlySecond: comparison.onlySecond,
-    lost: comparison.lost,
-    gained: comparison.gained,
-    deltaPp: comparison.deltaPp,
-  },
-  ...(transfer === undefined ? {} : { transfer: transfer.gate }),
+const comparisonRecord: Tau2ComparisonRecord = {
+  paired: comparison.paired,
+  onlyFirst: comparison.onlyFirst,
+  onlySecond: comparison.onlySecond,
+  lost: comparison.lost,
+  gained: comparison.gained,
+  deltaPp: comparison.deltaPp,
 };
-const audit = tau2GateAudit(evidence);
-const detectablePp = tau2DetectablePp(evidence.comparison);
+
+const detectablePp = tau2DetectablePp(comparisonRecord);
 
 /**
  * What this pair is allowed to say, decided before the gates are written.
@@ -181,6 +175,10 @@ const detectablePp = tau2DetectablePp(evidence.comparison);
  * when what it actually says is that 50 paired tasks cannot see an effect that
  * small. The gate now mirrors the R45 revert rule (harm) and the readout carries
  * the resolution it can honestly claim. See `paired-verdict.ts`.
+ *
+ * R52 moved it above the evidence, because the evidence now carries the claim: the
+ * protocol's `V5-resolution` grades whether a run claimed more than its sample can
+ * resolve, and the only place that answer exists is here.
  */
 const served = second.tau2?.recall?.served ?? 0;
 const verdict = pairedVerdict({
@@ -190,6 +188,20 @@ const verdict = pairedVerdict({
   servedPacks: served,
   detectablePp: detectablePp ?? Number.POSITIVE_INFINITY,
 });
+
+const evidence: Tau2Evidence = {
+  domain: scenario?.test ?? DOMAIN,
+  trialCount: first.metrics?.k ?? 4,
+  reference: tau2ArmRecordOf('reference', first),
+  memory: tau2ArmRecordOf('memory', second),
+  comparison: comparisonRecord,
+  // R52: the protocol grades the claim, not the sample. `null` where the pair concluded nothing is
+  // the point of the field — without it, `V5` would read this pair's silence as a lane that never
+  // reports claims and fall back to the 6pp bar this scenario cannot meet at any n.
+  claimPp: verdict.state === 'UNRESOLVED' ? null : comparison.deltaPp,
+  ...(transfer === undefined ? {} : { transfer: transfer.gate }),
+};
+const audit = tau2GateAudit(evidence);
 
 /**
  * The three conditions that belong to this pair rather than to the instrument.

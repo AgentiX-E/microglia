@@ -243,6 +243,16 @@ export type Tau2Evidence = {
   readonly reference?: Tau2ArmRecord;
   readonly comparison?: Tau2ComparisonRecord;
   /**
+   * The direction this pair publishes, when it publishes one.
+   *
+   * R52. `V5-resolution` grades the claim rather than the sample: a run that concludes nothing says
+   * so with `null` and passes, a run that concludes must have resolved what it concluded, and a run
+   * that never mentions the question falls back to the 6pp bar it has always been graded by. The
+   * three states are the protocol's, not this lane's — see `ProtocolGateInput.claimPp` — and the
+   * value comes from `pairedVerdict`, so the two half-answers cannot disagree.
+   */
+  readonly claimPp?: number | null;
+  /**
    * The transfer measurement, when the run answered a scenario it did not learn from.
    *
    * One reading supplies four gates: the reconciliation, the floor, the ledger and the net. It is
@@ -453,6 +463,7 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
     partition?: NonNullable<ProtocolGateInput['partition']>;
     parseRate?: number;
     detectablePp?: number;
+    claimPp?: number | null;
     callFailureRate?: number;
     calls?: number;
     callFailures?: number;
@@ -491,6 +502,11 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
   if (detectablePp !== undefined) {
     extra.detectablePp = detectablePp;
     supplied.push('detectablePp');
+  }
+  // `undefined` is not a claim of "nothing claimed": it is a lane that does not report claims, and
+  // the protocol reads it as such. Only the pair step can say `null`, because only it has a verdict.
+  if (evidence.claimPp !== undefined) {
+    extra.claimPp = evidence.claimPp;
   }
   // A call tally of zero is not perfect reliability, it is a counter nobody incremented: the arm
   // artefacts written before this field existed carry `calls: 0` beside sixty-eight scored tasks,

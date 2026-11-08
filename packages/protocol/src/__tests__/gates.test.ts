@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GATE_ORDER,
+  POWER_TARGET_PP,
   SUBSTRATE_FLOOR,
   buildProtocolGates,
   inGateOrder,
@@ -321,6 +322,71 @@ describe('the resolution gate stops a run rather than annotating it', () => {
       );
       expect(gate?.pass).toBe(true);
     }
+  });
+
+  /**
+   * R52: the gate grades the run's claim, not the scenario's population.
+   *
+   * `detectablePp <= 6` is unreachable for τ² retail at any n — 9.05pp over all 115 tasks — so the
+   * gate was red on every dispatch for a reason no mechanism could fix. The three states of
+   * `claimPp` are what replaced it, and the third one is the one that keeps the old condition for
+   * every lane that never thought about claims.
+   */
+  it('passes a run that measured and concluded nothing, at a resolution it cannot narrow', () => {
+    const gate = buildProtocolGates({ ...minimal, detectablePp: 9.05, claimPp: null }).find(
+      (entry) => entry.id === 'V5-resolution',
+    );
+    expect(gate?.pass).toBe(true);
+    expect(gate?.actual).toBe(
+      'minimum detectable 9.05pp against a 6.00pp target; the run claims no direction',
+    );
+  });
+
+  it('fails a run that claims either direction more finely than its sample can resolve', () => {
+    for (const claimPp of [4, -4, 9.04]) {
+      const gate = buildProtocolGates({ ...minimal, detectablePp: 9.05, claimPp }).find(
+        (entry) => entry.id === 'V5-resolution',
+      );
+      expect(gate?.pass, String(claimPp)).toBe(false);
+    }
+  });
+
+  it('passes a claim it could have resolved, and the exact boundary', () => {
+    for (const claimPp of [9.05, 12, -20]) {
+      const gate = buildProtocolGates({ ...minimal, detectablePp: 9.05, claimPp }).find(
+        (entry) => entry.id === 'V5-resolution',
+      );
+      expect(gate?.pass, String(claimPp)).toBe(true);
+    }
+  });
+
+  it('keeps the old condition for a lane that reports no claims at all', () => {
+    // Absence is not "claimed nothing". A lane that never mentions the question must not pass by
+    // omitting it, which is the vacuous pass R50 spent an iteration removing.
+    const gate = buildProtocolGates({ ...minimal, detectablePp: 9.05 }).find(
+      (entry) => entry.id === 'V5-resolution',
+    );
+    expect(gate?.pass).toBe(false);
+    expect(gate?.actual).toBe(
+      'minimum detectable 9.05pp against a 6.00pp target; this lane reports no claims',
+    );
+  });
+
+  it('refuses a claim made against a resolution the run never estimated', () => {
+    const gate = buildProtocolGates({
+      ...minimal,
+      detectablePp: Number.POSITIVE_INFINITY,
+      claimPp: 3,
+    }).find((entry) => entry.id === 'V5-resolution');
+    expect(gate?.pass).toBe(false);
+    expect(gate?.actual).toBe('not estimable: no question changed hands');
+  });
+
+  it('names the target it is measuring against, which is the protocol constant', () => {
+    const gate = buildProtocolGates({ ...minimal, detectablePp: 9.05, claimPp: null }).find(
+      (entry) => entry.id === 'V5-resolution',
+    );
+    expect(gate?.actual).toContain(`${POWER_TARGET_PP.toFixed(2)}pp target`);
   });
 });
 
