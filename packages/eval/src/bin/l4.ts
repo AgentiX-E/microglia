@@ -412,7 +412,7 @@ const gates = [
   ...(() => {
     const unit = measured.instrumentation?.distillUnit;
     if (unit === undefined || unit.unit !== 'trace') return [];
-    const gate = recurrenceGate(unit);
+    const gate = recurrenceGate(unit, measured.instrumentation?.storeItems);
     return [{ id: 'l4-support-recurrence', pass: gate.pass, actual: gate.actual, criterion: gate.criterion }];
   })(),
   // R53: a three-level arm whose arms served different items is not a note effect. The

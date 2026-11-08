@@ -8,7 +8,27 @@
  */
 import { describe, expect, it } from 'vitest';
 import { recurrenceGate } from '../recurrence.js';
+import type { StoreItemRecord, StoreItemSample } from '../store-items.js';
 import type { ConsolidationCensus, DistillUnitRecord } from '../tau2-instrument.js';
+
+const stored = (id: string, supportTasks: number): StoreItemRecord => ({
+  id,
+  kind: 'procedure',
+  status: 'active',
+  statement: 'confirm the customer identity before changing a booking',
+  trust: 0.9,
+  scope: { domain: 'retail' },
+  supportTasks,
+  evidence: supportTasks,
+});
+
+const sample = (items: readonly StoreItemRecord[], omitted = 0): StoreItemSample => ({
+  items,
+  limit: 64,
+  maxChars: 240,
+  omitted,
+  truncated: 0,
+});
 
 const census = (overrides: Partial<ConsolidationCensus> = {}): ConsolidationCensus => ({
   considered: 7,
@@ -80,5 +100,46 @@ describe('recurrenceGate', () => {
     );
     expect(gate.pass).toBe(true);
     expect(gate.actual).toContain('0 group(s)');
+  });
+});
+
+describe('recurrenceGate — the store the census describes', () => {
+  it('passes when the group it reports is visible as an item backed by two tasks', () => {
+    const gate = recurrenceGate(record(), sample([stored('k1', 2), stored('k2', 1)]));
+    expect(gate.pass).toBe(true);
+    expect(gate.actual).toContain('1 item(s) backed by two or more tasks');
+  });
+
+  it('fails a census that reports a group the store it ships does not contain', () => {
+    // Two claims from one task merge into an item still backed by one task, and a census read from a
+    // different store than the one reported reads the same way. Both are a corroboration the artefact
+    // claims and does not hold, and this is the only place the two blocks can be compared.
+    const gate = recurrenceGate(record(), sample([stored('k1', 1), stored('k2', 1)]));
+    expect(gate.pass).toBe(false);
+    expect(gate.actual).toContain('0 item(s) backed by two or more tasks');
+  });
+
+  it('passes a store where nothing merged and no item is backed by two tasks', () => {
+    const gate = recurrenceGate(
+      record({ consolidation: census({ groups: 0, merged: 0, retained: 7, supportAfter: { 1: 7 }, maxSupportAfter: 1 }) }),
+      sample([stored('k1', 1), stored('k2', 1)]),
+    );
+    expect(gate.pass).toBe(true);
+  });
+
+  it('does not grade the cross-check on a sample that omitted items', () => {
+    // The corroborated item could be outside the window. Failing here would be failing the sample's
+    // limit, not the run's arithmetic, so the reading is reported as ungraded instead.
+    const gate = recurrenceGate(record(), sample([stored('k1', 1)], 12));
+    expect(gate.pass).toBe(true);
+    expect(gate.actual).toContain('store not sampled whole');
+  });
+
+  it('keeps the distribution reconciliation first, so an incomplete sample cannot hide it', () => {
+    const gate = recurrenceGate(
+      record({ consolidation: census({ retained: 4, supportAfter: { 1: 3 } }) }),
+      sample([stored('k1', 2)], 12),
+    );
+    expect(gate.pass).toBe(false);
   });
 });

@@ -9,8 +9,16 @@
  *
  * Its second job is to catch the failure that has no symptom: a trace arm whose consolidation pass
  * never ran. That run has the treatment's name, the control's store, and one fewer field.
+ *
+ * Its third is the cross-check the two blocks make possible, and it only exists because the artefact
+ * carries the store as well as the census: **a pass that reports a group must leave an item backed by
+ * two tasks.** A group of items that all came from one task merges into an item still backed by one,
+ * and a census read from a different store than the one reported would show the same thing. Either
+ * way the census would be describing a corroboration that the store it ships does not contain, which
+ * is the R48 defect one field over.
  */
 import type { ConsolidationCensus } from '@agentix-e/microglia-core/distill';
+import type { StoreItemSample } from './store-items.js';
 import type { DistillUnitRecord } from './tau2-instrument.js';
 
 export type RecurrenceGate = {
@@ -31,8 +39,10 @@ const sum = (distribution: Readonly<Record<number, number>>): number =>
  *    different stores;
  *  - the pass reports a `retained` that is not the count of survivors it also reports.
  */
-export function recurrenceGate(record: DistillUnitRecord): RecurrenceGate {
-  const criterion = 'a trace arm reports both support distributions, and they describe the store it reports';
+export function recurrenceGate(record: DistillUnitRecord, store?: StoreItemSample): RecurrenceGate {
+  const criterion =
+    'a trace arm reports both support distributions, and they describe the store it reports — ' +
+    'including the item the pass says it corroborated';
   const census: ConsolidationCensus | undefined = record.consolidation;
   if (census === undefined) {
     return {
@@ -44,15 +54,26 @@ export function recurrenceGate(record: DistillUnitRecord): RecurrenceGate {
   const before = sum(census.supportBefore);
   const after = sum(census.supportAfter);
   const reconciled = before === census.considered && after === census.retained;
+  // The cross-check needs the whole store. A sample that omitted items could hold the corroborated
+  // one outside the window, and failing a gate for that would be failing it for the sample's limit
+  // rather than for the run's arithmetic — so an incomplete sample reports the reading as ungraded
+  // instead of as a violation.
+  const corroborated = store === undefined || store.omitted > 0
+    ? undefined
+    : store.items.filter((item) => item.supportTasks >= 2).length;
+  const consistent = census.groups === 0 || corroborated === undefined || corroborated >= 1;
   return {
-    pass: reconciled,
+    pass: reconciled && consistent,
     actual:
       `${String(census.considered)}→${String(census.retained)} item(s), ` +
       `${String(census.groups)} group(s), max support ${String(census.maxSupportBefore)}→${String(
         census.maxSupportAfter,
       )}, distributions ${String(before)}/${String(census.considered)} and ` +
       `${String(after)}/${String(census.retained)}, floors ` +
-      `${String(census.threshold)}/${String(census.conditionMinShared)} shared term(s)`,
+      `${String(census.threshold)}/${String(census.conditionMinShared)} shared term(s)` +
+      (corroborated === undefined
+        ? ', store not sampled whole'
+        : `, ${String(corroborated)} item(s) backed by two or more tasks`),
     criterion,
   };
 }
