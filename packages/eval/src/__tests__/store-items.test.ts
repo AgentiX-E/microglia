@@ -23,6 +23,7 @@ const item = (overrides: Partial<Parameters<typeof storeItemSample>[0][number]> 
   statement: 'A request of this shape is resolved by calling find_user, then cancel_pending_order.',
   trust: 0.9,
   scope: { domain: 'retail' },
+  evidence: [{ taskId: 'task_a', runId: 'run_1' }],
   ...overrides,
 });
 
@@ -91,6 +92,48 @@ describe('the store sample the artefact carries', () => {
     expect(sample.items[0]?.when).toHaveLength(50);
     expect(sample.items[0]?.when?.endsWith('…')).toBe(true);
     expect(sample.truncated).toBe(1);
+  });
+
+  it('carries how many distinct tasks stand behind each item, and how many rows', () => {
+    // R55.0's measurement, taken with no treatment at all: the competitive record's `sup3` arm
+    // admits a claim only when at least three distinct tasks derived it, and this project has
+    // never counted whether anything recurs. Both numbers are already in the store -- an item
+    // holds its evidence rows, each naming the task it came from -- so the sample can carry them
+    // without changing what the distiller writes.
+    const sample = storeItemSample([
+      item({
+        id: 'recurring',
+        evidence: [
+          { taskId: 'task_a', runId: 'r1' },
+          { taskId: 'task_a', runId: 'r2' },
+          { taskId: 'task_b', runId: 'r3' },
+        ],
+      }),
+      item({ id: 'single', evidence: [{ taskId: 'task_c', runId: 'r4' }] }),
+    ]);
+    expect(sample.items.map((entry) => entry.evidence)).toEqual([3, 1]);
+    // Three rows, two tasks: the same task retried is one observation, which is the definition
+    // the score uses and the one a recurrence claim has to be read against.
+    expect(sample.items.map((entry) => entry.supportTasks)).toEqual([2, 1]);
+  });
+
+  it('counts a row with no task as its own observation, as the score does', () => {
+    const sample = storeItemSample([
+      item({
+        id: 'unattributed',
+        evidence: [{ runId: 'r1' }, { runId: 'r2' }],
+      }),
+    ]);
+    expect(sample.items[0]?.supportTasks).toBe(2);
+    expect(sample.items[0]?.evidence).toBe(2);
+  });
+
+  it('reports zero support for an item with no evidence rows rather than one', () => {
+    // Unreachable through the store -- an item is created with its first row -- but the count is
+    // a claim about corroboration, and an empty list is no corroboration at all.
+    const sample = storeItemSample([item({ evidence: [] })]);
+    expect(sample.items[0]?.supportTasks).toBe(0);
+    expect(sample.items[0]?.evidence).toBe(0);
   });
 
   it('omits the scope domain when the item has none, which V44 counts separately', () => {

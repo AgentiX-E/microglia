@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createKnowledgeItem, mergeEvidence, scoreKnowledge } from '../knowledge.js';
+import {
+  countDistinctTasks,
+  createKnowledgeItem,
+  distinctTasks,
+  mergeEvidence,
+  scoreKnowledge,
+} from '../knowledge.js';
 import { defaultPolicy } from '../policy.js';
-import type { DistillCandidate } from '../types.js';
+import type { DistillCandidate, EvidenceRef } from '../types.js';
 
 const AT = 1_700_000_000_000;
 
@@ -75,5 +81,36 @@ describe('evidence independence', () => {
     expect(scoreKnowledge(two, defaultPolicy)).toBeGreaterThan(
       scoreKnowledge(one, defaultPolicy) + 0.05,
     );
+  });
+});
+
+/**
+ * The count itself, exported so a census can ask the same question of a sample.
+ *
+ * R55.0's `supportTasks` is this number read off the artefact's `storeItems`, and a readback that
+ * re-implemented the grouping would be free to disagree with the score it is supposed to explain.
+ */
+describe('the distinct-task count as its own contract', () => {
+  it('agrees with the score on what one task is', () => {
+    const six = fold(6, () => 'task_a');
+    expect(countDistinctTasks(six.evidence)).toBe(1);
+    expect(distinctTasks(six)).toBe(countDistinctTasks(six.evidence));
+  });
+
+  it('separates tasks and runs, and counts a run only when no task is named', () => {
+    const mixed: readonly EvidenceRef[] = [
+      { feedbackId: 'f1', runId: 'r1', at: AT, weight: 0.9, taskId: 'task_a' },
+      { feedbackId: 'f2', runId: 'r2', at: AT, weight: 0.9, taskId: 'task_a' },
+      { feedbackId: 'f3', runId: 'r3', at: AT, weight: 0.9, taskId: 'task_b' },
+      { feedbackId: 'f4', runId: 'r4', at: AT, weight: 0.9 },
+    ];
+    // Two tasks and one unattributed run: four rows, three observations.
+    expect(countDistinctTasks(mixed)).toBe(3);
+  });
+
+  it('is zero for no evidence, not one', () => {
+    // A store item always has at least one row, so zero is reachable only through a caller that
+    // passed none. Returning 1 there would let an empty item claim corroboration it does not have.
+    expect(countDistinctTasks([])).toBe(0);
   });
 });

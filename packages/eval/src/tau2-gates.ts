@@ -1,5 +1,5 @@
 /**
- * The τ² lane's projection onto the protocol: which of the thirty-nine gates it can fire, and why
+ * The τ² lane's projection onto the protocol: which of the forty gates it can fire, and why
  * the other thirty cannot fire at all.
  *
  * ## The question this file answers, and the one it does not
@@ -25,7 +25,7 @@
  * | **informative** | supplied *and* present in the record that exists | 2 |
  *
  * The fourth bucket is the uncomfortable one and it is kept separate on purpose: **vacuous**.
- * `V6-controls-inject` and `V7-channel` — two of the thirteen in the table above — fire with an
+ * `V6-controls-inject` and `V7-channel` — two of the fourteen in the table above — fire with an
  * empty control list and an `undefined` channel, print "no pack-based controls configured" and
  * pass. They are counted as evaluable by any honest reading of "did the gate run", and they
  * certify nothing. All
@@ -35,13 +35,14 @@
  *
  * ## What is not decided here
  *
- * Whether two informative gates out of thirty-nine is a failure of the protocol or of this lane's
+ * Whether two informative gates out of forty is a failure of the protocol or of this lane's
  * instrumentation. The registration said the former if fewer than fifteen fired; the refutation is
  * recorded, and the arm-index table is what makes the difference visible enough to argue about.
  */
 import {
   GATE_ORDER,
   buildProtocolGates,
+  type FunnelInput,
   type ProtocolGateInput,
   type ScenarioGateInput,
   type TransferGateInput,
@@ -136,6 +137,15 @@ export type Tau2ArmRecord = {
     readonly events?: number;
     readonly llmFailed?: number;
   };
+  /**
+   * How far the pipeline from a correction to a servable rule got, when the driver counted it.
+   *
+   * R55's audit: eight gates graded a number and none asked whether the machine that produced it
+   * carried anything. This is `V0`'s subject, carried on the arm because the arm is where the store
+   * and its learning half meet. Absent on every artefact written before it existed, which leaves
+   * `V0` absent rather than green.
+   */
+  readonly funnel?: FunnelInput;
   /** Provenance of the stored items' `scope.domain`, which is the ceiling on every transfer claim. */
   readonly domainOrigin?: {
     readonly storedWithDomain: number;
@@ -264,13 +274,14 @@ export type Tau2Evidence = {
 };
 
 /**
- * The thirteen gates this lane's record type can feed, and the field that feeds each.
+ * The fourteen gates this lane's record type can feed, and the field that feeds each.
  *
  * Written as data so the audit and the tests read the same list. An entry here is a promise that
  * `tau2ProtocolInput` can produce the field; a field the projection never sets is a lie the
  * `supplied` set would expose on the first run.
  */
 const SUPPLYABLE: readonly { readonly id: string; readonly field: Tau2Field }[] = [
+  { id: 'V0-instrument-ready', field: 'funnel' },
   { id: 'V1-pack-not-empty', field: 'meanPackIds' },
   { id: 'V2-fold-partition', field: 'partition' },
   { id: 'V3-parse-rate', field: 'parseRate' },
@@ -361,6 +372,7 @@ const ARM_INDEXED: readonly { readonly id: string; readonly needs: string }[] = 
 
 /** The enabling fields, named as the audit reports them. */
 export type Tau2Field =
+  | 'funnel'
   | 'meanPackIds'
   | 'partition'
   | 'parseRate'
@@ -380,6 +392,7 @@ export type Tau2Field =
  * `the lane's own record: partition` in a published report.
  */
 const FIELD_OF: Readonly<Record<Tau2Field, string>> = {
+  funnel: 'the counts from a correction to a servable rule, so a zero can be located',
   meanPackIds: 'the mean number of recalled items per prompt',
   partition: 'the split, so leaking and duplication can be counted',
   parseRate: 'the share of trials that carried a verdict',
@@ -459,6 +472,7 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
   // every consumer, and a projection that reassigned through a cast on the finished object would
   // be able to overwrite a field after `supplied` had already been computed from it.
   const extra: {
+    funnel?: FunnelInput;
     meanPackIds?: number;
     packPopulation?: NonNullable<ProtocolGateInput['packPopulation']>;
     partition?: NonNullable<ProtocolGateInput['partition']>;
@@ -473,6 +487,13 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
     transfer?: TransferGateInput;
   } = {};
 
+  if (memory?.funnel !== undefined) {
+    // Recorded by the driver rather than derived here. A projection that recomputed the counts from
+    // the arm's other fields would be able to disagree with the store it is describing, and the one
+    // thing `V0` exists to catch is two counts taken over different populations.
+    extra.funnel = memory.funnel;
+    supplied.push('funnel');
+  }
   if (memory?.meanPackIds !== undefined) {
     extra.meanPackIds = memory.meanPackIds;
     supplied.push('meanPackIds');

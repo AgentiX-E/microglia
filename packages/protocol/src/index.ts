@@ -47,6 +47,7 @@ export {
   transferGates,
   type EvidenceDelivery,
   type FramingDelivery,
+  type FunnelInput,
   type ProtocolGateInput,
   type ScenarioGateInput,
   type TransferGateInput,

@@ -551,6 +551,16 @@ export {
 } from './store-items.js';
 
 export {
+  TAU2_DISTILL_FORM,
+  guardAgainstToolNames,
+  matchesToolName,
+  toolInventoryOf,
+  toolNameCensus,
+  type ToolNameCensus,
+  type ToolNameGuard,
+} from './tau2-register.js';
+
+export {
   INJECTION_NOTE_LEVELS,
   resolveInjectionNotePlan,
   type InjectionNotePlan,

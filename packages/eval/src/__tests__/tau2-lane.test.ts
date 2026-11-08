@@ -28,7 +28,7 @@ import { L4ParseError } from '../l4.js';
  *  2. **The projection never invents a fact.** A field that is absent must produce an absent gate,
  *     and a call tally of zero must read as "nobody counted" rather than as perfect reliability.
  *  3. **The index covers the protocol exactly.** Thirteen supplyable plus twenty-six arm-indexed is
- *     thirty-nine, and a gate that appears in neither table is a gate the audit would silently drop
+ *     forty, and a gate that appears in neither table is a gate the audit would silently drop
  *     from every future τ² report.
  */
 
@@ -445,7 +445,9 @@ describe('the audit accounts for every gate in the protocol', () => {
 
   it('names an arm for every gate it cannot fire', () => {
     const audit = tau2GateAudit(committed);
-    expect(audit.absent).toHaveLength(35);
+    // 36 rather than 26: `V0` is supplyable but this record predates the funnel, so it is absent for
+    // the other reason — the lane can carry the field and this artefact does not.
+    expect(audit.absent).toHaveLength(36);
     expect(audit.absent.every((entry) => entry.needs.trim() !== '')).toBe(true);
     expect(audit.absent.map((entry) => entry.id)).toContain('V45-clearance-dose-matched');
   });
@@ -461,10 +463,10 @@ describe('the audit accounts for every gate in the protocol', () => {
     expect(raw?.needs).toContain('raw arm');
   });
 
-  it('reaches thirteen gates when every field the lane can produce is present', () => {
+  it('reaches fourteen gates when every field the lane can produce is present', () => {
     // The lane's ceiling, measured on the record type rather than on a run: no τ² run has produced
-    // this artefact, and the audit says so by counting it as thirteen supplyable rather than as
-    // thirteen measured. The four transfer ids arrived with R29 stage 2, and they come from one
+    // this artefact, and the audit says so by counting it as fourteen supplyable rather than as
+    // fourteen measured. The four transfer ids arrived with R29 stage 2, and they come from one
     // reading rather than from four arms.
     const instrumented: Tau2Evidence = {
       domain: 'retail',
@@ -479,6 +481,7 @@ describe('the audit accounts for every gate in the protocol', () => {
         learning: { rows: 60, unanswered: 0, edited: 60, distillFailed: 0 },
         domainOrigin: { storedWithDomain: 60, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
         split: { train: ['1', '2'], test: ['7', '9'] },
+        funnel: { corrections: 60, candidates: 58, admitted: 40, stored: 40, servable: 36 },
       },
       reference: { arm: 'reference', tasks: 68, trials: 4, unscored: 0 },
       comparison: { paired: 2, onlyFirst: 0, onlySecond: 0, lost: 1, gained: 0, deltaPp: -50 },
@@ -497,9 +500,9 @@ describe('the audit accounts for every gate in the protocol', () => {
       },
     };
     const audit = tau2GateAudit(instrumented);
-    expect(audit.evaluable).toHaveLength(13);
+    expect(audit.evaluable).toHaveLength(14);
     expect(audit.absent).toHaveLength(26);
-    expect(audit.supplyable).toBe(13);
+    expect(audit.supplyable).toBe(14);
     expect(audit.armIndexed).toBe(26);
   });
 
@@ -667,7 +670,7 @@ describe('the audit accounts for every gate in the protocol', () => {
   it('fires only the two vacuous gates when the evidence is a domain and a trial count', () => {
     const audit = tau2GateAudit({ domain: 'retail', trialCount: 4 });
     expect(audit.evaluable).toEqual(['V6-controls-inject', 'V7-channel']);
-    expect(audit.absent).toHaveLength(37);
+    expect(audit.absent).toHaveLength(38);
   });
 
   it('keeps the two tables and the protocol in exact agreement', () => {

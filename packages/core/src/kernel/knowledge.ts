@@ -99,15 +99,25 @@ export function specificity(scope: KnowledgeScope): number {
 }
 
 /**
- * How many distinct tasks stand behind an item.
+ * How many distinct tasks stand behind a set of evidence rows.
  *
- * The same grouping the score uses: a task contributes once, whatever its attempt
- * count, and evidence without a task falls back to its run.
+ * The grouping is the score's: a task contributes once, whatever its attempt
+ * count, and evidence without a task falls back to its run. Exported on its own
+ * because a readback has to count the same thing over a sample that is not a
+ * `KnowledgeItem` — R55.0's `supportTasks` — and two implementations of one
+ * definition is how a store and its census come to disagree.
  */
-export function distinctTasks(item: KnowledgeItem): number {
+export function countDistinctTasks(
+  evidence: readonly { readonly taskId?: string; readonly runId: string }[],
+): number {
   const seen = new Set<string>();
-  for (const evidence of item.evidence) seen.add(evidence.taskId ?? `run:${evidence.runId}`);
+  for (const entry of evidence) seen.add(entry.taskId ?? `run:${entry.runId}`);
   return seen.size;
+}
+
+/** How many distinct tasks stand behind an item. */
+export function distinctTasks(item: KnowledgeItem): number {
+  return countDistinctTasks(item.evidence);
 }
 
 export function scoreKnowledge(item: KnowledgeItem, policy: Policy, now = item.updatedAt): number {

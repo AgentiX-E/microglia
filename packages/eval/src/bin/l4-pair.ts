@@ -320,7 +320,7 @@ await writeJson('poc-l4-pair', {
     'pass^4 per task is the k=4 reading: a task counts only when all four trials passed.',
     'The pair is defined on the intersection of task ids; tasks scored by one arm only are counted, not dropped silently.',
     'Published reference for scale: ALTK-Evolve pass^4 = 0.575 on tau2-retail.',
-    'The protocol gates are the shared thirty-nine, not a τ² copy of them; `absent` names the arm each of the rest would need.',
+    'The protocol gates are the shared forty, not a τ² copy of them; `absent` names the arm each of the rest would need.',
     'Call reliability is graded over the population the arm recorded: `calls.scope` is `distillation` when the episodes\u2019 tally came from a process that does not report one.',
     '`transfer` pairs the two arms episode by episode, so a repair is one episode the control failed and the treatment passed. The treatment is the whole pack: `repaired` says the pack fixed an episode, not which item in it did.',
   ],

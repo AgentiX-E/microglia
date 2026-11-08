@@ -133,7 +133,7 @@ describe('the pairing step on a cross-domain pair', () => {
     // Four gates arrive with the reading, and the index says so.
     expect(published.protocol.evaluable).toContain('V15-transfer-reconciles');
     expect(published.protocol.evaluable).toContain('V33-transfer-ledger');
-    expect(published.protocol.supplyable).toBe(13);
+    expect(published.protocol.supplyable).toBe(14);
     expect(published.protocol.armIndexed).toBe(26);
     // These arms did not record how many tasks their scenarios hold, so the pair states no ceiling:
     // an upper bound invented from a guess is worse than the absence it replaces.

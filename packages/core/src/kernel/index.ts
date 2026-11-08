@@ -119,6 +119,8 @@ export {
   observationsOf,
   decideStatus,
   dedupeKeyOf,
+  countDistinctTasks,
+  distinctTasks,
   expireKnowledge,
   isInlinePayload,
   mergeEvidence,

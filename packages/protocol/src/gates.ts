@@ -3,7 +3,7 @@
  *
  * ## Why this is a package rather than a module inside one lane
  *
- * Thirty-one gates certify every number this project publishes, and for twenty-six iterations they had
+ * Forty gates certify every number this project publishes, and for twenty-six iterations they had
  * exactly one caller: the BIRD lane. The second scenario in the repository — τ²-bench — did not import
  * them; it wrote three of its own, one of which failed at a 15pp half-width against a 5pp bar and was
  * recorded as a note rather than as a verdict. **A protocol with one customer is a habit**, and the
@@ -202,12 +202,15 @@ export type TransferGateInput = {
  * byte. A push order that drifts one line is a diff in thirty-one published files.
  *
  * The list reproduces the sequence the single-lane implementation emitted, so extracting this package
- * changed no artefact. It has **39 entries** rather than 31: the eight transfer ids (`V15`–`V17`, `V33`,
+ * changed no artefact. It has **40 entries** rather than 31: the eight transfer ids (`V15`–`V17`, `V33`,
  * `V39`–`V42`) are passed *into* `transferGates` as arguments rather than written beside an object
  * literal, so a scan for `id:` misses them — and a list missing them would sort eight published gates
- * to the end of the report.
+ * to the end of the report. The fortieth, `V0-instrument-ready`, was added in R55's audit: the eight
+ * gates below `V1` all grade a number, and none of them asks whether the pipeline that produced the
+ * number carried anything at any stage.
  */
 export const GATE_ORDER: readonly string[] = [
+  'V0-instrument-ready',
   'V1-pack-not-empty',
   'V2-fold-partition',
   'V3-parse-rate',
@@ -613,7 +616,45 @@ export type ProtocolGateInput = {
     /** Every question's distinct-result count was at least one, or the recording dropped a case. */
     readonly consistent: boolean;
   };
+  /**
+   * How much of the pipeline from a correction to a servable rule carried anything, when the lane
+   * counted it.
+   *
+   * Every gate in this file grades a number. None of them asks whether the machine that produced the
+   * number was running: `V1` passes on a pack of one rule and `V32` passes on a store whose every
+   * item was quarantined. Three published rounds were read as "the mechanism does not work" when the
+   * stage that had failed was the distiller's parse, and one was read as "the store is thin" when
+   * the write path had refused every candidate. The funnel is that missing question, stated as five
+   * counts whose only purpose is to locate a zero.
+   */
+  readonly funnel?: FunnelInput;
 };
+
+/**
+ * The five stages a rule passes through, and the two refusal counts that explain a narrowing.
+ *
+ * The names are the pipeline's, in order: the learning half could teach from `corrections` events,
+ * the interpreter proposed `candidates`, the store `admitted` some of them, it `stored` that many
+ * items, and `servable` of those are reachable by the recall the arm actually asks in. A stage that
+ * is zero is a different defect from a stage that is small, and only the sequence distinguishes them.
+ */
+export type FunnelInput = {
+  /** Learnable corrections the learning half produced. */
+  readonly corrections: number;
+  /** Candidate claims the interpreter proposed over them. */
+  readonly candidates: number;
+  /** Candidates that became an item or merged into one: created plus merged. */
+  readonly admitted: number;
+  /** Items the store holds. */
+  readonly stored: number;
+  /** Items the recall scope can reach. */
+  readonly servable: number;
+  /** Candidates a host-side rule refused. */
+  readonly refused?: number;
+  /** Events the interpreter failed on. */
+  readonly failed?: number;
+};
+
 
 export type ScenarioGateInput = {
   /**
@@ -674,10 +715,63 @@ function packReading(
   );
 }
 
+/**
+ * `V0`'s sentence: the chain as it ran, and the stage that broke when one did.
+ *
+ * A funnel is read to answer one question — *where did it stop* — and a sentence that reported only
+ * the first and last numbers would move that question back to the reader.
+ */
+function funnelReading(funnel: FunnelInput, reconciled: boolean): string {
+  const refusals = [
+    funnel.refused === undefined ? undefined : `${String(funnel.refused)} refused`,
+    funnel.failed === undefined ? undefined : `${String(funnel.failed)} failed`,
+  ].filter((entry): entry is string => entry !== undefined);
+  const chain =
+    `${String(funnel.corrections)} correction(s) -> ${String(funnel.candidates)} candidate(s) -> ` +
+    `${String(funnel.admitted)} admitted -> ${String(funnel.stored)} stored -> ` +
+    `${String(funnel.servable)} servable`;
+  const tail = refusals.length === 0 ? '' : ` (${refusals.join(', ')})`;
+  if (!reconciled) {
+    return (
+      `${chain}${tail}: a stage is larger than the one before it, so a count was taken over a ` +
+      'different population than the one it is used to explain'
+    );
+  }
+  const empty = emptyStage(funnel);
+  return empty === undefined ? `${chain}${tail}` : `${chain}${tail}: ${empty}`;
+}
+
+function emptyStage(funnel: FunnelInput): string | undefined {
+  if (funnel.corrections === 0) {
+    return 'the learning half produced no correctable episode, so no stage after it could carry anything';
+  }
+  if (funnel.candidates === 0) return 'the interpreter proposed no candidate over any correction';
+  if (funnel.admitted === 0) return 'every candidate was refused: the write path admitted nothing it was offered';
+  if (funnel.stored === 0) return 'the store holds no item, which contradicts an admission above';
+  if (funnel.servable === 0) {
+    return 'the store holds items and none is reachable by the recall scope this arm asks in';
+  }
+  return undefined;
+}
+
 export function buildProtocolGates(
   input: ProtocolGateInput & ScenarioGateInput,
 ): ValidityGate[] {
   const gates: ValidityGate[] = [];
+  if (input.funnel !== undefined) {
+    const funnel = input.funnel;
+    const reconciled =
+      funnel.admitted <= funnel.candidates &&
+      funnel.stored <= funnel.admitted &&
+      funnel.servable <= funnel.stored;
+    gates.push({
+      id: 'V0-instrument-ready',
+      criterion: 'every stage from a correction to a servable rule carried something, and the stages reconcile',
+      actual: funnelReading(funnel, reconciled),
+      pass: reconciled && funnel.corrections > 0 && funnel.candidates > 0 && funnel.admitted > 0 && funnel.servable > 0,
+      blocking: true,
+    });
+  }
   if (input.meanPackIds !== undefined) {
     gates.push({
       id: 'V1-pack-not-empty',

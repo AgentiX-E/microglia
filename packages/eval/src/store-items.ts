@@ -14,6 +14,8 @@
  * register of the store.
  */
 
+import { countDistinctTasks } from '@agentix-e/microglia-core';
+
 export type StoreItemRecord = {
   readonly id: string;
   readonly kind: string;
@@ -34,6 +36,19 @@ export type StoreItemRecord = {
   readonly statement: string;
   readonly trust: number;
   readonly scope: { readonly domain?: string };
+  /**
+   * Distinct tasks among the item's evidence — the support the score actually credits.
+   *
+   * R55.0. The competitive record's `sup3` arm admits a claim only when at least three distinct
+   * tasks derived it, and until this count existed nothing in this project asked whether anything
+   * recurs: `support` is a sum of weights, and one correction at trust 0.9 clears the 0.8 floor by
+   * itself. The count is taken with the score's own grouping (a task once, whatever its attempts;
+   * a run stands in when no task is named), so a recurrence reading cannot disagree with the
+   * fusion it explains.
+   */
+  readonly supportTasks: number;
+  /** Evidence rows the item holds, which is the other half of the same question. */
+  readonly evidence: number;
 };
 
 export type StoreItemSample = {
@@ -62,6 +77,7 @@ export function storeItemSample(
     readonly statement: string;
     readonly trust: number;
     readonly scope: { readonly domain?: string };
+    readonly evidence: readonly { readonly taskId?: string; readonly runId: string }[];
   }[],
   options: { readonly limit?: number; readonly maxChars?: number } = {},
 ): StoreItemSample {
@@ -80,6 +96,8 @@ export function storeItemSample(
       statement: statement.text,
       trust: item.trust,
       scope: item.scope.domain === undefined ? {} : { domain: item.scope.domain },
+      supportTasks: countDistinctTasks(item.evidence),
+      evidence: item.evidence.length,
     };
   });
   return { items: sampled, limit, maxChars, omitted: Math.max(0, items.length - sampled.length), truncated };

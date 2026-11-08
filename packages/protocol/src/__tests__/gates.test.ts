@@ -149,6 +149,15 @@ const full: ProtocolGateInput & ScenarioGateInput = {
     unsigned: 0,
     consistent: true,
   },
+  funnel: {
+    corrections: 350,
+    candidates: 340,
+    admitted: 240,
+    stored: 240,
+    servable: 200,
+    refused: 60,
+    failed: 5,
+  },
 };
 
 const gate = (input: ProtocolGateInput & ScenarioGateInput, id: string): ValidityGate => {
@@ -165,10 +174,11 @@ describe('the gate set', () => {
   });
 
   it('publishes each id exactly once', () => {
-    // 39 rather than 31: eight transfer ids arrive as arguments to `transferGates` rather than as
-    // object keys, and a list that missed them would sort eight published gates to the end.
-    expect(GATE_ORDER).toHaveLength(39);
-    expect(new Set(GATE_ORDER).size).toBe(39);
+    // 40 rather than 31: eight transfer ids arrive as arguments to `transferGates` rather than as
+    // object keys, and a list that missed them would sort eight published gates to the end. The
+    // fortieth is `V0`, which grades the pipeline rather than a number it produced.
+    expect(GATE_ORDER).toHaveLength(40);
+    expect(new Set(GATE_ORDER).size).toBe(40);
   });
 
   it('omits the scenario gates rather than passing them vacuously', () => {
@@ -571,5 +581,105 @@ describe('the substrate floor', () => {
     // One constant rather than two literals: a statistic reporting against 100 and a gate enforcing
     // 80 is a run whose verdict and its own floor disagree.
     expect(SUBSTRATE_FLOOR).toBe(100);
+  });
+});
+
+/**
+ * `V0`: the only gate whose subject is the machine rather than a number the machine produced.
+ *
+ * Every other gate here grades a reading. A run can pass all of them and have measured nothing —
+ * `V1` passes on one rule per question, `V32` passes on a store whose every item was quarantined —
+ * and three published rounds were read as "the mechanism does not work" when the stage that had
+ * failed was upstream of every gate the report carried. So the funnel is graded for a zero first.
+ */
+describe('the instrument-readiness gate', () => {
+  const withFunnel = (funnel: NonNullable<ProtocolGateInput['funnel']>) =>
+    gate({ ...minimal, funnel }, 'V0-instrument-ready');
+
+  it('passes a chain that carried something at every stage', () => {
+    const found = withFunnel({ corrections: 32, candidates: 30, admitted: 20, stored: 20, servable: 16 });
+    expect(found.pass).toBe(true);
+    expect(found.blocking).toBe(true);
+    expect(found.actual).toContain('32 correction(s) -> 30 candidate(s) -> 20 admitted -> 20 stored -> 16 servable');
+  });
+
+  it('names the refusals beside the chain, so a narrowing is explainable', () => {
+    const found = withFunnel({
+      corrections: 32,
+      candidates: 30,
+      admitted: 20,
+      stored: 20,
+      servable: 16,
+      refused: 6,
+      failed: 2,
+    });
+    expect(found.actual).toContain('(6 refused, 2 failed)');
+  });
+
+  it('says nothing about refusals when the lane counted none', () => {
+    // Absent is not zero: a lane that never counted refusals must not read as a lane that had none.
+    const found = withFunnel({ corrections: 4, candidates: 4, admitted: 4, stored: 4, servable: 4 });
+    expect(found.actual).not.toContain('refused');
+    expect(found.pass).toBe(true);
+  });
+
+  it('fails when the learning half had nothing to teach from', () => {
+    const found = withFunnel({ corrections: 0, candidates: 0, admitted: 0, stored: 0, servable: 0 });
+    expect(found.pass).toBe(false);
+    expect(found.actual).toContain('no correctable episode');
+  });
+
+  it('fails when every correction produced no candidate', () => {
+    const found = withFunnel({ corrections: 32, candidates: 0, admitted: 0, stored: 0, servable: 0 });
+    expect(found.pass).toBe(false);
+    expect(found.actual).toContain('proposed no candidate');
+  });
+
+  it('fails when the write path admitted nothing it was offered', () => {
+    const found = withFunnel({ corrections: 32, candidates: 30, admitted: 0, stored: 0, servable: 0 });
+    expect(found.pass).toBe(false);
+    expect(found.actual).toContain('every candidate was refused');
+  });
+
+  it('fails when an admission left no item in the store', () => {
+    // Reachable through a merge that found its own candidate, so the population question is real:
+    // a store that reports nothing after admitting something is a counter that lost an item.
+    const found = withFunnel({ corrections: 32, candidates: 30, admitted: 4, stored: 0, servable: 0 });
+    expect(found.pass).toBe(false);
+    expect(found.actual).toContain('the store holds no item');
+  });
+
+  it('fails when items exist and none is reachable by the recall scope', () => {
+    const found = withFunnel({ corrections: 32, candidates: 30, admitted: 20, stored: 20, servable: 0 });
+    expect(found.pass).toBe(false);
+    expect(found.actual).toContain('none is reachable by the recall scope');
+  });
+
+  it('fails a chain whose stages do not reconcile, and says why', () => {
+    // 40 admitted out of 30 candidates: two counts taken over different populations. That is an
+    // instrument defect, and the gate has to be able to say so rather than report the last number.
+    const found = withFunnel({ corrections: 32, candidates: 30, admitted: 40, stored: 40, servable: 40 });
+    expect(found.pass).toBe(false);
+    expect(found.actual).toContain('a stage is larger than the one before it');
+    expect(found.actual).toContain('different population');
+  });
+
+  it('fails a store holding more items than were admitted', () => {
+    const found = withFunnel({ corrections: 32, candidates: 30, admitted: 20, stored: 25, servable: 10 });
+    expect(found.pass).toBe(false);
+    expect(found.actual).toContain('different population');
+  });
+
+  it('fails more servable items than the store holds', () => {
+    const found = withFunnel({ corrections: 32, candidates: 30, admitted: 20, stored: 10, servable: 12 });
+    expect(found.pass).toBe(false);
+    expect(found.actual).toContain('different population');
+  });
+
+  it('is absent, not green, when the lane never counted the funnel', () => {
+    // Twenty artefacts exist without this field. A default of "ready" would have certified every
+    // one of them with a reading nobody took.
+    const ids = buildProtocolGates(minimal).map((entry) => entry.id);
+    expect(ids).not.toContain('V0-instrument-ready');
   });
 });

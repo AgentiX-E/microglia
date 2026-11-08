@@ -37,7 +37,9 @@
  *    arm's census (`storeCensus`) and the request tally (`recall`) travel beside the rate.
  */
 import { defaultPolicy } from '@agentix-e/microglia-core/kernel';
+import type { FunnelInput } from '@agentix-e/microglia-protocol';
 import type { AdmissionCensus, Tau2ArmRecord } from './tau2-gates.js';
+import type { StoreItemSample } from './store-items.js';
 import { coverageHistogram, useCensus, type UseArm, type UseObservation } from './tau2-use-census.js';
 
 export type { AdmissionCensus } from './tau2-gates.js';
@@ -189,24 +191,35 @@ export type Tau2Raw = {
    * never recorded, and a level nobody declared is not evidence that the default ran.
    */
   /** R54: the store's own words, bounded. See `storeItemSample`. */
-  readonly storeItems?: {
-    readonly items: readonly {
-      readonly id: string;
-      readonly kind: string;
-      readonly when?: string;
-      readonly statement: string;
-      readonly trust: number;
-      readonly scope: { readonly domain?: string };
-    }[];
-    readonly limit: number;
-    readonly maxChars: number;
-    readonly omitted: number;
-    readonly truncated: number;
+  readonly storeItems?: StoreItemSample;
+  /**
+   * R56: the form the distiller was asked for, and the inventory its ban refused names from.
+   *
+   * Absent on artefacts written before this field, which reads as "the form was not recorded" rather
+   * than as `lesson`: a readback that assumed the old default would attribute a difference between
+   * two runs to a treatment one of them never declared. R56 says so itself — *if the artefact cannot
+   * say which form ran, the run is `NO_MEASUREMENT`* — and the inventory is recorded beside it
+   * because a ban whose subject is unknown cannot be distinguished from a ban that had nothing to do.
+   */
+  readonly distillForm?: {
+    readonly form: string;
+    /** The action names the ban refused, from the corrections this run learned from. */
+    readonly toolInventory: readonly string[];
+    /** Candidates the host refused for naming one of them. */
+    readonly refused: number;
   };
   readonly injectionNote?: {
     readonly mode: 'none' | 'standard' | 'hardened';
     readonly declared: boolean;
   };
+  /**
+   * How far the pipeline from a correction to a servable rule got.
+   *
+   * Counted by the driver at the boundaries it can see: the learning half's corrections, the
+   * interpreter's candidates, the store's admissions, and the census's servable items. Absent on
+   * every artefact before R55, which leaves `V0` absent rather than passing.
+   */
+  readonly funnel?: FunnelInput;
   /** The write path's own census, when the driver ran with admission switched on. */
   readonly writeAdmission?: {
     readonly mode: 'off' | 'neighbours';
@@ -419,6 +432,7 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     // carried only the first turned R42's empty pack into a number with no cause.
     ...(raw.writeAdmission === undefined ? {} : { writeAdmission: raw.writeAdmission }),
     ...(raw.store === undefined ? {} : { store: raw.store }),
+    ...(raw.funnel === undefined ? {} : { funnel: raw.funnel }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),
     // The use census rides beside V1's rate. It is computed here, from the raw
     // observations the driver collected at the facade, so the driver carries

@@ -67,8 +67,11 @@ import {
   stampDomain,
   stoppedRun,
   storeCensus,
+  TAU2_DISTILL_FORM,
+  guardAgainstToolNames,
   tau2EditSemantics,
   toPassAtK,
+  toolInventoryOf,
   trialRowsOf,
   unansweredTasks,
   type Correction,
@@ -523,9 +526,24 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // model fails on every event. See `tau2-distill.ts` for why this is the host's decision rather
   // than the combinator's.
   const distiller = resilientInterpreter(
-    createLlmInterpreter({ llm: { complete: async (prompt) => (await llm.chat(prompt, 1200)).text } }),
+    createLlmInterpreter({
+      llm: { complete: async (prompt) => (await llm.chat(prompt, 1200)).text },
+      // R56: the one variable. The `lesson` form asks `when` to name a property "the reader can
+      // check on a different input: which tables or columns it involves" — an instruction written
+      // for a database, which in a lane whose input is a customer asking to cancel an order can
+      // only be satisfied by naming the tools. `procedure` asks for the trigger in the question's
+      // own terms, and it is the form this lane has never run.
+      form: TAU2_DISTILL_FORM,
+    }),
     ruleInterpreter,
   );
+  // The ban that makes the form real. A prompt cannot enforce itself, so a candidate whose statement
+  // or condition names one of the tools this split learned from is refused at the host boundary and
+  // counted. The inventory is built from the corrections themselves rather than from a constant: a
+  // hand-written list would go stale the moment the scenario renames an action, and a stale ban is a
+  // green reading on a store nobody constrained.
+  const toolInventory = toolInventoryOf(corrections);
+  const toolGuard = guardAgainstToolNames(toolInventory);
   // The domain on every claim is the host's, not the interpreter's: `parseScope` takes it from the
   // model's JSON, recall filters on it, and an item stored under a spelling no question asks in is
   // stored, counted, and unreachable. Both branches of the fallback are stamped, because the rules
@@ -551,6 +569,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   for (const correction of corrections) {
     const handle = host.begin({
       task: TASK,
+      // R55.0's instrument. `EvidenceRef.taskId` is what makes the store's support countable per
+      // task, and this call never set it: every item's evidence therefore fell back to its run id,
+      // one run per correction, and `distinctTasks` was 1 for every item by construction. That is
+      // not a store with no recurrence, it is a store whose recurrence could not be recorded — the
+      // distinction R55's own refutation turns on. The id is the correction's, so a claim derived
+      // from one task twice counts once and a claim derived from two tasks counts twice.
+      taskId: correction.taskId,
       // R51: the question, not its id. The distiller's prompt asks for a trigger
       // "in the question's own terms" and reads `run.input.question` to find them;
       // this field carried `correction.taskId`, so the model was asked to write in
@@ -580,6 +605,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const distillReport = await host.distill({
     generalize: false,
     fatal: stoppedRun,
+    accept: toolGuard.accept,
     ...(WRITE_ADMISSION_PLAN.mode === 'off' ? {} : { admission: WRITE_ADMISSION_PLAN.options }),
   });
   const faults = distiller.faults();
@@ -818,6 +844,16 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // and read none of them, so its readback could not tell a trigger in the user's register
     // from one in the procedure's — and those two predict opposite coverage.
     storeItems: storeItemSample(knowledge),
+    // R56: the treatment and the subject it acted on, recorded beside the store it produced. The
+    // form is what the prompt asked for; the inventory is what the ban refused names from; the
+    // count is how often it fired. An artefact that carried the form alone would read the same
+    // whether the ban ran or was vacuous, and R56's first refutation is that the ban is too strict —
+    // a claim that needs the count to be graded.
+    distillForm: {
+      form: TAU2_DISTILL_FORM,
+      toolInventory,
+      refused: toolGuard.refused(),
+    },
     // The treatment, recorded beside its result: an artefact cannot otherwise tell an arm
     // that switched write admission on from one that never asked, and the counters are the
     // only place the mechanism's own population appears.
@@ -831,6 +867,20 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       suppressed: distillReport.suppressed,
     },
     store: census,
+    // R55's audit: the five counts that locate a zero. Every gate in the protocol graded a number
+    // and none asked whether the machine that produced it carried anything — three rounds were read
+    // as "the mechanism does not work" when the failing stage was upstream of every gate the report
+    // carried. The counts are the driver's own, taken at the boundaries it can see, and they must
+    // reconcile or `V0` says the two populations differ rather than reporting the last one.
+    funnel: {
+      corrections: corrections.length,
+      candidates: distillReport.candidates,
+      admitted: distillReport.created + distillReport.merged,
+      stored: knowledge.length,
+      servable: census.servable,
+      refused: distillReport.rejectedUnsafe + distillReport.rejectedBorrowed + distillReport.rejectedByHost,
+      failed: distillReport.failed,
+    },
     recall: { requests: primary.recallRequests, served: primary.recallServed, empty: primary.recallRequests - primary.recallServed },
     // What the served packs contained. `withoutDomain` is the store's count of
     // `domain === undefined` items, from the same domain ledger V44 reads.
