@@ -85,9 +85,9 @@ on:
         required: false
         default: '6'
       bird:
-        description: 'Run the BIRD lane (false = L4 only, for a smoke run)'
+        description: 'BIRD lane: empty = the registration decides (a τ² registration buys none), true/false = explicit override'
         required: false
-        default: 'true'
+        default: ''
       l4:
         description: 'Also run the L4 lane (needs the tau2 environment; hours of calls)'
         required: false
@@ -141,13 +141,55 @@ env:
   SOTA_ARTEFACT: ${{ github.event.inputs.prereg != '' && format('{0}-{1}.json', github.event.inputs.split == 'dev' && 'poc-sota-bird-dev' || (github.event.inputs.split == 'train' && 'poc-sota-bird-train' || 'poc-sota-bird'), github.event.inputs.prereg) || (github.event.inputs.split == 'dev' && 'poc-sota-bird-dev.json' || (github.event.inputs.split == 'train' && 'poc-sota-bird-train.json' || 'poc-sota-bird.json')) }}
 
 jobs:
+  # Which lane this dispatch buys, decided once and before anything is spent.
+  #
+  # The two lanes measure different corpora and their gates were written without knowing about
+  # each other: `bird` defaulted to `true` for every dispatch, so a τ² dispatch bought a 1,768-call,
+  # seventeen-minute BIRD measurement of an arm nobody grades (42524907557). The rule is the one the
+  # rest of the lane already follows for the recall floor and the facade pair — the registration
+  # decides the experiment — and it lives in `packages/eval/src/lane-scope.ts` rather than in an
+  # `if:` because a workflow expression cannot be unit-tested and this one is.
+  #
+  # It reads the registration and nothing else. A job gated on its output is a job whose gate has
+  # cases; when the input default was `true`, a dispatch that meant to buy the lane and one that
+  # never thought about it were the same string.
+  scope:
+    name: 'Which lane this dispatch buys'
+    runs-on: ubuntu-latest
+    outputs:
+      bird: ${{ steps.scope.outputs.bird }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Resolve the scope
+        id: scope
+        env:
+          EVENT: ${{ github.event_name }}
+          BIRD_INPUT: ${{ github.event.inputs.bird || '' }}
+          SPLIT: ${{ github.event.inputs.split || 'minidev' }}
+          PREREG: ${{ github.event.inputs.prereg || '' }}
+        run: |
+          pnpm --silent eval:lane-scope
+          echo "### Lane scope" >> "$GITHUB_STEP_SUMMARY"
+          sed -n 's/^reason=//p' "$GITHUB_OUTPUT" | tail -1 >> "$GITHUB_STEP_SUMMARY"
+
   bird:
     # The split is in the title, not only in the inputs: a run list that calls all of them Mini-Dev
     # is a run list a reader has to open to tell apart, and the two splits measure different cells.
     name: BIRD ${{ github.event.inputs.split == 'dev' && 'dev' || (github.event.inputs.split == 'train' && 'train (out-of-sample)' || 'Mini-Dev') }} (cross-fitted, memory on/off)
-    # A dispatch that only wants the L4 lane should not pay for a BIRD run it did
-    # not ask for. Scheduled and push-triggered runs are unaffected.
-    if: github.event_name != 'workflow_dispatch' || github.event.inputs.bird != 'false'
+    # Decided by `scope`, which reads the registration: a τ² registration buys no BIRD lane, an
+    # explicit `bird: false` buys none, and a BIRD-only split buys one regardless. Scheduled and
+    # push-triggered runs keep the lane, because their scope resolves to it.
+    needs: scope
+    if: needs.scope.outputs.bird == 'true'
     runs-on: ubuntu-latest
     # Measured, not guessed: dev at 1,534 questions over four arms is 6,504 calls in 130 minutes,
     # so the cap has to cover the largest dispatch anyone actually runs. Train at 6,600 questions
@@ -384,7 +426,7 @@ jobs:
       # already said. It sits before the publish step so a failure here is visible in the
       # run's own output rather than only in an artefact nobody opened.
       - name: Re-score with the evidenced cascade
-        if: inputs.adjudicate == 'true' && inputs.bird == 'true'
+        if: inputs.adjudicate == 'true'
         timeout-minutes: 90
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
@@ -536,7 +578,7 @@ jobs:
       # into the step above would fail every run that did not buy it. The first dispatch
       # that produced one uploaded nothing, so its numbers exist only in a log.
       - name: Upload the adjudication
-        if: inputs.adjudicate == 'true' && inputs.bird == 'true'
+        if: inputs.adjudicate == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: sota-adjudication

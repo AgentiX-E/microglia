@@ -57,6 +57,7 @@
     "eval:probe": "tsx packages/eval/src/bin/embed-probe.ts",
     "eval:plugin": "tsx packages/eval/src/bin/plugin-run.ts",
     "eval:prereg": "tsx packages/eval/src/bin/prereg.ts",
+    "eval:lane-scope": "tsx packages/eval/src/bin/lane-scope.ts",
     "eval:prereg-floor": "tsx packages/eval/src/bin/prereg-floor.ts",
     "eval:prereg-pair": "tsx packages/eval/src/bin/prereg-pair.ts",
     "eval:prereg-notes": "tsx packages/eval/src/bin/prereg-notes.ts",
