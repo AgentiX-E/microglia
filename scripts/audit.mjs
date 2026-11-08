@@ -116,7 +116,48 @@ for (const internal of ['WHITEPAPER.md', 'TECH-DESIGN.md', 'ROADMAP.md', 'AUDIT.
   if (nested) fail('boundary', `docs/${internal} belongs in microglia-docs, not here`);
 }
 
-// Every `pnpm <script>` a workflow runs must exist.
+// A `TAU_*` variable the code reads is a knob. If no workflow can set it, its
+// default is the only value it will ever have -- and a registration whose single
+// variable it is cannot be dispatched at all.
+//
+// This is not hypothetical either. R53's whole treatment is `TAU_INJECTION_NOTE`:
+// the driver resolved it, the artefact recorded which level ran, three tests
+// covered the resolution, and no workflow passed it -- so the switch existed,
+// defaulted to `standard`, and no dispatch could move it. R56's `TAU_DISTILL_FORM`
+// was the same shape one iteration earlier.
+//
+// The scan is the source tree minus the tests: a test sets `TAU_PYTHON` to point
+// at an interpreter, which is a local convenience rather than a dispatch control,
+// and the allowlist below says so per name rather than by pattern.
+{
+  const LOCAL_ONLY = {
+    TAU_PYTHON: 'the driver tests point this at the interpreter the workflow installs',
+    TAU_WORKDIR: 'the driver tests point this at a temporary tau2 checkout',
+    TAU_REFERENCE: 'the reference arm path, for a pairing run a developer starts by hand',
+  };
+  const workflowsText = [];
+  const workflows = join(ROOT, '.github', 'workflows');
+  for (const entry of await readdir(workflows, { withFileTypes: true })) {
+    if (!entry.name.endsWith('.yml')) continue;
+    workflowsText.push(await readFile(join(workflows, entry.name), 'utf8'));
+  }
+  const wired = new Set(
+    workflowsText.flatMap((text) => [...text.matchAll(/TAU_[A-Z0-9_]+/g)].map((match) => match[0])),
+  );
+  const read = new Map();
+  for await (const path of walk(join(ROOT, 'packages'))) {
+    if (!path.endsWith('.ts') || path.includes('__tests__') || path.endsWith('.d.ts')) continue;
+    const text = await readFile(path, 'utf8');
+    for (const match of text.matchAll(/TAU_[A-Z0-9_]+/g)) {
+      if (!read.has(match[0])) read.set(match[0], relative(ROOT, path));
+    }
+  }
+  for (const [name, where] of read) {
+    if (wired.has(name) || name in LOCAL_ONLY) continue;
+    fail('workflow', `${where} reads '${name}', and no workflow can set it: its default is its only value`);
+  }
+}
+
 //
 // A rename that edits the call site instead of moving the definition is not
 // hypothetical: `poc:typecheck` became `typecheck:lanes` and a workflow step kept

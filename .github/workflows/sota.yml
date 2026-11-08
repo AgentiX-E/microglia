@@ -767,6 +767,24 @@ jobs:
           # count is already at the platform's limit of twenty-five. Unset means
           # off, which is the store every artefact before this switch measured.
           TAU_WRITE_ADMISSION: ${{ vars.TAU_WRITE_ADMISSION }}
+          # The four switches a registration owns rather than the dispatch menu. Each is a
+          # repository variable for the reason `template` is: which claims a store admits, which
+          # sentence a pack opens with, which form the distiller is asked for and which seed the
+          # recall draws from are properties of the experiment, not of the run.
+          #
+          # R53's whole treatment is `TAU_INJECTION_NOTE` (none / standard / hardened) and R56's was
+          # `TAU_DISTILL_FORM`. Both were read by the driver, resolved through a tested function and
+          # recorded in the artefact -- and neither was passed here, so neither could be varied by
+          # any dispatch. `scripts/audit.mjs` now fails on a `TAU_*` the source reads and no workflow
+          # can set, which is what makes that a build error rather than a review habit.
+          #
+          # Unset means empty means the default the lane has always run: `standard` with
+          # `declared: false`, `lesson`, seed 7, 400 calls, and the published admission threshold.
+          TAU_INJECTION_NOTE: ${{ vars.TAU_INJECTION_NOTE }}
+          TAU_DISTILL_FORM: ${{ vars.TAU_DISTILL_FORM }}
+          TAU_SEED: ${{ vars.TAU_SEED }}
+          TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}
+          TAU_WRITE_ADMISSION_THRESHOLD: ${{ vars.TAU_WRITE_ADMISSION_THRESHOLD }}
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           TAU_DRIVER: ${{ vars.TAU_DRIVER || './packages/eval/src/bin/tau2-driver.ts' }}
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}
@@ -830,6 +848,12 @@ jobs:
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
           TAU_TRIALS: ${{ vars.TAU_TRIALS || '4' }}
           TAU_MEMORY: 'false'
+          # The same four switches, empty. The two arms must share every setting that is not the
+          # memory, and an arm that read a different seed would differ in more than its store.
+          TAU_INJECTION_NOTE: ${{ vars.TAU_INJECTION_NOTE }}
+          TAU_DISTILL_FORM: ${{ vars.TAU_DISTILL_FORM }}
+          TAU_SEED: ${{ vars.TAU_SEED }}
+          TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}
           TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
           TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '2' }}
           TAU_RETRIES: ${{ vars.TAU_RETRIES || '4' }}
