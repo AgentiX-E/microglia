@@ -13,7 +13,7 @@
  *     number dropped is reported rather than silently discarded.
  */
 import { MicrogliaError, hashText, hashJson } from '../kernel/index.js';
-import type { KnowledgeItem, KnowledgePack, RecallQuery } from '../kernel/index.js';
+import type { Json, KnowledgeItem, KnowledgePack, RecallQuery } from '../kernel/index.js';
 
 export const OPEN_TAG = '<microglia-knowledge';
 export const CLOSE_TAG = '</microglia-knowledge>';
@@ -91,7 +91,32 @@ export type RenderedPack = {
   readonly truncated: number;
 };
 
-function encodeLine(item: KnowledgeItem, conditions: boolean): string {
+/**
+ * What rendering needs from an item, which is six fields rather than the record's twenty.
+ *
+ * Narrowed deliberately: R57's planted arm renders one authored rule into a pack it did not build,
+ * and requiring a full `KnowledgeItem` there would mean inventing an evidence trail, a lifecycle and
+ * a support count for a rule that has none of them. The renderer never read those fields; this is
+ * the type saying so.
+ */
+export type RenderableItem = Pick<
+  KnowledgeItem,
+  'id' | 'kind' | 'confidence' | 'scope' | 'statement'
+> & {
+  readonly when?: string;
+  readonly payload?: Json;
+};
+
+/**
+ * One item as the block carries it, which is a line rather than a field.
+ *
+ * Exported for the one caller that appends an item to a block it did not render: R57's planted arm
+ * adds exactly one authored rule to every pack, and a line encoded any other way would either be
+ * unparseable or differ from the renderer's format in a way no reader would notice until the two
+ * drifted. Everything the renderer guarantees — the condition first, `<` escaped, no trailing
+ * whitespace — is this function's, so the appended line is the renderer's line.
+ */
+export function encodeItemLine(item: RenderableItem, conditions: boolean): string {
   const record = {
     id: item.id,
     kind: item.kind,
@@ -122,7 +147,7 @@ function encodeLine(item: KnowledgeItem, conditions: boolean): string {
  */
 const MAX_ITEMS = 99_999;
 
-export function renderPack(items: readonly KnowledgeItem[], options: RenderOptions): RenderedPack {
+export function renderPack(items: readonly RenderableItem[], options: RenderOptions): RenderedPack {
   if (items.length > MAX_ITEMS) {
     throw new MicrogliaError('MG_E_CONFIG', `Cannot render ${items.length} items in one pack`, {
       items: items.length,
@@ -188,7 +213,7 @@ export function renderPack(items: readonly KnowledgeItem[], options: RenderOptio
   let truncated = 0;
 
   for (const item of items) {
-    const line = encodeLine(item, conditions);
+    const line = encodeItemLine(item, conditions);
     if (used + line.length + 1 > options.budget) {
       truncated += 1;
       continue;

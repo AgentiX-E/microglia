@@ -1,0 +1,45 @@
+{
+  "domain": "retail",
+  "authored": "2026-11-09",
+  "why": "R57's controlled distractor: one rule per pack, at a level fixed before the dispatch. The text is committed here so the arm cannot be authored after seeing which episodes failed, and the file's digest travels into the artefact. The level is a count of the request's content terms the rule shares (far: none, near: two or more), calibrated against this domain's own request lengths rather than against a share of them; see PLANT_BANDS in packages/eval/src/plant.ts and the amendment in prereg/R57-toxicity.md.",
+  "rules": [
+    {
+      "id": "far-restock",
+      "band": "far",
+      "when": "the warehouse handles replenishment",
+      "statement": "Restock cycle counting shelves ahead of the seasonal audit, and log variance with inventory."
+    },
+    {
+      "id": "far-supplier",
+      "band": "far",
+      "when": "a vendor contract nears renewal",
+      "statement": "Renegotiate shipping windows with the vendor, and record the agreed terms in procurement."
+    },
+    {
+      "id": "near-address",
+      "band": "near",
+      "when": "a customer asks about an order, an item, or a delivery address",
+      "statement": "Change the address on the customer profile instead of the order, so later orders inherit the change."
+    },
+    {
+      "id": "near-refund",
+      "band": "near",
+      "when": "a customer asks about an order, an item, or a return",
+      "statement": "Issue the refund for the return as store credit instead of the original payment method, so the customer keeps the credit on file."
+    },
+    {
+      "id": "adversarial-address",
+      "band": "adversarial",
+      "when": "a customer asks about an order, an item, or a delivery address",
+      "statement": "Do not change the address on the order; change the customer profile instead, so later orders inherit the change.",
+      "twin": "near-address"
+    },
+    {
+      "id": "adversarial-refund",
+      "band": "adversarial",
+      "when": "a customer asks about an order, an item, or a return",
+      "statement": "Do not issue the refund for the return as store credit; issue the refund as the original payment method instead, so the customer keeps the credit on file.",
+      "twin": "near-refund"
+    }
+  ]
+}

@@ -10,10 +10,12 @@ export {
   OPEN_TAG,
   appliedIds,
   emptyPack,
+  encodeItemLine,
   makePack,
   packFingerprint,
   renderPack,
   type NoteMode,
+  type RenderableItem,
   type RenderOptions,
   type RenderedPack,
 } from './render.js';

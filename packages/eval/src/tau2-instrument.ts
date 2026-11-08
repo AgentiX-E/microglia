@@ -43,6 +43,7 @@ import type { StoreItemSample } from './store-items.js';
 import type { ConsolidationCensus } from '@agentix-e/microglia-core/distill';
 import type { InactionCensus } from './inaction.js';
 import type { YieldCensus } from './tau2-yield.js';
+import type { PlantCensus } from './plant.js';
 import { coverageHistogram, useCensus, type UseArm, type UseObservation } from './tau2-use-census.js';
 
 export type { AdmissionCensus } from './tau2-gates.js';
@@ -271,6 +272,14 @@ export type Tau2Raw = {
    * axis that decides whether either can recur.
    */
   readonly yieldCensus?: YieldCensus;
+  /**
+   * R57: the controlled distractor this arm planted, and the level it landed at.
+   *
+   * Absent on every artefact before this field and on every control arm — absence is "nothing was
+   * planted", which is a different reading from a census of zero plants, and only the presence of
+   * `declared` inside it tells an arm from a dispatch that never heard of the switch.
+   */
+  readonly plant?: PlantCensus;
   readonly injectionNote?: InjectionNoteRecord;
   /**
    * How far the pipeline from a correction to a servable rule got.
@@ -472,6 +481,7 @@ export const PROJECTION: { readonly [K in keyof Tau2Raw]-?: 'carried' | 'reduced
   distillUnit: 'carried',
   traceClaims: 'carried',
   yieldCensus: 'carried',
+  plant: 'carried',
   injectionNote: 'carried',
   funnel: 'carried',
   writeAdmission: 'carried',
@@ -551,6 +561,7 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     ...(raw.distillUnit === undefined ? {} : { distillUnit: raw.distillUnit }),
     ...(raw.traceClaims === undefined ? {} : { traceClaims: raw.traceClaims }),
     ...(raw.yieldCensus === undefined ? {} : { yieldCensus: raw.yieldCensus }),
+    ...(raw.plant === undefined ? {} : { plant: raw.plant }),
     ...(raw.injectionNote === undefined ? {} : { injectionNote: raw.injectionNote }),
     ...(raw.funnel === undefined ? {} : { funnel: raw.funnel }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),

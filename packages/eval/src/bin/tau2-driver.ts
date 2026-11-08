@@ -102,6 +102,19 @@ import {
   type ProbeAttempt,
 } from '@agentix-e/microglia-eval';
 import type { NoteMode } from '@agentix-e/microglia-core/apply';
+import {
+  PLANT_ENV,
+  plantCensus,
+  plantedDigest,
+  plantSummary,
+  plantedFor,
+  plantedRendered,
+  resolvePlantArm,
+  validatePlanted,
+  type PlantCensus,
+  type PlantedDocument,
+  type PlantedItem,
+} from '../plant.js';
 import { consolidateKnowledge } from '@agentix-e/microglia-core/distill';
 import { defaultPolicy } from '@agentix-e/microglia-core';
 
@@ -185,6 +198,27 @@ const NOTE_PLAN = resolveInjectionNotePlan(process.env);
  * treatment.
  */
 const NOTE_ARMS = resolveFacadeNotePlan(process.env, PAIR_PLAN);
+/**
+ * R57's controlled distractor, resolved at module load.
+ *
+ * Unset is the control arm and no rule is planted, so every artefact committed before this module
+ * produced the packs it always did. The rules are read from the committed file rather than authored
+ * here: a rule written in this process could be written after seeing which episodes failed, and the
+ * file's digest is what travels into the artefact to show that it was not.
+ */
+const PLANT_PLAN = resolvePlantArm(process.env);
+/**
+ * The committed rules, at one path and no other.
+ *
+ * Deliberately not an environment variable: a dispatch that could point at rules it did not commit
+ * would make the digest in the artefact a digest of a file nobody can inspect, which is the one
+ * property that stops an arm being authored after seeing which episodes it broke.
+ */
+const PLANTED_PATH = join(REPO, 'eval', 'planted', 'retail.json');
+const PLANTED: PlantedDocument | undefined =
+  PLANT_PLAN.arm === 'none'
+    ? undefined
+    : validatePlanted(JSON.parse(readFileSync(PLANTED_PATH, 'utf8')) as PlantedDocument);
 const TRIALS = Math.max(1, Number(process.env['TAU_TRIALS'] ?? 4) || 4);
 const TRAIN_SHARE = Number(process.env['TAU_TRAIN_SHARE'] ?? 0.5) || 0.5;
 /**
@@ -804,6 +838,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   process.stdout.write(
     `[tau2] injection-note: mode=${NOTE_PLAN.mode} declared=${String(NOTE_PLAN.declared)}\n`,
   );
+  // R57: the arm, its digest, and how often the band was reached. Printed before the run rather
+  // than only recorded in the artefact, because a band that collapsed is worth knowing about before
+  // an hour of evaluation is spent on it.
+  if (PLANTED !== undefined) {
+    process.stdout.write(
+      `[tau2] plant: arm=${PLANT_PLAN.arm} env=${PLANT_ENV} digest=${plantedDigest(PLANTED)} ` +
+        `rules=${PLANTED.rules.length}\n`,
+    );
+  }
   // R54: three conditions, verbatim, on the run's own page. A count of conditions cannot be
   // read for register, and register is the whole question the next arm asks of this store.
   for (const item of knowledge.slice(0, 3)) {
@@ -841,6 +884,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     readonly coverageObservations?: UseObservation[];
     /** Whether the agent acted at all in each episode, reduced to per-task counts. */
     readonly inaction: InactionCensus;
+    /**
+     * R57: the level the distractor was planted at, and whether it landed in its band.
+     *
+     * Absent on the control arm, which planted nothing — the absence is the reading that says this
+     * dispatch was the control rather than an arm whose census came back empty.
+     */
+    readonly plant?: PlantCensus;
   };
 
   const evaluateFacade = async (
@@ -858,6 +908,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // What each served pack actually contained, at the facade boundary. The
     // recall scope, the floor and the pack are exactly as R45 ran them.
     const useObservations: UseObservation[] = [];
+    // R57: one reading per request that received the planted rule. The rule is appended to the
+    // rendered block rather than added to the store, because the registration asks for exactly one
+    // rule in every pack — an item the store merely held would be retrieved on the requests that
+    // resemble it, which is the confound the arm exists to remove.
+    const plantReadings: PlantedItem[] = [];
+    let plantCreatedBlock = 0;
     const facade = await startRecall(async ({ text }) => {
       const pack = await host.recall({
         task: TASK,
@@ -868,17 +924,40 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         // which is what every single-facade and paired dispatch does.
         ...(note === undefined ? {} : { note }),
       });
+      const planted = PLANTED === undefined ? undefined : plantedFor(PLANT_PLAN.arm, text, PLANTED);
+      if (planted === undefined || PLANTED === undefined) {
+        recallRequests += 1;
+        if (pack.items.length > 0) recallServed += 1;
+        servedPackSizes.push(pack.items.length);
+        useObservations.push({
+          query: text,
+          statements: pack.items.map((item) => item.statement),
+          // R51 made condition + statement the document the floor is applied to; this is the
+          // same document, so the histogram cannot score a pack by text the floor never saw.
+          documents: pack.items.map(recallText),
+        });
+        return pack;
+      }
+      const injection = plantedRendered(pack.rendered, planted.rule, {
+        // The host's own budget, so a pack that had room keeps it: the appended line is the only
+        // difference between this pack and the control's.
+        budget: pack.budget,
+        scope: { task: TASK, domain: RECALL_DOMAIN },
+        ...(note === undefined ? {} : { note }),
+      });
+      if (injection.created) plantCreatedBlock += 1;
+      plantReadings.push(planted);
+      // Counted as served, and counted as one item larger: the planted rule is in the prompt, and a
+      // served tally that omitted it would describe a pack the agent did not read.
       recallRequests += 1;
-      if (pack.items.length > 0) recallServed += 1;
-      servedPackSizes.push(pack.items.length);
+      recallServed += 1;
+      servedPackSizes.push(pack.items.length + 1);
       useObservations.push({
         query: text,
-        statements: pack.items.map((item) => item.statement),
-        // R51 made condition + statement the document the floor is applied to; this is the
-        // same document, so the histogram cannot score a pack by text the floor never saw.
-        documents: pack.items.map(recallText),
+        statements: [...pack.items.map((item) => item.statement), planted.rule.statement],
+        documents: [...pack.items.map(recallText), recallText(planted.rule)],
       });
-      return pack;
+      return { ...pack, rendered: injection.rendered };
     });
     let evalStdout = '';
     try {
@@ -910,6 +989,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       // R48's defect was two readings from different dispatches, and sharing one census between two
       // facades would recreate it one layer down.
       inaction: inactionCensusOf(diagnostics, TEST_DOMAIN),
+      ...(PLANTED === undefined
+        ? {}
+        : {
+            plant: plantCensus(PLANT_PLAN, plantReadings, PLANTED, plantCreatedBlock),
+          }),
     };
   };
 
@@ -1023,6 +1107,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     await host.close();
   }
 
+  if (primary.plant !== undefined) {
+    process.stdout.write(`[tau2] planted: ${plantSummary(primary.plant)}\n`);
+  }
+
   const agentTurns = primary.diagnostics?.agent_turns ?? null;
   const scored = primary.scored;
   const llmStats = llm.stats;
@@ -1076,6 +1164,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       claims: distillReport.candidates,
       ...(consolidation === undefined ? {} : { consolidation: consolidation.report }),
     },
+    // R57: the controlled distractor, when this dispatch armed one. Absent is the control arm.
+    ...(primary.plant === undefined ? {} : { plant: primary.plant }),
     // R60: the ceiling this dispatch ran at, and whether it was chosen or inherited.
     traceClaims: TRACE_CLAIMS,
     // R60: claims per correction, counted from the store rather than from the interpreter's report —

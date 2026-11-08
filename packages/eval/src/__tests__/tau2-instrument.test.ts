@@ -490,6 +490,20 @@ describe('the projection has a decision for every field, and keeps it', () => {
           { taskId: 'retail/1', assertions: 1, claims: 1 },
         ],
       },
+      // R57: the planted arm's census, carried because a `carried` decision is checked against the
+      // fields the fixture defines — a fixture that omitted it would let the projection drop it in
+      // silence, which is the defect this guard was written for.
+      plant: {
+        arm: 'near',
+        declared: true,
+        planted: 200,
+        inBand: 152,
+        createdBlock: 12,
+        terms: [1, 2, 5],
+        coverages: [0.02, 0.05, 0.13],
+        byRule: { 'near-address': 120, 'near-refund': 80 },
+        digest: 'abc123abc123abcd',
+      },
       injectionNote: { mode: 'standard', declared: false },
       funnel: {
         corrections: 2,

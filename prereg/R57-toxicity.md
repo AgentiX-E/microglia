@@ -45,15 +45,17 @@ agent has no task context inside an episode) — this registration **plants** th
 
 One arm adds exactly one synthetic rule to every pack, at a coverage level fixed before the run:
 
-| arm | the planted rule's share of the query's content terms | what it is |
+| arm | the request's content terms the planted rule shares | what it is |
 | --- | --- | --- |
 | `none` | — | the store as R56 leaves it |
-| `far` | under 5% | grammatical, domain-flavoured, topically unrelated |
-| `near` | 10–20% | shares the topic, states the wrong action |
-| `adversarial` | 10–20%, contradicts a known-correct rule | same text as `near`, negated |
+| `far` | none | grammatical, domain-flavoured, topically unrelated |
+| `near` | two or more | shares the topic, states the wrong action |
+| `adversarial` | its `near` twin's, by construction | the same words as `near`, the correct action forbidden |
 
 The rules are authored once, committed, and identical across arms; each is bound to a query by the
-same `recallText` coverage the floor uses, so the level is measured rather than asserted.
+same `recallText` coverage the floor uses, so the level is measured rather than asserted. The level
+is a count rather than the share this section first stated — see the amendment below, which was
+written before any arm ran.
 
 Two properties make this a measurement rather than a demonstration:
 
@@ -100,6 +102,40 @@ Two properties make this a measurement rather than a demonstration:
 - Authoring the planted rules after seeing which episodes failed. The rules are committed before the
   dispatch and the file's hash goes in the artefact.
 - Grading `pass^4` alone. The mean is registered as reported-not-claimed; the ledger is the reading.
+
+## Amendment, 2026-11-09 — the level is a term count, and the pair is measured on one text
+
+Written before any arm was dispatched, and before any episode existed to look at. Two defects were
+found by measuring the committed rules against this domain's own requests.
+
+**The share band was unreachable.** A retail request carries 11 to 126 content terms — median 40,
+p90 78, p10 21, counted over the 114 requests in `retail.json` with the lane's own tokenizer. A rule
+that shares four of a request's terms therefore covers 0.10 of a short one and 0.03 of a long one,
+and no rule that shares a request's topic lands in 10–20% of it: measured, the drafted `near` rules
+reached 10–20% on 11% and 12% of requests, and `far` on 0%. A band that reports `inBand: false` on
+nearly every request measures its own arithmetic.
+
+The band is therefore a count of the request's content terms that the rule shares: `far` is none,
+`near` and `adversarial` are two or more. That is the same distinction with the request's length
+taken out of it, and it is what "shares the topic" means when a topic is forty words long. The share
+is still recorded per request and in the census, because it is the quantity the recall floor uses;
+it no longer decides the band.
+
+**The pair was not matched on level.** The drafted `adversarial` rules were the `near` rules with an
+action forbidden *and* one word added — `keep`, in the address pair, a term 30% of retail requests
+carry — so the adversarial arm sat at median 0.067 coverage against the near arm's 0.048 and on 64%
+of requests in band against 49%. Polarity would have moved the dose, which is the one confound this
+contrast exists to remove. Two repairs, both enforced in code rather than by care:
+
+- `validatePlanted` refuses a twin pair whose token sets differ by anything other than a declared
+  negation marker, so a future edit to one side of a pair cannot silently change its level.
+- A pair's level is measured on the `near` text and inherited by both arms, because a negation
+  marker is itself a token and a third of retail requests say "not" themselves.
+
+After the amendment: `far` shares nothing with 100% of requests, and the `near`/`adversarial` arm
+reaches its band on 76% of them, the rest recorded as drift rather than repaired. The rules were
+re-authored once, on the request-length distribution, before any dispatch and before any episode
+was scored.
 
 ## Cost
 

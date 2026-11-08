@@ -799,6 +799,12 @@ jobs:
           # committed trace artefact ran at; a run at six is a different treatment and the ceiling
           # travels into the artefact so a readback can tell the two apart.
           TAU_TRACE_CLAIMS: ${{ vars.TAU_TRACE_CLAIMS }}
+          # R57: which controlled distractor this dispatch plants, and nothing else. Unset is the
+          # control arm, so every artefact committed before this variable produced the packs it
+          # always did. The rules themselves are committed in eval/planted/retail.json and their
+          # digest travels into the artefact, which is what stops an arm being authored after the
+          # episodes it failed are known.
+          TAU_PLANTED_RULES: ${{ vars.TAU_PLANTED_RULES }}
           TAU_SEED: ${{ vars.TAU_SEED }}
           TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}
           TAU_WRITE_ADMISSION_THRESHOLD: ${{ vars.TAU_WRITE_ADMISSION_THRESHOLD }}
