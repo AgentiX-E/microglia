@@ -21,6 +21,32 @@ dispatch of this registration as written would have compared a retail store agai
 called the result a note-level effect. Nothing below changed; the predictions are about levels of one
 sentence and were never about a sample size.
 
+**Control repaired 2026-11-08, before dispatch — the treatment cannot be three dispatches.** The
+first refutation below reads *"if the three arms' delivery censuses are not identical, the experiment
+varied more than the note and is abandoned"*, and no arrangement of three separate dispatches can
+satisfy it. Two dispatches of one configuration differ in their corrections, because the model
+produces them at run time: R54 distilled from ten corrections and R56 from eight on the same 32-row
+learning fold, and their delivered-pair counts were 2,765 and 2,984. A registration whose control is
+"the three arms are identical except for the note" therefore cannot be graded by running three arms;
+it would fail its own first refutation every time, and the failure would be honest and useless.
+
+The note is also not a per-arm property in the code. `note: NOTE_PLAN.mode` is passed to
+`openMicroglia`, so it is fixed for the host, and R49's two facades share one host — which is why the
+paired-facade pattern cannot carry three notes either without a change.
+
+So this registration is **blocked on a capability, not on a switch**: the note has to become a
+*rendering option of one recall* rather than a property of the process, and the three levels have to
+run as three facades over **one** store, one learning phase and one seed — R49's pattern generalised
+from two facades to three. What then differs between arms is the sentence and the answers it produces,
+which is the variable; what cannot differ is the store, which is what "same store, same items" has to
+mean. `TAU_INJECTION_NOTE` reaching the workflow (AUDIT 34.66) was necessary and is not sufficient.
+
+Nothing below is weakened by this. The three predictions and the four refutations stand as written;
+what changes is that the first refutation becomes checkable, because one run over one store can
+produce censuses that are comparable to the digit on the side that matters — the items each pack
+carried for the same request — while the side that cannot be held (how many requests the agent chose
+to make) is reported per arm instead of asserted equal.
+
 # R53 — the pack's instruction is the variable, and three levels of it
 
 **Registered** 2026-11-08, undispatched. Blocked on R51's readback by the one-lane rule:
