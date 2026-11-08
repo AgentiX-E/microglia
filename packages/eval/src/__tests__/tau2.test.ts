@@ -291,6 +291,18 @@ describe('learnableCorrections', () => {
     expect(only?.instruction).toBe('Cancel a shipment that has not left the warehouse.');
   });
 
+  it('carries the rubric on the correction, because a trace has two halves', () => {
+    // R58. A trace is the attempt beside what the task promised, and the promise lives in the
+    // criteria: the calls when the task states them, the assertions when it does not. The
+    // correction carried the first and dropped the second, so a distiller reading a trace could
+    // see what the agent did and only half of what it should have done.
+    const [only] = learnableCorrections(
+      [task({ id: 'a', assertions: ['The order is cancelled.', 'The user is told the refund date.'] })],
+      new Map([['a', 0]]),
+    );
+    expect(only?.assertions).toEqual(['The order is cancelled.', 'The user is told the refund date.']);
+  });
+
   it('honours a threshold below one, for runs that score partial credit', () => {
     const tasks = [task({ id: 'a' }), task({ id: 'b' })];
     const rewards = new Map([

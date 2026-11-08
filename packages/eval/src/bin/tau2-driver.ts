@@ -75,6 +75,10 @@ import {
   noteFacadeReading,
   noteFacadeSummary,
   resolveDistillForm,
+  resolveDistillUnit,
+  tracesOf,
+  traceOf,
+  actionSentence,
   resolveFacadeNotePlan,
   tau2EditSemantics,
   toPassAtK,
@@ -83,6 +87,7 @@ import {
   unansweredTasks,
   type Correction,
   type PassAtKInput,
+  type TaskTrace,
   type Tau2ArmRecord,
   type Tau2Raw,
   type TauTrialRow,
@@ -94,6 +99,8 @@ import {
   type ProbeAttempt,
 } from '@agentix-e/microglia-eval';
 import type { NoteMode } from '@agentix-e/microglia-core/apply';
+import { consolidateKnowledge } from '@agentix-e/microglia-core/distill';
+import { defaultPolicy } from '@agentix-e/microglia-core';
 
 const runFile = promisify(execFile);
 
@@ -222,6 +229,20 @@ const TASK = 'tau2.act';
  * the record rather than in a comment.
  */
 const DISTILL_FORM = resolveDistillForm();
+
+/**
+ * The unit this dispatch distils, resolved once and recorded from the same value.
+ *
+ * R58. `correction` is the unit every published arm measured — one failed task, one sentence, one
+ * rule — and it is the default because an upgrade must not change what a published number measured.
+ * `trace` puts the attempt beside the reference trajectory and asks for up to three claims, which is
+ * the only arrangement in which one claim can be derived by three tasks and `supportTasks` can reach
+ * a recurrence threshold at all.
+ *
+ * Read at module load so a misspelt value refuses the run before the first model call, and recorded
+ * so a reader of the artefact never has to infer which of the two produced the store.
+ */
+const DISTILL_UNIT = resolveDistillUnit();
 
 /** One `run_split.py` invocation, with its stdout surfaced on failure. */
 async function phase(args: readonly string[]): Promise<string> {
@@ -543,7 +564,14 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   );
 
   const learned = readFileSync(learnPath, 'utf8');
-  const learnedTasks = parseTauTasks(JSON.parse(learned));
+  // Parsed once: two readers of one document is two chances to describe two different documents,
+  // and the trace arm's honesty depends on both halves coming from the same run.
+  const learnedDocument = JSON.parse(learned) as unknown;
+  const learnedTasks = parseTauTasks(learnedDocument);
+  // The traces, only for the arm that reads them: `tracesOf` walks every message of every
+  // simulation, and paying that on a correction arm would be work whose result the arm never uses.
+  const traces: ReadonlyMap<string, TaskTrace> =
+    DISTILL_UNIT === 'trace' ? tracesOf(learnedDocument) : new Map<string, TaskTrace>();
   const rewards = bestRewards(learned);
   const corrections: Correction[] = learnableCorrections(learnedTasks, rewards);
   // The two ways a training task can leave the store without a correction are not the same fact, and
@@ -577,7 +605,14 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       // for a database, which in a lane whose input is a customer asking to cancel an order can
       // only be satisfied by naming the tools. `procedure` asks for the trigger in the question's
       // own terms, and it is the form this lane has never run.
-      form: DISTILL_FORM,
+      // R58: the unit decides the form. A trace arm that kept the `lesson` guidance would ask a
+      // model to name "which tables or columns it involves" of a conversation, which is the
+      // measurement R54 made and R56 reverted; a correction arm that took the trace guidance would
+      // be asked to compare an attempt it was never shown.
+      form: DISTILL_UNIT === 'trace' ? 'trace' : DISTILL_FORM,
+      // Three claims from one trace: the unit is richer, and a single sentence about a whole
+      // episode is the object this registration exists to replace.
+      ...(DISTILL_UNIT === 'trace' ? { maxCandidates: 3 } : {}),
     }),
     ruleInterpreter,
   );
@@ -615,7 +650,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     ...(NOTE_ARMS.enabled ? { budgetBasis: NOTE_ARMS.budgetBasis } : {}),
   });
 
+  let withTrace = 0;
   for (const correction of corrections) {
+    const trace = traces.get(correction.taskId);
+    if (trace !== undefined) withTrace += 1;
     const handle = host.begin({
       task: TASK,
       // R55.0's instrument. `EvidenceRef.taskId` is what makes the store's support countable per
@@ -636,6 +674,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         taskId: correction.taskId,
         domain: LEARN_DOMAIN,
         schemaDigest: LEARN_DOMAIN,
+        // R58: the attempt beside the reference trajectory. Absent when the learning document
+        // recorded no simulation for this task, which the artefact counts as `untraced` rather than
+        // as a trace with no calls in it — the two read the same in a store and are different runs.
+        ...(trace === undefined
+          ? {}
+          : traceOf(trace, {
+              expected: correction.actions.map((action) => actionSentence(action)),
+              ...(correction.assertions.length === 0 ? {} : { rubric: correction.assertions }),
+            })),
       },
       model: llm.model,
       promptVersion: 'tau2/1',
@@ -657,6 +704,25 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     accept: toolGuard.accept,
     ...(WRITE_ADMISSION_PLAN.mode === 'off' ? {} : { admission: WRITE_ADMISSION_PLAN.options }),
   });
+  // R58: the recurrence pass, over the store the distiller just wrote.
+  //
+  // Only for the trace arm, and only after the write: the pass answers a question about a *finished*
+  // store ("which of these items are one claim, and how many tasks stand behind each?"), which is a
+  // question no write-side rule can ask — R55.0's store of seven items with one task each and a store
+  // of three items with two or three tasks each are identical from the write path's point of view.
+  //
+  // Recorded even when it changes nothing, because "the pass ran and found no recurrence" and "the
+  // pass did not run" are different findings, and the artefact has to be able to tell them apart.
+  const consolidation =
+    DISTILL_UNIT === 'trace'
+      ? consolidateKnowledge(await store.listKnowledge({}), {
+          now: Date.now(),
+          policy: defaultPolicy,
+        })
+      : undefined;
+  if (consolidation !== undefined) {
+    for (const item of consolidation.items) await store.putKnowledge(item);
+  }
   const faults = distiller.faults();
   // The store's census, taken here rather than after the evaluation, because the funnel's last stage
   // is what decides whether there is anything to evaluate. R42 paid an hour of pack-free evaluation to
@@ -675,6 +741,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     refused: distillReport.rejectedUnsafe + distillReport.rejectedBorrowed + distillReport.rejectedByHost,
     failed: distillReport.failed,
   };
+  // The arm is defined by reading traces. A learning document that carried none — an older τ²
+  // whose writer did not persist simulations, or a parse that met a different shape — would distil
+  // the correction arm's object under the trace arm's name, and report the control's store as the
+  // treatment's. Refused before the expensive half of the dispatch, like every other empty store.
+  if (DISTILL_UNIT === 'trace' && withTrace === 0) {
+    throw noMeasurementRefusal(
+      `the trace arm read 0 traces from ${String(corrections.length)} correction(s): the learning document carries no simulate messages, so the unit under test did not run`,
+    );
+  }
   const funnelState = funnelVerdict(funnel);
   if (!funnelState.ready) {
     // A run whose pipeline did not carry anything has no reading to publish, and evaluating it would
@@ -971,9 +1046,19 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // whether the ban ran or was vacuous, and R56's first refutation is that the ban is too strict —
     // a claim that needs the count to be graded.
     distillForm: {
-      form: DISTILL_FORM,
+      form: DISTILL_UNIT === 'trace' ? 'trace' : DISTILL_FORM,
       toolInventory,
       refused: toolGuard.refused(),
+    },
+    // R58: the unit, the traces it read, and what the recurrence pass did with them. Absent
+    // consolidation on a trace arm would be a pass that did not run; absent `distillUnit` on any
+    // artefact before this field is "not recorded", which a readback must not read as `correction`.
+    distillUnit: {
+      unit: DISTILL_UNIT,
+      traces: traces.size,
+      traced: withTrace,
+      claims: distillReport.candidates,
+      ...(consolidation === undefined ? {} : { consolidation: consolidation.report }),
     },
     // The treatment, recorded beside its result: an artefact cannot otherwise tell an arm
     // that switched write admission on from one that never asked, and the counters are the

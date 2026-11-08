@@ -31,6 +31,7 @@ import {
   pairedFacadeArtifact,
   pairedVerdict,
   parseTauResults,
+  recurrenceGate,
   sampleGates,
   perTaskRows,
   toPassAtK,
@@ -404,6 +405,16 @@ const gates = [
           criterion: 'a registered within-run pair is never a cross-run comparison',
         },
       ]),
+  // R58: a trace arm's support reading is only a reading if the artefact's two distributions
+  // describe the store it also reports. Graded as a gate rather than printed as a footnote, because
+  // the run that fails it has no recurrence number to interpret — and because a trace arm whose
+  // consolidation pass never ran carries the treatment's name and the control's store.
+  ...(() => {
+    const unit = measured.instrumentation?.distillUnit;
+    if (unit === undefined || unit.unit !== 'trace') return [];
+    const gate = recurrenceGate(unit);
+    return [{ id: 'l4-support-recurrence', pass: gate.pass, actual: gate.actual, criterion: gate.criterion }];
+  })(),
   // R53: a three-level arm whose arms served different items is not a note effect. The
   // control is graded as a gate rather than printed as a footnote, because the run that
   // fails it has no interpretable delta at all.

@@ -451,6 +451,29 @@ describe('the projection has a decision for every field, and keeps it', () => {
         truncated: 0,
       },
       distillForm: { form: 'lesson', toolInventory: ['find_user'], refused: 0 },
+      // R58: the carried fixture holds the unit, because a `carried` decision is only checked
+      // against the fields the fixture defines — and the guard that catches a dropped field would
+      // otherwise be silent about the one this iteration added.
+      distillUnit: {
+        unit: 'trace',
+        traces: 3,
+        traced: 3,
+        claims: 7,
+        consolidation: {
+          considered: 3,
+          groups: 1,
+          merged: 1,
+          retained: 2,
+          threshold: 0.7,
+          refusedCondition: 0,
+          refusedPayload: 0,
+          refusedDuplicateEvidence: 0,
+          supportBefore: { 1: 3 },
+          supportAfter: { 1: 1, 2: 1 },
+          maxSupportBefore: 1,
+          maxSupportAfter: 2,
+        },
+      },
       injectionNote: { mode: 'standard', declared: false },
       funnel: {
         corrections: 2,

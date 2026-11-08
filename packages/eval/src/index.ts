@@ -567,6 +567,19 @@ export {
   type ToolNameGuard,
 } from './tau2-register.js';
 
+export { recurrenceGate, type RecurrenceGate } from './recurrence.js';
+
+export {
+  TRACE_CALL_CAP,
+  parseTraceCalls,
+  resolveDistillUnit,
+  traceOf,
+  tracesOf,
+  type DistillUnit,
+  type TaskTrace,
+  type TraceCall,
+} from './tau2-trace.js';
+
 export {
   INJECTION_NOTE_LEVELS,
   resolveInjectionNotePlan,

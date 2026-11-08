@@ -115,7 +115,7 @@ const KINDS = new Set<KnowledgeKind>([
  * changes what a *candidate is*, not only how it is worded: a repair must name a mechanism
  * and must not quote the case's values.
  */
-export type DistillForm = 'lesson' | 'repair' | 'procedure' | 'lexicon';
+export type DistillForm = 'lesson' | 'repair' | 'procedure' | 'lexicon' | 'trace';
 
 /**
  * The repair form's instructions.
@@ -193,6 +193,40 @@ const LEXICON_INSTRUCTION: readonly string[] = [
   '- No second-person instructions, no advice to the reader, no imperative mood.',
 ];
 
+/**
+ * The trace form: several claims from one episode, in the register the request was made in.
+ *
+ * The unit of distillation is what this form changes. Every earlier form reads one *correction* —
+ * a sentence stating what should have happened — and returns one rule, so a claim derived from a
+ * trace and a claim derived from the tool it names are indistinguishable, and no two traces can
+ * produce the same claim (R55.0 measured the store: `{1: 7}`, one task behind every item).
+ *
+ * The event's `input.trace` carries both halves of the episode: `attempt` (the calls the agent
+ * made) and `expected` (the reference trajectory), with the rubric that failed. The difference
+ * between them is the lesson, and it is a difference only a trace can show — which is why the
+ * prompt puts them side by side instead of describing them.
+ *
+ * The register constraint is the other half. R54 and R56 established that a `when` written for a
+ * database is unsatisfiable in a lane whose input is a person asking to cancel an order, and that
+ * the model satisfies it by naming tools. So the condition is asked for in the requester's words,
+ * and the ban that enforces it is host-side (`DistillOptions.accept`) because a prompt cannot
+ * enforce itself.
+ */
+const TRACE_INSTRUCTION: readonly string[] = [
+  'You read one task trace and state what it teaches, as rules a later agent can act on.',
+  'Return JSON only, with this shape:',
+  '{"candidates":[{"kind":"constraint|procedure|negative","statement":"...","when":"..."}]}',
+  'The event holds `input.trace`: `attempt` is what the agent did, in order; `expected` is what the reference trajectory does instead; `rubric` is the checks the attempt failed.',
+  'Rules:',
+  '- Return at most three candidates. Each states one thing this trace teaches; two claims that restate each other are one claim and will be merged.',
+  '- Never name a tool, a function, an endpoint or an identifier. A statement says what to establish, check or avoid, in words that survive the rename of every tool in the system.',
+  '- Prefer the claim that would have prevented the divergence between `attempt` and `expected`, abstracted away from this case. When the two differ by a missing step, the claim names the step and the state it establishes; when they differ by order, it names the order and why it matters.',
+  '- `when` is the trigger, in the words the person making the request used: what they are asking for and what state the thing they are asking about is in. It must be checkable on a different request and must not hold for every request.',
+  '- Do not quote this case: no names of people, products, orders or numbers, and no paraphrase of the request. A rule that only fits the trace it came from teaches nothing.',
+  '- Return an empty array when the trace teaches nothing reusable.',
+  '- At most 300 characters in the statement.',
+];
+
 const REPAIR_INSTRUCTION: readonly string[] = [
   'You compare one wrong attempt with the correction that replaced it, and state what generalises.',
   'Return JSON only, with this shape:',
@@ -226,6 +260,8 @@ export function buildDistillPrompt(
   const instructions =
     form === 'procedure'
       ? [...PROCEDURE_INSTRUCTION, taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '']
+      : form === 'trace'
+      ? [...TRACE_INSTRUCTION, taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '']
       : form === 'repair'
       ? [
           ...REPAIR_INSTRUCTION,

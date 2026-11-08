@@ -34,6 +34,14 @@ export {
   type GeneralizationPlan,
 } from './generalize.js';
 export {
+  claimOverlap,
+  claimTokens,
+  consolidateKnowledge,
+  type ConsolidationCensus,
+  type ConsolidationOptions,
+  type ConsolidationResult,
+} from './consolidate.js';
+export {
   MAX_STATEMENT,
   buildDistillPrompt,
   createLlmInterpreter,

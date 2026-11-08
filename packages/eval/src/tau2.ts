@@ -201,6 +201,15 @@ export type Correction = {
    * than as a question.
    */
   readonly instruction: string;
+  /**
+   * The rubric the task is scored against, when it states one.
+   *
+   * R58. A trace is the attempt beside what the task promised, and the promise lives in the
+   * criteria: the calls when the task names them, the assertions when it does not. The correction
+   * carried the first and dropped the second, so a distiller reading a trace could see what the
+   * agent did and only half of what it should have done.
+   */
+  readonly assertions: readonly string[];
 };
 
 /**
@@ -256,7 +265,13 @@ export function learnableCorrections(
   for (const task of tasks) {
     const teaching = teachingOf(task, rewards.get(task.id), threshold);
     if (teaching === undefined) continue;
-    out.push({ taskId: task.id, statement: teaching, actions: task.actions, instruction: task.instruction });
+    out.push({
+    taskId: task.id,
+    statement: teaching,
+    actions: task.actions,
+    instruction: task.instruction,
+    assertions: task.assertions,
+  });
   }
   return out;
 }

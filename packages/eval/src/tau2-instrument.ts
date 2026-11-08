@@ -40,6 +40,7 @@ import { defaultPolicy } from '@agentix-e/microglia-core/kernel';
 import type { FunnelInput } from '@agentix-e/microglia-protocol';
 import type { AdmissionCensus, Tau2ArmRecord } from './tau2-gates.js';
 import type { StoreItemSample } from './store-items.js';
+import type { ConsolidationCensus } from '@agentix-e/microglia-core/distill';
 import type { InactionCensus } from './inaction.js';
 import { coverageHistogram, useCensus, type UseArm, type UseObservation } from './tau2-use-census.js';
 
@@ -75,6 +76,28 @@ export type DistillFormRecord = {
   readonly toolInventory: readonly string[];
   /** Candidates the host refused for naming one of them. */
   readonly refused: number;
+};
+
+/**
+ * R58: the unit distilled, the traces it read, and what the recurrence pass did with them.
+ *
+ * Three facts in one record because a trace arm's reading is uninterpretable without all three: the
+ * unit says which object the model was shown, `traces`/`traced` say whether the document it was read
+ * from carried that object at all (a run that fell back to corrections has the trace arm's name and
+ * the control's store), and the census is the only place `supportAfter` exists — the store's items
+ * carry `supportTasks` one at a time, and the distribution over them is what a recurrence threshold
+ * asks about.
+ */
+export type DistillUnitRecord = {
+  readonly unit: 'correction' | 'trace';
+  /** Traces the learning document carried. */
+  readonly traces: number;
+  /** Corrections that carried one, and were therefore distilled from a trace. */
+  readonly traced: number;
+  /** Candidates the interpreter returned before any screening. */
+  readonly claims: number;
+  /** Absent when the pass did not run, which on a trace arm is a defect rather than a zero. */
+  readonly consolidation?: ConsolidationCensus;
 };
 
 /** The sentence every pack opened with. See `Tau2Raw.injectionNote`. */
@@ -228,6 +251,8 @@ export type Tau2Raw = {
    * because a ban whose subject is unknown cannot be distinguished from a ban that had nothing to do.
    */
   readonly distillForm?: DistillFormRecord;
+  /** R58: the unit, the traces, and the consolidation census. See `DistillUnitRecord`. */
+  readonly distillUnit?: DistillUnitRecord;
   readonly injectionNote?: InjectionNoteRecord;
   /**
    * How far the pipeline from a correction to a servable rule got.
@@ -426,6 +451,7 @@ export const PROJECTION: { readonly [K in keyof Tau2Raw]-?: 'carried' | 'reduced
   widenedItems: 'reduced',
   storeItems: 'carried',
   distillForm: 'carried',
+  distillUnit: 'carried',
   injectionNote: 'carried',
   funnel: 'carried',
   writeAdmission: 'carried',
@@ -502,6 +528,7 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     // refuses, because the artefact still looks complete.
     ...(raw.storeItems === undefined ? {} : { storeItems: raw.storeItems }),
     ...(raw.distillForm === undefined ? {} : { distillForm: raw.distillForm }),
+    ...(raw.distillUnit === undefined ? {} : { distillUnit: raw.distillUnit }),
     ...(raw.injectionNote === undefined ? {} : { injectionNote: raw.injectionNote }),
     ...(raw.funnel === undefined ? {} : { funnel: raw.funnel }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),

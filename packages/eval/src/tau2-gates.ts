@@ -51,7 +51,7 @@ import {
 import { detectableDelta } from './protocol.js';
 import type { CoverageHistogram, UseCensus } from './tau2-use-census.js';
 import type { InactionCensus } from './inaction.js';
-import type { DistillFormRecord, InjectionNoteRecord } from './tau2-instrument.js';
+import type { DistillFormRecord, DistillUnitRecord, InjectionNoteRecord } from './tau2-instrument.js';
 import type { StoreItemSample } from './store-items.js';
 
 /**
@@ -151,6 +151,8 @@ export type Tau2ArmRecord = {
   /** R54/R56: the store's own words, bounded, and the form the distiller was asked for. */
   readonly storeItems?: StoreItemSample;
   readonly distillForm?: DistillFormRecord;
+  /** R58: the unit distilled, the traces read, and the recurrence pass's census. */
+  readonly distillUnit?: DistillUnitRecord;
   readonly injectionNote?: InjectionNoteRecord;
   /**
    * How far the pipeline from a correction to a servable rule got, when the driver counted it.
