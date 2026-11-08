@@ -83,6 +83,7 @@ export const DEFERRALS: Readonly<Record<string, string>> = {
   coupling: 'the scanner itself: it defines the word list, so it necessarily contains every word on it',
   'gate-matrix': 'the matrix names the artefact it was rendered against; the dataset name is an argument, not a query',
   judge: 'the LLM judge\'s prompt and record name the artefact being judged',
+  'lane-scope': 'decides which of the two lanes a dispatch buys; the lane names are the subject, not a query',
   plugin: 'the plugin contract\'s worked example is a host that returns SQL',
   reproduction: 'the reproduction config names the published BIRD cell and its M-Schema rendering',
   'rose-vec': 'the public adjudication set\'s record fields',

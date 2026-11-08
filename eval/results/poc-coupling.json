@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 163,
+  "scanned": 164,
   "totals": {
-    "modules": 163,
-    "lines": 44142,
+    "modules": 164,
+    "lines": 44243,
     "adapterLines": 1766,
-    "deferredLines": 5762,
-    "coupledShare": 0.1677
+    "deferredLines": 5863,
+    "coupledShare": 0.1696
   },
   "layers": [
     {
@@ -37,11 +37,11 @@
     },
     {
       "layer": "eval",
-      "modules": 107,
-      "lines": 31376,
+      "modules": 108,
+      "lines": 31477,
       "adapterLines": 0,
-      "deferredLines": 5762,
-      "coupled": 13
+      "deferredLines": 5863,
+      "coupled": 14
     },
     {
       "layer": "browser",
@@ -143,7 +143,7 @@
       "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 448,
+      "lines": 449,
       "words": [
         "sql",
         "sqlite",
@@ -176,6 +176,17 @@
       ],
       "verdict": "deferred",
       "reason": "the LLM judge's prompt and record name the artefact being judged"
+    },
+    {
+      "pkg": "eval",
+      "module": "lane-scope",
+      "path": "packages/eval/src/lane-scope.ts",
+      "lines": 100,
+      "words": [
+        "bird"
+      ],
+      "verdict": "deferred",
+      "reason": "decides which of the two lanes a dispatch buys; the lane names are the subject, not a query"
     },
     {
       "pkg": "eval",
@@ -483,7 +494,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "163 modules, 13 deferred with a reason"
+      "detail": "164 modules, 14 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -498,5 +509,5 @@
       "detail": "39 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1766 of 44142 production lines across 163 modules: 7 adapter modules in `sql`, 13 deferred with a reason, and `core` at 0 coupled modules of 39; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1766 of 44243 production lines across 164 modules: 7 adapter modules in `sql`, 14 deferred with a reason, and `core` at 0 coupled modules of 39; 5 package edges, 0 of them upward."
 }
