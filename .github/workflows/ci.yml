@@ -129,8 +129,8 @@ jobs:
             const checks = [
               ['four gates fire', ids.length === 4],
               ['two of them are vacuous', a.protocol.vacuous.length === 2],
-              ['thirty-five are absent', a.protocol.absent.length === 35],
-              ['thirteen supplyable', a.protocol.supplyable === 13],
+              ['thirty-six are absent', a.protocol.absent.length === 36],
+              ['fourteen supplyable', a.protocol.supplyable === 14],
               ['twenty-six arm-indexed', a.protocol.armIndexed === 26],
               ['the resolution gate fired', resolution !== undefined],
               ['and it blocks', resolution.blocking === true],
