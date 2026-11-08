@@ -2,19 +2,19 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 150,
+  "scanned": 152,
   "totals": {
-    "modules": 150,
-    "lines": 40647,
+    "modules": 152,
+    "lines": 41048,
     "adapterLines": 1766,
     "deferredLines": 5643,
-    "coupledShare": 0.1792
+    "coupledShare": 0.1803
   },
   "layers": [
     {
       "layer": "core",
       "modules": 38,
-      "lines": 7207,
+      "lines": 7217,
       "adapterLines": 0,
       "deferredLines": 0,
       "coupled": 0
@@ -22,7 +22,7 @@
     {
       "layer": "protocol",
       "modules": 2,
-      "lines": 1326,
+      "lines": 1420,
       "adapterLines": 0,
       "deferredLines": 0,
       "coupled": 0
@@ -37,11 +37,11 @@
     },
     {
       "layer": "eval",
-      "modules": 95,
-      "lines": 28786,
+      "modules": 97,
+      "lines": 29083,
       "adapterLines": 0,
       "deferredLines": 5643,
-      "coupled": 12
+      "coupled": 13
     },
     {
       "layer": "browser",
@@ -70,13 +70,13 @@
     {
       "from": "eval",
       "to": "core",
-      "files": 38,
+      "files": 40,
       "upward": false
     },
     {
       "from": "eval",
       "to": "protocol",
-      "files": 5,
+      "files": 7,
       "upward": false
     },
     {
@@ -154,6 +154,17 @@
       ],
       "verdict": "deferred",
       "reason": "the scanner itself: it defines the word list, so it necessarily contains every word on it"
+    },
+    {
+      "pkg": "eval",
+      "module": "gate-matrix",
+      "path": "packages/eval/src/gate-matrix.ts",
+      "lines": 118,
+      "words": [
+        "bird"
+      ],
+      "verdict": "general",
+      "reason": null
     },
     {
       "pkg": "eval",
@@ -470,9 +481,9 @@
   "gates": [
     {
       "id": "V72-every-coupled-module-has-a-verdict",
-      "pass": true,
+      "pass": false,
       "blocking": true,
-      "detail": "150 modules, 12 deferred with a reason"
+      "detail": "1 coupled modules have no verdict, first packages/eval/src/gate-matrix.ts (bird)"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -487,5 +498,5 @@
       "detail": "38 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1766 of 40647 production lines across 150 modules: 7 adapter modules in `sql`, 12 deferred with a reason, and `core` at 0 coupled modules of 38; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1766 of 41048 production lines across 152 modules: 7 adapter modules in `sql`, 12 deferred with a reason, and `core` at 0 coupled modules of 38; 5 package edges, 0 of them upward."
 }

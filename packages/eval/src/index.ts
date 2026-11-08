@@ -550,6 +550,8 @@ export {
   type StoreItemSample,
 } from './store-items.js';
 
+export { gateRows, renderMatrix, type GateRow } from './gate-matrix.js';
+
 export {
   TAU2_DISTILL_FORM,
   guardAgainstToolNames,
