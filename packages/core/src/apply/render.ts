@@ -13,7 +13,7 @@
  *     number dropped is reported rather than silently discarded.
  */
 import { MicrogliaError, hashText, hashJson } from '../kernel/index.js';
-import type { KnowledgeItem, KnowledgePack } from '../kernel/index.js';
+import type { KnowledgeItem, KnowledgePack, RecallQuery } from '../kernel/index.js';
 
 export const OPEN_TAG = '<microglia-knowledge';
 export const CLOSE_TAG = '</microglia-knowledge>';
@@ -57,9 +57,28 @@ export type RenderOptions = {
    * blanking it would invert the block rather than vary the experiment.
    */
   readonly note?: NoteMode;
+  /**
+   * What the character budget is measured over.
+   *
+   * `note-included` is the historical accounting and stays the default: the wrapper — note and
+   * all — is charged to the budget, which is what every committed artefact measured.
+   *
+   * `note-excluded` charges only the block's data, counting the wrapper as if it carried no
+   * note. It exists because the note competes with the items it annotates for the same
+   * characters: at a fixed budget the `hardened` sentence is ~110 characters longer than
+   * `standard` and buys that room by dropping the last rule, so an arm differing *only* in
+   * wording carries a different pack. R53's control is "same items, same order" — three
+   * levels that cannot hold it are three treatments, not three levels of one. Under this
+   * basis all three levels have identical capacity by construction.
+   *
+   * The consequence is stated rather than hidden: the rendered block may exceed `budget` by
+   * the note's length, and `tokens` reports the whole block as it always did. `note: 'none'`
+   * is the note-free block, so it still satisfies the original guarantee exactly.
+   */
+  readonly budgetBasis?: 'note-included' | 'note-excluded';
 };
 
-export type NoteMode = 'standard' | 'hardened' | 'none';
+export type NoteMode = NonNullable<RecallQuery['note']>;
 
 /** Appended by `hardened`. No double quote and no ampersand: the note is an XML attribute. */
 const CALIBRATION =
@@ -145,7 +164,15 @@ export function renderPack(items: readonly KnowledgeItem[], options: RenderOptio
         ? `${base} ${CALIBRATION}`
         : base;
   const open = `<${tag} version="1" note="${note}" items="__N__">`;
-  const overhead = open.length + close.length + 1;
+  // What the budget is charged for. Under `note-excluded` the wrapper is counted as if it
+  // carried no note, so the sentence and the rules stop competing for the same characters;
+  // see `budgetBasis`. The note itself is rendered either way — this changes only the
+  // arithmetic that decides how many lines fit beside it.
+  const counted =
+    (options.budgetBasis ?? 'note-included') === 'note-excluded'
+      ? `<${tag} version="1" note="" items="__N__">`
+      : open;
+  const overhead = counted.length + close.length + 1;
 
   // A budget too small for the wrapper itself cannot carry any knowledge. An
   // empty string is the honest answer: it is what fits, and a host that greps

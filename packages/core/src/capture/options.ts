@@ -56,6 +56,15 @@ export type MicrogliaOptions = {
    * committed before R53.
    */
   readonly note?: NoteMode;
+  /**
+   * What this host's character budget is charged for. See `RenderOptions.budgetBasis`.
+   *
+   * Absent means `note-included`, the accounting every published number was produced
+   * under. A host that varies the note must declare `note-excluded`: at a fixed budget the
+   * hardened sentence is longer than the standard one and buys that room by dropping the
+   * last rule, so the arms would differ in their packs as well as in their wording.
+   */
+  readonly budgetBasis?: 'note-included' | 'note-excluded';
   /** Apply feedback to the knowledge that was in the run's prompt. Default true. */
   readonly credit?: boolean;
   /**

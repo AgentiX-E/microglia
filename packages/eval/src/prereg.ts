@@ -40,6 +40,15 @@ export type Prereg = {
    */
   readonly facadePair?: 'as-is-floored' | 'off';
   /**
+   * Whether this registration runs R53's three note levels as three facades of ONE dispatch.
+   *
+   * `off` (or an absent key) keeps every earlier registration on the single-note path. The
+   * value is a declaration, not a knob: the level set is the registered one (`none`,
+   * `standard`, `hardened`), and a registration that pairs the floor with the note would
+   * vary two treatments at once.
+   */
+  readonly facadeNotes?: 'three-level' | 'off';
+  /**
    * The scenario pair this registration executes, when it pins one.
    *
    * Absent means "whatever the lane is configured with", which is what every registration
@@ -87,6 +96,7 @@ const HEADER_KEYS = [
   ...REQUIRED_KEYS,
   'recallFloor',
   'facadePair',
+  'facadeNotes',
   'trainDomain',
   'testDomain',
   'recallDomain',
@@ -222,6 +232,25 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  const notesText = values.get('facadeNotes');
+  let facadeNotes: Prereg['facadeNotes'];
+  if (notesText !== undefined) {
+    if (notesText !== 'three-level' && notesText !== 'off') {
+      collected.push({
+        where: `header 'facadeNotes'`,
+        problem: `must be 'three-level' or 'off', received '${notesText}'`,
+      });
+    } else {
+      facadeNotes = notesText;
+    }
+  }
+  if (facadeNotes === 'three-level' && facadePair === 'as-is-floored') {
+    collected.push({
+      where: `header 'facadeNotes'`,
+      problem: 'a three-level note arm and a paired recall facade vary two treatments in one dispatch',
+    });
+  }
+
   if (facadePair === 'as-is-floored' && (recallFloor === undefined || recallFloor <= 0)) {
     collected.push({
       where: `header 'facadePair'`,
@@ -324,6 +353,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       gates,
       ...(recallFloor === undefined ? {} : { recallFloor }),
       ...(facadePair === undefined ? {} : { facadePair }),
+      ...(facadeNotes === undefined ? {} : { facadeNotes }),
       ...(trainDomain === undefined ? {} : { trainDomain }),
       ...(testDomain === undefined ? {} : { testDomain }),
       ...(recallDomain === undefined ? {} : { recallDomain }),

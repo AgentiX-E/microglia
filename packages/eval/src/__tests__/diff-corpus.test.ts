@@ -101,3 +101,24 @@ describe('diffCasesOf', () => {
     expect('packIdList' in (cases[0] ?? {})).toBe(false);
   });
 });
+
+describe('the fields a reading can be stratified by', () => {
+  it('carries the gold SQL and the difficulty when the lane recorded them', () => {
+    // R28 stratifies by overlap and R39 by resolution; both need the gold query and the
+    // difficulty beside the difference, and a corpus that dropped them would silently
+    // collapse every stratum into one. Absent stays absent, which the test below holds.
+    const cases = diffCasesOf({
+      per_case: [{ ...QUESTION, goldSql: 'SELECT count(*) FROM account', difficulty: 'simple' }],
+    });
+    expect(cases[0]).toMatchObject({
+      goldSql: 'SELECT count(*) FROM account',
+      difficulty: 'simple',
+    });
+  });
+
+  it('leaves both absent rather than empty when the lane did not record them', () => {
+    const cases = diffCasesOf({ per_case: [QUESTION] });
+    expect('goldSql' in (cases[0] ?? {})).toBe(false);
+    expect('difficulty' in (cases[0] ?? {})).toBe(false);
+  });
+});

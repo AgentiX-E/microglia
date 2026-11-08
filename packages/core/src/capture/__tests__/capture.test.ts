@@ -403,3 +403,59 @@ describe('doctor: the promotion gate backlog', () => {
     await mg.close();
   });
 });
+
+/**
+ * R53: the note is a rendering option of ONE recall, not a property of the process.
+ *
+ * The registration's first refutation is that the three levels' delivery censuses must be
+ * identical, and three dispatches cannot satisfy it — the model produces different
+ * corrections on each, so the stores differ before the note does. One host, one store and
+ * three recalls can, because the level is chosen per request. That is also the honest
+ * description of the thing: the note is text a pack is rendered with, not state the memory
+ * holds.
+ *
+ * The second half is the defect the first half exposes: at a fixed budget the longer
+ * sentence displaces the last rule, so a host that varies the note without declaring
+ * `budgetBasis` measures a sentence AND a pack.
+ */
+describe('the note is chosen per recall', () => {
+  it('renders the level the request asks for, over the host default', async () => {
+    const { mg, store } = await create({ note: 'none' });
+    await store.putKnowledge(knowledge('k_1'));
+    const quiet = await mg.recall({ task: 'chart.recommend', text: 'monthly revenue trend' });
+    expect(quiet.rendered).not.toContain('the observation is the evidence');
+
+    const hardened = await mg.recall({
+      task: 'chart.recommend',
+      text: 'monthly revenue trend',
+      note: 'hardened',
+    });
+    expect(hardened.rendered).toContain('the observation is the evidence');
+    // The items are the same items: the arm varies the sentence, not the pack.
+    expect(hardened.ids).toEqual(quiet.ids);
+    await mg.close();
+  });
+
+  it('keeps the host level when a request does not name one', async () => {
+    const { mg, store } = await create({ note: 'hardened' });
+    await store.putKnowledge(knowledge('k_1'));
+    const pack = await mg.recall({ task: 'chart.recommend', text: 'monthly revenue trend' });
+    expect(pack.rendered).toContain('the observation is the evidence');
+    await mg.close();
+  });
+
+  it('carries the same items at all three levels when the budget excludes the note', async () => {
+    const { mg, store } = await create({ budgetBasis: 'note-excluded' });
+    for (const id of ['k_1', 'k_2', 'k_3', 'k_4']) await store.putKnowledge(knowledge(id));
+    const packs = [];
+    for (const note of ['none', 'standard', 'hardened'] as const) {
+      packs.push(await mg.recall({ task: 'chart.recommend', text: 'monthly revenue trend', note }));
+    }
+    expect(packs[1]?.ids).toEqual(packs[0]?.ids);
+    expect(packs[2]?.ids).toEqual(packs[0]?.ids);
+    // And the level really did reach the text, or the equality above would be vacuous.
+    expect(packs[2]?.rendered).toContain('the observation is the evidence');
+    expect(packs[0]?.rendered).not.toContain('Reference data from prior user corrections');
+    await mg.close();
+  });
+});

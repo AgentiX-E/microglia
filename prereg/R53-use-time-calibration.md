@@ -7,6 +7,7 @@ sample: 228
 gates: V1,V2,V3,V5,V6,V7,V8,V32,V44
 recallFloor: 0
 facadePair: off
+facadeNotes: three-level
 trainDomain: retail
 testDomain: retail
 recallDomain: retail
@@ -40,6 +41,34 @@ run as three facades over **one** store, one learning phase and one seed — R49
 from two facades to three. What then differs between arms is the sentence and the answers it produces,
 which is the variable; what cannot differ is the store, which is what "same store, same items" has to
 mean. `TAU_INJECTION_NOTE` reaching the workflow (AUDIT 34.66) was necessary and is not sufficient.
+
+**Capability built 2026-11-08, before dispatch.** The blocked item is no longer blocked, and
+building it found one defect that would have made the first refutation fire on a confound rather
+than on the note.
+
+The defect: the note is an attribute of the wrapper and the wrapper is charged to the character
+budget, so at a fixed budget the `hardened` sentence — about 110 characters longer than `standard`
+— bought its room by dropping the last rule. At budget 320 the `standard` arm carried one item and
+the `hardened` arm carried none. Three levels that carry different packs are three treatments, not
+three levels of one, and *"the delivery censuses are identical to the digit"* would have failed for
+a reason that has nothing to do with the sentence. `RenderOptions.budgetBasis: 'note-excluded'`
+charges the budget to the block's data and counts the wrapper as if it carried no note, so all
+three levels have identical capacity by construction; the historical accounting stays the default
+because an upgrade must not change what a published number measured. The test was written red
+first, and it is the test that found this.
+
+The capability, in the order the data flows:
+
+| Piece | What it makes true |
+| --- | --- |
+| `RecallQuery.note` | the level is a rendering option of ONE recall, so three facades can share one host and one store |
+| `MicrogliaOptions.budgetBasis` | the host declares what its budget is charged for, and the artefact records it |
+| `resolveFacadeNotePlan` (`TAU_FACADE_NOTES`) | the arm is resolved from this registration, refuses a simultaneous floor pair, and refuses a single declared level beside a three-level arm |
+| `prereg-notes.ts` + `facadeNotes: three-level` | the dispatch cannot choose its own levels, and the workflow reads the declaration rather than a repository variable |
+| three facades in `tau2-driver.ts` | one learning phase, one store, one seed stream, three evaluations; the `standard` arm stays the arm the rest of the lane grades |
+| `packIdentity` in the artefact | the control as a number: for every request two arms both saw, the served statements must be equal |
+| `l4-note-identity` gate + `r53_readback.py` | a run that fails the control is `IDENTITY_BROKEN` and blocks, instead of reporting a delta |
+| `poc-l4-facade-notes.json` | three arms, two contrasts against `standard`, the census per arm, and the basis that made the control possible |
 
 Nothing below is weakened by this. The three predictions and the four refutations stand as written;
 what changes is that the first refutation becomes checkable, because one run over one store can

@@ -54,6 +54,14 @@ export type BuildPackOptions = {
   readonly absenceFloor?: number;
   /** The sentence the block opens with; see `NoteMode`. Absent means `standard`. */
   readonly note?: NoteMode;
+  /**
+   * What the budget is charged for; see `RenderOptions.budgetBasis`.
+   *
+   * Absent means `note-included`, the accounting every published number was produced under. A
+   * dispatch that varies the note must declare `note-excluded`, because otherwise the longer
+   * sentence displaces the last rule and the arms differ in their packs as well as their wording.
+   */
+  readonly budgetBasis?: 'note-included' | 'note-excluded';
 };
 
 export async function buildPack(
@@ -107,5 +115,6 @@ export async function buildPack(
     budget,
     ...(options.tag === undefined ? {} : { tag: options.tag }),
     ...(options.note === undefined ? {} : { note: options.note }),
+    ...(options.budgetBasis === undefined ? {} : { budgetBasis: options.budgetBasis }),
   });
 }

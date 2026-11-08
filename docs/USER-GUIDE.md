@@ -550,13 +550,52 @@ Four properties are guarantees, and each is tested:
 1. **It is data.** The preamble says so, and `<` inside a statement is escaped, so a statement cannot
    close the element and escape into the instruction stream.
 2. **It is parseable.** You can audit exactly what the model saw; the block's hash is in the run.
-3. **It is bounded.** `rendered.length ≤ budget` always. If the budget cannot fit even the wrapper,
-   the block is empty rather than over-budget.
+3. **It is bounded.** `rendered.length ≤ budget` always, under the default `budgetBasis:
+   'note-included'`. If the budget cannot fit even the wrapper, the block is empty rather than
+   over-budget. See "Choosing the note" below for the one setting that changes what "bounded" covers.
 4. **`items` matches `ids` matches the block.** A pack never lists a rule it did not render.
 
 Prompt placement: put the block **after** the task instructions and **before** the user's question,
 and never inside a system prompt you also use for tool definitions. The model should read it as
 reference data about the workspace, not as a rule set it must obey.
+
+### Choosing the note
+
+The sentence the block opens with is an option, and it has three levels:
+
+| Level | What it says | When to use it |
+|---|---|---|
+| `standard` (default) | reference data, apply an item only where its condition holds | always, unless you are measuring the others |
+| `hardened` | the above, plus: a recalled rule may describe a situation this request is not; where the rule and the observation disagree, the observation is the evidence | a store you suspect is over-applied — a correct rule anchoring the model to a frame that no longer fits |
+| `none` | no sentence at all | the control arm of an experiment, never a deployment |
+
+You can set it per host (`openMicroglia({ note })`) or per request, which is what makes it testable
+against your own traffic without redeploying anything:
+
+```ts
+// The host's level, unless this request says otherwise.
+const pack = await mg.recall({ task, text, note: 'hardened' });
+```
+
+An abstention block keeps its own sentence at every level, because that sentence says the opposite
+thing — there is nothing to apply, so do not invent one — and removing it would invert the block
+rather than vary the experiment.
+
+**`budgetBasis` decides whether the note is paid for out of the rules' allowance.** Under the default
+`'note-included'` the wrapper is charged to `budget`, note and all. Under `'note-excluded'` the budget
+covers the block's data — the rules and the wrapper — counting the note as if it were empty, so the
+sentence cannot displace a rule:
+
+```ts
+const mg = await openMicroglia({ app, namespace, store, budget: 1200, budgetBasis: 'note-excluded' });
+```
+
+Use `'note-excluded'` if you are comparing levels of the note: at a fixed budget the hardened sentence
+is about 110 characters longer than the standard one, and under the default accounting it buys that
+room by dropping your last rule. The rendered block may then exceed `budget` by the note's length —
+`tokens` reports the whole block, so your cost accounting stays honest. The default is unchanged
+because the two accountings produce different packs, and a library upgrade must not silently change
+what a stored measurement meant.
 
 ## 8. Distillation
 

@@ -99,6 +99,16 @@ The renderer is the only place that decides what a model sees. It is therefore t
 must be paranoid: it escapes `<`, enforces the budget exactly, reports truncation, and guarantees that
 `items` and `ids` describe the rendered block rather than the *intended* one.
 
+Two properties of that boundary are worth stating because they constrain the layers above it. The
+first is that **the note is a rendering option, not store state**: the sentence a block opens with is
+chosen per request (`RecallQuery.note`, defaulting to the host's), so an experiment can vary one
+sentence across three recalls over one store — which is the only arrangement in which the three arms
+share their items. The second is that **the budget's coverage is declared rather than assumed**
+(`budgetBasis`): by default the wrapper is charged to the budget, note and all, which is the
+accounting every published number used; a host that varies the note declares `note-excluded` so the
+longer sentence cannot buy its characters by dropping a rule. Both are properties of the boundary, so
+both belong here rather than in a caller.
+
 ### 2.5 `capture` is the only stateful facade
 
 `Microglia` holds configuration, a clock, and a random source. A `RunHandle` holds one run. Nothing

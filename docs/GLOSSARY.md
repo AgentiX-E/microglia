@@ -306,9 +306,21 @@ empty pack when none fits, so a budget is not a linear dial: on this project's s
 500–824 characters, a 600-character budget admits one item on 29% of questions, and the 1,200-character
 default admits 1.83. A dose response is read in `mean_pack_ids`, never in the budget that produced it.
 
+**Budget basis** — what a host's character budget is charged for. `note-included` (the default) charges
+the block's wrapper, note and all; `note-excluded` charges the block's data and counts the wrapper as if
+it carried no note. The distinction is not cosmetic: the hardened note is ~110 characters longer than
+the standard one, so under `note-included` a longer sentence buys its room by dropping the last rule. If
+you are comparing note levels, the difference between the arms must not include the pack.
+
 **Coverage (dose)** — the share of questions on which a dose arm injected at least one item. A cell at
 0.29 items per question is 71% control, and its interval cannot bound a per-item effect better than
 about ±5pp; the number to read before any delta from a reduced budget.
+
+**Note level** — one of `standard`, `hardened` or `none` (`NoteMode`): the sentence a knowledge block
+opens with. A property of the *rendering* rather than of the store, which is why it can be set per
+request (`recall({ note })`) and why three levels can be compared over one store in one run. The
+hardened level exists because the 2026 memory-failure literature puts the damage after retrieval: a
+correct rule can anchor the model to a frame that no longer fits.
 
 **Standing** — what the prompt says the model may do with a block of knowledge: whether it is
 reference data it may disregard, or a record of failures it should avoid repeating. It is a property of

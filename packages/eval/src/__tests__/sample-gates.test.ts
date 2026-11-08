@@ -1,0 +1,63 @@
+import { describe, expect, it } from 'vitest';
+import { sampleGates, type SampleGateInput } from '../sample-gates.js';
+
+/**
+ * The two arms of an L4 dispatch are not graded against the same bar.
+ *
+ * Six consecutive `sota` runs concluded `failure` with the memory arm green, because the
+ * memory-free reference arm was graded against `published + 5pp` — a bar a control cannot pass and
+ * is not supposed to. The defect is not cosmetic: a status that is always red is a status nobody
+ * reads, and the failures it exists to signal become indistinguishable from the expected one.
+ */
+
+const memory: SampleGateInput = {
+  arm: 'memory',
+  pass4: 0.5439,
+  tasks: 57,
+  unscored: 0,
+  minTasks: 40,
+  published: { meets: false },
+  bar: 0.05,
+};
+
+function ids(gates: ReturnType<typeof sampleGates>): string[] {
+  return gates.map((gate) => gate.id);
+}
+
+describe('the sample gates of one arm', () => {
+  it('holds the memory arm to the published bar when one applies', () => {
+    const gates = sampleGates(memory);
+    expect(ids(gates)).toEqual(['l4-pass4', 'l4-coverage', 'l4-fully-scored']);
+    expect(gates[0]?.pass).toBe(false);
+    expect(gates[0]?.criterion).toBe('>= published + 0.05');
+  });
+
+  it('never holds the control to the treatment bar', () => {
+    // The bar is a statement about the treatment. The control owes the pairing step a complete
+    // per-task record instead, which is a different gate rather than no gate.
+    const gates = sampleGates({ ...memory, arm: 'reference' });
+    expect(ids(gates)).toEqual(['l4-control-arm', 'l4-coverage', 'l4-fully-scored']);
+    expect(gates[0]?.pass).toBe(true);
+  });
+
+  it('omits the bar entirely when no published number applies to the scenario', () => {
+    // Omitting a gate is a statement and not a pass: the metric carries `published_bar_applies: 0`.
+    const gates = sampleGates({ ...memory, published: undefined });
+    expect(ids(gates)).toEqual(['l4-coverage', 'l4-fully-scored']);
+  });
+
+  it('fails the control when it dropped a task the pairing step needs', () => {
+    const gates = sampleGates({ ...memory, arm: 'reference', unscored: 3 });
+    const control = gates.find((gate) => gate.id === 'l4-control-arm');
+    expect(control?.pass).toBe(false);
+    expect(control?.actual).toBe('57 scored, 3 unscored');
+    // And the shared gate still says the same thing about the same number.
+    expect(gates.find((gate) => gate.id === 'l4-fully-scored')?.pass).toBe(false);
+  });
+
+  it('fails the control when it scored nothing at all', () => {
+    const gates = sampleGates({ ...memory, arm: 'reference', tasks: 0 });
+    expect(gates.find((gate) => gate.id === 'l4-control-arm')?.pass).toBe(false);
+    expect(gates.find((gate) => gate.id === 'l4-coverage')?.pass).toBe(false);
+  });
+});

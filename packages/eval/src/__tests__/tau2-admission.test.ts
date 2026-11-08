@@ -308,3 +308,26 @@ describe('storeCensus admission telemetry', () => {
     expect(census.reasons).toEqual({});
   });
 });
+
+describe('the shapes a τ² correction may take', () => {
+  it('refuses an action that names no tool', () => {
+    // A call-shaped correction whose tool name is the empty string is not a call: it would
+    // price as a call and teach nothing, and the admission rule is the only place that can
+    // say so before the store holds it.
+    expect(
+      tau2EditSemantics(
+        { actions: [{ name: '', arguments: {} }] },
+        { actions: [{ name: 'cancel_pending_order', arguments: { order_id: '1' } }] },
+      ),
+    ).toBeUndefined();
+  });
+
+  it('refuses a completion whose entries are not tool names', () => {
+    expect(
+      tau2EditSemantics(
+        { actions: [42] },
+        { actions: [{ name: 'cancel_pending_order', arguments: {} }] },
+      ),
+    ).toBeUndefined();
+  });
+});

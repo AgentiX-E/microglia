@@ -119,6 +119,53 @@ describe('the pack note has three levels, and silence is one of them', () => {
     }
   });
 
+  it('does not let the note decide which items the pack carries', () => {
+    // R53's control is *same store, same recall, same items, same order* — and the note
+    // is longer at the level that matters. The note lives in the wrapper, the wrapper is
+    // charged to the budget, so at every budget the extra sentence used to buy itself
+    // room by dropping the last rule. That is not a sentence differing between arms; it
+    // is a sentence and a pack.
+    //
+    // `note-excluded` charges the budget to the block's data: the wrapper is counted as
+    // if it carried no note, so the three levels have identical capacity by construction.
+    const pool = Array.from({ length: 8 }, (_, index) => ({
+      ...item({ statement: `Rule ${String(index)}: for a trend question, use a line chart.` }),
+      id: `k_${String(index)}`,
+    }));
+    for (let budget = 320; budget <= 1600; budget += 17) {
+      const arms = (['none', 'standard', 'hardened'] as const).map((note) =>
+        renderPack(pool, { budget, note, budgetBasis: 'note-excluded' }),
+      );
+      const ids = arms.map((arm) => arm.ids);
+      expect(ids[1], `budget ${String(budget)}`).toEqual(ids[0]);
+      expect(ids[2], `budget ${String(budget)}`).toEqual(ids[0]);
+    }
+  });
+
+  it('still bounds the block itself when the note is outside the budget', () => {
+    // The silent level is exactly the note-free block, so the original guarantee has to
+    // survive verbatim: what is rendered never exceeds the allowance. Only the note may
+    // sit above it, because the note is not knowledge.
+    const pool = Array.from({ length: 8 }, (_, index) => ({
+      ...item({ statement: `Rule ${String(index)}: for a trend question, use a line chart.` }),
+      id: `k_${String(index)}`,
+    }));
+    for (let budget = 60; budget <= 1600; budget += 41) {
+      const silent = renderPack(pool, { budget, note: 'none', budgetBasis: 'note-excluded' });
+      expect(silent.rendered.length, `budget ${String(budget)}`).toBeLessThanOrEqual(budget);
+    }
+  });
+
+  it('keeps the historical accounting when no basis is declared', () => {
+    // Every committed artefact was produced by a renderer that charged the note to the
+    // budget. The new basis is opt-in for exactly that reason: an upgrade must not change
+    // what a published number measured.
+    const implicit = renderPack([conditioned()], { budget: 1200 });
+    const explicit = renderPack([conditioned()], { budget: 1200, budgetBasis: 'note-included' });
+    expect(explicit.rendered).toBe(implicit.rendered);
+    expect(explicit.ids).toEqual(implicit.ids);
+  });
+
   it('never puts a double quote in a note it adds, because the note is an attribute', () => {
     // `note="..."` is delimited by double quotes and the existing condition-checking text
     // already spends one pair on the word `when`. A third level that adds more would make

@@ -43,6 +43,7 @@ import {
   ProviderNoMeasurementError,
   classifyProviderProbe,
   driverArgs,
+  facadeArmTasks,
   facadePairSummary,
   facadePairVerdict,
   facadeScope,
@@ -71,7 +72,10 @@ import {
   funnelVerdict,
   noMeasurementRefusal,
   guardAgainstToolNames,
+  noteFacadeReading,
+  noteFacadeSummary,
   resolveDistillForm,
+  resolveFacadeNotePlan,
   tau2EditSemantics,
   toPassAtK,
   toolInventoryOf,
@@ -85,8 +89,11 @@ import {
   type UseObservation,
   type PairedFacadeReading,
   type InactionCensus,
+  type NoteArmReading,
+  type NotedFacadeReading,
   type ProbeAttempt,
 } from '@agentix-e/microglia-eval';
+import type { NoteMode } from '@agentix-e/microglia-core/apply';
 
 const runFile = promisify(execFile);
 
@@ -156,6 +163,18 @@ const WRITE_ADMISSION_PLAN = resolveWriteAdmissionPlan(process.env);
  * that wants to compare three levels needs and a bare default cannot give it.
  */
 const NOTE_PLAN = resolveInjectionNotePlan(process.env);
+/**
+ * R53's three-level arm, resolved at module load.
+ *
+ * Off by default, so every artefact committed before it is still produced by the path that
+ * wrote it. Enabled is not "one more facade": it is the only arrangement in which three note
+ * levels can be compared at all, because a dispatch's corrections are produced by the model
+ * at run time and two dispatches of one configuration distil different stores. The plan also
+ * refuses a dispatch that varies the floor and the note together, and one that names a single
+ * note level beside a three-level arm -- both would publish a record that contradicts its own
+ * treatment.
+ */
+const NOTE_ARMS = resolveFacadeNotePlan(process.env, PAIR_PLAN);
 const TRIALS = Math.max(1, Number(process.env['TAU_TRIALS'] ?? 4) || 4);
 const TRAIN_SHARE = Number(process.env['TAU_TRAIN_SHARE'] ?? 0.5) || 0.5;
 /**
@@ -374,6 +393,9 @@ export function instrument(): Tau2ArmRecord | undefined {
 /** The one paired-facade record, when this dispatch registered a pair. */
 let observedPair: PairedFacadeReading | undefined;
 
+/** The three-level note record, when this dispatch registered one. */
+let observedNotes: NotedFacadeReading | undefined;
+
 /**
  * Additive, like `instrument()`: `l4.ts` was written against a driver exporting
  * `run()`, and a driver that does not export this (every driver before R49) is
@@ -382,6 +404,16 @@ let observedPair: PairedFacadeReading | undefined;
  */
 export function pairedFacades(): PairedFacadeReading | undefined {
   return observedPair;
+}
+
+/**
+ * R53's three-level note record, when this dispatch registered one.
+ *
+ * Additive in the same way: a driver that does not export this (every driver before R53) is
+ * a single-note or paired-facade run, and its absence is not a failure.
+ */
+export function notedFacades(): NotedFacadeReading | undefined {
+  return observedNotes;
 }
 
 /**
@@ -576,6 +608,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // `tau2-admission.ts` for the measurement and the guarded condition.
     editSemantics: tau2EditSemantics,
     note: NOTE_PLAN.mode,
+    // R53: the three levels must serve the same items for the same request, and at a fixed
+    // budget the hardened sentence is longer than the standard one and used to buy that room
+    // by dropping the last rule. Declared only for the arm that needs it, because an upgrade
+    // must not change what a published number measured.
+    ...(NOTE_ARMS.enabled ? { budgetBasis: NOTE_ARMS.budgetBasis } : {}),
   });
 
   for (const correction of corrections) {
@@ -715,7 +752,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     readonly inaction: InactionCensus;
   };
 
-  const evaluateFacade = async (floor: number, out: string): Promise<FacadeEvaluation> => {
+  const evaluateFacade = async (
+    floor: number,
+    out: string,
+    note?: NoteMode,
+  ): Promise<FacadeEvaluation> => {
     // What V1 grades: the pack is rendered in this process and read in another,
     // so its size is counted at the boundary rather than reconstructed from the
     // agent's transcript. A mean over no request and a mean over two hundred
@@ -732,6 +773,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         text,
         scope: { domain: RECALL_DOMAIN },
         minCoverage: floor,
+        // R53: the level is a rendering option of THIS recall. `undefined` keeps the host's,
+        // which is what every single-facade and paired dispatch does.
+        ...(note === undefined ? {} : { note }),
       });
       recallRequests += 1;
       if (pack.items.length > 0) recallServed += 1;
@@ -780,7 +824,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
 
   // Attest the single store before either facade recalls. A second learning
   // phase would produce a second fingerprint and be refused by the invariant.
-  const sharedScope = PAIR_PLAN.enabled
+  const sharedScope = PAIR_PLAN.enabled || NOTE_ARMS.enabled
     ? attestPairScope({
         dispatchId: DISPATCH_ID,
         preregId: PREREG_ID,
@@ -836,6 +880,51 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       // the population that already survived it.
       primary = { ...floored, coverageObservations: asIs.useObservations };
       process.stdout.write(`[tau2] paired facades: ${facadePairSummary(observedPair)}\n`);
+    } else if (NOTE_ARMS.enabled && sharedScope !== undefined) {
+      // R53: three facades of ONE run over ONE store. The floor is the dispatch's registered
+      // one for every arm -- the note is the variable, so anything else that could differ
+      // between the arms must not.
+      const evaluations = new Map<NoteMode, FacadeEvaluation>();
+      const arms: NoteArmReading[] = [];
+      for (const note of NOTE_ARMS.arms) {
+        const evaluation = await evaluateFacade(
+          MIN_COVERAGE,
+          join(workdir, `eval-note-${note}.json`),
+          note,
+        );
+        evaluations.set(note, evaluation);
+        let tasks;
+        try {
+          tasks = facadeArmTasks(evaluation.scored.tasks);
+        } catch (error) {
+          // A facade whose task rows cannot be paired is an instrument that did not measure,
+          // not a run that crashed: the lane gets the labelled refusal it gets for an outage.
+          throw noMeasurementRefusal((error as Error).message);
+        }
+        arms.push({
+          note,
+          servedPacks: evaluation.recallServed,
+          recallRequests: evaluation.recallRequests,
+          unscored: evaluation.scored.unscored,
+          tasks,
+          inaction: evaluation.inaction,
+          observations: evaluation.useObservations,
+        });
+      }
+      observedNotes = noteFacadeReading({
+        dispatchId: DISPATCH_ID,
+        preregId: PREREG_ID,
+        scope: sharedScope,
+        arms,
+        seed: PAIR_SEED,
+        model: llm.model,
+      });
+      const graded = evaluations.get(NOTE_ARMS.primary);
+      if (graded === undefined) {
+        throw noMeasurementRefusal(`the primary note arm '${NOTE_ARMS.primary}' did not run`);
+      }
+      primary = graded;
+      process.stdout.write(`[tau2] note arms: ${noteFacadeSummary(observedNotes)}\n`);
     } else {
       primary = await evaluateFacade(MIN_COVERAGE, evalPath);
     }

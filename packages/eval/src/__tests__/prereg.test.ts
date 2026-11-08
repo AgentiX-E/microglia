@@ -427,3 +427,42 @@ describe('a registration can pin its scenario pair', () => {
     );
   });
 });
+
+/**
+ * R53's arm is a third declaration, and the first version of it was parsed, validated and then
+ * dropped: the parser's own object literal did not carry the field, so `eval:prereg-notes`
+ * printed `false` for a registration that said `three-level`. The lane has spent three
+ * iterations on exactly this failure mode — a value that is read, checked, and never travels —
+ * so the round trip is a test rather than a paragraph.
+ */
+describe('the facadeNotes header', () => {
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${PREDICTION}${REFUTATION}`;
+  }
+
+  it('registers three note levels over one store', () => {
+    const reading = readPrereg(withHeader('facadeNotes: three-level'), 'R8.3-xiyan-cell.md');
+    expect(reading.problems).toEqual([]);
+    // The return value, not the parse: this is the assertion that would have failed.
+    expect(reading.prereg?.facadeNotes).toBe('three-level');
+  });
+
+  it('leaves every registration opened before R53 on the single-note path', () => {
+    expect(readPrereg(VALID, 'R8.3-xiyan-cell.md').prereg?.facadeNotes).toBeUndefined();
+  });
+
+  it('refuses a value the protocol never declared', () => {
+    const reported = problemsOf(withHeader('facadeNotes: four-level'));
+    expect(reported.some((entry) => entry.includes("header 'facadeNotes'"))).toBe(true);
+  });
+
+  it('refuses to vary the note and the floor in one registration', () => {
+    const reading = readPrereg(
+      withHeader('recallFloor: 0.01\nfacadePair: as-is-floored\nfacadeNotes: three-level'),
+      'R8.3-xiyan-cell.md',
+    );
+    expect(
+      reading.problems.some((entry) => entry.problem.includes('vary two treatments in one dispatch')),
+    ).toBe(true);
+  });
+});

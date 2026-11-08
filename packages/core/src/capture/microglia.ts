@@ -71,6 +71,8 @@ export class Microglia implements RunHost {
   private readonly budget: number;
   private readonly tag: string | undefined;
   private readonly note: NoteMode | undefined;
+  /** See `RenderOptions.budgetBasis`; `undefined` is the historical accounting. */
+  private readonly budgetBasis: 'note-included' | 'note-excluded' | undefined;
   private readonly creditEnabled: boolean;
   private readonly corroborationFloor: number | undefined;
   /**
@@ -112,6 +114,7 @@ export class Microglia implements RunHost {
     this.budget = options.budget ?? this.policy.defaultBudget;
     this.tag = options.tag;
     this.note = options.note;
+    this.budgetBasis = options.budgetBasis;
     this.creditEnabled = options.credit ?? true;
     this.editSemantics = options.editSemantics;
     this.corroborationFloor = options.corroborationFloor;
@@ -158,6 +161,11 @@ export class Microglia implements RunHost {
   public async recall(query: Omit<RecallQuery, 'namespace'>): Promise<KnowledgePack> {
     this.assertOpen();
     const silenced = await this.cannotCorroborate();
+    // The request's level wins over the host's: the note is a rendering option of one recall,
+    // and an experiment that varies one sentence needs three levels over ONE store. Absent on
+    // the query means the host's; absent on both renders the text every committed artefact
+    // carries.
+    const note = query.note ?? this.note;
     const pack = await buildPack(
       { ...query, namespace: this.namespace },
       {
@@ -171,7 +179,8 @@ export class Microglia implements RunHost {
         // for the duration of this request.
         ...(silenced ? { minEvidence: 2 } : {}),
         ...(this.tag === undefined ? {} : { tag: this.tag }),
-        ...(this.note === undefined ? {} : { note: this.note }),
+        ...(note === undefined ? {} : { note }),
+        ...(this.budgetBasis === undefined ? {} : { budgetBasis: this.budgetBasis }),
       },
     );
     // An empty pack for a reason is not the same as an empty pack for no reason, and a

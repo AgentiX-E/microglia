@@ -728,6 +728,10 @@ jobs:
           fi
           FLOOR=$(pnpm --silent eval:prereg-floor "$FILE")
           PAIR=$(pnpm --silent eval:prereg-pair "$FILE")
+          # R53: three note levels over ONE store. The arm cannot be dispatched by the menu
+          # for the same reason the pair cannot: the registration is the only source of truth,
+          # and a run that chose its levels after the readout would be choosing its contrasts.
+          NOTES=$(pnpm --silent eval:prereg-notes "$FILE")
           # R54: the scenario pair is a property of the experiment, like the floor. R51's
           # readback graded a retail store's rules on airline questions because this value
           # lived in a repository variable set for the transfer arm, and nothing in the
@@ -739,10 +743,11 @@ jobs:
           RECALL=$(sed -n 's/^recall=//p' "$RUNNER_TEMP/scenario.env")
           echo "floor=$FLOOR" >> "$GITHUB_OUTPUT"
           echo "pair=$PAIR" >> "$GITHUB_OUTPUT"
+          echo "notes=$NOTES" >> "$GITHUB_OUTPUT"
           echo "train=$TRAIN" >> "$GITHUB_OUTPUT"
           echo "test=$TEST" >> "$GITHUB_OUTPUT"
           echo "recall=$RECALL" >> "$GITHUB_OUTPUT"
-          echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: L4 arm — memory
         if: github.event.inputs.l4_arms != 'reference'
@@ -755,6 +760,10 @@ jobs:
           # path is preserved verbatim. `TAU_PREREG` is what `facadeScope`
           # attests as the one registration both facades execute.
           TAU_FACADE_PAIR: ${{ steps.recall_floor.outputs.pair }}
+          # R53's arm. Enabling it also declares `budgetBasis: note-excluded`, because at a
+          # fixed budget the hardened sentence is longer than the standard one and used to
+          # buy that room by dropping the last rule -- the arms would differ in their packs.
+          TAU_FACADE_NOTES: ${{ steps.recall_floor.outputs.notes }}
           TAU_PREREG: ${{ github.event.inputs.prereg }}
           # Defect 27: a bounded pre-flight probe, registered by R49. An
           # outage writes an explicit no-measurement artefact instead of a zero.
@@ -882,6 +891,16 @@ jobs:
         env:
           POC_RESULT_DIR: eval/results/arms/memory
         run: pnpm eval:facade-pair-readback
+
+      # R53: three note levels over one store is its own artefact and its own three states.
+      # `IDENTITY_BROKEN` blocks: an arm whose levels served different items differed in
+      # something the registration did not name, and no delta from it is interpretable.
+      - name: Read back the note levels
+        if: always()
+        timeout-minutes: 5
+        env:
+          POC_RESULT_DIR: eval/results/arms/memory
+        run: pnpm eval:note-facade-readback
 
       # A not-run that nobody notices is a skip. The annotation is the notice: it
       # names the variable that points at nothing, and the job stays green because

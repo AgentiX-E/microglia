@@ -635,6 +635,30 @@ export {
   type PairedFacadeReading,
 } from './facade-pair.js';
 export {
+  sampleGates,
+  type SampleGate,
+  type SampleGateInput,
+} from './sample-gates.js';
+export {
+  FACADE_NOTES_ENV,
+  NOTE_LEVELS,
+  PRIMARY_NOTE,
+  noteFacadeReading,
+  noteFacadeState,
+  noteFacadeSummary,
+  notedFacadeArtifact,
+  packIdentity,
+  readNotedFacadeArtifact,
+  resolveFacadeNotePlan,
+  type FacadeNotePlan,
+  type NoteArmReading,
+  type NoteContrast,
+  type NotedFacadeArtifact,
+  type NotedFacadeReading,
+  type NoteFacadeReadback,
+  type PackIdentity,
+} from './note-facade.js';
+export {
   NO_MEASUREMENT_ERROR_NAME,
   PROBE_MIN_SUCCESSES,
   ProviderNoMeasurementError,

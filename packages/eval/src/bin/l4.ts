@@ -27,15 +27,18 @@ import {
   meanPassAtK,
   facadePairState,
   isNoMeasurementRefusal,
+  notedFacadeArtifact,
   pairedFacadeArtifact,
   pairedVerdict,
   parseTauResults,
+  sampleGates,
   perTaskRows,
   toPassAtK,
   type PassAtKInput,
 } from '@agentix-e/microglia-eval';
 import type {
   NoMeasurementMarker,
+  NotedFacadeReading,
   PairedFacadeReading,
   Tau2ArmRecord,
   TauTrialRow,
@@ -208,6 +211,13 @@ type Measurement = {
    * before R49; an absent field is a single-facade run, not a failed pair.
    */
   readonly pairedFacades?: PairedFacadeReading;
+  /**
+   * R53's three-level note record, when the driver exports `notedFacades()`.
+   *
+   * Absent on a re-scored document and on every driver before R53; an absent field is a
+   * run that never varied the note, not a failed three-level arm.
+   */
+  readonly notedFacades?: NotedFacadeReading;
 };
 
 async function measureFromResults(path: string): Promise<Measurement> {
@@ -241,6 +251,7 @@ async function measureFromDriver(module: string): Promise<Measurement> {
     instrument?: () => Tau2ArmRecord | undefined;
     trials?: () => readonly TauTrialRow[] | undefined;
     pairedFacades?: () => PairedFacadeReading | undefined;
+    notedFacades?: () => NotedFacadeReading | undefined;
   };
   try {
     loaded = (await import(specifier)) as {
@@ -248,6 +259,7 @@ async function measureFromDriver(module: string): Promise<Measurement> {
       instrument?: () => Tau2ArmRecord | undefined;
       trials?: () => readonly TauTrialRow[] | undefined;
       pairedFacades?: () => PairedFacadeReading | undefined;
+      notedFacades?: () => NotedFacadeReading | undefined;
     };
   } catch (error) {
     // A driver that cannot be *resolved* is an absent environment, not a failed
@@ -279,6 +291,7 @@ async function measureFromDriver(module: string): Promise<Measurement> {
   const instrumentation = loaded.instrument?.();
   const trialRows = loaded.trials?.();
   const pairedFacades = loaded.pairedFacades?.();
+  const notedFacades = loaded.notedFacades?.();
   return {
     tasks,
     unscored: [],
@@ -287,6 +300,7 @@ async function measureFromDriver(module: string): Promise<Measurement> {
     ...(instrumentation === undefined ? {} : { instrumentation }),
     ...(trialRows === undefined ? {} : { trialRows }),
     ...(pairedFacades === undefined ? {} : { pairedFacades }),
+    ...(notedFacades === undefined ? {} : { notedFacades }),
   };
 }
 
@@ -297,6 +311,15 @@ const measured =
   resultsPath === undefined ? await measureFromDriver(driver as string) : await measureFromResults(resultsPath);
 
 const mean = meanPassAtK(measured.tasks);
+/**
+ * Which arm this file is grading.
+ *
+ * `TAU_MEMORY=false` is the reference arm: the same tasks, the same model, no store. It is the
+ * control the memory arm is paired against, so it is not held to the published bar — see
+ * `sampleGates` for the six dispatches that ended red before this distinction existed.
+ */
+const arm: 'memory' | 'reference' =
+  (process.env['TAU_MEMORY'] ?? 'true') === 'false' ? 'reference' : 'memory';
 const compared =
   scenarioBar.published === null ? undefined : compareToPublished(mean, scenarioBar.published, BAR);
 const coversSplit = measured.tasks.length >= MIN_TASKS;
@@ -324,11 +347,15 @@ if (referencePath !== undefined) {
 }
 
 const gates = [
-  // Only where a published number is a bar for this scenario. Omitting the gate is a statement, not
-  // a pass: the metric below carries `published_pass4: null`, and the note says why.
-  ...(compared === undefined
-    ? []
-    : [{ id: 'l4-pass4', pass: compared.meets, actual: mean, criterion: `>= published + ${BAR}` }]),
+  ...sampleGates({
+    arm,
+    pass4: mean,
+    tasks: measured.tasks.length,
+    unscored: measured.unscored.length,
+    minTasks: MIN_TASKS,
+    published: compared,
+    bar: BAR,
+  }),
   // R50. This arm has no reference arm of its own. When one is supplied the gate
   // is graded by `pairedVerdict`, which blocks on harm — the R45 rule — rather than
   // on a delta and a p-value the split cannot deliver. When none is supplied the
@@ -363,20 +390,6 @@ const gates = [
           };
         })(),
       ]),
-  {
-    id: 'l4-coverage',
-    pass: measured.tasks.length >= MIN_TASKS,
-    actual: measured.tasks.length,
-    criterion: `>= ${MIN_TASKS} tasks`,
-  },
-  // A score is only a split result if the whole grid was scored: the reader drops
-  // infrastructure failures from the denominator, so the count has to be stated.
-  {
-    id: 'l4-fully-scored',
-    pass: measured.unscored.length === 0,
-    actual: measured.unscored.length,
-    criterion: '= 0 unscored tasks',
-  },
   // A registered pair must not be a cross-run comparison. NO_MEASUREMENT is
   // not a failure here: it is an instrument that did not measure, and the
   // workflow's readback step annotates it explicitly. REFUSED_CROSS_RUN is a
@@ -389,6 +402,21 @@ const gates = [
           pass: facadePairState(measured.pairedFacades) !== 'REFUSED_CROSS_RUN',
           actual: facadePairState(measured.pairedFacades),
           criterion: 'a registered within-run pair is never a cross-run comparison',
+        },
+      ]),
+  // R53: a three-level arm whose arms served different items is not a note effect. The
+  // control is graded as a gate rather than printed as a footnote, because the run that
+  // fails it has no interpretable delta at all.
+  ...(measured.notedFacades === undefined
+    ? []
+    : [
+        {
+          id: 'l4-note-identity',
+          pass: measured.notedFacades.packIdentity.mismatched === 0,
+          actual: `${String(measured.notedFacades.packIdentity.mismatched)} mismatch of ${String(
+            measured.notedFacades.packIdentity.compared,
+          )} shared request(s)`,
+          criterion: 'the three note levels serve the same items for every request two of them saw',
         },
       ]),
 ];
@@ -405,8 +433,11 @@ await writeResult({
     // A bar that does not apply is reported as absent rather than as a number a reader could divide
     // by: `published_bar_applies` says which of the two this file is.
     ...(scenarioBar.published === null ? {} : { published_pass4: scenarioBar.published }),
-    published_bar_applies: scenarioBar.comparable ? 1 : 0,
-    ...(compared === undefined ? {} : { delta: compared.delta }),
+    // Which arm this is, because the two are graded differently and a reader of the artefact
+    // cannot otherwise tell a control that failed a bar from a treatment that missed one.
+    arm: arm === 'reference' ? 0 : 1,
+    published_bar_applies: scenarioBar.comparable && arm === 'memory' ? 1 : 0,
+    ...(compared === undefined || arm === 'reference' ? {} : { delta: compared.delta }),
     tasks: measured.tasks.length,
     unscored_tasks: measured.unscored.length,
     min_tasks: MIN_TASKS,
@@ -445,6 +476,15 @@ if (measured.pairedFacades !== undefined) {
   const artefact = pairedFacadeArtifact(measured.pairedFacades, new Date().toISOString());
   await writeJson('poc-l4-facade-pair', artefact);
   process.stdout.write(`[poc-l4-facade-pair] ${artefact.summary}\n`);
+}
+
+// R53: three note levels over one store is its OWN artefact, for the same reason the floor
+// pair is: the main document grades the memory arm against the memory-free reference, and a
+// note contrast is neither that nor a floor contrast.
+if (measured.notedFacades !== undefined) {
+  const artefact = notedFacadeArtifact(measured.notedFacades, new Date().toISOString());
+  await writeJson('poc-l4-facade-notes', artefact);
+  process.stdout.write(`[poc-l4-facade-notes] ${artefact.summary}\n`);
 }
 
 for (const gate of gates) {

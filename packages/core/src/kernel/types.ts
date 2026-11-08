@@ -476,4 +476,15 @@ export type RecallQuery = {
    * every caller had before the field existed.
    */
   readonly minEvidence?: number;
+  /**
+   * The sentence the rendered block opens with, for THIS request only.
+   *
+   * A request-level override of the host's note, absent meaning "whatever the host was
+   * opened with". It is on the query rather than only on the host because the level is
+   * text a pack is rendered with — not state the memory holds — and because an experiment
+   * that varies one sentence must be able to do it over ONE store: three dispatches of one
+   * configuration produce three stores, so three levels run that way measure the model's
+   * corrections, not the note. See `NoteMode` in `apply/render.ts` for the three levels.
+   */
+  readonly note?: 'standard' | 'hardened' | 'none';
 };
