@@ -58,7 +58,7 @@
     "eval:prereg": "tsx packages/eval/src/bin/prereg.ts",
     "eval:prereg-floor": "tsx packages/eval/src/bin/prereg-floor.ts",
     "eval:prereg-pair": "tsx packages/eval/src/bin/prereg-pair.ts",
-    "eval:verifiers": "python3 eval/verifiers/r49_readback.py --self-test",
+    "eval:verifiers": "python3 eval/verifiers/r49_readback.py --self-test && python3 eval/verifiers/r51_readback.py --self-test",
     "eval:facade-pair-readback": "tsx packages/eval/src/bin/facade-pair-readback.ts",
     "eval:protocol": "tsx packages/eval/src/bin/protocol.ts",
     "eval:harm": "tsx packages/eval/src/bin/harm-strata.ts",

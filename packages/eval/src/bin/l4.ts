@@ -28,6 +28,7 @@ import {
   facadePairState,
   isNoMeasurementRefusal,
   pairedFacadeArtifact,
+  pairedVerdict,
   parseTauResults,
   perTaskRows,
   toPassAtK,
@@ -328,12 +329,40 @@ const gates = [
   ...(compared === undefined
     ? []
     : [{ id: 'l4-pass4', pass: compared.meets, actual: mean, criterion: `>= published + ${BAR}` }]),
-  {
-    id: 'l4-paired',
-    pass: paired === undefined ? true : paired.delta >= 0 && paired.p < 0.05,
-    actual: paired === undefined ? 'no reference arm' : `${paired.delta.toFixed(2)}pp (p=${paired.p.toFixed(4)})`,
-    criterion: 'against the same agent without the memory: delta >= 0 at p<0.05',
-  },
+  // R50. This arm has no reference arm of its own. When one is supplied the gate
+  // is graded by `pairedVerdict`, which blocks on harm — the R45 rule — rather than
+  // on a delta and a p-value the split cannot deliver. When none is supplied the
+  // gate is **omitted**, because the house convention two lines above is that
+  // omitting a gate is a statement and not a pass: the previous version printed
+  // `PASS l4-paired: no reference arm`, which is a green square for a question this
+  // artefact cannot ask. The pair step (`bin/l4-pair.ts`) owns that question.
+  ...(paired === undefined
+    ? []
+    : [
+        (() => {
+          const verdict = pairedVerdict({
+            deltaPp: paired.delta,
+            p: paired.p,
+            paired: paired.n,
+            // The arm artefact does not carry its own served-pack count at this
+            // point; the pair step reads it from `remember` and grades the branch
+            // there. Passing 0 keeps the below-bar branch from firing on a number
+            // this file does not have.
+            servedPacks: 0,
+            // `Infinity` because this file has the delta and the p-value but not
+            // the discordance, so it cannot estimate a resolution and must not
+            // pretend to: an unestimable resolution can support neither a benefit
+            // nor an equivalence claim, and `pairedVerdict` reads it that way.
+            detectablePp: Number.POSITIVE_INFINITY,
+          });
+          return {
+            id: 'l4-paired',
+            pass: verdict.state !== 'HARM',
+            actual: `${paired.delta.toFixed(2)}pp (p=${paired.p.toFixed(4)}): ${verdict.state}`,
+            criterion: 'against the same agent without the memory: neither R45 revert branch fires',
+          };
+        })(),
+      ]),
   {
     id: 'l4-coverage',
     pass: measured.tasks.length >= MIN_TASKS,
