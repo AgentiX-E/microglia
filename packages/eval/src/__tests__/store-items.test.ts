@@ -38,6 +38,20 @@ describe('the store sample the artefact carries', () => {
     expect(sample.truncated).toBe(0);
   });
 
+  it('carries the reason an item was retired, which is the only pointer to the survivor', () => {
+    // The recurrence pass retires a member and names the survivor in `consolidated:<id>`. Without it
+    // the sample holds both items and no join, so a readback can say that a group merged and never
+    // say which pair — the one thing the registration asks it to judge.
+    const sample = storeItemSample([
+      item({ id: 'k2', status: 'retired', statusReason: 'consolidated:k1' }),
+      item({ id: 'k1' }),
+    ]);
+    expect(sample.items[0]?.statusReason).toBe('consolidated:k1');
+    // Absent rather than `undefined`: a key that is always present would tell a reader that the
+    // store said something about every item's status, which it does not.
+    expect(sample.items[1] === undefined ? null : 'statusReason' in sample.items[1]).toBe(false);
+  });
+
   it("carries each item's status, so the sample cannot be read over the wrong population", () => {
     // `conditioned` is counted over *servable* items -- active, and in the recall scope --
     // while the sample is drawn from the whole store. A readback that counted conditions in

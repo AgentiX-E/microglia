@@ -217,26 +217,47 @@ def _groups_under(items: list[dict[str, Any]], measure: str) -> tuple[int, list[
     return len(groups), groups
 
 
-def group_readings(items: list[dict[str, Any]]) -> list[tuple[float, str, str]]:
+def group_readings(items: list[dict[str, Any]]) -> tuple[list[tuple[float, str, str]], bool]:
     """Every group the run merged, with the containment of its closest pair.
 
     The count of groups is not evidence that the groups are claims. This is the reading that says
     whether the floor fell below the register's resolution: a merged pair whose statements are not
     contained in one another is a distinction the store was built to keep.
+
+    Two ways to link a retired member to the survivor that absorbed it. The store writes
+    `statusReason: consolidated:<id>`, and the projection began carrying it after R59 — an artefact
+    written before that has the retired item and the corroborated survivor but no pointer between
+    them. In that case the link is **inferred** from content: the live item whose statement contains
+    this one most. That is exact when the store merged one group and can only be an over-estimate
+    when it merged more, because the closest survivor is chosen for each member — so the inference
+    makes the "not one claim" refutation harder to fire and never easier. The second return value
+    says whether any link was inferred, so a reading built on one can say so.
     """
     by_id = {entry.get("id"): entry for entry in items}
+    live = [entry for entry in items if entry.get("status") != "retired"]
     out: list[tuple[float, str, str]] = []
+    inferred = False
     for entry in items:
+        if entry.get("status") != "retired":
+            continue
+        statement = str(entry.get("statement") or "")
         reason = str(entry.get("statusReason") or "")
-        if entry.get("status") != "retired" or not reason.startswith("consolidated:"):
-            continue
-        survivor = by_id.get(reason.split(":", 1)[1])
+        survivor = by_id.get(reason.split(":", 1)[1]) if reason.startswith("consolidated:") else None
         if survivor is None:
-            out.append((0.0, str(entry.get("statement") or ""), "(survivor not in the sample)"))
-            continue
-        score = containment(tokens(str(entry.get("statement") or "")), tokens(str(survivor.get("statement") or "")))
-        out.append((score, str(entry.get("statement") or ""), str(survivor.get("statement") or "")))
-    return out
+            if not live:
+                out.append((0.0, statement, "(survivor not in the sample)"))
+                continue
+            survivor = sorted(
+                live,
+                key=lambda row: (
+                    -containment(tokens(statement), tokens(str(row.get("statement") or ""))),
+                    str(row.get("id")),
+                ),
+            )[0]
+            inferred = True
+        score = containment(tokens(statement), tokens(str(survivor.get("statement") or "")))
+        out.append((score, statement, str(survivor.get("statement") or "")))
+    return out, inferred
 
 
 # --------------------------------------------------------------------------- #
@@ -361,13 +382,30 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
     )
 
     # The attribution reading: the same store under the floor R58 used.
+    #
+    # It is only a reading when the pass left the store alone. The artefact carries the store *after*
+    # the pass, so a run that merged two items has one item fewer and the pair is gone: re-scoring it
+    # under either measure finds nothing, which says nothing about either measure. R58 could be
+    # re-scored because its pass merged nothing; R59 cannot be, and grading it as a failed prediction
+    # would abandon a run for the shape of the artefact rather than for what it measured.
     stored = (tau2.get("storeItems") or {}).get("items")
     items = stored if isinstance(stored, list) and stored else None
+    re_scorable = items is not None and groups == 0
     if items is None:
         report.predict(
             "the floor is the reason: Jaccard at 0.70 merges strictly fewer groups than containment at 0.60",
             None,
             "storeItems absent",
+        )
+    elif not re_scorable:
+        report.predict(
+            "the floor is the reason: Jaccard at 0.70 merges strictly fewer groups than containment at 0.60",
+            None,
+            f"the pass merged {groups} group(s): the stored sample is the post-pass store and holds no pair to re-score",
+        )
+        report.note(
+            "the attribution reading is unavailable here, and not because the run was silent: the store "
+            "the artefact carries is the one the pass left, so the pair it merged is not in it"
         )
     else:
         kept_before, _ = _groups_under(items, "jaccard")
@@ -379,16 +417,26 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         )
         report.note(f"re-scoring over the store the run kept: containment {kept_after}, Jaccard {kept_before}")
 
-        readings = group_readings(items)
+    # What the pass actually did, on the store it left — which is a different question from what the
+    # floor would do to that store, and the only one that can be asked of a run that merged something.
+    if items:
+        readings, inferred = group_readings(items)
+        priced = [row for row in readings if row[2] != "(survivor not in the sample)"]
         if readings:
-            weakest = min(readings, key=lambda row: row[0])
-            report.note(f"weakest merged pair reads containment {weakest[0]:.3f}")
+            if inferred:
+                report.note(
+                    "the retired members carry no statusReason: each was linked to the live item that "
+                    "contains it most, which is exact for one group and can only over-state for more"
+                )
             for score, member, survivor in readings:
-                report.note(f"  merged {score:.3f}: {member[:110]!r} -> {survivor[:110]!r}")
+                jac = jaccard(tokens(member), tokens(survivor))
+                report.note(
+                    f"  merged {score:.3f} containment / {jac:.3f} Jaccard: {member[:100]!r} -> {survivor[:100]!r}"
+                )
             report.refute(
                 "a merged group is not one claim: the floor fell below the register's resolution",
-                weakest[0] < CONTENT_FLOOR,
-                f"weakest pair {weakest[0]:.3f} against a floor of {CONTENT_FLOOR:.2f}",
+                bool(priced) and min(row[0] for row in priced) < CONTENT_FLOOR,
+                f"weakest pair {min((row[0] for row in priced), default=0.0):.3f} against a floor of {CONTENT_FLOOR:.2f}",
             )
         else:
             report.note("no merged group carries a retired member in the sample")
@@ -428,9 +476,9 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         retained_share is not None and retained_share < PREDICTED_RETAINED_SHARE_MIN,
         f"{retained} of {considered} kept",
     )
-    if items is not None:
-        kept_before, _ = _groups_under(items, "jaccard")
-        kept_after, _ = _groups_under(items, "containment")
+    if re_scorable:
+        kept_before, _ = _groups_under(items or [], "jaccard")
+        kept_after, _ = _groups_under(items or [], "containment")
         report.refute(
             "the two measures agree on this store, so the calibration is wrong about which reading was inert",
             kept_after == kept_before and kept_after >= 1,
@@ -439,7 +487,7 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         if kept_after == 0 and groups > 0:
             report.note(
                 "the re-scoring found no group on the stored sample while the run merged "
-                f"{groups}: the sample is not the population the pass read"
+                f"{groups}: the sample is the post-pass store, not the population the pass read"
             )
 
     if report.refutation_fired:
@@ -468,7 +516,7 @@ NEAR_JACCARD_B = "confirm identity before changing pending reservation total ite
 
 
 def stored_item(identifier: str, statement: str, when: str, task: str, status: str = "active",
-                reason: str | None = None) -> dict[str, Any]:
+                reason: str | None = None, support: int = 1) -> dict[str, Any]:
     return {
         "id": identifier,
         "kind": "procedure",
@@ -478,7 +526,11 @@ def stored_item(identifier: str, statement: str, when: str, task: str, status: s
         "status": status,
         "statusReason": reason or "confidence-cleared",
         "payload": None,
-        "evidence": [{"feedbackId": f"fb_{identifier}", "runId": f"run_{identifier}", "taskId": task}],
+        "supportTasks": support,
+        "evidence": [
+            {"feedbackId": f"fb_{identifier}_{index}", "runId": f"run_{identifier}", "taskId": task}
+            for index in range(support)
+        ],
     }
 
 
@@ -557,7 +609,15 @@ def main() -> int:
             "tau2.distillUnit.consolidation.merged": 16,
             "tau2.distillUnit.consolidation.supportAfter": {"2": 8},
         })
+        # The calibration refutation is about a store the pass left alone: on a post-pass store the
+        # merged pair is gone, so "containment merges nothing here" is the artefact's shape and not a
+        # fact about either measure. The fixture is therefore a store the pass did not touch but
+        # which both measures would merge — the case the refutation exists for.
         agree = base_artefact(**{
+            "tau2.distillUnit.consolidation.groups": 0,
+            "tau2.distillUnit.consolidation.merged": 0,
+            "tau2.distillUnit.consolidation.retained": 24,
+            "tau2.distillUnit.consolidation.supportAfter": {"1": 24},
             "tau2.storeItems": {
                 "items": [
                     stored_item("k1", NEAR_JACCARD_A, "the user asks for several changes", "retail/0"),
@@ -570,7 +630,19 @@ def main() -> int:
                         reason="consolidated:k1",
                     ),
                 ]
-            }
+            },
+        })
+        post_pass = base_artefact(**{
+            "tau2.distillUnit.consolidation.groups": 1,
+            "tau2.distillUnit.consolidation.merged": 1,
+            "tau2.distillUnit.consolidation.retained": 23,
+            "tau2.distillUnit.consolidation.supportAfter": {"1": 22, "2": 1},
+            "tau2.storeItems": {
+                "items": [
+                    stored_item("k1", PAIR_A, "several changes at once", "retail/0", support=2),
+                    stored_item("k3", OTHER, "several changes at once", "retail/2"),
+                ]
+            },
         })
         not_one_claim = base_artefact(**{
             "tau2.storeItems": {
@@ -587,75 +659,97 @@ def main() -> int:
                 ]
             }
         })
-        cases: list[tuple[str, dict[str, Any], str]] = [
-            ("a store whose two closest items are one claim grades", base_artefact(), "GRADED"),
-            ("a pass that merged nothing again abandons: the mechanism is inert", inert, "ABANDONED"),
-            ("a store that recurs by halving is the R56 defect and abandons", halved, "ABANDONED"),
+        cases: list[tuple[str, dict[str, Any], str, str | None]] = [
+            ("a store whose two closest items are one claim grades", base_artefact(), "GRADED", None),
+            ("a pass that merged nothing again abandons: the mechanism is inert", inert, "ABANDONED", "no group merges again"),
+            ("a store that recurs by halving is the R56 defect and abandons", halved, "ABANDONED", "halving the store"),
             (
                 "both measures merging the same group abandons: the calibration is wrong",
                 agree,
                 "ABANDONED",
+                "the two measures agree",
             ),
             (
                 "a merged group that is not one claim abandons: the floor is too low",
                 not_one_claim,
                 "ABANDONED",
+                "not one claim",
+            ),
+            (
+                "a post-pass store grades the merge it shows and leaves the re-scoring ungraded",
+                post_pass,
+                "GRADED",
+                "holds no pair to re-score",
             ),
             (
                 "the correction arm is discarded rather than reinterpreted",
                 base_artefact(**{"tau2.distillUnit.unit": "correction"}),
                 "DISCARDED",
+                None,
             ),
             (
                 "an artefact that does not record its unit cannot be read",
                 base_artefact(**{"tau2.distillUnit": None}),
                 "NO_MEASUREMENT",
+                None,
             ),
             (
                 "a trace arm with no census did not run its pass",
                 base_artefact(**{"tau2.distillUnit.consolidation": None}),
                 "NO_MEASUREMENT",
+                None,
             ),
             (
                 "traces on too few corrections leaves the treatment unmeasured",
                 base_artefact(**{"tau2.distillUnit.traced": 3}),
                 "NO_MEASUREMENT",
+                None,
             ),
             (
                 "another scenario pair is discarded",
                 base_artefact(**{"tau2.scenario.test": "airline"}),
                 "DISCARDED",
+                None,
             ),
             (
                 "no storeItems leaves the attribution reading ungraded rather than failed",
                 base_artefact(**{"tau2.storeItems": None}),
                 "GRADED",
+                "storeItems absent",
             ),
             (
                 "no distillForm leaves the ban reading ungraded rather than failed",
                 base_artefact(**{"tau2.distillForm": None}),
                 "GRADED",
+                "refused None",
             ),
             (
                 "a learning half still capped at 32 fails the population prediction",
                 base_artefact(**{"tau2.learning.rows": 32}),
                 "ABANDONED",
+                "rows 32",
             ),
             (
                 "a run that did not score four trials abandons",
                 base_artefact(**{"metrics.k": 1}),
                 "ABANDONED",
+                "registered trial count",
             ),
         ]
         failures = 0
-        for label, artefact, expected in cases:
+        for label, artefact, expected, fragment in cases:
             state, report = grade(artefact)
-            mark = "ok  " if state == expected else "FAIL"
-            if state != expected:
+            rendered = report.render()
+            # The state alone can pass for the wrong reason: a fixture that abandons because the run
+            # scored one trial would also pass a case written about the calibration. The fragment is
+            # what says *which* reason fired.
+            honoured = fragment is None or fragment in rendered
+            mark = "ok  " if state == expected and honoured else "FAIL"
+            if state != expected or not honoured:
                 failures += 1
             print(f"  {mark} {label} -> {state}")
-            if state != expected:
-                print(report.render())
+            if state != expected or not honoured:
+                print(rendered)
         print()
         print("SELF-TEST PASSED" if failures == 0 else f"SELF-TEST FAILED ({failures})")
         return 0 if failures == 0 else 1

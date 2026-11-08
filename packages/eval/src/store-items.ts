@@ -49,6 +49,17 @@ export type StoreItemRecord = {
   readonly supportTasks: number;
   /** Evidence rows the item holds, which is the other half of the same question. */
   readonly evidence: number;
+  /**
+   * Why the item is in the state it is in, when the store says.
+   *
+   * R59. The recurrence pass retires a member and names the survivor that absorbed it
+   * (`consolidated:<id>`), and without that pointer a sample holds the retired item and the
+   * corroborated survivor with nothing joining them: a readback could report *that* a group merged
+   * and never say *which* pair, which is the one thing the registration asks it to judge. Carried
+   * as written rather than parsed, because the prefix is the store's vocabulary and a projection
+   * that interpreted it would break when the store gains another reason.
+   */
+  readonly statusReason?: string;
 };
 
 export type StoreItemSample = {
@@ -78,6 +89,8 @@ export function storeItemSample(
     readonly trust: number;
     readonly scope: { readonly domain?: string };
     readonly evidence: readonly { readonly taskId?: string; readonly runId: string }[];
+    /** The store's own reason for the item's status, which the recurrence pass uses to name a survivor. */
+    readonly statusReason?: string;
   }[],
   options: { readonly limit?: number; readonly maxChars?: number } = {},
 ): StoreItemSample {
@@ -98,6 +111,7 @@ export function storeItemSample(
       scope: item.scope.domain === undefined ? {} : { domain: item.scope.domain },
       supportTasks: countDistinctTasks(item.evidence),
       evidence: item.evidence.length,
+      ...(item.statusReason === undefined ? {} : { statusReason: item.statusReason }),
     };
   });
   return { items: sampled, limit, maxChars, omitted: Math.max(0, items.length - sampled.length), truncated };
