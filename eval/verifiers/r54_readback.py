@@ -212,19 +212,33 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         and injected is not None
         and measured + unmeasurable == injected
     )
+    # A census cannot have more conditioned items than servable ones, and cannot
+    # serve more items than it stored. Every count here is a number the run wrote
+    # about itself, so a combination that cannot describe a store is a corrupt
+    # artefact rather than a surprising one -- and grading predictions against it
+    # would report a defect in the write path that is a defect in the file.
+    stored = store.get("stored")
+    census_ok = (
+        conditioned is not None
+        and servable is not None
+        and 0 <= conditioned <= servable
+        and (stored is None or servable <= stored)
+    )
     instrument_ok = (
         (mean_pack or 0) > 0
         and (learning.get("distillFailed") or 0) == 0
         and (origin.get("storedWithoutDomain") or 0) == 0
         and (origin.get("unscopedIn") or 0) == 0
         and population_ok
+        and census_ok
     )
     report.predict(
         "the instrument holds: non-empty packs, no distiller failure, one coverage population",
         instrument_ok,
         f"mean {mean_pack}, distillFailed {learning.get('distillFailed')}, "
         f"withoutDomain {origin.get('storedWithoutDomain')}, unscoped {origin.get('unscopedIn')}, "
-        f"pairs {measured}+{unmeasurable} vs injected {injected}",
+        f"pairs {measured}+{unmeasurable} vs injected {injected}, "
+        f"conditioned {conditioned} of {servable} of {stored}",
     )
     report.predict(
         "the same episodes as R51: 4 trials over the held-out half",
@@ -288,10 +302,11 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         and empty_share > PREDICTED_EMPTY_MAX,
         f"p50 {p50}, empty share {empty_share:.3%}",
     )
+    written_ok = isinstance(sample, dict) and bool(sample.get("items"))
     report.refute(
         "the run cannot say what was written",
-        not (isinstance(sample, dict) and sample.get("items")),
-        "storeItems absent or empty",
+        not written_ok,
+        "storeItems present" if written_ok else "storeItems absent or empty",
     )
     report.refute(
         "the memory costs accuracy and the revert rule fires",
@@ -317,7 +332,7 @@ def base_artefact(**over: Any) -> dict[str, Any]:
         "tau2": {
             "meanPackIds": 1.9,
             "scenario": {"learn": "retail", "test": "retail", "recall": "retail"},
-            "store": {"stored": 10, "active": 10, "servable": 10, "conditioned": 16, "unconditioned": 0},
+            "store": {"stored": 16, "active": 16, "servable": 16, "conditioned": 16, "unconditioned": 0},
             "recall": {"requests": 1527, "served": 1527, "empty": 0},
             "use": {"injectedPairs": 2188, "zeroCoveragePairs": 750},
             "coverage": {
@@ -395,6 +410,11 @@ def main() -> int:
             (
                 "an artefact with no store text certifies nothing about the write path",
                 base_artefact(**{"tau2.storeItems": None}),
+                "ABANDONED",
+            ),
+            (
+                "a census that cannot describe a store abandons",
+                base_artefact(**{"tau2.store.conditioned": 99}),
                 "ABANDONED",
             ),
             (
