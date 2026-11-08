@@ -5,9 +5,9 @@
   "scanned": 152,
   "totals": {
     "modules": 152,
-    "lines": 41048,
+    "lines": 41049,
     "adapterLines": 1766,
-    "deferredLines": 5643,
+    "deferredLines": 5762,
     "coupledShare": 0.1803
   },
   "layers": [
@@ -38,9 +38,9 @@
     {
       "layer": "eval",
       "modules": 97,
-      "lines": 29083,
+      "lines": 29084,
       "adapterLines": 0,
-      "deferredLines": 5643,
+      "deferredLines": 5762,
       "coupled": 13
     },
     {
@@ -143,7 +143,7 @@
       "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 447,
+      "lines": 448,
       "words": [
         "sql",
         "sqlite",
@@ -163,8 +163,8 @@
       "words": [
         "bird"
       ],
-      "verdict": "general",
-      "reason": null
+      "verdict": "deferred",
+      "reason": "the matrix names the artefact it was rendered against; the dataset name is an argument, not a query"
     },
     {
       "pkg": "eval",
@@ -481,9 +481,9 @@
   "gates": [
     {
       "id": "V72-every-coupled-module-has-a-verdict",
-      "pass": false,
+      "pass": true,
       "blocking": true,
-      "detail": "1 coupled modules have no verdict, first packages/eval/src/gate-matrix.ts (bird)"
+      "detail": "152 modules, 13 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -498,5 +498,5 @@
       "detail": "38 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1766 of 41048 production lines across 152 modules: 7 adapter modules in `sql`, 12 deferred with a reason, and `core` at 0 coupled modules of 38; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1766 of 41049 production lines across 152 modules: 7 adapter modules in `sql`, 13 deferred with a reason, and `core` at 0 coupled modules of 38; 5 package edges, 0 of them upward."
 }

@@ -81,6 +81,7 @@ export const DEFERRALS: Readonly<Record<string, string>> = {
   'bird-data': 'the dataset loader; opens SQLite to read a corpus rather than to answer a question',
   'bird-rows': 'the corpus row shapes, not a query',
   coupling: 'the scanner itself: it defines the word list, so it necessarily contains every word on it',
+  'gate-matrix': 'the matrix names the artefact it was rendered against; the dataset name is an argument, not a query',
   judge: 'the LLM judge\'s prompt and record name the artefact being judged',
   plugin: 'the plugin contract\'s worked example is a host that returns SQL',
   reproduction: 'the reproduction config names the published BIRD cell and its M-Schema rendering',
