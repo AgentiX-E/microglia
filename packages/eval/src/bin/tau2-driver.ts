@@ -913,6 +913,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // observations are already filtered at the floor under test, and a histogram
     // built from them prices that floor as free.
     coverageObservations: primary.coverageObservations ?? primary.useObservations,
+    // R53's fourth prediction, recorded rather than discarded: `evaluateFacade` builds one census per
+    // facade, and the paired path kept its copy in `observedPair` while this path dropped it on the
+    // floor. A prediction whose subject the artefact does not carry cannot be graded, and this one
+    // was written before the field existed -- so the field goes in before the dispatch, not after.
+    inaction: primary.inaction,
     widenedItems: withoutDomain,
     scenario,
     // The scenario's own size, not the split's: a dispatch cap hides it, and it is what bounds the

@@ -40,6 +40,7 @@ import { defaultPolicy } from '@agentix-e/microglia-core/kernel';
 import type { FunnelInput } from '@agentix-e/microglia-protocol';
 import type { AdmissionCensus, Tau2ArmRecord } from './tau2-gates.js';
 import type { StoreItemSample } from './store-items.js';
+import type { InactionCensus } from './inaction.js';
 import { coverageHistogram, useCensus, type UseArm, type UseObservation } from './tau2-use-census.js';
 
 export type { AdmissionCensus } from './tau2-gates.js';
@@ -197,6 +198,16 @@ export type Tau2Raw = {
    * or the next floor is chosen from a table that says it costs nothing.
    */
   readonly coverageObservations?: readonly UseObservation[];
+  /**
+   * Whether the agent acted at all, per task, over the graded facade.
+   *
+   * R53's fourth prediction is that a licence to disregard a rule must not become a licence to stop
+   * acting, and this census is its subject. `evaluateFacade` built one for every facade and the
+   * single-facade path -- which is every dispatch since R49 unless the paired facade is switched on
+   * -- discarded it, so the prediction had nothing to read while R49's paired path quietly kept its
+   * own copy. One caller using a field is what makes the other caller's loss invisible.
+   */
+  readonly inaction?: InactionCensus;
   /**
    * R53: the sentence every pack in this arm opened with.
    *
@@ -410,6 +421,7 @@ export const PROJECTION: { readonly [K in keyof Tau2Raw]-?: 'carried' | 'reduced
   recall: 'carried',
   useObservations: 'reduced',
   coverageObservations: 'reduced',
+  inaction: 'carried',
   useArm: 'reduced',
   widenedItems: 'reduced',
   storeItems: 'carried',
@@ -493,6 +505,7 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     ...(raw.injectionNote === undefined ? {} : { injectionNote: raw.injectionNote }),
     ...(raw.funnel === undefined ? {} : { funnel: raw.funnel }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),
+    ...(raw.inaction === undefined ? {} : { inaction: raw.inaction }),
     // The use census rides beside V1's rate. It is computed here, from the raw
     // observations the driver collected at the facade, so the driver carries
     // only what it saw and the arithmetic stays in one tested function. A raw

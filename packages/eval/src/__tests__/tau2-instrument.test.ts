@@ -420,8 +420,9 @@ describe('the projection has a decision for every field, and keeps it', () => {
   // `keyof Tau2Raw`, so a field added to the driver's record does not compile until it is given a
   // decision -- verified by adding one and watching `tsc` refuse. These two tests hold the runtime
   // side: the table says what the mapping does, and the mapping does what the table says.
-  const full = (): Tau2Raw =>
+  const full = (over: Partial<Tau2Raw> = {}): Tau2Raw =>
     raw({
+      ...over,
       scenarioTasks: { learn: 115, test: 115 },
       store: {
         stored: 14,
@@ -465,6 +466,12 @@ describe('the projection has a decision for every field, and keeps it', () => {
       useArm: 'as-is',
       widenedItems: 0,
       coverageObservations: [{ query: 'cancel my reservation', statements: ['cancel reservation'] }],
+      inaction: {
+        state: 'OBSERVED',
+        tasks: [{ id: 'retail/5', trials: 4, inactive: 1 }],
+        inactiveTrials: 1,
+        totalTrials: 4,
+      },
     });
 
   const carried = Object.entries(PROJECTION)
@@ -473,6 +480,22 @@ describe('the projection has a decision for every field, and keeps it', () => {
   const reduced = Object.entries(PROJECTION)
     .filter(([, decision]) => decision === 'reduced')
     .map(([field]) => field);
+
+  it('carries the abstention census, which the single-facade path computed and threw away', () => {
+    // R53's fourth prediction is "a licence to disregard a rule must not become a licence to stop
+    // acting", and the census is its subject. `evaluateFacade` built one per facade and the
+    // single-facade path -- every dispatch since R49 unless the paired facade is switched on --
+    // dropped it on the floor, so the prediction had nothing to read. R49's paired path kept its
+    // copy, which is how the loss went unnoticed: one of the two callers used the field.
+    const inaction = {
+      state: 'OBSERVED' as const,
+      tasks: [{ id: 'retail/5', trials: 4, inactive: 1 }],
+      inactiveTrials: 1,
+      totalTrials: 4,
+    };
+    const record = armRecordFromDriver(full({ inaction }));
+    expect(record.inaction).toEqual(inaction);
+  });
 
   it('carries every field it says it carries', () => {
     const record = armRecordFromDriver(full()) as Record<string, unknown>;

@@ -50,6 +50,7 @@ import {
 } from '@agentix-e/microglia-protocol';
 import { detectableDelta } from './protocol.js';
 import type { CoverageHistogram, UseCensus } from './tau2-use-census.js';
+import type { InactionCensus } from './inaction.js';
 import type { DistillFormRecord, InjectionNoteRecord } from './tau2-instrument.js';
 import type { StoreItemSample } from './store-items.js';
 
@@ -139,6 +140,14 @@ export type Tau2ArmRecord = {
     readonly events?: number;
     readonly llmFailed?: number;
   };
+  /**
+   * R53: whether the agent acted at all in each episode, per task.
+   *
+   * Carried rather than graded: no gate reads it, and the prediction it answers — that a licence to
+   * disregard a rule must not become a licence to stop acting — is a readback subject. It travels
+   * because an artefact that dropped it made the prediction unanswerable, which is the R56 defect.
+   */
+  readonly inaction?: InactionCensus;
   /** R54/R56: the store's own words, bounded, and the form the distiller was asked for. */
   readonly storeItems?: StoreItemSample;
   readonly distillForm?: DistillFormRecord;
