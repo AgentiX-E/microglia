@@ -912,6 +912,12 @@ jobs:
       - name: The readback verifiers still grade their own fixtures
         run: pnpm eval:verifiers
 
+      # The coverage matrix is committed to the documentation repository, which this workflow cannot
+      # write to. What it can check is that the generator still renders: a projection that throws on
+      # a gate in neither table is a build failure here rather than a stale document there.
+      - name: Render the gate coverage matrix
+        run: pnpm eval:gate-matrix -- --out "$RUNNER_TEMP/GATE-COVERAGE-MATRIX.md"
+
       - name: Gate summary
         if: always()
         run: |

@@ -62,6 +62,7 @@
     "eval:verifiers": "python3 eval/verifiers/r49_readback.py --self-test && python3 eval/verifiers/r51_readback.py --self-test && python3 eval/verifiers/r54_readback.py --self-test && python3 eval/verifiers/r56_readback.py --self-test && python3 eval/verifiers/r55_readback.py --self-test",
     "eval:facade-pair-readback": "tsx packages/eval/src/bin/facade-pair-readback.ts",
     "eval:protocol": "tsx packages/eval/src/bin/protocol.ts",
+    "eval:gate-matrix": "tsx packages/eval/src/bin/gate-matrix.ts",
     "eval:harm": "tsx packages/eval/src/bin/harm-strata.ts",
     "eval:power": "tsx packages/eval/src/bin/power-audit.ts",
     "eval:query-diff": "tsx packages/eval/src/bin/query-diff.ts",
