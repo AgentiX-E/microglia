@@ -22,7 +22,7 @@ import {
   type KnowledgeItem,
   type KnowledgeKind,
 } from '../../kernel/index.js';
-import { consolidateKnowledge } from '../consolidate.js';
+import { claimContainment, claimTokens, consolidateKnowledge, sharedTerms } from '../consolidate.js';
 
 const AT = 1_700_000_000_000;
 
@@ -306,21 +306,99 @@ describe('consolidateKnowledge', () => {
   });
 
   it('merges exactly at the threshold and not below it', () => {
-    // Six content terms, five shared: 5/7 = 0.714. One term swapped off the shared set drops it to
-    // 4/8 = 0.5, which no threshold at 0.7 should merge.
+    // Six content terms on the shorter side and four of them shared: containment 4/6 = 0.667, so a
+    // 0.6 floor merges and a 0.7 floor does not. The same pair scores 4/11 = 0.36 as Jaccard,
+    // which no floor this lane ever used would have merged — the reading that made R58's pass
+    // inert.
     const at = [
       item(candidate('confirm identity before changing pending reservation', { id: 'a', taskId: 't1' }), 'k1'),
-      item(candidate('confirm identity before changing pending booking', { id: 'b', taskId: 't2' }), 'k2'),
+      item(
+        candidate('confirm identity before changing the payment method used for each order', {
+          id: 'b',
+          taskId: 't2',
+        }),
+        'k2',
+      ),
     ];
-    const atThreshold = consolidateKnowledge(at, { now: AT, policy: defaultPolicy, threshold: 0.7 });
+    const atThreshold = consolidateKnowledge(at, { now: AT, policy: defaultPolicy, threshold: 0.6 });
     expect(atThreshold.report.merged).toBe(1);
+    const underStricter = consolidateKnowledge(at, { now: AT, policy: defaultPolicy, threshold: 0.7 });
+    expect(underStricter.report.merged).toBe(0);
 
     const below = [
       item(candidate('confirm identity before changing pending reservation', { id: 'c', taskId: 't3' }), 'k3'),
       item(candidate('quote total before applying discount code to order', { id: 'd', taskId: 't4' }), 'k4'),
     ];
-    const tooDifferent = consolidateKnowledge(below, { now: AT, policy: defaultPolicy, threshold: 0.7 });
+    const tooDifferent = consolidateKnowledge(below, { now: AT, policy: defaultPolicy, threshold: 0.6 });
     expect(tooDifferent.report.merged).toBe(0);
+  });
+
+  it('reads the smaller claim, so a trailing caveat does not cost a repeat its merge', () => {
+    // The shape R58's store actually holds: one claim, then the same claim with a different closing
+    // clause. Shared terms 14, smaller claim 20, so containment is 0.700 — and the union's extra
+    // terms are exactly what Jaccard charged twice, putting the pair at 0.483.
+    const shared =
+      'When a request bundles several changes carry out every requested change in the order the requester ' +
+      'stated them and do not stop after the first one succeeds';
+    const restated =
+      'When a request bundles several changes carry out every requested change in the order the requester ' +
+      'stated them and stop once all are applied rather than adding extra lookups or calculations';
+    const items = [
+      item(candidate(shared, { id: 'a', taskId: 't1' }), 'k1'),
+      item(candidate(restated, { id: 'b', taskId: 't2' }), 'k2'),
+    ];
+    const { report } = consolidateKnowledge(items, { now: AT, policy: defaultPolicy });
+    expect(report).toMatchObject({ groups: 1, merged: 1, maxSupportAfter: 2 });
+  });
+
+  it('scores a pair the same whichever side of the store it sits on', () => {
+    // Containment chooses its denominator by size and not by argument order, so a measure that
+    // picked the left-hand set would merge in one order and not the other — a pass whose result
+    // depends on arrival order is the defect consolidation exists to remove.
+    const short = 'Confirm the customer identity before changing a pending reservation';
+    const long = `${short}, and quote the new total back to the customer before the change is applied`;
+    const one = consolidateKnowledge(
+      [item(candidate(short, { id: 'a', taskId: 't1' }), 'k1'), item(candidate(long, { id: 'b', taskId: 't2' }), 'k2')],
+      { now: AT, policy: defaultPolicy },
+    );
+    const other = consolidateKnowledge(
+      [item(candidate(long, { id: 'b', taskId: 't2' }), 'k2'), item(candidate(short, { id: 'a', taskId: 't1' }), 'k1')],
+      { now: AT, policy: defaultPolicy },
+    );
+    expect(one.report.merged).toBe(1);
+    expect(other.report.merged).toBe(1);
+  });
+
+  it('reads a paraphrased condition as agreement and a subject-only one as a conflict', () => {
+    // The count, not the ratio: both of these conditions read 0.400 containment against their
+    // partner, and only the first is a restatement of the same trigger.
+    const paraphrased = [
+      item(
+        candidate(ONE, {
+          id: 'a',
+          taskId: 't1',
+          when: 'the user asks for multiple distinct changes in one request and names the order',
+        }),
+        'k1',
+      ),
+      item(
+        candidate(ONE_AGAIN, {
+          id: 'b',
+          taskId: 't2',
+          when: 'the user asks for multiple distinct modifications and specifies the sequence',
+        }),
+        'k2',
+      ),
+    ];
+    const agreed = consolidateKnowledge(paraphrased, { now: AT, policy: defaultPolicy });
+    expect(agreed.report).toMatchObject({ merged: 1, refusedCondition: 0 });
+
+    const conflicting = [
+      item(candidate(ONE, { id: 'c', taskId: 't3', when: 'the customer asks to change a booking' }), 'k3'),
+      item(candidate(ONE_AGAIN, { id: 'd', taskId: 't4', when: 'the customer asks for a refund on a flight' }), 'k4'),
+    ];
+    const refused = consolidateKnowledge(conflicting, { now: AT, policy: defaultPolicy });
+    expect(refused.report).toMatchObject({ merged: 0, refusedCondition: 1 });
   });
 
   it('folds three paraphrases from three tasks into one item with three tasks of support', () => {
@@ -455,12 +533,60 @@ describe('consolidateKnowledge', () => {
     expect(report).toMatchObject({ merged: 0, retained: 2 });
   });
 
-  it('carries the threshold it used, so a reader can tell a strict pass from a loose one', () => {
+  it('carries the floors it used, so a reader can tell a strict pass from a loose one', () => {
     const { report } = consolidateKnowledge([], { now: AT, policy: defaultPolicy, threshold: 0.55 });
     expect(report.threshold).toBeCloseTo(0.55, 10);
-    // The default is the one the registration names; a reading without it is a number with no
+    // The defaults are the ones the registration names; a reading without them is a number with no
     // setting attached.
     const { report: byDefault } = consolidateKnowledge([], { now: AT, policy: defaultPolicy });
-    expect(byDefault.threshold).toBeCloseTo(0.7, 10);
+    expect(byDefault.threshold).toBeCloseTo(0.6, 10);
+    expect(byDefault.conditionMinShared).toBe(3);
+  });
+
+  it('honours an overridden condition floor, because a stricter pass must be dispatchable', () => {
+    const items = [
+      item(
+        candidate(ONE, {
+          id: 'a',
+          taskId: 't1',
+          when: 'the user asks for multiple distinct changes in one request and names the order',
+        }),
+        'k1',
+      ),
+      item(
+        candidate(ONE_AGAIN, {
+          id: 'b',
+          taskId: 't2',
+          when: 'the user asks for multiple distinct modifications and specifies the sequence',
+        }),
+        'k2',
+      ),
+    ];
+    // Four shared terms: below a floor of five, and the pair is refused rather than merged.
+    const strict = consolidateKnowledge(items, { now: AT, policy: defaultPolicy, conditionMinShared: 5 });
+    expect(strict.report).toMatchObject({ merged: 0, refusedCondition: 1, conditionMinShared: 5 });
+  });
+});
+
+describe('the measure itself', () => {
+  it('reports shared terms and containment as two readings of one comparison', () => {
+    // Stated directly because both sides of the pass are written in these terms and a reader of the
+    // census needs the arithmetic in one place.
+    const short = claimTokens('confirm identity before changing a pending reservation');
+    const long = claimTokens('confirm identity before changing a pending reservation and quote the new total');
+    expect(short.size).toBe(6);
+    expect(long.size).toBe(9);
+    expect(sharedTerms(short, long)).toBe(6);
+    // Everything the shorter claim says is in the longer one, so it is contained; the union would
+    // have scored 6/9, which is the penalty R58 measured.
+    expect(claimContainment(short, long)).toBeCloseTo(1, 10);
+    expect(claimContainment(long, short)).toBeCloseTo(1, 10);
+  });
+
+  it('treats two empty claims as no evidence rather than as a match', () => {
+    const empty = claimTokens('the a of the');
+    expect(empty.size).toBe(0);
+    expect(claimContainment(empty, empty)).toBe(0);
+    expect(sharedTerms(empty, empty)).toBe(0);
   });
 });

@@ -34,8 +34,9 @@ export {
   type GeneralizationPlan,
 } from './generalize.js';
 export {
-  claimOverlap,
+  claimContainment,
   claimTokens,
+  sharedTerms,
   consolidateKnowledge,
   type ConsolidationCensus,
   type ConsolidationOptions,

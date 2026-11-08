@@ -15,7 +15,8 @@ const census = (overrides: Partial<ConsolidationCensus> = {}): ConsolidationCens
   groups: 2,
   merged: 3,
   retained: 4,
-  threshold: 0.7,
+  threshold: 0.6,
+  conditionMinShared: 3,
   refusedCondition: 0,
   refusedPayload: 0,
   refusedDuplicateEvidence: 0,
@@ -40,6 +41,10 @@ describe('recurrenceGate', () => {
     const gate = recurrenceGate(record());
     expect(gate.pass).toBe(true);
     expect(gate.actual).toContain('max support 1→3');
+    // The floors travel with the reading: a store consolidated at 0.6 and one consolidated at 0.7
+    // are two experiments, and a gate that reported the support without them would let the second
+    // be read as the first.
+    expect(gate.actual).toContain('floors 0.6/3');
   });
 
   it('fails a trace arm whose pass did not run, because there is no after-state to read', () => {

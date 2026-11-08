@@ -105,6 +105,13 @@ mechanism that can raise `supportTasks` after the fact: the write path sees one 
 refuses to merge items whose payloads differ, whose evidence is the same, or whose conditions
 disagree, and counts each refusal.
 
+**Containment** — the similarity consolidation merges on: shared content terms over the *smaller* of
+the two claims, so a claim and the same claim with a different closing clause score 1.0-minus rather
+than 0.48 as Jaccard does. Measured on a real τ² store, the one pair of repeats reads 0.700 and the
+closest pair that is not a repeat reads 0.533, which is where the 0.60 floor comes from. The
+condition is compared by a *count* of shared terms instead (floor 3), because as a ratio a
+paraphrased trigger and an unrelated one are indistinguishable.
+
 **Trace** — one task's episode as the distiller can see it: what was attempted (the calls, in order),
 what the reference trajectory does instead, and the rubric the attempt failed. A trace is the unit a
 multi-claim distillation reads, in the same way a correction is the unit a single-claim one reads.

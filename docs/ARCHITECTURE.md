@@ -107,11 +107,27 @@ it gets the bytes it always got.
 
 | It merges | It refuses, and counts |
 |---|---|
-| same kind, same scope, statements that overlap past a threshold, compatible conditions | different payloads (one item cannot carry both), identical evidence (no support bought), conditions that disagree (the first would win by arrival order) |
+| same kind, same scope, statements whose terms are contained past a floor, compatible conditions | different payloads (one item cannot carry both), identical evidence (no support bought), conditions that share less than three content terms (the first would win by arrival order) |
 
 The survivor is the best-attested live member — not quarantined first, then the most distinct tasks,
 then the most evidence rows, then the smallest id — so the result is a function of the store rather
 than of the order its items happened to be written in.
+
+**The floor is measured on the store, and the first one was wrong.** It began as Jaccard overlap at
+0.70, and a store written by the trace unit says why that could not merge anything: its two closest
+items are one claim — both open *"when a request bundles several changes, carry out every requested
+change in the order the requester stated them"* and differ only in how the sentence closes — and
+Jaccard scores that pair **0.483**, which is the *maximum* of all 105 pairs in that store. The
+next-highest pair, which is not a repeat, is 0.250. A floor above a population's ceiling cannot be a
+decision.
+
+Containment — shared content terms over the *smaller* claim — charges a trailing clause once instead
+of twice and puts the same pair at **0.700** against **0.533** for the closest non-repeat, so the
+floor sits at **0.60**. The condition is tested by a count rather than a ratio, because the ratio is
+uninformative at this scale: a paraphrased trigger and an unrelated one both read 0.400, while a
+paraphrase shares four content terms and a conflict shares two. Both floors travel in the census
+(`threshold`, `conditionMinShared`), so a store consolidated under one setting is never read as a
+store consolidated under another.
 
 ### 2.4 `apply` owns the injection boundary
 

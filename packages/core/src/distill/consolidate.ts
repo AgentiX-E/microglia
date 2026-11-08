@@ -24,9 +24,38 @@
  *
  * A deterministic key is the only kind this project can test: a merge decided by a cosine is
  * decided by the model that produced the vectors, and the run that reads the census could not
- * reproduce it. The cost is that the key is coarse — token overlap over the claim's own words,
- * with the condition held to the same test — and the census carries the threshold it used so a
- * strict pass can be told from a loose one.
+ * reproduce it. The cost is that the key is coarse — token containment over the claim's own words —
+ * and the census carries the floor it used so a strict pass can be told from a loose one.
+ *
+ * ## Why containment, measured on the register rather than assumed
+ *
+ * The first version scored a pair with Jaccard, and R58's store is the reason it is not that any
+ * more. Its two closest items are one claim: both open "when a request bundles several changes,
+ * carry out every requested change in the order the requester stated them", and then differ — one
+ * ends "do not stop after the first one succeeds", the other "stop once all are applied rather than
+ * adding extra lookups or calculations". Jaccard puts that pair at **0.483** against a 0.70 floor,
+ * and 0.483 is the *maximum* of all 105 pairs in the store; the next-highest pair, which is not a
+ * repeat, is 0.250.
+ *
+ * Jaccard charges the difference twice: once for the terms the trailing clause adds, once for the
+ * terms it does not share. Containment charges it once — shared terms over the *smaller* claim's
+ * terms — and puts the same pair at **0.700** against 0.533 for the closest non-repeat. A floor of
+ * 0.60 therefore sits between them, which is where a floor has to sit to be a decision rather than
+ * a hope. Both numbers are measured on the store, not chosen.
+ *
+ * The condition is tested a different way, and that is also measured. The same pair's conditions —
+ * "multiple distinct changes in one request and names the order" against "multiple distinct
+ * modifications and specifies the sequence" — share four content terms of eight; the closest
+ * non-repeat pair's conditions share four as well, and two conditions that disagree about the
+ * subject ("the customer asks to change a booking" against "the customer asks for a refund on a
+ * flight") share two. As a *ratio* the condition therefore reads 0.400 whether the pair is one
+ * claim or two, which is no resolution at all: holding it to any floor in that neighbourhood would
+ * veto the one merge the register offers, and the pass would report itself inert a second time.
+ *
+ * What does separate them is an absolute count. A paraphrased trigger shares more than its subject
+ * — the register's true pair shares four terms — and a conflicting one shares the subject and
+ * nothing else. So the condition is vetoed only below three shared terms, and the census carries
+ * that count beside the ratio so a reader can see which test refused what.
  *
  * ## What it will not do
  *
@@ -51,15 +80,22 @@ export type ConsolidationOptions = {
   /** Needed to re-score a survivor: two tasks of support are not one task of confidence. */
   readonly policy: Policy;
   /**
-   * Token-overlap floor at which two claims are one claim. Default 0.7.
+   * Containment floor at which two claims are one claim. Default 0.6.
    *
-   * Calibrated on the shape a distiller writes: a claim is one sentence of six to twenty content
-   * terms, and the paraphrases this pass exists for share most of them ("confirm the customer's
-   * identity before changing a booking" / "confirm the customer identity before you change the
-   * booking"). Below 0.5 two claims that share only their subject merge, which is how a store
-   * loses the distinction it was built to keep.
+   * Calibrated on the register this lane actually writes: the store's one genuine pair of repeats
+   * reads 0.700 and the closest pair that is not a repeat reads 0.533 (see the header). Below 0.5
+   * two claims that share only their subject merge, which is how a store loses the distinction it
+   * was built to keep.
    */
   readonly threshold?: number;
+  /**
+   * Shared content terms below which two conditions are held to disagree. Default 3.
+   *
+   * A count and not a ratio, because the ratio does not separate at this sample: a paraphrased
+   * trigger and an unrelated one both read 0.400. A count separates them — a paraphrase shares
+   * more than the subject it is paraphrasing, a conflict shares the subject and nothing else.
+   */
+  readonly conditionMinShared?: number;
 };
 
 /** What consolidation did, in the numbers a readback reads. */
@@ -72,8 +108,10 @@ export type ConsolidationCensus = {
   readonly merged: number;
   /** Items left, which is `considered - merged`. */
   readonly retained: number;
-  /** The overlap floor this pass used. */
+  /** The claim floor this pass used. */
   readonly threshold: number;
+  /** The condition count floor it used, which is not a ratio and not the same number. */
+  readonly conditionMinShared: number;
   /** Pairs that overlapped and were refused for stating two different conditions. */
   readonly refusedCondition: number;
   /** Pairs that overlapped and were refused for carrying two different payloads. */
@@ -116,18 +154,35 @@ export function claimTokens(text: string): ReadonlySet<string> {
 }
 
 /**
- * Jaccard overlap over content terms: 1 when the two sets are equal, 0 when they share nothing.
+ * Content terms the two claims share.
+ *
+ * The unit the condition test is written in: a paraphrase shares more than the subject it restates,
+ * and a conflict shares the subject and nothing else, which a ratio over two short sets hides.
+ */
+export function sharedTerms(left: ReadonlySet<string>, right: ReadonlySet<string>): number {
+  let shared = 0;
+  for (const token of left) if (right.has(token)) shared += 1;
+  return shared;
+}
+
+/**
+ * Containment over content terms: 1 when the smaller claim's every term appears in the larger, 0
+ * when they share nothing.
+ *
+ * The denominator is the *smaller* claim, not the union, and that is the whole point of the
+ * change: a claim that restates another and then adds a caveat is the same claim, and a measure
+ * that charges for the caveat twice cannot see it. The measure is symmetric because the smaller
+ * side is chosen rather than named — two items in the opposite order score the same, which is what
+ * keeps the pass a function of the store rather than of its order.
  *
  * Two empty sets are 0 and not 1. A statement made only of stopwords reduces to no content terms,
  * and "these two claims have nothing in them" is not evidence that they are the same claim —
  * treating it as one would fold an unreadable item into a readable one and report a corroboration
  * that no task contributed to.
  */
-export function claimOverlap(left: ReadonlySet<string>, right: ReadonlySet<string>): number {
+export function claimContainment(left: ReadonlySet<string>, right: ReadonlySet<string>): number {
   if (left.size === 0 || right.size === 0) return 0;
-  let shared = 0;
-  for (const token of left) if (right.has(token)) shared += 1;
-  return shared / (left.size + right.size - shared);
+  return sharedTerms(left, right) / Math.min(left.size, right.size);
 }
 
 /** Distinct tasks behind an item, with the score's own grouping. */
@@ -196,7 +251,8 @@ export function consolidateKnowledge(
   items: readonly KnowledgeItem[],
   options: ConsolidationOptions,
 ): ConsolidationResult {
-  const threshold = options.threshold ?? 0.7;
+  const threshold = options.threshold ?? 0.6;
+  const conditionMinShared = options.conditionMinShared ?? 3;
   const consideredIndexes: number[] = [];
   for (let index = 0; index < items.length; index += 1) {
     if (items[index]?.status !== 'retired') consideredIndexes.push(index);
@@ -233,7 +289,7 @@ export function consolidateKnowledge(
       const rightItem = items[rightIndex] as KnowledgeItem;
       if (leftItem.kind !== rightItem.kind) continue;
       if (scopeKey(leftItem.scope) !== scopeKey(rightItem.scope)) continue;
-      const overlap = claimOverlap(
+      const overlap = claimContainment(
         tokensOf.get(leftIndex) as ReadonlySet<string>,
         tokensOf.get(rightIndex) as ReadonlySet<string>,
       );
@@ -241,7 +297,7 @@ export function consolidateKnowledge(
       if (
         leftItem.when !== undefined &&
         rightItem.when !== undefined &&
-        claimOverlap(claimTokens(leftItem.when), claimTokens(rightItem.when)) < threshold
+        sharedTerms(claimTokens(leftItem.when), claimTokens(rightItem.when)) < conditionMinShared
       ) {
         refusedCondition += 1;
         continue;
@@ -335,6 +391,7 @@ export function consolidateKnowledge(
       merged,
       retained: survivors.length,
       threshold,
+      conditionMinShared,
       refusedCondition,
       refusedPayload,
       refusedDuplicateEvidence,

@@ -759,7 +759,8 @@ import { consolidateKnowledge } from '@agentix-e/microglia-core/distill';
 const { items, report } = consolidateKnowledge(await store.listKnowledge({}), {
   now: Date.now(),
   policy: defaultPolicy,      // needed to re-score the survivor
-  threshold: 0.7,             // token overlap at which two claims are one claim
+  threshold: 0.6,             // containment at which two claims are one claim
+  conditionMinShared: 3,      // shared content terms below which two conditions disagree
 });
 for (const item of items) await store.putKnowledge(item);
 ```
@@ -770,6 +771,12 @@ every item was written by one task. The pass is deterministic (token overlap, no
 (a second run over its own output changes nothing), and it never merges two claims whose conditions
 disagree, whose payloads differ, or whose evidence is identical.
 
+`threshold` is **containment**, not Jaccard: the share of the *smaller* claim's content terms that the
+larger one also holds. That is what lets a claim and its own restatement with a different closing
+clause merge — the shape a distiller actually writes — where Jaccard charged the extra clause twice
+and merged nothing. The defaults (0.60 and 3) were calibrated on a real store rather than guessed:
+its one pair of repeats reads 0.700 and the closest pair that is not a repeat reads 0.533.
+
 `report` is what you read before trusting the store's shape:
 
 | Field | What it tells you |
@@ -777,6 +784,7 @@ disagree, whose payloads differ, or whose evidence is identical.
 | `considered` → `retained` | how much of the store the pass kept |
 | `groups`, `merged` | how much of it was the same claim said twice |
 | `supportBefore` / `supportAfter` | the distribution of `supportTasks` on both sides, which is the reading a corroboration gate asks for |
+| `threshold`, `conditionMinShared` | the two floors this pass used, so two stores consolidated under different settings are not compared by accident |
 | `refusedCondition` / `refusedPayload` / `refusedDuplicateEvidence` | why pairs that overlapped were not merged |
 
 Two things it does not do. It does not delete: a retired member is kept with `statusReason:

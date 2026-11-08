@@ -51,7 +51,8 @@ export function recurrenceGate(record: DistillUnitRecord): RecurrenceGate {
       `${String(census.groups)} group(s), max support ${String(census.maxSupportBefore)}→${String(
         census.maxSupportAfter,
       )}, distributions ${String(before)}/${String(census.considered)} and ` +
-      `${String(after)}/${String(census.retained)}`,
+      `${String(after)}/${String(census.retained)}, floors ` +
+      `${String(census.threshold)}/${String(census.conditionMinShared)} shared term(s)`,
     criterion,
   };
 }
