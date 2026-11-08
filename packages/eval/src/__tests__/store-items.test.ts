@@ -18,6 +18,7 @@ import { storeItemSample } from '../store-items.js';
 const item = (overrides: Partial<Parameters<typeof storeItemSample>[0][number]> = {}) => ({
   id: 'k1',
   kind: 'procedure',
+  status: 'active' as const,
   when: 'when the customer asks to cancel an order',
   statement: 'A request of this shape is resolved by calling find_user, then cancel_pending_order.',
   trust: 0.9,
@@ -34,6 +35,21 @@ describe('the store sample the artefact carries', () => {
     expect(sample.items[0]?.scope).toEqual({ domain: 'retail' });
     expect(sample.omitted).toBe(0);
     expect(sample.truncated).toBe(0);
+  });
+
+  it("carries each item's status, so the sample cannot be read over the wrong population", () => {
+    // `conditioned` is counted over *servable* items -- active, and in the recall scope --
+    // while the sample is drawn from the whole store. A readback that counted conditions in
+    // the sample and compared the total to `conditioned` would be comparing two populations,
+    // which is the defect this whole family of instruments exists to close. The status is
+    // what lets a reader intersect the sample with the population the count was taken over.
+    const sample = storeItemSample([
+      item({ id: 'a' }),
+      item({ id: 'r', status: 'retired' }),
+      item({ id: 'q', status: 'quarantined', when: undefined }),
+    ]);
+    expect(sample.items.map((entry) => entry.status)).toEqual(['active', 'retired', 'quarantined']);
+    expect(sample.items.filter((entry) => entry.status === 'active').length).toBe(1);
   });
 
   it('omits the condition key entirely when the item states none', () => {

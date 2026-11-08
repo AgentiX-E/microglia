@@ -17,6 +17,17 @@
 export type StoreItemRecord = {
   readonly id: string;
   readonly kind: string;
+  /**
+   * The item's lifecycle status, because the sample is not the population `conditioned` counts.
+   *
+   * `store.conditioned` is over *servable* items — active, and inside the recall scope — while
+   * the sample is the first `limit` items the store lists. A readback that counted conditions
+   * in the sample and compared the total to `conditioned` would be comparing two populations,
+   * which is precisely the defect the coverage readings were repaired for. The status is what
+   * lets a reader intersect the sample with the population the count was taken over, and it is
+   * required rather than optional so no sample can be written that omits it.
+   */
+  readonly status: string;
   /** The condition as written, truncated. Absent when the item states none. */
   readonly when?: string;
   /** The claim as written, truncated. */
@@ -46,6 +57,7 @@ export function storeItemSample(
   items: readonly {
     readonly id: string;
     readonly kind: string;
+    readonly status: string;
     readonly when?: string;
     readonly statement: string;
     readonly trust: number;
@@ -63,6 +75,7 @@ export function storeItemSample(
     return {
       id: item.id,
       kind: item.kind,
+      status: item.status,
       ...(when === undefined ? {} : { when: when.text }),
       statement: statement.text,
       trust: item.trust,

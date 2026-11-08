@@ -251,15 +251,26 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
     # carries the items in words for exactly this.
     sample = tau2.get("storeItems")
     if isinstance(sample, dict) and sample.get("items"):
-        written = [item for item in sample["items"] if (item.get("when") or "").strip()]
+        entries = sample["items"]
+        # `conditioned` is counted over servable items; the sample is the first
+        # `limit` the store lists, whatever their status. Reading conditions off the
+        # whole sample and comparing the total to `conditioned` compares two
+        # populations -- so the status, when the artefact carries it, decides which
+        # items this reading is about.
+        carries_status = any("status" in entry for entry in entries)
+        population = [entry for entry in entries if entry.get("status") == "active"] if carries_status else entries
+        written = [entry for entry in population if (entry.get("when") or "").strip()]
         report.predict(
             "the artefact carries the store's own condition text",
             len(written) > 0,
-            f"{len(written)} of {len(sample['items'])} sampled items state a condition, "
-            f"{sample.get('omitted')} omitted",
+            f"{len(written)} of {len(population)} "
+            f"{'active ' if carries_status else ''}sampled items state a condition "
+            f"({len(entries)} sampled, {sample.get('omitted')} omitted)",
         )
-        for item in written[:3]:
-            report.note(f"when: {item['when']}")
+        if not carries_status:
+            report.note("storeItems carries no status: conditions read over the whole sample")
+        for entry in written[:3]:
+            report.note(f"when: {entry['when']}")
     else:
         report.predict("the artefact carries the store's own condition text", None, "storeItems absent")
 
@@ -342,7 +353,10 @@ def base_artefact(**over: Any) -> dict[str, Any]:
                 "medians": {"pairs": 2180, "zeroPairs": 750, "medianAllPairs": 0.09, "medianNonzero": 0.31},
             },
             "storeItems": {
-                "items": [{"id": "a", "when": "the user asks to cancel a pending order", "statement": "call cancel_pending_order"}],
+                "items": [
+                    {"id": "a", "kind": "procedure", "status": "active", "when": "the user asks to cancel a pending order", "statement": "call cancel_pending_order"},
+                    {"id": "b", "kind": "procedure", "status": "retired", "when": "a retired trigger", "statement": "call nothing"},
+                ],
                 "limit": 64,
                 "maxChars": 240,
                 "omitted": 15,
@@ -415,6 +429,13 @@ def main() -> int:
             (
                 "a census that cannot describe a store abandons",
                 base_artefact(**{"tau2.store.conditioned": 99}),
+                "ABANDONED",
+            ),
+            (
+                "a sample with no retired trigger left still grades",
+                base_artefact(**{"tau2.storeItems": {"items": [
+                    {"id": "b", "status": "retired", "when": "a retired trigger", "statement": "x"},
+                ], "limit": 64, "maxChars": 240, "omitted": 0, "truncated": 0}}),
                 "ABANDONED",
             ),
             (
