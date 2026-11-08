@@ -50,6 +50,19 @@ export type UseArm = 'as-is' | 'domain-faithful' | 'widening-enabled' | 'coverag
 export type UseObservation = {
   readonly query: string;
   readonly statements: readonly string[];
+  /**
+   * What each injected item is *recalled by*: its condition followed by its statement.
+   *
+   * R51 made `recallText` the document the lexical index, the `minCoverage` floor and MMR all
+   * read, and this instrument kept measuring the statement alone — so a run whose floor was
+   * applied to condition-plus-statement was reported as though the floor and the measurement
+   * had seen the same text. They had not: the floor kept a rule the histogram then scored at
+   * 0.02, and the retention curve simulated a floor that no run applied.
+   *
+   * Absent on every observation written before this field, which reads as `statements` and is
+   * exactly what those runs measured.
+   */
+  readonly documents?: readonly string[];
 };
 
 /** The registered seven-field shape (§17.89). */
@@ -92,6 +105,17 @@ type PairRow = { readonly coverage: number; readonly measurable: boolean };
  * Flatten observations once, so the census and the profile cannot disagree
  * about how many pairs exist or which of them are measurable.
  */
+/**
+ * The document each item is scored on, which is the one it was recalled by.
+ *
+ * One function rather than an expression at each call site, because the whole defect this
+ * field repairs was three call sites deciding for themselves and all three choosing the
+ * statement.
+ */
+function recallDocuments(observation: UseObservation): readonly string[] {
+  return observation.documents ?? observation.statements;
+}
+
 function flatten(observations: readonly UseObservation[]): {
   readonly pairs: readonly PairRow[];
   readonly served: number;
@@ -104,8 +128,8 @@ function flatten(observations: readonly UseObservation[]): {
     if (observation.statements.length > 0) served += 1;
     packTotal += observation.statements.length;
     const measurable = tokenize(observation.query).length > 0;
-    for (const statement of observation.statements) {
-      pairs.push({ coverage: queryCoverage(observation.query, statement), measurable });
+    for (const document of recallDocuments(observation)) {
+      pairs.push({ coverage: queryCoverage(observation.query, document), measurable });
     }
   }
   return { pairs, served, packTotal };
@@ -249,7 +273,9 @@ export function coverageHistogram(observations: readonly UseObservation[]): Cove
   const rows = observations.map((observation) => ({
     served: observation.statements.length > 0,
     measurable: tokenize(observation.query).length > 0,
-    coverages: observation.statements.map((statement) => queryCoverage(observation.query, statement)),
+    coverages: recallDocuments(observation).map((document) =>
+      queryCoverage(observation.query, document),
+    ),
   }));
   const measured = rows.filter((row) => row.served && row.measurable);
   const nonzero = measured

@@ -35,7 +35,7 @@ import { promisify } from 'node:util';
 import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
 import { openMicroglia } from '@agentix-e/microglia-core/capture';
 import { createLlmInterpreter, ruleInterpreter } from '@agentix-e/microglia-core/distill';
-import { steppingClock, mulberry32 } from '@agentix-e/microglia-core';
+import { recallText, steppingClock, mulberry32 } from '@agentix-e/microglia-core';
 import {
   AS_IS_FLOOR,
   LlmClient,
@@ -681,6 +681,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       useObservations.push({
         query: text,
         statements: pack.items.map((item) => item.statement),
+        // R51 made condition + statement the document the floor is applied to; this is the
+        // same document, so the histogram cannot score a pack by text the floor never saw.
+        documents: pack.items.map(recallText),
       });
       return pack;
     });

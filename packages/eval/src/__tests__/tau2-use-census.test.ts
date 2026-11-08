@@ -347,3 +347,53 @@ describe('coverageHistogram — the committed population U3 needs', () => {
     );
   });
 });
+
+/**
+ * R54: the instrument scores each item by the document it was recalled by.
+ *
+ * R51 made `recallText` — condition, then statement — the text the lexical index, the
+ * `minCoverage` floor and MMR all read. This instrument kept measuring `statement`, so a run
+ * whose floor was applied to condition-plus-statement was reported as though the floor and
+ * the measurement had seen the same document. They had not: the floor kept a rule the
+ * histogram then scored at 0.02, and the retention curve simulated a floor no run applied.
+ *
+ * The case these tests are written around is the one the τ² store actually contains: a
+ * statement about tool names, whose condition names the situation in the user's words.
+ */
+describe('the use census reads the document the floor reads', () => {
+  const statement = 'A request of this shape is resolved by calling find_user, then cancel_pending_order.';
+  const condition = 'when the customer asks to cancel an order that has not shipped';
+  const query = 'I want to cancel an order that has not shipped yet';
+
+  it('scores the condition, so an item the floor kept is not reported as unrelated', () => {
+    const withDocuments = useCensus(
+      [{ query, statements: [statement], documents: [`${condition} ${statement}`] }],
+      'as-is',
+    );
+    const statementsOnly = useCensus([{ query, statements: [statement] }], 'as-is');
+    expect(withDocuments.zeroCoveragePairs).toBe(0);
+    expect(statementsOnly.zeroCoveragePairs).toBe(1);
+  });
+
+  it('falls back to the statement for an observation written before the field', () => {
+    // Every committed observation predates `documents`, and reading them as "no document"
+    // would report a coverage of zero for runs that measured a real one.
+    const legacy = useCensus([{ query, statements: [statement] }], 'as-is');
+    expect(legacy.injectedPairs).toBe(1);
+    expect(legacy.zeroCoveragePairs).toBe(1);
+  });
+
+  it('carries the same fallback into the histogram and its retention curve', () => {
+    const observation = { query, statements: [statement], documents: [`${condition} ${statement}`] };
+    const histogram = coverageHistogram([observation]);
+    expect(histogram.measuredPairs).toBe(1);
+    // The pair is measurable and its coverage is well above the lowest rung, so every floor
+    // keeps it: the curve must describe the floor the run actually applied.
+    expect(histogram.floors[0]?.retainedPairs).toBe(1);
+    expect(histogram.nonzeroQuantiles.p50).toBeGreaterThan(0.5);
+
+    const legacy = coverageHistogram([{ query, statements: [statement] }]);
+    expect(legacy.floors[0]?.retainedPairs).toBe(1);
+    expect(legacy.nonzeroQuantiles.p50).toBe(0);
+  });
+});
