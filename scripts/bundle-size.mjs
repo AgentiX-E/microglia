@@ -46,10 +46,19 @@ import { build } from 'esbuild';
  *   neighbourhood that a store without embeddings uses. Measured 45,309 raw at this
  *   commit. It ships because the distiller calls it and the next arm varies it; a
  *   mechanism that only exists in a document is not a mechanism.
+ *
+ * Raised once on 2026-11-08, 46,000 -> 47,000 raw (gzip untouched: 15,4xx measured
+ * against a 16,000 ceiling), for one capability:
+ *
+ *   `RecallQuery.note` and `budgetBasis` — the note becomes a rendering option of one
+ *   recall, and the character budget declares whether the wrapper is charged to it. Both
+ *   are what make three note levels comparable over one store (R53), and the alternative
+ *   was a treatment whose arms carried different packs. Measured 46,136 raw at this
+ *   commit, so the raise is 864 bytes of headroom rather than a new allowance.
  */
 const BUDGETS = [
   { name: 'browser', entry: 'packages/browser/dist/index.js', raw: 3200, gzip: 1600 },
-  { name: 'core', entry: 'packages/core/dist/index.js', raw: 46000, gzip: 16000 },
+  { name: 'core', entry: 'packages/core/dist/index.js', raw: 47000, gzip: 16000 },
 ];
 
 const probe = process.argv.includes('--probe');
