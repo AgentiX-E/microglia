@@ -14,8 +14,15 @@ recallDomain: retail
 
 # R55 — the store is a tenth as dense as the system that wins this lane
 
-**Registered** 2026-11-08, undispatched. Blocked on R54's readback by the one-lane rule: every
-arm is a comparison, and no comparison may be interpreted while another is open.
+**Registered** 2026-11-08, undispatched. Blocked on R56 by the one-lane rule: every arm is a
+comparison, and no comparison may be interpreted while another is open.
+
+**Sequencing amendment, 2026-11-08, before dispatch.** R54's readback fired its second refutation —
+the conditions exist and do not name the situation — and its registration names the prompt as the
+next registration, so R56 (the form) goes first. This registration's measurement stage therefore
+rides on R56's dispatch: `storeItems` gains `supportTasks` there with no treatment, and the
+distribution below is read from that artefact at no extra cost. R55.1 (admission at ≥3) runs after,
+on whatever store R56 leaves.
 
 ## The two numbers this registration exists for
 
