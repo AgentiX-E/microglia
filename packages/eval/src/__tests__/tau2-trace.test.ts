@@ -14,6 +14,8 @@
  * shape is a reader that will meet the real one and return nothing.
  */
 import { describe, expect, it } from 'vitest';
+import { buildDistillPrompt } from '@agentix-e/microglia-core/distill';
+import type { FeedbackEvent, RunRecord } from '@agentix-e/microglia-core';
 import { parseTraceCalls, resolveDistillUnit, traceOf, tracesOf, type TraceCall } from '../tau2-trace.js';
 
 function assistantWith(...calls: readonly { readonly name: string; readonly arguments: unknown }[]) {
@@ -272,5 +274,71 @@ describe('resolveDistillUnit', () => {
     // applied. `resolveDistillForm` predates this and reads garbage as its default; the unit is
     // refused, and the refusal is the difference between a wasted dispatch and a wrong reading.
     expect(() => resolveDistillUnit('traces')).toThrow(/TAU_DISTILL_UNIT/);
+  });
+});
+
+
+describe('the hand-off the driver makes, without a driver', () => {
+  it('carries an attempt read from a learning document into the prompt a model would receive', () => {
+    // The driver's path is: learning document -> `tracesOf` -> `traceOf` -> the run's `input` ->
+    // `buildDistillPrompt`. Every hop is a module boundary, and the run cannot report which one a
+    // silent failure happened at — a prompt without the trace looks exactly like a model that
+    // ignored one. This test crosses all four in one process, with no model and no tau2.
+    const learned = document([
+      {
+        task_id: 'task-42',
+        trial: 0,
+        reward_info: { reward: 0 },
+        messages: [
+          { role: 'user', content: 'I need to cancel the order I placed yesterday.' },
+          assistantWith({ name: 'cancel_pending_order', arguments: { order_id: '#W1' } }),
+        ],
+      },
+    ]);
+    const trace = tracesOf(learned).get('task-42');
+    expect(trace).toBeDefined();
+
+    const input = {
+      question: 'I need to cancel the order I placed yesterday.',
+      taskId: 'task-42',
+      ...traceOf(trace as NonNullable<typeof trace>, {
+        expected: ['get_order_details(order_id="#W1")', 'cancel_pending_order(order_id="#W1")'],
+        rubric: ['The order must still be pending.'],
+      }),
+    };
+    const event = {
+      schema: 'microglia.feedback/1',
+      id: 'fb_1',
+      at: 1_700_000_000_000,
+      namespace: 'tau2',
+      sessionId: 's',
+      runId: 'run_1',
+      task: 'retail',
+      kind: 'edit',
+      actor: { type: 'user' },
+      trust: 0.9,
+      signal: { type: 'edit', beforeHash: 'a', afterHash: 'b', ops: [], distance: 1 },
+      provenance: { knowledgeIds: [] },
+      redactions: 0,
+      taskId: 'task-42',
+    } as FeedbackEvent;
+    const run = {
+      schema: 'microglia.run/1',
+      id: 'run_1',
+      at: 1_700_000_000_000,
+      namespace: 'tau2',
+      sessionId: 's',
+      task: 'retail',
+      input,
+      output: {},
+      provenance: { knowledgeIds: [] },
+      feedbackIds: [],
+    } as RunRecord;
+
+    const prompt = buildDistillPrompt({ event, run }, [], undefined, 'trace');
+    expect(prompt).toContain('cancel_pending_order');
+    expect(prompt).toContain('get_order_details');
+    expect(prompt).toContain('The order must still be pending.');
+    expect(prompt).toContain('at most three candidates');
   });
 });
