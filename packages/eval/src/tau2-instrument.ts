@@ -180,6 +180,33 @@ export type Tau2Raw = {
    * or the next floor is chosen from a table that says it costs nothing.
    */
   readonly coverageObservations?: readonly UseObservation[];
+  /**
+   * R53: the sentence every pack in this arm opened with.
+   *
+   * `declared` separates "this run is the standard arm" from "nobody set the switch", and
+   * `mode` is the level. Absent on every artefact written before R53, which reads as "not
+   * measured" rather than as `standard`: a readback cannot attribute a sentence the artefact
+   * never recorded, and a level nobody declared is not evidence that the default ran.
+   */
+  /** R54: the store's own words, bounded. See `storeItemSample`. */
+  readonly storeItems?: {
+    readonly items: readonly {
+      readonly id: string;
+      readonly kind: string;
+      readonly when?: string;
+      readonly statement: string;
+      readonly trust: number;
+      readonly scope: { readonly domain?: string };
+    }[];
+    readonly limit: number;
+    readonly maxChars: number;
+    readonly omitted: number;
+    readonly truncated: number;
+  };
+  readonly injectionNote?: {
+    readonly mode: 'none' | 'standard' | 'hardened';
+    readonly declared: boolean;
+  };
   /** The write path's own census, when the driver ran with admission switched on. */
   readonly writeAdmission?: {
     readonly mode: 'off' | 'neighbours';

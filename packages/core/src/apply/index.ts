@@ -13,6 +13,7 @@ export {
   makePack,
   packFingerprint,
   renderPack,
+  type NoteMode,
   type RenderOptions,
   type RenderedPack,
 } from './render.js';

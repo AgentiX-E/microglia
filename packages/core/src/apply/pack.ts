@@ -8,7 +8,7 @@
 import { defaultPolicy, mmrSelect, queryCoverage, recallText } from '../kernel/index.js';
 import type { KnowledgeItem, KnowledgePack, RecallQuery } from '../kernel/index.js';
 import type { MemoryPort } from '../memory/index.js';
-import { makePack } from './render.js';
+import { makePack, type NoteMode } from './render.js';
 
 export type BuildPackOptions = {
   readonly memory: MemoryPort;
@@ -52,6 +52,8 @@ export type BuildPackOptions = {
    * overrule a recorded absence" are the same number.
    */
   readonly absenceFloor?: number;
+  /** The sentence the block opens with; see `NoteMode`. Absent means `standard`. */
+  readonly note?: NoteMode;
 };
 
 export async function buildPack(
@@ -104,5 +106,6 @@ export async function buildPack(
   return makePack(chosen, {
     budget,
     ...(options.tag === undefined ? {} : { tag: options.tag }),
+    ...(options.note === undefined ? {} : { note: options.note }),
   });
 }

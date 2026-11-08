@@ -365,3 +365,65 @@ describe('a paired facade must register its floor', () => {
     expect(facadePairSwitch({ ...base, facadePair: 'as-is-floored', recallFloor: 0.01 })).toBe(true);
   });
 });
+
+/**
+ * R54: the scenario pair is a property of the experiment.
+ *
+ * R51 registered three predictions about a within-scenario run and was dispatched against a
+ * repository variable that said `TAU_TEST_DOMAIN=airline`. The run measured exactly what it
+ * was configured to measure; the configuration was simply invisible in the registration, and
+ * the readback graded a retail store's rules on airline questions. These tests pin the header
+ * that makes the pair visible and the three refusals that keep a half-pinned pair from
+ * leaving half the experiment to a variable.
+ */
+describe('a registration can pin its scenario pair', () => {
+  const withDomains = (lines: readonly string[]): string =>
+    `${HEADER.replace(/^---\n/, `---\n${lines.join('\n')}\n`)}${PREDICTION}${REFUTATION}`;
+
+  it('reads a complete pair', () => {
+    const reading = readPrereg(
+      withDomains(['trainDomain: retail', 'testDomain: retail', 'recallDomain: retail']),
+      'R8.3-xiyan-cell.md',
+    );
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.trainDomain).toBe('retail');
+    expect(reading.prereg?.testDomain).toBe('retail');
+    expect(reading.prereg?.recallDomain).toBe('retail');
+  });
+
+  it('leaves the pair absent when nothing pins it, which is every registration before R54', () => {
+    const reading = readPrereg(VALID, 'R8.3-xiyan-cell.md');
+    expect(reading.prereg?.trainDomain).toBeUndefined();
+    expect(reading.prereg?.testDomain).toBeUndefined();
+    expect(reading.prereg?.recallDomain).toBeUndefined();
+  });
+
+  it('refuses a name that is not a scenario name', () => {
+    // The value is pasted into `TAU_TEST_DOMAIN`, so anything a shell would interpret is a
+    // value that can change the experiment between the registration and the run.
+    for (const bad of ['Retail', 're-tail', '$(echo x)', '../retail', 'retail airline']) {
+      const markdown = withDomains([`testDomain: ${bad}`]);
+      expect(problemsOf(markdown).some((entry) => entry.includes('is not a scenario name')), bad).toBe(
+        true,
+      );
+    }
+  });
+
+  it('refuses a recall domain the store does not own', () => {
+    // A third domain is an experiment no registration has a prediction about: recall is asked
+    // in the store's own scenario, which is what makes the transfer arm measurable at all.
+    const markdown = withDomains([
+      'trainDomain: retail',
+      'testDomain: airline',
+      'recallDomain: airline',
+    ]);
+    expect(problemsOf(markdown).some((entry) => entry.includes('must equal trainDomain'))).toBe(true);
+  });
+
+  it('refuses a recall domain with no train domain to check it against', () => {
+    const markdown = withDomains(['recallDomain: retail']);
+    expect(problemsOf(markdown).some((entry) => entry.includes('needs trainDomain declared beside it'))).toBe(
+      true,
+    );
+  });
+});

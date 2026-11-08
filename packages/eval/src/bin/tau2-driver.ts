@@ -47,6 +47,7 @@ import {
   facadePairVerdict,
   facadeScope,
   inactionCensusOf,
+  storeItemSample,
   inactionContrastOrNull,
   meanPassAtK,
   probeGate,
@@ -60,6 +61,7 @@ import {
   parseTauTasks,
   qualifiedId,
   resilientInterpreter,
+  resolveInjectionNotePlan,
   resolveWriteAdmissionPlan,
   resolveRecallFloor,
   stampDomain,
@@ -141,6 +143,13 @@ const PROVIDER_PROBE = (process.env['TAU_PROVIDER_PROBE'] ?? '').trim() === 'tru
  * not change the meaning of a committed number.
  */
 const WRITE_ADMISSION_PLAN = resolveWriteAdmissionPlan(process.env);
+/**
+ * R53's pack-note switch, resolved at module load. Unset is today's note, so every
+ * artefact committed before this module produced the same prompt it always did; `declared`
+ * separates "this run is the standard arm" from "nobody set the switch", which a readback
+ * that wants to compare three levels needs and a bare default cannot give it.
+ */
+const NOTE_PLAN = resolveInjectionNotePlan(process.env);
 const TRIALS = Math.max(1, Number(process.env['TAU_TRIALS'] ?? 4) || 4);
 const TRAIN_SHARE = Number(process.env['TAU_TRAIN_SHARE'] ?? 0.5) || 0.5;
 /**
@@ -536,6 +545,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // takes, which is what held all of R44's items as candidates. See
     // `tau2-admission.ts` for the measurement and the guarded condition.
     editSemantics: tau2EditSemantics,
+    note: NOTE_PLAN.mode,
   });
 
   for (const correction of corrections) {
@@ -605,6 +615,14 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       `rephrased=${String(distillReport.rephrased)} ` +
       `suppressed=${String(distillReport.suppressed)}\n`,
   );
+  process.stdout.write(
+    `[tau2] injection-note: mode=${NOTE_PLAN.mode} declared=${String(NOTE_PLAN.declared)}\n`,
+  );
+  // R54: three conditions, verbatim, on the run's own page. A count of conditions cannot be
+  // read for register, and register is the whole question the next arm asks of this store.
+  for (const item of knowledge.slice(0, 3)) {
+    process.stdout.write(`[tau2] store condition: ${item.when ?? '(none)'}\n`);
+  }
   process.stdout.write(`[tau2] distill model: configured=${llm.configuredModel} sent=${llm.model}\n`);
 
   /**
@@ -793,9 +811,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         ? { total: llmStats.prompts, failed: llmStats.failures, scope: 'distillation' as const }
         : { total: agentTurns, failed: episodeFailures(primary.diagnostics), scope: 'run' as const },
     domains: { stored: knowledge.length, withoutDomain, unscopedIn: 0, widenedIn: 0 },
+    // R54: what the store said, not only how many items said it. R51 could count conditions
+    // and read none of them, so its readback could not tell a trigger in the user's register
+    // from one in the procedure's — and those two predict opposite coverage.
+    storeItems: storeItemSample(knowledge),
     // The treatment, recorded beside its result: an artefact cannot otherwise tell an arm
     // that switched write admission on from one that never asked, and the counters are the
     // only place the mechanism's own population appears.
+    // R53: the sentence every pack in this arm opened with, recorded beside the store that
+    // produced the packs. A readback that cannot recover the level cannot tell an arm from a
+    // control, and two runs of one level would read as three.
+    injectionNote: { mode: NOTE_PLAN.mode, declared: NOTE_PLAN.declared },
     writeAdmission: {
       mode: WRITE_ADMISSION_PLAN.mode,
       rephrased: distillReport.rephrased,

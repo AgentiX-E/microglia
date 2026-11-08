@@ -39,6 +39,21 @@ export type Prereg = {
    * non-zero registered `recallFloor`.
    */
   readonly facadePair?: 'as-is-floored' | 'off';
+  /**
+   * The scenario pair this registration executes, when it pins one.
+   *
+   * Absent means "whatever the lane is configured with", which is what every registration
+   * before R54 meant. Present means the dispatch overrides the repository variables, and a
+   * run whose artefact records a different pair measured a different experiment.
+   */
+  readonly trainDomain?: string;
+  readonly testDomain?: string;
+  /**
+   * The domain recall is asked in. It must equal `trainDomain` when both are declared: a
+   * recall scope that is neither the store's domain nor the question's is a third thing,
+   * and no registration has a prediction about it.
+   */
+  readonly recallDomain?: string;
   /** One bullet per prediction: a claim that can be checked against the artefact. */
   readonly prediction: readonly string[];
   /** One bullet per condition under which the stage is abandoned. */
@@ -57,8 +72,25 @@ export type PreregReading = {
 };
 
 const REQUIRED_KEYS = ['id', 'step', 'opened', 'arms', 'sample', 'gates'] as const;
-/** Both optional keys keep every registration opened before U3 and R49 valid. */
-const HEADER_KEYS = [...REQUIRED_KEYS, 'recallFloor', 'facadePair'] as const;
+/**
+ * The optional keys, all of which keep a registration opened before them valid.
+ *
+ * `trainDomain`/`testDomain`/`recallDomain` were added by R54 for a reason the lane had
+ * already paid for: R51 registered three predictions about a within-scenario run, and the
+ * dispatch inherited `TAU_TEST_DOMAIN=airline` from a repository variable set for the
+ * transfer arm, so the readback graded a retail store answering airline questions. The
+ * scenario is a property of the experiment, exactly as the recall floor is, and a property
+ * of the experiment belongs in the registration rather than in whichever variable happened
+ * to be set the day it ran.
+ */
+const HEADER_KEYS = [
+  ...REQUIRED_KEYS,
+  'recallFloor',
+  'facadePair',
+  'trainDomain',
+  'testDomain',
+  'recallDomain',
+] as const;
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
 /** A bullet has to carry a claim; ten characters is a draft marker with punctuation. */
@@ -197,6 +229,39 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     });
   }
 
+  // R54: the scenario pair. A domain is a lowercase word, not a path or an expression, because
+  // it is pasted into `TAU_TRAIN_DOMAIN` and a value that means something to a shell is a value
+  // that can change the experiment between the registration and the run.
+  const domainOf = (key: 'trainDomain' | 'testDomain' | 'recallDomain'): string | undefined => {
+    const text = values.get(key);
+    if (text === undefined) return undefined;
+    if (!/^[a-z][a-z0-9]*$/.test(text)) {
+      collected.push({
+        where: `header '${key}'`,
+        problem: `'${text}' is not a scenario name such as retail or airline`,
+      });
+      return undefined;
+    }
+    return text;
+  };
+  const trainDomain = domainOf('trainDomain');
+  const testDomain = domainOf('testDomain');
+  const recallDomain = domainOf('recallDomain');
+  if (recallDomain !== undefined && trainDomain !== undefined && recallDomain !== trainDomain) {
+    collected.push({
+      where: `header 'recallDomain'`,
+      problem:
+        'must equal trainDomain: recall is asked in the store\'s own scenario, and a third ' +
+        'domain is an experiment no registration has a prediction about',
+    });
+  }
+  if (recallDomain !== undefined && trainDomain === undefined) {
+    collected.push({
+      where: `header 'recallDomain'`,
+      problem: 'needs trainDomain declared beside it, or the pair it is checked against is a variable',
+    });
+  }
+
   const id = values.get('id') ?? '';
   const stem = file.slice(file.lastIndexOf('/') + 1).replace(/\.md$/, '');
   if (id !== '' && id !== stem) {
@@ -259,6 +324,9 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       gates,
       ...(recallFloor === undefined ? {} : { recallFloor }),
       ...(facadePair === undefined ? {} : { facadePair }),
+      ...(trainDomain === undefined ? {} : { trainDomain }),
+      ...(testDomain === undefined ? {} : { testDomain }),
+      ...(recallDomain === undefined ? {} : { recallDomain }),
       prediction,
       refutation,
       file,

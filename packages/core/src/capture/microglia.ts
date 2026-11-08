@@ -33,6 +33,7 @@ import type {
 } from '../kernel/index.js';
 import type { MemoryPort, MemoryStats } from '../memory/index.js';
 import type { DistillCandidate } from '../kernel/index.js';
+import type { NoteMode } from '../apply/index.js';
 import { buildPack } from '../apply/index.js';
 import {
   distill as distillLog,
@@ -69,6 +70,7 @@ export class Microglia implements RunHost {
   private readonly interpreter: Interpreter;
   private readonly budget: number;
   private readonly tag: string | undefined;
+  private readonly note: NoteMode | undefined;
   private readonly creditEnabled: boolean;
   private readonly corroborationFloor: number | undefined;
   /**
@@ -109,6 +111,7 @@ export class Microglia implements RunHost {
     this.interpreter = options.interpreter ?? ruleInterpreter;
     this.budget = options.budget ?? this.policy.defaultBudget;
     this.tag = options.tag;
+    this.note = options.note;
     this.creditEnabled = options.credit ?? true;
     this.editSemantics = options.editSemantics;
     this.corroborationFloor = options.corroborationFloor;
@@ -168,6 +171,7 @@ export class Microglia implements RunHost {
         // for the duration of this request.
         ...(silenced ? { minEvidence: 2 } : {}),
         ...(this.tag === undefined ? {} : { tag: this.tag }),
+        ...(this.note === undefined ? {} : { note: this.note }),
       },
     );
     // An empty pack for a reason is not the same as an empty pack for no reason, and a

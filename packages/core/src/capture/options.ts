@@ -17,6 +17,7 @@ import type {
   RatingValue,
 } from '../kernel/index.js';
 import type { MemoryPort } from '../memory/index.js';
+import type { NoteMode } from '../apply/index.js';
 import type { Interpreter } from '../distill/index.js';
 
 export type MicrogliaOptions = {
@@ -49,6 +50,12 @@ export type MicrogliaOptions = {
   readonly corroborationFloor?: number;
   /** Element name used by the renderer; defaults to `microglia-knowledge`. */
   readonly tag?: string;
+  /**
+   * The sentence a pack opens with. See `NoteMode` for the three levels and the evidence
+   * behind the hardened one; the default renders byte-identically to every artefact
+   * committed before R53.
+   */
+  readonly note?: NoteMode;
   /** Apply feedback to the knowledge that was in the run's prompt. Default true. */
   readonly credit?: boolean;
   /**

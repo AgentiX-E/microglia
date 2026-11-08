@@ -543,6 +543,18 @@ export {
 } from './tau2-recall-floor.js';
 
 export {
+  storeItemSample,
+  type StoreItemRecord,
+  type StoreItemSample,
+} from './store-items.js';
+
+export {
+  INJECTION_NOTE_LEVELS,
+  resolveInjectionNotePlan,
+  type InjectionNotePlan,
+} from './injection-note-plan.js';
+
+export {
   WRITE_ADMISSION_MODE,
   resolveWriteAdmissionPlan,
   type WriteAdmissionMode,
