@@ -30,8 +30,10 @@ coverage prediction failed); this is the registration R54's own text names as th
 
 Every prediction about the write path held and the coverage bar did not: the conditions exist, they
 are delivered, and they share 8.33% of the request's terms — two thirds of the way to the bar from
-4.88%, and short of it. The paired delta is the first non-negative one this lane has produced, and
-by R50's rule it claims nothing: 57 pairs resolve 20.27pp, so `UNRESOLVED` is the whole of it.
+4.88%, and short of it. The paired delta is the largest positive point estimate this lane has
+produced, and it is the second non-negative one: the pre-R50 pair recorded +1.47pp over 68 pairs and
+failed on `p`, not on sign. By R50's rule neither claims anything — 57 pairs resolve 20.27pp, so
+`UNRESOLVED` is the whole of it.
 
 R54's second refutation therefore fired on its own terms — *the conditions exist and do not name the
 situation* — and its registration says what that means: **the next registration is about the prompt,
