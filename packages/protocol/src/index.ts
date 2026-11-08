@@ -40,6 +40,8 @@
  */
 export {
   buildProtocolGates,
+  funnelReading,
+  funnelVerdict,
   inGateOrder,
   GATE_ORDER,
   POWER_TARGET_PP,
@@ -48,6 +50,7 @@ export {
   type EvidenceDelivery,
   type FramingDelivery,
   type FunnelInput,
+  type FunnelVerdict,
   type ProtocolGateInput,
   type ScenarioGateInput,
   type TransferGateInput,

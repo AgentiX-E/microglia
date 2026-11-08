@@ -552,6 +552,11 @@ export {
 
 export { gateRows, renderMatrix, type GateRow } from './gate-matrix.js';
 
+// The funnel predicate travels with the lane so the driver can stop a run on the same condition the
+// gate publishes and a readback refuses on. Re-exported rather than re-implemented: three callers
+// with three definitions is the defect the funnel exists to remove.
+export { funnelReading, funnelVerdict, type FunnelVerdict } from '@agentix-e/microglia-protocol';
+
 export {
   TAU2_DISTILL_FORM,
   guardAgainstToolNames,

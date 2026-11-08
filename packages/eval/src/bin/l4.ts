@@ -136,7 +136,7 @@ async function notRun(reason?: string): Promise<never> {
 async function noMeasurement(marker: NoMeasurementMarker): Promise<never> {
   await writeResult({
     id: 'poc-l4',
-    title: 'L4 — τ²-bench pass^4 (no measurement: the provider failed its pre-flight probe)',
+    title: 'L4 — τ²-bench pass^4 (no measurement: the run stopped before any task was scored)',
     ranAt: new Date().toISOString(),
     model: process.env['TAU_MODEL'] ?? 'unknown',
     n: 0,
@@ -151,7 +151,7 @@ async function noMeasurement(marker: NoMeasurementMarker): Promise<never> {
     notes: [
       `The run stopped before any task was scored: ${marker.reason}`,
       `Claim: ${marker.claim}. No pass^4, no paired delta and no revert is produced by this run.`,
-      'A provider outage is an infrastructure failure, not a missing environment and not a result.',
+      'A stop before measurement is an infrastructure or instrument fact, not a missing environment and not a result.',
     ],
   });
   process.stdout.write(`[poc-l4] no measurement: ${marker.reason}\n`);

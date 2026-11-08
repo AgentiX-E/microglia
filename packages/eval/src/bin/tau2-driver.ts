@@ -67,6 +67,9 @@ import {
   stampDomain,
   stoppedRun,
   storeCensus,
+  funnelReading,
+  funnelVerdict,
+  noMeasurementRefusal,
   TAU2_DISTILL_FORM,
   guardAgainstToolNames,
   tau2EditSemantics,
@@ -609,14 +612,34 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     ...(WRITE_ADMISSION_PLAN.mode === 'off' ? {} : { admission: WRITE_ADMISSION_PLAN.options }),
   });
   const faults = distiller.faults();
+  // The store's census, taken here rather than after the evaluation, because the funnel's last stage
+  // is what decides whether there is anything to evaluate. R42 paid an hour of pack-free evaluation to
+  // learn that the store was empty; the predicate that answers it exists and is tested, and this is
+  // its second call site (the gate is the first, the readback the third).
+  // One read of the store, shared by the census, the funnel and the domain ledger: three reads of
+  // one store in a row would be three chances to describe three slightly different stores.
+  const knowledge = await store.listKnowledge({});
+  const census = storeCensus(knowledge, RECALL_DOMAIN);
+  const funnel = {
+    corrections: corrections.length,
+    candidates: distillReport.candidates,
+    admitted: distillReport.created + distillReport.merged,
+    stored: knowledge.length,
+    servable: census.servable,
+    refused: distillReport.rejectedUnsafe + distillReport.rejectedBorrowed + distillReport.rejectedByHost,
+    failed: distillReport.failed,
+  };
+  const funnelState = funnelVerdict(funnel);
+  if (!funnelState.ready) {
+    // A run whose pipeline did not carry anything has no reading to publish, and evaluating it would
+    // spend the expensive half of the dispatch producing a number about an empty store. Recorded as
+    // no-measurement rather than as a failure: the provider answered, the distiller ran, and what
+    // broke is the chain between them.
+    throw noMeasurementRefusal(funnelReading(funnel, funnelState));
+  }
   // The domain ledger, from the store rather than from the driver's intentions: an item that lost its
   // domain somewhere nobody instrumented is exactly what V44 exists to catch.
-  const knowledge = await store.listKnowledge({});
   const withoutDomain = knowledge.filter((item) => item.scope.domain === undefined).length;
-  // The population behind `V1`, counted at the boundary the gate grades: a store of fourteen items
-  // that serves nothing is a different defect depending on whether they are active and whether the
-  // recall scope can reach them, and R42's record carried neither number.
-  const census = storeCensus(knowledge, RECALL_DOMAIN);
   process.stdout.write(
     `[tau2] learn: ${String(corrections.length)} correction(s) from ${String(train.length)} task(s), ` +
       `${String(unanswered)} unreadable, ${String(distillReport.created)} created, ` +
@@ -872,15 +895,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // as "the mechanism does not work" when the failing stage was upstream of every gate the report
     // carried. The counts are the driver's own, taken at the boundaries it can see, and they must
     // reconcile or `V0` says the two populations differ rather than reporting the last one.
-    funnel: {
-      corrections: corrections.length,
-      candidates: distillReport.candidates,
-      admitted: distillReport.created + distillReport.merged,
-      stored: knowledge.length,
-      servable: census.servable,
-      refused: distillReport.rejectedUnsafe + distillReport.rejectedBorrowed + distillReport.rejectedByHost,
-      failed: distillReport.failed,
-    },
+    funnel,
     recall: { requests: primary.recallRequests, served: primary.recallServed, empty: primary.recallRequests - primary.recallServed },
     // What the served packs contained. `withoutDomain` is the store's count of
     // `domain === undefined` items, from the same domain ledger V44 reads.

@@ -4,6 +4,7 @@ import {
   POWER_TARGET_PP,
   SUBSTRATE_FLOOR,
   buildProtocolGates,
+  funnelVerdict,
   inGateOrder,
   transferGates,
   type ProtocolGateInput,
@@ -681,5 +682,50 @@ describe('the instrument-readiness gate', () => {
     // one of them with a reading nobody took.
     const ids = buildProtocolGates(minimal).map((entry) => entry.id);
     expect(ids).not.toContain('V0-instrument-ready');
+  });
+});
+
+/**
+ * The predicate behind `V0`, held on its own because it has three callers.
+ *
+ * The gate publishes it, the driver stops a run on it, and a readback returns `NO_MEASUREMENT` from
+ * it. Three callers that each decided for themselves would be three definitions of "the pipeline
+ * carried something", and the first divergence would be found in a published number.
+ */
+describe('the funnel verdict', () => {
+  const healthy = { corrections: 32, candidates: 30, admitted: 20, stored: 20, servable: 16 };
+
+  it('is ready when every stage carried something and the chain reconciles', () => {
+    expect(funnelVerdict(healthy)).toEqual({ ready: true, reason: 'every stage carried something' });
+  });
+
+  it('names the stage that stopped, not merely that one did', () => {
+    expect(funnelVerdict({ ...healthy, corrections: 0 }).reason).toContain('no correctable episode');
+    expect(funnelVerdict({ ...healthy, candidates: 0, admitted: 0, stored: 0, servable: 0 }).reason).toContain(
+      'proposed no candidate',
+    );
+    expect(funnelVerdict({ ...healthy, admitted: 0, stored: 0, servable: 0 }).reason).toContain(
+      'every candidate was refused',
+    );
+    expect(funnelVerdict({ ...healthy, admitted: 4, stored: 0, servable: 0 }).reason).toContain(
+      'the store holds no item',
+    );
+    expect(funnelVerdict({ ...healthy, servable: 0 }).reason).toContain('none is reachable by the recall scope');
+  });
+
+  it('is not ready when two counts describe different populations, whatever their size', () => {
+    const verdict = funnelVerdict({ ...healthy, candidates: 10 });
+    expect(verdict.ready).toBe(false);
+    expect(verdict.reason).toContain('different population');
+  });
+
+  it('agrees with the gate it feeds', () => {
+    // The gate's `pass` is this value: a caller that read one and not the other would be reading two
+    // answers to one question, which is the class of defect the funnel was built to expose.
+    const gateOf = (funnel: Parameters<typeof funnelVerdict>[0]) =>
+      buildProtocolGates({ ...minimal, funnel }).find((entry) => entry.id === 'V0-instrument-ready');
+    for (const funnel of [healthy, { ...healthy, servable: 0 }, { ...healthy, stored: 25 }]) {
+      expect(gateOf(funnel)?.pass).toBe(funnelVerdict(funnel).ready);
+    }
   });
 });

@@ -716,12 +716,42 @@ function packReading(
 }
 
 /**
+ * Where the funnel stopped, as a value.
+ *
+ * One predicate with three callers — the gate, the driver's early stop, and the readback — because
+ * three predicates that each decide for themselves is the defect this family of instruments exists
+ * to remove. `ready` is the publication condition; `reason` names the stage, so a caller that stops
+ * a run can say which one broke rather than that something did.
+ */
+export type FunnelVerdict = {
+  readonly ready: boolean;
+  readonly reason: string;
+};
+
+export function funnelVerdict(funnel: FunnelInput): FunnelVerdict {
+  const reconciled =
+    funnel.admitted <= funnel.candidates &&
+    funnel.stored <= funnel.admitted &&
+    funnel.servable <= funnel.stored;
+  if (!reconciled) {
+    return {
+      ready: false,
+      reason:
+        'a stage is larger than the one before it, so a count was taken over a different ' +
+        'population than the one it is used to explain',
+    };
+  }
+  const empty = emptyStage(funnel);
+  return empty === undefined ? { ready: true, reason: 'every stage carried something' } : { ready: false, reason: empty };
+}
+
+/**
  * `V0`'s sentence: the chain as it ran, and the stage that broke when one did.
  *
  * A funnel is read to answer one question — *where did it stop* — and a sentence that reported only
  * the first and last numbers would move that question back to the reader.
  */
-function funnelReading(funnel: FunnelInput, reconciled: boolean): string {
+export function funnelReading(funnel: FunnelInput, verdict: FunnelVerdict): string {
   const refusals = [
     funnel.refused === undefined ? undefined : `${String(funnel.refused)} refused`,
     funnel.failed === undefined ? undefined : `${String(funnel.failed)} failed`,
@@ -731,14 +761,7 @@ function funnelReading(funnel: FunnelInput, reconciled: boolean): string {
     `${String(funnel.admitted)} admitted -> ${String(funnel.stored)} stored -> ` +
     `${String(funnel.servable)} servable`;
   const tail = refusals.length === 0 ? '' : ` (${refusals.join(', ')})`;
-  if (!reconciled) {
-    return (
-      `${chain}${tail}: a stage is larger than the one before it, so a count was taken over a ` +
-      'different population than the one it is used to explain'
-    );
-  }
-  const empty = emptyStage(funnel);
-  return empty === undefined ? `${chain}${tail}` : `${chain}${tail}: ${empty}`;
+  return verdict.ready ? `${chain}${tail}` : `${chain}${tail}: ${verdict.reason}`;
 }
 
 function emptyStage(funnel: FunnelInput): string | undefined {
@@ -760,15 +783,12 @@ export function buildProtocolGates(
   const gates: ValidityGate[] = [];
   if (input.funnel !== undefined) {
     const funnel = input.funnel;
-    const reconciled =
-      funnel.admitted <= funnel.candidates &&
-      funnel.stored <= funnel.admitted &&
-      funnel.servable <= funnel.stored;
+    const verdict = funnelVerdict(funnel);
     gates.push({
       id: 'V0-instrument-ready',
       criterion: 'every stage from a correction to a servable rule carried something, and the stages reconcile',
-      actual: funnelReading(funnel, reconciled),
-      pass: reconciled && funnel.corrections > 0 && funnel.candidates > 0 && funnel.admitted > 0 && funnel.servable > 0,
+      actual: funnelReading(funnel, verdict),
+      pass: verdict.ready,
       blocking: true,
     });
   }
