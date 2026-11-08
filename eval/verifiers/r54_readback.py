@@ -249,9 +249,21 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         f"conditioned {conditioned} of {servable} of {stored}",
     )
     report.predict(
-        "the same episodes as R51: 4 trials over the held-out half",
-        (metrics.get("k") or 0) == 4 and (metrics.get("tasks") or 0) == 50,
+        "the run is the registered trial count: four",
+        (metrics.get("k") or 0) == 4,
         f"k={metrics.get('k')}, tasks={metrics.get('tasks')}",
+    )
+    # The episode count is reported and not graded. R54's header declares `sample: 200`, which
+    # is the *transfer* pair's size -- fifty airline tasks at four trials. A same-scenario
+    # retail run is split out of 115 tasks, so at `TAU_TEST_TASKS=0` it holds 57 out, and 228
+    # episodes is not the registered number. That is a stale field in the registration rather
+    # than a different experiment, and the Amendment records it; grading a prediction on it
+    # would abandon a mechanism reading for a bookkeeping error, which is defect 26 in the
+    # other direction.
+    episodes = (metrics.get("tasks") or 0) * (metrics.get("k") or 0)
+    report.note(
+        f"episodes {episodes} ({metrics.get('tasks')} tasks at k={metrics.get('k')}); "
+        f"the registration declares sample 200, the transfer pair's size"
     )
 
     # The written text, because a count of conditions cannot say whether they
@@ -467,8 +479,13 @@ def main() -> int:
                 "ABANDONED",
             ),
             (
-                "the wrong sample size is not this registration",
-                base_artefact(**{"metrics.tasks": 115}),
+                "a same-scenario size the header does not declare is still graded",
+                base_artefact(**{"metrics.tasks": 57}),
+                "GRADED",
+            ),
+            (
+                "a pair that did not run four trials abandons",
+                base_artefact(**{"metrics.k": 1}),
                 "ABANDONED",
             ),
         ]

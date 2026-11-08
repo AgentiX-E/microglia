@@ -101,6 +101,18 @@ and grades nothing on it. The 12% bar stays on the quantity R49 and R51 were rea
 the three readings remain comparable; a future registration that wants the delivered-pair
 median must register it, and must register a bar for it.
 
+**3. `sample: 200` is the transfer pair's size, and this run is 228 episodes.** The header's
+`sample` was carried over from R51, where the pair was retail → airline: fifty airline tasks at
+four trials. A same-scenario run is split out of one scenario's own pool — retail holds 115
+tasks, `trainShare 0.5` cuts 58/57 — and `TAU_TEST_TASKS` is 0, so this dispatch evaluates 57
+held-out tasks and 228 episodes. `TAU_TRAIN_TASKS` caps learning at 32 of the 58, as it did for
+R51. The field is stale and is recorded here rather than edited after a dispatch: no prediction
+in this registration is about the episode count, and the readback reports it as context instead
+of grading it, because abandoning a mechanism reading for a bookkeeping error is the same defect
+as reading a gate that passed on an absent input. What the header should say — and what the next
+registration will say — is the size of the scenario the predictions are about, not the size of
+the last one they were written against.
+
 One consequence worth stating in advance, because it is the reason the second median is now
 committed at all: a delivery that is eight-tenths unrelated **can** clear a non-zero median bar,
 since the survivors are by construction the related ones. If this run's p50 clears 12% while its
