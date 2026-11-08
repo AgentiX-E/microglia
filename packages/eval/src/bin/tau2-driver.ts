@@ -719,9 +719,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   //
   // Recorded even when it changes nothing, because "the pass ran and found no recurrence" and "the
   // pass did not run" are different findings, and the artefact has to be able to tell them apart.
+  //
+  // The store as the distiller wrote it, read once and used twice: as the pass's input, and as the
+  // population the yield is counted over. The two must be the same read, because a pass that folded
+  // two claims into one leaves the survivor citing both runs and the retired item citing its own,
+  // and a yield counted after it would report one claim twice. See `claimsPerCorrection`.
+  const written = await store.listKnowledge({});
   const consolidation =
     DISTILL_UNIT === 'trace'
-      ? consolidateKnowledge(await store.listKnowledge({}), {
+      ? consolidateKnowledge(written, {
           now: Date.now(),
           policy: defaultPolicy,
         })
@@ -1069,7 +1075,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // R60: claims per correction, counted from the store rather than from the interpreter's report —
     // a candidate the host refused is not yield, it is a claim that never reached a pack. Retired
     // items still count: a claim written and later folded into a paraphrase was written.
-    yieldCensus: yieldCensus(claimsPerCorrection(captured, knowledge)),
+    yieldCensus: yieldCensus(claimsPerCorrection(captured, written)),
     // The treatment, recorded beside its result: an artefact cannot otherwise tell an arm
     // that switched write admission on from one that never asked, and the counters are the
     // only place the mechanism's own population appears.

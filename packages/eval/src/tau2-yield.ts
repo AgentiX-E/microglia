@@ -56,6 +56,14 @@ function median(values: readonly number[]): number {
  * join on the task would attribute both items to both of them and double the yield. An item that
  * names its run twice counts once — the count is items, not citations.
  *
+ * An item citing *two* runs counts for both, and that is the definition rather than an oversight: a
+ * write-side merge (U6b's `update`) produces one item from two corrections, so the item stands for
+ * one claim from each and the sum over corrections is claims *written*, not the store's size. The
+ * caller therefore passes the store as the distiller wrote it, read **before** the recurrence pass,
+ * because that pass merges after the fact: it retires one item and leaves the survivor citing both
+ * runs, so counting its output reports the survivor once for each correction and the retired item
+ * once more — three claims where two were written.
+ *
  * Retired items count. A claim written and then folded into a paraphrase by consolidation was
  * written, and a yield that dropped it would report the pass as a loss of claims rather than a
  * change in their shape.

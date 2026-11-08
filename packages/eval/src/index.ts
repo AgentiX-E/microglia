@@ -568,6 +568,14 @@ export {
 } from './tau2-register.js';
 
 export { recurrenceGate, type RecurrenceGate } from './recurrence.js';
+export {
+  endpointsAgree,
+  pairedRateDelta,
+  tasksForEffectPp,
+  type EndpointAgreement,
+  type RateDelta,
+  type TaskRate,
+} from './paired-rate.js';
 export { claimsPerCorrection, yieldCensus, type CorrectionYield, type YieldCensus } from './tau2-yield.js';
 
 export {

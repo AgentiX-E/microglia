@@ -112,6 +112,22 @@ describe('claimsPerCorrection', () => {
     expect(rows.map((row) => row.claims)).toEqual([1, 0]);
   });
 
+  it('counts an item citing two runs for both, which is why the caller reads before the pass', () => {
+    // Two corrections, one claim each, as written: one attribution per correction and the sum is
+    // the number of claims written.
+    const asWritten = claimsPerCorrection(captured, [item(['run_1']), item(['run_2'])]);
+    expect(asWritten.map((row) => row.claims)).toEqual([1, 1]);
+
+    // The same two claims after the recurrence pass merged them: the survivor now cites both runs
+    // and the retired item still cites its own, so the same store reports three claims where two
+    // were written. This is not a bug in the counting, it is why `tau2-driver` reads the store
+    // before `consolidateKnowledge` rather than after it.
+    const afterPass = claimsPerCorrection(captured, [item(['run_1', 'run_2']), item(['run_2'])]);
+    expect(afterPass.map((row) => row.claims)).toEqual([1, 2]);
+    expect(afterPass.reduce((sum, row) => sum + row.claims, 0)).toBe(3);
+    expect(yieldCensus(asWritten).claims).toBe(2);
+  });
+
   it('reports a correction that wrote nothing as zero rather than dropping it', () => {
     const rows = claimsPerCorrection(captured, []);
     expect(rows.map((row) => row.claims)).toEqual([0, 0]);
