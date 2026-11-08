@@ -27,20 +27,50 @@ type Artifact = {
 
 const RESULTS = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 'results');
 
+/**
+ * Exit code for "there is nothing to price", distinct from "the reading is zero".
+ *
+ * This command had no failure mode. On the committed artefact it printed *this artefact predates
+ * the pool field* and returned zero, so a caller — or a reader — could not tell an unpriced axis
+ * from a priced one whose effect was nil. That is defect 26 in its purest form: a check that
+ * passes on an absent input. The review that found this read the whole output-side family
+ * (selector AUCs, the judge cascade, the oracle ceiling) and asked which of those claims could be
+ * recomputed from a committed file; the answer for the prior was none, and the command that would
+ * have said so was green.
+ *
+ * `2` is the same code the readback verifiers use for "the input is not there", so one convention
+ * covers both halves of a readback: a missing subject and a missing measurement are not results.
+ */
+const CANNOT_PRICE = 2;
+
+function cannotPrice(reason: string): void {
+  process.stdout.write(`[prior] cannot price: ${reason}\n`);
+  process.exitCode = CANNOT_PRICE;
+}
+
 function main(): void {
-  const artifact = JSON.parse(
-    readFileSync(birdArtefactPath(), 'utf8'),
-  ) as Artifact;
+  const path = birdArtefactPath();
+  let raw: string;
+  try {
+    raw = readFileSync(path, 'utf8');
+  } catch {
+    // A missing artefact is a configuration absence, not a crash. The stack trace this used to
+    // print named a path and stopped; it did not say that the axis had no input.
+    cannotPrice(`no artefact at ${path}`);
+    return;
+  }
+  const artifact = JSON.parse(raw) as Artifact;
   const { questions, recorded } = poolFromArtifact(artifact.per_case, artifact.config?.arms ?? []);
   const keyed = questions.filter(
     (question) => question.dbId !== undefined && question.fold !== undefined,
   );
   if (keyed.length === 0) {
-    process.stdout.write(
+    cannotPrice(
       recorded
-        ? '[prior] this artefact records no database or fold beside the pool: the prior cannot be ' +
-            'keyed, and a number computed without a key would describe a corpus it never saw\n'
-        : '[prior] this artefact predates the pool field, so there is nothing to look anything up in\n',
+        ? 'the artefact records no database or fold beside the pool, and a prior keyed without one ' +
+            'would describe a corpus it never saw'
+        : 'the artefact carries no pool: no candidate list was recorded, so there is nothing to ' +
+            'look anything up in',
     );
     return;
   }
@@ -78,9 +108,12 @@ function main(): void {
       (top, row) => (top === undefined || row.deltaPp > top.deltaPp ? row : top),
       undefined,
     );
+  // A pool where every question has one candidate is a *finding* — the draws collapsed — and it
+  // exits zero, because the subject was present and the answer is zero. That is the distinction
+  // the code above exists to preserve: absence is code 2, a nil reading is code 0.
   process.stdout.write(
     best === undefined
-      ? '[prior] no scope offered a choice to make\n'
+      ? '[prior] no scope offered a choice to make: the pool holds no question with two candidates\n'
       : `[prior] best scope '${best.scope}': ${best.deltaPp >= 0 ? '+' : ''}${best.deltaPp.toFixed(2)}pp ` +
           `over the first draw on ${best.choices} question(s), ${best.covered} of them with any ` +
           `support at all. In sample on this pool: an upper bound for a verifier, not a result.\n`,

@@ -3,11 +3,23 @@ id: R53-use-time-calibration
 step: R53
 opened: 2026-11-08
 arms: memory,reference
-sample: 200
+sample: 228
 gates: V1,V2,V3,V5,V6,V7,V8,V32,V44
 recallFloor: 0
 facadePair: off
+trainDomain: retail
+testDomain: retail
+recallDomain: retail
 ---
+
+**Header repaired 2026-11-08, before dispatch.** `sample: 200` was the *cross-domain* pair's size —
+fifty airline tasks at four trials — copied from R51, and the domain trio was missing entirely. Both
+are the R16 defect: a header that describes the last experiment rather than this one. A same-domain
+retail run is 57 held-out tasks at k=4 = **228 episodes**, and with no `recallDomain` declared the
+workflow falls back to the repository variable `TAU_TEST_DOMAIN`, which is still `airline` — so a
+dispatch of this registration as written would have compared a retail store against airline tasks and
+called the result a note-level effect. Nothing below changed; the predictions are about levels of one
+sentence and were never about a sample size.
 
 # R53 — the pack's instruction is the variable, and three levels of it
 
@@ -56,7 +68,7 @@ question is whether the *hardened* sentence does what AdaptiveMem reports.
 ## Prediction
 
 - `calibrated` at or above `today` at the pair's resolution, and above `today` by at least
-  the smallest effect 200 episodes can resolve. Below that, no claim is made either way.
+  the smallest effect 228 episodes can resolve. Below that, no claim is made either way.
 - The delivery census is identical across the three arms to the digit: same packs, same
   items, same coverage histogram. If any of the three moves, the arms differ in something
   other than the note and the comparison is abandoned.

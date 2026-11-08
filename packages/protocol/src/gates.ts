@@ -21,7 +21,11 @@
  * does not make a gate *evaluable*: `V45-clearance-dose-matched` names no scenario type and is
  * unreachable for a lane that ran no clearance arm. **Portability is indexical — a gate is as portable
  * as the arm behind it.** The second scenario's audit (`packages/eval/src/tau2-gates.ts`) is that
- * index, and it found 9 supplyable, 30 arm-indexed, and 2 of the 9 vacuous.
+ * index. It found **9** supplyable when it was written and **13** after R29 stage 2 made the four
+ * transfer gates reachable, with 2 of the 13 vacuous — which is why the count lives in that file's
+ * table and in the artefact, and why no number is quoted here from memory. This paragraph said
+ * "9 supplyable, 30 arm-indexed" for as long as the table had said 13 and 26, which is the drift
+ * the table exists to prevent, one file over.
  *
  * The two places where a scenario had leaked into this contract are now data:
  *

@@ -24,10 +24,11 @@
  * | **arm-indexed** | the field exists, but only an arm this lane never ran produces it | 26 |
  * | **informative** | supplied *and* present in the record that exists | 2 |
  *
- * The fourth bucket is the uncomfortable one and it is kept separate on purpose: **vacuous**. Two
- * of the nine supplyable gates — `V6-controls-inject` and `V7-channel` — fire with an empty control
- * list and a `undefined` channel, print "no pack-based controls configured" and pass. They are
- * counted as evaluable by any honest reading of "did the gate run", and they certify nothing. All
+ * The fourth bucket is the uncomfortable one and it is kept separate on purpose: **vacuous**.
+ * `V6-controls-inject` and `V7-channel` — two of the thirteen in the table above — fire with an
+ * empty control list and an `undefined` channel, print "no pack-based controls configured" and
+ * pass. They are counted as evaluable by any honest reading of "did the gate run", and they
+ * certify nothing. All
  * seventeen published BIRD artefacts carry `V6` with that exact sentence, and sixteen of seventeen
  * carry `V7` the same way. A count that folded them into the two informative gates would report
  * four gates where two do work.
