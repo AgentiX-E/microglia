@@ -903,6 +903,15 @@ jobs:
       - name: CPU scale and latency
         run: pnpm eval:scale
 
+      # A readback verifier is the one file in the repository whose job is to be
+      # right about a registration, and until this step none of them ran in CI.
+      # `eval:verifiers` chains their self-tests; a verifier that cannot grade its
+      # own fixtures GRADED/ABANDONED/DISCARDED/NO_MEASUREMENT is not a verifier,
+      # and R54's fourth state exists because a wrong-configuration dispatch has to
+      # be discarded rather than read as a result.
+      - name: The readback verifiers still grade their own fixtures
+        run: pnpm eval:verifiers
+
       - name: Gate summary
         if: always()
         run: |

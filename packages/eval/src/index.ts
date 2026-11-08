@@ -517,11 +517,13 @@ export { isGoldVerifiedCorrection, tau2EditSemantics } from './tau2-admission.js
 export {
   COVERAGE_FLOORS,
   coverageHistogram,
+  coverageMedians,
   coverageProfile,
   useCensus,
   zeroCoverageShare,
   type CoverageFloorRow,
   type CoverageHistogram,
+  type CoverageMedians,
   type CoverageProfile,
   type CoverageQuantiles,
   type UseArm,

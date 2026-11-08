@@ -251,11 +251,111 @@ export type CoverageHistogram = {
   readonly nonzeroQuantiles: CoverageQuantiles;
   /** One row per `COVERAGE_FLOORS` entry, in the same order. */
   readonly floors: readonly CoverageFloorRow[];
+  /**
+   * The two medians a "coverage p50" claim can mean, over this same population.
+   *
+   * Nested here rather than written beside the histogram, because a median built
+   * from a different observation list than the curve would be a second
+   * population rather than a second reading, and one block is one source.
+   * Absent on artefacts written before it, which read as "not measured".
+   */
+  readonly medians?: CoverageMedians;
 };
 
 function quantileOf(sorted: readonly number[], p: number): number {
   if (sorted.length === 0) return 0;
   return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))] as number;
+}
+
+type MeasuredRows = {
+  /** Served packs whose question has at least one content term, with their coverages. */
+  readonly measured: readonly { readonly coverages: readonly number[] }[];
+  /** Served packs a floor cannot judge, because the question has no content term. */
+  readonly unmeasurablePacks: number;
+};
+
+/**
+ * The one population every coverage reading is over.
+ *
+ * `coverageHistogram` and `coverageMedians` disagreeing about which packs are
+ * measurable would be the same defect as the three call sites that used to
+ * decide for themselves whether a rule says its condition. They are two
+ * reductions of this single pass.
+ */
+function measuredRows(observations: readonly UseObservation[]): MeasuredRows {
+  const rows = observations.map((observation) => ({
+    served: observation.statements.length > 0,
+    measurable: tokenize(observation.query).length > 0,
+    coverages: recallDocuments(observation).map((document) =>
+      queryCoverage(observation.query, document),
+    ),
+  }));
+  return {
+    measured: rows.filter((row) => row.served && row.measurable),
+    unmeasurablePacks: rows.filter((row) => row.served && !row.measurable).length,
+  };
+}
+
+/**
+ * The two medians a registration can mean when it says "coverage p50".
+ *
+ * R54's third prediction is written as "coverage p50 at least 12%", and the
+ * committed verifier grades it against `nonzeroQuantiles.p50` — the median over
+ * the pairs that cleared zero. R49 read `4.7%` and R51 read `4.88%` that way, so
+ * the series is defined by where the field sits. What the artefact never carried
+ * is the other population: R47 committed 750 zeros in 2,188 injected pairs, so
+ * the median over every delivered pair is that population's 24th non-zero
+ * percentile, about `0.027`, and it is in no field at all.
+ *
+ * The zeros were delivered. A bar met on the survivors is compatible with a
+ * delivery that is eight-tenths unrelated, which is exactly the state R54's
+ * third refutation has to tell apart from a distiller that names the situation.
+ * Both are reported because neither is the right one alone: a floor acts only on
+ * the survivors, while the model saw the zeros too.
+ *
+ * Both are upper medians — index `floor(0.5 * n)` — matching `quantileOf` and
+ * therefore `nonzeroQuantiles`, so the two shapes cannot disagree about the
+ * convention either.
+ */
+export type CoverageMedians = {
+  /** Delivered pairs from measurable packs; the population of both medians. */
+  readonly pairs: number;
+  /** Pairs whose delivered coverage is exactly zero. */
+  readonly zeroPairs: number;
+  /** Median over every delivered pair, zeros included. */
+  readonly medianAllPairs: number;
+  /** Median over the non-zero pairs only; 0 when every pair is zero. */
+  readonly medianNonzero: number;
+};
+
+/**
+ * Both medians over the population `coverageHistogram` commits a curve for.
+ *
+ * No model call and no new threshold: the same `tokenize`, `queryCoverage` and
+ * `recallDocuments` the floor uses, reduced to two numbers instead of seven
+ * quantiles.
+ */
+export function coverageMedians(observations: readonly UseObservation[]): CoverageMedians {
+  return mediansOf(measuredRows(observations).measured);
+}
+
+/** The same reduction over rows a caller already has, so no reading re-measures. */
+function mediansOf(measured: MeasuredRows['measured']): CoverageMedians {
+  const all: number[] = [];
+  let zeroPairs = 0;
+  for (const row of measured) {
+    for (const coverage of row.coverages) {
+      all.push(coverage);
+      if (coverage === 0) zeroPairs += 1;
+    }
+  }
+  const nonzero = all.filter((coverage) => coverage > 0).sort((a, b) => a - b);
+  return {
+    pairs: all.length,
+    zeroPairs,
+    medianAllPairs: quantileOf([...all].sort((a, b) => a - b), 0.5),
+    medianNonzero: quantileOf(nonzero, 0.5),
+  };
 }
 
 /**
@@ -270,19 +370,11 @@ function quantileOf(sorted: readonly number[], p: number): number {
  */
 export function coverageHistogram(observations: readonly UseObservation[]): CoverageHistogram {
   const profile = coverageProfile(observations);
-  const rows = observations.map((observation) => ({
-    served: observation.statements.length > 0,
-    measurable: tokenize(observation.query).length > 0,
-    coverages: recallDocuments(observation).map((document) =>
-      queryCoverage(observation.query, document),
-    ),
-  }));
-  const measured = rows.filter((row) => row.served && row.measurable);
+  const { measured, unmeasurablePacks } = measuredRows(observations);
   const nonzero = measured
     .flatMap((row) => row.coverages)
     .filter((coverage) => coverage > 0)
     .sort((a, b) => a - b);
-  const unmeasurablePacks = rows.filter((row) => row.served && !row.measurable).length;
 
   const floors = COVERAGE_FLOORS.map((minCoverage): CoverageFloorRow => {
     let retainedPairs = 0;
@@ -313,5 +405,8 @@ export function coverageHistogram(observations: readonly UseObservation[]): Cove
       max: nonzero.length === 0 ? 0 : (nonzero[nonzero.length - 1] as number),
     },
     floors,
+    // A "coverage p50" claim in a registration has two possible subjects and the
+    // artefact now answers both, from the rows this call already measured.
+    medians: mediansOf(measured),
   };
 }

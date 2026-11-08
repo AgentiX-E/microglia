@@ -342,8 +342,12 @@ describe('coverageHistogram — the committed population U3 needs', () => {
     );
     const round = JSON.parse(JSON.stringify(h)) as CoverageHistogramShape;
     expect(round).toEqual(h);
+    // Six fields since R54. The list is exact on purpose: this assertion is what
+    // makes a widening visible rather than silent, so `medians` was added here
+    // deliberately — it names the two medians a "coverage p50" claim can mean,
+    // and it is a second reduction of the same population, not a new population.
     expect(Object.keys(round).sort()).toEqual(
-      ['floors', 'measuredPairs', 'nonzeroQuantiles', 'unmeasurablePacks', 'unmeasurablePairs'].sort(),
+      ['floors', 'measuredPairs', 'medians', 'nonzeroQuantiles', 'unmeasurablePacks', 'unmeasurablePairs'].sort(),
     );
   });
 });

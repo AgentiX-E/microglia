@@ -359,6 +359,22 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
   const served = raw.servedPackSizes;
   const meanPackIds = served.length === 0 ? 0 : served.reduce((sum, size) => sum + size, 0) / served.length;
   const distinct = new Set(raw.test);
+  // One observation list for every use-side reading: the census, the retention
+  // curve and the two medians. They are three reductions of one population, and
+  // building one of them from a different facade than the others would make the
+  // artefact disagree with itself rather than report two views of one delivery.
+  //
+  // A function rather than a local, so the list arrives non-optional and no
+  // defensive `?? []` has to stand in for a branch that cannot be taken.
+  const useSide = (observations: readonly UseObservation[]) => ({
+    use: useCensus(observations, raw.useArm ?? 'as-is', raw.widenedItems ?? 0),
+    // The seven-field census commits one scalar about coverage. U3's floor must be
+    // computed from a committed histogram BEFORE its own dispatch (AUDIT 34.22), so
+    // reduce the SAME facade observations to the retention curve here, while they
+    // still exist in this process. The medians ride inside that block for the same
+    // reason.
+    coverage: coverageHistogram(raw.coverageObservations ?? observations),
+  });
 
   return {
     arm,
@@ -409,20 +425,6 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     // only what it saw and the arithmetic stays in one tested function. A raw
     // record with no observations reports no census at all — an older run is
     // "not measured", never a run that served a perfectly relevant empty pack.
-    ...(raw.useObservations === undefined
-      ? {}
-      : {
-          use: useCensus(
-            raw.useObservations,
-            raw.useArm ?? 'as-is',
-            raw.widenedItems ?? 0,
-          ),
-          // The seven-field census commits one scalar about coverage. U3's
-          // floor must be computed from a committed histogram BEFORE its own
-          // dispatch (AUDIT 34.22), so reduce the SAME facade observations to
-          // the retention curve here, while they still exist in this process.
-          // An older artefact has neither field and reads as "not measured".
-          coverage: coverageHistogram(raw.coverageObservations ?? raw.useObservations),
-        }),
+    ...(raw.useObservations === undefined ? {} : useSide(raw.useObservations)),
   };
 }
