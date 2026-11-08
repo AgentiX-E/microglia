@@ -18,10 +18,11 @@ function raw(over: Partial<Tau2Raw> = {}): Tau2Raw {
 }
 
 describe('storeCensus', () => {
-  const item = (status: string, domain?: string, statusReason?: string) => ({
+  const item = (status: string, domain?: string, statusReason?: string, when?: string) => ({
     status,
     scope: domain === undefined ? {} : { domain },
     ...(statusReason === undefined ? {} : { statusReason }),
+    ...(when === undefined ? {} : { when }),
   });
 
   it('counts the store by status and by what the recall scope can reach', () => {
@@ -41,6 +42,29 @@ describe('storeCensus', () => {
     // is active and unreachable, which is a different defect from being inactive.
     expect(census.servable).toBe(2);
     expect(census.statuses).toEqual({ active: 3, candidate: 0, quarantined: 1, retired: 1, other: 0 });
+  });
+
+  it('counts the conditions of the servable items, because a rule with none is recalled by nothing', () => {
+    // R51. The R49 store held ten rules, all ten servable, and not one of them
+    // stated a condition: every rule was "a request of this shape is resolved by
+    // calling ...", which shares no term with the question and says nothing about
+    // where it applies. Thirty-eight percent of requests were served an empty pack
+    // and the pack that did arrive carried 0.76 rules. A census that counts
+    // servable items alone would have called that store healthy.
+    const census = storeCensus(
+      [
+        item('active', 'retail', undefined, 'the customer asks to cancel a shipment'),
+        item('active', 'retail', undefined, '   '),
+        item('active', 'retail'),
+        // Out of scope: unconditioned for a different reason, and folding the two
+        // populations together would let one defect hide behind the other.
+        item('active', 'airline', undefined, 'a refund on a delayed flight'),
+      ],
+      'retail',
+    );
+    expect(census.servable).toBe(3);
+    expect(census.conditioned).toBe(1);
+    expect(census.unconditioned).toBe(2);
   });
 
   it('separates "nothing active" from "nothing in scope"', () => {
@@ -88,6 +112,8 @@ describe('storeCensus', () => {
       servable: 0,
       reasons: {},
       statuses: { active: 0, candidate: 0, quarantined: 0, retired: 0, other: 0 },
+      conditioned: 0,
+      unconditioned: 0,
       admission: {
         measured: 0,
         trustMin: 0,

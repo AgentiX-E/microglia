@@ -5,7 +5,7 @@
  * three paraphrases of one rule consume the room that a second, distinct rule
  * needed — the same failure mode as a top-k retrieval with no diversity.
  */
-import { defaultPolicy, mmrSelect, queryCoverage } from '../kernel/index.js';
+import { defaultPolicy, mmrSelect, queryCoverage, recallText } from '../kernel/index.js';
 import type { KnowledgeItem, KnowledgePack, RecallQuery } from '../kernel/index.js';
 import type { MemoryPort } from '../memory/index.js';
 import { makePack } from './render.js';
@@ -73,7 +73,7 @@ export async function buildPack(
   const byRelevance =
     floor <= 0
       ? hits
-      : hits.filter((hit) => queryCoverage(query.text, hit.item.statement) >= floor);
+      : hits.filter((hit) => queryCoverage(query.text, recallText(hit.item)) >= floor);
   // Corroboration is a different question from relevance, and it is asked before MMR:
   // a rule with one observation should not occupy a slot that a corroborated rule
   // could have filled.
@@ -84,7 +84,7 @@ export async function buildPack(
       : byRelevance.filter((hit) => hit.item.evidence.length >= minEvidence);
 
   const selected = mmrSelect<KnowledgeItem>(
-    eligible.map((hit) => ({ item: hit.item, relevance: hit.score, text: hit.item.statement })),
+    eligible.map((hit) => ({ item: hit.item, relevance: hit.score, text: recallText(hit.item) })),
     limit,
     1 - Math.min(1, Math.max(0, options.diversity ?? 0.25)),
   );

@@ -541,7 +541,18 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   for (const correction of corrections) {
     const handle = host.begin({
       task: TASK,
-      input: { question: correction.taskId, domain: LEARN_DOMAIN, schemaDigest: LEARN_DOMAIN },
+      // R51: the question, not its id. The distiller's prompt asks for a trigger
+      // "in the question's own terms" and reads `run.input.question` to find them;
+      // this field carried `correction.taskId`, so the model was asked to write in
+      // the terms of a number. The id stays beside it, because a task id is what a
+      // ledger, a split and a pair join on, and it must not be mistaken for a
+      // question by anything downstream.
+      input: {
+        question: correction.instruction === '' ? correction.taskId : correction.instruction,
+        taskId: correction.taskId,
+        domain: LEARN_DOMAIN,
+        schemaDigest: LEARN_DOMAIN,
+      },
       model: llm.model,
       promptVersion: 'tau2/1',
       domainPack: 'tau2',

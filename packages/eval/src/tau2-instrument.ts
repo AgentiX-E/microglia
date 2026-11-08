@@ -209,6 +209,18 @@ export type StoreCensus = {
     readonly retired: number;
     readonly other: number;
   };
+  /**
+   * Servable items that state a condition, and those that do not.
+   *
+   * R51. `when` is the half of a rule that says where it applies, and until this
+   * census existed nothing counted whether the write path had produced it. On the
+   * R49 store every rule was a statement with no condition: ten items, ten
+   * servable, and none of them recallable by a question because the only text they
+   * carried named tool calls. A pack that arrives often and says nothing about when
+   * it applies is the other half of the same defect, and it needs its own number.
+   */
+  readonly conditioned: number;
+  readonly unconditioned: number;
   /** How many items carry each admission reason, keyed by the reason the store wrote. */
   readonly reasons: Readonly<Record<string, number>>;
   /** The three numbers behind the reason, so a dispatch can verify a repair instead of repeating it. */
@@ -226,6 +238,8 @@ export type RecallTally = {
 type CensusItem = {
   readonly status: string;
   readonly scope: { readonly domain?: string };
+  /** The condition the item states, when it states one. Absent on stores written before R51. */
+  readonly when?: string;
   /** Why the admission gate left the item where it is. `undefined` on items that record none. */
   readonly statusReason?: string;
   /** Optional on stores written before R45; `admission.measured` says how many reported them. */
@@ -293,7 +307,25 @@ export function storeCensus(items: readonly CensusItem[], recallDomain: string):
               (item.confidence as number) < defaultPolicy.activationThreshold,
           ).length,
         };
-  return { stored: items.length, active: statuses.active, servable, statuses, reasons, admission };
+  // Counted over the servable population rather than the whole store: an item the
+  // recall scope cannot reach is unconditioned for a different reason, and adding
+  // the two populations together would let one defect hide behind the other.
+  const servableItems = items.filter(
+    (item) => item.status === 'active' && item.scope.domain === recallDomain,
+  );
+  const conditioned = servableItems.filter(
+    (item) => item.when !== undefined && item.when.trim().length > 0,
+  ).length;
+  return {
+    stored: items.length,
+    active: statuses.active,
+    servable,
+    statuses,
+    reasons,
+    admission,
+    conditioned,
+    unconditioned: servable - conditioned,
+  };
 }
 
 export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord {

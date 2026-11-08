@@ -189,6 +189,14 @@ export type Tau2ArmRecord = {
     readonly reasons?: Readonly<Record<string, number>>;
     /** Present on artefacts written from R45 onward; absent on older ones. */
     readonly admission?: AdmissionCensus;
+    /**
+     * R51: how many servable items state a condition, and how many do not. Absent
+     * on every artefact written before the census, which reads as "not measured"
+     * rather than as zero — the R49 store was ten items with no condition at all,
+     * and a zero written by a run that never counted would be indistinguishable.
+     */
+    readonly conditioned?: number;
+    readonly unconditioned?: number;
   };
   /** What the recall facade was asked for, and how many answers carried an item. */
   readonly recall?: {

@@ -26,8 +26,10 @@ item. Different scopes are not contradictions: a domain-specific exception is su
 the general rule, and specificity resolves it at read time.
 
 **Condition** — the `when` field on a knowledge item: the property of a task under which the claim
-applies, distilled beside the statement and rendered *before* it. It is text for a reader, not a filter:
-measured on BIRD, rendering it changed half the answers and none of the scores. A condition the runtime
+applies, distilled beside the statement and rendered *before* it. It is text for a reader before it is
+anything else — measured on BIRD, rendering it changed half the answers and none of the scores — and it
+is also half of the item's *recall text*, so a condition that names the situation a question is about
+raises that rule's coverage and a condition that is always true raises nothing. A condition the runtime
 must enforce belongs in `tables`/`columns` logic, not in prose.
 
 **Correction** — a structured statement of what the output should have been. Distinct from a rating
@@ -93,6 +95,12 @@ can equal several weak ones.
 **System time / world time** — the bitemporal pair. `validUntil` is when the claim stopped being true
 in the world; `systemUntil` is when the store stopped believing it. A rule can be superseded in system
 time while still being true in world time, and the reverse.
+
+**Recall text** — what a rule is matched by: its condition followed by its statement (`recallText` in
+the kernel). One definition rather than three, because the BM25 index, the `minCoverage` floor and the
+MMR diversity ranking each used to decide for themselves, and all three had settled on the statement
+alone. A rule distilled without a condition therefore has only its claim to be found by, which on an
+agentic benchmark meant an empty pack on 38% of 1,528 requests.
 
 **Trust** — a scalar in `[0, 1]` attached to a feedback event, derived from the *signal* (execution
 result > clarification > preference > rating with reason > edit > bare rating) and optionally capped by

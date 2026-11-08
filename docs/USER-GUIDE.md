@@ -526,6 +526,25 @@ the note tells the model to apply an item only where that condition holds — be
 what was true says nothing about when it is true, and the measured failure mode of this mechanism is a
 true rule applied to the wrong question. An item without `when` is unconditional; it is not "unknown".
 
+**A condition is also how the rule is found.** Retrieval does not match the statement alone: the BM25
+index, the `minCoverage` floor and the diversity ranking all read the item's *recall text*, which is
+`when` followed by `statement`. This is not a detail of the implementation — it is the difference
+between a store that answers and a store that holds. A rule distilled from a correction without its
+condition is a rule whose only searchable text is the claim, and a claim shaped "a request of this
+shape is resolved by calling `find_user`, then `cancel_pending_order`" shares no term with any question
+a person asks. Measured on a public agentic benchmark: a store of ten such rules served an empty pack
+on **38%** of 1,528 requests and averaged 0.76 rules per request. The same lane, once the write path
+carried the instruction it had been dropping, is the experiment R51 registers.
+
+So: **if you can state when a rule applies, state it.** The distiller prompt already asks for it, and
+an interpreter you write should return it in `when` rather than folding a condition into the statement.
+Two consequences worth knowing:
+
+- A condition raises the rule's coverage against a question that names the same situation, which is
+  what you want. It cannot lower it, because recall text is a union of both halves.
+- A condition that is always true buys nothing: it adds words that no question contains. The prompt
+  asks for a trigger the reader can check on a *different* input for exactly this reason.
+
 Four properties are guarantees, and each is tested:
 
 1. **It is data.** The preamble says so, and `<` inside a statement is escaped, so a statement cannot

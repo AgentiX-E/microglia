@@ -10,6 +10,7 @@ import {
   MicrogliaError,
   bm25Score,
   contentKey,
+  recallText,
   scopeMatches,
   specificity,
   tierFor,
@@ -326,7 +327,10 @@ export class EmbeddedMemory implements MemoryPort {
 
   private indexKnowledge(item: KnowledgeItem): void {
     this.knowledge.set(item.id, item);
-    this.index.add(item.id, `${item.statement} ${item.kind} ${scopeText(item)}`);
+    // `recallText`, not `statement`: a rule whose condition names the situation
+    // is recalled by that condition. See `recallText` for the dispatch that
+    // measured what excluding it costs.
+    this.index.add(item.id, `${recallText(item)} ${item.kind} ${scopeText(item)}`);
   }
 
   private assertOpen(): void {

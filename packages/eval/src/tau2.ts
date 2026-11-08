@@ -34,6 +34,26 @@ export type TauAction = {
 
 export type TauTask = {
   readonly id: string;
+  /**
+   * What the user asked for, in the user's words.
+   *
+   * R51. This was parsed and thrown away for the whole of the lane's life, and
+   * that is why the store it produced could not be recalled by a question. The
+   * write path distilled from the gold calls alone and recorded them as "a
+   * request of this shape is resolved by calling find_user, then
+   * cancel_pending_order", which shares no term with anything a user says; the
+   * event also carried the task *id* as `input.question`, so the distiller was
+   * asked to write a trigger "in the question's own terms" while being shown a
+   * number. 38% of 1,528 requests were served an empty pack on the R49 dispatch,
+   * and 0.76 rules per request on the 62% that were not.
+   *
+   * Upstream states it in two shapes — a bare string, or an object with
+   * `reason_for_call` and `task_instructions` — and both are read here. Absent is
+   * the empty string rather than `undefined`, because every consumer of this field
+   * asks "is there a question to show" and none of them should have to distinguish
+   * two ways of saying no.
+   */
+  readonly instruction: string;
   readonly actions: readonly TauAction[];
   /** Facts the agent is supposed to tell the user. */
   readonly communicate: readonly string[];
@@ -59,6 +79,26 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 function asStringArray(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0);
+}
+
+/**
+ * The user's request, from either of the two shapes upstream writes.
+ *
+ * A bare string, or `{reason_for_call, task_instructions}`. The object form is
+ * joined rather than picked between: `reason_for_call` is the one-line topic and
+ * `task_instructions` is the request, and a rule recalled by "refund" alone is a
+ * rule recalled by every refund. Absent stays the empty string — see
+ * `TauTask.instruction` for why this is not `undefined`.
+ */
+function instructionOf(userScenario: unknown): string {
+  const instructions = asRecord(userScenario)?.['instructions'];
+  if (typeof instructions === 'string') return instructions.trim();
+  const record = asRecord(instructions);
+  if (record === undefined) return '';
+  return [record['reason_for_call'], record['task_instructions']]
+    .filter((part): part is string => typeof part === 'string' && part.trim().length > 0)
+    .map((part) => (part as string).trim())
+    .join('. ');
 }
 
 function parseAction(value: unknown, taskId: string): TauAction {
@@ -106,6 +146,7 @@ export function parseTauTasks(document: unknown): TauTask[] {
     const actions = criteria?.['actions'];
     return {
       id,
+      instruction: instructionOf(task['user_scenario']),
       actions: Array.isArray(actions) ? actions.map((action) => parseAction(action, id)) : [],
       communicate: asStringArray(criteria?.['communicate_info']),
       assertions: asStringArray(criteria?.['nl_assertions']),
@@ -151,6 +192,15 @@ export type Correction = {
   readonly taskId: string;
   readonly statement: string;
   readonly actions: readonly TauAction[];
+  /**
+   * The request that was on screen when the episode went wrong.
+   *
+   * R51: carried on the correction rather than looked up again at the call site,
+   * because the call site is where it went missing. Empty when the task states
+   * no instruction, which the write path reads as "show the id instead" rather
+   * than as a question.
+   */
+  readonly instruction: string;
 };
 
 /**
@@ -206,7 +256,7 @@ export function learnableCorrections(
   for (const task of tasks) {
     const teaching = teachingOf(task, rewards.get(task.id), threshold);
     if (teaching === undefined) continue;
-    out.push({ taskId: task.id, statement: teaching, actions: task.actions });
+    out.push({ taskId: task.id, statement: teaching, actions: task.actions, instruction: task.instruction });
   }
   return out;
 }

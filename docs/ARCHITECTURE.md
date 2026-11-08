@@ -179,6 +179,14 @@ Measured at 10k rules, 2 vCPU:
 Measured contribution: at equal relevance, MMR raises the distinct claims in a four-slot pack from
 **1 to 4**.
 
+**What a rule is matched by.** Stages 1, 2 and 3 read the item's *recall text* — its `when` condition
+followed by its statement — and not the statement alone. One function, `recallText`, because the three
+stages had each decided for themselves and all three had settled on the statement, which is half a
+rule: the half that records what was true, with the half that says when it is true left out of every
+index, floor and diversity measure. A store whose rules carry no condition is then a store no question
+can find. Measured on τ² retail: ten rules, 38% of 1,528 requests served an empty pack, 0.76 rules per
+request.
+
 ## 6. Admission: one function, visible numbers
 
 ```

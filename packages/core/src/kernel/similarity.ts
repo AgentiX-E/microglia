@@ -58,6 +58,38 @@ export function queryCoverage(query: string, document: string): number {
   return shared / wanted.size;
 }
 
+/**
+ * The text a rule is recalled by.
+ *
+ * `when` was added in iteration 62 because a statement records what was true and
+ * says nothing about when it is true, and the renderer has printed it ahead of
+ * the statement ever since. Recall did not follow: the lexical index built its
+ * document from `statement`, `kind` and the scope, and the coverage gate measured
+ * against `statement` alone, so a rule whose condition names the question's own
+ * situation was invisible to the only two mechanisms that could have found it.
+ *
+ * The effect is measurable and it is the defect R51 exists for. On the R49
+ * dispatch the store held ten rules, 38% of 1,528 requests were served an empty
+ * pack, and the mean pack carried 0.76 rules; the rules' statements were of the
+ * form "A request of this shape is resolved by calling find_user, then
+ * cancel_pending_order, in that order", which shares no term with any question a
+ * user asks. The half that would have shared one had already been thrown away
+ * twice: once by the τ² write path, which distilled from the task's gold calls
+ * and never from the instruction, and again here.
+ *
+ * One function rather than three call sites, because the three had already
+ * drifted: the index, the coverage gate and the MMR diversity text each decided
+ * what a rule "says" on their own.
+ */
+export function recallText(item: {
+  readonly statement: string;
+  readonly when?: string | undefined;
+}): string {
+  return item.when === undefined || item.when.length === 0
+    ? item.statement
+    : `${item.when} ${item.statement}`;
+}
+
 export function jaccardSimilarity(a: string, b: string): number {
   const left = new Set(tokenize(a));
   const right = new Set(tokenize(b));

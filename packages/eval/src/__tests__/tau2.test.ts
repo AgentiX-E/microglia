@@ -13,6 +13,7 @@ import {
 
 const task = (overrides: Partial<TauTask> = {}): TauTask => ({
   id: 't1',
+  instruction: '',
   actions: [{ name: 'get_order', arguments: { order_id: '#W1' } }],
   communicate: [],
   assertions: [],
@@ -36,6 +37,7 @@ describe('parseTauTasks', () => {
     expect(tasks).toEqual([
       {
         id: 't1',
+        instruction: '',
         actions: [{ name: 'get_order', arguments: { order_id: '#W1' }, compareArgs: ['order_id'] }],
         communicate: ['the order ships Monday'],
         assertions: ['The order status is pending.'],
@@ -53,13 +55,13 @@ describe('parseTauTasks', () => {
 
   it('treats criteria with a non-array actions field as nothing to check', () => {
     expect(parseTauTasks({ tasks: [{ id: 't4', evaluation_criteria: { actions: null } }] })).toEqual([
-      { id: 't4', actions: [], communicate: [], assertions: [] },
+      { id: 't4', instruction: '', actions: [], communicate: [], assertions: [] },
     ]);
   });
 
   it('keeps a task with no criteria as a task with nothing to check', () => {
     expect(parseTauTasks({ tasks: [{ id: 't2' }] })).toEqual([
-      { id: 't2', actions: [], communicate: [], assertions: [] },
+      { id: 't2', instruction: '', actions: [], communicate: [], assertions: [] },
     ]);
   });
 
@@ -159,11 +161,74 @@ describe('taskCorrection', () => {
   });
 });
 
+describe('the instruction, which the lane threw away for its whole life', () => {
+  const first = (document: unknown) => parseTauTasks(document)[0]?.instruction;
+
+  it('reads the bare-string shape', () => {
+    expect(first({ tasks: [{ id: '7', user_scenario: { instructions: 'Swap my two orders.' } }] })).toBe(
+      'Swap my two orders.',
+    );
+  });
+
+  it('joins the object shape, because the topic alone recalls every topic', () => {
+    // `reason_for_call: 'Refund'` is a one-line topic and `task_instructions` is
+    // the request. A trigger built from the topic would fire on every refund, and a
+    // trigger is only useful if it is narrower than the domain it lives in.
+    expect(
+      first({
+        tasks: [
+          {
+            id: '9',
+            user_scenario: {
+              instructions: { reason_for_call: 'Refund', task_instructions: 'Refund the cheapest item.' },
+            },
+          },
+        ],
+      }),
+    ).toBe('Refund. Refund the cheapest item.');
+  });
+
+  it('keeps whichever half of the object shape is present', () => {
+    expect(
+      first({
+        tasks: [{ id: '9', user_scenario: { instructions: { task_instructions: 'Cancel it.' } } }],
+      }),
+    ).toBe('Cancel it.');
+    expect(
+      first({ tasks: [{ id: '9', user_scenario: { instructions: { reason_for_call: 'Cancel' } } }] }),
+    ).toBe('Cancel');
+  });
+
+  it('is the empty string when the task states none, and never undefined', () => {
+    // Absent and empty are one fact here: every consumer asks "is there a question
+    // to show", and none of them should have to distinguish two ways of saying no.
+    expect(first({ tasks: [{ id: 't2' }] })).toBe('');
+    expect(first({ tasks: [{ id: 't2', user_scenario: {} }] })).toBe('');
+    expect(first({ tasks: [{ id: 't2', user_scenario: { instructions: 7 } }] })).toBe('');
+    expect(first({ tasks: [{ id: 't2', user_scenario: 'Swap my orders.' }] })).toBe('');
+  });
+
+  it('trims both shapes, so a padded instruction is not a padded prompt', () => {
+    expect(first({ tasks: [{ id: '7', user_scenario: { instructions: '  Swap.  ' } }] })).toBe('Swap.');
+    expect(
+      first({
+        tasks: [
+          {
+            id: '7',
+            user_scenario: { instructions: { reason_for_call: ' Refund ', task_instructions: ' Now. ' } },
+          },
+        ],
+      }),
+    ).toBe('Refund. Now.');
+  });
+});
+
 describe('correctionEdit', () => {
   it('states the calls for a correction that names them', () => {
     expect(
       correctionEdit({
         taskId: 'a',
+        instruction: '',
         statement: 'A request of this shape is resolved by calling get_order(order_id="#W1"), in that order.',
         actions: [{ name: 'get_order', arguments: { order_id: '#W1' } }],
       }),
@@ -176,6 +241,7 @@ describe('correctionEdit', () => {
     // thrown in the driver's loop, ending the run at the first rubric-only task.
     const payload = correctionEdit({
       taskId: 'a',
+      instruction: '',
       statement: 'A request of this shape is resolved when: the order is cancelled.',
       actions: [],
     });
@@ -211,6 +277,18 @@ describe('learnableCorrections', () => {
     expect(only?.taskId).toBe('a');
     expect(only?.actions).toEqual([]);
     expect(only?.statement).toBe('A request of this shape is resolved when: The order is cancelled.');
+  });
+
+  it('carries the question on the correction, because the write path is where it went missing', () => {
+    // R51. The driver passed `correction.taskId` as `input.question`, so the
+    // distiller was asked to write a trigger "in the question's own terms" while
+    // being shown `"a"`. The correction carries the instruction now, and the driver
+    // forwards it; this assertion is the link between the parse and the event.
+    const [only] = learnableCorrections(
+      [task({ id: 'a', instruction: 'Cancel a shipment that has not left the warehouse.' })],
+      new Map([['a', 0]]),
+    );
+    expect(only?.instruction).toBe('Cancel a shipment that has not left the warehouse.');
   });
 
   it('honours a threshold below one, for runs that score partial credit', () => {

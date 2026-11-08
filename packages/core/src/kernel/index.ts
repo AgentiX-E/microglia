@@ -71,6 +71,7 @@ export {
   jaccardSimilarity,
   mmrSelect,
   queryCoverage,
+  recallText,
   tokenize,
 } from './similarity.js';
 
