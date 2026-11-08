@@ -568,6 +568,7 @@ export {
 } from './tau2-register.js';
 
 export { recurrenceGate, type RecurrenceGate } from './recurrence.js';
+export { claimsPerCorrection, yieldCensus, type CorrectionYield, type YieldCensus } from './tau2-yield.js';
 
 export {
   TRACE_CALL_CAP,

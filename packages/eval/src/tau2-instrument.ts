@@ -42,6 +42,7 @@ import type { AdmissionCensus, Tau2ArmRecord } from './tau2-gates.js';
 import type { StoreItemSample } from './store-items.js';
 import type { ConsolidationCensus } from '@agentix-e/microglia-core/distill';
 import type { InactionCensus } from './inaction.js';
+import type { YieldCensus } from './tau2-yield.js';
 import { coverageHistogram, useCensus, type UseArm, type UseObservation } from './tau2-use-census.js';
 
 export type { AdmissionCensus } from './tau2-gates.js';
@@ -253,6 +254,15 @@ export type Tau2Raw = {
   readonly distillForm?: DistillFormRecord;
   /** R58: the unit, the traces, and the consolidation census. See `DistillUnitRecord`. */
   readonly distillUnit?: DistillUnitRecord;
+  /**
+   * R60: how many claims each correction yielded. See `YieldCensus`.
+   *
+   * Beside `funnel` rather than inside `distillUnit`, because it is a property of the distiller and
+   * not of the unit: the correction arm yields one claim per correction by construction, and a record
+   * that could only express the trace arm's yield would make the two arms' stores incomparable on the
+   * axis that decides whether either can recur.
+   */
+  readonly yieldCensus?: YieldCensus;
   readonly injectionNote?: InjectionNoteRecord;
   /**
    * How far the pipeline from a correction to a servable rule got.
@@ -452,6 +462,7 @@ export const PROJECTION: { readonly [K in keyof Tau2Raw]-?: 'carried' | 'reduced
   storeItems: 'carried',
   distillForm: 'carried',
   distillUnit: 'carried',
+  yieldCensus: 'carried',
   injectionNote: 'carried',
   funnel: 'carried',
   writeAdmission: 'carried',
@@ -529,6 +540,7 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     ...(raw.storeItems === undefined ? {} : { storeItems: raw.storeItems }),
     ...(raw.distillForm === undefined ? {} : { distillForm: raw.distillForm }),
     ...(raw.distillUnit === undefined ? {} : { distillUnit: raw.distillUnit }),
+    ...(raw.yieldCensus === undefined ? {} : { yieldCensus: raw.yieldCensus }),
     ...(raw.injectionNote === undefined ? {} : { injectionNote: raw.injectionNote }),
     ...(raw.funnel === undefined ? {} : { funnel: raw.funnel }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),

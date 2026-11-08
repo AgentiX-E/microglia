@@ -475,6 +475,19 @@ describe('the projection has a decision for every field, and keeps it', () => {
           maxSupportAfter: 2,
         },
       },
+      // R60: the yield rides beside the unit, and the guard forces this fixture to say so — a carried
+      // field no fixture mentions is a field the projection could drop in silence.
+      yieldCensus: {
+        corrections: 2,
+        assertions: 3,
+        claims: 4,
+        maxClaims: 3,
+        medianClaims: 2,
+        perCorrection: [
+          { taskId: 'retail/0', assertions: 2, claims: 3 },
+          { taskId: 'retail/1', assertions: 1, claims: 1 },
+        ],
+      },
       injectionNote: { mode: 'standard', declared: false },
       funnel: {
         corrections: 2,

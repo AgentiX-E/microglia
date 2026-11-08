@@ -77,6 +77,8 @@ import {
   resolveDistillForm,
   resolveDistillUnit,
   tracesOf,
+  yieldCensus,
+  claimsPerCorrection,
   traceOf,
   actionSentence,
   resolveFacadeNotePlan,
@@ -651,6 +653,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   });
 
   let withTrace = 0;
+  // R60: one row per correction, so the yield can be attributed rather than averaged. The run id is
+  // what an item's evidence cites, and it is known only here.
+  const captured: { taskId: string; runId: string; assertions: number }[] = [];
   for (const correction of corrections) {
     const trace = traces.get(correction.taskId);
     if (trace !== undefined) withTrace += 1;
@@ -688,6 +693,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       promptVersion: 'tau2/1',
       domainPack: 'tau2',
     });
+    captured.push({ taskId: correction.taskId, runId: handle.id, assertions: correction.assertions.length });
     await handle.complete({ actions: correction.actions.map((action) => action.name) });
     // The corrected output differs from the completion by construction -- an edit that changes
     // nothing is refused by the capture layer, and a rubric-only correction would be refused for
@@ -1060,6 +1066,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       claims: distillReport.candidates,
       ...(consolidation === undefined ? {} : { consolidation: consolidation.report }),
     },
+    // R60: claims per correction, counted from the store rather than from the interpreter's report —
+    // a candidate the host refused is not yield, it is a claim that never reached a pack. Retired
+    // items still count: a claim written and later folded into a paraphrase was written.
+    yieldCensus: yieldCensus(claimsPerCorrection(captured, knowledge)),
     // The treatment, recorded beside its result: an artefact cannot otherwise tell an arm
     // that switched write admission on from one that never asked, and the counters are the
     // only place the mechanism's own population appears.
