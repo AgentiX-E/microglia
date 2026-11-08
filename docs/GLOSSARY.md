@@ -559,6 +559,23 @@ and two mandatory prose sections: the prediction and the refutation. The gate re
 section, an unfilled placeholder, or an id that disagrees with the filename; the benchmark workflow
 refuses a dispatch that names none.
 
+**Instrument funnel** — The five counts a store-building run passes through, in order: the corrections
+the learning half produced, the candidates the interpreter proposed, the ones the store admitted, the
+items it holds, and the items the recall scope can reach. It exists as a first-class object because
+every gate in the protocol grades a *reading* and none of them asks whether the machine that produced
+it carried anything: a run can pass all of them with a store whose every item was quarantined, and
+three published rounds were read as "the mechanism does not work" when the failing stage was upstream
+of every gate the report carried. The funnel is published as `V0-instrument-ready`, which fails when
+a stage is zero — and names the stage — or when two counts were taken over different populations.
+It is *absent*, not green, on any artefact that predates it.
+
+**No measurement** — The third outcome beside "passed" and "failed": a run that produced no reading
+at all, because the pipeline that would have produced one stopped. It is recorded as
+`status_no_measurement: 1` with the reason, and it is deliberately not a zero — a store that came
+out empty and a store that was never built are different facts, and reporting the first as `0.00`
+rules/questions is how an infrastructure failure becomes a scientific result. The reason carries the
+funnel chain, so a stopped run still says which stage broke and how many candidates it saw.
+
 **Published cell** — A competitor's reported number together with the four facts that make it
 comparable: model, schema representation, sample count and split. A cell without them is a headline.
 
