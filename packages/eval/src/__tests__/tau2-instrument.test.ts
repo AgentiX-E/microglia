@@ -177,6 +177,49 @@ describe('armRecordFromDriver', () => {
     expect(armRecordFromDriver(raw()).scenarioTasks).toBeUndefined();
   });
 
+  it("carries the store's own text, the form and the note — the three fields R56 lost", () => {
+    // The driver wrote all three and the arm record dropped all three, so R56's artefact came back
+    // with no item text, no `distillForm` and no note: two of its four predictions could not be
+    // graded and the third could not be explained. A projection that silently drops a field is worse
+    // than one that refuses, because the artefact still looks complete.
+    const sample = {
+      items: [
+        {
+          id: 'a',
+          kind: 'procedure',
+          status: 'active',
+          when: 'when the customer asks to cancel an order',
+          statement: 'confirm which order the customer means',
+          trust: 0.9,
+          scope: { domain: 'retail' },
+          supportTasks: 2,
+          evidence: 2,
+        },
+      ],
+      limit: 64,
+      maxChars: 240,
+      omitted: 0,
+      truncated: 0,
+    };
+    const record = armRecordFromDriver(
+      raw({
+        storeItems: sample,
+        distillForm: { form: 'procedure', toolInventory: ['find_user'], refused: 3 },
+        injectionNote: { mode: 'standard', declared: false },
+      }),
+    );
+    expect(record.storeItems?.items[0]?.supportTasks).toBe(2);
+    expect(record.distillForm).toEqual({ form: 'procedure', toolInventory: ['find_user'], refused: 3 });
+    expect(record.injectionNote).toEqual({ mode: 'standard', declared: false });
+  });
+
+  it('omits all three when an older driver wrote none of them', () => {
+    const record = armRecordFromDriver(raw());
+    expect(record.storeItems).toBeUndefined();
+    expect(record.distillForm).toBeUndefined();
+    expect(record.injectionNote).toBeUndefined();
+  });
+
   it('carries the store census and the recall tally, so a zero rate has a population', () => {
     const record = armRecordFromDriver(
       raw({

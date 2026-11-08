@@ -70,8 +70,8 @@ import {
   funnelReading,
   funnelVerdict,
   noMeasurementRefusal,
-  TAU2_DISTILL_FORM,
   guardAgainstToolNames,
+  resolveDistillForm,
   tau2EditSemantics,
   toPassAtK,
   toolInventoryOf,
@@ -194,6 +194,15 @@ function pythonPath(): string {
 
 const PYTHON = pythonPath();
 const TASK = 'tau2.act';
+
+/**
+ * The form this dispatch asks the distiller for.
+ *
+ * Read once, at module load, and recorded in the artefact from the same value: R56's `procedure` is
+ * reverted to `lesson` (see `resolveDistillForm`), and a dispatch that overrides it must say so in
+ * the record rather than in a comment.
+ */
+const DISTILL_FORM = resolveDistillForm();
 
 /** One `run_split.py` invocation, with its stdout surfaced on failure. */
 async function phase(args: readonly string[]): Promise<string> {
@@ -536,7 +545,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       // for a database, which in a lane whose input is a customer asking to cancel an order can
       // only be satisfied by naming the tools. `procedure` asks for the trigger in the question's
       // own terms, and it is the form this lane has never run.
-      form: TAU2_DISTILL_FORM,
+      form: DISTILL_FORM,
     }),
     ruleInterpreter,
   );
@@ -873,7 +882,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // whether the ban ran or was vacuous, and R56's first refutation is that the ban is too strict —
     // a claim that needs the count to be graded.
     distillForm: {
-      form: TAU2_DISTILL_FORM,
+      form: DISTILL_FORM,
       toolInventory,
       refused: toolGuard.refused(),
     },

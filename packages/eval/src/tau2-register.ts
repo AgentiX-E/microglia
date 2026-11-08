@@ -23,13 +23,23 @@ import type { DistillCandidate } from '@agentix-e/microglia-core';
 import type { DistillForm } from '@agentix-e/microglia-core/distill';
 
 /**
- * The form this lane asks for.
+ * The form this lane asks for, defaulting to the one R56 measured.
  *
- * `procedure` is R56's single variable. It is a constant rather than a `TAU_*` environment read so
- * that the dispatch cannot run one form while the artefact records another, and so that a reader of
- * the code sees the treatment the registration describes.
+ * R56 registered `procedure` as its single variable and measured it: the store came back with eight
+ * items instead of twenty, median rule/query coverage fell from 8.33% to 6.25% against a 12% bar,
+ * and the memory arm read −8.77pp against its own reference with 1,869 packs served — the `HARM`
+ * verdict R45 reverts on. So the default goes back to `lesson` and the change is reverted, as the
+ * rule requires: a treatment that loses does not stay on because its explanation is interesting.
+ *
+ * It reads `TAU_DISTILL_FORM` rather than being a constant now, because the next registration that
+ * wants to ask about the form again should not have to edit the lane to do it — and because the
+ * artefact records the form that actually ran, so a dispatch cannot run one and claim the other.
  */
-export const TAU2_DISTILL_FORM: DistillForm = 'procedure';
+export function resolveDistillForm(raw = process.env['TAU_DISTILL_FORM']): DistillForm {
+  return raw === 'procedure' || raw === 'repair' || raw === 'lexicon' || raw === 'lesson'
+    ? raw
+    : 'lesson';
+}
 
 /**
  * Names shorter than this are not evidence of a register.

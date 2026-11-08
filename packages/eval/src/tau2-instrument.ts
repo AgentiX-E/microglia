@@ -67,6 +67,21 @@ const spread = (values: readonly number[]): { min: number; max: number; mean: nu
         mean: values.reduce((sum, value) => sum + value, 0) / values.length,
       };
 
+/** The form a distiller was asked for, and the ban's subject and count. See `Tau2Raw.distillForm`. */
+export type DistillFormRecord = {
+  readonly form: string;
+  /** The action names the ban refused, from the corrections this run learned from. */
+  readonly toolInventory: readonly string[];
+  /** Candidates the host refused for naming one of them. */
+  readonly refused: number;
+};
+
+/** The sentence every pack opened with. See `Tau2Raw.injectionNote`. */
+export type InjectionNoteRecord = {
+  readonly mode: 'none' | 'standard' | 'hardened';
+  readonly declared: boolean;
+};
+
 /** What the driver observed, exactly as it observed it. */
 export type Tau2Raw = {
   /** Task ids the store learned from. */
@@ -201,17 +216,8 @@ export type Tau2Raw = {
    * say which form ran, the run is `NO_MEASUREMENT`* — and the inventory is recorded beside it
    * because a ban whose subject is unknown cannot be distinguished from a ban that had nothing to do.
    */
-  readonly distillForm?: {
-    readonly form: string;
-    /** The action names the ban refused, from the corrections this run learned from. */
-    readonly toolInventory: readonly string[];
-    /** Candidates the host refused for naming one of them. */
-    readonly refused: number;
-  };
-  readonly injectionNote?: {
-    readonly mode: 'none' | 'standard' | 'hardened';
-    readonly declared: boolean;
-  };
+  readonly distillForm?: DistillFormRecord;
+  readonly injectionNote?: InjectionNoteRecord;
   /**
    * How far the pipeline from a correction to a servable rule got.
    *
@@ -432,6 +438,13 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     // carried only the first turned R42's empty pack into a number with no cause.
     ...(raw.writeAdmission === undefined ? {} : { writeAdmission: raw.writeAdmission }),
     ...(raw.store === undefined ? {} : { store: raw.store }),
+    // R56 lost three fields here: the driver wrote the store's text, the form and the note, and this
+    // projection dropped all three, so two of the four predictions could not be graded and the third
+    // could not be explained. A projection that silently drops a field is worse than one that
+    // refuses, because the artefact still looks complete.
+    ...(raw.storeItems === undefined ? {} : { storeItems: raw.storeItems }),
+    ...(raw.distillForm === undefined ? {} : { distillForm: raw.distillForm }),
+    ...(raw.injectionNote === undefined ? {} : { injectionNote: raw.injectionNote }),
     ...(raw.funnel === undefined ? {} : { funnel: raw.funnel }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),
     // The use census rides beside V1's rate. It is computed here, from the raw

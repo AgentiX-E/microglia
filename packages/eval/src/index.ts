@@ -558,7 +558,7 @@ export { gateRows, renderMatrix, type GateRow } from './gate-matrix.js';
 export { funnelReading, funnelVerdict, type FunnelVerdict } from '@agentix-e/microglia-protocol';
 
 export {
-  TAU2_DISTILL_FORM,
+  resolveDistillForm,
   guardAgainstToolNames,
   matchesToolName,
   toolInventoryOf,

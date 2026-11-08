@@ -50,6 +50,8 @@ import {
 } from '@agentix-e/microglia-protocol';
 import { detectableDelta } from './protocol.js';
 import type { CoverageHistogram, UseCensus } from './tau2-use-census.js';
+import type { DistillFormRecord, InjectionNoteRecord } from './tau2-instrument.js';
+import type { StoreItemSample } from './store-items.js';
 
 /**
  * One arm's records, as far as the protocol is concerned.
@@ -137,6 +139,10 @@ export type Tau2ArmRecord = {
     readonly events?: number;
     readonly llmFailed?: number;
   };
+  /** R54/R56: the store's own words, bounded, and the form the distiller was asked for. */
+  readonly storeItems?: StoreItemSample;
+  readonly distillForm?: DistillFormRecord;
+  readonly injectionNote?: InjectionNoteRecord;
   /**
    * How far the pipeline from a correction to a servable rule got, when the driver counted it.
    *

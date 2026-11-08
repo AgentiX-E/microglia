@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DistillCandidate } from '@agentix-e/microglia-core';
 import {
-  TAU2_DISTILL_FORM,
+  resolveDistillForm,
   guardAgainstToolNames,
   matchesToolName,
   toolInventoryOf,
@@ -35,11 +35,28 @@ const candidate = (statement: string, when?: string): DistillCandidate => ({
 });
 
 describe('the τ² register', () => {
-  it('asks for the procedural form, and says which form that is', () => {
-    // One variable, declared where a reader of the code can see it and a readback can record it: an
-    // artefact that cannot say which form ran would let two runs of one form read as an experiment
-    // of two, which is R56's own `NO_MEASUREMENT` condition.
-    expect(TAU2_DISTILL_FORM).toBe('procedure');
+  it('defaults to the form R54 measured, because R56 lost', () => {
+    // R56 ran `procedure` and read −8.77pp with 1,869 packs served — the `HARM` verdict R45 reverts
+    // on — and its coverage fell rather than rose. The default is the arm that did not lose; a
+    // treatment does not stay on because its explanation is interesting.
+    expect(resolveDistillForm(undefined)).toBe('lesson');
+    expect(resolveDistillForm('')).toBe('lesson');
+  });
+
+  it('runs any form the distiller implements when a dispatch asks for one', () => {
+    // The next registration that asks about the form should not have to edit the lane to do it, and
+    // the artefact records what ran, so a dispatch cannot run one form and claim another.
+    expect(resolveDistillForm('procedure')).toBe('procedure');
+    expect(resolveDistillForm('repair')).toBe('repair');
+    expect(resolveDistillForm('lexicon')).toBe('lexicon');
+    expect(resolveDistillForm('lesson')).toBe('lesson');
+  });
+
+  it('reads an unknown form as the default rather than passing it through', () => {
+    // A typo in a workflow variable must not reach `buildDistillPrompt`, which switches on the value
+    // and would otherwise fall through to a prompt nobody wrote.
+    expect(resolveDistillForm('PROCEDURE')).toBe('lesson');
+    expect(resolveDistillForm('nonsense')).toBe('lesson');
   });
 });
 
