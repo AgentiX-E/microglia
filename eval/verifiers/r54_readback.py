@@ -56,6 +56,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from _pair import verdict_of
+
 # GRADED, NO_MEASUREMENT and ABANDONED are the three R49 and R51 use. DISCARDED
 # is R54's own first refutation, spelled as a state so a wrong-configuration
 # dispatch cannot be read as a scientific result.
@@ -125,7 +127,7 @@ def scenario_of(tau2: dict[str, Any]) -> dict[str, Any] | None:
     return block if isinstance(block, dict) else None
 
 
-def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
+def grade(artefact: dict[str, Any], pair: dict[str, Any] | None = None) -> tuple[str, Report]:
     report = Report()
     tau2 = artefact.get("tau2") or {}
     store = tau2.get("store") or {}
@@ -133,7 +135,8 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
     coverage = tau2.get("coverage") or {}
     quantiles = coverage.get("nonzeroQuantiles") or {}
     medians = coverage.get("medians") or {}
-    verdict = artefact.get("verdict") or {}
+    # The verdict is the pair file's, not the arm's: see `_pair.py`.
+    verdict = verdict_of(artefact, pair)
     metrics = artefact.get("metrics") or {}
 
     # R54's first refutation, read before anything else: a dispatch that ran a
@@ -208,7 +211,12 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
             gate_pass = gate.get("pass")
     report.predict(
         "no revert branch fires: the memory does not cost accuracy",
-        (state != "HARM") and (gate_pass is not False),
+        # `None` when the verdict is nowhere: an absent verdict is not a branch
+        # that did not fire, it is a branch nobody read, and a `PASS` beside it
+        # would be this report's own measurement defect.
+        None
+        if state is None
+        else (state != "HARM") and (gate_pass is not False),
         f"verdict {state}, l4-paired {'pass' if gate_pass else 'absent/fail'}",
     )
 
@@ -400,6 +408,10 @@ def base_artefact(**over: Any) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir", help="directory holding the arm artefacts")
+    parser.add_argument(
+        "--pair",
+        help="the pairing artefact (poc-l4-pair.json): the only record of the verdict",
+    )
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
 
@@ -489,6 +501,34 @@ def main() -> int:
                 "ABANDONED",
             ),
         ]
+        # The verdict lives in the pair file. Reading it from the arm made the
+        # revert prediction pass by not measuring, which is the defect this
+        # verifier exists to catch in someone else's artefact.
+        no_verdict = base_artefact()
+        del no_verdict["verdict"]
+        pair_cases: list[tuple[str, dict[str, Any], dict[str, Any], str, list[str]]] = [
+            (
+                "the pair file supplies the unresolved verdict the arm cannot carry",
+                no_verdict,
+                {"verdict": {"state": "UNRESOLVED"}, "comparison": {"deltaPp": 5.26}},
+                "GRADED",
+                ["verdict UNRESOLVED"],
+            ),
+            (
+                "a harm verdict in the pair file reverts",
+                no_verdict,
+                {"verdict": {"state": "HARM"}, "comparison": {"deltaPp": -8.77}},
+                "ABANDONED",
+                ["FIRED the memory costs accuracy"],
+            ),
+            (
+                "no verdict anywhere reads as unmeasured rather than as a clear branch",
+                no_verdict,
+                None,
+                "GRADED",
+                ["n/a   no revert branch fires"],
+            ),
+        ]
         failures = 0
         for label, artefact, expected in cases:
             state, report = grade(artefact)
@@ -498,6 +538,17 @@ def main() -> int:
             print(f"  {mark} {label} -> {state}")
             if state != expected:
                 print(report.render())
+        for label, artefact, pair, expected, required in pair_cases:
+            state, report = grade(artefact, pair)
+            rendered = report.render()
+            missing = [text for text in required if text not in rendered]
+            mark = "ok  " if state == expected and not missing else "FAIL"
+            if state != expected or missing:
+                failures += 1
+            print(f"  {mark} {label} -> {state}")
+            if state != expected or missing:
+                print(f"      missing from the report: {missing}")
+                print(rendered)
         print()
         print("SELF-TEST PASSED" if failures == 0 else f"SELF-TEST FAILED ({failures})")
         return 0 if failures == 0 else 1
@@ -505,13 +556,17 @@ def main() -> int:
     if not args.dir:
         parser.error("--dir is required unless --self-test is given")
     root = Path(args.dir)
+    pair = json.loads(Path(args.pair).read_text()) if args.pair else None
+    if pair is None:
+        found = sorted(root.rglob("poc-l4-pair.json"))
+        pair = json.loads(found[0].read_text()) if found else None
     artefacts = sorted(root.rglob("poc-l4.json"))
     if not artefacts:
         print(f"no poc-l4.json under {root}", file=sys.stderr)
         return 2
     worst = 0
     for path in artefacts:
-        state, report = grade(json.loads(path.read_text()))
+        state, report = grade(json.loads(path.read_text()), pair)
         print(f"{path}\n  {state}\n{report.render()}\n")
         if state in ("ABANDONED", "DISCARDED"):
             worst = 1

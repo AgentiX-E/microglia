@@ -32,8 +32,20 @@ choosing the subject of the claim at read time.
 
 Usage:
   python3 eval/tools/fetch_evidence.py --repo microglia --run <run-id> --out /tmp/r56
-  python3 r56_readback.py --dir /tmp/r56 [--baseline /tmp/r54/poc-l4.json]
+  python3 r56_readback.py --dir /tmp/r56 [--baseline /tmp/r54/poc-l4.json] [--pair /tmp/r56/poc-l4-pair.json]
   python3 r56_readback.py --self-test
+
+`--pair` defaults to the first `poc-l4-pair.json` under `--dir`, because the
+verdict and the paired delta are written by `eval:l4-pair` and not by either arm.
+Reading them from the arm -- which is what this file did first -- made the revert
+rule unfireable on real evidence.
+
+Two defects this readback found in itself, both of which it now tests for:
+
+  * it returned `NO_MEASUREMENT` at the missing form before writing down a single
+    reading that had survived, so R56's HARM, its coverage and its funnel were
+    dropped from the record of a run whose whole problem was a dropped field;
+  * its revert refutation read `artefact["verdict"]`, a field no arm writes.
 """
 
 from __future__ import annotations
@@ -43,6 +55,8 @@ import json
 import sys
 from pathlib import Path
 from typing import Any
+
+from _pair import delta_of, verdict_of
 
 STATES = ("GRADED", "NO_MEASUREMENT", "DISCARDED", "ABANDONED")
 
@@ -188,16 +202,133 @@ def baseline_share(baseline: dict[str, Any] | None) -> tuple[float | None, float
     return value, named, f"baseline names {named} of {len(active_population(items))}"
 
 
-def grade(artefact: dict[str, Any], baseline: dict[str, Any] | None = None) -> tuple[str, Report]:
-    report = Report()
+def yield_of(tau2: dict[str, Any]) -> tuple[int | None, int | None, float | None]:
+    """Candidates per correction, from the funnel or from the learning block.
+
+    R54 distilled two candidates from each of ten corrections and R56 distilled
+    one from each of eight, and that ratio -- not only the count of corrections,
+    which the model decides at runtime -- is the proximate cause of the store
+    shrinking from twenty items to eight. The funnel is the newer record and the
+    one R56 carries; the learning block is what R54 carries and is read as the
+    fallback so the two dispatches can be compared at all.
+    """
+    funnel = tau2.get("funnel") or {}
+    learning = tau2.get("learning") or {}
+    corrections = funnel.get("corrections", learning.get("edited"))
+    candidates = funnel.get("candidates", learning.get("distilled"))
+    if not isinstance(corrections, int) or not isinstance(candidates, int) or corrections <= 0:
+        return None, None, None
+    return corrections, candidates, candidates / corrections
+
+
+def readings(
+    report: Report,
+    artefact: dict[str, Any],
+    baseline: dict[str, Any] | None,
+    pair: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Take every reading the artefact still supports, before deciding the state.
+
+    R56's artefact lost `distillForm` and `storeItems` to a projection defect in
+    the driver, and the first version of this verifier returned `NO_MEASUREMENT`
+    at the missing form without writing down anything that had survived -- so the
+    record of the run held no numbers at all, and the cost of the loss could not
+    be stated in the same breath as the loss. A verifier that stops reading when
+    it cannot grade throws away the evidence it was built to keep.
+
+    Nothing here is graded. These are the readings a reader needs to understand a
+    state, and they are taken first so that every terminal state carries them.
+    """
     tau2 = artefact.get("tau2") or {}
-    store = tau2.get("store") or {}
-    recall = tau2.get("recall") or {}
+    verdict = verdict_of(artefact, pair)
     coverage = tau2.get("coverage") or {}
     quantiles = coverage.get("nonzeroQuantiles") or {}
     medians = coverage.get("medians") or {}
-    verdict = artefact.get("verdict") or {}
+    store = tau2.get("store") or {}
+    recall = tau2.get("recall") or {}
+    funnel = tau2.get("funnel") or {}
+    learning = tau2.get("learning") or {}
+
+    stored = store.get("stored")
+    servable = store.get("servable")
+    requests = recall.get("requests")
+    mean_pack = tau2.get("meanPackIds")
+    p50 = quantiles.get("p50")
+
+    report.note(
+        f"census: {stored if stored is not None else 'absent'} stored, "
+        f"{servable if servable is not None else 'absent'} servable, "
+        f"{requests if requests is not None else 'absent'} request(s); "
+        f"mean {mean_pack if mean_pack is not None else 'n/a'} item(s) per pack"
+    )
+    if isinstance(p50, (int, float)):
+        tail = ""
+        if isinstance(quantiles.get("p90"), (int, float)) and isinstance(quantiles.get("max"), (int, float)):
+            tail = f", p90 {quantiles['p90']:.4f}, max {quantiles['max']:.4f}"
+        report.note(f"coverage p50 {p50:.4f}{tail}")
+    else:
+        report.note("coverage p50 absent")
+    if funnel:
+        report.note(
+            "funnel: "
+            + " -> ".join(
+                str(funnel.get(key))
+                for key in ("corrections", "candidates", "admitted", "stored", "servable")
+            )
+            + f" (refused {funnel.get('refused')}, failed {funnel.get('failed')})"
+        )
+    corrections, candidates, per = yield_of(tau2)
+    base_per = yield_of((baseline or {}).get("tau2") or {})[2]
+    if per is None:
+        report.note("yield: the artefact carries no correction/candidate pair, so the yield is not stated")
+    elif base_per is None:
+        report.note(
+            f"yield: {candidates} candidate(s) from {corrections} correction(s) = {per:.2f} per "
+            "correction, baseline yield not stated"
+        )
+    else:
+        report.note(
+            f"yield: {candidates} candidate(s) from {corrections} correction(s) = {per:.2f} per "
+            f"correction, baseline {base_per:.2f}"
+        )
+    if isinstance(medians.get("medianAllPairs"), (int, float)):
+        report.note(
+            f"median over every delivered pair {medians['medianAllPairs']:.4f} "
+            f"({medians.get('zeroPairs')} of {medians.get('pairs')} at zero) -- not graded"
+        )
+
+    report.note(
+        f"paired pass^4: state {verdict.get('state')}, delta {delta_of(pair, verdict)}pp "
+        f"(the pair resolves {RESOLUTION_PP}pp at this sample; not claimed)"
+    )
+    if verdict.get("state") == "HARM":
+        # The number and the record fail separately. A `NO_MEASUREMENT` says the
+        # artefact cannot identify the treatment; it does not say the arm cost
+        # nothing. R45 reverts on the reading, and the reading is the pair file's.
+        report.note(
+            "the revert rule fires on that reading: R45 reverts the treatment, "
+            "independently of whether this artefact can name it"
+        )
+
+    return {
+        "p50": p50,
+        "meanPackIds": mean_pack,
+        "stored": stored,
+        "servable": servable,
+        "requests": requests,
+        "learning": learning,
+    }
+
+
+def grade(
+    artefact: dict[str, Any],
+    baseline: dict[str, Any] | None = None,
+    pair: dict[str, Any] | None = None,
+) -> tuple[str, Report]:
+    report = Report()
+    tau2 = artefact.get("tau2") or {}
     metrics = artefact.get("metrics") or {}
+    verdict = verdict_of(artefact, pair)
 
     # A dispatch that ran a different scenario pair measured a different
     # experiment. Read before anything else, as R54 does.
@@ -215,6 +346,11 @@ def grade(artefact: dict[str, Any], baseline: dict[str, Any] | None = None) -> t
             return "DISCARDED", report
     else:
         report.note("no scenario block: written before R54 pinned the pair, read as the registered one")
+
+    # Every reading the artefact still supports, taken before any state is
+    # decided, so that a `NO_MEASUREMENT` is a statement about one field and not
+    # a statement that the run produced nothing.
+    observed = readings(report, artefact, baseline, pair)
 
     # The treatment, before its result. R56's fourth refutation: an artefact that
     # cannot say which form ran cannot be read as an experiment of two forms.
@@ -250,19 +386,21 @@ def grade(artefact: dict[str, Any], baseline: dict[str, Any] | None = None) -> t
         f"form {form.get('form')}, inventory {len(inventory)}, refused {form.get('refused')}",
     )
 
-    stored = store.get("stored")
-    servable = store.get("servable")
-    requests = recall.get("requests")
+    stored = observed["stored"]
+    servable = observed["servable"]
+    requests = observed["requests"]
     if stored is None or servable is None or requests is None:
         report.predict("the census is present", None, "stored/servable/requests absent")
         return "NO_MEASUREMENT", report
 
+    recall = tau2.get("recall") or {}
+    coverage = tau2.get("coverage") or {}
     empty = recall.get("empty")
     if empty is None:
         empty = requests - (recall.get("served") or 0)
     empty_share = share(empty, requests)
-    mean_pack = tau2.get("meanPackIds")
-    p50 = quantiles.get("p50")
+    mean_pack = observed["meanPackIds"]
+    p50 = observed["p50"]
 
     report.predict(
         f"median rule/query coverage reaches {PREDICTED_P50_MIN:.0%} or more",
@@ -323,19 +461,8 @@ def grade(artefact: dict[str, Any], baseline: dict[str, Any] | None = None) -> t
     for example in examples:
         report.note(example)
 
-    # The pipeline, if the driver counted it. R55's gate, carried here as context:
-    # a zero stage explains a coverage failure that no predictor can.
-    funnel = tau2.get("funnel") or {}
-    if funnel:
-        report.note(
-            "funnel: "
-            + " -> ".join(
-                str(funnel.get(key))
-                for key in ("corrections", "candidates", "admitted", "stored", "servable")
-            )
-            + f" (refused {funnel.get('refused')}, failed {funnel.get('failed')})"
-        )
-
+    # The pipeline, funnel, yield and delivered-pair median are `readings`' notes,
+    # taken before the state was decided so that an ungraded run still carries them.
     learning = tau2.get("learning") or {}
     measured = coverage.get("measuredPairs")
     unmeasurable = coverage.get("unmeasurablePairs")
@@ -365,18 +492,10 @@ def grade(artefact: dict[str, Any], baseline: dict[str, Any] | None = None) -> t
     )
 
     # The paired delta is reported and not claimed, as the registration states
-    # before it looks. A HARM verdict still reverts under R45.
+    # before it looks. A HARM verdict still reverts under R45 -- and the sentence
+    # itself is `readings`' note, so a run that stops earlier still carries it.
     state = verdict.get("state")
-    delta = verdict.get("deltaPp")
-    report.note(
-        f"paired pass^4: state {state}, delta {delta}pp "
-        f"(the pair resolves {RESOLUTION_PP}pp at this sample; not claimed)"
-    )
-    if medians.get("medianAllPairs") is not None:
-        report.note(
-            f"median over every delivered pair {medians['medianAllPairs']:.4f} "
-            f"({medians.get('zeroPairs')} of {medians.get('pairs')} at zero) -- not graded"
-        )
+    delta = delta_of(pair, verdict)
 
     # Refutations, each naming one way the account can be wrong.
     report.refute(
@@ -530,6 +649,10 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir", help="directory holding the arm artefacts")
     parser.add_argument("--baseline", help="an R54 artefact, for the tool-name share it measured")
+    parser.add_argument(
+        "--pair",
+        help="the pairing artefact (poc-l4-pair.json): the only record of the verdict and the delta",
+    )
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
 
@@ -668,6 +791,45 @@ def main() -> int:
                 "NO_MEASUREMENT",
             ),
         ]
+        # A run that cannot be graded is not a run that measured nothing. R56
+        # lost `distillForm` and `storeItems` to a projection defect and this
+        # verifier returned `NO_MEASUREMENT` before writing down the readings
+        # that survived, so the record held no numbers and the cost of the loss
+        # could not even be stated. Each case below names a reading that must
+        # survive an ungraded state.
+        context_cases: list[tuple[str, dict[str, Any], dict[str, Any] | None, list[str]]] = [
+            (
+                "a run with no form block still reports what it measured",
+                base_artefact(**{"tau2.distillForm": None, "tau2.storeItems": None}),
+                base,
+                ["coverage p50 0.1900", "census: 16 stored, 16 servable", "funnel: 32 -> 30 -> 16 -> 16 -> 16", "yield:"],
+            ),
+            (
+                "a run with an empty inventory still reports its coverage",
+                base_artefact(**{"tau2.distillForm.toolInventory": []}),
+                base,
+                ["p50 0.1900", "yield: 30 candidate(s) from 32 correction(s)"],
+            ),
+            (
+                "a run with no store text still reports the census and the funnel",
+                base_artefact(**{"tau2.storeItems": None}),
+                base,
+                ["census: 16 stored, 16 servable", "refused 12, failed 0"],
+            ),
+            (
+                "the yield is read against the baseline it is compared to",
+                base_artefact(),
+                baseline_artefact(**{"tau2.learning": {"rows": 32, "edited": 10, "distilled": 20}}),
+                ["yield: 30 candidate(s) from 32 correction(s) = 0.94 per correction, baseline 2.00"],
+            ),
+            (
+                "a baseline with no learning block states the comparison instead of inventing it",
+                base_artefact(),
+                base,
+                ["baseline yield not stated"],
+            ),
+        ]
+
         failures = 0
         for label, artefact, baseline, expected in cases:
             state, report = grade(artefact, baseline)
@@ -677,6 +839,64 @@ def main() -> int:
             print(f"  {mark} {label} -> {state}")
             if state != expected:
                 print(report.render())
+        # The verdict lives in the pair file, not in either arm's artefact. Both
+        # of this directory's verifiers read it from the arm, so the revert rule
+        # could only ever fire on a synthetic field.
+        pair_harm = {
+            "comparison": {"paired": 57, "deltaPp": -8.77},
+            "verdict": {"state": "HARM", "reason": "l4-paired -8.77pp is below the -5pp bar"},
+        }
+        pair_unresolved = {
+            "comparison": {"paired": 57, "deltaPp": 5.26},
+            "verdict": {"state": "UNRESOLVED", "reason": "does not clear the resolution"},
+        }
+        no_verdict = base_artefact()
+        del no_verdict["verdict"]
+        pair_cases: list[tuple[str, dict[str, Any], dict[str, Any], str, list[str]]] = [
+            (
+                "a pair file supplies the harm the arm artefact cannot carry",
+                no_verdict,
+                pair_harm,
+                "ABANDONED",
+                ["state HARM", "revert rule fires"],
+            ),
+            (
+                "a pair file states the delta when the arm has none",
+                no_verdict,
+                pair_unresolved,
+                "GRADED",
+                ["state UNRESOLVED, delta 5.26pp"],
+            ),
+            (
+                "an arm with no verdict and no pair says so instead of reading clear",
+                no_verdict,
+                None,
+                "GRADED",
+                ["state None, delta Nonep"],
+            ),
+        ]
+        for label, artefact, pair, expected, required in pair_cases:
+            state, report = grade(artefact, baseline, pair)
+            rendered = report.render()
+            missing = [text for text in required if text not in rendered]
+            mark = "ok  " if state == expected and not missing else "FAIL"
+            if state != expected or missing:
+                failures += 1
+            print(f"  {mark} {label} -> {state}")
+            if state != expected or missing:
+                print(f"      missing from the report: {missing}")
+                print(rendered)
+        for label, artefact, baseline, required in context_cases:
+            state, report = grade(artefact, baseline)
+            rendered = report.render()
+            missing = [text for text in required if text not in rendered]
+            mark = "ok  " if not missing else "FAIL"
+            if missing:
+                failures += 1
+            print(f"  {mark} {label} -> {state}")
+            if missing:
+                print(f"      missing from the report: {missing}")
+                print(rendered)
         print()
         print("SELF-TEST PASSED" if failures == 0 else f"SELF-TEST FAILED ({failures})")
         return 0 if failures == 0 else 1
@@ -685,13 +905,17 @@ def main() -> int:
         parser.error("--dir is required unless --self-test is given")
     root = Path(args.dir)
     baseline = json.loads(Path(args.baseline).read_text()) if args.baseline else None
+    pair = json.loads(Path(args.pair).read_text()) if args.pair else None
+    if pair is None:
+        found = sorted(root.rglob("poc-l4-pair.json"))
+        pair = json.loads(found[0].read_text()) if found else None
     artefacts = sorted(root.rglob("poc-l4.json"))
     if not artefacts:
         print(f"no poc-l4.json under {root}", file=sys.stderr)
         return 2
     worst = 0
     for path in artefacts:
-        state, report = grade(json.loads(path.read_text()), baseline)
+        state, report = grade(json.loads(path.read_text()), baseline, pair)
         print(f"{path}\n  {state}\n{report.render()}\n")
         if state in ("ABANDONED", "DISCARDED"):
             worst = 1
