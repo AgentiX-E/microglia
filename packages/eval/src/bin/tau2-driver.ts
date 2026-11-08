@@ -76,6 +76,7 @@ import {
   noteFacadeSummary,
   resolveDistillForm,
   resolveDistillUnit,
+  resolveTraceClaims,
   tracesOf,
   yieldCensus,
   claimsPerCorrection,
@@ -245,6 +246,9 @@ const DISTILL_FORM = resolveDistillForm();
  * so a reader of the artefact never has to infer which of the two produced the store.
  */
 const DISTILL_UNIT = resolveDistillUnit();
+// R60: how many claims one trace may teach. Declared readback in the artefact, because two runs at
+// two ceilings are two experiments and a store cannot say which one built it.
+const TRACE_CLAIMS = resolveTraceClaims();
 
 /** One `run_split.py` invocation, with its stdout surfaced on failure. */
 async function phase(args: readonly string[]): Promise<string> {
@@ -614,7 +618,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       form: DISTILL_UNIT === 'trace' ? 'trace' : DISTILL_FORM,
       // Three claims from one trace: the unit is richer, and a single sentence about a whole
       // episode is the object this registration exists to replace.
-      ...(DISTILL_UNIT === 'trace' ? { maxCandidates: 3 } : {}),
+      ...(DISTILL_UNIT === 'trace' ? { maxCandidates: TRACE_CLAIMS.ceiling } : {}),
     }),
     ruleInterpreter,
   );
@@ -1072,6 +1076,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       claims: distillReport.candidates,
       ...(consolidation === undefined ? {} : { consolidation: consolidation.report }),
     },
+    // R60: the ceiling this dispatch ran at, and whether it was chosen or inherited.
+    traceClaims: TRACE_CLAIMS,
     // R60: claims per correction, counted from the store rather than from the interpreter's report —
     // a candidate the host refused is not yield, it is a claim that never reached a pack. Retired
     // items still count: a claim written and later folded into a paraphrase was written.

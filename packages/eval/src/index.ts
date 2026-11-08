@@ -577,6 +577,12 @@ export {
   type TaskRate,
 } from './paired-rate.js';
 export { claimsPerCorrection, yieldCensus, type CorrectionYield, type YieldCensus } from './tau2-yield.js';
+export {
+  DEFAULT_TRACE_CLAIMS,
+  TRACE_CLAIM_RANGE,
+  resolveTraceClaims,
+  type TraceClaimsPlan,
+} from './trace-claims.js';
 
 export {
   TRACE_CALL_CAP,

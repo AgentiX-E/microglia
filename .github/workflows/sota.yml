@@ -795,6 +795,10 @@ jobs:
           # the reference trajectory, with the recurrence pass over the store it produces). Not a
           # dispatch input, because a unit is a property of the experiment rather than of the run.
           TAU_DISTILL_UNIT: ${{ vars.TAU_DISTILL_UNIT }}
+          # R60: how many claims one trace may teach. Unset means three, which is what every
+          # committed trace artefact ran at; a run at six is a different treatment and the ceiling
+          # travels into the artefact so a readback can tell the two apart.
+          TAU_TRACE_CLAIMS: ${{ vars.TAU_TRACE_CLAIMS }}
           TAU_SEED: ${{ vars.TAU_SEED }}
           TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}
           TAU_WRITE_ADMISSION_THRESHOLD: ${{ vars.TAU_WRITE_ADMISSION_THRESHOLD }}

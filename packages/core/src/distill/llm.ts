@@ -212,13 +212,15 @@ const LEXICON_INSTRUCTION: readonly string[] = [
  * and the ban that enforces it is host-side (`DistillOptions.accept`) because a prompt cannot
  * enforce itself.
  */
-const TRACE_INSTRUCTION: readonly string[] = [
+const TRACE_PREAMBLE: readonly string[] = [
   'You read one task trace and state what it teaches, as rules a later agent can act on.',
   'Return JSON only, with this shape:',
   '{"candidates":[{"kind":"constraint|procedure|negative","statement":"...","when":"..."}]}',
   'The event holds `input.trace`: `attempt` is what the agent did, in order; `expected` is what the reference trajectory does instead; `rubric` is the checks the attempt failed.',
   'Rules:',
-  '- Return at most three candidates. Each states one thing this trace teaches; two claims that restate each other are one claim and will be merged.',
+];
+
+const TRACE_RULES: readonly string[] = [
   '- Never name a tool, a function, an endpoint or an identifier. A statement says what to establish, check or avoid, in words that survive the rename of every tool in the system.',
   '- Prefer the claim that would have prevented the divergence between `attempt` and `expected`, abstracted away from this case. When the two differ by a missing step, the claim names the step and the state it establishes; when they differ by order, it names the order and why it matters.',
   '- `when` is the trigger, in the words the person making the request used: what they are asking for and what state the thing they are asking about is in. It must be checkable on a different request and must not hold for every request.',
@@ -226,6 +228,36 @@ const TRACE_INSTRUCTION: readonly string[] = [
   '- Return an empty array when the trace teaches nothing reusable.',
   '- At most 300 characters in the statement.',
 ];
+
+/**
+ * The ceiling line, written from the number the parser will actually enforce.
+ *
+ * R60. The instruction used to say "at most three" in prose while `maxCandidates` trimmed to
+ * whatever the caller passed, so a dispatch that set the option to six asked the model for three
+ * and a dispatch that set it to two asked for three and silently kept two. The ceiling is now one
+ * number with two uses — the sentence the model reads and the count the parser keeps — and there is
+ * no spelling of it that can drift from the other.
+ *
+ * One candidate is phrased in the singular because "at most 1 candidates" is the kind of sentence a
+ * model reads as boilerplate.
+ */
+function traceCeilingLine(ceiling: number): string {
+  const noun = ceiling === 1 ? 'candidate' : 'candidates';
+  return (
+    `- Return at most ${String(ceiling)} ${noun}. Each states one thing this trace teaches; ` +
+    'two claims that restate each other are one claim and will be merged.'
+  );
+}
+
+/**
+ * The trace instructions, with the ceiling as the first rule.
+ *
+ * Composed from two arrays rather than spliced into one: a splice has to answer "what if the marker
+ * is not there", and that answer would be a branch no prompt can ever take.
+ */
+function traceInstruction(ceiling: number): readonly string[] {
+  return [...TRACE_PREAMBLE, traceCeilingLine(ceiling), ...TRACE_RULES];
+}
 
 const REPAIR_INSTRUCTION: readonly string[] = [
   'You compare one wrong attempt with the correction that replaced it, and state what generalises.',
@@ -248,6 +280,7 @@ export function buildDistillPrompt(
   taxonomy: readonly string[] = [],
   payloadHint?: string,
   form: DistillForm = 'lesson',
+  ceiling = 3,
 ): string {
   const payload = {
     task: context.event.task,
@@ -261,7 +294,7 @@ export function buildDistillPrompt(
     form === 'procedure'
       ? [...PROCEDURE_INSTRUCTION, taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '']
       : form === 'trace'
-      ? [...TRACE_INSTRUCTION, taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '']
+      ? [...traceInstruction(ceiling), taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '']
       : form === 'repair'
       ? [
           ...REPAIR_INSTRUCTION,
@@ -646,11 +679,14 @@ function balancedFrom(text: string, start: number): string | undefined {
  * the option changes is how many round trips are open at once.
  */
 export function createLlmInterpreter(options: LlmInterpreterOptions): Interpreter {
-  const max = options.maxCandidates ?? 2;
+  // The trace form's own default is three, which is what its instruction said before the ceiling
+  // became a parameter; the other forms keep two. A caller that wants a different ceiling passes it
+  // once and both the sentence and the trim follow.
+  const max = options.maxCandidates ?? ((options.form ?? 'lesson') === 'trace' ? 3 : 2);
   const remember = options.reasonCodeOf;
   const scopeOf = options.domainOf;
   const promptOf = (context: InterpretContext): string =>
-    buildDistillPrompt(context, options.taxonomy ?? [], options.payloadHint, options.form ?? 'lesson');
+    buildDistillPrompt(context, options.taxonomy ?? [], options.payloadHint, options.form ?? 'lesson', max);
   const candidatesOf = (context: InterpretContext, raw: string): readonly Candidate[] => {
     const parsed = parseDistillResponse(raw, {
       namespace: context.event.namespace,

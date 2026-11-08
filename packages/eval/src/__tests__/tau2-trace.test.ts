@@ -339,6 +339,6 @@ describe('the hand-off the driver makes, without a driver', () => {
     expect(prompt).toContain('cancel_pending_order');
     expect(prompt).toContain('get_order_details');
     expect(prompt).toContain('The order must still be pending.');
-    expect(prompt).toContain('at most three candidates');
+    expect(prompt).toContain('at most 3 candidates');
   });
 });

@@ -255,6 +255,14 @@ export type Tau2Raw = {
   /** R58: the unit, the traces, and the consolidation census. See `DistillUnitRecord`. */
   readonly distillUnit?: DistillUnitRecord;
   /**
+   * R60: the ceiling one trace ran under, and whether the dispatch chose it.
+   *
+   * Two runs at two ceilings are two experiments, and a store cannot say which one built it: the
+   * ceiling decides the yield and the yield is the thing R60 measures, so a readback that cannot
+   * recover it would compare a store of 31 claims against a store of 60 without knowing why.
+   */
+  readonly traceClaims?: { readonly ceiling: number; readonly declared: boolean };
+  /**
    * R60: how many claims each correction yielded. See `YieldCensus`.
    *
    * Beside `funnel` rather than inside `distillUnit`, because it is a property of the distiller and
@@ -462,6 +470,7 @@ export const PROJECTION: { readonly [K in keyof Tau2Raw]-?: 'carried' | 'reduced
   storeItems: 'carried',
   distillForm: 'carried',
   distillUnit: 'carried',
+  traceClaims: 'carried',
   yieldCensus: 'carried',
   injectionNote: 'carried',
   funnel: 'carried',
@@ -540,6 +549,7 @@ export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord
     ...(raw.storeItems === undefined ? {} : { storeItems: raw.storeItems }),
     ...(raw.distillForm === undefined ? {} : { distillForm: raw.distillForm }),
     ...(raw.distillUnit === undefined ? {} : { distillUnit: raw.distillUnit }),
+    ...(raw.traceClaims === undefined ? {} : { traceClaims: raw.traceClaims }),
     ...(raw.yieldCensus === undefined ? {} : { yieldCensus: raw.yieldCensus }),
     ...(raw.injectionNote === undefined ? {} : { injectionNote: raw.injectionNote }),
     ...(raw.funnel === undefined ? {} : { funnel: raw.funnel }),

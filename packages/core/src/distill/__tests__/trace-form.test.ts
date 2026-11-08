@@ -72,7 +72,7 @@ describe('the trace form', () => {
 
   it('asks for up to three claims, because one trace teaches more than one thing', () => {
     const prompt = buildDistillPrompt(context, [], undefined, 'trace');
-    expect(prompt).toContain('at most three candidates');
+    expect(prompt).toContain('at most 3 candidates');
     expect(prompt).toContain('"candidates"');
   });
 
@@ -125,5 +125,40 @@ describe('the trace form', () => {
     });
     const interpreter = createLlmInterpreter({ llm: { complete: async () => reply } });
     expect(await interpreter(context)).toHaveLength(2);
+  });
+});
+
+describe('the ceiling is one number, written where the model reads it and enforced where it is parsed', () => {
+  it('writes the ceiling it was given, and no other', () => {
+    for (const ceiling of [2, 3, 4, 6]) {
+      const prompt = buildDistillPrompt(context, [], undefined, 'trace', ceiling);
+      expect(prompt).toContain(`at most ${String(ceiling)} candidates`);
+      // A prompt that carries two different ceilings is the defect this parameter exists to
+      // remove: the model reads one and the parser keeps the other.
+      expect(prompt.match(/at most \d+ candidates?/g)).toHaveLength(1);
+    }
+  });
+
+  it('defaults to three, which is what the instruction said before it was a parameter', () => {
+    const prompt = buildDistillPrompt(context, [], undefined, 'trace');
+    expect(prompt).toContain('at most 3 candidates');
+  });
+
+  it('puts the ceiling first among the rules, because it bounds everything after it', () => {
+    const prompt = buildDistillPrompt(context, [], undefined, 'trace', 4);
+    const rules = prompt.slice(prompt.indexOf('Rules:'));
+    expect(rules.split('\n')[1]).toContain('at most 4 candidates');
+  });
+
+  it('says one candidate in the singular', () => {
+    const prompt = buildDistillPrompt(context, [], undefined, 'trace', 1);
+    expect(prompt).toContain('at most 1 candidate.');
+    expect(prompt).not.toContain('at most 1 candidates');
+  });
+
+  it('leaves the other forms alone, because their ceiling is a different sentence', () => {
+    const repair = buildDistillPrompt(context, [], undefined, 'repair', 6);
+    expect(repair).toContain('Return exactly one candidate');
+    expect(repair).not.toContain('at most 6 candidates');
   });
 });

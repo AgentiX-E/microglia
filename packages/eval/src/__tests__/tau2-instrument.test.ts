@@ -475,6 +475,8 @@ describe('the projection has a decision for every field, and keeps it', () => {
           maxSupportAfter: 2,
         },
       },
+      // R60: the ceiling the dispatch ran under, carried beside the yield it explains.
+      traceClaims: { ceiling: 3, declared: true },
       // R60: the yield rides beside the unit, and the guard forces this fixture to say so — a carried
       // field no fixture mentions is a field the projection could drop in silence.
       yieldCensus: {
