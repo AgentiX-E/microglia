@@ -103,26 +103,29 @@ jobs:
 
       # The second scenario, measured by the shared protocol rather than by three gates of its own.
       #
-      # The lane is red on purpose and this step asserts *why*. τ²'s paired comparison at n = 68
-      # resolves a 21.41pp difference at 80% power against a 6pp bar, so `V5-resolution` now blocks
-      # and the run refuses to publish the 1.47pp delta it used to publish. A green run here would
-      # mean the protocol had been tuned to pass, which is the failure stage 2 was registered to
-      # catch. Everything else in the check is the audit's shape: four gates fire, two of them
-      # vacuous, thirty-five are absent, and the effect itself did not move.
+      # R52 changed what this step can assert, and the change is the point rather than a casualty.
+      # τ²'s paired comparison at n = 68 resolves 21.41pp at 80% power, so the old gate — "the sample
+      # must resolve 6pp" — failed here forever, for a reason no mechanism could fix. The gate now
+      # grades the *claim*, and this pair claims nothing: it reports `UNRESOLVED` and `V5-resolution`
+      # passes while still printing 21.41pp against the 6pp target.
+      #
+      # So the assertion moved from "the step exits non-zero" to "the run says which state it is in,
+      # and the state it is in refuses the direction". A run that went green by claiming something it
+      # could not resolve would still fail here, because the claim and the resolution are both read
+      # out of the artefact and compared; a run that went green by *omitting* the claim would fail
+      # too, since `claim: null` is a value the artefact has to carry.
       - name: τ² lane measured by the protocol (second-scenario conformance)
         run: |
           set -euo pipefail
-          if POC_RESULT_DIR="${RUNNER_TEMP}/tau2-protocol" \
+          POC_RESULT_DIR="${RUNNER_TEMP}/tau2-protocol" \
             L4_FIRST=eval/results/history/l4-arm-reference-67.json \
             L4_SECOND=eval/results/history/l4-arm-memory-67.json \
-            pnpm eval:l4-pair; then
-            echo "the τ² pair published a delta its own instrument says it cannot resolve"
-            exit 1
-          fi
+            pnpm eval:l4-pair
           node -e "
             const a = require('${RUNNER_TEMP}/tau2-protocol/poc-l4-pair.json');
             const ids = a.protocol.evaluable;
             const resolution = a.gates.find((g) => g.id === 'V5-resolution');
+            const resolved = a.gates.find((g) => g.id === 'l4-effect-resolved');
             const checks = [
               ['four gates fire', ids.length === 4],
               ['two of them are vacuous', a.protocol.vacuous.length === 2],
@@ -131,8 +134,16 @@ jobs:
               ['twenty-six arm-indexed', a.protocol.armIndexed === 26],
               ['the resolution gate fired', resolution !== undefined],
               ['and it blocks', resolution.blocking === true],
-              ['and it fails', resolution.pass === false],
-              ['at the minimum detectable difference', resolution.actual.includes('21.41pp')],
+              ['and it names the minimum detectable difference', resolution.actual.includes('21.41pp')],
+              // R52: green here means "the pair claimed nothing", and the artefact has to say so
+              // in words. A run cannot pass by staying silent, because silence is `undefined` and
+              // `undefined` is graded by the 6pp bar this sample cannot meet.
+              ['and it passes because no direction was claimed', resolution.pass === true],
+              ['which the sentence states', resolution.actual.includes('the run claims no direction')],
+              ['the pair states its verdict', a.verdict.state === 'UNRESOLVED'],
+              ['and carries a null claim rather than an absent one', a.verdict.claim === null],
+              ['the readout still refuses the direction it cannot resolve', resolved !== undefined],
+              ['and that refusal does not block', resolved.blocking === false && resolved.pass === false],
               ['and the effect did not move', Math.abs(a.comparison.deltaPp - 1.4706) < 0.001],
             ];
             const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
