@@ -93,6 +93,26 @@ recurrence generalisation exists to widen, and an ablation that switched it off 
 measuring two mechanisms. It asks only about claims that would otherwise be *created*, so its
 contribution is the set of items that do not exist.
 
+**One decision runs after the store, not against it.** `consolidateKnowledge` takes a store that has
+already been written and asks a question none of the four above can: *which of these items are one
+claim?* The four are asked per write, when the store holds one episode of a claim and the second has
+just arrived; consolidation is asked once, over the finished store, and folds each group of
+paraphrases into one survivor carrying the union of its evidence. That union is what the recurrence
+count reads (`supportTasks` counts distinct tasks in `evidence`), which is why it is the only
+mechanism that can raise an item's support after the fact.
+
+It is a function over items rather than an option on `distill` for the same reason: a store can be
+consolidated twice without changing (`distill` would reprocess events), and a host that never asks for
+it gets the bytes it always got.
+
+| It merges | It refuses, and counts |
+|---|---|
+| same kind, same scope, statements that overlap past a threshold, compatible conditions | different payloads (one item cannot carry both), identical evidence (no support bought), conditions that disagree (the first would win by arrival order) |
+
+The survivor is the best-attested live member — not quarantined first, then the most distinct tasks,
+then the most evidence rows, then the smallest id — so the result is a function of the store rather
+than of the order its items happened to be written in.
+
 ### 2.4 `apply` owns the injection boundary
 
 The renderer is the only place that decides what a model sees. It is therefore the only place that

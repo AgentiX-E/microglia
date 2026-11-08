@@ -92,6 +92,23 @@ more specific rule wins, which is how a domain exception overrides a general rul
 **Support** — the sum of evidence weights. A threshold rather than a count, so one strong observation
 can equal several weak ones.
 
+**Support (distinct tasks)** (`supportTasks`) — how many *different* tasks stand behind an item, which
+is a different number from `support` and the one a corroboration question asks about. Eight attempts
+at one task are one observation by one user; the score groups evidence by task for that reason, and
+this count uses the same grouping so a recurrence reading cannot disagree with the fusion it explains.
+An item derived by three tasks reports 3 here and can report any `support` at all.
+
+**Consolidation** — a pass over a store that has already been written, which groups items stating one
+claim and folds each group into a survivor carrying the union of its evidence. It is the only
+mechanism that can raise `supportTasks` after the fact: the write path sees one claim at a time, and
+"two items said the same thing" is a property of the finished store rather than of either write. It
+refuses to merge items whose payloads differ, whose evidence is the same, or whose conditions
+disagree, and counts each refusal.
+
+**Trace** — one task's episode as the distiller can see it: what was attempted (the calls, in order),
+what the reference trajectory does instead, and the rubric the attempt failed. A trace is the unit a
+multi-claim distillation reads, in the same way a correction is the unit a single-claim one reads.
+
 **System time / world time** — the bitemporal pair. `validUntil` is when the claim stopped being true
 in the world; `systemUntil` is when the store stopped believing it. A rule can be superseded in system
 time while still being true in world time, and the reverse.

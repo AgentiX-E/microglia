@@ -746,6 +746,44 @@ not evidence about which of them is true, and retiring a rule on resemblance wou
 replace the rule it paraphrases. Retirement goes through `curate`, `recordContradiction` and
 `decideStatus`, all of which keep the closed item and the reason it was closed.
 
+### 8.4 Consolidation: the same claim, said twice by two tasks
+
+Admission is asked once per write, against a store that holds one episode of a claim. That is the
+right moment for deduplication and the wrong moment for a question about **corroboration**, which is
+a property of the finished store: *which of these items are one claim, and how many different tasks
+stand behind each?*
+
+```ts
+import { consolidateKnowledge } from '@agentix-e/microglia-core/distill';
+
+const { items, report } = consolidateKnowledge(await store.listKnowledge({}), {
+  now: Date.now(),
+  policy: defaultPolicy,      // needed to re-score the survivor
+  threshold: 0.7,             // token overlap at which two claims are one claim
+});
+for (const item of items) await store.putKnowledge(item);
+```
+
+Each group of paraphrases becomes one item carrying the union of its evidence, so an item that three
+tasks derived reports `supportTasks: 3` — which no threshold could have produced from a store where
+every item was written by one task. The pass is deterministic (token overlap, not a model), idempotent
+(a second run over its own output changes nothing), and it never merges two claims whose conditions
+disagree, whose payloads differ, or whose evidence is identical.
+
+`report` is what you read before trusting the store's shape:
+
+| Field | What it tells you |
+|---|---|
+| `considered` → `retained` | how much of the store the pass kept |
+| `groups`, `merged` | how much of it was the same claim said twice |
+| `supportBefore` / `supportAfter` | the distribution of `supportTasks` on both sides, which is the reading a corroboration gate asks for |
+| `refusedCondition` / `refusedPayload` / `refusedDuplicateEvidence` | why pairs that overlapped were not merged |
+
+Two things it does not do. It does not delete: a retired member is kept with `statusReason:
+consolidated:<id>`, so an erasure request and an audit both still see it. And it does not decide what
+a claim *means* — a merge of two claims that should have stayed apart will be visible in the census as
+a group, which is why the threshold travels with the report rather than living in a constant.
+
 ## 9. Exporting a dataset
 
 ```ts
