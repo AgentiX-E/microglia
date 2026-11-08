@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { COVERAGE_FLOORS } from '../tau2-use-census.js';
-import { armRecordFromDriver, storeCensus, type Tau2Raw } from '../tau2-instrument.js';
+import { PROJECTION, armRecordFromDriver, storeCensus, type Tau2Raw } from '../tau2-instrument.js';
 
 function raw(over: Partial<Tau2Raw> = {}): Tau2Raw {
   return {
@@ -412,6 +412,84 @@ describe('armRecordFromDriver', () => {
 
   it('names the arm it was asked for, so one function serves both arms', () => {
     expect(armRecordFromDriver(raw(), 'reference').arm).toBe('reference');
+  });
+});
+
+describe('the projection has a decision for every field, and keeps it', () => {
+  // R56 lost three fields here and nothing failed. `PROJECTION` is typed with `-?` over
+  // `keyof Tau2Raw`, so a field added to the driver's record does not compile until it is given a
+  // decision -- verified by adding one and watching `tsc` refuse. These two tests hold the runtime
+  // side: the table says what the mapping does, and the mapping does what the table says.
+  const full = (): Tau2Raw =>
+    raw({
+      scenarioTasks: { learn: 115, test: 115 },
+      store: {
+        stored: 14,
+        active: 14,
+        servable: 14,
+        statuses: { active: 14, candidate: 0, quarantined: 0, retired: 0, other: 0 },
+      },
+      recall: { requests: 200, served: 200, empty: 0 },
+      storeItems: {
+        items: [
+          {
+            id: 'a',
+            kind: 'lesson',
+            status: 'active',
+            when: 'when the customer asks to cancel an order',
+            statement: 'confirm which order the customer means',
+            trust: 0.9,
+            scope: { domain: 'retail' },
+            supportTasks: 1,
+            evidence: 1,
+          },
+        ],
+        limit: 64,
+        maxChars: 240,
+        omitted: 0,
+        truncated: 0,
+      },
+      distillForm: { form: 'lesson', toolInventory: ['find_user'], refused: 0 },
+      injectionNote: { mode: 'standard', declared: false },
+      funnel: {
+        corrections: 2,
+        candidates: 4,
+        admitted: 2,
+        stored: 2,
+        servable: 2,
+        refused: 0,
+        failed: 0,
+      },
+      writeAdmission: { mode: 'off', rephrased: 0, suppressed: 0 },
+      useObservations: [{ query: 'cancel my reservation', statements: ['cancel reservation'] }],
+      useArm: 'as-is',
+      widenedItems: 0,
+      coverageObservations: [{ query: 'cancel my reservation', statements: ['cancel reservation'] }],
+    });
+
+  const carried = Object.entries(PROJECTION)
+    .filter(([, decision]) => decision === 'carried')
+    .map(([field]) => field);
+  const reduced = Object.entries(PROJECTION)
+    .filter(([, decision]) => decision === 'reduced')
+    .map(([field]) => field);
+
+  it('carries every field it says it carries', () => {
+    const record = armRecordFromDriver(full()) as Record<string, unknown>;
+    const missing = carried.filter((field) => record[field] === undefined);
+    expect(missing).toEqual([]);
+    // And the list is not trivially everything: the decision has two values and both are used.
+    expect(reduced.length).toBeGreaterThan(0);
+    expect(carried.length + reduced.length).toBe(Object.keys(full()).length);
+  });
+
+  it('folds every field it says it folds, and does not pass it through under its own name', () => {
+    // A `reduced` decision flipped without the mapping moving would leave a field both folded and
+    // copied, which is how a projection starts carrying two copies of one fact. `coverage` and
+    // `use` are the reduced names, and they are different keys, so the raw names must be absent.
+    const record = armRecordFromDriver(full()) as Record<string, unknown>;
+    const leaked = reduced.filter((field) => field in record);
+    expect(leaked).toEqual([]);
   });
 });
 

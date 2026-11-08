@@ -374,7 +374,53 @@ export function storeCensus(items: readonly CensusItem[], recallDomain: string):
   };
 }
 
+/**
+ * Every field of the driver's record, and what the arm record does with it.
+ *
+ * R56 lost `storeItems`, `distillForm` and `injectionNote` here: the driver wrote all three, the
+ * artefact carried none, and nothing failed. The mapping below is a hand-written field list, so a
+ * field added to `Tau2Raw` is carried only if somebody remembers to carry it — and a forgotten field
+ * is invisible, because the artefact still looks complete.
+ *
+ * This table is the decision, written down once, typed with `-?` so that `keyof Tau2Raw` is
+ * exhaustive: **a field added to the driver's record fails to compile until it is given a
+ * decision.** Two values, because there are two ways to carry a field.
+ *
+ *  - `carried` — the arm record has a key of the same name, and the test asserts it is present
+ *    whenever the raw record defines it.
+ *  - `reduced` — the field is folded into a different key (`train`/`test` into `split`, `domains`
+ *    into `domainOrigin`, `useObservations` into `use` and `coverage`). A `reduced` field must NOT
+ *    appear verbatim, which is what stops a decision from being flipped without the mapping moving.
+ *
+ * It costs nothing at run time and it is not read by the function; `tsc` is the reader. That is
+ * deliberate. A check that has to be invoked can be skipped in the one dispatch that matters.
+ */
+export const PROJECTION: { readonly [K in keyof Tau2Raw]-?: 'carried' | 'reduced' } = {
+  train: 'reduced',
+  test: 'reduced',
+  trials: 'carried',
+  scenarioTasks: 'carried',
+  unscored: 'carried',
+  servedPackSizes: 'reduced',
+  learning: 'carried',
+  calls: 'carried',
+  scenario: 'carried',
+  domains: 'reduced',
+  store: 'carried',
+  recall: 'carried',
+  useObservations: 'reduced',
+  coverageObservations: 'reduced',
+  useArm: 'reduced',
+  widenedItems: 'reduced',
+  storeItems: 'carried',
+  distillForm: 'carried',
+  injectionNote: 'carried',
+  funnel: 'carried',
+  writeAdmission: 'carried',
+};
+
 export function armRecordFromDriver(raw: Tau2Raw, arm = 'memory'): Tau2ArmRecord {
+
   const served = raw.servedPackSizes;
   const meanPackIds = served.length === 0 ? 0 : served.reduce((sum, size) => sum + size, 0) / served.length;
   const distinct = new Set(raw.test);
