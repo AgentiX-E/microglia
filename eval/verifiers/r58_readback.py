@@ -241,10 +241,20 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         f"threshold {census.get('threshold')}, refusals condition/payload/evidence "
         f"{census.get('refusedCondition')}/{census.get('refusedPayload')}/{census.get('refusedDuplicateEvidence')}"
     )
-    report.note(
-        f"paired delta is reported and not claimed: {metrics.get('paired_delta_pp')}pp "
-        f"(p={metrics.get('paired_p')}, n={metrics.get('paired_n')})"
-    )
+    # The pair lives in its own file: the arm artefact grades one store, and a delta needs two.
+    # Absent is stated as absent rather than printed as `Nonepp`, which is what a reader would
+    # otherwise have to interpret as a zero.
+    pair = artefact.get("_pair") or {}
+    comparison = pair.get("comparison") or {}
+    if isinstance(comparison, dict) and comparison.get("paired"):
+        report.note(
+            "paired delta is reported and not claimed: "
+            f"{comparison.get('deltaPp'):.2f}pp (p={comparison.get('p'):.4f}, "
+            f"n={comparison.get('paired')}, {comparison.get('gained')} gained, "
+            f"{comparison.get('lost')} lost, verdict {(pair.get('verdict') or {}).get('state')})"
+        )
+    else:
+        report.note("no pair file beside the arm: the delta is not read here")
 
     # R58's refutations, in the order the registration states them.
     report.refute(
@@ -398,9 +408,13 @@ def main() -> int:
     if not artefacts:
         print(f"no poc-l4.json under {root}", file=sys.stderr)
         return 2
+    pairs = sorted(root.rglob("poc-l4-pair.json"))
+    pair_document = json.loads(pairs[0].read_text()) if pairs else {}
     worst = 0
     for path in artefacts:
-        state, report = grade(json.loads(path.read_text()))
+        document = json.loads(path.read_text())
+        document["_pair"] = pair_document
+        state, report = grade(document)
         print(f"{path}\n  {state}\n{report.render()}\n")
         if state in ("ABANDONED", "DISCARDED"):
             worst = 1
