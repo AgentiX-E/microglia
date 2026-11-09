@@ -82,6 +82,7 @@ export const DEFERRALS: Readonly<Record<string, string>> = {
   'bird-rows': 'the corpus row shapes, not a query',
   coupling: 'the scanner itself: it defines the word list, so it necessarily contains every word on it',
   'empty-result': 'classifies an empty attempt against the gold query by table set and value; it reads shapes and writes no statement',
+  exemplars: 'renders a training row\'s stored query text beside its question; it executes nothing and holds no adapter',
   'gate-matrix': 'the matrix names the artefact it was rendered against; the dataset name is an argument, not a query',
   judge: 'the LLM judge\'s prompt and record name the artefact being judged',
   'lane-scope': 'decides which of the two lanes a dispatch buys; the lane names are the subject, not a query',

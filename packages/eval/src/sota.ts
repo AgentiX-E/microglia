@@ -886,7 +886,22 @@ export type SqlArm =
    * ordered for: the lane's cross-fitting already holds the rows that are not in the current fold,
    * and a training question's gold query is supervision the benchmark gives away.
    */
-  | 'recall-order';
+  | 'recall-order'
+  /**
+   * The nearest training questions' gold queries, shown as worked examples.
+   *
+   * Every other arm in this lane shows the model *text about* a correction — advice, a repair, a
+   * definition, a reordering. This one shows it a question that was answered and the query that
+   * answered it, which is the content `oracle` injects when it injects the memory item whose
+   * evidence is this question (+33.14pp, 115 gained against 1 lost). `oracle` is not deployable; a
+   * neighbour from the same database is, because a training question's gold query is supervision
+   * the corpus already gives away and the fold that is being scored never sees its own rows.
+   *
+   * Prompt-identical to `none` except for one appended block capped at the length `full`'s pack
+   * carries, so the comparison against `full` is between two prompts of the same size that contain
+   * different things — guidance distilled from corrections against examples drawn from the corpus.
+   */
+  | 'examples';
 
 /**
  * What a sampling arm asks for, read from its name.
@@ -1026,6 +1041,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   linked: true,
   'linked-additive': true,
   'recall-order': true,
+  examples: true,
   'full-verified': true,
   'full-shuffled': true,
   'full-transferred': true,
@@ -1294,7 +1310,7 @@ export type { EvidenceDelivery, FramingDelivery } from '@agentix-e/microglia-pro
  * content half of the experiment, so it is a type rather than a convention: a lane that
  * grows a third form has to name it here and say which label it renders under.
  */
-export type PackKind = 'rule' | 'repair' | 'raw' | 'lexicon';
+export type PackKind = 'rule' | 'repair' | 'raw' | 'lexicon' | 'example';
 
 /**
  * What the dataset's own per-question knowledge is called in the prompt.
@@ -1327,6 +1343,11 @@ const PACK_LABEL: Record<PackKind, string> = {
   // every line names a phrase the question itself contains. The heading says so, because a reader
   // who takes the block for advice applies it to the whole question.
   lexicon: 'What the terms in this question are known to denote in this database:',
+  // The one block whose content is a query known to be right rather than a claim about one. The
+  // heading names the source, because a reader who takes these for corrections tries to apply a
+  // "fix" to a query that was never broken.
+  example:
+    'Worked examples from this database: each is a question it was asked, followed by the query that answered it:',
 };
 
 /**
@@ -1874,6 +1895,7 @@ const RETRY_LABEL: Record<PackKind, string> = {
   // prompt would need in order to know the block is evidence rather than advice.
   raw: 'Earlier questions on this database, each with the query that returned a wrong result and the query that corrected it:',
   lexicon: 'What the terms in this question are known to denote in this database:',
+  example: 'Worked examples from this database, each with the query that answered it:',
 };
 
 /**
@@ -1900,6 +1922,13 @@ const RETRY_INSTRUCTION: Record<PackKind, string> = {
     'Each item states what a term in this question denotes here. Read the definitions before ' +
     'writing: a term with a stated reading must be used with that reading, and a term with none ' +
     'carries no instruction.',
+  // No arm retries with examples, and this entry exists so that the record is total: a `PackKind`
+  // added without a label would render an undefined heading in a retry prompt, which is the class of
+  // defect that has cost this record two dispatches. The instruction is the truthful one for a block
+  // of worked examples, so an arm that later asks for this combination says what it means.
+  example:
+    'Each item is a question that was asked on this database and the query that answered it. ' +
+    'Write a query for this question, using them as a guide to how the schema is used here.',
 };
 
 export function retryPromptFor(input: RetryInput): string {

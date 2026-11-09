@@ -1127,9 +1127,10 @@ Be honest about the preconditions; the product is only useful inside them.
     is not coupled to SQL), the package import graph, and a verdict for every coupled module — `adapter`,
     `deferred` with a written reason, or `general`. Three gates decide whether the answer is publishable:
     every coupled module has a verdict, no package imports upward, and the base library names no scenario at
-    all. In this repository that reads **1,956 lines in seven modules**, fifteen deferred with a reason, and
+    all. In this repository that reads **1,956 lines in seven modules**, sixteen deferred with a reason, and
     **zero** in `core` out of forty modules — and it is a number rather than a paragraph, so it is checked
-    on every push.
+    on every push. (The line count is stable because the six modules are; the deferral count moves whenever
+    a new module names the scenario in code, which is what the deferral table is for.)
 
 ## 13. Measuring your own generator
 

@@ -142,6 +142,13 @@ import {
   recalledFor,
   readOrdering,
   summariseOrderings,
+  exemplarGate,
+  exemplarIndexOf,
+  nearestExemplars,
+  renderExemplars,
+  summariseExemplars,
+  type ExemplarRow,
+  type RenderedExemplars,
   sqlShapeOf,
   type GoldNeighbours,
   type TableOrdering,
@@ -323,14 +330,34 @@ const LEARN_SAMPLE = Math.trunc(nonNegative(process.env['SOTA_LEARN_SAMPLE'], 0)
 const RECALL_K = Math.trunc(nonNegative(process.env['SOTA_RECALL_K'], 5));
 
 /**
+ * How many worked examples one question is shown.
+ *
+ * Three, and registered at three before the arm was implemented: k = 1 makes the arm a coin flip on
+ * which of two equally similar questions was drawn, and the literature reports ten as a prompt whose
+ * extra examples are noise the model has to look past. The variable exists so a dose can be measured
+ * later, not so the registered value can be re-chosen after seeing an accuracy.
+ */
+const EXEMPLAR_K = Math.trunc(nonNegative(process.env['SOTA_EXEMPLAR_K'], 3));
+
+/**
+ * The character budget of the example block.
+ *
+ * 1,200 is `full`'s pack budget, and the equality is the point: the comparison that decides R65 is
+ * against `full`, and two prompts of the same length carrying different content is a comparison of
+ * content. A larger cap would let the arm win by buying tokens, which is a result about the bill.
+ */
+const EXEMPLAR_BUDGET = Math.trunc(nonNegative(process.env['SOTA_EXEMPLAR_BUDGET'], 1200));
+
+/**
  * How many retried questions a report of a retry effect needs before it says anything.
  *
- * R64 registers 140, which is the smallest population on which the interval around a repair rate of
- * roughly a third is narrower than the effect being claimed. It is an input rather than a constant
- * inside the summariser because it is a decision about evidence rather than a property of the
- * pipeline: a later registration can demand more without editing a metric.
+ * The default is R64's amended floor of 90, imported rather than repeated: the first R64 artefact
+ * was produced while this line still said 140 (the pre-amendment value), so a run that cleared the
+ * registered floor reported `meetsFloor: false`. A threshold that a registration changes has to be
+ * changed in the one place the artefact reads it, and the env override stays so a later registration
+ * can demand more without editing a metric.
  */
-const RETRY_POPULATION_FLOOR = Math.trunc(nonNegative(process.env['SOTA_RETRY_FLOOR'], 140));
+const RETRY_FLOOR = Math.trunc(nonNegative(process.env['SOTA_RETRY_FLOOR'], RETRY_POPULATION_FLOOR));
 
 /**
  * How long the whole lane may run, in minutes.
@@ -3617,6 +3644,16 @@ const orderReadings: TableOrdering[] = [];
 /** Questions where retrieval contributed at least one table, out of the questions asked. */
 let orderWithRecall = 0;
 
+/**
+ * What the worked-example arm rendered, one entry per question it was planned for.
+ *
+ * Run-level rather than per-fold, for the reason the ordering readings are: the arm's own validity is
+ * a statement about the population of prompts it wrote, and five folds are five samples of one
+ * population. A block that hit its cap in one fold and not another is one fact about the arm, not
+ * five facts about the folds.
+ */
+const exemplarRenders: RenderedExemplars[] = [];
+
 async function runFold(
   fold: number,
   rows: readonly BirdRow[],
@@ -3643,6 +3680,21 @@ async function runFold(
         })),
       )
     : new Map();
+
+  // The example pool: the *learn* rows with their gold queries, grouped by database. Built from the
+  // same rows the memory distils from and never from the fold being scored, so a question cannot be
+  // shown its own answer — the property `V2-fold-partition` already checks is the one that makes the
+  // arm deployable rather than a second `oracle`.
+  const exemplarIndex: ReadonlyMap<string, readonly { readonly question: string; readonly sql: string }[]> =
+    ARMS.has('examples')
+      ? exemplarIndexOf(
+          learnRows.map((row): ExemplarRow => ({
+            db: row.db_id,
+            question: row.question,
+            sql: row.SQL,
+          })),
+        )
+      : new Map();
 
   const widened = await buildFoldMemory(GENERALIZE, learnRows, dataset, task);
   // Scope widening is an arm here, not a second dispatch: the same corrections are
@@ -3758,6 +3810,10 @@ async function runFold(
     'full-raw': 'raw',
     'full-raw-shuffled': 'raw',
     'full-lexicon': 'lexicon',
+    // The only block whose items are queries rather than claims. Rendering it under the rule heading
+    // would ask the reader to apply a convention that is not there, and the arm would then measure
+    // the mismatch between label and content.
+    examples: 'example',
   };
 
   /**
@@ -4516,6 +4572,17 @@ async function runFold(
       if (recalled.length > 0) orderWithRecall += 1;
       noteChannel('recall-order', 'recall-order', ordered.reason === 'ordered');
       call(position, 'recall-order', '', 0, false, 'before', ordered.ddl);
+    }
+    if (ARMS.has('examples')) {
+      // The block is `none`'s prompt plus three worked examples from this database, and nothing else
+      // changes. The examples are the *learn* rows of this fold, so the arm reads the corpus rather
+      // than the store: an arm that mixed the two would confound retrieval-from-corpus with
+      // retrieval-from-memory in one cell, and the comparison against `full` is exactly the one that
+      // needs them apart.
+      const picked = nearestExemplars(exemplarIndex, row.db_id, row.question, EXEMPLAR_K);
+      const rendered = renderExemplars(picked, EXEMPLAR_BUDGET);
+      exemplarRenders.push(rendered);
+      call(position, 'examples', rendered.text, 0, false, 'before');
     }
     if (ARMS.has('values')) {
       // The same question, the same pack position, one input changed: the schema now says what the
@@ -6360,6 +6427,13 @@ async function main(): Promise<void> {
       }),
     );
   }
+  // The example arm's own validity condition, on the same principle: R65 states two ways the
+  // dispatch can stop being the test it describes, and a condition that lives only in a document is
+  // one somebody has to remember at reading time. Pushed whenever the arm was configured — an arm
+  // that was asked for and planned nothing is a wiring defect, and the gate says so by failing.
+  if (ARMS.has('examples')) {
+    gates.push(exemplarGate(summariseExemplars(exemplarRenders, EXEMPLAR_K, EXEMPLAR_BUDGET)));
+  }
 
   const assertions = {
     /**
@@ -6663,7 +6737,7 @@ async function main(): Promise<void> {
        * read off the execution the judge had already performed — a property of the pipeline measured
        * at no call cost rather than a dispatch spent to discover it.
        *
-       * `floor` is `SOTA_RETRY_FLOOR`, defaulting to the 140 that R64 registers, and it travels with
+       * `floor` is `SOTA_RETRY_FLOOR`, defaulting to the 90 R64's amendment registers, and it travels with
        * the verdict so that `meetsFloor: false` cannot be quoted as a result.
        */
       retry_population: summariseRetryPopulation(
@@ -6671,8 +6745,25 @@ async function main(): Promise<void> {
           reason: item.retryReason ?? undefined,
           correct: item.withoutMemoryCorrect,
         })),
-        RETRY_POPULATION_FLOOR,
+        RETRY_FLOOR,
       ),
+      /**
+       * What the worked-example arm wrote, so a null cannot be read as a mechanism that never ran.
+       *
+       * R65 registers two ways a dispatch stops being the test it describes: the arm fires on fewer
+       * than 80% of questions, or the cap drops an example on more than 5% of them. Neither is
+       * visible in an accuracy delta — an arm that fired on half the questions and one that fired on
+       * all of them can produce the same number — so the counts and the shares travel here, and
+       * `V75` reads them as a blocking gate.
+       *
+       * `meanChars` is the length the arm actually bought. It is reported per question rather than in
+       * total because the comparison that decides the line is against `full`'s pack, whose mean is
+       * 1,058 characters on this split: a block half that size is a smaller treatment, not a cheaper
+       * one.
+       */
+      exemplars: ARMS.has('examples')
+        ? summariseExemplars(exemplarRenders, EXEMPLAR_K, EXEMPLAR_BUDGET)
+        : null,
       /**
        * What the selectors did across the whole run, and what they had to work with.
        *
@@ -7213,8 +7304,17 @@ async function main(): Promise<void> {
   // size of the condition.
   const population = summariseRetryPopulation(
     cases.map((item) => ({ reason: item.retryReason ?? undefined, correct: item.withoutMemoryCorrect })),
-    RETRY_POPULATION_FLOOR,
+    RETRY_FLOOR,
   );
+  if (ARMS.has('examples')) {
+    const examples = summariseExemplars(exemplarRenders, EXEMPLAR_K, EXEMPLAR_BUDGET);
+    process.stdout.write(
+      `[sota] examples: fired=${examples.fired}/${examples.asked} ` +
+        `(${(examples.firedShare * 100).toFixed(2)}%) mean-chars=${examples.meanChars.toFixed(1)} ` +
+        `capped=${examples.droppedQuestions} (${(examples.droppedShare * 100).toFixed(2)}%) ` +
+        `k=${EXEMPLAR_K} budget=${EXEMPLAR_BUDGET}\n`,
+    );
+  }
   process.stdout.write(
     `[sota] retry-population: retried=${population.retried}/${population.asked} ` +
       `(${(population.share * 100).toFixed(2)}%) no-query=${population.byReason['no-query']} ` +

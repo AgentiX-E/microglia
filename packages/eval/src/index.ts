@@ -14,6 +14,7 @@ export {
 } from './call-budget.js';
 export { THINKING_HEADROOM, answerBudget, type ThinkingMode } from './decoding.js';
 export {
+  RETRY_POPULATION_FLOOR,
   RETRY_REASONS,
   retryTriggerFor,
   retryTriggerOf,
@@ -31,6 +32,18 @@ export {
   type EmptyCause,
   type EmptySummary,
 } from './empty-result.js';
+export {
+  EXEMPLAR_FLOOR,
+  exemplarGate,
+  exemplarIndexOf,
+  nearestExemplars,
+  renderExemplars,
+  summariseExemplars,
+  type ExemplarRow,
+  type ExemplarPool,
+  type ExemplarSummary,
+  type RenderedExemplars,
+} from './exemplars.js';
 
 export {
   anchorTables,
