@@ -5,10 +5,10 @@
   "scanned": 170,
   "totals": {
     "modules": 170,
-    "lines": 45859,
+    "lines": 45877,
     "adapterLines": 1956,
-    "deferredLines": 5934,
-    "coupledShare": 0.1693
+    "deferredLines": 5952,
+    "coupledShare": 0.1696
   },
   "layers": [
     {
@@ -38,9 +38,9 @@
     {
       "layer": "eval",
       "modules": 113,
-      "lines": 32784,
+      "lines": 32802,
       "adapterLines": 0,
-      "deferredLines": 5934,
+      "deferredLines": 5952,
       "coupled": 14
     },
     {
@@ -181,7 +181,7 @@
       "pkg": "eval",
       "module": "lane-scope",
       "path": "packages/eval/src/lane-scope.ts",
-      "lines": 100,
+      "lines": 118,
       "words": [
         "bird"
       ],
@@ -524,5 +524,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 45859 production lines across 170 modules: 7 adapter modules in `sql`, 14 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 45877 production lines across 170 modules: 7 adapter modules in `sql`, 14 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }

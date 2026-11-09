@@ -11,7 +11,7 @@
  *   EVENT=workflow_dispatch BIRD_INPUT='' SPLIT=minidev PREREG=R61-floor pnpm --silent eval:lane-scope
  */
 import { appendFileSync, readFileSync } from 'node:fs';
-import { laneScope } from '../lane-scope.js';
+import { laneScope, preregFileOf } from '../lane-scope.js';
 import { readPrereg } from '../prereg.js';
 
 function fail(message: string): void {
@@ -22,7 +22,7 @@ function fail(message: string): void {
 /** Whether the named registration declares a `recallFloor`, or undefined when none is named. */
 function floorDeclaration(id: string | undefined): boolean | undefined {
   if (id === undefined || id === '') return undefined;
-  const file = `prereg/${id}.md`;
+  const file = preregFileOf(id);
   let text: string;
   try {
     text = readFileSync(file, 'utf8');

@@ -28,7 +28,7 @@ on:
         required: false
         default: 'true'
       prereg:
-        description: 'R8.4: the pre-registration this dispatch executes, by id (prereg/<id>.md); a dispatch without one is refused'
+        description: 'R8.4: the pre-registration this dispatch executes, by bare id — `R63-recall-order`, not `prereg/R63-recall-order.md`, because the artefact is named from it; a dispatch without one is refused'
         required: false
         default: ''
       split:
@@ -331,9 +331,21 @@ jobs:
           PREREG: ${{ github.event.inputs.prereg || '' }}
         run: |
           if [ -z "$PREREG" ]; then
-            echo "::error::this dispatch names no pre-registration; set the 'prereg' input to a file in prereg/ (see prereg/TEMPLATE.md)"
+            echo "::error::this dispatch names no pre-registration; set the 'prereg' input to a bare id such as R63-recall-order (see prereg/TEMPLATE.md)"
             exit 1
           fi
+          # A bare id, and the refusal names the form. The field was documented as `prereg/<id>.md`,
+          # which reads like a path, so a dispatch that passed the path built
+          # `prereg/prereg/R63-recall-order.md.md` and failed with "no such pre-registration" about a
+          # file that existed. The artefact is also named from this string, so a path would write into
+          # a subdirectory of eval/results that the publish step never looks in — a silent loss of a
+          # twenty-minute run rather than a loud refusal of a one-word mistake.
+          case "$PREREG" in
+            */*|*.md)
+              echo "::error::the 'prereg' input is a bare id, not a path: pass '${PREREG##*/}' without the directory and without .md"
+              exit 1
+              ;;
+          esac
           pnpm eval:prereg "prereg/$PREREG.md"
 
       # Only this split's artefact. Deleting the other one would erase the evidence for every

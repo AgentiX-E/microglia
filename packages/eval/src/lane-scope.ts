@@ -97,3 +97,21 @@ export function laneScope(request: LaneRequest): LaneScope {
     reason: 'the dispatch names no registration, so the BIRD lane stands on its default',
   };
 }
+
+/**
+ * The file a dispatch's `prereg` input names.
+ *
+ * One identifier arrives in three forms — `R63-recall-order`, `R63-recall-order.md`, and
+ * `prereg/R63-recall-order.md` — because the CLI (`pnpm eval:prereg <path>`) takes a path and the
+ * workflow input takes an id. A dispatch that passed the path where the id was expected built
+ * `prereg/prereg/R63-recall-order.md.md` and reported that nobody had registered it: a message naming
+ * a file no caller typed, about a file that exists. The fix belongs in the resolver, not in the
+ * instruction to be more careful.
+ */
+export function preregFileOf(id: string): string {
+  let name = id.trim();
+  while (name.startsWith('./')) name = name.slice(2);
+  if (name.startsWith('prereg/')) name = name.slice('prereg/'.length);
+  if (name.endsWith('.md')) name = name.slice(0, -'.md'.length);
+  return name === '' ? '' : `prereg/${name}.md`;
+}

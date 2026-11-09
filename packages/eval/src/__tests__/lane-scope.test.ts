@@ -17,7 +17,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { laneScope } from '../lane-scope.js';
+import { laneScope, preregFileOf } from '../lane-scope.js';
 
 const ROOT = process.cwd();
 const TSX = join(ROOT, 'node_modules', '.bin', 'tsx');
@@ -220,5 +220,32 @@ describe('the lane-scope command reads a registration and writes one output file
     );
     expect(result.status).toBe(0);
     expect(result.stdout).toContain('bird=true');
+  });
+});
+
+describe('preregFileOf', () => {
+  it('takes the form the workflow input describes', () => {
+    expect(preregFileOf('R63-recall-order')).toBe('prereg/R63-recall-order.md');
+  });
+
+  it('takes a path, which is the form the CLI takes', () => {
+    // A dispatch that passed `prereg/R63-recall-order.md` to a field documented as
+    // `prereg/<id>.md` built `prereg/prereg/R63-recall-order.md.md` and reported that the
+    // registration did not exist. The file existed; the message was about a name nobody typed.
+    expect(preregFileOf('prereg/R63-recall-order.md')).toBe('prereg/R63-recall-order.md');
+    expect(preregFileOf('./prereg/R63-recall-order.md')).toBe('prereg/R63-recall-order.md');
+    expect(preregFileOf('R63-recall-order.md')).toBe('prereg/R63-recall-order.md');
+    expect(preregFileOf('  prereg/R63-recall-order  ')).toBe('prereg/R63-recall-order.md');
+  });
+
+  it('answers nothing for nothing, so a caller can tell "no registration" from a bad name', () => {
+    expect(preregFileOf('')).toBe('');
+    expect(preregFileOf('prereg/')).toBe('');
+    expect(preregFileOf('.md')).toBe('');
+  });
+
+  it('leaves a name that merely contains a separator alone', () => {
+    // A nested registration is a legitimate path; only the `prereg/` prefix is redundant.
+    expect(preregFileOf('sub/R1.md')).toBe('prereg/sub/R1.md');
   });
 });
