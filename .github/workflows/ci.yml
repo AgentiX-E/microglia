@@ -860,49 +860,16 @@ jobs:
           "
 
       - name: The scenario is a measurement, not a paragraph
+        # The eleven assertions live in `scripts/check-coupling-ledger.mjs` rather than inline here,
+        # because an inline `node -e` string is the one place in this workflow that no test can reach
+        # -- and because `pnpm check` did not make this comparison at all, so two pushes went red on a
+        # committed ledger describing a tree that had grown two modules while every local gate was
+        # green. The script runs the same claims, has fixtures for each, and is called from both
+        # places now, which is what makes the local gate the CI gate.
         run: |
           set -euo pipefail
           POC_RESULT_DIR="${RUNNER_TEMP}/coupling" pnpm eval:coupling
-          node -e "
-            const a = require('${RUNNER_TEMP}/coupling/poc-coupling.json');
-            const c = require('./eval/results/poc-coupling.json');
-            const g = Object.fromEntries(a.gates.map((x) => [x.id, x]));
-            const layer = (name) => a.layers.find((x) => x.layer === name);
-            const unclassified = a.coupled.filter((x) => x.verdict === 'general');
-            const upward = a.edges.filter((x) => x.upward);
-            const checks = [
-              ['every coupled module has a verdict, and the walk emitted what it scanned', g['V72-every-coupled-module-has-a-verdict'].pass === true && a.scanned === a.totals.modules && unclassified.length === 0],
-              ['no package imports upward: five edges, all downwards', g['V73-no-package-imports-upward'].pass === true && a.edges.length === 5 && upward.length === 0],
-              // The module count is a reading of the tree, not a constant, for the same reason
-              // the comment-only count below is not one: adding a module to core is not a
-              // regression, and a check that fails when the library grows teaches the project to
-              // edit the check. What is asserted is the property — every core module has a verdict
-              // and none of them is coupled to a scenario — and the snapshot comparison underneath
-              // is what notices the walk and the committed ledger describing different trees.
-              ['core is scenario-free: every module classified, zero coupled', g['V74-core-is-scenario-free'].pass === true && layer('core').modules > 0 && layer('core').coupled === 0],
-              ['the adapter is a package: seven modules, every line of them classified adapter', layer('sql').modules === 7 && layer('sql').adapterLines === layer('sql').lines],
-              // Pinned, unlike the module count above, because a deferral is a decision somebody
-              // wrote down: losing one means a module stopped naming the scenario it knows about,
-              // which is a change worth seeing. `lane-scope` is the fourteenth — it decides which
-              // lane a dispatch buys, so the lane names are its subject rather than a query.
-              ['fourteen modules keep their scenario words with a written reason, and none is blank', a.coupled.filter((x) => x.verdict === 'deferred').length === 14 && a.coupled.filter((x) => x.verdict === 'deferred').every((x) => typeof x.reason === 'string' && x.reason.length > 20)],
-              ['the five adapter modules that name a database are the ones that execute, guard, differ, link and render', a.coupled.filter((x) => x.pkg === 'sql').map((x) => x.module).sort().join(',') === 'm-schema,schema-link,sql-diff,sql-exec,sql-guard'],
-              ['the largest deferred module is the lane that has not been split yet', a.coupled.filter((x) => x.verdict === 'deferred').sort((x, y) => y.lines - x.lines)[0].module === 'sota'],
-              ['the scenario is between a tenth and a third of the tree, and the library packages are clean', a.totals.coupledShare > 0.1 && a.totals.coupledShare < 0.33 && layer('protocol').coupled === 0 && layer('node').coupled === 0 && layer('browser').coupled === 0],
-              // The count is a reading of the tree, not a constant: the first version of this
-              // assertion pinned 23 and failed the moment a module was added that explains, in
-              // prose, what a scenario's rule does not transfer to. What the check is for is that
-              // every hit has words in it and that the committed snapshot agrees with the walk.
-              ['a comment is not a coupling: every prose-only hit names a word', a.commentOnly.length === c.commentOnly.length && a.commentOnly.length > 0 && a.commentOnly.every((x) => x.words.length > 0)],
-              ['the committed snapshot still describes the tree it was taken from', c.scanned === a.scanned && c.totals.modules === a.totals.modules && c.gates.every((x) => x.pass)],
-              ['the statement quotes arithmetic rather than a verdict', a.statement.startsWith('the scenario is ') && a.statement.includes(' 0 of them upward') && a.statement.includes('agnostic') === false],
-            ];
-            const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
-            if (bad.length > 0) { console.error('coupling ledger failed: ' + bad.join(', ')); process.exit(1); }
-            console.log('coupling ledger: ' + checks.length + ' checks pass, ' + a.scanned + ' modules, ' +
-              layer('sql').modules + ' adapter modules, ' + a.coupled.filter((x) => x.verdict === 'deferred').length +
-              ' deferred, core coupled=' + layer('core').coupled);
-          "
+          node scripts/check-coupling-ledger.mjs "${RUNNER_TEMP}/coupling"
 
       - name: CPU scale and latency
         run: pnpm eval:scale
