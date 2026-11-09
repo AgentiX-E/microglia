@@ -13,6 +13,24 @@ export {
   type FoldSpend,
 } from './call-budget.js';
 export { THINKING_HEADROOM, answerBudget, type ThinkingMode } from './decoding.js';
+export {
+  RETRY_REASONS,
+  retryTriggerFor,
+  retryTriggerOf,
+  summariseRetryPopulation,
+  type RetryEvidence,
+  type RetryPopulation,
+  type RetryPopulationRow,
+  type RetryReason,
+  type RetryTrigger,
+} from './retry-trigger.js';
+export {
+  classifyEmptyAttempt,
+  summariseEmptyAttempts,
+  type EmptyAttempt,
+  type EmptyCause,
+  type EmptySummary,
+} from './empty-result.js';
 
 export {
   anchorTables,

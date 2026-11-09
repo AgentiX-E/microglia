@@ -244,6 +244,10 @@ import {
   requirePopulated,
   retryPromptFor,
   retrySubset,
+  retryTriggerFor,
+  retryTriggerOf,
+  summariseRetryPopulation,
+  type RetryReason,
   lexiconGate,
   lexiconPackOf,
   licensedLines,
@@ -317,6 +321,16 @@ const LEARN_SAMPLE = Math.trunc(nonNegative(process.env['SOTA_LEARN_SAMPLE'], 0)
  * dose can be measured later, not so it can be optimised now.
  */
 const RECALL_K = Math.trunc(nonNegative(process.env['SOTA_RECALL_K'], 5));
+
+/**
+ * How many retried questions a report of a retry effect needs before it says anything.
+ *
+ * R64 registers 140, which is the smallest population on which the interval around a repair rate of
+ * roughly a third is narrower than the effect being claimed. It is an input rather than a constant
+ * inside the summariser because it is a decision about evidence rather than a property of the
+ * pipeline: a later registration can demand more without editing a metric.
+ */
+const RETRY_POPULATION_FLOOR = Math.trunc(nonNegative(process.env['SOTA_RETRY_FLOOR'], 140));
 
 /**
  * How long the whole lane may run, in minutes.
@@ -780,6 +794,15 @@ type CaseOutcome = {
    * recorded as a fact and not used as a filter on any other arm.
    */
   readonly retried: boolean;
+  /**
+   * Whether the *without-memory* first attempt would have earned a retry, and why.
+   *
+   * The retry arms act on the baseline attempt, so this is their population — recorded on every
+   * case, including runs where no retry arm was dispatched, because the population is a property of
+   * the pipeline rather than of the arm. It costs nothing: it is read off the execution the judge
+   * had already performed to score the answer.
+   */
+  readonly retryReason: RetryReason | null;
   /**
    * The sampling facts for this question, or null when no sampling arm ran.
    *
@@ -1366,10 +1389,22 @@ const statements = new BoundedSql({
   rowCap: STATEMENT_ROW_CAP,
 });
 
-/** Execute a statement and canonicalise its result set. */
-async function execute(dbPath: string, sql: string): Promise<{ ok: boolean; rows: string[] }> {
+/**
+ * Execute a statement and canonicalise its result set.
+ *
+ * The failure reason travels with the failure now, because the retry decision is taken from this
+ * execution rather than from a second one: the lane used to run the same statement twice — once to
+ * judge the reply and once to decide whether it earned a retry — which is two chances to describe
+ * the same answer differently.
+ */
+async function execute(
+  dbPath: string,
+  sql: string,
+): Promise<{ ok: boolean; rows: string[]; error: string | undefined }> {
   const outcome = await statements.run(dbPath, sql);
-  return outcome.ok ? { ok: true, rows: canonicalRows(outcome.rows) } : { ok: false, rows: [] };
+  return outcome.ok
+    ? { ok: true, rows: canonicalRows(outcome.rows), error: undefined }
+    : { ok: false, rows: [], error: outcome.error ?? 'an error' };
 }
 
 /** The same outcome `executeQuery` builds, for a statement that ran under the deadline. */
@@ -1440,6 +1475,18 @@ type Judged = {
   readonly tokens: number;
   /** Local scoring time; the model's own latency is measured by the caller. */
   readonly latencyMs: number;
+  /**
+   * Whether this answer would have earned a retry, and why, or null if it stood on its own.
+   *
+   * Recorded per case rather than only summarised, because the retry arms are conditional
+   * treatments: their effect is diluted by every question that never reached them, and until this
+   * field existed the size of that population was a number in prose. A reader can now recompute it
+   * from the artefact without executing anything.
+   *
+   * It is decided from the execution that was already run to score the answer, at no call cost, and
+   * by the same function the retry arms use to build their prompts (`retryTriggerOf`).
+   */
+  readonly retryReason: RetryReason | null;
 };
 
 /**
@@ -1478,10 +1525,7 @@ async function resultShapeOf(dbPath: string, sql: string | undefined): Promise<R
  * the retry population is a property of the pipeline rather than of the benchmark.
  */
 async function failureOf(dbPath: string, sql: string | undefined): Promise<string | undefined> {
-  if (sql === undefined) return 'it did not contain a query';
-  const outcome = await runQuery(dbPath, sql);
-  if (!outcome.ok) return `it failed with: ${outcome.error ?? 'an error'}`;
-  return outcome.tuples.length === 0 ? 'it returned no rows' : undefined;
+  return retryTriggerFor(sql, sql === undefined ? undefined : await runQuery(dbPath, sql))?.message;
 }
 
 async function judgeReply(
@@ -1493,7 +1537,10 @@ async function judgeReply(
   const extracted = reply === undefined ? undefined : extractSql(reply.text);
   const sql = extracted ?? '';
   const parseOk = extracted !== undefined;
-  const predicted = sql === '' ? { ok: false, rows: [] } : await execute(dbPath, sql);
+  const predicted =
+    sql === ''
+      ? { ok: false, rows: [] as string[], error: undefined }
+      : await execute(dbPath, sql);
   let correct = false;
   let shadowCorrect = false;
   if (task.convention) {
@@ -1519,6 +1566,15 @@ async function judgeReply(
     execOk: predicted.ok,
     tokens: reply?.tokens ?? 0,
     latencyMs: 0,
+    // A reply that named no statement is not a statement that failed to run, so the emptiness of
+    // the string decides the first reason rather than the execution does.
+    retryReason:
+      retryTriggerOf({
+        parsed: parseOk && sql !== '',
+        executed: predicted.ok,
+        rows: predicted.rows.length,
+        error: predicted.error,
+      })?.reason ?? null,
   };
 }
 
@@ -5169,6 +5225,9 @@ async function runFold(
         execOk: false,
         tokens: 0,
         latencyMs: 0,
+        // No reply is not a retry reason: the call failed after its own retries, which the run
+        // counts separately. Retrying it would spend a call to learn what the provider already said.
+        retryReason: null,
       };
     const base = pick('none');
     const full = pick('full');
@@ -5212,6 +5271,7 @@ async function runFold(
       parseOk: full.parseOk,
       execOk: full.execOk,
       retried: retriedPositions.has(position),
+      retryReason: base.retryReason,
       draws: drawFacts.get(position) ?? null,
       // The candidates themselves, so every question about the pool is a computation over this
       // file rather than another dispatch.
@@ -6595,6 +6655,25 @@ async function main(): Promise<void> {
        */
       retry_subset: retrySubset(cases),
       /**
+       * The population the retry arms act on, and whether it is big enough to report an effect on.
+       *
+       * Two published retry readings in this record (+1.43pp and +0.57pp) were never written to an
+       * artefact, so the population behind them is unknown and the numbers cannot be re-derived from
+       * anything committed. The population is now recorded on every run, retry arm or not, and it is
+       * read off the execution the judge had already performed — a property of the pipeline measured
+       * at no call cost rather than a dispatch spent to discover it.
+       *
+       * `floor` is `SOTA_RETRY_FLOOR`, defaulting to the 140 that R64 registers, and it travels with
+       * the verdict so that `meetsFloor: false` cannot be quoted as a result.
+       */
+      retry_population: summariseRetryPopulation(
+        cases.map((item) => ({
+          reason: item.retryReason ?? undefined,
+          correct: item.withoutMemoryCorrect,
+        })),
+        RETRY_POPULATION_FLOOR,
+      ),
+      /**
        * What the selectors did across the whole run, and what they had to work with.
        *
        * The four arms this block describes are one experimental design: the draws are shared, so
@@ -7129,9 +7208,23 @@ async function main(): Promise<void> {
         `retrieved=${((orderWithRecall / orderReadings.length) * 100).toFixed(2)}% k=${RECALL_K}\n`,
     );
   }
+  // The population the retry arms would act on, on every run and at no call cost. Printed here,
+  // beside the arm deltas, because a conditional treatment's delta is only readable next to the
+  // size of the condition.
+  const population = summariseRetryPopulation(
+    cases.map((item) => ({ reason: item.retryReason ?? undefined, correct: item.withoutMemoryCorrect })),
+    RETRY_POPULATION_FLOOR,
+  );
+  process.stdout.write(
+    `[sota] retry-population: retried=${population.retried}/${population.asked} ` +
+      `(${(population.share * 100).toFixed(2)}%) no-query=${population.byReason['no-query']} ` +
+      `error=${population.byReason.error} empty=${population.byReason.empty} ` +
+      `wrong=${population.wrongAmongRetried} floor=${population.floor} ` +
+      `meets=${population.meetsFloor}\n`,
+  );
   // After the numbers it is a report about, never before: a bill printed at the top of a log is a
   // bill nobody scrolls back to read.
-  process.stdout.write(`[sota] model=${llm.model} thinking=${THINKING ?? 'provider-default'} ${
+  process.stdout.write(`[sota] model=${llm.model} thinking=${THINKING} ${
     usageLine('sota', llm.usage)
   } reasoning=${llm.stats.reasoningTokens}\n`);
 

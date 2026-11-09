@@ -1110,14 +1110,26 @@ Be honest about the preconditions; the product is only useful inside them.
     against no memory and against the full pack gives two different numbers, both true), and **a single
     decided run is not a replication**. `pnpm eval:resolution`, `prereg/R39-arm-resolution.md`.
 
+    **And count a control arm's population before you pay for the arm.** A conditional treatment —
+    retry-on-failure, escalate-on-low-confidence — acts on the questions your pipeline *rejected*, not on
+    the questions that were wrong, and the two populations differ by an order of magnitude. A retry loop
+    here fires on **6.4%** of BIRD dev (98 of 1,534), because it triggers only on a reply with no
+    statement, a statement that failed, or a result with no rows; a base accuracy of 53% suggests 47% and
+    is the wrong number. `pnpm eval:retry-population` counts the real one from any artefact already in the
+    tree, with no model call, and breaks it down: of the 89 empty results on dev, **54 read exactly the
+    gold query's tables** and **32 miss a value the gold uses** — so the repair a retry would have to make
+    is about values, not about schema. Count the population first; an arm whose denominator is a guess
+    reports its effect against the wrong base.
+
     **And if you are going to claim your library is scenario-agnostic, meter it.** `pnpm eval:coupling`
     recomputes the layer table from the source tree: production lines per package, the modules that name a
     database in **code** (comments are stripped, because a module that explains why it is *not* SQL-specific
     is not coupled to SQL), the package import graph, and a verdict for every coupled module — `adapter`,
     `deferred` with a written reason, or `general`. Three gates decide whether the answer is publishable:
     every coupled module has a verdict, no package imports upward, and the base library names no scenario at
-    all. In this repository that reads **1,766 lines in seven modules**, twelve deferred with a reason, and
-    **zero** in `core` — and it is a number rather than a paragraph, so it is checked on every push.
+    all. In this repository that reads **1,956 lines in seven modules**, fifteen deferred with a reason, and
+    **zero** in `core` out of forty modules — and it is a number rather than a paragraph, so it is checked
+    on every push.
 
 ## 13. Measuring your own generator
 

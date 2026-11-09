@@ -4,7 +4,7 @@ step: R63
 opened: 2026-11-09
 arms: linked-additive,recall-order
 sample: 350
-gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32
+gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V51
 ---
 
 # R63 — the ordering signal, dispatched against the one it replaces
@@ -102,3 +102,64 @@ What changes:
 
 Nothing else is amended. The four arms, the n, the 6pp resolution and the three refutation branches
 are unchanged.
+
+## Outcome
+
+One dispatch, `42645682353`, artefact `eval/results/poc-sota-bird-R63-recall-order.json`: 350
+questions on minidev, 5 folds, 1,923 calls, 2 retries, 0 call failures, 11 statements past the
+deadline of 4,518, `thinking=off`, `reasoning_tokens=0`. Every blocking gate passed and the artefact
+published; the run that preceded it failed on `V3-parse-rate` at 51.43% and is recorded separately.
+
+| Reading | Value | Predicted | |
+|---|---|---|---|
+| arms fire | `recall-order` 350/350, `linked-additive` 350/350 | ≥ 95% | ✓ |
+| `ordering.cleanShare` | 157/350 = 44.86% | 56.65% ± 5pp | ✗ — see Amendment 1, and the reproduction below |
+| `ordering.retrieved_share` | 100.00% | > 90% | ✓ |
+| `recall-order` vs `none` | 52.29%, **+0.86pp**, CI [−1.43, +3.14], p = 0.6476, 11 gained / 8 lost | ±4pp of zero | ✓ |
+| `recall-order` vs `linked-additive` | **−1.14pp**, p = 0.4240, 5 / 9 discordant | ±4pp of zero | ✓ |
+| `linked-additive` vs `none` | 53.43%, **+2.00pp**, CI [−0.29, +4.29], p = 0.1435, 12 gained / 5 lost | not registered individually | the strongest cell in the run |
+| `full` vs `none` | 52.00%, +0.57pp, CI [−2.86, +4.00], p = 0.8679, 19 gained / 17 lost | ±4pp of zero | ✓ |
+| bill | $0.2165, cache 60.9%, `bands: ["off_peak"]`, `peak_usd: 0` | computable, one band | ✓ |
+| resolution | V5: minimum detectable 4.80pp against a 6.00pp target | about 6pp | ✓ |
+
+**The instrument reproduced the free measurement exactly, on the wrong population.**
+`precision 39.98%`, gold `recall 99.48%`, `retrieved 100%`, `depth 51.00%` — every one of them equal
+to the value `pnpm eval:table-recall` computes offline, because the arm and the audit call the same
+functions. What differed was `cleanShare`: 44.86% here against 56.65% on dev. Amendment 1, written
+before the dispatch, says the transposable quantities are the three that matched and the non-transposable
+one is the share, which is a property of the question set. This registration therefore does not void
+the run on its second criterion.
+
+**The branch this selects is the closing one.** `recall-order` beats `linked-additive` by −1.14pp
+with an interval from −1.43 to +3.14: it excludes +6pp and contains zero, which is the branch the
+prediction named. The ordering line is closed **for accuracy**. The block stays — the free ceiling,
+the `ordering` summary and the two-arm comparison price schema linking for every later arm — and the
+next P0 in this line becomes the retrieved-exemplar arm: the nearest training question's **gold SQL**
+as a worked example, which is the lawful approximation of `oracle` (+33.14pp, p = 2.4e-35) rather
+than a reordering of it.
+
+**Two things the run says that the registration did not ask.** First, `linked-additive` is the best
+arm this lane has recorded on minidev at **+2.00pp** with 12 gained against 5 lost — and it is the
+arm that reorders the schema while removing nothing. Against `linked` at −9.58pp, which prunes, the
+pair reads: a signal that *deletes* tables costs accuracy and a signal that *moves* them does not.
+Second, the ordering signal whose effect on the prompt is largest (mean 4.88 tables moved, 100% of
+questions changed) produced the smaller of the two accuracy readings, so prompt perturbation is not
+a proxy for prompt usefulness — a reordering is read as a reordering, and the reader was not lost by
+it.
+
+## Amendment 2 — three gates the run emitted and this file did not name (2026-11-09)
+
+The artefact failed `eval:protocol` when it was committed, and the check is right: the run emitted
+`V44-domain-accounted`, `V48-statements-answered` and `V51-channel-applied`, none of which this
+header names. All three were added to the lane after this registration was written, and all three
+passed (`136 of 1,308 items with no domain, 0 widened`; `11 of 4,518 statements hit the deadline, 19
+truncated`; `linked-additive 350/350, recall-order 350/350`).
+
+They are added to the header here rather than dropped from the artefact, because an artefact in the
+repository is worth more than a declaration that predates the lane, and because a reader can see the
+date. The ordering is recorded plainly: this is a post-hoc declaration, and the honest reading of it
+is that the run was judged by three criteria it was not registered against — all of which it passed.
+The next registration in this lane names them in advance; R64 does.
+
+`V48` is the one that matters most here: 11 statements out of 4,518 hit the deadline, and a lane that
+reported a score without saying so would be reporting a number partly decided by its own timeout.

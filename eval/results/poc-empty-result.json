@@ -1,0 +1,19 @@
+{
+  "id": "poc-empty-result",
+  "source_artifact": "poc-sota-bird-dev",
+  "source_split": "dev",
+  "database_root": "/root/bird-dev/dev_20240627",
+  "composition": {
+    "examined": 89,
+    "byCause": {
+      "same-tables": 54,
+      "missing-table": 19,
+      "extra-table": 16
+    },
+    "sameTables": 54,
+    "shareSameTables": 0.6067,
+    "sameTablesMissingValue": 32,
+    "shareMissingValue": 0.3596,
+    "goldRanksOnly": 5
+  }
+}

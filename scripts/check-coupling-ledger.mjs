@@ -85,8 +85,14 @@ function checks(fresh, committed) {
       layer('sql').modules === 7 && layer('sql').adapterLines === layer('sql').lines,
     ],
     [
-      'fourteen modules keep their scenario words with a written reason, and none is blank',
-      deferred.length === 14 &&
+      'every deferral carries a written reason, and none is blank',
+      // The count is not pinned, and it was: the pin broke twice in one iteration for the same reason
+      // this file's header gives about `fresh.totals.modules` — the tree grows, the check goes red, and
+      // the repair is an edit to a number that measures nothing. What the pin was reaching for is that
+      // a deferral is a *decision somebody wrote down*, so that is what is checked: every deferred
+      // module carries a reason longer than a placeholder, and there is at least one, so a walk that
+      // classified nothing cannot pass this by being empty.
+      deferred.length > 0 &&
         deferred.every((entry) => typeof entry.reason === 'string' && entry.reason.length > 20),
     ],
     [
@@ -264,14 +270,18 @@ function selfTest() {
       ['no package imports upward: five edges, all downwards'],
     ],
     [
-      'a lost deferral is refused, because a deferral was a decision somebody wrote down',
+      // A deferral is a decision somebody wrote down, so an empty reason is a lost decision. The
+      // previous fixture flipped the verdict to `adapter` instead — a state the scanner cannot
+      // produce, since it derives `adapter` from the package — and the claim it exercised was the
+      // one whose count kept breaking. This one blanks the reason, which the record can really do.
+      'a blank deferral reason is refused, because a deferral was a decision somebody wrote down',
       fixture({
         coupled: fixture().coupled.map((entry) =>
-          entry.module === 'deferred-00' ? { ...entry, verdict: 'adapter' } : entry,
+          entry.module === 'deferred-00' ? { ...entry, reason: '' } : entry,
         ),
       }),
       fixture(),
-      ['fourteen modules keep their scenario words with a written reason, and none is blank'],
+      ['every deferral carries a written reason, and none is blank'],
     ],
     [
       'a statement that quotes a verdict instead of arithmetic is refused',

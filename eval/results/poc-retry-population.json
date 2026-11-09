@@ -1,0 +1,19 @@
+{
+  "id": "poc-retry-population",
+  "source_artifact": "poc-sota-bird-dev",
+  "source_split": "dev",
+  "database_root": "/root/bird-dev/dev_20240627",
+  "population": {
+    "asked": 1534,
+    "retried": 98,
+    "share": 0.0639,
+    "byReason": {
+      "no-query": 0,
+      "error": 9,
+      "empty": 89
+    },
+    "wrongAmongRetried": 98,
+    "floor": 140,
+    "meetsFloor": false
+  }
+}

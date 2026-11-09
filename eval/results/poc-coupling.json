@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 171,
+  "scanned": 173,
   "totals": {
-    "modules": 171,
-    "lines": 45919,
+    "modules": 173,
+    "lines": 46197,
     "adapterLines": 1956,
-    "deferredLines": 5952,
-    "coupledShare": 0.1695
+    "deferredLines": 6106,
+    "coupledShare": 0.1718
   },
   "layers": [
     {
@@ -37,11 +37,11 @@
     },
     {
       "layer": "eval",
-      "modules": 114,
-      "lines": 32844,
+      "modules": 116,
+      "lines": 33122,
       "adapterLines": 0,
-      "deferredLines": 5952,
-      "coupled": 14
+      "deferredLines": 6106,
+      "coupled": 15
     },
     {
       "layer": "browser",
@@ -70,7 +70,7 @@
     {
       "from": "eval",
       "to": "core",
-      "files": 47,
+      "files": 48,
       "upward": false
     },
     {
@@ -82,7 +82,7 @@
     {
       "from": "eval",
       "to": "sql",
-      "files": 9,
+      "files": 11,
       "upward": false
     },
     {
@@ -143,7 +143,7 @@
       "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 449,
+      "lines": 451,
       "words": [
         "sql",
         "sqlite",
@@ -210,6 +210,17 @@
       ],
       "verdict": "deferred",
       "reason": "the reproduction config names the published BIRD cell and its M-Schema rendering"
+    },
+    {
+      "pkg": "eval",
+      "module": "retry-trigger",
+      "path": "packages/eval/src/retry-trigger.ts",
+      "lines": 152,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "the retry vocabulary is made of execution facts — no query, an error, no rows — and it carries them into a prompt rather than executing anything"
     },
     {
       "pkg": "eval",
@@ -348,6 +359,13 @@
     {
       "pkg": "eval",
       "module": "embed-probe",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "empty-result",
       "words": [
         "bird"
       ]
@@ -517,7 +535,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "171 modules, 14 deferred with a reason"
+      "detail": "173 modules, 15 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -532,5 +550,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 45919 production lines across 171 modules: 7 adapter modules in `sql`, 14 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 46197 production lines across 173 modules: 7 adapter modules in `sql`, 15 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }
