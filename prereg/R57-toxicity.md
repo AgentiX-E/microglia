@@ -205,6 +205,48 @@ nothing, contradiction costs 7pp* — is the premise of the next four experiment
 ordering measured across three clocks. An ordering that survives one clock is a finding; an ordering
 that only exists across three is a coincidence with a schedule.
 
+## Amendment 4, 2026-11-09 — the pack is settled once per episode, and the published arms were measured under a moving one
+
+**What was wrong.** `MicrogliaAgent` recalled a pack on *every* turn from that turn's own message and
+prepended it as a second system message. Two consequences, found together and both structural:
+
+1. **The intervention moved.** A pack that changes each turn is a different treatment each turn, so a
+   delta over episodes was never a delta from "the memory" — it was a delta from a *sequence* of
+   memories. Every arm of this round, and every earlier arm that ran with a facade, was measured that
+   way.
+2. **It destroyed prefix caching for the rest of the prompt.** The provider caches on a token-block
+   prefix. With a per-turn second system message, the divergence point is the *second message of the
+   conversation*, so every token after it — the whole growing history, which is what an episode spends
+   most of its prompt on — was billed at the cache-miss rate on every turn of the memory arm and on no
+   turn of the reference arm. The two arms were not billed differently by 7%; they were billed
+   differently by the cache, and the lane could not see it because it recorded no token counts at all
+   (`calls: 0` on every arm).
+
+**The repair, and why it is a repair rather than a redesign.** The pack is recalled once, on the
+episode's first turn, and held for the rest of that episode (`eval/drivers/tau2/microglia_agent.py`,
+`selfcheck_agent.py`). The treatment is now a single intervention per episode — which is what "the
+store was frozen and the agent answered with it" was always supposed to mean — and the second system
+message no longer moves, so the conversation prefix is stable and cacheable.
+
+**What this does to the three published readings.**
+
+| quantity | measured under | still valid as |
+| --- | --- | --- |
+| `far` +0.00pp, `near` −3.51pp, `adversarial` +7.02pp | a pack recalled per turn | *the effect of a per-turn re-recall*, which is a different mechanism from a frozen store |
+| the ordering (near ≤ far < adversarial) | three separate dispatches, per-turn recall | the premise the next four experiments were registered against |
+
+**No decision rule changes, and no threshold moves.** The three readings are not withdrawn and they are
+not replaced: they are re-labelled by the mechanism that produced them, which is the rule Amendment 3
+already states for a reproduction. What changes is what the *next* dispatch measures, and its number
+will not be comparable to `+7.02pp` without saying so.
+
+**Why the cost matters to the science and not only to the bill.** A lane that cannot afford to run its
+own arms will run fewer of them, on smaller slices, with fewer trials — and every one of those is a
+power loss disguised as a result. The unit repair (`fc23de1`), the thinking-mode default, the retired
+model name, and this one are the same class of defect: **a number about the experiment that the
+experiment did not choose.** They are fixed together because each of them independently made a
+dispatch cost several times what its design assumed.
+
 ## Cost
 
 Three legs of one dispatch, not four dispatches: the registration's `plantedArms` header renders a
@@ -217,8 +259,9 @@ per leg carrying the per-arm coverage distribution.
 
 Because it cannot be made causal here. Joining an episode to the items in its pack needs a task and
 trial on every recall observation, and the τ² lane does not record one: `recall(text)` is called from
-the agent with no task context and the run is concurrent at four. Adding that context is a real
-repair and it is registered separately (`AUDIT 34.61`), but even with it, attribution over a store
-the distiller chose is confounded — an item is retrieved *because* it resembles the question, and
-the questions it resembles are the ones it is most likely to help or hurt. The planted rule is the
-only version of this question this bench can answer causally at this sample size.
+the agent with no task context, and the run is concurrent — one episode at a time since `fc23de1`,
+which makes a per-recall task label cheap but does not make the attribution causal. Adding that
+context is a real repair and it is registered separately (`AUDIT 34.61`), but even with it, attribution
+over a store the distiller chose is confounded — an item is retrieved *because* it resembles the
+question, and the questions it resembles are the ones it is most likely to help or hurt. The planted
+rule is the only version of this question this bench can answer causally at this sample size.

@@ -467,12 +467,32 @@ function diagnosticsOf(stdout: string): Tau2PhaseDiagnostics | undefined {
   return undefined;
 }
 
+/**
+ * What the provider says the phase cost, forwarded rather than recomputed.
+ *
+ * `cache_hit_rate` is the field this exists for. The reference arm and the memory arm send the
+ * same system prompt and the same growing conversation, so a cache-hit rate that differs between
+ * them by a factor is not a provider fluctuation — it is one arm changing a prefix the other arm
+ * leaves alone, and it is billed at roughly fifty times the hit rate on every token after the
+ * divergence point.
+ */
+type Tau2PhaseUsage = {
+  readonly calls?: number | null;
+  readonly prompt_tokens?: number | null;
+  readonly completion_tokens?: number | null;
+  readonly cached_tokens?: number | null;
+  readonly uncached_tokens?: number | null;
+  readonly cache_hit_rate?: number | null;
+};
+
 type Tau2PhaseDiagnostics = {
   readonly agent_turns?: number | null;
   readonly simulations?: number | null;
   readonly terminated?: Readonly<Record<string, number>> | null;
   /** Per-episode action record; absent on every run before the abstention instrument. */
   readonly inaction?: unknown;
+  /** Absent on every run before the counter existed, which is not the same as zero. */
+  readonly usage?: Tau2PhaseUsage | null;
 };
 
 /** The admission reasons, most frequent first, for the one line a run prints about its own store. */
@@ -1296,6 +1316,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   }
 
   const agentTurns = primary.diagnostics?.agent_turns ?? null;
+  // One line, unconditional, so that a run's bill is in its own log next to its score.
+  // `null` rather than an omitted line: a dispatch that could not count is a different
+  // fact from a dispatch that spent nothing, and the reader has to be able to tell.
+  process.stdout.write(
+    `[tau2] usage: ${JSON.stringify(primary.diagnostics?.usage ?? null)}\n`,
+  );
   const scored = primary.scored;
   const llmStats = llm.stats;
   observed = {

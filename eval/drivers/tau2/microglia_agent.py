@@ -1,4 +1,4 @@
-"""A tau2-bench agent that recalls a microglia pack before every turn.
+"""A tau2-bench agent that recalls one microglia pack per episode.
 
 Why this shape and not a fork of the benchmark: tau2 constructs its agents through
 a registry (`tau2.registry.register_agent`) and calls
@@ -8,10 +8,31 @@ the constructor is unchanged, and only `generate_next_message` is wrapped.
 
 What the wrapper does:
 
-  1. Takes the text of the incoming user or tool message.
-  2. Asks a local microglia facade for the pack relevant to it.
-  3. Prepends the pack as one additional system message, on a **copy** of the state,
-     so a pack is never repeated turn after turn as the conversation grows.
+  1. On the episode's first turn, takes the text of the incoming message and asks a
+     local microglia facade for the pack relevant to it.
+  2. Prepends that pack as one additional system message on a **copy** of the state.
+  3. Reuses the same pack for every later turn of that episode.
+
+**The pack is fixed per episode, and it was not before.** It used to be recalled on
+every turn from that turn's own message, which meant the second system message
+changed on every call. Two consequences, one of them financial:
+
+* **Prefix caching cannot work across turns.** DeepSeek caches on a token-block
+  prefix, and every message after the first differing block is a cache miss. With a
+  per-turn pack, the divergence point is the *second system message*, so the whole
+  conversation history — the part that grows quadratically with episode length —
+  was paid for at the miss rate on every single turn of the memory arm and on no
+  turn of the reference arm. The two arms were not being billed differently by 7%;
+  they were billed differently by the cache.
+* **The treatment was not constant.** A pack that changes each turn is a different
+  intervention each turn, so a delta over episodes cannot be attributed to "the
+  memory" — it is a delta over a sequence of interventions. R57's three arms were
+  measured under that arrangement and are re-read under `prereg/R57-toxicity.md`,
+  Amendment 4, rather than compared across it.
+
+An episode boundary is detected by the conversation getting shorter, which is the
+only thing `LLMAgentState` says about where it is: `messages` grows monotonically
+within an episode, so a length that does not exceed the last one is a new one.
 
 The memory is not a tool and not a policy change. It is context, which is exactly
 what the product claims to produce, and keeping it as one message makes the
@@ -41,6 +62,11 @@ PACK_TAG = "microglia-knowledge"
 
 _failures = 0
 _reported = False
+_recalls = 0
+
+# Sentinel rather than `None`, because "" is a real answer: a facade that was asked
+# and had nothing to say must not be asked again on the next turn.
+_UNSET = object()
 
 
 def _memory_url() -> str:
@@ -65,10 +91,11 @@ def recall(text: str) -> str:
     measuring the agent, and an unreachable sidecar is an infrastructure fact that
     should appear in the run's notes rather than as a crashed simulation.
     """
-    global _failures, _reported
+    global _failures, _reported, _recalls
     base = _memory_url()
     if base == "" or text.strip() == "":
         return ""
+    _recalls += 1
     domain = os.environ.get("MICROGLIA_DOMAIN", "").strip()
     query = {"task": "tau2.act", "text": text[:MAX_QUERY_CHARS]}
     if domain:
@@ -95,13 +122,31 @@ def injected_message(pack: str) -> SystemMessage:
 
 
 class MicrogliaAgent(LLMAgent):
-    """`LLMAgent` with one recalled system message in front of each turn."""
+    """`LLMAgent` whose recalled pack is settled on the first turn and then held.
+
+    The two class attributes are defaults, not state: an instance that has never
+    seen a turn reads `_UNSET` and an impossible length, and the first call settles
+    both. Nothing is written in `__init__` because the constructor belongs to tau2.
+    """
+
+    _pack: object = _UNSET
+    _turn: int = -1
+
+    def pack_for(self, state: LLMAgentState, text: str) -> str:
+        """The pack this turn should carry, recalling only when the episode changed."""
+        turn = len(state.messages)
+        held = self.__dict__.get("_pack", _UNSET)
+        if held is _UNSET or turn <= self.__dict__.get("_turn", -1):
+            held = recall(text)
+        self._pack = held
+        self._turn = turn
+        return held
 
     def generate_next_message(
         self, message: ValidAgentInputMessage, state: LLMAgentState
     ) -> tuple:
         text = getattr(message, "content", None)
-        pack = recall(text if isinstance(text, str) else "")
+        pack = self.pack_for(state, text if isinstance(text, str) else "")
         if pack:
             # A copy, not a mutation: appending to the shared state would make the
             # pack accumulate once per turn, and a ten-turn episode would carry ten
@@ -113,4 +158,8 @@ class MicrogliaAgent(LLMAgent):
 
 def memory_stats() -> dict:
     """What the run should record about the sidecar, so a zero is explainable."""
-    return {"recall_url": _memory_url(), "recall_failures": _failures}
+    return {
+        "recall_url": _memory_url(),
+        "recall_failures": _failures,
+        "recalls": _recalls,
+    }

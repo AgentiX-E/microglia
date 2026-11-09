@@ -24,9 +24,120 @@ import argparse
 import json
 import os
 import sys
+from collections import Counter
 
+import litellm
 from tau2.registry import registry
 from tau2.run import get_tasks, run_tasks
+
+# What this run spent, counted where it is spent.
+#
+# `l4` recorded `calls: 0` on every arm for two months because the episode count belongs to
+# another process and the distillation count belongs to this one, and nothing counted tokens
+# at all. A lane that cannot report its own bill cannot notice that one of its two arms is
+# paying the cache-miss rate on work the other arm pays the cache-hit rate for — which is
+# exactly what a per-turn memory injection does, silently, on every turn.
+#
+# The counter is a `Counter` rather than a dataclass because the provider's field names are
+# the record: `prompt_cache_hit_tokens` is DeepSeek's own, and a renamed copy would drift
+# from the API that produces it.
+_usage: Counter = Counter()
+
+
+def _number(usage, name: str) -> int:
+    value = getattr(usage, name, None)
+    if value is None and isinstance(usage, dict):
+        value = usage.get(name)
+    return int(value) if isinstance(value, (int, float)) else 0
+
+
+def _record_usage(kwargs, response, start_time, end_time) -> None:
+    del kwargs, start_time, end_time
+    usage = getattr(response, "usage", None)
+    if usage is None:
+        return
+    _usage["calls"] += 1
+    _usage["prompt_tokens"] += _number(usage, "prompt_tokens")
+    _usage["completion_tokens"] += _number(usage, "completion_tokens")
+    _usage["cached_tokens"] += _number(usage, "prompt_cache_hit_tokens")
+
+
+# litellm's callbacks are process-global and this module is imported once per process, but
+# `run_split` is also imported by its self-check, which imports it more than once under
+# different names. Guarding on identity keeps the count from doubling.
+if _record_usage not in litellm.success_callback:
+    litellm.success_callback.append(_record_usage)
+
+
+def usage_stats() -> dict:
+    """The run's bill, with the derived figures a reader would otherwise compute wrong."""
+    prompt = _usage["prompt_tokens"]
+    cached = _usage["cached_tokens"]
+    completion = _usage["completion_tokens"]
+    uncached = max(0, prompt - cached)
+    return {
+        "calls": _usage["calls"],
+        "prompt_tokens": prompt,
+        "completion_tokens": completion,
+        "cached_tokens": cached,
+        # Missed input is what the money is actually spent on, and it is not `prompt_tokens`:
+        # DeepSeek bills a cache hit at a fiftieth of the miss rate, so a run can double its
+        # prompt and halve its cost.
+        "uncached_tokens": uncached,
+        # A rate, not a count, because the comparison between arms is a rate: 0 means every
+        # token of the memory arm missed, which is the symptom this counter exists to expose.
+        "cache_hit_rate": (cached / prompt) if prompt else None,
+        "cost": _cost(prompt, cached, completion),
+    }
+
+
+# Per million tokens, deepseek-flash, read from the provider's rate card on 2026-11-09.
+# Kept in the artefact as well as in the code because a price is a fact about a date: a
+# number quoted a year from now without its rate card is a number nobody can check.
+_RATES = {
+    "peak": {"miss": 0.30, "hit": 0.006, "out": 1.20},
+    "off_peak": {"miss": 0.15, "hit": 0.003, "out": 0.60},
+}
+
+
+def _is_peak(now=None) -> bool:
+    """Peak is 01:00–04:00 and 06:00–10:00 UTC, Monday to Friday.
+
+    This is not a rounding: the same workload costs exactly twice as much inside those
+    windows, and every long run this repository has dispatched has started inside one of
+    them, because the person dispatching was awake in UTC+8 at the time.
+    """
+    from datetime import datetime, timezone
+
+    moment = now or datetime.now(timezone.utc)
+    if moment.weekday() >= 5:
+        return False
+    hour = moment.hour
+    return 1 <= hour < 4 or 6 <= hour < 10
+
+
+def _cost(prompt: int, cached: int, completion: int) -> dict:
+    peak = _is_peak()
+    mine = _RATES["peak" if peak else "off_peak"]
+    other = _RATES["off_peak" if peak else "peak"]
+    uncached = max(0, prompt - cached)
+
+    def bill(rate: dict) -> float:
+        return round(
+            cached / 1_000_000 * rate["hit"]
+            + uncached / 1_000_000 * rate["miss"]
+            + completion / 1_000_000 * rate["out"],
+            4,
+        )
+
+    return {
+        "usd": bill(mine),
+        "band": "peak" if peak else "off_peak",
+        "rates": mine,
+        # What the same tokens would have cost in the other band. A run that reports only its
+        # own band cannot be scheduled: the reader needs to know what moving it would save.
+        "usd_in_other_band": bill(other),
+    }
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
@@ -41,6 +152,28 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--max-steps", type=int, default=100)
     parser.add_argument("--seed", type=int, default=300)
     return parser.parse_args(argv)
+
+
+def _llm_args(retries: int) -> dict:
+    """Per-call arguments, including the one that decides the output bill.
+
+    `deepseek-flash` answers in thinking mode **by default** and bills reasoning tokens
+    at the output rate. tau-bench's agent makes one tool call per turn; a few hundred
+    tokens of deliberation before `get_order_status` is paid on every turn of every
+    episode and cannot change the reward. This lane asks for it off, and the request is
+    recorded in the artefact rather than left in a comment — a setting that changes the
+    bill by a factor has to be visible to whoever reads the number.
+
+    The legacy name `deepseek-chat` is scheduled for discontinuation and, while it still
+    resolves, it resolves to a model whose defaults this repository does not control.
+    Pinning the current name and the mode is the difference between a measurement and a
+    measurement of whatever the provider changed last night.
+    """
+    args: dict = {"num_retries": retries}
+    thinking = os.environ.get("TAU_THINKING", "disabled").strip().lower()
+    if thinking in ("disabled", "enabled"):
+        args["extra_body"] = {"thinking": {"type": thinking}}
+    return args
 
 
 def task_ids(domain: str, wanted: list[str]) -> list[str]:
@@ -163,12 +296,13 @@ def main(argv: list[str]) -> int:
         os.environ["MICROGLIA_MEMORY_URL"] = args.memory_url
     os.environ.setdefault("MICROGLIA_DOMAIN", args.domain)
 
-    model = os.environ.get("TAU_MODEL", "deepseek/deepseek-chat")
+    model = os.environ.get("TAU_MODEL", "deepseek/deepseek-flash")
     # litellm raises on a 429 rather than retrying, and one raised call aborts the
     # whole `run_tasks` - 68 tasks and 272 episodes lost to a rate limit one minute
     # from the end (the first reference-arm attempt). `num_retries` is litellm's own
     # knob and is forwarded verbatim through `llm_args_*`.
     retries = int(os.environ.get("TAU_RETRIES", "4"))
+    llm_args = _llm_args(retries)
     tasks = get_tasks(args.domain, wanted or None)
     if not tasks:
         raise SystemExit("tau2-no-tasks")
@@ -191,9 +325,9 @@ def main(argv: list[str]) -> int:
         # raises `TypeError: argument of type 'NoneType' is not iterable` before the
         # first episode. The parameters are optional in the signature and required by
         # the body; two empty dicts are the difference between a run and a traceback.
-        llm_args_agent={"num_retries": retries},
+        llm_args_agent=llm_args,
         llm_user=model,
-        llm_args_user={"num_retries": retries},
+        llm_args_user=llm_args,
         num_trials=args.trials,
         max_steps=args.max_steps,
         save_to=args.out,
@@ -212,7 +346,10 @@ def main(argv: list[str]) -> int:
                 "simulations": len(simulations) if simulations is not None else None,
                 "agent": args.agent,
                 "memory_url": args.memory_url,
-                "diagnostics": diagnostics_of(simulations),
+                "diagnostics": {**diagnostics_of(simulations), "usage": usage_stats()},
+                "usage": usage_stats(),
+                "thinking": os.environ.get("TAU_THINKING", "disabled"),
+                "model": model,
             }
         )
     )

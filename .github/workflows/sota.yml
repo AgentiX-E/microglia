@@ -360,9 +360,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/distill
-          key: distill-${{ vars.SOTA_MODEL || 'deepseek-chat' }}-sql-prompt-3-${{ github.run_id }}
+          key: distill-${{ vars.SOTA_MODEL || 'deepseek-flash' }}-sql-prompt-3-${{ github.run_id }}
           restore-keys: |
-            distill-${{ vars.SOTA_MODEL || 'deepseek-chat' }}-sql-prompt-3-
+            distill-${{ vars.SOTA_MODEL || 'deepseek-flash' }}-sql-prompt-3-
 
       - name: Run the benchmark
         # Above the lane's own deadline (130 minutes) with room for the last fold to finish
@@ -932,9 +932,14 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           TAU_DRIVER: ${{ vars.TAU_DRIVER || './packages/eval/src/bin/tau2-driver.ts' }}
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}
-          TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-chat' }}
+          TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-flash' }}
+          # Reasoning is billed at the output rate and tau-bench's agent makes one tool call per turn,
+          # so a few hundred tokens of deliberation before `get_order_status` is paid on every turn of
+          # every episode and cannot change the reward. `deepseek-flash` runs in thinking mode by
+          # default; this lane asks for it off, and `run_split` records the request in the artefact.
+          TAU_THINKING: ${{ vars.TAU_THINKING || 'disabled' }}
           # The distiller's model, in the REST id the endpoint serves. τ²'s Python half is a litellm
-          # caller and names its model `deepseek/deepseek-chat`; the TypeScript client that distils
+          # caller and names its model `deepseek/deepseek-flash`; the TypeScript client that distils
           # the corrections posts that name to `api.deepseek.com`, which answers 400 to it. Empty
           # means "read TAU_MODEL and translate the provider alias", which is the default.
           TAU_DISTILL_MODEL: ${{ vars.TAU_DISTILL_MODEL }}
@@ -987,7 +992,11 @@ jobs:
           TAU_PROVIDER_PROBE: ${{ steps.recall_floor.outputs.pair == 'true' && 'true' || 'false' }}
           TAU_DRIVER: ${{ vars.TAU_DRIVER || './packages/eval/src/bin/tau2-driver.ts' }}
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}
-          TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-chat' }}
+          TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-flash' }}
+          # Same value as the memory arm, and it has to be: the two arms must differ in the store and
+          # in nothing else. An arm that reasoned and a control that did not would differ in cost,
+          # in latency and in answer, and the delta would belong to none of them.
+          TAU_THINKING: ${{ vars.TAU_THINKING || 'disabled' }}
           TAU_VERSION: ${{ vars.TAU_VERSION }}
           # The scenario pair, stated once per arm so both arms cannot disagree about it. An
           # unset pair is a within-scenario run; a pair that differs is the transfer arm, whose
