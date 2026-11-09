@@ -23,6 +23,7 @@
  */
 import type { Json } from '@agentix-e/microglia-core';
 import { L4ParseError } from './l4.js';
+import type { DistillScope } from './tau2-scope.js';
 
 export type TauAction = {
   readonly name: string;
@@ -188,9 +189,29 @@ export function taskCorrection(task: TauTask): string | undefined {
   return undefined;
 }
 
+/**
+ * What a teaching record was made from: a task that went wrong and was repaired, or one that was
+ * right the first time.
+ *
+ * R62. The distinction is not decoration. A store grown from 14 repairs and a store grown from 57
+ * trajectories contain the same *kind* of claim, and only the provenance beside each one lets a
+ * readback say which store it is grading, count the two families separately, and refuse the case where
+ * an item cites both — a claim taught by a pass and a repair at once is the collision the round is
+ * looking for, and averaging it into either count would hide it.
+ */
+export type CorrectionProvenance = 'edited' | 'passed';
+
 export type Correction = {
   readonly taskId: string;
   readonly statement: string;
+  /**
+   * Whether this record came from a repair or from a pass.
+   *
+   * Required rather than optional: a default would have made every record a repair by omission, and
+   * an artefact that cannot tell the two apart cannot grade a round whose only moved knob is the
+   * population. See `CorrectionProvenance`.
+   */
+  readonly provenance: CorrectionProvenance;
   readonly actions: readonly TauAction[];
   /**
    * The request that was on screen when the episode went wrong.
@@ -243,10 +264,26 @@ export function correctionEdit(correction: Correction): Record<string, Json> {
  * Both callers of this — the corrections and the unanswered ledger — ask the same question in
  * different words, and they must answer it the same way: a task that teaches and a task that does
  * not are the two halves of one decision, and two copies of the decision drift.
+ *
+ * R62 adds the third answer. Under `scope: 'all'` a task whose reward cleared the threshold does not
+ * teach nothing; it teaches the rule its successful trajectory followed, and the record says so. The
+ * order of the two tests is what keeps the reading honest: a task with no recorded reward still
+ * teaches nothing under either scope, because a missing measurement is not a pass, and a pass with no
+ * stated criteria still teaches nothing, because there is no rule to state.
  */
-function teachingOf(task: TauTask, reward: number | undefined, threshold: number): string | undefined {
-  if (reward === undefined || reward >= threshold) return undefined;
-  return taskCorrection(task);
+function teachingOf(
+  task: TauTask,
+  reward: number | undefined,
+  threshold: number,
+  scope: DistillScope,
+): { readonly statement: string; readonly provenance: CorrectionProvenance } | undefined {
+  if (reward === undefined) return undefined;
+  const statement = taskCorrection(task);
+  if (statement === undefined) return undefined;
+  if (reward >= threshold) {
+    return scope === 'all' ? { statement, provenance: 'passed' } : undefined;
+  }
+  return { statement, provenance: 'edited' };
 }
 
 /**
@@ -255,23 +292,28 @@ function teachingOf(task: TauTask, reward: number | undefined, threshold: number
  * A task contributes one correction when its reward is below `threshold`, and none
  * when it passed: learning from a success would teach the memory that an episode
  * which already worked needs different handling.
+ *
+ * `scope` (R62) widens that to every task that states a rule, which is the population experiment:
+ * the default is `edited`, so every published arm keeps the store it measured.
  */
 export function learnableCorrections(
   tasks: readonly TauTask[],
   rewards: ReadonlyMap<string, number>,
   threshold = 1,
+  scope: DistillScope = 'edited',
 ): Correction[] {
   const out: Correction[] = [];
   for (const task of tasks) {
-    const teaching = teachingOf(task, rewards.get(task.id), threshold);
+    const teaching = teachingOf(task, rewards.get(task.id), threshold, scope);
     if (teaching === undefined) continue;
     out.push({
-    taskId: task.id,
-    statement: teaching,
-    actions: task.actions,
-    instruction: task.instruction,
-    assertions: task.assertions,
-  });
+      taskId: task.id,
+      statement: teaching.statement,
+      provenance: teaching.provenance,
+      actions: task.actions,
+      instruction: task.instruction,
+      assertions: task.assertions,
+    });
   }
   return out;
 }
@@ -293,6 +335,11 @@ export function learnableCorrections(
  *
  * The threshold travels with the caller's, so a run that scores partial credit reads its own passes
  * as passes here too.
+ *
+ * The scope does **not** travel: this ledger counts the questions a *repair* was supposed to answer,
+ * and it asks `teachingOf` with `'edited'` whatever the dispatch's scope is. Under `scope: 'all'` a
+ * pass becomes a teaching record, and it was already excluded one line above — the answer is the same
+ * and the reason is different, which is exactly why the argument is written down rather than inferred.
  */
 export function unansweredTasks(
   tasks: readonly TauTask[],
@@ -304,7 +351,7 @@ export function unansweredTasks(
     const reward = rewards.get(task.id);
     const passed = reward !== undefined && reward >= threshold;
     if (passed) continue;
-    if (teachingOf(task, reward, threshold) !== undefined) continue;
+    if (teachingOf(task, reward, threshold, 'edited') !== undefined) continue;
     out.push(task.id);
   }
   return out;

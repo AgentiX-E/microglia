@@ -16,9 +16,17 @@
 import { describe, expect, it } from 'vitest';
 import { buildDistillPrompt } from '@agentix-e/microglia-core/distill';
 import type { FeedbackEvent, RunRecord } from '@agentix-e/microglia-core';
-import { parseTraceCalls, resolveDistillUnit, traceOf, tracesOf, type TraceCall } from '../tau2-trace.js';
+import {
+  parseTraceCalls,
+  resolveDistillUnit,
+  traceOf,
+  tracesOf,
+  type TraceCall,
+} from '../tau2-trace.js';
 
-function assistantWith(...calls: readonly { readonly name: string; readonly arguments: unknown }[]) {
+function assistantWith(
+  ...calls: readonly { readonly name: string; readonly arguments: unknown }[]
+) {
   return {
     role: 'assistant',
     content: null,
@@ -70,7 +78,9 @@ describe('tracesOf', () => {
             {
               role: 'assistant',
               content: null,
-              tool_calls: [{ id: 'c1', function: { name: 'get_order', arguments: '{"id":"#W1"}' } }],
+              tool_calls: [
+                { id: 'c1', function: { name: 'get_order', arguments: '{"id":"#W1"}' } },
+              ],
             },
           ],
         },
@@ -86,9 +96,24 @@ describe('tracesOf', () => {
     // attempt. Reading the first trial would explain a failure with a success.
     const traces = tracesOf(
       document([
-        { task_id: 't1', trial: 0, reward_info: { reward: 1 }, messages: [assistantWith({ name: 'a', arguments: {} })] },
-        { task_id: 't1', trial: 1, reward_info: { reward: 0 }, messages: [assistantWith({ name: 'b', arguments: {} })] },
-        { task_id: 't1', trial: 2, reward_info: { reward: 0.5 }, messages: [assistantWith({ name: 'c', arguments: {} })] },
+        {
+          task_id: 't1',
+          trial: 0,
+          reward_info: { reward: 1 },
+          messages: [assistantWith({ name: 'a', arguments: {} })],
+        },
+        {
+          task_id: 't1',
+          trial: 1,
+          reward_info: { reward: 0 },
+          messages: [assistantWith({ name: 'b', arguments: {} })],
+        },
+        {
+          task_id: 't1',
+          trial: 2,
+          reward_info: { reward: 0.5 },
+          messages: [assistantWith({ name: 'c', arguments: {} })],
+        },
       ]),
     );
     expect(traces.get('t1')?.attempt.map((call) => call.name)).toEqual(['b']);
@@ -106,9 +131,14 @@ describe('tracesOf', () => {
   });
 
   it('bounds the attempt and says how much it cut', () => {
-    const calls = Array.from({ length: 20 }, (_, index) => ({ name: `call_${String(index)}`, arguments: {} }));
+    const calls = Array.from({ length: 20 }, (_, index) => ({
+      name: `call_${String(index)}`,
+      arguments: {},
+    }));
     const traces = tracesOf(
-      document([{ task_id: 't1', reward_info: { reward: 0 }, messages: [assistantWith(...calls)] }]),
+      document([
+        { task_id: 't1', reward_info: { reward: 0 }, messages: [assistantWith(...calls)] },
+      ]),
       8,
     );
     expect(traces.get('t1')?.attempt).toHaveLength(8);
@@ -144,20 +174,34 @@ describe('tracesOf', () => {
   });
 
   it('renders a call with no arguments as its name, and a scalar argument as itself', () => {
-    expect(parseTraceCalls([{ role: 'assistant', tool_calls: [{ name: 'ping' }] }])[0]?.detail).toBe('ping');
     expect(
-      parseTraceCalls([{ role: 'assistant', tool_calls: [{ name: 'ping', arguments: 7 }] }])[0]?.detail,
+      parseTraceCalls([{ role: 'assistant', tool_calls: [{ name: 'ping' }] }])[0]?.detail,
+    ).toBe('ping');
+    expect(
+      parseTraceCalls([{ role: 'assistant', tool_calls: [{ name: 'ping', arguments: 7 }] }])[0]
+        ?.detail,
     ).toBe('ping(7)');
     expect(
-      parseTraceCalls([{ role: 'assistant', tool_calls: [{ name: 'ping', arguments: null }] }])[0]?.detail,
+      parseTraceCalls([{ role: 'assistant', tool_calls: [{ name: 'ping', arguments: null }] }])[0]
+        ?.detail,
     ).toBe('ping');
   });
 
   it('keeps the first trial when two failed the same way', () => {
     const traces = tracesOf(
       document([
-        { task_id: 't1', trial: 0, reward_info: { reward: 0 }, messages: [assistantWith({ name: 'a', arguments: {} })] },
-        { task_id: 't1', trial: 1, reward_info: { reward: 0 }, messages: [assistantWith({ name: 'b', arguments: {} })] },
+        {
+          task_id: 't1',
+          trial: 0,
+          reward_info: { reward: 0 },
+          messages: [assistantWith({ name: 'a', arguments: {} })],
+        },
+        {
+          task_id: 't1',
+          trial: 1,
+          reward_info: { reward: 0 },
+          messages: [assistantWith({ name: 'b', arguments: {} })],
+        },
       ]),
     );
     expect(traces.get('t1')?.trial).toBe(0);
@@ -166,7 +210,10 @@ describe('tracesOf', () => {
 
   it('drops a call with no name rather than inventing one', () => {
     const calls = parseTraceCalls([
-      { role: 'assistant', tool_calls: [{ arguments: { x: 1 } }, { name: '  ' }, { name: 'ok', arguments: {} }] },
+      {
+        role: 'assistant',
+        tool_calls: [{ arguments: { x: 1 } }, { name: '  ' }, { name: 'ok', arguments: {} }],
+      },
     ]);
     expect(calls.map((call: TraceCall) => call.name)).toEqual(['ok']);
   });
@@ -184,14 +231,23 @@ describe('trace reading, on the shapes that are malformed rather than merely dif
 
   it('reads a simulation that states no trial as trial zero', () => {
     const traces = tracesOf(
-      document([{ task_id: 't1', reward_info: { reward: 0 }, messages: [assistantWith({ name: 'a', arguments: {} })] }]),
+      document([
+        {
+          task_id: 't1',
+          reward_info: { reward: 0 },
+          messages: [assistantWith({ name: 'a', arguments: {} })],
+        },
+      ]),
     );
     expect(traces.get('t1')?.trial).toBe(0);
   });
 
   it('renders an argument whose value is undefined as null rather than dropping the key', () => {
     const calls = parseTraceCalls([
-      { role: 'assistant', tool_calls: [{ name: 'call', arguments: { user: undefined, order: '#W1' } }] },
+      {
+        role: 'assistant',
+        tool_calls: [{ name: 'call', arguments: { user: undefined, order: '#W1' } }],
+      },
     ]);
     expect(calls[0]?.detail).toBe('call(user=null, order="#W1")');
   });
@@ -213,7 +269,12 @@ describe('trace reading, on the shapes that are malformed rather than merely dif
     const traces = tracesOf(
       document([
         { task_id: 't1', trial: 0, messages: [assistantWith({ name: 'a', arguments: {} })] },
-        { task_id: 't1', trial: 1, reward_info: { reward: 0 }, messages: [assistantWith({ name: 'b', arguments: {} })] },
+        {
+          task_id: 't1',
+          trial: 1,
+          reward_info: { reward: 0 },
+          messages: [assistantWith({ name: 'b', arguments: {} })],
+        },
       ]),
     );
     expect(traces.get('t1')?.trial).toBe(1);
@@ -225,12 +286,17 @@ describe('trace reading, on the shapes that are malformed rather than merely dif
       { role: 'assistant', tool_calls: [{ name: 'call', arguments: { blob: 'x'.repeat(400) } }] },
     ]);
     expect(calls[0]?.detail.endsWith('…')).toBe(true);
-    expect((calls[0]?.detail.length ?? 0)).toBeLessThanOrEqual(240);
+    expect(calls[0]?.detail.length ?? 0).toBeLessThanOrEqual(240);
   });
 });
 
 describe('traceOf and the payload the prompt reads', () => {
-  const trace = { taskId: 't1', trial: 0, attempt: [{ name: 'find_user', detail: 'find_user(user_id="u_1")' }], omitted: 0 };
+  const trace = {
+    taskId: 't1',
+    trial: 0,
+    attempt: [{ name: 'find_user', detail: 'find_user(user_id="u_1")' }],
+    omitted: 0,
+  };
 
   it('carries both halves of the episode, which is the whole point of the unit', () => {
     const payload = traceOf(trace, {
@@ -256,6 +322,66 @@ describe('traceOf and the payload the prompt reads', () => {
   });
 });
 
+describe('traceOf and the record a passing trajectory makes', () => {
+  const trace = {
+    taskId: 't1',
+    trial: 0,
+    attempt: [{ name: 'find_user', detail: 'find_user(user_id="u_1")' }],
+    omitted: 0,
+  };
+
+  it('states the trajectory that met the checks, and no reference to differ from', () => {
+    // R62. A record made from a task that passed has nothing to compare: the attempt *is* the
+    // reference. Emitting an empty `expected` would be the same lie as an empty rubric — it says
+    // "the reference trajectory does nothing", which is a claim about the task rather than an absence.
+    const payload = traceOf(trace, { met: true, rubric: ['The order must still be pending.'] });
+    expect(payload['trace']).toEqual({
+      attempt: ['find_user(user_id="u_1")'],
+      rubricMet: true,
+      rubric: ['The order must still be pending.'],
+      omitted: 0,
+    });
+    expect(Object.keys(payload['trace'] as Record<string, unknown>)).not.toContain('expected');
+  });
+
+  it('refuses a payload that would say both', () => {
+    // The contradiction has to be refused at the boundary rather than resolved in a caller's favour:
+    // a prompt that holds "here is what should have happened instead" beside "nothing should have
+    // happened instead" asks the model to guess, and a guess inside a prompt is an undeclared
+    // measurement.
+    expect(() => traceOf(trace, { met: true, expected: ['find_user(user_id="u_1")'] })).toThrow(
+      RangeError,
+    );
+  });
+
+  it('omits a rubric it does not have, on the passing shape too', () => {
+    const payload = traceOf(trace, { met: true });
+    expect(Object.keys(payload['trace'] as Record<string, unknown>).sort()).toEqual([
+      'attempt',
+      'omitted',
+      'rubricMet',
+    ]);
+  });
+
+  it('writes an empty expected list when a repair record supplies none at all', () => {
+    // Reachable now that the field is optional: a caller with a reference it could not read states
+    // nothing rather than omitting the key, because the repair shape promises a list and a reader
+    // that had to tell "absent" from "empty" here would be re-deriving what `met` already says.
+    expect(traceOf(trace, { met: false })).toEqual({
+      trace: { attempt: ['find_user(user_id="u_1")'], expected: [], omitted: 0 },
+    });
+  });
+
+  it('keeps the repair shape byte for byte when `met` is absent', () => {
+    // The invariant that makes R62 comparable to R61: a dispatch that distils repairs alone must read
+    // exactly the payload it read before this field existed. `met: false` and an absent `met` are the
+    // same payload, so a caller cannot half-migrate.
+    expect(traceOf(trace, { expected: ['a(b="1")'], rubric: ['r'] })).toEqual(
+      traceOf(trace, { expected: ['a(b="1")'], rubric: ['r'], met: false }),
+    );
+  });
+});
+
 describe('resolveDistillUnit', () => {
   it('defaults to the correction, which is what every published arm measured', () => {
     expect(resolveDistillUnit(undefined)).toBe('correction');
@@ -276,7 +402,6 @@ describe('resolveDistillUnit', () => {
     expect(() => resolveDistillUnit('traces')).toThrow(/TAU_DISTILL_UNIT/);
   });
 });
-
 
 describe('the hand-off the driver makes, without a driver', () => {
   it('carries an attempt read from a learning document into the prompt a model would receive', () => {

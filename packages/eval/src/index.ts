@@ -595,6 +595,17 @@ export {
   type TraceCall,
 } from './tau2-trace.js';
 
+// R62: which trajectories teach. Exported beside the unit because the two are the round's two
+// switches -- one says what shape a record has, the other says which tasks produce one -- and a
+// driver that could import one and not the other would decide the population by accident.
+export { resolveDistillScope, type DistillScope } from './tau2-scope.js';
+export {
+  provenanceCensus,
+  type ProvenanceCensus,
+  type ProvenanceItem,
+  type ProvenanceRecord,
+} from './tau2-provenance.js';
+
 export {
   INJECTION_NOTE_LEVELS,
   resolveInjectionNotePlan,
@@ -950,6 +961,7 @@ export {
   splitTaskIds,
   unansweredTasks,
   type Correction,
+  type CorrectionProvenance,
   type DriverCommand,
   type TauAction,
   type TauTask,

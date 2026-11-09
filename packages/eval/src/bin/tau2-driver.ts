@@ -85,7 +85,9 @@ import {
   noteFacadeReading,
   noteFacadeSummary,
   resolveDistillForm,
+  resolveDistillScope,
   resolveDistillUnit,
+  provenanceCensus,
   resolveTraceClaims,
   tracesOf,
   yieldCensus,
@@ -99,6 +101,7 @@ import {
   trialRowsOf,
   unansweredTasks,
   type Correction,
+  type CorrectionProvenance,
   type PassAtKInput,
   type TaskTrace,
   type Tau2ArmRecord,
@@ -302,6 +305,16 @@ const DISTILL_UNIT = resolveDistillUnit();
 // R60: how many claims one trace may teach. Declared readback in the artefact, because two runs at
 // two ceilings are two experiments and a store cannot say which one built it.
 const TRACE_CLAIMS = resolveTraceClaims();
+
+/**
+ * Which trajectories teach this dispatch (R62).
+ *
+ * `edited` is every published arm; `all` also asks each task that passed what its successful
+ * trajectory does. Read at module load so a misspelt value refuses the run before the first model
+ * call, and recorded in the artefact from the same value, because a store cannot say which population
+ * built it.
+ */
+const DISTILL_SCOPE = resolveDistillScope();
 
 /** One `run_split.py` invocation, with its stdout surfaced on failure. */
 async function phase(args: readonly string[]): Promise<string> {
@@ -682,7 +695,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       ? tracesOf(learnedDocument)
       : new Map<string, TaskTrace>();
   const rewards = bestRewards(learned);
-  const corrections: Correction[] = learnableCorrections(learnedTasks, rewards);
+  const corrections: Correction[] = learnableCorrections(learnedTasks, rewards, 1, DISTILL_SCOPE);
   // The two ways a training task can leave the store without a correction are not the same fact, and
   // V32 grades the difference: a task the model *passed* needed nothing, so a store built from every
   // failure is the store the arm was defined as; a task that *failed* and still taught nothing is a
@@ -722,6 +735,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       // measurement R54 made and R56 reverted; a correction arm that took the trace guidance would
       // be asked to compare an attempt it was never shown.
       form: DISTILL_UNIT === "trace" ? "trace" : DISTILL_FORM,
+      // R62: the prompt names the shape a record without `expected` has, but only for a dispatch that
+      // can produce one. A repair-only run reads exactly the prompt it read in R61, which is the
+      // property that keeps a published arm's numbers comparable across the change.
+      ...(DISTILL_SCOPE === "all" ? { passScope: true } : {}),
       // Three claims from one trace: the unit is richer, and a single sentence about a whole
       // episode is the object this registration exists to replace.
       ...(DISTILL_UNIT === "trace"
@@ -766,8 +783,16 @@ export async function run(): Promise<readonly PassAtKInput[]> {
 
   let withTrace = 0;
   // R60: one row per correction, so the yield can be attributed rather than averaged. The run id is
-  // what an item's evidence cites, and it is known only here.
-  const captured: { taskId: string; runId: string; assertions: number }[] = [];
+  // what an item's evidence cites, and it is known only here. R62 adds the provenance to the same row,
+  // because the join an item's evidence makes is the only route from a stored claim back to the task
+  // that taught it -- and without it the round cannot say which of the two populations a claim's
+  // support came from.
+  const captured: {
+    taskId: string;
+    runId: string;
+    assertions: number;
+    provenance: CorrectionProvenance;
+  }[] = [];
   for (const correction of corrections) {
     const trace = traces.get(correction.taskId);
     if (trace !== undefined) withTrace += 1;
@@ -800,9 +825,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         ...(trace === undefined
           ? {}
           : traceOf(trace, {
-              expected: correction.actions.map((action) =>
-                actionSentence(action),
-              ),
+              // R62: a record made from a passing trajectory has no reference to differ from, and the
+              // payload says so rather than offering it the gold path as though the attempt had missed
+              // it. Two shapes, one decision, made here because this is the only place that knows
+              // which population the record came from.
+              ...(correction.provenance === "passed"
+                ? { met: true }
+                : {
+                    expected: correction.actions.map((action) =>
+                      actionSentence(action),
+                    ),
+                  }),
               ...(correction.assertions.length === 0
                 ? {}
                 : { rubric: correction.assertions }),
@@ -816,6 +849,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       taskId: correction.taskId,
       runId: handle.id,
       assertions: correction.assertions.length,
+      provenance: correction.provenance,
     });
     await handle.complete({
       actions: correction.actions.map((action) => action.name),
@@ -854,6 +888,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // two claims into one leaves the survivor citing both runs and the retired item citing its own,
   // and a yield counted after it would report one claim twice. See `claimsPerCorrection`.
   const written = await store.listKnowledge({});
+  // R62: which population each claim came from, joined through the evidence's own run id. Taken here,
+  // from the store as the distiller wrote it, for the same reason the sweep is: the pass below folds
+  // items together, and a census over the folded store would attribute a merged claim to whichever of
+  // its two records the survivor happened to cite first.
+  const provenance = provenanceCensus(captured, written);
   const consolidationOptions = {
     now: Date.now(),
     policy: defaultPolicy,
@@ -1268,7 +1307,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     learning: {
       rows: train.length,
       unanswered,
-      edited: corrections.length,
+      // R62: corrections *from a repair*. Under `scope: all` the store also holds records made from a
+      // pass, and folding those into this count would make a widened store and a repaired one report
+      // the same number -- the field's name and its value finally agree, and the population is read
+      // from `provenance` instead.
+      edited: provenance.edited,
       distilled: knowledge.length,
       // Every count here is the distiller's own, including the one that explains an empty store.
       distillFailed: distillReport.failed,
@@ -1324,6 +1367,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         ? {}
         : { consolidation: consolidation.report }),
     },
+    // R62: which trajectories taught, and what the store looks like split by that. `scope` is the
+    // switch the dispatch read; `provenance` is the measurement of what it produced, and the two are
+    // recorded separately because a dispatch that asked for `all` and produced only repairs has to be
+    // distinguishable from one that asked for `edited`.
+    distillScope: DISTILL_SCOPE,
+    provenance,
     // R57: the controlled distractor, when this dispatch armed one. Absent is the control arm.
     ...(primary.plant === undefined ? {} : { plant: primary.plant }),
     // R60: the ceiling this dispatch ran at, and whether it was chosen or inherited.

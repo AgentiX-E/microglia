@@ -120,11 +120,19 @@ function rewardOf(simulation: Record<string, unknown>): number | undefined {
 }
 
 /**
- * Every failed task's attempt, keyed by task id.
+ * Every task's attempt, keyed by task id.
  *
  * A task with several trials contributes the one with the lowest reward, because that is the attempt
- * the correction was learned from. An unscored trial is ranked last rather than first: it teaches
- * nothing about the failure, and it is kept only when it is the only attempt there is.
+ * the record is about. An unscored trial is ranked last rather than first: it teaches nothing about
+ * the failure, and it is kept only when it is the only attempt there is.
+ *
+ * R62 reads this map under both provenances, and the same rule serves both: for a task that failed,
+ * the lowest reward is the failing attempt a repair is learned from; for a task that passed every
+ * trial, the lowest reward is still a pass. The two cannot disagree in this lane because the learning
+ * phase runs **one trial per task** — so a task whose best reward clears the threshold is a task whose
+ * only reward clears it. That is a property of the driver's own call (`trials: 1`), not of this
+ * function: a lane that ran the learning half at several trials would need the ranking to follow the
+ * provenance, and the paragraph is here so that whoever does it knows which assumption moved.
  */
 export function tracesOf(document: unknown, cap = TRACE_CALL_CAP): ReadonlyMap<string, TaskTrace> {
   const root = asRecord(document);
@@ -160,16 +168,42 @@ export function tracesOf(document: unknown, cap = TRACE_CALL_CAP): ReadonlyMap<s
  * the call site is a shape two call sites disagree about. `rubric` is omitted when the task states
  * none: an empty list would read as "the rubric was empty", which is a different fact from "this
  * task is scored on calls alone".
+ *
+ * R62 adds the third shape. A record made from a task that **passed** has no reference to compare
+ * against — the attempt *is* the reference — so it carries `rubricMet: true` and no `expected` list.
+ * Supplying both is refused rather than resolved in a caller's favour: a payload that says "here is
+ * what should have happened instead" beside "nothing should have happened instead" is a contradiction
+ * the model would have to guess about, and a guess inside a prompt is a measurement nobody declared.
  */
 export function traceOf(
   trace: TaskTrace,
-  reference: { readonly expected: readonly string[]; readonly rubric?: readonly string[] },
+  reference: {
+    readonly expected?: readonly string[];
+    readonly rubric?: readonly string[];
+    readonly met?: boolean;
+  },
 ): Record<string, Json> {
   const rubric = reference.rubric ?? [];
+  if (reference.met === true) {
+    if (reference.expected !== undefined) {
+      throw new RangeError(
+        'a passing trace states the trajectory that met its checks and no reference trajectory; ' +
+          'both were supplied',
+      );
+    }
+    return {
+      trace: {
+        attempt: trace.attempt.map((call) => call.detail),
+        rubricMet: true,
+        ...(rubric.length === 0 ? {} : { rubric: [...rubric] }),
+        omitted: trace.omitted,
+      },
+    };
+  }
   return {
     trace: {
       attempt: trace.attempt.map((call) => call.detail),
-      expected: [...reference.expected],
+      expected: [...(reference.expected ?? [])],
       ...(rubric.length === 0 ? {} : { rubric: [...rubric] }),
       omitted: trace.omitted,
     },

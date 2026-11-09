@@ -27,7 +27,9 @@ describe('parseTauTasks', () => {
         {
           id: 't1',
           evaluation_criteria: {
-            actions: [{ name: 'get_order', arguments: { order_id: '#W1' }, compare_args: ['order_id'] }],
+            actions: [
+              { name: 'get_order', arguments: { order_id: '#W1' }, compare_args: ['order_id'] },
+            ],
             communicate_info: ['the order ships Monday'],
             nl_assertions: ['The order status is pending.'],
           },
@@ -47,16 +49,21 @@ describe('parseTauTasks', () => {
 
   it('omits compare_args when the evaluator does not constrain them', () => {
     const [parsed] = parseTauTasks({
-      tasks: [{ id: 't1', evaluation_criteria: { actions: [{ name: 'get_order', arguments: { a: 1 } }] } }],
+      tasks: [
+        {
+          id: 't1',
+          evaluation_criteria: { actions: [{ name: 'get_order', arguments: { a: 1 } }] },
+        },
+      ],
     });
     expect(parsed?.actions[0]).toEqual({ name: 'get_order', arguments: { a: 1 } });
     expect(parsed?.actions[0]).not.toHaveProperty('compareArgs');
   });
 
   it('treats criteria with a non-array actions field as nothing to check', () => {
-    expect(parseTauTasks({ tasks: [{ id: 't4', evaluation_criteria: { actions: null } }] })).toEqual([
-      { id: 't4', instruction: '', actions: [], communicate: [], assertions: [] },
-    ]);
+    expect(
+      parseTauTasks({ tasks: [{ id: 't4', evaluation_criteria: { actions: null } }] }),
+    ).toEqual([{ id: 't4', instruction: '', actions: [], communicate: [], assertions: [] }]);
   });
 
   it('keeps a task with no criteria as a task with nothing to check', () => {
@@ -92,11 +99,13 @@ describe('parseTauTasks', () => {
   });
 
   it('refuses a malformed action rather than guessing its call', () => {
-    expect(() => parseTauTasks({ tasks: [{ id: 't', evaluation_criteria: { actions: [null] } }] })).toThrow(
-      /an action is not an object/,
-    );
     expect(() =>
-      parseTauTasks({ tasks: [{ id: 't', evaluation_criteria: { actions: [{ arguments: {} }] } }] }),
+      parseTauTasks({ tasks: [{ id: 't', evaluation_criteria: { actions: [null] } }] }),
+    ).toThrow(/an action is not an object/);
+    expect(() =>
+      parseTauTasks({
+        tasks: [{ id: 't', evaluation_criteria: { actions: [{ arguments: {} }] } }],
+      }),
     ).toThrow(/an action has no name/);
     expect(() =>
       parseTauTasks({ tasks: [{ id: 't', evaluation_criteria: { actions: [{ name: 'go' }] } }] }),
@@ -106,7 +115,9 @@ describe('parseTauTasks', () => {
 
 describe('actionSentence', () => {
   it('renders a call the way a person would write it', () => {
-    expect(actionSentence({ name: 'get_order', arguments: { order_id: '#W1' } })).toBe('get_order(order_id="#W1")');
+    expect(actionSentence({ name: 'get_order', arguments: { order_id: '#W1' } })).toBe(
+      'get_order(order_id="#W1")',
+    );
   });
 
   it('keeps numbers bare and objects as JSON', () => {
@@ -131,7 +142,9 @@ describe('taskCorrection', () => {
           ],
         }),
       ),
-    ).toBe('A request of this shape is resolved by calling get_order(order_id="#W1"), then cancel(order_id="#W1", reason="late"), in that order.');
+    ).toBe(
+      'A request of this shape is resolved by calling get_order(order_id="#W1"), then cancel(order_id="#W1", reason="late"), in that order.',
+    );
   });
 
   it('teaches the rubric when the criteria name no action', () => {
@@ -144,7 +157,10 @@ describe('taskCorrection', () => {
       taskCorrection(
         task({
           actions: [],
-          assertions: ['The order status is cancelled.', 'The payment is refunded to the gift card.'],
+          assertions: [
+            'The order status is cancelled.',
+            'The payment is refunded to the gift card.',
+          ],
         }),
       ),
     ).toBe(
@@ -153,7 +169,9 @@ describe('taskCorrection', () => {
   });
 
   it('prefers the calls when a task states both, because they are the sharper lesson', () => {
-    expect(taskCorrection(task({ assertions: ['The order is cancelled.'] }))).toContain('resolved by calling');
+    expect(taskCorrection(task({ assertions: ['The order is cancelled.'] }))).toContain(
+      'resolved by calling',
+    );
   });
 
   it('teaches nothing when the criteria name neither an action nor an assertion', () => {
@@ -165,9 +183,9 @@ describe('the instruction, which the lane threw away for its whole life', () => 
   const first = (document: unknown) => parseTauTasks(document)[0]?.instruction;
 
   it('reads the bare-string shape', () => {
-    expect(first({ tasks: [{ id: '7', user_scenario: { instructions: 'Swap my two orders.' } }] })).toBe(
-      'Swap my two orders.',
-    );
+    expect(
+      first({ tasks: [{ id: '7', user_scenario: { instructions: 'Swap my two orders.' } }] }),
+    ).toBe('Swap my two orders.');
   });
 
   it('joins the object shape, because the topic alone recalls every topic', () => {
@@ -180,7 +198,10 @@ describe('the instruction, which the lane threw away for its whole life', () => 
           {
             id: '9',
             user_scenario: {
-              instructions: { reason_for_call: 'Refund', task_instructions: 'Refund the cheapest item.' },
+              instructions: {
+                reason_for_call: 'Refund',
+                task_instructions: 'Refund the cheapest item.',
+              },
             },
           },
         ],
@@ -195,7 +216,9 @@ describe('the instruction, which the lane threw away for its whole life', () => 
       }),
     ).toBe('Cancel it.');
     expect(
-      first({ tasks: [{ id: '9', user_scenario: { instructions: { reason_for_call: 'Cancel' } } }] }),
+      first({
+        tasks: [{ id: '9', user_scenario: { instructions: { reason_for_call: 'Cancel' } } }],
+      }),
     ).toBe('Cancel');
   });
 
@@ -209,13 +232,17 @@ describe('the instruction, which the lane threw away for its whole life', () => 
   });
 
   it('trims both shapes, so a padded instruction is not a padded prompt', () => {
-    expect(first({ tasks: [{ id: '7', user_scenario: { instructions: '  Swap.  ' } }] })).toBe('Swap.');
+    expect(first({ tasks: [{ id: '7', user_scenario: { instructions: '  Swap.  ' } }] })).toBe(
+      'Swap.',
+    );
     expect(
       first({
         tasks: [
           {
             id: '7',
-            user_scenario: { instructions: { reason_for_call: ' Refund ', task_instructions: ' Now. ' } },
+            user_scenario: {
+              instructions: { reason_for_call: ' Refund ', task_instructions: ' Now. ' },
+            },
           },
         ],
       }),
@@ -229,7 +256,8 @@ describe('correctionEdit', () => {
       correctionEdit({
         taskId: 'a',
         instruction: '',
-        statement: 'A request of this shape is resolved by calling get_order(order_id="#W1"), in that order.',
+        statement:
+          'A request of this shape is resolved by calling get_order(order_id="#W1"), in that order.',
         actions: [{ name: 'get_order', arguments: { order_id: '#W1' } }],
       }),
     ).toEqual({ actions: [{ name: 'get_order', arguments: { order_id: '#W1' } }] });
@@ -276,7 +304,9 @@ describe('learnableCorrections', () => {
     );
     expect(only?.taskId).toBe('a');
     expect(only?.actions).toEqual([]);
-    expect(only?.statement).toBe('A request of this shape is resolved when: The order is cancelled.');
+    expect(only?.statement).toBe(
+      'A request of this shape is resolved when: The order is cancelled.',
+    );
   });
 
   it('carries the question on the correction, because the write path is where it went missing', () => {
@@ -297,10 +327,18 @@ describe('learnableCorrections', () => {
     // correction carried the first and dropped the second, so a distiller reading a trace could
     // see what the agent did and only half of what it should have done.
     const [only] = learnableCorrections(
-      [task({ id: 'a', assertions: ['The order is cancelled.', 'The user is told the refund date.'] })],
+      [
+        task({
+          id: 'a',
+          assertions: ['The order is cancelled.', 'The user is told the refund date.'],
+        }),
+      ],
       new Map([['a', 0]]),
     );
-    expect(only?.assertions).toEqual(['The order is cancelled.', 'The user is told the refund date.']);
+    expect(only?.assertions).toEqual([
+      'The order is cancelled.',
+      'The user is told the refund date.',
+    ]);
   });
 
   it('honours a threshold below one, for runs that score partial credit', () => {
@@ -311,9 +349,83 @@ describe('learnableCorrections', () => {
     ]);
     expect(learnableCorrections(tasks, rewards, 0.8).map((entry) => entry.taskId)).toEqual(['b']);
   });
+
+  it('marks every record it makes under the default scope as a repair', () => {
+    // R62. The provenance is required on the type, so the default scope's answer has to be asserted
+    // rather than assumed: a store of records all labelled `passed` would read as a widened population
+    // that was never widened.
+    const [only] = learnableCorrections([task({ id: 'a' })], new Map([['a', 0]]));
+    expect(only?.provenance).toBe('edited');
+  });
+
+  it('teaches the rule a passing trajectory followed, when the scope asks for every trajectory', () => {
+    // R62's treatment in one assertion. Twenty-three of R61's forty-five claims came from a
+    // population of fourteen tasks, and the other forty-three tasks taught nothing because they
+    // passed. Under `all` each of them states the rule its own trajectory follows, and the statement
+    // is derived the same way a repair's is -- from the criteria -- because that is what the task
+    // document establishes about what the right path is.
+    const tasks = [
+      task({ id: 'a' }),
+      task({ id: 'b', instruction: 'Cancel the order the user named.' }),
+    ];
+    const rewards = new Map([
+      ['a', 0],
+      ['b', 1],
+    ]);
+    const corrections = learnableCorrections(tasks, rewards, 1, 'all');
+    expect(corrections.map((entry) => entry.taskId)).toEqual(['a', 'b']);
+    expect(corrections.map((entry) => entry.provenance)).toEqual(['edited', 'passed']);
+    expect(corrections[1]?.statement).toBe(
+      'A request of this shape is resolved by calling get_order(order_id="#W1"), in that order.',
+    );
+  });
+
+  it('still refuses a pass that states no criteria, under either scope', () => {
+    // A widened population is a widening of *what teaches*, not a suspension of the requirement that
+    // something was stated. This is the case a `scope: all` implementation that skipped the
+    // `taskCorrection` check would silently admit as an empty-statement record.
+    const bare = [task({ id: 'a', actions: [], assertions: [] })];
+    expect(learnableCorrections(bare, new Map([['a', 1]]), 1, 'all')).toEqual([]);
+    expect(learnableCorrections(bare, new Map([['a', 1]]))).toEqual([]);
+  });
+
+  it('still refuses an unscored task under either scope', () => {
+    // A missing measurement is not a pass. The order of the two tests in `teachingOf` is what decides
+    // this, and reading the switch first would turn "nobody scored it" into "it succeeded".
+    const tasks = [task({ id: 'a' })];
+    expect(learnableCorrections(tasks, new Map(), 1, 'all')).toEqual([]);
+  });
+
+  it('reads a partial-credit threshold on the pass side too', () => {
+    const tasks = [task({ id: 'a' }), task({ id: 'b' })];
+    const rewards = new Map([
+      ['a', 0.9],
+      ['b', 0.4],
+    ]);
+    const corrections = learnableCorrections(tasks, rewards, 0.8, 'all');
+    expect(corrections.map((entry) => entry.provenance)).toEqual(['passed', 'edited']);
+  });
 });
 
 describe('unansweredTasks', () => {
+  it('is a ledger of failures, so a widened scope does not change it', () => {
+    // R62. The scope widens what *teaches*, not what counts as a lost question: a task that passed was
+    // excluded here one line before the teaching decision is made, so the number is the same under
+    // both populations — which is what `V32` needs, since a widened store must not move a gate that is
+    // about the record rather than about the store.
+    const tasks = [
+      task({ id: 'a' }),
+      task({ id: 'b' }),
+      task({ id: 'c', actions: [], assertions: [] }),
+    ];
+    const rewards = new Map([
+      ['a', 1],
+      ['b', 0],
+      ['c', 0],
+    ]);
+    expect(unansweredTasks(tasks, rewards)).toEqual(['c']);
+  });
+
   it('does not count a task the model already passed', () => {
     // The difference `V32` grades. A pass needs no correction and leaves the store smaller without
     // leaving a gap in the record, so counting it as unanswered would make the gate a statement
@@ -330,7 +442,15 @@ describe('unansweredTasks', () => {
 
   it('counts a failure whose criteria say nothing about what should have happened', () => {
     const tasks = [task({ id: 'a', actions: [] }), task({ id: 'b' })];
-    expect(unansweredTasks(tasks, new Map([['a', 0], ['b', 0]]))).toEqual(['a']);
+    expect(
+      unansweredTasks(
+        tasks,
+        new Map([
+          ['a', 0],
+          ['b', 0],
+        ]),
+      ),
+    ).toEqual(['a']);
   });
 
   it('does not count a failure whose rubric states what should have happened', () => {
@@ -424,7 +544,12 @@ describe('driverArgs', () => {
       agent: 'llm_agent' as const,
     };
     expect(driverArgs(base)).not.toContain('--memory-url');
-    const full = driverArgs({ ...base, memoryUrl: 'http://127.0.0.1:9000', maxSteps: 50, seed: 300 });
+    const full = driverArgs({
+      ...base,
+      memoryUrl: 'http://127.0.0.1:9000',
+      maxSteps: 50,
+      seed: 300,
+    });
     expect(full).toContain('--memory-url');
     expect(full[full.indexOf('--max-steps') + 1]).toBe('50');
     expect(full[full.indexOf('--seed') + 1]).toBe('300');

@@ -45,6 +45,7 @@ import type { InactionCensus } from "./inaction.js";
 import type { YieldCensus } from "./tau2-yield.js";
 import type { PlantCensus } from "./plant.js";
 import type { ConsolidationSweep } from "./consolidation-sweep.js";
+import type { ProvenanceCensus } from "./tau2-provenance.js";
 import {
   coverageHistogram,
   useCensus,
@@ -278,6 +279,16 @@ export type Tau2Raw = {
     readonly ceiling: number;
     readonly declared: boolean;
   };
+  /**
+   * R62: which trajectories taught, and the store split by that.
+   *
+   * Recorded as a plain variant string plus a census rather than folded into `distillUnit`, because
+   * the two switches are independent: a run can hold the same unit and distil from a different
+   * population, and a reader that inferred the population from the unit would compare two stores that
+   * differ in the only way this round moves.
+   */
+  readonly distillScope?: "edited" | "all";
+  readonly provenance?: ProvenanceCensus;
   /**
    * R60: how many claims each correction yielded. See `YieldCensus`.
    *
@@ -523,6 +534,8 @@ export const PROJECTION: {
   storeItems: "carried",
   distillForm: "carried",
   distillUnit: "carried",
+  distillScope: "carried",
+  provenance: "carried",
   traceClaims: "carried",
   yieldCensus: "carried",
   consolidationSweep: "carried",
@@ -624,6 +637,8 @@ export function armRecordFromDriver(
     ...(raw.storeItems === undefined ? {} : { storeItems: raw.storeItems }),
     ...(raw.distillForm === undefined ? {} : { distillForm: raw.distillForm }),
     ...(raw.distillUnit === undefined ? {} : { distillUnit: raw.distillUnit }),
+    ...(raw.distillScope === undefined ? {} : { distillScope: raw.distillScope }),
+    ...(raw.provenance === undefined ? {} : { provenance: raw.provenance }),
     ...(raw.traceClaims === undefined ? {} : { traceClaims: raw.traceClaims }),
     ...(raw.yieldCensus === undefined ? {} : { yieldCensus: raw.yieldCensus }),
     ...(raw.consolidationSweep === undefined

@@ -46,6 +46,15 @@ export type LlmInterpreterOptions = {
    * measurement used; `repair` asks for the contrastive account instead.
    */
   readonly form?: DistillForm;
+  /**
+   * Whether this lane also distils from trajectories that succeeded.
+   *
+   * R62. Default false, which is every published arm and every other lane: the trace prompt then
+   * reads exactly what it read before. True appends the two sentences a record without `expected`
+   * needs — see `TRACE_PASS_PREAMBLE` for why an absent reference must be named in the prompt rather
+   * than left for the model to infer.
+   */
+  readonly passScope?: boolean;
   /** Called for each candidate the parser dropped, with the reason. */
   readonly audit?: (reason: DropReason) => void;
   /**
@@ -230,6 +239,28 @@ const TRACE_RULES: readonly string[] = [
 ];
 
 /**
+ * The two extra sentences a lane that also learns from successes needs.
+ *
+ * R62 distils from every trajectory, not only the ones that failed, and a passing record has nothing
+ * to compare: `expected` is absent because the attempt *is* the reference. A prompt that described only
+ * the failing shape would leave the model to infer what a record without `expected` means, and the most
+ * likely reading — "the reference was not recorded" — produces an empty array, which is the refutation
+ * the round is testing for and must not be manufactured by the instrument.
+ *
+ * Kept as separate arrays and appended only when the caller declares the scope, so a dispatch that
+ * learns from repairs alone reads **byte for byte** the prompt it read in R61. That is the invariant
+ * worth having: a prompt change that silently moves a published arm's numbers is the kind of upgrade
+ * this repository refuses.
+ */
+const TRACE_PASS_PREAMBLE: readonly string[] = [
+  '`rubricMet` is true when the trajectory met every check instead of failing one: there `attempt` is the reference, `expected` is absent because there is nothing to compare it to, and `rubric` is the checks the attempt met.',
+];
+
+const TRACE_PASS_RULES: readonly string[] = [
+  '- When `rubricMet` is true, state the rule the trajectory follows, in the order it follows it: what the successful path establishes, and why that order is what makes it succeed. Do not compare it with anything.',
+];
+
+/**
  * The ceiling line, written from the number the parser will actually enforce.
  *
  * R60. The instruction used to say "at most three" in prose while `maxCandidates` trimmed to
@@ -255,8 +286,14 @@ function traceCeilingLine(ceiling: number): string {
  * Composed from two arrays rather than spliced into one: a splice has to answer "what if the marker
  * is not there", and that answer would be a branch no prompt can ever take.
  */
-function traceInstruction(ceiling: number): readonly string[] {
-  return [...TRACE_PREAMBLE, traceCeilingLine(ceiling), ...TRACE_RULES];
+function traceInstruction(ceiling: number, passScope: boolean): readonly string[] {
+  return [
+    ...TRACE_PREAMBLE,
+    ...(passScope ? TRACE_PASS_PREAMBLE : []),
+    traceCeilingLine(ceiling),
+    ...TRACE_RULES,
+    ...(passScope ? TRACE_PASS_RULES : []),
+  ];
 }
 
 const REPAIR_INSTRUCTION: readonly string[] = [
@@ -281,6 +318,7 @@ export function buildDistillPrompt(
   payloadHint?: string,
   form: DistillForm = 'lesson',
   ceiling = 3,
+  passScope = false,
 ): string {
   const payload = {
     task: context.event.task,
@@ -294,7 +332,7 @@ export function buildDistillPrompt(
     form === 'procedure'
       ? [...PROCEDURE_INSTRUCTION, taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '']
       : form === 'trace'
-      ? [...traceInstruction(ceiling), taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '']
+      ? [...traceInstruction(ceiling, passScope), taxonomy.length > 0 ? `Domain vocabulary: ${taxonomy.join(', ')}.` : '']
       : form === 'repair'
       ? [
           ...REPAIR_INSTRUCTION,
@@ -686,7 +724,14 @@ export function createLlmInterpreter(options: LlmInterpreterOptions): Interprete
   const remember = options.reasonCodeOf;
   const scopeOf = options.domainOf;
   const promptOf = (context: InterpretContext): string =>
-    buildDistillPrompt(context, options.taxonomy ?? [], options.payloadHint, options.form ?? 'lesson', max);
+    buildDistillPrompt(
+      context,
+      options.taxonomy ?? [],
+      options.payloadHint,
+      options.form ?? 'lesson',
+      max,
+      options.passScope === true,
+    );
   const candidatesOf = (context: InterpretContext, raw: string): readonly Candidate[] => {
     const parsed = parseDistillResponse(raw, {
       namespace: context.event.namespace,
