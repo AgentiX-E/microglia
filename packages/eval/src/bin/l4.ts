@@ -459,7 +459,11 @@ await writeResult({
     arm: arm === 'reference' ? 0 : 1,
     published_bar_applies:
       scenarioBar.comparable && arm === 'memory' && plantedArm === '' ? 1 : 0,
-    ...(plantedArm === '' ? {} : { planted_arm: plantedArm }),
+    // Which of the two bars this file was graded by, as a flag rather than a name: `metrics` is a
+    // record of numbers, and the name is already in the artefact where it belongs — `tau2.plant.arm`,
+    // written by the driver that planted the rules. `1` here means "the published bar was not this
+    // arm's", the third arm kind `sampleGates` documents.
+    planted_arm: plantedArm === '' ? 0 : 1,
     // Omitted for a planted arm as well, for the same reason the gate is: a delta against the published
     // number is the competitive reading, and a distractor arm is graded by its paired ledger instead.
     ...(compared === undefined || arm === 'reference' || plantedArm !== ''
