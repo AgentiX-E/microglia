@@ -112,14 +112,6 @@ on:
         description: 'L4 arms to run: both (memory then reference, paired), memory, or reference'
         required: false
         default: 'both'
-      planted:
-        description: 'R57: which controlled distractor this L4 arm plants (far/near/adversarial); empty = the TAU_PLANTED_RULES variable'
-        required: false
-        default: ''
-      distill_scope:
-        description: 'R62: which trajectories teach an L4 arm (edited/all); empty = the TAU_DISTILL_SCOPE variable'
-        required: false
-        default: ''
       l4_train_share:
         description: 'Share of L4 tasks used for learning (0.4 gives retail 68 held out, above its 60 floor)'
         required: false
@@ -848,11 +840,7 @@ jobs:
           # R62: `edited` (the corrections every published arm distils) or `all` (also every task that
           # passed, asked for the rule its successful trajectory follows). Unset is `edited`, so an
           # artefact committed before this variable produced the store it always did.
-          # R62: the dispatch may name the population and outrank the repository variable. Two arms in
-          # flight at once is the reason: a repository variable is global, so R57's arms and R62's would
-          # otherwise have to run one after another, six hours of serialised runner time for four
-          # independent experiments. Empty (a push or a schedule) still reads the variable.
-          TAU_DISTILL_SCOPE: ${{ inputs.distill_scope || vars.TAU_DISTILL_SCOPE }}
+          TAU_DISTILL_SCOPE: ${{ vars.TAU_DISTILL_SCOPE }}
           # R60: how many claims one trace may teach. Unset means three, which is what every
           # committed trace artefact ran at; a run at six is a different treatment and the ceiling
           # travels into the artefact so a readback can tell the two apart.
@@ -862,9 +850,7 @@ jobs:
           # always did. The rules themselves are committed in eval/planted/retail.json and their
           # digest travels into the artefact, which is what stops an arm being authored after the
           # episodes it failed are known.
-          # R57: same rule, same reason -- three arms that differ only in this word are three
-          # independent experiments and can share the wall clock.
-          TAU_PLANTED_RULES: ${{ inputs.planted || vars.TAU_PLANTED_RULES }}
+          TAU_PLANTED_RULES: ${{ vars.TAU_PLANTED_RULES }}
           TAU_SEED: ${{ vars.TAU_SEED }}
           TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}
           TAU_WRITE_ADMISSION_THRESHOLD: ${{ vars.TAU_WRITE_ADMISSION_THRESHOLD }}
