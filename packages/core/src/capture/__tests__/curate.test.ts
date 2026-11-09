@@ -184,6 +184,32 @@ describe('curation', () => {
     await store.close();
   });
 
+  it("breaks a tie by id rather than by recency, which is what stability has to mean", async () => {
+    // The comparator orders by density alone and lets stability carry the tie, so the property worth
+    // pinning is not "the comparator returns -1 sometimes" but the outcome: among two equally dense
+    // rules the lower id goes, even when the higher id is the newer of the two. A tie-break that had
+    // quietly become "newest wins" would prune a different rule every time the clock moved.
+    const tie = { injected: 2, flippedUp: 1, flippedDown: 1 } as const;
+    const newest = { ...item('k_1', 'Revenue uses a line chart.'), utility: tie, updatedAt: AT + 3 };
+    const older = { ...item('k_2', 'Revenue uses a donut chart.'), utility: tie, updatedAt: AT + 1 };
+    const best = {
+      ...item('k_3', 'Revenue uses a scatter chart.'),
+      utility: { injected: 5, flippedUp: 5, flippedDown: 0 } as const,
+      updatedAt: AT + 2,
+    };
+    const store = await storeWith([newest, older, best]);
+    const report = await curateKnowledge(store, defaultPolicy, AT + 10, {
+      maxItemsPerTask: 2,
+      prune: true,
+    });
+    expect(report.pruned).toBe(1);
+    const retired = (await store.listKnowledge({ status: 'all' })).filter(
+      (entry) => entry.status === 'retired',
+    );
+    expect(retired.map((entry) => entry.id)).toEqual(['k_1']);
+    await store.close();
+  });
+
   it('rejects options that would silently do something else', async () => {
     const store = await storeWith([]);
     await expect(curateKnowledge(store, defaultPolicy, AT, { mergeThreshold: 0 })).rejects.toThrow(

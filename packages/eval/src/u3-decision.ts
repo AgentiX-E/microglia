@@ -125,7 +125,11 @@ export function decideFloor(
 
   const maxNet = Math.max(...curve.map((row) => row.net));
   const admissible = curve.filter((row) => row.net === maxNet).map((row) => row.minCoverage);
-  const chosen = admissible.length > 0 ? Math.min(...admissible) : undefined;
+  // `curve` has one row per rung, the grid length is checked against `COVERAGE_FLOORS` above, and
+  // that constant is not empty — so `maxNet` is attained and `admissible` has at least one member.
+  // `admissible.length > 0 ? … : undefined` stood here and its else side was this file's one
+  // uncovered branch; the decision's `undefined` case belongs to `refuse`, which says why.
+  const chosen = Math.min(...admissible);
   // Registered tie-break: on a plateau, pick the least aggressive filter.
   const tieBreak: FloorTieBreak = admissible.length > 1 ? 'least-aggressive' : 'unique';
 

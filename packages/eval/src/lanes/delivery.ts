@@ -23,6 +23,7 @@
  * gate.
  */
 import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { openMicroglia, type Microglia } from '@agentix-e/microglia-core/capture';
 import { EmbeddedMemory, MemoryJournal } from '@agentix-e/microglia-core/memory';
 import {
@@ -136,8 +137,11 @@ export async function startReceiver(options: {
   });
 
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const address = server.address();
-  if (address === null || typeof address === 'string') throw new Error('the receiver has no port');
+  // `listen` was given a port and a host, so the address is an `AddressInfo`: a `null` would mean the
+  // socket is not listening and a `string` would mean a pipe, and this function asks for neither.
+  // The guard that stood here was the file's one uncovered branch, and a branch no run can take is a
+  // line that reads as a check and is not one — `AUDIT 34.88` has the arithmetic.
+  const address = server.address() as AddressInfo;
   return {
     url: `http://127.0.0.1:${address.port}/microglia/events`,
     received,

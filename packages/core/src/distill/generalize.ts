@@ -22,7 +22,7 @@
  *
  * Both halves are pure functions, so the bound is testable without a store.
  */
-import { jsonEqual } from '../kernel/index.js';
+import { jsonEqual, present } from '../kernel/index.js';
 import type { DistillCandidate, EvidenceRef, KnowledgeItem, KnowledgeScope } from '../kernel/index.js';
 
 /** Distinct tasks required before a claim may widen beyond its endorsers. */
@@ -192,8 +192,11 @@ export function generalizationPlan(
     (item) => item.status === 'active' && sameRuleShape(item, candidate),
   );
   if (siblings.length === 0) return undefined;
-  const target = pickGeneralizationTarget(siblings);
-  if (target === undefined) return undefined;
+  // `pickGeneralizationTarget` answers `undefined` only for a list with no active item, and `siblings`
+  // is filtered to active items two lines up and refused when empty. The guard that stood here was
+  // this file's one uncovered branch; `present` keeps the invariant expressed without a branch no
+  // input can take.
+  const target = present(pickGeneralizationTarget(siblings), 'an active sibling to generalise onto');
 
   let scope = widenedScopeOf([target.scope, candidate.scope]);
   if (scope === undefined) return undefined;

@@ -177,6 +177,37 @@ describe('templateCoverage', () => {
     ]);
   });
 
+  it('orders withheld reasons by count, and alphabetically when the counts are equal', () => {
+    // Both keys in one case. Sorting on the count alone is stable enough to look right and is not
+    // reproducible: the tie order would come from the map, and the map's order comes from whatever
+    // sequence the panel happened to run in. The alphabetical key had never been evaluated at all.
+    const coverage = templateCoverage([
+      {
+        key: 'r1\u0000a',
+        outcome: { status: 'withheld', slot: { name: 'p', kind: 'column' }, reason: 'no-column' },
+      },
+      {
+        key: 'r2\u0000a',
+        outcome: { status: 'withheld', slot: { name: 'p', kind: 'column' }, reason: 'table-tie' },
+      },
+      {
+        key: 'r3\u0000a',
+        outcome: { status: 'withheld', slot: { name: 'p', kind: 'column' }, reason: 'no-table' },
+      },
+      {
+        key: 'r4\u0000a',
+        outcome: { status: 'withheld', slot: { name: 'p', kind: 'column' }, reason: 'table-tie' },
+      },
+    ]);
+    // The two single-attempt reasons are the tie, so the alphabetical key is what decides their
+    // order; the two-attempt reason leads on the count alone.
+    expect(coverage.reasons.map((entry) => `${entry.reason}:${entry.attempts}`)).toEqual([
+      'table-tie:2',
+      'no-column:1',
+      'no-table:1',
+    ]);
+  });
+
   it('reports zero rather than a division when nothing was attempted', () => {
     expect(templateCoverage([])).toEqual({
       bound: 0,

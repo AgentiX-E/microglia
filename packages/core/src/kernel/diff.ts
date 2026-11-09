@@ -9,6 +9,7 @@
  * mark and encoding changes.
  */
 import { jsonEqual } from './hash.js';
+import { present } from './present.js';
 import type { CorrectionOp, Json, JsonPath } from './types.js';
 
 function isPlainObject(value: Json): value is { [key: string]: Json } {
@@ -109,8 +110,11 @@ export function applyOps(before: Json, ops: readonly CorrectionOp[]): Json {
       continue;
     }
     const parent = resolveParent(root, change.path);
-    const key = change.path[change.path.length - 1];
-    if (key === undefined) continue;
+    // The path is non-empty — the branch above returns for `length === 0` — so it has a last element.
+    // The `continue` that stood here was this file's one uncovered branch, and it was the wrong
+    // shape of guard besides: a diff op on an empty path means something upstream produced a
+    // malformed op, and skipping it would apply a diff that is not the one that was recorded.
+    const key = present(change.path[change.path.length - 1], 'the last segment of a non-empty path');
     if (Array.isArray(parent)) {
       if (typeof key !== 'number') continue;
       if (change.op === 'remove') parent.splice(key, 1);

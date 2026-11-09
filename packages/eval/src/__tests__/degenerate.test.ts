@@ -143,8 +143,9 @@ describe('report rendering of a regression', () => {
     knowledge: 3,
   });
 
-  it('prints a negative delta without a leading plus and a missing domain as a dash', () => {
-    const result: StudyResult = {
+  /** A rendered study, assembled rather than run: the renderer is the subject here. */
+  function synthetic(ablations: StudyResult['ablations'] = ABLATIONS): StudyResult {
+    return {
       config: {
         seed: 1,
         trainSize: 10,
@@ -174,9 +175,13 @@ describe('report rendering of a regression', () => {
         factStore: { name: 'fact-store', accuracy: 0.56, delta: 0.24, p: 0.001, facts: 16, untrustedFacts: 0 },
         factStorePoisoned: { name: 'fact-store-poisoned', accuracy: 0.2, delta: -0.12, p: 0.003, facts: 16, untrustedFacts: 8 },
       },
-      ablations: ABLATIONS,
+      ablations,
       gates: [{ id: 'G1', criterion: 'lift', actual: '-25.00pp', pass: false, blocking: true }],
     };
+  }
+
+  it('prints a negative delta without a leading plus and a missing domain as a dash', () => {
+    const result = synthetic();
     const markdown = renderMarkdown(result);
     expect(markdown).toContain('-25.00pp');
     expect(markdown).not.toContain('+-25.00pp');
@@ -185,6 +190,16 @@ describe('report rendering of a regression', () => {
     expect(markdown).toContain('## Held-out domain');
     // The second arm has no round 0, so its learning-curve cell is a dash.
     expect(markdown).toMatch(/\| 0 \| 50\.00% \| — \|/);
+  });
+
+  it('renders the ablation row when neither side kept the rule', () => {
+    // The row's two cells are separate claims: with credit assignment, and without it. A renderer
+    // that printed "still injected" in both would say the module changed nothing while appearing to
+    // have measured it, and the cell for the without-side had never been drawn.
+    const markdown = renderMarkdown(
+      synthetic({ ...ABLATIONS, credit: { ...ABLATIONS.credit, injectedWithout: false } }),
+    );
+    expect(markdown).toContain('| Credit assignment | withdrawn after 4 failures | withdrawn |');
   });
 });
 

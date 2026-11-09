@@ -210,6 +210,19 @@ describe('validateRunArtifact', () => {
     expect(reported).toContain('metrics.byDatabase');
   });
 
+  it('refuses a per-database count that is not a count', () => {
+    // `n` had a case and `correct` did not, and the two are separate checks on separate fields: a
+    // row of `{ dbId: 'shop', n: 2, correct: -1 }` would have been summed into `totalCorrect` and
+    // produced a negative accuracy denominator with no complaint.
+    const bad = patched((copy) => {
+      copy['metrics'] = {
+        ...(copy['metrics'] as Record<string, unknown>),
+        byDatabase: [{ dbId: 'shop', n: 2, correct: -1 }],
+      };
+    });
+    expect(paths(bad)).toContain('metrics.byDatabase[0].correct');
+  });
+
   it('refuses duplicate databases and more correct than cases', () => {
     const bad = patched((copy) => {
       copy['metrics'] = {
@@ -276,6 +289,38 @@ describe('runArtifactReport', () => {
       metrics: { ...artifact.metrics, answered: 1 },
     };
     expect(runArtifactReport(piped)).toContain('SELECT a \\|\\| b');
+  });
+
+  it('renders a case with neither an answer nor a reason for its absence', () => {
+    // The validator refuses this shape, and the renderer is still asked to draw artefacts that were
+    // written by an older release or edited by hand. `error ?? 'unknown'` is the difference between
+    // a table that says what happened and a column that says "error: null" and reads as a bug in
+    // the renderer.
+    const artifact: RunArtifact = {
+      ...base(),
+      cases: [{ id: 'x', dbId: 'shop', sql: null, error: null, correct: false }],
+      protocol: { comparison: 'multiset', cases: 1, concurrency: 1 },
+      metrics: {
+        n: 1,
+        answered: 0,
+        correct: 0,
+        accuracy: 0,
+        low: 0,
+        high: 0.9455,
+        byDatabase: [{ dbId: 'shop', n: 1, correct: 0 }],
+      },
+    };
+    expect(runArtifactReport(artifact)).toContain('| x | shop | no answer | error: unknown |');
+  });
+
+  it('renders a gate that failed, because a report is where a failure is read', () => {
+    // Every fixture in this file is a passing run, so the one character that separates a report from
+    // a green stamp — `fail` in the verdict column — had never been drawn.
+    const artifact: RunArtifact = {
+      ...base(),
+      gates: [{ code: 'V3', name: 'parse-rate', ok: false, detail: '0.40 of replies unparsed' }],
+    };
+    expect(runArtifactReport(artifact)).toContain('| V3 | parse-rate | fail | 0.40 of replies unparsed |');
   });
 
   it('renders a database with no cases as zero', () => {

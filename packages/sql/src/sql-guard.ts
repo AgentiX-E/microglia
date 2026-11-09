@@ -277,6 +277,15 @@ export class BoundedSql {
       // The callback rather than an `error` listener: a child that is already gone makes `send` fail
       // with EPIPE, which without a callback is an uncaught exception on a channel nobody is
       // watching, and the statement would then wait out its deadline instead of failing.
+      //
+      // This is the one branch in the repository that no test takes, and the reason is worth stating
+      // rather than hiding behind a coverage percentage. It fires when the channel is gone between
+      // `ready` and `send` — a child killed by the OOM killer, or by a host that ran out of file
+      // descriptors. Every route to that state inside this process goes through `close()`, which
+      // settles `exited` first and therefore resolves this statement on the line above instead; and
+      // the child cannot be made to die before it is ready without a spawn seam, which would be a
+      // mock of the very thing under test. `AUDIT 34.90` records the decision: the branch stays,
+      // because the failure it handles is real and the alternative is an uncaught EPIPE.
       slot.child.send(task, (error) => {
         if (error !== null) finish({ ok: false, error: EXITED, ms: 0 });
       });

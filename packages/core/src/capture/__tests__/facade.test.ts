@@ -223,6 +223,32 @@ describe('distillation window', () => {
     await mg.close();
   });
 
+  it('forwards write admission, so a paraphrase does not become a second rule', async () => {
+    // `admission` is a host option that had never been passed by a test, which means the one line
+    // that forwards it was never executed. What it buys is the difference between a store that grows
+    // one item per episode and a store that merges the second phrasing of a rule into the first —
+    // the negative effect the memory literature reports, measured at the write rather than the read.
+    const { mg, store } = await host();
+    const first = mg.begin({ task: 'chart.recommend', input: { q: 'a' } });
+    await first.complete({ mark: 'bar' });
+    await first.rate('down', ['wrong_chart_type']);
+    await mg.distill();
+    const before = (await store.listKnowledge({ status: 'all' })).length;
+    expect(before).toBeGreaterThan(0);
+
+    // The same lesson re-derived on a different task, which the exact-key dedupe cannot see because
+    // the key contains the scope.
+    const second = mg.begin({ task: 'chart.explain', input: { q: 'a' } });
+    await second.complete({ mark: 'bar' });
+    await second.rate('down', ['wrong_chart_type']);
+    const report = await mg.distill({ admission: { threshold: 0.2 } });
+    expect(report.candidates).toBeGreaterThan(0);
+    // Merged or refused, never created: the store's size is the observable, because both of the two
+    // non-`add` decisions leave it unchanged and only one of them is reachable from a fresh event.
+    expect((await store.listKnowledge({ status: 'all' })).length).toBe(before);
+    await mg.close();
+  });
+
   it('lets the host veto a claim before it is stored', async () => {
     // A prompt can ask for a lesson with no table names in it; only the host can refuse one that
     // has them. The veto is counted, so a store emptied by its own filter is visible.

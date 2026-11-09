@@ -87,10 +87,15 @@ export function logBinomialPmf(n: number, k: number, p: number): number {
   );
 }
 
-function logSumExp(values: readonly number[]): number {
+/**
+ * The argument is a non-empty tuple because the sum of an empty list has no logarithm, and the only
+ * caller always has at least one term. Stating it in the type is what let the runtime guard go: `if
+ * (max === -Infinity) return max` was this file's one uncovered branch, and it could not fire, so it
+ * was a line that read as arithmetic and behaved as a comment (`AUDIT 34.88`).
+ */
+function logSumExp(values: readonly [number, ...number[]]): number {
   let max = Number.NEGATIVE_INFINITY;
   for (const value of values) if (value > max) max = value;
-  if (max === Number.NEGATIVE_INFINITY) return max;
   let sum = 0;
   for (const value of values) sum += Math.exp(value - max);
   return max + Math.log(sum);
@@ -106,9 +111,11 @@ function logSumExp(values: readonly number[]): number {
 export function mcnemarExact(b: number, c: number): number {
   const n = b + c;
   if (n === 0) return 1;
-  const tailTerms: number[] = [];
+  // `n >= 1` here, so the smaller of the two counts is at least zero and the tail always has its
+  // `k = 0` term: the list is built with that term present rather than starting empty.
   const smaller = Math.min(b, c);
-  for (let k = 0; k <= smaller; k += 1) {
+  const tailTerms: [number, ...number[]] = [logBinomialPmf(n, 0, 0.5)];
+  for (let k = 1; k <= smaller; k += 1) {
     tailTerms.push(logBinomialPmf(n, k, 0.5));
   }
   const tail = Math.exp(logSumExp(tailTerms));

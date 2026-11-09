@@ -9,7 +9,7 @@
 import { describe, expect, it } from 'vitest';
 import { FactStore, runFactStore } from '../competitor.js';
 import { buildBatches } from '../study.js';
-import { buildCorpus } from '../scenario.js';
+import { buildCorpus, specFor } from '../scenario.js';
 
 describe('fact store', () => {
   it('replaces a fact that is similar enough to an existing one', () => {
@@ -37,6 +37,40 @@ describe('fact store', () => {
     const store = new FactStore();
     store.learn({ text: 'for a trend question use a line chart', mark: 'line', trusted: true, at: 1 });
     expect(store.retrieve('how many warehouses ship parcels')).toBeUndefined();
+  });
+});
+
+describe('what the fact store is allowed to learn from', () => {
+  /** One corpus item, with a baseline that either agrees with gold or does not. */
+  function item(id: string, text: string, mark: 'line' | 'pie', baseline: 'line' | 'pie') {
+    const query = {
+      id,
+      text,
+      domain: 'sales',
+      intent: 'trend' as const,
+      field: 'revenue',
+      measureB: 'cost',
+      category: 'region',
+      temporal: 'month',
+      categoryCount: 3,
+      grain: 'month' as const,
+    };
+    return { id, query, gold: specFor(query, mark), baseline: specFor(query, baseline) };
+  }
+
+  it('skips an episode the baseline already answered, and learns from the one it did not', () => {
+    // A store that learns from a correct episode spends a fact on something already known: the fact
+    // is retrieved for a question it cannot improve, and its presence inflates the fact count that
+    // the comparison against the memory arms is read from. The skip is one line and it is the
+    // difference between "taught 57 episodes" and "taught the 43 the baseline got wrong".
+    const agreeing = item('q1', 'trend of revenue by region', 'line', 'line');
+    const wrong = item('q2', 'composition of revenue by region', 'pie', 'line');
+    const result = runFactStore(
+      { train: [agreeing, wrong], holdout: [wrong] },
+      [[agreeing, wrong]],
+    );
+    expect(result.facts).toBe(1);
+    expect(result.correct).toEqual([true]);
   });
 });
 

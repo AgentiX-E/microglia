@@ -102,6 +102,8 @@ export {
 
 export { defaultPolicy, resolvePolicy } from './policy.js';
 
+export { present } from './present.js';
+
 export {
   WRITE_ADMISSION_THRESHOLD,
   WRITE_ADMISSION_TOP_S,

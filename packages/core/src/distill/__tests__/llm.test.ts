@@ -280,6 +280,19 @@ describe('the procedural form', () => {
     expect(prompt).not.toContain('You compare one wrong attempt');
     expect(prompt).not.toContain('You extract reusable, declarative lessons');
   });
+
+  it("carries the vocabulary the host supplies when there is one", () => {
+    // The vocabulary line is the only place a host can teach the distiller its own nouns. Both of
+    // the forms that had no case for it are pinned here: a form whose vocabulary was silently
+    // dropped still produces a valid prompt and a statement that uses the model's word for a column
+    // the store spells differently, which nothing else in this suite would notice.
+    expect(
+      buildDistillPrompt({ event, run }, ['raceId', 'driverRef'], undefined, 'procedure'),
+    ).toContain('Domain vocabulary: raceId, driverRef.');
+    expect(buildDistillPrompt({ event, run }, ['raceId'], undefined, 'trace')).toContain(
+      'Domain vocabulary: raceId.',
+    );
+  });
 });
 
 describe('the definitional form', () => {

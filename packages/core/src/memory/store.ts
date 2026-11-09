@@ -10,6 +10,7 @@ import {
   MicrogliaError,
   bm25Score,
   contentKey,
+  present,
   recallText,
   scopeMatches,
   specificity,
@@ -167,8 +168,13 @@ export class EmbeddedMemory implements MemoryPort {
     const scored: { item: KnowledgeItem; lexical: number }[] = [];
     let maxLexical = 0;
     for (const id of candidateIds) {
-      const item = this.knowledge.get(id);
-      if (!item) continue;
+      // Every candidate id came from `this.knowledge` or from the inverted index, and the two are
+      // written together (`indexKnowledge` posts only after the map holds the item) and erased
+      // together (both `forget` branches remove from both). An id here that the map does not hold
+      // would mean the index has outlived its documents, which must be a crash in `recall` rather
+      // than a pack that is quietly one rule shorter — the latter is indistinguishable from the
+      // memory having learned less, which is exactly the reading a retrieval defect must not fake.
+      const item = present(this.knowledge.get(id), `knowledge for candidate "${id}"`);
       if (item.namespace !== query.namespace) continue;
       if (item.status !== 'active') continue;
       if (!scopeMatches(item.scope, query)) continue;

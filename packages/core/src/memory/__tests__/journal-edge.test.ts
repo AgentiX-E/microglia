@@ -6,7 +6,7 @@
  * silently or refuses to start with no explanation. Both cases are asserted
  * here, on the real filesystem, with no fakes.
  */
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -155,6 +155,21 @@ describe('filters and lifecycle', () => {
     const memory = await openMemory();
     await memory.close();
     await expect(memory.close()).resolves.toBeUndefined();
+  });
+
+  it('writes an empty section as a zero-byte file rather than a blank line', async () => {
+    // A full snapshot rewrite is how `forget` persists an erasure, and a snapshot legitimately has
+    // no events — the erase took the last one. The convention the reader relies on is that "empty"
+    // is zero bytes: a file holding a single "\n" reads back as zero rows too, which is exactly why
+    // the difference is invisible until something counts lines, and why it needs a test rather than
+    // a reader's tolerance.
+    const dir = await mkdtemp(join(tmpdir(), 'mg-case-'));
+    const journal = new JsonlJournal({ dir });
+    await journal.load();
+    await journal.rewrite({ events: [], runs: [], knowledge: [] });
+    await journal.close();
+    expect(await readFile(journalPath(dir, 'events'), 'utf8')).toBe('');
+    expect(await readFile(journalPath(dir, 'knowledge'), 'utf8')).toBe('');
   });
 
   it('refuses writes after close but keeps reads available', async () => {

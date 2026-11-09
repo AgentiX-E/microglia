@@ -6,7 +6,7 @@
  * the honest cost of an embedded, crash-safe store: no separate index file to
  * fall out of sync with the data.
  */
-import { tokenize } from '../kernel/index.js';
+import { present, tokenize } from '../kernel/index.js';
 
 export class LexicalIndex {
   private readonly postings = new Map<string, Set<string>>();
@@ -34,8 +34,12 @@ export class LexicalIndex {
     this.documents.delete(id);
     this.totalLength -= existing.length;
     for (const token of new Set(existing.tokens)) {
-      const bucket = this.postings.get(token);
-      if (!bucket) continue;
+      // The bucket cannot be missing. `add` creates one for every token it posts under this id, and
+      // the only thing that deletes a bucket is this loop, after it has already taken every id out of
+      // it. `if (!bucket) continue` stood here and was the file's one uncovered branch: a posting the
+      // index lost track of would have been skipped in silence, leaving a stale document in the
+      // candidate set and a `totalLength` that no longer described the index.
+      const bucket = present(this.postings.get(token), `a posting list for "${token}"`);
       bucket.delete(id);
       if (bucket.size === 0) this.postings.delete(token);
     }

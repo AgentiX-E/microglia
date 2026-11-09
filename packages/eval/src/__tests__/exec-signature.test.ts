@@ -195,6 +195,20 @@ describe('scoreOf', () => {
     expect(scoreOf(sig, shapeOf('How many players are there', ''), 'column-shape')).toBeLessThan(0);
   });
 
+  it('penalises a table for a count question, and less than a scalar for a list', () => {
+    // "How many" is sometimes answered with a breakdown, so a table is weak evidence rather than a
+    // refutation — which is why it costs half what the reverse mistake costs. The two halves are
+    // asserted together because the ratio is the claim, and only one of them had ever been taken.
+    const table = scoreOf(
+      signature({ rowCount: 3, columnCount: 1, scalar: false }),
+      shapeOf('How many players are there', ''),
+      'row-shape',
+    );
+    const scalar = scoreOf(signature({}), shapeOf('List each player name', ''), 'row-shape');
+    expect(table).toBe(-0.5);
+    expect(scalar).toBe(-1.5);
+  });
+
   it('penalises a scalar for a list question', () => {
     expect(scoreOf(signature({}), shapeOf('List each player name', ''), 'row-shape')).toBeLessThan(0);
   });

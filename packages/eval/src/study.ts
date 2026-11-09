@@ -25,6 +25,7 @@ import {
   type Microglia,
 } from '@agentix-e/microglia-core/capture';
 import {
+  present,
   steppingClock,
   mulberry32,
   type Json,
@@ -668,7 +669,11 @@ export async function runStudy(config: StudyConfig = DEFAULT_CONFIG): Promise<St
   // A competitor-shaped baseline on the same feedback schedule: the question is
   // not whether the loop works, but whether the governance around it is what makes
   // it work.
-  const baselineCorrect = baseline?.holdout ?? [];
+  // `ARMS` is a constant whose first entry is the baseline arm, so the lookup above always hits; the
+  // `?? []` that stood here was this file's one uncovered branch, and it was the dangerous shape of
+  // default besides — an empty baseline turns every competitor comparison into a comparison with
+  // nothing, which produces numbers that look like a result.
+  const baselineCorrect = present(baseline, 'the baseline arm in ARMS').holdout;
   const toResult = (name: string, outcome: ReturnType<typeof runFactStore>): CompetitorResult => {
     const paired = comparePaired([...baselineCorrect], [...outcome.correct]);
     return {

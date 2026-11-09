@@ -124,9 +124,13 @@ export async function curateKnowledge(
     // Lowest utility density first: a rule that was given many chances and helped
     // rarely is the cheapest thing to lose. Ties break on id so the decision is
     // reproducible.
-    const ordered = [...bucket].sort(
-      (a, b) => density(a) - density(b) || (a.id < b.id ? -1 : 1),
-    );
+    // Ordering by density alone is enough, and the tie-break is not missing: `groupForMerge` sorts
+    // every bucket by id before handing it over, and `Array.prototype.sort` is stable, so two rules
+    // of equal density keep ascending id order without a second comparison. Writing that comparison
+    // out was the one branch in this file no input could take — a bucket always arrives in id order,
+    // so every pair the sort compares has the smaller id on the left and only `1` was ever returned.
+    // A stable sort states the same guarantee in a way that cannot be half-taken.
+    const ordered = [...bucket].sort((a, b) => density(a) - density(b));
     for (const item of ordered.slice(0, excess)) {
       const closed = close(item, undefined, 'pruned', now);
       writes.set(closed.id, closed);

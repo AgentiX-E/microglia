@@ -185,14 +185,17 @@ export class JsonlJournal implements Journal {
     // One file at a time, each renamed into place: a crash between the two
     // leaves a store that has erased the events but not the knowledge, which
     // the next `forget` re-derives from the same selector rather than losing data.
-    await writeFile(temp, rows.map((row) => JSON.stringify(row)).join('\n') + (rows.length === 0 ? '' : '\n'), 'utf8');
+    await writeFile(temp, serialiseRows(rows), 'utf8');
     await rename(temp, target);
   }
 
   private async rewriteKnowledge(items: readonly KnowledgeItem[]): Promise<void> {
     const target = join(this.dir, 'knowledge.jsonl');
     const temp = `${target}.tmp`;
-    await writeFile(temp, items.map((item) => JSON.stringify(item)).join('\n') + '\n', 'utf8');
+    // The same serialisation as `replace`, and the same reason: two writers of one file that
+    // disagree about what an empty list looks like is how a file acquires a lone newline that every
+    // reader has to tolerate and no test can see.
+    await writeFile(temp, serialiseRows(items), 'utf8');
     await rename(temp, target);
   }
 }
@@ -229,6 +232,18 @@ async function readLines<T>(path: string, label: string): Promise<T[]> {
 }
 
 /** Exposed for hosts that keep their journal elsewhere and only need the path helper. */
+/**
+ * One JSON object per line, with a newline after every row and none for an empty list.
+ *
+ * The newline is written per row rather than joined between rows and appended once, because that
+ * shape needs `rows.length === 0 ? '' : '\n'` — a branch whose empty side only fires when an erase
+ * took the last row, which is a real store and a rare one. Appending per row is the same bytes for
+ * every input, including none, and it is the same statement written without a conditional.
+ */
+function serialiseRows(rows: readonly unknown[]): string {
+  return rows.map((row) => `${JSON.stringify(row)}\n`).join('');
+}
+
 export function journalPath(dir: string, file: 'events' | 'runs' | 'knowledge'): string {
   return join(dir, `${file}.jsonl`);
 }
