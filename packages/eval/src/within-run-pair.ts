@@ -189,10 +189,12 @@ export function withinRunPair(asIs: FacadeArm, floored: FacadeArm): WithinRunPai
     return unmeasured('the two facades did not score exactly the same tasks');
   }
 
+  // No `paired === 0` guard stands here, and its absence is deliberate. `validArm` refuses an arm with
+  // no tasks and an arm that repeats an id, and the two sorted id lists are compared immediately above,
+  // so a pair reaching this line has equal non-empty id sets and `compareArms` pairs all of them. The
+  // guard that used to sit here could not fire, which made it the file's only uncovered statement —
+  // a reader learns more from this paragraph than from a branch no input can take.
   const comparison = compareArms(asIs.tasks, floored.tasks, PAIR_SEED, PAIR_RESAMPLES);
-  if (comparison.paired === 0 || comparison.onlyFirst !== 0 || comparison.onlySecond !== 0) {
-    return unmeasured('the paired comparison has no common task set');
-  }
 
   return {
     state: 'PAIRED',

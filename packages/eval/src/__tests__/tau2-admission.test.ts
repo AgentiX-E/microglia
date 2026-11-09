@@ -314,10 +314,14 @@ describe('the shapes a τ² correction may take', () => {
     // A call-shaped correction whose tool name is the empty string is not a call: it would
     // price as a call and teach nothing, and the admission rule is the only place that can
     // say so before the store holds it.
+    // The before side is the completion `complete()` writes. With an object-shaped `before` this
+    // assertion passed without reaching the validator it is named for: the driver-completion test
+    // short-circuits first and the answer is `undefined` for a different reason. A test that passes
+    // for the wrong reason certifies nothing, and this one had been certifying nothing since R58.
     expect(
       tau2EditSemantics(
+        { actions: ['cancel_pending_order'] },
         { actions: [{ name: '', arguments: {} }] },
-        { actions: [{ name: 'cancel_pending_order', arguments: { order_id: '1' } }] },
       ),
     ).toBeUndefined();
   });
@@ -329,5 +333,31 @@ describe('the shapes a τ² correction may take', () => {
         { actions: [{ name: 'cancel_pending_order', arguments: {} }] },
       ),
     ).toBeUndefined();
+  });
+
+  it('refuses a before side that is not an object with actions at all', () => {
+    // Three shapes the driver never writes and the admission rule still has to refuse: `null`, an
+    // array, and a scalar. Each is a separate operand of the same guard, so a test that only covered
+    // one of them would leave the other two unexercised — which is what the coverage report said.
+    const after = { actions: [{ name: 'cancel_pending_order', arguments: {} }] };
+    for (const before of [null, [{ function: 'cancel_pending_order' }], 'cancel_pending_order', 7]) {
+      expect(tau2EditSemantics(before, after), JSON.stringify(before)).toBeUndefined();
+    }
+  });
+
+  it('refuses an edit whose action is not a call at all', () => {
+    // Two operands of two guards: `arguments` is the half the call is priced on, and a name that is
+    // not a string is not a tool name however non-empty it looks. The empty-string name has its own
+    // test above; these are the shapes it did not reach.
+    // The before side has to be the shape `complete()` writes — the reference call names, in order —
+    // or the first half of the guard short-circuits and the after-side validator is never reached. That
+    // short-circuit is why the empty-name case below it had never exercised `return false` at all.
+    const before = { actions: ['cancel_pending_order'] };
+    for (const action of [{ name: 'cancel_pending_order' }, { name: 42, arguments: {} }]) {
+      expect(
+        tau2EditSemantics(before, { actions: [action] }),
+        JSON.stringify(action),
+      ).toBeUndefined();
+    }
   });
 });

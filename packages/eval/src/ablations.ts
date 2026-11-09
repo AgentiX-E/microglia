@@ -93,9 +93,18 @@ export async function creditAblation(failures = 4): Promise<CreditAblation> {
     }
 
     const pack = await mg.recall({ task: TASK, text: 'trend of revenue', scope: SCOPE });
-    const items = await store.listKnowledge({ namespace: NAMESPACE, status: 'all' });
+    // `status: 'all'` filters nothing out, and `learn` admitted one rule before this line, so the list
+    // cannot be empty. `items[0]?.status ?? 'missing'` stood here and no run could reach the fallback:
+    // third instance of the same class found this round (`AUDIT 34.88`). The postcondition is asserted
+    // rather than defended, so the absence of an item is a loud crash instead of a silent "missing"
+    // that would read as a store which rejected the rule.
+    const items = (await store.listKnowledge({ namespace: NAMESPACE, status: 'all' })) as [
+      { readonly status: string },
+      ...unknown[],
+    ];
     await mg.close();
-    return { injected: pack.ids.length > 0, status: items[0]?.status ?? 'missing' };
+    const [item] = items;
+    return { injected: pack.ids.length > 0, status: item.status };
   };
 
   const withCredit = await measure(true);

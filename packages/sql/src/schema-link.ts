@@ -209,7 +209,14 @@ export function linkSchema(ddl: string, question: string, evidence: string): Lin
     if (!anchors.has(block.table)) continue;
     for (const column of block.columns) {
       if (!keyLike(column)) continue;
-      for (const neighbour of byColumn.get(column.toLowerCase()) ?? []) kept.add(neighbour);
+      // `?? []` stood here and no input could reach it: `byColumn` is filled from every block's own
+      // columns two loops up, so an anchor's key-like column always has an entry. An unreachable
+      // fallback is not safety — it is a branch that reads as a guard, is never taken, and shows up in
+      // the coverage report as the file's only uncovered line, which is how a reader learns to stop
+      // reading that report. The invariant is asserted by construction instead, and a violation now
+      // throws here rather than silently pruning less than it says it does.
+      const owners = byColumn.get(column.toLowerCase()) as string[];
+      for (const neighbour of owners) kept.add(neighbour);
     }
   }
   // Prune only when pruning removes a third of the database. Dropping one table of six costs a

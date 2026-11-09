@@ -340,6 +340,31 @@ describe('microglia_feedback', () => {
     expect(result._meta?.code).toBe('MG_E_NAMESPACE_MISMATCH');
   });
 
+  it('lets a failure that is not the library`s own escape, because a bug is not a tool error', async () => {
+    // The catch above answers a `MicrogliaError` with a tool error the model can read. A `TypeError`
+    // from inside the facade is not that: it is a defect in the host, it tells the model nothing it
+    // could act on, and swallowing it here would report a broken deployment as a refused request —
+    // a tool error the caller retries forever. So the handler rethrows and the RPC layer answers.
+    const { microglia } = await mount();
+    const broken = new Proxy(microglia, {
+      get: (target, key, receiver) =>
+        key === 'recordFeedback'
+          ? () => Promise.reject(new TypeError('the trust column is missing'))
+          : Reflect.get(target, key, receiver),
+    });
+    const handler = createMcpHandler({ microglia: broken });
+    // The run has to exist for the call to reach the write, and the facade above only breaks the
+    // write — an unknown run would return before the catch and prove nothing.
+    const run = microglia.begin({ task: 'chart.recommend', input: { q: 'x' } });
+    const record = await run.complete({ mark: 'bar' });
+    await expect(
+      invoke(
+        handler,
+        call(1, 'microglia_feedback', { runId: record.id, kind: 'abstain', reason: 'x' }),
+      ),
+    ).rejects.toThrow('the trust column is missing');
+  });
+
   it('refuses a tool it does not serve, and names the ones it does', async () => {
     const { microglia } = await mount();
     const handler = createMcpHandler({ microglia });

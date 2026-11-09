@@ -364,6 +364,21 @@ describe('facadePairVerdict', () => {
     expect(verdictOf({ flooredTasks: shorter }).state).toBe('NO_MEASUREMENT');
   });
 
+  it('turns a task row it cannot name into NO_MEASUREMENT rather than a crash', () => {
+    // A paired comparison is keyed by the task id, so a nameless row is a broken instrument rather
+    // than a task that failed — and the conversion is where the instrument breaks, before any pairing
+    // happens. The verdict carries the refusal as its terminal state: a lane whose task mapping broke
+    // must not publish a contrast, and must not fail the step as though it had measured something.
+    const nameless: readonly PassAtKInput[] = [
+      ...tasks,
+      { taskId: '  ', successes: 0, trials: 4, k: 4 },
+    ];
+    const verdict = verdictOf({ asIsTasks: nameless });
+    expect(verdict.state).toBe('NO_MEASUREMENT');
+    if (verdict.state === 'PAIRED') return;
+    expect(verdict.reason).toContain('no task id');
+  });
+
   it('still pairs a floor that served nothing, and says so in the reading', () => {
     const verdict = verdictOf({ flooredServed: 0 });
     expect(verdict.state).toBe('PAIRED');

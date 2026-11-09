@@ -445,19 +445,14 @@ export function readFacadePairArtifact(value: unknown): FacadePairReadback {
   ) {
     throw new Error('the artefact is missing a field the readback must attest');
   }
-  // Narrow each number to its own local: an indexed read of a `Record` under
-  // `noUncheckedIndexedAccess` stays optional, so the checks above do not by
-  // themselves convince the type checker that the field exists.
-  const floored = (floors as Record<string, unknown>)['floored'];
-  const servedAsIs = (served as Record<string, unknown>)['asIs'];
-  const servedFloored = (served as Record<string, unknown>)['floored'];
-  if (
-    typeof floored !== 'number' ||
-    typeof servedAsIs !== 'number' ||
-    typeof servedFloored !== 'number'
-  ) {
-    throw new Error('the artefact is missing a numeric field the readback must attest');
-  }
+  // Narrow each number to its own local, and cast rather than re-validate. `noUncheckedIndexedAccess`
+  // keeps an indexed read of a `Record` optional, so the type checker needs the local; the guard that
+  // used to stand here tested the same three fields the check above had just tested, so no artefact
+  // could reach it and it was this file's only uncovered statement. A guard that cannot fire does not
+  // protect the reader — it teaches the reader that uncovered lines are normal.
+  const floored = (floors as Record<string, unknown>)['floored'] as number;
+  const servedAsIs = (served as Record<string, unknown>)['asIs'] as number;
+  const servedFloored = (served as Record<string, unknown>)['floored'] as number;
   const base = {
     state: state as FacadePairReadback['state'],
     summary,
