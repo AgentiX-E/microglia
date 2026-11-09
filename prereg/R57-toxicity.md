@@ -175,12 +175,43 @@ adversarial` is still graded as a difference of excesses against the 3.51pp drif
 `adversarial`'s dispatch is unchanged: `TAU_PLANTED_RULES=adversarial`, the published population,
 `TAU_DISTILL_UNIT=trace`.
 
+## Amendment 3, 2026-11-09 — the three arms move onto one clock, and what a reproduction may decide
+
+Written before the dispatch, and it is the amendment the two above made possible.
+
+**What was wrong with how the three arms were measured.** `far`, `near` and `adversarial` were three
+dispatches (`42534241219`, `42544865267`, `42556573088`), not one: `TAU_PLANTED_RULES` was a repository
+variable, a variable is global, and the dispatch menu is at its twenty-five-input ceiling. So each arm
+was measured on a different run, a different commit and a different slice of API latency atop the same
+tasks, and the arm-to-arm comparison carries between-run noise that the 3.51pp drift only *prices* — it
+does not remove it. The header now carries `plantedArms: far,near,adversarial`, and one dispatch fans
+out one leg per arm on one commit. The reproduction is the point: the same three arms, one clock.
+
+**What a reproduction is allowed to decide, fixed in advance.**
+
+| reading | threshold | what it settles |
+| --- | --- | --- |
+| every arm's excess is within 3.51pp of its published value | the same drift the ordering is graded against | the ladder is reproducible, and the two-rung conclusion stands as published |
+| any arm moves further than the drift | — | that arm's published excess is marked **not reproduced**, the ladder's conclusion is downgraded to a single measurement, and the movement is recorded in `COMPETITIVE` as an instrument difference |
+
+**What it may not do.** No decision rule changes, no population change, no change to the committed
+rule file (`0585fafcc817841a`), and the reproduction does not **replace** the published readings: a
+reproduction is a second measurement of the same quantity and both stay in the record, side by side,
+labelled by the dispatch that produced them. If the two disagree beyond the drift, the honest report is
+two numbers and a named instrument problem, not the newer one.
+
+**Why this is worth three legs of compute.** The conclusion this round reached — *proximity costs
+nothing, contradiction costs 7pp* — is the premise of the next four experiments, and it rests on an
+ordering measured across three clocks. An ordering that survives one clock is a finding; an ordering
+that only exists across three is a coincidence with a schedule.
+
 ## Cost
 
-Four dispatches of the same shape as R56, or one dispatch with four arms if the lane's facade can
-take a per-arm injection list: 57 tasks × 4 trials × 2 arms per arm, about two hours each. The
-implementation is one field on the facade (`TAU_PLANTED_RULES`), one committed rule file, and one
-artefact block carrying the per-arm coverage distribution.
+Three legs of one dispatch, not four dispatches: the registration's `plantedArms` header renders a
+matrix and the `l4` job runs one leg per arm on one commit (`f2330f8`). 57 tasks × 4 trials × 2 arms
+per leg, about two hours each and running in parallel, `fail-fast: false` because the three arms are
+independent readings. The implementation is a header line, one committed rule file, and one artefact
+per leg carrying the per-arm coverage distribution.
 
 ## Why not the retrospective attribution
 
