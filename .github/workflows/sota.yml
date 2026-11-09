@@ -953,7 +953,17 @@ jobs:
           TAU_TRIALS: ${{ vars.TAU_TRIALS || '4' }}
           TAU_MEMORY: 'true'
           TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
-          TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '2' }}
+          # One task at a time, because the two numbers are in different units.
+          #
+          # `max_concurrency` is tau2's TASK count; the provider's limit is a REQUEST count, and one
+          # episode holds an agent call, a user-simulator call and an evaluator call at once. So a
+          # task-level 2 arrives at the provider as five or six requests, and DeepSeek answers
+          # `your current concurrency is 6, which exceeds your concurrency limit of 5` — a limit that
+          # is itself a function of the account balance, so it falls exactly when a run is expensive.
+          # Both arms of `42568927112` died this way at 06:36, one minute apart, after fifty minutes of
+          # work. A task-level 1 cannot exceed a request-level 2 for this workload, which is the only
+          # value that is safe at any balance.
+          TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '1' }}
           TAU_RETRIES: ${{ vars.TAU_RETRIES || '4' }}
           TAU_MAX_TASKS: ${{ github.event.inputs.l4_tasks || vars.TAU_MAX_TASKS || '0' }}
           TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
@@ -999,7 +1009,9 @@ jobs:
           TAU_SEED: ${{ vars.TAU_SEED }}
           TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}
           TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
-          TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '2' }}
+          # One task at a time, for the reason spelled out on the memory arm above: `max_concurrency`
+          # counts tasks and the provider limits requests, and an episode holds three at once.
+          TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '1' }}
           TAU_RETRIES: ${{ vars.TAU_RETRIES || '4' }}
           TAU_MAX_TASKS: ${{ github.event.inputs.l4_tasks || vars.TAU_MAX_TASKS || '0' }}
           TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
