@@ -137,6 +137,43 @@ reaches its band on 76% of them, the rest recorded as drift rather than repaired
 re-authored once, on the request-length distribution, before any dispatch and before any episode
 was scored.
 
+## Amendment 2, 2026-11-09 — read after `near`, written before `adversarial`
+
+`near` ran (`42544865267` on `71457278`) and the readback returned **`ABANDONED`** on two graded
+predictions. One of them is a result. The other is a defect in this registration, and it is repaired
+here before the third arm is dispatched rather than explained afterwards.
+
+**The result.** `near` broke 5 episodes and repaired 7 of 57: excess **−2**, paired `pass^4`
+**+3.51pp** against a half-width of 11.91pp, `UNRESOLVED`. The registration predicted `near < 0`; the
+measured direction is the opposite, inside the drift a control arm moves on its own (3.51pp, R58→R59),
+so it is not evidence of a benefit — it is the absence of the predicted cost at this sample.
+
+**The defect.** The registration graded "the band landed on at least 60% of requests" and the census
+measured **35.4% of 1972**. The 60% was calibrated, in Amendment 1, on *task instructions* ("counted
+over the 114 requests in `retail.json`"). The census counts *every recall request*, and
+`eval/drivers/tau2/microglia_agent.py` sends the current message's content on each turn — 8.6 requests
+per episode, of which only the first carries the task's own words. So the prediction and the
+measurement named different populations, and the arm was graded against a number that could not apply
+to it. This is R51's defect one layer down: not a store graded on another domain's questions, but a
+level graded on another population's texts.
+
+**What the band becomes, for `adversarial`.**
+
+- The per-request band share is **reported, not graded**. It is a distribution over a population the
+  registration does not control, and it will be compared arm to arm.
+- The graded prediction is the one this contrast exists for: **the adversarial arm sits at the same
+  level as `near`** — its per-request band share within 10 percentage points of `near`'s measured
+  share, and its `byRule` census non-empty for every rule it used. Amendment 1's whole point was that
+  polarity must not move the dose; that is a between-arm equality, it needs no absolute threshold, and
+  it is measurable on exactly the population the census already records.
+- "One rule in every served request" stays graded for both arms, because it is a property of the
+  instrument and it held for both arms that ran (`1934 of 1934`, `1972 of 1972`).
+
+**What does not change.** The ledger is still the primary reading, the order `far ≈ 0 < near <
+adversarial` is still graded as a difference of excesses against the 3.51pp drift, and
+`adversarial`'s dispatch is unchanged: `TAU_PLANTED_RULES=adversarial`, the published population,
+`TAU_DISTILL_UNIT=trace`.
+
 ## Cost
 
 Four dispatches of the same shape as R56, or one dispatch with four arms if the lane's facade can

@@ -48,8 +48,18 @@ ARMS = ("far", "near", "adversarial")
 # Quoted from the amendment, which measured them before the dispatch rather than after: `far` shares
 # nothing with every request seen, and the near arm reaches its band on 76% of them, the rest recorded
 # as drift. The thresholds are below those readings so an arm is refused only when the level moved.
+# `far` shares nothing with anything, so its band is a property of the committed rule file and is
+# graded. `near`/`adversarial` were graded at 0.60 and that number was calibrated on *task
+# instructions* while the census counts *every recall request* — the agent sends the current message
+# per turn, 8.6 requests per episode, so only the first carries the task's words. `near` measured
+# 35.4% of 1972 against a 60% bar: the arm was graded against a population it never ran on. Amendment
+# 2 of the registration replaces that with the equality this contrast exists for — the two polarities
+# must sit at the same level — and the per-request share becomes a reported distribution.
 PREDICTED_FAR_BAND_SHARE = 0.95
-PREDICTED_NEAR_BAND_SHARE = 0.60
+# How far apart the two polarities' measured band shares may sit. Amendment 1's point was that
+# polarity must not move the dose; a between-arm equality needs no absolute threshold, which is what
+# makes it gradable on a population the registration does not control.
+POLARITY_LEVEL_TOLERANCE = 0.10
 # The control arm's own movement between two dispatches of one configuration (R58 63.16%, R59
 # 66.67%, same 57 tasks, nothing changed). A difference smaller than this is not a difference.
 CONTROL_DRIFT_PP = 3.51
@@ -229,7 +239,13 @@ def read_arm(name: str, directory: Path) -> tuple[Arm | None, str | None]:
 
 
 def band_floor(name: str) -> float:
-    return PREDICTED_FAR_BAND_SHARE if name == "far" else PREDICTED_NEAR_BAND_SHARE
+    """The graded band floor, for the arms whose level is a property of the committed file.
+
+    Only `far` has one. `near` and `adversarial` are graded against each other (Amendment 2), because
+    an absolute share over per-turn requests is a share over a population the registration does not
+    choose.
+    """
+    return PREDICTED_FAR_BAND_SHARE
 
 
 def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
@@ -281,15 +297,29 @@ def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
         ", ".join(sorted(digests)) if len(digests) > 1 else next(iter(digests)),
     )
 
-    # 3. The level landed. Read as a share of planted requests rather than of requests, because a
-    #    rule that was never planted cannot have failed its band.
+    # 3. The level. `far`'s is a property of the committed file and is graded; the two polarities are
+    #    reported and then compared with each other. Amendment 2 has the arithmetic: a share over
+    #    per-turn requests is not the share Amendment 1 calibrated, and near was already refused by a
+    #    bar its own population could not meet.
     for name in present:
         arm = arms[name]
         share = arm.band_share
+        if name == "far":
+            report.predict(
+                f"far: the band landed on at least {band_floor(name) * 100:.0f}% of requests",
+                None if share is None else share >= band_floor(name),
+                "no census" if share is None else f"{share * 100:.1f}% of {arm.planted}",
+            )
+        elif share is not None:
+            report.note(f"{name}: band share {share * 100:.1f}% of {arm.planted} (reported, not graded)")
+    if "near" in arms and "adversarial" in arms:
+        near_share = arms["near"].band_share
+        adversarial_share = arms["adversarial"].band_share
+        gap = None if near_share is None or adversarial_share is None else abs(adversarial_share - near_share)
         report.predict(
-            f"{name}: the band landed on at least {band_floor(name) * 100:.0f}% of requests",
-            None if share is None else share >= band_floor(name),
-            "no census" if share is None else f"{share * 100:.1f}% of {arm.planted}",
+            f"the two polarities sit at the same level: |adversarial - near| <= {POLARITY_LEVEL_TOLERANCE * 100:.0f}pp",
+            None if gap is None else gap <= POLARITY_LEVEL_TOLERANCE,
+            "no census" if gap is None else f"{gap * 100:.1f}pp apart",
         )
 
     # 4. Four trials, or the deltas are not the registered ones.
@@ -482,10 +512,16 @@ def self_test() -> int:
             "band landed",
         ),
         (
-            "a near arm below its band share did not run its band",
+            "the two polarities at different levels are not one treatment",
             {**passing_arms(), "near": fixture("near", census={"inBand": 40}, comparison={"lost": 9, "gained": 4})},
             "ABANDONED",
-            "band landed",
+            "56.0pp apart",
+        ),
+        (
+            "a polarity's share is reported rather than graded, because its population is per-turn",
+            {"near": fixture("near", census={"inBand": 40}, comparison={"lost": 9, "gained": 4})},
+            "GRADED",
+            "band share 20.0% of 200 (reported, not graded)",
         ),
         (
             "far and near inside the drift is the registered refutation",
