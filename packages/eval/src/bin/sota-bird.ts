@@ -211,6 +211,7 @@ import {
   parseArms,
   parseManifest,
   parseRows,
+  questionsDigest,
   type BirdRow,
   parseRetirementPolicy,
   artefactIdOf,
@@ -824,6 +825,23 @@ type Dataset = {
   readonly dbPath: (dbId: string) => string;
   /** Where the questions came from, recorded in the artefact. */
   readonly source: string;
+  /**
+   * A digest of the questions this run read, so two runs can be told apart by their corpus.
+   *
+   * The archive is pinned by `sha256` in `eval/manifests/`, and the one path that is not pinned is the
+   * fallback for a `BIRD_DIR` without a question file — which reads a URL. BIRD shipped a corrected
+   * Mini-Dev on 2026-10-28, and expert review put the previous one's annotation error rate at 52.8%
+   * (`Pervasive Annotation Errors…`, Jin et al., January 2026), so a number whose corpus cannot be
+   * identified is a number that cannot be compared with anything. See `questionsDigest`.
+   */
+  readonly digest: string;
+  /**
+   * Whether those questions came out of the pinned archive rather than a directory or a URL.
+   *
+   * Recorded beside the digest because the two answer different questions: the digest says *which*
+   * corpus, this says whether anybody can find it again from the manifest alone.
+   */
+  readonly pinned: boolean;
   /** Rows the archive repeats verbatim: dropped, and stated in the artefact. */
   readonly duplicates: number;
 };
@@ -1020,10 +1038,16 @@ async function loadDataset(limit: number): Promise<Dataset> {
 
   let rows: BirdRow[];
   let source: string;
+  // False until the question file is read out of the manifest's own archive. A `BIRD_DIR` is a
+  // directory somebody else assembled, and a URL is whatever it answers today; neither is the pinned
+  // corpus, and an artefact that called all three `pinned` would be describing a guarantee it does not
+  // have.
+  let pinned = false;
   const local = join(root, manifest.questions);
   if (existsSync(local)) {
     rows = parseRows(readFileSync(local, 'utf8'));
     source = local;
+    pinned = explicit === undefined;
   } else {
     const sources = [
       `${CRITIC_REPO}/sqlite-00000-of-00001.jsonl`,
@@ -1107,9 +1131,20 @@ async function loadDataset(limit: number): Promise<Dataset> {
     process.stdout.write(`[sota] data ok: ${dbId} ${counted.tables} tables, ${counted.rows} rows\n`);
   }
 
+  // Over the file's own rows rather than over the slice: the digest identifies the corpus, and two
+  // runs that measured different caps of one corpus are two slices of one corpus. `limit` and
+  // `qualifying_questions` in the artefact are what describe the slice.
+  const digest = questionsDigest(deduped.rows);
+  process.stdout.write(
+    `[sota] corpus ${digest.slice(0, 12)}: ${deduped.rows.length} question(s) from ${
+      pinned ? 'the pinned archive' : 'a source outside the manifest'
+    }\n`,
+  );
   return {
     rows: slice,
     source,
+    digest,
+    pinned,
     duplicates: deduped.duplicates,
     dbPath: (dbId) => databaseIn(root, dbId, manifest.nestedRoot),
   };
@@ -6130,6 +6165,10 @@ async function main(): Promise<void> {
     protocol: 'cross-fitted-kfold/3',
     dataset: SPLIT_NAME,
     source: dataset.source,
+    // The corpus itself, not its file name: see `Dataset.digest` for what changed to make this
+    // necessary and `Dataset.pinned` for what the digest cannot say on its own.
+    dataset_digest: dataset.digest,
+    dataset_pinned: dataset.pinned,
     model: MODEL,
     prompt_version: PROMPT_VERSION,
     config: {

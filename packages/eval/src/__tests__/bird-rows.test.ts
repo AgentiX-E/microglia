@@ -6,7 +6,13 @@
  * accuracy on a corpus nobody chose.
  */
 import { describe, expect, it } from 'vitest';
-import { compareGold, normaliseRow, parseGoldLines, parseRows } from '../bird-rows.js';
+import {
+  compareGold,
+  normaliseRow,
+  parseGoldLines,
+  parseRows,
+  questionsDigest,
+} from '../bird-rows.js';
 
 const QUESTION = {
   question_id: 3,
@@ -41,12 +47,19 @@ describe('parseRows', () => {
   });
 
   it('drops records that are not questions rather than counting them', () => {
-    const rows = parseRows(JSON.stringify([QUESTION, { question: 'no sql' }, null, 42, { ...QUESTION, SQL: '  ' }]));
+    const rows = parseRows(
+      JSON.stringify([QUESTION, { question: 'no sql' }, null, 42, { ...QUESTION, SQL: '  ' }]),
+    );
     expect(rows).toHaveLength(1);
   });
 
   it('keeps the file order, because the folds are assigned from it', () => {
-    const rows = parseRows(JSON.stringify([{ ...QUESTION, question_id: 9 }, { ...QUESTION, question_id: 1 }]));
+    const rows = parseRows(
+      JSON.stringify([
+        { ...QUESTION, question_id: 9 },
+        { ...QUESTION, question_id: 1 },
+      ]),
+    );
     expect(rows.map((row) => row.question_id)).toEqual([9, 1]);
   });
 
@@ -108,25 +121,19 @@ describe('compareGold', () => {
   const row = (sql: string): { SQL: string } => ({ SQL: sql });
 
   it('reports agreement when the two copies match', () => {
-    const reading = compareGold(
-      [row('SELECT 1'), row('SELECT 2')] as never,
-      [
-        { sql: 'SELECT 1', dbId: 'a' },
-        { sql: 'SELECT 2', dbId: 'b' },
-      ],
-    );
+    const reading = compareGold([row('SELECT 1'), row('SELECT 2')] as never, [
+      { sql: 'SELECT 1', dbId: 'a' },
+      { sql: 'SELECT 2', dbId: 'b' },
+    ]);
     expect(reading.compared).toBe(2);
     expect(reading.disagreeing).toEqual([]);
   });
 
   it('reports the first disagreement with both texts, so it can be read without the files', () => {
-    const reading = compareGold(
-      [row('SELECT 1'), row('SELECT 3')] as never,
-      [
-        { sql: 'SELECT 1', dbId: 'a' },
-        { sql: 'SELECT 2', dbId: 'a' },
-      ],
-    );
+    const reading = compareGold([row('SELECT 1'), row('SELECT 3')] as never, [
+      { sql: 'SELECT 1', dbId: 'a' },
+      { sql: 'SELECT 2', dbId: 'a' },
+    ]);
     expect(reading.disagreeing).toHaveLength(1);
     expect(reading.disagreeing[0]?.index).toBe(1);
     expect(reading.disagreeing[0]?.question_sql).toBe('SELECT 3');
@@ -137,7 +144,9 @@ describe('compareGold', () => {
     // The counts are reported beside `compared` so a caller can refuse a file of the wrong length;
     // this function does not decide that, because a shorter gold is a fact about the file and not
     // an error in the comparison.
-    const reading = compareGold([row('SELECT 1'), row('SELECT 2')] as never, [{ sql: 'SELECT 1', dbId: 'a' }]);
+    const reading = compareGold([row('SELECT 1'), row('SELECT 2')] as never, [
+      { sql: 'SELECT 1', dbId: 'a' },
+    ]);
     expect(reading.compared).toBe(1);
     expect(reading.questions).toBe(2);
     expect(reading.gold).toBe(1);
@@ -155,5 +164,49 @@ describe('compareGold', () => {
     const rows = Array.from({ length: 50 }, (_, at) => row(`SELECT ${at}`));
     const gold = Array.from({ length: 50 }, () => ({ sql: 'SELECT -1', dbId: 'a' }));
     expect(compareGold(rows as never, gold, 3).disagreeing).toHaveLength(3);
+  });
+});
+
+describe('questionsDigest', () => {
+  const rows = [
+    { ...QUESTION, question_id: 3, db_id: 'financial', SQL: 'SELECT count(*) FROM account' },
+    { ...QUESTION, question_id: 1, db_id: 'financial', SQL: 'SELECT 1' },
+    { ...QUESTION, question_id: 2, db_id: 'california_schools', SQL: 'SELECT 2' },
+  ];
+
+  it('does not depend on the order the file listed them in', () => {
+    // The fold assignment sorts by `db_id#question_id`, so two loaders that returned one corpus in
+    // file order and in id order describe the same benchmark. A digest that moved would tell a reader
+    // the corpus had changed when only the reader had.
+    expect(questionsDigest([...rows].reverse())).toBe(questionsDigest(rows));
+    expect(questionsDigest([rows[1]!, rows[2]!, rows[0]!])).toBe(questionsDigest(rows));
+  });
+
+  it('changes when a gold statement changes, which is what an annotation correction is', () => {
+    // BIRD shipped a corrected Mini-Dev on 2026-10-28. A digest over the questions alone would be
+    // identical across the two releases; the gold statement is the thing that moved.
+    const corrected = rows.map((row, index) =>
+      index === 0 ? { ...row, SQL: 'SELECT count(1) FROM account' } : row,
+    );
+    expect(questionsDigest(corrected)).not.toBe(questionsDigest(rows));
+  });
+
+  it('changes when the evidence changes, because the prompt is built from it', () => {
+    const evidenced = rows.map((row, index) =>
+      index === 1 ? { ...row, evidence: 'Accounts are counted per customer.' } : row,
+    );
+    expect(questionsDigest(evidenced)).not.toBe(questionsDigest(rows));
+  });
+
+  it('distinguishes an empty corpus from a one-row corpus', () => {
+    expect(questionsDigest([])).not.toBe(questionsDigest([rows[0]!]));
+  });
+
+  it('separates rows that would concatenate to the same text', () => {
+    // A digest built by joining the fields with a separator that can appear in them would call these
+    // two corpora the same. Canonical JSON quotes the strings, so it cannot.
+    const left = [{ ...QUESTION, db_id: 'a', question: 'b' }];
+    const right = [{ ...QUESTION, db_id: 'ab', question: '' }];
+    expect(questionsDigest(left)).not.toBe(questionsDigest(right));
   });
 });

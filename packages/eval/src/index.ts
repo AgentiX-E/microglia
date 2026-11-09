@@ -207,6 +207,7 @@ export {
   normaliseRow,
   parseGoldLines,
   parseRows,
+  questionsDigest,
   type BirdRow,
   type GoldAgreement,
 } from './bird-rows.js';
