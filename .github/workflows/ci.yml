@@ -37,6 +37,13 @@ jobs:
         run: pnpm build
 
       - name: Typecheck the lane CLIs
+        # The lanes' entry points are excluded from the composite build — `packages/*/tsconfig.json`
+        # lists `src/bin` under `exclude`, because they are processes rather than library surface and
+        # they resolve with `nodenext` rather than through the path aliases — so `pnpm build` above
+        # does not see them and coverage does not either. `pnpm typecheck` chains this second compiler
+        # run, which is why the local entry point and these two steps now check the same files: a
+        # `metrics` field typed as a number and written as a string passed every local gate and failed
+        # here twice (`9f63398`), and the difference was this line.
         run: pnpm typecheck:lanes
 
       - name: Tests with coverage gates

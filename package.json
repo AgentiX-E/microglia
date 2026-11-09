@@ -17,7 +17,7 @@
   "scripts": {
     "build": "tsc -b packages/core packages/protocol packages/sql packages/eval packages/node packages/browser",
     "clean": "tsc -b --clean packages/core packages/protocol packages/sql packages/eval packages/node packages/browser",
-    "typecheck": "tsc -b packages/core packages/protocol packages/sql packages/eval packages/node packages/browser",
+    "typecheck": "tsc -b packages/core packages/protocol packages/sql packages/eval packages/node packages/browser && tsc --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck packages/eval/src/bin/*.ts",
     "typecheck:lanes": "tsc --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck packages/eval/src/bin/*.ts",
     "test": "vitest run --coverage",
     "test:unit": "vitest run",
