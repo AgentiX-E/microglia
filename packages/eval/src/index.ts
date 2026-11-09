@@ -680,6 +680,11 @@ export {
   type SampleGateInput,
 } from './sample-gates.js';
 export {
+  pairGates,
+  plantedBarNote,
+  type PairGateInput,
+} from './pair-gates.js';
+export {
   FACADE_NOTES_ENV,
   NOTE_LEVELS,
   PRIMARY_NOTE,

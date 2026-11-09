@@ -47,6 +47,7 @@ import {
 } from '@agentix-e/microglia-eval';
 import { writeJson } from './lib.js';
 import { pairedVerdict } from '../paired-verdict.js';
+import { pairGates, plantedBarNote } from '../pair-gates.js';
 
 type TaskRow = { readonly id: string; readonly passed_all: boolean };
 
@@ -74,6 +75,12 @@ type Artefact = {
     /** The store's census and the recall tally, when the arm recorded them (R43 onward). */
     readonly store?: Tau2ArmRecord['store'];
     readonly recall?: Tau2ArmRecord['recall'];
+    /**
+     * R57: the distractor this arm planted. Read from the artefact rather than from the dispatch's
+     * environment, because the pair is about the two files: an arm filed under `near` whose artefact
+     * carries no plant census planted nothing, and its pair must be graded as the control it was.
+     */
+    readonly plant?: { readonly arm: string };
   };
   readonly per_task?: readonly TaskRow[];
   /** One row per evaluated episode; absent on artefacts written before R29 stage 2. */
@@ -204,45 +211,26 @@ const evidence: Tau2Evidence = {
 const audit = tau2GateAudit(evidence);
 
 /**
- * The three conditions that belong to this pair rather than to the instrument.
+ * The distractor the memory arm planted, read from the arm's own artefact.
  *
- * `l4-paired` blocks on harm, and only on harm. `l4-effect-resolved` reports
- * whether the pair can support the claim it is making; it does not block,
- * because an unresolvable effect is a statement about the sample rather than
- * about the memory — and `V5-resolution` already blocks on the same fact from
- * the protocol's side, so a second blocking copy would be the same red line
- * printed twice. `l4-same-split` blocks: two arms on different splits are not a
- * pair.
+ * `second` is the memory arm by construction (the order is stated where the two paths are read). An
+ * arm that planted one is graded by its plant census and its per-episode ledger rather than by the
+ * treatment's harm branch, which for that arm is its registered prediction; see `pair-gates.ts`.
  */
-const scenarioGates: readonly ValidityGate[] = [
-  {
-    id: 'l4-paired',
-    criterion: 'the memory does not cost accuracy: neither R45 revert branch fires',
-    actual:
-      `${comparison.deltaPp.toFixed(2)}pp (p=${comparison.p.toFixed(4)}, n=${comparison.paired}, ` +
-      `${served} served pack(s)): ${verdict.state}`,
-    pass: verdict.state !== 'HARM',
-    blocking: true,
-  },
-  {
-    id: 'l4-effect-resolved',
-    criterion:
-      'the pair resolves the effect it reports: |delta| >= minimum detectable difference, or no direction is claimed',
-    actual:
-      verdict.state === 'UNRESOLVED'
-        ? `UNRESOLVED: |${comparison.deltaPp.toFixed(2)}pp| against ${detectablePp === undefined ? 'an unestimable' : `${detectablePp.toFixed(2)}pp`} minimum detectable difference`
-        : (verdict.claim ?? verdict.state),
-    pass: verdict.state !== 'UNRESOLVED',
-    blocking: false,
-  },
-  {
-    id: 'l4-same-split',
-    criterion: 'both arms scored exactly the same tasks',
-    actual: `${comparison.onlyFirst} only in first, ${comparison.onlySecond} only in second`,
-    pass: splitMatches,
-    blocking: true,
-  },
-];
+const plantedArm = second.tau2?.plant?.arm;
+const scenarioGates: readonly ValidityGate[] = pairGates({
+  state: verdict.state,
+  claim: verdict.claim ?? null,
+  deltaPp: comparison.deltaPp,
+  p: comparison.p,
+  paired: comparison.paired,
+  served,
+  detectablePp,
+  splitMatches,
+  onlyFirst: comparison.onlyFirst,
+  onlySecond: comparison.onlySecond,
+  ...(plantedArm === undefined ? {} : { plantedArm }),
+});
 
 const gates = mergeGates(audit.gates, scenarioGates, inGateOrder);
 
@@ -255,6 +243,9 @@ await writeJson('poc-l4-pair', {
   first: { path: FIRST, ranAt: first.ranAt ?? null, pass4: first.metrics?.pass4 ?? null },
   second: { path: SECOND, ranAt: second.ranAt ?? null, pass4: second.metrics?.pass4 ?? null },
   comparison,
+  // R57: the distractor this pair is about, when the memory arm planted one. Without it a reader sees
+  // a pair artefact with no treatment gate and no reason for the omission.
+  ...(plantedBarNote(plantedArm) ?? {}),
   // R50: what the pair establishes, in one of three states, decided by the same
   // two numbers the report prints. `claim` is null unless a direction is
   // supported, so a reader cannot concatenate an unsupported sentence into a

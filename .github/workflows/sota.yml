@@ -184,7 +184,18 @@ jobs:
   bird:
     # The split is in the title, not only in the inputs: a run list that calls all of them Mini-Dev
     # is a run list a reader has to open to tell apart, and the two splits measure different cells.
-    name: BIRD ${{ github.event.inputs.split == 'dev' && 'dev' || (github.event.inputs.split == 'train' && 'train (out-of-sample)' || 'Mini-Dev') }} (cross-fitted, memory on/off)
+    #
+    # The label is the split input with `minidev` as its default, and not a nested ternary, because a
+    # job that is skipped never evaluates this expression: `42534241219` printed
+    # `BIRD ${{ (((github.event.inputs.split == 'dev') && 'dev') || …` into the run list, which is
+    # longer than the name it was replacing and unreadable precisely where a reader is trying to work
+    # out why the lane is missing. One expression, two words.
+    #
+    # `train` loses the `(out-of-sample)` suffix the ternary used to add. The warning it carried is in
+    # the `split` input's own description, which the run page shows beside the title, and in the
+    # artefact's name (`poc-sota-bird-train`); a conditional that survives into the run list as source
+    # text protects nobody from quoting the number.
+    name: BIRD ${{ github.event.inputs.split || 'minidev' }} (cross-fitted, memory on/off)
     # Decided by `scope`, which reads the registration: a τ² registration buys no BIRD lane, an
     # explicit `bird: false` buys none, and a BIRD-only split buys one regardless. Scheduled and
     # push-triggered runs keep the lane, because their scope resolves to it.
