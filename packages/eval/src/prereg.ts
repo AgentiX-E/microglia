@@ -49,6 +49,19 @@ export type Prereg = {
    */
   readonly facadeNotes?: 'three-level' | 'off';
   /**
+   * The planted distractor arms this registration runs, when it runs any.
+   *
+   * R57 declared three — `far`, `near`, `adversarial` — and dispatched them one at a time, because
+   * the arm lived in a repository variable and a variable is global: three arms meant three
+   * dispatches, each waiting six hours for the last, and a fourth experiment that forgot to clear
+   * the variable would have measured a distractor it never asked for. A property of the experiment
+   * belongs in the registration, exactly as the scenario pair and the recall floor do, so this is
+   * where the arm list lives and the workflow fans it out into one job per arm.
+   *
+   * Absent means one arm with no plant, which is what every registration before R57 is.
+   */
+  readonly plantedArms?: readonly string[];
+  /**
    * The scenario pair this registration executes, when it pins one.
    *
    * Absent means "whatever the lane is configured with", which is what every registration
@@ -100,6 +113,7 @@ const HEADER_KEYS = [
   'trainDomain',
   'testDomain',
   'recallDomain',
+  'plantedArms',
 ] as const;
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
@@ -291,6 +305,34 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     });
   }
 
+  // R57: the planted arms, one job each. A name is a lowercase word because it is pasted into
+  // `TAU_PLANTED_RULES` and indexed into `eval/planted/<domain>.json`; a name with punctuation in it
+  // would be an arm nobody can dispatch and a file nobody can find. Duplicates are refused rather
+  // than collapsed: two legs writing the same artefact directory is a race, not a repeat.
+  const plantedText = values.get('plantedArms');
+  let plantedArms: readonly string[] | undefined;
+  if (plantedText !== undefined) {
+    const names = plantedText
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry !== '');
+    if (names.length === 0) {
+      collected.push({ where: `header 'plantedArms'`, problem: 'declares no arm' });
+    }
+    for (const name of names) {
+      if (!/^[a-z][a-z0-9-]*$/.test(name)) {
+        collected.push({
+          where: `header 'plantedArms'`,
+          problem: `'${name}' is not an arm name such as near or adversarial`,
+        });
+      }
+    }
+    if (new Set(names).size !== names.length) {
+      collected.push({ where: `header 'plantedArms'`, problem: 'an arm is listed twice' });
+    }
+    plantedArms = names;
+  }
+
   const id = values.get('id') ?? '';
   const stem = file.slice(file.lastIndexOf('/') + 1).replace(/\.md$/, '');
   if (id !== '' && id !== stem) {
@@ -357,12 +399,25 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(trainDomain === undefined ? {} : { trainDomain }),
       ...(testDomain === undefined ? {} : { testDomain }),
       ...(recallDomain === undefined ? {} : { recallDomain }),
+      ...(plantedArms === undefined ? {} : { plantedArms }),
       prediction,
       refutation,
       file,
     },
     problems: [],
   };
+}
+
+/**
+ * The planted arms one dispatch runs, as the matrix a workflow fans out over.
+ *
+ * `['']` rather than `[]` when a registration plants nothing: a matrix with no values is not a job at
+ * all, and `''` is the value the driver already reads as "plant nothing" — so the unplanted leg needs
+ * no branch in the lane and no second code path in the workflow.
+ */
+export function plantedArmMatrix(prereg: Prereg): readonly string[] {
+  const arms = prereg.plantedArms ?? [];
+  return arms.length === 0 ? [''] : [...arms];
 }
 
 function capitalise(text: string): string {

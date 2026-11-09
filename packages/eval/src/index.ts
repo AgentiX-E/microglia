@@ -1314,6 +1314,7 @@ export {
   type Prereg,
   type PreregProblem,
   type PreregReading,
+  plantedArmMatrix,
 } from './prereg.js';
 
 export {

@@ -3,6 +3,7 @@ id: R57-toxicity
 step: R57
 opened: 2026-11-08
 arms: memory,reference
+plantedArms: far,near,adversarial
 sample: 228
 gates: V0,V1,V2,V3,V5,V6,V7,V8,V32,V44
 recallFloor: 0

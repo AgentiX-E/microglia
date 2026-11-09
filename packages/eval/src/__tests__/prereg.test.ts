@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { facadePairSwitch, preregGate, preregGateAgreement, readPrereg, type Prereg } from '../prereg.js';
+import {
+  facadePairSwitch,
+  plantedArmMatrix,
+  preregGate,
+  preregGateAgreement,
+  readPrereg,
+  type Prereg,
+} from '../prereg.js';
 
 const HEADER = [
   '---',
@@ -376,6 +383,58 @@ describe('a paired facade must register its floor', () => {
  * that makes the pair visible and the three refusals that keep a half-pinned pair from
  * leaving half the experiment to a variable.
  */
+describe('a registration declares its planted arms, and the workflow fans them out', () => {
+  /**
+   * R57's header, and the reason it is a header.
+   *
+   * The arm lived in `TAU_PLANTED_RULES` for three dispatches, which meant three six-hour runs in
+   * sequence — a variable is global, and the dispatch menu is full at twenty-five inputs. A list in
+   * the registration is the same declaration the scenario pair and the recall floor already are, and
+   * it is the only one of the three that changes how many jobs a dispatch runs.
+   */
+  const withArms = (line: string): string =>
+    `${HEADER.replace(/^---\n/, `---\n${line}\n`)}${PREDICTION}${REFUTATION}`;
+
+  it('reads the list, in the order it was registered', () => {
+    const reading = readPrereg(withArms('plantedArms: far,near,adversarial'), 'R8.3-xiyan-cell.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.plantedArms).toEqual(['far', 'near', 'adversarial']);
+  });
+
+  it('leaves the list absent when nothing plants, and the matrix is then one unplanted leg', () => {
+    // `['']` rather than `[]`: a matrix with no values is not a job at all, and the empty string is
+    // what the driver already reads as "plant nothing".
+    const reading = readPrereg(VALID, 'R8.3-xiyan-cell.md');
+    expect(reading.prereg?.plantedArms).toBeUndefined();
+    expect(plantedArmMatrix(reading.prereg as Prereg)).toEqual(['']);
+  });
+
+  it('fans a declared list out one leg per arm', () => {
+    const reading = readPrereg(withArms('plantedArms: far,near,adversarial'), 'R8.3-xiyan-cell.md');
+    expect(plantedArmMatrix(reading.prereg as Prereg)).toEqual(['far', 'near', 'adversarial']);
+  });
+
+  it('refuses a name that no file can answer to', () => {
+    // The name is pasted into `TAU_PLANTED_RULES` and indexed into `eval/planted/<domain>.json`; a
+    // name with punctuation in it is an arm nobody can dispatch and a file nobody can find.
+    expect(problemsOf(withArms('plantedArms: near,Adversarial!'))).toContain(
+      "header 'plantedArms': 'Adversarial!' is not an arm name such as near or adversarial",
+    );
+  });
+
+  it('refuses the same arm twice, because two legs write one artefact directory', () => {
+    expect(problemsOf(withArms('plantedArms: near,near'))).toContain(
+      "header 'plantedArms': an arm is listed twice",
+    );
+  });
+
+  it('refuses a header that declares nothing', () => {
+    expect(problemsOf(withArms('plantedArms:'))).toContain(
+      "header 'plantedArms': declares no arm",
+    );
+  });
+});
+
 describe('a registration can pin its scenario pair', () => {
   const withDomains = (lines: readonly string[]): string =>
     `${HEADER.replace(/^---\n/, `---\n${lines.join('\n')}\n`)}${PREDICTION}${REFUTATION}`;

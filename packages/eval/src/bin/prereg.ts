@@ -11,7 +11,11 @@
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { preregGate, readPrereg } from '@agentix-e/microglia-eval';
+// Relative rather than through the package name: `@agentix-e/microglia-eval` resolves to `dist/`,
+// so a validator imported that way grades the last build rather than the file a change just edited.
+// Every other bin in this directory imports `../`, and this one did not — which meant a new header
+// key was unknown to the very command a dispatch runs first.
+import { preregGate, readPrereg } from '../prereg.js';
 
 function main(): void {
   const root = process.cwd();

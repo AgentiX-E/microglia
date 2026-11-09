@@ -181,6 +181,57 @@ jobs:
           echo "### Lane scope" >> "$GITHUB_STEP_SUMMARY"
           sed -n 's/^reason=//p' "$GITHUB_OUTPUT" | tail -1 >> "$GITHUB_STEP_SUMMARY"
 
+  arms:
+    # The planted arms this registration runs, as a matrix.
+    #
+    # R57 dispatched its three distractor arms one at a time, because the arm lived in
+    # `TAU_PLANTED_RULES`, a variable is global, and the dispatch menu has no slot left at
+    # twenty-five inputs. Three arms then meant three six-hour runs that could not overlap —
+    # and the next experiment was one forgotten variable away from measuring a distractor it
+    # never asked for. An arm is a property of the experiment, so the registration declares the
+    # list (`plantedArms:`) and this job turns it into one leg per arm.
+    #
+    # A registration with no such header emits `[""]`: one leg, no plant, which is what every
+    # dispatch before R57 was. The empty leg is not a special case anywhere downstream because
+    # `""` is the value the driver already reads as "plant nothing".
+    name: 'Which arms this registration runs'
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.arms.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Fan the registration's arms out
+        id: arms
+        env:
+          PREREG: ${{ github.event.inputs.prereg || '' }}
+        run: |
+          set -euo pipefail
+          FILE="prereg/${PREREG}.md"
+          if [ ! -f "$FILE" ]; then
+            # A dispatch with no registration runs one unplanted leg. Refusing here would break
+            # every scheduled run, and the prereg is refused by its own gate a step later.
+            echo 'matrix=[""]' >> "$GITHUB_OUTPUT"
+            echo "### Arms" >> "$GITHUB_STEP_SUMMARY"
+            echo "no registration named, so one unplanted leg" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          ARMS=$(pnpm --silent eval:prereg-arms "$FILE")
+          echo "matrix=$ARMS" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Arms"
+            echo
+            echo "\`$FILE\` runs $ARMS"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   bird:
     # The split is in the title, not only in the inputs: a run list that calls all of them Mini-Dev
     # is a run list a reader has to open to tell apart, and the two splits measure different cells.
@@ -638,11 +689,22 @@ jobs:
   # come with it. A job that runs without either would publish a zero it did not
   # measure, so the gate is a repository variable rather than a TODO.
   l4:
-    name: 'L4 tau-bench pass^4'
+    # The arm is in the title because a run list with three legs called the same thing is a run
+    # list a reader has to open three times to tell apart — and the leg that measures `adversarial`
+    # is a different experiment from the leg that measures `far`.
+    name: "L4 tau-bench pass^4 — ${{ matrix.arm || 'no plant' }}"
     # Two switches, because the variable is for "this repository runs L4 now" and
     # the input is for "check the wiring once". A dispatch that sets neither leaves
     # a lane that costs hours of model calls switched off.
     if: vars.TAU_ENV_READY == 'true' || github.event.inputs.l4 == 'true'
+    needs: [arms]
+    # One leg per arm the registration declares. `fail-fast: false` because the arms are independent
+    # readings: a leg that misses its gate must not cancel the legs whose numbers are still worth
+    # having, which is the same reason the pair step runs under `always()`.
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: ${{ fromJSON(needs.arms.outputs.matrix) }}
     runs-on: ubuntu-latest
     # R49 runs TWO recall facades inside the memory arm's single driver run,
     # so that arm pays for two evaluations against one shared store. Two arms of
@@ -856,12 +918,14 @@ jobs:
           # committed trace artefact ran at; a run at six is a different treatment and the ceiling
           # travels into the artefact so a readback can tell the two apart.
           TAU_TRACE_CLAIMS: ${{ vars.TAU_TRACE_CLAIMS }}
-          # R57: which controlled distractor this dispatch plants, and nothing else. Unset is the
-          # control arm, so every artefact committed before this variable produced the packs it
-          # always did. The rules themselves are committed in eval/planted/retail.json and their
-          # digest travels into the artefact, which is what stops an arm being authored after the
-          # episodes it failed are known.
-          TAU_PLANTED_RULES: ${{ vars.TAU_PLANTED_RULES }}
+          # R57: which controlled distractor this leg plants, and nothing else. It comes from the
+          # registration's `plantedArms` header by way of the `arms` job, not from a repository
+          # variable: a variable is global, so three arms meant three dispatches in sequence and a
+          # fourth experiment was one forgotten `PATCH` from measuring a distractor nobody asked for.
+          # The empty leg is the control, which is what every artefact committed before R57 is; the
+          # rules themselves are committed in eval/planted/retail.json and their digest travels into
+          # the artefact, which is what stops an arm being authored after its episodes are known.
+          TAU_PLANTED_RULES: ${{ matrix.arm }}
           TAU_SEED: ${{ vars.TAU_SEED }}
           TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}
           TAU_WRITE_ADMISSION_THRESHOLD: ${{ vars.TAU_WRITE_ADMISSION_THRESHOLD }}
@@ -999,5 +1063,5 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: l4-evidence
+          name: l4-evidence-${{ matrix.arm || 'none' }}
           path: eval/results
