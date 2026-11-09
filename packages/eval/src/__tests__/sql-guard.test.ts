@@ -154,6 +154,24 @@ describe('a statement with a deadline', () => {
     expect(result.error).toBe('the statement process exited');
   });
 
+  it('reports a statement whose message never left, as exited rather than as a deadline', async () => {
+    // Closing while the statement waits for a child that has not finished booting: the readiness
+    // signal resolves on exit, so the write that follows lands on a closed channel and fails with
+    // EPIPE. Without the callback on `send` that is an uncaught exception on a channel nobody is
+    // watching, and the statement would wait out its deadline instead of failing.
+    //
+    // The close is issued with no delay on purpose. A `setTimeout` here would let the child finish
+    // booting and the write would succeed — which is what the case above does, and it is a different
+    // path: there the message left and the answer never came.
+    const sql = new BoundedSql({ deadlineMs: 30_000, workers: 1 });
+    const running = sql.run(small, 'select 1 as one');
+    await sql.close();
+    const result = await running;
+    expect(result.ok).toBe(false);
+    expect(result.deadline).toBe(false);
+    expect(result.error).toBe('the statement process exited');
+  });
+
   it('refuses to run after it is closed', async () => {
     const sql = new BoundedSql();
     expect((await sql.run(small, 'select 1 as one')).ok).toBe(true);

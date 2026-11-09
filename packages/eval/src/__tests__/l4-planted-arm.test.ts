@@ -194,7 +194,19 @@ describe('a pair whose memory arm planted a distractor', () => {
     expect(published['planted_arm']).toBe('near');
     // The gate is omitted; the number is not, and it is the number the arm was registered to produce.
     expect((published['comparison'] as { paired: number }).paired).toBe(12);
-    expect((published['verdict'] as { state: string }).state).toBe('HARM');
+    // The state is the registered revert rule's answer and stays: -7.02pp below the -5pp bar with a
+    // served pack is what R45 says it is. The *claim* does not stay, because "the memory costs
+    // accuracy" is false of a loss we planted on purpose.
+    const verdict = published['verdict'] as { state: string; claim: string | null };
+    expect(verdict.state).toBe('HARM');
+    expect(verdict.claim).toBeNull();
+    // And that suppression is what the protocol's resolution gate reads: a run that publishes a
+    // direction it cannot resolve is blocked by `V5-resolution`, which is right — so the fix belongs
+    // in the artefact rather than in the gate. On these twelve tasks the minimum detectable
+    // difference is far above the seven-point delta, so a claim here would have been refused.
+    const resolution = gates.find((gate) => gate.id === 'V5-resolution');
+    expect(resolution?.pass).toBe(true);
+    expect(resolution?.actual).toContain('claims no direction');
   });
 
   it('fails the same pair when nothing was planted, which is why the exemption is keyed on the census', () => {
@@ -213,5 +225,17 @@ describe('a pair whose memory arm planted a distractor', () => {
     expect(paired?.pass).toBe(false);
     expect(paired?.blocking).toBe(true);
     expect(published['planted_arm']).toBeUndefined();
+    // The other half of the pair above: the same numbers, no plant, and the claim is published —
+    // which is what makes `V5-resolution` fail. Two files that agreed on the omission but disagreed
+    // about the claim would have left the sentence standing on the arm it misattributes.
+    const verdict = published['verdict'] as { claim: string | null };
+    expect(verdict.claim).toBe('the memory costs accuracy: -66.67pp');
+    // And the protocol grades a claim it can see. This one is *resolved* — 66.67pp against a
+    // resolution of about twenty — so the gate passes, which is why the assertion is on what it read
+    // rather than on its verdict: the contrast with the planted case above is "claims no direction"
+    // versus "claims -66.67pp", and that contrast is what the suppression buys.
+    const resolution = gates.find((gate) => gate.id === 'V5-resolution');
+    expect(resolution?.actual).toContain('claims -66.67pp');
+    expect(resolution?.actual).not.toContain('claims no direction');
   });
 });

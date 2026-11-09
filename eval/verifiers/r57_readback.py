@@ -390,15 +390,24 @@ def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
     far_pp = (arms["far"].excess_pp or 0.0) * 100
     near_pp = (arms["near"].excess_pp or 0.0) * 100
     adversarial_pp = (arms["adversarial"].excess_pp or 0.0) * 100
+    # Strict, and the strictness is the repair. These two lines read
+    # `near_pp - far_pp > -CONTROL_DRIFT_PP`, which is "near is not much *better* than far": it
+    # passes when near is worse, when near is equal, and when near is better by up to the drift —
+    # a prediction that cannot fail written under the label of one that can. It passed here while
+    # the refutation below fired on the same two numbers ("far and near are indistinguishable at
+    # -3.51pp, inside a drift of 3.51pp"), so the account said both that the rung existed and that
+    # it did not. A predicted *order* needs the gap in the direction the order names.
     report.predict(
         "near is worse than far",
-        near_pp - far_pp > -CONTROL_DRIFT_PP,
-        f"{near_pp:+.2f}pp against {far_pp:+.2f}pp",
+        near_pp - far_pp > CONTROL_DRIFT_PP,
+        f"{near_pp:+.2f}pp against {far_pp:+.2f}pp, a gap of {near_pp - far_pp:+.2f}pp "
+        f"against a drift of {CONTROL_DRIFT_PP:.2f}pp",
     )
     report.predict(
         "adversarial is worse than near",
-        adversarial_pp - near_pp > -CONTROL_DRIFT_PP,
-        f"{adversarial_pp:+.2f}pp against {near_pp:+.2f}pp",
+        adversarial_pp - near_pp > CONTROL_DRIFT_PP,
+        f"{adversarial_pp:+.2f}pp against {near_pp:+.2f}pp, a gap of {adversarial_pp - near_pp:+.2f}pp "
+        f"against a drift of {CONTROL_DRIFT_PP:.2f}pp",
     )
     report.refute(
         "far and near are indistinguishable",

@@ -187,6 +187,20 @@ const detectablePp = tau2DetectablePp(comparisonRecord);
  * protocol's `V5-resolution` grades whether a run claimed more than its sample can
  * resolve, and the only place that answer exists is here.
  */
+/**
+ * The distractor the memory arm planted, read from the arm's own artefact.
+ *
+ * `second` is the memory arm by construction (the order is stated where the two paths are read). An
+ * arm that planted one is graded by its plant census and its per-episode ledger rather than by the
+ * treatment's harm branch, which for that arm is its registered prediction; see `pair-gates.ts`.
+ *
+ * Read before the evidence rather than after it, because the claim described below is a statement
+ * about this arm and the evidence is where the protocol reads it. The first version of this change
+ * read the artefact after the evidence that consumed it, which is a temporal dead zone rather than a
+ * wrong answer — `l4-planted-arm.test.ts` caught it on the first run, and the reason it caught it is
+ * that it runs the bin instead of the module.
+ */
+const plantedArm = second.tau2?.plant?.arm;
 const served = second.tau2?.recall?.served ?? 0;
 const verdict = pairedVerdict({
   deltaPp: comparison.deltaPp,
@@ -205,19 +219,17 @@ const evidence: Tau2Evidence = {
   // R52: the protocol grades the claim, not the sample. `null` where the pair concluded nothing is
   // the point of the field — without it, `V5` would read this pair's silence as a lane that never
   // reports claims and fall back to the 6pp bar this scenario cannot meet at any n.
-  claimPp: verdict.state === 'UNRESOLVED' ? null : comparison.deltaPp,
+  // R57: a planted arm publishes no direction, so `null` here is a statement about the arm rather
+  // than a claim it declined to make. The sentence HARM carries — "the memory costs accuracy" — is
+  // false of a pair whose loss came from a rule we planted on purpose, and the protocol's resolution
+  // gate is right to refuse it: `V5` blocks a published direction the sample cannot resolve, and
+  // -7.02pp against a 20.86pp minimum detectable difference is exactly that. Suppressing the claim is
+  // what makes the artefact true; suppressing the gate would have left the sentence standing.
+  claimPp: plantedArm !== undefined || verdict.state === 'UNRESOLVED' ? null : comparison.deltaPp,
   ...(transfer === undefined ? {} : { transfer: transfer.gate }),
 };
 const audit = tau2GateAudit(evidence);
 
-/**
- * The distractor the memory arm planted, read from the arm's own artefact.
- *
- * `second` is the memory arm by construction (the order is stated where the two paths are read). An
- * arm that planted one is graded by its plant census and its per-episode ledger rather than by the
- * treatment's harm branch, which for that arm is its registered prediction; see `pair-gates.ts`.
- */
-const plantedArm = second.tau2?.plant?.arm;
 const scenarioGates: readonly ValidityGate[] = pairGates({
   state: verdict.state,
   claim: verdict.claim ?? null,
@@ -252,7 +264,10 @@ await writeJson('poc-l4-pair', {
   // result.
   verdict: {
     state: verdict.state,
-    claim: verdict.claim,
+    // The state stays — it is the registered revert rule's answer and a reader needs to see that the
+    // rule fired — but the sentence that turns it into a claim about the memory does not, because on
+    // a planted arm the loss is the distractor's and saying otherwise misattributes it.
+    claim: plantedArm === undefined ? verdict.claim : null,
     reason: verdict.reason,
     excludedAbovePp: verdict.excludedAbovePp,
     servedPacks: served,
