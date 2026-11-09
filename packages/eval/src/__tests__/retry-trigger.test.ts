@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  RETRY_POPULATION_FLOOR,
   RETRY_REASONS,
   retryTriggerFor,
   retryTriggerOf,
@@ -147,5 +148,26 @@ describe('summariseRetryPopulation', () => {
     const atFloor = Array.from({ length: 140 }, () => ({ reason: 'empty' as const, correct: false }));
     expect(summariseRetryPopulation(atFloor, 140).meetsFloor).toBe(true);
     expect(summariseRetryPopulation(atFloor.slice(1), 140).meetsFloor).toBe(false);
+  });
+});
+
+describe('RETRY_POPULATION_FLOOR', () => {
+  it('is the floor R64 Amendment 1 registers, not the one the registration opened with', () => {
+    // A drift guard, not a tautology. R64 was written expecting 140 retried questions on the theory
+    // that a 53% base accuracy leaves 165 wrong ones; a retry arm acts on the questions the pipeline
+    // rejected, which is 6.39% of the split, so 140 was unreachable and the run would have been void
+    // for a reason the document invented. The amendment lowered it to 90 — and the first dispatch
+    // was produced while this constant still said 140, which made a passing population report
+    // `meetsFloor: false`. Changing the registered floor has to touch this line, or the artefact and
+    // the document disagree about whether the evidence cleared its own bar.
+    expect(RETRY_POPULATION_FLOOR).toBe(90);
+  });
+
+  it('accepts the population R64 measured and refuses the one its void clause names', () => {
+    const rows = (count: number): RetryPopulationRow[] =>
+      Array.from({ length: count }, () => ({ reason: 'empty' as const, correct: false }));
+    expect(summariseRetryPopulation(rows(98), RETRY_POPULATION_FLOOR).meetsFloor).toBe(true);
+    // R64's void threshold is 80, so 79 is the last population that cannot publish an effect.
+    expect(summariseRetryPopulation(rows(79), RETRY_POPULATION_FLOOR).meetsFloor).toBe(false);
   });
 });

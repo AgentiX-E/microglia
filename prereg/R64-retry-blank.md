@@ -136,3 +136,68 @@ registration in this line is about **values** rather than about schema text. Wri
 the dispatch is the point: after a positive result, "the retry helped because it re-read the
 question" and "the retry helped because the second attempt found the right spelling" are
 indistinguishable from the arm's delta alone.
+
+## Outcome — 2026-11-09, run `42661260446` (`eval/results/poc-sota-bird-dev-R64-retry-blank.json`)
+
+| reading | value |
+| --- | --- |
+| split / n / folds | `dev` / 1,534 / 5 |
+| calls / retries / call failures | 5,241 / 0 / 0 |
+| bill | $0.44, cache hit 73.79%, band `off_peak` |
+| `none` | 56.71% |
+| `full` | 56.78%, **+0.07pp** [−1.63, +1.76], p = 1.00, 87 gained / 86 lost |
+| `retry-blank` | 58.02%, **+1.30pp** [+0.78, +1.89], p < 1e-4, **20 gained / 0 lost** |
+| retried population | **98 / 1,534 = 6.39%** (`empty` 88, `error` 10, `no-query` 0; 98 of 98 wrong) |
+| repaired rate on that population | **20 / 98 = 20.41%** [13.27, 28.57], p = 1.9e-06 |
+| repaired, by trigger | `empty` 19 / 88 = 21.6%; `error` 1 / 10 = 10.0% |
+| repaired, by difficulty | simple 14 / 49, moderate 5 / 41, challenging 1 / 8 |
+| gained, by fold | 1, 3, 5, 6, 5 |
+| `retry-blank − full` | **+1.24pp** [−0.52, +3.00], p = 0.183, 101 gained / 82 lost |
+
+**The predictions, as amended, all held.** Amendment 1 predicted 90–110 retried questions, a repaired
+rate between 10% and 40%, and a net delta between 0 and +1.5pp. Measured: **98**, **20.41%**,
+**+1.30pp**. The zero-cost measurement made from the R63 artefact predicted `98 retried (error 9,
+empty 89)`; the run produced `98 (error 10, empty 88)`. One question moved between two trigger
+buckets, and the total did not move at all — which is the smallest possible error for a measurement
+that spends nothing.
+
+**The mechanism is neither promoted nor closed, and both bars are the registration's fault.**
+
+- *Promotion* required the repaired rate's lower bound to exceed 25%. The lower bound is 13.27%,
+  because 98 questions resolve a rate near a fifth to ±7.6pp. The document had already said this:
+  the prediction band was 15–45% "with the expected value in the lower half", because this model has
+  less headroom than the published ones. A promote bar of *lower bound > 25%* at n = 98 requires a
+  point estimate near **35%** — the upper half of the band the same document predicted against. The
+  bar and the prediction were written in one file, one page apart, and they test different worlds.
+- *Closing* required the upper bound to fall below 10%. It is 28.57%, so nothing is closed either.
+
+What the run does establish is narrow and solid: **on the 6.39% of questions the pipeline itself
+rejects, a blank retry repairs one in five** (19 of 88 empty results, 1 of 10 execution errors), the
+gains are spread across all five folds (1, 3, 5, 6, 5), and nothing regressed — 20 gained, 0 lost, on
+1,534 questions. The effect is real; it is also **bounded by its population**: even a retry that
+repaired every rejection would move this benchmark by **+6.39pp**, and this one moved it by +1.30pp,
+which is 20% of that ceiling. The ceiling is now a measured number rather than an inference, and it is
+the number that should govern how much further work this line deserves.
+
+**`full` is null on the fourth split.** Adding 1,534 dev questions to the record moves the memory
+arm's reading to +0.07pp with 87 gained and 86 lost — the same shape as `minidev`, `train` and the
+original panel. Whatever `full` does, it does not do it here.
+
+**Two defects found by reading the artefact against the registration.**
+
+1. `retry_population.meetsFloor` is **false**, because `SOTA_RETRY_FLOOR` still defaulted to the
+   pre-amendment 140. The amended floor is 90 and 98 clears it. The constant is fixed in this
+   iteration, with the amendment cited at the definition, because a registration that changes a
+   threshold has to change the code that reads it — otherwise the artefact records a verdict the
+   document does not hold.
+2. The promote bar above. It is recorded here rather than quietly relaxed: the next registration in
+   this line states its promotion threshold as *a point estimate above X with an interval excluding
+   zero*, both chosen inside the predicted band, so that clearing it is possible for a result the
+   document predicted.
+
+**What this buys the next registration.** Amendment 1's composition measurement said the empty
+results are 60.67% table-correct and 35.96% value-missed; this run says the repairs are concentrated
+exactly where that analysis pointed — 19 of the 20 repairs are empty results, and the one repair in
+the `error` bucket came from a question the model could re-answer rather than re-spell. The retry
+line therefore has one cheap next step (the value-missed fifth of the empty results) and one
+registered one (`retry-blank` against `retry-keyed` on this same 98-question population).

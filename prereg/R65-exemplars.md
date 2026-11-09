@@ -4,15 +4,17 @@ step: R65
 opened: 2026-11-09
 arms: examples
 sample: 350
-gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V51
+gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V51,V75
 ---
 
 # R65 — the lawful approximation of the largest positive this record has
 
-**Registered** 2026-11-09, undispatched. The arm is not implemented: `examples` is not yet in
-`OPTIONAL_ARMS`, so a dispatch naming it is refused by the parser with `Unknown arm 'examples'`. That
-is the intended order — the registration exists so the implementation has a target it cannot
-re-describe afterwards.
+**Registered** 2026-11-09. **Amended** 2026-11-09 after implementation, before dispatch: `V75` is
+added to the header because the two void conditions below are now a blocking gate rather than a
+sentence a reader has to remember. The predictions are unchanged.
+
+The file was written while the arm was unimplemented, and that order was the point: a registration
+that exists before the code has a target it cannot re-describe afterwards.
 
 ## Why this file exists
 

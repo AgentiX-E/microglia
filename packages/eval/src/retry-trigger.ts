@@ -114,6 +114,23 @@ export type RetryPopulationRow = {
  * much evidence it needs, not a property of the pipeline. It is reported back with the verdict so
  * that an artefact saying `meetsFloor: false` cannot be read as a result.
  */
+/**
+ * The population a retry effect needs before it is reported as one.
+ *
+ * 90 is R64's amended floor, and the amendment is the interesting part: the original registration
+ * asked for 140 on the reasoning that a 53% base accuracy leaves about 165 wrong answers. A retry arm
+ * does not act on wrong answers — it acts on the questions the pipeline itself rejected, which is
+ * 6.39% of the dev split, so 140 was unreachable by a factor of 1.4 and the run would have been
+ * void for a reason the registration had invented. Ninety is what the population supports, and 98
+ * questions resolve a repaired rate near a fifth to about ±7.6pp — enough to separate "does nothing"
+ * from "repairs a fifth of what it touches".
+ *
+ * It lives here rather than in the lane so that the number the artefact reports and the number a
+ * test can hold to the registration are the same number: the first R64 artefact was produced with a
+ * stale default of 140 and said `meetsFloor: false` about a population the amended document accepts.
+ */
+export const RETRY_POPULATION_FLOOR = 90;
+
 export type RetryPopulation = {
   readonly asked: number;
   readonly retried: number;
