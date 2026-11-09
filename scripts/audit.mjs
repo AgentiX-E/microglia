@@ -199,6 +199,21 @@ for (const internal of ['WHITEPAPER.md', 'TECH-DESIGN.md', 'ROADMAP.md', 'AUDIT.
   }
 }
 
+// A workflow is executable configuration and nothing compiles it, so the platform is the first reader
+// and the only one that ever rejects it. On 2026-11-09 `sota.yml` grew past GitHub's twenty-five-input
+// cap on a `workflow_dispatch`: the push produced a run named after the file, no dispatch of any
+// workflow could start, and CI was green throughout because `ci.yml` never looked at the others.
+{
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  try {
+    await promisify(execFile)('python3', ['scripts/check-workflows.py'], { cwd: ROOT });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    fail('workflow', detail.split('\n').slice(0, 4).join(' ').slice(0, 400));
+  }
+}
+
 if (failures.length > 0) {
   process.stderr.write(`audit failed (${failures.length})\n`);
   for (const failure of failures) process.stderr.write(`  - ${failure}\n`);
