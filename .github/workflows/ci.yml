@@ -632,10 +632,17 @@ jobs:
               ['the single-rule questions repaired 25 of 200 and broke 12 of 223', p.single.repairable === 200 && p.single.repaired === 25 && p.single.breakable === 223 && p.single.broken === 12],
               ['which is +3.07pp against -0.96pp for the pairs', Math.abs(p.single.netPp - 3.0732860520094563) < 1e-12 && Math.abs(p.pair.netPp + 0.958029197080292) < 1e-12],
               ['a difference of +4.03pp on [+0.76, +6.62], clustered by database', Math.abs(p.differencePp - 4.031315249089748) < 1e-12 && Math.abs(p.lowPp - 0.7633587786259541) < 1e-12 && Math.abs(p.highPp - 6.6228840821271495) < 1e-12 && p.excludesZero === true],
-              ['but the same contrast is negative in 12 of the 18 committed artefacts, so P7 holds', a.family.datasets === 18 && a.family.positive === 6 && a.family.negative === 12 && g['V61-ledger-family'] === true && v('P7').holds === true],
+              // The corpus count is not pinned here. It was, at 18, and publishing one artefact turned
+              // this line red for a reason that says nothing about the ledger — the same defect the
+              // coupling ledger had. What P7 claims is a *relation*: the single-versus-pair contrast
+              // reverses in more artefacts than it holds in. That survives the corpus growing, and it
+              // still fails if the reversal stops being the majority.
+              ['but the same contrast is negative in more committed artefacts than positive, so P7 holds', a.family.positive + a.family.negative + a.family.flat === a.family.datasets && a.family.negative > a.family.positive && g['V61-ledger-family'] === true && v('P7').holds === true && a.statement.includes(String(a.family.negative) + ' of the ' + String(a.family.datasets))],
               ['the power statement is 670 injections per rule, ten times what was measured', v('P6').holds === true && v('P6').observed.includes('670')],
               ['all seven registrations hold and all three gates pass', a.verdicts.every((x) => x.holds) && a.gates.every((x) => x.pass)],
-              ['the statement quotes the null, the correlation and the reversal', a.statement.includes('0.0047') && a.statement.includes('-0.13') && a.statement.includes('+4.03pp') && a.statement.includes('12 of the 18')],
+              // The family fragment of the statement is checked relationally above; these three are the
+              // statistics themselves, and a corpus change is meant to bring somebody here to look.
+              ['the statement quotes the null, the correlation and the reversal', a.statement.includes('0.0047') && a.statement.includes('-0.13') && a.statement.includes('+4.03pp')],
             ];
             const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
             if (bad.length > 0) { console.error('ledger failed: ' + bad.join(', ')); process.exit(1); }
