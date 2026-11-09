@@ -247,3 +247,60 @@ export function linkSchema(ddl: string, question: string, evidence: string): Lin
     reason: 'linked',
   };
 }
+
+/**
+ * The additive form: every table kept, the ones the question names moved to the front.
+ *
+ * `linkSchema` above prunes, and the measurement says pruning does not survive contact with the
+ * benchmark. The `linked` arm read **−9.58pp at p = 6.4e-21** over 1,534 questions — 202 broken
+ * against 55 repaired — and the same artefact explains it: errors where the gold query reads a table
+ * the prediction does not went from 107 to 291, and 44 predictions lost their `FROM` entirely. A
+ * pruner decides before the SQL exists; when it is wrong the model cannot ask for what it cannot see,
+ * and there is no threshold at which that stops being true, because the failure is structural rather
+ * than a matter of degree.
+ *
+ * So this variant cannot lose a table. It reorders and it labels, and both are recoverable by a
+ * reader that ignores them. The only claim it makes is the one the literature makes about *why*
+ * models are bad at schema selection: a model is more reliable at writing SQL than at picking tables,
+ * so anything that draws attention without removing options is free beta and no risk. If the arm
+ * measures zero, the conclusion is that ordering is not the lever and the next variant must verify
+ * against the SQL instead — which is a result, and a cheap one.
+ */
+export type AnnotatedSchema = {
+  readonly ddl: string;
+  /** The tables the question or its evidence names, in declaration order. */
+  readonly anchors: readonly string[];
+  readonly total: number;
+  readonly reason: 'annotated' | 'no-anchor' | 'single-table';
+};
+
+export function annotateSchema(ddl: string, question: string, evidence: string): AnnotatedSchema {
+  const blocks = schemaBlocks(ddl);
+  if (blocks.length <= 1) {
+    return { ddl, anchors: blocks.map((block) => block.table), total: blocks.length, reason: 'single-table' };
+  }
+  const tokens = questionTokens(`${question} ${evidence}`);
+  const anchors = blocks
+    .filter((block) => [block.table, ...block.columns].some((name) => tokens.has(name.toLowerCase())))
+    .map((block) => block.table);
+  if (anchors.length === 0) {
+    // Nothing names a table, so there is nothing to say. Returning the schema unchanged rather than
+    // with an empty header keeps the two states distinguishable in the artefact: a run whose header
+    // is absent had no anchor, and one whose header is present had anchors even if they were wrong.
+    return { ddl, anchors: [], total: blocks.length, reason: 'no-anchor' };
+  }
+  const named = new Set(anchors);
+  const ordered = [
+    ...blocks.filter((block) => named.has(block.table)),
+    ...blocks.filter((block) => !named.has(block.table)),
+  ];
+  const header =
+    `-- ${anchors.length} of ${blocks.length} tables are named by this question and are listed first.\n` +
+    `-- Every table is present; none was removed.\n`;
+  return {
+    ddl: header + ordered.map((block) => block.sql).join('\n'),
+    anchors,
+    total: blocks.length,
+    reason: 'annotated',
+  };
+}

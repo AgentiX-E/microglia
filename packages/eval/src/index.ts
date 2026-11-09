@@ -13,6 +13,7 @@ export {
   type FoldSpend,
 } from './call-budget.js';
 export {
+  annotateSchema,
   linkSchema,
   questionTokens,
   schemaBlocks,

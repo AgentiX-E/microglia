@@ -133,6 +133,7 @@ import {
   forecastBudget,
   interleaveByKey,
   judgeScalar,
+  annotateSchema,
   linkSchema,
   mapPool,
   parseChoice,
@@ -492,12 +493,25 @@ const distillations = DistillCache.load(DISTILL_CACHE_PATH);
  * artefact's wording identical to the version whose gate hard-coded both.
  */
 const CHANNEL_FLOORS: Record<
-  'values' | 'linked',
+  ChannelKind,
   { readonly floor: number; readonly expects: string }
 > = {
   values: { floor: 0.95, expects: 'values at least 95% of prompts' },
   linked: { floor: 0.01, expects: 'linked at least 1%' },
+  // The additive form is the one being tested *because* the reductive one measured -9.58pp, so the
+  // bar is that it fired at all: an arm whose header never appears is an arm that did not run, and a
+  // null published from it would be a null about the prompt rather than about ordering.
+  'linked-additive': { floor: 0.01, expects: 'linked-additive at least 1%' },
 };
+
+/**
+ * The two prompt-channel manipulations this lane performs, plus the additive variant of the second.
+ *
+ * Named once so that the artefact's `kind` field, the floors above and the call sites cannot drift:
+ * the floor is keyed by this union, so adding a channel without a floor is a type error rather than a
+ * gate that silently skips it.
+ */
+type ChannelKind = 'values' | 'linked' | 'linked-additive';
 
 const ARMS = armsFrom(process.env['SOTA_ARMS']);
 
@@ -2837,7 +2851,7 @@ type FoldResult = {
    */
   readonly channelApplied: readonly {
     readonly arm: string;
-    readonly kind: 'values' | 'linked';
+    readonly kind: ChannelKind;
     readonly applied: number;
     readonly asked: number;
   }[];
@@ -3671,8 +3685,8 @@ async function runFold(
    * finding. Counted here rather than inferred at the end, because the DDL comparison is cheap
    * where the text is still in hand and impossible once the fold is scored.
    */
-  const channelApplied = new Map<string, { readonly kind: 'values' | 'linked'; applied: number; asked: number }>();
-  const noteChannel = (arm: string, kind: 'values' | 'linked', applied: boolean): void => {
+  const channelApplied = new Map<string, { readonly kind: ChannelKind; applied: number; asked: number }>();
+  const noteChannel = (arm: string, kind: ChannelKind, applied: boolean): void => {
     const entry = channelApplied.get(arm) ?? { kind, applied: 0, asked: 0 };
     channelApplied.set(arm, { kind, applied: entry.applied + (applied ? 1 : 0), asked: entry.asked + 1 });
   };
@@ -4284,6 +4298,22 @@ async function runFold(
       });
       noteChannel('linked', 'linked', linked.reason === 'linked');
       call(position, 'linked', '', 0, false, 'before', linked.ddl);
+    }
+    if (ARMS.has('linked-additive')) {
+      // Same question, same pack position, and the same schema *content*: the only thing that changes
+      // is which tables come first and whether the prompt says how many were named. That is what makes
+      // the arm a test of ordering rather than a second test of pruning -- and it is the arm the
+      // `linked` result asks for, because a pruner's failure mode is unrecoverable and this one's is
+      // a reader ignoring a comment.
+      const annotated = annotateSchema(
+        schemaSql(dataset.dbPath(row.db_id)),
+        row.question,
+        row.evidence,
+      );
+      linkReasons[annotated.reason] = (linkReasons[annotated.reason] ?? 0) + 1;
+      linkTotal += annotated.total;
+      noteChannel('linked-additive', 'linked-additive', annotated.reason === 'annotated');
+      call(position, 'linked-additive', '', 0, false, 'before', annotated.ddl);
     }
     if (ARMS.has('values')) {
       // The same question, the same pack position, one input changed: the schema now says what the
@@ -5866,13 +5896,13 @@ async function main(): Promise<void> {
    */
   const channels = ((): readonly {
     readonly arm: string;
-    readonly kind: 'values' | 'linked';
+    readonly kind: ChannelKind;
     readonly applied: number;
     readonly asked: number;
     readonly floor: number;
     readonly expects: string;
   }[] => {
-    const totals = new Map<string, { kind: 'values' | 'linked'; applied: number; asked: number }>();
+    const totals = new Map<string, { kind: ChannelKind; applied: number; asked: number }>();
     for (const fold of folds) {
       for (const entry of fold.channelApplied) {
         const seen = totals.get(entry.arm) ?? { kind: entry.kind, applied: 0, asked: 0 };

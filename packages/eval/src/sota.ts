@@ -862,7 +862,17 @@ export type SqlArm =
    * model-based linker's contribution cannot be separated from the model's variance on the same
    * questions, and this project has ten iterations of evidence about what that costs an argument.
    */
-  | 'linked';
+  | 'linked'
+  /**
+   * The additive variant: every table kept, the ones the question names moved to the front.
+   *
+   * `linked` measures -9.58pp at p=6.4e-21 over 1,534 questions, with errors where a gold table is
+   * absent going from 107 to 291 and 44 predictions losing their `FROM`. A pruner decides before the
+   * SQL exists, so when it is wrong the model cannot ask for what it cannot see -- there is no
+   * threshold at which that stops being true. This arm cannot lose a table: it reorders and it
+   * labels, and both are recoverable by a reader that ignores them.
+   */
+  | 'linked-additive';
 
 /**
  * What a sampling arm asks for, read from its name.
@@ -1000,6 +1010,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'gen-plan': true,
   'gen-decompose': true,
   linked: true,
+  'linked-additive': true,
   'full-verified': true,
   'full-shuffled': true,
   'full-transferred': true,

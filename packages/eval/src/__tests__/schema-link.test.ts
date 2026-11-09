@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linkSchema, questionTokens, schemaBlocks } from '@agentix-e/microglia-sql';
+import { annotateSchema, linkSchema, questionTokens, schemaBlocks } from '@agentix-e/microglia-sql';
 
 /** BIRD's SQLite dumps: one CREATE per table, every name quoted, from `sqlite_master.sql`. */
 const RACES = `CREATE TABLE "races" ("raceId" INTEGER PRIMARY KEY, "year" INTEGER, "circuitId" INTEGER, "name" TEXT)`;
@@ -197,5 +197,57 @@ describe('pruned names', () => {
   it('reports no pruned names for a single-table database', () => {
     const single = 'CREATE TABLE "atoms" ("atom_id" INTEGER, "element" TEXT);';
     expect(linkSchema(single, 'how many atoms', '').prunedTables).toEqual([]);
+  });
+});
+
+describe('annotateSchema', () => {
+  it('keeps every table, because that is the whole reason it exists', () => {
+    // The reductive form measured -9.58pp at p=6.4e-21 and its error taxonomy says why: 291 errors
+    // where a gold table was absent, against 107 before. This form cannot produce that error.
+    const annotated = annotateSchema(FORMULA_1, 'How many drivers are there?', '');
+    expect(annotated.total).toBe(6);
+    expect((annotated.ddl.match(/CREATE TABLE/g) ?? [])).toHaveLength(6);
+    for (const block of schemaBlocks(FORMULA_1)) {
+      expect(annotated.ddl).toContain(block.sql);
+    }
+  });
+
+  it('puts the named tables first and says how many there are', () => {
+    const annotated = annotateSchema(FORMULA_1, 'How many drivers are there?', '');
+    expect(annotated.reason).toBe('annotated');
+    expect(annotated.anchors).toEqual(['drivers']);
+    expect(annotated.ddl.startsWith('-- 1 of 6 tables are named')).toBe(true);
+    // `drivers` was declared third and now comes first; the rest keep their declaration order.
+    expect(annotated.ddl.indexOf(DRIVERS)).toBeLessThan(annotated.ddl.indexOf(RACES));
+    expect(annotated.ddl.indexOf(RACES)).toBeLessThan(annotated.ddl.indexOf(RESULTS));
+  });
+
+  it('takes its anchors from the evidence as well as the question', () => {
+    const annotated = annotateSchema(FORMULA_1, 'How many are there?', 'count the rows in circuits');
+    expect(annotated.anchors).toEqual(['circuits']);
+  });
+
+  it('leaves the schema alone when nothing is named, and says so', () => {
+    // An empty header and an absent header have to be different states: one is a linker that found
+    // no anchor, the other is a linker that found one and was wrong.
+    const annotated = annotateSchema(FORMULA_1, 'What is the answer?', '');
+    expect(annotated.reason).toBe('no-anchor');
+    expect(annotated.ddl).toBe(FORMULA_1);
+    expect(annotated.anchors).toEqual([]);
+  });
+
+  it('does not add a header to a single-table database', () => {
+    const single = 'CREATE TABLE "atoms" ("atom_id" INTEGER, "element" TEXT);';
+    const annotated = annotateSchema(single, 'how many atoms', '');
+    expect(annotated.reason).toBe('single-table');
+    expect(annotated.ddl).toBe(single);
+  });
+
+  it('keeps a table whose columns are the only thing named', () => {
+    // A question that names a column and not its table is the case a lexical pruner gets wrong and
+    // an additive one cannot: `duration` appears in no question, `miliseconds` in this one.
+    const annotated = annotateSchema(FORMULA_1, 'longest milliseconds total', '');
+    expect(annotated.anchors).toEqual(['lapTimes']);
+    expect((annotated.ddl.match(/CREATE TABLE/g) ?? [])).toHaveLength(6);
   });
 });
