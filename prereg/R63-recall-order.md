@@ -75,3 +75,30 @@ powered to detect a small effect and it is not pretended to be: see the resoluti
   precedent: an arm that cannot fire publishes its own absence as a null.
 - The alternatives are named above so that the outcome selects one. A refutation that leaves the
   cause ambiguous turns the next stage into a search rather than a test.
+
+## Amendment 1 — the prior this registration names is on another split (2026-11-09)
+
+Criterion 2 and the second refutation both compare the run's `ordering.cleanShare` against 56.65%,
+which is the figure `pnpm eval:table-recall` produces on the **dev** split. The dispatch runs on
+**minidev**. The first run returned `clean=157/350 (44.86%)` while three of the four other quantities
+matched the dev prior almost exactly — precision 39.98% against 39.27%, gold recall 99.48% against
+99.66%, `retrieved_share` 100% against 100% — which says the mechanism was identical and the question
+set was not.
+
+That is a defect in this registration, not in the arm. A clean-ordering share is a property of the
+questions as much as of the signal: it asks how often the question determines the table set, and the
+share of such questions differs between splits.
+
+What changes:
+
+- `eval/verifiers/ordering.py` now returns `INCOMPARABLE` when the run and the prior disagree on
+  `split`, rather than grading the population difference as a wiring difference.
+- The observable that **does** transfer is the mechanism's own geometry — `retrieved_share`,
+  precision and gold recall — because none of the three depends on how many questions have a
+  determinate table set. Those are the criteria that stand unamended.
+- A `cleanShare` comparison requires a minidev prior: `BIRD_DEV_DIR=/path/to/minidev
+  pnpm eval:table-recall`. That is a zero-call measurement and it is now a precondition of quoting the
+  criterion rather than something to do after the fact.
+
+Nothing else is amended. The four arms, the n, the 6pp resolution and the three refutation branches
+are unchanged.

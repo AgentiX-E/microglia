@@ -133,6 +133,7 @@ import {
   forecastBudget,
   interleaveByKey,
   judgeScalar,
+  answerBudget,
   anchorTables,
   annotateSchema,
   orderSchema,
@@ -433,22 +434,35 @@ const RESAMPLES = Math.max(1000, Math.trunc(nonNegative(process.env['SOTA_RESAMP
  */
 const MODEL = process.env['SOTA_MODEL'] ?? 'deepseek-flash';
 /**
- * Whether the lane asks the model to think, and the default is to say so rather than to hope.
+ * Whether the lane asks the model to think. It asks it not to, and the reason is a measurement.
  *
- * The provider's default for this model is to think, and a thinking token is billed as an output
- * token while being invisible in every field except a count nobody was reading. `off` sends the
- * disable switch, which costs accuracy and therefore has to be a decision rather than a default:
- * every published BIRD cell in this repository was produced with thinking on, and a lane that
- * switched it off without saying so would move the baseline under all of them. The usage line
- * reports the reasoning share of the completion, so the decision can be taken on a number.
+ * The switch was left at the provider's default because a thinking token is invisible in every field
+ * except a count nobody read, and the decision was supposed to be taken on a number. The number
+ * arrived: with thinking on, the lane spent **1,354,007 reasoning tokens out of 1,423,622 completion
+ * tokens (95%)** across 1,989 replies, its `max_tokens` of 700 left about nineteen for the answer, and
+ * its own validity gate failed at `V3-parse-rate: 51.43%`. The previous run on the same split — which
+ * asked for the retired `deepseek-chat` alias and was routed to something that did not think — read
+ * 100% parse and 53.14% accuracy.
+ *
+ * So `off` is the regime every published BIRD cell in this repository was produced in, and it is the
+ * default. `on` is still reachable from `SOTA_THINKING`, and it costs `THINKING_HEADROOM` more
+ * completion tokens per call through `answerBudget`, which is what makes it measurable rather than
+ * silently truncating.
  */
-const THINKING = ((): 'off' | 'on' | undefined => {
+const THINKING = ((): 'off' | 'on' => {
   const raw = (process.env['SOTA_THINKING'] ?? '').trim().toLowerCase();
-  if (raw === '') return undefined;
-  if (raw === 'off' || raw === 'disabled' || raw === 'false') return 'off';
+  if (raw === '' || raw === 'off' || raw === 'disabled' || raw === 'false') return 'off';
   if (raw === 'on' || raw === 'enabled' || raw === 'true') return 'on';
   throw new Error(`SOTA_THINKING must be empty, off or on; got '${raw}'`);
 })();
+
+/**
+ * Completion tokens the answer itself gets. The switch above decides what else the budget carries.
+ *
+ * 700 because a SQL statement is a few dozen tokens and the retry prompts add a failed attempt and an
+ * error to that. `answerBudget` adds room to think on top when the run asks for it.
+ */
+const ANSWER_TOKENS = 700;
 const MAX_CALLS = nonNegative(process.env['POC_MAX_CALLS'], 8000);
 
 /**
@@ -874,11 +888,17 @@ const llm = new LlmClient({
   breakerThreshold: BREAKER_THRESHOLD,
   ...(ENDPOINT === '' ? {} : { endpoint: ENDPOINT }),
   ...(DEADLINE_AT === undefined ? {} : { deadline: DEADLINE_AT }),
-  ...(THINKING === undefined ? {} : { thinking: THINKING }),
+  thinking: THINKING,
 });
 
-const chat = (prompt: string, maxTokens = 700, temperature = 0): Promise<ChatReply> =>
-  llm.chat(prompt, maxTokens, temperature);
+const chat = (
+  prompt: string,
+  answerTokens = ANSWER_TOKENS,
+  temperature = 0,
+): Promise<ChatReply> => llm.chat(prompt, answerBudget(answerTokens, THINKING), temperature);
+
+/** What a single answer may spend, which the artefact records beside the reasoning share. */
+const COMPLETION_BUDGET = answerBudget(ANSWER_TOKENS, THINKING);
 
 
 /**
@@ -7041,7 +7061,11 @@ async function main(): Promise<void> {
       return {
         model: llm.model,
         configured_model: llm.configuredModel,
-        thinking: THINKING ?? 'provider-default',
+        thinking: THINKING,
+        // The switch without the budget is the half of the configuration that cost a run: 700 tokens
+        // against 681 reasoning tokens per reply left the parse rate at 51.43%. A reader can now
+        // recompute whether the budget could have held the completion it is looking at.
+        max_completion_tokens: COMPLETION_BUDGET,
         prompt_tokens: total.promptTokens,
         cached_tokens: total.cachedTokens,
         completion_tokens: total.completionTokens,

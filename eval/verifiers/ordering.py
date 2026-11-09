@@ -55,6 +55,7 @@ class Side:
     """One reading of the same three quantities, from either the prior or the run."""
 
     label: str
+    split: str | None
     n: int
     clean: int | None
     clean_share: float
@@ -80,6 +81,7 @@ def prior_of(artefact: dict[str, Any]) -> Side | None:
         return None
     return Side(
         label=str(artefact.get("id") or "prior"),
+        split=None if artefact.get("split") is None else str(artefact["split"]),
         n=int(both.get("n") or 0),
         clean=int(both.get("clean") or 0),
         clean_share=float(both.get("cleanShare") or 0.0),
@@ -95,6 +97,7 @@ def run_of(artefact: dict[str, Any]) -> Side | None:
         return None
     return Side(
         label=str(artefact.get("id") or "run"),
+        split=None if artefact.get("split") is None else str(artefact["split"]),
         n=int(ordering.get("n") or 0),
         clean=int(ordering.get("clean") or 0),
         clean_share=float(ordering.get("cleanShare") or 0.0),
@@ -135,6 +138,18 @@ def grade(run: Side | None, prior: Side | None) -> Verdict:
             "INCOMPARABLE",
             "no free measurement is committed, so there is no ceiling to reproduce; run "
             "`pnpm eval:table-recall` first",
+        )
+    if run.split is not None and prior.split is not None and run.split != prior.split:
+        # A ceiling is a property of a question set as much as of a mechanism: `clean` asks whether the
+        # question determines a table set, and that share differs between splits. The first version of
+        # this verifier compared a minidev run against a dev prior and called a 44.86% reading
+        # divergent, while the run's precision (39.98% against 39.27%) and gold recall (99.48% against
+        # 99.66%) said the mechanism was identical. What had moved was the population.
+        return Verdict(
+            "INCOMPARABLE",
+            f"the run is on `{run.split}` and the prior on `{prior.split}`: a clean-ordering share is a "
+            "property of the questions as well as of the signal, so the prior has to be taken on the "
+            "same split (`pnpm eval:table-recall` against that split's directory)",
         )
     if run.recall_k is not None and prior.recall_k and run.recall_k != prior.recall_k:
         return Verdict(
@@ -210,9 +225,11 @@ def self_test() -> int:
         share: float | None = None,
         retrieved: float | None = 1.0,
         k: int | None = 5,
+        split: str | None = "dev",
     ) -> Side:
         return Side(
             label="fixture",
+            split=split,
             n=n,
             clean=clean,
             clean_share=(clean / n if share is None else share),
@@ -250,6 +267,12 @@ def self_test() -> int:
             side(350, 150),
             prior,
             "DIVERGED",
+        ),
+        (
+            "a run on another split cannot be graded against this prior",
+            side(350, 157, split="minidev"),
+            prior,
+            "INCOMPARABLE",
         ),
         (
             "a 4pp gap at n=350 is inside the band, because sampling alone is 5.2pp wide",

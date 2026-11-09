@@ -12,6 +12,8 @@ export {
   type BudgetLedger,
   type FoldSpend,
 } from './call-budget.js';
+export { THINKING_HEADROOM, answerBudget, type ThinkingMode } from './decoding.js';
+
 export {
   anchorTables,
   annotateSchema,
