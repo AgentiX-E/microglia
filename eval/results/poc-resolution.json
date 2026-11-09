@@ -2,15 +2,15 @@
   "id": "poc-resolution",
   "title": "Every published arm, beside the difference its own sample could resolve",
   "source": "eval/results",
-  "artefacts": 20,
+  "artefacts": 21,
   "ledger": {
-    "rows": 98,
+    "rows": 103,
     "decided": 18,
     "significant95": 27,
-    "reconciled": 98,
-    "undecided": 80,
-    "quiet": 33,
-    "published": 98,
+    "reconciled": 103,
+    "undecided": 85,
+    "quiet": 36,
+    "published": 103,
     "skipped": 0,
     "largest": {
       "artefact": "poc-sota-bird.json",
@@ -36,10 +36,10 @@
     }
   },
   "memory": {
-    "runs": 20,
+    "runs": 21,
     "decided": 1,
     "significant95": 6,
-    "positive": 2,
+    "positive": 3,
     "negative": 18,
     "decidedRows": [
       {
@@ -213,6 +213,86 @@
       "decided": true,
       "significant95": true,
       "requiredN": 313,
+      "reconciles": true
+    },
+    {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "dataset": "BIRD Mini-Dev (sqlite)",
+      "arm": "full",
+      "control": "none",
+      "n": 350,
+      "helped": 19,
+      "harmed": 17,
+      "deltaPp": 0.5714,
+      "halfWidthPp": 3.36,
+      "minDetectablePp": 4.8034,
+      "decided": false,
+      "significant95": false,
+      "requiredN": 24732,
+      "reconciles": true
+    },
+    {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "dataset": "BIRD Mini-Dev (sqlite)",
+      "arm": "linked-additive",
+      "control": "none",
+      "n": 350,
+      "helped": 12,
+      "harmed": 5,
+      "deltaPp": 2,
+      "halfWidthPp": 2.3089,
+      "minDetectablePp": 3.3008,
+      "decided": false,
+      "significant95": false,
+      "requiredN": 954,
+      "reconciles": true
+    },
+    {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "dataset": "BIRD Mini-Dev (sqlite)",
+      "arm": "recall-order",
+      "control": "none",
+      "n": 350,
+      "helped": 11,
+      "harmed": 8,
+      "deltaPp": 0.8571,
+      "halfWidthPp": 2.441,
+      "minDetectablePp": 3.4896,
+      "decided": false,
+      "significant95": false,
+      "requiredN": 5802,
+      "reconciles": true
+    },
+    {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "dataset": "BIRD Mini-Dev (sqlite)",
+      "arm": "linked-additive",
+      "control": "full",
+      "n": 350,
+      "helped": 17,
+      "harmed": 12,
+      "deltaPp": 1.4286,
+      "halfWidthPp": 3.0157,
+      "minDetectablePp": 4.3112,
+      "decided": false,
+      "significant95": false,
+      "requiredN": 3188,
+      "reconciles": true
+    },
+    {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "dataset": "BIRD Mini-Dev (sqlite)",
+      "arm": "recall-order",
+      "control": "full",
+      "n": 350,
+      "helped": 17,
+      "harmed": 16,
+      "deltaPp": 0.2857,
+      "halfWidthPp": 3.217,
+      "minDetectablePp": 4.5989,
+      "decided": false,
+      "significant95": false,
+      "requiredN": 90682,
       "reconciles": true
     },
     {
@@ -1821,6 +1901,22 @@
           "reconciles": true
         },
         {
+          "artefact": "poc-sota-bird-R63-recall-order.json",
+          "dataset": "BIRD Mini-Dev (sqlite)",
+          "arm": "full",
+          "control": "none",
+          "n": 350,
+          "helped": 19,
+          "harmed": 17,
+          "deltaPp": 0.5714,
+          "halfWidthPp": 3.36,
+          "minDetectablePp": 4.8034,
+          "decided": false,
+          "significant95": false,
+          "requiredN": 24732,
+          "reconciles": true
+        },
+        {
           "artefact": "poc-sota-bird-raw.json",
           "dataset": "BIRD Mini-Dev (sqlite)",
           "arm": "full",
@@ -2030,7 +2126,7 @@
         }
       ],
       "decided": 1,
-      "positive": 2,
+      "positive": 3,
       "negative": 18,
       "decidedAgree": null,
       "allUndecided": false
@@ -3708,6 +3804,58 @@
       "allUndecided": true
     },
     {
+      "contrast": "linked-additive − full",
+      "readings": [
+        {
+          "artefact": "poc-sota-bird-R63-recall-order.json",
+          "dataset": "BIRD Mini-Dev (sqlite)",
+          "arm": "linked-additive",
+          "control": "full",
+          "n": 350,
+          "helped": 17,
+          "harmed": 12,
+          "deltaPp": 1.4286,
+          "halfWidthPp": 3.0157,
+          "minDetectablePp": 4.3112,
+          "decided": false,
+          "significant95": false,
+          "requiredN": 3188,
+          "reconciles": true
+        }
+      ],
+      "decided": 0,
+      "positive": 1,
+      "negative": 0,
+      "decidedAgree": null,
+      "allUndecided": true
+    },
+    {
+      "contrast": "linked-additive − none",
+      "readings": [
+        {
+          "artefact": "poc-sota-bird-R63-recall-order.json",
+          "dataset": "BIRD Mini-Dev (sqlite)",
+          "arm": "linked-additive",
+          "control": "none",
+          "n": 350,
+          "helped": 12,
+          "harmed": 5,
+          "deltaPp": 2,
+          "halfWidthPp": 2.3089,
+          "minDetectablePp": 3.3008,
+          "decided": false,
+          "significant95": false,
+          "requiredN": 954,
+          "reconciles": true
+        }
+      ],
+      "decided": 0,
+      "positive": 1,
+      "negative": 0,
+      "decidedAgree": null,
+      "allUndecided": true
+    },
+    {
       "contrast": "none-advisory − full",
       "readings": [
         {
@@ -3862,6 +4010,58 @@
       "negative": 0,
       "decidedAgree": null,
       "allUndecided": false
+    },
+    {
+      "contrast": "recall-order − full",
+      "readings": [
+        {
+          "artefact": "poc-sota-bird-R63-recall-order.json",
+          "dataset": "BIRD Mini-Dev (sqlite)",
+          "arm": "recall-order",
+          "control": "full",
+          "n": 350,
+          "helped": 17,
+          "harmed": 16,
+          "deltaPp": 0.2857,
+          "halfWidthPp": 3.217,
+          "minDetectablePp": 4.5989,
+          "decided": false,
+          "significant95": false,
+          "requiredN": 90682,
+          "reconciles": true
+        }
+      ],
+      "decided": 0,
+      "positive": 1,
+      "negative": 0,
+      "decidedAgree": null,
+      "allUndecided": true
+    },
+    {
+      "contrast": "recall-order − none",
+      "readings": [
+        {
+          "artefact": "poc-sota-bird-R63-recall-order.json",
+          "dataset": "BIRD Mini-Dev (sqlite)",
+          "arm": "recall-order",
+          "control": "none",
+          "n": 350,
+          "helped": 11,
+          "harmed": 8,
+          "deltaPp": 0.8571,
+          "halfWidthPp": 2.441,
+          "minDetectablePp": 3.4896,
+          "decided": false,
+          "significant95": false,
+          "requiredN": 5802,
+          "reconciles": true
+        }
+      ],
+      "decided": 0,
+      "positive": 1,
+      "negative": 0,
+      "decidedAgree": null,
+      "allUndecided": true
     }
   ],
   "shrinkage": [
@@ -3870,8 +4070,8 @@
       "points": [
         {
           "n": 350,
-          "rows": 13,
-          "medianAbsPp": 2.8571,
+          "rows": 14,
+          "medianAbsPp": 2.5714,
           "medianPp": -2.8571
         },
         {
@@ -4037,7 +4237,7 @@
   "floors": [
     {
       "n": 350,
-      "rows": 75,
+      "rows": 80,
       "bestPp": 1.3866,
       "worstPp": 8.6224,
       "medianPp": 4.3849
@@ -4239,6 +4439,15 @@
       "requiredN": 935
     },
     {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "arm": "linked-additive",
+      "control": "none",
+      "n": 350,
+      "deltaPp": 2,
+      "minDetectablePp": 3.3008,
+      "requiredN": 954
+    },
+    {
       "artefact": "poc-sota-bird.json",
       "arm": "full-grounded",
       "control": "none",
@@ -4437,6 +4646,15 @@
       "requiredN": 3141
     },
     {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "arm": "linked-additive",
+      "control": "full",
+      "n": 350,
+      "deltaPp": 1.4286,
+      "minDetectablePp": 4.3112,
+      "requiredN": 3188
+    },
+    {
       "artefact": "poc-sota-bird-substrate.json",
       "arm": "full",
       "control": "none",
@@ -4489,6 +4707,15 @@
       "deltaPp": 1.1429,
       "minDetectablePp": 4.3849,
       "requiredN": 5153
+    },
+    {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "arm": "recall-order",
+      "control": "none",
+      "n": 350,
+      "deltaPp": 0.8571,
+      "minDetectablePp": 3.4896,
+      "requiredN": 5802
     },
     {
       "artefact": "poc-sota-bird-transfer-repair.json",
@@ -4617,6 +4844,15 @@
       "requiredN": 23842
     },
     {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "arm": "full",
+      "control": "none",
+      "n": 350,
+      "deltaPp": 0.5714,
+      "minDetectablePp": 4.8034,
+      "requiredN": 24732
+    },
+    {
       "artefact": "poc-sota-bird-raw.json",
       "arm": "full-raw-shuffled",
       "control": "full",
@@ -4678,6 +4914,15 @@
       "deltaPp": -0.2857,
       "minDetectablePp": 4.1599,
       "requiredN": 74194
+    },
+    {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "arm": "recall-order",
+      "control": "full",
+      "n": 350,
+      "deltaPp": 0.2857,
+      "minDetectablePp": 4.5989,
+      "requiredN": 90682
     },
     {
       "artefact": "poc-sota-bird-dev-R37-lexicon-grain.json",
@@ -4785,6 +5030,12 @@
       "dataset": "BIRD Mini-Dev (sqlite)",
       "rows": 5,
       "decided": 2
+    },
+    {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "dataset": "BIRD Mini-Dev (sqlite)",
+      "rows": 5,
+      "decided": 0
     },
     {
       "artefact": "poc-sota-bird-anchor.json",
@@ -4906,20 +5157,20 @@
       "id": "V69-every-arm-is-a-row",
       "pass": true,
       "blocking": true,
-      "detail": "98 rows over 20 artefacts, none dropped"
+      "detail": "103 rows over 21 artefacts, none dropped"
     },
     {
       "id": "V70-the-ledger-reconciles",
       "pass": true,
       "blocking": true,
-      "detail": "98 rows: every printed delta is its own discordant counts"
+      "detail": "103 rows: every printed delta is its own discordant counts"
     },
     {
       "id": "V71-the-price-is-not-below-its-own-sample",
       "pass": true,
       "blocking": false,
-      "detail": "98 rows: decided ⟺ the price is at or below the sample"
+      "detail": "103 rows: decided ⟺ the price is at or below the sample"
     }
   ],
-  "statement": "98 arm rows over 20 artefacts, 18 decided at 80% power and 27 at a 95% interval, 98 reconciled; the largest claim was oracle − full at +32.5714pp on a design resolving 8.6224pp and the sharpest design resolved 0.8242pp; `full − none` has been measured 20 times, 1 could decide and 6 cleared a 95% interval, 2 of them positive; 33 rows sit under 1pp and were never decided."
+  "statement": "103 arm rows over 21 artefacts, 18 decided at 80% power and 27 at a 95% interval, 103 reconciled; the largest claim was oracle − full at +32.5714pp on a design resolving 8.6224pp and the sharpest design resolved 0.8242pp; `full − none` has been measured 21 times, 1 could decide and 6 cleared a 95% interval, 3 of them positive; 36 rows sit under 1pp and were never decided."
 }

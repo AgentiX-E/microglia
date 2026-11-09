@@ -15,6 +15,17 @@
       "significant95": true
     },
     {
+      "artefact": "poc-sota-bird-R63-recall-order.json",
+      "n": 350,
+      "helped": 19,
+      "harmed": 17,
+      "deltaPp": 0.5714285714285714,
+      "halfWidthPp": 3.3600000000000003,
+      "minDetectablePp": 4.803428571428571,
+      "resolvable": false,
+      "significant95": false
+    },
+    {
       "artefact": "poc-sota-bird-anchor.json",
       "n": 350,
       "helped": 10,
@@ -226,8 +237,8 @@
   ],
   "resolvable": 1,
   "significant95": 6,
-  "total": 20,
-  "resolvableShare": 0.05,
+  "total": 21,
+  "resolvableShare": 0.047619047619047616,
   "largest": {
     "artefact": "poc-sota-bird-evidence.json",
     "n": 350,
