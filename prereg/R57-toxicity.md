@@ -247,6 +247,34 @@ model name, and this one are the same class of defect: **a number about the expe
 experiment did not choose.** They are fixed together because each of them independently made a
 dispatch cost several times what its design assumed.
 
+## Amendment 5, 2026-11-09 — what this round may quote, and the sample it would need to quote it
+
+`eval/verifiers/power.py` recomputes every arm at `k=1..4` from the same 228 episodes and reports the
+exact McNemar p-value at each. The result changes what this round is allowed to say, so it is fixed here
+before any further dispatch.
+
+**The magnitudes are withdrawn.** No arm reaches p<0.05 at any `k`; the most favourable cell in the grid
+is `adversarial` at `pass^3`, p=0.096, and that is not the registered `k`. At `n=57` the smallest effect
+detectable at 80% power is 17.0–20.9pp, so a 7.02pp reading was never a measurement of the plant — it
+was the plant plus a noise floor wider than the plant. The point estimates stay in the record, labelled
+with their intervals and with the phrase *unresolved at this sample*, and they may not be quoted as the
+cost of a contradictory rule.
+
+**What survives, and at what strength.** `adversarial` is the only arm whose cost keeps its sign at
+every `k` (+5.26 to +14.04pp), and `near`'s sign does not (−3.51 to +7.02), so the *ordering* survives
+as a direction and nothing survives as a magnitude. The rung `far ≈ near` still fires, now against a
+5.26pp floor rather than 3.51pp.
+
+**A re-dispatch of this round has to be powered, not repeated.** Repeating 57×4 would produce a second
+unresolved number at the same cost, because trials do not enter the interval. Any further dispatch of
+this question must carry, in this header, an `n` at least as large as `required_n` for the effect it
+proposes to detect (**504 tasks for 7pp at the discordance these arms show**), and it must run outside
+the peak-rate windows (`TAU_REQUIRE_OFF_PEAK`, `AUDIT 34.95`).
+
+**And the cheaper instrument is the better one.** τ² retail at 57 tasks resolves 20.9pp; BIRD dev at
+1,534 questions resolves 2.2pp on the same provider. This round's question does not need τ² — it needs
+a population large enough to see the effect, and the repository already runs one.
+
 ## Cost
 
 Three legs of one dispatch, not four dispatches: the registration's `plantedArms` header renders a

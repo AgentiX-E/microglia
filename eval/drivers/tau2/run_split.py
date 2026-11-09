@@ -116,8 +116,55 @@ def _is_peak(now=None) -> bool:
     return 1 <= hour < 4 or 6 <= hour < 10
 
 
-def _cost(prompt: int, cached: int, completion: int) -> dict:
-    peak = _is_peak()
+def _next_off_peak(now=None):
+    """When the current peak window ends, so a refusal can say what to wait for.
+
+    A guard that says "not now" and not "at 10:00 UTC" is a guard an operator overrides, and
+    overriding it is how a run gets dispatched at double price a second time.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    moment = now or datetime.now(timezone.utc)
+    if not _is_peak(moment):
+        return moment
+    for hours in range(0, 25):
+        candidate = (moment + timedelta(hours=hours)).replace(minute=0, second=0, microsecond=0)
+        if candidate <= moment:
+            continue
+        if not _is_peak(candidate):
+            return candidate
+    return moment
+
+
+def peak_refusal(now=None) -> str:
+    """The marker a peak-window dispatch is refused with, or an empty string.
+
+    The rate card doubles at 01:00-04:00 and 06:00-10:00 UTC on weekdays, and UTC 01:00-10:00 is
+    09:00-18:00 in UTC+8 -- the hours the operator is awake. Every long run this lane has
+    dispatched started inside one of those windows, so the schedule was set by a time zone rather
+    than by a decision. Refusing before the first API call turns a doubled bill into a message.
+    """
+    from datetime import datetime, timezone
+
+    moment = now or datetime.now(timezone.utc)
+    if not _is_peak(moment):
+        return ""
+    opens = _next_off_peak(moment)
+    return (
+        f"tau2-peak-window: dispatched at {moment.strftime('%a %H:%M')} UTC, where the same tokens "
+        f"cost exactly twice the off-peak rate; the window closes at {opens.strftime('%a %H:%M')} UTC"
+    )
+
+
+def _cost(prompt: int, cached: int, completion: int, now=None) -> dict:
+    """The bill for one run, in the band that run actually ran in.
+
+    `now` is a parameter rather than a call to the clock inside, because a function that reads the
+    clock cannot be tested: the first version of this one made its own self-check pass or fail
+    depending on what hour the suite was run, which is a check that cannot say no on a Tuesday
+    afternoon. Every caller that means "now" passes nothing; every test passes a fixed moment.
+    """
+    peak = _is_peak(now)
     mine = _RATES["peak" if peak else "off_peak"]
     other = _RATES["off_peak" if peak else "peak"]
     uncached = max(0, prompt - cached)
@@ -151,6 +198,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--memory-url", default="")
     parser.add_argument("--max-steps", type=int, default=100)
     parser.add_argument("--seed", type=int, default=300)
+    # A full-quality run is six hours and four arms; at double price that is a doubled bill for a
+    # number that does not improve. The guard is off by default because a smoke run is cheap enough
+    # to be worth running whenever the operator is awake, and on for every dispatch that is not.
+    parser.add_argument("--require-off-peak", action="store_true")
     return parser.parse_args(argv)
 
 
@@ -276,6 +327,14 @@ def diagnostics_of(simulations) -> dict:
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     wanted = [entry for entry in args.tasks.split(",") if entry]
+
+    # Checked before the registry import and before the provider probe, because both of those
+    # cost nothing to skip and the whole point is to not start. `list` is exempt: it reads the
+    # local benchmark and never calls a provider.
+    if args.require_off_peak and args.phase != "list":
+        refusal = peak_refusal()
+        if refusal:
+            raise SystemExit(refusal)
 
     if args.phase == "list":
         ids = task_ids(args.domain, wanted)

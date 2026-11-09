@@ -971,6 +971,14 @@ jobs:
           TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '1' }}
           TAU_RETRIES: ${{ vars.TAU_RETRIES || '4' }}
           TAU_MAX_TASKS: ${{ github.event.inputs.l4_tasks || vars.TAU_MAX_TASKS || '0' }}
+          # Peak-rate windows are exactly double, and UTC 01:00-10:00 is 09:00-18:00 in UTC+8 --
+          # which is when the operator is awake, and therefore when every long run of this lane has
+          # been dispatched. A `l4` dispatch is a reading somebody is going to quote, so it is
+          # refused before its first provider call unless `TAU_ALLOW_PEAK=1` is set as a repository
+          # variable. Scheduled and push runs are not guarded: they are small regression runs whose
+          # whole purpose is to be green, and a guard that reddens CI at 09:00 Beijing time would be
+          # turned off within a week.
+          TAU_REQUIRE_OFF_PEAK: ${{ github.event.inputs.l4 == 'true' && vars.TAU_ALLOW_PEAK != '1' && '1' || '' }}
           TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
           # Each arm writes its own artefact: one file per arm is what a pairing step
           # needs, and `always()` on the next step means an arm that misses its bar still
@@ -1023,6 +1031,7 @@ jobs:
           TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '1' }}
           TAU_RETRIES: ${{ vars.TAU_RETRIES || '4' }}
           TAU_MAX_TASKS: ${{ github.event.inputs.l4_tasks || vars.TAU_MAX_TASKS || '0' }}
+          TAU_REQUIRE_OFF_PEAK: ${{ github.event.inputs.l4 == 'true' && vars.TAU_ALLOW_PEAK != '1' && '1' || '' }}
           TAU2_DATA_DIR: ${{ github.workspace }}/.tau2-bench/data
           POC_RESULT_DIR: eval/results/arms/reference
         run: pnpm eval:l4

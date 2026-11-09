@@ -400,6 +400,15 @@ export function driverArgs(input: {
   readonly memoryUrl?: string;
   readonly maxSteps?: number;
   readonly seed?: number;
+  /**
+   * Refuse to start inside a peak-rate window.
+   *
+   * Peak is exactly double, and UTC 01:00-10:00 is 09:00-18:00 in UTC+8, which is when the
+   * operator is awake and therefore when every long run of this lane has been dispatched. The
+   * flag is carried into the driver rather than checked here, so the refusal happens before the
+   * first provider call and the reason is the driver's own marker (`tau2-peak-window`).
+   */
+  readonly requireOffPeak?: boolean;
 }): string[] {
   const args = [
     input.script,
@@ -419,5 +428,6 @@ export function driverArgs(input: {
   if (input.memoryUrl !== undefined) args.push('--memory-url', input.memoryUrl);
   if (input.maxSteps !== undefined) args.push('--max-steps', String(input.maxSteps));
   if (input.seed !== undefined) args.push('--seed', String(input.seed));
+  if (input.requireOffPeak === true) args.push('--require-off-peak');
   return args;
 }

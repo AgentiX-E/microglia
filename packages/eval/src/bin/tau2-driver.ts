@@ -239,6 +239,14 @@ const PLANTED: PlantedDocument | undefined =
         JSON.parse(readFileSync(PLANTED_PATH, "utf8")) as PlantedDocument,
       );
 const TRIALS = Math.max(1, Number(process.env["TAU_TRIALS"] ?? 4) || 4);
+/**
+ * Whether a phase may start inside a peak-rate window.
+ *
+ * The rate card doubles there, and the window is 09:00-18:00 in UTC+8, so an unguarded long run
+ * is a doubled bill chosen by the operator's time zone. Off by default, because a ten-task smoke
+ * run is cheap at any hour; on for every dispatch whose result will be quoted.
+ */
+const REQUIRE_OFF_PEAK = process.env["TAU_REQUIRE_OFF_PEAK"] === "1";
 const TRAIN_SHARE = Number(process.env["TAU_TRAIN_SHARE"] ?? 0.5) || 0.5;
 /**
  * How many tasks to draw before splitting; `0` means the whole set.
@@ -682,6 +690,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         taskIds: test,
         trials: TRIALS,
         out: evalPath,
+        requireOffPeak: REQUIRE_OFF_PEAK,
       }),
     );
     // The reference arm's episodes are as much a part of the transfer ledger as the memory arm's:
@@ -700,6 +709,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       taskIds: train,
       trials: 1,
       out: learnPath,
+      requireOffPeak: REQUIRE_OFF_PEAK,
     }),
   );
 
@@ -1152,6 +1162,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
           trials: TRIALS,
           out,
           memoryUrl: facade.url,
+          requireOffPeak: REQUIRE_OFF_PEAK,
           ...(PAIR_PLAN.enabled ? { seed: PAIR_SEED } : {}),
         }),
       );

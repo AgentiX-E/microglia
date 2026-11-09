@@ -104,23 +104,55 @@ def the_weekend_is_off_peak_all_day(checks):
 
 @case
 def the_same_tokens_cost_exactly_twice_as_much_in_peak(checks):
-    peak = subject._cost(1_000_000, 0, 1_000_000)
+    # The moment is passed in. The first version of this case called `_cost` without one, so it
+    # read the wall clock and passed only between 01:00 and 10:00 UTC on a weekday -- a self-check
+    # that fails on a Tuesday afternoon is not a self-check, and the two-band assertion below is
+    # the only thing that can catch a rate card read backwards.
+    peak = subject._cost(1_000_000, 0, 1_000_000, at(0, 2))
+    off = subject._cost(1_000_000, 0, 1_000_000, at(0, 12))
     checks.equal(peak["usd"], 1.5, "1M missed input plus 1M output at peak")
     checks.equal(peak["band"], "peak", "the band is named, not inferred")
     checks.equal(peak["usd_in_other_band"], 0.75, "and the other band is quoted beside it")
+    checks.equal(off["usd"], 0.75, "the same tokens off-peak")
+    checks.equal(off["band"], "off_peak", "named as the other band")
+    checks.equal(off["usd_in_other_band"], 1.5, "and the peak bill quoted beside it")
+    checks.equal(round(peak["usd"] / off["usd"]), 2, "the factor of two is the whole point")
 
 
 @case
 def a_cached_token_costs_a_fiftieth_of_a_missed_one(checks):
     # 1M input, all cached, no output: 1M x 0.006 rather than 1M x 0.30.
-    checks.equal(subject._cost(1_000_000, 1_000_000, 0)["usd"], 0.006, "all hit at peak")
+    checks.equal(subject._cost(1_000_000, 1_000_000, 0, at(0, 2))["usd"], 0.006, "all hit at peak")
 
 
 @case
 def a_cache_hit_is_worth_fifty_times_its_own_price(checks):
-    missed = subject._cost(1_000_000, 0, 0)["usd"]
-    hit = subject._cost(1_000_000, 1_000_000, 0)["usd"]
+    missed = subject._cost(1_000_000, 0, 0, at(0, 2))["usd"]
+    hit = subject._cost(1_000_000, 1_000_000, 0, at(0, 2))["usd"]
     checks.equal(round(missed / hit), 50, "the ratio the write-path bug is measured in")
+
+
+@case
+def a_peak_dispatch_is_refused_before_it_spends_anything(checks):
+    refusal = subject.peak_refusal(at(0, 9, 47))
+    checks.substring(refusal, "tau2-peak-window", "the marker a caller branches on")
+    checks.substring(refusal, "10:00 UTC", "and the hour the window closes, not just the fact")
+    checks.substring(refusal, "twice", "and why it matters")
+
+
+@case
+def an_off_peak_dispatch_is_not_refused(checks):
+    checks.equal(subject.peak_refusal(at(0, 12)), "", "midday on a Monday is off-peak")
+    checks.equal(subject.peak_refusal(at(0, 4, 30)), "", "and so is the gap between windows")
+    checks.equal(subject.peak_refusal(at(5, 2)), "", "and all weekend")
+
+
+@case
+def the_refusal_names_the_end_of_the_window_it_is_in(checks):
+    checks.equal(subject._next_off_peak(at(0, 1)).hour, 4, "the first window closes at 04:00")
+    checks.equal(subject._next_off_peak(at(0, 9, 59)).hour, 10, "the second at 10:00")
+    checks.equal(subject._next_off_peak(at(0, 12)), at(0, 12), "off-peak is already open")
+    checks.equal(subject._next_off_peak(at(5, 2)), at(5, 2), "a weekend has nothing to wait for")
 
 
 @case

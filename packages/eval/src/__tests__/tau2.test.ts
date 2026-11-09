@@ -554,4 +554,24 @@ describe('driverArgs', () => {
     expect(full[full.indexOf('--max-steps') + 1]).toBe('50');
     expect(full[full.indexOf('--seed') + 1]).toBe('300');
   });
+
+  it('asks the driver to refuse a peak-rate window only when told to', () => {
+    const base = {
+      script: 's.py',
+      domain: 'retail',
+      phase: 'eval' as const,
+      taskIds: ['a'],
+      trials: 4,
+      out: 'o.json',
+      agent: 'microglia_agent' as const,
+    };
+    // Absent by default: a ten-task smoke run is cheap at any hour, and a guard that fires on it
+    // would train the operator to pass `requireOffPeak: false` on the runs that matter.
+    expect(driverArgs(base)).not.toContain('--require-off-peak');
+    expect(driverArgs({ ...base, requireOffPeak: false })).not.toContain('--require-off-peak');
+    // Present, and last, so a reader of a failed job's command line sees the reason first.
+    const guarded = driverArgs({ ...base, requireOffPeak: true });
+    expect(guarded).toContain('--require-off-peak');
+    expect(guarded[guarded.length - 1]).toBe('--require-off-peak');
+  });
 });

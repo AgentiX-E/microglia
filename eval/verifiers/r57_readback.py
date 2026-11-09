@@ -60,9 +60,13 @@ PREDICTED_FAR_BAND_SHARE = 0.95
 # polarity must not move the dose; a between-arm equality needs no absolute threshold, which is what
 # makes it gradable on a population the registration does not control.
 POLARITY_LEVEL_TOLERANCE = 0.10
-# The control arm's own movement between two dispatches of one configuration (R58 63.16%, R59
-# 66.67%, same 57 tasks, nothing changed). A difference smaller than this is not a difference.
-CONTROL_DRIFT_PP = 3.51
+# The control arm's own movement across dispatches in which nothing changed. It was 3.51pp, taken
+# from one pair (R58 63.16%, R59 66.67%, same 57 tasks); three more dispatches of the same control
+# (R57's `far`, `near` and `adversarial` legs, 57.89%, 57.89%, 63.16%) widen the observed spread to
+# 5.26pp at `pass^4`, and to 14.04pp at `pass^2` and `pass^3`. **A drift constant has to be an upper
+# bound of the spread, not one observation of it**, so it is the widest reading at the graded `k`.
+# `eval/verifiers/power.py` recomputes this from the artefacts rather than from this comment.
+CONTROL_DRIFT_PP = 5.26
 REQUIRED_TRIALS = 4
 # `near` and `adversarial` are the same words with the action forbidden; `far` shares nothing.
 ARMS_THAT_MUST_SHARE = ("near", "adversarial")
@@ -180,7 +184,26 @@ class Arm:
 
     @property
     def delta_pp(self) -> float | None:
+        """The artefact's paired change, in the artefact's own sign: memory **minus** control.
+
+        Kept under its own name because that is what the artefact stores, and every reader of the
+        artefact needs to be able to find it. It is not what this report prints -- see `cost_pp`.
+        """
         return _rate(self.comparison.get("deltaPp"))
+
+    @property
+    def cost_pp(self) -> float | None:
+        """The same number in the report's sign: **positive means the memory arm cost accuracy**.
+
+        The report prints two descriptions of each arm -- the ledger (`excess`, which is broken
+        minus repaired, so positive is a cost) and the paired change (`deltaPp`, which is memory
+        minus control, so positive is a *gain*). Printed side by side without this property they
+        contradicted each other: `adversarial` appeared as `excess +4` and `pass^4 -7.02pp` in one
+        block of text, and a reader skimming the second one concludes the memory helped. One
+        convention, applied at the boundary where the artefact's sign enters the report.
+        """
+        value = self.delta_pp
+        return None if value is None else -value
 
     @property
     def half_width_pp(self) -> float | None:
@@ -380,7 +403,7 @@ def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
             if arm.delta_pp is not None:
                 half = arm.half_width_pp
                 report.note(
-                    f"{name}: pass^4 {arm.delta_pp:+.2f}pp"
+                    f"{name}: pass^4 {arm.cost_pp:+.2f}pp of cost"
                     + ("" if half is None else f" against a half-width of {half:.2f}pp")
                 )
         if report.refutation_fired or not report.predictions_ok:
@@ -430,7 +453,7 @@ def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
         if arm.delta_pp is not None:
             half = arm.half_width_pp
             report.note(
-                f"{name}: pass^4 {arm.delta_pp:+.2f}pp"
+                f"{name}: pass^4 {arm.cost_pp:+.2f}pp of cost"
                 + ("" if half is None else f" against a half-width of {half:.2f}pp")
                 + " (reported, not claimed: the mean is unresolved at this sample by construction)"
             )
@@ -589,7 +612,28 @@ def self_test() -> int:
             "no comparison block for adversarial",
         ),
     ]
-    failures = 0
+    # The report prints each arm twice -- once as a ledger (`excess`, positive = a cost) and once
+    # as a paired change (the artefact's `deltaPp`, positive = a *gain*) -- and the two fields have
+    # opposite sign conventions. `adversarial`'s real artefact made the contradiction visible:
+    # excess +4 episodes, deltaPp -7.02pp, printed in one block of text, where the second number
+    # reads as "the memory helped". This case pins the repair: the same arm has to render as a
+    # positive cost, and the two lines have to agree rather than merely both be present.
+    contradictory = Arm(
+        "adversarial",
+        fixture("adversarial").census,
+        {"paired": 57, "lost": 11, "gained": 7, "deltaPp": -7.0175, "p": 0.48},
+        {"halfWidthPp": 14.59},
+        {"requests": 200},
+        4,
+    )
+    _, sign_report = grade({"adversarial": contradictory})
+    sign_rendered = sign_report.render()
+    sign_ok = "+7.02pp of cost" in sign_rendered and "excess +4" in sign_rendered
+    print(f"  {'ok  ' if sign_ok else 'FAIL'} the ledger and the paired change agree on which way the cost points")
+    if not sign_ok:
+        print(sign_rendered)
+
+    failures = 0 if sign_ok else 1
     for label, arms, expected, fragment in cases:
         state, report = grade(arms)
         rendered = report.render()
