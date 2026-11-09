@@ -1,0 +1,73 @@
+{
+  "id": "poc-table-recall",
+  "split": "dev",
+  "questions": 1534,
+  "single_table": 0,
+  "recall_k": 5,
+  "folds": 5,
+  "n": 1534,
+  "unscoreable": 0,
+  "degenerate": 0,
+  "signals": {
+    "anchors": {
+      "n": 1534,
+      "clean": 658,
+      "cleanShare": 0.42894393741851367,
+      "meanDepthShare": 0.49634941329856413,
+      "precision": 0.49980597594101667,
+      "recall": 0.8738127544097694
+    },
+    "recalled": {
+      "n": 1534,
+      "clean": 868,
+      "cleanShare": 0.5658409387222947,
+      "meanDepthShare": 0.4403846153846146,
+      "precision": 0.4793020868970236,
+      "recall": 0.9504748982360922
+    },
+    "both": {
+      "n": 1534,
+      "clean": 869,
+      "cleanShare": 0.5664928292046936,
+      "meanDepthShare": 0.4299512634258395,
+      "precision": 0.39272824488704716,
+      "recall": 0.9966078697421981
+    }
+  },
+  "both_versus_anchors": {
+    "n": 1534,
+    "baselineCorrect": 658,
+    "treatmentCorrect": 869,
+    "baselineAccuracy": 0.42894393741851367,
+    "treatmentAccuracy": 0.5664928292046936,
+    "delta": 0.13754889178617993,
+    "lost": 234,
+    "gained": 445,
+    "discordance": 0.4426336375488918,
+    "p": 4.48831424625828e-16,
+    "deltaCI": {
+      "low": 0.10299869621903521,
+      "high": 0.16883963494132986,
+      "point": 0.13754889178617993
+    }
+  },
+  "recalled_versus_anchors": {
+    "n": 1534,
+    "baselineCorrect": 658,
+    "treatmentCorrect": 868,
+    "baselineAccuracy": 0.42894393741851367,
+    "treatmentAccuracy": 0.5658409387222947,
+    "delta": 0.13689700130378096,
+    "lost": 234,
+    "gained": 444,
+    "discordance": 0.44198174706649285,
+    "p": 5.897241987421078e-16,
+    "deltaCI": {
+      "low": 0.10234680573663625,
+      "high": 0.16883963494132986,
+      "point": 0.13689700130378096
+    }
+  },
+  "model_calls": 0,
+  "note": "An ordering signal is not an accuracy delta: a clean ordering is the ceiling an ordering-only mechanism can reach, and whether a model reads a reordered schema at all is a question only a dispatch answers."
+}
