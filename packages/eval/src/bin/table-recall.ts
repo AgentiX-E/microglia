@@ -22,9 +22,11 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
-  annotateSchema,
+  anchorTables,
   assignFolds,
-  recalledTables,
+  goldIndex,
+  orderSchema,
+  recalledFor,
   tableRecallOf,
   TABLE_SIGNALS,
   type TableQuestion,
@@ -73,33 +75,72 @@ for (const dbId of new Set(rows.map((row) => row.db_id))) {
   tablesOf.set(dbId, schemaBlocks(ddl).map((block) => block.table));
 }
 
+/**
+ * Every gold query's table set, parsed once.
+ *
+ * The five folds each read four fifths of the split, so parsing per (fold, row) would run the parser
+ * six thousand times for fifteen hundred distinct statements.
+ */
+const goldOf = new Map<string, readonly string[]>();
+const goldTables = (row: Row): readonly string[] => {
+  const hit = goldOf.get(idOf(row));
+  if (hit !== undefined) return hit;
+  const tables = sqlShapeOf(row.SQL).tables;
+  goldOf.set(idOf(row), tables);
+  return tables;
+};
+
 const asked: TableQuestion[] = [];
 let singleTable = 0;
-for (const row of rows) {
-  const ddl = ddlOf.get(row.db_id) ?? '';
-  const tables = tablesOf.get(row.db_id) ?? [];
-  const gold = sqlShapeOf(row.SQL).tables;
-  const annotated = annotateSchema(ddl, row.question, row.evidence);
-  // A one-table schema names its only table by construction; `annotateSchema` says so as well, but
-  // the reading is taken from the schema's size so the two cannot disagree.
-  if (tables.length <= 1) singleTable += 1;
-  const anchors = tables.length <= 1 ? [] : annotated.anchors;
-  const pool = rows
-    .filter((other) => other.db_id === row.db_id && foldOf.get(idOf(other)) !== foldOf.get(idOf(row)))
-    .map((other) => ({ question: other.question, gold: sqlShapeOf(other.SQL).tables }));
-  asked.push({
-    tables,
-    gold,
-    anchors,
-    recalled: recalledTables(row.question, pool, K),
-  });
+let fired = 0;
+let movedTotal = 0;
+let retrieved = 0;
+for (let fold = 0; fold < FOLDS; fold += 1) {
+  // The index is built from the row's own fold complement, exactly as `runFold` builds it, and the
+  // signal is composed from the same three functions the arm calls. A measurement that composed them
+  // differently from the arm would be a description of a mechanism nobody dispatches.
+  const index = goldIndex(
+    rows
+      .filter((row) => foldOf.get(idOf(row)) !== fold)
+      .map((row) => ({ db: row.db_id, question: row.question, gold: goldTables(row) })),
+  );
+  // Filled at the row's own position rather than pushed, so the paired vector stays in the order the
+  // split was read. A bootstrap over a permuted vector returns a different interval for the same
+  // data — 10.63 vs 10.30 on the lower bound here — and a measurement whose interval moves when
+  // nothing moved is a measurement nobody can compare against itself.
+  for (const [at, row] of rows.entries()) {
+    if (foldOf.get(idOf(row)) !== fold) continue;
+    const ddl = ddlOf.get(row.db_id) ?? '';
+    const tables = tablesOf.get(row.db_id) ?? [];
+    // A one-table schema has one possible ordering, so counting it would let a signal that does
+    // nothing look like a signal that works.
+    if (tables.length <= 1) singleTable += 1;
+    const anchors = anchorTables(ddl, row.question, row.evidence).anchors;
+    const recalled = recalledFor(index, row.db_id, row.question, K);
+    const ordered = orderSchema(ddl, [...recalled, ...anchors], 'retrieved');
+    // Whether the arm's prompt differs from the unannotated one, which is the quantity the channel
+    // floor gates on at dispatch. Measured here so a dispatch's `recall-order at least 1%` has a
+    // predicted value rather than an alarm.
+    if (ordered.reason === 'ordered') {
+      fired += 1;
+      movedTotal += ordered.moved.length;
+    }
+    // Questions where retrieval contributed a table at all. This is the share the dispatch's
+    // `ordering.retrieved_share` is compared against, so it has to be a measured prior rather than a
+    // threshold chosen after the run.
+    if (recalled.length > 0) retrieved += 1;
+    asked[at] = { tables, gold: goldTables(row), anchors, recalled };
+  }
 }
 
 const reading = tableRecallOf(asked);
 
 const asTable = (): string => {
   const lines = [
-    `[table-recall] n=${reading.n} (single-table ${singleTable}, unscoreable ${reading.unscoreable}) k=${K}`,
+    `[table-recall] n=${reading.n} (single-table ${singleTable}, unscoreable ${reading.unscoreable}) k=${K} ` +
+      `fired=${fired}/${rows.length} (${((fired / rows.length) * 100).toFixed(2)}%) ` +
+      `moved=${(movedTotal / Math.max(1, fired)).toFixed(2)}/question ` +
+      `retrieved=${retrieved}/${rows.length} (${((retrieved / rows.length) * 100).toFixed(2)}%)`,
     '| signal | clean | share | mean depth | precision | recall |',
     '| --- | --- | --- | --- | --- | --- |',
   ];
@@ -134,6 +175,11 @@ await writeJson('poc-table-recall', {
   single_table: singleTable,
   recall_k: K,
   folds: FOLDS,
+  prompts_changed: fired,
+  prompts_changed_share: Number((fired / rows.length).toFixed(4)),
+  mean_tables_moved: Number((movedTotal / Math.max(1, fired)).toFixed(2)),
+  retrieved: retrieved,
+  retrieved_share: Number((retrieved / rows.length).toFixed(4)),
   n: reading.n,
   unscoreable: reading.unscoreable,
   degenerate: reading.degenerate,

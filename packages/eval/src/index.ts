@@ -13,11 +13,17 @@ export {
   type FoldSpend,
 } from './call-budget.js';
 export {
+  anchorTables,
   annotateSchema,
   linkSchema,
+  orderSchema,
   questionTokens,
   schemaBlocks,
+  type AnnotatedSchema,
   type LinkedSchema,
+  type OrderSource,
+  type OrderedSchema,
+  type SchemaAnchors,
   type SchemaBlock,
 } from '@agentix-e/microglia-sql';
 export {
@@ -364,11 +370,16 @@ export {
  */
 export {
   TABLE_SIGNALS,
+  goldIndex,
   namedBy,
   orderOf,
   readOrdering,
+  recalledFor,
   recalledTables,
+  summariseOrderings,
   tableRecallOf,
+  type GoldNeighbours,
+  type GoldRow,
   type SignalSummary,
   type TableOrdering,
   type TableQuestion,

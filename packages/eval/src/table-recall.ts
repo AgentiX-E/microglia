@@ -186,7 +186,14 @@ export type TableRecall = {
   readonly recalledVersusAnchors: PairedResult;
 };
 
-function summarise(readings: readonly TableOrdering[]): SignalSummary {
+/**
+ * One summary over however many readings a caller has.
+ *
+ * Exported because the dispatched lane summarises with it too: the arm's `clean` share then comes
+ * from the same arithmetic as the free ceiling it was chosen on, and a run whose number disagreed
+ * with the measurement would be a defect in the dispatch rather than an argument about statistics.
+ */
+export function summariseOrderings(readings: readonly TableOrdering[]): SignalSummary {
   const n = readings.length;
   if (n === 0) {
     return { n: 0, clean: 0, cleanShare: 0, meanDepthShare: 0, precision: 0, recall: 0 };
@@ -243,13 +250,71 @@ export function tableRecallOf(questions: readonly TableQuestion[]): TableRecall 
     unscoreable,
     degenerate,
     signals: {
-      anchors: summarise(bySignal.anchors),
-      recalled: summarise(bySignal.recalled),
-      both: summarise(bySignal.both),
+      anchors: summariseOrderings(bySignal.anchors),
+      recalled: summariseOrderings(bySignal.recalled),
+      both: summariseOrderings(bySignal.both),
     },
     bothVersusAnchors: comparePaired(cleanOf('anchors'), cleanOf('both')),
     recalledVersusAnchors: comparePaired(cleanOf('anchors'), cleanOf('recalled')),
   };
+}
+
+/**
+ * One training row, as the retrieval index needs it.
+ *
+ * `gold` is the table set of the row's own gold query. That is supervision the benchmark gives away
+ * for free and that the pipeline has never used for anything: a memory arm cannot read a test
+ * question's gold tables, but every *other* fold's are its training data, which is what makes this
+ * signal lawful under the cross-fitting the lane already runs.
+ */
+export type GoldRow = {
+  readonly db: string;
+  readonly question: string;
+  readonly gold: readonly string[];
+};
+
+/** The neighbours one question may draw from, in the order the caller supplied them. */
+export type GoldNeighbours = readonly {
+  readonly question: string;
+  readonly gold: readonly string[];
+}[];
+
+/**
+ * The training rows grouped by the database they were asked against.
+ *
+ * Grouped and not pooled, because a table name means nothing outside its own schema: `schools`
+ * exists in `california_schools` and not in `formula_1`, and a global index would offer it to a
+ * question where it cannot be joined. The absence of an entry is a meaningful state too — a
+ * database with a single question in the split has no neighbours, and the arm falls back to the
+ * lexical anchors rather than ending the fold.
+ */
+export function goldIndex(rows: readonly GoldRow[]): ReadonlyMap<string, GoldNeighbours> {
+  const index = new Map<string, { question: string; gold: readonly string[] }[]>();
+  for (const row of rows) {
+    const entry = { question: row.question, gold: row.gold };
+    const bucket = index.get(row.db);
+    if (bucket === undefined) index.set(row.db, [entry]);
+    else bucket.push(entry);
+  }
+  return index;
+}
+
+/**
+ * The gold tables the nearest training questions of this database read.
+ *
+ * The one-line composition the lane calls, kept here rather than there so that the measurement and
+ * the arm read the same index: a lane that built its own would be a second definition of "the
+ * neighbours", and the free ceiling would stop describing the thing that gets dispatched.
+ */
+export function recalledFor(
+  index: ReadonlyMap<string, GoldNeighbours>,
+  db: string,
+  question: string,
+  k: number,
+): readonly string[] {
+  const pool = index.get(db);
+  if (pool === undefined) return [];
+  return recalledTables(question, pool, k);
 }
 
 /**

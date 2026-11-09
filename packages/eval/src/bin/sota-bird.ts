@@ -133,7 +133,17 @@ import {
   forecastBudget,
   interleaveByKey,
   judgeScalar,
+  anchorTables,
   annotateSchema,
+  orderSchema,
+  schemaBlocks,
+  goldIndex,
+  recalledFor,
+  readOrdering,
+  summariseOrderings,
+  sqlShapeOf,
+  type GoldNeighbours,
+  type TableOrdering,
   bandsUsed,
   billOf,
   cacheHitRate,
@@ -296,6 +306,16 @@ const LIMIT = nonNegative(process.env['SOTA_LIMIT'], 0);
  * reader who compared the two would be comparing two different treatments.
  */
 const LEARN_SAMPLE = Math.trunc(nonNegative(process.env['SOTA_LEARN_SAMPLE'], 0));
+
+/**
+ * How many training questions one question's table set is retrieved from.
+ *
+ * Five, and deliberately not tuned: the free ceiling was measured at five, one neighbour is a coin
+ * flip on which of two similar questions was drawn, and a value chosen by looking at an arm's
+ * accuracy would be a knob fitted to the answer it is supposed to predict. The variable exists so a
+ * dose can be measured later, not so it can be optimised now.
+ */
+const RECALL_K = Math.trunc(nonNegative(process.env['SOTA_RECALL_K'], 5));
 
 /**
  * How long the whole lane may run, in minutes.
@@ -533,6 +553,10 @@ const CHANNEL_FLOORS: Record<
   // bar is that it fired at all: an arm whose header never appears is an arm that did not run, and a
   // null published from it would be a null about the prompt rather than about ordering.
   'linked-additive': { floor: 0.01, expects: 'linked-additive at least 1%' },
+  // The same floor and the same reason: `orderSchema` may legitimately decline (a question whose
+  // retrieved neighbours name nothing in this schema), so the gate asks that it fired at all rather
+  // than that it fired always. An arm whose header never appears is an arm that did not run.
+  'recall-order': { floor: 0.01, expects: 'recall-order at least 1%' },
 };
 
 /**
@@ -542,7 +566,7 @@ const CHANNEL_FLOORS: Record<
  * the floor is keyed by this union, so adding a channel without a floor is a type error rather than a
  * gate that silently skips it.
  */
-type ChannelKind = 'values' | 'linked' | 'linked-additive';
+type ChannelKind = 'values' | 'linked' | 'linked-additive' | 'recall-order';
 
 const ARMS = armsFrom(process.env['SOTA_ARMS']);
 
@@ -3485,6 +3509,38 @@ async function validateMemory(
   };
 }
 
+/**
+ * The tables a row's gold query reads, memoised across the run.
+ *
+ * Five folds ask about the same 1,534 rows and the parser is the only thing between a gold SQL string
+ * and a table set, so parsing it once per row rather than once per fold per row is worth the map. The
+ * key is the row's own identity rather than its position, because `rows` is re-filtered per fold and
+ * a positional cache would return another question's tables after the first fold.
+ */
+const goldTablesSeen = new Map<string, readonly string[]>();
+
+function goldTablesOfRow(row: BirdRow, id: string): readonly string[] {
+  const hit = goldTablesSeen.get(id);
+  if (hit !== undefined) return hit;
+  const tables = sqlShapeOf(row.SQL).tables;
+  goldTablesSeen.set(id, tables);
+  return tables;
+}
+
+/**
+ * What the ordering signal did on the questions it was asked, accumulated across folds.
+ *
+ * Run-level rather than per-fold because the folds are five samples of one population, and a fifth of
+ * 1,534 questions cannot answer a question the whole run cannot. The readings are the objects the free
+ * measurement produces and they are summarised by the same function, so the artefact's `clean` share
+ * is directly comparable to `pnpm eval:table-recall`'s: a run whose number disagreed with the
+ * measurement would be a defect in the dispatch, not a debate about statistics.
+ */
+const orderReadings: TableOrdering[] = [];
+
+/** Questions where retrieval contributed at least one table, out of the questions asked. */
+let orderWithRecall = 0;
+
 async function runFold(
   fold: number,
   rows: readonly BirdRow[],
@@ -3498,6 +3554,19 @@ async function runFold(
   // `rows` is interleaved across databases before it reaches a fold, so a prefix of it is a sample
   // of every database rather than of whichever one sorts first.
   const learnRows = LEARN_SAMPLE > 0 ? learnPool.slice(0, LEARN_SAMPLE) : learnPool;
+
+  // The retrieval index the ordering arm reads: the learn rows' gold table sets, grouped by the
+  // database they were asked against. Empty when no arm asks for it, because parsing 1,534 gold
+  // queries per fold is a cost the other arms should not pay.
+  const recallIndex: ReadonlyMap<string, GoldNeighbours> = ARMS.has('recall-order')
+    ? goldIndex(
+        learnRows.map((row) => ({
+          db: row.db_id,
+          question: row.question,
+          gold: goldTablesOfRow(row, idOf(row)),
+        })),
+      )
+    : new Map();
 
   const widened = await buildFoldMemory(GENERALIZE, learnRows, dataset, task);
   // Scope widening is an arm here, not a second dispatch: the same corrections are
@@ -4347,6 +4416,30 @@ async function runFold(
       linkTotal += annotated.total;
       noteChannel('linked-additive', 'linked-additive', annotated.reason === 'annotated');
       call(position, 'linked-additive', '', 0, false, 'before', annotated.ddl);
+    }
+    if (ARMS.has('recall-order')) {
+      // One decision separates this from `linked-additive`: which tables come first. The signal is
+      // the gold table set of the nearest *training* questions in this database -- the rows the
+      // cross-fit already holds, so no test question's own gold is read -- and the lexical anchors
+      // follow it, because the free measurement says anchors add 0.07pp of clean orderings once
+      // recall is present (868 -> 869 of 1,534) while reaching gold tables retrieval misses.
+      const ddl = schemaSql(dataset.dbPath(row.db_id));
+      const anchors = anchorTables(ddl, row.question, row.evidence).anchors;
+      const recalled = recalledFor(recallIndex, row.db_id, row.question, RECALL_K);
+      const ordered = orderSchema(ddl, [...recalled, ...anchors], 'retrieved');
+      // The same instrument the free ceiling was taken with, run on the prompt this arm is about to
+      // send. If the two disagree, the arm that gets paid for is not the one that was measured.
+      orderReadings.push(
+        readOrdering('both', {
+          tables: schemaBlocks(ddl).map((block) => block.table),
+          gold: goldTablesOfRow(row, idOf(row)),
+          anchors,
+          recalled,
+        }),
+      );
+      if (recalled.length > 0) orderWithRecall += 1;
+      noteChannel('recall-order', 'recall-order', ordered.reason === 'ordered');
+      call(position, 'recall-order', '', 0, false, 'before', ordered.ddl);
     }
     if (ARMS.has('values')) {
       // The same question, the same pack position, one input changed: the schema now says what the
@@ -6960,6 +7053,26 @@ async function main(): Promise<void> {
         usd_if_all_off_peak: bill.usdIfAllOffPeak,
       };
     })(),
+    /**
+     * What the ordering signal achieved on the questions it was asked.
+     *
+     * The free ceiling said 56.65% of the dev split can be ordered cleanly by retrieved gold tables
+     * against 42.89% by the lexical anchors `linked-additive` ships. This block says whether the
+     * dispatch did what the measurement predicted, computed by the same instrument on the prompts
+     * the arm actually sent -- so a disagreement is a defect in the wiring rather than a result.
+     *
+     * `retrieved` is the share of questions where the neighbours contributed a table at all: an arm
+     * that fired through its anchors on half the split is measuring anchors on half the split.
+     */
+    ordering:
+      orderReadings.length === 0
+        ? null
+        : {
+            ...summariseOrderings(orderReadings),
+            retrieved: orderWithRecall,
+            retrieved_share: Number((orderWithRecall / orderReadings.length).toFixed(4)),
+            recall_k: RECALL_K,
+          },
     generated_at: new Date().toISOString(),
   };
 
@@ -6979,6 +7092,17 @@ async function main(): Promise<void> {
       `[sota] arm ${entry.arm}: ${(entry.accuracy * 100).toFixed(2)}% ` +
         `delta=${entry.delta_pp.toFixed(2)}pp p=${entry.p_value.toFixed(4)} ` +
         `pids=${entry.mean_pack_ids.toFixed(2)}\n`,
+    );
+  }
+  if (orderReadings.length > 0) {
+    const summary = summariseOrderings(orderReadings);
+    process.stdout.write(
+      `[sota] recall-order: clean=${summary.clean}/${summary.n} ` +
+        `(${(summary.cleanShare * 100).toFixed(2)}%) ` +
+        `depth=${(summary.meanDepthShare * 100).toFixed(2)}% ` +
+        `precision=${(summary.precision * 100).toFixed(2)}% ` +
+        `recall=${(summary.recall * 100).toFixed(2)}% ` +
+        `retrieved=${((orderWithRecall / orderReadings.length) * 100).toFixed(2)}% k=${RECALL_K}\n`,
     );
   }
   // After the numbers it is a report about, never before: a bill printed at the top of a log is a

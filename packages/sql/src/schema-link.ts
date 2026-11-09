@@ -299,31 +299,124 @@ export type AnnotatedSchema = {
   readonly reason: 'annotated' | 'no-anchor' | 'single-table';
 };
 
-export function annotateSchema(ddl: string, question: string, evidence: string): AnnotatedSchema {
+/** The tables a question names, and how many tables were looked through to find them. */
+export type SchemaAnchors = {
+  readonly anchors: readonly string[];
+  readonly total: number;
+};
+
+/** Which evidence moved a table to the front, which is what the prompt header has to say. */
+export type OrderSource = 'named' | 'retrieved';
+
+/** How a reordering ended, in the three states a reader has to be able to tell apart. */
+export type OrderedSchema = {
+  readonly ddl: string;
+  /** The names actually moved, in the order they were moved, spelled as the schema spells them. */
+  readonly moved: readonly string[];
+  readonly total: number;
+  readonly reason: 'ordered' | 'no-signal' | 'single-table';
+};
+
+/** One block per table, plus the tables the question or its evidence names. */
+function readAnchors(
+  ddl: string,
+  question: string,
+  evidence: string,
+): { readonly blocks: readonly SchemaBlock[]; readonly anchors: readonly string[] } {
   const blocks = schemaBlocks(ddl);
+  if (blocks.length <= 1) return { blocks, anchors: [] };
+  const tokens = questionTokens(`${question} ${evidence}`);
+  return {
+    blocks,
+    anchors: blocks
+      .filter((block) => [block.table, ...block.columns].some((name) => tokens.has(name.toLowerCase())))
+      .map((block) => block.table),
+  };
+}
+
+/**
+ * What the question and its evidence name, without any decision about the prompt.
+ *
+ * Split out because two arms need the same answer and only one of them wants the lexical ordering:
+ * the additive arm moves what the question names, and the retrieval arm moves what similar training
+ * questions read and needs the lexical set only as a fallback. Two definitions of "named" would let
+ * the fallback drift from the arm it is standing in for.
+ */
+export function anchorTables(ddl: string, question: string, evidence: string): SchemaAnchors {
+  const { blocks, anchors } = readAnchors(ddl, question, evidence);
+  return { anchors, total: blocks.length };
+}
+
+/**
+ * Every table kept, the given ones first, in the order they were given.
+ *
+ * The general form of the additive linker, and the reason it is not `annotateSchema` with a wider
+ * argument: that one keeps declaration order *inside* the moved group. Under declaration order a
+ * signal can only add a table ahead of the first non-gold one and can never demote a wrong anchor,
+ * so a better signal is structurally unable to produce a better ordering — and a null from it would
+ * be a null about the ordering rather than about the evidence. The free measurement
+ * (`pnpm eval:table-recall`) prices exactly this: ordering by retrieved gold tables puts every gold
+ * table ahead of every non-gold one on 56.65% of the dev split, against 42.89% for lexical anchors.
+ *
+ * Two properties are preserved from the additive arm and they are what make it safe: no table is
+ * removed, and a wrong ordering costs a reader one skipped header rather than a table it cannot see.
+ */
+export function orderSchema(
+  ddl: string,
+  preferred: readonly string[],
+  source: OrderSource,
+): OrderedSchema {
+  const blocks = schemaBlocks(ddl);
+  if (blocks.length <= 1) return { ddl, moved: [], total: blocks.length, reason: 'single-table' };
+  const byName = new Map<string, SchemaBlock>();
+  for (const block of blocks) byName.set(block.table.toLowerCase(), block);
+  const taken = new Set<string>();
+  const moved: string[] = [];
+  const head: SchemaBlock[] = [];
+  for (const candidate of preferred) {
+    const key = candidate.toLowerCase();
+    // A signal may propose the same table twice — a retrieval union across neighbours does it
+    // routinely — and showing a table twice would make the prompt longer than the schema it copies.
+    if (taken.has(key)) continue;
+    const block = byName.get(key);
+    if (block === undefined) continue;
+    taken.add(key);
+    head.push(block);
+    moved.push(block.table);
+  }
+  if (moved.length === 0) {
+    // Nothing the signal said is in this schema, so there is nothing to say. Returning the schema
+    // rather than a header about zero tables keeps "the signal was silent" apart from "the signal
+    // fired and was wrong", which are the two states a reader of the artefact needs.
+    return { ddl, moved: [], total: blocks.length, reason: 'no-signal' };
+  }
+  const rest = blocks.filter((block) => !taken.has(block.table.toLowerCase()));
+  const header =
+    (source === 'named'
+      ? `-- ${moved.length} of ${blocks.length} tables are named by this question and are listed first.`
+      : `-- ${moved.length} of ${blocks.length} tables are read by similar questions and are listed first.`) +
+    '\n-- Every table is present; none was removed.\n';
+  return {
+    ddl: header + [...head, ...rest].map((block) => block.sql).join('\n'),
+    moved,
+    total: blocks.length,
+    reason: 'ordered',
+  };
+}
+
+export function annotateSchema(ddl: string, question: string, evidence: string): AnnotatedSchema {
+  const { blocks, anchors } = readAnchors(ddl, question, evidence);
   if (blocks.length <= 1) {
     return { ddl, anchors: blocks.map((block) => block.table), total: blocks.length, reason: 'single-table' };
   }
-  const tokens = questionTokens(`${question} ${evidence}`);
-  const anchors = blocks
-    .filter((block) => [block.table, ...block.columns].some((name) => tokens.has(name.toLowerCase())))
-    .map((block) => block.table);
   if (anchors.length === 0) {
     // Nothing names a table, so there is nothing to say. Returning the schema unchanged rather than
     // with an empty header keeps the two states distinguishable in the artefact: a run whose header
     // is absent had no anchor, and one whose header is present had anchors even if they were wrong.
     return { ddl, anchors: [], total: blocks.length, reason: 'no-anchor' };
   }
-  const named = new Set(anchors);
-  const ordered = [
-    ...blocks.filter((block) => named.has(block.table)),
-    ...blocks.filter((block) => !named.has(block.table)),
-  ];
-  const header =
-    `-- ${anchors.length} of ${blocks.length} tables are named by this question and are listed first.\n` +
-    `-- Every table is present; none was removed.\n`;
   return {
-    ddl: header + ordered.map((block) => block.sql).join('\n'),
+    ddl: orderSchema(ddl, anchors, 'named').ddl,
     anchors,
     total: blocks.length,
     reason: 'annotated',

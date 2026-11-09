@@ -4,6 +4,8 @@ import {
   namedBy,
   orderOf,
   readOrdering,
+  goldIndex,
+  recalledFor,
   recalledTables,
   tableRecallOf,
   type TableQuestion,
@@ -208,5 +210,56 @@ describe('recalledTables', () => {
       { question: 'aaa bbb ccc', gold: ['x', 'z'] },
     ];
     expect(recalledTables('aaa bbb', shared, 2)).toEqual(['x', 'y', 'z']);
+  });
+});
+
+describe('goldIndex', () => {
+  const rows = [
+    { db: 'formula_1', question: 'how many drivers', gold: ['drivers'] },
+    { db: 'formula_1', question: 'how many races', gold: ['races'] },
+    { db: 'california_schools', question: 'how many drivers', gold: ['schools'] },
+  ];
+
+  it('groups by database, because a table name only means something inside its own schema', () => {
+    // `california_schools` asks the same question and reads `schools`. If the index were global, a
+    // retrieval arm would offer `schools` to a question about `formula_1`, where that table does not
+    // exist — and `orderSection` would silently drop it, so the arm would look like it fired.
+    const index = goldIndex(rows);
+    expect(index.get('formula_1')?.map((entry) => entry.gold)).toEqual([['drivers'], ['races']]);
+    expect(index.get('california_schools')?.map((entry) => entry.gold)).toEqual([['schools']]);
+  });
+
+  it('keeps the pool in the order it was given, so two runs over the same rows agree', () => {
+    const index = goldIndex(rows);
+    expect(index.get('formula_1')?.map((entry) => entry.question)).toEqual([
+      'how many drivers',
+      'how many races',
+    ]);
+  });
+
+  it('has no entry for a database with no rows rather than an empty list to explain', () => {
+    expect(goldIndex(rows).get('toxicology')).toBeUndefined();
+  });
+});
+
+describe('recalledFor', () => {
+  const index = goldIndex([
+    { db: 'd', question: 'how many schools in alameda county', gold: ['frpm', 'schools'] },
+    { db: 'd', question: 'how many schools in a county', gold: ['schools'] },
+    { db: 'other', question: 'how many schools in alameda county', gold: ['elsewhere'] },
+  ]);
+
+  it('reads the pool of the question\u2019s own database and no other', () => {
+    expect(recalledFor(index, 'd', 'how many schools in alameda county', 5)).toEqual(['frpm', 'schools']);
+  });
+
+  it('returns nothing for a database the index does not hold', () => {
+    // The honest answer for a database with no training rows: the lane falls back to anchors, and a
+    // throw here would end a fold because one database had a single question in it.
+    expect(recalledFor(index, 'absent', 'anything', 5)).toEqual([]);
+  });
+
+  it('returns nothing when the neighbour count is zero, which is how the arm is disabled', () => {
+    expect(recalledFor(index, 'd', 'how many schools in alameda county', 0)).toEqual([]);
   });
 });

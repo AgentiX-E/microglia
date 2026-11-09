@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { annotateSchema, linkSchema, questionTokens, schemaBlocks } from '@agentix-e/microglia-sql';
+import {
+  anchorTables,
+  annotateSchema,
+  linkSchema,
+  orderSchema,
+  questionTokens,
+  schemaBlocks,
+} from '@agentix-e/microglia-sql';
 
 /** BIRD's SQLite dumps: one CREATE per table, every name quoted, from `sqlite_master.sql`. */
 const RACES = `CREATE TABLE "races" ("raceId" INTEGER PRIMARY KEY, "year" INTEGER, "circuitId" INTEGER, "name" TEXT)`;
@@ -276,5 +283,103 @@ describe('annotateSchema', () => {
     const annotated = annotateSchema(FORMULA_1, 'longest milliseconds total', '');
     expect(annotated.anchors).toEqual(['lapTimes']);
     expect((annotated.ddl.match(/CREATE TABLE/g) ?? [])).toHaveLength(6);
+  });
+});
+
+describe('anchorTables', () => {
+  it('names the tables the question names, in declaration order', () => {
+    // The primitive, split out of `annotateSchema` because the retrieval arm needs the fallback and
+    // not the ordering: one definition of "what does this question name" for both arms.
+    expect(anchorTables(FORMULA_1, 'How many drivers are there?', '').anchors).toEqual(['drivers']);
+    expect(anchorTables(FORMULA_1, 'race and circuit names', '').anchors).toEqual(['races', 'circuits']);
+  });
+
+  it('counts the blocks it looked through, so a caller can say how much it moved', () => {
+    expect(anchorTables(FORMULA_1, 'drivers', '').total).toBe(6);
+  });
+
+  it('names nothing in a single-table database, which needs no signal at all', () => {
+    expect(anchorTables('CREATE TABLE "atoms" ("atom_id" INTEGER)', 'how many atoms', '')).toEqual({
+      anchors: [],
+      total: 1,
+    });
+  });
+});
+
+describe('orderSchema', () => {
+  it('orders by the priority it was given, not by the order the DDL declares', () => {
+    // This is the line `annotateSchema` cannot express: it keeps declaration order inside the named
+    // group, so a better signal is structurally unable to put a better table first, and a null from
+    // it is a null about the ordering rather than about the evidence.
+    const ordered = orderSchema(FORMULA_1, ['pitStops', 'drivers'], 'retrieved');
+    expect(ordered.reason).toBe('ordered');
+    expect(ordered.moved).toEqual(['pitStops', 'drivers']);
+    expect(ordered.ddl.indexOf(PIT_STOPS)).toBeLessThan(ordered.ddl.indexOf(DRIVERS));
+    expect(ordered.ddl.indexOf(DRIVERS)).toBeLessThan(ordered.ddl.indexOf(RACES));
+  });
+
+  it('moves every table, so the arm still cannot lose one', () => {
+    const ordered = orderSchema(FORMULA_1, ['drivers', 'races'], 'retrieved');
+    expect((ordered.ddl.match(/CREATE TABLE/g) ?? [])).toHaveLength(6);
+    for (const block of schemaBlocks(FORMULA_1)) expect(ordered.ddl).toContain(block.sql);
+  });
+
+  it('resolves a name the signal spelled differently, and reports the schema spelling', () => {
+    // SQLite resolves identifiers case-insensitively and BIRD relies on it: `lapTimes` is declared
+    // and `laptimes` is what a lowercased retrieval index produces.
+    const ordered = orderSchema(FORMULA_1, ['laptimes'], 'retrieved');
+    expect(ordered.moved).toEqual(['lapTimes']);
+    expect(ordered.ddl.indexOf(LAP_TIMES)).toBeLessThan(ordered.ddl.indexOf(RACES));
+  });
+
+  it('drops a name the schema does not declare instead of inventing a placeholder', () => {
+    const ordered = orderSchema(FORMULA_1, ['nope', 'circuits'], 'retrieved');
+    expect(ordered.moved).toEqual(['circuits']);
+    expect(ordered.ddl).not.toContain('nope');
+  });
+
+  it('returns the schema unchanged when no name it was given exists', () => {
+    const ordered = orderSchema(FORMULA_1, ['nope', 'also-nope'], 'retrieved');
+    expect(ordered.reason).toBe('no-signal');
+    expect(ordered.moved).toEqual([]);
+    expect(ordered.ddl).toBe(FORMULA_1);
+  });
+
+  it('does not rewrite a single-table schema, where every ordering is the same ordering', () => {
+    const single = 'CREATE TABLE "atoms" ("atom_id" INTEGER)';
+    expect(orderSchema(single, ['atoms'], 'retrieved')).toEqual({
+      ddl: single,
+      moved: [],
+      total: 1,
+      reason: 'single-table',
+    });
+  });
+
+  it('says which evidence moved the tables, because two arms move them for different reasons', () => {
+    // A reader that ignores the header must still be able to tell the two arms apart in a
+    // transcript, and the artefact must not label a retrieved ordering as a lexical one.
+    expect(orderSchema(FORMULA_1, ['drivers'], 'retrieved').ddl).toContain(
+      '-- 1 of 6 tables are read by similar questions and are listed first.',
+    );
+    expect(orderSchema(FORMULA_1, ['drivers'], 'named').ddl).toContain(
+      '-- 1 of 6 tables are named by this question and are listed first.',
+    );
+  });
+
+  it('still orders when every table is preferred, and says how many it moved', () => {
+    // Vacuous by content: the ordering is a permutation of the whole schema and the model may read
+    // it exactly as it read the declaration order. Reported rather than suppressed, because the
+    // share of vacuous questions is what bounds the arm's leverage before any call is spent.
+    const all = schemaBlocks(FORMULA_1).map((block) => block.table).reverse();
+    const ordered = orderSchema(FORMULA_1, all, 'retrieved');
+    expect(ordered.moved).toHaveLength(6);
+    expect(ordered.reason).toBe('ordered');
+    expect(ordered.ddl.indexOf(PIT_STOPS)).toBeLessThan(ordered.ddl.indexOf(RACES));
+  });
+
+  it('de-duplicates a name given twice, so a table is shown once', () => {
+    const ordered = orderSchema(FORMULA_1, ['drivers', 'drivers', 'Drivers'], 'retrieved');
+    expect(ordered.moved).toEqual(['drivers']);
+    expect((ordered.ddl.match(/CREATE TABLE "drivers"/g) ?? [])).toHaveLength(1);
   });
 });

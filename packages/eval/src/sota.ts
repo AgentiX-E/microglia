@@ -872,7 +872,21 @@ export type SqlArm =
    * threshold at which that stops being true. This arm cannot lose a table: it reorders and it
    * labels, and both are recoverable by a reader that ignores them.
    */
-  | 'linked-additive';
+  | 'linked-additive'
+  /**
+   * The same additive form, ordered by what similar *training* questions read.
+   *
+   * `linked-additive` orders by lexical anchors, and the free measurement says that signal reaches a
+   * clean ordering on 42.89% of the dev split against 56.65% for the retrieved one: +13.75pp of
+   * clean orderings, p < 1e-4, at zero model calls. The two arms differ in one decision -- which
+   * tables come first -- and in nothing else, so the paired comparison between them prices the
+   * signal rather than the mechanism.
+   *
+   * The gold table sets it reads belong to the other folds' questions, never to the question being
+   * ordered for: the lane's cross-fitting already holds the rows that are not in the current fold,
+   * and a training question's gold query is supervision the benchmark gives away.
+   */
+  | 'recall-order';
 
 /**
  * What a sampling arm asks for, read from its name.
@@ -1011,6 +1025,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'gen-decompose': true,
   linked: true,
   'linked-additive': true,
+  'recall-order': true,
   'full-verified': true,
   'full-shuffled': true,
   'full-transferred': true,
