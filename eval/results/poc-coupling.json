@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 166,
+  "scanned": 167,
   "totals": {
-    "modules": 166,
-    "lines": 44546,
+    "modules": 167,
+    "lines": 44723,
     "adapterLines": 1766,
-    "deferredLines": 5863,
-    "coupledShare": 0.1684
+    "deferredLines": 5908,
+    "coupledShare": 0.1688
   },
   "layers": [
     {
@@ -37,10 +37,10 @@
     },
     {
       "layer": "eval",
-      "modules": 110,
-      "lines": 31735,
+      "modules": 111,
+      "lines": 31912,
       "adapterLines": 0,
-      "deferredLines": 5863,
+      "deferredLines": 5908,
       "coupled": 14
     },
     {
@@ -70,13 +70,13 @@
     {
       "from": "eval",
       "to": "core",
-      "files": 46,
+      "files": 47,
       "upward": false
     },
     {
       "from": "eval",
       "to": "protocol",
-      "files": 7,
+      "files": 8,
       "upward": false
     },
     {
@@ -132,7 +132,7 @@
       "pkg": "eval",
       "module": "bird-rows",
       "path": "packages/eval/src/bird-rows.ts",
-      "lines": 130,
+      "lines": 175,
       "words": [
         "sql"
       ],
@@ -494,7 +494,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "166 modules, 14 deferred with a reason"
+      "detail": "167 modules, 14 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -509,5 +509,5 @@
       "detail": "39 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1766 of 44546 production lines across 166 modules: 7 adapter modules in `sql`, 14 deferred with a reason, and `core` at 0 coupled modules of 39; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1766 of 44723 production lines across 167 modules: 7 adapter modules in `sql`, 14 deferred with a reason, and `core` at 0 coupled modules of 39; 5 package edges, 0 of them upward."
 }
