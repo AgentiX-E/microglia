@@ -61,3 +61,55 @@ describe('the sample gates of one arm', () => {
     expect(gates.find((gate) => gate.id === 'l4-coverage')?.pass).toBe(false);
   });
 });
+
+/**
+ * A planted distractor is the third kind of arm, and it needs the control's argument rather than the
+ * treatment's.
+ *
+ * R57 plants one irrelevant rule per pack and asks what it costs. The `far` arm answered: `pass^4`
+ * 0.5789 against a published 0.575, a paired ledger of 9 broken and 9 repaired episodes — net zero,
+ * which is the reading the registration predicted. The `L4 arm` step concluded `failure` anyway,
+ * because the published bar was applied to an arm whose own hypothesis is that it does not clear it.
+ * An arm that was right and a status that says it was wrong is the same defect as a control failing a
+ * bar no control can pass (six runs of it, one class of bug), and it was paid for twice in one round.
+ */
+
+const planted: SampleGateInput = { ...memory, planted: { arm: 'far' } };
+
+describe('a planted distractor arm', () => {
+  it('is not held to a published bar its own registration predicts it misses', () => {
+    const gates = sampleGates(planted);
+    expect(ids(gates)).toEqual(['l4-coverage', 'l4-fully-scored']);
+    expect(gates.some((gate) => gate.id === 'l4-pass4')).toBe(false);
+  });
+
+  it('still owes the sample, because planting a distractor does not license a small one', () => {
+    // The bar is the only gate a plant lifts. A ten-task arm is not evidence about anything, and the
+    // one thing a distractor arm still has to do is be a complete measurement of itself.
+    const gates = sampleGates({ ...planted, tasks: 12, unscored: 2 });
+    expect(gates.find((gate) => gate.id === 'l4-coverage')?.pass).toBe(false);
+    expect(gates.find((gate) => gate.id === 'l4-fully-scored')?.pass).toBe(false);
+    expect(gates).toHaveLength(2);
+  });
+
+  it('leaves the memory arm holding the bar when it planted nothing', () => {
+    // Keyed on the plant rather than on the environment: an arm that planted no distractor is the
+    // treatment, and it is graded like one. `undefined` is the same statement as an absent key.
+    expect(ids(sampleGates(memory))).toEqual(['l4-pass4', 'l4-coverage', 'l4-fully-scored']);
+    expect(ids(sampleGates({ ...memory, planted: undefined }))).toEqual([
+      'l4-pass4',
+      'l4-coverage',
+      'l4-fully-scored',
+    ]);
+  });
+
+  it('is graded by its plant census and ledger, which is why nothing is left here', () => {
+    // The gate is not replaced with a weaker one: what a planted arm owes is a plant share inside the
+    // band and a paired excess, and both are graded by `eval/verifiers/r57_readback.py` against the
+    // registration. Two gates is the whole content of this file's opinion about the arm.
+    expect(sampleGates(planted).map((gate) => gate.criterion)).toEqual([
+      '>= 40 tasks',
+      '= 0 unscored tasks',
+    ]);
+  });
+});

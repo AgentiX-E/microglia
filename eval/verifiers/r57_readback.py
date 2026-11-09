@@ -63,6 +63,10 @@ class Report:
         self.predictions: list[tuple[str, bool | None, str]] = []
         self.refutations: list[tuple[str, bool, str]] = []
         self.context: list[str] = []
+        # Set when fewer than three arms were supplied. The state stays `GRADED` because every
+        # prediction that *was* graded holds, and a reader who saw only the state would take it for a
+        # finished round -- so the partial set is stated above the predictions rather than inside them.
+        self.partial: list[str] = []
 
     def predict(self, name: str, ok: bool | None, detail: str = "") -> None:
         self.predictions.append((name, None if ok is None else bool(ok), detail))
@@ -82,7 +86,9 @@ class Report:
         return any(fired for _, fired, _ in self.refutations)
 
     def render(self) -> str:
-        lines = ["predictions:"]
+        lines = [] if not self.partial else [f"partial: {', '.join(self.partial)}", "predictions:"]
+        if not self.partial:
+            lines = ["predictions:"]
         for name, ok, detail in self.predictions:
             mark = "n/a " if ok is None else ("PASS" if ok else "FAIL")
             lines.append(f"  {mark}  {name}{'' if not detail else f'  ({detail})'}")
@@ -229,14 +235,25 @@ def band_floor(name: str) -> float:
 def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
     report = Report()
 
+    # A partial set is graded for what it can answer. Three arms are what the *order* needs; one arm
+    # is enough for the instrument and the ledger, and refusing to read a single arm made the tool
+    # answer nothing about a dispatch that had already measured everything about itself. The order
+    # prediction becomes `n/a` rather than a failure, because an arm that has not run is not an arm
+    # that failed.
+    present = [name for name in ARMS if name in arms]
     missing = [name for name in ARMS if name not in arms]
-    if missing:
-        report.predict("every armed arm was dispatched", None, f"missing {', '.join(missing)}")
+    if not present:
+        report.predict("at least one armed arm was dispatched", False, "none")
         return "NO_MEASUREMENT", report
+    if missing:
+        report.partial.append(
+            f"{len(present)} of {len(ARMS)} arms ({', '.join(present)}); "
+            f"missing {', '.join(missing)}, so the order is not graded"
+        )
 
     # 1. The arm is the arm it is filed under. A dispatch that planted the far rule under the near
     #    arm's name is not a weaker treatment, it is a different experiment.
-    for name in ARMS:
+    for name in present:
         declared = str(arms[name].census.get("arm") or "")
         if declared != name:
             report.refute(
@@ -248,7 +265,7 @@ def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
     report.predict("each directory carries the arm it is named for", True)
 
     # 2. One rule in every pack, out of the committed file.
-    for name in ARMS:
+    for name in present:
         arm = arms[name]
         served = arm.recall.get("requests")
         report.predict(
@@ -266,7 +283,7 @@ def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
 
     # 3. The level landed. Read as a share of planted requests rather than of requests, because a
     #    rule that was never planted cannot have failed its band.
-    for name in ARMS:
+    for name in present:
         arm = arms[name]
         share = arm.band_share
         report.predict(
@@ -276,7 +293,7 @@ def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
         )
 
     # 4. Four trials, or the deltas are not the registered ones.
-    off = {name: arms[name].trials for name in ARMS if arms[name].trials != REQUIRED_TRIALS}
+    off = {name: arms[name].trials for name in present if arms[name].trials != REQUIRED_TRIALS}
     report.predict(
         "every arm scored the registered trial count",
         not off,
@@ -286,8 +303,8 @@ def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
     # 5. The ledger, which is the reading. Graded per arm, because it is paired inside a dispatch.
     #    An arm whose pairing did not run leaves the arms incomparable rather than merely ungraded:
     #    the order is a difference of excesses, and a missing one is a measurement, not a zero.
-    unpaired = [name for name in ARMS if arms[name].excess is None]
-    for name in ARMS:
+    unpaired = [name for name in present if arms[name].excess is None]
+    for name in present:
         if arms[name].excess is not None:
             report.note(arms[name].ledger())
     if unpaired:
@@ -298,19 +315,19 @@ def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
         )
         return "NO_MEASUREMENT", report
 
-    if arms["near"].excess is not None:
+    if "near" in arms and arms["near"].excess is not None:
         report.predict(
             "near broke more episodes than it repaired",
             arms["near"].excess > 0,
             f"excess {arms['near'].excess:+d}",
         )
-    if arms["adversarial"].excess is not None:
+    if "adversarial" in arms and arms["adversarial"].excess is not None:
         report.predict(
             "adversarial broke more episodes than it repaired",
             arms["adversarial"].excess > 0,
             f"excess {arms['adversarial'].excess:+d}",
         )
-    if arms["far"].excess_pp is not None:
+    if "far" in arms and arms["far"].excess_pp is not None:
         # "Not free but not harmful": the harmful half of that is gradeable against the drift a
         # control arm moves on its own, and the "not free" half is not gradeable at this sample.
         report.predict(
@@ -320,7 +337,26 @@ def grade(arms: dict[str, Arm]) -> tuple[str, Report]:
         )
         report.predict("far is not free", None, "not gradeable at 57 pairs")
 
-    # 6. The order, graded only where it exceeds the drift.
+    # 6. The order, graded only where it exceeds the drift, and only where all three arms exist. The
+    #    difference of two excesses needs both of them: a missing arm is not a zero excess.
+    if len(present) < len(ARMS):
+        report.predict(
+            "the order is gradeable",
+            None,
+            f"needs {', '.join(ARMS)}; has {', '.join(present)}",
+        )
+        for name in present:
+            arm = arms[name]
+            if arm.delta_pp is not None:
+                half = arm.half_width_pp
+                report.note(
+                    f"{name}: pass^4 {arm.delta_pp:+.2f}pp"
+                    + ("" if half is None else f" against a half-width of {half:.2f}pp")
+                )
+        if report.refutation_fired or not report.predictions_ok:
+            return "ABANDONED", report
+        return "GRADED", report
+
     far_pp = (arms["far"].excess_pp or 0.0) * 100
     near_pp = (arms["near"].excess_pp or 0.0) * 100
     adversarial_pp = (arms["adversarial"].excess_pp or 0.0) * 100
@@ -409,11 +445,18 @@ def self_test() -> int:
     cases: list[tuple[str, dict[str, Arm], str, str | None]] = [
         ("three arms with the order the registration predicts", passing_arms(), "GRADED", None),
         (
-            "a missing arm is a measurement that did not happen",
+            "a partial set grades what it has and says the order is not",
             {"far": fixture("far"), "near": fixture("near")},
-            "NO_MEASUREMENT",
-            "missing adversarial",
+            "GRADED",
+            "2 of 3 arms (far, near); missing adversarial",
         ),
+        (
+            "a lone arm still grades its own instrument and ledger",
+            {"far": fixture("far")},
+            "GRADED",
+            "the order is gradeable",
+        ),
+        ("no arm at all is a measurement that did not happen", {}, "NO_MEASUREMENT", "none"),
         (
             "an arm filed under a name it did not run is discarded",
             {**passing_arms(), "near": fixture("near", census={"arm": "far"})},

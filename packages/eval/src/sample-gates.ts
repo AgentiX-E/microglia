@@ -29,6 +29,20 @@ export type SampleGate = {
 export type SampleGateInput = {
   /** Which arm this is. The distinction is the whole point of this module. */
   readonly arm: 'memory' | 'reference';
+  /**
+   * The distractor this arm planted, when it planted one.
+   *
+   * A third kind of arm, and the same argument as the control's one paragraph up: a planted arm's
+   * hypothesis is *what an irrelevant or misleading rule costs*, so `>= published + 5pp` is a bar its
+   * own registration says it should fail. R57's `far` arm measured `pass^4` 0.5789 against a published
+   * 0.575 — a net-zero ledger, exactly as registered — and the step concluded `failure` anyway, which
+   * is the shape that makes a red status unreadable: the arm was right and the gate was wrong.
+   *
+   * The replacement is not a gate here. The plant census and the paired ledger live in the artefact,
+   * and `eval/verifiers/r57_readback.py` grades them arm by arm; what this file owes a planted arm is
+   * that the bar does not apply, stated in `published_bar_applies` rather than silently omitted.
+   */
+  readonly planted?: { readonly arm: string } | undefined;
   readonly pass4: number;
   readonly tasks: number;
   readonly unscored: number;
@@ -42,7 +56,7 @@ export function sampleGates(input: SampleGateInput): readonly SampleGate[] {
   return [
     // The published bar is a statement about the treatment. Omitting the gate is a statement, not a
     // pass: the metric carries `published_bar_applies: 0` and the note says which arm this is.
-    ...(input.published === undefined || input.arm === 'reference'
+    ...(input.published === undefined || input.arm === 'reference' || input.planted !== undefined
       ? []
       : [
           {

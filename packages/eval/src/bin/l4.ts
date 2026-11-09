@@ -321,6 +321,15 @@ const mean = meanPassAtK(measured.tasks);
  */
 const arm: 'memory' | 'reference' =
   (process.env['TAU_MEMORY'] ?? 'true') === 'false' ? 'reference' : 'memory';
+/**
+ * The distractor this dispatch planted, when it planted one.
+ *
+ * Read from the same variable the driver reads, because the two files are reading one dispatch: a run
+ * that plants `far` and a run that plants nothing are the same measurement to this file and different
+ * experiments to the readback. See `sampleGates` for why a planted arm is not held to the published
+ * bar — R57's `far` arm missed it while behaving exactly as registered.
+ */
+const plantedArm = (process.env['TAU_PLANTED_RULES'] ?? '').trim();
 const compared =
   scenarioBar.published === null ? undefined : compareToPublished(mean, scenarioBar.published, BAR);
 const coversSplit = measured.tasks.length >= MIN_TASKS;
@@ -356,6 +365,7 @@ const gates = [
     minTasks: MIN_TASKS,
     published: compared,
     bar: BAR,
+    ...(plantedArm === '' ? {} : { planted: { arm: plantedArm } }),
   }),
   // R50. This arm has no reference arm of its own. When one is supplied the gate
   // is graded by `pairedVerdict`, which blocks on harm — the R45 rule — rather than
@@ -447,8 +457,14 @@ await writeResult({
     // Which arm this is, because the two are graded differently and a reader of the artefact
     // cannot otherwise tell a control that failed a bar from a treatment that missed one.
     arm: arm === 'reference' ? 0 : 1,
-    published_bar_applies: scenarioBar.comparable && arm === 'memory' ? 1 : 0,
-    ...(compared === undefined || arm === 'reference' ? {} : { delta: compared.delta }),
+    published_bar_applies:
+      scenarioBar.comparable && arm === 'memory' && plantedArm === '' ? 1 : 0,
+    ...(plantedArm === '' ? {} : { planted_arm: plantedArm }),
+    // Omitted for a planted arm as well, for the same reason the gate is: a delta against the published
+    // number is the competitive reading, and a distractor arm is graded by its paired ledger instead.
+    ...(compared === undefined || arm === 'reference' || plantedArm !== ''
+      ? {}
+      : { delta: compared.delta }),
     tasks: measured.tasks.length,
     unscored_tasks: measured.unscored.length,
     min_tasks: MIN_TASKS,
