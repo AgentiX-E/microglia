@@ -20,7 +20,7 @@ on:
         required: false
         default: '5'
       max_calls:
-        description: 'Hard model-call budget; the lane forecasts the remaining folds and stops early rather than discarding a run (dev at four arms used 6,504; minidev at four arms needs about 4,100 — a cap of 4,000 stopped R63 after one fold and lost it; train at 6,600 questions over two arms needs about 14,600)'
+        description: 'Hard model-call budget; the lane forecasts the remaining folds and stops early rather than discarding a run (dev at four arms used 6,504 with a warm distillation cache and about 12,400 cold — a cap of 9,000 stopped R64 after its first fold on 2026-11-09; minidev at four arms needs about 4,100, and a cap of 4,000 stopped R63 after one fold and lost it; train at 6,600 questions over two arms needs about 14,600)'
         required: false
         default: '8000'
       generalize:
