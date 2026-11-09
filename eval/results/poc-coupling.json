@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 168,
+  "scanned": 170,
   "totals": {
-    "modules": 168,
-    "lines": 44964,
-    "adapterLines": 1838,
+    "modules": 170,
+    "lines": 45686,
+    "adapterLines": 1863,
     "deferredLines": 5919,
-    "coupledShare": 0.1697
+    "coupledShare": 0.1676
   },
   "layers": [
     {
@@ -30,15 +30,15 @@
     {
       "layer": "sql",
       "modules": 7,
-      "lines": 1838,
-      "adapterLines": 1838,
+      "lines": 1863,
+      "adapterLines": 1863,
       "deferredLines": 0,
       "coupled": 5
     },
     {
       "layer": "eval",
-      "modules": 111,
-      "lines": 32007,
+      "modules": 113,
+      "lines": 32704,
       "adapterLines": 0,
       "deferredLines": 5919,
       "coupled": 14
@@ -272,7 +272,7 @@
       "pkg": "sql",
       "module": "schema-link",
       "path": "packages/sql/src/schema-link.ts",
-      "lines": 307,
+      "lines": 332,
       "words": [
         "sql"
       ],
@@ -321,6 +321,13 @@
       "module": "adapter",
       "words": [
         "sql"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "cost",
+      "words": [
+        "bird"
       ]
     },
     {
@@ -432,6 +439,14 @@
     },
     {
       "pkg": "eval",
+      "module": "table-recall",
+      "words": [
+        "sqlite",
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
       "module": "tau2",
       "words": [
         "sql",
@@ -494,7 +509,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "168 modules, 14 deferred with a reason"
+      "detail": "170 modules, 14 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -509,5 +524,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1838 of 44964 production lines across 168 modules: 7 adapter modules in `sql`, 14 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1863 of 45686 production lines across 170 modules: 7 adapter modules in `sql`, 14 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }

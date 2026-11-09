@@ -73,30 +73,55 @@ function splitTopLevel(body: string): string[] {
 /**
  * The identifiers a CREATE statement declares: the table, then its columns.
  *
- * Two shapes, because two exist. BIRD's SQLite dumps quote every name, and the quoted identifiers in
- * order are exactly the declaration. A dump without quotes needs the clauses parsed instead: the
- * table is whatever follows `CREATE TABLE`, and a column is the first word of a comma-separated
+ * One parse, three quoting conventions. The first version took the quoted identifiers in order when
+ * there were any and fell back to clause parsing when there were none, which assumed that a dump
+ * quotes every name or none of them: it read `"` as the only quote, so a backticked statement
+ * matched neither branch and produced nothing. Now the table is whatever follows `CREATE TABLE`
+ * under any of the three conventions, and a column is the first identifier of a comma-separated
  * clause that does not begin with a constraint keyword.
  *
- * The first version read `name TYPE` pairs across the whole statement, which turned
- * `CREATE TABLE atoms (atom_id INTEGER)` into a table called `atom_id` — the table name is followed
- * by another identifier, not by a type, so the pair rule never fired for it.
+ * The first version of the clause parser read `name TYPE` pairs across the whole statement, which
+ * turned `CREATE TABLE atoms (atom_id INTEGER)` into a table called `atom_id` — the table name is
+ * followed by another identifier, not by a type, so the pair rule never fired for it.
  */
+/**
+ * A declared name, however the dump happens to quote it.
+ *
+ * SQLite stores the statement as it was written, and the three dumps in this benchmark's own dev
+ * split disagree: double quotes, backticks, and nothing at all. The pattern had only the first and
+ * the third, so a backticked schema parsed to zero blocks — and zero blocks is not an error here, it
+ * is `single-table`, which made `annotateSchema` return the DDL unchanged. The arm was inert on
+ * those databases for three rounds and nothing said so, because an instrument that cannot fire
+ * reports its own absence as a null result.
+ */
+const IDENTIFIER = '(?:"([^"]+)"|`([^`]+)`|\\[([^\\]]+)\\]|([A-Za-z_][A-Za-z_0-9]*))';
+
+function nameOf(match: RegExpExecArray): string | undefined {
+  return match[1] ?? match[2] ?? match[3] ?? match[4];
+}
+
 function identifiersOf(statement: string): string[] {
-  const quoted = [...statement.matchAll(/"([^"]+)"/g)].map((match) => match[1] as string);
-  if (quoted.length > 0) return quoted;
   const open = statement.indexOf('(');
   const close = statement.lastIndexOf(')');
   const head = open === -1 ? statement : statement.slice(0, open);
-  const match = /\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_][A-Za-z_0-9]*)/i.exec(head);
-  const table = match?.[1];
+  const tableMatch = new RegExp(
+    String.raw`\bCREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?` + IDENTIFIER,
+    'i',
+  ).exec(head);
+  const table = tableMatch === null ? undefined : nameOf(tableMatch);
   if (table === undefined) return [];
   if (open === -1 || close <= open) return [table];
   const columns: string[] = [];
   for (const clause of splitTopLevel(statement.slice(open + 1, close))) {
-    const first = /^\s*([A-Za-z_][A-Za-z_0-9]*)/.exec(clause)?.[1];
-    if (first === undefined || CONSTRAINT_WORDS.has(first.toLowerCase())) continue;
-    columns.push(first);
+    const first = new RegExp(String.raw`^\s*` + IDENTIFIER).exec(clause);
+    if (first === null) continue;
+    const name = nameOf(first);
+    if (name === undefined || CONSTRAINT_WORDS.has(name.toLowerCase())) continue;
+    // The foreign key's target table was previously read as a column of this one, because the
+    // quoted shortcut returned every quoted name in the statement in order. It kept tables rather
+    // than dropping them, so it never broke an answer; it did put another table's name in this
+    // table's anchor set, where a question could match it and keep the wrong block.
+    if (!columns.includes(name)) columns.push(name);
   }
   return [table, ...columns];
 }

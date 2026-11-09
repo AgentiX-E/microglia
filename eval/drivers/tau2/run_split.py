@@ -25,6 +25,7 @@ import json
 import os
 import sys
 from collections import Counter
+from pathlib import Path
 
 import litellm
 from tau2.registry import registry
@@ -91,13 +92,40 @@ def usage_stats() -> dict:
     }
 
 
-# Per million tokens, deepseek-flash, read from the provider's rate card on 2026-11-09.
-# Kept in the artefact as well as in the code because a price is a fact about a date: a
-# number quoted a year from now without its rate card is a number nobody can check.
-_RATES = {
-    "peak": {"miss": 0.30, "hit": 0.006, "out": 1.20},
-    "off_peak": {"miss": 0.15, "hit": 0.003, "out": 0.60},
-}
+# Per million tokens, read from `eval/manifests/model-rates.json`.
+#
+# The card is data rather than source because it has two readers — this driver and
+# `packages/eval/src/cost.ts` — and two hardcoded copies of the same table is the arrangement
+# in which one of them is eventually wrong. It was two hardcoded copies until now: the S2/BIRD
+# lane billed nothing at all, so nothing could catch the drift, and the first thing the card
+# caught was that the lane had been asking for a retired model.
+#
+# The file is loaded once at import. A missing or malformed card raises rather than falling back
+# to a built-in table: a bill computed from a default rate is a bill nobody can check.
+_RATE_CARD_PATH = Path(__file__).resolve().parents[2] / "manifests" / "model-rates.json"
+
+
+def _load_rate_card(path=None) -> dict:
+    """The rate card, as the one object the bill and the guard both read."""
+    source = path or _RATE_CARD_PATH
+    with open(source, encoding="utf-8") as handle:
+        card = json.load(handle)
+    for band in ("peak", "off_peak"):
+        rates = card.get("bands", {}).get(band)
+        if not isinstance(rates, dict) or not {"miss", "hit", "out"} <= set(rates):
+            raise ValueError(f"model-rates.json has no usable '{band}' band: {source}")
+    windows = card.get("peakWindows")
+    if not isinstance(windows, list) or not windows:
+        raise ValueError(f"model-rates.json has no 'peakWindows': {source}")
+    return card
+
+
+_RATE_CARD = _load_rate_card()
+_RATES = _RATE_CARD["bands"]
+_PEAK_WINDOWS = tuple(
+    (int(window["fromHourUtc"]), int(window["toHourUtc"])) for window in _RATE_CARD["peakWindows"]
+)
+_PEAK_WEEKDAYS_ONLY = bool(_RATE_CARD.get("peakWeekdaysOnly", True))
 
 
 def _is_peak(now=None) -> bool:
@@ -106,14 +134,17 @@ def _is_peak(now=None) -> bool:
     This is not a rounding: the same workload costs exactly twice as much inside those
     windows, and every long run this repository has dispatched has started inside one of
     them, because the person dispatching was awake in UTC+8 at the time.
+
+    The windows come from the rate card rather than from this docstring. They matched when
+    both were written, and the docstring is what a reader checks the code against.
     """
     from datetime import datetime, timezone
 
     moment = now or datetime.now(timezone.utc)
-    if moment.weekday() >= 5:
+    if _PEAK_WEEKDAYS_ONLY and moment.weekday() >= 5:
         return False
     hour = moment.hour
-    return 1 <= hour < 4 or 6 <= hour < 10
+    return any(start <= hour < end for start, end in _PEAK_WINDOWS)
 
 
 def _next_off_peak(now=None):

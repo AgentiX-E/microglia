@@ -75,6 +75,7 @@
     "eval:feature-overlap": "tsx packages/eval/src/bin/feature-overlap.ts",
     "eval:rule-form": "tsx packages/eval/src/bin/rule-form.ts",
     "eval:referent": "tsx packages/eval/src/bin/referent.ts",
+    "eval:table-recall": "tsx packages/eval/src/bin/table-recall.ts",
     "eval:out-of-sample": "tsx packages/eval/src/bin/out-of-sample.ts",
     "eval:validity": "tsx packages/eval/src/bin/validity.ts",
     "eval:admission": "tsx packages/eval/src/bin/admission.ts",

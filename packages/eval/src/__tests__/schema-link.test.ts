@@ -34,6 +34,33 @@ describe('schemaBlocks', () => {
     expect(blocks[0]?.columns).toEqual(['a', 'b']);
   });
 
+  it('reads a backtick-quoted statement, which is a third format and was silently empty', () => {
+    // `toxicology`, `thrombosis_prediction` and `student_club` in BIRD dev ship this way. The
+    // identifier pattern accepted only `"` and bare names, so every one of those statements parsed
+    // to zero blocks — and a zero-block schema makes `annotateSchema` report `single-table` and
+    // return the DDL unchanged, which is why the additive arm was inert on those databases rather
+    // than measured on them. A measurement that cannot fire publishes its own absence as a null.
+    const blocks = schemaBlocks(
+      'CREATE TABLE `atom` (\n  `atom_id` TEXT NOT NULL,\n  `molecule_id` TEXT,\n'
+        + '  PRIMARY KEY (`atom_id`),\n  FOREIGN KEY (`molecule_id`) REFERENCES `molecule` (`molecule_id`)\n)',
+    );
+    expect(blocks).toHaveLength(1);
+    expect(blocks[0]?.table).toBe('atom');
+    expect(blocks[0]?.columns).toEqual(['atom_id', 'molecule_id']);
+  });
+
+  it('never reads the foreign key target as a column of this table', () => {
+    // The quoted shortcut returned every quoted name in the statement, so the table on the other
+    // side of a REFERENCES clause arrived as one of this table's columns. It kept tables rather than
+    // dropping them, so it never broke an answer -- it put a column in the anchor set that the
+    // question could match to the wrong table.
+    const blocks = schemaBlocks(
+      'CREATE TABLE "bond" ("bond_id" TEXT, "molecule_id" TEXT, '
+        + 'FOREIGN KEY ("molecule_id") REFERENCES "molecule" ("molecule_id"))',
+    );
+    expect(blocks[0]?.columns).toEqual(['bond_id', 'molecule_id']);
+  });
+
   it('returns nothing for a schema that declares no table', () => {
     expect(schemaBlocks('')).toEqual([]);
   });

@@ -244,6 +244,68 @@ def the_default_model_is_not_the_retired_name(checks):
     checks.absent(source, '"deepseek/deepseek-chat"', "and the retired name is not a default")
 
 
+@case
+def the_rates_are_read_from_the_shared_card_rather_than_copied_here(checks):
+    # The card has two readers: this driver and the TypeScript lanes. They were two hardcoded
+    # copies of the same table, which is the arrangement in which one of them is eventually
+    # wrong -- and nothing caught it, because the other lane billed nothing at all.
+    import json
+
+    card_path = os.path.join(HERE, "..", "..", "manifests", "model-rates.json")
+    with open(card_path, encoding="utf-8") as handle:
+        card = json.load(handle)
+    checks.equal(subject._RATES, card["bands"], "the driver bills at the card's rates")
+    checks.equal(
+        subject._PEAK_WINDOWS,
+        tuple((w["fromHourUtc"], w["toHourUtc"]) for w in card["peakWindows"]),
+        "and guards the card's windows",
+    )
+    source = open(os.path.join(HERE, "run_split.py"), encoding="utf-8").read()
+    # A literal rate in the source is how the second copy comes back.
+    checks.absent(source, "0.30", "no rate is written into the driver")
+    checks.absent(source, "1.20", "neither is the output rate")
+
+
+@case
+def a_card_without_a_band_is_refused_rather_than_defaulted(checks):
+    # A bill computed from a fallback rate is a bill nobody can check. Raising is the only
+    # behaviour that keeps the card authoritative when someone edits it badly.
+    import json
+    import tempfile
+
+    broken = {"bands": {"peak": {"miss": 0.3, "hit": 0.006, "out": 1.2}}, "peakWindows": []}
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
+        json.dump(broken, handle)
+        path = handle.name
+    try:
+        raised = ""
+        try:
+            subject._load_rate_card(path)
+        except ValueError as error:
+            raised = str(error)
+        checks.substring(raised, "no usable 'off_peak' band", "a missing band is a refusal")
+
+        with open(path, "w", encoding="utf-8") as handle:
+            json.dump(
+                {
+                    "bands": {
+                        "peak": {"miss": 0.3, "hit": 0.006, "out": 1.2},
+                        "off_peak": {"miss": 0.15, "hit": 0.003, "out": 0.6},
+                    },
+                    "peakWindows": [],
+                },
+                handle,
+            )
+        raised = ""
+        try:
+            subject._load_rate_card(path)
+        except ValueError as error:
+            raised = str(error)
+        checks.substring(raised, "no 'peakWindows'", "and so are no windows")
+    finally:
+        os.unlink(path)
+
+
 # ------------------------------------------------------------------------- runner
 
 

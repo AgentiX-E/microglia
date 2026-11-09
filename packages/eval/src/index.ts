@@ -327,6 +327,55 @@ export {
   type LlmStats,
 } from './model-client.js';
 
+/**
+ * The rate card, and the arithmetic that turns tokens into a bill.
+ *
+ * Exported because every lane that spends money prints one of these lines, and a lane that
+ * assembled its own would be a second implementation of a number that appears in a report.
+ */
+export {
+  EMPTY_BANDED,
+  EMPTY_USAGE,
+  RATE_CARD,
+  addToBand,
+  addUsage,
+  bandOf,
+  bandsUsed,
+  billOf,
+  cacheHitRate,
+  costOf,
+  isPeak,
+  nextOffPeak,
+  totalUsage,
+  usageLine,
+  type BandRates,
+  type BandedUsage,
+  type BillReading,
+  type CostReading,
+  type PeakWindow,
+  type RateBand,
+  type TokenUsage,
+} from './cost.js';
+
+/**
+ * The schema-ordering measurement: what an ordering signal can put in front of a reader, computed
+ * from gold queries rather than from model calls. It decides whether a schema arm is worth a
+ * dispatch, which is the cheapest place in this repository to answer that question.
+ */
+export {
+  TABLE_SIGNALS,
+  namedBy,
+  orderOf,
+  readOrdering,
+  recalledTables,
+  tableRecallOf,
+  type SignalSummary,
+  type TableOrdering,
+  type TableQuestion,
+  type TableRecall,
+  type TableSignal,
+} from './table-recall.js';
+
 export {
   conditionText,
   creditedWith,

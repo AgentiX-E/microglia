@@ -36,6 +36,10 @@ function client(calls: readonly Call[], overrides: Partial<ConstructorParameters
     fetchImpl,
     sleep: noSleep,
     random: () => 0,
+    // Fixed, because the band a call is billed in is read from the clock: a suite without this
+    // asserts a different bill before and after 10:00 UTC, which is the defect under test arriving
+    // through the test suite instead of the lane. Monday noon UTC is off-peak.
+    now: () => new Date(Date.UTC(2026, 10, 9, 12, 0, 0)),
     ...overrides,
   });
   return { instance, seen };
@@ -86,7 +90,14 @@ describe('LlmClient', () => {
 
   it('returns the text, the token count and the attempts it took', async () => {
     const { instance } = client([ok('SELECT 1', 42)]);
-    await expect(instance.chat('hi')).resolves.toEqual({ text: 'SELECT 1', tokens: 42, attempts: 1 });
+    await expect(instance.chat('hi')).resolves.toEqual({
+      text: 'SELECT 1',
+      tokens: 42,
+      promptTokens: 0,
+      cachedTokens: 0,
+      completionTokens: 0,
+      attempts: 1,
+    });
     expect(instance.stats).toEqual({
       calls: 1,
       prompts: 1,
@@ -94,7 +105,159 @@ describe('LlmClient', () => {
       retries: 0,
       timeouts: 0,
       tokens: 42,
+      promptTokens: 0,
+      cachedTokens: 0,
+      completionTokens: 0,
+      reasoningTokens: 0,
     });
+  });
+
+  it('keeps the prompt, the cache split and the completion apart, because they bill differently', async () => {
+    // The lane read `total_tokens` alone until now, and a cached prompt token is fifty times cheaper
+    // than a miss: this is the split without which no bill in this repository could be explained.
+    const { instance } = client([
+      {
+        status: 200,
+        body: {
+          choices: [{ message: { content: 'SELECT 2' } }],
+          usage: {
+            total_tokens: 1_300,
+            prompt_tokens: 1_000,
+            completion_tokens: 300,
+            prompt_cache_hit_tokens: 800,
+            prompt_cache_miss_tokens: 200,
+          },
+        },
+      },
+    ]);
+    const reply = await instance.chat('hi');
+    expect(reply.promptTokens).toBe(1_000);
+    expect(reply.cachedTokens).toBe(800);
+    expect(reply.completionTokens).toBe(300);
+    expect(instance.usage.off_peak).toEqual({ promptTokens: 1_000, cachedTokens: 800, completionTokens: 300 });
+    expect(instance.usage.peak).toEqual({ promptTokens: 0, cachedTokens: 0, completionTokens: 0 });
+  });
+
+  it('books a call answered inside a peak window at the peak rate, which is a different bill', async () => {
+    // The same tokens, twelve hours apart. A lane that books its whole run at the band in force
+    // when it finished cannot tell these apart, and that is the number the clock would then choose.
+    const body = (text: string): Call => ({
+      status: 200,
+      body: {
+        choices: [{ message: { content: text } }],
+        usage: { total_tokens: 30, prompt_tokens: 20, completion_tokens: 10 },
+      },
+    });
+    const peak = client([body('a')], { now: () => new Date(Date.UTC(2026, 10, 9, 2, 0, 0)) });
+    await peak.instance.chat('hi');
+    expect(peak.instance.usage.peak).toEqual({ promptTokens: 20, cachedTokens: 0, completionTokens: 10 });
+    expect(peak.instance.usage.off_peak).toEqual({ promptTokens: 0, cachedTokens: 0, completionTokens: 0 });
+  });
+
+  it('splits a run that crosses a window boundary across both bands', async () => {
+    // 03:59 UTC is peak, 04:01 is not. One run, two rates, and the bill is exact only because the
+    // clock is read per reply rather than once at the end.
+    const body = (text: string): Call => ({
+      status: 200,
+      body: {
+        choices: [{ message: { content: text } }],
+        usage: { total_tokens: 30, prompt_tokens: 20, completion_tokens: 10 },
+      },
+    });
+    let minute = 59;
+    const hour = 3;
+    const straddling = client([body('a'), body('b')], {
+      now: () => {
+        const moment = new Date(Date.UTC(2026, 10, 9, hour, minute, 0));
+        minute += 2;
+        return moment;
+      },
+    });
+    await straddling.instance.chat('one');
+    await straddling.instance.chat('two');
+    expect(straddling.instance.usage.peak.completionTokens).toBe(10);
+    expect(straddling.instance.usage.off_peak.completionTokens).toBe(10);
+  });
+
+  it('records reasoning tokens when the provider attributes any', async () => {
+    // Billed as output, indistinguishable from an answer token in every other field. The number is
+    // the only evidence a lane is paying for thinking, so it is kept even though nothing acts on it.
+    const { instance } = client([
+      {
+        status: 200,
+        body: {
+          choices: [{ message: { content: 'ok' } }],
+          usage: { total_tokens: 10, prompt_tokens: 4, completion_tokens: 6, completion_tokens_details: { reasoning_tokens: 5 } },
+        },
+      },
+    ]);
+    const reply = await instance.chat('hi');
+    expect(reply.reasoningTokens).toBe(5);
+    expect(instance.stats.reasoningTokens).toBe(5);
+  });
+
+  it('leaves reasoning tokens absent when the provider says nothing, which is not zero', async () => {
+    const { instance } = client([ok('x')]);
+    const reply = await instance.chat('hi');
+    expect(reply.reasoningTokens).toBeUndefined();
+    expect(instance.stats.reasoningTokens).toBe(0);
+  });
+
+  it('clamps a cache-hit count larger than the prompt it belongs to', async () => {
+    const { instance } = client([
+      {
+        status: 200,
+        body: {
+          choices: [{ message: { content: 'x' } }],
+          usage: { total_tokens: 10, prompt_tokens: 4, completion_tokens: 6, prompt_cache_hit_tokens: 99 },
+        },
+      },
+    ]);
+    const reply = await instance.chat('hi');
+    expect(reply.cachedTokens).toBe(4);
+  });
+
+  it('sums the bill across prompts, which is what the usage line reads', async () => {
+    const { instance } = client([
+      {
+        status: 200,
+        body: {
+          choices: [{ message: { content: 'a' } }],
+          usage: { total_tokens: 30, prompt_tokens: 20, completion_tokens: 10, prompt_cache_hit_tokens: 5 },
+        },
+      },
+      {
+        status: 200,
+        body: {
+          choices: [{ message: { content: 'b' } }],
+          usage: { total_tokens: 60, prompt_tokens: 40, completion_tokens: 20, prompt_cache_hit_tokens: 15 },
+        },
+      },
+    ]);
+    await instance.chat('one');
+    await instance.chat('two');
+    expect(instance.stats.promptTokens).toBe(60);
+    expect(instance.stats.cachedTokens).toBe(20);
+    expect(instance.stats.completionTokens).toBe(30);
+  });
+
+  it('sends no thinking field unless it was told which way to ask', async () => {
+    const { instance, seen } = client([ok('x')]);
+    await instance.chat('hi');
+    const body = JSON.parse(seen[0]?.split(' ').slice(1).join(' ') ?? '{}') as { thinking?: unknown };
+    expect(body.thinking).toBeUndefined();
+  });
+
+  it('sends the disable switch when the run asked for the cheap path, and the enable switch for its control', async () => {
+    const off = client([ok('x')], { thinking: 'off' });
+    await off.instance.chat('hi');
+    const offBody = JSON.parse(off.seen[0]?.split(' ').slice(1).join(' ') ?? '{}') as { thinking?: unknown };
+    expect(offBody.thinking).toEqual({ type: 'disabled' });
+
+    const on = client([ok('x')], { thinking: 'on' });
+    await on.instance.chat('hi');
+    const onBody = JSON.parse(on.seen[0]?.split(' ').slice(1).join(' ') ?? '{}') as { thinking?: unknown };
+    expect(onBody.thinking).toEqual({ type: 'enabled' });
   });
 
   it('treats a missing choice as an empty reply rather than throwing', async () => {

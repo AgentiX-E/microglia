@@ -134,7 +134,12 @@ import {
   interleaveByKey,
   judgeScalar,
   annotateSchema,
+  bandsUsed,
+  billOf,
+  cacheHitRate,
   linkSchema,
+  totalUsage,
+  usageLine,
   mapPool,
   parseChoice,
   probeSummary,
@@ -397,7 +402,33 @@ const GENERALIZE = (process.env['SOTA_GENERALIZE'] ?? 'true') !== 'false';
  */
 const DOMAIN_SCOPE = (process.env['SOTA_DOMAIN_SCOPE'] ?? 'false') === 'true';
 const RESAMPLES = Math.max(1000, Math.trunc(nonNegative(process.env['SOTA_RESAMPLES'], 10_000)));
-const MODEL = process.env['SOTA_MODEL'] ?? 'deepseek-chat';
+/**
+ * The model this lane asks for.
+ *
+ * It said `deepseek-chat` until now, and that name has been retired: the endpoint keeps answering
+ * it by silently routing to the current model, so the lane was measuring a model it had not named
+ * while the artefact recorded the name it had. The τ² lane was corrected when this was found there;
+ * this one was not, which is how the same defect survives a fix — a default is a fact with an
+ * expiry date, and there were two places holding it.
+ */
+const MODEL = process.env['SOTA_MODEL'] ?? 'deepseek-flash';
+/**
+ * Whether the lane asks the model to think, and the default is to say so rather than to hope.
+ *
+ * The provider's default for this model is to think, and a thinking token is billed as an output
+ * token while being invisible in every field except a count nobody was reading. `off` sends the
+ * disable switch, which costs accuracy and therefore has to be a decision rather than a default:
+ * every published BIRD cell in this repository was produced with thinking on, and a lane that
+ * switched it off without saying so would move the baseline under all of them. The usage line
+ * reports the reasoning share of the completion, so the decision can be taken on a number.
+ */
+const THINKING = ((): 'off' | 'on' | undefined => {
+  const raw = (process.env['SOTA_THINKING'] ?? '').trim().toLowerCase();
+  if (raw === '') return undefined;
+  if (raw === 'off' || raw === 'disabled' || raw === 'false') return 'off';
+  if (raw === 'on' || raw === 'enabled' || raw === 'true') return 'on';
+  throw new Error(`SOTA_THINKING must be empty, off or on; got '${raw}'`);
+})();
 const MAX_CALLS = nonNegative(process.env['POC_MAX_CALLS'], 8000);
 
 /**
@@ -797,6 +828,7 @@ type Reply = ChatReply;
  * policy cannot tell noise from an outage, and a benchmark that runs through one
  * measures the outage.
  */
+
 /**
  * Where the model calls go, when a caller points them somewhere else.
  *
@@ -818,6 +850,7 @@ const llm = new LlmClient({
   breakerThreshold: BREAKER_THRESHOLD,
   ...(ENDPOINT === '' ? {} : { endpoint: ENDPOINT }),
   ...(DEADLINE_AT === undefined ? {} : { deadline: DEADLINE_AT }),
+  ...(THINKING === undefined ? {} : { thinking: THINKING }),
 });
 
 const chat = (prompt: string, maxTokens = 700, temperature = 0): Promise<ChatReply> =>
@@ -6898,6 +6931,35 @@ async function main(): Promise<void> {
     distill_failure_samples: [...new Set(folds.flatMap((fold) => fold.distillFailures))].slice(0, 8),
     per_case: cases,
     items,
+    /**
+     * What the run cost, and what it would have cost somewhere else on the clock.
+     *
+     * The lane that spends the money did not report it: `usage.total_tokens` was read and the
+     * prompt, the completion and the cache split were thrown away, so a bill could be computed for
+     * no run in this repository and the four causes of the one expensive week were invisible here.
+     * The model and the thinking setting are recorded beside the tokens because a token count
+     * without them is not reproducible: the same prompt costs four times as much on a model that
+     * thinks, and nothing in the count says whether it did.
+     */
+    usage: (() => {
+      const banded = llm.usage;
+      const bill = billOf(banded);
+      const total = totalUsage(banded);
+      return {
+        model: llm.model,
+        configured_model: llm.configuredModel,
+        thinking: THINKING ?? 'provider-default',
+        prompt_tokens: total.promptTokens,
+        cached_tokens: total.cachedTokens,
+        completion_tokens: total.completionTokens,
+        reasoning_tokens: llm.stats.reasoningTokens,
+        cache_hit_rate: Number(cacheHitRate(total).toFixed(4)),
+        bands: bandsUsed(banded),
+        usd: bill.usd,
+        peak_usd: bill.peakUsd,
+        usd_if_all_off_peak: bill.usdIfAllOffPeak,
+      };
+    })(),
     generated_at: new Date().toISOString(),
   };
 
@@ -6919,6 +6981,11 @@ async function main(): Promise<void> {
         `pids=${entry.mean_pack_ids.toFixed(2)}\n`,
     );
   }
+  // After the numbers it is a report about, never before: a bill printed at the top of a log is a
+  // bill nobody scrolls back to read.
+  process.stdout.write(`[sota] model=${llm.model} thinking=${THINKING ?? 'provider-default'} ${
+    usageLine('sota', llm.usage)
+  } reasoning=${llm.stats.reasoningTokens}\n`);
 
   const failed = gates.filter((gate) => gate.blocking && !gate.pass);
   if (failed.length > 0) {

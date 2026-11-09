@@ -117,7 +117,14 @@ on:
         required: false
         default: '0.5'
   schedule:
-    - cron: '0 3 * * 1'
+    # 18:00 UTC Monday, which is Tuesday 02:00 in UTC+8.
+    #
+    # It was `0 3 * * 1` — precisely inside the 01:00–04:00 UTC window that bills at exactly double.
+    # A cron expression is a dispatch nobody re-reads, so the most expensive thing in this repository
+    # was the run that needed no decision to start: once a week, at double price, whether or not
+    # anyone was watching. The hour chosen here is outside the rate card's windows and also outside
+    # the provider's published discount boundary, so it survives a correction to either one.
+    - cron: '0 18 * * 1'
 
 permissions:
   contents: read
@@ -371,6 +378,17 @@ jobs:
         timeout-minutes: 200
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # The lane's own default was `deepseek-chat` until this round: a retired name that the
+          # endpoint keeps answering by routing it somewhere else, so every artefact recorded a model
+          # the lane had not asked for. It is set here as well as in the source because the cache key
+          # two steps above already reads this variable, and a cache keyed on one model while the run
+          # calls another is a cache that never hits.
+          SOTA_MODEL: ${{ vars.SOTA_MODEL || 'deepseek-flash' }}
+          # Empty leaves the provider's default, which for this model is to think. Thinking is billed
+          # at the output rate and is invisible in every field except a count nothing was reading, so
+          # the `off` switch is available from here and the usage line reports the reasoning share —
+          # the decision is taken on a number rather than on an assumption about either direction.
+          SOTA_THINKING: ${{ vars.SOTA_THINKING || '' }}
           SOTA_LIMIT: ${{ github.event.inputs.limit || '0' }}
           SOTA_FOLDS: ${{ github.event.inputs.folds || '5' }}
           SOTA_GENERALIZE: ${{ github.event.inputs.generalize || 'true' }}

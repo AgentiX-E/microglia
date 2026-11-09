@@ -21,10 +21,33 @@
  */
 import { MicrogliaError } from '@agentix-e/microglia-core';
 import { CircuitBreaker, backoffMs } from './concurrency.js';
+import { EMPTY_BANDED, addToBand, totalUsage, type BandedUsage } from './cost.js';
 
 export type ChatReply = {
   readonly text: string;
+  /** `total_tokens` as the provider reported it. Kept because it is what the provider bills against. */
   readonly tokens: number;
+  /**
+   * The prompt the provider read, and how much of it came from its prefix cache.
+   *
+   * These are separate fields rather than a subtraction at the call site because the cache rate is
+   * fifty times cheaper than the miss rate: a run whose prompt is 90% cached and a run whose prompt
+   * is not at all can carry the same `total_tokens` and bills that differ by a factor of fifty. The
+   * lane read `total_tokens` alone for two months, which is precisely why that difference was never
+   * visible.
+   */
+  readonly promptTokens: number;
+  readonly cachedTokens: number;
+  /** Tokens the model produced. On a thinking model this includes the thinking, which is billed here. */
+  readonly completionTokens: number;
+  /**
+   * The part of `completionTokens` the provider attributed to reasoning.
+   *
+   * Recorded rather than acted on: it is the only evidence that a lane is paying for thinking, and
+   * the rate card prices an output token four times an uncached input token. Absent when the provider
+   * does not report it, which is not the same as zero.
+   */
+  readonly reasoningTokens?: number;
   /** HTTP attempts this reply cost, retries included. */
   readonly attempts: number;
 };
@@ -52,6 +75,25 @@ export type LlmClientOptions = {
   readonly fetchImpl?: typeof fetch;
   readonly sleep?: (ms: number) => Promise<void>;
   readonly random?: () => number;
+  /**
+   * Whether to ask the model to think, when the caller wants to say.
+   *
+   * Three states rather than a boolean, because "do not send the field" is a real choice and it is
+   * the current one: every number in this repository was produced with whatever the endpoint does by
+   * default, and a client that quietly switched that off would have moved the baseline under every
+   * one of them. `'off'` sends the provider's disable switch explicitly, which is the only way a run
+   * can be cheaper on purpose rather than by accident — the provider's default for the current model
+   * is to think, and thinking is billed at the output rate.
+   */
+  readonly thinking?: 'off' | 'on';
+  /**
+   * The clock, injected so a bill is a function of the run rather than of when the suite ran.
+   *
+   * The band a call is billed in is read at reply time. A test that does not fix the clock would
+   * assert different bills inside and outside the provider's peak windows — which is precisely the
+   * defect this whole file was written to stop, arriving through the test suite instead of the lane.
+   */
+  readonly now?: () => Date;
 };
 
 export type LlmStats = {
@@ -62,6 +104,12 @@ export type LlmStats = {
   readonly failures: number;
   readonly retries: number;
   readonly tokens: number;
+  /** The bill's three inputs, accumulated over the run. */
+  readonly promptTokens: number;
+  readonly cachedTokens: number;
+  readonly completionTokens: number;
+  /** Reasoning tokens the provider attributed, or zero when it attributed none. */
+  readonly reasoningTokens: number;
   /**
    * Attempts the client abandoned because the reply did not arrive in time.
    *
@@ -188,6 +236,15 @@ export class LlmClient {
   private retries = 0;
   private timeouts = 0;
   private tokensUsed = 0;
+  /**
+   * The run's tokens, by the band each call was answered in.
+   *
+   * Per band rather than in total, because a run that spans 04:00 or 10:00 UTC was billed at two
+   * rates and a single total cannot be priced. The lane that books the whole run at the band in
+   * force when it ended publishes a number the clock chose.
+   */
+  private bandedUsage: BandedUsage = EMPTY_BANDED;
+  private reasoningTokensUsed = 0;
 
   public constructor(private readonly options: LlmClientOptions) {
     if (options.apiKey === '') {
@@ -267,6 +324,9 @@ export class LlmClient {
             messages: [{ role: 'user', content: prompt }],
             temperature,
             max_tokens: maxTokens,
+            ...(this.options.thinking === undefined
+              ? {}
+              : { thinking: { type: this.options.thinking === 'off' ? 'disabled' : 'enabled' } }),
           }),
           signal: AbortSignal.timeout(timeout),
         });
@@ -307,12 +367,43 @@ export class LlmClient {
       }
       const body = (await response.json()) as {
         choices?: { message?: { content?: string } }[];
-        usage?: { total_tokens?: number };
+        usage?: {
+          total_tokens?: number;
+          prompt_tokens?: number;
+          completion_tokens?: number;
+          /** The provider's spelling of the cache split; both keys are read because both are sent. */
+          prompt_cache_hit_tokens?: number;
+          prompt_cache_miss_tokens?: number;
+          completion_tokens_details?: { reasoning_tokens?: number };
+        };
       };
-      const tokens = body.usage?.total_tokens ?? 0;
+      const usage = body.usage ?? {};
+      const tokens = usage.total_tokens ?? 0;
+      const promptTokens = usage.prompt_tokens ?? 0;
+      const completionTokens = usage.completion_tokens ?? 0;
+      // A provider that reports a hit count without a total is not a provider whose arithmetic can be
+      // trusted, so the hit count is what is believed and the miss count is what is derived.
+      const cachedTokens = Math.min(promptTokens, Math.max(0, usage.prompt_cache_hit_tokens ?? 0));
+      const reasoningTokens = Math.max(0, usage.completion_tokens_details?.reasoning_tokens ?? 0);
       this.tokensUsed += tokens;
+      this.bandedUsage = addToBand(this.bandedUsage, (this.options.now ?? (() => new Date()))(), {
+        promptTokens,
+        cachedTokens,
+        completionTokens,
+      });
+      this.reasoningTokensUsed += reasoningTokens;
       this.breaker.record(true);
-      return { text: body.choices?.[0]?.message?.content ?? '', tokens, attempts };
+      return {
+        text: body.choices?.[0]?.message?.content ?? '',
+        tokens,
+        promptTokens,
+        cachedTokens,
+        completionTokens,
+        ...(usage.completion_tokens_details?.reasoning_tokens === undefined
+          ? {}
+          : { reasoningTokens }),
+        attempts,
+      };
     }
 
     this.failures += 1;
@@ -327,13 +418,28 @@ export class LlmClient {
   }
 
   public get stats(): LlmStats {
+    const total = totalUsage(this.bandedUsage);
     return {
       calls: this.calls,
       prompts: this.prompts,
       failures: this.failures,
       retries: this.retries,
       tokens: this.tokensUsed,
+      promptTokens: total.promptTokens,
+      cachedTokens: total.cachedTokens,
+      completionTokens: total.completionTokens,
+      reasoningTokens: this.reasoningTokensUsed,
       timeouts: this.timeouts,
     };
+  }
+
+  /**
+   * The run's tokens by band, in the shape `billOf` prices.
+   *
+   * Separate from `stats` because a bill is not a statistic: `stats` is read by gates that ask "did
+   * every prompt get an answer", and this is read by the one line that says what the answers cost.
+   */
+  public get usage(): BandedUsage {
+    return this.bandedUsage;
   }
 }

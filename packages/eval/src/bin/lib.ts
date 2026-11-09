@@ -11,7 +11,15 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
 export const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
-export const DEEPSEEK_MODEL = 'deepseek-chat';
+/**
+ * The id this file's callers ask the endpoint for.
+ *
+ * It said `deepseek-chat`, which the endpoint now answers by routing elsewhere: the lane would
+ * have measured a model it had not named. Third place this name was written down, which is the
+ * argument for writing it down once — see `SOTA_MODEL` in `sota-bird.ts` and `TAU_MODEL` in the
+ * τ² driver.
+ */
+export const DEEPSEEK_MODEL = 'deepseek-flash';
 export const ZHIPU_URL = 'https://open.bigmodel.cn/api/paas/v4/embeddings';
 export const ZHIPU_MODEL = 'embedding-3';
 
