@@ -6237,7 +6237,11 @@ async function main(): Promise<void> {
    * paid for, the number is missing, and the artefact reads as a complete result. This gate is cheap
    * because the request and the rows are both in the file.
    */
-  const requestedArms = [...ARMS];
+  // `none` is not a row: it is the baseline every row is a delta against, reported once in
+  // `paired.baselineAccuracy`. The first version of this gate counted it and refused a run whose
+  // table was complete — its own message read "missing none of 6 bought arm(s)", which is what a
+  // gate written against an arm list rather than against the *table* produces.
+  const requestedArms = [...ARMS].filter((arm) => arm !== 'none');
   const reportedArms = new Set(arms.map((entry) => entry.arm as string));
   const missingArms = requestedArms.filter((arm) => !reportedArms.has(arm));
   const armCoverage: ValidityGate = {
@@ -6245,8 +6249,8 @@ async function main(): Promise<void> {
     criterion: 'every arm this dispatch bought produced a row, so no planned reading is silently absent',
     actual:
       missingArms.length === 0
-        ? `${requestedArms.length}/${requestedArms.length} arm(s) reported`
-        : `missing ${missingArms.join(', ')} of ${requestedArms.length} bought arm(s)`,
+        ? `${requestedArms.length}/${requestedArms.length} arm(s) reported, \`none\` scored as the baseline`
+        : `${missingArms.join(', ')} missing of ${requestedArms.length} bought arm(s)`,
     pass: missingArms.length === 0,
     blocking: true,
   };
