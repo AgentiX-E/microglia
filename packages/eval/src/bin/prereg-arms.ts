@@ -13,9 +13,15 @@
  * driver already reads as "plant nothing", so the empty leg needs no branch anywhere in the lane.
  *
  * Usage: pnpm eval:prereg-arms prereg/<id>.md
+ *
+ * `--csv` prints the arms as a comma-separated list instead of a JSON matrix, and prints nothing at
+ * all when the header names no arm beyond the two baselines. That is what the dispatch needs: an
+ * empty `SOTA_ARMS` used to fall back to a hard-coded `gated,oracle`, so a registration declaring
+ * `arms: full` ran two planted arms it never asked for — R72 bought 7,235 calls of the wrong
+ * experiment that way. The registration is the commitment, so it is also the default.
  */
 import { readFileSync } from 'node:fs';
-import { plantedArmMatrix, readPrereg } from '../prereg.js';
+import { essentialArms, plantedArmMatrix, readPrereg } from '../prereg.js';
 
 function refuse(message: string): void {
   process.stderr.write(`[prereg-arms] ${message}\n`);
@@ -23,9 +29,10 @@ function refuse(message: string): void {
 }
 
 function main(): void {
-  const file = process.argv[2];
+  const csv = process.argv.includes('--csv');
+  const file = process.argv.slice(2).find((entry) => !entry.startsWith('--'));
   if (file === undefined) {
-    refuse('usage: pnpm eval:prereg-arms prereg/<id>.md');
+    refuse('usage: pnpm eval:prereg-arms [--csv] prereg/<id>.md');
     return;
   }
 
@@ -34,6 +41,15 @@ function main(): void {
     for (const problem of reading.problems) {
       refuse(`at ${problem.where}: ${problem.problem}`);
     }
+    return;
+  }
+
+  if (csv) {
+    const arms = essentialArms(reading.prereg.arms);
+    process.stdout.write(arms.join(','));
+    // The empty list is a fact worth printing on the run's page: it says the file asked for the two
+    // baselines and nothing else, which is different from a file whose header failed to parse.
+    process.stderr.write(`[prereg-arms] ${file}: ${arms.join(',') || 'baselines only'}\n`);
     return;
   }
 

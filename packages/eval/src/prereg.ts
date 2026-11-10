@@ -584,21 +584,47 @@ export function facadePairSwitch(prereg: Prereg): boolean {
  * from both sides before the comparison. Order is not a fact here: the lanes fan arms out and sort
  * their own output, so both sides are sorted before they are reported.
  *
- * The relation is **containment, not equality**: every arm a registration declares must be bought,
- * and a dispatch may buy more. R66 is why — its header names `retry-values` and its dispatch buys
- * `retry-blank,retry-values`, because a treatment without its control is not a measurement. Equality
- * would refuse the replay of the only run that produced that reading, which teaches the next author
- * to leave the control out of the dispatch rather than to leave it in the file.
+ * The relation is **equality, in both directions**, and the first version of this function got that
+ * wrong in a way worth recording. It asked only whether every declared arm was bought — which is
+ * vacuously true when the header declares nothing beyond the baselines, and R72's header declares
+ * exactly `full`. A dispatch of `gated,oracle` against it passed the check, ran a different
+ * experiment from the one the file describes, and spent 7,235 calls before the budget forecast
+ * noticed the arithmetic. "Every element of the empty set is bought" is true and useless; the arm a
+ * run buys that its registration never names is the failure mode that costs money, and it is the one
+ * the one-directional reading cannot see.
+ *
+ * The counter-argument for containment was R66: its header names `retry-values` while its dispatch
+ * bought `retry-blank,retry-values`, because a treatment without its control is not a measurement.
+ * The answer is to write the control into the header — it is the commitment, and a commitment that
+ * omits half of what it buys is the defect, not the dispatch. R66's header now names both.
  */
 export function armsAgainstRegistration(
   prereg: Pick<Prereg, 'arms'> | undefined,
   requested: Iterable<string>,
-): { readonly ok: boolean; readonly declared: readonly string[]; readonly requested: readonly string[] } {
-  const essential = (arms: Iterable<string>): readonly string[] =>
-    [...new Set(arms)].filter((arm) => arm !== 'none' && arm !== 'full').sort();
-  const declared = essential(prereg?.arms ?? []);
-  const bought = essential(requested);
+): {
+  readonly ok: boolean;
+  readonly declared: readonly string[];
+  readonly requested: readonly string[];
+  readonly unbought: readonly string[];
+  readonly undeclared: readonly string[];
+} {
+  const declared = essentialArms(prereg?.arms ?? []);
+  const bought = essentialArms(requested);
+  const unbought = declared.filter((arm) => !bought.includes(arm));
+  const undeclared = bought.filter((arm) => !declared.includes(arm));
   // A registration with no header is a hand run: there is no claim to disagree with.
-  const ok = prereg === undefined || declared.every((arm) => bought.includes(arm));
-  return { ok, declared, requested: bought };
+  const ok = prereg === undefined || (unbought.length === 0 && undeclared.length === 0);
+  return { ok, declared, requested: bought, unbought, undeclared };
+}
+
+/**
+ * The arms a header names, minus the two the lane always measures.
+ *
+ * Exported because the dispatch has to *fall back* to this list when no arm menu entry was given:
+ * an empty `SOTA_ARMS` used to fall back to a hard-coded `gated,oracle`, which is a different
+ * experiment from the one most registrations describe. The registration is the commitment, so it is
+ * also the default, and this is the one place that decides what "declared" means.
+ */
+export function essentialArms(arms: Iterable<string>): readonly string[] {
+  return [...new Set(arms)].filter((arm) => arm !== 'none' && arm !== 'full').sort();
 }

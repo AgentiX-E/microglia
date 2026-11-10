@@ -65,7 +65,7 @@ import { writeJson } from './lib.js';
 import { armsAgainstRegistration, readPrereg } from '../prereg.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { join } from 'node:path';
@@ -611,17 +611,40 @@ function armsFrom(raw: string | undefined): Set<ArmName> {
 function armsAgainstPrereg(arms: Set<ArmName>, prereg: string): Set<ArmName> {
   if (prereg === '') return arms;
   const path = `prereg/${prereg}.md`;
-  if (!existsSync(path)) return arms;
+  // A named registration that is not there is not a hand run. It is a misspelt file, and the two
+  // representations of the experiment then disagree in silence — the same shape as the frozen
+  // arm list that made R67 read its arms from a menu default.
+  if (!existsSync(path)) {
+    throw new MicrogliaError('MG_E_CONFIG', `SOTA_PREREG names ${path}, which does not exist`, {
+      prereg: path,
+      listed: readdirSync('prereg').filter((entry) => entry.endsWith('.md')).length,
+    });
+  }
   const reading = readPrereg(readFileSync(path, 'utf8'), path);
   const agreement = armsAgainstRegistration(reading.prereg, [...arms]);
   if (!agreement.ok) {
-    throw new MicrogliaError(
-      'MG_E_CONFIG',
-      `SOTA_ARMS does not match ${path}: the dispatch buys ` +
-        `${agreement.requested.join(', ') || 'nothing'}, the registration declares ` +
-        `${agreement.declared.join(', ') || 'nothing'}`,
-      { prereg: path, declared: [...agreement.declared], requested: [...agreement.requested] },
-    );
+    // Two directions, two sentences. A single "does not match" sentence was what let the first
+    // version of the rule pass a dispatch of `gated,oracle` against a registration declaring only
+    // `full`: with nothing declared, "every declared arm is bought" is vacuously true, and the
+    // sentence a reader would have seen named neither side of the actual disagreement.
+    const detail: string[] = [];
+    if (agreement.undeclared.length > 0) {
+      detail.push(
+        `the dispatch buys ${agreement.undeclared.join(', ')}, which ${path} does not declare`,
+      );
+    }
+    if (agreement.unbought.length > 0) {
+      detail.push(
+        `the registration declares ${agreement.unbought.join(', ')}, which this dispatch does not buy`,
+      );
+    }
+    throw new MicrogliaError('MG_E_CONFIG', `SOTA_ARMS does not match ${path}: ${detail.join('; ')}`, {
+      prereg: path,
+      declared: [...agreement.declared],
+      requested: [...agreement.requested],
+      unbought: [...agreement.unbought],
+      undeclared: [...agreement.undeclared],
+    });
   }
   return arms;
 }

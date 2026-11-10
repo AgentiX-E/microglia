@@ -2,7 +2,7 @@
 id: R66-retry-values
 step: R66
 opened: 2026-11-10
-arms: retry-values
+arms: retry-blank,retry-values
 sample: 1534
 gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V51,V76
 ---

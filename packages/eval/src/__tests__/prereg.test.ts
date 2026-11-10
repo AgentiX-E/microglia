@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   armsAgainstRegistration,
+  essentialArms,
   facadePairSwitch,
   plantedArmMatrix,
   preregGate,
@@ -573,11 +574,11 @@ describe('the arms a dispatch buys against the arms it registers', () => {
       registration('sample-5-first', 'sample-10-oracle', 'sample-5-exec'),
       ['sample-5-exec', 'sample-5-first', 'sample-10-oracle'],
     );
-    expect(agreement).toEqual({
-      ok: true,
-      declared: ['sample-10-oracle', 'sample-5-exec', 'sample-5-first'],
-      requested: ['sample-10-oracle', 'sample-5-exec', 'sample-5-first'],
-    });
+    expect(agreement.ok).toBe(true);
+    expect(agreement.declared).toEqual(['sample-10-oracle', 'sample-5-exec', 'sample-5-first']);
+    expect(agreement.requested).toEqual(['sample-10-oracle', 'sample-5-exec', 'sample-5-first']);
+    expect(agreement.unbought).toEqual([]);
+    expect(agreement.undeclared).toEqual([]);
   });
 
   it('ignores none and full, which every run measures whether or not it says so', () => {
@@ -591,15 +592,35 @@ describe('the arms a dispatch buys against the arms it registers', () => {
     expect(agreement.ok).toBe(false);
     expect(agreement.declared).toEqual(['sample-10-first']);
     expect(agreement.requested).toEqual(['gated', 'oracle']);
+    expect(agreement.undeclared).toEqual(['gated', 'oracle']);
+    expect(agreement.unbought).toEqual(['sample-10-first']);
   });
 
-  it('accepts a dispatch that buys a control the header does not name', () => {
-    // R66's shape: the file names the treatment, the dispatch buys `retry-blank` beside it, because a
-    // treatment without its control is not a measurement. Containment rather than equality is what
-    // keeps that replay possible; equality would teach the next author to drop the control.
+  it('refuses a dispatch against a registration that declares only baselines', () => {
+    // R72's shape, and the defect this rule had for one iteration. The header declares `full`, the
+    // menu was empty, the workflow substituted `gated,oracle`, and the one-directional check asked
+    // "is every declared arm bought" — of an empty list, which is true for any dispatch at all. The
+    // run spent 7,235 calls measuring an experiment its file does not describe.
+    const agreement = armsAgainstRegistration(registration('full'), ['gated', 'oracle']);
+    expect(agreement.declared).toEqual([]);
+    expect(agreement.ok).toBe(false);
+    expect(agreement.undeclared).toEqual(['gated', 'oracle']);
+    expect(agreement.unbought).toEqual([]);
+  });
+
+  it('accepts the baselines alone against a header that declares only baselines', () => {
+    expect(armsAgainstRegistration(registration('full'), ['none', 'full']).ok).toBe(true);
+  });
+
+  it('refuses a dispatch that buys a control its registration does not name', () => {
+    // R66's shape, and the relation is equality rather than containment: the file named the
+    // treatment while the dispatch bought `retry-blank` beside it. The header is the commitment, so
+    // the header was corrected — an arm list that omits half of what it buys is the defect, and a
+    // rule that lets it pass is the rule that let R72 through.
     const agreement = armsAgainstRegistration(registration('retry-values'), ['retry-blank', 'retry-values']);
-    expect(agreement.ok).toBe(true);
-    expect(agreement.requested).toEqual(['retry-blank', 'retry-values']);
+    expect(agreement.ok).toBe(false);
+    expect(agreement.undeclared).toEqual(['retry-blank']);
+    expect(agreement.unbought).toEqual([]);
   });
 
   it('refuses a dispatch that buys fewer arms than the registration declares', () => {
@@ -608,9 +629,17 @@ describe('the arms a dispatch buys against the arms it registers', () => {
       ['sample-5-first'],
     );
     expect(agreement.ok).toBe(false);
+    expect(agreement.unbought).toEqual(['sample-5-exec']);
   });
 
   it('leaves a hand run alone, because there is no claim to disagree with', () => {
     expect(armsAgainstRegistration(undefined, ['gated', 'oracle']).ok).toBe(true);
+  });
+
+  it('drops the baselines, deduplicates and sorts what a header names', () => {
+    // One definition of "declared", used by the check and by the dispatch's fallback: a header read
+    // differently in two places is the shape this whole file exists to close.
+    expect(essentialArms(['none', 'full', 'gated', 'gated', 'oracle'])).toEqual(['gated', 'oracle']);
+    expect(essentialArms(['none', 'full'])).toEqual([]);
   });
 });
