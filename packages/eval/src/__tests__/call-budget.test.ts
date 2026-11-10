@@ -138,3 +138,58 @@ describe('forecastBudget', () => {
     expect(verdict.projected).toBe(2000 + 2640);
   });
 });
+
+describe('forecastBudget under a ceiling', () => {
+  // R74, exactly. Fold 1 cost 5,483 calls, the projection was 29,609, the dispatch had written
+  // 28,000, and the run stopped holding a fifth of its own cost. The ceiling is the number that
+  // says whether the run is affordable; the cap is the number the operator guessed it would be.
+  const r74 = { spent: 5483, cap: 28_000, folds: [{ fold: 0, calls: 5483 }], totalFolds: 5 };
+
+  it('raises its own cap to the projection when the ceiling covers it', () => {
+    const verdict = forecastBudget({ ...r74, ceiling: 32_000 });
+    expect(verdict.ok).toBe(true);
+    expect(verdict.projected).toBe(29_609);
+    // The cap handed back is the one the remaining folds must be bought under, and it is the
+    // projection rather than the ceiling: authorising headroom nobody measured is not the same
+    // decision as authorising the number the folds actually implied.
+    expect(verdict.cap).toBe(29_609);
+    expect(verdict.resized).toBe(true);
+  });
+
+  it('says nothing when the projection fits the cap it was given', () => {
+    const verdict = forecastBudget({ ...r74, cap: 32_000 });
+    expect(verdict.ok).toBe(true);
+    expect(verdict.resized).toBe(false);
+    expect(verdict.cap).toBe(32_000);
+  });
+
+  it('still refuses when the projection does not fit the ceiling', () => {
+    // The ceiling is a commitment about money, so it is the one number that may end a run.
+    const verdict = forecastBudget({ ...r74, ceiling: 29_000 });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.shortfall).toBe(609);
+    // A refused run does not hand back a raised cap: there is nothing to authorise.
+    expect(verdict.cap).toBe(28_000);
+    expect(verdict.resized).toBe(false);
+  });
+
+  it('treats an absent ceiling as the cap, which is what every earlier run meant', () => {
+    const withoutCeiling = forecastBudget(r74);
+    const explicit = forecastBudget({ ...r74, ceiling: 28_000 });
+    expect(withoutCeiling).toEqual(explicit);
+    expect(withoutCeiling.ok).toBe(false);
+  });
+
+  it('will not let a ceiling below the cap shrink the bound', () => {
+    // A dispatch that sends ceiling 20,000 and cap 28,000 has contradicted itself. Reading the
+    // smaller number as the bound would refuse a run the operator explicitly authorised.
+    const verdict = forecastBudget({ ...r74, ceiling: 20_000 });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.shortfall).toBe(1609);
+  });
+
+  it('measures the margin against the ceiling rather than the cap', () => {
+    const verdict = forecastBudget({ ...r74, cap: 28_000, ceiling: 40_000 });
+    expect(verdict.margin).toBe(40_000 - 29_609);
+  });
+});

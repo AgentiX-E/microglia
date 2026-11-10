@@ -1306,6 +1306,8 @@ export {
   type OverlapRow,
 } from './overlap.js';
 
+export { planBudget, type BudgetPlan, type BudgetRequest, type PriorRun } from './budget-plan.js';
+
 export {
   looDraws,
   looGroups,

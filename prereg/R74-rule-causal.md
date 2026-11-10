@@ -129,3 +129,53 @@ The second version of this paragraph claimed the fold made the choice "independe
 which is wrong — the folds partition the questions, so there is nothing to be independent of. The
 correction is recorded rather than deleted because a registration is a document about what was
 believed, and this file has already published one sentence that a fold total refuted.
+
+## Amendment 2 — the cap was an estimate wearing a bound's clothes, and the run paid to find out
+
+**Written after dispatch `42856739453`, which failed 31 minutes in with no artefact.**
+
+Fold 1 completed at **5,483 calls over 4,698 question-arms** — 1.167 per question-arm against the
+1.078 R72 measured, because `loo` renders a degraded pack, degraded SQL errors more often, and the
+repair call is what turns one failure into a second attempt. The forecast after that fold said the run
+needed **29,609** calls; the dispatch had written **28,000**; the lane stopped, wrote a partial
+artefact, and exited 1. **The fold it had just paid for was discarded** — $0.45 of calls spent to
+compute a number that four more folds would have fitted inside 32,000.
+
+The forecast was right. The dispatch's arithmetic was low by 5.7%, which is the *fourth consecutive
+registration* whose estimate was the moving part (R72: 44,000 budgeted, 16,876 spent; R73: 4,000
+budgeted, 851 reached before a stop; R73 Amd 2: 5,600 budgeted, 3,165 spent). Four misses in four
+directions is not carelessness, it is the wrong instrument: a cost table written by hand is a guess
+about a lane whose repair rate changes when its arms change.
+
+**Two defects, one in each layer, and both are now structural.**
+
+1. **An estimate was given a bound's authority.** `forecastBudget` compared the projection against the
+   same number the operator had written as the cap, so an arithmetic miss became a run that died
+   holding a fifth of its own cost. The two are different objects: a projection is what the folds
+   imply, a ceiling is what the operator authorises. **Only the ceiling may end a run now.** A run
+   whose projection exceeds its cap but fits its ceiling raises its own cap to the projection
+   (`LlmClient.authoriseCalls`, upward only, non-finite ignored) and prints that it did; the artefact
+   records `config.budget = { cap, ceiling, cap_in_force }` so the next registration can see the miss
+   rather than rediscover it.
+2. **The estimate was arithmetic in a Markdown table.** `pnpm eval:budget` now derives it from an
+   artefact: the measured rate, the projection, and a ceiling that is a *multiple* rather than a
+   number whenever the requested arm list contains an arm the prior run never evaluated — 1.2× for
+   the 8% miss, which would have produced 33,416 here and the run would have finished.
+
+The second defect has a corollary worth stating because it is the reason the first one existed. A
+number nobody measured cannot be made more accurate by writing it down more precisely, and every
+registration that tried was refining a figure that had no measurement behind it. The tool does not
+make the estimate correct; it makes the *ceiling* wide enough that being wrong is affordable, and it
+prints which arm the width is for.
+
+**Re-dispatched** with `max_calls` 27,846 and `ceiling_calls` 33,416, both from
+`pnpm eval:budget --bird eval/results/poc-sota-bird-train-R72-overlap-gate.json --arms none,full,loo`.
+Everything else is unchanged: three
+arms, `train`, five folds, `learn_sample` 700, `deadline_min` 170.
+
+**What the miss is evidence for, beyond cost.** `loo` costing 8% more calls than `full` is a fact about
+the arm: withholding one rule from the pack makes the model's SQL error more often, which is the first
+direct evidence in this lane that the rules *prevent* malformed queries rather than merely
+contextualising them. If the arm's accuracy is flat while its syntax error rate is higher, that
+separates "the rule helps the model say the right thing" from "the rule helps the model say anything
+at all" — and the second is testable from the same artefact's statements block at zero calls.

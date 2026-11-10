@@ -56,7 +56,10 @@
  *  - `SOTA_SEED`       bootstrap and memory seed; default 7
  *  - `SOTA_GENERALIZE` `false` to distil without scope widening (ablation)
  *  - `SOTA_RESAMPLES`  bootstrap resamples; default 10000, per the protocol
- *  - `POC_MAX_CALLS`   hard call budget; default 8000, sized from a measured five-fold run
+ *  - `POC_MAX_CALLS`   the call budget to forecast against; default 8000, sized from a measured run
+ *  - `POC_CEILING_CALLS` the most the dispatch authorises, when that is more than the forecast;
+ *                      default `POC_MAX_CALLS`, and a run whose forecast exceeds it stops after the
+ *                      fold that measured the miss rather than after paying for the whole run
  *  - `SOTA_DEADLINE_MIN` wall-clock limit for the lane; default 130, under the workflow's step
  *                      timeout, so a run that cannot finish writes down what it measured
  *  - `SOTA_DISTILL_CONCURRENCY` distillation replies in flight at once; default 8
@@ -529,6 +532,16 @@ const THINKING = ((): 'off' | 'on' => {
  */
 const ANSWER_TOKENS = 700;
 const MAX_CALLS = nonNegative(process.env['POC_MAX_CALLS'], 8000);
+
+/**
+ * The most this dispatch authorises, which is not the same number as its forecast.
+ *
+ * A forecast is arithmetic over folds that have not run; a ceiling is a commitment about money. R74
+ * taught the difference the expensive way — 5,483 calls spent on fold 1, a projection of 29,609, a
+ * cap of 28,000, and a run that stopped holding a fifth of its own cost. The forecast now raises the
+ * cap to itself when it fits here, and only this number can end a run.
+ */
+const CEILING_CALLS = Math.max(MAX_CALLS, nonNegative(process.env['POC_CEILING_CALLS'], 0));
 
 /**
  * How many model calls are in flight at once.
@@ -6212,23 +6225,36 @@ async function main(): Promise<void> {
     const forecast = forecastBudget({
       spent: llm.stats.calls,
       cap: MAX_CALLS,
+      ceiling: CEILING_CALLS,
       folds: spend,
       totalFolds: FOLDS,
     });
+    if (forecast.resized) {
+      // The estimate was low and the bound covers it. Raising the cap is the whole point of the
+      // ceiling: the run keeps the fold it paid for, and the artefact says the forecast missed.
+      const raised = llm.authoriseCalls(forecast.cap);
+      process.stdout.write(
+        `[sota] budget forecast after fold ${fold + 1}/${FOLDS}: the run needs about ` +
+          `${forecast.projected} calls, above the ${MAX_CALLS} forecast but inside the ` +
+          `${CEILING_CALLS} ceiling; cap raised to ${raised}\n`,
+      );
+    }
     if (!forecast.ok) {
       process.stdout.write(
         `[sota] budget forecast after fold ${fold + 1}/${FOLDS}: the run needs about ` +
-          `${forecast.projected} calls, the cap is ${MAX_CALLS} (short by ${forecast.shortfall})\n`,
+          `${forecast.projected} calls, the ceiling is ${CEILING_CALLS} ` +
+          `(short by ${forecast.shortfall})\n`,
       );
       await writeStop(
         `the remaining ${FOLDS - spend.length} folds cost about ` +
           `${forecast.projected - llm.stats.calls} more calls at the dearest fold's price, ` +
-          `which the cap of ${MAX_CALLS} cannot cover`,
+          `which the ceiling of ${CEILING_CALLS} cannot cover`,
         0,
         'budget',
       );
-      throw new MicrogliaError('MG_E_BUDGET_EXCEEDED', 'the configured cap cannot finish the folds', {
+      throw new MicrogliaError('MG_E_BUDGET_EXCEEDED', 'the configured ceiling cannot finish the folds', {
         cap: MAX_CALLS,
+        ceiling: CEILING_CALLS,
         spent: llm.stats.calls,
         projected: forecast.projected,
         shortfall: forecast.shortfall,
@@ -6957,6 +6983,13 @@ async function main(): Promise<void> {
       // is not in the record is a knob the next reader has to take on trust, which is the same
       // failure the credential label closed one iteration ago.
       sample_temperature: SAMPLE_TEMPERATURE,
+      // What the dispatch forecast, what it authorised, and what the forecast turned out to be.
+      //
+      // Three numbers because the difference between the first two is a decision the operator made
+      // and the difference between the second and third is a fact the run discovered. A budget gate
+      // that only records the number it enforced cannot say whether the gate was the binding
+      // constraint or the clock was, which is the question every later registration asks.
+      budget: { cap: MAX_CALLS, ceiling: CEILING_CALLS, cap_in_force: llm.callCap },
       breaker_threshold: BREAKER_THRESHOLD,
       generation_cache: generations.stats,
       // True only when this run built a second, unwidened memory. When the run is

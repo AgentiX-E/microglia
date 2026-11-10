@@ -230,6 +230,16 @@ export class LlmClient {
   public readonly configuredModel: string;
 
   private readonly breaker: CircuitBreaker;
+  /**
+   * The ceiling in force, which is not always the one the options named.
+   *
+   * A run that measures its own folds can discover that the operator's forecast was low, and the
+   * choice at that moment is between stopping with the folds it paid for and spending the rest under
+   * a bound it can now see. The bound is still a bound — `authoriseCalls` refuses to lower it — but
+   * the *estimate* stops being able to kill the run, which is the only way a forecast can be wrong
+   * without destroying work.
+   */
+  private cap: number;
   private calls = 0;
   private prompts = 0;
   private failures = 0;
@@ -257,6 +267,25 @@ export class LlmClient {
     this.model = resolved.sent;
     this.configuredModel = options.model;
     this.breaker = new CircuitBreaker(options.breakerThreshold ?? 8);
+    this.cap = options.maxCalls;
+  }
+
+  /** The ceiling in force now, which a run may have raised after measuring its own folds. */
+  public get callCap(): number {
+    return this.cap;
+  }
+
+  /**
+   * Raise the ceiling to `cap`, returning the ceiling in force afterwards.
+   *
+   * Only upward. A call that could lower the ceiling would be a way to fail a run that was running
+   * inside its budget, and "authorise" is not a verb that includes "revoke". A lower argument is
+   * ignored rather than refused: the caller is a forecast that has just measured a *smaller* fold
+   * than the one it replaced, which is good news and not an error.
+   */
+  public authoriseCalls(cap: number): number {
+    if (Number.isFinite(cap) && cap > this.cap) this.cap = Math.trunc(cap);
+    return this.cap;
   }
 
   /**
@@ -306,7 +335,7 @@ export class LlmClient {
         // slept through its own limit would start one more attempt it has no time to finish.
         assertLive();
       }
-      if (this.calls >= this.options.maxCalls) {
+      if (this.calls >= this.cap) {
         throw new MicrogliaError('MG_E_BUDGET_EXCEEDED', 'call budget reached');
       }
       this.calls += 1;

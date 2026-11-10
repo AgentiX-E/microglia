@@ -20,9 +20,13 @@ on:
         required: false
         default: '5'
       max_calls:
-        description: 'Hard model-call budget; the lane forecasts the remaining folds and stops early rather than discarding a run (dev at four arms used 6,504 with a warm distillation cache and about 12,400 cold — a cap of 9,000 stopped R64 after its first fold on 2026-11-09; minidev at four arms needs about 4,100, and a cap of 4,000 stopped R63 after one fold and lost it; train at 6,600 questions over two arms needs about 14,600)'
+        description: 'The model-call forecast this dispatch was sized from; the lane compares each fold against it and raises its own cap to the projection whenever the ceiling below covers that. A cap of 9,000 stopped R64 after its first fold; train at 6,600 questions over two arms needs about 14,600'
         required: false
         default: '8000'
+      ceiling_calls:
+        description: 'The most this dispatch authorises, when that is more than the forecast. Only this number ends a run: a forecast that is low costs a printed line rather than the folds already paid for (R74 spent 5,483 calls on fold 1 to report 29,609 against a 28,000 cap). Empty means the ceiling is the forecast'
+        required: false
+        default: ''
       generalize:
         description: 'Scope widening during distillation (false = ablation)'
         required: false
@@ -55,22 +59,10 @@ on:
         description: 'Result comparison that scores the run: multiset (BIRD official) or set (ROSE baseline); the other is computed alongside'
         required: false
         default: 'multiset'
-      transfer_targets:
-        description: 'Foreign cases each admitted rule is shown (0 disables the transfer measurement)'
-        required: false
-        default: '4'
       # `density_panel` is not an input any more. It is R9.1's panel size — a property of that
       # registration rather than of a run — and it holds the twenty-five-input cap that a second
       # backbone needs. It is read from `vars.SOTA_DENSITY_PANEL`, defaulting to the same `0` this
       # menu defaulted to, so no dispatch that did not set it changes behaviour.
-      density_rules_per_db:
-        description: 'R9.1: rules drawn from each database, by content hash (8 per database is ~1,400 calls at a panel of 20)'
-        required: false
-        default: '8'
-      transfer_panel:
-        description: 'R9.4: questions from other databases each exercised rule is shown (0 disables the foreign arm; 10 is the pre-registered panel)'
-        required: false
-        default: '10'
       # `template` and `sample_temperature` are not inputs. They belong to a pre-registration rather
       # than to a dispatch menu: a foreign-rule form and a sampling temperature are properties of the
       # experiment, not of the run, and a knob nobody sets from the menu is a knob whose default is
@@ -572,16 +564,21 @@ jobs:
           # The registration's own declaration when it makes one, so an experiment that moves the
           # temperature does not move it for every other queued dispatch.
           SOTA_SAMPLE_TEMPERATURE: ${{ steps.temperature.outputs.value || vars.SOTA_SAMPLE_TEMPERATURE || '0.7' }}
-          SOTA_TRANSFER_TARGETS: ${{ github.event.inputs.transfer_targets || '4' }}
+          # The transfer and density knobs are configuration rather than per-dispatch form fields.
+          # Forty registrations never varied them, and a dispatch input nobody varies spends one of
+          # GitHub's twenty-five slots on a constant — the cap that `ceiling_calls` needed, and that
+          # the checker refused to let this file exceed.
+          SOTA_TRANSFER_TARGETS: ${{ vars.SOTA_TRANSFER_TARGETS || '4' }}
           SOTA_DENSITY_PANEL: ${{ vars.SOTA_DENSITY_PANEL || '0' }}
-          SOTA_DENSITY_RULES_PER_DB: ${{ github.event.inputs.density_rules_per_db || '8' }}
-          SOTA_TRANSFER_PANEL: ${{ github.event.inputs.transfer_panel || '10' }}
+          SOTA_DENSITY_RULES_PER_DB: ${{ vars.SOTA_DENSITY_RULES_PER_DB || '8' }}
+          SOTA_TRANSFER_PANEL: ${{ vars.SOTA_TRANSFER_PANEL || '10' }}
           # R10. Empty on a schedule, which the lane reads as the incumbent form: a dispatch that
           # says nothing repeats R9.4 rather than silently becoming the new arm.
           SOTA_TEMPLATE: ${{ vars.SOTA_TEMPLATE || '' }}
           SOTA_SPLIT: ${{ github.event.inputs.split || 'minidev' }}
           SOTA_LEARN_SAMPLE: ${{ github.event.inputs.learn_sample || '0' }}
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '8000' }}
+          POC_CEILING_CALLS: ${{ github.event.inputs.ceiling_calls || '' }}
         run: pnpm eval:sota
 
       - name: Attribute the flips to rules

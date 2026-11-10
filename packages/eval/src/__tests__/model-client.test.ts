@@ -588,3 +588,52 @@ describe('the deadline', () => {
     await expect(instance.chat('p')).resolves.toMatchObject({ text: 'x' });
   });
 });
+
+describe('LlmClient authorising more calls', () => {
+  it('refuses a call past the ceiling it was constructed with', async () => {
+    const { instance } = client([ok('one')], { maxCalls: 1 });
+    await expect(instance.chat('first')).resolves.toMatchObject({ text: 'one' });
+    await expect(instance.chat('second')).rejects.toThrow(/call budget reached/);
+  });
+
+  it('spends a call it was authorised to spend after the fact', async () => {
+    // R74's shape: the run measures a fold, learns its own forecast was low, and is authorised to
+    // keep going. The capability is the whole point — a forecast that can only refuse is a
+    // forecast that converts a 5.7% arithmetic miss into a discarded run.
+    const { instance, seen } = client([ok('one'), ok('two')], { maxCalls: 1 });
+    await instance.chat('first');
+    expect(instance.authoriseCalls(2)).toBe(2);
+    await expect(instance.chat('second')).resolves.toMatchObject({ text: 'two' });
+    expect(seen).toHaveLength(2);
+  });
+
+  it('reports the ceiling in force rather than the one it was built with', () => {
+    const { instance } = client([], { maxCalls: 10 });
+    expect(instance.callCap).toBe(10);
+    instance.authoriseCalls(25);
+    expect(instance.callCap).toBe(25);
+  });
+
+  it('ignores a lower authorisation instead of shrinking a run that is already paying', () => {
+    // A forecast can measure a *cheaper* fold than the one it replaced, and the right response to
+    // good news is not to fail the call the run is in the middle of making.
+    const { instance } = client([], { maxCalls: 40 });
+    expect(instance.authoriseCalls(12)).toBe(40);
+    expect(instance.callCap).toBe(40);
+  });
+
+  it('ignores a non-finite authorisation rather than making the ceiling unbounded', () => {
+    // `Infinity` reaching this field is a NaN sliding through arithmetic in a forecast, and a
+    // ceiling of Infinity is not a budget at all — it is the absence of one, arrived at by accident.
+    const { instance } = client([], { maxCalls: 10 });
+    expect(instance.authoriseCalls(Number.POSITIVE_INFINITY)).toBe(10);
+    expect(instance.authoriseCalls(Number.NaN)).toBe(10);
+  });
+
+  it('keeps the raised ceiling across a burst of concurrent calls', async () => {
+    const { instance } = client([ok('a'), ok('b'), ok('c')], { maxCalls: 1 });
+    instance.authoriseCalls(3);
+    const texts = await Promise.all([instance.chat('1'), instance.chat('2'), instance.chat('3')]);
+    expect(texts.map((text) => text.text)).toEqual(['a', 'b', 'c']);
+  });
+});
