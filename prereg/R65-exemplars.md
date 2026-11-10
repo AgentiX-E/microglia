@@ -139,3 +139,63 @@ code existed and is not being edited: if the re-dispatch lands inside ±4pp, the
 +1.71pp already observed means the re-run cannot be presented as a fresh test of an untested idea —
 only as a properly delivered version of the same one. That is the trade the void clause forces, and it
 is cheaper than publishing a number the arm's own gate refused.
+
+## Outcome 2 — 2026-11-10, run `42729684852` (all gates pass)
+
+Same split, same seed, same folds, budget 1,600 so the registered dose of three exemplars fits:
+
+| reading | value |
+| --- | --- |
+| calls / cost / cache | 1,442 / **$0.1236** / 78.43%, band `off_peak` |
+| `V75-exemplars-delivered` | **pass** — fired 350/350 (100%), capped 6/350 (**1.71%**), mean block **993.4** chars, k=3 |
+| `none` | 51.14% |
+| `full` | 50.86%, −0.29pp [−3.14, +2.57], p = 1.00, 13 gained / 14 lost |
+| `examples` | **56.57%, +5.43pp [+1.43, +9.43], p = 0.0127, 36 gained / 17 lost** |
+| `examples − full` | **+5.71pp [+1.71, +9.71], p = 0.0078, 36 gained / 16 lost** |
+| per fold (gained / lost) | +2, −2, +6, +6, +7 |
+
+This run is valid, and it does not select a branch. +5.43pp is **above** the +4pp closing threshold and
+**below** the +6pp promotion threshold: the registration's branches leave a two-point hole between them,
+and the estimate landed inside it. The same hole exists in R64's refutation (promote at LB > 25%, close
+at UB < 10%), which also returned a result in the unassigned region. Two registrations in one iteration
+produced the same class of defect, so it is the branches' structure and not their numbers.
+
+## Amendment 2 — the branches did not tile, and the replication is the deciding experiment (2026-11-10)
+
+Written before any further dispatch, and it changes the *decision rule* rather than the hypothesis.
+
+**What the two runs say about the instrument.** The arm's prompt content is deterministic: same learn
+rows, same k, same similarity, same rendering, and after Amendment 1 the same budget on 98% of
+questions. Yet the same arm measured **+1.71pp** and **+5.43pp** on two dispatches, and the movement is
+not confined to it:
+
+- `none` — a fixed prompt with no store and no examples — moved **52.00% → 51.14%**;
+- `full` moved **54.00% → 50.86%**, and its store was not the same store: **680 → 684 corrections**,
+  **1,321 → 1,313 active items**, **38 → 42 fresh distillations** against the persisted cache;
+- `examples` moved **53.71% → 56.57%**.
+
+So the between-dispatch spread on 350 questions is about **3–4pp**, which is the same size as the
+within-dispatch bootstrap interval and larger than every effect this record has published below 4pp.
+The interval in an artefact is conditional on the store that was built and the replies that were drawn;
+it is not an interval over dispatches. That is not a reason to distrust the direction — both runs put
+`examples` above `none`, and both put it at or above `full` — it is a reason to stop treating a single
+dispatch as decisive at this resolution.
+
+**The decision rule for the gap.**
+
+1. The gap between +4pp and +6pp is closed as a *region*, by fiat recorded here: **a result in the gap
+   is not promoted and not closed; it is replicated.**
+2. **Replication is the next dispatch**: the same arm, the same split, the same seed, a fresh
+   generation cache, run twice. The estimand is the *pooled* delta over ≥3 valid runs, with the
+   between-run spread reported beside it. Promotion then requires a pooled estimate of **+6pp or more**
+   **and** a between-run spread whose half-width does not swallow the threshold; closing requires a
+   pooled estimate inside ±4pp. A pooled estimate in the gap again ends the line by budget rather than
+   by evidence, and that outcome is named here in advance.
+3. **No dose experiment until the replication is in.** The promotion clause's k = 1, 3, 6 curve would
+   spend three dispatches to explain a +5pp that may itself be a fold draw; a dose curve over an
+   unstable estimate is a curve of noise.
+
+The hypothesis is unchanged: three correct worked examples from the same database are worth *something*
+and the question is whether that something reaches the two digits `oracle` prices. What changes is that
+the answer will now be read off three dispatches rather than one, because this iteration measured how
+much of a one-dispatch answer is the dispatch.
