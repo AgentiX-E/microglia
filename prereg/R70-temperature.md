@@ -2,7 +2,7 @@
 id: R70-temperature
 step: R70
 opened: 2026-11-10
-arms: sample-5-first,sample-5-exec,sample-5-oracle
+arms: sample-5-first,sample-5-exec,sample-5-oracle,sample-5
 sample: 350
 temperature: 1.0
 gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V18,V19,V32,V44,V48,V51
@@ -37,7 +37,18 @@ or neither.
 
 ## The design, exactly
 
-- The arms are R69's five-draw arms, unchanged: `sample-5-first`, `sample-5-exec`, `sample-5-oracle`.
+- The arms are R69's five-draw arms: `sample-5-first`, `sample-5-exec`, `sample-5-oracle`, plus
+  **`sample-5`** — majority over the largest agreeing group, the self-consistency every published
+  pipeline uses and this lane has never run at k = 5. It costs **zero** calls: it reads draws the
+  dispatch already bought, which is why it is registered here rather than in a dispatch of its own.
+- **Why majority is here and not in R69.** Computed offline from R67's recorded pool, majority at
+  k = 5 is **51.71%** against `first`'s 50.86% — **+0.86pp, 9.7% of the ceiling**, indistinguishable
+  from the coin flip that `sample-5-exec` and `sample-5-random` both scored. That is what a pool of
+  near-duplicates implies (T = 0.7, 1,750 candidates, median distinct results per question well under
+  the draws), and it is the reason heat is the next variable rather than more draws: self-consistency
+  needs disagreement to vote on. If T = 1.0 makes majority worth something, the mechanism is
+  diversity; if it does not, voting is dead on this lane and the eight remaining points are a
+  *reading* problem, which is R71.
 - **The only thing that changes is the temperature**, now declared in this header: `temperature: 1.0`
   against R69's lane default of 0.7. Same 350 questions, same five folds, same prompt, same judge,
   same backbone, same day.
@@ -49,8 +60,10 @@ or neither.
 - **The ceiling rises and the baseline falls.** `oracle − first` at **+10…+20pp** against R69's same-
   dispatch k = 5 ceiling, with `sample-5-first` **2–5pp below** R69's `sample-5-first`. A hotter first
   draw is a worse answer, and a pool's gains are paid for out of the baseline it is measured against.
-- **The selector stays at chance.** `exec − first` under +3pp. If heat makes execution shape
-  informative, that contradicts R67's mechanism and the contradiction is the finding.
+- **The selector stays at chance, and voting does not.** `exec − first` under +3pp, while
+  **`sample-5 − first` reaches at least +2pp** — the prediction that separates "the draws are too
+  alike to vote" from "voting does not work here". The two are different futures: the first says buy
+  heat, the second says stop buying draws.
 - **`V3-parse-rate` holds at 100%.** Temperature changes which answer is drawn, not the format it is
   drawn in; a parse failure here would mean the hotter draw is a different kind of failure.
 - **The draw count is 5 for every arm** and `V18`/`V19` reconcile every candidate, so a null result
