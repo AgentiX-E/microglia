@@ -63,6 +63,17 @@ variable moved, which is more than the published rows can say.
 - Cost, stated before the run: 350 questions × (1 + 5 + 5) draws ≈ 3,850 calls per dispatch, two
   dispatches, no new harness code. R67's three arms are the reference row and are not re-bought.
 
+### The instrument gap this registration found before it could be dispatched
+
+`SOTA_MODEL` is read from a **repository variable**, not from a dispatch input, and the distillation
+cache key two steps above the run reads the same variable. So a backbone swap is currently a
+repository-wide mutation that every later dispatch inherits, and the cache key moves with it — which
+means two backbones cannot be run side by side, and a forgotten variable would silently key a cache
+on one model while the lane calls another. That is the same defect shape as the credential: the
+value existed, the *per-run* choice of it did not. A `model` input on the workflow, with the secret
+that pairs with it, is the work that has to land between this registration and its dispatch, and it
+is listed here rather than discovered after a wasted run.
+
 ## Prediction
 
 - **The second backbone is much weaker on `first`**: 25–45% against this lane's 56.71%, which is the
