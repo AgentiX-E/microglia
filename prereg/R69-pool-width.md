@@ -26,6 +26,35 @@ inside the double-priced window. One pass of ten draws contains the five-draw po
 so adding the k = 5 arms costs **zero calls** and turns the width effect from a comparison across two
 dispatches into a paired difference within one.
 
+## Outcome 0 — void before the first model call, twice, on a shell quote (2026-11-10)
+
+The first dispatch, `42794305166`, and R68's first dispatch beside it, `42794459960`, both died **one
+second** into the BIRD job, at `Resolve the sampling temperature` — the step this iteration added.
+
+The step ended with `echo "${VALUE:-the lane's default (…)}"`. Inside the `word` part of a parameter
+expansion the shell parses quote characters **even though the whole expansion sits inside double
+quotes**, so the apostrophe opened a string that never closed:
+
+```
+/home/runner/work/_temp/….sh: line 10: unexpected EOF while looking for matching `'
+Process completed with exit code 2.
+```
+
+Reproduced locally in one line before the re-dispatch (`bash t.sh` → exit 2), which is what the local
+rehearsal of a new workflow step is for and what this iteration skipped: the step was written,
+committed and dispatched without ever being executed.
+
+The cost is the smallest this class can have — two dispatches, no model calls, no artefact, no folds
+— and the fix is not the sentence but the **checker**: `scripts/check-workflows.py` now runs `bash -n`
+over every `run:` block in every workflow. It parses and does not execute, so no step runs, and it
+catches the whole class — an unbalanced quote, a missing `fi`, an unclosed heredoc — in five files
+rather than in the one that broke. Two self-test cases were added beside it: the apostrophe case that
+would have failed, and a well-formed loop that must stay clean.
+
+This is the fourth instance of one shape in three iterations: a value existed, the place that reads it
+existed, and nothing checked that the two agreed. The first three were registrations against arms;
+this one was a workflow against a parser.
+
 ## Why this file exists
 
 R67 measured the pool for the first time and the result is not ambiguous: five draws at T = 0.7

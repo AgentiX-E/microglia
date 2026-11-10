@@ -12,6 +12,16 @@ gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V51
 **Registered** 2026-11-10, undispatched, and it depends on R67 having been dispatched first. **Two
 dispatches from the start** (Rule 13).
 
+## Outcome 0 — void before the first model call (2026-11-10)
+
+Dispatch `42794459960` died one second into the BIRD job at `Resolve the sampling temperature`, the
+step R69's iteration added: an apostrophe inside a parameter expansion opened a shell string that
+never closed. No model was called, no fold was written. The defect, the reproduction and the checker
+that now refuses the whole class are recorded in `R69-pool-width.md` § Outcome 0 — one place, because
+it is one bug and this file would be a second copy of it.
+
+The registration is unchanged and the dispatch is repeated.
+
 ## Why this file exists
 
 The comparison this project keeps being asked about is a 7B model: DPC's re-runs put

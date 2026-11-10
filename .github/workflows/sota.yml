@@ -458,10 +458,19 @@ jobs:
             VALUE=$(pnpm --silent eval:prereg-temperature "prereg/${PREREG}.md")
           fi
           echo "value=$VALUE" >> "$GITHUB_OUTPUT"
+          # No `${VALUE:-word}` here, and that is a fix rather than a style: inside the `word` part
+          # of a parameter expansion the shell parses quotes even though the whole thing sits inside
+          # double quotes, so the apostrophe in an English sentence opened a string that never
+          # closed. R69's and R68's first dispatches both died on it in one second, before a single
+          # model call - a shell expansion is not inside the quotes it appears to be inside.
           {
             echo "### Sampling temperature"
             echo
-            echo "${VALUE:-the lane's default (\`vars.SOTA_SAMPLE_TEMPERATURE\`)}"
+            if [ -n "$VALUE" ]; then
+              echo "declared by the registration: $VALUE"
+            else
+              echo "the lane default, from vars.SOTA_SAMPLE_TEMPERATURE"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Run the benchmark

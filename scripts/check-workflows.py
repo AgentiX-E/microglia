@@ -108,6 +108,51 @@ def literal_checks(path: Path, name) -> list[str]:
     return failures
 
 
+def shell_syntax(document: dict, name) -> list[str]:
+    """Every `run:` block must be a shell script bash can parse.
+
+    The cap and the runner were the only things checked here, and R69's first dispatch paid for the
+    gap: its new step wrote ```echo "${VALUE:-the lane's default}"```, and inside the `word` part of a
+    parameter expansion the shell parses quotes even though the whole thing sits inside double
+    quotes. The apostrophe opened a string that never closed, the step died in one second, and the
+    dispatch was over before its first model call. Two dispatches died that way, on a step whose
+    only job was printing one word into a summary.
+
+    `bash -n` is a parse and not an execution: no step runs, no variable is read, and the file's
+    `${{ }}` expressions are just characters to the parser. It is the cheapest check that would have
+    caught this, and it catches the whole class -- an unbalanced quote, a missing `fi`, a heredoc
+    that is never closed -- in every workflow in the repository rather than in the one that broke.
+    """
+    import subprocess
+
+    failures: list[str] = []
+    jobs = document.get("jobs") or {}
+    if not isinstance(jobs, dict):
+        return failures
+    for job, body in jobs.items():
+        if not isinstance(body, dict):
+            continue
+        steps = body.get("steps")
+        if not isinstance(steps, list):
+            continue
+        for index, step in enumerate(steps):
+            if not isinstance(step, dict):
+                continue
+            script = step.get("run")
+            if not isinstance(script, str):
+                continue
+            parsed = subprocess.run(
+                ["bash", "-n"], input=script, text=True, capture_output=True, check=False
+            )
+            if parsed.returncode != 0:
+                detail = (parsed.stderr or "").strip().splitlines()
+                failures.append(
+                    f"{name}: job `{job}` step {index + 1} does not parse as a shell script: "
+                    f"{detail[-1] if detail else 'bash -n refused it'}"
+                )
+    return failures
+
+
 def check(path: Path) -> list[str]:
     failures: list[str] = []
     # A path outside the repository is still a workflow file to whoever handed it over, and a check
@@ -166,6 +211,7 @@ def check(path: Path) -> list[str]:
                 failures.append(f"{name}: job `{job}` is not a mapping")
             elif "runs-on" not in body:
                 failures.append(f"{name}: job `{job}` names no runner")
+    failures.extend(shell_syntax(document, name))
     return failures
 
 
@@ -183,6 +229,7 @@ def self_test() -> int:
         job_runner: bool = True,
         duplicate: str | None = None,
         base: int = 2,
+        step_run: str | None = None,
     ) -> str:
         # `base` exists so one case can nest the block deeper: the counter derives its indent from the
         # `inputs:` line, and a case that only ever fed it one indentation would agree with a version
@@ -211,7 +258,13 @@ def self_test() -> int:
         tail = ["jobs:", "  build:"]
         if job_runner:
             tail.append("    runs-on: ubuntu-latest")
-        tail.append("    steps: []")
+        if step_run is None:
+            tail.append("    steps: []")
+        else:
+            tail.append("    steps:")
+            tail.append("      - name: a step")
+            tail.append("        run: |")
+            tail.extend(f"          {line}" for line in step_run.rstrip("\n").split("\n"))
         return "\n".join(header + body + tail) + "\n"
 
     cases: list[tuple[str, str, bool, str | None]] = [
@@ -236,6 +289,20 @@ def self_test() -> int:
         ),
         ("a job without a runner is refused", workflow(2, job_runner=False), False, "names no runner"),
         ("a file that is not YAML is refused", "on: [unclosed\n", False, "does not parse"),
+        # The case R69 and R68 paid for: `set -euo pipefail` and an English sentence inside a
+        # parameter expansion. A checker that only counted inputs and runners called this file clean.
+        (
+            "a step bash cannot parse is refused",
+            workflow(2, step_run='VALUE=""\necho "${VALUE:-the lane\'s default}"\n'),
+            False,
+            "does not parse as a shell script",
+        ),
+        (
+            "a step that is a valid script is clean",
+            workflow(2, step_run='VALUE=""\nfor x in a b; do echo "$x"; done\n'),
+            True,
+            None,
+        ),
     ]
     failures = 0
     with tempfile.TemporaryDirectory() as directory:
@@ -287,7 +354,10 @@ def main(argv: list[str]) -> int:
             print(f"workflow: {line}")
         return 1
     if HAS_YAML:
-        print(f"workflow: {len(paths)} file(s) parse, declare at most {MAX_INPUTS} inputs, and name runners")
+        print(
+            f"workflow: {len(paths)} file(s) parse, declare at most {MAX_INPUTS} inputs, name runners, "
+            "and every run: block is a script bash can parse"
+        )
     else:
         print(f"workflow: {len(paths)} file(s) declare at most {MAX_INPUTS} inputs; PyYAML is absent, so "
               "they were counted rather than parsed")
