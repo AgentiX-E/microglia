@@ -13,14 +13,14 @@ describe('planBudget', () => {
     expect(plan.measured).toBe(true);
   });
 
-  it('prices a third arm above what a two-arm rate would project, because the arm is unmeasured', () => {
+  it('prices a new arm above what a measured rate would project, because the arm is unmeasured', () => {
     // R74's dispatch. The projection from R72's rate is 27,846 and the run measured 29,609, so the
-    // ceiling is what carries the difference — 1.2 × 27,846 = 33,416, which covers it.
+    // ceiling is what carries the difference — 1.3 × 27,846 = 36,200, which covers it.
     const plan = planBudget(r72, { arms: ['none', 'full', 'loo'] });
     expect(plan.projected).toBe(27_846);
     expect(plan.unmeasured).toEqual(['loo']);
     expect(plan.measured).toBe(false);
-    expect(plan.ceiling).toBe(33_416);
+    expect(plan.ceiling).toBe(36_200);
     expect(plan.ceiling).toBeGreaterThan(29_609);
   });
 
@@ -88,5 +88,45 @@ describe('planBudget', () => {
     const bare = Math.ceil(7_829 * 2 * plan.ratePerQuestionArm);
     expect(plan.projected).toBe(bare);
     expect(plan.ceiling).toBe(Math.ceil(bare * 1.5));
+  });
+});
+
+describe('planBudget counting draws rather than arms', () => {
+  // R68, as it actually went: a prior of two five-draw sampling arms and a request of three of them.
+  const r73: PriorRun = { calls: 3_165, questions: 350, arms: ['none', 'full', 'sample-5-first', 'sample-5-assert'], folds: 5 };
+  const draws = { none: 1, full: 1, 'sample-5-first': 5, 'sample-5-assert': 5, 'sample-5-exec': 5, 'sample-5-oracle': 5 };
+
+  it('charges a five-draw arm five times what a plain arm costs', () => {
+    // The weights apply to the prior as well, which is the whole point: a plan priced with two
+    // denominators is a ratio between two different measurements.
+    const plain = planBudget(r73, { arms: ['none', 'full'], weights: draws });
+    const sampled = planBudget(r73, { arms: ['none', 'full', 'sample-5-first'], weights: draws });
+    // Two draws in the first, seven in the second.
+    expect(sampled.projected / plain.projected).toBeCloseTo(3.5, 1);
+  });
+
+  it('reproduces the improvement over the draw-blind projection that R68 paid for', () => {
+    // Blind: 350 × 4 arms × the per-arm rate = 4,179, and the run needed 5,638 — 35% short.
+    // Counted: 350 × 16 draws × the per-draw rate = 4,642 — 18% short, and the 130% ceiling covers it.
+    const plan = planBudget(r73, {
+      arms: ['none', 'sample-5-first', 'sample-5-exec', 'sample-5-oracle'],
+      weights: draws,
+    });
+    expect(plan.projected).toBe(4_642);
+    expect(plan.ceiling).toBeGreaterThan(5_638);
+  });
+
+  it('prices the prior with the same weights as the request, or the rate is measured against a lie', () => {
+    // A prior with twelve draws' worth of arms and a denominator of four would report a rate three
+    // times too high, and every later projection would inherit the error.
+    const plan = planBudget(r73, { arms: ['none', 'full'], weights: draws });
+    expect(plan.ratePerQuestionArm).toBeCloseTo(3_165 / (350 * 12), 6);
+  });
+
+  it('treats an absent or nonsense weight as one call rather than as free', () => {
+    const plan = planBudget(r73, { arms: ['none', 'full', 'mystery'], weights: { none: 1, full: 1, mystery: 0 } });
+    const blind = planBudget(r73, { arms: ['none', 'full', 'mystery'] });
+    expect(plan.projected).toBe(blind.projected);
+    expect(plan.projected).toBeGreaterThan(0);
   });
 });

@@ -1309,6 +1309,16 @@ export {
 export { planBudget, type BudgetPlan, type BudgetRequest, type PriorRun } from './budget-plan.js';
 
 export {
+  relabelReading,
+  relabelVerdict,
+  type GradedArm,
+  type GradedPair,
+  type RelabelCase,
+  type RelabelReading,
+  type RelabelVerdict,
+} from './relabel.js';
+
+export {
   looDraws,
   looGroups,
   looOverall,

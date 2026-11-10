@@ -42,6 +42,19 @@ export type PriorRun = {
 export type BudgetRequest = {
   /** The arms the new dispatch will evaluate. */
   readonly arms: readonly string[];
+  /**
+   * How many model calls one question costs in each arm.
+   *
+   * **The per-arm rate was the second defect in this module and R68 found it.** The first version
+   * priced an arm as an arm, so a dispatch of three five-draw sampling arms projected 4,179 calls and
+   * measured 5,638: the arms cost five draws each, and the count that matters is draws rather than
+   * arms. A `sample-5-*` arm is five calls per question and a `full` arm is one, so a run of three
+   * sampling arms costs fifteen times a question and a run of two costs ten.
+   *
+   * Absent means every arm costs one call, which is right for the plain arms and is what the
+   * single-draw runs in this repository actually did.
+   */
+  readonly weights?: Readonly<Record<string, number>>;
   /** Questions to draw; defaults to the prior run's population. */
   readonly questions?: number;
   /** Folds; defaults to the prior run's. */
@@ -53,18 +66,22 @@ export type BudgetRequest = {
    */
   readonly safetyPct?: number;
   /**
-   * The multiple applied when part of the arm list has no measured rate. Defaults to 120.
+   * The multiple applied when part of the arm list has no measured rate. Defaults to 130.
    *
-   * Twenty percent because the one case on record was 8%: R74's `loo` arm cost 1.167 calls per
-   * question-arm against the 1.078 R72 measured, and a multiple has to cover the miss it is for with
-   * room for the next one. It is a multiple rather than a rate for a reason the lane has now learned
-   * four times: a number nobody measured cannot be improved by being written down more precisely.
+   * Two cases are on record and they are different sizes. R74 added one plain arm to a plain pair and
+   * cost 8% more than the projection; R68 replaced a two-sampling-arm run with a three-sampling-arm
+   * one and cost 35% more, or 18% once the projection learned to count draws rather than arms. A
+   * multiple has to cover the *next* miss rather than the last one, and the misses so far have been
+   * structural — a new arm is exactly the case where a measured rate cannot apply — so the default is
+   * 130: enough for both cases on record with room for a third, and still a bound rather than an
+   * unlimited licence, since a run that exceeds it is a run whose registration was wrong about its own
+   * shape.
    */
   readonly unmeasuredPct?: number;
 };
 
 export type BudgetPlan = {
-  /** Measured calls per question per arm in the prior run; zero when the prior is unusable. */
+  /** Measured calls per question per draw in the prior run; zero when the prior is unusable. */
   readonly ratePerQuestionArm: number;
   /** Calls the new dispatch is expected to spend. */
   readonly projected: number;
@@ -79,7 +96,7 @@ export type BudgetPlan = {
 };
 
 const DEFAULT_SAFETY_PCT = 110;
-const DEFAULT_UNMEASURED_PCT = 120;
+const DEFAULT_UNMEASURED_PCT = 130;
 
 export function planBudget(prior: PriorRun, request: BudgetRequest): BudgetPlan {
   const questions = request.questions ?? prior.questions;
@@ -103,13 +120,21 @@ export function planBudget(prior: PriorRun, request: BudgetRequest): BudgetPlan 
     };
   }
 
-  const rate = prior.calls / (prior.questions * prior.arms.length);
+  // The prior's own weights, so a sampling run is not measured with a draw-blind denominator. A prior
+  // whose arms do not all cost one call is priced by the same weighting the request will be.
+  const weightOf = (arm: string): number => {
+    const weighted = request.weights?.[arm];
+    return weighted !== undefined && weighted > 0 ? weighted : 1;
+  };
+  const priorWeight = prior.arms.reduce((sum, arm) => sum + weightOf(arm), 0);
+  const requestWeight = arms.reduce((sum, arm) => sum + weightOf(arm), 0);
+  const rate = prior.calls / (prior.questions * priorWeight);
   const safetyPct = request.safetyPct ?? DEFAULT_SAFETY_PCT;
   // Ceiled once, on the product, so the projected number and the ceiling cannot disagree about the
   // rounding of an intermediate figure. `Math.round` per term would let a four-fold projection
   // differ from four single-fold projections by a call, which reads as a lane that is inconsistent
   // with itself.
-  const projected = Math.ceil((questions * arms.length * rate * safetyPct) / 100);
+  const projected = Math.ceil((questions * requestWeight * rate * safetyPct) / 100);
   const unmeasuredPct = request.unmeasuredPct ?? DEFAULT_UNMEASURED_PCT;
   const ceiling = measured ? projected : Math.ceil((projected * unmeasuredPct) / 100);
 

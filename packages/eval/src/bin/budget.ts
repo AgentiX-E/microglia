@@ -23,7 +23,7 @@
  * Zero calls.
  */
 import { readFileSync } from 'node:fs';
-import { planBudget, type PriorRun } from '@agentix-e/microglia-eval';
+import { planBudget, samplingSpecOf, type PriorRun } from '@agentix-e/microglia-eval';
 import { birdArtefactPath } from './lib.js';
 
 type Artefact = {
@@ -88,7 +88,15 @@ export function main(argv: readonly string[]): number {
   const requestQuestions = numberOf(flag(argv, 'questions')) ?? prior.questions;
   const requestFolds = numberOf(flag(argv, 'folds')) ?? prior.folds;
 
-  const plan = planBudget(prior, { arms, questions: requestQuestions, folds: requestFolds });
+  // Draws, not arms. A `sample-5-*` arm costs five calls per question, and a projection that counted
+  // it as one is what let R68 be dispatched at 4,179 calls for a run that needed 5,638. The weight is
+  // read from the same `samplingSpecOf` the lane dispatches with, so a new selector cannot arrive with
+  // a cost nobody modelled.
+  const weights: Record<string, number> = {};
+  for (const arm of new Set([...prior.arms, ...arms])) {
+    weights[arm] = samplingSpecOf(arm)?.n ?? 1;
+  }
+  const plan = planBudget(prior, { arms, questions: requestQuestions, folds: requestFolds, weights });
 
   process.stdout.write(`[budget] prior      ${path}\n`);
   process.stdout.write(
@@ -104,8 +112,10 @@ export function main(argv: readonly string[]): number {
   }
 
   process.stdout.write(
-    `[budget] rate       ${plan.ratePerQuestionArm.toFixed(4)} calls per question per arm\n`,
+    `[budget] rate       ${plan.ratePerQuestionArm.toFixed(4)} calls per question per draw\n`,
   );
+  const draws = arms.reduce((sum, arm) => sum + (weights[arm] ?? 1), 0);
+  process.stdout.write(`[budget] draws      ${String(draws)} per question (${arms.map((arm) => `${arm}×${String(weights[arm] ?? 1)}`).join(', ')})\n`);
   process.stdout.write(
     `[budget] request    ${requestQuestions} questions × ${arms.length} arm(s) × ${requestFolds} fold(s)` +
       ` — ${arms.join(',')}\n`,
@@ -113,7 +123,7 @@ export function main(argv: readonly string[]): number {
   process.stdout.write(`[budget] projected  ${plan.projected}\n`);
   process.stdout.write(
     `[budget] ceiling    ${plan.ceiling}` +
-      (plan.measured ? ' (equal: every arm has a measured rate)\n' : ` (1.2× because ${plan.unmeasured.join(',')} is unmeasured)\n`),
+      (plan.measured ? ' (equal: every arm has a measured rate)\n' : ` (1.3× because ${plan.unmeasured.join(',')} is unmeasured)\n`),
   );
   return 0;
 }

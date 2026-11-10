@@ -74,6 +74,7 @@
     "eval:assertion": "tsx packages/eval/src/bin/assertion.ts",
     "eval:loo": "tsx packages/eval/src/bin/loo.ts",
     "eval:budget": "tsx packages/eval/src/bin/budget.ts",
+    "eval:relabel": "tsx packages/eval/src/bin/relabel.ts",
     "eval:harm": "tsx packages/eval/src/bin/harm-strata.ts",
     "eval:power": "tsx packages/eval/src/bin/power-audit.ts",
     "eval:query-diff": "tsx packages/eval/src/bin/query-diff.ts",
