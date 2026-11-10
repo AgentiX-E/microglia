@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 177,
+  "scanned": 178,
   "totals": {
-    "modules": 177,
-    "lines": 47411,
+    "modules": 178,
+    "lines": 47687,
     "adapterLines": 1956,
-    "deferredLines": 7689,
-    "coupledShare": 0.2008
+    "deferredLines": 7761,
+    "coupledShare": 0.2011
   },
   "layers": [
     {
@@ -37,10 +37,10 @@
     },
     {
       "layer": "eval",
-      "modules": 120,
-      "lines": 34336,
+      "modules": 121,
+      "lines": 34612,
       "adapterLines": 0,
-      "deferredLines": 7689,
+      "deferredLines": 7761,
       "coupled": 20
     },
     {
@@ -165,7 +165,7 @@
       "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 463,
+      "lines": 466,
       "words": [
         "sql",
         "sqlite",
@@ -292,7 +292,7 @@
       "pkg": "eval",
       "module": "sota",
       "path": "packages/eval/src/sota.ts",
-      "lines": 2400,
+      "lines": 2469,
       "words": [
         "sql",
         "sqlite",
@@ -491,6 +491,13 @@
       ]
     },
     {
+      "pkg": "eval",
+      "module": "overlap",
+      "words": [
+        "bird"
+      ]
+    },
+    {
       "pkg": "core",
       "module": "pack",
       "words": [
@@ -597,7 +604,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "177 modules, 20 deferred with a reason"
+      "detail": "178 modules, 20 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -612,5 +619,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 47411 production lines across 177 modules: 7 adapter modules in `sql`, 20 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 47687 production lines across 178 modules: 7 adapter modules in `sql`, 20 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }

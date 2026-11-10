@@ -1273,6 +1273,16 @@ export {
   type ContentSignalName,
 } from './content-signal.js';
 
+export {
+  OVERLAP_ROUTED_THRESHOLD,
+  OVERLAP_THRESHOLD,
+  crossFittedThresholds,
+  overlapTerciles,
+  overlapWordsOf,
+  packOverlapOf,
+  type OverlapRow,
+} from './overlap.js';
+
 export { BoundedSql, type BoundedSqlOptions, type StatementResult } from '@agentix-e/microglia-sql';
 
 export {

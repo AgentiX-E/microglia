@@ -84,6 +84,9 @@ export const DEFERRALS: Readonly<Record<string, string>> = {
   'content-signal':
     'compares the question\'s own words against a candidate\'s column names and literals; it reads ' +
     'strings and executes nothing',
+  overlap:
+    'measures how much of a question a pack\'s rendered text accounts for; it reads strings that were ' +
+    'recorded before it ran and executes nothing',
   'bird-data': 'the dataset loader; opens SQLite to read a corpus rather than to answer a question',
   'bird-rows': 'the corpus row shapes, not a query',
   coupling: 'the scanner itself: it defines the word list, so it necessarily contains every word on it',
