@@ -19,6 +19,10 @@ export type ArtifactPoolCandidate = {
   readonly correct: boolean;
   readonly resultKey: number;
   readonly signature: ExecSignature | null;
+  /** The query the draw produced, from R69's successor onward. */
+  readonly sql?: string;
+  /** The result's column names, from R69's successor onward. */
+  readonly columns?: readonly string[] | null;
 };
 
 /** One case of `per_case`, with only the fields the pool needs. */
@@ -96,6 +100,10 @@ export function poolFromArtifact(
       correct: candidate.correct,
       resultKey: candidate.resultKey,
       signature: candidate.signature,
+      // Carried through only when the file recorded them, so a content reading can tell "no query
+      // was written here" from "this artefact predates the field".
+      ...(candidate.sql === undefined ? {} : { sql: candidate.sql }),
+      ...(candidate.columns === undefined ? {} : { columns: candidate.columns }),
     }));
     questions.push({
       id: entry.id,
@@ -103,6 +111,7 @@ export function poolFromArtifact(
       candidates,
       // Carried through only when present, so a reader can tell an unrecorded database from a
       // database called '' without asking the artefact which version wrote it.
+      question: entry.question,
       ...(entry.dbId === undefined ? {} : { dbId: entry.dbId }),
       ...(entry.fold === undefined ? {} : { fold: entry.fold }),
     });

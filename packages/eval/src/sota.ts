@@ -2376,3 +2376,24 @@ export function failureKind(failure: string): FailureKind {
   if (text.includes('different values')) return 'values';
   return 'other';
 }
+
+/**
+ * The best of the first `width` draws, which is what a ceiling arm claims to be.
+ *
+ * R69 registered `sample-5-oracle` beside `sample-10-oracle` and published one row: the search kept
+ * the first oracle arm in union order, and the row it kept read the pool whole — so a run that took
+ * ten draws reported the ten-draw best under a name that says five, and the ten-draw arm did not
+ * exist at all. The registration's primary estimand was the difference between those two rows.
+ *
+ * The width is a property of the arm, so slicing belongs here rather than in the lane: a ceiling is
+ * "the best of the n draws this arm names", and two ceilings are only comparable when each is read
+ * at its own n. A question whose draws were all wrong still yields a candidate — the fallback — so
+ * the arm is scored on the same population as every other one instead of dropping out of the pair.
+ */
+export function ceilingAmong<T extends { readonly correct: boolean }>(
+  verdicts: readonly T[],
+  width: number,
+): T | undefined {
+  const pool = verdicts.slice(0, Math.max(1, width));
+  return pool.find((verdict) => verdict.correct) ?? pool[0];
+}

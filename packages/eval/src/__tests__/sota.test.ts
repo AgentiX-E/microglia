@@ -10,6 +10,7 @@ import {
   armPairBetween,
   armPairsAgainstFull,
   buildValidityGates,
+  ceilingAmong,
   contrastTable,
   priorScopeOf,
   samplingSpecOf,
@@ -3159,5 +3160,43 @@ describe('rawEventVerbatim', () => {
       verbatim: 0,
       sample: 'Schema: SELECT 1',
     });
+  });
+});
+
+describe('ceilingAmong', () => {
+  // R69's primary estimand was `ceiling(10) − ceiling(5)`, and the lane published one row: the
+  // search kept the first oracle arm and the ceiling read the pool whole. These tests are written
+  // against that failure rather than around it.
+  const verdicts = [
+    { correct: false },
+    { correct: false },
+    { correct: false },
+    { correct: false },
+    { correct: false },
+    { correct: false },
+    { correct: true },
+    { correct: false },
+    { correct: false },
+    { correct: false },
+  ];
+
+  it('reads only the draws the arm names', () => {
+    // The right answer is the seventh draw. A five-draw ceiling must not see it — that is precisely
+    // what makes `ceiling(10) − ceiling(5)` a measurement instead of a relabelling.
+    expect(ceilingAmong(verdicts, 5)).toBe(verdicts[0]);
+    expect(ceilingAmong(verdicts, 10)).toBe(verdicts[6]);
+  });
+
+  it('falls back to the first draw when every draw is wrong, so the arm keeps its population', () => {
+    const wrong = verdicts.map(() => ({ correct: false }));
+    expect(ceilingAmong(wrong, 5)).toBe(wrong[0]);
+  });
+
+  it('treats a width below one as one draw rather than as an empty ceiling', () => {
+    expect(ceilingAmong(verdicts, 0)).toBe(verdicts[0]);
+  });
+
+  it('has no ceiling for a question that produced no draws', () => {
+    expect(ceilingAmong([], 5)).toBeUndefined();
   });
 });

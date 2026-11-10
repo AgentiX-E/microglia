@@ -111,6 +111,7 @@ import {
   LlmClient,
   stoppedRun,
   buildValidityGates,
+  ceilingAmong,
   canonicalRows,
   comparePaired,
   creditHistogram,
@@ -300,6 +301,7 @@ import {
   outcomeOf,
   unexecuted,
   type QueryOutcome,
+  type ValidityGate,
 } from '@agentix-e/microglia-eval';
 
 const DATASET_REPO = 'https://huggingface.co/datasets/birdsql/bird_mini_dev';
@@ -5049,7 +5051,7 @@ async function runFold(
    * three-draw run asking for `sample-5-oracle` would be reporting the best of three under a name
    * that says five.
    */
-  const ceilingArm = (OPTIONAL_ARMS as readonly ArmName[]).find(
+  const ceilingArms = (OPTIONAL_ARMS as readonly ArmName[]).filter(
     (arm) => samplingSpecOf(arm)?.selector === 'oracle' && ARMS.has(arm),
   );
   /**
@@ -5063,7 +5065,7 @@ async function runFold(
    *
    * It costs nothing: every draw is judged anyway so the chosen one can be scored.
    */
-  const wantsCeiling = ceilingArm !== undefined;
+  const wantsCeiling = ceilingArms.length > 0;
   const sampleReplies = new Map<string, Reply | undefined>();
   const drawJudged = new Map<number, Judged[]>();
   /**
@@ -5105,7 +5107,7 @@ async function runFold(
     samplingDraws = Math.max(
       2,
       ...samplingArmsThisRun.map((arm) => samplingSpecOf(arm)?.n ?? 1),
-      ceilingArm === undefined ? 1 : (samplingSpecOf(ceilingArm)?.n ?? 1),
+      ...ceilingArms.map((arm) => samplingSpecOf(arm)?.n ?? 1),
       // The prior's name carries its draw count like every other sampling arm, so a five-draw prior
       // asked for on its own still pays for five draws rather than silently reading one.
       priorArm === undefined ? 1 : (samplingSpecOf(priorArm)?.n ?? 1),
@@ -5441,11 +5443,23 @@ async function runFold(
       packChars: 0,
     });
   }
-  if (ceilingArm !== undefined) {
+  // One row per registered ceiling, each reading **its own** draw count.
+  //
+  // R69 registered `sample-5-oracle` beside `sample-10-oracle` — the whole point being a paired
+  // width effect — and got one row: the search above kept the first oracle arm in union order and
+  // dropped the second, silently, while the surviving row read *all ten* draws because the ceiling
+  // took `verdicts` whole. The run passed every gate. So the rung of the ladder that the
+  // registration's own estimand depends on was absent from the table, and the row that was present
+  // was labelled with a width it had not measured.
+  //
+  // A ceiling is "the best of the n draws this arm names", which is a fact about the arm rather than
+  // about the run: slicing by the arm's own `n` is what makes two ceilings comparable at all.
+  for (const ceilingArm of ceilingArms) {
+    const width = samplingSpecOf(ceilingArm)?.n ?? 1;
     for (const [position, verdicts] of drawJudged) {
-      const anyCorrect = verdicts.find((verdict) => verdict.correct) ?? verdicts[0];
-      if (anyCorrect === undefined) continue;
-      judged.set(`${position}:${ceilingArm}`, anyCorrect);
+      const best = ceilingAmong(verdicts, width);
+      if (best === undefined) continue;
+      judged.set(`${position}:${ceilingArm}`, best);
       plans.push({ position, arm: ceilingArm, prompt: '', packIds: 0, packChars: 0 });
     }
   }
@@ -6210,6 +6224,33 @@ async function main(): Promise<void> {
     });
   }
 
+  /**
+   * Every arm the dispatch bought must own a row.
+   *
+   * R69 registered six arms and published five. `sample-10-oracle` was dropped by a search that kept
+   * the first oracle arm in union order, and the surviving `sample-5-oracle` row carried the *ten*-draw
+   * ceiling because the ceiling read the pool whole. Every other gate passed: the run reconciled, the
+   * pool was complete, the parse rate was 1.00. The registration's primary estimand — the width
+   * effect, `ceiling(10) − ceiling(5)` — was simply absent from the table, and nothing said so.
+   *
+   * An arm that is bought and not reported is the most expensive kind of silence: the dispatch is
+   * paid for, the number is missing, and the artefact reads as a complete result. This gate is cheap
+   * because the request and the rows are both in the file.
+   */
+  const requestedArms = [...ARMS];
+  const reportedArms = new Set(arms.map((entry) => entry.arm as string));
+  const missingArms = requestedArms.filter((arm) => !reportedArms.has(arm));
+  const armCoverage: ValidityGate = {
+    id: 'V77-every-requested-arm-is-a-row',
+    criterion: 'every arm this dispatch bought produced a row, so no planned reading is silently absent',
+    actual:
+      missingArms.length === 0
+        ? `${requestedArms.length}/${requestedArms.length} arm(s) reported`
+        : `missing ${missingArms.join(', ')} of ${requestedArms.length} bought arm(s)`,
+    pass: missingArms.length === 0,
+    blocking: true,
+  };
+
   // Each control against `full`, paired on the questions both answered. The deltas
   // against `none` above are the treatment effect; these are the difference between
   // two treatments, which is what a control is for.
@@ -6378,7 +6419,7 @@ async function main(): Promise<void> {
       ...CHANNEL_FLOORS[entry.kind],
     }));
   })();
-  const gates = buildValidityGates({
+  const gates = [...buildValidityGates({
     meanPackIds,
     partition: {
       evaluated: seen.size,
@@ -6592,7 +6633,10 @@ async function main(): Promise<void> {
     // The protocol's oracle ceiling applies to the convention lane, where the
     // accepted answer has a form the model must reproduce.
     ...(ACTIVE === undefined || channelBest === undefined ? {} : { channelCeiling: channelBest.accuracy }),
-  });
+  })];
+  // The arm-coverage gate last, so it reads the final table rather than the one built beside it: an
+  // arm appended by any later block is still counted, and one dropped by any later block is caught.
+  gates.push(armCoverage);
   // R9's family, appended rather than folded into `buildValidityGates`: its bars are about whether
   // the *workload* can decide the question, and a family that cannot is a reason to rebuild the
   // family, not a reason to disbelieve the accuracy above.

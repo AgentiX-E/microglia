@@ -15,6 +15,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { contentPopulation, contentReadings } from '@agentix-e/microglia-eval';
 import { poolFromArtifact, poolReport, type ArtifactPoolCase } from '@agentix-e/microglia-eval';
 import { birdArtefactPath } from './lib.js';
 
@@ -64,6 +65,26 @@ function main(): void {
         `${reading.eligible} question(s), AUC ${reading.auc.toFixed(3)} ` +
         `[${reading.aucLow.toFixed(3)}, ${reading.aucHigh.toFixed(3)}], ${reading.pairs} pair(s)\n`,
     );
+  }
+  // The signals that read a candidate rather than measuring its shape, on the same axis. R67 priced
+  // seven shape signals at chance; the competitor's selection step writes assertions out of the
+  // question's own vocabulary, and the two signals below are the free half of that. When the
+  // artefact carries no query text — every run before R69's successor — there is no population and
+  // the line says so, which is a different statement from "the signals were at chance".
+  const content = contentReadings(questions);
+  if (content.length === 0) {
+    process.stdout.write(
+      '[pool] content signals: no population — this artefact records candidates as shapes only\n',
+    );
+  } else {
+    process.stdout.write(`[pool] content signals over ${contentPopulation(questions)} question(s):\n`);
+    for (const reading of content) {
+      process.stdout.write(
+        `[pool] ${reading.signal.padEnd(15)} top-pick ${(reading.accuracy * 100).toFixed(1)}% of ` +
+          `${reading.eligible} question(s), AUC ${reading.auc.toFixed(3)} ` +
+          `[${reading.aucLow.toFixed(3)}, ${reading.aucHigh.toFixed(3)}], ${reading.pairs} pair(s)\n`,
+      );
+    }
   }
   // No verdict here on purpose. Which of these may rank anything is decided once, by the gate step
   // that runs next, under a bar that corrects for six tests and floors the standard error. A second

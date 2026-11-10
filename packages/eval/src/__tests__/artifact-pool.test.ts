@@ -139,3 +139,37 @@ describe('poolFromArtifact', () => {
     expect(pool.draws).toBe(0);
   });
 });
+
+describe('the candidate content the artefact now records', () => {
+  it('carries the query and its columns through, so a content reading can be priced offline', () => {
+    const pool = poolFromArtifact(
+      [
+        row({
+          pool: [
+            {
+              draw: 0,
+              correct: true,
+              resultKey: 0,
+              signature: null,
+              sql: 'select county from t',
+              columns: ['County'],
+            },
+            { draw: 1, correct: false, resultKey: 1, signature: null, sql: 'select 1' },
+          ],
+        }),
+      ],
+      ['sample-2-first'],
+    );
+    const [first, second] = pool.questions[0]?.candidates ?? [];
+    expect(first?.sql).toBe('select county from t');
+    expect(first?.columns).toEqual(['County']);
+    // Absent rather than empty on the candidate that recorded neither: a content reading has to be
+    // able to tell "not recorded" from "recorded as nothing".
+    expect(second?.columns).toBeUndefined();
+  });
+
+  it('carries the question itself, which is what a content signal reads', () => {
+    const pool = poolFromArtifact([row()], ['sample-2-first']);
+    expect(pool.questions[0]?.question).toBe('How many accounts are there?');
+  });
+});

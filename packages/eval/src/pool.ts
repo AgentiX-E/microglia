@@ -95,6 +95,19 @@ export type PoolQuestion = {
   readonly dbId?: string;
   /** The cross-fitting fold, for the same reason and under the same rule. */
   readonly fold?: number;
+  /**
+   * The question as it was asked, when the artefact recorded it.
+   *
+   * The pool was described for four iterations as a thing that answers questions "without a
+   * dispatch", and everything asked of it was about shapes, which are derived from what the
+   * candidates returned. A *content* signal reads the question's own words instead, and until this
+   * field existed those words were not in the reading — `shapeOf` keeps a handful of booleans
+   * (`wantsMany`, `wantsCount`) and throws the sentence away.
+   *
+   * Optional under the same rule as the rest: an artefact written before the field is still read,
+   * and a content reading over a file without it must say "no population" rather than "chance".
+   */
+  readonly question?: string;
 };
 
 export type PoolSummary = {
@@ -247,6 +260,23 @@ export function poolSummary(questions: readonly PoolQuestion[]): PoolSummary {
 
 export type SignalChoice = SignalName | 'draw-order';
 
+export type AucReading<Label extends string = string> = {
+  readonly signal: Label;
+  /** Questions where at least two distinct results were produced, so a choice existed. */
+  readonly eligible: number;
+  /** Of those, the ones where the candidate this scorer ranks first is correct. */
+  readonly topPick: number;
+  readonly accuracy: number;
+  /** Candidate-level AUC against correctness, over every question in the pool. */
+  readonly auc: number;
+  readonly aucLow: number;
+  readonly aucHigh: number;
+  readonly aucSe: number;
+  readonly positive: number;
+  readonly negative: number;
+  readonly pairs: number;
+};
+
 export type PoolSignalReading = {
   readonly signal: SignalChoice;
   /** Questions where at least two distinct results were produced, so a choice existed. */
@@ -352,6 +382,29 @@ function scoreFor(candidate: PoolCandidate, shape: QuestionShape, signal: Signal
   return scoreOf(candidate.signature ?? FAILED_SIGNATURE, shape, signal);
 }
 
+/**
+ * The candidate a scorer ranks first, ties to the earlier draw.
+ *
+ * Strictly greater, for the same reason `pickOf` is: a signal with no opinion must not reorder the
+ * pool, and an inert scorer that reported "take the last draw" as its accuracy would look like a
+ * mechanism.
+ */
+function rankedFirst<Q extends PoolQuestion>(
+  question: Q,
+  score: (candidate: PoolCandidate, question: Q) => number,
+): PoolCandidate | undefined {
+  let best: PoolCandidate | undefined;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  for (const candidate of question.candidates) {
+    const value = score(candidate, question);
+    if (best === undefined || value > bestScore) {
+      best = candidate;
+      bestScore = value;
+    }
+  }
+  return best;
+}
+
 function pickOf(question: PoolQuestion, signal: SignalChoice): PoolCandidate | undefined {
   let best: PoolCandidate | undefined;
   let bestScore = Number.NEGATIVE_INFINITY;
@@ -382,8 +435,44 @@ export function signalReading(
   signal: SignalChoice,
   options: { readonly resamples?: number; readonly seed?: number } = {},
 ): PoolSignalReading {
+  return aucReading(
+    questions,
+    signal,
+    (candidate, question) => scoreFor(candidate, question.shape, signal),
+    { ...options, pick: (question) => pickOf(question, signal) },
+  );
+}
+
+/**
+ * The same reading for any scorer, including one that reads the candidate rather than its shape.
+ *
+ * Extracted rather than copied because the clustering argument above applies to every scorer
+ * equally, and a second copy of the bootstrap is a second interval that can disagree with the first
+ * about the same pool. The content signals in `content-signal.ts` are the reason it exists: they
+ * score a candidate by what it says, not by what its result looks like, and they have to be read on
+ * exactly the same axis as the shape signals or the comparison between the two is not one.
+ */
+export function aucReading<Label extends string, Q extends PoolQuestion = PoolQuestion>(
+  questions: readonly Q[],
+  signal: Label,
+  score: (candidate: PoolCandidate, question: Q) => number,
+  options: {
+    readonly resamples?: number;
+    readonly seed?: number;
+    /**
+     * Which candidate the scorer ranks first, when the scorer is not "the highest number".
+     *
+     * `signalReading` passes `pickOf`, which is the shape signals' own tie rule and predates this
+     * function; a content scorer that has no opinion about a candidate (it recorded no query at all)
+     * has to abstain rather than be ranked last, and abstention is a property of the scorer rather
+     * than of the arithmetic, so it is supplied by the caller.
+     */
+    readonly pick?: (question: Q) => PoolCandidate | undefined;
+  } = {},
+): AucReading<Label> {
   const eligible = questions.filter((question) => outcomesOf(question) >= 2);
-  const topPick = eligible.filter((question) => pickOf(question, signal)?.correct === true).length;
+  const pick = options.pick ?? ((question: Q) => rankedFirst(question, score));
+  const topPick = eligible.filter((question) => pick(question)?.correct === true).length;
   const positive: number[][] = [];
   const negative: number[][] = [];
   let pairs = 0;
@@ -391,9 +480,9 @@ export function signalReading(
     const up: number[] = [];
     const down: number[] = [];
     for (const candidate of question.candidates) {
-      const score = scoreFor(candidate, question.shape, signal);
-      if (candidate.correct) up.push(score);
-      else down.push(score);
+      const value = score(candidate, question);
+      if (candidate.correct) up.push(value);
+      else down.push(value);
     }
     positive.push(up);
     negative.push(down);

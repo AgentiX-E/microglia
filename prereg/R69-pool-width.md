@@ -125,3 +125,76 @@ applies names the outcome. They are written on the **within-run** ceiling delta,
 
 Any estimate that fits none of the four is impossible by construction: the branches are a partition of
 the real line cut at 3pp and 5pp.
+
+## Outcome — width buys two points, and the run published five arms of six (2026-11-10)
+
+Dispatch `42796339905`, minidev, n = 350, 5 folds, **4,829 calls, $0.3967**, `off_peak`, pool
+3,500 candidates all signed and reconciled, 14 gates, every one passed.
+
+| arm | accuracy | vs `none` (52.00%) | gained / lost |
+| --- | --- | --- | --- |
+| `full` | 50.57% | −1.43pp [−4.57, +1.71] | 13 / 18 |
+| `sample-5-first` | 51.71% | −0.29pp [−3.14, +2.57] | 13 / 14 |
+| `sample-10-first` | 51.71% | −0.29pp | 13 / 14 |
+| `sample-5-exec` | 50.86% | −1.14pp [−3.71, +1.14] | 7 / 11 |
+| `sample-10-exec` | 50.57% | −1.43pp [−4.57, +1.71] | 13 / 18 |
+| `sample-5-oracle` | **61.14%** | +9.14pp [+6.29, +12.29] | 32 / 0 |
+| `sample-10-oracle` | **absent** | — | — |
+
+**The row labelled `sample-5-oracle` is the ten-draw ceiling.** The lane searched the union for *the*
+oracle arm, kept the first in union order, and let it read the pool whole; `sample-10-oracle` was
+dropped without a word and every gate passed. So the registration's primary estimand —
+`ceiling(10) − ceiling(5)` — was missing from the table while the artefact read as a complete result.
+
+It is recoverable from the pool at zero cost, which is what the pool is for:
+
+| reading | value |
+| --- | --- |
+| `first` (same draw at both widths) | 181 / 350 = **51.71%** |
+| `ceiling(k=5)` — best of the **first five** draws | 207 / 350 = **59.14%** |
+| `ceiling(k=10)` — best of all ten | 214 / 350 = **61.14%** |
+| **width effect, paired within this run** | **+2.00pp** |
+| ceiling over `first`, at k = 5 / k = 10 | +7.43pp / +9.43pp |
+| majority of the largest agreeing group, k = 5 / k = 10 | 51.71% / 52.29% (+0.00 / +0.57pp) |
+
+**The branch: width saturates.** The registered condition was a k = 10 ceiling within **3pp** of the k =
+5 ceiling, and the delta is 2.00pp. Doubling the draws from five to ten buys two points of ceiling and
+nothing at the selector: `sample-10-exec` is *below* the first draw (−1.14pp), and its ceiling share
+is negative at both widths. The file's own instruction for this branch is to stop buying draws and go
+after the one thing it has not varied — **what the draw is asked** — which is R71.
+
+**Four predictions, and the honest count is two.**
+
+- *Width buys ceiling less than linearly, +12…+20pp* — **missed**. The ceiling moved +2.00pp, far
+  below the band, and the k = 5 ceiling itself came in at +7.43pp rather than R67's +8.85pp.
+- *The k = 5 arms reproduce R67 within ±3pp* — **held**: `first` 51.71 vs 50.86 (+0.85), ceiling 59.14
+  vs 59.71 (−0.57), `exec` 50.86 vs 52.00 (−1.14). The day moved by under a point, which is what makes
+  the within-run delta readable at all.
+- *The selector stays at chance at both widths* — **held, and more emphatically than predicted**:
+  −1.14pp at k = 10 and −0.86pp at k = 5, both *below* taking the first draw.
+- *Draw count equals k for every arm* — **held**: 3,500 candidates over 350 questions, 10 per question,
+  `sample-5-*` reading the first five.
+
+**A reading the shape gate produced and that the arm refutes.** With 3,500 candidates the signal gate
+now finds three survivors by Holm — `empty` (AUC 0.545), `column-shape` (0.556), `value-type` (0.562) —
+and a composite that beats the draw-order baseline by +2.9pp on the 138 questions where a choice
+existed (5 gained, 1 lost). The arm built from the shape composite scored **1.14pp below** the first
+draw. Both numbers are true and they are about different populations: the gate reads the 138 questions
+where a choice existed, and the arm is scored over all 350, where two thirds of the questions had one
+result and the choice was vacuous. That gap is now the reason R71's readout must report the *eligible*
+population beside the whole one, and it is the second time this iteration found a number that was true
+of its own denominator and false of the run.
+
+**The defect, and what now refuses it.** Two fixes, both of which the run would have needed:
+
+- `ceilingAmong(verdicts, width)` reads the best of *the first n draws*, so two ceiling arms are two
+  readings of one pool rather than one reading wearing two names. Four tests pin it, including the
+  case that matters: the right answer at draw 7 is invisible to a five-draw ceiling.
+- `V77-every-requested-arm-is-a-row` is a blocking gate. An arm that is bought and not reported is the
+  most expensive kind of silence this lane can produce — the dispatch is paid for, the number is
+  missing, and the artefact reads as complete. R69's own artefact would fail it now, which is the
+  point: the gate is written against the run that produced it.
+
+**Cost.** 4,829 calls for **$0.3967**, `off_peak`, against R66's 5,594 calls for $0.7078 inside the
+double-priced window — the same order of work for 56% of the money. The lesson from R66's outcome is
+already paying.

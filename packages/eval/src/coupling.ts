@@ -78,6 +78,12 @@ export const SCENARIO_WORDS = ['sql', 'sqlite', 'nl2sql', 'text-to-sql', 'bird',
 export const DEFERRALS: Readonly<Record<string, string>> = {
   artefacts: 'names the dataset and split ids; typed by the loader rather than by SQL',
   'artifact-schema': 'declares a record field called `sql`; the schema is the protocol\'s, the column is a string',
+  'artifact-pool':
+    'carries the candidate\'s query through from the artefact into the pool reading; it parses a ' +
+    'record and executes nothing',
+  'content-signal':
+    'compares the question\'s own words against a candidate\'s column names and literals; it reads ' +
+    'strings and executes nothing',
   'bird-data': 'the dataset loader; opens SQLite to read a corpus rather than to answer a question',
   'bird-rows': 'the corpus row shapes, not a query',
   coupling: 'the scanner itself: it defines the word list, so it necessarily contains every word on it',

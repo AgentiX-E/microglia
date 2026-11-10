@@ -1023,6 +1023,7 @@ export {
   type ContrastSpec,
   type SamplingSelector,
   buildValidityGates,
+  ceilingAmong,
   canonicalRows,
   type ResultComparison,
   conventionOf,
@@ -1258,6 +1259,16 @@ export {
   type SchemaIndex,
   type TableShape,
 } from '@agentix-e/microglia-sql';
+
+export {
+  CONTENT_SIGNALS,
+  contentPopulation,
+  contentReadings,
+  contentScoreOf,
+  contentWordsOf,
+  literalTokensOf,
+  type ContentSignalName,
+} from './content-signal.js';
 
 export { BoundedSql, type BoundedSqlOptions, type StatementResult } from '@agentix-e/microglia-sql';
 

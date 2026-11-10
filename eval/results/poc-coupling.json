@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 176,
+  "scanned": 177,
   "totals": {
-    "modules": 176,
-    "lines": 47067,
+    "modules": 177,
+    "lines": 47411,
     "adapterLines": 1956,
-    "deferredLines": 7229,
-    "coupledShare": 0.1925
+    "deferredLines": 7689,
+    "coupledShare": 0.2008
   },
   "layers": [
     {
@@ -37,11 +37,11 @@
     },
     {
       "layer": "eval",
-      "modules": 119,
-      "lines": 33992,
+      "modules": 120,
+      "lines": 34336,
       "adapterLines": 0,
-      "deferredLines": 7229,
-      "coupled": 18
+      "deferredLines": 7689,
+      "coupled": 20
     },
     {
       "layer": "browser",
@@ -107,6 +107,17 @@
     },
     {
       "pkg": "eval",
+      "module": "artifact-pool",
+      "path": "packages/eval/src/artifact-pool.ts",
+      "lines": 125,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "carries the candidate's query through from the artefact into the pool reading; it parses a record and executes nothing"
+    },
+    {
+      "pkg": "eval",
       "module": "artifact-schema",
       "path": "packages/eval/src/artifact-schema.ts",
       "lines": 348,
@@ -141,9 +152,20 @@
     },
     {
       "pkg": "eval",
+      "module": "content-signal",
+      "path": "packages/eval/src/content-signal.ts",
+      "lines": 219,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "compares the question's own words against a candidate's column names and literals; it reads strings and executes nothing"
+    },
+    {
+      "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 457,
+      "lines": 463,
       "words": [
         "sql",
         "sqlite",
@@ -214,7 +236,7 @@
       "pkg": "eval",
       "module": "pool",
       "path": "packages/eval/src/pool.ts",
-      "lines": 462,
+      "lines": 551,
       "words": [
         "sql"
       ],
@@ -270,7 +292,7 @@
       "pkg": "eval",
       "module": "sota",
       "path": "packages/eval/src/sota.ts",
-      "lines": 2379,
+      "lines": 2400,
       "words": [
         "sql",
         "sqlite",
@@ -575,7 +597,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "176 modules, 18 deferred with a reason"
+      "detail": "177 modules, 20 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -590,5 +612,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 47067 production lines across 176 modules: 7 adapter modules in `sql`, 18 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 47411 production lines across 177 modules: 7 adapter modules in `sql`, 20 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }
