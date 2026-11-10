@@ -104,3 +104,59 @@ One extra call on 98 questions of 1,534, with a prompt up to 600 characters long
 run is a `retry-blank` replay plus about 2% more prompt tokens, and the R64 bill was $0.44. It is
 dispatched off-peak, and the cap is set from the forecast rather than from the warm-cache figure that
 stopped R64's first attempt after one fold.
+
+## Outcome — the block fires on three empty retries in four and moves three questions (2026-11-10)
+
+Dispatch `42750334097`, `dev`, n = 1,534, 5 folds, **5,594 calls**, **$0.7078**, cache hit 73.5%,
+`V76` passed, every other gate passed, 0 call failures.
+
+| arm | accuracy | vs `none` | gained / lost |
+| --- | --- | --- | --- |
+| `none` | 56.71% | — | — |
+| `full` | 56.58% | −0.13pp [−1.83, +1.56], p = 0.94 | 82 / 84 |
+| `retry-blank` | 58.08% | +1.37pp [+0.85, +1.96], p = 9.5e-07 | 21 / 0 |
+| `retry-values` | 58.28% | +1.56pp [+0.98, +2.22], p = 1.2e-07 | 24 / 0 |
+| retried population | **101 / 1,534 = 6.58%** (`empty` 91, `error` 10, `no-query` 0; 101 of 101 wrong) | | |
+| repaired on it | blank **21 / 101 = 20.79%**; values **24 / 101 = 23.76%** | | |
+| paired, values vs blank | **6 gained / 3 lost of 101 = +2.97pp**, exact p = **0.51** | | |
+| `V76-values-delivered` | asked 91, fired **69 (75.82%)**, 112 lines, 141 chars mean, 0 dropped, 10 errors of which 5 fired | | |
+
+**The mechanism works and the mechanism is nearly worthless, and those are different claims.** The
+block fires on 75.8% of the empty retries (predicted floor: 60%), so the literal matcher is reading
+the right columns and delivering short, specific lines. It then converts **6 questions that
+`retry-blank` did not** — and, which the arm table above cannot show, **breaks 3 that `retry-blank`
+had repaired**. Net three questions out of 1,534, exact p = 0.51.
+
+The `0 lost` column is the reason this needs spelling out. Every arm in this lane reports gained and
+lost **against `none`**, and against `none` both retry arms are strictly additive because a retry
+cannot un-answer a question the first attempt got right. Against its own control — the whole point of
+the arm — the value block is 6 up and 3 down, and 69 questions were shown evidence that changed
+nothing.
+
+**Three predictions held, one failed, one was mis-priced.**
+
+- Fired share ≥ 60% → **75.8%**, held.
+- Non-value failures undamaged → held trivially: **`error` 0 / 10 in both arms**. R64 repaired one of
+  its ten; this run repaired none of its ten, in either arm, so the bucket carries no information
+  about the block in either direction.
+- Delta against `retry-blank` +0.2…+1.1pp → **+0.20pp**, at the floor of the band, held.
+- Repaired rate 25–40% → **23.76%**, below the band. The file predicted "+4 to +16 more repairs out of
+  98"; the run produced **+3 of 101**. This is the failure that matters, and its size is what the
+  branch below turns on.
+- Bill equals R64's within 10% → **+6.7% in calls** (5,594 vs 5,241). But the dispatched cost is
+  **1.6× R64's** ($0.7078 vs $0.44) and the artefact says why: `bands: [peak, off_peak]`,
+  `usd_if_all_off_peak: 0.4725`. The dispatch ran at **03:34 UTC, inside the 01:00–04:00 UTC window
+  that bills at exactly double** — the window the workflow's own schedule comment was rewritten to
+  avoid. That is $0.235 bought nothing, and it is the second time this project has paid it.
+
+**The branch: narrowed**, and the registration's own words are that a positive under +8pp leaves the
+value explanation "one contributor among several" and means the composition measurement's 35.96% share
+"overstates what is recoverable". Measured share of that composition actually recovered by a full
+literal-level correction: **3 of 1,534 questions**. The tempting re-description — "the block fired on
+76% of retries, so the mechanism is confirmed" — is exactly what the registration forbade in writing,
+because firing is not converting.
+
+So the retry line's remaining 5pp is **not** reachable by evidence about spellings, and the next
+spend on it is not a better literal matcher. What R66 does establish is that a second attempt with
+*any* post-mortem evidence repairs 20% of its population at zero risk of loss, and that the evidence
+which would convert the other 80% is not in the database's spellings.

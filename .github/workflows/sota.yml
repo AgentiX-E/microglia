@@ -438,6 +438,32 @@ jobs:
           restore-keys: |
             distill-${{ steps.backbone.outputs.model }}-sql-prompt-3-
 
+      # The temperature a registration declares, or the lane's default.
+      #
+      # `SOTA_SAMPLE_TEMPERATURE` is a repository variable, and a variable is global: R70 measures the
+      # same arms at T = 1.0 that R69 measures at 0.7, so on a variable the second experiment is a
+      # mutation every queued run inherits — including one dispatched in between, which would then
+      # measure neither temperature and report the lane's. The arms already come from the
+      # registration for exactly this reason; this reads the second knob from the same file. A
+      # registration that declares none leaves the variable's own default in place, so nothing that
+      # was dispatched before R70 changes behaviour.
+      - name: Resolve the sampling temperature
+        id: temperature
+        env:
+          PREREG: ${{ github.event.inputs.prereg || '' }}
+        run: |
+          set -euo pipefail
+          VALUE=""
+          if [ -n "$PREREG" ]; then
+            VALUE=$(pnpm --silent eval:prereg-temperature "prereg/${PREREG}.md")
+          fi
+          echo "value=$VALUE" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Sampling temperature"
+            echo
+            echo "${VALUE:-the lane's default (\`vars.SOTA_SAMPLE_TEMPERATURE\`)}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Run the benchmark
         # Above the lane's own deadline (130 minutes) with room for the last fold to finish
         # writing, and below the job's. The step timeout is a backstop, not a plan: the run that
@@ -477,7 +503,9 @@ jobs:
           SOTA_DISTILL_CACHE: ${{ github.workspace }}/.cache/distill/cache.json
           SOTA_CONVENTION: ${{ github.event.inputs.convention || '' }}
           SOTA_RESAMPLES: '10000'
-          SOTA_SAMPLE_TEMPERATURE: ${{ vars.SOTA_SAMPLE_TEMPERATURE || '0.7' }}
+          # The registration's own declaration when it makes one, so an experiment that moves the
+          # temperature does not move it for every other queued dispatch.
+          SOTA_SAMPLE_TEMPERATURE: ${{ steps.temperature.outputs.value || vars.SOTA_SAMPLE_TEMPERATURE || '0.7' }}
           SOTA_TRANSFER_TARGETS: ${{ github.event.inputs.transfer_targets || '4' }}
           SOTA_DENSITY_PANEL: ${{ vars.SOTA_DENSITY_PANEL || '0' }}
           SOTA_DENSITY_RULES_PER_DB: ${{ github.event.inputs.density_rules_per_db || '8' }}

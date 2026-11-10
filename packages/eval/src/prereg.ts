@@ -62,6 +62,22 @@ export type Prereg = {
    */
   readonly plantedArms?: readonly string[];
   /**
+   * The sampling temperature a draw-based registration runs at, when it moves it.
+   *
+   * Absent means the lane's own default, which is what every sampling run before R70 used.
+   * `SOTA_SAMPLE_TEMPERATURE` was a **repository variable**, and a variable is global: R69 measured
+   * a pool at T = 0.7 and R70 wanted the same arms at T = 1.0, which on a variable is two
+   * dispatches separated by a mutation every other queued run then inherits — the exact shape that
+   * made `SOTA_MODEL` a per-dispatch input. Temperature is a property of the experiment, so it is
+   * declared here, beside the arms and for the same reason, and the workflow reads it from the file
+   * rather than from a variable nobody re-reads.
+   *
+   * A registration declares one temperature because it runs one dispatch: R69's two-dispatch design
+   * was split into R69 (width at the default) and R70 (heat) when this key was added, since one
+   * header cannot be honest about two temperatures.
+   */
+  readonly sampleTemperature?: number;
+  /**
    * The scenario pair this registration executes, when it pins one.
    *
    * Absent means "whatever the lane is configured with", which is what every registration
@@ -114,6 +130,7 @@ const HEADER_KEYS = [
   'testDomain',
   'recallDomain',
   'plantedArms',
+  'temperature',
 ] as const;
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
@@ -347,6 +364,27 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     collected.push({ where: 'header opened', problem: `'${opened}' is not a calendar date` });
   }
   const arms = listOf(values.get('arms') ?? '', collected);
+  // R70: the temperature. Kept in `(0, 2]` because those are the bounds every provider in this
+  // lane accepts; a zero here is a deterministic run wearing a sampling arm's name, and it would
+  // be reported as a pool of identical draws without saying so.
+  const temperatureText = values.get('temperature');
+  let sampleTemperature: number | undefined;
+  if (temperatureText !== undefined) {
+    const parsed = Number(temperatureText);
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 2) {
+      collected.push({
+        where: `header 'temperature'`,
+        problem: `'${temperatureText}' is not a finite number in (0, 2]`,
+      });
+    } else if (!arms.some((arm) => arm.startsWith('sample-'))) {
+      collected.push({
+        where: `header 'temperature'`,
+        problem: 'is declared by a registration that runs no sample-<n> arm, so it describes no draw',
+      });
+    } else {
+      sampleTemperature = parsed;
+    }
+  }
   const gates = listOf(values.get('gates') ?? '', collected);
   for (const gate of gates) {
     if (!/^V\d+$/.test(gate)) collected.push({ where: 'header gates', problem: `'${gate}' is not a gate code such as V30` });
@@ -400,6 +438,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(testDomain === undefined ? {} : { testDomain }),
       ...(recallDomain === undefined ? {} : { recallDomain }),
       ...(plantedArms === undefined ? {} : { plantedArms }),
+      ...(sampleTemperature === undefined ? {} : { sampleTemperature }),
       prediction,
       refutation,
       file,

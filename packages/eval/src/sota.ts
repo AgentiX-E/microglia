@@ -827,6 +827,42 @@ export type SqlArm =
    */
   | 'sample-5-prior-shape'
   /**
+   * Ten draws, and the first one.
+   *
+   * R67 priced five draws: the pool contains the right answer on **+8.85pp** more questions than
+   * the first draw, and every selector made of execution shape recovers none of it. Selection can
+   * only recover what generation produced, so the branch its own refutation names is *the pool* —
+   * and the only quantity that decides whether width is the binding constraint is the ceiling at a
+   * second width.
+   *
+   * `first` is not a formality here. Ten draws cost ten calls and return one answer, so the arm is
+   * the price of width paid without a selector, and `sample-10-exec − sample-10-first` is the only
+   * honest numerator. It is registered at k = 10 *beside* k = 5 in one dispatch because the draws
+   * are already paid for: the first five of the ten are the five-draw pool, so the width effect
+   * becomes a within-run paired difference instead of a comparison across two days, two caches and
+   * two endpoint states.
+   */
+  | 'sample-10-first'
+  /**
+   * The ceiling on the same ten draws: the best a selector could have done.
+   *
+   * If the ceiling moves from +8.85pp to +12pp, ten draws bought three points and further widening
+   * is buying less than linearly; if it does not move, the pool was already saturated at five and
+   * the remaining gap is a selector problem after all. Both readings are decisions, which is more
+   * than the published rows can say — they vary width, scaffold and judge at once.
+   */
+  | 'sample-10-oracle'
+  /**
+   * The same ten draws, chosen by the execution-shape composite.
+   *
+   * The share `(exec − first) / (oracle − first)` is the one number that is comparable across
+   * baselines (Rule 14), and R67 measured it at 12.9% on five draws with every one of seven
+   * signals' AUC intervals straddling 0.5. The question this arm answers is whether that share
+   * *rises with width*: a selector that has no information cannot, and a measurement showing it
+   * does would put R67's mechanism in doubt rather than the selector.
+   */
+  | 'sample-10-exec'
+  /**
    * The same question with the schema annotated with a few values per column.
    *
    * The prompt has only ever carried the DDL, so every literal in every answer is a guess about a
@@ -1062,6 +1098,11 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-5-prior': true,
   'sample-5-prior-shape': true,
   'sample-5-model': true,
+  // R69: the width ladder. Ten draws, three selectors, registered beside the five-draw arms in the
+  // same dispatch so the ceiling's *delta* is paired within a run rather than across two.
+  'sample-10-first': true,
+  'sample-10-oracle': true,
+  'sample-10-exec': true,
   values: true,
   'm-schema': true,
   'gen-plan': true,

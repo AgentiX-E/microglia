@@ -525,3 +525,37 @@ describe('the facadeNotes header', () => {
     ).toBe(true);
   });
 });
+
+describe('the sampling temperature', () => {
+  // R70 measures the same arms at T = 1.0 that R69 measures at the lane's default. The value used
+  // to live in `SOTA_SAMPLE_TEMPERATURE`, a repository variable, so setting it for one experiment
+  // set it for every queued run — the shape that made `SOTA_MODEL` a per-dispatch input. A
+  // registration declares its own temperature and the workflow reads it from the file.
+  const withTemperature = (line: string, arms = 'sample-5-first'): string =>
+    `${HEADER.replace('arms: none', `arms: ${arms}`).replace(/^---\n/, `---\n${line}\n`)}${PREDICTION}${REFUTATION}`;
+
+  it('reads the number a draw-based registration declares', () => {
+    const reading = readPrereg(withTemperature('temperature: 1.0'), 'R8.3-xiyan-cell.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.sampleTemperature).toBe(1);
+  });
+
+  it('leaves every earlier registration on the lane default', () => {
+    const reading = readPrereg(withTemperature(''), 'R8.3-xiyan-cell.md');
+    expect(reading.prereg?.sampleTemperature).toBeUndefined();
+  });
+
+  it('refuses a temperature outside the interval every provider in the lane accepts', () => {
+    for (const bad of ['0', '2.5', '-1', 'hot']) {
+      const reported = problemsOf(withTemperature(`temperature: ${bad}`));
+      expect(reported.some((entry) => entry.includes("header 'temperature'"))).toBe(true);
+    }
+  });
+
+  it('refuses a temperature on a registration that draws nothing', () => {
+    // A temperature with no `sample-<n>` arm describes no draw: it would be recorded in the
+    // artefact and read afterwards as a property of a run that never sampled.
+    const reported = problemsOf(withTemperature('temperature: 1.0', 'none,gated'));
+    expect(reported.some((entry) => entry.includes('describes no draw'))).toBe(true);
+  });
+});

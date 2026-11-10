@@ -6658,6 +6658,14 @@ async function main(): Promise<void> {
       distill_prompt_repair: folds.some((fold) => fold.repairActive !== null) ? 'distill-prompt/3+repair' : null,
       distill_max_tokens: 2000,
       concurrency: CONCURRENCY,
+      // The temperature every draw in this run was sampled at.
+      //
+      // It lived only in the environment and in one stdout line, so the artefact could not tell a
+      // dispatch of R69 (T = 0.7) from a dispatch of R70 (T = 1.0) — two experiments whose entire
+      // difference is this number, and whose numbers are only comparable to each other. A knob that
+      // is not in the record is a knob the next reader has to take on trust, which is the same
+      // failure the credential label closed one iteration ago.
+      sample_temperature: SAMPLE_TEMPERATURE,
       breaker_threshold: BREAKER_THRESHOLD,
       generation_cache: generations.stats,
       // True only when this run built a second, unwidened memory. When the run is

@@ -2,18 +2,29 @@
 id: R69-pool-width
 step: R69
 opened: 2026-11-10
-arms: sample-10-first,sample-10-oracle,sample-10-exec
+arms: sample-5-first,sample-5-exec,sample-5-oracle,sample-10-first,sample-10-exec,sample-10-oracle
 sample: 350
 gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V18,V19,V32,V44,V48,V51
 ---
 
 # R69 — the pool is where the answer is, so the next question is how wide and how hot
 
-**Registered** 2026-11-10, undispatched. Two dispatches from the start (Rule 13). The arms
-`sample-10-first`, `sample-10-oracle` and `sample-10-exec` **are not in `OPTIONAL_ARMS`**: the parser
-accepts any `sample-N-SELECTOR` and the union lists only k = 3 and k = 5, which is the same gap that
-cost R67 a dispatch. They are added before this file is dispatched, and this sentence exists so the
-next reader can tell a plan from a claim.
+**Registered** 2026-11-10, dispatched the same day. Two dispatches from the start (Rule 13): this one
+and R70, which was split out of it at the first header review.
+
+The arms `sample-10-first`, `sample-10-oracle` and `sample-10-exec` **were not in `OPTIONAL_ARMS`**
+when this file was written: the parser accepts any `sample-N-SELECTOR` and the union listed only k = 3
+and k = 5, which is the same gap that cost R67 a dispatch. They are in the union now, pinned by the
+test that pins every other arm, and the draw count is pinned too — a `sample-10-*` arm that quietly
+drew five would report a width effect of exactly zero and read as a saturated pool.
+
+Three sentences above this one were written as a claim about the future. The fourth is a correction
+made before the dispatch and it is here on purpose: the **five-draw arms are registered beside the
+ten-draw arms in the same dispatch**. R69 as first written would have compared its k = 10 ceiling with
+R67's k = 5 ceiling measured on another day, through another cache, and — as R66's outcome records —
+inside the double-priced window. One pass of ten draws contains the five-draw pool as its first five,
+so adding the k = 5 arms costs **zero calls** and turns the width effect from a comparison across two
+dispatches into a paired difference within one.
 
 ## Why this file exists
 
@@ -33,48 +44,55 @@ any selector work. This file does both, one variable per dispatch.
 - **Dispatch A — width.** `sample-10-first`, `sample-10-exec`, `sample-10-oracle` at the lane's
   existing T = 0.7. The estimand is the ceiling, `oracle − first`, and every arm rides one pass of
   ten draws.
-- **Dispatch B — temperature.** R67's five-draw arms at **T = 1.0** (`SOTA_SAMPLE_TEMPERATURE`),
-  same arms and same folds. `sample-5-first` at T = 1.0 against R67's `sample-5-first` at T = 0.7
-  separates "hotter draws are more diverse" from "hotter draws are worse", which a single
-  temperature cannot.
-- **The comparison that decides the line** is the ceiling in each dispatch against R67's **+8.85pp**,
-  and the *ceiling share* an execution selector recovers in each. Points are not the axis (Rule 14);
-  the share is.
-- Cost: A is 350 × 10 draws + 700 baseline ≈ **4,200 calls**; B is R67's ≈ 2,900. Both capped from
-  the forecast rather than from a warm-cache bill, which is how R66's first dispatch died.
+- **Dispatch B — temperature** moved to **R70**, and the reason is mechanical rather than editorial:
+  a registration's header carries **one** temperature, and this file's two dispatches wanted 0.7 and
+  1.0. Keeping them together meant the header lied to one of them, and a header that lies is worse
+  than two files. R70 carries `temperature: 1.0` and the same three five-draw arms; the comparison
+  against this dispatch's T = 0.7 arms is then a same-day, same-cache, same-endpoint reading.
+- **The comparison that decides the line** is the ceiling at k = 10 against the ceiling at k = 5
+  **measured in this dispatch**, and the *ceiling share* an execution selector recovers at each width.
+  Points are not the axis (Rule 14); the share is.
+- Cost: 350 × 10 draws + 700 baseline ≈ **4,200 calls**, one dispatch, capped from the forecast rather
+  than from a warm-cache bill, which is how R66's first dispatch died — and dispatched outside the
+  01:00–04:00 UTC double-priced window, which is how R66's *second* dispatch lost $0.235.
 
 ## Prediction
 
-- **Width buys ceiling, less than linearly**: `sample-10-oracle − first` at **+12…+20pp**, against
-  +8.85pp at k = 5. Ten draws to buy four points would be the honest shape of diminishing returns.
-- **Heat buys diversity up to a point, then damage**: at T = 1.0 the ceiling is **+9…+18pp** while
-  `sample-5-first` *falls* by 2–5pp against its T = 0.7 reading, because a hotter first draw is a
-  worse answer and the pool's gains are paid for out of the baseline.
-- **The selector stays at chance on both**: `exec − first` under **+3pp** in both dispatches, and all
-  seven AUCs still straddling 0.5. If a wider pool makes execution shape informative, that is a
-  finding and it contradicts R67's mechanism; predicting it stays at chance is what makes the
+- **Width buys ceiling, less than linearly**: `sample-10-oracle − first` at **+12…+20pp** against the
+  *same dispatch's* k = 5 ceiling. Ten draws to buy four points is the honest shape of diminishing
+  returns, and the prediction is a band rather than a point because the only prior reading (+8.85pp at
+  k = 5) was taken on another day.
+- **The k = 5 arms reproduce R67 within ±3pp on all four readings** (`first`, `exec`, `oracle`, and the
+  `none` baseline). This is not decoration: the width delta is within-run and paired, so it survives a
+  bad day, but the *comparison with R67's +8.85pp* does not. A k = 5 ceiling five points off R67 makes
+  the day the explanation, and the row says so before the number is read.
+- **The selector stays at chance at both widths**: `exec − first` under **+3pp** at k = 10, and the
+  ceiling share it recovers still under 20%. If a wider pool makes execution shape informative that is
+  a finding and it contradicts R67's mechanism; predicting it stays at chance is what makes the
   contradiction visible if it does not.
 - **The instrument**: 100% parse, `V18`/`V19` reconcile every candidate, and the draw count per
   question equals k for every arm — a k = 10 arm that silently drew five would report a width effect
-  of zero.
+  of exactly zero.
 
 ## Refutation
 
-The branches partition the space (Rule 12): ordered, exhaustive, first match names the outcome.
+The branches partition the space (Rule 12), are ordered, cover every value, and the first one that
+applies names the outcome. They are written on the **within-run** ceiling delta,
+`ceiling(k=10) − ceiling(k=5)`, because that is the only quantity here that no day can move.
 
 - **Void** — `V18-pool-complete` or `V19-pool-reconciles` fails, or the mean draws per question is
-  below k − 0.5 in either dispatch. Then the width was not delivered and neither number describes one.
-- **Width pays** — the k = 10 ceiling is at least **+15pp** and at least **5pp above** R67's +8.85.
-  Then generation width is the lever, the lane adopts k = 10 for the oracle-style pool, and the next
-  registration is a selector again — because a pool that contains the answer twice as often changes
-  what a selector is worth even at AUC 0.5.
-- **Heat pays** — the T = 1.0 ceiling is at least **+15pp** and at least 5pp above R67's, while
-  `sample-5-first` at T = 1.0 is within 2pp of its T = 0.7 reading. Then diversity, not width, is the
-  missing ingredient and the next registration varies the prompt instead of k.
-- **Neither pays** — both ceilings are under +12pp. Then five draws already saturate what this model
-  can produce on these questions at this prompt, the two-digit gap is not in generation on this lane,
-  and the next registration stops buying draws and goes after the one thing R67 did not vary: **what
-  the draw is asked** — decomposition, or a second model.
+  below k − 0.5. Then the width was not delivered and the number describes a pool nobody asked for.
+- **Width pays** — the k = 10 ceiling is **at least 5pp above** the k = 5 ceiling in the same
+  dispatch, and at least **+15pp above `first`**. Then generation width is the lever, the lane adopts
+  k = 10 as the pool it selects from, and the next registration is a selector again — a pool that
+  contains the answer materially more often changes what a selector is worth even at AUC 0.5.
+- **Width saturates** — the k = 10 ceiling is **within 3pp** of the k = 5 ceiling. Then five draws
+  already contain what this model can produce at this prompt, doubling the draws buys nothing, and the
+  next registration stops buying draws and goes after the one thing R67 did not vary: **what the draw
+  is asked** — decomposition, or a second model.
+- **Otherwise** — between 3 and 5pp. Width pays a little; the next registration repeats this one at
+  k = 20 only if the ceiling share *also* rose, and otherwise the answer is that a selector is the
+  binding constraint after all and the spend moves to one.
 
-The branches are applied in the order written, and any estimate that fits none of the four is
-impossible by construction.
+Any estimate that fits none of the four is impossible by construction: the branches are a partition of
+the real line cut at 3pp and 5pp.

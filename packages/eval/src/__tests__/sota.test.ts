@@ -284,6 +284,9 @@ describe('parseArms', () => {
       'retry-blank',
       'retry-keyed',
       'retry-values',
+      'sample-10-exec',
+      'sample-10-first',
+      'sample-10-oracle',
       'sample-3',
       'sample-3-exec',
       'sample-3-first',
@@ -477,6 +480,9 @@ describe('parseArms', () => {
       'sample-5-prior',
       'sample-5-prior-shape',
       'sample-5-model',
+      'sample-10-first',
+      'sample-10-oracle',
+      'sample-10-exec',
       'values',
       'm-schema',
       'gen-plan',
@@ -2888,6 +2894,15 @@ describe('samplingSpecOf', () => {
     expect(samplingSpecOf('sample-5')).toEqual({ n: 5, selector: 'majority' });
     expect(samplingSpecOf('sample-5-first')).toEqual({ n: 5, selector: 'first' });
     expect(samplingSpecOf('sample-3-exec')).toEqual({ n: 3, selector: 'exec' });
+  });
+
+  it('reads a width the register has never run before, which is R69', () => {
+    // The one failure mode a width experiment cannot see from the inside: a `sample-10-*` arm that
+    // quietly drew five would report a width effect of exactly zero and look like a saturated pool.
+    // The draw count is read from the name, and this pins that it is read rather than assumed.
+    expect(samplingSpecOf('sample-10-first')).toEqual({ n: 10, selector: 'first' });
+    expect(samplingSpecOf('sample-10-oracle')).toEqual({ n: 10, selector: 'oracle' });
+    expect(samplingSpecOf('sample-10-exec')).toEqual({ n: 10, selector: 'exec' });
   });
 
   it('knows the memory prior, which is a selector that reads other folds', () => {
