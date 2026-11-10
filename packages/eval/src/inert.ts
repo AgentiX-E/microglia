@@ -163,22 +163,22 @@ export function liveShareBuckets(
   rules: readonly RuleInertness[],
   edges: readonly number[] = [0, 0.01, 0.25, 0.5, 0.75, 1],
 ): readonly { readonly atLeast: number; readonly below: number; readonly rules: number }[] {
+  const shareOfRule = (row: RuleInertness): number => (row.draws === 0 ? 0 : row.live / row.draws);
+  const last = edges[edges.length - 1] ?? 1;
   const out: { atLeast: number; below: number; rules: number }[] = [];
   for (let index = 0; index < edges.length - 1; index += 1) {
     const low = edges[index] as number;
     const high = edges[index + 1] as number;
+    // The final edge is closed on both sides, so a rule that changed every answer is not dropped from a
+    // distribution that claims to cover every rule. Built by counting rather than by patching the
+    // array afterwards: the earlier version incremented the last bucket in place, which is a mutation
+    // inside a type that promises not to have one.
     const count = rules.filter((row) => {
-      const share = row.draws === 0 ? 0 : row.live / row.draws;
-      return share >= low && share < high;
+      const share = shareOfRule(row);
+      return share >= low && (index === edges.length - 2 ? share <= last : share < high);
     }).length;
     out.push({ atLeast: low, below: high, rules: count });
   }
-  const last = edges[edges.length - 1] as number;
-  const top = rules.filter((row) => (row.draws === 0 ? 0 : row.live / row.draws) >= last).length;
-  // The final edge is closed on both sides, so a rule that changed every answer is not dropped from a
-  // distribution that claims to cover every rule.
-  const previous = out[out.length - 1];
-  if (previous !== undefined) previous.rules += top;
   return out;
 }
 
