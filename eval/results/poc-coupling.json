@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 178,
+  "scanned": 179,
   "totals": {
-    "modules": 178,
-    "lines": 47713,
+    "modules": 179,
+    "lines": 48128,
     "adapterLines": 1956,
-    "deferredLines": 7761,
-    "coupledShare": 0.201
+    "deferredLines": 8154,
+    "coupledShare": 0.2074
   },
   "layers": [
     {
@@ -37,11 +37,11 @@
     },
     {
       "layer": "eval",
-      "modules": 121,
-      "lines": 34638,
+      "modules": 122,
+      "lines": 35053,
       "adapterLines": 0,
-      "deferredLines": 7761,
-      "coupled": 20
+      "deferredLines": 8154,
+      "coupled": 21
     },
     {
       "layer": "browser",
@@ -129,6 +129,17 @@
     },
     {
       "pkg": "eval",
+      "module": "assertion",
+      "path": "packages/eval/src/assertion.ts",
+      "lines": 313,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "scores a candidate against the assertions a model wrote for one question; the query it reads is a string the pool already recorded, and the arithmetic never opens a database"
+    },
+    {
+      "pkg": "eval",
       "module": "bird-data",
       "path": "packages/eval/src/bird-data.ts",
       "lines": 440,
@@ -165,7 +176,7 @@
       "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 466,
+      "lines": 469,
       "words": [
         "sql",
         "sqlite",
@@ -281,7 +292,7 @@
       "pkg": "eval",
       "module": "selector",
       "path": "packages/eval/src/selector.ts",
-      "lines": 336,
+      "lines": 386,
       "words": [
         "sql"
       ],
@@ -292,7 +303,7 @@
       "pkg": "eval",
       "module": "sota",
       "path": "packages/eval/src/sota.ts",
-      "lines": 2469,
+      "lines": 2496,
       "words": [
         "sql",
         "sqlite",
@@ -519,6 +530,13 @@
       ]
     },
     {
+      "pkg": "eval",
+      "module": "prereg",
+      "words": [
+        "bird"
+      ]
+    },
+    {
       "pkg": "core",
       "module": "render",
       "words": [
@@ -604,7 +622,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "178 modules, 20 deferred with a reason"
+      "detail": "179 modules, 21 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -619,5 +637,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 47713 production lines across 178 modules: 7 adapter modules in `sql`, 20 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 48128 production lines across 179 modules: 7 adapter modules in `sql`, 21 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }

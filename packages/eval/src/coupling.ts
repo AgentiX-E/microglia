@@ -84,6 +84,9 @@ export const DEFERRALS: Readonly<Record<string, string>> = {
   'content-signal':
     'compares the question\'s own words against a candidate\'s column names and literals; it reads ' +
     'strings and executes nothing',
+  assertion:
+    'scores a candidate against the assertions a model wrote for one question; the query it reads is ' +
+    'a string the pool already recorded, and the arithmetic never opens a database',
   overlap:
     'measures how much of a question a pack\'s rendered text accounts for; it reads strings that were ' +
     'recorded before it ran and executes nothing',

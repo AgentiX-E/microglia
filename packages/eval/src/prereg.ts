@@ -618,6 +618,28 @@ export function armsAgainstRegistration(
 }
 
 /**
+ * The sampled arms a header names that the lane cannot buy.
+ *
+ * Only `sample-` names are checked, and the restriction is the whole design. A registration's arm
+ * header is read by three lanes with three vocabularies — this one's `sample-N-selector` family, the
+ * tau-bench pair (`memory`/`reference`), and the BIRD arms that have been retired from the table but
+ * are still described by the run that used them — so "every arm must exist" refuses files that are
+ * correct. The `sample-` prefix is the one family whose names are *constructed* from a width and a
+ * selector, and a constructed name can be parseable, plannable and absent from the list the lane
+ * checks membership against: R67's dispatch died on `sample-5-exec` in two seconds for exactly that,
+ * and R73's `sample-5-assert` was declared before the arm existed.
+ *
+ * The check lives here rather than in the lane because a registration is written days before it is
+ * dispatched, and `pnpm check` runs on every push.
+ */
+export function unknownSampleArms(arms: Iterable<string>, known: Iterable<string>): readonly string[] {
+  const table = new Set(known);
+  return [...new Set(arms)]
+    .filter((arm) => arm.startsWith('sample-') && !table.has(arm))
+    .sort();
+}
+
+/**
  * The arms a header names, minus the two the lane always measures.
  *
  * Exported because the dispatch has to *fall back* to this list when no arm menu entry was given:

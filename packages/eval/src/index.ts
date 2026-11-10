@@ -85,6 +85,7 @@ export {
   type SchemaBlock,
 } from '@agentix-e/microglia-sql';
 export {
+  assertionPrompt,
   choicePrompt,
   choicePromptWithResults,
   parseChoice,
@@ -101,6 +102,25 @@ export {
   type SelectionReason,
   type SelectionStats,
 } from './selector.js';
+
+export {
+  ASSERTION_KINDS,
+  ASSERTION_SIGNALS,
+  MAX_ASSERTIONS_PER_KIND,
+  NO_ASSERTIONS,
+  assertAnything,
+  assertionHitsOf,
+  assertionPopulation,
+  assertionReadings,
+  assertionScoreOf,
+  assertionSignalOf,
+  parseAssertions,
+  selectByAssertions,
+  type AssertedQuestion,
+  type AssertionKind,
+  type AssertionSignalName,
+  type Assertions,
+} from './assertion.js';
 export { recoveryRatio, type RecoveryInput } from './recovery.js';
 export {
   TRANSFER_FLOOR,

@@ -7,6 +7,7 @@ import {
   preregGate,
   preregGateAgreement,
   readPrereg,
+  unknownSampleArms,
   type Prereg,
 } from '../prereg.js';
 
@@ -641,5 +642,30 @@ describe('the arms a dispatch buys against the arms it registers', () => {
     // differently in two places is the shape this whole file exists to close.
     expect(essentialArms(['none', 'full', 'gated', 'gated', 'oracle'])).toEqual(['gated', 'oracle']);
     expect(essentialArms(['none', 'full'])).toEqual([]);
+  });
+});
+
+describe('the sampled arms a header names that the lane cannot buy', () => {
+  const KNOWN = ['sample-5', 'sample-5-first', 'sample-5-assert'];
+
+  it('says nothing about a header whose arms all exist', () => {
+    expect(unknownSampleArms(['sample-5-first', 'sample-5-assert'], KNOWN)).toEqual([]);
+  });
+
+  it('names the one that does not, because a constructible name is not an existing arm', () => {
+    // R67's dispatch died on `sample-5-exec` in two seconds: the parser built it from a width and a
+    // selector, and the table the lane checks membership against had never been told about it.
+    expect(unknownSampleArms(['sample-5-first', 'sample-9-oracle'], KNOWN)).toEqual(['sample-9-oracle']);
+  });
+
+  it('leaves the other two vocabularies alone', () => {
+    // `memory`/`reference` belong to the tau-bench lane and `retry-values` to a retired BIRD family.
+    // A check that demanded every arm exist would refuse files that are correct, which is how a gate
+    // teaches its author to route around it.
+    expect(unknownSampleArms(['memory', 'reference', 'retry-values', 'keyword-router'], KNOWN)).toEqual([]);
+  });
+
+  it('reports each unknown arm once', () => {
+    expect(unknownSampleArms(['sample-2-x', 'sample-2-x'], KNOWN)).toEqual(['sample-2-x']);
   });
 });

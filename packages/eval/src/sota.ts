@@ -827,6 +827,27 @@ export type SqlArm =
    */
   | 'sample-5-prior-shape'
   /**
+   * The same five draws, chosen by assertions a model wrote for *this* question.
+   *
+   * R71 priced the free half of CHESS's selection step and found it inert: `column-mention` 0.514,
+   * `literal-match` 0.509, and the second was constant across the draws on 342 of 350 questions. The
+   * diagnosis was not that the signals were weak but that they were not per-question facts — every
+   * draw of a question shares the question's words, so a rule over those words cannot order the
+   * draws. What the competitor buys with its writer is exactly the missing property: the assertions
+   * are authored for this question against these results, so they differ between questions even when
+   * the questions do not.
+   *
+   * This arm is that writer, and it is the one arm in this table whose cost is a call the pool did
+   * not already pay: one per question, not one per candidate. The reply is held to a grammar of three
+   * executable kinds and scored by arithmetic, so the model never grades its own work — it says what
+   * a correct answer must contain, and code decides which draw contains it.
+   *
+   * If this does not clear the first draw, no per-question reader recovers the pool on this corpus
+   * and the selection line closes; if it does, the 8.2 points CHESS reports are the price of reading
+   * rather than a mechanism nobody here had tried.
+   */
+  | 'sample-5-assert'
+  /**
    * Ten draws, and the first one.
    *
    * R67 priced five draws: the pool contains the right answer on **+8.85pp** more questions than
@@ -992,6 +1013,11 @@ export const SAMPLING_SELECTORS = [
   'value',
   'prior-shape',
   'prior',
+  // R73: the selector reads assertions a model wrote *for this question*, and every other selector
+  // in this list reads the candidates themselves. It sits last because the alternation is ordered
+  // and `assert` shares no prefix with the others, which is the property the previous comment is
+  // about.
+  'assert',
 ] as const;
 
 export type SamplingSelector = 'majority' | (typeof SAMPLING_SELECTORS)[number];
@@ -1097,6 +1123,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-5-value': true,
   'sample-5-prior': true,
   'sample-5-prior-shape': true,
+  'sample-5-assert': true,
   'sample-5-model': true,
   // R69: the width ladder. Ten draws, three selectors, registered beside the five-draw arms in the
   // same dispatch so the ceiling's *delta* is paired within a run rather than across two.

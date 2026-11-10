@@ -68,7 +68,7 @@ import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import {
   MicrogliaError,
@@ -112,6 +112,11 @@ import {
   stoppedRun,
   buildValidityGates,
   armCoverageGate,
+  assertAnything,
+  assertionPrompt,
+  parseAssertions,
+  selectByAssertions,
+  type Assertions,
   ceilingAmong,
   canonicalRows,
   comparePaired,
@@ -659,6 +664,33 @@ const DISTILL_CACHE_PATH = process.env['SOTA_DISTILL_CACHE'] ?? '';
 const distillations = DistillCache.load(DISTILL_CACHE_PATH);
 
 /**
+ * Where the assertions R73's writer produced are kept between dispatches.
+ *
+ * The distillation cache's argument, for the same amount of money: a replay of the same split should
+ * learn the same assertions for nothing, and a writer whose output moved between two runs of one
+ * split would make the arm's delta a statement about sampling rather than about the mechanism. Keyed
+ * on the full prompt, because the prompt carries the schema and the question and two questions that
+ * differ in either must not share a writer's answer.
+ */
+const ASSERTION_CACHE_PATH = process.env['SOTA_ASSERTION_CACHE'] ?? '';
+const assertionCache = new Map<string, Assertions>();
+if (ASSERTION_CACHE_PATH !== '' && existsSync(ASSERTION_CACHE_PATH)) {
+  try {
+    const raw = JSON.parse(readFileSync(ASSERTION_CACHE_PATH, 'utf8')) as Record<string, Assertions>;
+    for (const [key, value] of Object.entries(raw)) assertionCache.set(key, value);
+  } catch {
+    // A corrupt cache is a cold cache. Refusing the run over it would make a lost file cost a
+    // dispatch, which is the opposite of what a cache is for.
+  }
+}
+
+function flushAssertionCache(): void {
+  if (ASSERTION_CACHE_PATH === '' || assertionCache.size === 0) return;
+  mkdirSync(dirname(ASSERTION_CACHE_PATH), { recursive: true });
+  writeFileSync(ASSERTION_CACHE_PATH, JSON.stringify(Object.fromEntries(assertionCache), null, 1));
+}
+
+/**
  * How often each channel kind has to rewrite the prompt before its null is a null about the channel.
  *
  * The floors differ because the manipulations differ: `values` annotates every column unconditionally,
@@ -946,6 +978,14 @@ type CaseOutcome = {
     readonly sql?: string;
     readonly columns?: readonly string[] | null;
   }[] | null;
+  /**
+   * What R73's writer said a correct answer must contain, or null when the arm did not run.
+   *
+   * In the file rather than in the writer's cache, because the reading has to be a computation over
+   * this artefact: `pnpm eval:assertion` scores every candidate against these sentences and needs no
+   * model, and a writer re-run would be a second writer measuring a second question.
+   */
+  readonly assertions?: Assertions | null;
   /**
    * What the linker offered this question, or null when the arm did not run.
    *
@@ -5110,6 +5150,15 @@ async function runFold(
    * dispatch. The sampling run pays for the draws once; the analysis costs nothing.
    */
   const poolByPositionRecord = new Map<number, PoolQuestion>();
+  /**
+   * What R73's writer said a correct answer must contain, per question.
+   *
+   * Declared beside the pool record because both are read by the artefact writer below, and a map
+   * scoped to the pass that fills it is a map the artefact cannot see: the first version of this
+   * line sat inside the pool builder, and `pnpm typecheck` named the artefact writer rather than the
+   * declaration.
+   */
+  const assertionsByPosition = new Map<number, Assertions>();
   const chosenJudged = new Map<string, { readonly position: number; readonly arm: ArmName; readonly verdict: Judged }>();
   const selectionByArm = new Map<ArmName, Selection[]>();
   /**
@@ -5289,6 +5338,80 @@ async function runFold(
     }
 
     /**
+     * Write the assertions the `assert` selector reads: one call per question, none per candidate.
+     *
+     * Paid only when an arm that reads them was bought, because the assertions are not part of any
+     * other arm's input and a dispatch that did not ask for them must not buy them. One call per
+     * question rather than one per candidate is the whole economy of the mechanism: CHESS writes its
+     * assertions per question and executes them per candidate, and the execution is arithmetic here
+     * because the grammar is three kinds and nothing else.
+     *
+     * The writer is shown the task prompt verbatim — the schema and the evidence the generator saw —
+     * and the *shapes* of what the draws returned, never the SQL and never the verdict. A writer that
+     * saw the queries would be choosing rather than describing, and its description would then be
+     * unrefutable by the arithmetic that scores the candidates.
+     */
+    const assertArms = samplingArmsThisRun.filter((arm) => samplingSpecOf(arm)?.selector === 'assert');
+    if (assertArms.length > 0) {
+      const batch: { position: number; key: string; prompt: string }[] = [];
+      for (const position of evalRows.keys()) {
+        const recorded = poolByPositionRecord.get(position) as PoolQuestion;
+        const at = index.get(`${position}:none`);
+        const wording = at === undefined ? undefined : plans[at]?.prompt;
+        if (wording === undefined) continue;
+        const prompt = assertionPrompt(
+          wording,
+          recorded.candidates.slice(0, samplingDraws).map((candidate) => ({
+            columns: candidate.columns ?? null,
+            rows: candidate.signature?.rowCount ?? 0,
+            ran: candidate.resultKey >= 0,
+          })),
+        );
+        batch.push({
+          position,
+          prompt,
+          key: createHash('sha256').update(prompt).digest('hex').slice(0, 32),
+        });
+      }
+      let written = 0;
+      let reused = 0;
+      const replied = await mapPool(batch, CONCURRENCY, async (item) => {
+        const cached = assertionCache.get(item.key);
+        if (cached !== undefined) {
+          reused += 1;
+          return { item, assertions: cached };
+        }
+        try {
+          const reply = await chat(item.prompt, 120, 0);
+          return { item, assertions: parseAssertions(reply.text) };
+        } catch (error) {
+          if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+          if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+          return { item, assertions: undefined };
+        } finally {
+          written += 1;
+          if (written % 50 === 0 || written === batch.length - reused) {
+            process.stdout.write(
+              `[sota] fold ${fold + 1}/${FOLDS} assertions ${written}/${batch.length - reused} ` +
+                `calls=${llm.stats.calls} failed=${llm.stats.failures}\n`,
+            );
+          }
+        }
+      });
+      for (const entry of replied) {
+        if (entry.assertions === undefined) continue;
+        assertionsByPosition.set(entry.item.position, entry.assertions);
+        assertionCache.set(entry.item.key, entry.assertions);
+      }
+      flushAssertionCache();
+      const withAssertion = [...assertionsByPosition.values()].filter((set) => assertAnything(set)).length;
+      process.stdout.write(
+        `[sota] fold ${fold + 1}/${FOLDS} wrote assertions for ${withAssertion}/${batch.length} ` +
+          `question(s), ${batch.length - reused} written and ${reused} reused from the cache\n`,
+      );
+    }
+
+    /**
      * Ask a model which candidate to keep, only where there is something to choose.
      *
      * The skip is the design, not an optimisation: three byte-identical queries are one candidate,
@@ -5399,7 +5522,16 @@ async function runFold(
                 ? selectRandom(slice, mulberry32(SEED + position))
                 : spec.selector === 'first'
                   ? selectFirst(slice)
-                  : spec.selector === 'model' || spec.selector === 'exec'
+                  : spec.selector === 'assert'
+                    ? // The one selector that reads something written *for this question*. It scores
+                      // the recorded pool rather than the `Candidate` slice, because an assertion is
+                      // checked against columns, SQL and a row count and the slice carries none of
+                      // them.
+                      selectByAssertions(
+                        shapePoolOf(position, spec.n).candidates,
+                        assertionsByPosition.get(position),
+                      )
+                    : spec.selector === 'model' || spec.selector === 'exec'
                     ? selectByModel(slice.length, choiceAtIndex.get(`${position}:${arm}`))
                     : selectByConsistency(slice);
         chosenJudged.set(`${position}:${arm}`, {
@@ -5580,6 +5712,10 @@ async function runFold(
       // The candidates themselves, so every question about the pool is a computation over this
       // file rather than another dispatch.
       pool: poolByPositionRecord.get(position)?.candidates ?? null,
+      // What R73's writer said a correct answer must contain, beside the candidates it is scored
+      // against. Recorded rather than recomputed, for the same reason the pool is: the reading has
+      // to be a computation over this file, and a writer re-run would be a second writer.
+      assertions: assertionsByPosition.get(position) ?? null,
       schemaTables: linkKept.get(position) ?? null,
       injected: injectedByPosition.get(position) ?? [],
       injectedRepair: injectedRepairByPosition.get(position) ?? [],

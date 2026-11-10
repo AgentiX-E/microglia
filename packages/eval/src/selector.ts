@@ -50,6 +50,8 @@ export type SelectionReason =
   | 'model'
   /** The execution-shape composite endorsed one; see `selectByShape`. */
   | 'shape'
+  /** Assertions written for this question endorsed one; see `assertion.ts`. */
+  | 'assertion'
   /** No candidates at all: the caller asked for a selection it did not supply. */
   | 'empty';
 
@@ -196,6 +198,54 @@ export function choicePrompt(task: string, queries: readonly string[]): string {
     `for the task above. Exactly one of them is the most likely to answer the question correctly.\n\n` +
     `${blocks.join('\n\n')}\n\n` +
     'Reply with the number of the most likely correct query inside <choice></choice> and nothing else.'
+  );
+}
+
+/**
+ * The prompt that asks a model to write what a correct answer must contain.
+ *
+ * This is CHESS's mechanism and the one thing in this project that reads a candidate *for its
+ * question* rather than for its shape. R71 settled that the free approximations do not work: a rule
+ * over the question's own words ranks nothing, because every draw of a question shares those words.
+ * What differs between draws is which of the question's requirements each result actually meets, and
+ * only something that read the question can say which requirements there were.
+ *
+ * Three lines, three executable kinds, no SQL. The model is deliberately not asked for a query or a
+ * verdict: a query would be a sixth candidate nobody drew, and a verdict would be the model grading
+ * its own judgement — neither is checkable by code, and both would make the arm's number a statement
+ * about the model rather than about the mechanism. What it writes is checked by arithmetic against
+ * every candidate, which is what makes this a measurement.
+ *
+ * The task prompt is passed through verbatim for the same reason `choicePrompt` does it, plus one of
+ * its own: an assertion about a column name is only checkable if the writer saw the schema the
+ * generator saw.
+ */
+export function assertionPrompt(
+  task: string,
+  shapes: readonly {
+    readonly columns: readonly string[] | null;
+    readonly rows: number;
+    readonly ran: boolean;
+  }[],
+): string {
+  const blocks = shapes.map((shape, index) =>
+    shape.ran
+      ? `[${index + 1}] columns (${(shape.columns ?? []).join(', ') || 'none'}) — ${shape.rows} row${
+          shape.rows === 1 ? '' : 's'
+        }`
+      : `[${index + 1}] the query did not run`,
+  );
+  return (
+    `${task}\n\n` +
+    `${shapes.length} ${shapes.length === 1 ? 'query was' : 'queries were'} written for the question ` +
+    `above, and these are the shapes of what they returned:\n\n` +
+    `${blocks.join('\n')}\n\n` +
+    'Before anyone chooses between them: say what a correct answer to this question must contain, ' +
+    'in exactly three lines and nothing else.\n\n' +
+    'column:<one column the result must have, spelled as the schema spells it>\n' +
+    'value:<one literal from the question that the query must contain>\n' +
+    'rows:<how many rows the correct result has>\n\n' +
+    'Use only those three forms. Do not write SQL. Do not explain.'
   );
 }
 

@@ -2,7 +2,7 @@
 id: R73-written-reader
 step: R73
 opened: 2026-11-10
-arms: sample-5-assert
+arms: sample-5-first,sample-5-assert
 sample: 350
 gates: V18,V19,V69
 ---
@@ -56,9 +56,8 @@ because the previous one was free.
 - **The arm:** `sample-5-assert`, scored against **`sample-5-first`** — the draw it would have taken
   had it decided nothing — on all 350 questions and on the eligible population, both reported. R69's
   lesson is that the two denominators can disagree in sign, so neither alone is the reading.
-- **Where it runs:** offline, like R71. `pnpm eval:assert --write` buys the 350 assertions and caches
-  them; `pnpm eval:assert --read` computes the arm from the cache and the pool. A second run must
-  reproduce the first from the cache alone, or the artefact is a transcript rather than a reading.
+- **Where it runs:** a dispatch on `minidev`, not offline, and the amendment below says why the
+  first version of this line was wrong.
 
 ## Prediction
 
@@ -101,3 +100,41 @@ The order matters: a number that lands between the bars is described as measured
 It does not run on `train`, and it does not change a default. R72 already holds the registered claim on
 the lane's memory behaviour, and two open experiments on one population is how a record ends up with a
 number it cannot attribute. R73 reads R70's pool and nothing else.
+
+## Amendment 1 — the pool is bought with the writer, and the control is bought with the treatment
+
+**Written before dispatch.** Three things changed while the arm was implemented, and each of them is a
+fact about the mechanism rather than a preference.
+
+**The control is in the header.** The arm's baseline is `sample-5-first` — the draw it would have taken
+had it decided nothing — and a header that names only the treatment is a header that lets the dispatch
+omit the control. R66 taught this the expensive way: its header named `retry-values` while its dispatch
+bought `retry-blank` beside it, and the arm-check rule was loosened to accommodate the file rather than
+the file corrected. The rule is equality in both directions now, so the header names both:
+`sample-5-first,sample-5-assert`.
+
+**The writer runs inside the dispatch, not beside it.** The first version of this file said offline:
+read R70's pool, write 350 assertions, score them. That works, and it is what `pnpm eval:assertion`
+does — but it produces a *derived* file, and the promise this project keeps making about a pool is
+that the reading is a computation over the artefact the run wrote. An assertion written against a
+pool re-read from another day's file is an assertion about a schema and a set of draws that are only
+believed to be the same ones. The writer therefore runs in the lane, one call per question, and lands
+in the same `per_case` entry as the candidates it is scored against.
+
+**The cache makes the replay free, not the first run.** `SOTA_ASSERTION_CACHE` keys a writer's reply on
+the full prompt, so a second dispatch of the same split pays nothing for the assertions and measures the
+same ones — the distillation cache's argument, and the reason a re-run can be a replication rather
+than a second experiment. The first run pays 350 calls.
+
+| item | calls | note |
+| --- | --- | --- |
+| the writer | 350 | one per question, `learn_sample` 0 |
+| five draws × 350 | 1,750 | the pool the arm selects from |
+| two answers × 350 | 700 | `none` and `full` are always measured |
+| **total** | **≈2,800** | ≈$0.23 off-peak, ≈25 minutes |
+
+**The reading is still offline.** `pnpm eval:assertion` takes the artefact and prints the four signals
+— `assertion-column`, `assertion-value`, `assertion-rows` and their sum — with zero calls. The three
+kinds are reported separately because the arm is a claim about which sentence carries the ranking, and
+a combined number alone could not say that a `rows:` assertion was a shape signal this lane already
+knows is inert.

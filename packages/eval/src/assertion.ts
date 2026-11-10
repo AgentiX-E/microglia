@@ -26,6 +26,7 @@
  */
 
 import { aucReading, type AucReading, type PoolCandidate, type PoolQuestion } from './pool.js';
+import type { Selection } from './selector.js';
 
 /** The three assertion kinds a writer may emit, in the order the scorer reports them. */
 export const ASSERTION_KINDS = ['column', 'value', 'rows'] as const;
@@ -265,4 +266,47 @@ export function assertionReadings(
 /** Questions a writer produced assertions for: the population `assertionReadings` reads. */
 export function assertionPopulation(questions: readonly AssertedQuestion[]): number {
   return asserted(questions).length;
+}
+
+/**
+ * The selector: the candidate that satisfies the most assertions, ties to the earlier draw.
+ *
+ * Two abstentions, and they are different facts. No candidates at all is `empty`, which is the pool's
+ * own failure. No assertions is `no-agreement` with the first draw chosen, which is the *writer's*
+ * failure — and it has to be reported as a first draw rather than as a selection, because an arm that
+ * silently becomes `sample-5-first` on the questions its writer could not answer would report the
+ * baseline's accuracy as its own mechanism's.
+ *
+ * `votes` is the size of the winning tie group rather than one, so a run can report how often the
+ * writer's preference was unambiguous. `groups` is the number of distinct scores, which is what says
+ * whether the assertions ordered anything at all: on a question where all five draws satisfy the same
+ * two sentences, `groups` is 1 and the choice is the first draw by construction.
+ */
+export function selectByAssertions(
+  candidates: readonly PoolCandidate[],
+  assertions: Assertions | undefined,
+): Selection {
+  if (candidates.length === 0) {
+    return { chosen: 0, votes: 0, groups: 0, reason: 'empty', emptyResult: false };
+  }
+  if (assertions === undefined || !assertAnything(assertions)) {
+    return { chosen: 0, votes: 1, groups: 0, reason: 'no-agreement', emptyResult: false };
+  }
+  const scores = candidates.map((candidate) => assertionScoreOf(candidate, assertions));
+  let chosen = 0;
+  for (let at = 1; at < scores.length; at += 1) {
+    // Strictly greater, so a tie keeps the earlier draw — the pool's rule everywhere else, and the
+    // one that stops an inert writer from reporting "take the last draw" as a mechanism.
+    if ((scores[at] as number) > (scores[chosen] as number)) chosen = at;
+  }
+  const best = scores[chosen] as number;
+  const votes = scores.filter((score) => score === best).length;
+  const groups = new Set(scores).size;
+  return {
+    chosen,
+    votes,
+    groups,
+    reason: 'assertion',
+    emptyResult: candidates[chosen]?.signature?.empty === true,
+  };
 }

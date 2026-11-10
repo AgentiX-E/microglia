@@ -11,9 +11,11 @@ import {
   assertionScoreOf,
   assertionSignalOf,
   parseAssertions,
+  selectByAssertions,
   type Assertions,
 } from '../assertion.js';
 import type { ExecSignature } from '../exec-signature.js';
+import { assertionPrompt } from '../selector.js';
 import type { PoolCandidate, PoolQuestion } from '../pool.js';
 
 const SHAPE = {
@@ -244,5 +246,120 @@ describe('the reading a written selector gets', () => {
       'assertion-rows',
       'assertion-hits',
     ]);
+  });
+});
+
+describe('the selection a written selector makes', () => {
+  it('reports an empty pool as empty rather than as an abstention', () => {
+    expect(selectByAssertions([], ASSERTIONS)).toEqual({
+      chosen: 0,
+      votes: 0,
+      groups: 0,
+      reason: 'empty',
+      emptyResult: false,
+    });
+  });
+
+  it('falls back to the first draw when the writer wrote nothing', () => {
+    // The writer's failure, not the pool's: reported as the baseline so an arm whose writer missed a
+    // question cannot claim that question's accuracy as its own mechanism.
+    expect(selectByAssertions([candidate(0), candidate(1)], undefined)).toEqual({
+      chosen: 0,
+      votes: 1,
+      groups: 0,
+      reason: 'no-agreement',
+      emptyResult: false,
+    });
+    expect(selectByAssertions([candidate(0)], NO_ASSERTIONS).reason).toBe('no-agreement');
+  });
+
+  it('chooses the draw that satisfies the most assertions', () => {
+    const candidates = [
+      candidate(0, { columns: ['state'], rows: 1 }),
+      candidate(1, { columns: ['County'], rows: 1, correct: true }),
+    ];
+    const selection = selectByAssertions(candidates, ASSERTIONS);
+    expect(selection.chosen).toBe(1);
+    expect(selection.reason).toBe('assertion');
+    expect(selection.groups).toBe(2);
+    expect(selection.votes).toBe(1);
+  });
+
+  it('breaks a tie toward the earlier draw and counts the tie', () => {
+    const candidates = [candidate(0, { rows: 1 }), candidate(1, { rows: 1 }), candidate(2, { rows: 2 })];
+    const selection = selectByAssertions(candidates, { ...NO_ASSERTIONS, rows: [1] });
+    expect(selection.chosen).toBe(0);
+    expect(selection.votes).toBe(2);
+    expect(selection.groups).toBe(2);
+  });
+
+  it('says the assertions ordered nothing when every draw scores the same', () => {
+    // `groups` is the number that says whether the writer's sentences ranked anything at all; on a
+    // question where all five satisfy the same two sentences the choice is the first draw by
+    // construction and the arm is `sample-5-first` for that question.
+    const candidates = [candidate(0, { rows: 1 }), candidate(1, { rows: 1 })];
+    const selection = selectByAssertions(candidates, { ...NO_ASSERTIONS, rows: [1] });
+    expect(selection.groups).toBe(1);
+    expect(selection.chosen).toBe(0);
+    expect(selection.votes).toBe(2);
+  });
+
+  it('reports that it chose an empty result, because an empty group is the failure it amplifies', () => {
+    const candidates = [candidate(0, { rows: 3 }), candidate(1, { rows: 0 })];
+    const selection = selectByAssertions(candidates, { ...NO_ASSERTIONS, rows: [0] });
+    expect(selection.chosen).toBe(1);
+    expect(selection.emptyResult).toBe(true);
+  });
+});
+
+describe('the prompt the writer is held to', () => {
+  const SHAPES = [
+    { columns: ['County', 'Population'], rows: 3, ran: true },
+    { columns: null, rows: 0, ran: false },
+  ];
+
+  it('passes the task through verbatim, so the writer saw the schema the generator saw', () => {
+    const prompt = assertionPrompt('SCHEMA: county(name, population)\nQ: how many?', SHAPES);
+    expect(prompt.startsWith('SCHEMA: county(name, population)\nQ: how many?')).toBe(true);
+  });
+
+  it('describes each result by its columns and its row count, and says plural', () => {
+    const prompt = assertionPrompt('task', SHAPES);
+    expect(prompt).toContain('[1] columns (County, Population) — 3 rows');
+    expect(prompt).toContain('2 queries were written');
+  });
+
+  it('says a query did not run rather than reporting an empty result', () => {
+    // The two most confusable outcomes in this lane: a wrong join returns nothing and a broken query
+    // returns nothing. A writer told "0 rows" would assert a row count the query never produced.
+    expect(assertionPrompt('task', SHAPES)).toContain('[2] the query did not run');
+  });
+
+  it('names an unnamed result rather than printing an empty bracket', () => {
+    expect(assertionPrompt('task', [{ columns: [], rows: 1, ran: true }])).toContain('columns (none) — 1 row');
+  });
+
+  it('asks for exactly the three kinds and forbids SQL and prose', () => {
+    const prompt = assertionPrompt('task', [{ columns: null, rows: 0, ran: true }]);
+    for (const line of ['column:<', 'value:<', 'rows:<']) expect(prompt).toContain(line);
+    expect(prompt).toContain('Do not write SQL');
+    expect(prompt).toContain('Do not explain');
+  });
+
+  it('says one query was written when there is one', () => {
+    expect(assertionPrompt('task', [{ columns: ['a'], rows: 1, ran: true }])).toContain('1 query was written');
+  });
+});
+
+describe('the quote a writer may put around a value', () => {
+  it('strips one layer of single quotes', () => {
+    expect(parseAssertions("value:'CA'").values).toEqual(['CA']);
+  });
+
+  it('leaves an unbalanced quote alone rather than cutting a character off', () => {
+    // A parser that trims on the strength of one quote turns a malformed line into a different
+    // assertion, and every match it invents is counted as agreement.
+    expect(parseAssertions("value:'CA").values).toEqual(["'CA"]);
+    expect(parseAssertions("value:C'A").values).toEqual(["C'A"]);
   });
 });

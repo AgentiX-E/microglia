@@ -15,7 +15,8 @@ import { join } from 'node:path';
 // so a validator imported that way grades the last build rather than the file a change just edited.
 // Every other bin in this directory imports `../`, and this one did not — which meant a new header
 // key was unknown to the very command a dispatch runs first.
-import { preregGate, readPrereg } from '../prereg.js';
+import { OPTIONAL_ARMS } from '../sota.js';
+import { preregGate, readPrereg, unknownSampleArms } from '../prereg.js';
 
 function main(): void {
   const root = process.cwd();
@@ -45,6 +46,20 @@ function main(): void {
       process.stdout.write(`[prereg]   at ${problem.where}: ${problem.problem}\n`);
     }
     if (!gate.ok) failed += 1;
+    // A registration written before its arm exists is a plan, and a plan dispatched is a run that
+    // dies in its first second. Checked here because this runs on every push and the dispatch does
+    // not: R67 lost a dispatch to `sample-5-exec`, which the parser could construct and the table had
+    // never been told about.
+    if (reading.prereg !== undefined) {
+      const unknown = unknownSampleArms(reading.prereg.arms, OPTIONAL_ARMS);
+      if (unknown.length > 0) {
+        process.stdout.write(
+          `[prereg] FAIL ${relative} — the header names ${unknown.join(', ')}, which the lane ` +
+            `cannot buy\n`,
+        );
+        failed += 1;
+      }
+    }
   }
   process.stdout.write(`[prereg] ${files.length - failed}/${files.length} valid\n`);
   if (failed > 0) process.exitCode = 1;

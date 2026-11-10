@@ -71,6 +71,7 @@
     "eval:gate-matrix": "tsx packages/eval/src/bin/gate-matrix.ts",
     "eval:arm-coverage": "tsx packages/eval/src/bin/arm-coverage.ts",
     "eval:overlap": "tsx packages/eval/src/bin/overlap.ts",
+    "eval:assertion": "tsx packages/eval/src/bin/assertion.ts",
     "eval:harm": "tsx packages/eval/src/bin/harm-strata.ts",
     "eval:power": "tsx packages/eval/src/bin/power-audit.ts",
     "eval:query-diff": "tsx packages/eval/src/bin/query-diff.ts",
