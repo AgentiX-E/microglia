@@ -199,3 +199,43 @@ The hypothesis is unchanged: three correct worked examples from the same databas
 and the question is whether that something reaches the two digits `oracle` prices. What changes is that
 the answer will now be read off three dispatches rather than one, because this iteration measured how
 much of a one-dispatch answer is the dispatch.
+
+## Outcome 3 — the replication, pooled, and the line closes (2026-11-10)
+
+Two further dispatches of the same configuration (`42732114335`, `42732137586`), each 1,432 calls,
+$0.22, `V75` pass with 6 of 350 questions capped (1.71%), mean block 993.4 characters:
+
+| run | `none` | `full` | `examples` | `examples − full` |
+| --- | --- | --- | --- | --- |
+| `42729684852` | 51.14% | 50.86% (−0.29pp) | **56.57% (+5.43pp)** [1.43, 9.43] | +5.71pp [1.71, 9.71] |
+| `42732114335` | 52.57% | 51.71% (−0.86pp) | **55.71% (+3.14pp)** [−0.86, 7.14] | +4.00pp [0.00, 8.00] |
+| `42732137586` | 52.57% | 52.29% (−0.29pp) | **55.43% (+2.86pp)** [−0.86, 6.57] | +3.14pp [−0.86, 7.14] |
+| **pooled** | — | **null on all three** | **+3.81pp**, 95 gained / 55 lost, n = 1,050, exact p = 0.0014 | **+4.28pp** |
+
+**The pooled estimate is +3.81pp, which is inside ±4pp, so Amendment 2's rule closes the line.** The
+rule was written before these two runs existed, it names this outcome explicitly, and it is not being
+reinterpreted now that the number is in: a pooled estimate inside the closing band ends the exemplar
+line, whatever the best single dispatch said.
+
+What the three runs establish, stated as narrowly as the evidence allows:
+
+1. **Three correct worked examples from the same database are worth about +4pp**, not +33pp. The
+   interval is [−0.86, +7.14] on any single dispatch and the pooled point estimate is +3.81pp with
+   p = 0.0014. It is a real effect and it is an order of magnitude below `oracle`.
+2. **`oracle`'s +33.14pp is a fact about the answer key, not about the prompt.** This registration's
+   closing branch said exactly that if the delta landed inside ±4pp, and it did. The only way to
+   approach 33pp with retrieval is to retrieve the item written for the question being asked, which is
+   not retrieval.
+3. **The store is not a substitute and not an addition.** `full` is null on all three dispatches
+   (−0.29, −0.86, −0.29) while `examples` is positive on all three, so the memory pack does not add to
+   the corpus and the corpus does add to the pack. The product's claim — "we remember what the corpus
+   does not contain" — survives; the *value* of that claim on this benchmark is not measurable through
+   accuracy at n=350.
+4. **The dispatch spread is 2.86–5.43pp on one arm.** `none` moved 51.14 → 52.57 between dispatch 2 and
+   the replications, which is +1.43pp of pure run-to-run movement on a fixed prompt. Any future
+   sub-4pp claim on 350 questions has to be pooled across dispatches or it is a claim about one draw.
+
+**The next stage is not a dose curve.** Amendment 2 forbade it until the replication was in, and the
+replication says the effect is under the threshold the dose curve would need to resolve it: k = 1, 3, 6
+would be three dispatches to explain 3.8pp. The register's remaining two-digit region is generation and
+selection, and that is the next registration.
