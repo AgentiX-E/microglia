@@ -130,3 +130,77 @@ describe('planBudget counting draws rather than arms', () => {
     expect(plan.projected).toBeGreaterThan(0);
   });
 });
+
+describe('the learning pass, which does not scale with the question count', () => {
+  // R77's first dispatch: 2,000 questions over `none,full,loo` priced at R74's measured 1.0416 calls
+  // per question per draw, which came to 6,875 and was authorised at 7,600. Fold 1 spent 1,952 —
+  // 1,200 evaluation calls and **700 learning calls** — and the run was refused permission to finish a
+  // bill that would have come to about 10,541.
+  const r74 = {
+    calls: 24_465,
+    questions: 7_829,
+    arms: ['none', 'full', 'loo'],
+    folds: 5,
+    learningPerFold: 700,
+    // 2,624 of its 3,500 learning requests were answered by the cache.
+    learningHitShare: 2_624 / 3_500,
+  };
+
+  it('takes the prior learning pass out of the rate it charges per question', () => {
+    // The prior's learning cost 876 calls of its 24,465. Charging those 876 to the questions would
+    // price the next dispatch's questions at a cost they do not incur.
+    const plan = planBudget(r74, { arms: ['none', 'full', 'loo'], questions: 7_829 });
+    expect(plan.ratePerQuestionArm).toBeCloseTo((24_465 - 876) / (7_829 * 3), 6);
+    expect(plan.ratePerQuestionArm).toBeLessThan(24_465 / (7_829 * 3));
+  });
+
+  it('projects the same dispatch onto 2,000 questions and prices its learning separately', () => {
+    const plan = planBudget(r74, { arms: ['none', 'full', 'loo'], questions: 2_000, learningPerFold: 700 });
+    const marginal = (24_465 - 876) / (7_829 * 3);
+    // 1,200 questions per draw at the marginal rate, plus the learning the cache does not answer.
+    expect(plan.projected).toBe(Math.ceil(1.1 * (2_000 * 3 * marginal + 700 * 5 * (1 - 2_624 / 3_500))));
+    // And the bound is the cold case: every learning request paid in full, with its own headroom.
+    expect(plan.ceiling).toBeGreaterThan(plan.projected);
+    expect(plan.ceiling).toBeGreaterThanOrEqual(Math.ceil(1.1 * (2_000 * 3 * marginal + 700 * 5)));
+    expect(plan.amortisedLearning).toBe(false);
+  });
+
+  it('bounds a learning dispatch above the number the run itself will forecast', () => {
+    // The run extrapolates the remaining folds at the dearest fold's price, which is the first fold
+    // and the one whose cache is cold: 5 × 1,952 ≈ 9,760, and 10,541 with its own safety. A
+    // registration sized below that is a registration the ceiling will stop after four fifths of its
+    // bill has been paid for one fifth of its data.
+    const plan = planBudget(r74, { arms: ['none', 'full', 'loo'], questions: 2_000, learningPerFold: 700 });
+    expect(plan.ceiling).toBeGreaterThan(10_541);
+  });
+
+  it('says when the projection is still a ratio over a mixture', () => {
+    // A prior that states only its total cannot separate the two costs. The projection is then the
+    // number that was wrong, and it says so rather than looking like the number that was right.
+    const unstated = { ...r74, learningPerFold: undefined, learningHitShare: undefined };
+    const plan = planBudget(unstated, { arms: ['none', 'full', 'loo'], questions: 2_000, learningPerFold: 700 });
+    expect(plan.amortisedLearning).toBe(true);
+    // Nothing to subtract, so the ratio is the whole bill — R77's 6,875.
+    expect(plan.projected).toBe(Math.ceil(1.1 * (2_000 * 3 * (24_465 / (7_829 * 3)) + 700 * 5)));
+  });
+
+  it('does not claim a mixture when the dispatch does not learn', () => {
+    const plan = planBudget(r74, { arms: ['none', 'full'], questions: 1_534 });
+    expect(plan.amortisedLearning).toBe(false);
+    expect(plan.ceiling).toBe(plan.projected);
+  });
+
+  it('clamps a hit share that is not a share', () => {
+    // Above one would credit the prior with more free calls than it made; below zero would charge it
+    // for more learning than it can have done. Both are read as the nearest real share rather than
+    // refused, because the number comes from two counts and a rounded quotient is not a corruption.
+    const all = planBudget({ ...r74, learningHitShare: 5 }, { arms: ['none'], questions: 100 });
+    const paid = planBudget({ ...r74, learningHitShare: 0 }, { arms: ['none'], questions: 100 });
+    const whole = planBudget({ ...r74, learningHitShare: 1 }, { arms: ['none'], questions: 100 });
+    const negative = planBudget({ ...r74, learningHitShare: -2 }, { arms: ['none'], questions: 100 });
+    expect(all.ratePerQuestionArm).toBe(whole.ratePerQuestionArm);
+    expect(negative.ratePerQuestionArm).toBe(paid.ratePerQuestionArm);
+    // And the two ends differ, or the clamp would be untestable.
+    expect(all.ratePerQuestionArm).toBeGreaterThan(paid.ratePerQuestionArm);
+  });
+});

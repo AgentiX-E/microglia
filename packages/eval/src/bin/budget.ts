@@ -38,6 +38,18 @@ type Artefact = {
     readonly arms?: readonly string[];
     readonly folds?: number;
     readonly limit?: number;
+    /** Questions each fold distilled from. The part of the bill that does not scale with `limit`. */
+    readonly learn_sample?: number;
+    /**
+     * The in-run deduplication of learning generations.
+     *
+     * `hits` of `hits + misses` learning requests were answered without a call, so this is the share of
+     * the prior's learning pass that was free — the number that turns `learn_sample` into a cost. It
+     * lives inside `config` because that is where the run wrote it; a reader looking for it at the top
+     * level finds nothing and reports "nothing measurable", which is how this field was found to be in
+     * the wrong place.
+     */
+    readonly generation_cache?: { readonly hits?: number; readonly misses?: number };
   };
   readonly per_case?: readonly unknown[];
 };
@@ -76,17 +88,26 @@ export function main(argv: readonly string[]): number {
   // has the rows, and a projection that refused to read a file it could count would be a tool that
   // only works on new runs.
   const questions = populationOf(artefact);
+  const cache = artefact.config?.generation_cache;
+  const cacheRequests = (cache?.hits ?? 0) + (cache?.misses ?? 0);
   const prior: PriorRun = {
     calls: artefact.calls ?? 0,
     questions,
     arms: artefact.config?.arms ?? [],
     folds: artefact.config?.folds ?? 0,
+    // Absent when the artefact predates the field, which is what makes the projection amortised: it
+    // then charges the prior's learning pass to its questions and says so.
+    learningPerFold: artefact.config?.learn_sample,
+    learningHitShare: cacheRequests > 0 ? (cache?.hits ?? 0) / cacheRequests : undefined,
   };
 
   const requestedArms = flag(argv, 'arms');
   const arms = requestedArms === undefined ? prior.arms : requestedArms.split(',').map((arm) => arm.trim());
   const requestQuestions = numberOf(flag(argv, 'questions')) ?? prior.questions;
   const requestFolds = numberOf(flag(argv, 'folds')) ?? prior.folds;
+  // `--learn` is the dispatch's own `learn_sample`. A dispatch that learns and does not say so is
+  // priced as if it did not, which is the omission that stopped R77 after one fold.
+  const requestLearning = numberOf(flag(argv, 'learn'));
 
   // Draws, not arms. A `sample-5-*` arm costs five calls per question, and a projection that counted
   // it as one is what let R68 be dispatched at 4,179 calls for a run that needed 5,638. The weight is
@@ -96,7 +117,13 @@ export function main(argv: readonly string[]): number {
   for (const arm of new Set([...prior.arms, ...arms])) {
     weights[arm] = samplingSpecOf(arm)?.n ?? 1;
   }
-  const plan = planBudget(prior, { arms, questions: requestQuestions, folds: requestFolds, weights });
+  const plan = planBudget(prior, {
+    arms,
+    questions: requestQuestions,
+    folds: requestFolds,
+    weights,
+    learningPerFold: requestLearning,
+  });
 
   process.stdout.write(`[budget] prior      ${path}\n`);
   process.stdout.write(
@@ -120,10 +147,24 @@ export function main(argv: readonly string[]): number {
     `[budget] request    ${requestQuestions} questions × ${arms.length} arm(s) × ${requestFolds} fold(s)` +
       ` — ${arms.join(',')}\n`,
   );
+  if (requestLearning !== undefined && requestLearning > 0) {
+    process.stdout.write(
+      `[budget] learning   ${String(requestLearning)} per fold × ${String(requestFolds)} fold(s) = ` +
+        `${String(requestLearning * requestFolds)} request(s); the prior cache answered ` +
+        `${cacheRequests > 0 ? `${(((cache?.hits ?? 0) / cacheRequests) * 100).toFixed(0)}%` : 'nothing measurable'}\n`,
+    );
+  }
+  if (plan.amortisedLearning) {
+    process.stdout.write(
+      '[budget] amortised  the prior does not separate its learning pass from its questions, so the ' +
+        'projection is a ratio over a mixture and the ceiling is the number to authorise\n',
+    );
+  }
   process.stdout.write(`[budget] projected  ${plan.projected}\n`);
   process.stdout.write(
     `[budget] ceiling    ${plan.ceiling}` +
-      (plan.measured ? ' (equal: every arm has a measured rate)\n' : ` (1.3× because ${plan.unmeasured.join(',')} is unmeasured)\n`),
+      (plan.measured ? '' : ` (1.3× because ${plan.unmeasured.join(',')} is unmeasured)`) +
+      (plan.ceiling > plan.projected ? ' — the bound, which prices learning cold\n' : ' — equal to the projection\n'),
   );
   return 0;
 }
