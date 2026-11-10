@@ -87,6 +87,9 @@ export const DEFERRALS: Readonly<Record<string, string>> = {
   judge: 'the LLM judge\'s prompt and record name the artefact being judged',
   'lane-scope': 'decides which of the two lanes a dispatch buys; the lane names are the subject, not a query',
   plugin: 'the plugin contract\'s worked example is a host that returns SQL',
+  pool:
+    'the candidate record carries the query text so a selector can be priced against a pool already ' +
+    'bought; it stores a string and executes nothing',
   reproduction: 'the reproduction config names the published BIRD cell and its M-Schema rendering',
   'retry-trigger': 'the retry vocabulary is made of execution facts — no query, an error, no rows — and it carries them into a prompt rather than executing anything',
   'rose-vec': 'the public adjudication set\'s record fields',

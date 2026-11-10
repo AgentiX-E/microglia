@@ -5,10 +5,10 @@
   "scanned": 176,
   "totals": {
     "modules": 176,
-    "lines": 47033,
+    "lines": 47067,
     "adapterLines": 1956,
-    "deferredLines": 6764,
-    "coupledShare": 0.1827
+    "deferredLines": 7229,
+    "coupledShare": 0.1925
   },
   "layers": [
     {
@@ -38,10 +38,10 @@
     {
       "layer": "eval",
       "modules": 119,
-      "lines": 33958,
+      "lines": 33992,
       "adapterLines": 0,
-      "deferredLines": 6764,
-      "coupled": 17
+      "deferredLines": 7229,
+      "coupled": 18
     },
     {
       "layer": "browser",
@@ -143,7 +143,7 @@
       "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 454,
+      "lines": 457,
       "words": [
         "sql",
         "sqlite",
@@ -209,6 +209,17 @@
       ],
       "verdict": "deferred",
       "reason": "the plugin contract's worked example is a host that returns SQL"
+    },
+    {
+      "pkg": "eval",
+      "module": "pool",
+      "path": "packages/eval/src/pool.ts",
+      "lines": 462,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "the candidate record carries the query text so a selector can be priced against a pool already bought; it stores a string and executes nothing"
     },
     {
       "pkg": "eval",
@@ -564,7 +575,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "176 modules, 17 deferred with a reason"
+      "detail": "176 modules, 18 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -579,5 +590,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 47033 production lines across 176 modules: 7 adapter modules in `sql`, 17 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 47067 production lines across 176 modules: 7 adapter modules in `sql`, 18 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }
