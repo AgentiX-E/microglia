@@ -343,11 +343,17 @@ const EXEMPLAR_K = Math.trunc(nonNegative(process.env['SOTA_EXEMPLAR_K'], 3));
 /**
  * The character budget of the example block.
  *
- * 1,200 is `full`'s pack budget, and the equality is the point: the comparison that decides R65 is
- * against `full`, and two prompts of the same length carrying different content is a comparison of
- * content. A larger cap would let the arm win by buying tokens, which is a result about the bill.
+ * 1,600 rather than the 1,200 R65 opened with, and the reason is delivery rather than hypothesis:
+ * at 1,200 the registered dose of three exemplars did not fit on 9.71% of minidev questions, so the
+ * arm as dispatched was not the arm as registered and `V75` voided the run. R65's Amendment 1 records
+ * that reading and fixes the instrument; the prediction and the closing branch are untouched.
+ *
+ * The length match against `full` is stated as a measured mean, not as an equal constant: the run at
+ * 1,200 wrote blocks averaging 946 characters against `full`'s 1,090, and the questions that gain a
+ * third exemplar move that mean to about 975 — inside 10% of the pack it is compared with, which is
+ * the property the comparison needs.
  */
-const EXEMPLAR_BUDGET = Math.trunc(nonNegative(process.env['SOTA_EXEMPLAR_BUDGET'], 1200));
+const EXEMPLAR_BUDGET = Math.trunc(nonNegative(process.env['SOTA_EXEMPLAR_BUDGET'], 1600));
 
 /**
  * How many retried questions a report of a retry effect needs before it says anything.

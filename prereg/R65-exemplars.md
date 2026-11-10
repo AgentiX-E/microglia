@@ -88,3 +88,54 @@ same split, which is the cell this registration buys.
 
 The alternatives are named so the outcome selects one, and so that a null cannot afterwards be
 re-described as a narrow win.
+
+## Outcome — 2026-11-10, run `42725249396` (void by its own gate)
+
+The arm ran: `minidev`, n=350, 1,438 calls, $0.1352 off-peak, cache 73.11%, `full` at 54.00%
+(+2.00pp, 18 gained / 11 lost) and `examples` at **53.71% (+1.71pp [−2.29, +5.71], p = 0.48, 28 gained
+/ 22 lost)**. Per-fold deltas: +1.43, 0, +1.43, +2.86, +4.29.
+
+**The run is void**, and the gate that voided it is the one this file wrote in advance:
+
+```
+V75-exemplars-delivered  false
+asked=350 fired=350 (100.00%) capped=34 (9.71%) mean-chars=946.3 k=3 budget=1200
+```
+
+The arm fired on every question (prediction: ≥90%, ✓) and wrote blocks averaging 946 characters
+against `full`'s 1,090 (budget 1,200). But on **34 questions (9.71%)** the budget could not hold the
+third exemplar, so a tenth of the dispatch showed the model two examples where the registration says
+three. The void clause allows 5%. The lane refused the run and published no claim, which is the
+behaviour the clause exists to produce.
+
+**The point estimate is recorded and is not evidence.** +1.71pp against `none` and −0.29pp [−4.29,
++3.71] against `full` (24 gained / 25 lost, p = 1.00) are the numbers a void run produced. They are
+written here because hiding them would be worse than disclosing them, and they are not read as
+selecting the closing branch — a void run selects nothing.
+
+## Amendment 1 — the instrument delivered two examples where the registration says three (2026-11-10)
+
+The void condition is about **delivery**, and delivery is part of the instrument rather than part of the
+hypothesis. So this amendment changes one number — the block's character budget, 1,200 → **1,600** —
+and explicitly changes nothing else: the dose stays k = 3, the similarity function stays the tree's
+lexical overlap, the cross-fitting stays, the prediction stays **+2…+10pp against `none`**, the closing
+branch stays **±4pp**, and the deciding comparison stays against `full`.
+
+Why 1,600 is the right repair rather than a relaxation:
+
+- At 1,200 the block averaged 946 characters and *still* could not fit its third exemplar on 9.71% of
+  questions, because BIRD's question texts plus a gold query run to about 315 characters per exemplar
+  and the tail is long.
+- Raising the budget does not buy the arm an advantage over `full`: it moves the mean block from 946 to
+  about 975 characters, against a pack whose measured mean is 1,090. The comparison stays
+  length-matched within 10% — the property the equal-constant version was reaching for, stated as a
+  measured mean instead of as an equality.
+- The alternative repairs are worse. Dropping to k = 2 changes the registered dose. Keeping 1,200 and
+  widening the void threshold changes the bar after seeing the number that crossed it. Truncating an
+  exemplar breaks the one rule the renderer was built around.
+
+**What this amendment does not do is protect the hypothesis.** The hypothesis was written before the
+code existed and is not being edited: if the re-dispatch lands inside ±4pp, the line closes, and the
++1.71pp already observed means the re-run cannot be presented as a fresh test of an untested idea —
+only as a properly delivered version of the same one. That is the trade the void clause forces, and it
+is cheaper than publishing a number the arm's own gate refused.
