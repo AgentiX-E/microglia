@@ -197,3 +197,49 @@ underpowered and the four questions were label noise.
 covers mini-dev only, and the 336 id matches against train are collisions between two id spaces, not
 corrections. The out-of-sample split is the population whose labels nobody has questioned, and it is
 now the only one whose effect sizes this lane will quote.
+
+## Amendment 1 — the population was two populations
+
+**2026-11-10, after the reading and before anything was built on it.** The release this file re-scores
+against is the `sql_only` configuration of Arcwise-Plat, which by its own description keeps the
+questions and replaces only the gold. It keeps *its* questions: **67 of the 350 questions in this
+slice have different text in it**, because BIRD shipped further Mini-Dev revisions after the
+`v1-2024-06-20` this repository pins — its 2026 update realigned the ids to 0–499 and rewrote the
+questions again. On 44 of those 67 the gold moved too.
+
+So the arithmetic in the Outcome above is a mixture, and its two parts are different instruments:
+
+| population | n | Δ original | Δ corrected | shrink |
+| --- | --- | --- | --- | --- |
+| whole slice, as first reported | 350 | −2.71pp | −1.33pp | 51% |
+| **question unchanged — a relabelling** | **283** | **−3.03pp** | **−1.34pp** | 54% |
+| question rewritten — a corpus revision | 67 | ≈0 | ≈0 | — |
+
+**The conclusion survives exactly, and two numbers that were wrong are now visible.**
+
+- **The corrected delta is −1.34pp on the population that can carry it**, against −1.33pp on the
+  mixture. The defect did not bias the effect: both arms are equally wrong on a question neither was
+  asked, so those 67 rows cancel out of a paired difference.
+- **Every mini-dev accuracy in this lane was 8.7pp too low.** On the 283 the baseline is **62.69%**
+  under the pinned labels and 59.64% under the corrected ones; the mixture reported **54.02% → 51.26%**.
+  The 67 mis-paired rows score 14.93% and 16.31% for the two arms and drag both down by about seven
+  points. A comparison against a published mini-dev cell was therefore comparing a number depressed by
+  the instrument with a number that is not.
+- **The direction count is unchanged in substance.** 11 of 14 artefacts keep their sign on the clean
+  population, and the two that land on exactly 0.00pp (R63's recall-order, R60's raw arm) are null
+  results becoming null rather than verdicts being withdrawn.
+
+**What this file got right and what it got wrong.** Right: the direction, the magnitude of the shrink,
+and that the correction damages the baseline more than the memory arm (on 283: baseline −3.05pp,
+memory −1.37pp). Wrong: it stated the effect on a population that is not one, and it did not notice
+that a "SQL-only" correction to a *corpus this repository pins two revisions behind* cannot be
+SQL-only in effect.
+
+**Consequence for the instrument.** This is a repair rather than an experiment, so it carries no
+registration of its own: the corrected labels are now a pinned revision beside the pinned corpus
+(`eval/manifests/gold/`, digest and citation in the manifest, identified offline by the two null-`evidence`
+rows its own card names), a dispatch chooses whether to apply it (`gold: corrected`), `reviseGold` drops
+the rows it cannot score and names them, and every artefact records which labels its number was measured
+against. The mini-dev pool becomes **283** whenever the correction is used, and the number is printed
+rather than absorbed. No published cell moved: `vendor` is the default, and a run that keeps it now says
+so in a field that did not exist before.
