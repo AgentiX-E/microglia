@@ -142,6 +142,7 @@ import {
   recalledFor,
   readOrdering,
   summariseOrderings,
+  RETRY_POPULATION_FLOOR,
   exemplarGate,
   exemplarIndexOf,
   nearestExemplars,
