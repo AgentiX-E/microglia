@@ -903,6 +903,23 @@ type CaseOutcome = {
     readonly correct: boolean;
     readonly resultKey: number;
     readonly signature: ExecSignature | null;
+    /**
+     * The query this draw produced, and the columns it returned.
+     *
+     * Recorded from R69 onward because the pool's own promise — "the next question about them can be
+     * answered without a dispatch" — held only for questions about shapes. A selector that reads a
+     * candidate rather than measuring its shape is the one thing a competitor's ablation says carries
+     * ranking information, and until this field existed, pricing such a selector offline was
+     * impossible: the content had been thrown away at write time. Costs bytes, not calls.
+     *
+     * Optional so that the type can be satisfied by a pool re-read from an older artefact, which is
+     * the only reason this interface is shared with `PoolQuestion`. What keeps the producer honest is
+     * not the type but the count beside it: the artefact's `pool.rereadable` reports how many
+     * candidates carried a query, and a run reporting zero of 3,500 is a run whose pool cannot be
+     * re-read.
+     */
+    readonly sql?: string;
+    readonly columns?: readonly string[] | null;
   }[] | null;
   /**
    * What the linker offered this question, or null when the arm did not run.
@@ -5155,6 +5172,7 @@ async function runFold(
       const verdicts: Judged[] = [];
       const queries: string[] = [];
       const results: string[] = [];
+      const columnLists: (readonly string[] | null)[] = [];
       // The pool the measurement reads, built from the same executions as the selectors' candidates
       // rather than from a second pass over them: a second execution is a second answer, and two
       // readings of one pool that disagree are worse than one reading.
@@ -5185,6 +5203,10 @@ async function runFold(
         // execution result is the candidate's own output and re-running it later would be a second
         // execution of the same query with a different answer.
         results.push(renderRows(outcome === undefined ? false : outcome.ok, outcome?.tuples ?? []));
+        // Column names beside the rendered rows: a content-aware verifier reads them ("does the
+        // result answer with something named like the question's noun?"), and they are a handful of
+        // bytes where the rows are kilobytes.
+        columnLists.push(outcome === undefined || !outcome.ok ? null : [...outcome.columns]);
         // Every draw is scored, not only the chosen one, because the ceiling is the score of a
         // selector that always picked right and cannot be computed after the fact.
         verdicts.push(await judgeReply(row, dbPath, reply, task));
@@ -5228,6 +5250,8 @@ async function runFold(
           correct: verdict.correct,
           resultKey: keys[draw] ?? -1,
           signature: shapes[draw] ?? null,
+          sql: queries[draw] ?? '',
+          columns: columnLists[draw] ?? null,
         })),
       });
       const right = verdicts.filter((verdict) => verdict.correct).length;
@@ -6495,6 +6519,9 @@ async function main(): Promise<void> {
               candidates: summary.candidates,
               signed: summary.signed,
               unsigned: summary.unsigned,
+              // Candidates whose query text is in the artefact, so a later selector can be priced
+              // against this pool without buying the pool again.
+              rereadable: summary.withQuery,
               consistent: questions.every(
                 (question) =>
                   question.candidates.length > 0 &&

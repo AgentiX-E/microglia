@@ -420,3 +420,28 @@ describe('signalReadings', () => {
     }
   });
 });
+
+describe('the pool as a thing that can be re-read', () => {
+  it('counts the candidates that carry their own query text', () => {
+    // The field's whole purpose: a pool recorded only as shapes can price a shape selector and
+    // nothing else. CHESS's selection step is content-aware, so the question this count answers is
+    // whether the next offline reading can ask about content at all — and for four iterations the
+    // answer was no, because the query was thrown away when the artefact was written.
+    const summary = poolSummary([
+      question('q1', [
+        { ...candidate(0, true, 0, ran(1)), sql: 'select a from t', columns: ['a'] },
+        { ...candidate(1, false, 1, ran(2)), sql: 'select b from t', columns: ['b'] },
+        { ...candidate(2, false, 2, null), sql: '' },
+      ]),
+    ]);
+    expect(summary.withQuery).toBe(2);
+    expect(summary.candidates).toBe(3);
+  });
+
+  it('reports zero for a pool written before the field existed, rather than a share', () => {
+    // Every committed artefact before R69 is this case, and a reader has to be able to tell "no
+    // candidate had a query" from "this file predates queries being kept".
+    const summary = poolSummary([question('q1', [candidate(0, true, 0, ran(1))])]);
+    expect(summary.withQuery).toBe(0);
+  });
+});

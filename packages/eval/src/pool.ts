@@ -62,6 +62,23 @@ export type PoolCandidate = {
   /** Index of the distinct result this candidate produced within its question, or -1 for none. */
   readonly resultKey: number;
   readonly signature: ExecSignature | null;
+  /**
+   * The query this candidate was, when the artefact recorded it.
+   *
+   * The type's own docstring promised that carrying the pool "lets the next question about them be
+   * answered without a dispatch", and for four iterations that was true of exactly one family of
+   * questions: the ones about shapes. A shape is derived here, once, and stored; the **query** was
+   * not, so the one question the competitive reading actually raises — whether a selector can *read*
+   * a candidate rather than measure it — could not be asked of a pool that had already been paid for.
+   * CHESS's selection step is content-aware, this project's are shape-aware, and the difference
+   * between them was unmeasurable offline because the content was thrown away at write time.
+   *
+   * Optional, because every artefact written before this field existed is still read and re-analysed
+   * and a required field would make those files invalid rather than incomplete.
+   */
+  readonly sql?: string;
+  /** The result's column names, when recorded: the cheapest content a verifier can read. */
+  readonly columns?: readonly string[] | null;
 };
 
 export type PoolQuestion = {
@@ -86,6 +103,14 @@ export type PoolSummary = {
   readonly signed: number;
   /** Candidates with no query at all. */
   readonly unsigned: number;
+  /**
+   * Candidates that carry their own query text, or zero for a pool recorded before the field existed.
+   *
+   * This is the count that says whether a pool can be used to price a *content-aware* selector
+   * without a dispatch. Shape signals were the only ones priceable offline, which is how eleven
+   * iterations priced shape and never priced reading.
+   */
+  readonly withQuery: number;
   /** Share of candidates that carry a shape; zero when nothing was recorded. */
   readonly signatureShare: number;
   /** Mean number of distinct execution results per question. */
@@ -175,6 +200,7 @@ export function poolSummary(questions: readonly PoolQuestion[]): PoolSummary {
   let candidates = 0;
   let signed = 0;
   let unsigned = 0;
+  let withQuery = 0;
   let oracle = 0;
   let first = 0;
   let ceilingOnly = 0;
@@ -186,6 +212,10 @@ export function poolSummary(questions: readonly PoolQuestion[]): PoolSummary {
     for (const candidate of question.candidates) {
       if (candidate.signature === null) unsigned += 1;
       else signed += 1;
+      // Counted rather than assumed: the field that makes a pool re-readable is written by a
+      // producer nobody tests, and a counter in the summary is the difference between "the pool is
+      // in the file" and "the pool is in the file as shapes".
+      if (typeof candidate.sql === 'string' && candidate.sql !== '') withQuery += 1;
     }
     const right = question.candidates.filter((candidate) => candidate.correct).length;
     const firstRight = firstCandidate(question)?.correct === true;
@@ -201,6 +231,7 @@ export function poolSummary(questions: readonly PoolQuestion[]): PoolSummary {
     candidates,
     signed,
     unsigned,
+    withQuery,
     signatureShare: candidates === 0 ? 0 : signed / candidates,
     distinctMean: counts.length === 0 ? 0 : counts.reduce((sum, count) => sum + count, 0) / counts.length,
     distinctMedian: median(counts),
