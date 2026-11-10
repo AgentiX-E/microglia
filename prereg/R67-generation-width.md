@@ -60,23 +60,26 @@ both (`sample-n` draws, `pool.ts`, `union.ts`, `prior.ts`, selectors `first`, `r
 The branches **partition** the space (Rule 12): they are ordered, they cover every value, and the first
 one that applies selects the outcome.
 
-1. **Promoted** — pooled over the two dispatches, `sample-5-exec − first` is **≥ +8pp** with the
-   between-run spread reported and the pooled interval excluding zero. Then execution-guided selection
-   becomes the product's default generation mode.
-2. **Narrowed to the ceiling** — pooled `sample-5-exec − first` is under +8pp **while** the oracle arm
-   shows a pool ceiling of ≥ +15pp. Then selection is the problem, not generation, and the next
-   registration is a selector rather than a wider pool.
-3. **Narrowed to the pool** — pooled `sample-5-exec − first` is under +8pp **and** the oracle arm shows
-   a ceiling under +15pp. Then five draws at this temperature do not contain the answer often enough,
-   and the next registration widens or diversifies the pool (k, temperature, decomposition) before any
-   selector work.
-4. **Closed** — pooled `sample-5-exec − first` is inside ±3pp **and** the ceiling arm is under +8pp.
-   Then generation width does not matter on this task at this model, and the two-digit gap is not
-   reachable in this lane at all — which would be a finding about the benchmark's remaining headroom
-   rather than about this system.
+- **Promoted** — pooled over the two dispatches, `sample-5-exec − first` is **≥ +8pp** with the
+  between-run spread reported and the pooled interval excluding zero. Then execution-guided selection
+  becomes the product's default generation mode.
+- **Narrowed to the ceiling** — pooled `sample-5-exec − first` is under +8pp **while** the oracle arm
+  shows a pool ceiling of ≥ +15pp. Then selection is the problem, not generation, and the next
+  registration is a selector rather than a wider pool.
+- **Narrowed to the pool** — pooled `sample-5-exec − first` is under +8pp **and** the oracle arm shows
+  a ceiling under +15pp. Then five draws at this temperature do not contain the answer often enough,
+  and the next registration widens or diversifies the pool (k, temperature, decomposition) before any
+  selector work.
+- **Closed** — pooled `sample-5-exec − first` is inside ±3pp **and** the ceiling arm is under +8pp.
+  Then generation width does not matter on this task at this model, and the two-digit gap is not
+  reachable in this lane at all — which would be a finding about the benchmark's remaining headroom
+  rather than about this system.
 
-A result that fits none of the four is impossible by construction, which is the point: R64 and R65 both
-produced estimates in unassigned regions, and that is the defect this file is written to avoid.
+The branches are applied in the order written: the first one whose conditions hold names the outcome,
+and any estimate that fits none of the four is impossible by construction.
+
+That property is the point: R64 and R65 both produced estimates in unassigned regions, and that is the
+defect this file is written to avoid.
 
 ## Cost
 
