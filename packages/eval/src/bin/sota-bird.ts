@@ -111,6 +111,7 @@ import {
   LlmClient,
   stoppedRun,
   buildValidityGates,
+  armCoverageGate,
   ceilingAmong,
   canonicalRows,
   comparePaired,
@@ -301,7 +302,6 @@ import {
   outcomeOf,
   unexecuted,
   type QueryOutcome,
-  type ValidityGate,
 } from '@agentix-e/microglia-eval';
 
 const DATASET_REPO = 'https://huggingface.co/datasets/birdsql/bird_mini_dev';
@@ -6240,20 +6240,12 @@ async function main(): Promise<void> {
   // `none` is not a row: it is the baseline every row is a delta against, reported once in
   // `paired.baselineAccuracy`. The first version of this gate counted it and refused a run whose
   // table was complete — its own message read "missing none of 6 bought arm(s)", which is what a
-  // gate written against an arm list rather than against the *table* produces.
-  const requestedArms = [...ARMS].filter((arm) => arm !== 'none');
-  const reportedArms = new Set(arms.map((entry) => entry.arm as string));
-  const missingArms = requestedArms.filter((arm) => !reportedArms.has(arm));
-  const armCoverage: ValidityGate = {
-    id: 'V77-every-requested-arm-is-a-row',
-    criterion: 'every arm this dispatch bought produced a row, so no planned reading is silently absent',
-    actual:
-      missingArms.length === 0
-        ? `${requestedArms.length}/${requestedArms.length} arm(s) reported, \`none\` scored as the baseline`
-        : `${missingArms.join(', ')} missing of ${requestedArms.length} bought arm(s)`,
-    pass: missingArms.length === 0,
-    blocking: true,
-  };
+  // gate written against an arm list rather than against the *table* produces. It now lives in
+  // `armCoverageGate` with tests, because the version in this file had none.
+  const armCoverage = armCoverageGate(
+    [...ARMS],
+    arms.map((entry) => entry.arm as string),
+  );
 
   // Each control against `full`, paired on the questions both answered. The deltas
   // against `none` above are the treatment effect; these are the difference between

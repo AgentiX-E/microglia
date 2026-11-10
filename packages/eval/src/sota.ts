@@ -2397,3 +2397,72 @@ export function ceilingAmong<T extends { readonly correct: boolean }>(
   const pool = verdicts.slice(0, Math.max(1, width));
   return pool.find((verdict) => verdict.correct) ?? pool[0];
 }
+
+/** The arm that is not a row: it is the baseline every row is a delta against. */
+export const BASELINE_ARM = 'none';
+
+/**
+ * The gate that refuses a run whose table is missing a row the dispatch paid for.
+ *
+ * R69 registered six arms and published five: `sample-10-oracle` was dropped by a search that kept
+ * the first oracle arm in union order, every other gate passed, and the registration's primary
+ * estimand was simply absent from the table. The row count is the one thing a reader cannot check
+ * without the dispatch's own input, so the input is compared to the output here rather than trusted.
+ *
+ * It is a function and not a literal in `main()` because the first version was a literal, and it was
+ * wrong in the way untested code is wrong: it built the *request* out of the arm list, which contains
+ * `none`, and `none` is never a row. A complete run was refused with a message that read "missing
+ * none of 6 bought arm(s)" — the sentence stated its own bug, and only a dispatch discovered it.
+ * Comparing the table against the arms *minus the baseline* is one test away from being obviously
+ * right, which is what the tests below are for.
+ *
+ * `reported` may contain rows nobody requested. The lane always scores its own control arm (`full`),
+ * which no registration buys, so an unrequested row is normal and is not a defect; a missing
+ * requested row is.
+ */
+export function armCoverageGate(
+  requested: readonly string[],
+  reported: readonly string[],
+  id = 'V77-every-requested-arm-is-a-row',
+): ValidityGate {
+  const bought = requested.filter((arm) => arm !== BASELINE_ARM);
+  const rows = new Set(reported);
+  const missing = bought.filter((arm) => !rows.has(arm));
+  const actual =
+    bought.length === 0
+      ? `this artefact buys no arm beyond \`${BASELINE_ARM}\`, so no row can be missing`
+      : missing.length === 0
+        ? `${String(bought.length)}/${String(bought.length)} bought arm(s) reported, ` +
+          `\`${BASELINE_ARM}\` scored as the baseline`
+        : `${missing.join(', ')} missing of ${String(bought.length)} bought arm(s), ` +
+          `\`${BASELINE_ARM}\` scored as the baseline`;
+  return {
+    id,
+    criterion: 'every arm this dispatch bought produced a row, so no planned reading is silently absent',
+    actual,
+    pass: missing.length === 0,
+    blocking: true,
+  };
+}
+
+/**
+ * The same gate applied to an artefact's own two fields.
+ *
+ * The gate runs inside the dispatch, where it can only refuse a run that has just been paid for. The
+ * artefact it refused is still on disk, and whether the refusal was the run's fault or the gate's is
+ * a question about the file — so the comparison has to be replayable from the file alone. This is the
+ * replay: `config.arms` is what the dispatch bought, `arms` is what it published.
+ *
+ * An artefact written before either field existed reads as buying nothing and publishing nothing,
+ * which passes and says so. That is the honest reading of a file that records no arm at all, and it
+ * keeps the replay applicable to the whole history rather than only to runs from today.
+ */
+export function armCoverageOf(artefact: {
+  readonly config?: { readonly arms?: readonly string[] } | undefined;
+  readonly arms?: readonly { readonly arm: string }[] | undefined;
+}): ValidityGate {
+  return armCoverageGate(
+    artefact.config?.arms ?? [],
+    (artefact.arms ?? []).map((row) => row.arm),
+  );
+}

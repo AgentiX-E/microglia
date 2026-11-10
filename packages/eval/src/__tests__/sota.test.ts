@@ -9,6 +9,8 @@ import {
   CONTRASTS,
   armPairBetween,
   armPairsAgainstFull,
+  armCoverageGate,
+  armCoverageOf,
   buildValidityGates,
   ceilingAmong,
   contrastTable,
@@ -3198,5 +3200,59 @@ describe('ceilingAmong', () => {
 
   it('has no ceiling for a question that produced no draws', () => {
     expect(ceilingAmong([], 5)).toBeUndefined();
+  });
+});
+
+describe('armCoverageGate', () => {
+  // R70 bought four arms and reported all four, and the gate refused the run anyway: it compared the
+  // table to the arm *list*, which contains `none`. The tests below are written against that refusal.
+  const bought = ['sample-5-first', 'sample-5-exec', 'sample-5-oracle', 'sample-5'];
+
+  it('passes when every bought arm owns a row', () => {
+    const gate = armCoverageGate([...bought, 'none'], [...bought, 'full']);
+    expect(gate.pass).toBe(true);
+    expect(gate.actual).toBe('4/4 bought arm(s) reported, `none` scored as the baseline');
+  });
+
+  it('does not require a row for the baseline, because the baseline is not a row', () => {
+    // The defect, exactly: `none` is reported once in `paired.baselineAccuracy`, never as a row.
+    const gate = armCoverageGate(['none'], []);
+    expect(gate.pass).toBe(true);
+    expect(gate.actual).toContain('buys no arm beyond `none`');
+  });
+
+  it('names the arm whose row is missing and counts only the bought arms', () => {
+    const gate = armCoverageGate([...bought, 'none'], ['sample-5-first', 'full']);
+    expect(gate.pass).toBe(false);
+    expect(gate.actual).toBe('sample-5-exec, sample-5-oracle, sample-5 missing of 4 bought arm(s), `none` scored as the baseline');
+  });
+
+  it('is blocking, because a missing row is a paid-for reading that reads as an absence', () => {
+    expect(armCoverageGate(bought, []).blocking).toBe(true);
+  });
+
+  it('accepts a row nobody bought, because the lane always scores its own control arm', () => {
+    expect(armCoverageGate(bought, [...bought, 'full', 'full-unguarded']).pass).toBe(true);
+  });
+
+  it('takes its identifier from the caller so a second lane can reuse the rule', () => {
+    expect(armCoverageGate(bought, bought, 'V99').id).toBe('V99');
+  });
+
+  it('replays from an artefact, which is the only way to re-judge a run already paid for', () => {
+    const gate = armCoverageOf({
+      config: { arms: ['none', 'full', 'sample-5'] },
+      arms: [{ arm: 'full' }, { arm: 'sample-5' }],
+    });
+    expect(gate.pass).toBe(true);
+    expect(gate.actual).toContain('2/2 bought arm(s) reported');
+  });
+
+  it('reads an artefact that records no arm as buying nothing, rather than as a failure', () => {
+    // Every artefact written before `config.arms` existed. Failing them would make the replay a
+    // statement about the file format instead of about the run.
+    const gate = armCoverageOf({});
+    expect(gate.pass).toBe(true);
+    expect(gate.actual).toContain('no arm beyond');
   });
 });
