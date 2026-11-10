@@ -138,3 +138,30 @@ than a second experiment. The first run pays 350 calls.
 kinds are reported separately because the arm is a claim about which sentence carries the ranking, and
 a combined number alone could not say that a `rows:` assertion was a shape signal this lane already
 knows is inert.
+
+## Amendment 2 — the writer works, and the budget it was given was a guess that the first fold refuted
+
+Run `42834602173`, 2026-11-10 14:29 UTC, stopped after its first fold at **851 calls** by the budget
+forecast: `the run needs about 4596 calls, the cap is 4000 (short by 596)`. No artefact. The mechanism
+is not what failed:
+
+```
+[sota] fold 1/5 assertions 70/70 calls=851 failed=0
+[sota] fold 1/5 wrote assertions for 70/70 question(s), 70 written and 0 reused from the cache
+```
+
+**Seventy questions, seventy replies, zero failures, in fifteen seconds.** One call per question as
+designed, and every reply parsed into at least one assertion — which is the number this amendment
+exists to record, because a writer that answered nothing on half the questions would have made the arm
+a measurement of obedience.
+
+**What was wrong was the estimate.** The table in Amendment 1 said ≈2,800 calls for five folds of
+seventy questions and it was 4,596. The fold decomposes into 70 writer calls, 350 draws, 140 answer
+calls, 140 adjudications, 139 repairs and about 280 distillation calls — and the distillation is the
+line nobody priced: `learn_sample` 0 does not mean no distillation, it means the lane's default, which
+on a 280-question learning set is 280 calls of its own. Amendment 1's argument that "the pool is bought
+with the writer" was right and its arithmetic missed a term.
+
+**Re-dispatch at cap 5,600** (the forecast plus 22%), same registration, same arms, same split. The
+lesson is the one R72's Outcome 0 taught at twenty times the price: a budget is a forecast and a
+forecast that has never run is a guess, so the fold's own measurement is the number to dispatch on.
