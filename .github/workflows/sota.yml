@@ -443,6 +443,21 @@ jobs:
           restore-keys: |
             distill-${{ steps.backbone.outputs.model }}-sql-prompt-3-
 
+      # What R73's writer said, kept between dispatches.
+      #
+      # The writer costs one call per question and its reply is a function of the prompt, which
+      # carries the schema and the question: a replay of the same split should pay nothing for the
+      # assertions and measure the same ones, and a writer whose output moved between two runs would
+      # make the arm's delta a statement about sampling. Keyed on the prompt hash inside the file, so
+      # the cache key itself can be coarse.
+      - name: Restore the assertion cache
+        uses: actions/cache@v4
+        with:
+          path: .cache/assertions
+          key: assertions-${{ steps.backbone.outputs.model }}-${{ github.run_id }}
+          restore-keys: |
+            assertions-${{ steps.backbone.outputs.model }}-
+
       # The temperature a registration declares, or the lane's default.
       #
       # `SOTA_SAMPLE_TEMPERATURE` is a repository variable, and a variable is global: R70 measures the
@@ -549,6 +564,9 @@ jobs:
           SOTA_SEMANTICS: ${{ github.event.inputs.semantics || 'multiset' }}
           SOTA_VALIDATION_CREDIT: ${{ github.event.inputs.validation_credit || 'absolute' }}
           SOTA_DISTILL_CACHE: ${{ github.workspace }}/.cache/distill/cache.json
+          # Empty when the run buys no writer, which is every run before R73 and every arm after it
+          # that does not read assertions.
+          SOTA_ASSERTION_CACHE: ${{ github.workspace }}/.cache/assertions/cache.json
           SOTA_CONVENTION: ${{ github.event.inputs.convention || '' }}
           SOTA_RESAMPLES: '10000'
           # The registration's own declaration when it makes one, so an experiment that moves the
