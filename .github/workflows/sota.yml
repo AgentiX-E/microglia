@@ -76,10 +76,15 @@ on:
       # experiment, not of the run, and a knob nobody sets from the menu is a knob whose default is
       # the only value it ever has. Both still work, from repository variables, and the dispatch
       # limit of twenty-five inputs is what made the distinction necessary.
+      # No default. The menu entry used to default to `gated,oracle`, so "leave it empty and let the
+      # registration decide" was unreachable twice over: GitHub substitutes an input's default when
+      # the dispatch sends an empty string, so the `||` fallback below never ran, and the default was
+      # the R67 ladder besides. R72 declares `arms: full` and was dispatched with an empty field
+      # twice; both times it bought two planted arms its file never names. An empty field now means
+      # what it says, and `Resolve the arms` fills it from the file.
       arms:
-        description: 'Control arms beyond none+full (gated,duplicate,wrong-scope,stated,oracle)'
+        description: 'Control arms beyond none+full; empty reads them from the pre-registration'
         required: false
-        default: 'gated,oracle'
       # The backbone, per dispatch rather than per repository.
       #
       # `SOTA_MODEL` was a repository variable and the cache key above the run read the same
