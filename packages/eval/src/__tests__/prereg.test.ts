@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  armsAgainstRegistration,
   facadePairSwitch,
   plantedArmMatrix,
   preregGate,
@@ -557,5 +558,59 @@ describe('the sampling temperature', () => {
     // artefact and read afterwards as a property of a run that never sampled.
     const reported = problemsOf(withTemperature('temperature: 1.0', 'none,gated'));
     expect(reported.some((entry) => entry.includes('describes no draw'))).toBe(true);
+  });
+});
+
+describe('the arms a dispatch buys against the arms it registers', () => {
+  // R67's dispatch bought `gated,oracle` from the menu default while its file named five sampling
+  // arms, and nothing noticed: the header is validated against `OPTIONAL_ARMS` and the menu was
+  // validated against nothing. The comparison has to be order-insensitive and it has to ignore
+  // `none`/`full`, because those are always measured and are not always written into a header.
+  const registration = (...arms: string[]): { arms: readonly string[] } => ({ arms });
+
+  it('agrees when both sides name the same arms in a different order', () => {
+    const agreement = armsAgainstRegistration(
+      registration('sample-5-first', 'sample-10-oracle', 'sample-5-exec'),
+      ['sample-5-exec', 'sample-5-first', 'sample-10-oracle'],
+    );
+    expect(agreement).toEqual({
+      ok: true,
+      declared: ['sample-10-oracle', 'sample-5-exec', 'sample-5-first'],
+      requested: ['sample-10-oracle', 'sample-5-exec', 'sample-5-first'],
+    });
+  });
+
+  it('ignores none and full, which every run measures whether or not it says so', () => {
+    const agreement = armsAgainstRegistration(registration('sample-5-first'), ['none', 'full', 'sample-5-first']);
+    expect(agreement.ok).toBe(true);
+  });
+
+  it('refuses a dispatch that buys an arm its registration does not name', () => {
+    // The failure this exists for: the menu default is not the registration.
+    const agreement = armsAgainstRegistration(registration('sample-10-first'), ['gated', 'oracle']);
+    expect(agreement.ok).toBe(false);
+    expect(agreement.declared).toEqual(['sample-10-first']);
+    expect(agreement.requested).toEqual(['gated', 'oracle']);
+  });
+
+  it('accepts a dispatch that buys a control the header does not name', () => {
+    // R66's shape: the file names the treatment, the dispatch buys `retry-blank` beside it, because a
+    // treatment without its control is not a measurement. Containment rather than equality is what
+    // keeps that replay possible; equality would teach the next author to drop the control.
+    const agreement = armsAgainstRegistration(registration('retry-values'), ['retry-blank', 'retry-values']);
+    expect(agreement.ok).toBe(true);
+    expect(agreement.requested).toEqual(['retry-blank', 'retry-values']);
+  });
+
+  it('refuses a dispatch that buys fewer arms than the registration declares', () => {
+    const agreement = armsAgainstRegistration(
+      registration('sample-5-first', 'sample-5-exec'),
+      ['sample-5-first'],
+    );
+    expect(agreement.ok).toBe(false);
+  });
+
+  it('leaves a hand run alone, because there is no claim to disagree with', () => {
+    expect(armsAgainstRegistration(undefined, ['gated', 'oracle']).ok).toBe(true);
   });
 });

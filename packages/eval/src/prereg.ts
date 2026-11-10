@@ -568,3 +568,37 @@ export function preregGateAgreement(prereg: Prereg, emitted: readonly string[]):
 export function facadePairSwitch(prereg: Prereg): boolean {
   return prereg.facadePair === 'as-is-floored';
 }
+
+/**
+ * Whether the arms a dispatch buys are the arms its registration declares.
+ *
+ * The sampled arms travel in `SOTA_ARMS` — a dispatch input — while the registration declares the
+ * same list in its header. Two representations of one fact, and this repository has paid for that
+ * shape three times: `retry-values` was registered while the arm did not exist, `sample-5-exec`
+ * existed as a parseable formula but not as a name in `OPTIONAL_ARMS`, and R67's dispatch read
+ * `gated,oracle` from the menu default while its file said something else entirely. `pnpm check`
+ * validates the header against `OPTIONAL_ARMS`; until now nothing compared it with the thing the run
+ * actually buys, which is the only comparison that matters at run time.
+ *
+ * `none` and `full` are always measured and are not always written into a header, so they are dropped
+ * from both sides before the comparison. Order is not a fact here: the lanes fan arms out and sort
+ * their own output, so both sides are sorted before they are reported.
+ *
+ * The relation is **containment, not equality**: every arm a registration declares must be bought,
+ * and a dispatch may buy more. R66 is why — its header names `retry-values` and its dispatch buys
+ * `retry-blank,retry-values`, because a treatment without its control is not a measurement. Equality
+ * would refuse the replay of the only run that produced that reading, which teaches the next author
+ * to leave the control out of the dispatch rather than to leave it in the file.
+ */
+export function armsAgainstRegistration(
+  prereg: Pick<Prereg, 'arms'> | undefined,
+  requested: Iterable<string>,
+): { readonly ok: boolean; readonly declared: readonly string[]; readonly requested: readonly string[] } {
+  const essential = (arms: Iterable<string>): readonly string[] =>
+    [...new Set(arms)].filter((arm) => arm !== 'none' && arm !== 'full').sort();
+  const declared = essential(prereg?.arms ?? []);
+  const bought = essential(requested);
+  // A registration with no header is a hand run: there is no claim to disagree with.
+  const ok = prereg === undefined || declared.every((arm) => bought.includes(arm));
+  return { ok, declared, requested: bought };
+}

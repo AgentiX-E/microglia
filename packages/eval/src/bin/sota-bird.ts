@@ -62,6 +62,7 @@
  *  - `SOTA_DISTILL_CONCURRENCY` distillation replies in flight at once; default 8
  */
 import { writeJson } from './lib.js';
+import { armsAgainstRegistration, readPrereg } from '../prereg.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -593,6 +594,37 @@ function armsFrom(raw: string | undefined): Set<ArmName> {
 }
 
 /**
+ * Refuse a dispatch whose arm list disagrees with the registration it claims to execute.
+ *
+ * The sampled arms travel in `SOTA_ARMS`, from the dispatch menu, and the registration declares its
+ * own list in its header. Two representations of one fact, and the repository has now paid for this
+ * shape three times: `retry-values` was registered while the arm did not exist, `sample-5-exec`
+ * existed as a formula but not as a name, and R67's own arm list was read from a menu default while
+ * its file said something else. The header is validated against `OPTIONAL_ARMS` by `pnpm check`;
+ * nothing validated it against the thing the run actually buys.
+ *
+ * The comparison itself is in `prereg.ts` so it can be tested without a process; this is the file
+ * read and the named failure. A dispatch with no registration is a hand run and is left alone.
+ */
+function armsAgainstPrereg(arms: Set<ArmName>, prereg: string): Set<ArmName> {
+  if (prereg === '') return arms;
+  const path = `prereg/${prereg}.md`;
+  if (!existsSync(path)) return arms;
+  const reading = readPrereg(readFileSync(path, 'utf8'), path);
+  const agreement = armsAgainstRegistration(reading.prereg, [...arms]);
+  if (!agreement.ok) {
+    throw new MicrogliaError(
+      'MG_E_CONFIG',
+      `SOTA_ARMS does not match ${path}: the dispatch buys ` +
+        `${agreement.requested.join(', ') || 'nothing'}, the registration declares ` +
+        `${agreement.declared.join(', ') || 'nothing'}`,
+      { prereg: path, declared: [...agreement.declared], requested: [...agreement.requested] },
+    );
+  }
+  return arms;
+}
+
+/**
  * The distillation cache, persisted so a replayed dispatch learns the same store.
  *
  * Unset path means no persistence: the run pays for every distillation, as every run did
@@ -638,7 +670,7 @@ const CHANNEL_FLOORS: Record<
  */
 type ChannelKind = 'values' | 'linked' | 'linked-additive' | 'recall-order';
 
-const ARMS = armsFrom(process.env['SOTA_ARMS']);
+const ARMS = armsAgainstPrereg(armsFrom(process.env['SOTA_ARMS']), PREREG);
 
 /**
  * When an injected rule has earned retirement.

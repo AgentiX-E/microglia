@@ -5,10 +5,10 @@
   "scanned": 176,
   "totals": {
     "modules": 176,
-    "lines": 46999,
+    "lines": 47033,
     "adapterLines": 1956,
     "deferredLines": 6764,
-    "coupledShare": 0.1829
+    "coupledShare": 0.1827
   },
   "layers": [
     {
@@ -38,7 +38,7 @@
     {
       "layer": "eval",
       "modules": 119,
-      "lines": 33924,
+      "lines": 33958,
       "adapterLines": 0,
       "deferredLines": 6764,
       "coupled": 17
@@ -579,5 +579,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 46999 production lines across 176 modules: 7 adapter modules in `sql`, 17 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 47033 production lines across 176 modules: 7 adapter modules in `sql`, 17 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }
