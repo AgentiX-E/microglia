@@ -947,8 +947,13 @@ type Reply = ChatReply;
  * benchmark lane was the one place that could not be: a sequencing defect in the deletion
  * arm reached CI, ran fourteen minutes, and reported a crash where it should have reported
  * a number.
+ *
+ * `SOTA_ENDPOINT` first and `DEEPSEEK_ENDPOINT` second, because the credential it is paired with is
+ * `SOTA_API_KEY`: two names for one provider's host and one name for another's key is the same
+ * half-variable configuration that made the backbone confound unremovable. The old name still works
+ * because every rehearsal this repository documents uses it.
  */
-const ENDPOINT = process.env['DEEPSEEK_ENDPOINT'] ?? '';
+const ENDPOINT = process.env['SOTA_ENDPOINT'] ?? process.env['DEEPSEEK_ENDPOINT'] ?? '';
 
 /**
  * Which key pays, decided before the first call rather than discovered at the four-hundredth.

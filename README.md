@@ -730,6 +730,11 @@ A DeepSeek key aimed at another provider's host stops the run before the first c
 answering. The artefact's `model_credential` field says which of the two paid, so two runs of the same arm on
 different backbones stay tellable apart.
 
+`SOTA_ENDPOINT` is the host that goes with `SOTA_API_KEY`; `DEEPSEEK_ENDPOINT`, which every rehearsal in this
+repository already uses, still works as the older name. The `sota` workflow exposes one dispatch input that
+moves all three — `backbone=zhipu:MODEL` — because a menu that can move the host without the key is a
+menu that can spend the wrong account's money on a refusal.
+
 `pnpm bundle:size` bundles both published entry points for the browser and holds them to a ceiling:
 **3,009 B raw / 1,410 B gzipped** for the client and **43,330 B / 14,684 B gzipped** for the core. The
 build would fail if either stopped bundling without Node builtins, which is the "no runtime dependency"

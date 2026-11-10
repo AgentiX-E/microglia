@@ -63,16 +63,23 @@ variable moved, which is more than the published rows can say.
 - Cost, stated before the run: 350 questions × (1 + 5 + 5) draws ≈ 3,850 calls per dispatch, two
   dispatches, no new harness code. R67's three arms are the reference row and are not re-bought.
 
-### The instrument gap this registration found before it could be dispatched
+### The instrument gap this registration found, and what closed it
 
-`SOTA_MODEL` is read from a **repository variable**, not from a dispatch input, and the distillation
-cache key two steps above the run reads the same variable. So a backbone swap is currently a
-repository-wide mutation that every later dispatch inherits, and the cache key moves with it — which
-means two backbones cannot be run side by side, and a forgotten variable would silently key a cache
-on one model while the lane calls another. That is the same defect shape as the credential: the
-value existed, the *per-run* choice of it did not. A `model` input on the workflow, with the secret
-that pairs with it, is the work that has to land between this registration and its dispatch, and it
-is listed here rather than discovered after a wasted run.
+`SOTA_MODEL` was read from a **repository variable**, not from a dispatch input, and the distillation
+cache key two steps above the run read the same variable. So a backbone swap was a repository-wide
+mutation that every later dispatch inherited, and the cache key moved with it — two backbones could
+not be run side by side, and a forgotten variable would silently key a cache on one model while the
+lane called another. The same defect shape as the credential: the value existed, the *per-run*
+choice of it did not.
+
+It is closed, and the shape it closed in is worth recording because the first design was wrong. Three
+inputs — `model`, `endpoint`, `credential` — would have let a caller move the host while leaving the
+key behind, which is the defect rather than the fix, and the repository's own workflow linter refused
+the file for declaring 28 `workflow_dispatch` inputs against GitHub's cap of 25. The answer is **one**
+input, `backbone`, whose vocabulary is closed: empty leaves every published run exactly where it was,
+and `zhipu:MODEL` moves the model, the host and the key together. A knob that cannot be set
+half-way cannot be set half-way by mistake. `density_panel` moved to a repository variable to pay for
+the slot, at the same default it had, so no dispatch that did not set it changes behaviour.
 
 ## Prediction
 

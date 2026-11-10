@@ -59,10 +59,10 @@ on:
         description: 'Foreign cases each admitted rule is shown (0 disables the transfer measurement)'
         required: false
         default: '4'
-      density_panel:
-        description: 'R9.1: questions every selected rule is shown, one rule at a time (0 disables the family; 20 is the pre-registered panel)'
-        required: false
-        default: '0'
+      # `density_panel` is not an input any more. It is R9.1's panel size — a property of that
+      # registration rather than of a run — and it holds the twenty-five-input cap that a second
+      # backbone needs. It is read from `vars.SOTA_DENSITY_PANEL`, defaulting to the same `0` this
+      # menu defaulted to, so no dispatch that did not set it changes behaviour.
       density_rules_per_db:
         description: 'R9.1: rules drawn from each database, by content hash (8 per database is ~1,400 calls at a panel of 20)'
         required: false
@@ -80,6 +80,22 @@ on:
         description: 'Control arms beyond none+full (gated,duplicate,wrong-scope,stated,oracle)'
         required: false
         default: 'gated,oracle'
+      # The backbone, per dispatch rather than per repository.
+      #
+      # `SOTA_MODEL` was a repository variable and the cache key above the run read the same
+      # variable, so changing the backbone was a global mutation that every later dispatch
+      # inherited, two backbones could not be run side by side, and a forgotten variable keyed a
+      # cache on one model while the lane called another. R68 is the experiment that needs this:
+      # the same scaffold on a second backbone, one variable moved.
+      #
+      # One input rather than three, because the model, the host and the key are one decision and
+      # splitting them is how this repository ended up able to move the host while still sending
+      # the other provider's key. `zhipu:<model-id>` moves all three together; the empty value
+      # leaves every published run exactly where it was.
+      backbone:
+        description: 'Backbone for this dispatch: empty = the repository model on this provider; zhipu:<model-id> = that model on Zhipu, with the key and the host moving together'
+        required: false
+        default: ''
       concurrency:
         description: 'Model calls in flight at once (1 = serial)'
         required: false
@@ -302,14 +318,53 @@ jobs:
       - name: Build
         run: pnpm build
 
-      - name: Require credentials
+      - name: Resolve the backbone and require its credential
+        # Three values decide where a run's tokens are bought: the model, the host and the key. They
+        # are resolved together here because splitting them is how this repository became able to
+        # point the lane at a foreign host while still sending this provider's key — a combination
+        # that does not fail as a rejection but as a refusal per prompt, a tripped breaker, and an
+        # artefact saying the endpoint stopped answering.
+        id: backbone
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
+          BACKBONE: ${{ github.event.inputs.backbone || '' }}
+          DEFAULT_MODEL: ${{ vars.SOTA_MODEL || 'deepseek-flash' }}
         run: |
-          if [ -z "$DEEPSEEK_API_KEY" ]; then
-            echo "::error::DEEPSEEK_API_KEY is not configured for this repository"
-            exit 1
-          fi
+          set -euo pipefail
+          case "$BACKBONE" in
+            '')
+              if [ -z "$DEEPSEEK_API_KEY" ]; then
+                echo "::error::DEEPSEEK_API_KEY is not configured for this repository"
+                exit 1
+              fi
+              {
+                echo "model=$DEFAULT_MODEL"
+                echo "endpoint="
+                echo "credential=default"
+              } >> "$GITHUB_OUTPUT"
+              ;;
+            zhipu:*)
+              MODEL="${BACKBONE#zhipu:}"
+              if [ -z "$MODEL" ]; then
+                echo "::error::backbone=zhipu: names no model"
+                exit 1
+              fi
+              if [ -z "$ZHIPU_API_KEY" ]; then
+                echo "::error::ZHIPU_API_KEY is not configured for this repository"
+                exit 1
+              fi
+              {
+                echo "model=$MODEL"
+                echo "endpoint=https://open.bigmodel.cn/api/paas/v4/chat/completions"
+                echo "credential=zhipu"
+              } >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "::error::backbone must be empty or zhipu:<model-id>, not '$BACKBONE'"
+              exit 1
+              ;;
+          esac
 
       # No inventory step: the lane verifies its own data. It reads the pinned manifest for its
       # split (`bird-minidev.json`, `bird-dev.json` or `bird-train.json`), checks the download's
@@ -379,9 +434,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .cache/distill
-          key: distill-${{ vars.SOTA_MODEL || 'deepseek-flash' }}-sql-prompt-3-${{ github.run_id }}
+          key: distill-${{ steps.backbone.outputs.model }}-sql-prompt-3-${{ github.run_id }}
           restore-keys: |
-            distill-${{ vars.SOTA_MODEL || 'deepseek-flash' }}-sql-prompt-3-
+            distill-${{ steps.backbone.outputs.model }}-sql-prompt-3-
 
       - name: Run the benchmark
         # Above the lane's own deadline (130 minutes) with room for the last fold to finish
@@ -395,7 +450,12 @@ jobs:
           # the lane had not asked for. It is set here as well as in the source because the cache key
           # two steps above already reads this variable, and a cache keyed on one model while the run
           # calls another is a cache that never hits.
-          SOTA_MODEL: ${{ vars.SOTA_MODEL || 'deepseek-flash' }}
+          SOTA_MODEL: ${{ steps.backbone.outputs.model }}
+          # Empty leaves the client on its own default, which is this provider. A value here is what
+          # makes a backbone swap possible, and `planCredential` refuses the combination that would
+          # spend the default key on it.
+          SOTA_ENDPOINT: ${{ steps.backbone.outputs.endpoint }}
+          SOTA_API_KEY: ${{ (steps.backbone.outputs.credential == 'zhipu' && secrets.ZHIPU_API_KEY) || '' }}
           # Empty leaves the provider's default, which for this model is to think. Thinking is billed
           # at the output rate and is invisible in every field except a count nothing was reading, so
           # the `off` switch is available from here and the usage line reports the reasoning share —
@@ -419,7 +479,7 @@ jobs:
           SOTA_RESAMPLES: '10000'
           SOTA_SAMPLE_TEMPERATURE: ${{ vars.SOTA_SAMPLE_TEMPERATURE || '0.7' }}
           SOTA_TRANSFER_TARGETS: ${{ github.event.inputs.transfer_targets || '4' }}
-          SOTA_DENSITY_PANEL: ${{ github.event.inputs.density_panel || '0' }}
+          SOTA_DENSITY_PANEL: ${{ vars.SOTA_DENSITY_PANEL || '0' }}
           SOTA_DENSITY_RULES_PER_DB: ${{ github.event.inputs.density_rules_per_db || '8' }}
           SOTA_TRANSFER_PANEL: ${{ github.event.inputs.transfer_panel || '10' }}
           # R10. Empty on a schedule, which the lane reads as the incumbent form: a dispatch that
