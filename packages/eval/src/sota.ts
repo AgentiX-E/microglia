@@ -767,6 +767,18 @@ export type SqlArm =
    * exists, and charging it with the cost of the extra draws would be pricing temperature as
    * judgement.
    */
+  | 'sample-5-exec'
+  /**
+   * Five draws, chosen by the same execution-shape composite as `sample-3-exec`.
+   *
+   * Registered by R67 and *not* present in this union when R67 was dispatched, which is the one
+   * thing this arm's comment has to say that the others do not: the parser has accepted
+   * `sample-<n>-<selector>` generically since the selectors were factored into one list, so the arm
+   * was constructible, plannable and absent from the list the lane checks membership against. The
+   * dispatch died in two seconds with `Unknown arm 'sample-5-exec'` — the right refusal, at the
+   * right price, and a reminder that "the machinery is generic" is not the same claim as "the arm
+   * exists". R66 wrote that sentence about itself; R67 did not.
+   */
   | 'sample-5-shape'
   /**
    * The same five draws, chosen by one signal: the unit the answer is in.
@@ -1044,6 +1056,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'sample-3-oracle': true,
   'sample-3-model': true,
   'sample-3-exec': true,
+  'sample-5-exec': true,
   'sample-5-shape': true,
   'sample-5-value': true,
   'sample-5-prior': true,

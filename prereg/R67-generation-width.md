@@ -13,6 +13,23 @@ gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V51
 between-run spread at 3–4pp on this split (Rule 13) and a single dispatch cannot decide the effect this
 registration is about.
 
+## Outcome 0 — void by configuration, in two seconds (2026-11-10)
+
+The first dispatch, `42747647806`, never reached a question. The lane refused the arm list:
+`MG_E_CONFIG: Unknown arm 'sample-5-exec'`. The selector exists (`exec` has been in
+`SAMPLING_SELECTORS` since the selectors were factored into one list), the parser accepts any
+`sample-N-SELECTOR`, and `sample-3-exec` is a registered arm — so the formula was constructible,
+plannable and absent from `OPTIONAL_ARMS`, which is the list membership is actually checked against.
+
+This is the third time in two iterations that one fact had two representations and only one was
+updated: `RETRY_POPULATION_FLOOR` stayed 140 while the amendment said 90, `retry-values` was
+registered while the arm did not exist (R66's own header says so), and now an arm whose parser form
+exists but whose name does not. R66 wrote the sentence; R67 assumed the machinery. The arm is now in
+the union, the list is pinned by the test that pins every other arm, and the dispatch is repeated.
+
+The cost of this class is two seconds and no calls — the refusal happens before the first model call —
+which is the right price and exactly why the arm list is checked where it is.
+
 ## Why this file exists
 
 R65 closed the last prompt-content lever in the register. Pooled over three valid dispatches, three
