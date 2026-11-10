@@ -30,6 +30,49 @@ the union, the list is pinned by the test that pins every other arm, and the dis
 The cost of this class is two seconds and no calls — the refusal happens before the first model call —
 which is the right price and exactly why the arm list is checked where it is.
 
+## Outcome — the pool is real, the selectors are at chance, and the branch it triggers is "widen the pool" (2026-11-10)
+
+Dispatch `42749802682`, minidev, n = 350, 5 folds, 2,930 calls, **$0.4708** at 100% peak pricing
+($0.2354 off-peak), cache 77.4%, all gates passed, 1,750 candidates signed and reconciled.
+
+| arm | accuracy | vs `none` | vs `sample-5-first` |
+| --- | --- | --- | --- |
+| `none` | 52.29% | — | — |
+| `full` | 51.43% | −0.86pp [−4.00, +2.00], p = 0.71 | — |
+| `sample-5-first` | 50.86% | −1.43pp, p = 0.42 | — |
+| `sample-5-random` | 52.00% | −0.29pp, p = 1.00 | **+1.14pp** |
+| `sample-5-exec` | 52.00% | −0.29pp, p = 1.00 | **+1.14pp** |
+| `sample-5-prior` | 53.14% | +0.86pp, p = 0.70 | **+2.28pp** |
+| `sample-5-oracle` | **59.71%** | +7.43pp, p < 1e-4 | **+8.85pp** |
+
+Four readings, in the order they matter:
+
+1. **Temperature costs 1.43pp and the pool repays 8.85pp.** Five draws at T = 0.7 contain the answer
+   on 8.85pp more questions than the first draw does, against R67's predicted band of +10…+25pp —
+   *below* the band, which is the first thing the prediction got wrong.
+2. **Execution-shape selection is worth exactly what a coin flip is worth.** `sample-5-exec` and
+   `sample-5-random` are not approximately equal, they are the *same number*: 52.00% and +1.14pp over
+   `first`. Ceiling share 12.9%.
+3. **The reason is measured, not inferred.** On the 120 questions where the draws disagreed (296
+   pairs), the AUC of every execution-shape signal is at chance: draw-order 0.510 [0.421, 0.596],
+   null-share 0.492, empty 0.535, duplicate-share 0.537, column-shape 0.541, value-type 0.542,
+   row-shape 0.546 — seven intervals, every one straddling 0.5. A selector made of signals that
+   cannot rank cannot rank, and it did not.
+4. **The prior selector is the only one above chance** (+2.28pp over `first`, 25.8% of the ceiling),
+   and its own report says why to distrust the headline: `db-signature` reads +10.00pp on 80
+   questions, 36 of them with any support, *in sample*. That is an upper bound for a verifier, not a
+   result.
+
+**The branch.** Ordered against the file's own conditions: not promoted (1.14 < 8); not narrowed to
+the ceiling (the ceiling is 8.85, under 15); **narrowed to the pool** — `exec − first` under +8pp
+*and* the ceiling under +15pp. The registration's own instruction for that branch is that the next
+registration widens or diversifies the pool before any selector work, and that is R69.
+
+Two predictions held and two did not, recorded rather than smoothed: `prior − exec` inside ±3pp
+(measured +1.14) was right, and the cost forecast (~2,100 calls per arm, 9,000 for the dispatch) was
+high by a factor of three, because one pass of five draws feeds all five selectors — the arms are
+priced at 2,930 calls in total, not per arm.
+
 ## Why this file exists
 
 R65 closed the last prompt-content lever in the register. Pooled over three valid dispatches, three
