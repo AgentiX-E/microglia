@@ -1320,6 +1320,16 @@ export {
 } from './gold-revision.js';
 
 export {
+  drawSpread,
+  inertReading,
+  liveShareBuckets,
+  normaliseSql,
+  type InertPair,
+  type InertReading,
+  type RuleInertness,
+} from './inert.js';
+
+export {
   relabelReading,
   relabelSubgroup,
   relabelVerdict,

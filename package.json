@@ -94,7 +94,8 @@
     "eval:resolution": "tsx packages/eval/src/bin/resolution.ts",
     "eval:coupling": "tsx packages/eval/src/bin/coupling.ts",
     "eval:mediation": "tsx packages/eval/src/bin/mediation.ts",
-    "eval:stability": "tsx packages/eval/src/bin/gate-stability.ts"
+    "eval:stability": "tsx packages/eval/src/bin/gate-stability.ts",
+    "eval:inert": "tsx packages/eval/src/bin/inert.ts"
   },
   "devDependencies": {
     "@agentix-e/microglia-browser": "workspace:*",
