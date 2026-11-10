@@ -168,3 +168,63 @@ the 6,263 available. Distilling from all of them would add ≈31,300 calls — t
 and the claim here is about *routing*, not about how much a fold can learn: every arm in the run sees
 the same pack, so a smaller learning sample moves the level of both arms and not the difference the
 registration is about. 700 per fold is the size R70's folds used, doubled.
+
+## Outcome 0 — void: the dispatch that ran instead bought two arms this file never names
+
+Run `42819268828`, 2026-11-10 12:51 UTC, **stopped after its first fold at 7,235 calls**. Nothing in
+the table below is R72's reading, and the reason is a lane defect rather than a bad hypothesis.
+
+**What was dispatched.** `arms` was left empty, and the workflow's fallback was the literal
+`gated,oracle` — the R67 ladder frozen into a menu default. This file declares `arms: full`. The run
+therefore measured two planted arms that no sentence in this file mentions, on 1,566 questions of
+fold 1, and the registration's own arm check did not stop it:
+
+```ts
+// the rule as it stood, one direction, over an empty list
+const ok = prereg === undefined || declared.every((arm) => bought.includes(arm));
+```
+
+`declared` is the header minus the two baselines, so `arms: full` yields `[]`, and "every element of
+the empty set is bought" is true for any dispatch whatsoever. The check passed on the one dispatch it
+could not possibly have checked.
+
+**What stopped it.** The budget forecast, one fold in: `the run needs about 39069 calls, the cap is
+26000 (short by 13069)`. That number is the useful residue of the failed run and the reason this
+Outcome is cheap rather than expensive — it is the **first measurement of what a two-arm train
+dispatch actually costs**, and it is 2.1× the estimate in the Amendment above.
+
+| per fold (1,566 questions) | calls | note |
+| --- | --- | --- |
+| answering, 2 arms | 6,264 | 2 calls per question-arm, not 1 |
+| distillation, `learn_sample` 700 | 711 | cache-hit on the R69 key |
+| adjudication | 260 | |
+| **fold total** | **7,235** | 21 minutes wall clock |
+| **five folds, projected** | **39,069** | $3.15 at R70's $0.0806 per call, off-peak |
+
+The estimate of $1.5 was wrong by a factor of two because answering costs **2 calls per
+question-arm**: one to generate and one to repair, and `edited = 271` of 6,264 is what made that
+visible only in the totals. The cost of the void run itself was **$0.58**.
+
+**Two fixes, one of them a correction of a correction.**
+
+1. **The default is the registration.** `SOTA_ARMS` now falls back to `steps.registration.outputs.value`,
+   produced by `pnpm eval:prereg-arms --csv prereg/R72-overlap-gate.md` — the same pattern the
+   temperature already used, for the same reason, and an empty header resolves to "the two baselines"
+   rather than to somebody else's ladder. A literal default in a workflow is a third representation
+   of a fact that already has two.
+2. **The check is equality in both directions.** `armsAgainstRegistration` now reports `unbought`
+   and `undeclared` separately and refuses both, because "the dispatch buys an arm the file never
+   names" and "the file names an arm the dispatch does not buy" are different facts that need
+   different sentences. The counter-argument for the old containment rule was R66, whose header named
+   the treatment while its dispatch bought `retry-blank` beside it; the answer is that the header is
+   the commitment, so **R66's header now names both arms** and the rule can be exact. A named
+   registration that does not exist is also refused now instead of silently skipped.
+
+Neither fix would have caught this on its own: the check was reachable and wrong, and the default was
+wrong and unreachable.
+
+**Re-dispatch.** Same registration, `train`, five folds, `learn_sample` 700, cap **44,000** (the
+forecast plus 13%), deadline 175 minutes — the first fold's 21 minutes puts five folds at ≈105 plus
+distillation on a cold queue, and the step's own cap is 200. Estimated **$3.2 off-peak**, 2.1× the
+original estimate and still the cheapest form of this experiment: the policy is read afterwards by
+`pnpm eval:overlap --policy` for nothing.
