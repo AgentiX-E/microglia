@@ -15,6 +15,19 @@ the arm in `OPTIONAL_ARMS`, and `V76-values-delivered` — the gate that impleme
 void condition rather than a new one. `V76` fails a dispatch whose block fired on fewer than 30% of
 the empty retries, which is the sentence written below in the Refutation.
 
+## Outcome 0 — void by forecast, at 1,479 calls short (2026-11-10)
+
+The first dispatch, `42747637476`, measured fold 1 and then refused to continue: **it needs about
+13,479 calls, the cap is 12,000**. That is the same mechanism that stopped R64's first attempt, and
+the cost section above predicted the trap and then walked into it — the cap was set from R64's
+*bill* (5,241 calls for four arms) rather than from a cold-cache forecast, and this dispatch had no
+warm distillation cache, so fold 1 spent 1,227 of its 2,496 calls learning.
+
+Nothing about the registration changes. The forecast is the instrument's own number, taken from one
+fully measured fold, and the re-dispatch uses it with a 7.6% margin (cap 15,000). The refusal is the
+right behaviour — a run that stops after fold 1 and says why is worth more than a run that stops
+after fold 4 with no artefact — and it cost the fold rather than the dispatch.
+
 ## Why this file exists
 
 R64 measured the retry line for the first time: **20 of 98** rejected questions repaired (20.41%), worth
