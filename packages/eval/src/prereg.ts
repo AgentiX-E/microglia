@@ -364,22 +364,32 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     collected.push({ where: 'header opened', problem: `'${opened}' is not a calendar date` });
   }
   const arms = listOf(values.get('arms') ?? '', collected);
-  // R70: the temperature. Kept in `(0, 2]` because those are the bounds every provider in this
-  // lane accepts; a zero here is a deterministic run wearing a sampling arm's name, and it would
-  // be reported as a pool of identical draws without saying so.
+  // R70: the temperature, which every draw in a run is sampled at.
+  //
+  // The bound is closed at zero now, and it used to be open, for a reason the first version stated and
+  // then applied to the wrong set of registrations: "a zero here is a deterministic run wearing a
+  // sampling arm's name, and it would be reported as a pool of identical draws without saying so."
+  // That is exactly right **for a registration that declares a `sample-<n>` arm**, and it is wrong for
+  // every other one — a run of `none` and `loo` at temperature zero is the lane's ordinary
+  // deterministic form, and R77 cannot be registered at all without expressing it.
+  //
+  // So the rule follows the reason rather than the number: a sampling arm at zero is refused, because
+  // its five draws would be one draw reported five times; a registration without one may pin zero,
+  // because there is no pool for it to degenerate.
   const temperatureText = values.get('temperature');
   let sampleTemperature: number | undefined;
   if (temperatureText !== undefined) {
     const parsed = Number(temperatureText);
-    if (!Number.isFinite(parsed) || parsed <= 0 || parsed > 2) {
+    const sampled = arms.some((arm) => arm.startsWith('sample-'));
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 2) {
       collected.push({
         where: `header 'temperature'`,
-        problem: `'${temperatureText}' is not a finite number in (0, 2]`,
+        problem: `'${temperatureText}' is not a finite number in [0, 2]`,
       });
-    } else if (!arms.some((arm) => arm.startsWith('sample-'))) {
+    } else if (parsed === 0 && sampled) {
       collected.push({
         where: `header 'temperature'`,
-        problem: 'is declared by a registration that runs no sample-<n> arm, so it describes no draw',
+        problem: 'is zero for a registration that runs a sample-<n> arm, whose draws would all be one draw',
       });
     } else {
       sampleTemperature = parsed;

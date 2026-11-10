@@ -549,17 +549,35 @@ describe('the sampling temperature', () => {
   });
 
   it('refuses a temperature outside the interval every provider in the lane accepts', () => {
-    for (const bad of ['0', '2.5', '-1', 'hot']) {
+    for (const bad of ['2.5', '-1', 'hot']) {
       const reported = problemsOf(withTemperature(`temperature: ${bad}`));
       expect(reported.some((entry) => entry.includes("header 'temperature'"))).toBe(true);
     }
   });
 
-  it('refuses a temperature on a registration that draws nothing', () => {
-    // A temperature with no `sample-<n>` arm describes no draw: it would be recorded in the
-    // artefact and read afterwards as a property of a run that never sampled.
-    const reported = problemsOf(withTemperature('temperature: 1.0', 'none,gated'));
-    expect(reported.some((entry) => entry.includes('describes no draw'))).toBe(true);
+  it('refuses zero on a registration that draws a pool, because five draws would be one draw', () => {
+    // The reason the old rule was written for, kept where it applies. A `sample-<n>` arm at
+    // temperature zero returns the same query n times and the artefact would report a pool.
+    const reported = problemsOf(withTemperature('temperature: 0'));
+    expect(reported.some((entry) => entry.includes('whose draws would all be one draw'))).toBe(true);
+  });
+
+  it('accepts zero on a registration that draws once, which is the deterministic form', () => {
+    // R77 needs it: its whole design is that a deterministic decoder given two prompts differing by
+    // one rule returns the same query if and only if the rule did not matter. The old rule refused
+    // this and called the declaration meaningless — but the temperature is what **every** draw in the
+    // run is sampled at, so a registration without a sampling arm was never describing nothing, it was
+    // describing its own single draw. R74 is the evidence: it declared no temperature, inherited the
+    // workflow's 0.7, and its pairs were sampled at 0.7 without its file ever saying so.
+    const reading = readPrereg(withTemperature('temperature: 0', 'none,loo'), 'R8.3-xiyan-cell.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.sampleTemperature).toBe(0);
+  });
+
+  it('accepts a non-zero temperature on a registration that draws once', () => {
+    const reading = readPrereg(withTemperature('temperature: 0.7', 'none,loo'), 'R8.3-xiyan-cell.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.sampleTemperature).toBe(0.7);
   });
 });
 
