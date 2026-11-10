@@ -93,6 +93,8 @@ export const DEFERRALS: Readonly<Record<string, string>> = {
   selector: 'candidate selection over SQL strings; the selector is a policy, the strings are opaque',
   sota: 'the mixed lane module: prompt, arms and gate inputs still share a file',
   validity: 'one gate diffs two statements, and it imports the differ from `sql` rather than copying it',
+  'value-correction':
+    'compares the literals an attempt wrote against the values a column holds; it reads two strings and executes nothing',
 };
 
 /** One production module, as the walker found it. */

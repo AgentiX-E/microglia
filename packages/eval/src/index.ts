@@ -41,6 +41,23 @@ export {
   type EmptySummary,
 } from './empty-result.js';
 export {
+  VALUE_BLOCK_BUDGET,
+  VALUE_FLOOR,
+  VALUE_NEAREST,
+  editDistance,
+  nearestValues,
+  sqlLiterals,
+  summariseValues,
+  valueCorrections,
+  valueGate,
+  type ColumnValues,
+  type ValueCorrection,
+  type ValueCorrectionInput,
+  type ValueCorrectionOptions,
+  type ValueRow,
+  type ValueSummary,
+} from './value-correction.js';
+export {
   EXEMPLAR_FLOOR,
   exemplarGate,
   exemplarIndexOf,

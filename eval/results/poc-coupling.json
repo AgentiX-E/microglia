@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 175,
+  "scanned": 176,
   "totals": {
-    "modules": 175,
-    "lines": 46564,
+    "modules": 176,
+    "lines": 46906,
     "adapterLines": 1956,
-    "deferredLines": 6368,
-    "coupledShare": 0.1761
+    "deferredLines": 6710,
+    "coupledShare": 0.1821
   },
   "layers": [
     {
@@ -37,11 +37,11 @@
     },
     {
       "layer": "eval",
-      "modules": 118,
-      "lines": 33489,
+      "modules": 119,
+      "lines": 33831,
       "adapterLines": 0,
-      "deferredLines": 6368,
-      "coupled": 16
+      "deferredLines": 6710,
+      "coupled": 17
     },
     {
       "layer": "browser",
@@ -143,7 +143,7 @@
       "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 452,
+      "lines": 454,
       "words": [
         "sql",
         "sqlite",
@@ -259,7 +259,7 @@
       "pkg": "eval",
       "module": "sota",
       "path": "packages/eval/src/sota.ts",
-      "lines": 2298,
+      "lines": 2325,
       "words": [
         "sql",
         "sqlite",
@@ -278,6 +278,17 @@
       ],
       "verdict": "deferred",
       "reason": "one gate diffs two statements, and it imports the differ from `sql` rather than copying it"
+    },
+    {
+      "pkg": "eval",
+      "module": "value-correction",
+      "path": "packages/eval/src/value-correction.ts",
+      "lines": 313,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "compares the literals an attempt wrote against the values a column holds; it reads two strings and executes nothing"
     },
     {
       "pkg": "sql",
@@ -553,7 +564,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "175 modules, 16 deferred with a reason"
+      "detail": "176 modules, 17 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -568,5 +579,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 46564 production lines across 175 modules: 7 adapter modules in `sql`, 16 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 46906 production lines across 176 modules: 7 adapter modules in `sql`, 17 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }

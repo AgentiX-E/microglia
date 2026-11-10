@@ -663,6 +663,20 @@ export type SqlArm =
    */
   | 'retry-keyed'
   /**
+   * The retry, told which spelling this database uses.
+   *
+   * R64 repaired 20 of the 98 rejected questions and 19 of those came out of the empty bucket; of
+   * the 89 empty results, 32 read exactly the gold tables and filtered on a value the database does
+   * not spell that way. `WHERE County = 'Alameda County'` against a column holding `'Alameda'` is
+   * not a reasoning failure and re-reading the question cannot fix it, because the model has never
+   * been shown the column's contents.
+   *
+   * So the second attempt is told, in one line per literal: what the query wrote, and what the
+   * column actually holds. Built from the attempt's own text and a read of the database, at zero
+   * model calls, which is why it costs the same 98 calls `retry-blank` costs.
+   */
+  | 'retry-values'
+  /**
    * Three draws at a non-zero temperature, chosen by the largest agreeing group.
    *
    * The axis this project never varied. Every memory arm and every baseline has been one draw at
@@ -1019,6 +1033,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-lexicon': true,
   'chars-proc-600': true,
   'retry-keyed': true,
+  'retry-values': true,
   'sample-3': true,
   'sample-5': true,
   'sample-5-first': true,
@@ -1310,7 +1325,7 @@ export type { EvidenceDelivery, FramingDelivery } from '@agentix-e/microglia-pro
  * content half of the experiment, so it is a type rather than a convention: a lane that
  * grows a third form has to name it here and say which label it renders under.
  */
-export type PackKind = 'rule' | 'repair' | 'raw' | 'lexicon' | 'example';
+export type PackKind = 'rule' | 'repair' | 'raw' | 'lexicon' | 'example' | 'value';
 
 /**
  * What the dataset's own per-question knowledge is called in the prompt.
@@ -1348,6 +1363,10 @@ const PACK_LABEL: Record<PackKind, string> = {
   // "fix" to a query that was never broken.
   example:
     'Worked examples from this database: each is a question it was asked, followed by the query that answered it:',
+  // The only block in this lane whose content is the database itself rather than something learned
+  // from a run: a spelling the column holds. The heading names the source, because a reader who
+  // takes these for corrections will try to repair a query that was only mistyped.
+  value: 'How this database spells the values this question names:',
 };
 
 /**
@@ -1896,6 +1915,7 @@ const RETRY_LABEL: Record<PackKind, string> = {
   raw: 'Earlier questions on this database, each with the query that returned a wrong result and the query that corrected it:',
   lexicon: 'What the terms in this question are known to denote in this database:',
   example: 'Worked examples from this database, each with the query that answered it:',
+  value: 'What this database holds for the values the query above wrote:',
 };
 
 /**
@@ -1929,6 +1949,13 @@ const RETRY_INSTRUCTION: Record<PackKind, string> = {
   example:
     'Each item is a question that was asked on this database and the query that answered it. ' +
     'Write a query for this question, using them as a guide to how the schema is used here.',
+  // A spelling is not advice to weigh: either the literal is the one the column holds or it is not.
+  // The second sentence exists because a miss is not always the cause, and a retry that rewrites a
+  // correct literal to satisfy this block would trade one wrong answer for another.
+  value:
+    'Each line names a literal the query above wrote and what the column actually holds. Where a ' +
+    'line applies, use the spelling the database holds. Where none explains the failure, write a ' +
+    'different query that answers the question.',
 };
 
 export function retryPromptFor(input: RetryInput): string {

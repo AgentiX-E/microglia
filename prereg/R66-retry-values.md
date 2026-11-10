@@ -4,14 +4,16 @@ step: R66
 opened: 2026-11-10
 arms: retry-values
 sample: 1534
-gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V51
+gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V51,V76
 ---
 
 # R66 — the retry that is told which spelling the database uses
 
-**Registered** 2026-11-10, undispatched. The arm is not implemented: `retry-values` is not in
-`OPTIONAL_ARMS`, so a dispatch naming it is refused with `Unknown arm 'retry-values'`. That order is
-deliberate — the registration exists so the implementation has a target it cannot re-describe.
+**Registered** 2026-11-10. **Implemented** the same day, in the order this file demanded: the
+registration first, as a target the implementation could not re-describe, then `value-correction.ts`,
+the arm in `OPTIONAL_ARMS`, and `V76-values-delivered` — the gate that implements this file's own
+void condition rather than a new one. `V76` fails a dispatch whose block fired on fewer than 30% of
+the empty retries, which is the sentence written below in the Refutation.
 
 ## Why this file exists
 

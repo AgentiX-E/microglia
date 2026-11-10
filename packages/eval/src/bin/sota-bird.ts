@@ -257,7 +257,13 @@ import {
   retryTriggerFor,
   retryTriggerOf,
   summariseRetryPopulation,
+  summariseValues,
+  valueCorrections,
+  valueGate,
+  type ColumnValues,
   type RetryReason,
+  type RetryTrigger,
+  type ValueRow,
   lexiconGate,
   lexiconPackOf,
   licensedLines,
@@ -697,7 +703,13 @@ const DECISIVE = parseDecisivePolicy({
  * `retry-blank` is the same second attempt with no pack at all, which is what separates
  * "retrying helps" from "the memory helps a retry".
  */
-const RETRY_ARMS = ['full-onretry', 'full-repair-onretry', 'retry-blank', 'retry-keyed'] as const;
+const RETRY_ARMS = [
+  'full-onretry',
+  'full-repair-onretry',
+  'retry-blank',
+  'retry-keyed',
+  'retry-values',
+] as const;
 
 /**
  * The character budgets the dose arms use.
@@ -1578,8 +1590,74 @@ async function resultShapeOf(dbPath: string, sql: string | undefined): Promise<R
  * run, or one that runs and returns no rows. Both are decidable from the database alone, so
  * the retry population is a property of the pipeline rather than of the benchmark.
  */
+/** What a first attempt earned, kept whole so a caller that needs the reason does not re-run it. */
+async function triggerOf(dbPath: string, sql: string | undefined): Promise<RetryTrigger | undefined> {
+  return retryTriggerFor(sql, sql === undefined ? undefined : await runQuery(dbPath, sql));
+}
+
 async function failureOf(dbPath: string, sql: string | undefined): Promise<string | undefined> {
-  return retryTriggerFor(sql, sql === undefined ? undefined : await runQuery(dbPath, sql))?.message;
+  return (await triggerOf(dbPath, sql))?.message;
+}
+
+/**
+ * The distinct values of one table's columns, read once per database per table.
+ *
+ * The value block compares an attempt's literals against what the columns actually hold, so the read
+ * is the mechanism rather than an optimisation of it. Cached per `(database, table)` because the 98
+ * retried questions of a dev run touch the same few tables repeatedly: uncached this is about two
+ * thousand `select distinct` statements, cached it is one per table the run ever mentions.
+ *
+ * Fifty distinct values per column and no ordering, because the cap is R66's and an `order by` would
+ * make the sample depend on the collation rather than on the column.
+ */
+const tableValuesCache = new Map<string, readonly ColumnValues[]>();
+
+function columnValuesOf(dbPath: string, table: string): readonly ColumnValues[] {
+  const key = `${dbPath}\u0000${table}`;
+  const cached = tableValuesCache.get(key);
+  if (cached !== undefined) return cached;
+  const out: ColumnValues[] = [];
+  const db = new DatabaseSync(dbPath, { readOnly: true });
+  try {
+    const columns = db.prepare(`pragma table_info(${quoteIdentifier(table)})`).all() as {
+      name: string;
+    }[];
+    for (const column of columns) {
+      const identifier = quoteIdentifier(column.name);
+      try {
+        const rows = db
+          .prepare(`select distinct ${identifier} as v from ${quoteIdentifier(table)} where ${identifier} is not null limit 50`)
+          .all() as { v: unknown }[];
+        const values = rows.map((row) => (row.v === null ? '' : String(row.v))).filter((value) => value !== '');
+        if (values.length > 0) out.push({ table, column: column.name, values });
+      } catch {
+        // A blob column cannot be rendered as a literal to compare against, and skipping it is the
+        // honest outcome: the block is evidence about spellings, not a migration of the schema.
+      }
+    }
+  } finally {
+    db.close();
+  }
+  tableValuesCache.set(key, out);
+  return out;
+}
+
+/**
+ * The columns an attempt could have meant, as far as its own text says.
+ *
+ * The table names are the schema's own, matched on word boundaries so `school` does not match
+ * `schools`, and a statement that names no table gets no columns rather than every column in the
+ * database: a block built from tables the query never touched is a guess wearing evidence's clothes.
+ * Six tables is a cap on work, not on truth — no BIRD question in this split joins more.
+ */
+const MAX_VALUED_TABLES = 6;
+
+function columnsForAttempt(dbPath: string, sql: string): readonly ColumnValues[] {
+  const tables = schemaBlocks(schemaSql(dbPath))
+    .map((block) => block.table)
+    .filter((table) => new RegExp(`\\b${table.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(sql))
+    .slice(0, MAX_VALUED_TABLES);
+  return tables.flatMap((table) => columnValuesOf(dbPath, table));
 }
 
 async function judgeReply(
@@ -3681,6 +3759,14 @@ let orderWithRecall = 0;
  */
 const exemplarRenders: RenderedExemplars[] = [];
 
+/**
+ * What the value block delivered, per retried question, for the arm's own gate.
+ *
+ * Module scope for the same reason `exemplarRenders` is: a fold is one sample of a population of
+ * prompts, and a block that fired in one fold and not another is one fact about the arm.
+ */
+const valueRows: ValueRow[] = [];
+
 async function runFold(
   fold: number,
   rows: readonly BirdRow[],
@@ -4715,13 +4801,32 @@ async function runFold(
       }
       const row = evalRows[position] as BirdRow;
       const dbPath = dataset.dbPath(row.db_id);
-      const failure = await failureOf(dbPath, extractSql(reply.text));
-      if (failure === undefined) {
+      const attemptSql = extractSql(reply.text);
+      const trigger = await triggerOf(dbPath, attemptSql);
+      if (trigger === undefined) {
         notRetried += 1;
         continue;
       }
+      const failure = trigger.message;
       retried += 1;
       retriedPositions.add(position);
+      // One block, one read of the database, no model call: the arm changes what the second prompt
+      // says and nothing about the bill. Every line is a literal the attempt itself wrote, so the
+      // evidence cannot arrive from a source the attempt did not already trust.
+      const valueCorrection = retryArmsThisRun.includes('retry-values')
+        ? valueCorrections({
+            sql: attemptSql ?? '',
+            columns: attemptSql === undefined ? [] : columnsForAttempt(dbPath, attemptSql),
+          })
+        : undefined;
+      if (valueCorrection !== undefined) {
+        valueRows.push({
+          reason: trigger.reason,
+          lines: valueCorrection.lines,
+          chars: valueCorrection.text.length,
+          dropped: valueCorrection.dropped,
+        });
+      }
       let keyedText = '';
       let keyedIds = 0;
       if (retryArmsThisRun.includes('retry-keyed') && procedural !== undefined) {
@@ -4740,14 +4845,20 @@ async function runFold(
       for (const arm of retryArmsThisRun) {
         const repair = arm === 'full-repair-onretry';
         const keyed = arm === 'retry-keyed';
+        const valued = arm === 'retry-values';
         const pack =
           arm === 'retry-blank'
             ? ''
-            : keyed
-              ? keyedText
-              : (repair ? packsHere.repair?.rendered : packsHere.rule.rendered) ?? '';
+            : valued
+              ? (valueCorrection?.text ?? '')
+              : keyed
+                ? keyedText
+                : (repair ? packsHere.repair?.rendered : packsHere.rule.rendered) ?? '';
+        // The value block retrieves nothing from the store, so its id count is zero by definition
+        // rather than by omission: a reader comparing pack sizes must not read this arm as a
+        // memory arm that happened to return nothing.
         const packIds =
-          arm === 'retry-blank'
+          arm === 'retry-blank' || valued
             ? 0
             : keyed
               ? keyedIds
@@ -4765,6 +4876,7 @@ async function runFold(
             failure,
             pack,
             ...(repair ? { packKind: 'repair' as const } : {}),
+            ...(valued ? { packKind: 'value' as const } : {}),
           }),
         });
       }
@@ -6447,6 +6559,12 @@ async function main(): Promise<void> {
   if (ARMS.has('examples')) {
     gates.push(exemplarGate(summariseExemplars(exemplarRenders, EXEMPLAR_K, EXEMPLAR_BUDGET)));
   }
+  // The same principle for R66: the registration names "the arm fires on fewer than 30% of the
+  // empty results" as a void condition, so a dispatch that produced an empty block fails here
+  // instead of publishing a delta about nothing.
+  if (ARMS.has('retry-values')) {
+    gates.push(valueGate(summariseValues(valueRows)));
+  }
 
   const assertions = {
     /**
@@ -6787,6 +6905,16 @@ async function main(): Promise<void> {
       exemplars: ARMS.has('examples')
         ? summariseExemplars(exemplarRenders, EXEMPLAR_K, EXEMPLAR_BUDGET)
         : null,
+      /**
+       * What the value block delivered on the population it acts on.
+       *
+       * R66's mechanism is a sentence about spellings, and a delta of zero means one of two very
+       * different things: the sentence was shown and did not help, or the block was empty and there
+       * was nothing to show. `asked` is counted over the empty retries only, because that is the
+       * population the registration names, and `firedOnErrors` sits beside it because the
+       * registration predicts the block leaves execution errors alone.
+       */
+      values: ARMS.has('retry-values') ? summariseValues(valueRows) : null,
       /**
        * What the selectors did across the whole run, and what they had to work with.
        *
@@ -7336,6 +7464,15 @@ async function main(): Promise<void> {
         `(${(examples.firedShare * 100).toFixed(2)}%) mean-chars=${examples.meanChars.toFixed(1)} ` +
         `capped=${examples.droppedQuestions} (${(examples.droppedShare * 100).toFixed(2)}%) ` +
         `k=${EXEMPLAR_K} budget=${EXEMPLAR_BUDGET}\n`,
+    );
+  }
+  if (ARMS.has('retry-values')) {
+    const values = summariseValues(valueRows);
+    process.stdout.write(
+      `[sota] values: fired=${values.fired}/${values.asked} ` +
+        `(${(values.firedShare * 100).toFixed(2)}%) lines=${values.lines} ` +
+        `mean-chars=${values.meanChars.toFixed(1)} dropped=${values.droppedLines} ` +
+        `errors=${values.firedOnErrors}/${values.errors}\n`,
     );
   }
   process.stdout.write(
