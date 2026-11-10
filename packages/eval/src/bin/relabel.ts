@@ -35,6 +35,7 @@ import { birdArtefactPath } from './lib.js';
 type Row = {
   readonly questionId?: string | number | null;
   readonly dbId?: string | null;
+  readonly question?: string | null;
   readonly predictedSql?: string | null;
   readonly baselineSql?: string | null;
   readonly correct?: boolean | null;
@@ -47,7 +48,7 @@ type Artefact = {
   readonly scored_by?: ResultComparison | null;
 };
 
-type Gold = { readonly question_id: string | number; readonly SQL: string };
+type Gold = { readonly question_id: string | number; readonly SQL: string; readonly question?: string };
 
 const flag = (argv: readonly string[], name: string): string | undefined => {
   const index = argv.indexOf(`--${name}`);
@@ -90,9 +91,9 @@ export async function main(argv: readonly string[]): Promise<number> {
   }
 
   const artefact = JSON.parse(readFileSync(birdPath, 'utf8')) as Artefact;
-  const corrected = new Map<string, string>();
+  const corrected = new Map<string, Gold>();
   for (const row of JSON.parse(readFileSync(goldPath, 'utf8')) as readonly Gold[]) {
-    corrected.set(String(row.question_id), row.SQL);
+    corrected.set(String(row.question_id), row);
   }
   const root = databaseRoot(flag(argv, 'db'));
 
@@ -136,8 +137,16 @@ export async function main(argv: readonly string[]): Promise<number> {
       missing.push(id);
       continue;
     }
+    // Whether the corrected release rewrote the question as well as the label. The `sql_only` variant
+    // says it kept the questions, and it did keep *its* questions — but its questions are not the ones
+    // this repository pinned: 67 of the 350 disagree, which places the pin a revision behind the file
+    // the correction was built on. On 44 of those the gold moved too, and those rows are a corpus
+    // revision rather than a relabel, so they are counted apart.
+    const questionRevised =
+      typeof gold.question === 'string' &&
+      (row.question ?? '').trim() !== gold.question.trim();
     const dbPath = dbPathFor(root, dbId);
-    const goldRows = await rowsOf(dbPath, gold);
+    const goldRows = await rowsOf(dbPath, gold.SQL);
     const predictedRows = await rowsOf(dbPath, predicted);
     const baselineRows = await rowsOf(dbPath, baseline);
     // `matches` rather than a local comparison, because the artefact's own verdicts were produced by
@@ -156,7 +165,7 @@ export async function main(argv: readonly string[]): Promise<number> {
       original: row.withoutMemoryCorrect === true,
       corrected: same(baselineRows, goldRows),
     };
-    cases.push({ id, treatment: treatmentGraded, baseline: baselineGraded });
+    cases.push({ id, treatment: treatmentGraded, baseline: baselineGraded, questionRevised });
     done += 1;
     if (done % 50 === 0) {
       const elapsed = (Date.now() - started) / 1000;
@@ -186,16 +195,32 @@ export async function main(argv: readonly string[]): Promise<number> {
   const line = (name: string, percent: number, correct: number): string =>
     `[relabel] ${name.padEnd(22)} ${percent.toFixed(2).padStart(7)}%  (${String(correct)}/${String(reading.n)})\n`;
 
+  // The two halves of the population, on one line each, so the mixture above can be read as what it
+  // is made of. `relabelled` is the number any claim about "corrected gold" has to be stated on.
+  const group = (name: string, subset: typeof reading.unrevised): string =>
+    `[relabel] ${name.padEnd(12)} n=${String(subset.n).padStart(4)}  ` +
+    `memory ${subset.treatment.original.percent.toFixed(2)}%→${subset.treatment.corrected.percent.toFixed(2)}%  ` +
+    `baseline ${subset.baseline.original.percent.toFixed(2)}%→${subset.baseline.corrected.percent.toFixed(2)}%  ` +
+    `delta ${subset.delta.original.toFixed(2)}pp→${subset.delta.corrected.toFixed(2)}pp\n`;
+
   process.stdout.write(`[relabel] artefact  ${birdPath}\n`);
   process.stdout.write(`[relabel] gold      ${goldPath}\n`);
   process.stdout.write(
     `[relabel] matched   ${String(cases.length)} of ${String(artefact.per_case.length)} case(s)` +
       (missing.length === 0 ? '\n' : `, ${String(missing.length)} unmatched\n`),
   );
-  process.stdout.write(line('memory, original', reading.treatment.original.percent, reading.treatment.original.correct));
-  process.stdout.write(line('memory, corrected', reading.treatment.corrected.percent, reading.treatment.corrected.correct));
-  process.stdout.write(line('baseline, original', reading.baseline.original.percent, reading.baseline.original.correct));
-  process.stdout.write(line('baseline, corrected', reading.baseline.corrected.percent, reading.baseline.corrected.correct));
+  process.stdout.write(
+    line('memory, original', reading.treatment.original.percent, reading.treatment.original.correct),
+  );
+  process.stdout.write(
+    line('memory, corrected', reading.treatment.corrected.percent, reading.treatment.corrected.correct),
+  );
+  process.stdout.write(
+    line('baseline, original', reading.baseline.original.percent, reading.baseline.original.correct),
+  );
+  process.stdout.write(
+    line('baseline, corrected', reading.baseline.corrected.percent, reading.baseline.corrected.correct),
+  );
   process.stdout.write(
     `[relabel] delta     original ${reading.delta.original.toFixed(2)}pp ` +
       `[${(before.deltaCI.low * 100).toFixed(2)}, ${(before.deltaCI.high * 100).toFixed(2)}] p ${before.p.toFixed(4)}\n`,
@@ -208,8 +233,10 @@ export async function main(argv: readonly string[]): Promise<number> {
     `[relabel] flips     ${String(reading.flips.up)} up / ${String(reading.flips.down)} down; ` +
       `${String(reading.pairChanged)} question(s) changed which arm was ahead\n`,
   );
-    process.stdout.write(`[relabel] verdict   ${verdict}\n`);
-    return 0;
+  process.stdout.write(group('relabelled', reading.unrevised));
+  process.stdout.write(group('revised', reading.revised));
+  process.stdout.write(`[relabel] verdict   ${verdict}\n`);
+  return 0;
   } finally {
     await statements.close();
   }

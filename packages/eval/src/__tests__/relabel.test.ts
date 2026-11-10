@@ -147,3 +147,72 @@ describe('relabelVerdict', () => {
     );
   });
 });
+
+describe('the population a relabel claim is stated on', () => {
+  // The corrected release is the `sql_only` variant, which by its own description keeps the questions
+  // and replaces only the gold. It keeps *its* questions: 67 of the 350 in the transfer slice differ
+  // from the ones this repository pinned, which places the pin two revisions behind, and on 44 of
+  // those the gold moved too. Grading an answer to question A against the label of question B is a
+  // corpus revision, not a relabelling, and a single delta over both halves reports the sum of two
+  // things as if it were one.
+
+  it('splits the population by whether the question itself was rewritten', () => {
+    const mixed: readonly RelabelCase[] = [
+      { id: 'same', treatment: graded(true, true), baseline: graded(false, false) },
+      { id: 'moved', treatment: graded(true, false), baseline: graded(false, false), questionRevised: true },
+    ];
+    const reading = relabelReading(mixed);
+    expect(reading.unrevised.n).toBe(1);
+    expect(reading.revised.n).toBe(1);
+    expect(reading.unrevised.delta.original).toBe(100);
+    expect(reading.revised.delta.original).toBe(100);
+    expect(reading.revised.delta.corrected).toBe(0);
+  });
+
+  it('leaves the relabelled delta untouched by a row whose question moved', () => {
+    // The whole-population delta is a mixture and this is why it cannot be quoted. The clean pair here
+    // is a dead heat; the third row is a question the correction rewrote, on which the treatment arm
+    // happens to be right, and folding it in turns a null into a +33pp gain.
+    const clean: readonly RelabelCase[] = [
+      { id: 'a', treatment: graded(true, true), baseline: graded(true, true) },
+      { id: 'b', treatment: graded(false, false), baseline: graded(false, false) },
+    ];
+    const withRevised: readonly RelabelCase[] = [
+      ...clean,
+      { id: 'c', treatment: graded(true, true), baseline: graded(false, false), questionRevised: true },
+    ];
+    expect(relabelReading(clean).unrevised.delta.original).toBe(0);
+    expect(relabelReading(withRevised).unrevised.delta.original).toBe(0);
+    expect(relabelReading(withRevised).delta.original).toBeCloseTo(33.33, 2);
+    expect(relabelReading(withRevised).revised.n).toBe(1);
+    expect(relabelReading(withRevised).revised.delta.original).toBe(100);
+  });
+
+  it('counts a case that does not say as unrevised', () => {
+    // A reading written before the field existed has to keep the population it had. Treating unknown
+    // as revised would empty the clean group and leave every claim stated on nobody.
+    const reading = relabelReading(cases);
+    expect(reading.revised.n).toBe(0);
+    expect(reading.unrevised.n).toBe(cases.length);
+    expect(reading.unrevised.delta).toEqual(reading.delta);
+  });
+
+  it('reports an empty subgroup as zero rather than as a division by nothing', () => {
+    const reading = relabelReading(cases);
+    expect(reading.revised.treatment.original.percent).toBe(0);
+    expect(reading.revised.baseline.corrected.percent).toBe(0);
+    expect(reading.revised.delta).toEqual({ original: 0, corrected: 0 });
+  });
+});
+
+describe('a correction that lands exactly on zero', () => {
+  it('calls it fragile rather than stable, because a zero delta has no sign to keep', () => {
+    // The verdict a reader will see most often once a correction is applied: the effect was there
+    // under the old labels and the corrected labels put it at exactly nothing. `stable` would report
+    // the sign as preserved; there is no sign.
+    const excluded = { low: 1, high: 3 };
+    expect(relabelVerdict({ original: 2, corrected: 0 }, { original: excluded, corrected: excluded })).toBe(
+      'fragile',
+    );
+  });
+});

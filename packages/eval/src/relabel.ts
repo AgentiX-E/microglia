@@ -17,13 +17,14 @@
  * This module does the accounting. It knows nothing about SQL and nothing about where correctness
  * comes from — it takes two booleans per arm per question, one under each grading, and reports what a
  * reader needs before believing anything else in the file:
- *
  *  - how many questions changed verdict under the correction, which bounds every claim the run made;
  *  - each arm's accuracy under both gradings, because a correction can lift both arms and leave the
  *    *difference* untouched — which is the only number a memory experiment is about;
  *  - the paired delta under both gradings, so a verdict can be called **stable** (same sign, still
  *    excluding zero), **fragile** (same sign, no longer excluding zero), **reversed** (sign flip) or
- *    **absent** (neither grading separates the arms).
+ *    **absent** (neither grading separates the arms);
+ *  - and that same accounting over the two halves of the population the correction actually produced,
+ *    because a delta over the whole of it is a mixture. See `RelabelCase.questionRevised`.
  */
 
 /** One question's two verdicts, for one arm. */
@@ -41,12 +42,35 @@ export type RelabelCase = {
   readonly treatment: GradedPair;
   /** The arm it is compared with. */
   readonly baseline: GradedPair;
+  /**
+   * Whether the corrected release changed the **question**, not only the label.
+   *
+   * This is not a detail. The two files disagree about 67 of the 350 questions in the transfer slice,
+   * and on 44 of them the question *and* the gold both moved: the corrected file does not answer the
+   * question the run was asked, it answers a different one. Grading an answer to question A against
+   * the label of question B is not a relabelling, and mixing those rows into a relabelling table
+   * attributes a corpus revision to a label correction. Absent means "the file did not say", which is
+   * counted as unrevised: a reading written before this field existed has to keep the population it
+   * had, and treating unknown as revised would silently empty the clean group.
+   */
+  readonly questionRevised?: boolean;
 };
 
 export type GradedArm = {
   readonly correct: number;
   /** Correct as a proportion of the population, in percentage points. */
   readonly percent: number;
+};
+
+export type RelabelArm = { readonly original: GradedArm; readonly corrected: GradedArm };
+
+/** The same accounting, over a subset of the population. */
+export type RelabelSubgroup = {
+  readonly n: number;
+  readonly treatment: RelabelArm;
+  readonly baseline: RelabelArm;
+  /** Treatment minus baseline, in percentage points, under each grading. */
+  readonly delta: { readonly original: number; readonly corrected: number };
 };
 
 export type RelabelReading = {
@@ -66,6 +90,16 @@ export type RelabelReading = {
    * first number would make the correction look more disruptive than it is — or less.
    */
   readonly pairChanged: number;
+  /**
+   * The population the correction actually relabelled: the question is the one the run was asked, and
+   * only its gold moved.
+   *
+   * This is the number to read. `delta` above is the whole population and it is a mixture of a label
+   * correction and a corpus revision.
+   */
+  readonly unrevised: RelabelSubgroup;
+  /** Questions whose text the corrected release also rewrote: a different question, not a new label. */
+  readonly revised: RelabelSubgroup;
 };
 
 const percent = (count: number, n: number): number => (n === 0 ? 0 : (count / n) * 100);
@@ -112,32 +146,19 @@ export function relabelVerdict(
   return excludedAfter ? 'stable' : 'fragile';
 }
 
-export function relabelReading(cases: readonly RelabelCase[]): RelabelReading {
+/** The same accounting on a subset, so a mixture can be read as its two parts. */
+export function relabelSubgroup(cases: readonly RelabelCase[]): RelabelSubgroup {
   const n = cases.length;
   let treatmentOriginal = 0;
   let treatmentCorrected = 0;
   let baselineOriginal = 0;
   let baselineCorrected = 0;
-  let up = 0;
-  let down = 0;
-  let pairChanged = 0;
-
   for (const item of cases) {
     if (item.treatment.original) treatmentOriginal += 1;
     if (item.treatment.corrected) treatmentCorrected += 1;
     if (item.baseline.original) baselineOriginal += 1;
     if (item.baseline.corrected) baselineCorrected += 1;
-    if (!item.treatment.original && item.treatment.corrected) up += 1;
-    if (item.treatment.original && !item.treatment.corrected) down += 1;
-    // The pair's shape is what the experiment reports: treatment right and baseline wrong is a gain,
-    // and it is the same gain whether both verdicts were reached under the old gold or the new one.
-    const before = item.treatment.original === item.baseline.original;
-    const after = item.treatment.corrected === item.baseline.corrected;
-    const gainedBefore = item.treatment.original && !item.baseline.original;
-    const gainedAfter = item.treatment.corrected && !item.baseline.corrected;
-    if (before !== after || gainedBefore !== gainedAfter) pairChanged += 1;
   }
-
   return {
     n,
     treatment: {
@@ -152,7 +173,36 @@ export function relabelReading(cases: readonly RelabelCase[]): RelabelReading {
       original: percent(treatmentOriginal, n) - percent(baselineOriginal, n),
       corrected: percent(treatmentCorrected, n) - percent(baselineCorrected, n),
     },
+  };
+}
+
+export function relabelReading(cases: readonly RelabelCase[]): RelabelReading {
+  const n = cases.length;
+  let up = 0;
+  let down = 0;
+  let pairChanged = 0;
+
+  for (const item of cases) {
+    if (!item.treatment.original && item.treatment.corrected) up += 1;
+    if (item.treatment.original && !item.treatment.corrected) down += 1;
+    // The pair's shape is what the experiment reports: treatment right and baseline wrong is a gain,
+    // and it is the same gain whether both verdicts were reached under the old gold or the new one.
+    const before = item.treatment.original === item.baseline.original;
+    const after = item.treatment.corrected === item.baseline.corrected;
+    const gainedBefore = item.treatment.original && !item.baseline.original;
+    const gainedAfter = item.treatment.corrected && !item.baseline.corrected;
+    if (before !== after || gainedBefore !== gainedAfter) pairChanged += 1;
+  }
+
+  const whole = relabelSubgroup(cases);
+  return {
+    n,
+    treatment: whole.treatment,
+    baseline: whole.baseline,
+    delta: whole.delta,
     flips: { up, down },
     pairChanged,
+    unrevised: relabelSubgroup(cases.filter((item) => item.questionRevised !== true)),
+    revised: relabelSubgroup(cases.filter((item) => item.questionRevised === true)),
   };
 }

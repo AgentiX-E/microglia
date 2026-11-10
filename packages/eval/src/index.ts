@@ -1309,12 +1309,26 @@ export {
 export { planBudget, type BudgetPlan, type BudgetRequest, type PriorRun } from './budget-plan.js';
 
 export {
+  GoldRevisionError,
+  parseGoldRevision,
+  reviseGold,
+  revisionDigest,
+  type GoldRevisionEntry,
+  type GoldRevisionReading,
+  type GoldRevisionResult,
+  type RevisionDrop,
+} from './gold-revision.js';
+
+export {
   relabelReading,
+  relabelSubgroup,
   relabelVerdict,
   type GradedArm,
   type GradedPair,
+  type RelabelArm,
   type RelabelCase,
   type RelabelReading,
+  type RelabelSubgroup,
   type RelabelVerdict,
 } from './relabel.js';
 
