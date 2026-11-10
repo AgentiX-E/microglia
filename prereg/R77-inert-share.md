@@ -78,3 +78,33 @@ estimate — it is a count, and it costs one dispatch.
 It does not measure whether a live rule is *right*. A rule that changes the answer and makes it worse is
 as live as one that fixes it, and separating those two is R74's question, which has been answered at the
 strength it could be. This file measures only whether the pack is doing anything at all.
+
+## Amendment 1 — the first dispatch was authorised for two thirds of itself
+
+**2026-11-10, before any reading.** The dispatch (`42915903394`) ran fold 1 and stopped:
+
+```
+[sota] fold 1/5: eval=400 learn=700 edited=272 unanswered=0 distillFailed=0 active=521 calls=1952
+[sota] budget forecast after fold 1/5: the run needs about 10541 calls, the ceiling is 7600 (short by 2941)
+[sota] failed: MG_E_BUDGET_EXCEEDED: the configured ceiling cannot finish the folds
+```
+
+1,952 calls spent, no artefact. The ceiling did exactly what R74's amendment built it to do — only a
+ceiling may end a run — but it ended a run whose *authorisation* was wrong rather than one whose
+forecast was. Nothing was overspent; the run was refused permission to finish.
+
+**Why the projection was 6,875.** `pnpm eval:budget` priced 2,000 questions × 3 arms at R74's measured
+**1.0416 calls per question per draw**. That rate is a mixture, and the mixture is the defect: R74
+spent 700 *learning* calls per fold against a `GenerationCache` that deduplicated 2,624 of the 3,500
+learning requests, so most of its learning was free and the rate is mostly a marginal per-question
+cost. **The learning pass does not scale with `limit`.** A projection that multiplies a
+cache-warm mix onto a smaller question sample with a cold cache prices the cheap part correctly and
+omits the expensive one. Fold 1 of this dispatch paid all 700.
+
+This is the third instance of one error class, and each instance moved up a level: R64 sized a run by
+arm count, R68 found the arm count was a draw count, and this one found that a per-question rate is a
+rate only over the part of the bill that is per question.
+
+**Amended budget.** 11,000 forecast, **12,000 ceiling**, deadline 200. The upper bound is five folds at
+the dearest fold's price — 5 × 2,147 — and the ceiling is that plus the same 9% margin the planner
+uses. ≈$0.95 for the dispatch, ≈$1.12 for the registration including the fold that was thrown away.
