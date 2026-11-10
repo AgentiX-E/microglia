@@ -8,6 +8,14 @@
   "attribution": "BIRD Benchmark (bird-bench contributors), https://bird-bench.github.io — data licence changed to CC BY-SA 4.0 on 2024-04-27",
   "root": "minidev/MINIDEV",
   "questions": "mini_dev_sqlite.json",
+  "goldRevision": {
+    "path": "gold/bird-minidev-arcwise-sql-only.json",
+    "sha256": "e7bf76408f99266506ea558d84982c69422e5db3dfecab5f08a3a8d3900e8395",
+    "variant": "sql_only",
+    "citation": "Jin, Choi, Zhu and Kang, Pervasive Annotation Errors Break Text-to-SQL Benchmarks and Leaderboards, PVLDB 19(5):931-944, 2026",
+    "attribution": "Arcwise-Plat (uiuc-kang-lab), https://huggingface.co/datasets/uiuc-kang-lab/arcwise-plat — CC BY-SA 4.0, the same licence as the corpus it corrects",
+    "licence": "CC-BY-SA-4.0"
+  },
   "databases": [
     "california_schools",
     "card_games",

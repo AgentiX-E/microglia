@@ -63,6 +63,8 @@ export type BirdManifest = {
    */
   readonly nested?: string;
   readonly nestedRoot?: string;
+  /** A second opinion on this split's labels, if one has been published. See `GoldRevisionRef`. */
+  readonly goldRevision?: GoldRevisionRef;
   readonly databases: readonly string[];
   readonly retrievedAt: string;
 };
@@ -107,6 +109,47 @@ function text(record: Record<string, unknown>, field: string): string {
   }
   return value;
 }
+
+/**
+ * A corrected label set this split may be scored against, declared by the manifest.
+ *
+ * The corpus stays pinned; the revision is a second, separately pinned file that names the rows it
+ * corrects. Declaring it here rather than in the run means the digest and the citation travel with the
+ * split, and a dispatch chooses only whether to apply it.
+ */
+export type GoldRevisionRef = {
+  /** Path relative to the manifest's own directory. */
+  readonly path: string;
+  readonly sha256: string;
+  /** Which published configuration this is — `sql_only` or `full` — because they mean different things. */
+  readonly variant: string;
+  readonly citation: string;
+  readonly attribution: string;
+  readonly licence: string;
+};
+
+const goldRevisionOf = (record: Record<string, unknown>): { readonly goldRevision?: GoldRevisionRef } => {
+  const value = record['goldRevision'];
+  if (value === undefined) return {};
+  const inner = asRecord(value);
+  if (inner === undefined) {
+    throw new BirdDataError('manifest-field', '`goldRevision` must be an object');
+  }
+  const sha256 = text(inner, 'sha256');
+  if (!/^[0-9a-f]{64}$/.test(sha256)) {
+    throw new BirdDataError('manifest-field', '`goldRevision.sha256` must be 64 lowercase hex characters');
+  }
+  return {
+    goldRevision: {
+      path: text(inner, 'path'),
+      sha256,
+      variant: text(inner, 'variant'),
+      citation: text(inner, 'citation'),
+      attribution: text(inner, 'attribution'),
+      licence: text(inner, 'licence'),
+    },
+  };
+};
 
 /**
  * The nested-archive pair, read as a pair.
@@ -166,6 +209,9 @@ export function parseManifest(value: unknown): BirdManifest {
     // believes it has a nested archive when it has nothing to unpack, which is the same failure
     // again from the other side. Both are refused here rather than discovered on a runner.
     ...nestedFields(record),
+    // A corrected label set, if this split has one. Optional because only Mini-Dev has been
+    // re-annotated: dev and train carry the vendor's labels and no second opinion exists for them.
+    ...goldRevisionOf(record),
     databases: ids,
     retrievedAt: text(record, 'retrievedAt'),
   };

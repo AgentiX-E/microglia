@@ -21,6 +21,7 @@ import {
   withinDatabases,
   type BirdDataErrorReason,
 } from '../bird-data.js';
+import { revisionDigest } from '../gold-revision.js';
 
 const manifestPath = new URL('../../../../eval/manifests/bird-minidev.json', import.meta.url);
 const raw: unknown = JSON.parse(readFileSync(manifestPath, 'utf8'));
@@ -404,5 +405,104 @@ describe('the questions the archive repeats', () => {
     const result = dedupeQuestions([question(1, 'How many accounts?'), other]);
     expect(result.rows).toHaveLength(2);
     expect(result.duplicates).toBe(0);
+  });
+});
+
+describe('the corrected labels a split may be scored against', () => {
+  const base = {
+    name: 'example',
+    version: 'v1',
+    url: 'https://example.invalid/a.zip',
+    bytes: 10,
+    sha256: 'a'.repeat(64),
+    licence: 'CC-BY-SA-4.0',
+    attribution: 'nobody',
+    root: 'root',
+    questions: 'questions.json',
+    databases: ['db'],
+    retrievedAt: '2026-11-01',
+  };
+  const revision = {
+    path: 'gold/x.json',
+    sha256: 'b'.repeat(64),
+    variant: 'sql_only',
+    citation: 'somebody, 2026',
+    attribution: 'somewhere',
+    licence: 'CC-BY-SA-4.0',
+  };
+
+  it('declares one for Mini-Dev and none for the splits nobody has re-annotated', () => {
+    // The correction is evidence about Mini-Dev only. A dev or train manifest that carried one would
+    // be claiming a second opinion that does not exist for those questions.
+    const mini = parseManifest(
+      JSON.parse(readFileSync(new URL('../../../../eval/manifests/bird-minidev.json', import.meta.url), 'utf8')),
+    );
+    expect(mini.goldRevision?.variant).toBe('sql_only');
+    for (const file of ['bird-dev.json', 'bird-train.json']) {
+      const parsed = parseManifest(
+        JSON.parse(readFileSync(new URL(`../../../../eval/manifests/${file}`, import.meta.url), 'utf8')),
+      );
+      expect(parsed.goldRevision).toBeUndefined();
+    }
+  });
+
+  it('pins the vendored revision to the digest the manifest declares', () => {
+    // The file is read by the re-scoring path, which runs offline. A manifest that named a digest the
+    // committed file does not have would be a revision nobody can verify at the moment it matters.
+    const root = new URL('../../../../eval/manifests/', import.meta.url);
+    const manifest = parseManifest(JSON.parse(readFileSync(new URL('bird-minidev.json', root), 'utf8')));
+    const declared = manifest.goldRevision;
+    expect(declared).toBeDefined();
+    const text = readFileSync(new URL(declared?.path ?? '', root), 'utf8');
+    expect(revisionDigest(text)).toBe(declared?.sha256);
+  });
+
+  it('identifies the vendored revision by the two rows its own card names', () => {
+    // `sql_only` and `full` share 498 ids and differ only in whether the questions were rewritten, so
+    // a filename cannot tell them apart. The card says `evidence` is null for 1507 and 1528, and that
+    // pair is the fingerprint: a file built by another pipeline would not reproduce it.
+    const text = readFileSync(
+      new URL('../../../../eval/manifests/gold/bird-minidev-arcwise-sql-only.json', import.meta.url),
+      'utf8',
+    );
+    const raw = JSON.parse(text) as readonly Record<string, unknown>[];
+    expect(raw).toHaveLength(498);
+    const nullEvidence = raw.filter((row) => row['evidence'] === null).map((row) => row['question_id']);
+    expect(nullEvidence).toEqual(['1507', '1528']);
+    expect(raw.some((row) => 'original_question' in row)).toBe(false);
+  });
+
+  it('refuses a declaration whose digest is not a digest', () => {
+    expect(() => parseManifest({ ...base, goldRevision: { ...revision, sha256: 'xyz' } })).toThrow(
+      /goldRevision.sha256/,
+    );
+  });
+
+  it('refuses a declaration that omits the citation', () => {
+    // The citation is what makes the correction checkable. A revision without one is a label change
+    // with no author.
+    const { citation: _citation, ...withoutCitation } = revision;
+    expect(() => parseManifest({ ...base, goldRevision: withoutCitation })).toThrow(/citation/);
+  });
+});
+
+describe('a malformed corrected-label declaration', () => {
+  it('refuses a declaration that is not an object', () => {
+    // A string here would be read as "a revision exists" and its fields then read as undefined,
+    // which produces a dispatch that believes it corrected the labels and did not.
+    const base = {
+      name: 'example',
+      version: 'v1',
+      url: 'https://example.invalid/a.zip',
+      bytes: 10,
+      sha256: 'a'.repeat(64),
+      licence: 'CC-BY-SA-4.0',
+      attribution: 'nobody',
+      root: 'root',
+      questions: 'questions.json',
+      databases: ['db'],
+      retrievedAt: '2026-11-01',
+    };
+    expect(() => parseManifest({ ...base, goldRevision: 'gold/x.json' })).toThrow(/must be an object/);
   });
 });

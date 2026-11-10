@@ -249,7 +249,11 @@ import {
   parseManifest,
   parseRows,
   questionsDigest,
+  parseGoldRevision,
+  reviseGold,
+  revisionDigest,
   type BirdRow,
+  type GoldRevisionReading,
   parseRetirementPolicy,
   artefactIdOf,
   artefactWriteIdOf,
@@ -1166,7 +1170,74 @@ type Dataset = {
   readonly pinned: boolean;
   /** Rows the archive repeats verbatim: dropped, and stated in the artefact. */
   readonly duplicates: number;
+  /**
+   * The corrected labels this run was scored against, or `null` when it used the pinned ones.
+   *
+   * Recorded because the two are not the same measurement and the number alone cannot say which one it
+   * is: Mini-Dev's annotation error rate was measured at 52.8%, and 43.1% of this slice's gold differs
+   * in the corrected release. A run that does not name its labels is a run whose accuracy is a fact
+   * about a file nobody can identify.
+   */
+  readonly gold: GoldRevisionReading | null;
 };
+
+/**
+ * The corrected labels, if this dispatch asked for them.
+ *
+ * `POC_GOLD` is a dispatch input rather than a repository variable, for the reason the sampling
+ * temperature became one: a knob that lives in the repository is a knob whose setting for one
+ * experiment is its setting for every queued run.
+ *
+ * The file is read from beside the manifest and verified against the digest the manifest declares,
+ * which is the same contract the archive gets. A revision whose digest does not match is refused rather
+ * than applied — a correction is evidence, and evidence that cannot be identified is not evidence.
+ */
+function applyRevision(
+  rows: readonly BirdRow[],
+  manifest: BirdManifest,
+): { readonly rows: readonly BirdRow[]; readonly gold: GoldRevisionReading | null } {
+  const choice = (process.env['POC_GOLD'] ?? 'vendor').trim().toLowerCase();
+  if (choice === '' || choice === 'vendor') return { rows, gold: null };
+  if (choice !== 'corrected') {
+    throw new MicrogliaError('MG_E_CONFIG', `POC_GOLD is '${choice}'; it is 'vendor' or 'corrected'`, {
+      hint: 'the pinned labels, or the correction published against them',
+    });
+  }
+  const revision = manifest.goldRevision;
+  if (revision === undefined) {
+    throw new MicrogliaError('MG_E_CONFIG', `split '${SPLIT}' declares no corrected label set`, {
+      manifest: manifest.name,
+      hint: 'only Mini-Dev has been re-annotated; dev and train carry the vendor labels and no second opinion',
+    });
+  }
+  const path = join(dirname(MANIFEST), revision.path);
+  if (!existsSync(path)) {
+    throw new MicrogliaError('MG_E_STORE_IO', `the corrected labels are not at ${path}`, {
+      manifest: manifest.name,
+      hint: 'they are vendored under eval/manifests/gold/ and read offline',
+    });
+  }
+  const text = readFileSync(path, 'utf8');
+  const digest = revisionDigest(text);
+  if (digest !== revision.sha256) {
+    throw new MicrogliaError('MG_E_STORE_IO', 'the corrected labels do not match the digest the manifest pins', {
+      expected: revision.sha256,
+      observed: digest,
+    });
+  }
+  const result = reviseGold(rows, parseGoldRevision(text, revision.path), revision.path, digest);
+  process.stdout.write(
+    `[sota] gold: ${revision.variant} ${digest.slice(0, 12)} — ${String(result.reading.applied)} ` +
+      `label(s) replaced, ${String(result.reading.unchanged)} already agreed, ` +
+      `${String(result.reading.dropped.length)} question(s) dropped\n`,
+  );
+  for (const drop of result.reading.dropped.slice(0, 5)) {
+    // Printed rather than only counted: a reader who sees `dropped: 67` and nothing else cannot tell
+    // whether the correction rewrote a date or invented a different question.
+    process.stdout.write(`[sota] gold: '${drop.id}' asks '${drop.correctedQuestion.slice(0, 80)}'\n`);
+  }
+  return { rows: result.rows, gold: result.reading };
+}
 
 async function fetchText(url: string): Promise<string | undefined> {
   try {
@@ -1409,6 +1480,13 @@ async function loadDataset(limit: number): Promise<Dataset> {
   // What the split scores; see `poolOf`. The remainder is interleaved across
   // databases, because a prefix of a database-sorted file is a sample of one
   // database.
+  //
+  // The corrected labels, when this dispatch asked for them, are applied before the pool is taken.
+  // Two reasons, and the second is the one that matters: a revision that dropped rows after the slice
+  // was drawn would silently shrink `n` below the number the run was sized on, and the split's own
+  // fold assignment would be computed over a population the run does not score.
+  const revised = applyRevision(rows, manifest);
+  rows = [...revised.rows];
   const pool = poolOf(rows, SPLIT);
   // The manifest's database list is the split's *selection*, not a description of the archive.
   // On dev and Mini-Dev the two are the same and this drops nothing. On train the archive holds 69
@@ -1468,6 +1546,7 @@ async function loadDataset(limit: number): Promise<Dataset> {
     digest,
     pinned,
     duplicates: deduped.duplicates,
+    gold: revised.gold,
     dbPath: (dbId) => databaseIn(root, dbId, manifest.nestedRoot),
   };
 }
@@ -6942,6 +7021,11 @@ async function main(): Promise<void> {
     // necessary and `Dataset.pinned` for what the digest cannot say on its own.
     dataset_digest: dataset.digest,
     dataset_pinned: dataset.pinned,
+    // Which labels these numbers were scored against. `null` is the pinned corpus's own; anything else
+    // names a revision file, its digest, and how much of the population it could relabel — see
+    // `applyRevision` for why 43% of this split's gold differed and why some rows cannot be scored at
+    // all.
+    dataset_gold: dataset.gold,
     model: MODEL,
     prompt_version: PROMPT_VERSION,
     config: {

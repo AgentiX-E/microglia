@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 182,
+  "scanned": 183,
   "totals": {
-    "modules": 182,
-    "lines": 48922,
+    "modules": 183,
+    "lines": 49240,
     "adapterLines": 1956,
-    "deferredLines": 8199,
-    "coupledShare": 0.205
+    "deferredLines": 8457,
+    "coupledShare": 0.2089
   },
   "layers": [
     {
@@ -37,11 +37,11 @@
     },
     {
       "layer": "eval",
-      "modules": 125,
-      "lines": 35847,
+      "modules": 126,
+      "lines": 36165,
       "adapterLines": 0,
-      "deferredLines": 8199,
-      "coupled": 21
+      "deferredLines": 8457,
+      "coupled": 22
     },
     {
       "layer": "browser",
@@ -142,7 +142,7 @@
       "pkg": "eval",
       "module": "bird-data",
       "path": "packages/eval/src/bird-data.ts",
-      "lines": 440,
+      "lines": 486,
       "words": [
         "sql",
         "sqlite"
@@ -176,7 +176,7 @@
       "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 469,
+      "lines": 472,
       "words": [
         "sql",
         "sqlite",
@@ -209,6 +209,17 @@
       ],
       "verdict": "deferred",
       "reason": "the matrix names the artefact it was rendered against; the dataset name is an argument, not a query"
+    },
+    {
+      "pkg": "eval",
+      "module": "gold-revision",
+      "path": "packages/eval/src/gold-revision.ts",
+      "lines": 209,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "applies a published correction to the gold a run is scored against; the statements are labels it replaces as strings, and it opens no database"
     },
     {
       "pkg": "eval",
@@ -638,7 +649,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "182 modules, 21 deferred with a reason"
+      "detail": "183 modules, 22 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -653,5 +664,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 48922 production lines across 182 modules: 7 adapter modules in `sql`, 21 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 49240 production lines across 183 modules: 7 adapter modules in `sql`, 22 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }

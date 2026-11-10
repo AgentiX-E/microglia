@@ -129,6 +129,18 @@ on:
         description: 'Share of L4 tasks used for learning (0.4 gives retail 68 held out, above its 60 floor)'
         required: false
         default: '0.5'
+      # The labels, which are part of the instrument rather than part of the run.
+      #
+      # Mini-Dev's annotation error rate was measured at 52.8% (Jin et al., PVLDB 19(5), 2026) and
+      # 43.1% of this lane's transfer slice has a different gold in the corrected release, so the
+      # number a dispatch produces depends on which of the two it was scored against. `vendor` is the
+      # pinned corpus and every published cell; `corrected` applies the vendored revision and drops the
+      # 67 questions whose text the correction also rewrote, because an answer to one question graded
+      # against another question's label is a corpus revision, not a relabelling.
+      gold:
+        description: 'Labels to score against: vendor (the pinned corpus, every published cell) or corrected (the vendored revision, on the questions it can label)'
+        required: false
+        default: 'vendor'
   schedule:
     # 18:00 UTC Monday, which is Tuesday 02:00 in UTC+8.
     #
@@ -579,6 +591,11 @@ jobs:
           SOTA_LEARN_SAMPLE: ${{ github.event.inputs.learn_sample || '0' }}
           POC_MAX_CALLS: ${{ github.event.inputs.max_calls || '8000' }}
           POC_CEILING_CALLS: ${{ github.event.inputs.ceiling_calls || '' }}
+          # Which labels the run is scored against: the pinned corpus's own, or the correction
+          # published against them (43.1% of this slice's gold differs). An input rather than a
+          # variable for the same reason the temperature is: it is a property of the experiment, and a
+          # repository variable set for one dispatch would silently move every queued run's score.
+          POC_GOLD: ${{ github.event.inputs.gold || 'vendor' }}
         run: pnpm eval:sota
 
       - name: Attribute the flips to rules
