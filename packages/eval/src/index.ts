@@ -1319,6 +1319,7 @@ export {
 } from './relabel.js';
 
 export {
+  looCrossFitted,
   looDraws,
   looGroups,
   looOverall,

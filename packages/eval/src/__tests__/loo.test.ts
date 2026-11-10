@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  looCrossFitted,
   looDraws,
   looGroups,
   looOverall,
@@ -136,5 +137,87 @@ describe('looDraws', () => {
 
   it('is all zeros for a split that withheld nothing', () => {
     expect(looDraws([])).toEqual({ withheld: 0, rules: 0, median: 0, max: 0, mean: 0 });
+  });
+});
+
+describe('looCrossFitted', () => {
+  /**
+   * A rule that looks harmful only inside the fold it was judged on.
+   *
+   * Eight questions across four folds. Rule `r` is injected on two questions per fold, and in fold 0
+   * the model happened to fail both of them — so an in-sample ledger calls `r` harmful and then
+   * measures a large "improvement" when it is withheld. In folds 1–3 the same rule is injected on
+   * questions the full arm got right, so the other folds call it helpful or neutral, and the
+   * cross-fitted reading is the one that says the fold-0 effect was the fold.
+   */
+  const foldShaped: LooRow[] = [
+    // Fold 0: the model failed all six questions that injected `r`, and the withheld arm got them.
+    ...Array.from({ length: 6 }, (): LooRow => ({
+      fold: 0,
+      correct: true,
+      injectedCorrect: false,
+      dropped: 'r',
+      packIds: ['r'],
+    })),
+    // Folds 1-3: eighteen questions the full arm got right. They contribute nothing to `r`'s net —
+    // net counts flips — which is why the out-of-fold ledger sees only fold 0's six losses.
+    ...([1, 2, 3] as const).flatMap((fold): LooRow[] =>
+      Array.from({ length: 6 }, (): LooRow => ({
+        fold,
+        correct: true,
+        injectedCorrect: true,
+        dropped: 'r',
+        packIds: ['r'],
+      })),
+    ),
+  ];
+  const allRight = foldShaped.map(() => true);
+
+  it('reads the class effect on folds the class was not decided on', () => {
+    // In sample, `r` is harmful (net −6) and every pair that withheld it improved: the withheld arm is
+    // right on 24 of 24, the full arm on 18 of 24.
+    const inSample = looGroups(foldShaped, allRight).find((group) => group.name === 'harmful');
+    expect(inSample?.pairs).toBe(24);
+    expect(inSample?.reading.delta).toBeCloseTo(0.25, 6);
+    // Cross-fitted, the eighteen pairs whose own fold produced no losses are judged by a ledger that
+    // sees only fold 0's six — and on those eighteen the withheld arm and the full arm agree, so the
+    // class carries nothing. The fold-0 pairs, whose out-of-fold ledger is flat, fall outside the
+    // class entirely. The effect the in-sample table reported was the fold that produced its label.
+    const fitted = looCrossFitted(foldShaped, allRight, 4);
+    const harmful = fitted.readings.find((reading) => reading.name.startsWith('harmful'));
+    expect(harmful?.pairs).toBe(18);
+    expect(Math.abs(harmful?.reading.delta ?? 1)).toBeLessThan(Math.abs(inSample?.reading.delta ?? 0));
+    expect(harmful?.reading.delta).toBeCloseTo(0, 6);
+  });
+
+  it('keeps a rule that every fold calls harmful', () => {
+    // The same shape with the misfire in every fold: now the out-of-fold evidence agrees, and the
+    // cross-fitted reading has to keep the effect rather than erase it.
+    const everywhere: LooRow[] = ([0, 1, 2, 3] as const).flatMap((fold): LooRow[] => [
+      { fold, correct: true, injectedCorrect: false, dropped: 'r', packIds: ['r'] },
+      { fold, correct: true, injectedCorrect: false, dropped: 'r', packIds: ['r'] },
+    ]);
+    const fitted = looCrossFitted(everywhere, everywhere.map(() => true), 4);
+    const harmful = fitted.readings.find((reading) => reading.name.startsWith('harmful'));
+    expect(harmful?.pairs).toBe(8);
+    expect(harmful?.reading.delta).toBeCloseTo(1, 6);
+  });
+
+  it('counts a rule no other fold saw instead of calling it neutral', () => {
+    // Neutral is a measurement; unseen is the absence of one. Filing an unseen rule with the neutral
+    // group would let a fold's unique rule vote on a class it has no evidence about.
+    const oneFold: LooRow[] = [
+      { fold: 0, correct: true, injectedCorrect: false, dropped: 'only-here', packIds: ['only-here'] },
+      { fold: 1, correct: false, injectedCorrect: false, dropped: null, packIds: [] },
+    ];
+    const fitted = looCrossFitted(oneFold, [true, false], 2);
+    expect(fitted.unseen).toBe(1);
+    expect(fitted.readings).toEqual([]);
+  });
+
+  it('is defined for a single fold, where no out-of-fold evidence exists', () => {
+    const fitted = looCrossFitted([{ fold: 0, correct: true, injectedCorrect: true, dropped: 'r', packIds: ['r'] }], [true], 1);
+    expect(fitted.readings).toEqual([]);
+    expect(fitted.unseen).toBe(1);
   });
 });

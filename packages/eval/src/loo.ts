@@ -200,3 +200,79 @@ export function looDraws(rows: readonly LooRow[]): {
     mean: draws.length === 0 ? 0 : total / draws.length,
   };
 }
+
+/**
+ * The class table with the rule's class decided on folds the effect is not measured on.
+ *
+ * `looGroups` assigns a rule's class from every question in the split and then measures the withheld
+ * effect on those same questions, which is a regression to the mean wearing a causal claim's clothes:
+ * a question where `full` happened to fail is a question whose rules were classified `harmful`, and a
+ * second draw (`loo`) on that question is expected to do better whether or not the rule mattered. The
+ * class table's +2.37pp on harmful rules and −2.84pp on helpful ones were therefore not evidence of
+ * anything until the two halves were separated.
+ *
+ * Here they are: a question's withheld rule is classified using **only the other folds**, and the
+ * effect is measured on the question's own fold. A rule's class is then a property of the five sixths
+ * of the split the question did not come from, and the paired difference on the remaining sixth has no
+ * reason to regress — except through the rule.
+ *
+ * A rule that appears in one fold only has no other-fold evidence, and it is counted as `unseen` and
+ * excluded from the class readings rather than called neutral: neutral is a measurement (net zero on
+ * evidence) and unseen is the absence of one, which is the distinction R71 spent a whole registration
+ * on.
+ */
+export function looCrossFitted(
+  rows: readonly LooRow[],
+  withoutMemory: readonly boolean[],
+  folds = 5,
+): { readonly readings: readonly LooReading[]; readonly unseen: number } {
+  const byFold = new Map<number, number[]>();
+  rows.forEach((row, index) => {
+    const fold = Number.isInteger(row.fold) ? row.fold % folds : 0;
+    byFold.set(fold, [...(byFold.get(fold) ?? []), index]);
+  });
+
+  const bucket: Record<RuleClass, { held: boolean[]; full: boolean[] }> = {
+    harmful: { held: [], full: [] },
+    helpful: { held: [], full: [] },
+    neutral: { held: [], full: [] },
+  };
+  let unseen = 0;
+
+  for (const [fold, indices] of byFold) {
+    // The ledger needs every row of the other folds, including those with nothing withheld: a rule's
+    // net is computed from the questions that injected it, and dropping the withheld rows from the
+    // denominator would understate every rule's exposure.
+    const others = rows
+      .map((row, index) => ({ row, index }))
+      .filter(({ row }) => (Number.isInteger(row.fold) ? row.fold % folds : 0) !== fold);
+    const ledger = observationalLedger(
+      others.map(({ row }) => row),
+      others.map(({ index }) => withoutMemory[index] === true),
+    );
+    const classOf = new Map(ledger.map((verdict) => [verdict.rule, ruleClassOf(verdict)]));
+
+    for (const index of indices) {
+      const row = rows[index];
+      if (row === undefined || row.dropped === null) continue;
+      const label = classOf.get(row.dropped);
+      if (label === undefined) {
+        unseen += 1;
+        continue;
+      }
+      bucket[label].held.push(row.correct);
+      bucket[label].full.push(row.injectedCorrect);
+    }
+  }
+
+  const order: readonly RuleClass[] = ['harmful', 'helpful', 'neutral'];
+  const readings = order
+    .filter((label) => bucket[label].held.length > 0)
+    .map((label) => ({
+      name: `${label} (cross-fitted)`,
+      pairs: bucket[label].held.length,
+      withheld: bucket[label].held.length,
+      reading: comparePaired(bucket[label].full, bucket[label].held, 7, 10_000),
+    }));
+  return { readings, unseen };
+}

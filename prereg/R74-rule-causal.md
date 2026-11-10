@@ -179,3 +179,81 @@ direct evidence in this lane that the rules *prevent* malformed queries rather t
 contextualising them. If the arm's accuracy is flat while its syntax error rate is higher, that
 separates "the rule helps the model say the right thing" from "the rule helps the model say anything
 at all" — and the second is testable from the same artefact's statements block at zero calls.
+
+## Outcome — the attribution was two thirds selection effect, and what is left does not pay for a pruning
+
+Run `42890996017`, 2026-11-10 20:01 UTC, 105 minutes. `train`, 7,829
+questions, three arms, **24,465 calls**, and `config.budget = {cap: 27,846, ceiling: 33,416,
+cap_in_force: 29,587}` — **the ceiling mechanism fired on its first live run**: the projection passed the
+forecast at some fold and the run was authorised to continue instead of dying with the folds it had
+paid for. Without Amendment 2 this file would have produced nothing for the second time.
+
+**The whole split first, because it is null.**
+
+| arm | accuracy | n |
+| --- | --- | --- |
+| `full` | 55.66% | 7,829 |
+| `loo` | 55.65% | 7,829 |
+
+**−0.01pp** [−0.52, 0.51], p = 1.0000. Withholding one rule per question from a pack of 1.86 moves
+nothing at all. The withheld choice was well spread — 532 distinct rules, median 10 draws, max 88.
+
+**The class table is where the file's branches are decided, and it says two opposite things
+depending on where the class was decided.**
+
+| class | in-sample Δ (95% CI, p) | pairs | cross-fitted Δ (95% CI, p) | pairs |
+| --- | --- | --- | --- | --- |
+| harmful | **+2.37pp [1.54, 3.21], p < 0.0001** | 3,369 | **+0.82pp [−0.08, 1.73], p 0.0978** | 2,431 |
+| helpful | **−2.84pp [−3.84, −1.88], p < 0.0001** | 2,498 | −0.33pp [−1.42, 0.77], p 0.6241 | 1,828 |
+| neutral | −0.51pp [−1.38, 0.36], p 0.2888 | 1,962 | −0.43pp [−1.25, 0.37], p 0.3379 | 3,276 |
+
+**Branch 3 fires, and this file should have predicted that it could.** A rule is called harmful *because*
+the `full` arm failed on the questions that drew it, and the paired effect is then measured on those
+same questions — so a question that was unlucky is a question whose rules were labelled harmful, and a
+second draw on it is expected to improve whatever the rule did. `looCrossFitted` decides each rule's
+class on **the other four folds** and measures the effect on the fifth, and the effect falls from
++2.37pp to **+0.82pp** on harmful and from −2.84pp to **−0.33pp** on helpful: **65% of the harmful
+signal and 88% of the helpful one were the fold that produced the label.** The neutral class is the only
+one that does not move, which is what a null should do.
+
+**What survives, stated at the strength it survives at.** The harmful class keeps its **direction** at
+p = 0.0978 and nothing else does. That is not nothing — it is the first out-of-sample evidence this
+project has that any per-rule quality signal exists at all — but it is not a lever:
+
+- the effect is **+0.82pp on the 43% of questions that drew a harmful rule**, so pruning all 171 of them
+  projects to about **+0.35pp on the split**, on a population where one question is 0.013pp and a
+  paired interval at this size is ±0.4pp. **The intervention would be indistinguishable from noise.**
+- the helpful class **loses its effect entirely** out of fold, so "keep the good rules" has no measured
+  basis and the pruning can only be one-sided.
+- 294 pairs withheld a rule that no other fold saw and are counted as `unseen` rather than neutral,
+  because neutral is a measurement and unseen is the absence of one.
+
+**So the answer to the question the user posed — that what we memorise and how we use it is wrong
+because the memory is wrong — is: yes for the instrument, and not enough for the intervention.** The
+per-rule verdicts this project has been using to decide what goes into memory are **two thirds
+regression artifact**. That is a defect in `attribution.ts`'s output as a *decision input*, and it is
+now recorded as such. But the residual, measured causally, is too small to prune.
+
+**The whole-split null now has three explanations and the file's own branch structure cannot separate
+them.** −0.01pp is consistent with (i) a pack of 1.86 rules whose average effect is zero because helpful
+and harmful cancel, which the in-sample table appeared to show; (ii) a pack whose rules are mostly inert,
+which the cross-fitted table shows; and (iii) an effect too small to see at 7,829 questions. The
+cross-fitted numbers favour (ii): the harmful class is worth +0.82pp and covers 43% of questions, the
+helpful class is worth nothing, and 0.43 × 0.82 ≈ 0.35pp is inside the interval of the whole-split null.
+**A pack cannot help if most of its rules are inert, and this project has never once measured how many
+of its rules do anything at all.**
+
+**The next registration follows from that sentence rather than from a branch.** Its question is not
+"which rules are harmful" but **"how many of the 540 rules change any answer, in either direction"** —
+the inert share, measured by a within-question design that randomises *which* rule is withheld across
+draws rather than holding one hash draw per question. That is a different instrument from this one and
+is registered separately.
+
+**Two instrument defects found while reading this file.**
+
+1. `pnpm eval:loo` had **never produced output**. The command was registered in `package.json`, the
+   module was covered by sixteen tests, and the binary exported `main` without ever calling it: a
+   script that exits zero and prints nothing, which is the worst shape a defect can take because every
+   gate in this repository passed. Fixed, and it is the reason this file's numbers exist at all.
+2. The in-sample class table was the only one the module produced. `looGroups` is now labelled for what
+   it is in the code, and `looCrossFitted` sits beside it with the reason written down.

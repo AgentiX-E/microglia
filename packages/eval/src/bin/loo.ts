@@ -16,7 +16,15 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { looDraws, looGroups, looOverall, ruleClassOf, observationalLedger, type LooRow } from '@agentix-e/microglia-eval';
+import {
+  looCrossFitted,
+  looDraws,
+  looGroups,
+  looOverall,
+  observationalLedger,
+  ruleClassOf,
+  type LooRow,
+} from '@agentix-e/microglia-eval';
 import { birdArtefactPath } from './lib.js';
 
 type Row = {
@@ -90,5 +98,13 @@ export function main(argv: readonly string[]): number {
   };
   print('overall', overall.pairs, overall.reading);
   for (const group of looGroups(measured, withoutMemory)) print(group.name, group.pairs, group.reading);
+  // The same class table with each rule's class decided on the folds the effect is not measured on.
+  // The in-sample table above cannot distinguish "the rule is harmful" from "the question was hard",
+  // because a question the full arm happened to fail is a question whose rules were called harmful.
+  const fitted = looCrossFitted(measured, withoutMemory);
+  process.stdout.write(`[loo] cross-fitted: ${String(fitted.unseen)} pair(s) withheld a rule no other fold saw\n`);
+  for (const group of fitted.readings) print(group.name, group.pairs, group.reading);
   return 0;
 }
+
+process.exitCode = main(process.argv.slice(2));
