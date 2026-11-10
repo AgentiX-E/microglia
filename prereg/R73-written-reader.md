@@ -165,3 +165,71 @@ with the writer" was right and its arithmetic missed a term.
 **Re-dispatch at cap 5,600** (the forecast plus 22%), same registration, same arms, same split. The
 lesson is the one R72's Outcome 0 taught at twenty times the price: a budget is a forecast and a
 forecast that has never run is a guess, so the fold's own measurement is the number to dispatch on.
+
+## Outcome — four questions moved, and a zero-width interval says why the other 111 could not
+
+Run `42836018132`, 2026-11-10 14:37 UTC, completed in 24 minutes. `minidev`, 350 questions, arms
+`sample-5-first,sample-5-assert` exactly as the header names them. **3,165 calls** against the 5,600 cap
+Amendment 2 bought — the forecast was 4,596 and the run needed 69% of it, so the 22% margin was still
+an over-estimate, which is the third time in three registrations that the estimate was the moving part.
+350 writer replies, zero failures, all cached under `assertions-deepseek-flash`.
+
+**The arms.**
+
+| arm | accuracy | delta vs none | 95% CI | p | rules/question |
+| --- | --- | --- | --- | --- | --- |
+| `none` | 52.57% | — | — | — | 0 |
+| `full` | 53.43% | +0.86pp | [−2.00, 3.71] | 0.7011 | 1.83 |
+| `sample-5-first` | 51.14% | −1.43pp | [−4.00, 1.14] | 0.4049 | 0.00 |
+| `sample-5-assert` | 52.29% | −0.29pp | [−2.57, 2.00] | 1.0000 | 0.00 |
+
+The arm against its own control: **+1.15pp** (52.29% − 51.14%), `[−0.86, 3.14]`. Four questions.
+
+**The four signals, and the two that are not signals.**
+
+| signal | AUC | 95% CI | top pick | eligible |
+| --- | --- | --- | --- | --- |
+| `assertion-column` | 0.544 | [0.481, 0.604] | 28.70% | 115 |
+| `assertion-value` | **0.500** | **[0.500, 0.500]** | 26.09% | 115 |
+| `assertion-rows` | 0.562 | [0.494, 0.626] | 26.96% | 115 |
+| `assertion-hits` (sum) | 0.581 | [0.492, 0.667] | 29.57% | 115 |
+
+**The branch.** *The writer is not the price*: every interval straddles 0.5. The selection line does not
+close on a mechanism question but on a **population** question, and the file's own prediction is what
+fails first — 0.60–0.75 was registered, 0.581 is the highest reading, and no signal reaches the lower
+bar. Within the registered grammar the reading is measured, it is small, and it adopts no line.
+
+**Four things the table says that the branch sentence does not.**
+
+**One: `assertion-value` at exactly 0.500 with a zero-width interval is a diagnosis, not a null.** The
+interval is `[0.500, 0.500]` because the signal does not vary on any of the 115 eligible questions: a
+`value:` assertion names a literal the question states, and all five draws of a question either return
+that literal or none of them do. This is R71's `literal-match` phenomenon one step further — R71 varied
+on 8 of 350 questions, this varies on none of 115. **A reader cannot rank candidates on a property the
+candidates agree about**, and the width of the interval is again the tell rather than the noise.
+
+**Two: the strongest single kind is the one the registration pre-dismissed.** The file argued that a
+`rows:` assertion is "a shape signal this lane already knows is inert" and expected `column:` to carry
+the claim. Measured: `rows:` 0.562, `column:` 0.544. The prior was inverted. It is worth one sentence
+of humility in a lane that has now priced three readers: the shape signals keep being weaker in theory
+than in measurement, which is what `prior-shape` was fitted to and what the sum exploits.
+
+**Three: the top-pick number is the only reading above the registered floor, and it is four questions.**
+`assertion-hits` picks the correct draw on 29.57% of eligible questions against `sample-5-first`'s
+26.09% — **+3.48pp**, above the +3pp the branch names. Four questions out of 115, on a signal whose AUC
+interval is `[0.492, 0.667]`. The registration required the interval and the gain *together*, precisely
+so a four-question gain on a 115-question population could not be read as a lever, and that condition is
+doing the work it was written for.
+
+**Four: the ceiling was the population, and it was registered as 145 and measured 115.** The file
+predicted 205 of 350 questions would collapse to a single distinct result; 235 did. The eligible
+population — the only one where a selector can move anything — is **32.9%** of the split, one third of
+what R70 counted as a disagreement pool. A 115-question population with 252 pairs detects an AUC of about
+0.59 and nothing smaller, so this run's *effectiveness* is bounded by its *size*: it excludes a strong
+reading and cannot exclude a weak one.
+
+**What is settled.** The claim "writing an assertion per question recovers the CHESS gap" is not
+supported at the strength the file registered, and the mechanism is not refuted either — it is
+underpowered by construction. The lane's next money goes to size rather than to a new mechanism: the
+same writer, the same three kinds, on **BIRD dev's full 1,534 questions** instead of 350, which turns
+115 eligible into about 500 and moves the detection floor from ~0.59 to ~0.56 for roughly one dollar.

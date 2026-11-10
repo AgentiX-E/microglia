@@ -22,6 +22,8 @@
  * the corpus's own vocabulary (`Free Meal Count (K-12)`), and a pack that repeats it is on topic
  * whether or not it repeats the question's phrasing.
  */
+import { bootstrapCI, mcnemarExact, mulberry32 } from '@agentix-e/microglia-core';
+
 const FUNCTION_WORDS = new Set(
   `a an the of in on at to for from by with without into over under and or but if then than that this
    these those is are was were be been being does do did not no it its as about per what which who whom
@@ -152,6 +154,96 @@ export function overlapTerciles(rows: readonly OverlapRow[]): {
           : sorted.filter((row) => row.overlap < threshold).length / sorted.length,
     })),
   };
+}
+
+/** A net flip count with the interval that says whether its sign would survive another draw. */
+export type NetReading = {
+  readonly net: number;
+  readonly per100: number;
+  /** Interval on the per-question mean, in percentage points. */
+  readonly low: number;
+  readonly high: number;
+  /** McNemar's exact two-sided p, over the questions that moved in either direction. */
+  readonly p: number;
+};
+
+/**
+ * R72's branch, decided per tercile instead of on the whole split.
+ *
+ * The registration's condition has two halves — "the low-tercile net improves by at least +2pp" and
+ * "the interval excludes zero" — and the tercile table could supply neither: it reports a net count,
+ * and a count over 2,609 questions says nothing about whether the sign is a property of the routing or
+ * of this draw. Worse, the count is not even the registered quantity. What R72 asks is whether routing
+ * *beats injecting* inside the tercile where injecting is supposed to hurt, so the improvement is a
+ * paired comparison against the always-inject regime and not a difference of two counts read off
+ * separate lines.
+ *
+ * Three readings per tercile, and the third is the one the branch is about:
+ *
+ * - `injected` — the regime the gate would replace. Negative everywhere in R72's reading, which is the
+ *   finding that outlived the branch.
+ * - `routed` — the regime the gate would install, against the same not-injecting baseline.
+ * - `gain` — routed minus injected, per question. Withholding a pack that lost a question turns a −1
+ *   into a +1, so a withheld question contributes ±2 here; a question above the threshold contributes
+ *   nothing, because the two regimes agree on it by construction.
+ */
+export function tercileVerdicts(
+  rows: readonly OverlapRow[],
+  threshold: number,
+  options: { readonly seed?: number; readonly resamples?: number } = {},
+): readonly {
+  readonly name: 'low' | 'middle' | 'high';
+  readonly mean: number;
+  readonly n: number;
+  readonly injected: NetReading;
+  readonly routed: NetReading;
+  readonly gain: NetReading;
+}[] {
+  const seed = options.seed ?? 7;
+  const resamples = options.resamples ?? 10_000;
+  const sorted = [...rows].sort((left, right) => left.overlap - right.overlap);
+  // No population, no terciles: three empty segments would be a table whose every cell is a zero that
+  // means "unmeasured" and reads as "measured at zero".
+  if (sorted.length === 0) return [];
+  const third = Math.floor(sorted.length / 3);
+  const bounds: readonly (readonly ['low' | 'middle' | 'high', number, number])[] = [
+    ['low', 0, third],
+    ['middle', third, 2 * third],
+    ['high', 2 * third, sorted.length],
+  ];
+  const read = (deltas: readonly number[]): NetReading => {
+    const net = deltas.reduce((sum, value) => sum + value, 0);
+    const interval = bootstrapCI([...deltas], undefined, resamples, mulberry32(seed));
+    // A magnitude-2 step is one withheld question whose sign was wrong, so counting signs rather than
+    // summing magnitudes is what makes the same read work for the injected, routed and gain columns.
+    const gained = deltas.filter((value) => value > 0).length;
+    const lost = deltas.filter((value) => value < 0).length;
+    return {
+      net,
+      per100: deltas.length === 0 ? 0 : (net / deltas.length) * 100,
+      low: interval.low * 100,
+      high: interval.high * 100,
+      p: mcnemarExact(gained, lost),
+    };
+  };
+  return bounds.map(([name, low, high]) => {
+    const segment = sorted.slice(low, high);
+    const injectedDeltas = segment.map((row) => (row.gained ? 1 : 0) - (row.lost ? 1 : 0));
+    const routedDeltas = segment.map((row) =>
+      row.overlap >= threshold ? (row.gained ? 1 : 0) - (row.lost ? 1 : 0) : (row.lost ? 1 : 0) - (row.gained ? 1 : 0),
+    );
+    const gainDeltas = routedDeltas.map((value, index) => value - (injectedDeltas[index] ?? 0));
+    const mean =
+      segment.length === 0 ? 0 : segment.reduce((sum, row) => sum + row.overlap, 0) / segment.length;
+    return {
+      name,
+      mean,
+      n: segment.length,
+      injected: read(injectedDeltas),
+      routed: read(routedDeltas),
+      gain: read(gainDeltas),
+    };
+  });
 }
 
 /**

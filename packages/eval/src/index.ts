@@ -1300,6 +1300,8 @@ export {
   overlapTerciles,
   overlapWordsOf,
   packOverlapOf,
+  tercileVerdicts,
+  type NetReading,
   type OverlapRow,
 } from './overlap.js';
 

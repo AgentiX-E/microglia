@@ -15,10 +15,12 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
+  OVERLAP_ROUTED_THRESHOLD,
   comparePaired,
   crossFittedThresholds,
   overlapTerciles,
   packOverlapOf,
+  tercileVerdicts,
   type OverlapRow,
 } from '@agentix-e/microglia-eval';
 import { birdArtefactPath } from './lib.js';
@@ -61,6 +63,21 @@ export function main(argv: readonly string[]): number {
     process.stdout.write(
       `[overlap] ${entry.name.padEnd(6)} mean overlap ${entry.mean.toFixed(3)}  n ${String(entry.n)}  ` +
         `net ${String(entry.net)}  (${entry.per100.toFixed(2)} per 100)\n`,
+    );
+  }
+  // R72's branch is about the low tercile's sign, and a count without an interval cannot decide it.
+  const verdicts = tercileVerdicts(measured, OVERLAP_ROUTED_THRESHOLD);
+  process.stdout.write(
+    `[overlap] tercile  injecting (95% CI, p)              routing at ${OVERLAP_ROUTED_THRESHOLD.toFixed(2)}` +
+      `                gate gain\n`,
+  );
+  const format = (reading: { net: number; per100: number; low: number; high: number; p: number }): string =>
+    `${reading.net >= 0 ? '+' : ''}${String(reading.net)} (${reading.per100 >= 0 ? '+' : ''}${reading.per100.toFixed(2)}pp ` +
+    `[${reading.low.toFixed(2)}, ${reading.high.toFixed(2)}] p ${reading.p.toFixed(4)})`;
+  for (const verdict of verdicts) {
+    process.stdout.write(
+      `[overlap] ${verdict.name.padEnd(7)} ${format(verdict.injected).padEnd(44)} ` +
+        `${format(verdict.routed).padEnd(44)} ${format(verdict.gain)}\n`,
     );
   }
   for (const entry of table.withheldShare) {

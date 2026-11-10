@@ -228,3 +228,64 @@ forecast plus 13%), deadline 175 minutes — the first fold's 21 minutes puts fi
 distillation on a cold queue, and the step's own cap is 200. Estimated **$3.2 off-peak**, 2.1× the
 original estimate and still the cheapest form of this experiment: the policy is read afterwards by
 `pnpm eval:overlap --policy` for nothing.
+
+## Outcome — the axis is real, its whole domain is negative, and the gate is a zero-cost retention
+
+Run `42831874678`, 2026-11-10 14:13 UTC, completed in 64 minutes. `train`, five folds, 7,829 questions,
+`learn_sample` 700, `none` and `full` as registered. **16,876 calls, $1.4039, cache hit 78.1%.**
+
+**The whole-split number first, because it is the one that has been misread before.** Memory costs
+**−0.84pp** on 7,829 questions: 56.57% without, 55.73% with, `[−1.44, −0.26]`, p = 0.0054. That is the
+third independent population on which the prefix pack is negative, and it is now narrow enough to
+exclude zero rather than merely to point downward.
+
+**The routing table, with the intervals the branch needs.**
+
+| tercile | mean overlap | n | injecting (95% CI, p) | routing at 0.30 (95% CI, p) | gate gain (95% CI, p) |
+| --- | --- | --- | --- | --- | --- |
+| low | 0.081 | 2,609 | **−38 (−1.46pp [−2.45, −0.50], p 0.0042)** | +38 (+1.46pp [0.50, 2.45]) | **+76 (+2.91pp [1.00, 4.91], p 0.0042)** |
+| middle | 0.197 | 2,609 | −18 (−0.69pp [−1.69, 0.31], p 0.1973) | +18 (+0.69pp [−0.31, 1.69]) | +36 (+1.38pp [−0.61, 3.37], p 0.1973) |
+| high | 0.355 | 2,611 | −10 (−0.38pp [−1.49, 0.69], p 0.5287) | +6 (+0.23pp [−0.84, 1.30]) | +16 (+0.61pp [−0.61, 1.84], p 0.3891) |
+
+Cross-fitted thresholds: **0.35, 0.37, 0.35, 0.37, 0.37** — region 0.35–0.37, one hundredth inside the
+0.38–0.41 Amendment 1 derived from R66's dev file and 0.03 below the 0.38 the constant holds. The
+cross-fitted policy flips **+9** against always-injecting's **−66**. A 0.30 gate withholds **77.3%**, a
+0.20 gate **48.0%**.
+
+**The branch.** *Overlap is the axis*: the low-tercile net improves by **+2.91pp**, above the
+registered +2pp floor, and its interval `[1.00, 4.91]` excludes zero. The gate becomes the lane's
+default and every later memory mechanism is evaluated on the gated regime. **But the branch's own
+sentence is not the whole reading, and three facts have to travel with it.**
+
+**One: the gradient is monotone in magnitude and null in the top two thirds.** −1.46pp, −0.69pp,
+−0.38pp, and only the first has an interval that excludes zero. The registered expectation was "low
+overlap hurts, high overlap helps"; what replicates is "below-median overlap hurts, and the top two
+thirds are a wash". The sign never turns positive. The hypothesis survives; the half of it that
+promised a benefit does not.
+
+**Two: nothing in this file's domain is a benefit.** The high tercile's mean overlap is 0.355 — every
+tercile sits below one half, because a pack of a few dozen rules does not repeat half a question's
+vocabulary. So "high overlap" here means "less unrelated", not "on topic". The honest statement is
+narrower than the axis claim: **overlap measures how much damage a pack does, and it never measures
+gain.**
+
+**Three: the gate's benefit is entirely the absence of harm, and against no memory at all it is zero.**
+At 0.30 the routed policy scores 56.55% against `none`'s 56.57% — **−0.02pp**. At 0.20 it scores 56.35%,
+**−0.22pp**. Every +pp in the policy column is measured against always-injecting, which is the worse
+arm. A gate that withholds 77% of its packs and lands one hundredth of a point below "do not inject" has
+not made memory useful; it has made memory free. Both facts are true and only one of them is a result:
+
+- the pack is not harmful when it shares the question's vocabulary, which is a real and reproducible
+  regularity;
+- the pack is not helpful when it does, which closes the prefix position as a source of accuracy.
+
+That second clause is what the next registration spends its money on, and it is the branch this file
+did not write: **the position is closed, not the mechanism.** R66 opened evidence *after* a failure;
+that is now the only position in the lane with an open question.
+
+**What is settled here.** `OVERLAP_THRESHOLD` stays 0.38 as the registered constant and
+`OVERLAP_ROUTED_THRESHOLD` 0.30 as the in-band one, and neither is promoted to a default, because a
+default that buys −0.02pp is a default that should be a switch that is off. `pnpm eval:overlap` gained
+`tercileVerdicts`, so the three readings above are recomputable from any artefact rather than quoted
+from this paragraph, and each tercile now carries the McNemar interval that the branch condition names
+and the table alone could not supply.

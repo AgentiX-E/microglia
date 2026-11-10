@@ -6,6 +6,7 @@ import {
   packOverlapOf,
   overlapTerciles,
   overlapWordsOf,
+  tercileVerdicts,
   type OverlapRow,
 } from '../overlap.js';
 
@@ -123,5 +124,77 @@ describe('crossFittedThresholds', () => {
       [0.05, 0.5].map((overlap) => ({ fold, overlap, gained: false, lost: false })),
     );
     expect(crossFittedThresholds(rows).every((choice) => choice.threshold === 0.8)).toBe(true);
+  });
+});
+
+describe('tercileVerdicts', () => {
+  // Nine questions, three per tercile, so the tercile boundaries are exact and the arithmetic can be
+  // read off by hand rather than trusted.
+  const rows: readonly OverlapRow[] = [
+    { overlap: 0.01, gained: false, lost: true },
+    { overlap: 0.02, gained: false, lost: true },
+    { overlap: 0.03, gained: false, lost: true },
+    { overlap: 0.5, gained: false, lost: false },
+    { overlap: 0.51, gained: false, lost: false },
+    { overlap: 0.52, gained: true, lost: false },
+    { overlap: 0.9, gained: true, lost: false },
+    { overlap: 0.91, gained: true, lost: false },
+    { overlap: 0.92, gained: false, lost: false },
+  ];
+
+  it('reports the regime it would replace with the interval the branch condition names', () => {
+    const verdicts = tercileVerdicts(rows, 0.4, { resamples: 500 });
+    expect(verdicts.map((verdict) => verdict.name)).toEqual(['low', 'middle', 'high']);
+    // The low tercile loses all three of its questions, and the interval has to say so.
+    expect(verdicts[0]?.injected.net).toBe(-3);
+    expect(verdicts[0]?.injected.low).toBeLessThan(0);
+    // Three losses against no gains is p = 0.25 exactly: McNemar's floor needs six to clear 0.05, and
+    // the low tercile in this fixture is deliberately small enough to show the floor rather than hide it.
+    expect(verdicts[0]?.injected.p).toBeCloseTo(0.25, 6);
+    // The high tercile gains two and loses none, which is a small enough sample to stay unproven.
+    expect(verdicts[2]?.injected.net).toBe(2);
+  });
+
+  it('keeps what the threshold would inject and reverses what it would withhold', () => {
+    const verdicts = tercileVerdicts(rows, 0.4, { resamples: 500 });
+    // Nothing in the low tercile clears 0.4, so routing there is the negation of injecting.
+    expect(verdicts[0]?.routed.net).toBe(3);
+    // The middle tercile keeps its one gain and reverses nothing else into a loss.
+    expect(verdicts[1]?.routed.net).toBe(1);
+    // The high tercile clears the threshold entirely, so routing and injecting agree.
+    expect(verdicts[2]?.routed.net).toBe(2);
+  });
+
+  it('prices the gate as a paired comparison rather than a difference of two counts', () => {
+    const verdicts = tercileVerdicts(rows, 0.4, { resamples: 500 });
+    // A withheld question whose sign was wrong contributes two flips against always-injecting.
+    expect(verdicts[0]?.gain.net).toBe(6);
+    expect(verdicts[0]?.gain.per100).toBeCloseTo(200, 5);
+    // A question above the threshold contributes nothing, because both regimes agree on it.
+    expect(verdicts[2]?.gain.net).toBe(0);
+    expect(verdicts[2]?.gain.p).toBe(1);
+  });
+
+  it('treats a threshold above every overlap as withholding everything', () => {
+    const verdicts = tercileVerdicts(rows, 5, { resamples: 200 });
+    for (const verdict of verdicts) expect(verdict.routed.net).toBe(-verdict.injected.net);
+  });
+
+  it('survives an empty population rather than dividing by zero', () => {
+    expect(tercileVerdicts([], 0.4, { resamples: 50 })).toEqual([]);
+  });
+
+  it('reports a zero-width interval when nothing moved, which is the tell and not the noise', () => {
+    const flat: readonly OverlapRow[] = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6].map((overlap) => ({
+      overlap,
+      gained: false,
+      lost: false,
+    }));
+    const verdicts = tercileVerdicts(flat, 0.4, { resamples: 200 });
+    for (const verdict of verdicts) {
+      expect(verdict.injected.net).toBe(0);
+      expect(verdict.injected.low).toBe(0);
+      expect(verdict.injected.high).toBe(0);
+    }
   });
 });
