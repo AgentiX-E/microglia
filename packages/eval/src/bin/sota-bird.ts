@@ -242,6 +242,8 @@ import {
   artefactIdOf,
   artefactWriteIdOf,
   poolOf,
+  hostOf,
+  planCredential,
   SPLITS,
   splitFrom,
   splitNameOf,
@@ -936,10 +938,28 @@ type Reply = ChatReply;
  */
 const ENDPOINT = process.env['DEEPSEEK_ENDPOINT'] ?? '';
 
+/**
+ * Which key pays, decided before the first call rather than discovered at the four-hundredth.
+ *
+ * `SOTA_API_KEY` is the variable a backbone swap needs and did not have: the host could be moved
+ * and the model id could be moved, but the credential was read from `DEEPSEEK_API_KEY` and
+ * nowhere else, so the one comparison this record keeps promising — the same scaffold on a
+ * different model — could not be run without editing this file. The plan refuses the combination
+ * that would spend DeepSeek's key on somebody else's host, because that failure is not a status
+ * code a reader sees; it is a refusal per prompt, an eight-prompt breaker, and an artefact that
+ * says the endpoint stopped answering.
+ */
+const CREDENTIAL = planCredential({
+  sotaKey: process.env['SOTA_API_KEY'],
+  deepseekKey: process.env['DEEPSEEK_API_KEY'],
+  endpointHost: ENDPOINT === '' ? '' : hostOf(ENDPOINT),
+});
+
+
 const DEADLINE_AT = DEADLINE_MIN > 0 ? Date.now() + DEADLINE_MIN * 60_000 : undefined;
 
 const llm = new LlmClient({
-  apiKey: process.env['DEEPSEEK_API_KEY'] ?? '',
+  apiKey: CREDENTIAL.key,
   model: MODEL,
   maxCalls: MAX_CALLS,
   breakerThreshold: BREAKER_THRESHOLD,
@@ -5638,20 +5658,6 @@ async function runFold(
   };
 }
 
-/**
- * The host of an endpoint, without the path or any query it carried.
- *
- * Used only to label a run, but it is parsed rather than echoed: an endpoint with a token
- * in its query string would otherwise be written into a committed artefact.
- */
-function hostOf(endpoint: string): string {
-  try {
-    return new URL(endpoint).host;
-  } catch {
-    return 'unparseable';
-  }
-}
-
 function rate(values: readonly boolean[]): number {
   return values.length === 0 ? 0 : values.filter(Boolean).length / values.length;
 }
@@ -6472,6 +6478,16 @@ async function main(): Promise<void> {
      * produces, so the artefact has to say which one it is.
      */
     model_endpoint: ENDPOINT === '' ? 'default' : hostOf(ENDPOINT),
+    /**
+     * Which account paid, as a label rather than a value.
+     *
+     * `lane` means `SOTA_API_KEY` funded this run, `deepseek` means the key lent by the default
+     * host did, and `none` means the client refused before any call was made. Without it, two runs
+     * of the same arm on the same questions are indistinguishable in the artefact — and the whole
+     * point of naming a second credential is that the backbone becomes a variable someone can
+     * compare against, which requires the artefact to say which variable was moved.
+     */
+    model_credential: CREDENTIAL.source,
   };
 
   const items = folds.flatMap((fold) =>

@@ -721,6 +721,15 @@ sequencing defect in the deletion arm — it wrote to the store inside the scori
 spent fourteen minutes failing a guard that was correct, and every other mechanism here had been rehearsed
 locally first. The artefact records the endpoint host, so a rehearsal cannot be mistaken for a run.
 
+`SOTA_API_KEY` funds a run whose host is not this one, and it exists because the model and the host were
+already variables while the credential was not — which made the one comparison nobody here has run, the same
+scaffold on a different model, impossible to run correctly. A key is spent where it was named: `SOTA_API_KEY`
+wherever the lane points, and `DEEPSEEK_API_KEY` only at `api.deepseek.com` and at a stand-in on this machine.
+A DeepSeek key aimed at another provider's host stops the run before the first call instead of arriving as a
+`4xx`, because a refusal per prompt ends as a tripped breaker and an artefact that says the endpoint stopped
+answering. The artefact's `model_credential` field says which of the two paid, so two runs of the same arm on
+different backbones stay tellable apart.
+
 `pnpm bundle:size` bundles both published entry points for the browser and holds them to a ceiling:
 **3,009 B raw / 1,410 B gzipped** for the client and **43,330 B / 14,684 B gzipped** for the core. The
 build would fail if either stopped bundling without Node builtins, which is the "no runtime dependency"

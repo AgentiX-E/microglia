@@ -14,6 +14,14 @@ export {
 } from './call-budget.js';
 export { THINKING_HEADROOM, answerBudget, type ThinkingMode } from './decoding.js';
 export {
+  DEFAULT_MODEL_HOST,
+  hostOf,
+  planCredential,
+  type CredentialInput,
+  type CredentialPlan,
+  type CredentialSource,
+} from './credential.js';
+export {
   RETRY_POPULATION_FLOOR,
   RETRY_REASONS,
   retryTriggerFor,
