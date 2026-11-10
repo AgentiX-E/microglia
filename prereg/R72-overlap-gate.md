@@ -162,3 +162,9 @@ dispatch with no draws costs about **2.4 calls per question**: ≈18,500 calls, 
 measured 1.94 calls/s, ≈**$1.5** off-peak — inside the job's 340-minute cap with room for the wall-clock
 stop the lane enforces itself. The policy is read afterwards by `pnpm eval:overlap --policy`, which
 costs nothing.
+
+**One more dispatch parameter, recorded rather than assumed.** `learn_sample` is **700** per fold, not
+the 6,263 available. Distilling from all of them would add ≈31,300 calls — twice the answering cost —
+and the claim here is about *routing*, not about how much a fold can learn: every arm in the run sees
+the same pack, so a smaller learning sample moves the level of both arms and not the difference the
+registration is about. 700 per fold is the size R70's folds used, doubled.
