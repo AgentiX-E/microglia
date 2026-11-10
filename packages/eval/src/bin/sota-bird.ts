@@ -112,6 +112,7 @@ import {
   stoppedRun,
   buildValidityGates,
   armCoverageGate,
+  looIndex,
   assertAnything,
   assertionPrompt,
   parseAssertions,
@@ -920,6 +921,15 @@ type CaseOutcome = {
   readonly expected: number | null;
   /** The rules the full arm actually injected, for per-rule attribution. */
   readonly packIdList: readonly string[];
+  /**
+   * Which rule the `loo` arm withheld, or null when the arm did not run or the pack was empty.
+   *
+   * Recorded rather than re-derived because the choice is a hash of the question *and the fold*, and
+   * a fold is not a field on the row. Re-deriving it in a reader would work today and would silently
+   * pick a different rule the moment the fold layout changed — which is the failure mode this field
+   * exists to make impossible.
+   */
+  readonly looDropped?: string | null;
   readonly tokens: number;
   readonly latencyMs: number;
   /**
@@ -4232,6 +4242,16 @@ async function runFold(
   const injectedText = (pack: Pack): string[] =>
     pack.items.map((item) => `${item.statement} ${item.when ?? ''}`);
   /** The texts each question's packs contained, for the relevance audit. */
+  /**
+   * Which rule the `loo` arm withheld, per question.
+   *
+   * The reading needs the rule's identity rather than only the fact that one was withheld: the
+   * question R74 asks is whether the rules `attribution` calls harmful are harmful when the choice
+   * to drop them is random, and that is a join between this field and the rule table. Declared here
+   * for the same reason the assertion map is — a map scoped to the pass that fills it is a map the
+   * artefact writer cannot see.
+   */
+  const looDroppedByPosition = new Map<number, string>();
   const injectedByPosition = new Map<number, string[]>();
   const injectedRepairByPosition = new Map<number, string[]>();
   const injectedProceduralByPosition = new Map<number, string[]>();
@@ -4697,6 +4717,18 @@ async function runFold(
     if (ARMS.has('chars-proc-600') && procedural !== undefined) {
       const cut = await procedural.host.recall({ ...query, scope: { domain: row.db_id }, budget: 600 });
       call(position, 'chars-proc-600', cut.rendered, cut.ids.length);
+    }
+    if (ARMS.has('loo')) {
+      // Exactly one rule withheld from the pack `full` renders, chosen from the question's own text
+      // so nobody — including this lane on a re-run — can choose differently. Nothing is
+      // re-retrieved and nothing is re-cut: if this cell moves, the withheld rule moved it.
+      const index = looIndex(pack.items.length, `${row.question}\u0000${String(fold)}`);
+      const kept =
+        index === -1 ? [] : pack.items.filter((_, at) => at !== index);
+      const withheld = index === -1 ? undefined : pack.items[index];
+      if (withheld !== undefined) looDroppedByPosition.set(position, withheld.id);
+      const cut = makePack(kept, { budget: pack.budget });
+      call(position, 'loo', cut.rendered, cut.ids.length);
     }
     if (ARMS.has('full-procedural')) {
       const procedurePack = proceduralPacks.get(position);
@@ -5726,6 +5758,7 @@ async function runFold(
       coverage: pack.coverage,
       expected: task.expected.get(idOf(row)) ?? null,
       packIdList: pack.ids,
+      looDropped: looDroppedByPosition.get(position) ?? null,
       tokens: full.tokens,
       latencyMs: full.latencyMs,
       arms,

@@ -39,6 +39,7 @@ import {
   retrySubset,
   schemaLinkSplit,
   reportedSql,
+  looIndex,
   type GateInput,
 } from '../sota.js';
 
@@ -277,6 +278,7 @@ describe('parseArms', () => {
       'gen-plan',
       'linked',
       'linked-additive',
+      'loo',
       'm-schema',
       'none',
       'none-advisory',
@@ -466,6 +468,7 @@ describe('parseArms', () => {
       'full-procedural',
       'full-lexicon',
       'chars-proc-600',
+      'loo',
       'retry-keyed',
       'retry-values',
       'sample-3',
@@ -3256,5 +3259,39 @@ describe('armCoverageGate', () => {
     const gate = armCoverageOf({});
     expect(gate.pass).toBe(true);
     expect(gate.actual).toContain('no arm beyond');
+  });
+});
+
+describe('looIndex', () => {
+  it('is -1 for an empty pack, which is not position zero', () => {
+    // A question the retriever offered nothing for has no rule to withhold. Reading that as "drop the
+    // first rule" would file every empty pack with the one-item packs.
+    expect(looIndex(0, 'anything')).toBe(-1);
+    expect(looIndex(-3, 'anything')).toBe(-1);
+  });
+
+  it('stays inside the pack', () => {
+    for (const count of [1, 2, 3, 5, 9]) {
+      for (let index = 0; index < 60; index += 1) {
+        const chosen = looIndex(count, `question ${String(index)}`);
+        expect(chosen).toBeGreaterThanOrEqual(0);
+        expect(chosen).toBeLessThan(count);
+      }
+    }
+  });
+
+  it('is a function of the key alone, which is what makes the run reproducible', () => {
+    expect(looIndex(7, 'the same question')).toBe(looIndex(7, 'the same question'));
+  });
+
+  it('spreads the choice rather than parking it on one position', () => {
+    // A hash that happened to keep the low bit would drop the first rule every time, and the arm
+    // would be "without the best-ranked rule" rather than "without one at random".
+    const counts = [0, 0, 0, 0, 0];
+    for (let index = 0; index < 500; index += 1) {
+      const chosen = looIndex(5, `question ${String(index)} about a table`);
+      counts[chosen] = (counts[chosen] ?? 0) + 1;
+    }
+    for (const count of counts) expect(count).toBeGreaterThan(50);
   });
 });

@@ -17,6 +17,7 @@ import type { PriorScope } from './memory-prior.js';
 import { buildProtocolGates } from '@agentix-e/microglia-protocol';
 import type { ProtocolGateInput, ValidityGate } from '@agentix-e/microglia-protocol';
 import { canonicalRows } from '@agentix-e/microglia-sql';
+import { hashText } from '@agentix-e/microglia-core';
 import { comparePaired } from './stats.js';
 
 /**
@@ -650,6 +651,27 @@ export type SqlArm =
    */
   | 'chars-proc-600'
   /**
+   * The full pack with exactly one rule withheld, chosen at random per question.
+   *
+   * Every claim this lane has made about a *rule* is observational. `attribution.ts` reports 267
+   * harmful, 236 helpful and 1,206 neutral rules of the 1,709 ever injected, and it reports it from
+   * the questions each rule happened to be injected on — which is not a random sample. A rule
+   * retrieved by a hard question and withheld from an easy one looks harmful whatever it says.
+   *
+   * This arm is the cheapest design that makes the attribution causal. One rule is dropped per
+   * question, the choice derived from the question's own text so the run is reproducible, and the
+   * comparison is **paired within the question**: the same question, the same other rules, one rule
+   * fewer. Pooled over the split, each rule contributes as many paired observations as there are
+   * questions that drew it, and a group of rules — harmful, helpful, one-item packs, three-item
+   * packs — contributes all of theirs.
+   *
+   * It does not identify a single rule's effect, and it is not meant to: at 1.86 rules per question
+   * a rule is drawn about ten times, which is a distribution and not an estimate. What it can say is
+   * whether the 267 harmful rules are harmful when the selection is random, which is the question
+   * the next pruning decision turns on.
+   */
+  | 'loo'
+  /**
    * The retry, retrieving the procedure by the *failure* rather than by the question.
    *
    * Every retrievable note in this project is found by comparing it to the question, and the
@@ -1106,6 +1128,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-procedural': true,
   'full-lexicon': true,
   'chars-proc-600': true,
+  loo: true,
   'retry-keyed': true,
   'retry-values': true,
   'sample-3': true,
@@ -2492,4 +2515,26 @@ export function armCoverageOf(artefact: {
     artefact.config?.arms ?? [],
     (artefact.arms ?? []).map((row) => row.arm),
   );
+}
+
+/**
+ * Which rule the `loo` arm withholds, derived from the question's own text.
+ *
+ * The index is a hash rather than a random draw because the reading has to be reproducible from the
+ * artefact: a `--seed` on a dispatch puts the seed outside the registration, and a rule chosen by a
+ * number nobody recorded makes "the effect of dropping rule r" a statement about one run of one
+ * script. Hashing the question and the fold gives every question a fixed choice that the lane cannot
+ * make differently on a re-run, and the choice is uniform over positions because the hash is.
+ *
+ * `-1` for an empty pack, which is not position zero: a question the retriever offered nothing for
+ * has no rule to withhold, and reading that as "withheld the first rule" would put every empty pack
+ * into the same bucket as the one-item packs and quietly compare them.
+ */
+export function looIndex(count: number, key: string): number {
+  if (count <= 0) return -1;
+  // `hashText` is sixteen lowercase hex characters by contract, so the first eight parse as a
+  // 32-bit integer and there is no `NaN` path to guard: a fallback here would be a branch no input
+  // can reach, and an unreachable branch reads as a defence that is not there.
+  const value = Number.parseInt(hashText(key).slice(0, 8), 16);
+  return value % count;
 }

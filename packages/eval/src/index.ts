@@ -1046,6 +1046,7 @@ export {
   ceilingAmong,
   armCoverageGate,
   armCoverageOf,
+  looIndex,
   BASELINE_ARM,
   canonicalRows,
   type ResultComparison,
@@ -1304,6 +1305,18 @@ export {
   type NetReading,
   type OverlapRow,
 } from './overlap.js';
+
+export {
+  looDraws,
+  looGroups,
+  looOverall,
+  ruleClassOf,
+  observationalLedger,
+  type LooReading,
+  type LooRow,
+  type RuleClass,
+  type RuleVerdict,
+} from './loo.js';
 
 export { BoundedSql, type BoundedSqlOptions, type StatementResult } from '@agentix-e/microglia-sql';
 
