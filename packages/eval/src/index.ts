@@ -1555,3 +1555,10 @@ export {
   type Estimate,
   type PublishedCell,
 } from './reproduction.js';
+
+export {
+  sharedCases,
+  widthShare,
+  type WidthCase,
+  type WidthShare,
+} from './width.js';
