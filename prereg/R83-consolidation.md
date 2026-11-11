@@ -11,7 +11,8 @@ gates: V18,V19,V77
 
 # R83 — merge first, then ask what a witness is worth
 
-**Registered** 2026-11-11, undispatched. One variable moves: the store `full` reads.
+**Registered** 2026-11-11, and cancelled before dispatch — see "Void before dispatch" below. One variable
+moves: the store `full` reads.
 
 ## Why this is the next question rather than another filter
 
@@ -112,6 +113,41 @@ The branches **partition** the space, are ordered, and the first whose condition
   the pack was too long rather than wrongly supported, the merge is the first mechanism in this record to
   beat `full` on this split, and the next registration buys the support floor over the merged store — the
   arm this file deliberately deferred.
+
+## Void before dispatch — read from the store, not from the run
+
+The registration was written, and then the store it would have merged was read out of R81's fifth artefact
+instead of being bought again. `items` is a per-item projection of all 254 claims across the five folds, so the
+containment the pass uses can be computed on it directly, for nothing:
+
+| fold | claims | same-scope pairs | pairs at containment ≥ 0.60 |
+| --- | --- | --- | --- |
+| 0 | 45 | 128 | 1 |
+| 1 | 47 | 138 | 1 |
+| 2 | 57 | 168 | 0 |
+| 3 | 54 | 143 | 1 |
+| 4 | 51 | 124 | 0 |
+| **total** | **254** | **633** | **3** |
+
+The three pairs are the same pair of statements in three different folds — one claim about naming entities
+stated two ways, at containment 0.714 against the pass's 0.60 floor.
+
+**That is a real fold, and it is too small to measure.** Three groups over 1,534 questions touch at most six
+questions, so the ceiling on any accuracy effect is **0.39pp** — and this lane's minimum detectable effect at
+n = 1,534 is **1.99pp** (`V5-resolution`, reported as 1.99 against a 6.00 target). The arm is underpowered by a
+factor of five *by construction*, and no result it returned — null or otherwise — could be told from noise.
+
+So the dispatch is cancelled and the file is kept as the record of why. This is the same rule the record has
+applied three times before ("a threshold chosen by its own result"), applied one step earlier: **a run whose
+ceiling sits below its own detection floor is not an experiment.** What it would have bought is a null that
+could not distinguish "the merge does nothing" from "the merge does something too small to see", published
+under a registration number.
+
+The reading does say something useful, and it is what closes the question: a store of 52 claims distilled from
+64 corrections contains **one** repeat. Raising `learn_sample` to the full 1,227 corrections a fold would
+multiply the population about nineteen-fold and the repeats with it — to roughly twenty groups, still under 3%
+of questions, still below this lane's floor. The merge is not the missing mechanism; the store is too small to
+have one.
 
 ## What this file does not do
 
