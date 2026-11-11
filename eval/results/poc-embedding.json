@@ -1,7 +1,6 @@
 {
   "id": "poc-embedding",
   "title": "Paraphrase retrieval: BM25 vs Zhipu embedding-3 vs rank fusion",
-  "ranAt": "2026-10-20T02:37:56.141Z",
   "model": "embedding-3",
   "n": 96,
   "calls": 3,

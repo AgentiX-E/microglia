@@ -1,7 +1,6 @@
 {
   "id": "poc-llm-reader",
   "title": "LLM reader: generic vs house conventions, with an unguarded poison control",
-  "ranAt": "2026-10-20T02:32:52.915Z",
   "model": "deepseek-chat",
   "n": 70,
   "calls": 152,

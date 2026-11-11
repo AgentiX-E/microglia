@@ -2,7 +2,6 @@
   "id": "judge-calibration",
   "title": "What a judge has to beat, on public adjudicated NL2SQL labels",
   "variant": "execution",
-  "ranAt": "2026-10-25T08:31:14.049Z",
   "model": "none (deterministic execution)",
   "n": 322,
   "calls": 0,

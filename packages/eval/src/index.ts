@@ -267,6 +267,14 @@ export {
 } from './artefacts.js';
 
 export {
+  VOLATILE_KEYS,
+  splitClaim,
+  volatileKeysIn,
+  type ClaimSplit,
+  type VolatilePath,
+} from './claim.js';
+
+export {
   BirdDataError,
   archiveVerdict,
   dedupeQuestions,
@@ -1560,8 +1568,14 @@ export {
 } from './reproduction.js';
 
 export {
+  DEFAULT_SELECTED_ARM,
+  selectedArmProblem,
   sharedCases,
+  widthArguments,
+  widthCases,
   widthShare,
+  type WidthArmNames,
+  type WidthArguments,
   type WidthCase,
   type WidthShare,
 } from './width.js';

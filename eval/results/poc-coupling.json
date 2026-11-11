@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 186,
+  "scanned": 187,
   "totals": {
-    "modules": 186,
-    "lines": 50190,
+    "modules": 187,
+    "lines": 50427,
     "adapterLines": 1956,
-    "deferredLines": 8519,
-    "coupledShare": 0.2062
+    "deferredLines": 8806,
+    "coupledShare": 0.2109
   },
   "layers": [
     {
@@ -37,11 +37,11 @@
     },
     {
       "layer": "eval",
-      "modules": 129,
-      "lines": 37115,
+      "modules": 130,
+      "lines": 37352,
       "adapterLines": 0,
-      "deferredLines": 8519,
-      "coupled": 22
+      "deferredLines": 8806,
+      "coupled": 23
     },
     {
       "layer": "browser",
@@ -176,7 +176,7 @@
       "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 472,
+      "lines": 476,
       "words": [
         "sql",
         "sqlite",
@@ -344,6 +344,17 @@
       ],
       "verdict": "deferred",
       "reason": "compares the literals an attempt wrote against the values a column holds; it reads two strings and executes nothing"
+    },
+    {
+      "pkg": "eval",
+      "module": "width",
+      "path": "packages/eval/src/width.ts",
+      "lines": 283,
+      "words": [
+        "bird"
+      ],
+      "verdict": "deferred",
+      "reason": "the only scenario word in it is the `--bird` flag name, which is what every reading in this package calls \"the artefact to read\"; it parses three arguments and divides a difference of marks it was handed, and it opens nothing"
     },
     {
       "pkg": "sql",
@@ -657,7 +668,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "186 modules, 22 deferred with a reason"
+      "detail": "187 modules, 23 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -672,5 +683,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 50190 production lines across 186 modules: 7 adapter modules in `sql`, 22 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 50427 production lines across 187 modules: 7 adapter modules in `sql`, 23 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }

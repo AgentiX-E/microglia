@@ -1,7 +1,6 @@
 {
   "id": "sota-adjudication",
   "title": "The S2 answers, re-scored by a criterion EX did not choose",
-  "ranAt": "2026-10-26T02:44:42.540Z",
   "model": "deepseek-chat",
   "n": 292,
   "calls": 1211,

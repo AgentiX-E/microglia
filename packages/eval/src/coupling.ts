@@ -113,6 +113,10 @@ export const DEFERRALS: Readonly<Record<string, string>> = {
   validity: 'one gate diffs two statements, and it imports the differ from `sql` rather than copying it',
   'value-correction':
     'compares the literals an attempt wrote against the values a column holds; it reads two strings and executes nothing',
+  width:
+    'the only scenario word in it is the `--bird` flag name, which is what every reading in this ' +
+    'package calls "the artefact to read"; it parses three arguments and divides a difference of ' +
+    'marks it was handed, and it opens nothing',
 };
 
 /** One production module, as the walker found it. */

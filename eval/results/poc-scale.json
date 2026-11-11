@@ -1,7 +1,6 @@
 {
   "id": "poc-scale",
   "title": "CPU retrieval and memory cost from 1k to 100k items",
-  "ranAt": "2026-10-23T04:42:08.110Z",
   "model": "none",
   "n": 3,
   "calls": 0,
@@ -32,32 +31,24 @@
     {
       "items": 1000,
       "buildMs": 13,
-      "p50Ms": 1.262,
-      "p95Ms": 1.906,
       "meanTokens": 260.12,
       "heapMB": 6.3
     },
     {
       "items": 10000,
       "buildMs": 69,
-      "p50Ms": 2.105,
-      "p95Ms": 2.676,
       "meanTokens": 257.78,
       "heapMB": 29.3
     },
     {
       "items": 50000,
       "buildMs": 329,
-      "p50Ms": 8.891,
-      "p95Ms": 10.764,
       "meanTokens": 256.65,
       "heapMB": 113.1
     },
     {
       "items": 100000,
       "buildMs": 750,
-      "p50Ms": 18.648,
-      "p95Ms": 22.73,
       "meanTokens": 256.65,
       "heapMB": 173.9
     }

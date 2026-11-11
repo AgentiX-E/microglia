@@ -156,3 +156,127 @@ export function sharedCases(
   const seen = new Set(other.map((row) => row.id));
   return primary.filter((row) => seen.has(row.id));
 }
+
+/**
+ * The arm a share divides by when the caller does not name one.
+ *
+ * `sample-5-exec` is what R67, R68 and R70 all bought, so every published share in this repository is
+ * that arm. It is a default and not an assumption: the reading still refuses a question that does not
+ * carry the arm (see `widthCases`), so an artefact with no `exec` arm reports "no question carries all
+ * three" and lists what it did buy.
+ */
+export const DEFAULT_SELECTED_ARM = 'sample-5-exec';
+
+/** Where a width reading takes its three answers from. */
+export type WidthArguments = {
+  /** The artefact to read, or `null` to let the caller fall back to `chooseArtefact`. */
+  readonly bird: string | null;
+  /** The artefact to intersect the question ids with before computing anything. */
+  readonly with: string | null;
+  /** The arm whose picks are `selected`, and whether the caller named it or this module defaulted it. */
+  readonly selected: { readonly arm: string; readonly explicit: boolean };
+};
+
+/**
+ * The command line a width reading accepts, parsed strictly and in one place.
+ *
+ * This lives here rather than in the CLI because the CLI is excluded from coverage by the package's own
+ * rule — "the logic they call lives in the package and is covered there" — and an argument parser that
+ * nothing tests is how `pool.ts` came to accept `--bird`, ignore it, and describe a different file.
+ *
+ * Three decisions are worth their lines:
+ *
+ * - **An unknown flag is an error, not a fallback.** The caller has written something the program does
+ *   not understand; guessing which file they meant is the failure this parser exists to prevent.
+ * - **A flag with no value is an error even when a later argument exists.** `--bird --with b.json` would
+ *   otherwise read a path called `--with`, and then silently ignore `b.json`.
+ * - **A repeated flag is an error.** Two `--bird`s are two answers to one question, and picking either
+ *   one is picking for the caller.
+ */
+export function widthArguments(argv: readonly string[]): WidthArguments {
+  let bird: string | null = null;
+  let withPath: string | null = null;
+  let selected: string | null = null;
+  const flags = ['--bird', '--with', '--selected'] as const;
+  for (let index = 0; index < argv.length; index += 1) {
+    const flag = argv[index] as string;
+    if (!(flags as readonly string[]).includes(flag)) {
+      throw new Error(
+        `unrecognised argument ${flag}: this reading takes --bird <artefact>, --with <artefact> and --selected <arm>`,
+      );
+    }
+    const value = argv[index + 1];
+    if (value === undefined || value.startsWith('--')) {
+      throw new Error(
+        flag === '--selected'
+          ? '--selected needs an arm name, for example --selected sample-5-assert'
+          : `${flag} needs a path, and the next argument is another flag`,
+      );
+    }
+    index += 1;
+    if (flag === '--bird') {
+      if (bird !== null) throw new Error('--bird given twice, so there is no single artefact to read');
+      bird = value;
+    } else if (flag === '--with') {
+      if (withPath !== null) throw new Error('--with given twice, so there is no single population');
+      withPath = value;
+    } else {
+      if (selected !== null) throw new Error('--selected given twice, so there is no single arm');
+      selected = value;
+    }
+  }
+  return {
+    bird,
+    with: withPath,
+    selected: { arm: selected ?? DEFAULT_SELECTED_ARM, explicit: selected !== null },
+  };
+}
+
+/**
+ * Why a named arm cannot be the one this reading divides by, or `null` when it can.
+ *
+ * Only an **explicitly named** arm is checked. The default is not: a directory scan can land on an
+ * artefact that never bought `sample-5-exec`, and that invocation is expected to report "no question
+ * carries all three" with the arms it did buy — a second, differently worded error for the same
+ * condition would be noise. A caller who typed an arm name has asserted something, and an artefact that
+ * does not contain that arm can contradict it.
+ */
+export function selectedArmProblem(arm: string, bought: readonly string[]): string | null {
+  if (bought.includes(arm)) return null;
+  return `this artefact did not buy '${arm}'; it bought ${bought.join(', ') || 'nothing recorded'}`;
+}
+
+/** The three marks a share needs from one question, keyed by the arm names the artefact uses. */
+export type WidthArmNames = {
+  readonly first: string;
+  readonly selected: string;
+  readonly oracle: string;
+};
+
+/**
+ * The questions that carry all three marks, keyed by the arm names this run actually bought.
+ *
+ * A question missing any of the three is excluded rather than defaulted: `false` is a scored wrong answer
+ * for every arm, so a missing mark that became `false` would depress all three rates equally and shrink
+ * the denominator the share divides by — a silent change to the population rather than a refusal.
+ */
+export function widthCases(
+  rows: readonly {
+    readonly id: string | number | null | undefined;
+    readonly marks: Readonly<Record<string, boolean>> | undefined;
+  }[],
+  arms: WidthArmNames,
+): readonly WidthCase[] {
+  const cases: WidthCase[] = [];
+  for (const row of rows) {
+    if (row.id === null || row.id === undefined) continue;
+    const marks = row.marks;
+    if (marks === undefined) continue;
+    const first = marks[arms.first];
+    const selected = marks[arms.selected];
+    const oracle = marks[arms.oracle];
+    if (first === undefined || selected === undefined || oracle === undefined) continue;
+    cases.push({ id: String(row.id), first, selected, oracle });
+  }
+  return cases;
+}

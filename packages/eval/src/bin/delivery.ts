@@ -39,7 +39,10 @@ await writeResult({
     'A real HTTP receiver on loopback verifies an HMAC over the posted bytes, stores by event id and de-duplicates; the sender is the library\'s own WebhookDispatcher.',
     'The receiver stores the first request and then loses the acknowledgement, so the retry has to carry the same id: one repeat, one stored event, zero missed. A sender with random ids would have shown two stored events instead.',
     'One request is answered 250 ms late on purpose. The slowest delivery has to move past it, or a stopwatch stuck at zero would pass the latency gate.',
-    `p95 is ${report.metrics.p95Ms} ms on loopback. The contract's 60 s is a ceiling this lane cannot stress — it reports the floor and inherits the bound rather than proving it.`,
+    // The measured round trip is a loopback floor on whichever machine ran this lane, so it is the one
+    // number here that is not a claim about the code: `writeJson` moves it to the volatile sidecar and
+    // the sentence says why rather than quoting a value that changes with the host.
+    "The round trip this lane measures is a loopback floor on the machine that ran it, so it is recorded beside the artefact rather than in it. The contract's 60 s is a ceiling this lane cannot stress — it reports the floor and inherits the bound rather than proving it.",
     'Event types are derived from store transitions (admitted, rewritten, retired); task.completed is built from the record the host holds when it closes a task, because the task table is the host\'s.',
   ],
 });

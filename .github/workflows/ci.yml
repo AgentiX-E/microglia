@@ -885,6 +885,14 @@ jobs:
           POC_RESULT_DIR="${RUNNER_TEMP}/coupling" pnpm eval:coupling
           node scripts/check-coupling-ledger.mjs "${RUNNER_TEMP}/coupling"
 
+      - name: No artefact shipped a wall clock or a host timing
+        # `pnpm check` runs every lane, so every lane rewrites its committed artefact. Six of them
+        # carried `ranAt` or a per-arm latency, which made the gate dirty the tree on every run and
+        # once put 279 lines of a sandbox's p50/p95 inside an experiment's commit. `writeJson` strips
+        # them now; this refuses the ones that arrive another way -- a hand-edited file, a lane with
+        # its own writer, a new field invented in the shape of the old ones.
+        run: pnpm eval:claim-check
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

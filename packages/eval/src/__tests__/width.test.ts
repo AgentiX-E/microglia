@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { sharedCases, widthShare, type WidthCase } from '../width.js';
+import {
+  DEFAULT_SELECTED_ARM,
+  selectedArmProblem,
+  sharedCases,
+  widthArguments,
+  widthCases,
+  widthShare,
+  type WidthCase,
+} from '../width.js';
 
 const row = (id: string, first: boolean, selected: boolean, oracle: boolean): WidthCase => ({
   id,
@@ -126,5 +134,111 @@ describe('sharedCases', () => {
     // The case R68's Amendment 1 is guarding: a share computed across two populations would compare a
     // selector on one set of questions against a ceiling on another.
     expect(sharedCases([row('a', true, true, true)], [row('z', true, true, true)])).toEqual([]);
+  });
+});
+
+describe('widthArguments', () => {
+  it('takes the defaults when the caller says nothing', () => {
+    // The historical invocation: no `--bird`, so the CLI falls back to `chooseArtefact`, and the middle
+    // arm is the one R67, R68 and R70 all bought.
+    expect(widthArguments([])).toEqual({
+      bird: null,
+      with: null,
+      selected: { arm: DEFAULT_SELECTED_ARM, explicit: false },
+    });
+  });
+
+  it('reads all three flags, in any order', () => {
+    expect(widthArguments(['--selected', 'sample-5-assert', '--with', 'b.json', '--bird', 'a.json'])).toEqual({
+      bird: 'a.json',
+      with: 'b.json',
+      selected: { arm: 'sample-5-assert', explicit: true },
+    });
+  });
+
+  it('distinguishes a named arm from the default', () => {
+    // The distinction is load-bearing: a *named* arm is checked against what the artefact bought, and the
+    // default is not, so `explicit` has to survive the parse rather than be recomputed from equality —
+    // naming `sample-5-exec` on purpose must still refuse an artefact that never ran it.
+    expect(widthArguments(['--selected', DEFAULT_SELECTED_ARM]).selected).toEqual({
+      arm: DEFAULT_SELECTED_ARM,
+      explicit: true,
+    });
+  });
+
+  it('refuses a flag it does not understand instead of falling back to a directory scan', () => {
+    // `pool.ts` accepted `--bird`, ignored it and described a different file. Guessing is the defect.
+    expect(() => widthArguments(['--arm', 'x'])).toThrow(/unrecognised argument --arm/);
+    expect(() => widthArguments(['a.json'])).toThrow(/unrecognised argument a.json/);
+  });
+
+  it('refuses a flag whose value is the next flag', () => {
+    // `--bird --with b.json` would otherwise read a path called `--with` and silently drop `b.json`.
+    expect(() => widthArguments(['--bird', '--with', 'b.json'])).toThrow(/--bird needs a path/);
+    expect(() => widthArguments(['--selected'])).toThrow(/--selected needs an arm name/);
+  });
+
+  it('refuses a flag given twice, because two answers are not one', () => {
+    expect(() => widthArguments(['--bird', 'a.json', '--bird', 'b.json'])).toThrow(/--bird given twice/);
+    expect(() => widthArguments(['--with', 'a.json', '--with', 'b.json'])).toThrow(/--with given twice/);
+    expect(() => widthArguments(['--selected', 'x', '--selected', 'y'])).toThrow(/--selected given twice/);
+  });
+});
+
+describe('selectedArmProblem', () => {
+  it('accepts an arm the artefact bought', () => {
+    expect(selectedArmProblem('sample-5-assert', ['sample-5-first', 'sample-5-assert'])).toBeNull();
+  });
+
+  it('names what the artefact bought instead of only what it lacked', () => {
+    expect(selectedArmProblem('sample-5-assert', ['sample-5-exec'])).toBe(
+      "this artefact did not buy 'sample-5-assert'; it bought sample-5-exec",
+    );
+  });
+
+  it('says so when the artefact records no arms at all', () => {
+    // An older artefact has no `config.arms`; the message has to stay a sentence rather than end in a
+    // colon and nothing.
+    expect(selectedArmProblem('x', [])).toBe("this artefact did not buy 'x'; it bought nothing recorded");
+  });
+});
+
+describe('widthCases', () => {
+  const arms = { first: 'sample-5-first', selected: 'sample-5-assert', oracle: 'sample-5-oracle' };
+
+  it('keys the three marks by the arm names this run bought', () => {
+    const cases = widthCases(
+      [
+        {
+          id: 'q1',
+          marks: { 'sample-5-first': false, 'sample-5-assert': true, 'sample-5-oracle': true },
+        },
+      ],
+      arms,
+    );
+    expect(cases).toEqual([{ id: 'q1', first: false, selected: true, oracle: true }]);
+  });
+
+  it('drops a question that is missing any of the three rather than reading it as wrong', () => {
+    // `false` is a scored wrong answer for every arm, so defaulting a missing mark would depress all
+    // three rates equally and shrink the denominator the share divides by.
+    const cases = widthCases(
+      [
+        { id: 'q1', marks: { 'sample-5-first': true, 'sample-5-oracle': true } },
+        { id: 'q2', marks: { 'sample-5-first': true, 'sample-5-assert': true } },
+        { id: 'q3', marks: { 'sample-5-assert': true, 'sample-5-oracle': true } },
+        { id: 'q4', marks: undefined },
+        { id: null, marks: { 'sample-5-first': true, 'sample-5-assert': true, 'sample-5-oracle': true } },
+        { id: 'q5', marks: { 'sample-5-first': true, 'sample-5-assert': true, 'sample-5-oracle': true } },
+      ],
+      arms,
+    );
+    expect(cases.map((entry) => entry.id)).toEqual(['q5']);
+  });
+
+  it('keeps the artefact ordering and stringifies numeric ids', () => {
+    const marks = { 'sample-5-first': true, 'sample-5-assert': true, 'sample-5-oracle': true };
+    const cases = widthCases([{ id: 7, marks }, { id: 3, marks }], arms);
+    expect(cases.map((entry) => entry.id)).toEqual(['7', '3']);
   });
 });

@@ -8,17 +8,29 @@
  *   pnpm eval:width-share                                   # the artefact `chooseArtefact` picks
  *   pnpm eval:width-share --bird a.json                     # one artefact
  *   pnpm eval:width-share --bird a.json --with b.json        # intersect with a second artefact
+ *   pnpm eval:width-share --bird a.json --selected sample-5-assert
  *
  * The `--with` form exists because R68's Amendment 1 requires it: the readback intersects this run's
  * question ids with R67's **before computing anything**, so a question one run lost to a provider failure
  * cannot make the selector and the ceiling numbers refer to different populations.
+ *
+ * `--selected` exists because R80 buys `sample-5-assert` instead of `sample-5-exec`: the first and oracle
+ * arms keep their names, the middle one does not, and a reading hard-coded to `exec` would have reported
+ * a ceiling with an arm that dispatch never ran.
  *
  * Arms are read off the artefact by name, not assumed to exist. Every reading names the arms it found and
  * the ones it did not, because a share computed from a missing arm would be a number about two arms
  * wearing a third's name.
  */
 import { readFileSync } from 'node:fs';
-import { sharedCases, widthShare, type WidthCase } from '@agentix-e/microglia-eval';
+import {
+  selectedArmProblem,
+  sharedCases,
+  widthArguments,
+  widthCases,
+  widthShare,
+  type WidthCase,
+} from '@agentix-e/microglia-eval';
 import { birdArtefactPath } from './lib.js';
 
 type Row = {
@@ -32,54 +44,51 @@ type Artefact = {
   readonly config?: { readonly arms?: readonly string[] };
 };
 
-/** The three arms a width dispatch buys, by the name the artefact uses. */
-const SELECTED = 'sample-5-exec';
+/** The two arms a width dispatch always buys under these names, whatever the selector is called. */
 const FIRST = 'sample-5-first';
 const ORACLE = 'sample-5-oracle';
 
-function read(path: string): { readonly cases: readonly WidthCase[]; readonly arms: readonly string[] } {
+function read(
+  path: string,
+  selectedArm: string,
+): { readonly cases: readonly WidthCase[]; readonly arms: readonly string[] } {
   const artefact = JSON.parse(readFileSync(path, 'utf8')) as Artefact;
   const arms = artefact.config?.arms ?? [];
-  const cases: WidthCase[] = [];
-  for (const row of artefact.per_case) {
-    const id = row.questionId ?? row.id;
-    if (id === null || id === undefined) continue;
-    const marks = row.arms;
-    if (marks === undefined) continue;
-    const first = marks[FIRST];
-    const selected = marks[SELECTED];
-    const oracle = marks[ORACLE];
-    // A question missing any of the three is excluded rather than defaulted: `false` is a scored wrong
-    // answer for every arm, so a missing mark that became `false` would depress all three rates equally
-    // and shrink the denominator that the share divides by.
-    if (first === undefined || selected === undefined || oracle === undefined) continue;
-    cases.push({ id: String(id), first, selected, oracle });
-  }
-  return { cases, arms };
+  const rows = artefact.per_case.map((row) => ({ id: row.questionId ?? row.id, marks: row.arms }));
+  return { cases: widthCases(rows, { first: FIRST, selected: selectedArm, oracle: ORACLE }), arms };
 }
 
 function main(argv: readonly string[]): number {
-  const at = argv.indexOf('--bird');
-  const path = at === -1 ? birdArtefactPath() : (argv[at + 1] ?? birdArtefactPath());
-  const withAt = argv.indexOf('--with');
-  const primary = read(path);
+  let args;
+  try {
+    args = widthArguments(argv);
+  } catch (error) {
+    process.stdout.write(`[width] ${error instanceof Error ? error.message : String(error)}\n`);
+    return 1;
+  }
+  const path = args.bird ?? birdArtefactPath();
+  const { arm, explicit } = args.selected;
+  const primary = read(path, arm);
+
+  // A named arm the artefact never bought is the caller's mistake and is reported as one, before any
+  // number is printed: the alternative is a reading that divides by an arm with no marks at all.
+  const problem = explicit ? selectedArmProblem(arm, primary.arms) : null;
+  if (problem !== null) {
+    process.stdout.write(`[width] ${problem}\n`);
+    return 1;
+  }
 
   if (primary.cases.length === 0) {
     process.stdout.write(
-      `[width] ${path}: no question carries all three of ${FIRST}, ${SELECTED}, ${ORACLE}\n` +
+      `[width] ${path}: no question carries all three of ${FIRST}, ${arm}, ${ORACLE}\n` +
         `[width] arms this artefact bought: ${primary.arms.join(', ') || 'none recorded'}\n`,
     );
     return 1;
   }
 
   let cases = primary.cases;
-  if (withAt !== -1) {
-    const other = argv[withAt + 1];
-    if (other === undefined) {
-      process.stdout.write('[width] --with needs a path\n');
-      return 1;
-    }
-    const between = read(other);
+  if (args.with !== null) {
+    const between = read(args.with, arm);
     cases = sharedCases(primary.cases, between.cases);
     process.stdout.write(
       `[width] intersection ${cases.length} of ${primary.cases.length} and ${between.cases.length}\n`,
@@ -93,8 +102,9 @@ function main(argv: readonly string[]): number {
   const reading = widthShare(cases);
   const pct = (value: number): string => value.toFixed(2);
   process.stdout.write(
-    `[width] ${cases.length} question(s): first ${pct(reading.first * 100)}%, ` +
-      `selected ${pct(reading.selected * 100)}%, oracle ${pct(reading.oracle * 100)}%\n` +
+    `[width] ${cases.length} question(s)${explicit ? `, selected = ${arm}` : ''}: ` +
+      `first ${pct(reading.first * 100)}%, selected ${pct(reading.selected * 100)}%, ` +
+      `oracle ${pct(reading.oracle * 100)}%\n` +
       `[width] ceiling ${pct(reading.ceilingPp)}pp, captured ${pct(reading.capturedPp)}pp\n`,
   );
   if (reading.share === null) {
@@ -111,7 +121,9 @@ function main(argv: readonly string[]): number {
   if (reading.share !== null && reading.interval !== null) {
     const { low, high } = reading.interval;
     const verdict = low > 0 ? 'CAPTURED' : high < 0 ? 'NEGATIVE' : 'INCONCLUSIVE';
-    process.stdout.write(`[width] verdict ${verdict}: the interval ${low > 0 ? 'excludes' : high < 0 ? 'lies below' : 'covers'} zero\n`);
+    process.stdout.write(
+      `[width] verdict ${verdict}: the interval ${low > 0 ? 'excludes' : high < 0 ? 'lies below' : 'covers'} zero\n`,
+    );
   }
   return 0;
 }

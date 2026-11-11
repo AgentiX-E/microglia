@@ -1,7 +1,6 @@
 {
   "id": "poc-llm-distill",
   "title": "LLM distillation: free-text feedback to scoped lesson",
-  "ranAt": "2026-10-20T02:36:14.845Z",
   "model": "deepseek-chat",
   "n": 24,
   "calls": 24,

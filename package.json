@@ -22,7 +22,7 @@
     "test": "vitest run --coverage",
     "test:unit": "vitest run",
     "bench": "pnpm build && node packages/eval/dist/bench/run.js",
-    "check": "pnpm typecheck && pnpm typecheck:lanes && pnpm test && pnpm audit:repo && pnpm eval:power && pnpm eval:integrity && pnpm eval:memform && pnpm eval:l0 && pnpm eval:pairs && pnpm eval:delivery && pnpm eval:protocol && pnpm eval:query-diff && pnpm eval:mediation && pnpm eval:stability && pnpm eval:feature-overlap && pnpm eval:rule-form && pnpm eval:referent && pnpm eval:out-of-sample && pnpm eval:validity && pnpm eval:admission && pnpm eval:ledger && pnpm eval:pack-assign && pnpm eval:lexicon && pnpm eval:frontier && pnpm eval:resolution && pnpm eval:coupling-check && pnpm eval:verifiers && pnpm eval:arm-coverage && pnpm bench && pnpm bundle:size && pnpm bundle:size -- --probe",
+    "check": "pnpm typecheck && pnpm typecheck:lanes && pnpm test && pnpm audit:repo && pnpm eval:power && pnpm eval:integrity && pnpm eval:memform && pnpm eval:l0 && pnpm eval:pairs && pnpm eval:delivery && pnpm eval:protocol && pnpm eval:query-diff && pnpm eval:mediation && pnpm eval:stability && pnpm eval:feature-overlap && pnpm eval:rule-form && pnpm eval:referent && pnpm eval:out-of-sample && pnpm eval:validity && pnpm eval:admission && pnpm eval:ledger && pnpm eval:pack-assign && pnpm eval:lexicon && pnpm eval:frontier && pnpm eval:resolution && pnpm eval:coupling-check && pnpm eval:claim-check && pnpm eval:verifiers && pnpm eval:arm-coverage && pnpm bench && pnpm bundle:size && pnpm bundle:size -- --probe",
     "eval:llm-reader": "tsx packages/eval/src/bin/llm-reader.ts",
     "eval:llm-distill": "tsx packages/eval/src/bin/llm-distill.ts",
     "eval:embedding": "tsx packages/eval/src/bin/embedding.ts",
@@ -99,6 +99,7 @@
     "eval:stability": "tsx packages/eval/src/bin/gate-stability.ts",
     "eval:inert": "tsx packages/eval/src/bin/inert.ts",
     "eval:width-share": "tsx packages/eval/src/bin/width-share.ts",
+    "eval:claim-check": "tsx packages/eval/src/bin/claim-check.ts",
     "eval:coupling-check": "POC_RESULT_DIR=.cache/coupling pnpm eval:coupling && node scripts/check-coupling-ledger.mjs .cache/coupling"
   },
   "devDependencies": {

@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseSilencePlan } from '../inert.js';
 import { OPTIONAL_ARMS, samplingSpecOf } from '../sota.js';
+import { DEFAULT_SELECTED_ARM } from '../width.js';
 import {
   armsAgainstRegistration,
   essentialArms,
@@ -916,6 +917,15 @@ describe('the scale registration', () => {
     // and therefore scores the same 1,534 questions the published cell was measured on.
     expect(reading.prereg?.offset ?? 0).toBe(0);
     expect(populationAgainstRegistration(reading.prereg, 1534, 0).ok).toBe(true);
+  });
+
+  it('names an arm the width reading does not default to', () => {
+    // The share R67, R68 and R70 reported divided by `sample-5-exec`. R80's middle arm is a written
+    // reader, so `eval:width-share` has to be told which arm to divide by; a reading stuck on the default
+    // would have printed a ceiling for an arm this dispatch never bought, which is the wrong-file defect
+    // one flag over.
+    expect(reading.prereg?.arms ?? []).not.toContain(DEFAULT_SELECTED_ARM);
+    expect(reading.prereg?.arms).toContain('sample-5-assert');
   });
 
   it('buys a population that can separate the AUC it is looking for', () => {

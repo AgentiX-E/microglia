@@ -6,7 +6,7 @@
  * Nothing here is imported by a published package.
  */
 import { existsSync } from 'node:fs';
-import { attemptTimeoutMs, chooseArtefact, retryAfterMs } from '@agentix-e/microglia-eval';
+import { attemptTimeoutMs, chooseArtefact, retryAfterMs, splitClaim } from '@agentix-e/microglia-eval';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
@@ -344,8 +344,14 @@ export async function writeJson(id: string, value: unknown): Promise<void> {
   // The committed artefact lives in the repository; a self-check run redirects it
   // so a CI gate can exercise a lane without overwriting the evidence it ships.
   const dir = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 'results');
-  await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, `${id}${resultSuffix()}.json`), `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  await mkdir(join(dir, '.volatile'), { recursive: true });
+  // What is committed is the claim. The hour and the host go beside it, uncommitted: `pnpm check`
+  // runs every lane, so an artefact carrying either one made the gate dirty the tree on every run and
+  // once put 279 lines of a sandbox's latency inside an experiment's commit.
+  const { claim, volatile } = splitClaim(value);
+  const name = `${id}${resultSuffix()}.json`;
+  await writeFile(join(dir, name), `${JSON.stringify(claim, null, 2)}\n`, 'utf8');
+  await writeFile(join(dir, '.volatile', name), `${JSON.stringify(volatile, null, 2)}\n`, 'utf8');
 }
 
 export async function writeResult(result: PocResult): Promise<void> {

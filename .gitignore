@@ -15,3 +15,7 @@ bench/results/*.md
 
 # Dataset cache for the public benchmark lane
 .cache/
+
+# The hour and the host: written beside every artefact, never committed
+eval/results/.volatile/
+bench/results/.volatile/

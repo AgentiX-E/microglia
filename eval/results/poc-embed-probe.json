@@ -1,7 +1,6 @@
 {
   "id": "poc-embed-probe",
   "title": "Is semantic similarity a relevance signal where lexical overlap is none?",
-  "ranAt": "2026-10-24T14:26:56.947Z",
   "source": "eval/results/poc-sota-bird.json",
   "model": "embedding-3",
   "n": 148,

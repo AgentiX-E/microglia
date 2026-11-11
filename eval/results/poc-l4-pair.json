@@ -1,16 +1,13 @@
 {
   "id": "poc-l4-pair",
   "title": "L4 — memory arm against the reference arm on one split, paired per task",
-  "ranAt": "2026-11-01T04:22:16.049Z",
   "domain": "retail",
   "first": {
     "path": "eval/results/history/l4-arm-reference-67.json",
-    "ranAt": "2026-10-25T03:43:49.150Z",
     "pass4": 0.5147058823529411
   },
   "second": {
     "path": "eval/results/history/l4-arm-memory-67.json",
-    "ranAt": "2026-10-25T02:49:19.560Z",
     "pass4": 0.5294117647058824
   },
   "comparison": {
