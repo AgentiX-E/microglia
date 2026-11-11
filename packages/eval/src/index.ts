@@ -186,6 +186,7 @@ export {
   type ArtifactPoolCandidate,
   type ArtifactPoolCase,
 } from './artifact-pool.js';
+export { artefactArgument } from './artefact-arg.js';
 export {
   poolReport,
   type PoolReport,

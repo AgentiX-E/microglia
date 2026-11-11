@@ -16,7 +16,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { contentPopulation, contentReadings } from '@agentix-e/microglia-eval';
-import { poolFromArtifact, poolReport, type ArtifactPoolCase } from '@agentix-e/microglia-eval';
+import { artefactArgument, poolFromArtifact, poolReport, type ArtifactPoolCase } from '@agentix-e/microglia-eval';
 import { birdArtefactPath } from './lib.js';
 
 type Artifact = {
@@ -28,8 +28,11 @@ type Artifact = {
 const RESULTS = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 'results');
 
 function main(): void {
+  // `--bird <path>` names the artefact this reading is of. Before this line the flag was accepted by the
+  // shell and ignored here, so `pnpm eval:pool --bird r68.json` reported on the newest file in the results
+  // directory — "this artefact predates the pool field" — about a run nobody had pointed at.
   const artifact = JSON.parse(
-    readFileSync(birdArtefactPath(), 'utf8'),
+    readFileSync(artefactArgument(process.argv.slice(2), birdArtefactPath), 'utf8'),
   ) as Artifact;
   const { questions, draws, recorded } = poolFromArtifact(
     artifact.per_case,
