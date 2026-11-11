@@ -70,6 +70,7 @@ import {
   backboneProblem,
   populationAgainstRegistration,
   readPrereg,
+  thinkingProblem,
 } from '../prereg.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -552,12 +553,50 @@ const MODEL = process.env['SOTA_MODEL'] ?? 'deepseek-flash';
  * default. `on` is still reachable from `SOTA_THINKING`, and it costs `THINKING_HEADROOM` more
  * completion tokens per call through `answerBudget`, which is what makes it measurable rather than
  * silently truncating.
+ *
+ * R84 is the registration that makes the switch a variable rather than a setting, and it found this
+ * arrangement in the shape R68 closed for the model: `SOTA_THINKING` is a **repository variable**, so one
+ * experiment's regime is every queued dispatch's regime and two regimes cannot be run side by side. The
+ * dispatch menu is full at twenty-five inputs, so the registration's header is where the regime lives —
+ * a property of the experiment, read before the first call. `null` here means the variable was never
+ * set, which is not a second opinion; a **stated** disagreement with the header is refused by
+ * `thinkingProblem`, so neither representation can overwrite the other in silence.
  */
-const THINKING = ((): 'off' | 'on' => {
+const THINKING_ENV: 'off' | 'on' | null = ((): 'off' | 'on' | null => {
   const raw = (process.env['SOTA_THINKING'] ?? '').trim().toLowerCase();
-  if (raw === '' || raw === 'off' || raw === 'disabled' || raw === 'false') return 'off';
+  if (raw === '') return null;
+  if (raw === 'off' || raw === 'disabled' || raw === 'false') return 'off';
   if (raw === 'on' || raw === 'enabled' || raw === 'true') return 'on';
   throw new Error(`SOTA_THINKING must be empty, off or on; got '${raw}'`);
+})();
+
+/**
+ * The regime the registration fixes, if it fixes one.
+ *
+ * A header that cannot be read is not this function's failure to report: `populationAgainstPrereg` and
+ * `armsAgainstPrereg` both refuse an unreadable registration at the top of the run, and this check runs
+ * before them only because the completion budget depends on it. Silence here therefore means "the file
+ * says nothing", not "the file was fine".
+ */
+function declaredThinking(prereg: string): 'off' | 'on' | undefined {
+  if (prereg === '') return undefined;
+  const path = `prereg/${prereg}.md`;
+  if (!existsSync(path)) return undefined;
+  const reading = readPrereg(readFileSync(path, 'utf8'), path);
+  return reading.prereg?.thinking;
+}
+
+const THINKING: 'off' | 'on' = ((): 'off' | 'on' => {
+  const declared = declaredThinking(PREREG);
+  const problem = thinkingProblem(THINKING_ENV, declared);
+  if (problem !== undefined) {
+    throw new MicrogliaError('MG_E_CONFIG', problem, {
+      prereg: `prereg/${PREREG}.md`,
+      declaredThinking: declared ?? '',
+      configuredThinking: THINKING_ENV ?? '',
+    });
+  }
+  return THINKING_ENV ?? declared ?? 'off';
 })();
 
 /**

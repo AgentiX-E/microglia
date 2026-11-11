@@ -748,6 +748,12 @@ jobs:
           # at the output rate and is invisible in every field except a count nothing was reading, so
           # the `off` switch is available from here and the usage line reports the reasoning share —
           # the decision is taken on a number rather than on an assumption about either direction.
+          #
+          # R84 moved the regime out of this variable and into the registration's header, which the lane
+          # reads before its first call. An empty value here therefore means "the file decides", and a
+          # stated value that disagrees with the file is refused by the lane instead of one of the two
+          # overwriting the other in silence — the same arrangement `backbone` has, and for the same
+          # reason: a variable is one experiment's setting applied to every queued dispatch.
           SOTA_THINKING: ${{ vars.SOTA_THINKING || '' }}
           # From the registration, so the number that sizes the run and the number the run reports
           # are one fact. A dispatch that types a different one still wins here and is refused by the

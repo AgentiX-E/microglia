@@ -288,3 +288,35 @@ describe('a plan that was never sent to the model is not scored', () => {
     expect(later).toBeLessThan(judgeLoop);
   });
 });
+
+describe('the thinking regime is the registration\'s, and the artefact says which one ran', () => {
+  const { file, source: text } = parse();
+
+  it('derives the regime from the header rather than from the variable alone', () => {
+    // R84's claim is that one variable moved, and the regime is the one it held fixed. A lane that ran
+    // the variable's value while the file said the other thing would publish a number about a different
+    // experiment under the registration's name, and nothing in the artefact would contradict it: the
+    // `thinking` field would simply report what the variable held.
+    const derived = declarationOf(file, 'THINKING');
+    expect(derived).toBeDefined();
+    const body = derived?.node.getText(file) ?? '';
+    expect(body).toContain('declaredThinking(PREREG)');
+    expect(body).toContain('thinkingProblem(THINKING_ENV, declared)');
+    expect(body).toContain('return THINKING_ENV ?? declared ?? \'off\';');
+  });
+
+  it('reads the header before the budget it decides', () => {
+    // `answerBudget` adds the thinking headroom, so a regime discovered after the budget is computed
+    // would produce 700 tokens for a run that thinks and truncate every answer it was meant to protect.
+    expect(text.indexOf('const THINKING:')).toBeLessThan(text.indexOf('const COMPLETION_BUDGET ='));
+  });
+
+  it('records the regime it ran, not the one the environment named', () => {
+    const usage = text.indexOf('thinking: THINKING,', text.indexOf('usage: {'));
+    expect(usage).toBeGreaterThan(0);
+    expect(text.slice(usage, usage + 40)).toContain('thinking: THINKING,');
+    // The raw variable is never what the run reports: an unset variable is `null` and the artefact has
+    // no such value, and a set one that the header overruled would be a different run's regime.
+    expect(text).not.toContain('thinking: THINKING_ENV');
+  });
+});

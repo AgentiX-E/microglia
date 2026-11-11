@@ -142,6 +142,20 @@ export type Prereg = {
    * thereby wrong, and a dispatch that states none is checked against nothing.
    */
   readonly split?: string;
+  /**
+   * Whether this registration's dispatch asks the model to think.
+   *
+   * R84 asks a question the record cannot answer without it: R82 measured the expensive backbone 6.00pp
+   * **below** the cheap one on the same 350 questions, paired, and the only regime it held fixed is this
+   * switch. `SOTA_THINKING` is a **repository variable**, which is the shape R68 closed for the model —
+   * one registration's setting is every queued dispatch's setting, and two regimes cannot be run side by
+   * side. The dispatch menu is full at twenty-five inputs, so the header is where the regime belongs:
+   * a property of the experiment, read before the first call, and refused if the variable disagrees with
+   * it rather than silently preferred by either.
+   *
+   * Absent means the variable decides, which is what every registration before R84 is.
+   */
+  readonly thinking?: 'on' | 'off';
   /** One bullet per prediction: a claim that can be checked against the artefact. */
   readonly prediction: readonly string[];
   /** One bullet per condition under which the stage is abandoned. */
@@ -185,6 +199,7 @@ const HEADER_KEYS = [
   'offset',
   'backbone',
   'split',
+  'thinking',
 ] as const;
 
 /**
@@ -497,6 +512,25 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // The thinking regime, which R84 needs and which has no dispatch field to live in.
+  //
+  // Two values and no synonyms. `SOTA_THINKING` accepts `enabled`, `disabled`, `true` and `false`
+  // because a human types it into a variable box once; a header is read by every later dispatch and
+  // compared against that variable, so a declaration spelled four ways is a declaration that cannot be
+  // compared. Refused here rather than at the first call, like every other header value.
+  const thinkingText = values.get('thinking');
+  let thinking: 'on' | 'off' | undefined;
+  if (thinkingText !== undefined) {
+    if (thinkingText !== 'on' && thinkingText !== 'off') {
+      collected.push({
+        where: `header 'thinking'`,
+        problem: `'${thinkingText}' is not on or off`,
+      });
+    } else {
+      thinking = thinkingText;
+    }
+  }
+
   // A plan path is read by the lane, so a path outside the repository is either a typo or a dispatch
   // reading whatever the runner happens to have there. Refused here rather than at read time, because a
   // registration's header is checked before its dispatch spends anything.
@@ -593,6 +627,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(sampleTemperature === undefined ? {} : { sampleTemperature }),
       ...(backbone === undefined ? {} : { backbone }),
       ...(split === undefined ? {} : { split }),
+      ...(thinking === undefined ? {} : { thinking }),
       prediction,
       refutation,
       file,
@@ -874,6 +909,28 @@ export function backboneProblem(
   return (
     `this registration fixes the backbone at '${declared}' and this dispatch would call ` +
     `'${configured}', so the model is not the only variable that moved`
+  );
+}
+
+/**
+ * Refuse a dispatch whose thinking regime is not the one the registration fixed.
+ *
+ * `null` is the environment being unset, which is not a second opinion: an unset `SOTA_THINKING` and
+ * `thinking: on` in the file is one regime, and treating silence as disagreement would make every
+ * dispatch with no variable set refuse the very registration that states what it wants. A **stated**
+ * disagreement is the case this exists for — the repository variable is global, so a setting left behind
+ * by another experiment would otherwise apply to this one in silence, and the artefact would record a
+ * regime the registration never declared as if the registration had.
+ */
+export function thinkingProblem(
+  configured: 'on' | 'off' | null,
+  declared: 'on' | 'off' | undefined,
+): string | undefined {
+  if (declared === undefined || configured === null) return undefined;
+  if (configured === declared) return undefined;
+  return (
+    `this registration fixes the thinking regime at '${declared}' and this dispatch would run ` +
+    `'${configured}', so the regime is not the only variable that moved`
   );
 }
 

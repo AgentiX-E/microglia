@@ -13,6 +13,7 @@ import {
   preregGateAgreement,
   populationAgainstRegistration,
   readPrereg,
+  thinkingProblem,
   unknownSampleArms,
   type Prereg,
 } from '../prereg.js';
@@ -1084,5 +1085,65 @@ describe('backboneProblem', () => {
       "this registration fixes the backbone at 'deepseek-v4-pro' and this dispatch would call " +
         "'deepseek-flash', so the model is not the only variable that moved",
     );
+  });
+});
+
+describe('the thinking regime a registration declares', () => {
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${PREDICTION}${REFUTATION}`;
+  }
+
+  it('reads the regime, because it is a property of the experiment', () => {
+    // R84's claim is that one variable moved and that the regime is the one that was held fixed. The
+    // dispatch menu is full at twenty-five inputs and a repository variable is global, which is the
+    // defect `SOTA_MODEL` and `SOTA_SAMPLE_TEMPERATURE` were both promoted out of — so the header is
+    // the only place the regime can live without becoming a setting for every queued run.
+    expect(readPrereg(withHeader('thinking: on'), 'R8.3-xiyan-cell.md').prereg?.thinking).toBe('on');
+    expect(readPrereg(withHeader('thinking: off'), 'R8.3-xiyan-cell.md').prereg?.thinking).toBe('off');
+  });
+
+  it('leaves every registration that states none on the lane default', () => {
+    expect(readPrereg(VALID, 'R8.3-xiyan-cell.md').prereg?.thinking).toBeUndefined();
+  });
+
+  it('refuses a spelling the lane cannot run', () => {
+    expect(problemsOf(withHeader('thinking: yes'))).toContain(
+      "header 'thinking': 'yes' is not on or off",
+    );
+  });
+
+  it('refuses the synonyms the environment variable accepts, which are not declarations', () => {
+    // `SOTA_THINKING` accepts `enabled`, `disabled`, `true` and `false` because a human types it into a
+    // variable box; a header is read by every later dispatch and a registration that says `enabled` is
+    // a registration whose declaration cannot be compared to the switch the lane runs.
+    expect(problemsOf(withHeader('thinking: enabled'))).toContain(
+      "header 'thinking': 'enabled' is not on or off",
+    );
+  });
+});
+
+describe('thinkingProblem', () => {
+  it('says nothing when the registration pins no regime', () => {
+    expect(thinkingProblem('on', undefined)).toBeUndefined();
+  });
+
+  it('says nothing when the dispatch runs the regime the registration fixed', () => {
+    expect(thinkingProblem('on', 'on')).toBeUndefined();
+    expect(thinkingProblem('off', 'off')).toBeUndefined();
+  });
+
+  it('says nothing when the dispatch names none, because the registration decides', () => {
+    // `null` is the environment being unset, which is not a second opinion. This is the branch R84
+    // relies on: an unset variable and `thinking: on` in the file is one regime, not a disagreement.
+    expect(thinkingProblem(null, 'on')).toBeUndefined();
+    expect(thinkingProblem(null, 'off')).toBeUndefined();
+  });
+
+  it('refuses a run whose regime is not the one the registration fixed', () => {
+    expect(thinkingProblem('off', 'on')).toBe(
+      "this registration fixes the thinking regime at 'on' and this dispatch would run 'off', " +
+        'so the regime is not the only variable that moved',
+    );
+    expect(thinkingProblem('on', 'off')).toContain("fixes the thinking regime at 'off'");
   });
 });
