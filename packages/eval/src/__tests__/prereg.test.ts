@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parseSilencePlan } from '../inert.js';
+import { OPTIONAL_ARMS, samplingSpecOf } from '../sota.js';
 import {
   armsAgainstRegistration,
   essentialArms,
@@ -878,5 +879,51 @@ describe('the pruning registration', () => {
     expect(reading.prereg?.offset).toBe(r78.prereg?.offset);
     expect(reading.prereg?.sample).toBe(r78.prereg?.sample);
     expect(populationAgainstRegistration(reading.prereg, 1900, 2000).ok).toBe(true);
+  });
+});
+
+describe('the scale registration', () => {
+  // R80 is R73's mechanism at the size R73's own arithmetic asks for: 115 eligible questions cannot
+  // separate an AUC of 0.56 from chance, and `dev` is the smallest split that can.
+  const reading = readPrereg(
+    readFileSync('prereg/R80-reader-at-scale.md', 'utf8'),
+    'prereg/R80-reader-at-scale.md',
+  );
+
+  it('parses, and names the control beside the treatment', () => {
+    // The header is the commitment. A file that named only `sample-5-assert` would let a dispatch buy
+    // the treatment without the draw it is measured against, which is R66's lesson recorded as a rule.
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.arms).toEqual(['sample-5-first', 'sample-5-assert']);
+  });
+
+  it('names two arms the lane can build, not two it can only spell', () => {
+    // R67's dispatch died in two seconds on a name the parser could construct and the table had never
+    // been told about. Membership is asked of the table the lane dispatches with, not of a literal.
+    for (const arm of reading.prereg?.arms ?? []) {
+      expect(OPTIONAL_ARMS as readonly string[]).toContain(arm);
+      expect(samplingSpecOf(arm)).toEqual({
+        n: 5,
+        selector: arm === 'sample-5-first' ? 'first' : 'assert',
+      });
+    }
+  });
+
+  it('sizes the split the published dev cell was measured on, so `none` re-buys 57.63%', () => {
+    expect(reading.prereg?.sample).toBe(1534);
+    // Absent rather than `offset: 0`: a header written before R78 says nothing about a start, and
+    // reading that as zero is the parser's job. What matters here is that this register skips nothing
+    // and therefore scores the same 1,534 questions the published cell was measured on.
+    expect(reading.prereg?.offset ?? 0).toBe(0);
+    expect(populationAgainstRegistration(reading.prereg, 1534, 0).ok).toBe(true);
+  });
+
+  it('buys a population that can separate the AUC it is looking for', () => {
+    // R73's own closing arithmetic: eligible questions are 32.9% of the split, 115 was too few to
+    // detect 0.56, and about 500 is enough. A later edit that shrinks the sample has to argue with
+    // this line rather than with a sentence in a file.
+    const eligible = (questions: number): number => Math.floor(questions * 0.329);
+    expect(eligible(350)).toBeLessThan(120);
+    expect(eligible(reading.prereg?.sample ?? 0)).toBeGreaterThanOrEqual(500);
   });
 });
