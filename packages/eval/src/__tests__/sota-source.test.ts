@@ -320,3 +320,32 @@ describe('the thinking regime is the registration\'s, and the artefact says whic
     expect(text).not.toContain('thinking: THINKING_ENV');
   });
 });
+
+describe('the lane role is on the artefact, not only in the documents', () => {
+  const { source: text } = parse();
+
+  it('declares the class that these numbers may be quoted as', () => {
+    // BIRD is the hostile case by S2c. The constant is what makes the classification a property of the
+    // output instead of a convention its reader has to remember — and remembering is what failed: a
+    // report quoted this lane's absolute accuracy beside a leaderboard row three days after the rule
+    // was fixed.
+    expect(text).toContain("const CLAIM_CLASS = 'hostile';");
+    const usage = text.indexOf('claim_class: CLAIM_CLASS,');
+    expect(usage).toBeGreaterThan(0);
+    // It sits in the same object as the model and the regime, because a reader who takes one of those
+    // three without the other two is holding a number about an experiment they cannot identify.
+    expect(usage).toBeGreaterThan(text.indexOf('configured_model: llm.configuredModel,'));
+    expect(usage).toBeLessThan(text.indexOf('max_completion_tokens: COMPLETION_BUDGET,'));
+  });
+
+  it('refuses a registration that claims evidence this lane cannot supply', () => {
+    const call = text.indexOf('laneRoleProblem(reading.prereg.lane');
+    expect(call).toBeGreaterThan(0);
+    // The split is the fact the refusal turns on: a BIRD split means no recurrence, and a claim of
+    // product or transfer evidence on it is a claim about experience measured where nothing recurs.
+    expect(text.slice(call, call + 120)).toContain('split: SPLIT_NAME');
+    // Refused before the first model call, like every other header check: the block that runs this is
+    // the one that already reads the registration for its backbone, and it is module scope.
+    expect(call).toBeLessThan(text.indexOf('await askPlanned('));
+  });
+});

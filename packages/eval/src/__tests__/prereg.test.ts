@@ -8,6 +8,7 @@ import {
   backboneProblem,
   essentialArms,
   facadePairSwitch,
+  laneRoleProblem,
   plantedArmMatrix,
   preregGate,
   preregGateAgreement,
@@ -1145,5 +1146,88 @@ describe('thinkingProblem', () => {
         'so the regime is not the only variable that moved',
     );
     expect(thinkingProblem('on', 'off')).toContain("fixes the thinking regime at 'off'");
+  });
+});
+
+describe('the lane role, as a header field', () => {
+  const HEADER = [
+    '---',
+    'id: R85-lane-role',
+    'step: R85',
+    'opened: 2026-11-11',
+    'arms: sample-5-first',
+    'sample: 350',
+    'gates: V1,V2',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '\n## Prediction\n\n- **one claim that is long enough to count as a claim here.**\n' +
+    '\n## Refutation\n\n- **Void** — the first branch, long enough to count as a claim.\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads the role', () => {
+    const reading = readPrereg(withHeader('lane: hostile'), 'R85-lane-role.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.lane).toBe('hostile');
+  });
+
+  it('leaves it absent when the header does not name one', () => {
+    const reading = readPrereg(withHeader('split: dev'), 'R85-lane-role.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.lane).toBeUndefined();
+  });
+
+  it('refuses a role outside the three, and the capitalised form of one', () => {
+    expect(readPrereg(withHeader('lane: sota'), 'R85-lane-role.md').problems).toEqual([
+      { where: "header 'lane'", problem: "'sota' is not one of product, transfer or hostile" },
+    ]);
+    expect(readPrereg(withHeader('lane: Product'), 'R85-lane-role.md').problems).toHaveLength(1);
+  });
+});
+
+describe('laneRoleProblem', () => {
+  it('says nothing when the registration does not declare a role', () => {
+    // Absent is every registration written before S2c, and forty of them are BIRD cells whose role the
+    // split already fixes. Refusing them would be a migration, not a check.
+    expect(laneRoleProblem(undefined, { split: 'dev' })).toBeUndefined();
+    expect(laneRoleProblem(undefined, { split: 'test', tau2Domain: 'retail' })).toBeUndefined();
+  });
+
+  it('accepts the three roles on the lanes they belong to', () => {
+    expect(laneRoleProblem('hostile', { split: 'dev' })).toBeUndefined();
+    expect(laneRoleProblem('hostile', { split: 'minidev' })).toBeUndefined();
+    expect(laneRoleProblem('product', { split: 'test', tau2Domain: 'retail' })).toBeUndefined();
+    expect(laneRoleProblem('transfer', { split: 'test', tau2Domain: 'airline' })).toBeUndefined();
+  });
+
+  it('refuses a product or transfer claim on the hostile lane', () => {
+    // This is the check that would have stopped the iteration before last. S2c forbade quoting BIRD's
+    // absolute EX beside a leaderboard row on 2026-11-08; three days later a report still did it, and
+    // nothing in the machinery could have objected, because the role only existed in prose.
+    expect(laneRoleProblem('product', { split: 'dev' })).toBe(
+      "this registration claims 'product' evidence on the 'dev' split, and that split is the hostile " +
+        'case: BIRD questions never recur, so a lift measured there is not a lift from experience',
+    );
+    expect(laneRoleProblem('transfer', { split: 'minidev' })).toContain("claims 'transfer' evidence");
+    expect(laneRoleProblem('product', { split: 'train' })).toContain('never recur');
+  });
+
+  it('allows a tau2 registration that also names a split, because the domain decides the lane', () => {
+    // The lane's τ² driver takes `train` and `test` as its split names, so `split` alone cannot say
+    // which scenario ran. A declared domain does, and the check does not overreach into policing the
+    // τ² roles: same-domain is product, cross-domain is transfer, and both are legible from the domain.
+    expect(laneRoleProblem('product', { split: 'train', tau2Domain: 'retail' })).toBeUndefined();
+    expect(laneRoleProblem('hostile', { split: 'test', tau2Domain: 'airline' })).toBeUndefined();
+  });
+
+  it('refuses the word for the role rather than a synonym for it', () => {
+    expect(laneRoleProblem('sota', { split: 'dev' })).toBe(
+      "header 'lane': 'sota' is not product, transfer or hostile",
+    );
+    expect(laneRoleProblem('Product', { split: 'dev' })).toContain('is not product, transfer or hostile');
   });
 });

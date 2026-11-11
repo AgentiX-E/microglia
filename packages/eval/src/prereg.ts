@@ -143,6 +143,19 @@ export type Prereg = {
    */
   readonly split?: string;
   /**
+   * Which lane this registration is allowed to speak from: `product`, `transfer` or `hostile`.
+   *
+   * S2c fixed the partition on 2026-11-08 — τ² same-domain carries product evidence, τ² cross-domain
+   * carries a transfer reading, and BIRD carries the hostile case and may be quoted for its negative
+   * delta and its exchange-rate arithmetic and nothing else. That decision lived only in prose, and
+   * three days later a report quoted BIRD's absolute accuracy beside a leaderboard row anyway. A rule
+   * that nothing can object to is a note; this field is what makes it a check.
+   *
+   * Absent means every registration written before the field, which is most of them: the split already
+   * fixes BIRD's role, and refusing the backlog would be a migration rather than a guard.
+   */
+  readonly lane?: string;
+  /**
    * Whether this registration's dispatch asks the model to think.
    *
    * R84 asks a question the record cannot answer without it: R82 measured the expensive backbone 6.00pp
@@ -199,6 +212,7 @@ const HEADER_KEYS = [
   'offset',
   'backbone',
   'split',
+  'lane',
   'thinking',
 ] as const;
 
@@ -211,6 +225,16 @@ const HEADER_KEYS = [
  * call of a paid dispatch, which is the class of check this file exists to move earlier.
  */
 const HEADER_SPLITS: ReadonlySet<string> = new Set(['minidev', 'dev', 'train']);
+
+/**
+ * The three roles S2c assigns, and the only three a header may name.
+ *
+ * No synonyms, for the reason `thinking` has none: a header is read by every later dispatch and
+ * compared against a rule, so a role spellable as `sota` or `leaderboard` or `Product` is a role that
+ * cannot be compared. The member order is the order of the S2c table, product first.
+ */
+const HEADER_LANES: ReadonlySet<string> = new Set(['product', 'transfer', 'hostile']);
+const LANE_LIST = 'product, transfer or hostile';
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
 /** A bullet has to carry a claim; ten characters is a draft marker with punctuation. */
@@ -512,6 +536,21 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // Which lane may quote this run. Read here rather than inferred at report time because the report
+  // is written by whoever is holding the number, and that is exactly the layer that got it wrong.
+  const laneText = values.get('lane');
+  let lane: string | undefined;
+  if (laneText !== undefined) {
+    if (!HEADER_LANES.has(laneText)) {
+      collected.push({
+        where: `header 'lane'`,
+        problem: `'${laneText}' is not one of ${LANE_LIST}`,
+      });
+    } else {
+      lane = laneText;
+    }
+  }
+
   // The thinking regime, which R84 needs and which has no dispatch field to live in.
   //
   // Two values and no synonyms. `SOTA_THINKING` accepts `enabled`, `disabled`, `true` and `false`
@@ -627,6 +666,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(sampleTemperature === undefined ? {} : { sampleTemperature }),
       ...(backbone === undefined ? {} : { backbone }),
       ...(split === undefined ? {} : { split }),
+      ...(lane === undefined ? {} : { lane }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,
       refutation,
@@ -931,6 +971,39 @@ export function thinkingProblem(
   return (
     `this registration fixes the thinking regime at '${declared}' and this dispatch would run ` +
     `'${configured}', so the regime is not the only variable that moved`
+  );
+}
+
+/**
+ * Refuse a registration that claims evidence its lane cannot supply.
+ *
+ * S2c's partition (2026-11-08) is the rule: **τ² same-domain is product evidence, τ² cross-domain is a
+ * transfer reading, BIRD is the hostile case** — quotable for its negative delta and its exchange-rate
+ * arithmetic and for nothing else. The rule was written down and then violated in prose three days
+ * later, which is the failure a written rule is supposed to prevent; this is the check that could have
+ * objected. It cannot police what a report says, but it can refuse the registration that licensed it,
+ * and a registration is where every readout starts.
+ *
+ * The one hard case is the BIRD test: `split` alone is ambiguous, because the τ² driver also names its
+ * splits `train` and `test`. A declared τ² domain resolves it — a registration that says which domain
+ * it runs is on that lane whatever its split is called — and the check deliberately does not go further
+ * and police the τ² roles, which are legible from the domains themselves.
+ */
+export function laneRoleProblem(
+  declared: string | undefined,
+  context: { readonly split?: string; readonly tau2Domain?: string },
+): string | undefined {
+  if (declared === undefined) return undefined;
+  if (!HEADER_LANES.has(declared)) {
+    return `header 'lane': '${declared}' is not ${LANE_LIST}`;
+  }
+  const hostileSplit = context.split !== undefined && HEADER_SPLITS.has(context.split);
+  if (!hostileSplit || context.tau2Domain !== undefined) return undefined;
+  if (declared === 'hostile') return undefined;
+  return (
+    `this registration claims '${declared}' evidence on the '${context.split}' split, and that split ` +
+    'is the hostile case: BIRD questions never recur, so a lift measured there is not a lift from ' +
+    'experience'
   );
 }
 

@@ -68,6 +68,7 @@ import { writeJson } from './lib.js';
 import {
   armsAgainstRegistration,
   backboneProblem,
+  laneRoleProblem,
   populationAgainstRegistration,
   readPrereg,
   thinkingProblem,
@@ -503,6 +504,17 @@ const ARTEFACT_ID = artefactWriteIdOf({ split: SPLIT, prereg: PREREG });
  * would be filed as `indicative` and never as the reproduction it is.
  */
 const SPLIT_NAME = splitNameOf(SPLIT);
+/**
+ * The role S2c assigns to every number this file produces: the hostile case.
+ *
+ * Recorded in the artefact rather than remembered by its reader. S2c (2026-11-08) allows exactly two
+ * things to be quoted from this lane — the negative delta a memory arm produces, and the exchange-rate
+ * arithmetic that prices it — and forbids an absolute EX beside a leaderboard row. That rule was
+ * written down and then broken in prose within three days, which is what a rule with no representation
+ * in the output is worth. A dispatch that wants to claim product evidence belongs on the τ² lane, where
+ * the workload repeats; `laneRoleProblem` refuses the registration that would say otherwise.
+ */
+const CLAIM_CLASS = 'hostile';
 const FOLDS = Math.max(2, Math.trunc(nonNegative(process.env['SOTA_FOLDS'], 5)));
 const SEED = Math.trunc(nonNegative(process.env['SOTA_SEED'], 7));
 /**
@@ -963,11 +975,26 @@ function requireInput(arm: ArmName, filled: readonly unknown[], what: string): v
   const reading = readPrereg(readFileSync(path, 'utf8'), path);
   if (reading.prereg === undefined) return;
   const problem = backboneProblem(MODEL, reading.prereg.backbone);
-  if (problem === undefined) return;
-  throw new MicrogliaError('MG_E_CONFIG', problem, {
+  if (problem !== undefined) {
+    throw new MicrogliaError('MG_E_CONFIG', problem, {
+      prereg: path,
+      declaredModel: reading.prereg.backbone ?? '',
+      configuredModel: MODEL,
+    });
+  }
+  // Which lane may quote this run, refused before the first call rather than corrected in a report.
+  //
+  // S2c fixed the partition on 2026-11-08 — τ² same-domain is product evidence, BIRD is the hostile
+  // case — and it was violated in prose within three days, by a readout that put this lane's absolute
+  // accuracy beside a leaderboard row. Nothing in the machinery could object, because the role existed
+  // only in a document. A registration that declares `product` or `transfer` while dispatching a BIRD
+  // split is the licensable form of that mistake, and this refuses it where a rule can still act.
+  const roleProblem = laneRoleProblem(reading.prereg.lane, { split: SPLIT_NAME });
+  if (roleProblem === undefined) return;
+  throw new MicrogliaError('MG_E_CONFIG', roleProblem, {
     prereg: path,
-    declaredModel: reading.prereg.backbone ?? '',
-    configuredModel: MODEL,
+    declaredLane: reading.prereg.lane ?? '',
+    split: SPLIT_NAME,
   });
 })();
 
@@ -8518,6 +8545,17 @@ async function main(): Promise<void> {
       return {
         model: llm.model,
         configured_model: llm.configuredModel,
+        /**
+         * Which lane this run's numbers may be quoted from.
+         *
+         * A constant of the file, not a reading of it: this module *is* the hostile lane, and the point
+         * is that every artefact it produces carries that on its face. S2c allows two things to be
+         * quoted from here — the negative delta, and the exchange-rate arithmetic that prices it — and
+         * forbids an absolute EX beside a leaderboard row. A number that travels without its class is
+         * how the rule was broken in prose for three days; a reader now has to delete a field to
+         * misquote this run.
+         */
+        claim_class: CLAIM_CLASS,
         thinking: THINKING,
         // The switch without the budget is the half of the configuration that cost a run: 700 tokens
         // against 681 reasoning tokens per reply left the parse rate at 51.43%. A reader can now
