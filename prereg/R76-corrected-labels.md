@@ -64,3 +64,42 @@ It does not measure whether memory helps. One minidev population, one arm contra
 R75 established cannot carry an effect of the size this lane can produce: **1.4–3.1pp against a paired
 detection floor near 2.5pp**. Its subject is the instrument, and its answer is "the correction reaches
 the scorer, and here is the number it produces".
+
+## Amendment 1 — the budget, restated from the planner that now exists
+
+**2026-11-10, before dispatch.** This file opened with **≈916 calls projected, ceiling 2,490**, computed
+by `pnpm eval:budget` at the time. Two changes landed under it and both move the number: the planner now
+takes the prior run's own learning pass out of its bill before turning what is left into a per-question
+rate, and `forecastBudget` no longer charges a cold fold's learning to the folds that read it from the
+cache. The figures above are withdrawn and replaced by the tool, unchanged in every other respect:
+
+```
+pnpm eval:budget --bird <R74 artefact> --arms none,full --questions 283 --folds 5 --learn 283
+  rate       1.0043 calls per question per draw   (23,589 marginal calls over 7,829 × 3)
+  learning   283 per fold × 5 = 1,415 requests; the prior cache answered 75%
+  projected  1,015
+  ceiling    2,494 — the bound, which prices learning cold
+```
+
+**Authorised: `max_calls` 1,015, `ceiling_calls` 2,494, `learn_sample` 283, five folds, deadline 130.**
+≈$0.08 at the rate R74 paid.
+
+The projection is 1,015 and not 916 for a reason worth stating, because it is the third registration in
+a row whose estimate moved: **916 priced the evaluation and omitted most of a learning pass.** A dispatch
+that distils from 283 questions per fold makes 1,415 requests, the cache answers about three quarters of
+them, and the remaining 354 calls are real. A number that leaves them out is not conservative, it is
+short — and short is the direction that stops a run after it has paid for its first fold.
+
+Nothing else in the registration moves: the same three predictions, the same four refutations, the same
+283-question population and the same `gold: corrected`.
+
+## Amendment 2 — what the dispatch buys, and what it does not
+
+The arm list is `none,full` and **`learn_sample` is 283 rather than zero**, which is a choice about the
+instrument rather than about the memory. A `full` arm with no learning pass has an empty pack, and an
+empty pack is refused by the pack gate before it can report anything; the validation would then be a
+`none`-only run wearing two arm names. Distilling from the same 283 questions the evaluation scores is
+what R74 and R77 already do, so the shape of the dispatch is the shape the published cells were produced
+in — which is the property a validation of the *label* path needs and the property a measurement of the
+*memory* would not survive.
+
