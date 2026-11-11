@@ -4,6 +4,7 @@ step: R82
 opened: 2026-11-11
 arms: sample-5-first,sample-5-assert
 sample: 350
+split: minidev
 backbone: deepseek-v4-pro
 gates: V1,V2,V3,V4,V5,V6,V7,V8,V12,V32,V44,V48,V51
 ---

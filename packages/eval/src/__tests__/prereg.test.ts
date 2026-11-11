@@ -748,6 +748,26 @@ describe('the population a registration scores', () => {
     }
   });
 
+  it('reads a split out of the header', () => {
+    const reading = readPrereg(withOffset('split: dev'), 'R8.3-xiyan-cell.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.split).toBe('dev');
+  });
+
+  it('leaves every earlier registration saying nothing about its split', () => {
+    expect(readPrereg(withOffset(''), 'R8.3-xiyan-cell.md').prereg?.split).toBeUndefined();
+  });
+
+  it('refuses a split the lane cannot serve', () => {
+    // `sample` and the split are two halves of one population — 1,534 is `dev`, 350 is `minidev` — and
+    // a header naming a split the workflow does not offer would be discovered by the first model call
+    // of a dispatch that had already been paid for.
+    for (const bad of ['Dev', 'minidev2', 'full']) {
+      const reported = problemsOf(withOffset(`split: ${bad}`));
+      expect(reported.some((entry) => entry.includes("header 'split'"))).toBe(true);
+    }
+  });
+
   it('reads an empty offset as the first question', () => {
     const reading = readPrereg(withOffset('offset:'), 'R8.3-xiyan-cell.md');
     expect(reading.problems).toEqual([]);
@@ -797,6 +817,28 @@ describe('a dispatch whose population disagrees with its registration', () => {
   it('reports both disagreements rather than the first', () => {
     const agreement = populationAgainstRegistration(registration(1875, 2000), 2000, 0);
     expect(agreement.problems.length).toBe(2);
+  });
+
+  it('accepts a split that matches the file', () => {
+    expect(populationAgainstRegistration({ sample: 1534, split: 'dev' }, 1534, 0, 'dev').ok).toBe(true);
+  });
+
+  it('refuses the other split even when the question count agrees', () => {
+    // R81's fourth dispatch: `sample: 1534` in the file, `split: minidev` on the menu. The limit check
+    // passed because `limit` was 0 and the lane read every usable question of a 350-question split, and
+    // the artefact was published under the registration's name for $0.0973.
+    const agreement = populationAgainstRegistration({ sample: 350, split: 'dev' }, 350, 0, 'minidev');
+    expect(agreement.ok).toBe(false);
+    expect(agreement.problems).toEqual([
+      "this dispatch scores the 'minidev' split, but the registration scores 'dev'",
+    ]);
+  });
+
+  it('compares nothing when either side names no split', () => {
+    // The same asymmetry the offset check uses: a file that never stated a split is not thereby wrong,
+    // and a dispatch that states none is checked against nothing.
+    expect(populationAgainstRegistration({ sample: 350 }, 350, 0, 'minidev').ok).toBe(true);
+    expect(populationAgainstRegistration({ sample: 350, split: 'dev' }, 350, 0).ok).toBe(true);
   });
 });
 

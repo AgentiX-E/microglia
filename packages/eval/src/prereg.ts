@@ -129,6 +129,19 @@ export type Prereg = {
    * every push, while a dispatch's `backbone` input is typeable by anyone and reaches a paid run.
    */
   readonly backbone?: string;
+  /**
+   * The split this registration scores, when the header names one.
+   *
+   * `sample` alone does not fix a population. 1,534 questions is `dev`, 350 is `minidev` and 7,829 is
+   * `train`, so a header saying `sample: 1534` and a dispatch saying `split: minidev` agree about
+   * nothing while `populationAgainstRegistration` finds the limit correct — which is exactly what R81's
+   * fourth dispatch did: it named 1,534, ran 350, and published under the registration's name for
+   * $0.0973. The arm list had this check first; the population is the older and larger claim.
+   *
+   * Absent keeps every earlier registration unconstrained: a file that never stated its split is not
+   * thereby wrong, and a dispatch that states none is checked against nothing.
+   */
+  readonly split?: string;
   /** One bullet per prediction: a claim that can be checked against the artefact. */
   readonly prediction: readonly string[];
   /** One bullet per condition under which the stage is abandoned. */
@@ -171,7 +184,18 @@ const HEADER_KEYS = [
   'looTargets',
   'offset',
   'backbone',
+  'split',
 ] as const;
+
+/**
+ * The splits a header may name.
+ *
+ * Stated here rather than imported from the lane so a registration can be read — and `pnpm check`
+ * can validate every header on every push — without a dependency on the file that runs the run. A
+ * registration naming a split the lane cannot serve would otherwise be discovered by the first model
+ * call of a paid dispatch, which is the class of check this file exists to move earlier.
+ */
+const HEADER_SPLITS: ReadonlySet<string> = new Set(['minidev', 'dev', 'train']);
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
 /** A bullet has to carry a claim; ten characters is a draft marker with punctuation. */
@@ -455,6 +479,24 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // The split, which is the other half of the population `sample` only half describes.
+  //
+  // Validated against the three the workflow offers rather than against a pattern: a header is read
+  // before its dispatch spends anything, and `Dev` or `minidev2` would be a dispatch the lane cannot
+  // serve finding out at the first model call.
+  const splitText = values.get('split');
+  let split: string | undefined;
+  if (splitText !== undefined) {
+    if (!HEADER_SPLITS.has(splitText)) {
+      collected.push({
+        where: `header 'split'`,
+        problem: `'${splitText}' is not one of ${[...HEADER_SPLITS].join(', ')}`,
+      });
+    } else {
+      split = splitText;
+    }
+  }
+
   // A plan path is read by the lane, so a path outside the repository is either a typo or a dispatch
   // reading whatever the runner happens to have there. Refused here rather than at read time, because a
   // registration's header is checked before its dispatch spends anything.
@@ -550,6 +592,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(plantedArms === undefined ? {} : { plantedArms }),
       ...(sampleTemperature === undefined ? {} : { sampleTemperature }),
       ...(backbone === undefined ? {} : { backbone }),
+      ...(split === undefined ? {} : { split }),
       prediction,
       refutation,
       file,
@@ -744,9 +787,10 @@ export function armsAgainstRegistration(
  * the folds, and the folds are half of what a cross-fitted number means.
  */
 export function populationAgainstRegistration(
-  prereg: Pick<Prereg, 'sample' | 'offset'> | undefined,
+  prereg: Pick<Prereg, 'sample' | 'offset' | 'split'> | undefined,
   limit: number,
   offset: number,
+  split?: string,
 ): { readonly ok: boolean; readonly problems: readonly string[] } {
   if (prereg === undefined) return { ok: true, problems: [] };
   const problems: string[] = [];
@@ -763,6 +807,14 @@ export function populationAgainstRegistration(
       offset === 0
         ? `this dispatch starts at the first question, but the registration starts at ${declaredOffset}`
         : `this dispatch skips ${offset} questions, but the registration skips ${declaredOffset}`,
+    );
+  }
+  // The split, checked only when both sides state one. A registration that names no split is checked
+  // against nothing, and a dispatch that names none is left to the menu's default rather than being
+  // refused for a field it never had — the same asymmetry the offset check uses.
+  if (prereg.split !== undefined && split !== undefined && split !== prereg.split) {
+    problems.push(
+      `this dispatch scores the '${split}' split, but the registration scores '${prereg.split}'`,
     );
   }
   return { ok: problems.length === 0, problems };

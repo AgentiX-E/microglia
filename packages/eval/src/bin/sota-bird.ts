@@ -663,7 +663,7 @@ function armsFrom(raw: string | undefined): Set<ArmName> {
  * has already refused it by the time this runs, and a second silent path that treats "the file is
  * broken" as "no claim was made" is how a dispatch ends up alone with its own numbers.
  */
-function populationAgainstPrereg(prereg: string, limit: number, offset: number): void {
+function populationAgainstPrereg(prereg: string, limit: number, offset: number, split: string): void {
   if (prereg === '') return;
   const path = `prereg/${prereg}.md`;
   const reading = readPrereg(readFileSync(path, 'utf8'), path);
@@ -673,12 +673,20 @@ function populationAgainstPrereg(prereg: string, limit: number, offset: number):
       problems: reading.problems.map((problem) => `${problem.where}: ${problem.problem}`),
     });
   }
-  const agreement = populationAgainstRegistration(reading.prereg, limit, offset);
+  const agreement = populationAgainstRegistration(reading.prereg, limit, offset, split);
   if (agreement.ok) return;
   throw new MicrogliaError(
     'MG_E_CONFIG',
     `this dispatch is not ${path}: ${agreement.problems.join('; ')}`,
-    { prereg: path, limit, offset, sample: reading.prereg.sample, declaredOffset: reading.prereg.offset ?? 0 },
+    {
+      prereg: path,
+      limit,
+      offset,
+      split,
+      sample: reading.prereg.sample,
+      declaredOffset: reading.prereg.offset ?? 0,
+      declaredSplit: reading.prereg.split ?? '',
+    },
   );
 }
 
@@ -879,7 +887,7 @@ const CHANNEL_FLOORS: Record<
 type ChannelKind = 'values' | 'linked' | 'linked-additive' | 'recall-order';
 
 const ARMS = armsAgainstPrereg(armsFrom(process.env['SOTA_ARMS']), PREREG);
-populationAgainstPrereg(PREREG, LIMIT, OFFSET);
+populationAgainstPrereg(PREREG, LIMIT, OFFSET, SPLIT);
 
 /**
  * Refuse a dispatch that bought an arm whose input another arm's branch fills.
