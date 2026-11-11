@@ -373,6 +373,7 @@ describe('every switch a registration owns is read from the registration', () =>
     ['TAU_TEST_DOMAIN', 'test'],
     ['TAU_RECALL_DOMAIN', 'recall'],
     ['TAU_DISTILL_FORM', 'form'],
+    ['TAU_DISTILL_UNIT', 'unit'],
   ];
 
   /** The line a key is assigned on, in the L4 step, with its continuation lines folded in. */

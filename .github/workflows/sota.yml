@@ -1267,7 +1267,10 @@ jobs:
           # `procedure` and a dispatch whose variable still said `lesson` would publish the control
           # under the treatment's name; the script refuses that, and refuses a trace dispatch that
           # would replace the form the registration pinned.
-          FORM=$(pnpm --silent eval:prereg-form "$FILE" "${TAU_FORM_VAR:-}" "${TAU_UNIT_VAR:-}")
+          pnpm --silent eval:prereg-form "$FILE" "${TAU_FORM_VAR:-}" "${TAU_UNIT_VAR:-}" \
+            > "$RUNNER_TEMP/distill.env"
+          UNIT=$(sed -n 's/^unit=//p' "$RUNNER_TEMP/distill.env")
+          FORM=$(sed -n 's/^form=//p' "$RUNNER_TEMP/distill.env")
           pnpm --silent eval:prereg-scenario "$FILE" > "$RUNNER_TEMP/scenario.env"
           TRAIN=$(sed -n 's/^train=//p' "$RUNNER_TEMP/scenario.env")
           TEST=$(sed -n 's/^test=//p' "$RUNNER_TEMP/scenario.env")
@@ -1279,7 +1282,8 @@ jobs:
           echo "test=$TEST" >> "$GITHUB_OUTPUT"
           echo "recall=$RECALL" >> "$GITHUB_OUTPUT"
           echo "form=$FORM" >> "$GITHUB_OUTPUT"
-          echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`, distiller form \`${FORM:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "unit=$UNIT" >> "$GITHUB_OUTPUT"
+          echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`, distiller \`${UNIT:-inherited}/${FORM:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: L4 arm — memory
         if: github.event.inputs.l4_arms != 'reference'
@@ -1329,7 +1333,7 @@ jobs:
           # R58: `correction` (the unit every published arm measured) or `trace` (the attempt beside
           # the reference trajectory, with the recurrence pass over the store it produces). Not a
           # dispatch input, because a unit is a property of the experiment rather than of the run.
-          TAU_DISTILL_UNIT: ${{ vars.TAU_DISTILL_UNIT }}
+          TAU_DISTILL_UNIT: ${{ steps.recall_floor.outputs.unit || vars.TAU_DISTILL_UNIT }}
           # R62: `edited` (the corrections every published arm distils) or `all` (also every task that
           # passed, asked for the rule its successful trajectory follows). Unset is `edited`, so an
           # artefact committed before this variable produced the store it always did.

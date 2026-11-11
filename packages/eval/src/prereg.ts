@@ -171,6 +171,16 @@ export type Prereg = {
    */
   readonly distillForm?: string;
   /**
+   * Whether this dispatch distils one correction per failed task, or the attempt's trace.
+   *
+   * R58 wrote that "a unit is a property of the experiment rather than of the run" and then left it in
+   * `vars.TAU_DISTILL_UNIT` anyway — which is the same defect one field over, and it was live: when R56
+   * was finally written, that variable still held `trace` from the recurrence arm, so a registration
+   * whose store is built from corrections would have run the trace arm under its own name and its
+   * artefact would have agreed with the variable rather than with the registration.
+   */
+  readonly distillUnit?: string;
+  /**
    * Whether this registration's dispatch asks the model to think.
    *
    * R84 asks a question the record cannot answer without it: R82 measured the expensive backbone 6.00pp
@@ -229,6 +239,7 @@ const HEADER_KEYS = [
   'split',
   'lane',
   'distillForm',
+  'distillUnit',
   'thinking',
 ] as const;
 
@@ -259,6 +270,9 @@ const HEADER_LANES: ReadonlySet<string> = new Set(['product', 'transfer', 'hosti
  * because a divergence between the two lists should be a failing test rather than an import edge.
  */
 const HEADER_FORMS: ReadonlySet<string> = new Set(['lesson', 'procedure', 'repair', 'lexicon']);
+
+/** The two units `resolveDistillUnit` accepts, and nothing else: `correction` is the published one. */
+const HEADER_UNITS: ReadonlySet<string> = new Set(['correction', 'trace']);
 const LANE_LIST = 'product, transfer or hostile';
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
@@ -592,6 +606,21 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // Which trajectory teaches this dispatch. R58 declared it a property of the experiment and left it in
+  // a variable; the variable still held the other arm's value three weeks later.
+  const unitText = values.get('distillUnit');
+  let distillUnit: string | undefined;
+  if (unitText !== undefined) {
+    if (!HEADER_UNITS.has(unitText)) {
+      collected.push({
+        where: `header 'distillUnit'`,
+        problem: `'${unitText}' is not one of ${[...HEADER_UNITS].join(', ')}`,
+      });
+    } else {
+      distillUnit = unitText;
+    }
+  }
+
   // The thinking regime, which R84 needs and which has no dispatch field to live in.
   //
   // Two values and no synonyms. `SOTA_THINKING` accepts `enabled`, `disabled`, `true` and `false`
@@ -709,6 +738,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(split === undefined ? {} : { split }),
       ...(lane === undefined ? {} : { lane }),
       ...(distillForm === undefined ? {} : { distillForm }),
+      ...(distillUnit === undefined ? {} : { distillUnit }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,
       refutation,
@@ -1046,6 +1076,31 @@ export function distillFormProblem(
   return (
     `this registration fixes the distiller's form at '${declared}' and this dispatch would run ` +
     `'${stated}', so the form is not the only variable that moved`
+  );
+}
+
+/**
+ * Refuse a dispatch whose distilling unit is not the one the registration fixed.
+ *
+ * The same sentence as `thinkingProblem` and `distillFormProblem`, because it is the same defect: a
+ * repository variable is global, so it is one experiment's setting applied to every queued dispatch.
+ * This one had already gone wrong in the record — `vars.TAU_DISTILL_UNIT` held `trace` when R56, whose
+ * whole store is corrections, was written — and nothing in the machinery could object, because the
+ * registration had no field for a value the driver was already resolving through a tested function.
+ *
+ * `null` and the empty string are the variable being unset: the registration decides, and that is not
+ * a disagreement.
+ */
+export function distillUnitProblem(
+  configured: string | null,
+  declared: string | undefined,
+): string | undefined {
+  if (declared === undefined) return undefined;
+  const stated = configured === null || configured === '' ? undefined : configured;
+  if (stated === undefined || stated === declared) return undefined;
+  return (
+    `this registration fixes the distiller's unit at '${declared}' and this dispatch would run ` +
+    `'${stated}', so the unit is not the only variable that moved`
   );
 }
 

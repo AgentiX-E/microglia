@@ -7,6 +7,7 @@ import {
   armsAgainstRegistration,
   backboneProblem,
   distillFormProblem,
+  distillUnitProblem,
   essentialArms,
   facadePairSwitch,
   laneRoleProblem,
@@ -1266,6 +1267,73 @@ describe('distillFormProblem', () => {
         "'trace', which replaces the form, so the registered switch cannot take effect",
     );
     expect(distillFormProblem('', 'trace', 'trace')).toBeUndefined();
+  });
+});
+
+describe('the distiller unit, as a header field', () => {
+  const HEADER = [
+    '---',
+    'id: R87-distill-unit',
+    'step: R87',
+    'opened: 2026-11-12',
+    'arms: memory',
+    'sample: 228',
+    'gates: V1,V2',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '\n## Prediction\n\n- **one claim that is long enough to count as a claim here.**\n' +
+    '\n## Refutation\n\n- **Void** — the first branch, long enough to count as a claim.\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads the unit the registration distils', () => {
+    expect(readPrereg(withHeader('distillUnit: correction'), 'R87-distill-unit.md').prereg?.distillUnit)
+      .toBe('correction');
+    expect(readPrereg(withHeader('distillUnit: trace'), 'R87-distill-unit.md').prereg?.distillUnit)
+      .toBe('trace');
+  });
+
+  it('leaves it absent when the header does not name one', () => {
+    const reading = readPrereg(withHeader('split: dev'), 'R87-distill-unit.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.distillUnit).toBeUndefined();
+  });
+
+  it('refuses a unit the lane cannot distil, and the capitalised form of one', () => {
+    expect(readPrereg(withHeader('distillUnit: episode'), 'R87-distill-unit.md').problems).toEqual([
+      { where: "header 'distillUnit'", problem: "'episode' is not one of correction, trace" },
+    ]);
+    expect(readPrereg(withHeader('distillUnit: Trace'), 'R87-distill-unit.md').problems).toHaveLength(1);
+  });
+});
+
+describe('distillUnitProblem', () => {
+  it('says nothing when the registration names no unit', () => {
+    expect(distillUnitProblem('trace', undefined)).toBeUndefined();
+  });
+
+  it('says nothing when the variable is unset, because the registration decides', () => {
+    expect(distillUnitProblem('', 'correction')).toBeUndefined();
+    expect(distillUnitProblem(null, 'trace')).toBeUndefined();
+  });
+
+  it('says nothing when the variable agrees', () => {
+    expect(distillUnitProblem('correction', 'correction')).toBeUndefined();
+  });
+
+  it('refuses a variable left behind by another experiment', () => {
+    // This is the state the repository was in when R56 was written: `vars.TAU_DISTILL_UNIT` held
+    // `trace` from the recurrence arm, so a registration that distils one correction per task would
+    // have run a different experiment under its own name, with the artefact saying `trace` and the
+    // registration saying nothing at all about it.
+    expect(distillUnitProblem('trace', 'correction')).toBe(
+      "this registration fixes the distiller's unit at 'correction' and this dispatch would run " +
+        "'trace', so the unit is not the only variable that moved",
+    );
   });
 });
 

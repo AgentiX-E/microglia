@@ -12,10 +12,10 @@
  * disagreement is a refusal rather than a note. An unset variable is not a second opinion.
  *
  * Usage: pnpm eval:prereg-form prereg/<id>.md [configured-form] [configured-unit]
- *   -> prints "form=<value>" and exits 0, or prints the reason to stderr and exits 1.
+ *   -> prints "unit=<value>" and "form=<value>" and exits 0, or prints the reason and exits 1.
  */
 import { readFileSync } from 'node:fs';
-import { distillFormProblem, readPrereg } from '../prereg.js';
+import { distillFormProblem, distillUnitProblem, readPrereg } from '../prereg.js';
 
 function refuse(message: string): void {
   process.stderr.write(`[prereg-form] ${message}\n`);
@@ -29,21 +29,37 @@ function main(): void {
     return;
   }
   const configured = process.argv[3] ?? '';
-  const unit = (process.argv[4] ?? '').trim() === 'trace' ? 'trace' : 'correction';
+  const configuredUnit = (process.argv[4] ?? '').trim() === 'trace' ? 'trace' : 'correction';
   const reading = readPrereg(readFileSync(file, 'utf8'), file);
   if (reading.prereg === undefined) {
     for (const problem of reading.problems) refuse(`at ${problem.where}: ${problem.problem}`);
     return;
   }
+  const declaredUnit = reading.prereg.distillUnit;
+  // A stated disagreement is refused rather than resolved by preference: the variable is what the
+  // workflow would run, the header is what the experiment says it runs, and a silent win for either
+  // one is how a run ends up published under a registration it does not execute.
+  const unitProblem = distillUnitProblem(
+    process.argv[4] ?? null,
+    declaredUnit,
+  );
+  if (unitProblem !== undefined) {
+    refuse(unitProblem);
+    return;
+  }
+  // The unit that will actually run, which is what decides whether the form can take effect at all.
+  const unit = declaredUnit ?? configuredUnit;
   const declared = reading.prereg.distillForm;
   const problem = distillFormProblem(configured, declared, unit);
   if (problem !== undefined) {
     refuse(problem);
     return;
   }
-  // The header wins when it names one, because `distillFormProblem` has already refused the case where
-  // the two disagree. Empty means the variable stands, exactly as it did before this script existed.
-  process.stdout.write(`form=${declared ?? ''}\n`);
+  // Two lines rather than one token, for `prereg-scenario`'s reason: the workflow reads each into its
+  // own variable and an expression that split a string would be a parser in YAML. The header wins when
+  // it names a value, because the checks above have already refused the case where the two disagree;
+  // empty means the variable stands, exactly as it did before this script existed.
+  process.stdout.write(`unit=${declaredUnit ?? ''}\nform=${declared ?? ''}\n`);
 }
 
 main();
