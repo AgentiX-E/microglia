@@ -189,6 +189,11 @@ export {
 export { artefactArgument, noArguments } from './artefact-arg.js';
 export { PROVIDER_ALIASES, splitProvider } from './model-id.js';
 export {
+  consolidatedMemoryOf,
+  type ConsolidatedMemory,
+  type MemoryShape,
+} from './consolidated.js';
+export {
   catalogueIdsOf,
   catalogueLine,
   catalogueNoteOf,

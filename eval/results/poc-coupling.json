@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 190,
+  "scanned": 191,
   "totals": {
-    "modules": 190,
-    "lines": 51189,
+    "modules": 191,
+    "lines": 51302,
     "adapterLines": 1956,
-    "deferredLines": 9027,
-    "coupledShare": 0.2121
+    "deferredLines": 9043,
+    "coupledShare": 0.2119
   },
   "layers": [
     {
@@ -37,10 +37,10 @@
     },
     {
       "layer": "eval",
-      "modules": 133,
-      "lines": 38114,
+      "modules": 134,
+      "lines": 38227,
       "adapterLines": 0,
-      "deferredLines": 9027,
+      "deferredLines": 9043,
       "coupled": 24
     },
     {
@@ -70,7 +70,7 @@
     {
       "from": "eval",
       "to": "core",
-      "files": 51,
+      "files": 52,
       "upward": false
     },
     {
@@ -325,7 +325,7 @@
       "pkg": "eval",
       "module": "sota",
       "path": "packages/eval/src/sota.ts",
-      "lines": 2634,
+      "lines": 2650,
       "words": [
         "sql",
         "sqlite",
@@ -438,6 +438,13 @@
       "module": "budget-plan",
       "words": [
         "sql"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "consolidated",
+      "words": [
+        "bird"
       ]
     },
     {
@@ -679,7 +686,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "190 modules, 24 deferred with a reason"
+      "detail": "191 modules, 24 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -694,5 +701,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 51189 production lines across 190 modules: 7 adapter modules in `sql`, 24 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 51302 production lines across 191 modules: 7 adapter modules in `sql`, 24 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }

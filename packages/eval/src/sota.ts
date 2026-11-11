@@ -215,6 +215,21 @@ export type SqlArm =
    * legitimate result ("nothing in this corpus was corroborated twice"), not a broken
    * control, and failing the run on it would prevent publishing the finding.
    */
+  /**
+   * The same store after the consolidation pass has folded one claim stated several ways into one item.
+   *
+   * This arm exists because of a number nothing had read: `active_corroborated: 0` of `active_total: 258`.
+   * Every claim in this lane's store is supported by exactly one observation, and no pass has ever asked
+   * which of those 258 are one claim — `consolidateKnowledge` runs on the tau2 lane and on the sweep, and
+   * the BIRD lane has never called it. The published competitive arm admits a guideline after three
+   * distinct learning tasks; this store cannot reach two.
+   *
+   * The arm does not lower a threshold and does not filter: it runs the product's own merger over the
+   * store the distiller wrote, writes the survivors back and injects the result. `supportAfter` in the
+   * census is what the merge bought, and `crossTaskGroups` is how much of it was corroboration rather
+   * than the same failure stated twice.
+   */
+  | 'full-consolidated'
   | 'full-corroborated'
   /**
    * The same retrieval, one slot instead of the pack's mean of 1.78.
@@ -1211,6 +1226,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   examples: true,
   'full-verified': true,
   'full-shuffled': true,
+  'full-consolidated': true,
   'full-reconstructed': true,
   'full-reconstructed-shuffled': true,
   'full-transferred': true,

@@ -93,11 +93,13 @@ import {
   combineInterpreters,
   createLlmInterpreter,
   ruleInterpreter,
+  type ConsolidationCensus,
   type DistillForm,
   type DropReason,
   type Interpreter,
   type DistillCandidate,
 } from '@agentix-e/microglia-core/distill';
+import { consolidatedMemoryOf, type MemoryShape } from '../consolidated.js';
 import {
   DistillCache,
   GenerationCache,
@@ -3630,6 +3632,16 @@ type FoldResult = {
   readonly activeRulesBeforeValidation: number;
   /** Active rules in the unwidened memory, or null when no such memory was built. */
   readonly narrowActive: number | null;
+  /**
+   * What the merge bought on this fold, or null when the arm was off.
+   *
+   * `supportBefore` and `supportAfter` are distributions of witnesses per claim, so the pair answers
+   * whether the pass found anything to fold; `crossTaskGroups` is the part of it that is
+   * corroboration rather than one failure stated twice; and the `refused*` counts separate "nothing
+   * in this store recurred" from "everything that recurred was refused", which are opposite
+   * findings about the same store.
+   */
+  readonly consolidation: ConsolidationCensus | null;
   /** Active items in the repair memory, or null when the content arm was off. */
   readonly repairActive: number | null;
   /** Active items in the procedural memory, or null when that arm was off. */
@@ -3751,6 +3763,87 @@ type FoldResult = {
 };
 
 /**
+ * The merge's totals across the folds it ran in, as the artefact states them.
+ *
+ * snake_case because this is a projection into the file rather than a fold record: readers of the
+ * artefact and the verifiers under `eval/verifiers` key off these names.
+ */
+type ConsolidationSummary = {
+  readonly folds: number;
+  readonly threshold: number;
+  readonly condition_min_shared: number;
+  readonly considered: number;
+  readonly groups: number;
+  readonly merged: number;
+  readonly retained: number;
+  readonly cross_task_groups: number;
+  readonly largest_group: number;
+  readonly weakest_pair: number;
+  readonly refused: {
+    readonly condition: number;
+    readonly payload: number;
+    readonly duplicate_evidence: number;
+    readonly linkage: number;
+  };
+  readonly support_before: Readonly<Record<number, number>>;
+  readonly support_after: Readonly<Record<number, number>>;
+  readonly max_support_before: number;
+  readonly max_support_after: number;
+};
+
+/**
+ * What the merge did across every fold it ran in.
+ *
+ * A reduction rather than a mean: `merged`, `retained` and `groups` are counts of claims, and
+ * averaging per-fold ratios would report a number about folds rather than about the store. The two
+ * floors are read from the pass's own report instead of from a constant here — this lane does not
+ * choose them, the product does, and a floor copied into the artefact would eventually disagree with
+ * the pass that ran. `support_before` beside `support_after` is the whole point of the arm: a store
+ * of one-witness claims and a store of corroborated ones have the same item count and different
+ * distributions, and only the pair says which one the merge produced.
+ */
+function consolidationTotal(folds: readonly FoldResult[]): ConsolidationSummary | null {
+  const ran = folds.flatMap((fold) => (fold.consolidation === null ? [] : [fold.consolidation]));
+  if (ran.length === 0) return null;
+  const sum = (pick: (census: ConsolidationCensus) => number): number =>
+    ran.reduce((total, census) => total + pick(census), 0);
+  const histogram = (
+    pick: (census: ConsolidationCensus) => Readonly<Record<number, number>>,
+  ): Record<number, number> => {
+    const out: Record<number, number> = {};
+    for (const census of ran) {
+      for (const [support, count] of Object.entries(pick(census))) {
+        const key = Number(support);
+        out[key] = (out[key] ?? 0) + count;
+      }
+    }
+    return out;
+  };
+  return {
+    folds: ran.length,
+    threshold: Math.min(...ran.map((census) => census.threshold)),
+    condition_min_shared: Math.min(...ran.map((census) => census.conditionMinShared)),
+    considered: sum((census) => census.considered),
+    groups: sum((census) => census.groups),
+    merged: sum((census) => census.merged),
+    retained: sum((census) => census.retained),
+    cross_task_groups: sum((census) => census.crossTaskGroups),
+    largest_group: Math.max(...ran.map((census) => census.largestGroup)),
+    weakest_pair: Math.min(...ran.map((census) => census.weakestPair)),
+    refused: {
+      condition: sum((census) => census.refusedCondition),
+      payload: sum((census) => census.refusedPayload),
+      duplicate_evidence: sum((census) => census.refusedDuplicateEvidence),
+      linkage: sum((census) => census.refusedLinkage),
+    },
+    support_before: histogram((census) => census.supportBefore),
+    support_after: histogram((census) => census.supportAfter),
+    max_support_before: Math.max(...ran.map((census) => census.maxSupportBefore)),
+    max_support_after: Math.max(...ran.map((census) => census.maxSupportAfter)),
+  };
+}
+
+/**
  * Wrap an interpreter so a parse failure leaves a reason behind.
  *
  * Counting failures is not enough to fix them: the message distinguishes a
@@ -3841,6 +3934,22 @@ function screenInterpretation(
   return screened;
 };
 
+/**
+ * How every memory in this lane is opened, stated once.
+ *
+ * `full-consolidated` compares a second memory against the one `full` reads, so every field that
+ * differed between the two would be reported as the merge's doing rather than as a parameter's.
+ * The identity, the budget and the clock start are therefore shared. The random source is not: it
+ * is built per memory from `SEED`, because two memories drawing from one generator would hand the
+ * second arm a different sample than the first for a reason that is not the arm.
+ */
+const LANE_MEMORY: MemoryShape = {
+  app: 'microglia-sota',
+  namespace: 'bird',
+  budget: 1200,
+  clockStart: 1_700_000_000_000,
+};
+
 async function buildFoldMemory(
   generalize: boolean,
   learnRows: readonly BirdRow[],
@@ -3854,8 +3963,8 @@ async function buildFoldMemory(
   let lastReply = '';
   let distilledSoFar = 0;
   const host = await openMicroglia({
-    app: 'microglia-sota',
-    namespace: 'bird',
+    app: LANE_MEMORY.app,
+    namespace: LANE_MEMORY.namespace,
     store,
     interpreter: screenInterpretation(
       form,
@@ -3936,8 +4045,8 @@ async function buildFoldMemory(
       ...(form === 'lexicon' ? [] : [ruleInterpreter]),
       ),
     ),
-    budget: 1200,
-    clock: steppingClock(1_700_000_000_000, 1),
+    budget: LANE_MEMORY.budget,
+    clock: steppingClock(LANE_MEMORY.clockStart, 1),
     random: mulberry32(SEED),
   });
   const learning = await learn(host, learnRows, dataset, task);
@@ -4286,6 +4395,11 @@ async function runFold(
   const learning = widened.learning;
   const distilled = widened.distilled;
   const frozen = widened.frozen;
+  // The merge arm's memory. Built from the store `full` reads and never written back into it, so
+  // the one difference between the two arms is the store — not the order they were asked in.
+  const consolidated = ARMS.has('full-consolidated')
+    ? await consolidatedMemoryOf(widened.store, LANE_MEMORY, SEED)
+    : undefined;
   const distillFailures = [
     ...widened.distillFailures,
     ...(narrowed === undefined ? [] : narrowed.distillFailures),
@@ -4977,6 +5091,15 @@ async function runFold(
       // The same items under the error heading. The pack layer is not asked for anything new, so the
       // comparison with `full` is one string of framing rather than a different retrieval.
       call(position, 'full-prohibitive', pack.rendered, pack.ids.length);
+    }
+    if (consolidated !== undefined) {
+      // The same recall, budget and renderer over the merged store. The order of these two arms is
+      // the argument of the registration: `full-corroborated` asks for two witnesses from a store
+      // whose every claim has one, and this arm first turns several statements of one claim into one
+      // claim. If the floor was the problem, this is the store it was waiting for; if the store was
+      // never the problem, both read the same number and the merge is inert.
+      const folded = await consolidated.host.recall({ ...query, scope: { domain: row.db_id } });
+      call(position, 'full-consolidated', folded.rendered, folded.ids.length);
     }
     if (ARMS.has('full-corroborated')) {
       // The same recall with the pack layer's corroboration floor - the product path,
@@ -6445,6 +6568,7 @@ async function runFold(
     digestBeforeValidation: frozen.digest,
     activeRulesBeforeValidation: frozen.active,
     narrowActive: narrowed?.frozen.active ?? null,
+    consolidation: consolidated?.report ?? null,
     repairActive: repaired?.frozen.active ?? null,
     proceduralActive: procedural?.frozen.active ?? null,
     failureKey: { asked: keyedTried, hit: keyedHits, stored: storedCodes, observed: observedCodes },
@@ -7506,6 +7630,10 @@ async function main(): Promise<void> {
       // A filter is a condition of the result: a number produced at a different
       // threshold is a different number.
       corroboration_min: ARMS.has('full-corroborated') ? CORROBORATION : null,
+      // The merge arm's manipulation check: how many claims the pass folded, how many survived, and
+      // how the support distribution moved. Null when the arm was off, because a run that did not buy
+      // the arm must not publish a zero that reads like a pass which found nothing to merge.
+      consolidation: consolidationTotal(folds),
       // The family's shape, so a reader can say which one produced the numbers above.
       density:
         DENSITY_PANEL === 0
