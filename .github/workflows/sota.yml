@@ -538,6 +538,7 @@ jobs:
       # backstop is always above the clock, and a dispatch whose deadline cannot fit the job fails
       # here, before the first call.
       - name: Require a deadline the job can honour
+        id: deadline
         env:
           DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}
         run: |
@@ -548,13 +549,17 @@ jobs:
             echo "::error::deadline_min ${DEADLINE_MIN} cannot fit the job: the job limit is 340 minutes and the step needs 25 of headroom, so the largest deadline this lane may take is ${CAP}. A run dispatched above it is killed by the runner with no artefact, which is what happened to R68 at deadline 300."
             exit 1
           fi
+          # The timeout is computed here rather than in the step's own expression, because GitHub's
+          # parser refuses arithmetic inside `timeout-minutes`: `fromJSON(...) + 25` was rejected with
+          # "Unexpected symbol: '+'" and the dispatch failed with HTTP 422 before the run existed.
+          echo "timeout=$((DEADLINE_MIN + 25))" >> "$GITHUB_OUTPUT"
           echo "deadline ${DEADLINE_MIN} min, step timeout $((DEADLINE_MIN + 25)) min, job limit 340 min"
 
       - name: Run the benchmark
         # Above the lane's own deadline with room for the last fold to finish writing, and below the
         # job's. The step timeout is a backstop, not a plan: the run that died here at 160 minutes had
         # finished three folds and left no artefact.
-        timeout-minutes: ${{ fromJSON(github.event.inputs.deadline_min || '130') + 25 }}
+        timeout-minutes: ${{ fromJSON(steps.deadline.outputs.timeout) }}
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           # The lane's own default was `deepseek-chat` until this round: a retired name that the
