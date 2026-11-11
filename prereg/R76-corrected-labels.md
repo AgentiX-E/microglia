@@ -103,3 +103,41 @@ what R74 and R77 already do, so the shape of the dispatch is the shape the publi
 in — which is the property a validation of the *label* path needs and the property a measurement of the
 *memory* would not survive.
 
+## Outcome — 2026-11-11, dispatch `42931789908`
+
+**910 calls, five folds, 283 questions, `none,full`, `temperature: 0.7`, gates all pass.** Every
+refutation this file named stayed silent and every prediction held; the payload is the size of the
+agreement rather than the fact of it.
+
+| the file said | the artefact says |
+| --- | --- |
+| `n` is 283, not 350 | **`n.total` 283, `n.eval` 283, `qualifying` 283** |
+| 67 of the slice's questions are unlabelable | 350 − 283 = **67**; the revision's own drop list holds **81** for the whole of Mini-Dev, of which 67 fall inside this slice, which is the arithmetic R75's amendment predicted |
+| `dataset_gold` is not null | `gold/bird-minidev-arcwise-sql-only.json`, digest `e7bf7640…e8395`, **498 entries, 129 labels replaced, 288 already agreed, 0 unmatched, 81 dropped** |
+| the baseline lands in 57–63% | **59.36%** (168 of 283) |
+| the baseline is not near 51.26% | 8.1pp above it, which is the 8.7pp the mixture was short by |
+| the memory arm is within 4pp | **0.00pp** — 59.36% against 59.36% |
+
+**The number that matters is 59.36 against 59.64.** R75 re-scored fourteen artefacts that were produced
+by a different instrument and put the corrected baseline at 59.64%; this dispatch asked the loader for
+the correction and got 59.36%. Two measurements, one second-hand and one end to end, **0.28pp apart**,
+which is a tenth of the paired noise on 283 questions and is the first time this lane has predicted a
+level rather than a direction.
+
+**The delta is a dead heat, and the statements are not.** 283 of 283 questions produced a different
+`full` statement from their `none` statement, and **168 were correct in both arms**. So the pack moved
+every answer's text without moving a single verdict on this slice — the reshuffle R74 found at 7,829
+questions, reproduced at 283 at temperature 0.7. A delta of exactly zero with 283/283 differing
+statements is not the memory doing nothing; it is the memory doing something that nets to nothing, and
+the two are only distinguishable because the statements are in the artefact.
+
+**What the dispatch cost against what it was authorised for.** 910 calls against 1,015 projected, 10%
+under, with 859 of 920 distillation requests answered from the restored cache — the amortised shape
+Amendment 1 priced.
+
+**What this file does not license.** Every mini-dev level this record has published before R75 is about
+8.7pp low, and this run is the reason they can be restated rather than re-run: the correction is a
+pinned revision with a digest, `reviseGold` drops what it cannot score, and the artefact names the gold
+it was measured against. The dev cells are **not** affected — the revision is built on Mini-Dev — so the
+competitive ranking, which is quoted on dev, stands where it stood.
+
