@@ -110,10 +110,17 @@ def _load_rate_card(path=None) -> dict:
     source = path or _RATE_CARD_PATH
     with open(source, encoding="utf-8") as handle:
         card = json.load(handle)
+    # One card per provider, one price row per model. The row this driver bills with is the card's
+    # `defaultModel`, which is the model the lane is configured with; a second row is another model's
+    # price and using it here would be using the wrong one.
+    prices = card.get("prices")
+    default = card.get("defaultModel")
+    if not isinstance(prices, dict) or not isinstance(default, str) or default == "":
+        raise ValueError(f"model-rates.json has no 'prices'/'defaultModel': {source}")
     for band in ("peak", "off_peak"):
-        rates = card.get("bands", {}).get(band)
+        rates = (prices.get(default) or {}).get(band)
         if not isinstance(rates, dict) or not {"miss", "hit", "out"} <= set(rates):
-            raise ValueError(f"model-rates.json has no usable '{band}' band: {source}")
+            raise ValueError(f"model-rates.json has no usable '{band}' band for {default}: {source}")
     windows = card.get("peakWindows")
     if not isinstance(windows, list) or not windows:
         raise ValueError(f"model-rates.json has no 'peakWindows': {source}")
@@ -121,7 +128,7 @@ def _load_rate_card(path=None) -> dict:
 
 
 _RATE_CARD = _load_rate_card()
-_RATES = _RATE_CARD["bands"]
+_RATES = _RATE_CARD["prices"][_RATE_CARD["defaultModel"]]
 _PEAK_WINDOWS = tuple(
     (int(window["fromHourUtc"]), int(window["toHourUtc"])) for window in _RATE_CARD["peakWindows"]
 )

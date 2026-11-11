@@ -7,12 +7,14 @@ import {
   addToBand,
   addUsage,
   bandOf,
+  bandsFor,
   bandsUsed,
   billOf,
   cacheHitRate,
   costOf,
   isPeak,
   nextOffPeak,
+  pricedModels,
   totalUsage,
   usageLine,
   type BandedUsage,
@@ -43,7 +45,8 @@ describe('RATE_CARD', () => {
   ) as {
     readonly currency: string;
     readonly unit: string;
-    readonly bands: Record<string, { miss: number; hit: number; out: number }>;
+    readonly defaultModel: string;
+    readonly prices: Record<string, Record<string, { miss: number; hit: number; out: number }>>;
     readonly peakWindows: readonly { fromHourUtc: number; toHourUtc: number }[];
     readonly peakWeekdaysOnly: boolean;
   };
@@ -52,27 +55,40 @@ describe('RATE_CARD', () => {
     expect(RATE_CARD.currency).toBe(manifest.currency);
     expect(RATE_CARD.unit).toBe(manifest.unit);
     expect(RATE_CARD.peakWeekdaysOnly).toBe(manifest.peakWeekdaysOnly);
-    expect(RATE_CARD.bands).toEqual(manifest.bands);
+    expect(RATE_CARD.prices).toEqual(manifest.prices);
+    expect(RATE_CARD.defaultModel).toBe(manifest.defaultModel);
     expect(RATE_CARD.peakWindows).toEqual(manifest.peakWindows);
   });
 
-  it('states peak as exactly twice every rate, which is the whole reason it matters', () => {
-    const { peak, off_peak: offPeak } = RATE_CARD.bands;
-    expect(peak.miss).toBeCloseTo(offPeak.miss * 2, 12);
-    expect(peak.hit).toBeCloseTo(offPeak.hit * 2, 12);
-    expect(peak.out).toBeCloseTo(offPeak.out * 2, 12);
+  it('states peak as exactly twice every rate, on every model it prices', () => {
+    for (const [model, bands] of Object.entries(RATE_CARD.prices)) {
+      expect(bands.peak.miss, model).toBeCloseTo(bands.off_peak.miss * 2, 12);
+      expect(bands.peak.hit, model).toBeCloseTo(bands.off_peak.hit * 2, 12);
+      expect(bands.peak.out, model).toBeCloseTo(bands.off_peak.out * 2, 12);
+    }
   });
 
-  it('prices a cached token fifty times below an uncached one', () => {
-    expect(RATE_CARD.bands.peak.miss / RATE_CARD.bands.peak.hit).toBeCloseTo(50, 12);
-    expect(RATE_CARD.bands.off_peak.miss / RATE_CARD.bands.off_peak.hit).toBeCloseTo(50, 12);
+  it('prices a cached token at least twenty-five times below an uncached one', () => {
+    // The provider's two cache ratios differ by model — the default model's is exactly fifty and the
+    // stronger one's is thirty — so the claim that survives both is the one that matters: caching
+    // dominates a bill, and a lane that destroys its prefix cache is paying thirty to fifty times
+    // what the tokens are worth.
+    for (const [model, bands] of Object.entries(RATE_CARD.prices)) {
+      expect(bands.peak.miss / bands.peak.hit, model).toBeGreaterThanOrEqual(25);
+      expect(bands.off_peak.miss / bands.off_peak.hit, model).toBeGreaterThanOrEqual(25);
+    }
+    const flash = RATE_CARD.prices['deepseek-flash'];
+    if (flash === undefined) throw new Error('the card must price the model it defaults to');
+    expect(flash.peak.miss / flash.peak.hit).toBeCloseTo(50, 12);
   });
 
   it('prices an output token above an uncached input token, which is what makes thinking expensive', () => {
     // The rate card does not distinguish a useful token from a reasoning token: both arrive as
     // `completion_tokens`. The only control over that cost is not asking for it, which is why
     // every lane passes the thinking switch explicitly instead of relying on a default.
-    expect(RATE_CARD.bands.peak.out / RATE_CARD.bands.peak.miss).toBeCloseTo(4, 12);
+    for (const [model, bands] of Object.entries(RATE_CARD.prices)) {
+      expect(bands.peak.out / bands.peak.miss, model).toBeGreaterThanOrEqual(3);
+    }
   });
 });
 
@@ -173,7 +189,7 @@ describe('costOf', () => {
 
   it('carries the rates it used, so a bill can be re-derived from the artefact', () => {
     const reading = costOf(usage(1, 0, 1), at(2026, 11, MONDAY, 2));
-    expect(reading.rates).toEqual(RATE_CARD.bands.peak);
+    expect(reading.rates).toEqual(bandsFor('deepseek-flash')?.peak);
   });
 
   it('bills an empty run at zero rather than at a floor', () => {
@@ -359,7 +375,75 @@ describe('pricingFor', () => {
   it('uses the card’s own name and model list, not a copy of them', () => {
     // The manifest is the single source: a second hardcoded table is what this module's header calls
     // the arrangement in which one of the two is eventually wrong.
-    expect(pricingFor(RATE_CARD.appliesTo[0] as string).card).toBe(RATE_CARD.name);
-    expect(RATE_CARD.appliesTo).toContain('deepseek-flash');
+    for (const model of pricedModels()) {
+      expect(pricingFor(model).card, model).toBe(RATE_CARD.name);
+      expect(pricingFor(model).matches, model).toBe(true);
+    }
+  });
+
+  it('prices the host’s stronger model exactly, because it is on the card', () => {
+    // The point of the second row: a backbone comparison is the experiment this record keeps promising,
+    // and a run on the stronger model that reported the weaker model's `usd` would understate its own
+    // cost four-fold with a note calling itself an approximation.
+    expect(pricingFor('deepseek-v4-pro')).toEqual({
+      card: 'deepseek-rate-card',
+      pricedAs: 'deepseek-v4-pro',
+      matches: true,
+    });
+  });
+});
+
+describe('bandsFor and pricedModels', () => {
+  it('answers with the row for the model that was asked, and nothing for one it does not price', () => {
+    expect(bandsFor('deepseek-v4-pro')?.off_peak).toEqual({ miss: 0.66, hit: 0.022, out: 1.98 });
+    expect(bandsFor('deepseek-flash')?.off_peak).toEqual({ miss: 0.15, hit: 0.003, out: 0.6 });
+    // `undefined` rather than another model's row: the caller has to decide what an unpriced model
+    // means, and a function that answered anyway would make that decision silently.
+    expect(bandsFor('glm-4.7-flashx')).toBeUndefined();
+    expect(bandsFor('  deepseek-flash  ')).toBeDefined();
+  });
+
+  it('lists the models it prices, sorted, which is what an artefact quotes', () => {
+    expect(pricedModels()).toEqual(['deepseek-flash', 'deepseek-v4-pro']);
+  });
+
+  it('exposes the default row by reference, so the headline rates cannot drift from the table', () => {
+    // Identity, not equality: two objects holding the same six numbers is the arrangement in which
+    // one of them is eventually edited.
+    expect(RATE_CARD.bands).toBe(RATE_CARD.prices[RATE_CARD.defaultModel]);
+  });
+});
+
+describe('pricing a second backbone', () => {
+  const millionMiss = usage(1_000_000, 0, 0);
+
+  it('bills the stronger model at its own rates, which are 4.4× the default’s on input', () => {
+    const flash = billOf(spentAt(millionMiss, at(2026, 11, MONDAY, 12)));
+    const pro = billOf(spentAt(millionMiss, at(2026, 11, MONDAY, 12)), 'deepseek-v4-pro');
+    expect(flash.usd).toBe(0.15);
+    expect(pro.usd).toBe(0.66);
+    expect(pro.usd / flash.usd).toBeCloseTo(4.4, 6);
+  });
+
+  it('carries the model’s rates into the reading a caller inspects', () => {
+    const reading = costOf(millionMiss, at(2026, 11, MONDAY, 2), 'deepseek-v4-pro');
+    expect(reading.band).toBe('peak');
+    expect(reading.rates).toEqual({ miss: 1.32, hit: 0.044, out: 3.96 });
+    expect(reading.usd).toBe(1.32);
+  });
+
+  it('falls back to the default model’s rates for a model the card does not price, and says so', () => {
+    // Falling back is not the defect; falling back *silently* was. `pricingFor` is what makes the
+    // fallback visible in the artefact, and this asserts the two agree.
+    const reading = costOf(millionMiss, at(2026, 11, MONDAY, 12), 'glm-4.7-flashx');
+    expect(reading.usd).toBe(0.15);
+    expect(billOf(spentAt(millionMiss, at(2026, 11, MONDAY, 12)), 'glm-4.7-flashx').usd).toBe(0.15);
+    expect(pricingFor('glm-4.7-flashx').pricedAs).toBe('deepseek-flash');
+  });
+
+  it('prints the stronger model’s bill in the one line a lane reports', () => {
+    const spent = spentAt(usage(1_000_000, 0, 1_000_000), at(2026, 11, MONDAY, 12));
+    expect(usageLine('pro', spent, 'deepseek-v4-pro')).toContain('bill=$2.6400');
+    expect(usageLine('flash', spent)).toContain('bill=$0.7500');
   });
 });

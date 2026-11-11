@@ -1,18 +1,24 @@
 {
   "name": "deepseek-rate-card",
-  "appliesTo": ["deepseek-flash"],
-  "version": 1,
+  "version": 2,
   "currency": "USD",
   "unit": "per_million_tokens",
-  "bands": {
-    "peak": { "miss": 0.3, "hit": 0.006, "out": 1.2 },
-    "off_peak": { "miss": 0.15, "hit": 0.003, "out": 0.6 }
+  "defaultModel": "deepseek-flash",
+  "prices": {
+    "deepseek-flash": {
+      "peak": { "miss": 0.3, "hit": 0.006, "out": 1.2 },
+      "off_peak": { "miss": 0.15, "hit": 0.003, "out": 0.6 }
+    },
+    "deepseek-v4-pro": {
+      "peak": { "miss": 1.32, "hit": 0.044, "out": 3.96 },
+      "off_peak": { "miss": 0.66, "hit": 0.022, "out": 1.98 }
+    }
   },
   "peakWindows": [
     { "fromHourUtc": 1, "toHourUtc": 4 },
     { "fromHourUtc": 6, "toHourUtc": 10 }
   ],
   "peakWeekdaysOnly": true,
-  "note": "Two readers, one card: the TypeScript lanes load this file through packages/eval/src/cost.ts and the tau2 driver loads it through eval/drivers/tau2/run_split.py. Both were hardcoded once and both were hardcoded separately, which is the arrangement in which one of them is eventually wrong. A test asserts the TypeScript constant matches this file, and a Python self-check asserts the driver's bill matches it too. A card prices the models it names: `appliesTo` lists them, and a run on any other model is billed by this card as an *approximation* and says so in its own artefact (`priced_as`), because a number labelled with the wrong price is worse than a number labelled with its assumption.",
+  "note": "Two readers, one card: the TypeScript lanes load this file through packages/eval/src/cost.ts and the tau2 driver loads it through eval/drivers/tau2/run_split.py. Both were hardcoded once and both were hardcoded separately, which is the arrangement in which one of them is eventually wrong. A test asserts the TypeScript constant matches this file, and a Python self-check asserts the driver's bill matches it too. One card per provider, one price row per model: the peak predicate belongs to the provider and the numbers belong to the model, which is how the provider publishes them. A run that names a model `prices` does not hold is billed at `defaultModel` and says so in its own artefact (`pricing.matches: false`, `pricing.pricedAs`), because an approximation that names itself is a number with an assumption and an approximation that does not is a number presented as a fact.",
   "scheduling": "A run scheduled inside a peak window pays exactly double, and a cron expression is a dispatch that nobody re-reads. The weekly regression run therefore starts at 18:00 UTC, which is outside the windows above and also outside the provider's published discount boundary, so the choice survives a correction to either one."
 }

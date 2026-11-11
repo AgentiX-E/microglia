@@ -120,7 +120,14 @@ export type LlmStats = {
   readonly timeouts: number;
 };
 
-const DEFAULT_ENDPOINT = 'https://api.deepseek.com/chat/completions';
+/**
+ * Where a call goes when the lane was pointed nowhere.
+ *
+ * Exported because the catalogue probe derives its sibling from this exact string: `/models` beside
+ * `/chat/completions`. A second copy of the default would let a dispatch check one host and call
+ * another, which is the shape of every defect this file has already been repaired for.
+ */
+export const DEFAULT_CHAT_ENDPOINT = 'https://api.deepseek.com/chat/completions';
 
 /**
  * The model ids the endpoint serves under a `provider/` alias.
@@ -303,7 +310,7 @@ export class LlmClient {
     const fetchImpl = this.options.fetchImpl ?? fetch;
     const sleep = this.options.sleep ?? (async (ms: number) => new Promise((resolve) => setTimeout(resolve, ms)));
     const random = this.options.random ?? Math.random;
-    const endpoint = this.options.endpoint ?? DEFAULT_ENDPOINT;
+    const endpoint = this.options.endpoint ?? DEFAULT_CHAT_ENDPOINT;
     const timeout = this.options.timeoutMs ?? attemptTimeoutMs(maxTokens);
     const deadline = this.options.deadline;
 

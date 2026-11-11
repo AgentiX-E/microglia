@@ -16,6 +16,7 @@
  * hand. A YAML dependency for six scalar fields would be the largest thing in this package.
  */
 import type { RunGate } from './artifact-schema.js';
+import { restModelOf } from './model-client.js';
 
 export type Prereg = {
   readonly id: string;
@@ -116,6 +117,18 @@ export type Prereg = {
    * and no registration has a prediction about it.
    */
   readonly recallDomain?: string;
+  /**
+   * The model this registration runs, when it pins one.
+   *
+   * Absent means "whatever the lane is configured with", which is what every registration before R82
+   * meant. Present means the dispatch is *that* model or it is not this experiment: R82's whole claim
+   * is that one variable moved — the backbone — and a claim of that shape cannot be checked from an
+   * artefact that does not know which model produced it.
+   *
+   * The id is checked here rather than at dispatch because the header is validated by `pnpm check` on
+   * every push, while a dispatch's `backbone` input is typeable by anyone and reaches a paid run.
+   */
+  readonly backbone?: string;
   /** One bullet per prediction: a claim that can be checked against the artefact. */
   readonly prediction: readonly string[];
   /** One bullet per condition under which the stage is abandoned. */
@@ -157,6 +170,7 @@ const HEADER_KEYS = [
   'temperature',
   'looTargets',
   'offset',
+  'backbone',
 ] as const;
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
@@ -421,6 +435,26 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       sampleTemperature = parsed;
     }
   }
+  // R82: the backbone, which is the one variable that registration moves.
+  //
+  // A model id is a lowercase word with dashes, dots and at most one `provider/` prefix — the shape
+  // `restModelOf` understands — because it is pasted into `SOTA_MODEL` and compared to the id the
+  // client actually sends. A value the lane cannot send is refused here rather than at the first call.
+  const backboneText = values.get('backbone');
+  let backbone: string | undefined;
+  if (backboneText !== undefined) {
+    if (!/^[a-z0-9][a-z0-9._-]*([:/][a-z0-9][a-z0-9._-]*)?$/i.test(backboneText)) {
+      collected.push({
+        where: `header 'backbone'`,
+        problem:
+        `'${backboneText}' is not a model id such as deepseek-flash, deepseek/deepseek-flash or ` +
+        'zhipu:glm-4.7-flashx',
+      });
+    } else {
+      backbone = backboneText;
+    }
+  }
+
   // A plan path is read by the lane, so a path outside the repository is either a typo or a dispatch
   // reading whatever the runner happens to have there. Refused here rather than at read time, because a
   // registration's header is checked before its dispatch spends anything.
@@ -515,6 +549,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(recallDomain === undefined ? {} : { recallDomain }),
       ...(plantedArms === undefined ? {} : { plantedArms }),
       ...(sampleTemperature === undefined ? {} : { sampleTemperature }),
+      ...(backbone === undefined ? {} : { backbone }),
       prediction,
       refutation,
       file,
@@ -748,6 +783,48 @@ export function populationAgainstRegistration(
  * The check lives here rather than in the lane because a registration is written days before it is
  * dispatched, and `pnpm check` runs on every push.
  */
+/**
+ * A model id as the client would send it, however it was spelled.
+ *
+ * A registration may name its model the way the dispatch names it — `zhipu:glm-4.7-flashx`, where the
+ * prefix chooses a host and a key — or the way the client sends it, `deepseek/deepseek-flash`, where the
+ * prefix is litellm's spelling of a provider inside the id. Both are the same claim about which model
+ * runs, so the comparison is made on the id and not on the spelling; otherwise the check would refuse
+ * the two conventions this repository actually uses.
+ */
+function sentModel(spelling: string): string {
+  const trimmed = spelling.trim();
+  const colon = trimmed.indexOf(':');
+  return restModelOf(colon > 0 ? trimmed.slice(colon + 1) : trimmed).sent;
+}
+
+/**
+ * Whether the model a dispatch would call is the model the registration fixed.
+ *
+ * R82 exists to move exactly one variable — the backbone — and a claim of that shape cannot be checked
+ * from an artefact that does not know which model produced it. The lane reads `SOTA_MODEL` from the
+ * dispatch; the registration states the model in its header; two representations of one fact is the
+ * shape this repository has paid for before (R67 bought its arms from a menu default while its file
+ * said something else), so the disagreement is a refusal rather than a note in a report.
+ *
+ * The comparison is on what the client **sends**, not on what was typed: a `provider/` prefix is
+ * litellm's spelling of the same model and `restModelOf` is the one place that translation lives. A
+ * check that compared the spellings would refuse the very lane convention it exists to protect.
+ */
+export function backboneProblem(
+  configured: string,
+  declared: string | undefined,
+): string | undefined {
+  if (declared === undefined) return undefined;
+  const sent = sentModel(configured);
+  const wants = sentModel(declared);
+  if (sent === wants) return undefined;
+  return (
+    `this registration fixes the backbone at '${declared}' and this dispatch would call ` +
+    `'${configured}', so the model is not the only variable that moved`
+  );
+}
+
 export function unknownSampleArms(arms: Iterable<string>, known: Iterable<string>): readonly string[] {
   const table = new Set(known);
   return [...new Set(arms)]

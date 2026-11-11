@@ -19,8 +19,14 @@
  * R78, and `sample` is required by the header validator, so an empty `sample` is a file that failed
  * to parse and is refused rather than defaulted.
  *
+ * `backbone` is the third: R82 moves one variable — the model — and the file that declares the
+ * experiment declares which model it is. The dispatch may still say `backbone:`, and the lane refuses a
+ * disagreement against the header; this reader is what lets the *workflow* default to the file instead
+ * of to the repository variable, which is the global mutation R68 closed.
+ *
  * Usage: pnpm eval:prereg-population --field sample prereg/<id>.md
  *        pnpm eval:prereg-population --field offset prereg/<id>.md
+ *        pnpm eval:prereg-population --field backbone prereg/<id>.md
  */
 import { readFileSync } from 'node:fs';
 import { readPrereg } from '../prereg.js';
@@ -36,8 +42,8 @@ function main(): void {
   const field = at === -1 ? undefined : args[at + 1];
   const file = args.find((entry, index) => !entry.startsWith('--') && index !== at + 1);
 
-  if ((field !== 'sample' && field !== 'offset') || file === undefined) {
-    refuse('usage: pnpm eval:prereg-population --field sample|offset prereg/<id>.md');
+  if ((field !== 'sample' && field !== 'offset' && field !== 'backbone') || file === undefined) {
+    refuse('usage: pnpm eval:prereg-population --field sample|offset|backbone prereg/<id>.md');
     return;
   }
 
@@ -61,7 +67,12 @@ function main(): void {
     return;
   }
 
-  const value = field === 'sample' ? String(reading.prereg.sample) : reading.prereg.offset;
+  const value =
+    field === 'sample'
+      ? String(reading.prereg.sample)
+      : field === 'offset'
+        ? reading.prereg.offset
+        : reading.prereg.backbone;
   process.stdout.write(value === undefined ? '' : String(value));
   // On the run's own page: a population read from a file is exactly the number a reader assumes the
   // dispatch menu set, and zero is a legal offset that looks like "nothing was said".

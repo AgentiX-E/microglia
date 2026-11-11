@@ -254,7 +254,11 @@ def the_rates_are_read_from_the_shared_card_rather_than_copied_here(checks):
     card_path = os.path.join(HERE, "..", "..", "manifests", "model-rates.json")
     with open(card_path, encoding="utf-8") as handle:
         card = json.load(handle)
-    checks.equal(subject._RATES, card["bands"], "the driver bills at the card's rates")
+    checks.equal(
+        subject._RATES,
+        card["prices"][card["defaultModel"]],
+        "the driver bills at the card's rates for the card's default model",
+    )
     checks.equal(
         subject._PEAK_WINDOWS,
         tuple((w["fromHourUtc"], w["toHourUtc"]) for w in card["peakWindows"]),
@@ -273,7 +277,11 @@ def a_card_without_a_band_is_refused_rather_than_defaulted(checks):
     import json
     import tempfile
 
-    broken = {"bands": {"peak": {"miss": 0.3, "hit": 0.006, "out": 1.2}}, "peakWindows": []}
+    broken = {
+        "defaultModel": "deepseek-flash",
+        "prices": {"deepseek-flash": {"peak": {"miss": 0.3, "hit": 0.006, "out": 1.2}}},
+        "peakWindows": [],
+    }
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as handle:
         json.dump(broken, handle)
         path = handle.name
@@ -288,9 +296,12 @@ def a_card_without_a_band_is_refused_rather_than_defaulted(checks):
         with open(path, "w", encoding="utf-8") as handle:
             json.dump(
                 {
-                    "bands": {
-                        "peak": {"miss": 0.3, "hit": 0.006, "out": 1.2},
-                        "off_peak": {"miss": 0.15, "hit": 0.003, "out": 0.6},
+                    "defaultModel": "deepseek-flash",
+                    "prices": {
+                        "deepseek-flash": {
+                            "peak": {"miss": 0.3, "hit": 0.006, "out": 1.2},
+                            "off_peak": {"miss": 0.15, "hit": 0.003, "out": 0.6},
+                        }
                     },
                     "peakWindows": [],
                 },

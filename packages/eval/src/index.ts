@@ -188,6 +188,18 @@ export {
 } from './artifact-pool.js';
 export { artefactArgument, noArguments } from './artefact-arg.js';
 export {
+  catalogueIdsOf,
+  catalogueLine,
+  catalogueNoteOf,
+  catalogueVerdictOf,
+  modelsUrlOf,
+  probeBackbone,
+  type CatalogueNote,
+  type CatalogueReading,
+  type CatalogueVerdict,
+  type ProbeInput,
+} from './backbone.js';
+export {
   poolReport,
   type PoolReport,
   type PoolReportQuestion,
@@ -437,8 +449,10 @@ export {
   billOf,
   cacheHitRate,
   costOf,
+  bandsFor,
   isPeak,
   nextOffPeak,
+  pricedModels,
   pricingFor,
   totalUsage,
   usageLine,

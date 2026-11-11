@@ -90,7 +90,7 @@ on:
       # the other provider's key. `zhipu:<model-id>` moves all three together; the empty value
       # leaves every published run exactly where it was.
       backbone:
-        description: 'Backbone for this dispatch: empty = the repository model on this provider; zhipu:<model-id> = that model on Zhipu, with the key and the host moving together'
+        description: 'Backbone for this dispatch: empty = the repository model on this provider; <model-id> = that model on this provider, which is the swap that needs no new credential; zhipu:<model-id> = that model on Zhipu, with the key and the host moving together'
         required: false
         default: ''
       concurrency:
@@ -350,9 +350,21 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           ZHIPU_API_KEY: ${{ secrets.ZHIPU_API_KEY }}
           BACKBONE: ${{ github.event.inputs.backbone || '' }}
+          PREREG: ${{ github.event.inputs.prereg || '' }}
           DEFAULT_MODEL: ${{ vars.SOTA_MODEL || 'deepseek-flash' }}
         run: |
           set -euo pipefail
+          # The registration may fix the model, and when it does it is the default: a dispatch that names
+          # a file and no backbone runs the model that file declares, rather than the repository variable
+          # the file was written to replace. An explicit `backbone:` still wins and the lane refuses a
+          # disagreement against the header, so the two representations cannot diverge in silence.
+          DECLARED=""
+          if [ -n "$PREREG" ]; then
+            DECLARED=$(pnpm --silent eval:prereg-population --field backbone "prereg/${PREREG}.md")
+          fi
+          if [ -z "$BACKBONE" ] && [ -n "$DECLARED" ]; then
+            BACKBONE="$DECLARED"
+          fi
           case "$BACKBONE" in
             '')
               if [ -z "$DEEPSEEK_API_KEY" ]; then
@@ -382,10 +394,49 @@ jobs:
               } >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo "::error::backbone must be empty or zhipu:<model-id>, not '$BACKBONE'"
-              exit 1
+              # A bare model id on the default host. This is the one backbone swap that needs no new
+              # credential — the same host serves both models under the same key — and until now it was
+              # the swap that could not be dispatched, because the vocabulary was closed to `zhipu:` and
+              # the repository variable was the only way to name a model, which is the repository-wide
+              # mutation R68 closed. The catalogue probe below is what makes the open vocabulary safe:
+              # a typo fails in ten seconds with the served list printed.
+              case "$BACKBONE" in
+                *:*)
+                  echo "::error::backbone=$BACKBONE names a provider prefix this workflow does not know; it is empty, <model-id> on this provider, or zhipu:<model-id>"
+                  exit 1
+                  ;;
+              esac
+              if [ -z "$DEEPSEEK_API_KEY" ]; then
+                echo "::error::DEEPSEEK_API_KEY is not configured for this repository"
+                exit 1
+              fi
+              {
+                echo "model=$BACKBONE"
+                echo "endpoint="
+                echo "credential=default"
+              } >> "$GITHUB_OUTPUT"
               ;;
           esac
+
+      # Ask the host what it serves, ten seconds before the first call.
+      #
+      # The lane's own failure mode for a model id the host does not serve is quiet and expensive: a
+      # `4xx` per prompt, which `verdictOf` classifies as a refusal, which trips the eight-prompt
+      # breaker, and the run then reports "the endpoint stopped answering" about a host that answered
+      # every time — twenty minutes and about a dollar to learn that a string was wrong.
+      #
+      # It cannot veto on "I could not tell": a host may serve chat completions and no catalogue at all,
+      # and the probe records `unlistable` for that rather than failing the step. Only a catalogue that
+      # *answered* and did not list the model refuses, and it prints the list it did serve so the fix is
+      # in the log rather than in a second dispatch.
+      - name: Ask the host whether it serves the model
+        env:
+          SOTA_MODEL: ${{ steps.backbone.outputs.model }}
+          SOTA_ENDPOINT: ${{ steps.backbone.outputs.endpoint }}
+          # The resolved credential decides which key the probe may spend, exactly as it decides for the
+          # lane: a `zhipu:` dispatch spends the zhipu key, and everything else spends DeepSeek's.
+          SOTA_API_KEY: ${{ steps.backbone.outputs.credential == 'zhipu' && secrets.ZHIPU_API_KEY || secrets.DEEPSEEK_API_KEY }}
+        run: pnpm eval:backbone-probe --out eval/results/.volatile/backbone-probe.json
 
       # No inventory step: the lane verifies its own data. It reads the pinned manifest for its
       # split (`bird-minidev.json`, `bird-dev.json` or `bird-train.json`), checks the download's
@@ -686,6 +737,10 @@ jobs:
           # spend the default key on it.
           SOTA_ENDPOINT: ${{ steps.backbone.outputs.endpoint }}
           SOTA_API_KEY: ${{ (steps.backbone.outputs.credential == 'zhipu' && secrets.ZHIPU_API_KEY) || '' }}
+          # What the catalogue said about the model this run is about to call. The probe ran above,
+          # before the first model call; the artefact records its verdict, so a number produced by a
+          # model the host confirmed is distinguishable from one produced by a model id nobody checked.
+          SOTA_BACKBONE_PROBE: eval/results/.volatile/backbone-probe.json
           # Empty leaves the provider's default, which for this model is to think. Thinking is billed
           # at the output rate and is invisible in every field except a count nothing was reading, so
           # the `off` switch is available from here and the usage line reports the reasoning share —

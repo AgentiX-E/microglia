@@ -18,6 +18,11 @@ opinionated:
   dispatch   a `workflow_dispatch` that exists declares `inputs` only under `on`
   runs-on    every job names a runner, because a job without one is rejected at parse time upstream
   deadline   a step that runs on the lane's own clock derives its timeout from that clock
+  catalogue  a job that runs the lane asks the host what it serves, and asks before the first call
+
+  The last one is R82's instrument: a dispatch naming a model the host does not serve fails as a `4xx`
+  per prompt, trips the eight-prompt breaker, and reports "the endpoint stopped answering" about a host
+  that answered every time — twenty minutes and about a dollar to learn that a string was wrong.
 
   The last one is R68's third attempt: `deadline_min` 300 against a literal step timeout of 200, so the
   runner killed the step a hundred minutes before the lane's own clock would have and the run wrote no
@@ -204,6 +209,58 @@ def deadline_headroom(document: dict, name) -> list[str]:
     return failures
 
 
+def backbone_catalogue(document: dict, name) -> list[str]:
+    """A job that runs the lane asks the host what it serves, and asks before the first call.
+
+    The defect is a wrong string in a dispatch. `SOTA_MODEL` names a model the host does not serve; the
+    host answers `404` per prompt; `verdictOf` calls that a refusal; eight refusals trip the breaker; and
+    the artefact then reports that the endpoint stopped answering — twenty minutes and about a dollar
+    after a check that takes one request and ten seconds.
+
+    **Order is the rule, not presence.** A probe that runs after the lane is a probe that reports on
+    money already spent, so the step index is compared rather than the step's existence. The lane is
+    found by the variable it is paid through (`deadline_min` in a step's env), which is the same signal
+    `deadline_headroom` uses and for the same reason: it names the run without reading a step's title.
+    """
+    failures: list[str] = []
+    jobs = document.get("jobs") or {}
+    if not isinstance(jobs, dict):
+        return failures
+    for job, body in jobs.items():
+        if not isinstance(body, dict):
+            continue
+        steps = body.get("steps")
+        if not isinstance(steps, list):
+            continue
+        lane_at = None
+        probe_at = None
+        for index, step in enumerate(steps):
+            if not isinstance(step, dict):
+                continue
+            script = step.get("run")
+            if isinstance(script, str) and "eval:backbone-probe" in script and probe_at is None:
+                probe_at = index
+            env = step.get("env")
+            if lane_at is None and isinstance(env, dict) and "SOTA_DEADLINE_MIN" in env:
+                lane_at = index
+        if lane_at is None:
+            continue
+        if probe_at is None:
+            failures.append(
+                f"{name}: job `{job}` runs the lane and never asks the host what it serves; a dispatch "
+                "naming a model the host does not list spends its budget learning that at the "
+                "four-hundredth call rather than at the first (R82) -- add a step running "
+                "`pnpm eval:backbone-probe` before the run"
+            )
+        elif probe_at > lane_at:
+            failures.append(
+                f"{name}: job `{job}` asks the host what it serves at step {probe_at + 1}, after the "
+                f"lane at step {lane_at + 1}; a probe that runs after the first model call reports on "
+                "money already spent (R82) -- move it above the run"
+            )
+    return failures
+
+
 def check(path: Path) -> list[str]:
     failures: list[str] = []
     # A path outside the repository is still a workflow file to whoever handed it over, and a check
@@ -264,6 +321,7 @@ def check(path: Path) -> list[str]:
                 failures.append(f"{name}: job `{job}` names no runner")
     failures.extend(shell_syntax(document, name))
     failures.extend(deadline_headroom(document, name))
+    failures.extend(backbone_catalogue(document, name))
     return failures
 
 
@@ -284,6 +342,8 @@ def self_test() -> int:
         step_run: str | None = None,
         step_env: str | None = None,
         step_timeout: int | None = None,
+        leading_step_run: str | None = None,
+        second_step_run: str | None = None,
     ) -> str:
         # `base` exists so one case can nest the block deeper: the counter derives its indent from the
         # `inputs:` line, and a case that only ever fed it one indentation would agree with a version
@@ -316,13 +376,21 @@ def self_test() -> int:
             tail.append("    steps: []")
         else:
             tail.append("    steps:")
-            tail.append("      - name: a step")
-            if step_timeout is not None:
-                tail.append(f"        timeout-minutes: {step_timeout}")
-            if step_env is not None:
-                tail.extend(["        env:", f"          {step_env}"])
-            tail.append("        run: |")
-            tail.extend(f"          {line}" for line in step_run.rstrip("\n").split("\n"))
+
+            def emit(script: str, env: str | None = None, timeout: int | None = None) -> None:
+                tail.append("      - name: a step")
+                if timeout is not None:
+                    tail.append(f"        timeout-minutes: {timeout}")
+                if env is not None:
+                    tail.extend(["        env:", f"          {env}"])
+                tail.append("        run: |")
+                tail.extend(f"          {line}" for line in script.rstrip("\n").split("\n"))
+
+            if leading_step_run is not None:
+                emit(leading_step_run)
+            emit(step_run, step_env, step_timeout)
+            if second_step_run is not None:
+                emit(second_step_run)
         return "\n".join(header + body + tail) + "\n"
 
     cases: list[tuple[str, str, bool, str | None]] = [
@@ -381,6 +449,41 @@ def self_test() -> int:
                 step_run="echo run\n",
                 step_env="SOTA_DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}",
                 step_timeout=None,
+                leading_step_run="pnpm eval:backbone-probe --out a.json\n",
+            ),
+            True,
+            None,
+        ),
+        # R82: a dispatch names a model the host does not serve, and the lane pays twenty minutes to
+        # find out. The probe is cheap, so its absence is a defect and its *position* is the second one.
+        (
+            "a lane job that never asks the host what it serves is refused",
+            workflow(
+                2,
+                step_run="echo run\n",
+                step_env="SOTA_DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}",
+            ),
+            False,
+            "never asks the host what it serves",
+        ),
+        (
+            "a probe after the lane is refused, because it reports on money already spent",
+            workflow(
+                2,
+                step_run="echo run\n",
+                step_env="SOTA_DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}",
+                second_step_run="pnpm eval:backbone-probe --out a.json\n",
+            ),
+            False,
+            "after the",
+        ),
+        (
+            "a probe before the lane is clean",
+            workflow(
+                2,
+                step_run="echo run\n",
+                step_env="SOTA_DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}",
+                leading_step_run="pnpm eval:backbone-probe --out a.json\n",
             ),
             True,
             None,
@@ -438,7 +541,8 @@ def main(argv: list[str]) -> int:
     if HAS_YAML:
         print(
             f"workflow: {len(paths)} file(s) parse, declare at most {MAX_INPUTS} inputs, name runners, "
-            "derive the lane's timeout from its deadline, and every run: block is a script bash can parse"
+            "derive the lane's timeout from its deadline, ask the host what it serves before the first "
+            "call, and every run: block is a script bash can parse"
         )
     else:
         print(f"workflow: {len(paths)} file(s) declare at most {MAX_INPUTS} inputs; PyYAML is absent, so "

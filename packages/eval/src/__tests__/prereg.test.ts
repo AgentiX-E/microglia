@@ -5,6 +5,7 @@ import { OPTIONAL_ARMS, samplingSpecOf } from '../sota.js';
 import { DEFAULT_SELECTED_ARM } from '../width.js';
 import {
   armsAgainstRegistration,
+  backboneProblem,
   essentialArms,
   facadePairSwitch,
   plantedArmMatrix,
@@ -978,5 +979,68 @@ describe('the reconstruction registration', () => {
     const budget = Number(match?.[1]);
     expect(budget).toBeGreaterThan(0);
     expect(budget).toBeLessThan(1090 / 2);
+  });
+});
+
+describe('a registration can fix the backbone, which is the one variable R82 moves', () => {
+  const NAME = 'R8.3-xiyan-cell.md';
+  const withHeader = (line: string): string =>
+    `${HEADER.replace(/^---\n/, `---\n${line}\n`)}${PREDICTION}${REFUTATION}`;
+
+  it('reads the model id, by bare name or with the provider prefix', () => {
+    // The file name is the header's own id: `readPrereg` refuses a registration whose id and file
+    // disagree, and a case that passed a different name would be reading `undefined` from a problem.
+    expect(readPrereg(withHeader('backbone: deepseek-v4-pro'), NAME).prereg?.backbone).toBe(
+      'deepseek-v4-pro',
+    );
+    expect(
+      readPrereg(withHeader('backbone: deepseek/deepseek-v4-pro'), NAME).prereg?.backbone,
+    ).toBe('deepseek/deepseek-v4-pro');
+    // The dispatch spelling, where the prefix chooses a host and a key rather than naming a provider
+    // inside the id: a registration may say either, and the comparison is on the id.
+    expect(readPrereg(withHeader('backbone: zhipu:glm-4.7-flashx'), NAME).prereg?.backbone).toBe(
+      'zhipu:glm-4.7-flashx',
+    );
+  });
+
+  it('leaves it absent when the registration pins nothing, which is every registration before R82', () => {
+    expect(readPrereg(VALID, NAME).prereg?.backbone).toBeUndefined();
+  });
+
+  it('refuses a value that is not a model id, before a dispatch can paste it into SOTA_MODEL', () => {
+    // The header is validated on every push; a dispatch field is typeable by anyone and reaches a paid
+    // run, so the shape is checked where the checking is free.
+    expect(problemsOf(withHeader('backbone: DeepSeek V4'))).toContain(
+      "header 'backbone': 'DeepSeek V4' is not a model id such as deepseek-flash, " +
+        'deepseek/deepseek-flash or zhipu:glm-4.7-flashx',
+    );
+    expect(problemsOf(withHeader('backbone: -v4-pro'))).toHaveLength(1);
+  });
+});
+
+describe('backboneProblem', () => {
+  it('says nothing when the registration pins no model', () => {
+    expect(backboneProblem('deepseek-flash', undefined)).toBeUndefined();
+  });
+
+  it('says nothing when the dispatch would call the model the registration fixed', () => {
+    expect(backboneProblem('deepseek-v4-pro', 'deepseek-v4-pro')).toBeUndefined();
+  });
+
+  it('treats a dispatch-style provider prefix as the same model', () => {
+    expect(backboneProblem('glm-4.7-flashx', 'zhipu:glm-4.7-flashx')).toBeUndefined();
+  });
+
+  it('compares what the client sends, so a provider prefix is the same model', () => {
+    // `deepseek/` is litellm's spelling of the same id and `restModelOf` is the one place that
+    // translation lives; a check on the typed spelling would refuse the lane's own convention.
+    expect(backboneProblem('deepseek/deepseek-v4-pro', 'deepseek-v4-pro')).toBeUndefined();
+  });
+
+  it('refuses a run whose model is not the one the registration fixed', () => {
+    expect(backboneProblem('deepseek-flash', 'deepseek-v4-pro')).toBe(
+      "this registration fixes the backbone at 'deepseek-v4-pro' and this dispatch would call " +
+        "'deepseek-flash', so the model is not the only variable that moved",
+    );
   });
 });

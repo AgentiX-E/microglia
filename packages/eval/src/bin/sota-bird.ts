@@ -65,7 +65,12 @@
  *  - `SOTA_DISTILL_CONCURRENCY` distillation replies in flight at once; default 8
  */
 import { writeJson } from './lib.js';
-import { armsAgainstRegistration, populationAgainstRegistration, readPrereg } from '../prereg.js';
+import {
+  armsAgainstRegistration,
+  backboneProblem,
+  populationAgainstRegistration,
+  readPrereg,
+} from '../prereg.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -173,6 +178,7 @@ import {
   bandsUsed,
   billOf,
   cacheHitRate,
+  catalogueNoteOf,
   linkSchema,
   totalUsage,
   usageLine,
@@ -871,6 +877,28 @@ type ChannelKind = 'values' | 'linked' | 'linked-additive' | 'recall-order';
 
 const ARMS = armsAgainstPrereg(armsFrom(process.env['SOTA_ARMS']), PREREG);
 populationAgainstPrereg(PREREG, LIMIT, OFFSET);
+/**
+ * Refuse a dispatch whose backbone is not the one the registration fixed.
+ *
+ * R82's claim is that one variable moved. A run of the old model published under that registration
+ * would be a number about a different experiment wearing the prediction's name, and nothing in the
+ * artefact would contradict it: `model` would simply read what the dispatch typed. The comparison is
+ * in `prereg.ts` so it can be tested without a process; this is the file read and the named failure.
+ */
+(() => {
+  if (PREREG === '') return;
+  const path = `prereg/${PREREG}.md`;
+  if (!existsSync(path)) return;
+  const reading = readPrereg(readFileSync(path, 'utf8'), path);
+  if (reading.prereg === undefined) return;
+  const problem = backboneProblem(MODEL, reading.prereg.backbone);
+  if (problem === undefined) return;
+  throw new MicrogliaError('MG_E_CONFIG', problem, {
+    prereg: path,
+    declaredModel: reading.prereg.backbone ?? '',
+    configuredModel: MODEL,
+  });
+})();
 
 // An arm that withholds the registration's list cannot run without the list.
 //
@@ -7372,6 +7400,16 @@ async function main(): Promise<void> {
      * compare against, which requires the artefact to say which variable was moved.
      */
     model_credential: CREDENTIAL.source,
+    /**
+     * Whether the host listed this model when the dispatch asked, ten seconds before the first call.
+     *
+     * A number produced by a model the host confirmed is a different claim from a number produced by a
+     * model id nobody ever checked, and the artefact is the only place that difference survives. The
+     * step that asks runs in the workflow, writes its verdict to a file, and this reads it back:
+     * `unprobed` is what every earlier artefact is, and it is recorded rather than defaulted to
+     * `listed`, because a default of `listed` would erase the distinction the field exists for.
+     */
+    backbone_catalogue: catalogueNoteOf(process.env['SOTA_BACKBONE_PROBE'] ?? null),
   };
 
   const items = folds.flatMap((fold) =>
@@ -8209,7 +8247,10 @@ async function main(): Promise<void> {
      */
     usage: (() => {
       const banded = llm.usage;
-      const bill = billOf(banded);
+      // Priced at the model that actually moved these tokens: the card holds one row per model, and
+      // a run on the host's stronger model whose `usd` came from the cheaper row would understate its
+      // own cost by 4.4× on input — with `pricing` beside it saying only that it was an approximation.
+      const bill = billOf(banded, llm.model);
       const total = totalUsage(banded);
       return {
         model: llm.model,

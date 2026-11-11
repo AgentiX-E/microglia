@@ -52,32 +52,84 @@ export type PeakWindow = {
   readonly toHourUtc: number;
 };
 
-/** The rates every sentence about cost in this repository is computed with. */
+/**
+ * The price rows, one per model the card prices.
+ *
+ * Named so the default row can be **the same object** the card exposes as its headline rates rather
+ * than a copy of it: two objects that happen to hold the same numbers are the arrangement in which
+ * one of them is eventually edited, and a test asserts the identity rather than the equality.
+ */
+const PRICES = {
+  'deepseek-flash': {
+    peak: { miss: 0.3, hit: 0.006, out: 1.2 },
+    off_peak: { miss: 0.15, hit: 0.003, out: 0.6 },
+  },
+  /**
+   * The same host's stronger model, at the prices the host publishes beside the first one.
+   *
+   * It is here because a backbone comparison is the one experiment this record keeps promising and
+   * the bill is part of the result: a run on the stronger model that reported the weaker model's
+   * `usd` would understate its own cost by 4.4× on input and 3.3× on output, and the artefact would
+   * be the only place the error could have been caught.
+   */
+  'deepseek-v4-pro': {
+    peak: { miss: 1.32, hit: 0.044, out: 3.96 },
+    off_peak: { miss: 0.66, hit: 0.022, out: 1.98 },
+  },
+} as const satisfies Readonly<Record<string, Readonly<Record<RateBand, BandRates>>>>;
+
+/**
+ * The rates every sentence about cost in this repository is computed with.
+ *
+ * One card per **provider**, one price row per **model**: the peak predicate is the provider's — it
+ * doubles the same two windows for every model it serves — and the numbers are the model's. The card
+ * used to hold a single `bands` pair plus an `appliesTo` list, which was the right idea expressed as a
+ * claim it could not keep: it named one model and had nowhere to put a second model's prices, so the
+ * first run on a stronger model would have been billed at the weaker model's rate with a note calling
+ * itself an approximation. A note does not turn a four-fold error into a price.
+ */
 export const RATE_CARD: {
   readonly currency: string;
   readonly unit: string;
+  /** The model a run is billed as when it names one the card does not price. */
+  readonly defaultModel: string;
+  /** Dollars per million tokens, one row per model the card prices, by band. */
+  readonly prices: Readonly<Record<string, Readonly<Record<RateBand, BandRates>>>>;
+  /** The default model's row, by reference, so the two cannot be equal and different. */
   readonly bands: Readonly<Record<RateBand, BandRates>>;
   readonly peakWindows: readonly PeakWindow[];
   readonly peakWeekdaysOnly: boolean;
-  /** The models this card actually prices. A run on anything else is priced by approximation. */
-  readonly appliesTo: readonly string[];
   /** The card's own name, which the artefact quotes so a bill is never anonymous. */
   readonly name: string;
 } = {
   name: 'deepseek-rate-card',
-  appliesTo: ['deepseek-flash'],
+  defaultModel: 'deepseek-flash',
   currency: 'USD',
   unit: 'per_million_tokens',
-  bands: {
-    peak: { miss: 0.3, hit: 0.006, out: 1.2 },
-    off_peak: { miss: 0.15, hit: 0.003, out: 0.6 },
-  },
+  prices: PRICES,
+  bands: PRICES['deepseek-flash'],
   peakWindows: [
     { fromHourUtc: 1, toHourUtc: 4 },
     { fromHourUtc: 6, toHourUtc: 10 },
   ],
   peakWeekdaysOnly: true,
 };
+
+/** The models this card prices, sorted, so an artefact can list them without re-deriving them. */
+export function pricedModels(): readonly string[] {
+  return Object.keys(RATE_CARD.prices).sort();
+}
+
+/**
+ * The band rates for one model, or `undefined` when the card does not price it.
+ *
+ * `undefined` rather than the default row, because the caller has to decide what an unpriced model
+ * means — bill it as an approximation and say so, or refuse — and a function that silently answered
+ * with another model's prices would make that decision for it.
+ */
+export function bandsFor(model: string): Readonly<Record<RateBand, BandRates>> | undefined {
+  return RATE_CARD.prices[model.trim()];
+}
 
 /**
  * The tokens one run moved, split the way the provider bills them.
@@ -206,15 +258,20 @@ export type CostReading = {
   readonly rates: BandRates;
 };
 
-/** What one set of tokens cost at the moment they were spent. */
-export function costOf(usage: TokenUsage, now: Date): CostReading {
+/** What one set of tokens cost at the moment they were spent, on the model that moved them. */
+export function costOf(
+  usage: TokenUsage,
+  now: Date,
+  model: string = RATE_CARD.defaultModel,
+): CostReading {
   const band = bandOf(now);
   const other: RateBand = band === 'peak' ? 'off_peak' : 'peak';
+  const priced = bandsFor(model) ?? RATE_CARD.bands;
   return {
     band,
-    usd: bill(usage, RATE_CARD.bands[band]),
-    usdInOtherBand: bill(usage, RATE_CARD.bands[other]),
-    rates: RATE_CARD.bands[band],
+    usd: bill(usage, priced[band]),
+    usdInOtherBand: bill(usage, priced[other]),
+    rates: priced[band],
   };
 }
 
@@ -237,11 +294,14 @@ export type BillReading = {
  * unless the run never touched a peak window: a run that spent a third of its tokens at
  * peak does not halve when it moves, it drops by the peak share of its own bill.
  */
-export function billOf(banded: BandedUsage): BillReading {
-  const peakUsd = bill(banded.peak, RATE_CARD.bands.peak);
-  const offPeakUsd = bill(banded.off_peak, RATE_CARD.bands.off_peak);
-  const peakRates = RATE_CARD.bands.peak;
-  const offPeakRates = RATE_CARD.bands.off_peak;
+export function billOf(banded: BandedUsage, model: string = RATE_CARD.defaultModel): BillReading {
+  // An unpriced model is billed at the card's headline row and named as an approximation by
+  // `pricingFor`; the fallback is a reference to that row, never a second copy of it.
+  const priced = bandsFor(model) ?? RATE_CARD.bands;
+  const peakRates = priced.peak;
+  const offPeakRates = priced.off_peak;
+  const peakUsd = bill(banded.peak, peakRates);
+  const offPeakUsd = bill(banded.off_peak, offPeakRates);
   return {
     usd: round4(peakUsd + offPeakUsd),
     peakUsd,
@@ -288,9 +348,13 @@ function thousands(value: number): string {
  * because a report that omits the second cannot be acted on, and the action (move the
  * schedule) is the entire point of measuring the first.
  */
-export function usageLine(label: string, banded: BandedUsage): string {
+export function usageLine(
+  label: string,
+  banded: BandedUsage,
+  model: string = RATE_CARD.defaultModel,
+): string {
   const total = billable(totalUsage(banded));
-  const bill = billOf(banded);
+  const bill = billOf(banded, model);
   const cached = billable(banded.peak).cachedTokens + billable(banded.off_peak).cachedTokens;
   const hit = (cacheHitRate({ ...total, cachedTokens: cached }) * 100).toFixed(1);
   const peakShare = bill.usd === 0 ? 0 : (bill.peakUsd / bill.usd) * 100;
@@ -333,10 +397,10 @@ export type PricingBasis = {
 
 /** Which card prices this model, and whether it is really that model's card. */
 export function pricingFor(model: string): PricingBasis {
-  const matches = RATE_CARD.appliesTo.includes(model);
+  const priced = bandsFor(model) !== undefined;
   return {
     card: RATE_CARD.name,
-    pricedAs: matches ? model : (RATE_CARD.appliesTo[0] ?? 'unknown'),
-    matches,
+    pricedAs: priced ? model.trim() : RATE_CARD.defaultModel,
+    matches: priced,
   };
 }
