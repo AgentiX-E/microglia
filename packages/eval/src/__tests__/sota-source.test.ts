@@ -92,3 +92,51 @@ describe('a pass that costs a call per question is not gated on another arm', ()
     expect(pushAt).toBeGreaterThan((samplingIf as ts.IfStatement).end);
   });
 });
+
+/**
+ * The same defect in a second array.
+ *
+ * R81's third attempt failed `V77` after forty-two minutes with one of its two bought arms missing:
+ * the donor library that `full-reconstructed-shuffled` draws from was built under `full-shuffled`
+ * alone, so the reconstruction pair — which buys the control and not the arm that fills the library —
+ * found no donor, produced no call and published no row. The treatment arm was complete, which is why
+ * nothing before the coverage gate could see it.
+ *
+ * The lesson is not "fix that line". It is that **any array an arm reads has to be built for every
+ * arm that reads it**, and the check has to happen before the run pays for the evaluation rather than
+ * after. Both halves are asserted below.
+ */
+describe('an input library is built for every arm that reads it', () => {
+  const { file } = parse();
+
+  /** The condition a `const` is initialised under, or an empty string when it is not conditional. */
+  function conditionOf(name: string): string {
+    const declaration = declarationOf(file, name);
+    expect(declaration, `${name} must exist`).toBeDefined();
+    const initializer = declaration?.node.declarationList.declarations[0]?.initializer;
+    expect(initializer, `${name} must be initialised`).toBeDefined();
+    return initializer !== undefined && ts.isConditionalExpression(initializer)
+      ? initializer.condition.getText(file)
+      : '';
+  }
+
+  it('builds the donor library for the reconstruction control, not only for full-shuffled', () => {
+    const condition = conditionOf('packLibrary');
+    expect(condition).toContain("'full-shuffled'");
+    expect(condition).toContain("'full-reconstructed-shuffled'");
+  });
+
+  it('refuses an empty library at the top of the first fold, not at the last gate', () => {
+    const declaredAt = file.text.indexOf('const packLibrary');
+    expect(declaredAt).toBeGreaterThan(0);
+    // A union that a later edit narrows is one failure; deleting the check is another, and the second
+    // one is silent. Both arms are named here because both read the same array. Matched as a pattern
+    // rather than as a string so the call may be wrapped across lines without failing the test.
+    for (const arm of ['full-shuffled', 'full-reconstructed-shuffled']) {
+      const check = new RegExp(`requireInput\\(\\s*'${arm}'`).exec(file.text)?.index ?? -1;
+      expect(check, `${arm} reads the library and has no check that it was filled`).toBeGreaterThan(
+        declaredAt,
+      );
+    }
+  });
+});

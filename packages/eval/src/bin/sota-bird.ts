@@ -880,6 +880,27 @@ type ChannelKind = 'values' | 'linked' | 'linked-additive' | 'recall-order';
 
 const ARMS = armsAgainstPrereg(armsFrom(process.env['SOTA_ARMS']), PREREG);
 populationAgainstPrereg(PREREG, LIMIT, OFFSET);
+
+/**
+ * Refuse a dispatch that bought an arm whose input another arm's branch fills.
+ *
+ * This lane has now produced the same defect twice, in two different arrays. R81's reconstruction pass
+ * was written inside the sampling block, so a dispatch that bought no sampling arm skipped it — sixteen
+ * minutes and $0.23 for an artefact that looked complete. Its second attempt then failed on the donor
+ * library, which was built under `full-shuffled` alone: the reconstruction pair bought
+ * `full-reconstructed-shuffled` and no donor existed, so the control arm produced no call and no row —
+ * forty-two minutes, and `V77` could only report it after the evaluation.
+ *
+ * `V77` remains the backstop, because it compares the dispatch's own arm list against the rows that
+ * came out and no arm can hide from it. But it can only speak at the end. This speaks at the top of the
+ * first fold: an arm that was bought and has nothing to read is a configuration error, and saying so
+ * before the first model call costs nothing where saying it after ten thousand of them costs the run.
+ */
+function requireInput(arm: ArmName, filled: readonly unknown[], what: string): void {
+  if (!ARMS.has(arm) || filled.length > 0) return;
+  throw new MicrogliaError('MG_E_CONFIG', `${arm} was bought, but ${what}`);
+}
+
 /**
  * Refuse a dispatch whose backbone is not the one the registration fixed.
  *
@@ -4729,16 +4750,30 @@ async function runFold(
     }
   }
 
-  // The size-matched donor library the shuffled arm draws from: every held-out question's own
+  // The size-matched donor library the shuffled arms draw from: every held-out question's own
   // pack size, so a swap can be made without also changing how much text was injected.
+  //
+  // Two arms read it — `full-shuffled` and `full-reconstructed-shuffled` — and the first version of
+  // this line was built under `full-shuffled` alone. R81 bought only the reconstruction pair, so the
+  // library was empty, no donor was ever found, the control arm produced no call and no row, and the
+  // run failed `V77` after forty-two minutes with the treatment row complete. Same shape as the pass
+  // that was written inside the sampling block: **an input array filled by a different arm's branch.**
+  // The conditions are therefore the union of the readers, and `requireInput` below refuses the
+  // dispatch at the top of the first fold rather than at the end of the last one.
   const packLibrary: PackCell[] =
-    ARMS.has('full-shuffled')
+    ARMS.has('full-shuffled') || ARMS.has('full-reconstructed-shuffled')
       ? [...rawPacks].map(([position, pack]) => ({
           position,
           db: (evalRows[position] as BirdRow).db_id,
           items: pack.items.length,
         }))
       : [];
+  requireInput('full-shuffled', packLibrary, 'the size-matched donor library is empty');
+  requireInput(
+    'full-reconstructed-shuffled',
+    packLibrary,
+    'the size-matched donor library is empty, so no shuffled plan can be built',
+  );
 
   // The deletion half of the literature's prescription, run on learn rows only, before
   // any held-out question is scored.
