@@ -2538,3 +2538,46 @@ export function looIndex(count: number, key: string): number {
   const value = Number.parseInt(hashText(key).slice(0, 8), 16);
   return value % count;
 }
+
+/**
+ * Which rule a *top-up* dispatch withholds, when the plan names the rules it wants drawn.
+ *
+ * `looIndex` spreads the withheld rule uniformly over the pack, which is the right choice when the
+ * question is "what does this pack do" and the wrong one when the question is "does **this** rule ever
+ * fire". R77 left 105 rules holding fewer than five draws, and the draws they are short of are 346 — a
+ * number a randomised top-up cannot hit, because a uniform choice spends most of its calls on the rules
+ * that are already measured.
+ *
+ * So the plan is a set of rule ids and this function spends the budget as a load balancer: among the
+ * plan's rules that are in this pack, take the one with the fewest draws already assigned, and break a
+ * tie by hashing the question with the rule so the choice is uniform over the tied set and identical on
+ * a re-run. `assigned` is the caller's running count, which is what makes the balance real; without it
+ * a hash alone would cluster.
+ *
+ * `-1` when the pack holds none of the plan's rules, which is not an error: a pack is built per
+ * question, and a question whose retrieval never offered a target has nothing to withhold from the plan.
+ */
+export function targetedLooIndex(
+  ids: readonly string[],
+  plan: ReadonlySet<string>,
+  assigned: ReadonlyMap<string, number>,
+  key: string,
+): number {
+  const candidates = ids
+    .map((id, index) => ({ id, index }))
+    .filter((entry) => plan.has(entry.id));
+  if (candidates.length === 0) return -1;
+  const fewest = Math.min(...candidates.map((entry) => assigned.get(entry.id) ?? 0));
+  const tied = candidates.filter((entry) => (assigned.get(entry.id) ?? 0) === fewest);
+  if (tied.length === 1) return (tied[0] as { index: number }).index;
+  // The hash orders the whole tied set rather than picking one slot, so a pack that gains a rule cannot
+  // move every other question's choice: the order is by hash of (key, id) and the first is taken.
+  // Array#sort is stable, so two ids whose hashes collide keep their pack order, which is deterministic
+  // because the pack is. A second comparison key would be a branch no input can reach, and an
+  // unreachable branch reads as a defence that is not there.
+  const ordered = [...tied].sort((left, right) =>
+    hashText(`${key}\u0000${left.id}`).localeCompare(hashText(`${key}\u0000${right.id}`)),
+  );
+  return (ordered[0] as { index: number }).index;
+}
+

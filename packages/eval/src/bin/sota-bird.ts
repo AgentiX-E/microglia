@@ -116,6 +116,9 @@ import {
   buildValidityGates,
   armCoverageGate,
   looIndex,
+  parseSilencePlan,
+  targetedLooIndex,
+  type SilencePlan,
   assertAnything,
   assertionPrompt,
   parseAssertions,
@@ -672,6 +675,38 @@ function armsAgainstPrereg(arms: Set<ArmName>, prereg: string): Set<ArmName> {
   }
   return arms;
 }
+
+/**
+ * The draw plan a top-up registration buys against, when it declares one.
+ *
+ * R77 left 105 rules holding fewer than five draws and 346 draws short of a verdict. `looIndex` spreads
+ * the withheld rule uniformly over the pack, which is right for "what does this pack do" and useless for
+ * "does this rule ever fire": a uniform draw spends most of its calls on rules that are already measured.
+ * The plan is a property of the experiment, so it is declared in the registration's header and read from
+ * there — no dispatch field (the input budget is full) and no repository variable (a variable is global,
+ * which is the defect `SOTA_MODEL` and `SOTA_SAMPLE_TEMPERATURE` were both promoted out of).
+ *
+ * A malformed plan is refused rather than ignored: a lane that shrugs at a plan it could not read spends
+ * its calls on its own hash and reports the numbers as a top-up of the rules the plan named.
+ */
+const LOO_PLAN: SilencePlan | null = (() => {
+  if (PREREG === '') return null;
+  const path = `prereg/${PREREG}.md`;
+  if (!existsSync(path)) return null;
+  const declared = readPrereg(readFileSync(path, 'utf8'), path).prereg?.looTargets;
+  if (declared === undefined) return null;
+  if (!existsSync(declared)) {
+    throw new MicrogliaError('MG_E_CONFIG', `${path} names ${declared}, which does not exist`, {
+      prereg: path,
+      looTargets: declared,
+    });
+  }
+  return parseSilencePlan(readFileSync(declared, 'utf8'), declared);
+})();
+
+/** The plan's rule ids, and how many draws each has been given so far in this run. */
+const LOO_TARGET_SET: ReadonlySet<string> = new Set((LOO_PLAN?.targets ?? []).map((row) => row.rule));
+const looPlanDraws = new Map<string, number>();
 
 /**
  * The distillation cache, persisted so a replayed dispatch learns the same store.
@@ -4825,11 +4860,33 @@ async function runFold(
       // Exactly one rule withheld from the pack `full` renders, chosen from the question's own text
       // so nobody — including this lane on a re-run — can choose differently. Nothing is
       // re-retrieved and nothing is re-cut: if this cell moves, the withheld rule moved it.
-      const index = looIndex(pack.items.length, `${row.question}\u0000${String(fold)}`);
+      //
+      // A top-up registration replaces the hash with a purchase order: the plan names the rules that
+      // are short of draws, and the draw goes to whichever of them this pack contains and has been
+      // drawn least. The hash still decides between equally-short candidates, so the choice stays
+      // reproducible; `-1` from the plan means this question's pack holds nothing it wants, and the
+      // lane falls back to its own uniform choice rather than withholding nothing, because a question
+      // with no draw at all is a call not made.
+      const key = `${row.question}\u0000${String(fold)}`;
+      const targeted =
+        LOO_PLAN === null
+          ? -1
+          : targetedLooIndex(
+              pack.items.map((item) => item.id),
+              LOO_TARGET_SET,
+              looPlanDraws,
+              key,
+            );
+      const index = targeted !== -1 ? targeted : looIndex(pack.items.length, key);
       const kept =
         index === -1 ? [] : pack.items.filter((_, at) => at !== index);
       const withheld = index === -1 ? undefined : pack.items[index];
-      if (withheld !== undefined) looDroppedByPosition.set(position, withheld.id);
+      if (withheld !== undefined) {
+        looDroppedByPosition.set(position, withheld.id);
+        if (LOO_TARGET_SET.has(withheld.id)) {
+          looPlanDraws.set(withheld.id, (looPlanDraws.get(withheld.id) ?? 0) + 1);
+        }
+      }
       const cut = makePack(kept, { budget: pack.budget });
       call(position, 'loo', cut.rendered, cut.ids.length);
     }
@@ -7069,6 +7126,20 @@ async function main(): Promise<void> {
       // find the prediction they were supposed to test. A prediction that is not attached to its
       // measurement is a prediction the next reader has to take on trust.
       prereg: PREREG === '' ? null : `prereg/${PREREG}.md`,
+      // Which rules the `loo` arm was aimed at, when it was aimed at all. A top-up whose plan is not in
+      // the artefact is a top-up nobody can check: the reading is "these 105 rules were brought to five
+      // draws", and a reader holding the numbers needs the list and the per-rule count to verify it.
+      loo_targets:
+        LOO_PLAN === null
+          ? null
+          : {
+              rules: LOO_PLAN.targets.length,
+              draws: LOO_PLAN.draws,
+              need: LOO_PLAN.targets.reduce((sum, row) => sum + row.need, 0),
+              given: LOO_PLAN.targets
+                .filter((row) => (looPlanDraws.get(row.rule) ?? 0) > 0)
+                .length,
+            },
       convention: ACTIVE?.sentence ?? null,
       task: TASK,
       distill_prompt: 'distill-prompt/3',

@@ -14,13 +14,14 @@
  * that did not move — R74 measured 52.0% at T = 0.7, which is why the number this prints is only a
  * count when the run was deterministic.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   drawSpread,
   inertReading,
   liveShareBuckets,
   silenceReading,
+  silenceTargets,
   type InertPair,
 } from '@agentix-e/microglia-eval';
 import { birdArtefactPath } from './lib.js';
@@ -110,6 +111,30 @@ export function main(argv: readonly string[]): number {
       `than that rate explains, and ${String(silence.underPowered)} of them hold fewer than ` +
       `${String(silence.drawsToResolve)} draw(s), where silence would be chance once in twenty\n`,
   );
+  // The purchase order, when one is asked for: which rules are short of draws, how many each, and in
+  // what order a dispatch that can only pay for part of the plan should pay for them.
+  const emitAt = argv.indexOf('--emit-targets');
+  if (emitAt !== -1) {
+    const destination = argv[emitAt + 1];
+    if (destination === undefined) throw new Error('--emit-targets needs a path');
+    const drawsFlag = argv.indexOf('--draws');
+    const draws = drawsFlag === -1 ? 5 : Number(argv[drawsFlag + 1]);
+    const capFlag = argv.indexOf('--cap');
+    const targets = silenceTargets(reading.rules, {
+      draws: Number.isFinite(draws) ? draws : 5,
+      cap: capFlag === -1 ? undefined : Number(argv[capFlag + 1]),
+    });
+    writeFileSync(
+      destination,
+      `${JSON.stringify({ source: path, draws, targets }, null, 2)}\n`,
+      'utf8',
+    );
+    process.stdout.write(
+      `[inert] targets     ${String(targets.length)} rule(s), ` +
+        `${String(targets.reduce((sum, row) => sum + row.need, 0))} draw(s) short of ${String(draws)} ` +
+        `-> ${destination}\n`,
+    );
+  }
   // The busiest rules, because a pack's problem is usually visible in the first ten lines of this table.
   process.stdout.write('[inert] top rules   rule                          draws  live\n');
   for (const rule of reading.rules.slice(0, 10)) {

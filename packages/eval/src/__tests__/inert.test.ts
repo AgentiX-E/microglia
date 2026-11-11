@@ -4,7 +4,9 @@ import {
   inertReading,
   liveShareBuckets,
   normaliseSql,
+  parseSilencePlan,
   silenceReading,
+  silenceTargets,
   type InertPair,
   type RuleInertness,
 } from '../inert.js';
@@ -132,6 +134,19 @@ describe('liveShareBuckets', () => {
     expect(buckets.map((bucket) => bucket.rules)).toEqual([1, 0, 1, 1, 1]);
   });
 
+  it('counts a rule that was never drawn in the zero bucket rather than dividing by its draws', () => {
+    // `inertReading` never emits a rule with zero draws, but the function is exported and a caller
+    // holding rows from anywhere else would otherwise get NaN for a share and lose the rule from the
+    // distribution it is supposed to cover.
+    const buckets = liveShareBuckets([{ rule: 'never', draws: 0, live: 0 }]);
+    expect(buckets[0]?.rules).toBe(1);
+    expect(buckets.reduce((sum, bucket) => sum + bucket.rules, 0)).toBe(1);
+  });
+
+  it('treats a caller that supplies no edges at all as having none to distribute over', () => {
+    expect(liveShareBuckets([{ rule: 'a', draws: 1, live: 1 }], [])).toEqual([]);
+  });
+
   it('reports an empty distribution as zeros rather than as no buckets', () => {
     const buckets = liveShareBuckets([]);
     expect(buckets).toHaveLength(5);
@@ -216,5 +231,100 @@ describe('silenceReading', () => {
       drawsToResolve: 0,
       underPowered: 0,
     });
+  });
+});
+
+describe('silenceTargets', () => {
+  const rule = (name: string, draws: number, live: number): RuleInertness => ({ rule: name, draws, live });
+
+  it('asks for the draws each silent rule is short of the resolving count, and nothing more', () => {
+    const targets = silenceTargets([rule('a', 4, 2), rule('short', 1, 0), rule('near', 4, 0)], { draws: 5 });
+    expect(targets).toEqual([
+      { rule: 'short', draws: 1, need: 4 },
+      { rule: 'near', draws: 4, need: 1 },
+    ]);
+  });
+
+  it('drops a rule that already holds enough draws to be called dead', () => {
+    // The eight rules of R77's pack that already hold five draws are evidence, and spending a call to
+    // give them a sixth would be spending it on a settled question.
+    expect(silenceTargets([rule('settled', 9, 0), rule('a', 4, 2)], { draws: 5 })).toEqual([]);
+  });
+
+  it('never asks for a draw when no rule ever fired, because no number of them resolves anything', () => {
+    expect(silenceTargets([rule('dead', 1, 0), rule('also', 2, 0)], { draws: 5 })).toEqual([]);
+  });
+
+  it('orders by need, then by name, so two runs of the same file plan the same draws', () => {
+    const targets = silenceTargets(
+      [rule('b', 3, 0), rule('a', 3, 0), rule('c', 1, 0), rule('live', 4, 1)],
+      { draws: 5 },
+    );
+    expect(targets.map((row) => row.rule)).toEqual(['c', 'a', 'b']);
+    // c is four draws short and a and b are two each, so the plan is eight calls and not the thirteen a
+    // count of silent rules would suggest.
+    expect(targets.reduce((sum, row) => sum + row.need, 0)).toBe(8);
+  });
+
+  it('caps the plan at whole rules, because half a rule is not a purchase', () => {
+    const rules = [rule('live', 2, 1), rule('a', 1, 0), rule('b', 1, 0), rule('c', 1, 0)];
+    // Each silent rule is four draws short: eight calls buy two of them, seven buy one, and a cap is a
+    // budget rather than an instruction to overspend it.
+    expect(silenceTargets(rules, { draws: 5, cap: 8 })).toHaveLength(2);
+    expect(silenceTargets(rules, { draws: 5, cap: 7 })).toEqual([{ rule: 'a', draws: 1, need: 4 }]);
+    expect(silenceTargets(rules, { draws: 5, cap: 0 })).toEqual([]);
+  });
+});
+
+describe('parseSilencePlan', () => {
+  const plan = (targets: unknown, draws: unknown = 5): string =>
+    JSON.stringify({ source: 'x.json', draws, targets });
+
+  it('reads the plan the tool wrote', () => {
+    const parsed = parseSilencePlan(plan([{ rule: 'a', draws: 1, need: 4 }]), 'p.json');
+    expect(parsed.draws).toBe(5);
+    expect(parsed.targets).toEqual([{ rule: 'a', draws: 1, need: 4 }]);
+  });
+
+  it('refuses text that is not JSON, and says which file it came from', () => {
+    expect(() => parseSilencePlan('not json at all', 'p.json')).toThrow(/p\.json: not JSON/);
+  });
+
+  it('refuses a file that is not a plan rather than reading an empty one', () => {
+    // An empty plan and a plan that failed to parse are the same thing to a lane that shrugs at both,
+    // and the second is a dispatch that spends its calls on the wrong rules without saying so.
+    expect(() => parseSilencePlan('[]', 'p.json')).toThrow(/targets/);
+    expect(() => parseSilencePlan('{"targets": 3}', 'p.json')).toThrow(/targets/);
+  });
+
+  it('refuses an entry with no rule or a need of zero', () => {
+    expect(() => parseSilencePlan(plan([{ rule: '', draws: 1, need: 4 }]), 'p.json')).toThrow(/rule/);
+    expect(() => parseSilencePlan(plan([{ rule: 'a', draws: 1, need: 0 }]), 'p.json')).toThrow(/need/);
+  });
+
+  it('refuses a plan that names the same rule twice', () => {
+    const twice = plan([{ rule: 'a', draws: 1, need: 4 }, { rule: 'a', draws: 1, need: 2 }]);
+    expect(() => parseSilencePlan(twice, 'p.json')).toThrow(/twice/);
+  });
+
+  it('refuses a draws count that is not a positive integer', () => {
+    expect(() => parseSilencePlan(plan([], 0), 'p.json')).toThrow(/draws/);
+    expect(() => parseSilencePlan(plan([], 2.5), 'p.json')).toThrow(/draws/);
+  });
+
+  it('accepts an empty list, which is a plan to buy nothing', () => {
+    expect(parseSilencePlan(plan([]), 'p.json').targets).toEqual([]);
+  });
+
+  it('refuses a target that is not an object at all', () => {
+    expect(() => parseSilencePlan(plan([null]), 'p.json')).toThrow(/not an object/);
+  });
+
+  it('reads a target that does not say how many draws it has as having none', () => {
+    // The field is provenance rather than plan: what a dispatch buys is `need`, and a file written
+    // before `draws` existed is still a usable plan.
+    expect(parseSilencePlan(plan([{ rule: 'a', need: 4 }]), 'p.json').targets).toEqual([
+      { rule: 'a', draws: 0, need: 4 },
+    ]);
   });
 });

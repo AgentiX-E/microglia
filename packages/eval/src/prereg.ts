@@ -78,6 +78,18 @@ export type Prereg = {
    */
   readonly sampleTemperature?: number;
   /**
+   * Where a top-up registration's draw plan lives, when it buys draws for named rules.
+   *
+   * R77 measured that 113 of 472 rules never fired and that 105 of them hold fewer than five draws, so
+   * the experiment it left behind is not a pruning but a purchase: 346 draws aimed at the rules that are
+   * short. A randomised `loo` draw cannot aim, and the plan is a property of the experiment exactly as
+   * the arms and the temperature are, so it is declared here rather than in a dispatch field — the
+   * workflow's input budget is full and a repository variable is global.
+   *
+   * Absent means the lane withholds by its own hash, which is what every registration before R78 does.
+   */
+  readonly looTargets?: string;
+  /**
    * The scenario pair this registration executes, when it pins one.
    *
    * Absent means "whatever the lane is configured with", which is what every registration
@@ -131,6 +143,7 @@ const HEADER_KEYS = [
   'recallDomain',
   'plantedArms',
   'temperature',
+  'looTargets',
 ] as const;
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
@@ -395,6 +408,28 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       sampleTemperature = parsed;
     }
   }
+  // A plan path is read by the lane, so a path outside the repository is either a typo or a dispatch
+  // reading whatever the runner happens to have there. Refused here rather than at read time, because a
+  // registration's header is checked before its dispatch spends anything.
+  const looTargetsText = values.get('looTargets');
+  let looTargets: string | undefined;
+  if (looTargetsText !== undefined) {
+    const segments = looTargetsText.split('/');
+    if (
+      looTargetsText === '' ||
+      looTargetsText.startsWith('/') ||
+      segments.includes('..') ||
+      !looTargetsText.endsWith('.json')
+    ) {
+      collected.push({
+        where: `header 'looTargets'`,
+        problem: `'${looTargetsText}' is not a repository-relative .json path`,
+      });
+    } else {
+      looTargets = looTargetsText;
+    }
+  }
+
   const gates = listOf(values.get('gates') ?? '', collected);
   for (const gate of gates) {
     if (!/^V\d+$/.test(gate)) collected.push({ where: 'header gates', problem: `'${gate}' is not a gate code such as V30` });
@@ -444,6 +479,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(recallFloor === undefined ? {} : { recallFloor }),
       ...(facadePair === undefined ? {} : { facadePair }),
       ...(facadeNotes === undefined ? {} : { facadeNotes }),
+      ...(looTargets === undefined ? {} : { looTargets }),
       ...(trainDomain === undefined ? {} : { trainDomain }),
       ...(testDomain === undefined ? {} : { testDomain }),
       ...(recallDomain === undefined ? {} : { recallDomain }),

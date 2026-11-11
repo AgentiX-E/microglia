@@ -11,6 +11,7 @@ import {
   armPairsAgainstFull,
   armCoverageGate,
   armCoverageOf,
+  targetedLooIndex,
   buildValidityGates,
   ceilingAmong,
   contrastTable,
@@ -3293,5 +3294,46 @@ describe('looIndex', () => {
       counts[chosen] = (counts[chosen] ?? 0) + 1;
     }
     for (const count of counts) expect(count).toBeGreaterThan(50);
+  });
+});
+
+describe('targetedLooIndex', () => {
+  const plan = new Set(['t1', 't2']);
+  const none = new Map<string, number>();
+
+  it('withholds a rule the plan named, never one it did not', () => {
+    const ids = ['other', 't1', 'also'];
+    expect(targetedLooIndex(ids, plan, none, 'q')).toBe(1);
+  });
+
+  it('returns -1 when the pack holds nothing the plan wants', () => {
+    expect(targetedLooIndex(['a', 'b'], plan, none, 'q')).toBe(-1);
+    expect(targetedLooIndex([], plan, none, 'q')).toBe(-1);
+  });
+
+  it('spends the budget on the rule that has been drawn least', () => {
+    // The whole point of a top-up: a pack that offers two targets gives its draw to the one that is
+    // still short, so 346 draws land as 105 rules brought to five rather than as a hash over the pack.
+    const ids = ['t1', 't2'];
+    expect(targetedLooIndex(ids, plan, new Map([['t1', 3]]), 'q')).toBe(1);
+    expect(targetedLooIndex(ids, plan, new Map([['t2', 3]]), 'q')).toBe(0);
+    // Neither at zero, which is the case a comparison against zero would pass by coincidence: the
+    // choice has to be between two non-zero counts or the test agrees with a version that only ever
+    // looks for an undrawn rule.
+    expect(targetedLooIndex(ids, plan, new Map([['t1', 2], ['t2', 3]]), 'q')).toBe(0);
+    expect(targetedLooIndex(ids, plan, new Map([['t1', 3], ['t2', 2]]), 'q')).toBe(1);
+  });
+
+  it('is deterministic and spreads when two targets are equally short', () => {
+    const ids = ['t1', 't2'];
+    const first = targetedLooIndex(ids, plan, none, 'q1');
+    expect(targetedLooIndex(ids, plan, none, 'q1')).toBe(first);
+    // Different questions must not all choose the same rule, or a top-up would give one rule every draw.
+    const choices = new Set(['q1', 'q2', 'q3', 'q4', 'q5', 'q6'].map((key) => targetedLooIndex(ids, plan, none, key)));
+    expect(choices.size).toBe(2);
+  });
+
+  it('ignores a target that is not in this pack', () => {
+    expect(targetedLooIndex(['t2'], plan, new Map([['t1', 9]]), 'q')).toBe(0);
   });
 });

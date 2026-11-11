@@ -687,3 +687,31 @@ describe('the sampled arms a header names that the lane cannot buy', () => {
     expect(unknownSampleArms(['sample-2-x', 'sample-2-x'], KNOWN)).toEqual(['sample-2-x']);
   });
 });
+
+describe('the target list a top-up registration buys its draws against', () => {
+  const withTargets = (line: string): string =>
+    `${HEADER.replace(/^---\n/, `---\n${line}\n`)}${PREDICTION}${REFUTATION}`;
+
+  it('reads a plan path out of the header', () => {
+    const reading = readPrereg(
+      withTargets('looTargets: eval/manifests/loo/R77-silent-tail.json'),
+      'R8.3-xiyan-cell.md',
+    );
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.looTargets).toBe('eval/manifests/loo/R77-silent-tail.json');
+  });
+
+  it('leaves every earlier registration buying nothing', () => {
+    const reading = readPrereg(withTargets(''), 'R8.3-xiyan-cell.md');
+    expect(reading.prereg?.looTargets).toBeUndefined();
+  });
+
+  it('refuses a path that is absolute or climbs out of the repository', () => {
+    // A registration is a document, and a document that names a file outside the tree is either a
+    // typo or a dispatch that reads whatever the runner happens to have there.
+    for (const bad of ['/etc/passwd', '../secrets.json', 'eval/../../x.json']) {
+      const reported = problemsOf(withTargets(`looTargets: ${bad}`));
+      expect(reported.some((entry) => entry.includes("header 'looTargets'"))).toBe(true);
+    }
+  });
+});

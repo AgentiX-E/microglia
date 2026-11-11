@@ -270,3 +270,115 @@ export function silenceReading(rules: readonly RuleInertness[]): SilenceReading 
   };
 }
 
+/** One rule that needs draws before its silence means anything. */
+export type SilenceTarget = {
+  readonly rule: string;
+  /** Draws it has. */
+  readonly draws: number;
+  /** Draws it is short of the count at which silence would be chance once in twenty. */
+  readonly need: number;
+};
+
+/**
+ * The draws a top-up would have to buy, rule by rule.
+ *
+ * R77 left the pack with 113 rules that never fired and 105 of them holding fewer than five draws. This
+ * turns "give those more draws" into a purchase order: which rules, how many draws each, and in what
+ * order — because a dispatch that can only pay for part of the plan should pay for the rules furthest
+ * from a verdict rather than for a random subset of them.
+ *
+ * Ordered by `need` descending then by name, so two people planning from the same file plan the same
+ * draws. `cap` truncates the plan at a budget the caller can pay, and it truncates only from the end of
+ * that order.
+ *
+ * Returns nothing when no rule ever fired: silence is then not a chance event at any sample size, and a
+ * purchase order would be a call to spend calls on a question no number of them answers. It returns
+ * nothing for a rule that already holds the resolving count for the same reason in reverse — its silence
+ * is already evidence, and more draws would confirm rather than inform.
+ */
+export function silenceTargets(
+  rules: readonly RuleInertness[],
+  options: { readonly draws: number; readonly cap?: number },
+): readonly SilenceTarget[] {
+  const wanted = Math.max(0, Math.floor(options.draws));
+  const reading = silenceReading(rules);
+  if (reading.workingRate <= 0 || wanted === 0) return [];
+  const planned = rules
+    .filter((row) => row.live === 0 && row.draws < wanted)
+    .map((row) => ({ rule: row.rule, draws: row.draws, need: wanted - row.draws }))
+    .sort((left, right) => right.need - left.need || left.rule.localeCompare(right.rule));
+  const cap = options.cap;
+  if (cap === undefined || cap >= planned.reduce((sum, row) => sum + row.need, 0)) return planned;
+  // Truncation keeps whole rules for as long as the budget covers them, so the plan never claims a
+  // fractional draw of a rule it then reports as targetable.
+  const kept: SilenceTarget[] = [];
+  let left = Math.max(0, Math.floor(cap));
+  for (const row of planned) {
+    if (row.need > left) break;
+    kept.push(row);
+    left -= row.need;
+  }
+  return kept;
+}
+
+/** A plan to buy draws for named rules, as the tool writes it and the lane reads it. */
+export type SilencePlan = {
+  readonly draws: number;
+  readonly targets: readonly SilenceTarget[];
+};
+
+/**
+ * Read a plan, and refuse anything that is not one.
+ *
+ * The dangerous failure here is not a malformed file — it is a file that parses into **nothing**. A lane
+ * that shrugs at an empty plan spends its calls on whatever rules its own hash chooses and reports the
+ * numbers as a top-up of the rules the plan named, which is a dispatch that measured something and
+ * claimed something else. So every way of being wrong is an error: no `targets`, a target with no rule,
+ * a need of zero (a rule that needs nothing is a planning bug, not a purchase), and the same rule named
+ * twice (which would spend its budget twice and report half the coverage).
+ */
+export function parseSilencePlan(text: string, source: string): SilencePlan {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch (error) {
+    // `JSON.parse` throws a `SyntaxError` and nothing else, so the message is stringified rather than
+    // narrowed: an `instanceof` check here would be a branch no input can take.
+    throw new Error(`${source}: not JSON (${String(error)})`);
+  }
+  // Structure before values, so a file of the wrong shape reports the shape rather than the first
+  // field it fails to find. `[]` is the case that matters: an array is an object to `typeof` and would
+  // otherwise be reported as a plan with a bad `draws`, which reads like a typo rather than a wrong file.
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error(`${source}: not a plan object, so it has no targets`);
+  }
+  const record = raw as { readonly draws?: unknown; readonly targets?: unknown };
+  if (!Array.isArray(record.targets)) {
+    throw new Error(`${source}: no targets array, so it is not a plan`);
+  }
+  const draws = record.draws;
+  if (typeof draws !== 'number' || !Number.isInteger(draws) || draws <= 0) {
+    throw new Error(`${source}: draws must be a positive integer, got ${JSON.stringify(draws)}`);
+  }
+  const seen = new Set<string>();
+  const targets: SilenceTarget[] = [];
+  for (const entry of record.targets) {
+    if (entry === null || typeof entry !== 'object') throw new Error(`${source}: a target is not an object`);
+    const row = entry as { readonly rule?: unknown; readonly draws?: unknown; readonly need?: unknown };
+    if (typeof row.rule !== 'string' || row.rule === '') {
+      throw new Error(`${source}: a target names no rule`);
+    }
+    if (typeof row.need !== 'number' || !Number.isInteger(row.need) || row.need <= 0) {
+      throw new Error(`${source}: ${row.rule} needs ${JSON.stringify(row.need)} draws, and a need of zero is a planning bug`);
+    }
+    if (seen.has(row.rule)) throw new Error(`${source}: ${row.rule} is named twice`);
+    seen.add(row.rule);
+    targets.push({
+      rule: row.rule,
+      draws: typeof row.draws === 'number' ? row.draws : 0,
+      need: row.need,
+    });
+  }
+  return { draws, targets };
+}
+

@@ -1047,6 +1047,7 @@ export {
   armCoverageGate,
   armCoverageOf,
   looIndex,
+  targetedLooIndex,
   BASELINE_ARM,
   canonicalRows,
   type ResultComparison,
@@ -1325,11 +1326,15 @@ export {
   inertReading,
   liveShareBuckets,
   normaliseSql,
+  parseSilencePlan,
   silenceReading,
+  silenceTargets,
   type InertPair,
   type InertReading,
   type RuleInertness,
+  type SilencePlan,
   type SilenceReading,
+  type SilenceTarget,
 } from './inert.js';
 
 export {

@@ -1,0 +1,532 @@
+{
+  "source": "eval/results/poc-sota-bird-train-R77-inert-share.json",
+  "draws": 5,
+  "targets": [
+    {
+      "rule": "k_01hf7uarkf_88fa3",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarll_17ts3",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarlo_39jjx",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarm1_4v6gb",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarm2_0swvb",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarm3_edb53",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarm5_ba1rm",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarmv_4n4bj",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uaro6_beh2n",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uaroc_fcjbn",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarof_9ccb6",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarom_2zbnk",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarp1_2ggcy",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarpl_evqxg",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarpp_cn1pc",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarpv_9r0vq",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarqp_68avm",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarqq_7qx2k",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarre_8j4w3",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarrh_2nat1",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarrk_bhr0g",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarrn_a9bd2",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uars0_dtg2t",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uars1_2z1s0",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uars7_4yv9b",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarsf_1y5q5",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarsh_f0qef",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarsv_byxxc",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uart3_egm5q",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarta_1sv39",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarti_d8vd8",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uartl_fq0ev",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uartm_7wdbv",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarua_2kn5b",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uaruc_59xsv",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarv0_0e5pf",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarv3_3fe1c",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarv4_8cqs3",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarv9_89qrx",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarva_96ks1",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarve_e7e1j",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas03_6nfwe",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas0a_cf1s2",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas0e_71t12",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas0q_7vhre",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas22_cmanf",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas25_an6gk",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas2b_6j20r",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas2l_6bsfe",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas2p_24tkx",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas32_fkmqm",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas37_f4qgr",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas3d_b0ba9",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas3p_8dbqf",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas42_cy49z",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas4d_ctsb2",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas4o_5j7f5",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas4s_2sb5d",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uas50_bfm0s",
+      "draws": 1,
+      "need": 4
+    },
+    {
+      "rule": "k_01hf7uarka_8ebtw",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarkl_1n6xs",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarl1_6yrc2",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarlf_86mfv",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarmd_9cqmd",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarmk_5bbm6",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarmn_bn6nz",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarn8_dhd5k",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarnq_7pyfv",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uaro3_dbj8g",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uaroa_bnt7t",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarop_9m92w",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarpc_2x51a",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarqg_29jg8",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarrb_3bfak",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uart9_fnrs2",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarvd_bnxd9",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uas09_e8vjp",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uas1i_4sevd",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uas2i_bhp73",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uas4j_fzpkg",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uas4q_8jhxb",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uas51_46ymz",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uas53_baf3d",
+      "draws": 2,
+      "need": 3
+    },
+    {
+      "rule": "k_01hf7uarla_btcf8",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uarmb_36evp",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uarnb_71gdb",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uarot_7qdnz",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uarpm_8bb3k",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uarpo_6c1jx",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uarqj_0rpzc",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uarrq_5r65g",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uarru_07ph7",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uarsn_cjq8m",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uas0g_9bs29",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uas1b_32eke",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uas3b_6e2hw",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uas3l_fc8ep",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uas3o_bsn8a",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uas3u_5n1t9",
+      "draws": 3,
+      "need": 2
+    },
+    {
+      "rule": "k_01hf7uaroi_9z2g5",
+      "draws": 4,
+      "need": 1
+    },
+    {
+      "rule": "k_01hf7uarq9_0ztsn",
+      "draws": 4,
+      "need": 1
+    },
+    {
+      "rule": "k_01hf7uarvr_585m8",
+      "draws": 4,
+      "need": 1
+    },
+    {
+      "rule": "k_01hf7uas33_2v7a0",
+      "draws": 4,
+      "need": 1
+    },
+    {
+      "rule": "k_01hf7uas41_7yahj",
+      "draws": 4,
+      "need": 1
+    },
+    {
+      "rule": "k_01hf7uas48_dere2",
+      "draws": 4,
+      "need": 1
+    }
+  ],
+  "note": "Rules R77 drew fewer than five times without ever firing. Generated by `pnpm eval:inert --bird <the R77 artefact> --emit-targets`, which is the only thing that may write this file: the plan is a measurement, not a list somebody typed."
+}
