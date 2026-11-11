@@ -5,6 +5,7 @@ import {
   liveShareBuckets,
   normaliseSql,
   parseSilencePlan,
+  planCoverage,
   silenceReading,
   silenceTargets,
   type InertPair,
@@ -357,5 +358,75 @@ describe('parseSilencePlan', () => {
     expect(parseSilencePlan(plan([{ rule: 'a', need: 4 }]), 'p.json').targets).toEqual([
       { rule: 'a', draws: 0, need: 4 },
     ]);
+  });
+});
+
+describe('planCoverage', () => {
+  const plan = parseSilencePlan(
+    JSON.stringify({
+      draws: 5,
+      targets: [
+        { rule: 'a', draws: 1, need: 4 },
+        { rule: 'b', draws: 0, need: 5 },
+        { rule: 'c', draws: 3, need: 2 },
+      ],
+    }),
+    'p.json',
+  );
+
+  it('reports each count only from the arm that can measure it', () => {
+    const seen = {
+      present: new Set(['a', 'b']),
+      draws: new Map([['a', 2]]),
+      withheld: new Set(['a', 'b']),
+    };
+    expect(planCoverage(plan, seen, new Set(['pruned']))).toEqual({
+      rules: 3,
+      draws: 5,
+      need: 11,
+      present: 2,
+      given: null,
+      withheld: 2,
+    });
+    expect(planCoverage(plan, seen, new Set(['loo']))).toEqual({
+      rules: 3,
+      draws: 5,
+      need: 11,
+      present: 2,
+      given: 1,
+      withheld: null,
+    });
+    expect(planCoverage(plan, seen, new Set(['loo', 'pruned']))).toMatchObject({ given: 1, withheld: 2 });
+  });
+
+  it('never reports a zero for an arm the run did not buy', () => {
+    // The regression: R79 bought `pruned` alone and its artefact recorded `given: 0` of 105 beside 694
+    // withheld placements, which reads as "the plan did not reach this store" — the opposite of the
+    // truth. `present` is the store's own answer and it is not optional.
+    const seen = {
+      present: new Set(['a', 'b', 'c']),
+      draws: new Map<string, number>(),
+      withheld: new Set(['a', 'c']),
+    };
+    const reading = planCoverage(plan, seen, new Set(['pruned']));
+    expect(reading.given).toBeNull();
+    expect(reading.present).toBe(3);
+    expect(reading.withheld).toBe(2);
+  });
+
+  it('counts a rule the loo arm drew zero times as nu-given, and one it drew as given', () => {
+    const seen = {
+      present: new Set(['a', 'b', 'c']),
+      draws: new Map([['b', 0], ['c', 1]]),
+      withheld: new Set<string>(),
+    };
+    expect(planCoverage(plan, seen, new Set(['loo'])).given).toBe(1);
+  });
+
+  it('reports zero present when the store holds nothing the plan names', () => {
+    // A plan from another store's ids is a real outcome and must read as zero rather than as null:
+    // `present: 0` is a measurement, `given: null` is the absence of one.
+    const reading = planCoverage(plan, { present: new Set(), draws: new Map(), withheld: new Set() }, new Set(['full']));
+    expect(reading).toMatchObject({ present: 0, given: null, withheld: null });
   });
 });

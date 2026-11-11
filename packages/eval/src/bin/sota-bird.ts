@@ -117,6 +117,7 @@ import {
   armCoverageGate,
   looIndex,
   parseSilencePlan,
+  planCoverage,
   targetedLooIndex,
   type SilencePlan,
   assertAnything,
@@ -752,6 +753,9 @@ const LOO_PLAN: SilencePlan | null = (() => {
 /** The plan's rule ids, and how many draws each has been given so far in this run. */
 const LOO_TARGET_SET: ReadonlySet<string> = new Set((LOO_PLAN?.targets ?? []).map((row) => row.rule));
 const looPlanDraws = new Map<string, number>();
+/** Plan rules this run's store held, and the ones `pruned` withheld. Reported by `planCoverage`. */
+const looPlanPresent = new Set<string>();
+const looPlanWithheld = new Set<string>();
 
 /**
  * The distillation cache, persisted so a replayed dispatch learns the same store.
@@ -4626,6 +4630,10 @@ async function runFold(
       coverage: Number(queryCoverage(row.question, pack.items[0]?.statement ?? '').toFixed(3)),
     });
     injectedByPosition.set(position, injectedText(pack));
+    // Which of the plan's rules this question's pack holds. Recorded before any arm reads the pack,
+    // because it is a property of the store rather than of an arm: R79 bought `pruned` alone and its
+    // artefact reported `given: 0` of 105 while 694 placements of those rules were being withheld.
+    for (const item of pack.items) if (LOO_TARGET_SET.has(item.id)) looPlanPresent.add(item.id);
     if (repairPacks.get(position) !== undefined) {
       injectedRepairByPosition.set(position, injectedText(repairPacks.get(position) as Pack));
     }
@@ -4989,6 +4997,9 @@ async function runFold(
       // rules each arm rendered, so the readback can tell "the pruning emptied this pack" from "the
       // pruning removed one of several" without a second counter that could drift from it.
       const kept = pack.items.filter((item) => !LOO_TARGET_SET.has(item.id));
+      for (const item of pack.items) {
+        if (LOO_TARGET_SET.has(item.id)) looPlanWithheld.add(item.id);
+      }
       const cut = makePack(kept, { budget: pack.budget });
       call(position, 'pruned', cut.rendered, cut.ids.length);
     }
@@ -7239,14 +7250,11 @@ async function main(): Promise<void> {
       loo_targets:
         LOO_PLAN === null
           ? null
-          : {
-              rules: LOO_PLAN.targets.length,
-              draws: LOO_PLAN.draws,
-              need: LOO_PLAN.targets.reduce((sum, row) => sum + row.need, 0),
-              given: LOO_PLAN.targets
-                .filter((row) => (looPlanDraws.get(row.rule) ?? 0) > 0)
-                .length,
-            },
+          : planCoverage(
+              LOO_PLAN,
+              { present: looPlanPresent, draws: looPlanDraws, withheld: looPlanWithheld },
+              ARMS,
+            ),
       convention: ACTIVE?.sentence ?? null,
       task: TASK,
       distill_prompt: 'distill-prompt/3',

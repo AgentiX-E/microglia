@@ -416,3 +416,56 @@ export function parseSilencePlan(text: string, source: string): SilencePlan {
   return { draws, targets };
 }
 
+/** What a run did with the plan it was dispatched under. */
+export type PlanCoverage = {
+  /** Rules the plan names. */
+  readonly rules: number;
+  /** Draws the plan asks each of them for. */
+  readonly draws: number;
+  /** Draws the plan asks for in total. */
+  readonly need: number;
+  /** Named rules this run's store actually holds, whether or not an arm touched them. */
+  readonly present: number;
+  /** Named rules the `loo` arm drew from, or `null` if this run did not buy `loo`. */
+  readonly given: number | null;
+  /** Named rules the `pruned` arm withheld, or `null` if this run did not buy `pruned`. */
+  readonly withheld: number | null;
+};
+
+/**
+ * Report what became of the plan, without letting an arm that was not bought read as a measurement.
+ *
+ * `given` counts the draws the `loo` arm took, and only that arm increments it. R79 bought `pruned`
+ * alone — the arm whose entire purpose is to withhold the plan's rules — and its artefact therefore
+ * recorded `given: 0` beside 694 rule placements withheld from 642 packs. **Zero is what a counter
+ * nobody increments reads as**, and the sentence it produces ("the plan did not reach this store") is
+ * the opposite of what happened. The same shape as R67's arm table: a field that is right when its own
+ * arm runs and silently wrong when another one does.
+ *
+ * So each count is reported only by the arm that can measure it, `null` otherwise, and `present` —
+ * which is a property of the store rather than of any arm — is what answers "did the plan reach this
+ * run at all". A reader holding two `null`s and a `present` cannot mistake either for zero.
+ */
+export function planCoverage(
+  plan: SilencePlan,
+  seen: {
+    readonly present: ReadonlySet<string>;
+    readonly draws: ReadonlyMap<string, number>;
+    readonly withheld: ReadonlySet<string>;
+  },
+  arms: ReadonlySet<string>,
+): PlanCoverage {
+  return {
+    rules: plan.targets.length,
+    draws: plan.draws,
+    need: plan.targets.reduce((sum, row) => sum + row.need, 0),
+    present: seen.present.size,
+    given: arms.has('loo')
+      ? plan.targets.filter((row) => (seen.draws.get(row.rule) ?? 0) > 0).length
+      : null,
+    withheld: arms.has('pruned')
+      ? plan.targets.filter((row) => seen.withheld.has(row.rule)).length
+      : null,
+  };
+}
+

@@ -182,3 +182,88 @@ from a plan rather than from a measurement, and the measurement now exists: 2,96
 folds and a fifth evaluation. A cap that over-authorises is not free — it is the number the in-run
 forecast is compared against, and a bound nobody can approach tells the run nothing about whether it is
 on track.
+
+## Outcome 2 — the share travels, and it travels because the baseline fell (2026-11-11)
+
+Dispatch `42935463233`, 00:58 UTC, **3,404 calls, $1.0773** ($0.8691 of it peak, $0.6427 if all
+off-peak), 350 questions, 11 databases, five folds, 300-minute deadline, no gate failed.
+
+| arm | accuracy |
+| --- | --- |
+| `none` — no memory, no draws | 28.86% |
+| `full` — one deterministic draw + memory | 28.57% |
+| `sample-5-first` | 28.00% |
+| `sample-5-exec` — the execution-shape selector | **35.43%** |
+| `sample-5-oracle` — best of the five, reads the key | **42.57%** |
+
+Paired against `full`, same questions:
+
+| contrast | R67 (deepseek, 50.86% first) | R68 (glm, 28.00% first) |
+| --- | --- | --- |
+| `exec − full` | +0.57pp [−2.57, 3.71], p = 0.86 | **+6.86pp [2.86, 11.14], p = 0.0022**, 41 gained / 17 lost |
+| `first − full` | −0.57pp [−4.00, 2.86] | −0.57pp [−4.57, 3.43] |
+| `oracle − full` | +8.29pp [5.14, 11.71] | **+14.00pp [9.71, 18.29]** |
+
+**The share, intersecting the two artefacts' question ids first** (350 of 350 and 350, `pnpm
+eval:width-share --with`, as Amendment 1 requires):
+
+| | R67 | R68 |
+| --- | --- | --- |
+| first / selected / oracle | 50.86 / 52.00 / 59.71 | 28.00 / 35.43 / 42.57 |
+| ceiling `oracle − first` | **8.86pp** | **14.57pp** |
+| captured `exec − first` | 1.14pp | 7.43pp |
+| share, 95% | 0.13 [−0.27, 0.40] — INCONCLUSIVE | **0.51 [0.33, 0.67] — CAPTURED** |
+
+**The branch is `Baseline-bound`.** Read in the order the refutation block writes them: `first` is
+28.00% and the parse rate is 100%, so it is not `Void`; and 0.51 is 3.9× R67's 0.13, which is "at least
+twice", so `Baseline-bound` applies before `Selector-bound` and `Transferred` are reached. The published
++17.6pp between DAIL-SQL+SC and CHESS+SC was measured at a 48.6% baseline, and this is the arithmetic
+that says so: **a selector that recovers half of a 14.57pp ceiling on a 28% model recovers an eighth of
+an 8.86pp ceiling on a 51% one.**
+
+**One leg of that test is weaker than the sentence it produces, and it is recorded here rather than
+rounded away.** The "at least twice" comparison is a ratio of point estimates. R67's share has a 95%
+interval of [−0.27, 0.40] — it is indistinguishable from zero — so against R67's *upper* bound the
+doubling fails (0.51 / 0.40 = 1.28). Against R67's point estimate it holds at 3.9×, and R68's own lower
+bound 0.33 clears twice R67's point estimate 0.26. What would settle it is a stronger-backbone share
+measured with an interval that excludes zero, which needs a wider ceiling on that backbone — the same
+thing R69 already tried to buy and did not get.
+
+### The prediction that failed is the more useful number
+
+| prediction | band | measured | |
+| --- | --- | --- | --- |
+| second backbone's `first`, against 56.71% | 25–45% | 28.00% | **holds** |
+| ceiling `oracle − first` | +30…+50pp | **+14.57pp** | **fails, by half** |
+| absolute gain `exec − first` | +5…+15pp | +7.43pp | holds |
+| ceiling share within 2× of R67's | 0.03–0.26 | 0.51 | fails (3.9×) |
+| parse rate on the weaker backbone | ≥ 95% | 100% | holds |
+
+**Breadth does not get cheaper as the model gets worse; it gets more valuable at a constant rate.** The
+registered reasoning was "more failures means more of them are one draw away from being found", and the
+band it produced (+30…+50pp) assumed the ceiling grows faster than the failures do. It does not:
+
+| | R67 | R68 |
+| --- | --- | --- |
+| failures under `first` | 49.14pp | 72.00pp |
+| ceiling at five draws | 8.86pp | 14.57pp |
+| **ceiling as a share of failures** | **18.0%** | **20.2%** |
+
+Five draws rescue about **a fifth of the failures** on both backbones. The ceiling grew 1.64× while the
+failure population grew 1.47× — proportional, not super-linear. So the widening is not where the
+difference lives; the difference is entirely in how much of the widened ceiling a selector can *find*,
+and that is 13% at a 51% baseline against 51% at a 28% one. A weaker model's wrong answers are wrong in
+more distinguishable ways, not merely more numerous.
+
+### What this changes
+
+`Selector-bound` would have sent the next registration to a better selector. `Baseline-bound` sends it to
+the **ceiling**, and the two ceiling levers already have readings: width saturates (R69: k = 10 bought
++2.00pp of ceiling over k = 5 for twice the calls, and `sample-10-exec` came in *below* the first draw),
+and **temperature has never been measured at all** — `R70-temperature` is registered and unspent. So the
+next dispatch is R70, not another selector.
+
+**One instrument caveat, recorded because it is a property of this run and not of the design.** The glm
+lane timed out **118 calls** and retried 135, against **0** on the deepseek lane; 6 calls failed outright
+and are scored wrong for every arm. That cannot favour one arm over another, but it can compress the
+difference between them, so the +6.86pp is if anything an underestimate.
