@@ -1,5 +1,6 @@
 {
   "name": "deepseek-rate-card",
+  "appliesTo": ["deepseek-flash"],
   "version": 1,
   "currency": "USD",
   "unit": "per_million_tokens",
@@ -12,6 +13,6 @@
     { "fromHourUtc": 6, "toHourUtc": 10 }
   ],
   "peakWeekdaysOnly": true,
-  "note": "Two readers, one card: the TypeScript lanes load this file through packages/eval/src/cost.ts and the tau2 driver loads it through eval/drivers/tau2/run_split.py. Both were hardcoded once and both were hardcoded separately, which is the arrangement in which one of them is eventually wrong. A test asserts the TypeScript constant matches this file, and a Python self-check asserts the driver's bill matches it too.",
+  "note": "Two readers, one card: the TypeScript lanes load this file through packages/eval/src/cost.ts and the tau2 driver loads it through eval/drivers/tau2/run_split.py. Both were hardcoded once and both were hardcoded separately, which is the arrangement in which one of them is eventually wrong. A test asserts the TypeScript constant matches this file, and a Python self-check asserts the driver's bill matches it too. A card prices the models it names: `appliesTo` lists them, and a run on any other model is billed by this card as an *approximation* and says so in its own artefact (`priced_as`), because a number labelled with the wrong price is worse than a number labelled with its assumption.",
   "scheduling": "A run scheduled inside a peak window pays exactly double, and a cron expression is a dispatch that nobody re-reads. The weekly regression run therefore starts at 18:00 UTC, which is outside the windows above and also outside the provider's published discount boundary, so the choice survives a correction to either one."
 }

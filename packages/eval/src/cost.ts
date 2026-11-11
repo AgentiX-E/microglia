@@ -59,7 +59,13 @@ export const RATE_CARD: {
   readonly bands: Readonly<Record<RateBand, BandRates>>;
   readonly peakWindows: readonly PeakWindow[];
   readonly peakWeekdaysOnly: boolean;
+  /** The models this card actually prices. A run on anything else is priced by approximation. */
+  readonly appliesTo: readonly string[];
+  /** The card's own name, which the artefact quotes so a bill is never anonymous. */
+  readonly name: string;
 } = {
+  name: 'deepseek-rate-card',
+  appliesTo: ['deepseek-flash'],
   currency: 'USD',
   unit: 'per_million_tokens',
   bands: {
@@ -302,4 +308,35 @@ export function bandsUsed(banded: BandedUsage): readonly RateBand[] {
   return BANDS.filter(
     (band) => banded[band].promptTokens > 0 || banded[band].completionTokens > 0,
   );
+}
+
+/**
+ * What a bill assumes about the model it prices.
+ *
+ * The card is DeepSeek's, and R68 spent real money on `glm-4.7-flashx` while `usage.model` said so and
+ * the `usd` beside it was computed from DeepSeek's rates. Nothing in the artefact said which card the
+ * number came from, so a reader comparing two backbones' costs was comparing a price to an assumption.
+ *
+ * A card that does not name a model is not refused — refusing would make the lane unusable on a second
+ * backbone, which is the experiment R68 was — but the bill has to **say** it is an approximation and name
+ * the model it approximated with. That is the difference between a number with an assumption and a number
+ * presented as a fact.
+ */
+export type PricingBasis = {
+  /** The card's own name, from the manifest rather than from this module. */
+  readonly card: string;
+  /** The model the rates belong to. */
+  readonly pricedAs: string;
+  /** Whether that model is the one the run actually called. */
+  readonly matches: boolean;
+};
+
+/** Which card prices this model, and whether it is really that model's card. */
+export function pricingFor(model: string): PricingBasis {
+  const matches = RATE_CARD.appliesTo.includes(model);
+  return {
+    card: RATE_CARD.name,
+    pricedAs: matches ? model : (RATE_CARD.appliesTo[0] ?? 'unknown'),
+    matches,
+  };
 }

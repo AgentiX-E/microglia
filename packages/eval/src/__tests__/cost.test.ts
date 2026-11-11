@@ -16,6 +16,7 @@ import {
   totalUsage,
   usageLine,
   type BandedUsage,
+  pricingFor,
   type TokenUsage,
 } from '../cost.js';
 
@@ -333,5 +334,32 @@ describe('addUsage', () => {
 
   it('is additive from the empty record', () => {
     expect(addUsage(EMPTY_USAGE, usage(7, 3, 1))).toEqual(usage(7, 3, 1));
+  });
+});
+
+describe('pricingFor', () => {
+  it('says the card is the model', () => {
+    expect(pricingFor('deepseek-flash')).toEqual({
+      card: 'deepseek-rate-card',
+      pricedAs: 'deepseek-flash',
+      matches: true,
+    });
+  });
+
+  it('names the model it approximated with, rather than pretending', () => {
+    // R68 spent real money on glm-4.7-flashx and its `usd` was DeepSeek's rates with nothing in the
+    // artefact to say so. A reader comparing two backbones' costs was comparing a price to an assumption.
+    expect(pricingFor('glm-4.7-flashx')).toEqual({
+      card: 'deepseek-rate-card',
+      pricedAs: 'deepseek-flash',
+      matches: false,
+    });
+  });
+
+  it('uses the card’s own name and model list, not a copy of them', () => {
+    // The manifest is the single source: a second hardcoded table is what this module's header calls
+    // the arrangement in which one of the two is eventually wrong.
+    expect(pricingFor(RATE_CARD.appliesTo[0] as string).card).toBe(RATE_CARD.name);
+    expect(RATE_CARD.appliesTo).toContain('deepseek-flash');
   });
 });

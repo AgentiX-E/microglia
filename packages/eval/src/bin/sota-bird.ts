@@ -184,6 +184,7 @@ import {
   schemaLinkSplit,
   shuffledSource,
   parseGuidance,
+  pricingFor,
   reconstructPrompt,
   reconstructReading,
   type ParsedGuidance,
@@ -8227,6 +8228,15 @@ async function main(): Promise<void> {
         usd: bill.usd,
         peak_usd: bill.peakUsd,
         usd_if_all_off_peak: bill.usdIfAllOffPeak,
+        /**
+         * Which rate card priced this bill, and whether it is the right one for the model.
+         *
+         * R68 spent real money on `glm-4.7-flashx` and its `usd` was computed from DeepSeek's card with
+         * nothing in the file to say so: a reader comparing two backbones' costs was comparing a price to
+         * an assumption. `matches: false` is not an error — a second backbone is a legitimate experiment —
+         * but the bill says what it assumed instead of presenting the assumption as the price.
+         */
+        pricing: pricingFor(llm.model),
       };
     })(),
     /**

@@ -439,6 +439,7 @@ export {
   costOf,
   isPeak,
   nextOffPeak,
+  pricingFor,
   totalUsage,
   usageLine,
   type BandRates,
@@ -446,6 +447,7 @@ export {
   type BillReading,
   type CostReading,
   type PeakWindow,
+  type PricingBasis,
   type RateBand,
   type TokenUsage,
 } from './cost.js';
