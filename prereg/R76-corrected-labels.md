@@ -74,7 +74,8 @@ rate, and `forecastBudget` no longer charges a cold fold's learning to the folds
 cache. The figures above are withdrawn and replaced by the tool, unchanged in every other respect:
 
 ```
-pnpm eval:budget --bird <R74 artefact> --arms none,full --questions 283 --folds 5 --learn 283
+R74_ARTEFACT=eval/results/poc-sota-bird-train-R74-rule-causal.json
+pnpm eval:budget --bird "$R74_ARTEFACT" --arms none,full --questions 283 --folds 5 --learn 283
   rate       1.0043 calls per question per draw   (23,589 marginal calls over 7,829 × 3)
   learning   283 per fold × 5 = 1,415 requests; the prior cache answered 75%
   projected  1,015
