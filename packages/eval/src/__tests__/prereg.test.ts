@@ -1,4 +1,6 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+import { parseSilencePlan } from '../inert.js';
 import {
   armsAgainstRegistration,
   essentialArms,
@@ -713,5 +715,34 @@ describe('the target list a top-up registration buys its draws against', () => {
       const reported = problemsOf(withTargets(`looTargets: ${bad}`));
       expect(reported.some((entry) => entry.includes("header 'looTargets'"))).toBe(true);
     }
+  });
+});
+
+describe('the draw plan R78 is registered against', () => {
+  // A registration that names a file nobody has read is a dispatch that fails at the reader, and the
+  // failure would arrive after the runner was provisioned and the caches restored. This is the same
+  // discipline as the coupling ledger: the committed artefact has to parse, and it has to agree with the
+  // numbers the registration quotes about it.
+  const reading = readPrereg(
+    readFileSync('prereg/R78-silent-tail.md', 'utf8'),
+    'prereg/R78-silent-tail.md',
+  );
+
+  it('is named by the registration and parses', () => {
+    expect(reading.problems).toEqual([]);
+    const declared = reading.prereg?.looTargets;
+    expect(declared).toBe('eval/manifests/loo/R77-silent-tail.json');
+    const plan = parseSilencePlan(readFileSync(declared as string, 'utf8'), declared as string);
+    expect(plan.draws).toBe(5);
+    expect(plan.targets.length).toBe(105);
+    expect(plan.targets.reduce((sum, row) => sum + row.need, 0)).toBe(346);
+  });
+
+  it('names no rule twice, which the parser would refuse but a hand edit could reintroduce', () => {
+    const plan = parseSilencePlan(
+      readFileSync('eval/manifests/loo/R77-silent-tail.json', 'utf8'),
+      'eval/manifests/loo/R77-silent-tail.json',
+    );
+    expect(new Set(plan.targets.map((row) => row.rule)).size).toBe(plan.targets.length);
   });
 });
