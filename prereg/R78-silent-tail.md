@@ -174,3 +174,74 @@ retriever did offer the rule, and the price of asking it cleanly is 5,625 calls 
 R77 spent **$0.531** on 6,946 calls, 70.5% of them cache hits. At the same per-call price and the same
 learning-cache behaviour, 9,200 calls is **≈ $0.71**. The budget is set to 10,000 with a ceiling of
 11,000, so a cache that misses more than R77's fails on the ceiling rather than on the runner.
+
+## Outcome — the pack reproduced to a fifth of a point, and the plan did not travel
+
+**Read 2026-11-11, run `42951989979`.** 1,900 questions at offset 2,000, three arms, **6,943 calls**,
+**$1.11** of which **$1.05 was peak-rate** — see the cost note below.
+
+| reading | R77 (offset 0) | R78 (offset 2,000) | difference |
+| --- | --- | --- | --- |
+| pairs compared | 1,999 | 1,899 | — |
+| **inert pairs at T = 0** | **55.73%** | **55.87%** | **+0.14pp** |
+| rules ever withheld | 472 | 484 | +12 |
+| **wholly inert** | **113** | **109** | **−4** |
+| per-draw live rate of the firing rules | 49.9% (47.6–52.2) | 49.6% (47.2–52.0) | −0.3pp |
+| **excess** | **74.8** (72.5–77.1) | **71.0** (68.6–73.4) | −3.8 |
+| `full` accuracy | 61.80% | 57.79% | — (different questions) |
+| memory effect (`full` − `none`) | +0.25pp (−0.90 … +1.40) | **−0.32pp** (−1.58 … +0.95) | — |
+
+**The reproducibility is the result.** Two dispatches, two disjoint populations, two independently
+distilled stores, and 55.73% against 55.87%: inertness is a property of this pack and not of the
+questions it was measured on. The excess intervals overlap (72.5–77.1 and 68.6–73.4), so the dead weight
+is **71 to 75 rules of about 480** — 15%, not the 24% the raw silence count suggests.
+
+**Prediction 1 held.** `loo_targets.given` is **97**, above the 90 the registration asked for.
+
+**Prediction 2 failed, and its failure is the finding.** The registration said the run would deliver
+"about 346 draws because 18.4% of 1,875 is 345". It delivered **97 of them**. The hit rate did not move
+because a rule stopped being recalled; it moved because **`looTargets` does not travel between
+dispatches**. The plan names 105 rule ids from R77's store, and R78 distilled its own store from
+different questions: a rule id is a content hash, so a rule survives the trip only when the same sentence
+was learned again. 97 of the 105 did — the general ones, which is why the surviving draws are
+concentrated in the 64 rules with no domain — and the domain-scoped ones did not.
+
+That is a property of the instrument worth stating plainly: **a draw plan is store-local**. It buys
+draws for the rules of one learning pass, and a top-up over a different population cannot inherit it. The
+mechanism is still right — `targetedLooIndex` spent every draw it could on the least-drawn target and
+never fell back to its own hash while a planned rule was available — but the purchase was one third of
+what the file said.
+
+**Prediction 3 was worded wrong.** It said the union would put the *wholly-inert count* between 38 and
+75. The count is **109**; the numbers 38 and 75 were the *chance* and *excess* components of it, and the
+excess — **71.0**, inside 38–75 — is what the sentence's arithmetic described. The prediction's numbers
+were right about the quantity it was computing and its noun named a different one.
+
+### Cost: the same run, 47% cheaper, one day earlier
+
+R77 spent **$0.531** for 6,946 calls. R78 spent **$1.111** for 6,943 — same model, same provider, same
+cache hit rate (70.2% against 70.5%), 6% more prompt tokens. The difference is the clock:
+
+| band | R77 (23:19 UTC) | R78 (03:19 UTC) |
+| --- | --- | --- |
+| peak spend | **$0.000** | **$1.054** |
+| off-peak spend | $0.531 | $0.057 |
+| **same run, all off-peak** | $0.531 | **$0.584** |
+
+R78 crossed into the peak band nine minutes after starting. **The identical dispatch costs 1.90× at peak
+for the same tokens**, and the artefact already carries `usd_if_all_off_peak` to say so. Nothing about
+the experiment improved by running it at 11:19 Beijing time; the schedule is the cheapest lever this
+project has and it is free.
+
+### The artefact that priced this run could not record what it cost
+
+`per_fold` in a completed artefact carried `eval`, `learn`, `edited`, `distilled_failed`, `active` — and
+neither `calls` nor `learning_calls`. The **partial** artefact, the one written when a run stops, has
+carried both since R77. So `forecastBudget`'s learning term could be measured while a run was dying and
+never after one succeeded, and R77's Amendment 3 says what that cost: R74's row is a **threshold**
+(`≤ 26,529`) rather than a replay because "its artefact records calls per fold and not learning per fold —
+the field is new". The field was not new. It was in the other writer.
+
+Both keys are now written by the completed artefact as well, from the same `FoldSpend` the forecast reads.
+R78's own artefact predates the fix and cannot be replayed either; that is recorded here rather than
+repaired by re-running a 6,943-call experiment for a bookkeeping field.

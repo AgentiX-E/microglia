@@ -7940,8 +7940,17 @@ async function main(): Promise<void> {
       deadline_ms: STATEMENT_DEADLINE_MS,
       row_cap: STATEMENT_ROW_CAP,
     },
-    per_fold: folds.map((fold) => ({
+    per_fold: folds.map((fold, index) => ({
       fold: fold.fold,
+      // What the fold cost, and how much of it was the one-off learning pass.
+      //
+      // The partial artefact has carried both since R77 and the completed one carried neither, so a
+      // `forecastBudget` derived from a finished run could not be replayed from it: R74's row in R77's
+      // Amendment 3 is a **threshold** rather than a replay for exactly this reason, and the field that
+      // would have made it a replay was in the wrong writer. A number the forecast divides by is a
+      // number the artefact has to keep.
+      calls: spend[index]?.calls ?? 0,
+      learning_calls: spend[index]?.learning ?? 0,
       eval: fold.eval,
       learn: fold.learn,
       edited: fold.learning.edited,

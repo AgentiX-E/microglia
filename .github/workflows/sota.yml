@@ -567,6 +567,27 @@ jobs:
             if [ -n "$OFFSET" ]; then echo "- skipped before the slice: $OFFSET"; fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # What the clock costs, before anything is spent.
+      #
+      # The provider bills in two bands and peak is exactly double. R77 ran at 23:19 UTC and paid
+      # $0.531 for 6,946 calls; R78 ran the same experiment at 03:19 UTC and paid $1.111 for 6,943, of
+      # which $1.054 was peak — the identical dispatch at 1.9x for the same tokens. `bandOf` and
+      # `nextOffPeak` had existed unused since the rate card was written, which this repository treats
+      # as a defect: a mechanism that only exists in a document is not a mechanism.
+      #
+      # It warns rather than refuses. A guard that stops a dispatch and says "try again at 16:30" is a
+      # guard an operator overrides, and an experiment that was ready to run is a real thing to lose.
+      - name: Name the price of the clock
+        id: band
+        run: |
+          set -euo pipefail
+          pnpm --silent eval:band | tee band.txt
+          {
+            echo "### Cost band"
+            echo
+            cat band.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # The step timeout used to be the literal 200 and the lane's own deadline a dispatch input
       # whose default was 130. Those two numbers were the same claim about the same run, and nothing
       # tied them together: R68's third attempt was dispatched with `deadline_min: 300`, spent 2,961
