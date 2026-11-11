@@ -738,7 +738,12 @@ export {
   type ToolNameGuard,
 } from './tau2-register.js';
 
-export { recurrenceGate, type RecurrenceGate } from './recurrence.js';
+export {
+  recurrenceCensus,
+  recurrenceGate,
+  type RecurrenceCensus,
+  type RecurrenceGate,
+} from './recurrence.js';
 export {
   endpointsAgree,
   pairedRateDelta,

@@ -97,3 +97,48 @@ export function recurrenceGate(
     criterion,
   };
 }
+
+/**
+ * The support distribution itself: how many items the store holds at each support count.
+ *
+ * R55.0's question, separated from `recurrenceGate`'s (may this reading be trusted at all). The two
+ * belong apart because they fail differently: a gate that never runs and a census over a partial
+ * sample both report `atLeastThree: 0`, and only one of them is a fact about the store.
+ *
+ * `whole` is the field a readback has to check first. A sample of 64 items out of 400 that reports
+ * zero corroboration is a statement about 64 items, and the store it is quoted as describing may hold
+ * the corroborated one outside the window — so the census refuses the word rather than the number.
+ */
+export type RecurrenceCensus = {
+  readonly sampled: number;
+  readonly omitted: number;
+  /** `supportTasks` → items, ascending, only buckets that occur. */
+  readonly histogram: Readonly<Record<number, number>>;
+  readonly max: number;
+  readonly atLeastTwo: number;
+  readonly atLeastThree: number;
+  /** Whether this census describes the store or only the window the sample took. */
+  readonly whole: boolean;
+};
+
+export function recurrenceCensus(store: StoreItemSample): RecurrenceCensus {
+  const histogram: Record<number, number> = {};
+  let max = 0;
+  let atLeastTwo = 0;
+  let atLeastThree = 0;
+  for (const item of store.items) {
+    histogram[item.supportTasks] = (histogram[item.supportTasks] ?? 0) + 1;
+    max = Math.max(max, item.supportTasks);
+    if (item.supportTasks >= 2) atLeastTwo += 1;
+    if (item.supportTasks >= 3) atLeastThree += 1;
+  }
+  return {
+    sampled: store.items.length,
+    omitted: store.omitted,
+    histogram,
+    max,
+    atLeastTwo,
+    atLeastThree,
+    whole: store.omitted === 0,
+  };
+}

@@ -7,7 +7,7 @@
  * a different set of items than the counts beside it.
  */
 import { describe, expect, it } from "vitest";
-import { recurrenceGate } from "../recurrence.js";
+import { recurrenceCensus, recurrenceGate } from "../recurrence.js";
 import type { StoreItemRecord, StoreItemSample } from "../store-items.js";
 import type {
   ConsolidationCensus,
@@ -219,5 +219,52 @@ describe("recurrenceGate — the store the census describes", () => {
       sample([stored("k1", 2)], 12),
     );
     expect(gate.pass).toBe(false);
+  });
+});
+
+/**
+ * R55.0 — the distribution itself, not the gate over it.
+ *
+ * The gate above decides whether a support reading may be read at all. This is the reading: how many
+ * items the store holds at each support count, and whether the sample that reports it is the store.
+ * The domain's SOTA holder admits claims only at support across three distinct tasks and carries ~5
+ * items per learning task; this lane carries 0.50. Until the histogram exists, "the store is too thin"
+ * is an inference from an item count rather than a measurement of what the store contains.
+ */
+describe('recurrenceCensus', () => {
+  it('reports one bucket per support value and sums to the sample', () => {
+    const reading = recurrenceCensus(sample([stored('a', 1), stored('b', 1), stored('c', 3)]));
+    expect(reading.histogram).toEqual({ 1: 2, 3: 1 });
+    expect(reading.sampled).toBe(3);
+    expect(reading.max).toBe(3);
+    expect(reading.atLeastTwo).toBe(1);
+    expect(reading.atLeastThree).toBe(1);
+  });
+
+  it('reports a store that does not recur as a maximum of one', () => {
+    // This is the reading R55.0 exists to make: every item backed by exactly one task is a store in
+    // which no claim has been corroborated, whatever its item count says.
+    const reading = recurrenceCensus(sample([stored('a', 1), stored('b', 1)]));
+    expect(reading.max).toBe(1);
+    expect(reading.atLeastTwo).toBe(0);
+    expect(reading.atLeastThree).toBe(0);
+  });
+
+  it('refuses to call a truncated sample the store', () => {
+    // The sample's own limit is not the store's size, and a census that reported `atLeastThree: 0`
+    // over 64 of 400 items would be answering a question about the first 64 items under the store's
+    // name. `whole` is the field a readback has to check before quoting a zero.
+    const reading = recurrenceCensus(sample([stored('a', 1)], 336));
+    expect(reading.whole).toBe(false);
+    expect(reading.omitted).toBe(336);
+    expect(reading.sampled).toBe(1);
+  });
+
+  it('reports an empty store as empty rather than as whole', () => {
+    const reading = recurrenceCensus(sample([]));
+    expect(reading.histogram).toEqual({});
+    expect(reading.max).toBe(0);
+    expect(reading.sampled).toBe(0);
+    expect(reading.whole).toBe(true);
   });
 });

@@ -50,6 +50,7 @@
     "eval:template": "tsx packages/eval/src/bin/template-probe.ts",
     "eval:union": "tsx packages/eval/src/bin/union.ts",
     "eval:store": "tsx packages/eval/src/bin/store.ts",
+    "eval:recurrence": "tsx packages/eval/src/bin/recurrence.ts",
     "eval:arm-pairs": "tsx packages/eval/src/bin/arm-pairs.ts",
     "eval:arm-contrast": "tsx packages/eval/src/bin/arm-contrast.ts",
     "eval:l4-pair": "tsx packages/eval/src/bin/l4-pair.ts",
