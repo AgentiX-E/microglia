@@ -88,3 +88,64 @@ afterwards be described as a confirmation.
 The branches are applied in the order written. An estimate that fits none of the four is impossible by
 construction: the two conditions are "interval excludes 0.5" and "gain ≥ 4pp", which cut the space
 into four.
+
+## Outcome — content is not free, and the gap is the price of reading (2026-11-11)
+
+Read from R70's pool with `pnpm eval:pool --bird`, **zero calls**: 350 questions × 5 draws = 1,750
+candidates, **all 1,750 signed** — every candidate carries its query and its columns — so the `Void`
+branch (a partial pool) does not apply, and 150 questions carried at least two distinct results against
+the 138 this file expected.
+
+| signal | AUC, 95% | top-pick on 150 | against the first draw's 30.0% |
+| --- | --- | --- | --- |
+| `column-mention` (content) | **0.514 [0.464, 0.567]** | 28.7% | **−1.3pp** |
+| `literal-match` (content) | **0.506 [0.500, 0.520]** | 30.7% | +0.7pp |
+| `content-mean` | 0.520 [0.468, 0.574] | 29.3% | −0.7pp |
+| `column-shape` (shape) | 0.565 [0.532, 0.606] | 32.7% | +2.7pp |
+| `value-type` (shape) | 0.567 [0.527, 0.610] | 30.7% | +0.7pp |
+| `empty` (shape) | 0.553 [0.523, 0.590] | 31.3% | +1.3pp |
+| `null-share` (shape) | 0.511 [0.482, 0.543] | 30.0% | 0.0pp |
+
+**Branch: `Content is not free`.** Both content intervals straddle 0.5 and the gain is negative. The
+branch's own sentence is the finding: **the gap to the published pipelines is the price of reading, not
+a missing cheap signal.** CHESS writes its assertions with a model, per question, and executes them per
+candidate — that is one call per draw, five per question, and it is now the only selection lever with a
+measured reason behind it rather than an intuition. The next registration prices exactly that.
+
+### The predictions, scored
+
+| prediction | registered | measured | |
+| --- | --- | --- | --- |
+| `column-mention` AUC | 0.58–0.72, interval excluding 0.5 | **0.514 [0.464, 0.567]** | **fails** |
+| `literal-match` AUC | 0.52–0.64, the wider of the two intervals | **0.506 [0.500, 0.520]** | **fails, and narrowest** |
+| top-pick gain over `first` | +2…+10pp on the eligible population | **−1.3pp** | **fails** |
+| the two denominators disagree in magnitude, agree in sign | — | **not scoreable** | the prediction assumed a positive gain |
+
+**"A correct query names the thing the question asks about; that is close to a tautology and it should
+show" — it does not show, and the reason is the fourth prediction's own subject.** Two thirds of these
+questions have one distinct result across five draws, so the eligible population is small, the column
+names agree across candidates, and a signal computed from a name that all candidates share cannot rank
+them. Content-aware selection needs candidates that differ in *content*, and five draws of one prompt
+mostly differ in shape.
+
+The fourth prediction is recorded as not scoreable rather than as held: it was written as "the gain over
+all 350 should be smaller than the gain over the eligible 138", which presumes a positive gain. The
+measured gain is negative, so the comparison the sentence describes has nothing to shrink.
+
+### The reading that is not about content at all
+
+Three pools, three backbones and temperatures, the same three questions asked of each — how much room is
+there, and can anything in the artefact find it:
+
+| pool | model | T | eligible | `first` | `oracle` | ceiling | `empty` AUC | `column-mention` AUC |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| R67 | `deepseek-flash` | 0.7 | 120 | 50.86% | 59.71% | 8.86pp | 0.535 | — (no text recorded) |
+| R70 | `deepseek-flash` | 1.0 | 150 | 50.29% | 58.86% | 8.57pp | 0.553 | 0.514 |
+| R68 | `glm-4.7-flashx` | 0.7 | 263 | 28.00% | 42.57% | 14.57pp | **0.706** | **0.633 [0.590, 0.681]** |
+
+**Signal strength tracks the failure population, not the temperature and not the signal.** The same
+`empty` feature is worth 0.535 where 49% of questions are wrong and 0.706 where 72% are; every content
+and shape signal on the hot pool sits within 0.02 of chance while the same signals at the weak backbone
+clear it comfortably. That is R68's finding measured at the level of one candidate, and it says where the
+next selector experiment belongs: **on a baseline low enough for the ranking to be possible**, and with a
+reader expensive enough to use the content the cheap signals cannot.

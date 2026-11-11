@@ -94,3 +94,86 @@ The branches are ordered, the first that applies names the outcome, and the axis
 
 The five branches are a partition of the `(Δceiling, Δfirst)` plane with the boundaries written down,
 so a number that lands between them cannot afterwards be described as a confirmation.
+
+## Outcome — heat moved the draws around and left the ceiling where it was (2026-11-11)
+
+Dispatch `42965249014`, 05:21 → 05:45 UTC, **2,966 calls, $0.2385**, 100% off-peak, 77.3% of prompt
+tokens served from cache, no timeout, no retry, no failed call. `config.sample_temperature = 1`,
+five folds, 350 questions, every gate passed.
+
+| arm | accuracy | against `full` |
+| --- | --- | --- |
+| `none` | 52.29% | — |
+| `full` | 53.43% | — |
+| `sample-5-first` | 50.29% | −3.14pp [−6.29, 0.00], p = 0.080 |
+| `sample-5` — majority vote | 50.57% | −2.86pp [−6.00, 0.29], p = 0.099 |
+| `sample-5-exec` | **48.57%** | **−4.86pp [−8.57, −1.14], p = 0.016** |
+| `sample-5-oracle` | 58.86% | +5.43pp [2.29, 8.86], p = 0.0019 |
+
+**The branch, on the axis this file registered** — `(Δceiling, Δfirst)` against R69's same-dispatch
+k = 5 arms: R69's ceiling was 7.43pp and its `first` 51.71%; R70's ceiling is **8.57pp** and its `first`
+**50.29%**. So **Δceiling = +1.14pp, Δfirst = −1.42pp**.
+
+- `Void` — parse 100%, `V18`/`V19` reconcile 1,750 candidates, `sample_temperature` is 1. Not void.
+- `Heat pays` — needs +5pp of ceiling. No.
+- `Heat at a price` — needs +5pp of ceiling. No.
+- `Heat costs` — needs the ceiling within 3pp (1.14, yes) **and** `first` down at least 2pp (1.42, **no**,
+  by 0.58pp).
+- **`Otherwise` applies**, and it is what the file says to do with a ceiling gain under 5pp that does not
+  meet the baseline-loss bar: report as measured, adopt no line, and take R69's branch on its own
+  reading.
+
+**That is the letter of the partition and it should not be read as a stay of execution.** The substance
+is on the third row of the table above: the deployable arm is **−4.86pp against `full`, p = 0.016**, and
+−2.00pp against R69's `sample-5-exec` (50.57%). Temperature bought 1.14pp of ceiling, paid 1.42pp of
+baseline for it, and cost the selector two more — a hotter pool is a pool whose candidates are *more*
+alike in correctness and *less* separable by what they return. **The temperature line is closed.**
+
+### The predictions, scored
+
+| prediction | registered | measured | |
+| --- | --- | --- | --- |
+| ceiling `oracle − first` | +10…+20pp over R69's | **+1.14pp** | **fails** |
+| `first` below R69's | 2–5pp | −1.42pp | fails, under the band |
+| `exec − first` | under +3pp | −1.71pp | holds |
+| `sample-5 − first` | at least +2pp | **+0.29pp** | **fails** |
+| parse rate | 100% | 100% | holds |
+| five draws on every arm | 5 | 5 | holds |
+
+**The second failing prediction is the one that closes a question.** The file was written to separate
+"the draws are too alike to vote" from "voting does not work here": heat was supposed to make voting
+pay. Voting paid **+0.29pp** on hotter draws and −2.86pp against the pack. So the draws were never too
+alike — voting simply does not work on this task, at either temperature, and the answer to R69's width
+question is not "buy heat" either.
+
+### What the pool actually did
+
+Same questions, same model, same five draws, one number changed:
+
+| | R67, T = 0.7 | R70, T = 1.0 |
+| --- | --- | --- |
+| distinct results per question, mean | 1.45 | **1.60** |
+| histogram 1/2/3/4/5 | 231 / 85 / 30 / 3 / 1 | **201 / 100 / 39 / 9 / 1** |
+| questions with the answer in the pool | 209 | 206 |
+| questions the first draw got right | 178 | 176 |
+| ceiling | **31 questions, 8.86pp** | **30 questions, 8.57pp** |
+
+**Heat bought diversity and nothing else.** The distribution of distinct results widened exactly as
+intended — 30 more questions disaggregated — while the pool's *coverage* fell by three questions and the
+first draw's accuracy by two. A hotter sample moves wrong answers around; it does not find the right one
+that a cooler sample missed. That is why the ceiling is a property of the model and the question rather
+than of the sampling distribution, and it is the last of the three ceiling levers this project could pull
+cheaply: width saturates (R69), heat does nothing (here), and what remains is **decomposition or a second
+model** — different prompts rather than the same prompt spun harder.
+
+### Cost, as the smallest dispatch this project has bought
+
+| | R67 (T = 0.7) | R70 (T = 1.0) |
+| --- | --- | --- |
+| calls | 2,930 | 2,966 |
+| band | 100% peak | **100% off-peak** |
+| cache hit rate | 0% | **77.3%** |
+| spend | $0.4708 | **$0.2385** |
+
+The same experiment, half the money, from two levers that changed no science: dispatch inside the
+off-peak window, and let the prompt cache see the questions a previous dispatch already asked.
