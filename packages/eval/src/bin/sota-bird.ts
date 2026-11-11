@@ -143,6 +143,7 @@ import {
   choicePromptWithResults,
   failureKind,
   forecastBudget,
+  type FoldSpend,
   interleaveByKey,
   judgeScalar,
   answerBudget,
@@ -3291,6 +3292,14 @@ type FoldTransferRecord = {
 type FoldResult = {
   readonly fold: number;
   readonly learn: number;
+  /**
+   * Calls the fold's learning pass spent, measured around it rather than assumed from `learn`.
+   *
+   * The distinction is the whole point of the field: `learn` counts questions, the cache answers most
+   * of them without a call, and the balance is a one-off per run rather than a per-fold price. See
+   * `FoldSpend.learning` for the two dispatches that were stopped by conflating the two.
+   */
+  readonly learningCalls: number;
   readonly eval: number;
   readonly cases: readonly CaseOutcome[];
   readonly learning: LearningPass;
@@ -4030,7 +4039,9 @@ async function runFold(
         )
       : new Map();
 
+  const learningStartedAt = llm.stats.calls;
   const widened = await buildFoldMemory(GENERALIZE, learnRows, dataset, task);
+  const learningCalls = llm.stats.calls - learningStartedAt;
   // Scope widening is an arm here, not a second dispatch: the same corrections are
   // distilled twice, once promoting rules that recur across databases and once
   // leaving them where they were observed, so the two packs differ in exactly one
@@ -6016,6 +6027,7 @@ async function runFold(
   return {
     fold,
     learn: learnRows.length,
+    learningCalls,
     eval: cases.length,
     cases,
     storeItems: listed,
@@ -6241,7 +6253,7 @@ async function main(): Promise<void> {
    * dispatch can be sized from measurements rather than from a guess.
    */
   const folds: FoldResult[] = [];
-  const spend: { fold: number; calls: number }[] = [];
+  const spend: FoldSpend[] = [];
   const writeStop = async (
     reason: string,
     callsInFlightFold: number,
@@ -6263,6 +6275,9 @@ async function main(): Promise<void> {
       per_fold: folds.map((fold, index) => ({
         fold: fold.fold,
         calls: spend[index]?.calls ?? 0,
+        // Separated so a stop artefact shows which part of a fold's bill the next folds inherit
+        // and which part they get from the cache for free.
+        learning_calls: spend[index]?.learning ?? 0,
         eval: fold.eval,
         learn: fold.learn,
         edited: fold.learning.edited,
@@ -6276,8 +6291,11 @@ async function main(): Promise<void> {
   };
   for (let fold = 0; fold < FOLDS; fold += 1) {
     const before = llm.stats.calls;
+    let learningCalls = 0;
     try {
-      folds.push(await runFold(fold, rows, foldOf, dataset, task));
+      const outcome = await runFold(fold, rows, foldOf, dataset, task);
+      folds.push(outcome);
+      learningCalls = outcome.learningCalls;
     } catch (error) {
       if (!(error instanceof MicrogliaError)) throw error;
       if (error.code === 'MG_E_DEADLINE') {
@@ -6300,7 +6318,8 @@ async function main(): Promise<void> {
       );
       throw error;
     }
-    spend.push({ fold, calls: llm.stats.calls - before });
+    // The learning pass travels with the fold so the forecast can treat it as the one-off it is.
+    spend.push({ fold, calls: llm.stats.calls - before, learning: learningCalls });
     const forecast = forecastBudget({
       spent: llm.stats.calls,
       cap: MAX_CALLS,

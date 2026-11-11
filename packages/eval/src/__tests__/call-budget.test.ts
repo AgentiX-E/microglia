@@ -193,3 +193,70 @@ describe('forecastBudget under a ceiling', () => {
     expect(verdict.margin).toBe(40_000 - 29_609);
   });
 });
+
+describe('the fold that pays for everything the others read', () => {
+  // Two dispatches were killed by the same arithmetic. R77's first: fold 1 cost 1,952 (1,200
+  // evaluation, 700 learning, 52 other), the forecast multiplied that fold by five and reported 10,541
+  // against a 7,600 ceiling — and the completed run cost 6,946, of which the entire learning pass was
+  // 877 calls. R74's first: fold 1 cost 5,483, the forecast reported 29,609 against a 28,000 cap, and
+  // the re-run cost 24,465.
+  const r77 = { fold: 1, calls: 1_952, learning: 700 };
+
+  it('does not charge a start-up cost to folds that read it from the cache', () => {
+    const forecast = forecastBudget({ spent: 1_952, cap: 7_600, folds: [r77], totalFolds: 5 });
+    // 1,952 + 4 × 1,252 × 1.1 — inside the ceiling the first dispatch already had.
+    expect(forecast.projected).toBe(1_952 + Math.ceil(1_252 * 4 * 1.1));
+    expect(forecast.ok).toBe(true);
+    expect(forecast.projected).toBeLessThan(6_946 * 1.1);
+  });
+
+  it('would have finished R74 for any learning pass above 366 calls', () => {
+    // R74's artefact records calls per fold but not learning per fold — the field did not exist — so
+    // this states the threshold rather than inventing a measurement. R74's forecast was 29,609, which is
+    // 5,483 × (1 + 4 × 1.1): fold 1 charged to four folds that would not pay it. Anything above 366
+    // calls of learning in fold 1 brings the projection under the 28,000 the dispatch had, and the pass
+    // cost 877 calls in R77, which is built the same way and pays it in the same place.
+    const at = (learning: number) =>
+      forecastBudget({
+        spent: 5_483,
+        cap: 28_000,
+        folds: [{ fold: 1, calls: 5_483, learning }],
+        totalFolds: 5,
+      });
+    expect(at(365).ok).toBe(false);
+    expect(at(366).ok).toBe(true);
+  });
+
+  it('keeps the dearest-fold rule over the folds that have no start-up cost', () => {
+    // The net cost, not the net of the maximum: a later fold that retries more is still the price the
+    // remaining folds are charged, and a *cheaper* later fold does not discount them.
+    const folds = [
+      { fold: 1, calls: 1_952, learning: 700 },
+      { fold: 2, calls: 1_400, learning: 40 },
+    ];
+    const forecast = forecastBudget({ spent: 3_352, cap: 12_000, folds, totalFolds: 5 });
+    expect(forecast.projected).toBe(3_352 + Math.ceil(1_360 * 3 * 1.1));
+  });
+
+  it('behaves exactly as before when a fold reports no learning pass', () => {
+    const forecast = forecastBudget({
+      spent: 1_000,
+      cap: 9_000,
+      folds: [{ fold: 1, calls: 1_000 }],
+      totalFolds: 3,
+    });
+    expect(forecast.projected).toBe(1_000 + Math.ceil(1_000 * 2 * 1.1));
+  });
+
+  it('refuses a fold that reports more learning than it spent, rather than projecting below zero', () => {
+    // A negative learning figure cannot be evidence of anything, and letting it through would subtract
+    // a cost from the extrapolation and quietly raise the ceiling the run thinks it has.
+    const forecast = forecastBudget({
+      spent: 500,
+      cap: 6_000,
+      folds: [{ fold: 1, calls: 500, learning: 900 }],
+      totalFolds: 4,
+    });
+    expect(forecast.projected).toBe(500);
+  });
+});

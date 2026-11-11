@@ -108,3 +108,135 @@ rate only over the part of the bill that is per question.
 **Amended budget.** 11,000 forecast, **12,000 ceiling**, deadline 200. The upper bound is five folds at
 the dearest fold's price — 5 × 2,147 — and the ceiling is that plus the same 9% margin the planner
 uses. ≈$0.95 for the dispatch, ≈$1.12 for the registration including the fold that was thrown away.
+
+## Amendment 2 — the first dispatch would have finished
+
+**2026-11-10, after the reading.** The second dispatch (`42922152605`) spent **6,946 calls** and
+**$0.531** over five folds. That is inside the **7,600** the first dispatch was authorised for. **The
+first dispatch was not under-sized; it was stopped by a forecast that projected fold 1's price onto four
+folds it did not describe.**
+
+Fold 1 of the first dispatch cost 1,952 calls: 1,200 evaluation, 700 learning, 52 other. The `GenerationCache`
+answered none of that learning because a cache with nothing in it cannot. The in-run forecast multiplied
+that fold by five and reported 10,541. In the completed run the cache answered **2,623 of 3,500** learning
+requests — the same 75% it answered in R74 — so the whole learning pass cost **877 calls, not 3,500**, and
+the run came in at 6,946.
+
+**Amendment 1 above is therefore wrong about its central sentence.** It said the registration was
+"authorised for two thirds of itself". It was authorised for 91% of what the run actually needed. What
+was wrong is the instrument that decided, and the defect it exposes is one level further in than the one
+Amendment 1 found:
+
+- `planBudget` priced the dispatch at 6,875 before it ran, and the run cost 6,946 — accurate to 1%.
+- The corrected `planBudget` prices it at 7,593 projected / 11,249 bounded, and both bracket the truth.
+- **`forecastBudget` projected 10,541 for a run that cost 6,946, an over-estimate of 52%, and the ceiling
+  obeyed it.**
+
+A forecast that extrapolates the *dearest completed fold* is an upper bound, and an upper bound is what a
+ceiling should be compared against — but this one names the cold-start fold as if it were typical, so the
+bound grows with exactly the quantity that shrinks. The repair belongs in `forecastBudget`: the first
+fold's learning is paid once, so it is a start-up cost and not a per-fold rate. Amendment 1's mechanism
+(the learning pass does not scale with `limit`) is right; its arithmetic assumed the pass was paid per
+fold rather than deduplicated across them, and its conclusion about *this dispatch* is withdrawn.
+
+What the mistake cost: **1,952 calls, about $0.15**, and one fold of data that was thrown away.
+
+## Outcome — 2026-11-10, dispatch `42922152605`
+
+**6,946 calls, $0.531, 5 folds, 2,000 questions, `none,full,loo`, `temperature: 0`.** Gates all pass;
+`n` 2,000/2,000 with no leak; 1.83 rules injected per question.
+
+### The reading
+
+| reading | value |
+| --- | --- |
+| pairs compared | 1,999 (1 with no statement on one side) |
+| **inert** | **1,114 — 55.73%** (5 live pairs differ only by case) |
+| rules ever withheld | 472; draws per rule median **3**, p90 9, max 28, mean 4.24 |
+| **rules that never changed an answer** | **113 — 23.9% of the pack** |
+| rules live on ≥75% of their draws | 102 — 21.6% |
+| live share 1–25% / 25–50% / 50–75% | 24 / 105 / 128 |
+| concentration | the busiest tenth produced **33.3%** of the live answers |
+
+**No branch fires, and that is the outcome.** The file named three: above 70% (the distillation prompt),
+below 30% (the dose), within 2pp of R74's 52.0% (the mixture was never a mixture). The reading is
+**55.73%**: above the prediction's own ceiling of 55%, and **1.7pp outside the window in which the
+temperature-0.7 decoder would have been nearly deterministic**.
+
+**Prediction 1 is falsified by 0.73pp, and in the direction that matters.** The band was 30–55% on the
+reasoning that the deterministic share must sit *below* R74's 52.0% at T = 0.7, the gap being coincidence.
+The deterministic share is **higher** than the mixture it was supposed to be a component of. The pack is
+more inert than predicted, and the coincidence explanation for R74's number is dead: at T = 0, where
+coincidence is impossible, the share does not fall — it rises, on a different pack and a fifth of the
+population, but by more than the 2pp the branch allowed.
+
+**Prediction 2 is falsified, and it was arithmetically impossible as written.** "Per-rule inertness will
+be much higher than pair-level inertness" cannot hold for rules with more than one draw: a rule live on
+some draws contributes identical pairs on the others, so pair-level inertness is an average over rules
+and wholly-inertness is a per-rule extreme, and the extreme is below the average unless the pack is
+bimodal. It is bimodal — that is the finding — but the prediction asserted the opposite relation.
+
+| what the pack is made of | share | per-rule live rate |
+| --- | --- | --- |
+| never fires | **23.9%** | 0 |
+| fires sometimes | 54.5% | ~0.5 |
+| fires on ≥75% of draws | **21.6%** | ≥0.75 |
+
+**Prediction 3 holds.** A third of the live answers come from a tenth of the rules.
+
+### What the split says about memory
+
+| arm | accuracy |
+| --- | --- |
+| `none` | 61.55% |
+| `full` | 61.80% |
+| `loo` (one rule withheld) | 60.90% |
+
+Withholding one rule **improves** accuracy by **−0.90pp** [−1.90, 0.10], p = 0.0886 — the widest-sample
+out-of-sample reading of the negative effect this lane has, and the first at temperature zero. The
+cross-fitted class table is empty: harmful **+0.00pp**, helpful **+0.00pp**, neutral −1.21pp
+[−2.58, 0.16], with 224 pairs withheld a rule no other fold saw. A rule class that survives cross-fitting
+does not exist in this pack, which is R74's conclusion reproduced on a population whose draws were
+randomised rather than hash-fixed.
+
+### What this file did not expect
+
+**A quarter of the pack is dead weight and a fifth of it is the pack.** Neither number was a branch, and
+both are more actionable than the pair-level share: the 113 rules that never fired are a pruning
+candidate on *evidence of absence* rather than on a regression artifact, and the 102 that fire on most
+draws are the instrument. But 113 rules at a median of 3 draws each is weak evidence per rule — a rule
+live half the time is silent on three draws 12.5% of the time, so most of the 113 could be noise. The
+honest next measurement is not a pruning; it is **giving those 113 more draws** and asking whether any of
+them ever fires.
+
+## Amendment 3 — the repair, replayed on both dispatches
+
+**2026-11-10, after the outcome.** The repair Amendment 2 asked for is in `forecastBudget`: `FoldSpend`
+now carries the optional `learning` figure, measured around the fold's learning pass rather than assumed
+from the question count, and the extrapolation takes the maximum of `calls - learning` instead of the
+maximum of `calls`. Taking the net cost *before* the maximum, rather than subtracting learning from the
+maximum, keeps the original rule — the remaining folds are priced at the dearest one — while refusing to
+charge a one-off to folds that read it from the cache.
+
+Replayed on the two ledgers it was derived from, with nothing else changed:
+
+| dispatch | forecast then | forecast now | actual | error then | error now | cap | verdict now |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| R77 (1,952 after fold 1, 700 of it learning) | 10,541 | **7,461** | 6,946 | +52% | **+7.4%** | 7,600 | finishes, 139 to spare |
+| R74 (5,483 after fold 1) | 29,609 | **≤ 26,529** | 24,465 | +21% | ≤ +8.4% | 28,000 | finishes for any pass above 366 calls |
+
+R74's row is a threshold and not a replay because its artefact records calls per fold and not learning
+per fold — the field is new. The break-even is 366 calls of learning in fold 1; the pass cost 877 in R77,
+which pays it in the same place, so the direction is not in doubt but the figure is a bound. The test
+that carries this states the threshold rather than asserting a measurement the artefact cannot support.
+
+Three tests pin the new behaviour: the R77 replay, the R74 threshold, and the one that keeps the
+dearest-fold rule honest when a *later* fold is dearer than the net of the cold one. Two more pin the
+edges that make it safe to ship — a fold with no `learning` field forecasts exactly as before, so no
+published figure moves, and a fold that reports more learning than it spent is clamped rather than
+subtracted, because a negative cost would quietly raise the ceiling the run believes it has.
+
+**What this does not fix.** The forecast is still an extrapolation from a sample of one to four folds,
+and the +7.4% residual is the folds not being priced alike. That is what the 10% safety factor is for and
+it is now the only thing the safety factor has to cover, which is the difference between a bound that
+absorbs fold-to-fold variation and a bound that absorbs a structural error.

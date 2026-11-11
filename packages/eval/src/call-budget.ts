@@ -16,9 +16,12 @@
  *
  *  - It refuses only on evidence. With no completed fold there is nothing to extrapolate from, and
  *    inventing a prior would refuse configurations that are merely expensive.
- *  - It uses the dearest fold, not the mean. Folds are not priced alike — the first pays for a cold
- *    store, and a fold that admits more rules asks for more corrections — and an optimistic
- *    projection is worse than none, because it is quoted as reassurance.
+ *  - It uses the dearest fold, not the mean. Folds are not priced alike — a fold that admits more rules
+ *    asks for more corrections — and an optimistic projection is worse than none, because it is quoted
+ *    as reassurance. **But a start-up cost is not a per-fold price**, and that distinction cost two
+ *    dispatches: the dearest fold is the *first* one, because it pays the learning pass that every
+ *    later fold reads from the cache, so extrapolating it multiplies a one-off by the fold count. See
+ *    `FoldSpend.learning`.
  *
  * A third property was added after R74. The forecast was originally compared against the same number
  * the operator had written as the cap, which made an estimate the run could not survive being wrong
@@ -35,6 +38,21 @@ export type FoldSpend = {
   readonly fold: number;
   /** Attempts this fold spent, retries included — the unit the ceiling counts. */
   readonly calls: number;
+  /**
+   * Of those, the ones the fold's learning pass spent.
+   *
+   * The learning pass is paid **once**, because it is answered from a cache that every later fold
+   * shares. The first fold of a run pays it in full, and the artefact of a completed run shows how
+   * completely: R77's five folds spent 877 learning calls between them, 700 of them in fold 1.
+   *
+   * Without this field a forecast extrapolates the one fold that contains a start-up cost as though
+   * every fold did, and the bound grows by exactly the quantity that shrinks. R77's first dispatch was
+   * stopped on a projection of 10,541 for a run that cost 6,946; R74's first was stopped on 29,609 for
+   * a run that cost 24,465. Both were killed by the same 700 calls counted five times.
+   *
+   * Absent means the fold does not report a learning pass, which is the old behaviour exactly.
+   */
+  readonly learning?: number;
 };
 
 export type BudgetLedger = {
@@ -109,7 +127,14 @@ export function forecastBudget(ledger: BudgetLedger): BudgetForecast {
       resized: false,
     };
   }
-  const dearest = ledger.folds.reduce((most, fold) => (fold.calls > most ? fold.calls : most), 0);
+  // The one-off, removed before the extrapolation: the dearest fold's cost net of its learning pass.
+  // Taking the maximum of the *net* costs rather than the net of the maximum keeps the original rule —
+  // price the remaining folds at the dearer one — while refusing to charge a start-up cost to folds that
+  // will not pay it.
+  const dearest = ledger.folds.reduce(
+    (most, fold) => Math.max(most, fold.calls - Math.max(0, fold.learning ?? 0)),
+    0,
+  );
   const safetyPct = ledger.safetyPct ?? DEFAULT_SAFETY_PCT;
   const projected = ledger.spent + Math.ceil((dearest * remaining * safetyPct) / 100);
   if (projected <= bound) {
