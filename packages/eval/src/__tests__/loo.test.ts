@@ -105,6 +105,23 @@ describe('looGroups', () => {
     expect(groups.some((group) => group.name === 'neutral')).toBe(false);
   });
 
+  it('counts a rule the ledger never saw injected as neutral, and says which table that is', () => {
+    // The withheld rule is in no pack in this split, so no observational verdict exists for it.
+    // `looCrossFitted` calls that `unseen` and excludes it from the class readings; this pooled table
+    // calls it `neutral`, which is the label R77 published. The case is here so the difference is a
+    // recorded decision rather than a fallback nobody looked at.
+    const ghost: readonly LooRow[] = [
+      { fold: 0, correct: false, injectedCorrect: false, dropped: 'ghost', packIds: ['harmful'] },
+      { fold: 0, correct: false, injectedCorrect: false, dropped: 'harmful', packIds: ['harmful'] },
+    ];
+    const groups = looGroups(ghost, [true, true]);
+    expect(groups.map((group) => group.name)).toEqual(['harmful', 'neutral', '1 rule(s)']);
+    const neutral = groups.find((group) => group.name === 'neutral');
+    expect(neutral?.pairs).toBe(1);
+    // The ghost's withheld draw changed nothing, so its own segment reads zero rather than absent.
+    expect(neutral?.reading.delta).toBeCloseTo(0, 10);
+  });
+
   it('buckets pack size with the third bucket open at the top', () => {
     const sized: readonly LooRow[] = [
       { fold: 0, correct: true, injectedCorrect: false, dropped: 'a', packIds: ['a'] },

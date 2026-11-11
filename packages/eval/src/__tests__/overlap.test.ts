@@ -180,8 +180,32 @@ describe('tercileVerdicts', () => {
     for (const verdict of verdicts) expect(verdict.routed.net).toBe(-verdict.injected.net);
   });
 
+  it('runs on its own defaults, which is what every caller in the lane uses', () => {
+    // The injected options are how the fixtures stay fast; a default that crashed or resampled zero
+    // times would stay green behind them, and the lane takes this path on 1,534 questions.
+    const verdicts = tercileVerdicts(rows, 0.4);
+    expect(verdicts.map((verdict) => verdict.name)).toEqual(['low', 'middle', 'high']);
+    expect(verdicts[0]?.injected.net).toBe(-3);
+    expect(verdicts[0]?.injected.low).toBeLessThan(0);
+  });
+
   it('survives an empty population rather than dividing by zero', () => {
     expect(tercileVerdicts([], 0.4, { resamples: 50 })).toEqual([]);
+  });
+
+  it('reports two empty terciles as empty rather than as zeros that read as measured', () => {
+    // Floor(2 / 3) is zero, so the low and middle segments are [0,0) and [0,0). A cell printed as
+    // `net 0` there would be indistinguishable from a segment that was measured and did not move, which
+    // is the distinction `per100` already carries for a one-element segment.
+    const two: readonly OverlapRow[] = [
+      { overlap: 0.1, gained: true, lost: false },
+      { overlap: 0.9, gained: false, lost: true },
+    ];
+    const verdicts = tercileVerdicts(two, 0.5, { resamples: 100 });
+    expect(verdicts.map((verdict) => verdict.n)).toEqual([0, 0, 2]);
+    expect(verdicts[0]?.mean).toBe(0);
+    expect(verdicts[0]?.injected.per100).toBe(0);
+    expect(verdicts[2]?.mean).toBe(0.5);
   });
 
   it('reports a zero-width interval when nothing moved, which is the tell and not the noise', () => {

@@ -228,11 +228,19 @@ export function tercileVerdicts(
   };
   return bounds.map(([name, low, high]) => {
     const segment = sorted.slice(low, high);
-    const injectedDeltas = segment.map((row) => (row.gained ? 1 : 0) - (row.lost ? 1 : 0));
-    const routedDeltas = segment.map((row) =>
-      row.overlap >= threshold ? (row.gained ? 1 : 0) - (row.lost ? 1 : 0) : (row.lost ? 1 : 0) - (row.gained ? 1 : 0),
-    );
-    const gainDeltas = routedDeltas.map((value, index) => value - (injectedDeltas[index] ?? 0));
+    // One row, one pair of regimes. Above the threshold the gate injects what the store would have
+    // injected, so its delta *is* the injected delta; below it the gate withholds, which is the same
+    // question with its sign flipped. Writing that as `-injected` rather than as a second conditional
+    // subtraction is what makes the reversal read as a reversal, and it removes a fallback that could
+    // never be taken: the two columns are built from the same segment and always have one entry each.
+    const pairs = segment.map((row) => {
+      const injected = (row.gained ? 1 : 0) - (row.lost ? 1 : 0);
+      const routed = row.overlap >= threshold ? injected : -injected;
+      return { injected, routed, gain: routed - injected };
+    });
+    const injectedDeltas = pairs.map((pair) => pair.injected);
+    const routedDeltas = pairs.map((pair) => pair.routed);
+    const gainDeltas = pairs.map((pair) => pair.gain);
     const mean =
       segment.length === 0 ? 0 : segment.reduce((sum, row) => sum + row.overlap, 0) / segment.length;
     return {

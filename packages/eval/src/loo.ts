@@ -140,12 +140,22 @@ export function looGroups(
   const classOf = new Map(ledger.map((verdict) => [verdict.rule, ruleClassOf(verdict)]));
   const byClass = new Map<RuleClass, LooRow[]>();
   const bySize = new Map<string, LooRow[]>();
+  // Append into the array the map already holds rather than rebuilding it: `map.set(key, [...(get(key)
+  // ?? []), row])` carries a fallback that can never be taken on the first row only, and a fallback
+  // that cannot be taken is either dead code or a hole a reader has to re-derive.
+  const append = <K>(map: Map<K, LooRow[]>, key: K, row: LooRow): void => {
+    const held = map.get(key);
+    if (held === undefined) map.set(key, [row]);
+    else held.push(row);
+  };
   for (const row of rows) {
     if (row.dropped === null) continue;
-    const label = classOf.get(row.dropped) ?? 'neutral';
-    byClass.set(label, [...(byClass.get(label) ?? []), row]);
-    const size = String(Math.min(row.packIds.length, 3));
-    bySize.set(size, [...(bySize.get(size) ?? []), row]);
+    // A rule that was withheld but never injected anywhere in the split has no ledger verdict. It is
+    // counted `neutral` here and `unseen` by `looCrossFitted`, and the difference is deliberate rather
+    // than an oversight: this table is the pooled one R77 published, and relabelling its rows now would
+    // silently change numbers that are already in the record.
+    append(byClass, classOf.get(row.dropped) ?? 'neutral', row);
+    append(bySize, String(Math.min(row.packIds.length, 3)), row);
   }
   const order: readonly RuleClass[] = ['harmful', 'helpful', 'neutral'];
   const read = (name: string, segment: readonly LooRow[]): LooReading => {
@@ -162,12 +172,17 @@ export function looGroups(
       ),
     };
   };
-  return [
-    ...order.filter((name) => byClass.has(name)).map((name) => read(name, byClass.get(name) ?? [])),
-    ...[...bySize.keys()]
-      .sort((left, right) => Number(left) - Number(right))
-      .map((size) => read(`${size === '3' ? '3+' : size} rule(s)`, bySize.get(size) ?? [])),
-  ];
+  // Iterating the entries rather than the class order is what removes the second unreachable fallback:
+  // `order.filter(has).map(get ?? [])` asks the map the same question twice, and the `[]` is there only
+  // because the type system cannot see that the filter answered it.
+  const classes = order.flatMap((name) => {
+    const segment = byClass.get(name);
+    return segment === undefined ? [] : [read(name, segment)];
+  });
+  const sizes = [...bySize.entries()]
+    .sort(([left], [right]) => Number(left) - Number(right))
+    .map(([size, segment]) => read(`${size === '3' ? '3+' : size} rule(s)`, segment));
+  return [...classes, ...sizes];
 }
 
 /**
