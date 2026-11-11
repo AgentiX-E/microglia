@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ceilingFromPool,
   DEFAULT_SELECTED_ARM,
   selectedArmProblem,
   sharedCases,
@@ -240,5 +241,60 @@ describe('widthCases', () => {
     const marks = { 'sample-5-first': true, 'sample-5-assert': true, 'sample-5-oracle': true };
     const cases = widthCases([{ id: 7, marks }, { id: 3, marks }], arms);
     expect(cases.map((entry) => entry.id)).toEqual(['7', '3']);
+  });
+});
+
+describe('ceilingFromPool', () => {
+  const row = (id: string, correct: readonly boolean[] | null): Parameters<typeof ceilingFromPool>[0][number] => ({
+    id,
+    marks: {},
+    candidates: correct === null ? null : correct.map((flag) => ({ correct: flag })),
+  });
+
+  it('reads the ceiling from the draws rather than from an arm', () => {
+    // R80 registers no oracle arm: the ceiling is a property of the pool it bought, and the pool records
+    // every candidate. Reading it here is what keeps a share available for a run that bought two arms.
+    const ceiling = ceilingFromPool([row('a', [false, false, true]), row('b', [false, false])]);
+    expect(ceiling.get('a')).toBe(true);
+    expect(ceiling.get('b')).toBe(false);
+  });
+
+  it('records nothing for a question with no pool', () => {
+    // A dropped draw is not an unanswerable question, and putting it in the denominator as `false` would
+    // charge the selector for a provider failure.
+    const ceiling = ceilingFromPool([row('a', null), row('b', [])]);
+    expect(ceiling.has('a')).toBe(false);
+    expect(ceiling.has('b')).toBe(false);
+  });
+
+  it('skips a row with no id', () => {
+    expect(ceilingFromPool([{ id: null, marks: undefined, candidates: [{ correct: true }] }]).size).toBe(0);
+  });
+});
+
+describe('widthCases with a pool ceiling', () => {
+  const arms = { first: 'sample-5-first', selected: 'sample-5-assert', oracle: 'sample-5-oracle' };
+  const marks = { 'sample-5-first': false, 'sample-5-assert': true };
+
+  it('falls back to the pool when the artefact bought no oracle arm', () => {
+    const cases = widthCases([{ id: 'q', marks }], arms, {
+      oracleFrom: new Map([['q', true]]),
+    });
+    expect(cases).toEqual([{ id: 'q', first: false, selected: true, oracle: true }]);
+  });
+
+  it('prefers the arm whose name is the ceiling when the run bought one', () => {
+    // An artefact that bought `sample-5-oracle` has a ceiling over *its own* width, which may differ from
+    // the pool's if that arm read fewer draws. The arm wins because it is the registered estimand.
+    const cases = widthCases(
+      [{ id: 'q', marks: { ...marks, 'sample-5-oracle': false } }],
+      arms,
+      { oracleFrom: new Map([['q', true]]) },
+    );
+    expect(cases[0]?.oracle).toBe(false);
+  });
+
+  it('drops a question neither source can give a ceiling for', () => {
+    expect(widthCases([{ id: 'q', marks }], arms)).toEqual([]);
   });
 });

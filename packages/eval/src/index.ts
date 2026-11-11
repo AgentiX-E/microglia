@@ -1568,6 +1568,7 @@ export {
 } from './reproduction.js';
 
 export {
+  ceilingFromPool,
   DEFAULT_SELECTED_ARM,
   selectedArmProblem,
   sharedCases,
@@ -1576,6 +1577,8 @@ export {
   widthShare,
   type WidthArmNames,
   type WidthArguments,
+  type WidthCaseOptions,
+  type WidthRow,
   type WidthCase,
   type WidthShare,
 } from './width.js';

@@ -24,12 +24,14 @@
  */
 import { readFileSync } from 'node:fs';
 import {
+  ceilingFromPool,
   selectedArmProblem,
   sharedCases,
   widthArguments,
   widthCases,
   widthShare,
   type WidthCase,
+  type WidthRow,
 } from '@agentix-e/microglia-eval';
 import { birdArtefactPath } from './lib.js';
 
@@ -37,6 +39,7 @@ type Row = {
   readonly questionId?: string | number | null;
   readonly id?: string | number | null;
   readonly arms?: Readonly<Record<string, boolean>> | undefined;
+  readonly pool?: readonly { readonly correct: boolean }[] | null | undefined;
 };
 
 type Artefact = {
@@ -51,11 +54,28 @@ const ORACLE = 'sample-5-oracle';
 function read(
   path: string,
   selectedArm: string,
-): { readonly cases: readonly WidthCase[]; readonly arms: readonly string[] } {
+): {
+  readonly cases: readonly WidthCase[];
+  readonly arms: readonly string[];
+  readonly ceilingFrom: 'arm' | 'pool' | 'none';
+} {
   const artefact = JSON.parse(readFileSync(path, 'utf8')) as Artefact;
   const arms = artefact.config?.arms ?? [];
-  const rows = artefact.per_case.map((row) => ({ id: row.questionId ?? row.id, marks: row.arms }));
-  return { cases: widthCases(rows, { first: FIRST, selected: selectedArm, oracle: ORACLE }), arms };
+  const rows: WidthRow[] = artefact.per_case.map((row) => ({
+    id: row.questionId ?? row.id,
+    marks: row.arms,
+    candidates: row.pool,
+  }));
+  const oracleFrom = ceilingFromPool(rows);
+  const cases = widthCases(rows, { first: FIRST, selected: selectedArm, oracle: ORACLE }, { oracleFrom });
+  // Which source the ceiling came from, because a share read off the pool and a share read off a
+  // registered oracle arm are the same arithmetic over possibly different populations of draws.
+  const ceilingFrom = arms.includes(ORACLE)
+    ? 'arm'
+    : cases.length > 0
+      ? 'pool'
+      : 'none';
+  return { cases, arms, ceilingFrom };
 }
 
 function main(argv: readonly string[]): number {
@@ -81,7 +101,8 @@ function main(argv: readonly string[]): number {
   if (primary.cases.length === 0) {
     process.stdout.write(
       `[width] ${path}: no question carries all three of ${FIRST}, ${arm}, ${ORACLE}\n` +
-        `[width] arms this artefact bought: ${primary.arms.join(', ') || 'none recorded'}\n`,
+        `[width] arms this artefact bought: ${primary.arms.join(', ') || 'none recorded'}\n` +
+        '[width] a ceiling needs an oracle arm or a recorded pool, and this file has neither\n',
     );
     return 1;
   }
@@ -102,7 +123,8 @@ function main(argv: readonly string[]): number {
   const reading = widthShare(cases);
   const pct = (value: number): string => value.toFixed(2);
   process.stdout.write(
-    `[width] ${cases.length} question(s)${explicit ? `, selected = ${arm}` : ''}: ` +
+    `[width] ${cases.length} question(s)${explicit ? `, selected = ${arm}` : ''}, ` +
+      `ceiling from ${primary.ceilingFrom}: ` +
       `first ${pct(reading.first * 100)}%, selected ${pct(reading.selected * 100)}%, ` +
       `oracle ${pct(reading.oracle * 100)}%\n` +
       `[width] ceiling ${pct(reading.ceilingPp)}pp, captured ${pct(reading.capturedPp)}pp\n`,

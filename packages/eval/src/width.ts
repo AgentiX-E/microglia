@@ -261,22 +261,65 @@ export type WidthArmNames = {
  * the denominator the share divides by — a silent change to the population rather than a refusal.
  */
 export function widthCases(
-  rows: readonly {
-    readonly id: string | number | null | undefined;
-    readonly marks: Readonly<Record<string, boolean>> | undefined;
-  }[],
+  rows: readonly WidthRow[],
   arms: WidthArmNames,
+  options: WidthCaseOptions = {},
 ): readonly WidthCase[] {
   const cases: WidthCase[] = [];
   for (const row of rows) {
     if (row.id === null || row.id === undefined) continue;
     const marks = row.marks;
     if (marks === undefined) continue;
+    const id = String(row.id);
     const first = marks[arms.first];
     const selected = marks[arms.selected];
-    const oracle = marks[arms.oracle];
+    // The ceiling comes from the oracle arm when the run bought one, and from the recorded pool when it
+    // did not. Both answer "did any draw get this right"; a registration that names no oracle arm is not
+    // a run that cannot report its ceiling, and R80 is exactly that case.
+    const oracle = marks[arms.oracle] ?? options.oracleFrom?.get(id);
     if (first === undefined || selected === undefined || oracle === undefined) continue;
-    cases.push({ id: String(row.id), first, selected, oracle });
+    cases.push({ id, first, selected, oracle });
   }
   return cases;
+}
+
+/** One `per_case` row as the reading needs it: an id, the arm marks, and the candidates if recorded. */
+export type WidthRow = {
+  readonly id: string | number | null | undefined;
+  readonly marks: Readonly<Record<string, boolean>> | undefined;
+  readonly candidates?: readonly { readonly correct: boolean }[] | null | undefined;
+};
+
+export type WidthCaseOptions = {
+  /**
+   * The ceiling per question, read from the pool rather than from an oracle arm.
+   *
+   * A run records every candidate it bought, so the ceiling — "the best of the draws taken" — is a
+   * property of the pool and not of an arm. Reading it from the pool means the ceiling of a past run is
+   * still available when that run registered no oracle arm, which is what R80 did: it buys a first draw
+   * and a written reader, and the arm that exists only to be quoted in a ratio would have been a third
+   * purchase for a number the pool already holds.
+   */
+  readonly oracleFrom?: ReadonlyMap<string, boolean> | undefined;
+};
+
+/**
+ * The pool's own ceiling, per question: whether any recorded draw was right.
+ *
+ * An empty or absent pool contributes nothing rather than `false`. A question whose draws were all
+ * dropped has no measured ceiling, and recording it as unanswerable would put a provider failure into
+ * the denominator of the share.
+ */
+export function ceilingFromPool(rows: readonly WidthRow[]): ReadonlyMap<string, boolean> {
+  const ceiling = new Map<string, boolean>();
+  for (const row of rows) {
+    if (row.id === null || row.id === undefined) continue;
+    const candidates = row.candidates;
+    if (candidates === undefined || candidates === null || candidates.length === 0) continue;
+    ceiling.set(
+      String(row.id),
+      candidates.some((candidate) => candidate.correct === true),
+    );
+  }
+  return ceiling;
 }
