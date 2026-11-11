@@ -672,6 +672,24 @@ export type SqlArm =
    */
   | 'loo'
   /**
+   * The pack with the registration's own dead-weight list removed.
+   *
+   * R77 priced 74.8 rules of dead weight (95% 72.5–77.1) and `silenceTargets` turned the unsettled part
+   * of it into a purchase order. This is the arm that acts on that order instead of buying more draws
+   * for it: every rule the plan names is withheld at once, from every question, and the comparison is
+   * `full` against `full` minus them, paired within the question.
+   *
+   * It is the first arm in this project that asks whether **removing** memory helps. Every previous arm
+   * varied the pack against the empty context and found the whole component inside its own noise
+   * (±1.4pp at 2,000 questions); a pruning has a different question and a much smaller ask, because it
+   * changes 1.83 rules to 1.0 rather than 1.83 to 0.
+   *
+   * The rule set is not a knob. It is `looTargets`, read from the registration, so the arm deletes what
+   * the file says and a dispatch cannot quietly prune something else — and a run that asks for this arm
+   * without the plan is refused rather than measuring `full` under a second name.
+   */
+  | 'pruned'
+  /**
    * The retry, retrieving the procedure by the *failure* rather than by the question.
    *
    * Every retrievable note in this project is found by comparing it to the question, and the
@@ -1129,6 +1147,7 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   'full-lexicon': true,
   'chars-proc-600': true,
   loo: true,
+  pruned: true,
   'retry-keyed': true,
   'retry-values': true,
   'sample-3': true,

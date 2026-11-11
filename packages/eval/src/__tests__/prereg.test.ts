@@ -851,3 +851,32 @@ describe('the draw plan R78 is registered against', () => {
     expect(Math.floor((sample * 369) / 2000)).toBeGreaterThanOrEqual(346);
   });
 });
+
+describe('the pruning registration', () => {
+  // R79 is the first arm whose counterfactual is less memory, and its meaning is entirely in the list
+  // it names: `pruned` with no `looTargets` renders the full pack and would be published as `full`
+  // under a second name. The lane refuses that; this asserts the file would not ask for it.
+  const reading = readPrereg(
+    readFileSync('prereg/R79-pruned-pack.md', 'utf8'),
+    'prereg/R79-pruned-pack.md',
+  );
+
+  it('parses, declares the pruning arm, and names the list that gives it meaning', () => {
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.arms).toEqual(['pruned']);
+    expect(reading.prereg?.looTargets).toBe('eval/manifests/loo/R77-silent-tail.json');
+  });
+
+  it('scores R78’s slice, so the learning cache pays for the second pass', () => {
+    // Two registrations on one slice is not a duplicate dispatch: the store is rebuilt from the same
+    // questions at the same seeds, and `SOTA_DISTILL_CACHE` keys on the prompt, so the second pass
+    // learns for nothing. It also makes the two readbacks comparable question by question.
+    const r78 = readPrereg(
+      readFileSync('prereg/R78-silent-tail.md', 'utf8'),
+      'prereg/R78-silent-tail.md',
+    );
+    expect(reading.prereg?.offset).toBe(r78.prereg?.offset);
+    expect(reading.prereg?.sample).toBe(r78.prereg?.sample);
+    expect(populationAgainstRegistration(reading.prereg, 1900, 2000).ok).toBe(true);
+  });
+});

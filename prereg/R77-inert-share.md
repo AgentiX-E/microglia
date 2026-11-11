@@ -262,7 +262,7 @@ randomness, so a replay of this reading on this artefact returns the same bounds
 | **excess (dead weight)** | **74.8** | **72.5 – 77.1** |
 | excess as a share of the 472 rules | 15.85% | **15.36 – 16.33%** |
 
-`pnpm eval:inert --bird <R77 artefact>` prints both lines; the artefact was not re-measured and no model
+`pnpm eval:inert --bird` pointed at R77's artefact prints both lines; the artefact was not re-measured and no model
 was called.
 
 **What this settles.** Dead weight exists: the lower bound is **72.5 rules**, 15.4% of the pack, and no

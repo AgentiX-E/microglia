@@ -829,6 +829,23 @@ type ChannelKind = 'values' | 'linked' | 'linked-additive' | 'recall-order';
 const ARMS = armsAgainstPrereg(armsFrom(process.env['SOTA_ARMS']), PREREG);
 populationAgainstPrereg(PREREG, LIMIT, OFFSET);
 
+// An arm that withholds the registration's list cannot run without the list.
+//
+// Without this, `pruned` would render the full pack and be published as `full` under a second name —
+// the failure `full-validated` was refused for and the one `sample-5-exec` produced when a name existed
+// without a mechanism. The check is here rather than in `parseArms` because it depends on a file this
+// module has already read: the arm's *existence* is a table entry, but its *meaning* is the plan's list.
+if (ARMS.has('pruned') && LOO_PLAN === null) {
+  throw new MicrogliaError(
+    'MG_E_CONFIG',
+    "the 'pruned' arm withholds the rules `looTargets` names, and this dispatch names none",
+    {
+      prereg: PREREG === '' ? null : `prereg/${PREREG}.md`,
+      hint: 'a registration that runs `pruned` declares `looTargets`, the same header `loo` tops up',
+    },
+  );
+}
+
 /**
  * When an injected rule has earned retirement.
  *
@@ -4961,6 +4978,19 @@ async function runFold(
       }
       const cut = makePack(kept, { budget: pack.budget });
       call(position, 'loo', cut.rendered, cut.ids.length);
+    }
+    if (ARMS.has('pruned')) {
+      // Every rule the registration's own list names, withheld at once. Nothing is re-retrieved and
+      // nothing is re-cut, exactly as for `loo`: if this cell moves, the dead weight moved it.
+      //
+      // The pack can empty completely, and that is a real treatment rather than a failure: a question
+      // whose one rule is on the list is a question where the memory had nothing else to offer, and an
+      // empty pack scores as the `none` baseline does. The artefact's `armPackIds` carries how many
+      // rules each arm rendered, so the readback can tell "the pruning emptied this pack" from "the
+      // pruning removed one of several" without a second counter that could drift from it.
+      const kept = pack.items.filter((item) => !LOO_TARGET_SET.has(item.id));
+      const cut = makePack(kept, { budget: pack.budget });
+      call(position, 'pruned', cut.rendered, cut.ids.length);
     }
     if (ARMS.has('full-procedural')) {
       const procedurePack = proceduralPacks.get(position);
