@@ -160,6 +160,7 @@ import {
   interleaveByKey,
   judgeScalar,
   answerBudget,
+  distillBudget,
   anchorTables,
   annotateSchema,
   orderSchema,
@@ -4079,8 +4080,11 @@ async function buildFoldMemory(
               if (cached !== undefined) return cached;
               // The repair form writes an object with three fields; the rule form writes one
               // sentence. Truncation is silent — the reply fails to parse and is counted as
-              // "the model said nothing" — so the headroom is set where the risk is.
-              const reply = await chat(prompt, form === 'repair' ? 3000 : 2000);
+              // "the model said nothing" — so the headroom is set where the risk is, and it is the
+              // *same* function that sizes the answer: a thinking model spends its budget before
+              // writing, and a distiller left at the off-regime ceiling answered with 572 empty or
+              // truncated replies out of 1,400 in R84.
+              const reply = await chat(prompt, distillBudget(form, THINKING));
               lastReply = reply.text;
               distillations.set(key, reply.text);
               distilledSoFar += 1;
@@ -7759,7 +7763,11 @@ async function main(): Promise<void> {
       // because a number produced under it is not comparable to one produced under the
       // rule form, and a single `distill_prompt` field would let a reader assume it was.
       distill_prompt_repair: folds.some((fold) => fold.repairActive !== null) ? 'distill-prompt/3+repair' : null,
-      distill_max_tokens: 2000,
+      // The two budgets the distiller was given, resolved by the function that also sized the answer.
+      // Recorded from that function rather than as a literal, because the literal was wrong: a repair
+      // run used 3,000 and published 2,000.
+      distill_max_tokens: distillBudget('rule', THINKING),
+      distill_repair_max_tokens: distillBudget('repair', THINKING),
       concurrency: CONCURRENCY,
       // The temperature every draw in this run was sampled at.
       //

@@ -398,3 +398,23 @@ describe('every switch a registration owns is read from the registration', () =>
     }
   });
 });
+
+describe('the distiller is sized by the same function as the answer', () => {
+  const { source: text } = parse();
+
+  it('does not leave the distiller budget as a literal at the call site', () => {
+    // R84 sent 1,400 distillations through a literal — `form === 'repair' ? 3000 : 2000` — while the
+    // answer went through `answerBudget`, so with the regime on, the distiller spent its ceiling
+    // thinking and 572 replies arrived empty or truncated. The two magnitudes were in the same file and
+    // only one of them knew what regime the run was in.
+    expect(text).toContain('chat(prompt, distillBudget(form, THINKING))');
+    expect(text).not.toContain("form === 'repair' ? 3000 : 2000");
+  });
+
+  it('records the budgets it used, which is two numbers and not one', () => {
+    // The artefact published `distill_max_tokens: 2000` while a repair run spent 3,000: a recorded
+    // value that is not the value the run ran, which is the defect the rate card closed for money.
+    expect(text).toContain("distill_max_tokens: distillBudget('rule', THINKING),");
+    expect(text).toContain("distill_repair_max_tokens: distillBudget('repair', THINKING),");
+  });
+});

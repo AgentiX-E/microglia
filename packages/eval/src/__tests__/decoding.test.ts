@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { THINKING_HEADROOM, answerBudget } from '../decoding.js';
+import { THINKING_HEADROOM, answerBudget, distillBudget } from '../decoding.js';
 
 describe('answerBudget', () => {
   it('passes the answer budget through unchanged when the model does not think', () => {
@@ -29,5 +29,24 @@ describe('answerBudget', () => {
       expect(answerBudget(701, mode)).toBeGreaterThanOrEqual(answerBudget(700, mode));
     }
     expect(answerBudget(700, 'on')).toBeGreaterThan(answerBudget(700, 'off'));
+  });
+});
+
+describe('distillBudget', () => {
+  it('sizes the distiller the same way it sizes an answer', () => {
+    // R84's distiller failed 572 of 1,400 replies — empty or truncated JSON — because its budget was a
+    // literal at the call site and the regime added headroom to a different literal. A regime that
+    // changes token economics has to reach every budget that spends those tokens, and the distiller is
+    // the one call a fold makes to a second prompt on every correction.
+    expect(distillBudget('procedure', 'off')).toBe(2_000);
+    expect(distillBudget('repair', 'off')).toBe(3_000);
+    expect(distillBudget('procedure', 'on')).toBe(3_200);
+    expect(distillBudget('repair', 'on')).toBe(4_200);
+  });
+
+  it('gives the repair form its own base, because it answers a different question', () => {
+    // The repair pass shows the model the attempt and the reference, so its answer is longer than a
+    // rule's. That was already true and was already two literals in two files.
+    expect(distillBudget('repair', 'off') - distillBudget('lesson', 'off')).toBe(1_000);
   });
 });

@@ -12,7 +12,14 @@ export {
   type BudgetLedger,
   type FoldSpend,
 } from './call-budget.js';
-export { THINKING_HEADROOM, answerBudget, type ThinkingMode } from './decoding.js';
+export {
+  DISTILL_REPAIR_TOKENS,
+  DISTILL_TOKENS,
+  THINKING_HEADROOM,
+  answerBudget,
+  distillBudget,
+  type ThinkingMode,
+} from './decoding.js';
 export {
   DEFAULT_MODEL_HOST,
   hostOf,

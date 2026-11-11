@@ -39,3 +39,31 @@ export const THINKING_HEADROOM = 1_200;
 export function answerBudget(answerTokens: number, thinking: ThinkingMode): number {
   return answerTokens + (thinking === 'on' ? THINKING_HEADROOM : 0);
 }
+
+/**
+ * Tokens a rule's distillation is given, and tokens the repair form is given.
+ *
+ * Stated here because they were stated in two places that could disagree: `sota-bird.ts` called
+ * `chat(prompt, form === 'repair' ? 3000 : 2000)` and recorded `distill_max_tokens: 2000` in the
+ * artefact, so a repair run published a configuration it did not use. That is the same defect the
+ * rate card closed for money and `sample_temperature` closed for sampling — a number in the record that
+ * is not the number the run ran.
+ */
+export const DISTILL_TOKENS = 2_000;
+export const DISTILL_REPAIR_TOKENS = 3_000;
+
+/**
+ * The distiller's completion budget, under the same regime as the answer's.
+ *
+ * R84 is why this exists. With `thinking: on` the distiller kept its 2,000-token ceiling, the model
+ * spent it thinking, and **572 of 1,400 replies** arrived empty or truncated mid-object:
+ *
+ *   `MG_E_INVALID_SIGNAL: LLM response is not JSON :: {"candidates":[{"kind":"constraint",…`
+ *
+ * The answer budget had been coupled to the regime for two iterations and the distiller's had not,
+ * because it was a literal at a call site rather than a parameter with a name. A regime is not a
+ * property of one call; it is a property of every call the run makes.
+ */
+export function distillBudget(form: string, thinking: ThinkingMode): number {
+  return answerBudget(form === 'repair' ? DISTILL_REPAIR_TOKENS : DISTILL_TOKENS, thinking);
+}
