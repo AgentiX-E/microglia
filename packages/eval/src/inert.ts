@@ -197,3 +197,76 @@ export function drawSpread(rules: readonly RuleInertness[]): {
     max: draws.length === 0 ? 0 : (draws[draws.length - 1] as number),
   };
 }
+
+/**
+ * What a rule that never fired is evidence of, given how few times it was drawn.
+ *
+ * R77's most actionable number was also its least certain: **113 of 472 rules never changed an answer
+ * on any draw they got**, and most of them got three. Three draws is not a verdict — a rule live on half
+ * its draws is silent on three of them 12.5% of the time — so "a quarter of the pack is dead weight" is
+ * a statement about a sample, not about a pack. This prices that.
+ *
+ * The estimator is deliberately one parameter. Take the per-draw live rate **of the rules that fired at
+ * least once** and ask how many silences a pack of that behaviour would produce:
+ *
+ *     E[silent] = Σ (1 − p)^draws   over the rules that never fired
+ *
+ * Rules that never fired are excluded from `p` because including them is circular: nine rules silent on
+ * ten draws each would drag a pack-wide rate to 1/92 and then declare all nine of them expected. What
+ * survives is a comparison — observed silences against the silences the working rules predict — and an
+ * `excess` that is the dead weight the pack can actually be accused of.
+ *
+ * The assumption is stated because it is doing the work: that a silent rule, if it works at all, works
+ * at the rate the rules that fired demonstrated. A pack of two populations — a third that is dead and
+ * two thirds that fire on most draws — violates it in the direction that *understates* the excess, since
+ * `p` is then an average over the firing population and a matter of taste whether the dead third belongs
+ * in it. Understating is the safe direction for a pruning claim, which is what this number exists to
+ * price.
+ */
+export type SilenceReading = {
+  /** Rules that never changed an answer. */
+  readonly silent: number;
+  /** Per-draw live rate over the rules that fired at least once, in `[0, 1]`. */
+  readonly workingRate: number;
+  /** Silences a pack at that rate would produce on the same draw counts. */
+  readonly expectedSilent: number;
+  /** `silent − expectedSilent`: how many of them the draw counts cannot explain. */
+  readonly excess: number;
+  /** Draws at which a rule at `workingRate` is silent by chance less than once in twenty; 0 when the rate is. */
+  readonly drawsToResolve: number;
+  /** Silent rules holding fewer draws than `drawsToResolve`, which are not yet evidence of anything. */
+  readonly underPowered: number;
+};
+
+/**
+ * The draw count a rule needs before silence is evidence, at a given per-draw live rate.
+ *
+ * 0 when no rule ever fired, because then silence is not a chance event at any sample size and a number
+ * would read as "more draws would settle this" when nothing would.
+ */
+export function drawsToResolve(workingRate: number): number {
+  if (!(workingRate > 0)) return 0;
+  if (workingRate >= 1) return 1;
+  return Math.max(1, Math.ceil(Math.log(0.05) / Math.log(1 - workingRate)));
+}
+
+export function silenceReading(rules: readonly RuleInertness[]): SilenceReading {
+  const firing = rules.filter((row) => row.live > 0);
+  const draws = firing.reduce((sum, row) => sum + row.draws, 0);
+  const live = firing.reduce((sum, row) => sum + row.live, 0);
+  const workingRate = draws === 0 ? 0 : live / draws;
+  const silentRules = rules.filter((row) => row.live === 0);
+  const expectedSilent = silentRules.reduce((sum, row) => sum + (1 - workingRate) ** row.draws, 0);
+  const resolveAt = drawsToResolve(workingRate);
+  return {
+    silent: silentRules.length,
+    workingRate,
+    expectedSilent,
+    excess: silentRules.length - expectedSilent,
+    drawsToResolve: resolveAt,
+    // Zero when the rate is zero, because a rule cannot be under-powered against a bar that no sample
+    // size reaches — reporting every silent rule as under-powered there would be a call to spend calls.
+    underPowered: resolveAt === 0 ? 0 : silentRules.filter((row) => row.draws < resolveAt).length,
+  };
+}
+

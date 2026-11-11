@@ -4,7 +4,9 @@ import {
   inertReading,
   liveShareBuckets,
   normaliseSql,
+  silenceReading,
   type InertPair,
+  type RuleInertness,
 } from '../inert.js';
 
 const pair = (over: Partial<InertPair> = {}): InertPair => ({
@@ -150,5 +152,69 @@ describe('drawSpread', () => {
 
   it('survives a pack no rule was ever withheld from', () => {
     expect(drawSpread([])).toEqual({ rules: 0, median: 0, p90: 0, max: 0 });
+  });
+});
+
+describe('silenceReading', () => {
+  const rule = (name: string, draws: number, live: number): RuleInertness => ({ rule: name, draws, live });
+
+  it('prices silence against the rate the rules that did fire demonstrated', () => {
+    // One rule live on half its draws and one silent on three: a working rule is silent three times in
+    // a row with probability 0.5³, so the silence costs 0.125 of a rule and the excess is 0.875.
+    const reading = silenceReading([rule('a', 4, 2), rule('b', 3, 0)]);
+    expect(reading.workingRate).toBe(0.5);
+    expect(reading.expectedSilent).toBeCloseTo(0.125, 10);
+    expect(reading.silent).toBe(1);
+    expect(reading.excess).toBeCloseTo(0.875, 10);
+  });
+
+  it('estimates the rate from the rules that fired, not from the dead ones', () => {
+    // Nine silent rules with ten draws each would drag a pack-wide rate to 1/92 and make every silence
+    // look expected. The rate is 1/2 because that is what the one rule that ever fired demonstrated.
+    const rules = [rule('live', 2, 1), ...Array.from({ length: 9 }, (_, i) => rule(`dead${String(i)}`, 10, 0))];
+    const reading = silenceReading(rules);
+    expect(reading.workingRate).toBe(0.5);
+    // Nine rules silent on ten draws at p = 0.5 is 9 × 0.00098 expected, so nearly all of them are
+    // excess rather than chance.
+    expect(reading.expectedSilent).toBeLessThan(0.01);
+    expect(reading.excess).toBeGreaterThan(8.99);
+  });
+
+  it('names the draw count at which a rule of the pack rate would be silent by chance less than once in twenty', () => {
+    // 0.5⁴ = 6.25% and 0.5⁵ = 3.125%, so five draws is the first count under 5%.
+    expect(silenceReading([rule('a', 4, 2), rule('b', 3, 0)]).drawsToResolve).toBe(5);
+    expect(silenceReading([rule('a', 4, 4), rule('b', 3, 0)]).drawsToResolve).toBe(1);
+  });
+
+  it('refuses to name a draw count when no rule ever fired', () => {
+    // With a zero rate the silence is not evidence of chance at any sample size, and a number here
+    // would be read as "more draws would settle it" when nothing would.
+    const reading = silenceReading([rule('a', 4, 0), rule('b', 3, 0)]);
+    expect(reading.workingRate).toBe(0);
+    expect(reading.drawsToResolve).toBe(0);
+    expect(reading.expectedSilent).toBe(2);
+    expect(reading.underPowered).toBe(0);
+  });
+
+  it('counts the silent rules that have not yet had enough draws to be called dead', () => {
+    const reading = silenceReading([
+      rule('short', 3, 0),
+      rule('long', 9, 0),
+      rule('live', 4, 2),
+    ]);
+    // 0.5⁹ is under 0.2%, so the long one is evidence at this rate and the short one is not.
+    expect(reading.underPowered).toBe(1);
+    expect(reading.excess).toBeGreaterThan(0.9);
+  });
+
+  it('survives a pack with no rules at all', () => {
+    expect(silenceReading([])).toMatchObject({
+      silent: 0,
+      workingRate: 0,
+      expectedSilent: 0,
+      excess: 0,
+      drawsToResolve: 0,
+      underPowered: 0,
+    });
   });
 });

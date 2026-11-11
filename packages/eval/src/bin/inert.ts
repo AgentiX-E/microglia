@@ -20,6 +20,7 @@ import {
   drawSpread,
   inertReading,
   liveShareBuckets,
+  silenceReading,
   type InertPair,
 } from '@agentix-e/microglia-eval';
 import { birdArtefactPath } from './lib.js';
@@ -95,6 +96,20 @@ export function main(argv: readonly string[]): number {
         `${String(bucket.rules).padStart(5)}\n`,
     );
   }
+  // What the silence is evidence of, which is the difference between a pruning and a bigger sample. A
+  // rule silent on three draws at the pack's own rate is silent by chance an eighth of the time, so the
+  // headline number above over-counts dead rules by however many of them are short.
+  const silence = silenceReading(reading.rules);
+  process.stdout.write(
+    `[inert] working     the rules that fired did so on ${(silence.workingRate * 100).toFixed(1)}% of ` +
+      `their draws, which predicts ${silence.expectedSilent.toFixed(1)} silence(s) among the ` +
+      `${String(silence.silent)}\n`,
+  );
+  process.stdout.write(
+    `[inert] silent      ${String(silence.silent)} rule(s) never fired; ${silence.excess.toFixed(1)} more ` +
+      `than that rate explains, and ${String(silence.underPowered)} of them hold fewer than ` +
+      `${String(silence.drawsToResolve)} draw(s), where silence would be chance once in twenty\n`,
+  );
   // The busiest rules, because a pack's problem is usually visible in the first ten lines of this table.
   process.stdout.write('[inert] top rules   rule                          draws  live\n');
   for (const rule of reading.rules.slice(0, 10)) {

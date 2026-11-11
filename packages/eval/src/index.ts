@@ -1321,12 +1321,15 @@ export {
 
 export {
   drawSpread,
+  drawsToResolve,
   inertReading,
   liveShareBuckets,
   normaliseSql,
+  silenceReading,
   type InertPair,
   type InertReading,
   type RuleInertness,
+  type SilenceReading,
 } from './inert.js';
 
 export {
