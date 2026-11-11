@@ -16,7 +16,7 @@
  * hand. A YAML dependency for six scalar fields would be the largest thing in this package.
  */
 import type { RunGate } from './artifact-schema.js';
-import { restModelOf } from './model-client.js';
+import { splitProvider } from './model-id.js';
 
 export type Prereg = {
   readonly id: string;
@@ -438,7 +438,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
   // R82: the backbone, which is the one variable that registration moves.
   //
   // A model id is a lowercase word with dashes, dots and at most one `provider/` prefix — the shape
-  // `restModelOf` understands — because it is pasted into `SOTA_MODEL` and compared to the id the
+  // `splitProvider` understands — because it is pasted into `SOTA_MODEL` and compared to the id the
   // client actually sends. A value the lane cannot send is refused here rather than at the first call.
   const backboneText = values.get('backbone');
   let backbone: string | undefined;
@@ -795,7 +795,7 @@ export function populationAgainstRegistration(
 function sentModel(spelling: string): string {
   const trimmed = spelling.trim();
   const colon = trimmed.indexOf(':');
-  return restModelOf(colon > 0 ? trimmed.slice(colon + 1) : trimmed).sent;
+  return splitProvider(colon > 0 ? trimmed.slice(colon + 1) : trimmed).sent;
 }
 
 /**
@@ -808,7 +808,7 @@ function sentModel(spelling: string): string {
  * said something else), so the disagreement is a refusal rather than a note in a report.
  *
  * The comparison is on what the client **sends**, not on what was typed: a `provider/` prefix is
- * litellm's spelling of the same model and `restModelOf` is the one place that translation lives. A
+ * litellm's spelling of the same model and `splitProvider` is the one place that translation lives. A
  * check that compared the spellings would refuse the very lane convention it exists to protect.
  */
 export function backboneProblem(

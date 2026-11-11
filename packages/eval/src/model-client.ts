@@ -20,6 +20,7 @@
  *    decides whether that is data (one question unanswered) or fatal.
  */
 import { MicrogliaError } from '@agentix-e/microglia-core';
+import { splitProvider } from './model-id.js';
 import { CircuitBreaker, backoffMs } from './concurrency.js';
 import { EMPTY_BANDED, addToBand, totalUsage, type BandedUsage } from './cost.js';
 
@@ -130,41 +131,19 @@ export type LlmStats = {
 export const DEFAULT_CHAT_ENDPOINT = 'https://api.deepseek.com/chat/completions';
 
 /**
- * The model ids the endpoint serves under a `provider/` alias.
- *
- * One list, and only one entry, because it is a translation rather than a guess. The τ² lane is a
- * litellm caller in its Python half and a REST caller in this one, so its model is named
- * `deepseek/deepseek-chat` — litellm's spelling of the provider and the id. This client posts to
- * `api.deepseek.com/chat/completions`, whose `model` field is `deepseek-chat`. Sending the router's
- * spelling was rejected with a 400 on every call, and the lane read that as "the model said nothing
- * about this correction": 32 prompts, 32 empty answers, a store with no knowledge in it.
- *
- * The list stays narrow on purpose. A prefix this file does not know is left alone, because
- * `deepseek-ai/DeepSeek-V3` and `openai/gpt-4o` are names of other things rather than aliases of
- * this one, and mangling them would report a provider mismatch for a configuration that made a
- * different choice.
- */
-const PROVIDER_ALIASES = new Set(['deepseek']);
-
-/**
  * What this endpoint should be told the model is called.
  *
- * Returns the id to send and, when a prefix was removed, the prefix, so a caller can record both
- * names: the artefact says what was configured, and the request says what was asked.
+ * The translation itself lives in `model-id.ts`, which imports nothing: this file carries a dependency
+ * on the core package and therefore on a build, and a registration is read by jobs that run before one.
+ * `model-client` keeps the refusal an empty id deserves, because a client about to send `model: ''` is
+ * the one place a silent empty string becomes a wasted dispatch.
  */
 export function restModelOf(configured: string): { readonly sent: string; readonly stripped?: string } {
-  const trimmed = configured.trim();
-  if (trimmed === '') {
+  const resolved = splitProvider(configured);
+  if (resolved.sent === '') {
     throw new MicrogliaError('MG_E_CONFIG', 'A model id is required for the model endpoint');
   }
-  const slash = trimmed.indexOf('/');
-  if (slash <= 0) return { sent: trimmed };
-  const alias = trimmed.slice(0, slash);
-  if (!PROVIDER_ALIASES.has(alias.toLowerCase())) return { sent: trimmed };
-  const rest = trimmed.slice(slash + 1).trim();
-  // `deepseek/` with nothing behind it is not a model id; keeping the raw text lets the endpoint
-  // answer, which is a better error than one this file invents.
-  return rest === '' ? { sent: trimmed } : { sent: rest, stripped: alias };
+  return resolved;
 }
 
 /**

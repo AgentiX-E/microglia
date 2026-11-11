@@ -187,6 +187,7 @@ export {
   type ArtifactPoolCase,
 } from './artifact-pool.js';
 export { artefactArgument, noArguments } from './artefact-arg.js';
+export { PROVIDER_ALIASES, splitProvider } from './model-id.js';
 export {
   catalogueIdsOf,
   catalogueLine,
