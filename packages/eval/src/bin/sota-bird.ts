@@ -5798,119 +5798,7 @@ async function runFold(
       );
     }
 
-    /**
-     * Ask a model which candidate to keep, only where there is something to choose.
-     *
-     * The skip is the design, not an optimisation: three byte-identical queries are one candidate,
-     * and a selector that spends a call agreeing with itself would report a cost with no decision
-     * behind it. `modelAsked` therefore counts the questions where the choice was real, which is
-     * the denominator every other number about this arm should be read against.
-     */
-    /**
-     * Write one question's advice, from what the store remembers, and inject only that.
-     *
-     * The arms this feeds exist because three recent results say injecting a *stored abstraction* is the
-     * wrong object: an error in a stored rule regenerates itself through retrieval and re-abstraction
-     * (arXiv:2610.27406), a replayed experience causes negative transfer unless it is reconstructed for
-     * the present state (arXiv:2607.28272), and a flat pool of concrete memories degrades as the task set
-     * grows (arXiv:2610.19386). `full-raw` already showed that swapping the rule for the case it came
-     * from changes nothing (--0.86pp, p = 0.76) — the case is still a persisted object — so this pass
-     * persists nothing at all: it writes advice for this question and drops it.
-     *
-     * The shuffled arm holds the call, the prompt shape and the budget fixed and changes only *whose*
-     * notes the writer reads, because an extra call is also an extra attempt and an arm that improved
-     * could be buying a second chance rather than better guidance.
-     */
-    const reconstructWanted =
-      ARMS.has('full-reconstructed') || ARMS.has('full-reconstructed-shuffled');
-    const reconstructed = new Map<number, ParsedGuidance>();
-    const reconstructedShuffled = new Map<number, ParsedGuidance>();
-    if (reconstructWanted) {
-      const plansFor: { position: number; arm: ArmName; prompt: string; donor: boolean }[] = [];
-      for (const [position, row] of evalRows.entries()) {
-        const pack = rawPacks.get(position);
-        if (pack === undefined) continue;
-        const notesOf = (items: readonly { statement: string; when?: string | undefined }[]): string =>
-          reconstructPrompt(row.question, row.evidence ?? '', items, RECONSTRUCT_BUDGET);
-        if (ARMS.has('full-reconstructed') && pack.items.length > 0) {
-          plansFor.push({
-            position,
-            arm: 'full-reconstructed',
-            prompt: notesOf(pack.items),
-            donor: false,
-          });
-        }
-        if (ARMS.has('full-reconstructed-shuffled')) {
-          // Same database, another question, matched on item count: the control the pack's own
-          // `full-shuffled` arm uses, so the two comparisons differ in what is persisted and nothing else.
-          const donorPosition = shuffledSource(packLibrary, {
-            position,
-            db: row.db_id,
-            items: pack.items.length,
-          });
-          const donor = donorPosition === undefined ? undefined : rawPacks.get(donorPosition);
-          if (donor !== undefined && donor.items.length > 0) {
-            plansFor.push({
-              position,
-              arm: 'full-reconstructed-shuffled',
-              prompt: notesOf(donor.items),
-              donor: true,
-            });
-          }
-        }
-      }
-      let wrote = 0;
-      let reused = 0;
-      const replies = await mapPool(plansFor, CONCURRENCY, async (item) => {
-        const key = createHash('sha256').update(item.prompt).digest('hex').slice(0, 32);
-        const cached = guidanceCache.get(key);
-        if (cached !== undefined) {
-          reused += 1;
-          return { item, key, guidance: cached };
-        }
-        try {
-          const reply = await chat(item.prompt, 160, 0);
-          return { item, key, guidance: parseGuidance(reply.text, RECONSTRUCT_BUDGET) };
-        } catch (error) {
-          if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
-          if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
-          return { item, key, guidance: undefined };
-        } finally {
-          wrote += 1;
-          if (wrote % 50 === 0 || wrote === plansFor.length - reused) {
-            process.stdout.write(
-              `[sota] fold ${fold + 1}/${FOLDS} guidance ${wrote}/${plansFor.length - reused} ` +
-                `calls=${llm.stats.calls} failed=${llm.stats.failures}\n`,
-            );
-          }
-        }
-      });
-      for (const entry of replies) {
-        if (entry.guidance === undefined) continue;
-        guidanceCache.set(entry.key, entry.guidance);
-        if (entry.item.donor) reconstructedShuffled.set(entry.item.position, entry.guidance);
-        else reconstructed.set(entry.item.position, entry.guidance);
-      }
-      flushGuidanceCache();
-      for (const [position, guidance] of reconstructed) {
-        call(position, 'full-reconstructed', guidance.text, 0);
-      }
-      for (const [position, guidance] of reconstructedShuffled) {
-        call(position, 'full-reconstructed-shuffled', guidance.text, 0);
-      }
-      reconstructPasses.push({
-        fold: fold + 1,
-        write: reconstructReading([...reconstructed.values()], RECONSTRUCT_BUDGET),
-        shuffled: reconstructReading([...reconstructedShuffled.values()], RECONSTRUCT_BUDGET),
-        reused,
-      });
-      process.stdout.write(
-        `[sota] fold ${fold + 1}/${FOLDS} reconstructed ${String(reconstructed.size)} question(s), ` +
-          `declined ${String(
-            [...reconstructed.values()].filter((entry) => entry.declined).length,
-          )}, shuffled ${String(reconstructedShuffled.size)}, reused ${String(reused)}\n`,
-      );
-    }
+
 
     const choiceBatch: { position: number; arm: ArmName; prompt: string }[] = [];
     for (const position of evalRows.keys()) {
@@ -6038,6 +5926,120 @@ async function runFold(
       }
     }
   }
+
+    /**
+     * Ask a model which candidate to keep, only where there is something to choose.
+     *
+     * The skip is the design, not an optimisation: three byte-identical queries are one candidate,
+     * and a selector that spends a call agreeing with itself would report a cost with no decision
+     * behind it. `modelAsked` therefore counts the questions where the choice was real, which is
+     * the denominator every other number about this arm should be read against.
+     */
+    /**
+     * Write one question's advice, from what the store remembers, and inject only that.
+     *
+     * The arms this feeds exist because three recent results say injecting a *stored abstraction* is the
+     * wrong object: an error in a stored rule regenerates itself through retrieval and re-abstraction
+     * (arXiv:2610.27406), a replayed experience causes negative transfer unless it is reconstructed for
+     * the present state (arXiv:2607.28272), and a flat pool of concrete memories degrades as the task set
+     * grows (arXiv:2610.19386). `full-raw` already showed that swapping the rule for the case it came
+     * from changes nothing (--0.86pp, p = 0.76) — the case is still a persisted object — so this pass
+     * persists nothing at all: it writes advice for this question and drops it.
+     *
+     * The shuffled arm holds the call, the prompt shape and the budget fixed and changes only *whose*
+     * notes the writer reads, because an extra call is also an extra attempt and an arm that improved
+     * could be buying a second chance rather than better guidance.
+     */
+    const reconstructWanted =
+      ARMS.has('full-reconstructed') || ARMS.has('full-reconstructed-shuffled');
+    const reconstructed = new Map<number, ParsedGuidance>();
+    const reconstructedShuffled = new Map<number, ParsedGuidance>();
+    if (reconstructWanted) {
+      const plansFor: { position: number; arm: ArmName; prompt: string; donor: boolean }[] = [];
+      for (const [position, row] of evalRows.entries()) {
+        const pack = rawPacks.get(position);
+        if (pack === undefined) continue;
+        const notesOf = (items: readonly { statement: string; when?: string | undefined }[]): string =>
+          reconstructPrompt(row.question, row.evidence ?? '', items, RECONSTRUCT_BUDGET);
+        if (ARMS.has('full-reconstructed') && pack.items.length > 0) {
+          plansFor.push({
+            position,
+            arm: 'full-reconstructed',
+            prompt: notesOf(pack.items),
+            donor: false,
+          });
+        }
+        if (ARMS.has('full-reconstructed-shuffled')) {
+          // Same database, another question, matched on item count: the control the pack's own
+          // `full-shuffled` arm uses, so the two comparisons differ in what is persisted and nothing else.
+          const donorPosition = shuffledSource(packLibrary, {
+            position,
+            db: row.db_id,
+            items: pack.items.length,
+          });
+          const donor = donorPosition === undefined ? undefined : rawPacks.get(donorPosition);
+          if (donor !== undefined && donor.items.length > 0) {
+            plansFor.push({
+              position,
+              arm: 'full-reconstructed-shuffled',
+              prompt: notesOf(donor.items),
+              donor: true,
+            });
+          }
+        }
+      }
+      let wrote = 0;
+      let reused = 0;
+      const replies = await mapPool(plansFor, CONCURRENCY, async (item) => {
+        const key = createHash('sha256').update(item.prompt).digest('hex').slice(0, 32);
+        const cached = guidanceCache.get(key);
+        if (cached !== undefined) {
+          reused += 1;
+          return { item, key, guidance: cached };
+        }
+        try {
+          const reply = await chat(item.prompt, 160, 0);
+          return { item, key, guidance: parseGuidance(reply.text, RECONSTRUCT_BUDGET) };
+        } catch (error) {
+          if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+          if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+          return { item, key, guidance: undefined };
+        } finally {
+          wrote += 1;
+          if (wrote % 50 === 0 || wrote === plansFor.length - reused) {
+            process.stdout.write(
+              `[sota] fold ${fold + 1}/${FOLDS} guidance ${wrote}/${plansFor.length - reused} ` +
+                `calls=${llm.stats.calls} failed=${llm.stats.failures}\n`,
+            );
+          }
+        }
+      });
+      for (const entry of replies) {
+        if (entry.guidance === undefined) continue;
+        guidanceCache.set(entry.key, entry.guidance);
+        if (entry.item.donor) reconstructedShuffled.set(entry.item.position, entry.guidance);
+        else reconstructed.set(entry.item.position, entry.guidance);
+      }
+      flushGuidanceCache();
+      for (const [position, guidance] of reconstructed) {
+        call(position, 'full-reconstructed', guidance.text, 0);
+      }
+      for (const [position, guidance] of reconstructedShuffled) {
+        call(position, 'full-reconstructed-shuffled', guidance.text, 0);
+      }
+      reconstructPasses.push({
+        fold: fold + 1,
+        write: reconstructReading([...reconstructed.values()], RECONSTRUCT_BUDGET),
+        shuffled: reconstructReading([...reconstructedShuffled.values()], RECONSTRUCT_BUDGET),
+        reused,
+      });
+      process.stdout.write(
+        `[sota] fold ${fold + 1}/${FOLDS} reconstructed ${String(reconstructed.size)} question(s), ` +
+          `declined ${String(
+            [...reconstructed.values()].filter((entry) => entry.declined).length,
+          )}, shuffled ${String(reconstructedShuffled.size)}, reused ${String(reused)}\n`,
+      );
+    }
 
   const judged = new Map<string, Judged>();
   for (const [index, plan] of plans.entries()) {
