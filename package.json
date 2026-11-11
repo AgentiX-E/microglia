@@ -62,6 +62,7 @@
     "eval:prereg-pair": "tsx packages/eval/src/bin/prereg-pair.ts",
     "eval:prereg-notes": "tsx packages/eval/src/bin/prereg-notes.ts",
     "eval:prereg-scenario": "tsx packages/eval/src/bin/prereg-scenario.ts",
+    "eval:prereg-form": "tsx packages/eval/src/bin/prereg-form.ts",
     "eval:prereg-arms": "tsx packages/eval/src/bin/prereg-arms.ts",
     "eval:prereg-temperature": "tsx packages/eval/src/bin/prereg-temperature.ts",
     "eval:prereg-population": "tsx packages/eval/src/bin/prereg-population.ts",

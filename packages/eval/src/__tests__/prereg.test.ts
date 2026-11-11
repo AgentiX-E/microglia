@@ -6,6 +6,7 @@ import { DEFAULT_SELECTED_ARM } from '../width.js';
 import {
   armsAgainstRegistration,
   backboneProblem,
+  distillFormProblem,
   essentialArms,
   facadePairSwitch,
   laneRoleProblem,
@@ -1186,6 +1187,85 @@ describe('the lane role, as a header field', () => {
       { where: "header 'lane'", problem: "'sota' is not one of product, transfer or hostile" },
     ]);
     expect(readPrereg(withHeader('lane: Product'), 'R85-lane-role.md').problems).toHaveLength(1);
+  });
+});
+
+describe('the distiller form, as a header field', () => {
+  const HEADER = [
+    '---',
+    'id: R86-distill-form',
+    'step: R86',
+    'opened: 2026-11-12',
+    'arms: memory',
+    'sample: 228',
+    'gates: V1,V2',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '\n## Prediction\n\n- **one claim that is long enough to count as a claim here.**\n' +
+    '\n## Refutation\n\n- **Void** — the first branch, long enough to count as a claim.\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads the form the registration asks the distiller for', () => {
+    const reading = readPrereg(withHeader('distillForm: procedure'), 'R86-distill-form.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.distillForm).toBe('procedure');
+  });
+
+  it('leaves it absent when the header does not name one', () => {
+    const reading = readPrereg(withHeader('trainDomain: retail'), 'R86-distill-form.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.distillForm).toBeUndefined();
+  });
+
+  it('refuses a form the lane cannot render, and the capitalised form of one', () => {
+    // `trace` is resolved by the unit, not by this field: a header that named it would be
+    // declaring a form the lane never reads, which is the defect this field closes.
+    expect(readPrereg(withHeader('distillForm: narrative'), 'R86-distill-form.md').problems).toEqual([
+      { where: "header 'distillForm'", problem: "'narrative' is not one of lesson, procedure, repair, lexicon" },
+    ]);
+    expect(readPrereg(withHeader('distillForm: Procedure'), 'R86-distill-form.md').problems).toHaveLength(1);
+    expect(readPrereg(withHeader('distillForm: trace'), 'R86-distill-form.md').problems).toHaveLength(1);
+  });
+});
+
+describe('distillFormProblem', () => {
+  it('says nothing when the registration names no form', () => {
+    expect(distillFormProblem('procedure', undefined, 'correction')).toBeUndefined();
+    expect(distillFormProblem('', undefined, 'trace')).toBeUndefined();
+  });
+
+  it('says nothing when the variable is unset, because the registration decides', () => {
+    // A variable left over from another experiment is the case this exists for; an unset one is
+    // not a second opinion, it is the absence of one.
+    expect(distillFormProblem('', 'procedure', 'correction')).toBeUndefined();
+    expect(distillFormProblem(null, 'procedure', 'correction')).toBeUndefined();
+  });
+
+  it('says nothing when the variable agrees', () => {
+    expect(distillFormProblem('procedure', 'procedure', 'correction')).toBeUndefined();
+  });
+
+  it('refuses a variable that would run a different form than the registration fixed', () => {
+    expect(distillFormProblem('lesson', 'procedure', 'correction')).toBe(
+      "this registration fixes the distiller's form at 'procedure' and this dispatch would run " +
+        "'lesson', so the form is not the only variable that moved",
+    );
+  });
+
+  it('refuses a trace dispatch that would discard the registered form', () => {
+    // `form: unit === 'trace' ? 'trace' : DISTILL_FORM` makes a header that names a form and a
+    // dispatch that distils traces a contradiction: the registered switch cannot take effect, and
+    // the run would be published as an experiment of two variables with one of them inert.
+    expect(distillFormProblem('', 'procedure', 'trace')).toBe(
+      "this registration fixes the distiller's form at 'procedure' and this dispatch distils " +
+        "'trace', which replaces the form, so the registered switch cannot take effect",
+    );
+    expect(distillFormProblem('', 'trace', 'trace')).toBeUndefined();
   });
 });
 

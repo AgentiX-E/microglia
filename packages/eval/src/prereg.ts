@@ -156,6 +156,21 @@ export type Prereg = {
    */
   readonly lane?: string;
   /**
+   * Which shape of claim the distiller is asked for: `lesson`, `procedure`, `repair` or `lexicon`.
+   *
+   * R56's entire treatment is this switch. It has been resolvable since the τ² driver was written —
+   * `resolveDistillForm` reads `TAU_DISTILL_FORM`, refuses nothing and defaults to `lesson` — and it
+   * could not be varied by a dispatch until the workflow passed the variable, which it now does from
+   * `vars`. A repository variable is global: it is one experiment's setting applied to every queued
+   * dispatch, two forms cannot be run side by side, and a forgotten value keys a run that its
+   * registration never described. That is the shape R68 closed for the model and R84 for the thinking
+   * regime, and this field is the third time the same fix is applied to the same defect.
+   *
+   * `trace` is deliberately not a value here: the unit decides it (`unit === 'trace' ? 'trace' : …`),
+   * so a header that named it would be declaring a switch the lane never reads.
+   */
+  readonly distillForm?: string;
+  /**
    * Whether this registration's dispatch asks the model to think.
    *
    * R84 asks a question the record cannot answer without it: R82 measured the expensive backbone 6.00pp
@@ -213,6 +228,7 @@ const HEADER_KEYS = [
   'backbone',
   'split',
   'lane',
+  'distillForm',
   'thinking',
 ] as const;
 
@@ -234,6 +250,15 @@ const HEADER_SPLITS: ReadonlySet<string> = new Set(['minidev', 'dev', 'train']);
  * cannot be compared. The member order is the order of the S2c table, product first.
  */
 const HEADER_LANES: ReadonlySet<string> = new Set(['product', 'transfer', 'hostile']);
+
+/**
+ * The forms the distiller can be asked for, minus `trace`.
+ *
+ * Mirrors `resolveDistillForm`'s accepted set, which is the one the lane can actually render. Stated
+ * here rather than imported because a registration is checked on every push, without the driver, and
+ * because a divergence between the two lists should be a failing test rather than an import edge.
+ */
+const HEADER_FORMS: ReadonlySet<string> = new Set(['lesson', 'procedure', 'repair', 'lexicon']);
 const LANE_LIST = 'product, transfer or hostile';
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
@@ -551,6 +576,22 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // The shape of claim the distiller is asked for. R56's one variable, and the third instance of a
+  // switch that could only be varied by a repository variable — one experiment's setting applied to
+  // every queued dispatch, with nothing in the registration to contradict it.
+  const formText = values.get('distillForm');
+  let distillForm: string | undefined;
+  if (formText !== undefined) {
+    if (!HEADER_FORMS.has(formText)) {
+      collected.push({
+        where: `header 'distillForm'`,
+        problem: `'${formText}' is not one of ${[...HEADER_FORMS].join(', ')}`,
+      });
+    } else {
+      distillForm = formText;
+    }
+  }
+
   // The thinking regime, which R84 needs and which has no dispatch field to live in.
   //
   // Two values and no synonyms. `SOTA_THINKING` accepts `enabled`, `disabled`, `true` and `false`
@@ -667,6 +708,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(backbone === undefined ? {} : { backbone }),
       ...(split === undefined ? {} : { split }),
       ...(lane === undefined ? {} : { lane }),
+      ...(distillForm === undefined ? {} : { distillForm }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,
       refutation,
@@ -971,6 +1013,39 @@ export function thinkingProblem(
   return (
     `this registration fixes the thinking regime at '${declared}' and this dispatch would run ` +
     `'${configured}', so the regime is not the only variable that moved`
+  );
+}
+
+/**
+ * Refuse a dispatch whose distiller form is not the one the registration fixed.
+ *
+ * Three ways the registration's switch can fail to be the one that ran, and each has its own sentence:
+ * a stated disagreement with the variable, a variable that would run another form, and a trace dispatch
+ * that replaces the form entirely. The third is the one no existing check could have caught: the driver
+ * picks `trace` when the unit is a trace, so a registration that fixes `procedure` and a dispatch that
+ * distils traces produces a run whose registered variable was inert — published as one experiment, with
+ * a treatment that never fired.
+ *
+ * `null` and the empty string are the variable being unset, which is not a second opinion: the
+ * registration decides, exactly as it does for the thinking regime.
+ */
+export function distillFormProblem(
+  configured: string | null,
+  declared: string | undefined,
+  unit: string,
+): string | undefined {
+  if (declared === undefined) return undefined;
+  if (unit === 'trace' && declared !== 'trace') {
+    return (
+      `this registration fixes the distiller's form at '${declared}' and this dispatch distils ` +
+      `'trace', which replaces the form, so the registered switch cannot take effect`
+    );
+  }
+  const stated = configured === null || configured === '' ? undefined : configured;
+  if (stated === undefined || stated === declared) return undefined;
+  return (
+    `this registration fixes the distiller's form at '${declared}' and this dispatch would run ` +
+    `'${stated}', so the form is not the only variable that moved`
   );
 }
 

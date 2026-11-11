@@ -349,3 +349,51 @@ describe('the lane role is on the artefact, not only in the documents', () => {
     expect(call).toBeLessThan(text.indexOf('await askPlanned('));
   });
 });
+
+describe('every switch a registration owns is read from the registration', () => {
+  const WORKFLOW = new URL('../../../../.github/workflows/sota.yml', import.meta.url);
+  const text = readFileSync(WORKFLOW, 'utf8');
+
+  /**
+   * The switches a header field supplies, and the output each must be read from.
+   *
+   * The list is the point. A switch that a registration can fix and a dispatch can still override is a
+   * treatment with two sources of truth, and the record has paid for that three times: R51 graded a
+   * retail store on airline questions because the scenario pair lived in a variable, R82's model was one
+   * forgotten `PATCH` from being a different experiment, and R56's entire treatment — the distiller's
+   * form — had been unsettable by any dispatch until this round. The last one is why the check exists:
+   * the form was read by the driver, resolved through a tested function, recorded in the artefact, and
+   * reachable only from `vars`, so a registration could say `procedure` and run `lesson`.
+   */
+  const OWNED: readonly (readonly [string, string])[] = [
+    ['TAU_MIN_COVERAGE', 'floor'],
+    ['TAU_FACADE_PAIR', 'pair'],
+    ['TAU_FACADE_NOTES', 'notes'],
+    ['TAU_TRAIN_DOMAIN', 'train'],
+    ['TAU_TEST_DOMAIN', 'test'],
+    ['TAU_RECALL_DOMAIN', 'recall'],
+    ['TAU_DISTILL_FORM', 'form'],
+  ];
+
+  /** The line a key is assigned on, in the L4 step, with its continuation lines folded in. */
+  function assignmentOf(key: string): string {
+    const lines = text.split('\n');
+    const index = lines.findIndex((line) => line.trimStart().startsWith(`${key}:`));
+    expect(index, `${key} is not assigned anywhere in sota.yml`).toBeGreaterThan(-1);
+    return lines.slice(index, index + 3).join('\n');
+  }
+
+  for (const [key, output] of OWNED) {
+    it(`${key} prefers the registration's ${output} over the variable`, () => {
+      expect(assignmentOf(key)).toContain(`steps.recall_floor.outputs.${output}`);
+    });
+  }
+
+  it('emits each of those outputs from the step that reads the header', () => {
+    // A preference for an output that is never written is an empty string, which silently restores the
+    // variable — the same failure as never wiring it, one layer down.
+    for (const output of OWNED.map(([, name]) => name)) {
+      expect(text).toContain(`echo "${output}=`);
+    }
+  });
+});

@@ -1230,6 +1230,11 @@ jobs:
         if: github.event.inputs.prereg != ''
         env:
           PREREG: ${{ github.event.inputs.prereg }}
+          # The two values the form check compares. Passed in rather than read by the script, because
+          # the script has no business knowing which repository variable feeds which lane, and because
+          # a check that read the variable itself could not be executed against a candidate value.
+          TAU_FORM_VAR: ${{ vars.TAU_DISTILL_FORM }}
+          TAU_UNIT_VAR: ${{ vars.TAU_DISTILL_UNIT }}
         run: |
           set -euo pipefail
           # The input is the registration ID, not the file name. A stray `.md`
@@ -1257,6 +1262,12 @@ jobs:
           # lived in a repository variable set for the transfer arm, and nothing in the
           # registration said which pair the predictions were about. A registration that
           # pins nothing prints three empty lines and the variables stand, exactly as before.
+          # R56: the distiller's form is the registration's, for the same reason the floor and the
+          # scenario pair are. `vars.TAU_DISTILL_FORM` is global, so a registration that fixed
+          # `procedure` and a dispatch whose variable still said `lesson` would publish the control
+          # under the treatment's name; the script refuses that, and refuses a trace dispatch that
+          # would replace the form the registration pinned.
+          FORM=$(pnpm --silent eval:prereg-form "$FILE" "${TAU_FORM_VAR:-}" "${TAU_UNIT_VAR:-}")
           pnpm --silent eval:prereg-scenario "$FILE" > "$RUNNER_TEMP/scenario.env"
           TRAIN=$(sed -n 's/^train=//p' "$RUNNER_TEMP/scenario.env")
           TEST=$(sed -n 's/^test=//p' "$RUNNER_TEMP/scenario.env")
@@ -1267,7 +1278,8 @@ jobs:
           echo "train=$TRAIN" >> "$GITHUB_OUTPUT"
           echo "test=$TEST" >> "$GITHUB_OUTPUT"
           echo "recall=$RECALL" >> "$GITHUB_OUTPUT"
-          echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "form=$FORM" >> "$GITHUB_OUTPUT"
+          echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`, distiller form \`${FORM:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: L4 arm — memory
         if: github.event.inputs.l4_arms != 'reference'
@@ -1310,7 +1322,10 @@ jobs:
           # Unset means empty means the default the lane has always run: `standard` with
           # `declared: false`, `lesson`, seed 7, 400 calls, and the published admission threshold.
           TAU_INJECTION_NOTE: ${{ vars.TAU_INJECTION_NOTE }}
-          TAU_DISTILL_FORM: ${{ vars.TAU_DISTILL_FORM }}
+          # R56's one variable, from the registration when it names one and from the variable
+          # otherwise. The read step refuses a disagreement before any model call, so the two can
+          # never both be in force: one of them is empty by the time this line is evaluated.
+          TAU_DISTILL_FORM: ${{ steps.recall_floor.outputs.form || vars.TAU_DISTILL_FORM }}
           # R58: `correction` (the unit every published arm measured) or `trace` (the attempt beside
           # the reference trajectory, with the recurrence pass over the store it produces). Not a
           # dispatch input, because a unit is a property of the experiment rather than of the run.

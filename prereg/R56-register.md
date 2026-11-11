@@ -10,6 +10,8 @@ facadePair: off
 trainDomain: retail
 testDomain: retail
 recallDomain: retail
+lane: product
+distillForm: procedure
 ---
 
 # R56 — the distiller is asked for the shape of a query, in a lane that has no tables
