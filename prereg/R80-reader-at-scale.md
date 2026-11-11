@@ -191,16 +191,28 @@ often than the 350-question slice suggested. The detection floor the file claime
 needed 1,534 questions and was reached anyway — the reader was detected at 0.0025 — but the pool that
 feeds a cheap selector is smaller than the arithmetic assumed.
 
-### What this licenses
+### What this licenses, and the lever it does *not*
 
-**Candidate generation is now the binding constraint, and it is a prompt-shape problem, not a sampling
-problem.** The selector works: it finds a fifth of a 7.37pp ceiling at 5 calls per question. What it
-cannot do is find a ceiling that five draws of *one prompt* fail to open — 75% of questions never produce
-a second distinct answer, and the first draw at T = 0.7 costs 1.30pp against the deterministic call. The
-published systems that clear 70% do not spin one prompt; CHASE-SQL generates its candidates from a
-divide-and-conquer decomposition, an execution-plan chain of thought and instance-aware examples, which
-is three *different* prompts. That is the lever this file hands to the next registration, and it is the
-one R70 named when it closed temperature: "different prompts rather than the same prompt spun harder".
-
-**And the memory component is still null at this population**: −0.46pp [−1.89, +0.91] on the split the
+**The memory component is still null at this population**: −0.46pp [−1.89, +0.91] on the split the
 leaderboard row is measured on, which is the same verdict R79 read on a different slice (−0.11pp).
+
+**The selector works and the pool it reads is narrow**, which points at candidate generation — but that
+pointer has already been followed and refuted, and this file would have been wrong to send a registration
+there. Iteration 107 of the record bought exactly the arm this readback invites: four *different*
+procedures on the same questions (`plain`, `gen-plan`, `gen-decompose`, `m-schema`), 350 questions, one
+judge. The union of the four arms had a **+8.57pp ceiling** and the four procedures **collapsed to 1.557
+distinct answers**, barely wider than the 1.46 that five draws of one prompt produced — and the two
+generators *lost* on their own: `gen-plan` −5.43pp (p = 0.004), `gen-decompose` −3.14pp. Heterogeneity did
+not widen the pool; it produced worse candidates that mostly repeated what the direct prompt said.
+
+**So the ceiling is not a diversity problem that a fourth prompt shape would fix.** R80's 7.37pp and
+iteration 107's 8.57pp are the same quantity measured two ways, and R68 already gave the scaling law that
+explains both: at a 57% baseline five draws rescue about a fifth of the failures, and the ceiling grows
+proportionally with the failure population rather than super-linearly. Given that, the levers that remain
+are the ones that change the *model's own reach* rather than the shape of what is fanned out — a stronger
+backbone, measured on this same cell — or nothing on BIRD dev at all.
+
+**What this file does establish, and it is the part worth keeping**: the written reader is the first
+selector in this project that beats the draw it reads with an interval excluding zero, and it does so at
+5 calls per question. That is a **deployable** result for any run whose candidate generation is better than
+ours, which is exactly the product statement: the reader is not the bottleneck here, the backbone is.
