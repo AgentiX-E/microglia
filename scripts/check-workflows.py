@@ -17,6 +17,11 @@ opinionated:
   unique     no input is declared twice, which YAML resolves by keeping the last one in silence
   dispatch   a `workflow_dispatch` that exists declares `inputs` only under `on`
   runs-on    every job names a runner, because a job without one is rejected at parse time upstream
+  deadline   a step that runs on the lane's own clock derives its timeout from that clock
+
+  The last one is R68's third attempt: `deadline_min` 300 against a literal step timeout of 200, so the
+  runner killed the step a hundred minutes before the lane's own clock would have and the run wrote no
+  artefact — the one outcome the deadline exists to prevent.
 
 Usage:
   python3 scripts/check-workflows.py            # exits 1 on the first rule that fails
@@ -153,6 +158,52 @@ def shell_syntax(document: dict, name) -> list[str]:
     return failures
 
 
+def deadline_headroom(document: dict, name) -> list[str]:
+    """A step that runs on the lane's own clock may not carry a literal timeout of its own.
+
+    R68's third attempt is the incident. `deadline_min` was 300, the step that runs the benchmark had
+    `timeout-minutes: 200`, and nothing anywhere compared the two: the lane spent 2,961 calls over four
+    folds, the runner killed the step 100 minutes before the lane's own clock would have, and the run
+    produced **no artefact at all** -- exactly the outcome the lane's deadline exists to prevent, since
+    a lane that stops itself writes the folds it has finished. The two numbers are one claim about one
+    run, so the timeout is derived from the deadline now, and this rule refuses the literal.
+
+    Only steps that read the deadline variable are covered, because a step with an unrelated timeout
+    (a publish step, an upload) is not making that claim.
+    """
+    failures: list[str] = []
+    jobs = document.get("jobs") or {}
+    if not isinstance(jobs, dict):
+        return failures
+    for job, body in jobs.items():
+        if not isinstance(body, dict):
+            continue
+        steps = body.get("steps")
+        if not isinstance(steps, list):
+            continue
+        for index, step in enumerate(steps):
+            if not isinstance(step, dict):
+                continue
+            env = step.get("env")
+            # The key or the value, because a step names the variable in its key in this repository and
+            # a step elsewhere might pass it through in the value. Looking only at values found nothing
+            # in the file that pays for this rule, which is how the rule's first self-test failed.
+            reads = isinstance(env, dict) and any(
+                str(key) == "SOTA_DEADLINE_MIN"
+                or (isinstance(value, str) and "deadline_min" in value)
+                for key, value in env.items()
+            )
+            timeout = step.get("timeout-minutes")
+            if reads and timeout is not None and not isinstance(timeout, str):
+                failures.append(
+                    f"{name}: job `{job}` step {index + 1} runs on the lane's deadline and also "
+                    f"declares a literal timeout of {timeout}; a dispatch whose deadline is larger is "
+                    "killed by the runner before the lane can stop itself and writes no artefact "
+                    "(R68) -- derive the timeout from `deadline_min` instead"
+                )
+    return failures
+
+
 def check(path: Path) -> list[str]:
     failures: list[str] = []
     # A path outside the repository is still a workflow file to whoever handed it over, and a check
@@ -212,6 +263,7 @@ def check(path: Path) -> list[str]:
             elif "runs-on" not in body:
                 failures.append(f"{name}: job `{job}` names no runner")
     failures.extend(shell_syntax(document, name))
+    failures.extend(deadline_headroom(document, name))
     return failures
 
 
@@ -230,6 +282,8 @@ def self_test() -> int:
         duplicate: str | None = None,
         base: int = 2,
         step_run: str | None = None,
+        step_env: str | None = None,
+        step_timeout: int | None = None,
     ) -> str:
         # `base` exists so one case can nest the block deeper: the counter derives its indent from the
         # `inputs:` line, and a case that only ever fed it one indentation would agree with a version
@@ -263,6 +317,10 @@ def self_test() -> int:
         else:
             tail.append("    steps:")
             tail.append("      - name: a step")
+            if step_timeout is not None:
+                tail.append(f"        timeout-minutes: {step_timeout}")
+            if step_env is not None:
+                tail.extend(["        env:", f"          {step_env}"])
             tail.append("        run: |")
             tail.extend(f"          {line}" for line in step_run.rstrip("\n").split("\n"))
         return "\n".join(header + body + tail) + "\n"
@@ -300,6 +358,30 @@ def self_test() -> int:
         (
             "a step that is a valid script is clean",
             workflow(2, step_run='VALUE=""\nfor x in a b; do echo "$x"; done\n'),
+            True,
+            None,
+        ),
+        # R68: a step on the lane's clock with a timeout of its own. The lane had no way to know, and
+        # the runner killed it a hundred minutes early with nothing to publish.
+        (
+            "a step on the lane's deadline may not carry a literal timeout",
+            workflow(
+                2,
+                step_run="echo run\n",
+                step_env="SOTA_DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}",
+                step_timeout=200,
+            ),
+            False,
+            "derive the timeout from",
+        ),
+        (
+            "the same step with the timeout derived is clean",
+            workflow(
+                2,
+                step_run="echo run\n",
+                step_env="SOTA_DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}",
+                step_timeout=None,
+            ),
             True,
             None,
         ),
@@ -356,7 +438,7 @@ def main(argv: list[str]) -> int:
     if HAS_YAML:
         print(
             f"workflow: {len(paths)} file(s) parse, declare at most {MAX_INPUTS} inputs, name runners, "
-            "and every run: block is a script bash can parse"
+            "derive the lane's timeout from its deadline, and every run: block is a script bash can parse"
         )
     else:
         print(f"workflow: {len(paths)} file(s) declare at most {MAX_INPUTS} inputs; PyYAML is absent, so "

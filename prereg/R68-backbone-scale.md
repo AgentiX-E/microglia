@@ -129,3 +129,56 @@ first one that applies names the outcome.
 
 The branches are applied in the order written: the first one whose conditions hold names the
 outcome, and any estimate that fits none of the four is impossible by construction.
+
+## Outcome 1 — the runner killed it a hundred minutes before the lane would have, and wrote nothing
+
+Dispatch `42904695578`, 2026-11-10 21:24 UTC. It spent **2,961 calls over four complete folds and the
+fifth fold's evaluation**, and then:
+
+```
+2026-11-11T00:45:06Z ##[error]The action 'Run the benchmark' has timed out after 200 minutes.
+No files were found with the provided path: eval/results/poc-sota-bird*.partial.json
+```
+
+**Two numbers that were the same claim about the same run, and nothing compared them.** The dispatch was
+sent with `deadline_min: 300`; the step that runs the benchmark had a literal `timeout-minutes: 200`.
+The lane's whole design is that it stops itself *before* the runner does, so that the folds it paid for
+are published as a partial artefact — the comment above that step says so, and the number in it (200)
+was chosen against the *default* deadline of 130. A dispatch that raises the deadline without raising
+the timeout converts the lane's graceful stop into a kill, and the kill discards everything.
+
+**This is a configuration defect, not a measurement**, and it is now structural rather than remembered:
+
+- the step's timeout is `fromJSON(github.event.inputs.deadline_min || '130') + 25`, so the backstop is
+  derived from the clock instead of written beside it;
+- a new step, `Require a deadline the job can honour`, refuses a dispatch whose deadline cannot fit the
+  job's 340 minutes **before the first model call**;
+- `scripts/check-workflows.py` gained a fifth rule: a step that reads `SOTA_DEADLINE_MIN` may not carry
+  a literal `timeout-minutes`, with a self-test case that reproduces this one. The rule's first version
+  looked for the variable in env *values*, found nothing in the file that pays for it, and passed the
+  case that was written to fail — the same shape of silent check this repository keeps finding.
+
+**What it cost**: 2,961 calls, no artefact, and the experiment's third attempt gone.
+
+## Amendment 1 — the population stays; the clock moves
+
+**The run was about twenty minutes from finishing when the step timeout took it.** Its own log is the
+measurement: fold 3 completed at call 2,263 in 149 minutes, fold 4 at 2,820 in 187 minutes, and fold 5
+had finished its evaluation at 2,961 when the runner fired. A fold costs about 530 calls (70 evaluation,
+350 draws through the five-sample arms, 70 scoring, ~40 choices), so the fifth fold needed roughly 460
+more — **about 3,420 calls and 220 minutes**, against a step timeout of 200 and a job limit of 340.
+
+**So the first instinct — halve the population — is the wrong correction, and it was almost recorded as
+the right one.** A registration that resized itself to fit a defect would have halved the population for
+a thirty-minute overrun and left the next dispatch to discover that 175 questions buy a share with 1.4×
+the interval. The defect is the timeout, it is now derived from the deadline, and the population is
+what it was.
+
+**Re-dispatched unchanged except for the clock and the cap**: 350 questions, five folds, three
+`sample-5` arms, `deadline_min` 300 (step 325, job 340), `max_calls` **3,700**, `ceiling_calls` **4,800**.
+
+**The cap is 45% lower than the 6,300 the third attempt authorised**, because that number was a forecast
+from a plan rather than from a measurement, and the measurement now exists: 2,961 calls bought four
+folds and a fifth evaluation. A cap that over-authorises is not free — it is the number the in-run
+forecast is compared against, and a bound nobody can approach tells the run nothing about whether it is
+on track.

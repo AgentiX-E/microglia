@@ -529,11 +529,32 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # The step timeout used to be the literal 200 and the lane's own deadline a dispatch input
+      # whose default was 130. Those two numbers were the same claim about the same run, and nothing
+      # tied them together: R68's third attempt was dispatched with `deadline_min: 300`, spent 2,961
+      # calls over four folds, and was killed by the runner at 200 minutes with **no artefact at
+      # all** — the one outcome the lane's self-stop exists to prevent, produced by a dispatch field
+      # the workflow accepted without reading. The timeout is now derived from the deadline, so the
+      # backstop is always above the clock, and a dispatch whose deadline cannot fit the job fails
+      # here, before the first call.
+      - name: Require a deadline the job can honour
+        env:
+          DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}
+        run: |
+          set -euo pipefail
+          # 25 minutes of headroom for the last fold to finish writing, and 340 for the job.
+          CAP=$((335 - 25))
+          if [ "$DEADLINE_MIN" -gt "$CAP" ]; then
+            echo "::error::deadline_min ${DEADLINE_MIN} cannot fit the job: the job limit is 340 minutes and the step needs 25 of headroom, so the largest deadline this lane may take is ${CAP}. A run dispatched above it is killed by the runner with no artefact, which is what happened to R68 at deadline 300."
+            exit 1
+          fi
+          echo "deadline ${DEADLINE_MIN} min, step timeout $((DEADLINE_MIN + 25)) min, job limit 340 min"
+
       - name: Run the benchmark
-        # Above the lane's own deadline (130 minutes) with room for the last fold to finish
-        # writing, and below the job's. The step timeout is a backstop, not a plan: the run that
-        # died here at 160 minutes had finished three folds and left no artefact.
-        timeout-minutes: 200
+        # Above the lane's own deadline with room for the last fold to finish writing, and below the
+        # job's. The step timeout is a backstop, not a plan: the run that died here at 160 minutes had
+        # finished three folds and left no artefact.
+        timeout-minutes: ${{ fromJSON(github.event.inputs.deadline_min || '130') + 25 }}
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           # The lane's own default was `deepseek-chat` until this round: a retired name that the
