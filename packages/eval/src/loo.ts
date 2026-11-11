@@ -125,6 +125,33 @@ export function looOverall(rows: readonly LooRow[]): {
 }
 
 /**
+ * The fold a row belongs to, with any record that is not an integer index folded into the first one.
+ *
+ * `row.fold` arrives from an artefact rather than from this module. A `null`, `1.5` or `NaN` there is a
+ * damaged record, not a sixth fold: modulo on `NaN` yields `NaN`, which is a legal map key that no
+ * other-fold filter can ever equal, so the row would be in a fold of its own and contribute to every
+ * other fold's ledger — silently, and in the direction that inflates a class reading. Folding it into
+ * zero keeps the row counted where its damage is visible.
+ */
+function foldOf(row: LooRow, folds: number): number {
+  return Number.isInteger(row.fold) ? row.fold % folds : 0;
+}
+
+/**
+ * Push a value into the array a map holds under a key, creating it only when it is absent.
+ *
+ * `map.set(key, [...(map.get(key) ?? []), value])` is the shorter spelling and it carries a fallback
+ * that can never be taken: the `[]` exists only for the first value of a key and the expression always
+ * supplies one. A fallback nothing can reach is either dead code or a hole a reader has to re-derive,
+ * and this file had the same three-line shape in two places.
+ */
+function pushInto<K, V>(map: Map<K, V[]>, key: K, value: V): void {
+  const held = map.get(key);
+  if (held === undefined) map.set(key, [value]);
+  else held.push(value);
+}
+
+/**
  * The readings R74's branches are decided on: by rule class, and by how many rules the pack held.
  *
  * Class is the question the project has been unable to answer — are the rules `attribution` calls
@@ -140,22 +167,14 @@ export function looGroups(
   const classOf = new Map(ledger.map((verdict) => [verdict.rule, ruleClassOf(verdict)]));
   const byClass = new Map<RuleClass, LooRow[]>();
   const bySize = new Map<string, LooRow[]>();
-  // Append into the array the map already holds rather than rebuilding it: `map.set(key, [...(get(key)
-  // ?? []), row])` carries a fallback that can never be taken on the first row only, and a fallback
-  // that cannot be taken is either dead code or a hole a reader has to re-derive.
-  const append = <K>(map: Map<K, LooRow[]>, key: K, row: LooRow): void => {
-    const held = map.get(key);
-    if (held === undefined) map.set(key, [row]);
-    else held.push(row);
-  };
   for (const row of rows) {
     if (row.dropped === null) continue;
     // A rule that was withheld but never injected anywhere in the split has no ledger verdict. It is
     // counted `neutral` here and `unseen` by `looCrossFitted`, and the difference is deliberate rather
     // than an oversight: this table is the pooled one R77 published, and relabelling its rows now would
     // silently change numbers that are already in the record.
-    append(byClass, classOf.get(row.dropped) ?? 'neutral', row);
-    append(bySize, String(Math.min(row.packIds.length, 3)), row);
+    pushInto(byClass, classOf.get(row.dropped) ?? 'neutral', row);
+    pushInto(bySize, String(Math.min(row.packIds.length, 3)), row);
   }
   const order: readonly RuleClass[] = ['harmful', 'helpful', 'neutral'];
   const read = (name: string, segment: readonly LooRow[]): LooReading => {
@@ -207,11 +226,24 @@ export function looDraws(rows: readonly LooRow[]): {
   }
   const draws = [...counts.values()].sort((left, right) => left - right);
   const total = draws.reduce((sum, value) => sum + value, 0);
+  // The median and the maximum in one pass rather than `draws[half] ?? 0` and `draws[last] ?? 0`: an
+  // index derived from the length is in range by construction, so `noUncheckedIndexedAccess` forces a
+  // fallback that no input can reach. Walking the sorted values gives both numbers and leaves the empty
+  // split reading zero without a conditional to explain.
+  const half = Math.floor(draws.length / 2);
+  let median = 0;
+  let max = 0;
+  let position = 0;
+  for (const value of draws) {
+    if (position === half) median = value;
+    max = value;
+    position += 1;
+  }
   return {
     withheld: total,
     rules: draws.length,
-    median: draws.length === 0 ? 0 : (draws[Math.floor(draws.length / 2)] ?? 0),
-    max: draws.length === 0 ? 0 : (draws[draws.length - 1] ?? 0),
+    median,
+    max,
     mean: draws.length === 0 ? 0 : total / draws.length,
   };
 }
@@ -243,8 +275,7 @@ export function looCrossFitted(
 ): { readonly readings: readonly LooReading[]; readonly unseen: number } {
   const byFold = new Map<number, number[]>();
   rows.forEach((row, index) => {
-    const fold = Number.isInteger(row.fold) ? row.fold % folds : 0;
-    byFold.set(fold, [...(byFold.get(fold) ?? []), index]);
+    pushInto(byFold, foldOf(row, folds), index);
   });
 
   const bucket: Record<RuleClass, { held: boolean[]; full: boolean[] }> = {
@@ -260,7 +291,7 @@ export function looCrossFitted(
     // denominator would understate every rule's exposure.
     const others = rows
       .map((row, index) => ({ row, index }))
-      .filter(({ row }) => (Number.isInteger(row.fold) ? row.fold % folds : 0) !== fold);
+      .filter(({ row }) => foldOf(row, folds) !== fold);
     const ledger = observationalLedger(
       others.map(({ row }) => row),
       others.map(({ index }) => withoutMemory[index] === true),

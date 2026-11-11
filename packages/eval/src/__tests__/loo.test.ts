@@ -158,6 +158,21 @@ describe('looDraws', () => {
 });
 
 describe('looCrossFitted', () => {
+  it('folds a damaged record into fold zero instead of giving it a fold of its own', () => {
+    // `NaN % 5` is `NaN`, and `NaN` is a legal map key that the other-fold filter can never equal, so a
+    // row with a non-integer fold would sit alone in its own fold *and* contribute to every other
+    // fold's ledger — inflating a class reading silently. Three rows in fold zero with one damaged and
+    // no other fold to learn from must therefore report three unseen rules and no readings at all.
+    const damaged: readonly LooRow[] = [
+      { fold: 0, correct: true, injectedCorrect: false, dropped: 'r', packIds: ['r'] },
+      { fold: 0, correct: true, injectedCorrect: false, dropped: 'r', packIds: ['r'] },
+      { fold: Number.NaN, correct: true, injectedCorrect: false, dropped: 'r', packIds: ['r'] },
+    ];
+    const crossFitted = looCrossFitted(damaged, [false, false, false]);
+    expect(crossFitted.readings).toEqual([]);
+    expect(crossFitted.unseen).toBe(3);
+  });
+
   /**
    * A rule that looks harmful only inside the fold it was judged on.
    *
