@@ -140,3 +140,100 @@ describe('an input library is built for every arm that reads it', () => {
     }
   });
 });
+
+/**
+ * The general form of the defect R81 found twice.
+ *
+ * Two attempts died of the same shape in two different arrays: a pass written inside another arm's
+ * `if`, and a donor library initialised under another arm's condition. Both are instances of one
+ * sentence — **this lane has inputs that only some arms fill, and every arm that reads one has to be
+ * among the arms that fill it** — so the check below is written against that sentence rather than
+ * against either array.
+ *
+ * It walks the file once for `const x = <condition containing ARMS.has(...)> ? ... : ...`, then again
+ * for every reference to `x`, carrying down the arm conditions of the `if` and the conditional
+ * expressions the reference sits inside. A reader under an arm the declaration does not name is the
+ * defect. The two fixtures after it exist because a check that is only ever run against a fixed file
+ * cannot show that it would have fired before the fix.
+ */
+type ArmInputAudit = {
+  /** Every input built under an arm condition, and the arms that condition names. */
+  readonly declared: ReadonlyMap<string, readonly string[]>;
+  /** Inputs read under an arm their declaration does not name, with those arms. */
+  readonly missing: ReadonlyMap<string, readonly string[]>;
+};
+
+function armsIn(text: string): readonly string[] {
+  return [...text.matchAll(/ARMS\.has\('([a-z0-9-]+)'\)/g)].map((match) => match[1] as string);
+}
+
+function auditArmInputs(source: string, name = 'sota-bird.ts'): ArmInputAudit {
+  const parsed = ts.createSourceFile(name, source, ts.ScriptTarget.ESNext, true);
+  const declared = new Map<string, readonly string[]>();
+  const collect = (node: ts.Node): void => {
+    if (ts.isVariableStatement(node)) {
+      for (const declaration of node.declarationList.declarations) {
+        const initializer = declaration.initializer;
+        if (initializer === undefined || !ts.isConditionalExpression(initializer)) continue;
+        const arms = armsIn(initializer.condition.getText(parsed));
+        if (arms.length > 0) declared.set(declaration.name.getText(parsed), arms);
+      }
+    }
+    ts.forEachChild(node, collect);
+  };
+  collect(parsed);
+  const readers = new Map<string, Set<string>>();
+  const walk = (node: ts.Node, guards: readonly string[]): void => {
+    if (ts.isIdentifier(node) && declared.has(node.text)) {
+      const arms = readers.get(node.text) ?? new Set<string>();
+      for (const arm of guards) arms.add(arm);
+      readers.set(node.text, arms);
+      return;
+    }
+    // Only the guard itself is read, never the guarded statement: an `if` whose body happens to
+    // mention another arm would otherwise attribute that arm to everything inside it, and the first
+    // version of this check did exactly that and reported the fixed array as still broken.
+    const deeper = ts.isIfStatement(node)
+      ? [...guards, ...armsIn(node.expression.getText(parsed))]
+      : ts.isConditionalExpression(node)
+        ? [...guards, ...armsIn(node.condition.getText(parsed))]
+        : guards;
+    ts.forEachChild(node, (child) => walk(child, deeper));
+  };
+  walk(parsed, []);
+  const missing = new Map<string, readonly string[]>();
+  for (const [input, built] of declared) {
+    const unbuilt = [...(readers.get(input) ?? [])].filter((arm) => !built.includes(arm));
+    if (unbuilt.length > 0) missing.set(input, unbuilt);
+  }
+  return { declared, missing };
+}
+
+describe('every arm that reads a conditional input is one of the arms that fills it', () => {
+  it('finds no such reader in the lane', () => {
+    const audit = auditArmInputs(readFileSync(PATH, 'utf8'));
+    // The count guards against a refactor that removes the pattern: an empty audit passes for ever.
+    expect(audit.declared.size).toBeGreaterThanOrEqual(8);
+    expect([...audit.missing]).toEqual([]);
+  });
+
+  it("catches the array that failed R81's third attempt", () => {
+    const fixture = [
+      "const packLibrary = ARMS.has('full-shuffled') ? pieces : [];",
+      "if (ARMS.has('full-reconstructed-shuffled')) consume(packLibrary);",
+    ].join('\n');
+    expect([...auditArmInputs(fixture, 'fixture.ts').missing]).toEqual([
+      ['packLibrary', ['full-reconstructed-shuffled']],
+    ]);
+  });
+
+  it('leaves an input that is not conditional alone', () => {
+    const fixture = [
+      'const everything = gather();',
+      "if (ARMS.has('full')) consume(everything);",
+    ].join('\n');
+    const audit = auditArmInputs(fixture, 'fixture.ts');
+    expect(audit.declared.size).toBe(0);
+    expect([...audit.missing]).toEqual([]);
+  });
+});
