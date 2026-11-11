@@ -191,6 +191,7 @@ import {
   shuffledSource,
   parseGuidance,
   pricingFor,
+  restModelOf,
   reconstructPrompt,
   reconstructReading,
   type ParsedGuidance,
@@ -8250,7 +8251,10 @@ async function main(): Promise<void> {
       // Priced at the model that actually moved these tokens: the card holds one row per model, and
       // a run on the host's stronger model whose `usd` came from the cheaper row would understate its
       // own cost by 4.4× on input — with `pricing` beside it saying only that it was an approximation.
-      const bill = billOf(banded, llm.model);
+      // Priced at the id the client actually sends: `deepseek/deepseek-flash` is litellm's spelling of
+      // the same model, and a bill keyed on the spelling would report every τ²-shaped run as priced by
+      // approximation when it was priced exactly.
+      const bill = billOf(banded, restModelOf(llm.model).sent);
       const total = totalUsage(banded);
       return {
         model: llm.model,
@@ -8277,7 +8281,7 @@ async function main(): Promise<void> {
          * an assumption. `matches: false` is not an error — a second backbone is a legitimate experiment —
          * but the bill says what it assumed instead of presenting the assumption as the price.
          */
-        pricing: pricingFor(llm.model),
+        pricing: pricingFor(restModelOf(llm.model).sent),
       };
     })(),
     /**

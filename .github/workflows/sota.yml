@@ -433,9 +433,12 @@ jobs:
         env:
           SOTA_MODEL: ${{ steps.backbone.outputs.model }}
           SOTA_ENDPOINT: ${{ steps.backbone.outputs.endpoint }}
-          # The resolved credential decides which key the probe may spend, exactly as it decides for the
-          # lane: a `zhipu:` dispatch spends the zhipu key, and everything else spends DeepSeek's.
-          SOTA_API_KEY: ${{ steps.backbone.outputs.credential == 'zhipu' && secrets.ZHIPU_API_KEY || secrets.DEEPSEEK_API_KEY }}
+          # The same two variables the lane is given, so `planCredential` reports the same source here as
+          # it does for the run: a `zhipu:` dispatch spends the lane key, and everything else spends
+          # DeepSeek's borrowed one. Passing the borrowed key as `SOTA_API_KEY` would relabel the account
+          # that paid in an artefact whose whole purpose is to name it.
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          SOTA_API_KEY: ${{ (steps.backbone.outputs.credential == 'zhipu' && secrets.ZHIPU_API_KEY) || '' }}
         run: pnpm eval:backbone-probe --out eval/results/.volatile/backbone-probe.json
 
       # No inventory step: the lane verifies its own data. It reads the pinned manifest for its
