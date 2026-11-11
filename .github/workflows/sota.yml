@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       limit:
-        description: 'Questions to draw (0 = every usable question)'
+        description: 'Questions to draw (0 = the registration''s own sample, or every usable question when there is none)'
         required: false
         default: '0'
       folds:
@@ -529,6 +529,44 @@ jobs:
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
+      # The population a registration scores, or the menu's own number.
+      #
+      # `sample` has been in every header since the first registration and nothing compared it with
+      # what the lane drew: `limit` defaulted to `0` ("every usable question"), the number was typed
+      # by hand when somebody remembered, and the artefact reported a population the file had not
+      # sized. Same defect as R67's arm list, same fix. `offset` is the other half: a `loo` draw is a
+      # (rule, question) pair and cannot be drawn twice, so a top-up of draws is a claim about
+      # *different* questions, and a prefix can never deliver them — the reason R78 was first written
+      # as "the same questions, more draws" and would have re-bought every pair R77 had spent.
+      #
+      # An explicit non-zero `limit` still wins, because a hand run of a registration at a smaller
+      # population is a legitimate thing to do — and the lane refuses it against the header, so the
+      # two representations cannot disagree in silence.
+      - name: Resolve the population
+        id: population
+        env:
+          PREREG: ${{ github.event.inputs.prereg || '' }}
+          LIMIT: ${{ github.event.inputs.limit || '0' }}
+        run: |
+          set -euo pipefail
+          SAMPLE=""
+          OFFSET=""
+          if [ -n "$PREREG" ]; then
+            SAMPLE=$(pnpm --silent eval:prereg-population --field sample "prereg/${PREREG}.md")
+            OFFSET=$(pnpm --silent eval:prereg-population --field offset "prereg/${PREREG}.md")
+          fi
+          if [ "$LIMIT" != "0" ] && [ -n "$LIMIT" ]; then
+            SAMPLE="$LIMIT"
+          fi
+          echo "sample=$SAMPLE" >> "$GITHUB_OUTPUT"
+          echo "offset=$OFFSET" >> "$GITHUB_OUTPUT"
+          {
+            echo "### Population"
+            echo
+            if [ -n "$SAMPLE" ]; then echo "- questions: $SAMPLE"; else echo "- questions: every usable one"; fi
+            if [ -n "$OFFSET" ]; then echo "- skipped before the slice: $OFFSET"; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # The step timeout used to be the literal 200 and the lane's own deadline a dispatch input
       # whose default was 130. Those two numbers were the same claim about the same run, and nothing
       # tied them together: R68's third attempt was dispatched with `deadline_min: 300`, spent 2,961
@@ -578,7 +616,11 @@ jobs:
           # the `off` switch is available from here and the usage line reports the reasoning share —
           # the decision is taken on a number rather than on an assumption about either direction.
           SOTA_THINKING: ${{ vars.SOTA_THINKING || '' }}
-          SOTA_LIMIT: ${{ github.event.inputs.limit || '0' }}
+          # From the registration, so the number that sizes the run and the number the run reports
+          # are one fact. A dispatch that types a different one still wins here and is refused by the
+          # lane against the header, which is the loud version of the same disagreement.
+          SOTA_LIMIT: ${{ steps.population.outputs.sample || '0' }}
+          SOTA_OFFSET: ${{ steps.population.outputs.offset || '0' }}
           SOTA_FOLDS: ${{ github.event.inputs.folds || '5' }}
           SOTA_GENERALIZE: ${{ github.event.inputs.generalize || 'true' }}
           SOTA_DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}

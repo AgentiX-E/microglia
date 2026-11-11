@@ -65,7 +65,7 @@
  *  - `SOTA_DISTILL_CONCURRENCY` distillation replies in flight at once; default 8
  */
 import { writeJson } from './lib.js';
-import { armsAgainstRegistration, readPrereg } from '../prereg.js';
+import { armsAgainstRegistration, populationAgainstRegistration, readPrereg } from '../prereg.js';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -332,6 +332,19 @@ const REPO = join(ROOT, '..', '..', '..');
 const CACHE = join(ROOT, '..', '.cache', 'bird');
 
 const LIMIT = nonNegative(process.env['SOTA_LIMIT'], 0);
+
+/**
+ * Questions to skip before `LIMIT`.
+ *
+ * A `loo` draw is a (rule, question) pair, and a pair cannot be drawn twice: the same pack, the same
+ * withheld rule and temperature zero are the same call. R78 is a top-up of draws R77's questions have
+ * already given, so it needs questions R77 did not score — and `SOTA_LIMIT` alone can only ever hand
+ * back a prefix of the corpus. Without this, "more draws" and "the same draws" are the same dispatch.
+ *
+ * Declared in the registration (`offset`) as well as the dispatch, because the two are one fact and
+ * this repository has paid for one fact in two places three times.
+ */
+const OFFSET = nonNegative(process.env['SOTA_OFFSET'], 0);
 
 /**
  * How many of a fold's learning questions to distil from, 0 meaning all of them.
@@ -623,6 +636,38 @@ function armsFrom(raw: string | undefined): Set<ArmName> {
 }
 
 /**
+ * Refuse a dispatch whose population disagrees with the one its registration sizes.
+ *
+ * The arm list got this check after R67 and the sample never did: `sample` has been in every header
+ * since the first registration and the lane only ever read `SOTA_LIMIT`, so an experiment sized on
+ * 2,000 questions and dispatched with 350 was not refused, it was reported under the registration's
+ * name. The comparison is in `prereg.ts` so it can be tested without a process; this is the file read
+ * and the named failure.
+ *
+ * A named registration that will not parse is refused here rather than skipped: `armsAgainstPrereg`
+ * has already refused it by the time this runs, and a second silent path that treats "the file is
+ * broken" as "no claim was made" is how a dispatch ends up alone with its own numbers.
+ */
+function populationAgainstPrereg(prereg: string, limit: number, offset: number): void {
+  if (prereg === '') return;
+  const path = `prereg/${prereg}.md`;
+  const reading = readPrereg(readFileSync(path, 'utf8'), path);
+  if (reading.prereg === undefined) {
+    throw new MicrogliaError('MG_E_CONFIG', `${path} does not parse, so its population is unknown`, {
+      prereg: path,
+      problems: reading.problems.map((problem) => `${problem.where}: ${problem.problem}`),
+    });
+  }
+  const agreement = populationAgainstRegistration(reading.prereg, limit, offset);
+  if (agreement.ok) return;
+  throw new MicrogliaError(
+    'MG_E_CONFIG',
+    `this dispatch is not ${path}: ${agreement.problems.join('; ')}`,
+    { prereg: path, limit, offset, sample: reading.prereg.sample, declaredOffset: reading.prereg.offset ?? 0 },
+  );
+}
+
+/**
  * Refuse a dispatch whose arm list disagrees with the registration it claims to execute.
  *
  * The sampled arms travel in `SOTA_ARMS`, from the dispatch menu, and the registration declares its
@@ -782,6 +827,7 @@ const CHANNEL_FLOORS: Record<
 type ChannelKind = 'values' | 'linked' | 'linked-additive' | 'recall-order';
 
 const ARMS = armsAgainstPrereg(armsFrom(process.env['SOTA_ARMS']), PREREG);
+populationAgainstPrereg(PREREG, LIMIT, OFFSET);
 
 /**
  * When an injected rule has earned retirement.
@@ -1451,7 +1497,7 @@ async function prepareArchive(): Promise<string> {
  * the eleven SQLite databases (as `<db>_template.sqlite`). A lane that expects one
  * archive cannot run; a lane that knows both can, with no manual setup.
  */
-async function loadDataset(limit: number): Promise<Dataset> {
+async function loadDataset(limit: number, offset = 0): Promise<Dataset> {
   const explicit = process.env['BIRD_DIR'];
   const manifest = loadManifest();
   mkdirSync(CACHE, { recursive: true });
@@ -1543,7 +1589,33 @@ async function loadDataset(limit: number): Promise<Dataset> {
     process.stdout.write(`[sota] selection: no questions for ${scoped.unused.join(', ')}\n`);
   }
   const ordered = interleaveByKey(scoped.rows, (row) => row.db_id);
-  const slice = limit > 0 ? ordered.slice(0, limit) : ordered;
+  // An offset exists because a top-up measurement cannot re-use the questions it is topping up.
+  //
+  // `loo` withholds one rule from one question's pack, so the unit of information is the
+  // (rule, question) pair and a pair that has already been drawn cannot be drawn again: at
+  // temperature zero the same pack and the same rule produce the same answer. Buying more draws
+  // therefore requires *more questions*, and the only way to get them from a corpus read in a fixed
+  // interleaved order was to take a larger prefix — which is the same questions plus some new ones,
+  // paying for every old pair a second time. R78 was sized on 1,875 questions and would have
+  // measured 1,875 of them, of which 2,000 minus nothing were already spent.
+  //
+  // The offset is a *population* input, not a sampling one: it names where the slice starts in the
+  // corpus's own order, so a run states which questions it scored and two runs cannot silently
+  // overlap.
+  if (offset > 0 && offset >= ordered.length) {
+    throw new MicrogliaError(
+      'MG_E_CONFIG',
+      `SOTA_OFFSET ${offset} is past the ${ordered.length} questions this split can score`,
+      { offset, population: ordered.length, split: SPLIT },
+    );
+  }
+  const slice =
+    limit > 0 ? ordered.slice(offset, offset + limit) : offset > 0 ? ordered.slice(offset) : ordered;
+  if (offset > 0) {
+    process.stdout.write(
+      `[sota] offset: questions ${offset}..${offset + slice.length - 1} of ${ordered.length}\n`,
+    );
+  }
 
   // There is deliberately no third database source: the lane used to fall back to
   // `bird-critic`'s `<db>_template.sqlite` files, which are the schema and not the
@@ -6235,7 +6307,7 @@ async function main(): Promise<void> {
       { known: Object.keys(HOUSE_CONVENTIONS).join(', ') },
     );
   }
-  const dataset = await loadDataset(LIMIT);
+  const dataset = await loadDataset(LIMIT, OFFSET);
   const idOf = (row: BirdRow): string => `${row.db_id}#${row.question_id}`;
 
   // The subset is chosen by a rule that does not look at outcomes: a one-row,
@@ -7113,6 +7185,11 @@ async function main(): Promise<void> {
       folds: FOLDS,
       seed: SEED,
       limit: LIMIT,
+      // Where the slice starts. Recorded because `limit` alone cannot say which questions were
+      // scored: two runs with `n = 1875` over one corpus are the same experiment only if they start
+      // at the same place, and a top-up whose offset nobody wrote down is indistinguishable from a
+      // replay of the run it was topping up.
+      offset: OFFSET,
       generalize: GENERALIZE,
       resamples: RESAMPLES,
       budget_chars: 1200,

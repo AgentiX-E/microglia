@@ -24,6 +24,8 @@
  * travel; the choice is the reader's and it is visible.
  */
 
+import { wilsonInterval } from './reproduction.js';
+
 /** One question: what the full pack produced, and what the pack without one rule produced. */
 export type InertPair = {
   readonly id: string;
@@ -232,6 +234,20 @@ export type SilenceReading = {
   readonly expectedSilent: number;
   /** `silent − expectedSilent`: how many of them the draw counts cannot explain. */
   readonly excess: number;
+  /**
+   * The interval `excess` is an estimate *of*, from the rate's own sampling error.
+   *
+   * The point estimate treats the working rate as known, and it is not: it is a proportion measured on
+   * the rules that fired, so a pack whose rate is really 0.45 and a pack whose rate is really 0.55
+   * predict different amounts of silence from the same draw counts. `excess` is strictly increasing in
+   * the rate — a higher rate makes a silence less likely and therefore more attributable to the rule —
+   * so the interval on the excess is the excess evaluated at the rate's own interval, with no
+   * simulation and no randomness. A lower bound above zero is the claim that dead weight exists, which
+   * is the claim a pruning would act on, and it costs nothing to read.
+   */
+  readonly excessInterval: { readonly low: number; readonly high: number };
+  /** The working rate the interval was computed from. */
+  readonly rateInterval: { readonly low: number; readonly high: number };
   /** Draws at which a rule at `workingRate` is silent by chance less than once in twenty; 0 when the rate is. */
   readonly drawsToResolve: number;
   /** Silent rules holding fewer draws than `drawsToResolve`, which are not yet evidence of anything. */
@@ -256,13 +272,31 @@ export function silenceReading(rules: readonly RuleInertness[]): SilenceReading 
   const live = firing.reduce((sum, row) => sum + row.live, 0);
   const workingRate = draws === 0 ? 0 : live / draws;
   const silentRules = rules.filter((row) => row.live === 0);
-  const expectedSilent = silentRules.reduce((sum, row) => sum + (1 - workingRate) ** row.draws, 0);
+  // The expected silences at a given rate, so the interval is the same arithmetic at two rates rather
+  // than a second estimator carrying its own assumptions.
+  const expectedAt = (rate: number): number =>
+    silentRules.reduce((sum, row) => sum + (1 - rate) ** row.draws, 0);
+  const expectedSilent = expectedAt(workingRate);
   const resolveAt = drawsToResolve(workingRate);
+  // The interval is the one `reproduction.ts` uses for a published cell, called with this proportion:
+  // one formula in the package, because two Wilson intervals that disagree in the fourth decimal are
+  // two numbers a reader has to reconcile. Zero draws has no interval — it is the absence of a
+  // measurement, and the estimator refuses `n = 0` rather than reporting certainty.
+  const rateInterval = draws > 0 ? wilsonInterval({ accuracy: workingRate, n: draws }) : { low: 0, high: 0 };
   return {
     silent: silentRules.length,
     workingRate,
     expectedSilent,
     excess: silentRules.length - expectedSilent,
+    // Monotone in the rate — a higher rate makes silence less likely and therefore more attributable to
+    // the rule — so the endpoints are the excess at the rate's own endpoints: a lower bound above zero
+    // is "even at the low end of the rate, more silences than chance", which is the claim a pruning
+    // needs and the one a point estimate cannot make.
+    excessInterval: {
+      low: silentRules.length - expectedAt(rateInterval.low),
+      high: silentRules.length - expectedAt(rateInterval.high),
+    },
+    rateInterval,
     drawsToResolve: resolveAt,
     // Zero when the rate is zero, because a rule cannot be under-powered against a bar that no sample
     // size reaches — reporting every silent rule as under-powered there would be a call to spend calls.

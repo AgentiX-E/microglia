@@ -103,13 +103,15 @@ export function main(argv: readonly string[]): number {
   const silence = silenceReading(reading.rules);
   process.stdout.write(
     `[inert] working     the rules that fired did so on ${(silence.workingRate * 100).toFixed(1)}% of ` +
-      `their draws, which predicts ${silence.expectedSilent.toFixed(1)} silence(s) among the ` +
-      `${String(silence.silent)}\n`,
+      `their draws (95% ${(silence.rateInterval.low * 100).toFixed(1)}–` +
+      `${(silence.rateInterval.high * 100).toFixed(1)}%), which predicts ` +
+      `${silence.expectedSilent.toFixed(1)} silence(s) among the ${String(silence.silent)}\n`,
   );
   process.stdout.write(
     `[inert] silent      ${String(silence.silent)} rule(s) never fired; ${silence.excess.toFixed(1)} more ` +
-      `than that rate explains, and ${String(silence.underPowered)} of them hold fewer than ` +
-      `${String(silence.drawsToResolve)} draw(s), where silence would be chance once in twenty\n`,
+      `than that rate explains (95% ${silence.excessInterval.low.toFixed(1)}–` +
+      `${silence.excessInterval.high.toFixed(1)}), and ${String(silence.underPowered)} of them hold fewer ` +
+      `than ${String(silence.drawsToResolve)} draw(s), where silence would be chance once in twenty\n`,
   );
   // The purchase order, when one is asked for: which rules are short of draws, how many each, and in
   // what order a dispatch that can only pay for part of the plan should pay for them.

@@ -201,6 +201,37 @@ describe('silenceReading', () => {
     expect(silenceReading([rule('a', 4, 4), rule('b', 3, 0)]).drawsToResolve).toBe(1);
   });
 
+  it('brackets the excess by the rate it was estimated from', () => {
+    // The point estimate treats the rate as known. It is a proportion measured on the rules that fired,
+    // so a pack whose rate is really lower predicts more silence and a smaller excess — and the excess
+    // is monotone in the rate, which is why the interval is the same arithmetic at the rate's endpoints.
+    const reading = silenceReading([rule('a', 4, 2), rule('b', 4, 0), rule('c', 4, 0)]);
+    expect(reading.rateInterval.low).toBeLessThan(reading.workingRate);
+    expect(reading.rateInterval.high).toBeGreaterThan(reading.workingRate);
+    expect(reading.excessInterval.low).toBeLessThan(reading.excess);
+    expect(reading.excessInterval.high).toBeGreaterThan(reading.excess);
+    // Two silent rules on four draws at a rate near a half: the low end of the rate still leaves most of
+    // the silence unexplained, so the claim survives its own uncertainty.
+    expect(reading.excessInterval.low).toBeGreaterThan(0);
+  });
+
+  it('has no interval to report when no rule ever fired', () => {
+    // Zero rate means silence is not a chance event at any sample size, and the excess is zero because
+    // the predictor already expects every one of them.
+    const reading = silenceReading([rule('a', 3, 0), rule('b', 3, 0)]);
+    expect(reading.workingRate).toBe(0);
+    expect(reading.rateInterval).toEqual({ low: 0, high: 0 });
+    expect(reading.excess).toBeCloseTo(0, 10);
+    expect(reading.excessInterval).toEqual({ low: 0, high: 0 });
+  });
+
+  it('has nothing to bracket when every rule fired', () => {
+    const reading = silenceReading([rule('a', 4, 1), rule('b', 4, 2)]);
+    expect(reading.silent).toBe(0);
+    expect(reading.excess).toBe(0);
+    expect(reading.excessInterval).toEqual({ low: 0, high: 0 });
+  });
+
   it('refuses to name a draw count when no rule ever fired', () => {
     // With a zero rate the silence is not evidence of chance at any sample size, and a number here
     // would be read as "more draws would settle it" when nothing would.

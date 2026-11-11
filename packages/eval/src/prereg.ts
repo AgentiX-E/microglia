@@ -23,6 +23,18 @@ export type Prereg = {
   readonly opened: string;
   readonly arms: readonly string[];
   readonly sample: number;
+  /**
+   * Questions to skip before `sample`, when the registration scores a slice that does not start at
+   * the corpus's first question.
+   *
+   * A `loo` draw is a (rule, question) pair and cannot be drawn twice, so a top-up of draws is a
+   * claim about a *different* population of questions. `sample` alone could only ever describe a
+   * prefix, which is why R78 was first written as "the same 2,000 questions, more draws" — a
+   * dispatch that would have re-bought every pair R77 had already spent.
+   *
+   * Absent means zero: every registration before R78 is the corpus's first `sample` questions.
+   */
+  readonly offset?: number;
   readonly gates: readonly string[];
   /**
    * The recall floor this dispatch applies, when it is a use-side arm. Absent
@@ -144,6 +156,7 @@ const HEADER_KEYS = [
   'plantedArms',
   'temperature',
   'looTargets',
+  'offset',
 ] as const;
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
@@ -442,6 +455,22 @@ export function readPrereg(markdown: string, file: string): PreregReading {
   if (sampleText !== '' && (!Number.isInteger(sample) || sample < 1)) {
     collected.push({ where: 'header sample', problem: `'${sampleText}' is not a positive integer` });
   }
+  // An offset is a count of skipped questions, so zero is a legal value and a negative one is not.
+  // A header that said `offset: -1` would otherwise be read as "start at the beginning" by a slice
+  // and as "start one early" by a reader, which is the kind of disagreement a header exists to stop.
+  let offset: number | undefined;
+  const offsetText = values.get('offset');
+  if (offsetText !== undefined) {
+    const parsed = Number(offsetText);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      collected.push({
+        where: 'header offset',
+        problem: `'${offsetText}' is not a non-negative integer`,
+      });
+    } else {
+      offset = parsed;
+    }
+  }
 
   const placeholder = PLACEHOLDER.exec(markdown);
   if (placeholder !== null) {
@@ -476,6 +505,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       arms,
       sample,
       gates,
+      ...(offset === undefined ? {} : { offset }),
       ...(recallFloor === undefined ? {} : { recallFloor }),
       ...(facadePair === undefined ? {} : { facadePair }),
       ...(facadeNotes === undefined ? {} : { facadeNotes }),
@@ -661,6 +691,46 @@ export function armsAgainstRegistration(
   // A registration with no header is a hand run: there is no claim to disagree with.
   const ok = prereg === undefined || (unbought.length === 0 && undeclared.length === 0);
   return { ok, declared, requested: bought, unbought, undeclared };
+}
+
+/**
+ * How a dispatch's population disagrees with the one its registration names.
+ *
+ * `sample` has been in the header since the first registration and nothing ever compared it with
+ * what the lane actually drew: R77 declares `sample: 2000` and the dispatch passed `SOTA_LIMIT=2000`
+ * because a person copied the number, which is not the same thing as a refusal. The same shape has
+ * already cost this repository twice — R67 read its arms from a menu default while its file said
+ * something else, and `SOTA_MODEL`/`SOTA_SAMPLE_TEMPERATURE` were repository variables that one
+ * dispatch inherited from another. A number that sizes an experiment is a claim about the
+ * experiment, so a dispatch that draws a different one is not running the registration.
+ *
+ * `limit = 0` means "every usable question", which no registration has ever declared; it is refused
+ * for the same reason rather than treated as "at least `sample`", because the extra questions change
+ * the folds, and the folds are half of what a cross-fitted number means.
+ */
+export function populationAgainstRegistration(
+  prereg: Pick<Prereg, 'sample' | 'offset'> | undefined,
+  limit: number,
+  offset: number,
+): { readonly ok: boolean; readonly problems: readonly string[] } {
+  if (prereg === undefined) return { ok: true, problems: [] };
+  const problems: string[] = [];
+  if (limit !== prereg.sample) {
+    problems.push(
+      limit === 0
+        ? `this dispatch scores every usable question, but the registration fixes n=${prereg.sample}`
+        : `this dispatch scores ${limit} questions, but the registration fixes n=${prereg.sample}`,
+    );
+  }
+  const declaredOffset = prereg.offset ?? 0;
+  if (offset !== declaredOffset) {
+    problems.push(
+      offset === 0
+        ? `this dispatch starts at the first question, but the registration starts at ${declaredOffset}`
+        : `this dispatch skips ${offset} questions, but the registration skips ${declaredOffset}`,
+    );
+  }
+  return { ok: problems.length === 0, problems };
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   plantedArmMatrix,
   preregGate,
   preregGateAgreement,
+  populationAgainstRegistration,
   readPrereg,
   unknownSampleArms,
   type Prereg,
@@ -718,6 +719,84 @@ describe('the target list a top-up registration buys its draws against', () => {
   });
 });
 
+describe('the population a registration scores', () => {
+  const withOffset = (line: string): string =>
+    `${HEADER.replace(/^---\n/, `---\n${line}\n`)}${PREDICTION}${REFUTATION}`;
+
+  it('reads an offset out of the header', () => {
+    const reading = readPrereg(withOffset('offset: 2000'), 'R8.3-xiyan-cell.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.offset).toBe(2000);
+  });
+
+  it('leaves every earlier registration starting at the first question', () => {
+    const reading = readPrereg(withOffset(''), 'R8.3-xiyan-cell.md');
+    expect(reading.prereg?.offset).toBeUndefined();
+  });
+
+  it('refuses an offset that is not a count of questions', () => {
+    // Zero is legal and therefore not in this list: a registration may state that it starts at the
+    // beginning, and the value it states is the one the gate compares against. An empty value is read
+    // as zero for the same reason `sample: ` reads as zero — the header's parser drops a value it
+    // cannot interpret onto the key's absence, and absence already means "the first question".
+    for (const bad of ['-1', '1.5', 'two']) {
+      const reported = problemsOf(withOffset(`offset: ${bad}`));
+      expect(reported.some((entry) => entry.includes('header offset'))).toBe(true);
+    }
+  });
+
+  it('reads an empty offset as the first question', () => {
+    const reading = readPrereg(withOffset('offset:'), 'R8.3-xiyan-cell.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.offset).toBe(0);
+  });
+});
+
+describe('a dispatch whose population disagrees with its registration', () => {
+  const registration = (sample: number, offset?: number): Pick<Prereg, 'sample' | 'offset'> =>
+    offset === undefined ? { sample } : { sample, offset };
+
+  it('accepts the population the file names', () => {
+    expect(populationAgainstRegistration(registration(2000), 2000, 0).ok).toBe(true);
+    expect(populationAgainstRegistration(registration(1875, 2000), 1875, 2000).ok).toBe(true);
+  });
+
+  it('has nothing to compare against for a hand run', () => {
+    expect(populationAgainstRegistration(undefined, 350, 0).ok).toBe(true);
+  });
+
+  it('refuses a dispatch that scores every usable question', () => {
+    // `limit = 0` is not "at least `sample`": the extra questions change the folds, and the folds are
+    // half of what a cross-fitted number means.
+    const agreement = populationAgainstRegistration(registration(2000), 0, 0);
+    expect(agreement.ok).toBe(false);
+    expect(agreement.problems[0]).toContain('every usable question');
+  });
+
+  it('names both numbers when the sample disagrees', () => {
+    const agreement = populationAgainstRegistration(registration(2000), 350, 0);
+    expect(agreement.ok).toBe(false);
+    expect(agreement.problems[0]).toContain('350');
+    expect(agreement.problems[0]).toContain('2000');
+  });
+
+  it('refuses a slice that starts where the file does not', () => {
+    // The two directions read differently on purpose: "starts at the first question" is a replay of a
+    // prefix, and "skips 2000" is a promise to score questions the registration never sized.
+    const atZero = populationAgainstRegistration(registration(1875, 2000), 1875, 0);
+    expect(atZero.ok).toBe(false);
+    expect(atZero.problems[0]).toContain('starts at the first question');
+    const jumped = populationAgainstRegistration(registration(2000), 2000, 2000);
+    expect(jumped.ok).toBe(false);
+    expect(jumped.problems[0]).toContain('skips 2000');
+  });
+
+  it('reports both disagreements rather than the first', () => {
+    const agreement = populationAgainstRegistration(registration(1875, 2000), 2000, 0);
+    expect(agreement.problems.length).toBe(2);
+  });
+});
+
 describe('the draw plan R78 is registered against', () => {
   // A registration that names a file nobody has read is a dispatch that fails at the reader, and the
   // failure would arrive after the runner was provisioned and the caches restored. This is the same
@@ -744,5 +823,31 @@ describe('the draw plan R78 is registered against', () => {
       'eval/manifests/loo/R77-silent-tail.json',
     );
     expect(new Set(plan.targets.map((row) => row.rule)).size).toBe(plan.targets.length);
+  });
+
+  it('scores questions R77 did not, because a re-drawn pair cannot inform', () => {
+    // R77 is `offset = 0, n = 2,000` (its own header says 2000), so this dispatch starts where R77's
+    // slice ended. The two numbers are the whole reason `offset` exists: a `loo` draw is a (rule,
+    // question) pair and temperature zero makes a second draw of the same pair the same call.
+    expect(reading.prereg?.offset).toBe(2000);
+    expect(reading.prereg?.sample).toBe(1900);
+    expect(populationAgainstRegistration(reading.prereg, 1900, 2000).ok).toBe(true);
+    // The two ways the overlap could come back silently, refused by the same function the lane runs.
+    expect(populationAgainstRegistration(reading.prereg, 1900, 0).ok).toBe(false);
+    expect(populationAgainstRegistration(reading.prereg, 2000, 2000).ok).toBe(false);
+  });
+
+  it('fits in the corpus R77 measured, with the draws it needs and room to spare', () => {
+    // `[sota] selection: 7829 of 9428 questions over 58 databases` in R77's job log. A slice that ran
+    // past the end would score fewer questions than the registration sized, silently.
+    const population = 7829;
+    const offset = reading.prereg?.offset ?? 0;
+    const sample = reading.prereg?.sample ?? 0;
+    expect(offset + sample).toBeLessThan(population);
+    // The draws this buys, at the hit rate R77 measured on its own packs: 369 of 2,000 questions hold
+    // a plan rule. Below 346 the plan is only partly bought and the readback has to say so.
+    // `floor(sample × 369 / 2000)`: 1,875 gives 345 and the plan needs 346, which is why the header
+    // says 1,900 — the one-draw shortfall Amendment 1 records.
+    expect(Math.floor((sample * 369) / 2000)).toBeGreaterThanOrEqual(346);
   });
 });

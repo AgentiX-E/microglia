@@ -240,3 +240,43 @@ subtracted, because a negative cost would quietly raise the ceiling the run beli
 and the +7.4% residual is the folds not being priced alike. That is what the 10% safety factor is for and
 it is now the only thing the safety factor has to cover, which is the difference between a bound that
 absorbs fold-to-fold variation and a bound that absorbs a structural error.
+
+## Amendment 4 — the excess has an interval, and its lower bound is two thirds of the estimate
+
+**2026-11-11, after the outcome, before R78 was dispatched.** Amendment 3 concluded that **74.8 rules of
+472** are dead weight — 15.9% of the pack, not the 23.9% the raw silence count suggests — by pricing the
+113 silent rules against the rate the rules that fired demonstrated. That was a point estimate of a
+quantity whose input is itself measured, and the difference matters: a pruning would act on `excess > 0`,
+and a point estimate cannot tell a reader whether zero is inside the interval.
+
+The rate is a proportion — 49.9% of the draws the firing rules got — so it has a Wilson interval, and
+`excess` is **strictly increasing** in that rate: a higher rate makes any silence less likely and
+therefore more attributable to the rule rather than to chance. The interval on the excess is therefore
+the same arithmetic evaluated at the rate's two endpoints, with no simulation, no resampling and no
+randomness, so a replay of this reading on this artefact returns the same bounds.
+
+| reading | value | 95% interval |
+| --- | --- | --- |
+| per-draw live rate of the rules that fired | 49.9% | **47.6 – 52.2%** |
+| silences that rate explains | 38.2 | — |
+| **excess (dead weight)** | **74.8** | **72.5 – 77.1** |
+| excess as a share of the 472 rules | 15.85% | **15.36 – 16.33%** |
+
+`pnpm eval:inert --bird <R77 artefact>` prints both lines; the artefact was not re-measured and no model
+was called.
+
+**What this settles.** Dead weight exists: the lower bound is **72.5 rules**, 15.4% of the pack, and no
+plausible error in the working rate closes the interval onto zero. Any statement of the form "55.73%
+inert pairs might be entirely a sampling artifact" is refuted by the same file that produced it. The
+number to quote is **16% of the pack changes nothing**, not 24%.
+
+**What this does not settle.** Which 105 rules they are. The interval is about the count; a pruning needs
+identities, and an identity needs the rule to have been drawn at the rate at which silence stops being
+chance — five draws at 49.9%, which 105 of the 113 do not have. That is R78's job, and the estimate above
+bounds what R78 can find: its answer must land between **35.9 and 40.5** wholly-inert rules if the rate is
+right, and outside that band is a statement about the rate rather than about the pack.
+
+**A note on the instrument.** `silenceReading` now calls the same `wilsonInterval` the published-cell
+catalogue uses, rather than carrying a second copy of the formula: two Wilson intervals in one package
+that disagreed in the fourth decimal would be two numbers a reader has to reconcile, and the one that was
+copied would be the one nobody re-derived.
