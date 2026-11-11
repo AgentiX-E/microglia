@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 184,
+  "scanned": 185,
   "totals": {
-    "modules": 184,
-    "lines": 49824,
+    "modules": 185,
+    "lines": 50106,
     "adapterLines": 1956,
-    "deferredLines": 8500,
-    "coupledShare": 0.2073
+    "deferredLines": 8519,
+    "coupledShare": 0.2065
   },
   "layers": [
     {
@@ -37,10 +37,10 @@
     },
     {
       "layer": "eval",
-      "modules": 127,
-      "lines": 36749,
+      "modules": 128,
+      "lines": 37031,
       "adapterLines": 0,
-      "deferredLines": 8500,
+      "deferredLines": 8519,
       "coupled": 22
     },
     {
@@ -314,7 +314,7 @@
       "pkg": "eval",
       "module": "sota",
       "path": "packages/eval/src/sota.ts",
-      "lines": 2584,
+      "lines": 2603,
       "words": [
         "sql",
         "sqlite",
@@ -657,7 +657,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "184 modules, 22 deferred with a reason"
+      "detail": "185 modules, 22 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -672,5 +672,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 49824 production lines across 184 modules: 7 adapter modules in `sql`, 22 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 50106 production lines across 185 modules: 7 adapter modules in `sql`, 22 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }
