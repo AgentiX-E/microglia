@@ -28,3 +28,24 @@ export function artefactArgument(argv: readonly string[], fallback: () => string
   }
   return path;
 }
+
+/**
+ * A reading that takes no arguments refuses them, rather than reading whatever the scan picks.
+ *
+ * Eight readers in this package take no arguments on purpose: they describe the artefact that
+ * `chooseArtefact` selects, which is the newest one in the results directory. The hazard is that the
+ * *shell* accepts anything: `pnpm eval:arm-pairs --bird r80.json` ran, ignored the flag, and printed a
+ * 350-question table about a different file — a plausible answer to a question nobody asked, which is the
+ * third time this defect class has cost a readback (see `artefactArgument` for the first two).
+ *
+ * A reader that cannot honour an argument must say so. This is deliberately a refusal and not a
+ * pass-through: making these readers accept `--bird` would be a feature, and a feature is a decision with
+ * tests, not something to grow by accident the next time someone types a flag out of habit.
+ */
+export function noArguments(argv: readonly string[], what: string): void {
+  if (argv.length === 0) return;
+  throw new Error(
+    `${what} takes no arguments, and '${argv[0]}' was given: it reads the artefact the directory ` +
+      'scan picks, so naming a file would be silently ignored rather than honoured',
+  );
+}

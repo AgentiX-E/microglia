@@ -141,6 +141,18 @@ on:
         description: 'Labels to score against: vendor (the pinned corpus, every published cell) or corrected (the vendored revision, on the questions it can label)'
         required: false
         default: 'vendor'
+      # The band lever, as a dispatch field rather than as an operator's memory.
+      #
+      # R78 was dispatched at 03:19 UTC and paid 1.90x what R79 paid for 96% of the same calls; both were
+      # correct dispatches of the same science, and the difference was nine minutes of clock. `pnpm
+      # eval:band` existed from the day the rate card was written and had no caller. The lesson recorded
+      # then was "dispatch inside the window", which is a rule somebody has to remember at the moment they
+      # are least likely to: this field is the same rule, executable, and it makes a dispatch's cost a
+      # property of the file rather than of the hour it was sent.
+      not_before:
+        description: 'Earliest UTC start, HH:MM (empty = now). The job waits for the window instead of being dispatched twice; a wait above 240 minutes is refused'
+        required: false
+        default: ''
   schedule:
     # 18:00 UTC Monday, which is Tuesday 02:00 in UTC+8.
     #
@@ -588,6 +600,45 @@ jobs:
             cat band.txt
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Wait for the band, when the dispatch named one
+        id: wait
+        if: ${{ github.event.inputs.not_before != '' }}
+        env:
+          NOT_BEFORE: ${{ github.event.inputs.not_before }}
+        run: |
+          set -euo pipefail
+          NOW=$(date -u +%s)
+          TARGET=$(date -u -d "today ${NOT_BEFORE}" +%s)
+          if [ "$TARGET" -le "$NOW" ]; then
+            TARGET=$(date -u -d "tomorrow ${NOT_BEFORE}" +%s)
+          fi
+          WAIT=$((TARGET - NOW))
+          WAIT_MIN=$(( (WAIT + 59) / 60 ))
+          if [ "$WAIT_MIN" -gt 240 ]; then
+            echo "::error::not_before ${NOT_BEFORE} is ${WAIT_MIN} minutes away; this lane waits at most 240, because the job limit is 340 and the run needs its own deadline after the wait"
+            exit 1
+          fi
+          echo "waiting ${WAIT_MIN} minute(s) for ${NOT_BEFORE} UTC; it is $(date -u +%H:%M) now"
+          echo "wait_min=${WAIT_MIN}" >> "$GITHUB_OUTPUT"
+          # Counted down in minutes rather than one long sleep, so a job that dies waiting says how far it
+          # got instead of showing a single silent line for two hours.
+          for minute in $(seq 1 "$WAIT_MIN"); do
+            sleep 60
+            if [ $((minute % 15)) -eq 0 ]; then echo "waited ${minute}/${WAIT_MIN} minute(s), $(date -u +%H:%M) UTC"; fi
+          done
+          echo "awake at $(date -u +%H:%M) UTC"
+          # Printed after the wait, so the summary says which band the run actually started in rather than
+          # which band the dispatch was sent in.
+          # Unmasked on purpose: the audit refuses a swallowed failure, and `eval:band` does not fail --
+          # it prints the band and warns. A step that cannot fail loudly is a step whose silence is
+          # indistinguishable from a pass.
+          pnpm --silent eval:band | tee band-after-wait.txt
+          {
+            echo "### Cost band after the wait"
+            echo
+            cat band-after-wait.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
       # The step timeout used to be the literal 200 and the lane's own deadline a dispatch input
       # whose default was 130. Those two numbers were the same claim about the same run, and nothing
       # tied them together: R68's third attempt was dispatched with `deadline_min: 300`, spent 2,961
@@ -600,12 +651,15 @@ jobs:
         id: deadline
         env:
           DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}
+          WAIT_MIN: ${{ steps.wait.outputs.wait_min || '0' }}
         run: |
           set -euo pipefail
-          # 25 minutes of headroom for the last fold to finish writing, and 340 for the job.
-          CAP=$((335 - 25))
+          # 25 minutes of headroom for the last fold to finish writing, and 340 for the job. The wait is
+          # part of the 340: a dispatch that sleeps for 140 minutes and then asks for a 300-minute deadline
+          # is killed with no artefact, which is the failure this check exists for.
+          CAP=$((335 - 25 - WAIT_MIN))
           if [ "$DEADLINE_MIN" -gt "$CAP" ]; then
-            echo "::error::deadline_min ${DEADLINE_MIN} cannot fit the job: the job limit is 340 minutes and the step needs 25 of headroom, so the largest deadline this lane may take is ${CAP}. A run dispatched above it is killed by the runner with no artefact, which is what happened to R68 at deadline 300."
+            echo "::error::deadline_min ${DEADLINE_MIN} cannot fit the job: the job limit is 340 minutes, the step needs 25 of headroom and this dispatch waited ${WAIT_MIN}, so the largest deadline this lane may take is ${CAP}. A run dispatched above it is killed by the runner with no artefact, which is what happened to R68 at deadline 300."
             exit 1
           fi
           # The timeout is computed here rather than in the step's own expression, because GitHub's

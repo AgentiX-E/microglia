@@ -7,6 +7,10 @@
  */
 import { existsSync } from 'node:fs';
 import { attemptTimeoutMs, chooseArtefact, retryAfterMs, splitClaim } from '@agentix-e/microglia-eval';
+
+// Re-exported so a CLI takes its arguments through the package rather than through a second
+// `process.argv` reader, which is how three readings came to describe a file nobody named.
+export { artefactArgument, noArguments } from '@agentix-e/microglia-eval';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 

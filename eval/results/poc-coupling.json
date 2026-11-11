@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 187,
+  "scanned": 188,
   "totals": {
-    "modules": 187,
-    "lines": 50427,
+    "modules": 188,
+    "lines": 50669,
     "adapterLines": 1956,
-    "deferredLines": 8806,
-    "coupledShare": 0.2109
+    "deferredLines": 9027,
+    "coupledShare": 0.2143
   },
   "layers": [
     {
@@ -37,11 +37,11 @@
     },
     {
       "layer": "eval",
-      "modules": 130,
-      "lines": 37352,
+      "modules": 131,
+      "lines": 37594,
       "adapterLines": 0,
-      "deferredLines": 8806,
-      "coupled": 23
+      "deferredLines": 9027,
+      "coupled": 24
     },
     {
       "layer": "browser",
@@ -176,7 +176,7 @@
       "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 476,
+      "lines": 479,
       "words": [
         "sql",
         "sqlite",
@@ -267,6 +267,17 @@
     },
     {
       "pkg": "eval",
+      "module": "reconstruct",
+      "path": "packages/eval/src/reconstruct.ts",
+      "lines": 144,
+      "words": [
+        "sql"
+      ],
+      "verdict": "deferred",
+      "reason": "writes the prompt that asks for one question of advice, and the prompt names what it forbids -- restating the notes, describing the tables, writing SQL; it opens no database and executes nothing"
+    },
+    {
+      "pkg": "eval",
       "module": "reproduction",
       "path": "packages/eval/src/reproduction.ts",
       "lines": 271,
@@ -314,7 +325,7 @@
       "pkg": "eval",
       "module": "sota",
       "path": "packages/eval/src/sota.ts",
-      "lines": 2603,
+      "lines": 2634,
       "words": [
         "sql",
         "sqlite",
@@ -349,7 +360,7 @@
       "pkg": "eval",
       "module": "width",
       "path": "packages/eval/src/width.ts",
-      "lines": 283,
+      "lines": 326,
       "words": [
         "bird"
       ],
@@ -668,7 +679,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "187 modules, 23 deferred with a reason"
+      "detail": "188 modules, 24 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -683,5 +694,5 @@
       "detail": "40 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 50427 production lines across 187 modules: 7 adapter modules in `sql`, 23 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 50669 production lines across 188 modules: 7 adapter modules in `sql`, 24 deferred with a reason, and `core` at 0 coupled modules of 40; 5 package edges, 0 of them upward."
 }

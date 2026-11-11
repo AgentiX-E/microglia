@@ -183,6 +183,10 @@ import {
   renderValue,
   schemaLinkSplit,
   shuffledSource,
+  parseGuidance,
+  reconstructPrompt,
+  reconstructReading,
+  type ParsedGuidance,
   TRANSFER_FLOOR,
   compareSubstrates,
   poolSubstrates,
@@ -794,6 +798,40 @@ function flushAssertionCache(): void {
 }
 
 /**
+ * Where the guidance the reconstruction arms wrote is kept between dispatches.
+ *
+ * Same argument as the assertion cache: a re-run of the same split should reconstruct the same advice for
+ * nothing, and a writer whose output moved between two runs would make `reconstructed − full` a statement
+ * about sampling rather than about persistence. Keyed on the full prompt, because the prompt carries the
+ * question, its evidence and the notes — two questions that differ in any of them must not share advice.
+ */
+const GUIDANCE_CACHE_PATH = process.env['SOTA_GUIDANCE_CACHE'] ?? '';
+const guidanceCache = new Map<string, ParsedGuidance>();
+if (GUIDANCE_CACHE_PATH !== '' && existsSync(GUIDANCE_CACHE_PATH)) {
+  try {
+    const raw = JSON.parse(readFileSync(GUIDANCE_CACHE_PATH, 'utf8')) as Record<string, ParsedGuidance>;
+    for (const [key, value] of Object.entries(raw)) guidanceCache.set(key, value);
+  } catch {
+    // A corrupt cache is a cold cache, for the reason the assertion cache records.
+  }
+}
+
+function flushGuidanceCache(): void {
+  if (GUIDANCE_CACHE_PATH === '' || guidanceCache.size === 0) return;
+  mkdirSync(dirname(GUIDANCE_CACHE_PATH), { recursive: true });
+  writeFileSync(GUIDANCE_CACHE_PATH, JSON.stringify(Object.fromEntries(guidanceCache), null, 1));
+}
+
+/**
+ * How many characters of advice a reconstruction may inject.
+ *
+ * The pack it replaces averages 1,090 characters, and one of the three papers' whole claim is that less
+ * text, better aimed, beats more text stored in advance. 240 is a fifth of the pack: enough for two
+ * clauses about this question, small enough that a win cannot be a length effect.
+ */
+const RECONSTRUCT_BUDGET = 240;
+
+/**
  * How often each channel kind has to rewrite the prompt before its null is a null about the channel.
  *
  * The floors differ because the manipulations differ: `values` annotates every column unconditionally,
@@ -957,6 +995,20 @@ const ANCHORED: readonly { readonly arm: ArmName; readonly mode: AnchorMode; rea
 
 /** One entry per fold in which the deletion arm ran. */
 const validations: (Awaited<ReturnType<typeof validateMemory>> & { fold: number })[] = [];
+
+/**
+ * One entry per fold in which a reconstruction arm ran.
+ *
+ * Recorded per fold rather than summed, because the pass is a per-fold writer: a fold whose store held
+ * nothing to reconstruct is a different reading from a fold whose writer declined everything, and a
+ * single total would merge them.
+ */
+const reconstructPasses: {
+  fold: number;
+  write: ReturnType<typeof reconstructReading>;
+  shuffled: ReturnType<typeof reconstructReading>;
+  reused: number;
+}[] = [];
 
 
 /**
@@ -5724,6 +5776,112 @@ async function runFold(
      * behind it. `modelAsked` therefore counts the questions where the choice was real, which is
      * the denominator every other number about this arm should be read against.
      */
+    /**
+     * Write one question's advice, from what the store remembers, and inject only that.
+     *
+     * The arms this feeds exist because three recent results say injecting a *stored abstraction* is the
+     * wrong object: an error in a stored rule regenerates itself through retrieval and re-abstraction
+     * (arXiv:2610.27406), a replayed experience causes negative transfer unless it is reconstructed for
+     * the present state (arXiv:2607.28272), and a flat pool of concrete memories degrades as the task set
+     * grows (arXiv:2610.19386). `full-raw` already showed that swapping the rule for the case it came
+     * from changes nothing (--0.86pp, p = 0.76) — the case is still a persisted object — so this pass
+     * persists nothing at all: it writes advice for this question and drops it.
+     *
+     * The shuffled arm holds the call, the prompt shape and the budget fixed and changes only *whose*
+     * notes the writer reads, because an extra call is also an extra attempt and an arm that improved
+     * could be buying a second chance rather than better guidance.
+     */
+    const reconstructWanted =
+      ARMS.has('full-reconstructed') || ARMS.has('full-reconstructed-shuffled');
+    const reconstructed = new Map<number, ParsedGuidance>();
+    const reconstructedShuffled = new Map<number, ParsedGuidance>();
+    if (reconstructWanted) {
+      const plansFor: { position: number; arm: ArmName; prompt: string; donor: boolean }[] = [];
+      for (const [position, row] of evalRows.entries()) {
+        const pack = rawPacks.get(position);
+        if (pack === undefined) continue;
+        const notesOf = (items: readonly { statement: string; when?: string | undefined }[]): string =>
+          reconstructPrompt(row.question, row.evidence ?? '', items, RECONSTRUCT_BUDGET);
+        if (ARMS.has('full-reconstructed') && pack.items.length > 0) {
+          plansFor.push({
+            position,
+            arm: 'full-reconstructed',
+            prompt: notesOf(pack.items),
+            donor: false,
+          });
+        }
+        if (ARMS.has('full-reconstructed-shuffled')) {
+          // Same database, another question, matched on item count: the control the pack's own
+          // `full-shuffled` arm uses, so the two comparisons differ in what is persisted and nothing else.
+          const donorPosition = shuffledSource(packLibrary, {
+            position,
+            db: row.db_id,
+            items: pack.items.length,
+          });
+          const donor = donorPosition === undefined ? undefined : rawPacks.get(donorPosition);
+          if (donor !== undefined && donor.items.length > 0) {
+            plansFor.push({
+              position,
+              arm: 'full-reconstructed-shuffled',
+              prompt: notesOf(donor.items),
+              donor: true,
+            });
+          }
+        }
+      }
+      let wrote = 0;
+      let reused = 0;
+      const replies = await mapPool(plansFor, CONCURRENCY, async (item) => {
+        const key = createHash('sha256').update(item.prompt).digest('hex').slice(0, 32);
+        const cached = guidanceCache.get(key);
+        if (cached !== undefined) {
+          reused += 1;
+          return { item, key, guidance: cached };
+        }
+        try {
+          const reply = await chat(item.prompt, 160, 0);
+          return { item, key, guidance: parseGuidance(reply.text, RECONSTRUCT_BUDGET) };
+        } catch (error) {
+          if (error instanceof MicrogliaError && error.code === 'MG_E_BUDGET_EXCEEDED') throw error;
+          if (error instanceof MicrogliaError && error.code === 'MG_E_PROVIDER_FAILED') throw error;
+          return { item, key, guidance: undefined };
+        } finally {
+          wrote += 1;
+          if (wrote % 50 === 0 || wrote === plansFor.length - reused) {
+            process.stdout.write(
+              `[sota] fold ${fold + 1}/${FOLDS} guidance ${wrote}/${plansFor.length - reused} ` +
+                `calls=${llm.stats.calls} failed=${llm.stats.failures}\n`,
+            );
+          }
+        }
+      });
+      for (const entry of replies) {
+        if (entry.guidance === undefined) continue;
+        guidanceCache.set(entry.key, entry.guidance);
+        if (entry.item.donor) reconstructedShuffled.set(entry.item.position, entry.guidance);
+        else reconstructed.set(entry.item.position, entry.guidance);
+      }
+      flushGuidanceCache();
+      for (const [position, guidance] of reconstructed) {
+        call(position, 'full-reconstructed', guidance.text, 0);
+      }
+      for (const [position, guidance] of reconstructedShuffled) {
+        call(position, 'full-reconstructed-shuffled', guidance.text, 0);
+      }
+      reconstructPasses.push({
+        fold: fold + 1,
+        write: reconstructReading([...reconstructed.values()], RECONSTRUCT_BUDGET),
+        shuffled: reconstructReading([...reconstructedShuffled.values()], RECONSTRUCT_BUDGET),
+        reused,
+      });
+      process.stdout.write(
+        `[sota] fold ${fold + 1}/${FOLDS} reconstructed ${String(reconstructed.size)} question(s), ` +
+          `declined ${String(
+            [...reconstructed.values()].filter((entry) => entry.declined).length,
+          )}, shuffled ${String(reconstructedShuffled.size)}, reused ${String(reused)}\n`,
+      );
+    }
+
     const choiceBatch: { position: number; arm: ArmName; prompt: string }[] = [];
     for (const position of evalRows.keys()) {
       const pool = poolByPosition.get(position);
@@ -7125,6 +7283,23 @@ async function main(): Promise<void> {
   gates.push(...(density === null ? [] : densityGates(density.report)));
   // The grain arm's own validity condition, emitted by the lane that measured it rather than by the
   // shared protocol: it is about what this representation rendered, and no other lane has one.
+  // A reconstruction arm that wrote advice on almost nothing is `none` under a different name: the
+  // population it is scored on would be the whole split with an empty block in front of it, and its
+  // delta would be a delta about nothing. The bar is low on purpose — a store that has nothing to say
+  // about 80% of questions is a finding, not a void — but a run where the writer declined *everything*
+  // has not measured the arm the registration names.
+  if (ARMS.has('full-reconstructed')) {
+    const total = reconstructPasses.reduce((sum, fold) => sum + fold.write.questions, 0);
+    const written = reconstructPasses.reduce((sum, fold) => sum + fold.write.written, 0);
+    const share = total === 0 ? 0 : written / total;
+    gates.push({
+      id: 'V80-reconstruction-wrote-something-to-inject',
+      pass: total > 0 && share >= 0.05,
+      actual: `${String(written)} of ${String(total)} question(s) carried advice (${(share * 100).toFixed(1)}%)`,
+      criterion: 'at least 5% of questions carry advice, or the arm is `none` with a call in front of it',
+      blocking: true,
+    });
+  }
   const lexiconFolds = folds.filter((fold) => fold.lexicon !== null);
   if (lexiconFolds.length > 0) {
     gates.push(
@@ -7943,6 +8118,27 @@ async function main(): Promise<void> {
     arm_pairs_shadow: armPairsShadow,
     gates,
     assertions,
+    /**
+     * What the reconstruction arms wrote, and what the writer declined to write.
+     *
+     * `declined` is not a failure count: a store of 1.86 rules per question should have nothing to say
+     * about most of them, and the arm's population splits by construction into the questions where advice
+     * existed and the ones where it did not. Reporting the split is what makes a null readable — a pack
+     * that says nothing and a pack that says something useless are different failures with different next
+     * steps.
+     */
+    reconstruct:
+      reconstructPasses.length === 0
+        ? null
+        : {
+            budget: RECONSTRUCT_BUDGET,
+            folds: reconstructPasses,
+            questions: reconstructPasses.reduce((sum, fold) => sum + fold.write.questions, 0),
+            written: reconstructPasses.reduce((sum, fold) => sum + fold.write.written, 0),
+            declined: reconstructPasses.reduce((sum, fold) => sum + fold.write.declined, 0),
+            shuffled_written: reconstructPasses.reduce((sum, fold) => sum + fold.shuffled.written, 0),
+            reused_from_cache: reconstructPasses.reduce((sum, fold) => sum + fold.reused, 0),
+          },
     statements: {
       ...statements.stats(),
       deadline_ms: STATEMENT_DEADLINE_MS,

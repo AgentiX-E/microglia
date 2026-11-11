@@ -1,18 +1,28 @@
 {
   "id": "poc-sota-arm-pairs",
   "source_artifact": "poc-sota-bird.json",
-  "source_generated_at": "2026-10-24T13:58:48.849Z",
-  "n": 350,
+  "source_generated_at": "2026-11-11T07:27:57.084Z",
+  "n": 1534,
   "pairs": [
     {
-      "arm": "full-plain",
-      "deltaPp": 0,
-      "ciLowPp": -2.571428571428571,
-      "ciHighPp": 2.571428571428571,
-      "p": 1,
-      "n": 350,
-      "lost": 10,
-      "gained": 10
+      "arm": "sample-5-assert",
+      "deltaPp": 0.5215123859191656,
+      "ciLowPp": -0.9778357235984355,
+      "ciHighPp": 2.0208604954367666,
+      "p": 0.5542689157763704,
+      "n": 1534,
+      "lost": 66,
+      "gained": 74
+    },
+    {
+      "arm": "sample-5-first",
+      "deltaPp": -0.847457627118644,
+      "ciLowPp": -2.346805736636245,
+      "ciHighPp": 0.651890482398957,
+      "p": 0.315624897443336,
+      "n": 1534,
+      "lost": 78,
+      "gained": 65
     }
   ]
 }

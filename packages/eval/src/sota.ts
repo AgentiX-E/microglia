@@ -512,6 +512,35 @@ export type SqlArm =
    * 1,256 lessons. The arm carries only the intersection, and its pack size is reported because a
    * store that admits nothing is a finding about the corpus rather than an arm that did nothing.
    */
+  /**
+   * The store's content, rebuilt for this question and discarded after it.
+   *
+   * Every previous arm injects what was **stored**: a rule distilled from a failure, rendered as it was
+   * learned. Three recent results say that is the wrong object to persist — a stored abstraction that
+   * carries an error regenerates it through retrieval and re-abstraction (*More Memory, Worse Agents*,
+   * arXiv:2610.27406), replaying a retrieved experience verbatim causes negative transfer
+   * (*MemHarness*, arXiv:2607.28272), and a flat pool of concrete memories degrades as the task set
+   * grows (*STRATA*, arXiv:2610.19386) — and their common prescription is to keep the experience and
+   * reconstruct the guidance on demand.
+   *
+   * This arm is that prescription at its cheapest: the same retrieval, one call that writes at most
+   * `RECONSTRUCT_BUDGET` characters of advice for this question only, and nothing written back. It is
+   * the cell this project's mechanism table has never had, because `full-raw` showed that injecting the
+   * *case* instead of the abstraction changes nothing (−0.86pp, p = 0.76) — the case and the rule are
+   * both persisted objects, and this arm persists neither.
+   *
+   * Its cost is one call per question, which the artefact records separately from the answer's.
+   */
+  | 'full-reconstructed'
+  /**
+   * The same call, from **another question's** notes.
+   *
+   * The reconstruction arm adds a call, and a call is an extra attempt: an arm that improves could be
+   * buying a second chance rather than better guidance. The control holds the call, the prompt shape and
+   * the budget fixed and changes only whose notes the writer sees, so `reconstructed − shuffled` is the
+   * content and `shuffled − none` is the cost of asking at all.
+   */
+  | 'full-reconstructed-shuffled'
   | 'full-transferred'
   /**
    * The other substrate, measured by the same instrument.
@@ -1182,6 +1211,8 @@ const OPTIONAL_ARM_TABLE: Record<Exclude<SqlArm, 'none' | 'full'>, true> = {
   examples: true,
   'full-verified': true,
   'full-shuffled': true,
+  'full-reconstructed': true,
+  'full-reconstructed-shuffled': true,
   'full-transferred': true,
   'full-repair-verified': true,
   'full-repair-transferred': true,

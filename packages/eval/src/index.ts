@@ -186,7 +186,7 @@ export {
   type ArtifactPoolCandidate,
   type ArtifactPoolCase,
 } from './artifact-pool.js';
-export { artefactArgument } from './artefact-arg.js';
+export { artefactArgument, noArguments } from './artefact-arg.js';
 export {
   poolReport,
   type PoolReport,
@@ -1566,6 +1566,16 @@ export {
   type Estimate,
   type PublishedCell,
 } from './reproduction.js';
+
+export {
+  DECLINE,
+  parseGuidance,
+  reconstructPrompt,
+  reconstructReading,
+  type GuidanceItem,
+  type ParsedGuidance,
+  type ReconstructReading,
+} from './reconstruct.js';
 
 export {
   ceilingFromPool,

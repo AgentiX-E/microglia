@@ -26,7 +26,7 @@ import {
   type StratumSummary,
   type TransferRow,
 } from '@agentix-e/microglia-eval';
-import { birdArtefactPath } from './lib.js';
+import { birdArtefactPath, noArguments } from './lib.js';
 
 type Artifact = {
   readonly metrics?: {
@@ -112,6 +112,7 @@ function evidenceLine(row: EvidenceRow): string {
 }
 
 function main(): void {
+  noArguments(process.argv.slice(2), 'this reading');
   const artifact = JSON.parse(readFileSync(birdArtefactPath(), 'utf8')) as Artifact;
   const report = artifact.metrics?.density;
   if (report === undefined) {

@@ -17,7 +17,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { poolFromArtifact, priorTable, type ArtifactPoolCase } from '@agentix-e/microglia-eval';
-import { birdArtefactPath } from './lib.js';
+import { birdArtefactPath, noArguments } from './lib.js';
 
 type Artifact = {
   readonly per_case: readonly ArtifactPoolCase[];
@@ -54,6 +54,7 @@ function cannotPrice(reason: string): void {
 }
 
 function main(): void {
+  noArguments(process.argv.slice(2), 'this reading');
   const path = birdArtefactPath();
   let raw: string;
   try {

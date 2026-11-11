@@ -14,7 +14,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { discriminationOf, storeReport, type InjectedCase, type StoreRun } from '@agentix-e/microglia-eval';
-import { birdArtefactPath } from './lib.js';
+import { birdArtefactPath, noArguments } from './lib.js';
 
 type AttributionArtifact = {
   readonly id?: string;
@@ -54,6 +54,7 @@ function attributionFiles(directory: string): string[] {
 }
 
 function main(): void {
+  noArguments(process.argv.slice(2), 'this reading');
   const files = attributionFiles(RESULTS);
   const runs: StoreRun[] = [];
   for (const file of files) {

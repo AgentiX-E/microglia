@@ -41,7 +41,7 @@ import {
   type SchemaNames,
   type TableShape,
 } from '@agentix-e/microglia-eval';
-import { birdArtefactPath, writeJson } from './lib.js';
+import { birdArtefactPath, noArguments, writeJson } from './lib.js';
 
 type Artifact = {
   readonly items?: readonly { readonly id: string; readonly statement?: string; readonly domain?: string | null }[];
@@ -82,6 +82,7 @@ function share(part: number, whole: number): string {
 }
 
 async function main(): Promise<void> {
+  noArguments(process.argv.slice(2), 'this reading');
   const artifact = JSON.parse(readFileSync(birdArtefactPath(), 'utf8')) as Artifact;
   const stored = artifact.items ?? [];
   if (stored.length === 0) {

@@ -11,7 +11,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { birdArtefactPath } from './lib.js';
+import { birdArtefactPath, noArguments } from './lib.js';
 
 /** The bars, as pre-registered in `ROADMAP.md` R7.1. */
 const CEILING_BAR_PP = 2;
@@ -60,6 +60,7 @@ function verdict(pass: boolean): string {
 }
 
 function main(): void {
+  noArguments(process.argv.slice(2), 'this reading');
   const artifact = JSON.parse(
     readFileSync(birdArtefactPath(), 'utf8'),
   ) as Artifact;

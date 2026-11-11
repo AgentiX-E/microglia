@@ -103,3 +103,104 @@ that is about **$2.0**; the identical run inside the off-peak window is about **
 the only dispatch that reproduces the dev cell, prices the reader at a detectable population and leaves
 a reusable 7,670-candidate pool behind it, and the next off-peak window is four hours away. The number
 this costs is written here rather than discovered on the invoice.
+
+## Outcome — the reader is real, and the sampling bill eats it (2026-11-11)
+
+Dispatch `42971765502`, 06:20 → 07:27 UTC, **12,194 calls, $1.6272**, 1,534 questions, 11 databases,
+5 folds, `learn_sample` 64, T = 0.7, cache hit rate 77.4%, no retry, no timeout, no failed call, every
+gate passing. It was dispatched inside the peak window, so the same run off-peak is about **$0.81**; the
+band lever is a dispatch field now (see below).
+
+| arm | accuracy | against `full` |
+| --- | --- | --- |
+| `none` — no memory, one deterministic call | **57.24%** (878) | — |
+| `full` — memory pack | 56.78% (871) | — |
+| `sample-5-first` — the first of five draws | 55.93% (858) | −0.85pp [−2.35, 0.65], p = 0.32 |
+| `sample-5-assert` — the written reader | **57.30%** (879) | +0.52pp [−0.98, 2.02], p = 0.55 |
+
+**The two contrasts that decide the question, paired within the question:**
+
+| contrast | reading | gained / lost |
+| --- | --- | --- |
+| `assert − first` | **+1.37pp [+0.52, +2.22], p = 0.0025** | 33 / 12 |
+| `assert − none` | +0.07pp [−1.04, +1.17] | 40 / 39 |
+| `full − none` | −0.46pp [−1.89, +0.91] | 55 / 62 |
+| `first − none` | **−1.30pp [−2.41, −0.26], p = 0.025** | 26 / 46 |
+
+**The written reader is the first selector in this project that is significantly better than the draw it
+reads** — +1.37pp at p = 0.0025, on 1,534 questions, with 33 questions gained against 12 lost. R73 bought
+the same mechanism at 350 questions and could not see it; R73's own closing sentence was that it was
+underpowered by construction, and this is that sentence confirmed rather than contradicted.
+
+**And the sampling bill eats the whole gain.** The first of five draws at T = 0.7 is **1.30pp worse than
+one deterministic call** (p = 0.025), so a selector that recovers 1.37pp of it lands level with doing
+nothing at all (`assert − none` = +0.07pp). The share reading says the same thing from the other side:
+
+| | R67, 350 questions | **R80, 1,534 questions** |
+| --- | --- | --- |
+| selector | `sample-5-exec` (shape) | **`sample-5-assert` (written)** |
+| first / selected / oracle | 50.86 / 52.00 / 59.71 | 55.93 / **57.30** / 63.30 |
+| ceiling `oracle − first` | 8.86pp | **7.37pp** (113 questions) |
+| captured `exec − first` | 1.14pp | 1.37pp |
+| **share, 95%** | 0.13 [−0.27, 0.40] — inconclusive | **0.19 [0.08, 0.29] — CAPTURED** |
+
+**The ceiling is 7.37pp at this population and the reader takes a fifth of it.** That is the first
+positive, interval-excluding-zero share this project has measured, and it was bought with 5 model calls
+per question (1,534 assertion writes for 2.99 assertions each). Its cost is in the same run: 12,194 calls
+against `none`'s 1,534.
+
+### The pool at 1,534 questions, and what the content signals do at 4.4× the population
+
+`pnpm eval:pool --bird` on the same artefact, zero calls: 7,670 candidates, 7,669 signed, **distinct
+answers per question mean 1.33, median 1** — 1,157 of 1,534 questions produced one distinct result across
+five draws. The registered bar calls that **NARROW** (≤ 0.33 of the draws), and it is the same verdict R69
+got at k = 10.
+
+| signal | AUC, 95% | top-pick on 383 eligible |
+| --- | --- | --- |
+| `value-type` (shape) | **0.561 [0.541, 0.582]** | 29.2% |
+| `column-shape` (shape) | **0.553 [0.532, 0.574]** | 29.2% |
+| `empty` (shape) | **0.546 [0.528, 0.564]** | 28.5% |
+| `row-shape` (shape) | 0.541 [0.519, 0.562] | 28.7% |
+| `null-share` (shape) | 0.541 [0.521, 0.562] | 28.7% |
+| `literal-match` (content) | 0.497 [0.490, 0.502] | 27.2% |
+| `column-mention` (content) | 0.489 [0.460, 0.518] | 26.6% |
+| `content-mean` (content) | 0.486 [0.456, 0.516] | 26.6% |
+
+**Every shape signal now excludes 0.5 and every content signal still covers it**, at 4.4× the population
+R71 read. So R71's `Content is not free` branch replicates with a tighter instrument, and R67's shape
+family is not worthless after all — it is *small* (AUC 0.54–0.56 against 0.49–0.51) and it was
+unmeasurable at 350 questions. A signal worth 0.55 AUC on a 7.37pp ceiling is worth about half of what the
+written reader recovers, which is consistent with `exec`'s 1.14pp against `assert`'s 1.37pp.
+
+### The predictions, scored
+
+| prediction | registered | measured | |
+| --- | --- | --- | --- |
+| `none` within 1.5pp of the published 57.63% | 56.1–59.1% | **57.24%** | holds |
+| parse rate | ≥ 98% | **100%** | holds |
+| assertions written | ≥ 80% of questions | **1,534 of 1,534, 2.99 each** | holds |
+| eligible population | ≥ 500 question(s) with ≥ 2 distinct | **383** | **fails, by 23%** |
+| `assert` vs `first` | positive, interval excluding zero | **+1.37pp [0.52, 2.22]** | **holds** |
+| `assert − none` | positive | +0.07pp | fails, level |
+
+**The one prediction that failed is the one R73's arithmetic was built on**, and it failed for a reason
+worth recording: "about 32.9% of the split will have more than one distinct result" was measured at
+T = 0.7 on 350 questions and came in at **25.0%** here, because a colder five-draw pool collapses more
+often than the 350-question slice suggested. The detection floor the file claimed (AUC ≈ 0.56) therefore
+needed 1,534 questions and was reached anyway — the reader was detected at 0.0025 — but the pool that
+feeds a cheap selector is smaller than the arithmetic assumed.
+
+### What this licenses
+
+**Candidate generation is now the binding constraint, and it is a prompt-shape problem, not a sampling
+problem.** The selector works: it finds a fifth of a 7.37pp ceiling at 5 calls per question. What it
+cannot do is find a ceiling that five draws of *one prompt* fail to open — 75% of questions never produce
+a second distinct answer, and the first draw at T = 0.7 costs 1.30pp against the deterministic call. The
+published systems that clear 70% do not spin one prompt; CHASE-SQL generates its candidates from a
+divide-and-conquer decomposition, an execution-plan chain of thought and instance-aware examples, which
+is three *different* prompts. That is the lever this file hands to the next registration, and it is the
+one R70 named when it closed temperature: "different prompts rather than the same prompt spun harder".
+
+**And the memory component is still null at this population**: −0.46pp [−1.89, +0.91] on the split the
+leaderboard row is measured on, which is the same verdict R79 read on a different slice (−0.11pp).

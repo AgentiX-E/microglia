@@ -937,3 +937,46 @@ describe('the scale registration', () => {
     expect(eligible(reading.prereg?.sample ?? 0)).toBeGreaterThanOrEqual(500);
   });
 });
+
+describe('the reconstruction registration', () => {
+  // R81 is the first arm that injects advice the store never stored, and its whole claim is that
+  // persistence — not content, not quantity — is what costs the pack its points. The three papers it
+  // cites all prescribe reconstruction; the file has to buy the control that tells a reconstruction from
+  // a second attempt.
+  const reading = readPrereg(
+    readFileSync('prereg/R81-reconstruction.md', 'utf8'),
+    'prereg/R81-reconstruction.md',
+  );
+
+  it('parses, and names the shuffled control beside the treatment', () => {
+    // A header naming only `full-reconstructed` would let a dispatch buy a treatment that adds a call
+    // with nothing to compare it to, and the arm's delta would then be a delta about the extra call.
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.arms).toEqual([
+      'full-reconstructed',
+      'full-reconstructed-shuffled',
+    ]);
+  });
+
+  it('buys two arms the lane can build', () => {
+    for (const arm of reading.prereg?.arms ?? []) {
+      expect(OPTIONAL_ARMS as readonly string[]).toContain(arm);
+    }
+  });
+
+  it('re-buys the published dev cell rather than a slice of it', () => {
+    expect(reading.prereg?.sample).toBe(1534);
+    expect(populationAgainstRegistration(reading.prereg, 1534, 0).ok).toBe(true);
+  });
+
+  it('keeps the guidance budget small enough that a win cannot be a length effect', () => {
+    // The arm injects less text than the pack it is compared against, which is the only way a positive
+    // delta is readable as "better aimed" rather than "more text".
+    const source = readFileSync('packages/eval/src/bin/sota-bird.ts', 'utf8');
+    const match = /const RECONSTRUCT_BUDGET = (\d+);/.exec(source);
+    expect(match).not.toBeNull();
+    const budget = Number(match?.[1]);
+    expect(budget).toBeGreaterThan(0);
+    expect(budget).toBeLessThan(1090 / 2);
+  });
+});

@@ -23,7 +23,7 @@ import {
   type ArtifactPoolCase,
   type SignalName,
 } from '@agentix-e/microglia-eval';
-import { birdArtefactPath } from './lib.js';
+import { birdArtefactPath, noArguments } from './lib.js';
 
 type Artifact = {
   readonly per_case: readonly ArtifactPoolCase[];
@@ -34,6 +34,7 @@ type Artifact = {
 const RESULTS = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 'results');
 
 function main(): void {
+  noArguments(process.argv.slice(2), 'this reading');
   const artifact = JSON.parse(
     readFileSync(birdArtefactPath(), 'utf8'),
   ) as Artifact;

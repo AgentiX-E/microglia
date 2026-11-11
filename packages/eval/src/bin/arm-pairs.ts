@@ -15,7 +15,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { armPairsAgainstFull } from '@agentix-e/microglia-eval';
-import { birdArtefactPath } from './lib.js';
+import { artefactArgument, birdArtefactPath } from './lib.js';
 
 type CaseRow = {
   readonly correct: boolean;
@@ -31,9 +31,11 @@ type Artifact = {
 const RESULTS = process.env['POC_RESULT_DIR'] ?? join(process.cwd(), 'eval', 'results');
 
 function main(): void {
-  const artifact = JSON.parse(
-    readFileSync(birdArtefactPath(), 'utf8'),
-  ) as Artifact;
+  // `--bird <path>` is honoured rather than ignored: this reader exists to audit a *named* artefact, and
+  // the first version of this line looked at `process.argv` not at all, so pointing it at R80's 1,534
+  // questions printed a 350-question table about the newest file in the results directory.
+  const path = artefactArgument(process.argv.slice(2), birdArtefactPath);
+  const artifact = JSON.parse(readFileSync(path, 'utf8')) as Artifact;
 
   const pairs = armPairsAgainstFull(
     artifact.per_case.map((row) => ({ full: row.correct, arms: row.arms ?? {} })),
