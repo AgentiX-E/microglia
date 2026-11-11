@@ -237,3 +237,54 @@ describe('every arm that reads a conditional input is one of the arms that fills
     expect([...audit.missing]).toEqual([]);
   });
 });
+
+/**
+ * The fifth instance of the same shape, and the first one that produced a number.
+ *
+ * R81's fourth dispatch published `full-reconstructed` and `full-reconstructed-shuffled` at **0.00%**
+ * — both at −52.57pp, with `V77` finding a row for each and `V80` finding advice in the prompts. The
+ * plans existed and carried the treatment; they were never sent to the model. `replies` was collected
+ * with one `mapPool(plans, …)` before the reconstruction pass appended its own plans, and the judge
+ * then paired `plans[index]` with `replies[index]`, so every appended plan read another plan's reply
+ * or `undefined`. The judge reads `undefined` as a failed reply, which is a wrong answer, which is an
+ * effect.
+ *
+ * Three properties replace it, and each is asserted below: the judge looks the reply up by plan, a
+ * fold refuses to score when a plan has none, and a pass that appends plans asks them.
+ */
+describe('a plan that was never sent to the model is not scored', () => {
+  const text = readFileSync(PATH, 'utf8');
+  // The judge loop, not the first `judgeReply(` in the file: the validation pass calls the same
+  // function on learn rows, and an anchor that matched that one would compare positions in two
+  // different parts of the fold.
+  const judgeLoop = text.indexOf('for (const [index, plan] of plans.entries()) {');
+
+  it('looks the reply up by plan rather than by position', () => {
+    expect(judgeLoop).toBeGreaterThan(0);
+    const body = text.slice(judgeLoop, text.indexOf('judged.set(', judgeLoop));
+    expect(body).toContain('replyOf.get(plan)');
+    // Not the file: the comment above the map explains the defect and names the old expression, so a
+    // file-wide search would fail on the explanation rather than on the code.
+    expect(body).not.toContain('replies[');
+  });
+
+  it('refuses a fold in which a planned call has no reply', () => {
+    const guard = text.indexOf('replyOf.size !== plans.length');
+    expect(guard).toBeGreaterThan(0);
+    // Before the judge, because the judge is what turns a missing reply into a wrong answer.
+    expect(guard).toBeLessThan(judgeLoop);
+  });
+
+  it('asks the plans that a later pass appends', () => {
+    const first = text.indexOf('await askPlanned(plans);');
+    const later = text.indexOf('askPlanned(plans.slice(answered));');
+    expect(first).toBeGreaterThan(0);
+    expect(later).toBeGreaterThan(first);
+    // After the reconstruction calls and before the judge: an arm whose prompt is built from the
+    // store has to be answered after it is built and before it is scored.
+    const reconstructCall = text.indexOf("call(position, 'full-reconstructed-shuffled', guidance.text, 0);");
+    expect(reconstructCall).toBeGreaterThan(0);
+    expect(later).toBeGreaterThan(reconstructCall);
+    expect(later).toBeLessThan(judgeLoop);
+  });
+});

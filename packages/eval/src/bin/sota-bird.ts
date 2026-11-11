@@ -5413,28 +5413,54 @@ async function runFold(
   }
 
   let completed = 0;
-  const replies = await mapPool(plans, CONCURRENCY, async (plan) => {
-    let reply: Reply | undefined;
-    try {
-      reply = await chat(plan.prompt);
-    } catch (error) {
-      // Three failures are not data: a spent budget, a provider that has stopped answering, and an
-      // elapsed deadline all mean the remaining replies would describe the run rather than the
-      // rules.
-      if (stoppedRun(error)) throw error;
-      reply = undefined;
-    }
-    completed += 1;
-    // Progress every twenty calls: a silent step is indistinguishable from a hung
-    // one, which is how a ten-hour run went unnoticed.
-    if (completed % 20 === 0 || completed === plans.length) {
-      process.stdout.write(
-        `[sota] fold ${fold + 1}/${FOLDS} eval ${completed}/${plans.length} ` +
-          `calls=${llm.stats.calls} retries=${llm.stats.retries} failed=${llm.stats.failures}\n`,
-      );
-    }
-    return reply;
-  });
+  /**
+   * The reply each planned call received, keyed by the plan rather than by its position.
+   *
+   * By plan and not by index because `plans` grows after the first batch: the reconstruction pass
+   * appends one plan per question whose advice it wrote, and the judge used to pair `plans[index]`
+   * with `replies[index]`. Every appended plan therefore read the reply of a *different* plan, or of
+   * none at all — and R81's third dispatch published `full-reconstructed` and
+   * `full-reconstructed-shuffled` at **0.00%** with `V77` and `V80` both passing, because a plan that
+   * was never sent to the model leaves no signature in the artefact that a gate can tell apart from a
+   * wrong answer. The reading was −52.57pp and it was the pairing.
+   */
+  const replyOf = new Map<PlannedCall, Reply | undefined>();
+  /** Plans already put to the model, which is what the next batch has to start after. */
+  let answered = 0;
+  /**
+   * Ask the model every plan that has not been asked yet.
+   *
+   * Batching rather than one `mapPool(plans)` call, because a later pass in the same fold adds plans
+   * of its own: the reconstruction arms exist only after their own writing call. Any plan that reaches
+   * the judge goes through here first, which is the property the index pairing did not have.
+   */
+  const askPlanned = async (batch: readonly PlannedCall[]): Promise<void> => {
+    const answers = await mapPool(batch, CONCURRENCY, async (plan) => {
+      let reply: Reply | undefined;
+      try {
+        reply = await chat(plan.prompt);
+      } catch (error) {
+        // Three failures are not data: a spent budget, a provider that has stopped answering, and an
+        // elapsed deadline all mean the remaining replies would describe the run rather than the
+        // rules.
+        if (stoppedRun(error)) throw error;
+        reply = undefined;
+      }
+      completed += 1;
+      // Progress every twenty calls: a silent step is indistinguishable from a hung
+      // one, which is how a ten-hour run went unnoticed.
+      if (completed % 20 === 0 || completed === plans.length) {
+        process.stdout.write(
+          `[sota] fold ${fold + 1}/${FOLDS} eval ${completed}/${plans.length} ` +
+            `calls=${llm.stats.calls} retries=${llm.stats.retries} failed=${llm.stats.failures}\n`,
+        );
+      }
+      return reply;
+    });
+    for (const [at, plan] of batch.entries()) replyOf.set(plan, answers[at]);
+    answered += batch.length;
+  };
+  await askPlanned(plans);
 
   // The retry arms' only round with a pack, and it happens only where the first answer did
   // not work: the query failed to execute, or it executed and returned nothing. Those are the
@@ -5458,7 +5484,11 @@ async function runFold(
     const batch: { position: number; arm: RetryArm; prompt: string; packIds: number; packChars: number }[] = [];
     for (const [position, packsHere] of retries) {
       const at = index.get(`${position}:none`);
-      const reply = at === undefined ? undefined : replies[at];
+      // Through the plan rather than through the position: `plans` and the replies stopped being
+      // index-parallel the moment a later pass appended to it, and a reply taken by index here would
+      // be the retry population's own version of the same defect.
+      const basePlan = at === undefined ? undefined : plans[at];
+      const reply = basePlan === undefined ? undefined : replyOf.get(basePlan);
       if (reply === undefined) {
         notRetried += 1;
         continue;
@@ -5574,7 +5604,8 @@ async function runFold(
     let unanswered = 0;
     for (const [position, pack] of anchored) {
       const at = index.get(`${position}:none`);
-      const draft = at === undefined ? undefined : replies[at];
+      const draftPlan = at === undefined ? undefined : plans[at];
+      const draft = draftPlan === undefined ? undefined : replyOf.get(draftPlan);
       if (draft === undefined) {
         unanswered += 1;
         continue;
@@ -6185,6 +6216,10 @@ async function runFold(
       for (const [position, guidance] of reconstructedShuffled) {
         call(position, 'full-reconstructed-shuffled', guidance.text, 0);
       }
+      // The plans these two loops just appended have never been put to the model. Asking here rather
+      // than at the top of the fold is the whole point: the arm's *treatment* is a prompt, and a plan
+      // whose prompt was never sent has no answer to score.
+      await askPlanned(plans.slice(answered));
       reconstructPasses.push({
         fold: fold + 1,
         write: reconstructReading([...reconstructed.values()], RECONSTRUCT_BUDGET),
@@ -6199,11 +6234,23 @@ async function runFold(
       );
     }
 
+  // A plan that was never sent to the model has no reply, and `undefined` is exactly what the judge
+  // reads for a reply that failed — so an unsent plan is scored as a wrong answer and reports an
+  // effect. R81's third dispatch did that for two arms at once (0.00%, −52.57pp, every gate passing)
+  // because the answers were collected before the plans existed. The count is a refusal rather than a
+  // warning: a fold that cannot answer every plan it wrote has not measured the arm it bought.
+  if (replyOf.size !== plans.length) {
+    throw new MicrogliaError(
+      'MG_E_CONFIG',
+      `${String(plans.length - replyOf.size)} planned call(s) were never sent to the model, so the arms that needed them would be scored against no reply`,
+      { planned: plans.length, answered: replyOf.size },
+    );
+  }
   const judged = new Map<string, Judged>();
   for (const [index, plan] of plans.entries()) {
     const row = evalRows[plan.position] as BirdRow;
     const started = performance.now();
-    const result = await judgeReply(row, dataset.dbPath(row.db_id), replies[index], task);
+    const result = await judgeReply(row, dataset.dbPath(row.db_id), replyOf.get(plan), task);
     // The judging half is the one that can stall without a model call, so it reports on its own
     // clock. A phase that prints nothing is a phase whose silence is indistinguishable from a hang,
     // which is exactly how a fold came to spend two hours in it with no line in the log.
