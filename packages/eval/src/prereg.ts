@@ -1132,7 +1132,7 @@ export function laneRoleProblem(
   if (declared === 'hostile') return undefined;
   return (
     `this registration claims '${declared}' evidence on the '${context.split}' split, and that split ` +
-    'is the hostile case: BIRD questions never recur, so a lift measured there is not a lift from ' +
+    'is the hostile case: its questions never recur, so a lift measured there is not a lift from ' +
     'experience'
   );
 }

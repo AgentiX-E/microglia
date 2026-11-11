@@ -1358,7 +1358,7 @@ describe('laneRoleProblem', () => {
     // nothing in the machinery could have objected, because the role only existed in prose.
     expect(laneRoleProblem('product', { split: 'dev' })).toBe(
       "this registration claims 'product' evidence on the 'dev' split, and that split is the hostile " +
-        'case: BIRD questions never recur, so a lift measured there is not a lift from experience',
+        'case: its questions never recur, so a lift measured there is not a lift from experience',
     );
     expect(laneRoleProblem('transfer', { split: 'minidev' })).toContain("claims 'transfer' evidence");
     expect(laneRoleProblem('product', { split: 'train' })).toContain('never recur');
