@@ -1335,10 +1335,13 @@ jobs:
           #
           # Unset means empty means the default the lane has always run: `standard` with
           # `declared: false`, `lesson`, seed 7, 400 calls, and the published admission threshold.
-          # R53's level, from the registration when it names one: `facadeNotes` in a header is what
-          # makes three note levels dispatchable, and this line read the variable until the assertion
-          # that covers *every* arm was written. The variable stands when the header names nothing.
-          TAU_INJECTION_NOTE: ${{ steps.recall_floor.outputs.notes || vars.TAU_INJECTION_NOTE }}
+          # The single-level note sentence. It is *not* the `facadeNotes` switch: `notes` is the
+          # three-arm flag (`TAU_FACADE_NOTES`, above) and passes `false` when a header names nothing,
+          # which is not a level. Wiring this line to it made every dispatch fail before its first
+          # model call -- `TAU_INJECTION_NOTE must be unset or one of none, standard, hardened, not
+          # 'false'` -- which is the driver being right about a switch the workflow got wrong. A level
+          # has no header key yet; R53's three-arm path is `facadeNotes`.
+          TAU_INJECTION_NOTE: ${{ vars.TAU_INJECTION_NOTE }}
           # R56's one variable, from the registration when it names one and from the variable
           # otherwise. The read step refuses a disagreement before any model call, so the two can
           # never both be in force: one of them is empty by the time this line is evaluated.
@@ -1459,7 +1462,7 @@ jobs:
           TAU_MEMORY: 'false'
           # The same four switches, empty. The two arms must share every setting that is not the
           # memory, and an arm that read a different seed would differ in more than its store.
-          TAU_INJECTION_NOTE: ${{ steps.recall_floor.outputs.notes || vars.TAU_INJECTION_NOTE }}
+          TAU_INJECTION_NOTE: ${{ vars.TAU_INJECTION_NOTE }}
           # The same registration values the memory arm reads. This arm distils nothing -- the memory is
           # off -- but the two arms are one experiment, and a control whose artefact records `lesson`
           # beside a treatment that recorded `procedure` is two experiments in one file. The previous

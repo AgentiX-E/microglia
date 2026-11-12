@@ -375,7 +375,6 @@ describe('every switch a registration owns is read from the registration', () =>
     ['TAU_DISTILL_FORM', 'form'],
     ['TAU_DISTILL_UNIT', 'unit'],
     ['TAU_DISTILL_SCOPE', 'scope'],
-    ['TAU_INJECTION_NOTE', 'notes'],
     ['TAU_TRACE_CLAIMS', 'claims'],
   ];
 
@@ -397,6 +396,15 @@ describe('every switch a registration owns is read from the registration', () =>
     expect(found.length, `${key} is not assigned anywhere in sota.yml`).toBeGreaterThan(0);
     return found;
   }
+
+  it('does not read the note level from the three-arm flag', () => {
+    // `TAU_INJECTION_NOTE` is a level (`standard`, `hardened`, `cautious`, `none`); `facadeNotes` is
+    // the three-arm flag and its output is `false` when a header names nothing. Wiring the level to it
+    // made every dispatch fail before its first model call, which is how this assertion came to exist:
+    // a switch whose two spellings look alike and mean different things is not a switch the guard can
+    // infer from a name.
+    expect(text).toContain('TAU_INJECTION_NOTE: ${{ vars.TAU_INJECTION_NOTE }}');
+  });
 
   for (const [key, output] of OWNED) {
     it(`${key} prefers the registration's ${output} over the variable`, () => {
