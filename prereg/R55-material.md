@@ -17,6 +17,19 @@ recallDomain: retail
 **Registered** 2026-11-08, undispatched. Blocked on R56 by the one-lane rule: every arm is a
 comparison, and no comparison may be interpreted while another is open.
 
+**Sequencing amendment, 2026-11-12 — R55.1's precondition is now a measurement, and it moved behind R58.**
+R55.0 was read and closed its own axis: `{1: 7}` on the trace store, no item at support 2, so a threshold at
+`supportTasks >= 3` admits nothing that store can hold. That is not a reason to lower the threshold; it is the
+first clause of this registration's refutation, arriving one stage early. The same arithmetic already closed R83
+on the BIRD lane (3 pairs above the consolidation floor, a 0.39pp ceiling) and the 1,296-rule dev store
+(**0 rules corroborated twice**), so recurrence is now the only open question and **R58 is the cell that asks
+it**: one trace instead of one sentence, up to three claims per trace, and a consolidation pass whose
+`supportBefore`/`supportAfter` are read over one store. R55.1 stays registered, stays at `>= 3`, and dispatches
+on the first store that holds an item at support 3 — with the two-arm design Appendix N of `COMPETITIVE.md`
+requires: `sup3-retrieved` is our pack, `sup3-prefix` is theirs (every admitted entry in the system prompt, no
+retrieval, no budget), and the second is the only cell in this project that can be compared with their
+published +3.33pp.
+
 **Sequencing amendment, 2026-11-08, before dispatch.** R54's readback fired its second refutation —
 the conditions exist and do not name the situation — and its registration names the prompt as the
 next registration, so R56 (the form) goes first. This registration's measurement stage therefore
