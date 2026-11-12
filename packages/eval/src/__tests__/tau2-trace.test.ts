@@ -395,6 +395,13 @@ describe('resolveDistillUnit', () => {
     expect(resolveDistillUnit(' TRACE ')).toBe('trace');
   });
 
+  it('reads the raw unit, which is the arm that stores the episode and asks no model', () => {
+    // R85's third unit. It is a value of this switch rather than a switch of its own because the
+    // question it answers -- what is the store made of -- is the same question the other two answer.
+    expect(resolveDistillUnit('raw')).toBe('raw');
+    expect(resolveDistillUnit(' RAW ')).toBe('raw');
+  });
+
   it('refuses an unrecognised unit instead of measuring the default', () => {
     // A typo in a dispatch variable is a run that reports a number about a treatment it never
     // applied. `resolveDistillForm` predates this and reads garbage as its default; the unit is

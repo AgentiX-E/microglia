@@ -39,6 +39,7 @@
  * instrumentation. The registration said the former if fewer than fifteen fired; the refutation is
  * recorded, and the arm-index table is what makes the difference visible enough to argue about.
  */
+import type { FaithfulnessCensus } from "./tau2-faithfulness.js";
 import {
   GATE_ORDER,
   buildProtocolGates,
@@ -153,6 +154,8 @@ export type Tau2ArmRecord = {
   readonly distillForm?: DistillFormRecord;
   /** R58: the unit distilled, the traces read, and the recurrence pass's census. */
   readonly distillUnit?: DistillUnitRecord;
+  /** R85: what the write preserved of the corrections' own entities. See `tau2-faithfulness.ts`. */
+  readonly faithfulness?: FaithfulnessCensus;
   readonly injectionNote?: InjectionNoteRecord;
   /**
    * How far the pipeline from a correction to a servable rule got, when the driver counted it.

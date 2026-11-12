@@ -210,7 +210,15 @@ export function traceOf(
   };
 }
 
-export type DistillUnit = 'correction' | 'trace';
+/**
+ * What one dispatch distils: the object the store is made of.
+ *
+ * `correction` and `trace` are two abstractions of the same episode — one sentence about a failed
+ * task, or up to three claims about an attempt at one. `raw` (R85) is the episode itself: the
+ * question, the calls it should have made, and their arguments, written verbatim and with no model
+ * call. It is the control the two preprints in `tau2-rawlog.ts` measure the abstractions against.
+ */
+export type DistillUnit = 'correction' | 'trace' | 'raw';
 
 /**
  * Which unit this dispatch distils, defaulting to the one every published arm measured.
@@ -224,7 +232,8 @@ export function resolveDistillUnit(raw = process.env['TAU_DISTILL_UNIT']): Disti
   const value = (raw ?? '').trim().toLowerCase();
   if (value === '' || value === 'correction') return 'correction';
   if (value === 'trace') return 'trace';
+  if (value === 'raw') return 'raw';
   throw new RangeError(
-    `TAU_DISTILL_UNIT must be unset, 'correction' or 'trace'; received '${String(raw)}'`,
+    `TAU_DISTILL_UNIT must be unset, 'correction', 'trace' or 'raw'; received '${String(raw)}'`,
   );
 }

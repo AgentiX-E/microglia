@@ -88,6 +88,11 @@ import {
   resolveDistillScope,
   resolveDistillUnit,
   provenanceCensus,
+  entitiesOf,
+  faithfulnessLine,
+  faithfulnessOf,
+  rawLogCensus,
+  rawLogInterpreter,
   resolveTraceClaims,
   tracesOf,
   yieldCensus,
@@ -113,6 +118,7 @@ import {
   type NoteArmReading,
   type NotedFacadeReading,
   type ProbeAttempt,
+  type ResilientInterpreter,
 } from "@agentix-e/microglia-eval";
 import type { NoteMode } from "@agentix-e/microglia-core/apply";
 import {
@@ -781,32 +787,44 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const noteDrop = (reason: string): void => {
     drops[reason] = (drops[reason] ?? 0) + 1;
   };
-  const distiller = resilientInterpreter(
-    createLlmInterpreter({
-      llm: { complete: async (prompt) => (await llm.chat(prompt, DISTILL_TOKENS)).text },
-      audit: noteDrop,
-      // R56: the one variable. The `lesson` form asks `when` to name a property "the reader can
-      // check on a different input: which tables or columns it involves" — an instruction written
-      // for a database, which in a lane whose input is a customer asking to cancel an order can
-      // only be satisfied by naming the tools. `procedure` asks for the trigger in the question's
-      // own terms, and it is the form this lane has never run.
-      // R58: the unit decides the form. A trace arm that kept the `lesson` guidance would ask a
-      // model to name "which tables or columns it involves" of a conversation, which is the
-      // measurement R54 made and R56 reverted; a correction arm that took the trace guidance would
-      // be asked to compare an attempt it was never shown.
-      form: DISTILL_UNIT === "trace" ? "trace" : DISTILL_FORM,
-      // R62: the prompt names the shape a record without `expected` has, but only for a dispatch that
-      // can produce one. A repair-only run reads exactly the prompt it read in R61, which is the
-      // property that keeps a published arm's numbers comparable across the change.
-      ...(DISTILL_SCOPE === "all" ? { passScope: true } : {}),
-      // Three claims from one trace: the unit is richer, and a single sentence about a whole
-      // episode is the object this registration exists to replace.
-      ...(DISTILL_UNIT === "trace"
-        ? { maxCandidates: TRACE_CLAIMS.ceiling }
-        : {}),
-    }),
-    ruleInterpreter,
-  );
+  // R85: a raw arm asks the model nothing, so there is no primary interpreter that can fail and no
+  // rule fallback to answer for it. The slot keeps the resilient pair's shape rather than becoming a
+  // second code path, because every line below -- the fault counts, the form record, the ban -- reads
+  // the same on all three units, and `faults()` is a constant zero the artefact still writes: an arm
+  // that had no faults and an arm that never counted them are different records, and R58 is the
+  // reason this project stopped conflating the two.
+  const distiller: ResilientInterpreter =
+    DISTILL_UNIT === "raw"
+      ? {
+          interpreter: rawLogInterpreter,
+          faults: () => ({ events: 0, reasons: [], samples: {} }),
+        }
+      : resilientInterpreter(
+          createLlmInterpreter({
+            llm: { complete: async (prompt) => (await llm.chat(prompt, DISTILL_TOKENS)).text },
+            audit: noteDrop,
+            // R56: the one variable. The `lesson` form asks `when` to name a property "the reader can
+            // check on a different input: which tables or columns it involves" — an instruction written
+            // for a database, which in a lane whose input is a customer asking to cancel an order can
+            // only be satisfied by naming the tools. `procedure` asks for the trigger in the question's
+            // own terms, and it is the form this lane has never run.
+            // R58: the unit decides the form. A trace arm that kept the `lesson` guidance would ask a
+            // model to name "which tables or columns it involves" of a conversation, which is the
+            // measurement R54 made and R56 reverted; a correction arm that took the trace guidance would
+            // be asked to compare an attempt it was never shown.
+            form: DISTILL_UNIT === "trace" ? "trace" : DISTILL_FORM,
+            // R62: the prompt names the shape a record without `expected` has, but only for a dispatch that
+            // can produce one. A repair-only run reads exactly the prompt it read in R61, which is the
+            // property that keeps a published arm's numbers comparable across the change.
+            ...(DISTILL_SCOPE === "all" ? { passScope: true } : {}),
+            // Three claims from one trace: the unit is richer, and a single sentence about a whole
+            // episode is the object this registration exists to replace.
+            ...(DISTILL_UNIT === "trace"
+              ? { maxCandidates: TRACE_CLAIMS.ceiling }
+              : {}),
+          }),
+          ruleInterpreter,
+        );
   // The ban that makes the form real. A prompt cannot enforce itself, so a candidate whose statement
   // or condition names one of the tools this split learned from is refused at the host boundary and
   // counted. The inventory is built from the corrections themselves rather than from a constant: a
@@ -852,6 +870,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     runId: string;
     assertions: number;
     provenance: CorrectionProvenance;
+    // R85: the entities this correction itself stated, carried on the capture row because the join
+    // back to the store is the evidence's own run id and nothing else about the correction survives
+    // into the item it produced.
+    entities: readonly string[];
   }[] = [];
   for (const correction of corrections) {
     const trace = traces.get(correction.taskId);
@@ -910,6 +932,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       runId: handle.id,
       assertions: correction.assertions.length,
       provenance: correction.provenance,
+      entities: entitiesOf(correction.actions),
     });
     await handle.complete({
       actions: correction.actions.map((action) => action.name),
@@ -928,7 +951,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const distillReport = await host.distill({
     generalize: false,
     fatal: stoppedRun,
-    accept: toolGuard.accept,
+    // R85: the ban exists to force a claim past the tool names, and a record *is* the call that
+    // names them. Applying it to a raw arm would refuse every candidate and evaluate an empty store
+    // under the arm's name -- which is the failure mode this repository has already paid for once,
+    // in R41. The ban is therefore not installed for this unit, and the census below records that it
+    // was off rather than leaving a reader to infer it from `refused: 0`.
+    ...(DISTILL_UNIT === "raw" ? {} : { accept: toolGuard.accept }),
     ...(WRITE_ADMISSION_PLAN.mode === "off"
       ? {}
       : { admission: WRITE_ADMISSION_PLAN.options }),
@@ -948,6 +976,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // two claims into one leaves the survivor citing both runs and the retired item citing its own,
   // and a yield counted after it would report one claim twice. See `claimsPerCorrection`.
   const written = await store.listKnowledge({});
+  // R85: the other half of the memory tax, measured where it is decided -- at the write. Nothing here
+  // calls a model: the entities are the corrections' own argument values and the text is what the
+  // store kept, so the number is a property of the writer and can be recomputed from any artefact
+  // that carries both. `Memory Tax` reports the same quantity as "detail survival at write", and it
+  // is the one failure mode six nulls on this lane could not be told apart from.
+  const faithfulness = faithfulnessOf(captured, written);
+  process.stdout.write(`[tau2] ${faithfulnessLine(faithfulness)}\n`);
   // R62: which population each claim came from, joined through the evidence's own run id. Taken here,
   // from the store as the distiller wrote it, for the same reason the sweep is: the pass below folds
   // items together, and a census over the folded store would attribute a merged claim to whichever of
@@ -957,6 +992,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     now: Date.now(),
     policy: defaultPolicy,
   } as const;
+  // Not for the raw unit, and the reason is the arm rather than the pass: a record is one event, and
+  // merging two records by statement similarity produces a third record neither episode wrote --
+  // which is exactly the abstraction this arm is the control for. The pass is a claim-merging pass;
+  // `written` on this unit is not a set of claims.
   const consolidation =
     DISTILL_UNIT === "trace"
       ? consolidateKnowledge(written, consolidationOptions)
@@ -1447,7 +1486,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // whether the ban ran or was vacuous, and R56's first refutation is that the ban is too strict —
     // a claim that needs the count to be graded.
     distillForm: {
-      form: DISTILL_UNIT === "trace" ? "trace" : DISTILL_FORM,
+      // `record` is the form of a unit that asks the model nothing: the field answers "what did the
+      // prompt ask for", and on this unit there was no prompt to ask.
+      form: DISTILL_UNIT === "trace" ? "trace" : DISTILL_UNIT === "raw" ? "record" : DISTILL_FORM,
       toolInventory,
       refused: toolGuard.refused(),
       // R84's other half: the ceiling the calls were given, from the same value the calls use.
@@ -1465,6 +1506,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         ? {}
         : { consolidation: consolidation.report }),
     },
+    // R85: the arm's own accounting, from the store. Absent on the two abstracting units, where the
+    // record it counts was never written; present, it says how many records survived the ceiling and
+    // that the ban was not installed.
+    ...(DISTILL_UNIT === "raw" ? { rawlog: rawLogCensus(written) } : {}),
+    ...(faithfulness === undefined ? {} : { faithfulness }),
     // R62: which trajectories taught, and what the store looks like split by that. `scope` is the
     // switch the dispatch read; `provenance` is the measurement of what it produced, and the two are
     // recorded separately because a dispatch that asked for `all` and produced only repairs has to be

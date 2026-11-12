@@ -574,6 +574,11 @@ describe('the projection has a decision for every field, and keeps it', () => {
         truncated: 0,
       },
       distillForm: { form: 'lesson', toolInventory: ['find_user'], refused: 0 },
+      // R85: the raw unit's census, carried for the same reason as every other field here — the
+      // guard is only as good as the fixture, and a fixture without it would let the projection drop
+      // it silently.
+      rawlog: { records: 14, clipped: 0, toolBan: false },
+      faithfulness: { corrections: 14, withoutEntities: 0, entities: 40, kept: 31, whole: 9 },
       // R58: the carried fixture holds the unit, because a `carried` decision is only checked
       // against the fields the fixture defines — and the guard that catches a dropped field would
       // otherwise be silent about the one this iteration added.

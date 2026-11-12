@@ -36,6 +36,8 @@
  *    zero items from a store of fourteen and the record could not say which of the two it was, so the
  *    arm's census (`storeCensus`) and the request tally (`recall`) travel beside the rate.
  */
+import type { FaithfulnessCensus } from "./tau2-faithfulness.js";
+import type { RawLogCensus } from "./tau2-rawlog.js";
 import { defaultPolicy } from "@agentix-e/microglia-core/kernel";
 import type { FunnelInput } from "@agentix-e/microglia-protocol";
 import type { AdmissionCensus, Tau2ArmRecord } from "./tau2-gates.js";
@@ -108,7 +110,7 @@ export type DistillFormRecord = {
  * asks about.
  */
 export type DistillUnitRecord = {
-  readonly unit: "correction" | "trace";
+  readonly unit: "correction" | "trace" | "raw";
   /** Traces the learning document carried. */
   readonly traces: number;
   /** Corrections that carried one, and were therefore distilled from a trace. */
@@ -303,6 +305,18 @@ export type Tau2Raw = {
   readonly distillForm?: DistillFormRecord;
   /** R58: the unit, the traces, and the consolidation census. See `DistillUnitRecord`. */
   readonly distillUnit?: DistillUnitRecord;
+  /**
+   * R85: what the raw unit's store holds, and whether the ceiling clipped any of it.
+   *
+   * Present only on this unit, because the record it describes exists only there — absence is "this
+   * arm has no records", which a reader must not confuse with "the count was zero".
+   */
+  readonly rawlog?: RawLogCensus;
+  /**
+   * R85: what the write kept of each correction's own entities, and therefore the half of the memory
+   * tax this lane had no instrument for. Model-free; see `tau2-faithfulness.ts`.
+   */
+  readonly faithfulness?: FaithfulnessCensus;
   /**
    * R60: the ceiling one trace ran under, and whether the dispatch chose it.
    *
@@ -569,6 +583,8 @@ export const PROJECTION: {
   storeItems: "carried",
   distillForm: "carried",
   distillUnit: "carried",
+  rawlog: "carried",
+  faithfulness: "carried",
   distillScope: "carried",
   provenance: "carried",
   traceClaims: "carried",
@@ -678,6 +694,8 @@ export function armRecordFromDriver(
     ...(raw.storeItems === undefined ? {} : { storeItems: raw.storeItems }),
     ...(raw.distillForm === undefined ? {} : { distillForm: raw.distillForm }),
     ...(raw.distillUnit === undefined ? {} : { distillUnit: raw.distillUnit }),
+    ...(raw.rawlog === undefined ? {} : { rawlog: raw.rawlog }),
+    ...(raw.faithfulness === undefined ? {} : { faithfulness: raw.faithfulness }),
     ...(raw.distillScope === undefined ? {} : { distillScope: raw.distillScope }),
     ...(raw.provenance === undefined ? {} : { provenance: raw.provenance }),
     ...(raw.traceClaims === undefined ? {} : { traceClaims: raw.traceClaims }),

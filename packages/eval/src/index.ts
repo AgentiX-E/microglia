@@ -911,6 +911,27 @@ export {
   type InterpreterFaults,
   type ResilientInterpreter,
 } from './tau2-distill.js';
+export {
+  ENTITY_MAX_CHARS,
+  ENTITY_MIN_CHARS,
+  entitiesOf,
+  faithfulnessLine,
+  faithfulnessOf,
+  faithfulnessRate,
+  type FaithfulnessCensus,
+  type FaithfulnessItem,
+  type FaithfulnessRow,
+} from './tau2-faithfulness.js';
+export {
+  RAWLOG_STATEMENT_CEILING,
+  RAWLOG_TRUNCATION_MARK,
+  RAWLOG_TRUST,
+  rawLogCensus,
+  rawLogInterpreter,
+  rawLogStatement,
+  rawLogTruncated,
+  type RawLogCensus,
+} from './tau2-rawlog.js';
 export { stoppedRun } from './stopped-run.js';
 export {
   DEFAULT_MIN_TASKS,

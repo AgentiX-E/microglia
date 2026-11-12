@@ -1292,6 +1292,15 @@ describe('distillFormProblem', () => {
     expect(distillFormProblem('lesson', 'procedure', 'correction')).toBeUndefined();
   });
 
+  it('refuses a raw dispatch that declares a form, because no prompt is sent', () => {
+    // R85's unit writes the episode verbatim and calls no model. A registration that named a form
+    // would describe a prompt nothing sends, and the store would be published as `raw` while
+    // claiming a form that was never asked for -- an inconsistency inside the registration, which is
+    // the one class of disagreement this check still refuses.
+    expect(distillFormProblem('', 'procedure', 'raw')).toContain('there is no prompt for a form');
+    expect(distillFormProblem('', undefined, 'raw')).toBeUndefined();
+  });
+
   it('refuses a trace dispatch that would discard the registered form', () => {
     // `form: unit === 'trace' ? 'trace' : DISTILL_FORM` makes a header that names a form and a
     // dispatch that distils traces a contradiction: the registered switch cannot take effect, and
@@ -1339,7 +1348,7 @@ describe('the distiller unit, as a header field', () => {
 
   it('refuses a unit the lane cannot distil, and the capitalised form of one', () => {
     expect(readPrereg(withHeader('distillUnit: episode'), 'R87-distill-unit.md').problems).toEqual([
-      { where: "header 'distillUnit'", problem: "'episode' is not one of correction, trace" },
+      { where: "header 'distillUnit'", problem: "'episode' is not one of correction, trace, raw" },
     ]);
     expect(readPrereg(withHeader('distillUnit: Trace'), 'R87-distill-unit.md').problems).toHaveLength(1);
   });

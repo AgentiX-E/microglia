@@ -1,0 +1,147 @@
+import { describe, expect, it } from 'vitest';
+import {
+  ENTITY_MAX_CHARS,
+  entitiesOf,
+  faithfulnessLine,
+  faithfulnessOf,
+  faithfulnessRate,
+} from '../tau2-faithfulness.js';
+
+/**
+ * Faithfulness: what the write destroyed.
+ *
+ * Every other instrument in this repository measures the route from a stored item to a prompt, and
+ * all of them read the same whether the item was written perfectly or written with the order id
+ * removed. These cases pin the half that reads the write, and each one is a way that number can be
+ * made to say something it did not measure: the wrong denominator, a join that credits one
+ * correction with another's text, a zero standing in for an absence.
+ */
+
+const item = (statement: string, runId: string, condition?: string) => ({
+  statement,
+  ...(condition === undefined ? {} : { condition }),
+  evidence: [{ runId }],
+});
+
+describe('entitiesOf', () => {
+  it('takes the argument values, which are the identities a later task will quote', () => {
+    expect(
+      entitiesOf([
+        { arguments: { order_id: 'W237', reason: 'no longer needed' } },
+        { arguments: { item_ids: ['item-9', 'item-10'], quantity: 3 } },
+      ]),
+    ).toEqual(['W237', 'no longer needed', 'item-9', 'item-10', '3']);
+  });
+
+  it('drops values that identify nothing: short strings, booleans, empty fields', () => {
+    // `1`, `no`, `true` and an empty string are the vocabulary of every task in the corpus, so a
+    // writer cannot lose them and counting them would raise every rate toward one.
+    expect(
+      entitiesOf([{ arguments: { a: 'no', b: '', c: true, d: null, e: 12, f: 'abc' } }]),
+    ).toEqual(['12', 'abc']);
+  });
+
+  it('excludes a pasted sentence, which is prose rather than an identity', () => {
+    const prose = 'x'.repeat(ENTITY_MAX_CHARS + 1);
+    expect(entitiesOf([{ arguments: { note: prose } }])).toEqual([]);
+  });
+
+  it('counts an entity once per correction however many calls carry it', () => {
+    expect(
+      entitiesOf([{ arguments: { order_id: 'W237' } }, { arguments: { order_id: 'W237' } }]),
+    ).toEqual(['W237']);
+  });
+});
+
+describe('faithfulnessOf', () => {
+  it('reads one for a writer that kept everything, which is what a record is', () => {
+    const census = faithfulnessOf(
+      [{ runId: 'r1', entities: ['W237', 'item-9'] }],
+      [item('Q: exchange W237 for item-9\nA: exchange_delivered_order(order_id="W237")', 'r1')],
+    );
+    expect(census).toEqual({ corrections: 1, withoutEntities: 0, entities: 2, kept: 2, whole: 1 });
+    expect(faithfulnessRate(census)).toBe(1);
+  });
+
+  it('counts a dropped identity as lost, which is the number an abstraction moves', () => {
+    const census = faithfulnessOf(
+      [{ runId: 'r1', entities: ['W237', 'item-9'] }],
+      [item('Exchange a delivered order for a different size', 'r1')],
+    );
+    expect(census?.kept).toBe(0);
+    expect(census?.whole).toBe(0);
+    expect(faithfulnessRate(census)).toBe(0);
+  });
+
+  it('counts the condition as text the write kept', () => {
+    // A claim's trigger is part of what it preserved: a rule that says `order_id="W237"` only in its
+    // condition has kept the identity, and a reading that looked at the statement alone would report
+    // it destroyed.
+    const census = faithfulnessOf(
+      [{ runId: 'r1', entities: ['W237'] }],
+      [item('Confirm before changing a pending order', 'r1', 'the request names W237')],
+    );
+    expect(census?.kept).toBe(1);
+  });
+
+  it('matches without regard to case, because the store writing w237 has kept W237', () => {
+    const census = faithfulnessOf(
+      [{ runId: 'r1', entities: ['W237'] }],
+      [item('the order w237 was delivered', 'r1')],
+    );
+    expect(census?.kept).toBe(1);
+  });
+
+  it('does not credit one correction with another correction text', () => {
+    // The join is the evidence's own run id. A store that answers a correction with an item citing a
+    // different one has replaced it rather than preserved it, and the reading has to say so — this is
+    // exactly what an aggressively merging distiller does, and it is the case a join on task id would
+    // have hidden.
+    const census = faithfulnessOf(
+      [
+        { runId: 'r1', entities: ['W237'] },
+        { runId: 'r2', entities: ['W999'] },
+      ],
+      [item('Q: cancel W999', 'r2')],
+    );
+    expect(census?.kept).toBe(1);
+    expect(census?.entities).toBe(2);
+    expect(census?.whole).toBe(1);
+  });
+
+  it('keeps a correction with nothing to preserve out of the denominator', () => {
+    const census = faithfulnessOf(
+      [
+        { runId: 'r1', entities: [] },
+        { runId: 'r2', entities: ['W237'] },
+      ],
+      [item('Q: cancel W237', 'r2')],
+    );
+    expect(census).toEqual({ corrections: 1, withoutEntities: 1, entities: 1, kept: 1, whole: 1 });
+  });
+
+  it('answers undefined rather than one when no correction carried an entity', () => {
+    // A corpus with nothing to preserve cannot be found unfaithful, and reporting 1.0 for it would
+    // make an entity-free lane look like a perfect writer -- the same defect as a `0` hold rate over
+    // no pairs, one measurement over.
+    const census = faithfulnessOf([{ runId: 'r1', entities: [] }], [item('anything', 'r1')]);
+    expect(census).toBeUndefined();
+    expect(faithfulnessRate(census)).toBeUndefined();
+    expect(faithfulnessLine(census)).toBe('faithfulness: absent (no correction carried an argument value)');
+  });
+});
+
+describe('faithfulnessLine', () => {
+  it('prints the counts that give the rate meaning', () => {
+    const line = faithfulnessLine({
+      corrections: 3,
+      withoutEntities: 1,
+      entities: 8,
+      kept: 6,
+      whole: 1,
+    });
+    expect(line).toBe(
+      'faithfulness: 6 of 8 entity(ies) kept (75.0%), whole in 1 of 3 correction(s), 1 with none to keep',
+    );
+  });
+});

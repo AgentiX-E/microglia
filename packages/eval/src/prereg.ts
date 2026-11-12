@@ -306,7 +306,7 @@ const HEADER_LANES: ReadonlySet<string> = new Set(['product', 'transfer', 'hosti
 const HEADER_FORMS: ReadonlySet<string> = new Set(['lesson', 'procedure', 'repair', 'lexicon']);
 
 /** The two units `resolveDistillUnit` accepts, and nothing else: `correction` is the published one. */
-const HEADER_UNITS: ReadonlySet<string> = new Set(['correction', 'trace']);
+const HEADER_UNITS: ReadonlySet<string> = new Set(['correction', 'trace', 'raw']);
 
 /** The two populations `resolveDistillScope` accepts: the failures, or every trajectory. */
 const HEADER_SCOPES: ReadonlySet<string> = new Set(['edited', 'all']);
@@ -1211,6 +1211,17 @@ export function distillFormProblem(
     return (
       `this registration fixes the distiller's form at '${declared}' and this dispatch distils ` +
       `'trace', which replaces the form, so the registered switch cannot take effect`
+    );
+  }
+  // R85: a raw unit writes the episode verbatim and calls no model, so a declared form describes a
+  // prompt nothing sends. The two switches are not in tension — one of them has no object — and a
+  // registration that declared both would publish a store as `raw` while claiming a form that was
+  // never asked for, which is an inconsistency inside the registration and therefore still a refusal.
+  if (unit === 'raw') {
+    return (
+      `this registration fixes the distiller's form at '${declared}' and this dispatch distils ` +
+      `'raw', which writes the episode verbatim and asks no model: there is no prompt for a form ` +
+      'to describe'
     );
   }
   // No longer compares `configured` with `declared`: see `switchOverride`. The arm reads the

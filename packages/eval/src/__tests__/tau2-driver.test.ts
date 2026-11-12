@@ -112,6 +112,61 @@ describe('the L4 driver', () => {
     }
   }, 60_000);
 
+  it('records the episode on a raw arm and asks no model at all, end to end', async () => {
+    // The arm this test protects is the one the two preprints in `tau2-rawlog.ts` measure against:
+    // the record, written verbatim, with no abstraction step. Three things have to hold at once for
+    // it to be that arm — the store is made of records, the model is never called, and the artefact
+    // says both — and each of the three fails silently in a different way.
+    const { dir, executable } = stubRunner();
+    process.env['TAU_PYTHON'] = executable;
+    process.env['TAU_MEMORY'] = 'true';
+    process.env['TAU_TRIALS'] = '2';
+    process.env['TAU_TRAIN_SHARE'] = '0.75';
+    process.env['TAU_DISTILL_UNIT'] = 'raw';
+    process.env['TAU_WORKDIR'] = dir;
+    process.env['DEEPSEEK_API_KEY'] = 'test-key';
+    process.env['TAU_DISTILL_MODEL'] = 'deepseek/deepseek-chat';
+    let calls = 0;
+    vi.stubGlobal('fetch', async () => {
+      calls += 1;
+      throw new Error('a raw arm must not call a model');
+    });
+    try {
+      const driver = await import('../bin/tau2-driver.js?case=raw');
+      await driver.run();
+      const record = driver.instrument();
+      // Not "no fault was recorded": no call was made. A raw arm that fell back to the model on a
+      // timeout would still have recorded zero faults on a provider that answered.
+      expect(calls).toBe(0);
+      expect(record?.distillUnit?.unit).toBe('raw');
+      // A form of `record` is how the artefact says the prompt was never sent, and it has to say it:
+      // the field would otherwise carry the `lesson` default on an arm that asked nothing.
+      expect(record?.distillForm?.form).toBe('record');
+      expect(record?.distillForm?.refused).toBe(0);
+      // The records reached the store, and they are what the store is made of.
+      expect(record?.rawlog?.records).toBeGreaterThanOrEqual(1);
+      expect(record?.rawlog?.toolBan).toBe(false);
+      const sampled = record?.storeItems?.items ?? [];
+      expect(sampled.length).toBeGreaterThanOrEqual(1);
+      for (const item of sampled) {
+        expect(item.kind).toBe('exemplar');
+        expect(item.statement.startsWith('Q: ')).toBe(true);
+      }
+      // The pass that merges claims did not run over a set of records.
+      expect(record?.distillUnit?.consolidation).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env['TAU_PYTHON'];
+      delete process.env['TAU_MEMORY'];
+      delete process.env['TAU_TRIALS'];
+      delete process.env['TAU_TRAIN_SHARE'];
+      delete process.env['TAU_DISTILL_UNIT'];
+      delete process.env['TAU_WORKDIR'];
+      delete process.env['DEEPSEEK_API_KEY'];
+      delete process.env['TAU_DISTILL_MODEL'];
+    }
+  }, 60_000);
+
   it('sweeps the consolidation floor on a trace arm, end to end', async () => {
     // The sweep is the instrument R61 grades, and it sits after distillation in the driver: a fault
     // there would spend an hour of evaluation before showing. This drives the whole path — stub
