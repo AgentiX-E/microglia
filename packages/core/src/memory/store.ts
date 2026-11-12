@@ -16,6 +16,7 @@ import {
   specificity,
   tierFor,
   tokenize,
+  visibleBefore,
   withoutEvidence,
 } from '../kernel/index.js';
 import type {
@@ -161,6 +162,7 @@ export class EmbeddedMemory implements MemoryPort {
         if (item.status !== 'active') continue;
         if (item.namespace !== query.namespace) continue;
         if (item.scope.task !== query.task) continue;
+        if (!visibleBefore(item, query.before)) continue;
         if (scopeMatches(item.scope, query)) candidateIds.add(id);
       }
     }
@@ -178,6 +180,9 @@ export class EmbeddedMemory implements MemoryPort {
       if (item.namespace !== query.namespace) continue;
       if (item.status !== 'active') continue;
       if (!scopeMatches(item.scope, query)) continue;
+      // Second truth of the same rule: the index path above and this one both have to honour the
+      // watermark, because an item the index cannot reach is still reachable through a scope.
+      if (!visibleBefore(item, query.before)) continue;
       const lexical = bm25Score(
         queryTokens,
         this.index.tokensOf(id),

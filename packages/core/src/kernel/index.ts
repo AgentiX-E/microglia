@@ -135,5 +135,6 @@ export {
   statementIdentity,
   wouldChange,
   validityDecay,
+  visibleBefore,
   type AdmissionDecision,
 } from './knowledge.js';

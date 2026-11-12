@@ -210,6 +210,19 @@ export type EvidenceRef = {
    * previous behaviour.
    */
   readonly taskId?: string;
+  /**
+   * Which attempt at that task produced this evidence, when the host ran it more than once.
+   *
+   * The offline arms write every claim before any evaluation trial starts, so this field is absent
+   * from all of them and their packs are unchanged. It exists for the in-episode arm, where the
+   * store is written *during* the evaluation from the trial that just failed, and where the one
+   * property that makes the reading a measurement rather than a leak is that trial *t* cannot read
+   * a claim distilled from trial *t*. See `visibleBefore`.
+   *
+   * Zero is a real attempt and not a sentinel: a store written by the first trial must be invisible
+   * to the first trial, which no `if (trial)` shortcut may quietly allow.
+   */
+  readonly trial?: number;
 };
 
 /**
@@ -487,4 +500,18 @@ export type RecallQuery = {
    * corrections, not the note. See `NoteMode` in `apply/render.ts` for the three levels.
    */
   readonly note?: 'standard' | 'hardened' | 'none';
+  /**
+   * The trial index whose pack this is: only claims from strictly earlier attempts may be served.
+   *
+   * Absent means "no watermark", which is every offline arm -- the store there is frozen before the
+   * evaluation starts, so there is nothing to leak. It is present only in the in-episode arm, where
+   * the write happens between trials and the whole reading depends on trial *t* not seeing what
+   * trial *t* taught. The watermark travels in the request rather than in the writer's memory
+   * because it has to hold against a write that lands while the trial is still recalling, and a
+   * filter the reader supplies is the only one a concurrent writer cannot outrun.
+   *
+   * `0` is a real trial: an offline store (no trial declared on any evidence) passes every
+   * watermark, and a store written by attempt zero fails a watermark of zero.
+   */
+  readonly before?: number;
 };

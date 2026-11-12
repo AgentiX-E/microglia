@@ -53,6 +53,21 @@ describe('recallQueryOf', () => {
     });
   });
 
+  it('carries the trial watermark, which only the in-episode arm sets', () => {
+    // `before` is the one knob whose absence is a *statement* rather than a default: every offline arm
+    // recalls a store frozen before the evaluation, and a watermark invented here would filter those
+    // packs against a trial index nothing declared.
+    expect(recallQueryOf(read({ before: '2' }), FIXED)).toEqual({ query: { ...FIXED, before: 2 } });
+    expect(recallQueryOf(read({ before: '0' }), FIXED)).toEqual({ query: { ...FIXED, before: 0 } });
+  });
+
+  it('refuses a watermark that is not a trial index, because -1 silently serves a later trial', () => {
+    // A negative watermark matches every item, so it is not a typo that fails loudly downstream: it is
+    // a leak that reads as an empty lesson. `2.5` is refused for the same reason the limit is.
+    expect(recallQueryOf(read({ before: '-1' }), FIXED)).toEqual({ error: 'before is not a trial index' });
+    expect(recallQueryOf(read({ before: '2.5' }), FIXED)).toEqual({ error: 'before is not a trial index' });
+  });
+
   it('refuses a coverage floor outside a share', () => {
     expect(recallQueryOf(read({ minCoverage: '2' }), FIXED)).toEqual({
       error: 'minCoverage is not a share between 0 and 1',
