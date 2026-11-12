@@ -6,18 +6,24 @@ the arm R58 ran -- what the store is made of -- and the reading has two halves t
 reasons: the *write* (a record per correction, no model call, every entity preserved) and the *read*
 (a pack whose text shares the question's words, which is what a lexical retriever can match).
 
-The readback grades the write before the read, because a store of clipped records is a summary written
-by `slice` and a coverage number from it is not the arm's. `faithfulness` is the instrument that
-separates the two, and it is the half of the memory tax this lane had no measurement for: `Memory Tax`
-names it `faithfulness` (the detail was destroyed when the memory was written) against `accessibility`
-(the detail survived and the retriever never served it), and only the second was instrumented here.
+The readback grades the write before the read, because a coverage number from a store the ceiling cut
+is not the arm's. `faithfulness` is the instrument that separates the two, and it is the half of the
+memory tax this lane had no measurement for: `Memory Tax` names it `faithfulness` (the detail was
+destroyed when the memory was written) against `accessibility` (the detail survived and the retriever
+never served it), and only the second was instrumented here.
+
+`rawlog.clipped` is printed and not graded. The registration states the write-side claim on
+faithfulness -- "a number below 0.95 refutes the arm's own claim to be a record rather than a summary
+of one" -- and names the ceiling as the *cause* of any loss, counted per record. Grading the share
+directly would add a threshold the registration never stated, so the census prints the count and the
+refutation's evidence says whether the ceiling was the only thing that cut text.
 
 States, the same four the other verifiers use:
 
   GRADED          every graded prediction holds and no refutation fired.
-  NO_MEASUREMENT  the artefact cannot answer the question: no unit, no record census, no faithfulness.
+  NO_MEASUREMENT  the artefact cannot answer the question: no unit, no record census, no counts.
   DISCARDED       the artefact is another arm or another scenario pair.
-  ABANDONED       a refutation fired: no records, clipped records, coverage under the bar, or a drop.
+  ABANDONED       a refutation fired: no records, entities lost, coverage under the bar, or a drop.
 
 Usage:
   python3 eval/tools/fetch_evidence.py --repo microglia --run <run-id> --out /tmp/r85
@@ -44,10 +50,6 @@ PREDICTED_FAITHFULNESS_MIN = 0.95
 PREDICTED_COVERAGE_P50_MIN = 0.12
 PUBLISHED_PASS4 = 0.575
 REQUIRED_SCENARIO = {"learn": "retail", "test": "retail", "recall": "retail"}
-# The share of a record that may be lost before the arm stops being a record. One percent is not a
-# tolerance: it is the acknowledgement that a corpus can hold one pathological episode, and that the
-# census counts it either way.
-MAX_CLIPPED_SHARE = 0.01
 
 
 class Report:
@@ -187,6 +189,18 @@ def grade(artefact: dict[str, Any], pair: dict[str, Any] | None = None) -> tuple
         return "NO_MEASUREMENT", report
 
     # ---- the write -------------------------------------------------------------------------------
+    # Diagnostic, not a bar. The registration puts the write-side claim on faithfulness ("a number
+    # below 0.95 refutes the arm's own claim to be a record"), and the ceiling appears there as the
+    # *cause* of any loss, counted by `rawlog.clipped`. So the share is printed beside the prediction
+    # rather than graded on its own: a threshold here would be a gate the registration never stated,
+    # and this lane has already paid once for asserting an arm's premise without measuring it.
+    clipped_share = share(clipped, written)
+    if clipped_share is not None:
+        report.note(
+            f"records clipped by the ceiling: {clipped} of {written} ({clipped_share:.1%})"
+            + (" — the ceiling is where any lost detail went" if clipped else "")
+        )
+
     form = tau2.get("distillForm") or {}
     items = sampled_items(tau2)
     bad_items = [
@@ -246,14 +260,13 @@ def grade(artefact: dict[str, Any], pair: dict[str, Any] | None = None) -> tuple
             report.refute(
                 "the ceiling clipped the records rather than the write abstracting them",
                 kept_share < PREDICTED_FAITHFULNESS_MIN,
-                f"{kept_share:.2%} kept; the next variable is the ceiling, not the unit",
+                f"{kept_share:.2%} kept, and "
+                + (
+                    "the ceiling is the only thing that cut text"
+                    if clipped
+                    else "nothing was clipped, so the loss is not the ceiling"
+                ),
             )
-
-    clipped_share = share(clipped, written)
-    if clipped_share is not None:
-        report.note(
-            f"records clipped by the ceiling: {clipped} of {written} ({clipped_share:.1%})"
-        )
 
     # ---- the read --------------------------------------------------------------------------------
     coverage = median_nonzero(tau2)
@@ -426,6 +439,14 @@ def main() -> int:
                 "GRADED",
             ),
             (
+                # Clipping is the registered *cause*, not a registered bar: a store that clipped has
+                # to lose its detail in `faithfulness` before the arm is refuted, and this fixture
+                # clips four records while keeping every entity.
+                "clipped records alone do not abandon, because the loss is measured on the entities",
+                base_record(**{"tau2.rawlog": {"records": 100, "clipped": 4, "toolBan": False}}),
+                "GRADED",
+            ),
+            (
                 "a pass^4 below the published number fails the prediction",
                 base_record(**{"metrics.pass4": 0.40}),
                 "ABANDONED",
@@ -474,7 +495,7 @@ def main() -> int:
                 ["retention: absent (no per_trial ledger on both arms"],
             ),
             (
-                "the record census prints the clipped share, because a clipped record is not a record",
+                "the census prints the clipped share, because it is where any lost detail went",
                 base_record(**{"tau2.rawlog": {"records": 100, "clipped": 4, "toolBan": False}}),
                 ["records clipped by the ceiling: 4 of 100 (4.0%)"],
             ),
