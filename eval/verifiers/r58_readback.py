@@ -34,6 +34,7 @@ from pathlib import Path
 from typing import Any
 
 from _funnel import STOPPED_PREFIX, funnel_notes
+from _retention import retention_note
 
 STATES = ("GRADED", "NO_MEASUREMENT", "DISCARDED", "ABANDONED")
 
@@ -264,6 +265,11 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         )
     else:
         report.note("no pair file beside the arm: the delta is not read here")
+    # Retention is a second reading of the same pair and it answers a different question: the delta
+    # says whether the arms differ, retention says whether what passed kept passing. Printed
+    # unconditionally, so a pair without it reads as `absent` rather than as a line the reader
+    # forgot -- the defect of AUDIT 34.100, where the number existed and the reader did not ask.
+    report.note(retention_note(pair))
 
     # R58's refutations, in the order the registration states them.
     report.refute(
@@ -432,6 +438,40 @@ def main() -> int:
                 "a run that wrote a store says no sentence was written rather than nothing",
                 base_artefact(),
                 ["stopped before measurement: absent"],
+            ),
+            # Retention is printed for every pair, including the pairs that predate it, because a
+            # reader whose output is silent here cannot be told from a pair with no retention.
+            (
+                "a pair carrying retention prints both arms with the denominator that gives the rate meaning",
+                base_artefact(
+                    _pair={
+                        "retention": {
+                            "reference": {"ordered": 57, "withoutOrder": 0, "pairs": 8, "held": 7, "rate": 0.875},
+                            "memory": {"ordered": 55, "withoutOrder": 2, "pairs": 20, "held": 13, "rate": 0.65},
+                        }
+                    }
+                ),
+                [
+                    "retention: reference 0.875 (7 held of 8 pair(s)), "
+                    "memory 0.650 (13 held of 20 pair(s)), 2 of 57 task(s) carried no order",
+                ],
+            ),
+            (
+                "an arm with no pair prints undefined rather than a zero it did not measure",
+                base_artefact(
+                    _pair={
+                        "retention": {
+                            "reference": {"ordered": 57, "withoutOrder": 0, "pairs": 8, "held": 7, "rate": 0.875},
+                            "memory": {"ordered": 0, "withoutOrder": 57, "pairs": 0, "held": 0, "rate": None},
+                        }
+                    }
+                ),
+                ["memory undefined (0 held of 0 pair(s)), 57 of 57 task(s) carried no order"],
+            ),
+            (
+                "a pair written before retention existed says so instead of printing nothing",
+                base_artefact(_pair={"comparison": {"paired": 57, "gained": 9, "lost": 4, "deltaPp": 8.8, "p": 0.31}}),
+                ["retention: absent (no per_trial ledger on both arms"],
             ),
         ]
         for label, artefact, required in context_cases:
