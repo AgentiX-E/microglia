@@ -99,4 +99,12 @@ describe('sotaLineOf', () => {
   it('answers an absent pass^4 rather than printing a delta against nothing', () => {
     expect(sotaLineOf('retail', null, 57)).toContain('pass^4 absent');
   });
+
+  it('calls an unstated sample unstated rather than counting it as none', () => {
+    // `null` is "the run did not say", not "the run scored zero tasks", and a line that printed 0
+    // would read as a split that failed its floor.
+    const line = sotaLineOf('retail', 0.70, null);
+    expect(line).toContain('an unstated count');
+    expect(line).toContain('cross-sample');
+  });
 });
