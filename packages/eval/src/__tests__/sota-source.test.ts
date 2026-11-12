@@ -380,6 +380,10 @@ describe('every switch a registration owns is read from the registration', () =>
     // that code reads and no workflow can set has its default as its only value, which is what
     // `scripts/audit.mjs` refuses. R55.1's two arms differ in this line and nothing else.
     ['TAU_PACK_MODE', 'mode'],
+    // The consumer side of the same switch: the fragment the lane appends to its recall is rendered by
+    // the resolver, so an arm that read the mode but not the fragment would report a place it did not
+    // serve from.
+    ['MICROGLIA_PACK_KNOBS', 'knobs'],
   ];
 
   /** The line a key is assigned on, in the L4 step, with its continuation lines folded in. */

@@ -1298,6 +1298,12 @@ jobs:
           SCOPE=$(sed -n 's/^scope=//p' "$RUNNER_TEMP/distill.env")
           CLAIMS=$(sed -n 's/^claims=//p' "$RUNNER_TEMP/distill.env")
           MODE=$(sed -n 's/^mode=//p' "$RUNNER_TEMP/distill.env")
+          # The mode resolved into the query fragment the lane appends to its recall, printed by the
+          # resolver rather than spelled here: the workflow has no business knowing that "no retrieval"
+          # is `anchoring=scope&minCoverage=0`, and a fragment written in YAML would be the copy that
+          # drifts the first time an arm is refined. Empty for `retrieved`, which keeps the request
+          # byte-identical to every committed artefact's.
+          KNOBS=$(pnpm --silent eval:pack-knobs "${MODE:-}")
           pnpm --silent eval:prereg-scenario "$FILE" > "$RUNNER_TEMP/scenario.env"
           TRAIN=$(sed -n 's/^train=//p' "$RUNNER_TEMP/scenario.env")
           TEST=$(sed -n 's/^test=//p' "$RUNNER_TEMP/scenario.env")
@@ -1313,6 +1319,7 @@ jobs:
           echo "scope=$SCOPE" >> "$GITHUB_OUTPUT"
           echo "claims=$CLAIMS" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "knobs=$KNOBS" >> "$GITHUB_OUTPUT"
           echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`, distiller \`${UNIT:-inherited}/${FORM:-inherited}\` over \`${SCOPE:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: L4 arm — memory
@@ -1380,6 +1387,7 @@ jobs:
           # travels into the artefact so a readback can tell the two apart.
           TAU_TRACE_CLAIMS: ${{ steps.recall_floor.outputs.claims || vars.TAU_TRACE_CLAIMS }}
           TAU_PACK_MODE: ${{ steps.recall_floor.outputs.mode || vars.TAU_PACK_MODE }}
+          MICROGLIA_PACK_KNOBS: ${{ steps.recall_floor.outputs.knobs }}
           # R57: which controlled distractor this leg plants, and nothing else. It comes from the
           # registration's `plantedArms` header by way of the `arms` job, not from a repository
           # variable: a variable is global, so three arms meant three dispatches in sequence and a
@@ -1494,6 +1502,7 @@ jobs:
           TAU_DISTILL_SCOPE: ${{ steps.recall_floor.outputs.scope || vars.TAU_DISTILL_SCOPE }}
           TAU_TRACE_CLAIMS: ${{ steps.recall_floor.outputs.claims || vars.TAU_TRACE_CLAIMS }}
           TAU_PACK_MODE: ${{ steps.recall_floor.outputs.mode || vars.TAU_PACK_MODE }}
+          MICROGLIA_PACK_KNOBS: ${{ steps.recall_floor.outputs.knobs }}
           TAU_SEED: ${{ vars.TAU_SEED }}
           TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}
           TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}

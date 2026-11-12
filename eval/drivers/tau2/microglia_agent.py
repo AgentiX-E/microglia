@@ -84,6 +84,35 @@ def _timeout() -> float:
     return value if value > 0 else DEFAULT_TIMEOUT_S
 
 
+def parse_knobs(raw: str) -> dict[str, str]:
+    """The recall knobs a dispatch resolved, as query parameters.
+
+    R55.1's switch is resolved in TypeScript — `pack-mode-plan.ts` decides what `prefix` means and
+    `pack-knobs` renders it — and this driver only carries the answer across. That division is the point:
+    a second place that knew what "no retrieval" means in query parameters would be the copy that drifts
+    the first time the arm is refined.
+
+    A malformed pair is dropped rather than passed through. It cannot be honoured either way, and an
+    empty value would reach the route's validator, which refuses it with a 400 the run would record as a
+    recall failure — a treatment that served nothing would then look like an unreachable sidecar.
+    """
+    knobs: dict[str, str] = {}
+    for pair in raw.split("&"):
+        key, sep, value = pair.partition("=")
+        if sep and key.strip():
+            knobs[key.strip()] = value.strip()
+    return knobs
+
+
+def recall_url(base: str, text: str, domain: str, knobs: dict[str, str]) -> str:
+    """The one request this lane makes, built in one place so a knob cannot be added to a copy."""
+    query = {"task": "tau2.act", "text": text[:MAX_QUERY_CHARS]}
+    if domain:
+        query["domain"] = domain
+    query.update(knobs)
+    return f"{base.rstrip('/')}/v1/recall?{urllib.parse.urlencode(query)}"
+
+
 def recall(text: str) -> str:
     """The rendered pack for one turn, or an empty string.
 
@@ -97,10 +126,7 @@ def recall(text: str) -> str:
         return ""
     _recalls += 1
     domain = os.environ.get("MICROGLIA_DOMAIN", "").strip()
-    query = {"task": "tau2.act", "text": text[:MAX_QUERY_CHARS]}
-    if domain:
-        query["domain"] = domain
-    url = f"{base.rstrip('/')}/v1/recall?{urllib.parse.urlencode(query)}"
+    url = recall_url(base, text, domain, parse_knobs(os.environ.get("MICROGLIA_PACK_KNOBS", "")))
     try:
         with urllib.request.urlopen(url, timeout=_timeout()) as response:
             payload = json.loads(response.read().decode("utf-8"))

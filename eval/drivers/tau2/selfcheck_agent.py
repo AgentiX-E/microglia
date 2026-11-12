@@ -308,6 +308,41 @@ class Checks:
             self.failed.append(f"{why}: {expected!r} is not in {actual!r}")
 
 
+@case
+def the_prefix_arm_asks_for_the_pack_the_registration_named(checks):
+    """R55.1's switch has to reach the one request this lane makes.
+
+    The knobs are resolved in TypeScript and carried here as a query fragment, so the failure this case
+    covers is not a wrong value -- the route validates those and refuses them with a 400 -- but a
+    fragment that never arrives. An arm that reported `packMode: prefix` and asked for a retrieved pack
+    would be the control filed under the treatment's name, which is the defect the switch exists to end.
+    """
+    base = "http://memory.local"
+    plain = subject.recall_url(base, "cancel my order", "retail", {})
+    checks.equal(
+        plain,
+        "http://memory.local/v1/recall?task=tau2.act&text=cancel+my+order&domain=retail",
+        "the retrieved arm sends exactly the request every committed artefact sent",
+    )
+    prefix = subject.recall_url(
+        base,
+        "cancel my order",
+        "retail",
+        subject.parse_knobs("anchoring=scope&minCoverage=0&limit=999&budget=200000"),
+    )
+    for fragment in ("anchoring=scope", "minCoverage=0", "limit=999", "budget=200000"):
+        checks.substring(prefix, fragment, "the prefix arm carries every knob the resolver rendered")
+    checks.equal(len(prefix.split("&")), 7, "four knobs are added to the three the lane always sends")
+
+
+@case
+def a_malformed_knob_is_dropped_rather_than_sent(checks):
+    # An empty value would reach the route's validator and come back a 400, which this agent reports as
+    # a recall failure -- an arm that served nothing would look like an unreachable sidecar.
+    knobs = subject.parse_knobs("anchoring=scope&=&novalue&limit=999")
+    checks.equal(sorted(knobs), ["anchoring", "limit"], "only the two well-formed pairs survive")
+
+
 def main(argv: list[str]) -> int:
     if "--self-test" not in argv:
         print(__doc__)
