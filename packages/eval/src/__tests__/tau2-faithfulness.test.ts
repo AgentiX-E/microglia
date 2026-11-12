@@ -182,6 +182,25 @@ describe('faithfulnessOf', () => {
     expect(faithfulnessRate(census)).toBe(0);
   });
 
+  it('says absent when the corrections carried no argument value at all', () => {
+    // The second time this module would have printed a zero for an absence, and the one that a
+    // coverage number found: with every correction in `withoutEntities`, `entities` is 0 and the rate
+    // is `undefined`, so a `?? 0` fallback printed `0 of 0 entity(ies) kept (0.0%)`. That sentence
+    // reads as total destruction at the write and is really "this corpus had no entity to preserve".
+    const census = {
+      corrections: 0,
+      withoutEntities: 12,
+      entities: 0,
+      kept: 0,
+      whole: 0,
+      unwritten: 0,
+    };
+    expect(faithfulnessRate(census)).toBeUndefined();
+    expect(faithfulnessLine(census)).toBe(
+      'faithfulness: absent (12 correction(s) carried no argument value)',
+    );
+  });
+
 describe('faithfulnessLine', () => {
   it('prints the counts that give the rate meaning', () => {
     const line = faithfulnessLine({

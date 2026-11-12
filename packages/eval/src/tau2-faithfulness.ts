@@ -174,7 +174,10 @@ export function faithfulnessOf(
  */
 export function faithfulnessRate(census: FaithfulnessCensus | undefined): number | undefined {
   if (census === undefined || census.entities === 0) return undefined;
-  if (census.unwritten === census.corrections) return undefined;
+  // `> 0` is load-bearing: with no correction carrying an entity, `corrections` is 0 and `unwritten`
+  // is 0, so the equality holds on a population that has nothing to do with an empty store. That
+  // collapse made "this corpus had no entity" read as "no write reached the store".
+  if (census.unwritten > 0 && census.unwritten === census.corrections) return undefined;
   return census.kept / census.entities;
 }
 
@@ -183,13 +186,22 @@ export function faithfulnessLine(census: FaithfulnessCensus | undefined): string
   if (census === undefined) {
     return 'faithfulness: absent (no correction carried an argument value)';
   }
-  if (census.unwritten === census.corrections) {
+  if (census.unwritten > 0 && census.unwritten === census.corrections) {
     return (
       `faithfulness: no measurement -- ${String(census.entities)} entity(ies) in ` +
       `${String(census.corrections)} correction(s) never reached the store`
     );
   }
-  const rate = faithfulnessRate(census) ?? 0;
+  if (census.entities === 0) {
+    // The correction(s) reached the store and none of them carried an argument value, so there is no
+    // denominator. A `0 of 0 (0.0%)` here would be the third time this module printed an absence as a
+    // zero, and this one was found by a coverage row rather than by a run: the `?? 0` below it was
+    // unreachable for exactly the input that needed a sentence of its own.
+    return `faithfulness: absent (${String(census.withoutEntities)} correction(s) carried no argument value)`;
+  }
+  // Both guards above are what make this division total: the store answered at least one correction and
+  // at least one entity value exists, so there is no `?? 0` left to hide a missing denominator behind.
+  const rate = census.kept / census.entities;
   return (
     `faithfulness: ${String(census.kept)} of ${String(census.entities)} entity(ies) kept ` +
     `(${(rate * 100).toFixed(1)}%), whole in ${String(census.whole)} of ` +

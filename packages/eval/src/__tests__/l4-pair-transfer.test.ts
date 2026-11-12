@@ -115,6 +115,14 @@ describe('the pairing step on a cross-domain pair', () => {
         ledger: readonly { task: string; trial: number }[];
       };
       ceiling?: { tasks: number; halfWidthPp: number; mde80Pp: number; resolvesFivePp: boolean };
+      degradation?: {
+        broke: number;
+        repaired: number;
+        blankRight: number;
+        measured: number;
+        breakRate: number;
+        netPp: number;
+      };
       protocol: { evaluable: readonly string[]; supplyable: number; armIndexed: number };
     };
 
@@ -125,6 +133,14 @@ describe('the pairing step on a cross-domain pair', () => {
     expect(published.transfer?.broke).toBe(0);
     expect(published.transfer?.measured).toBe(12);
     expect(published.transfer?.orphanMemory).toBe(0);
+    // R88: the field's own metric, published on every pair rather than only on a transfer. Of the 12
+    // paired trials the reference passed 4 (the other 8 are the informative ones it failed), and the
+    // memory arm broke none of those — so the share is 0 over a denominator of 4 rather than absent.
+    expect(published.degradation?.broke).toBe(0);
+    expect(published.degradation?.measured).toBe(12);
+    expect(published.degradation?.blankRight).toBe(4);
+    expect(published.degradation?.breakRate).toBe(0);
+    expect(published.degradation?.repaired).toBe(4);
     expect(published.transfer?.netPp).toBeCloseTo((4 / 12) * 100, 9);
     expect(published.transfer?.verdict).toBe('unmeasured');
     // The ledger is the pairs themselves: one row per episode, with the trial number kept.
@@ -193,6 +209,14 @@ describe('the pairing step on a cross-domain pair', () => {
     const published = JSON.parse(readFileSync(join(dir, 'poc-l4-pair.json'), 'utf8')) as {
       comparison: { paired: number; lost: number; gained: number };
       ceiling?: { tasks: number; halfWidthPp: number; mde80Pp: number; resolvesFivePp: boolean };
+      degradation?: {
+        broke: number;
+        repaired: number;
+        blankRight: number;
+        measured: number;
+        breakRate: number;
+        netPp: number;
+      };
     };
 
     expect(published.comparison.paired).toBe(4);

@@ -944,6 +944,7 @@ export {
   rawLogTruncated,
   type RawLogCensus,
 } from './tau2-rawlog.js';
+export { degradationLineOf, degradationOfPair } from './tau2-degradation.js';
 export { stoppedRun } from './stopped-run.js';
 export {
   DEFAULT_MIN_TASKS,

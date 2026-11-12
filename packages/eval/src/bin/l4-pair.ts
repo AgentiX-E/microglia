@@ -32,6 +32,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inGateOrder, mergeGates, type ValidityGate } from '@agentix-e/microglia-protocol';
+import { degradationLineOf, degradationOfPair } from '../tau2-degradation.js';
 import {
   ceilingOf,
   compareArms,
@@ -259,6 +260,16 @@ const gates = mergeGates(audit.gates, scenarioGates, inGateOrder);
 // which is the order, and every artefact published before `per_task` gained `outcomes` carries the
 // ledger and not the order. A run whose artefact carries neither reports `undefined` rather than a zero
 // it did not measure.
+// R88: the field's own metric, on every pair rather than only on a transfer. `pass^4` calls a task
+// lost when one of its four trials fails and hides that three were unharmed; the share of trials the
+// reference passed that the memory arm failed is the number `Don't Just Trust Your Memory` reports as
+// 52% of memory-induced failures, and this lane has never published it for a within-domain pair.
+const degradation =
+  first.per_trial === undefined || second.per_trial === undefined
+    ? undefined
+    : degradationOfPair(first.per_trial, second.per_trial, second.tau2?.scenario?.learn ?? DOMAIN);
+process.stdout.write(`${degradationLineOf(degradation)}\n`);
+
 const retain = (artefact: Artefact) =>
   artefact.per_trial === undefined ? undefined : holdRateOfTrials(artefact.per_trial);
 const firstHeld = retain(first);
@@ -279,6 +290,20 @@ await writeJson('poc-l4-pair', {
   second: { path: SECOND, ranAt: second.ranAt ?? null, pass4: second.metrics?.pass4 ?? null },
   comparison,
   ...(retention === undefined ? {} : { retention }),
+  // The degradation reading, unconditionally: it is the only number in this artefact that says how
+  // many trials the treatment broke rather than how many tasks it changed.
+  ...(degradation === undefined
+    ? {}
+    : {
+        degradation: {
+          broke: degradation.broke,
+          repaired: degradation.repaired,
+          blankRight: degradation.blankRight,
+          measured: degradation.measured,
+          breakRate: degradation.breakRate,
+          netPp: degradation.netPp,
+        },
+      }),
   // R57: the distractor this pair is about, when the memory arm planted one. Without it a reader sees
   // a pair artefact with no treatment gate and no reason for the omission.
   ...(plantedBarNote(plantedArm) ?? {}),

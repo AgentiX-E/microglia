@@ -243,4 +243,18 @@ describe('holdRateOfTrials — retention from the episode ledger', () => {
   it('says undefined for an empty ledger rather than zero', () => {
     expect(holdRateOfTrials([])).toEqual({ ordered: 0, withoutOrder: 0, pairs: 0, held: 0, rate: undefined });
   });
+
+  it('skips a task whose every episode went unscored, rather than counting a pair it never saw', () => {
+    // The other half of "drops an unscored episode": a task where *none* of them were scored has no
+    // sequence at all, so it contributes no pair. Folding it in as a zero would make an infrastructure
+    // outage read as a treatment that failed to hold what it learned -- and the retention reading is
+    // the one this lane publishes about accumulation, so it must not absorb the host's failures.
+    const rows = [
+      { id: 'retail::scored', trial: 0, reward: 1 },
+      { id: 'retail::scored', trial: 1, reward: 1 },
+      { id: 'retail::unscored', trial: 0, reward: null },
+      { id: 'retail::unscored', trial: 1, reward: null },
+    ];
+    expect(holdRateOfTrials(rows)).toMatchObject({ pairs: 1, held: 1, rate: 1 });
+  });
 });
