@@ -120,6 +120,26 @@ def the_same_tokens_cost_exactly_twice_as_much_in_peak(checks):
 
 
 @case
+def a_phase_that_outlives_its_window_is_bounded_not_known(checks):
+    # R58's evaluation opened at 04:48 UTC inside the off-peak window and closed at 06:21 inside the
+    # peak one. `usage_stats()` read the clock when it was called -- the close -- and priced all
+    # ninety-three minutes at double: $2.1162 for tokens that cost $1.0581 in the band the phase
+    # ran in. The bill is now anchored on the phase's first call, and a phase that crosses says so
+    # rather than silently picking the more expensive side.
+    crossed = subject._cost(1_000_000, 0, 1_000_000, at(0, 4), at(0, 7))
+    checks.equal(crossed["band"], "off_peak", "the band the phase opened in, which a dispatch chose")
+    checks.equal(crossed["usd"], 0.75, "priced in that band")
+    checks.equal(crossed.get("band_boundary_crossed"), True, "and it says the window moved under it")
+    checks.equal(
+        crossed.get("usd_if_ended_in_its_closing_band"),
+        1.5,
+        "with the other end of the bound, so the truth is stated as an interval rather than a number",
+    )
+    inside = subject._cost(1_000_000, 0, 1_000_000, at(0, 11), at(0, 12))
+    checks.equal(inside.get("band_boundary_crossed"), None, "a phase inside one window is not bounded")
+
+
+@case
 def a_cached_token_costs_a_fiftieth_of_a_missed_one(checks):
     # 1M input, all cached, no output: 1M x 0.006 rather than 1M x 0.30.
     checks.equal(subject._cost(1_000_000, 1_000_000, 0, at(0, 2))["usd"], 0.006, "all hit at peak")

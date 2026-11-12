@@ -25,6 +25,10 @@ import json
 import os
 import sys
 from collections import Counter
+# Module level rather than inside the two functions that also need it: `_record_usage` is a
+# litellm callback and runs outside any of them, so a local import would be a `NameError` at the
+# first billed call -- which is exactly how the self-check found it.
+from datetime import datetime, timezone
 from pathlib import Path
 
 import litellm
@@ -52,11 +56,24 @@ def _number(usage, name: str) -> int:
     return int(value) if isinstance(value, (int, float)) else 0
 
 
+# When this phase's first billable call happened, which is the only clock the bill has.
+#
+# `usage_stats()` used to read the time it was called, and that is the *end* of the phase: R58's
+# evaluation began at 04:48 UTC (off-peak) and finished at 06:21 (peak), and its artefact reported
+# $2.1162 -- the whole ninety-three minutes priced at the double rate, when the same tokens in the
+# band the phase actually ran in cost $1.0581. A bill computed at the wrong end of the run is not a
+# conservative estimate; it is a number that would make an operator move a window that was fine.
+_first_call_at: "datetime | None" = None
+
+
 def _record_usage(kwargs, response, start_time, end_time) -> None:
+    global _first_call_at
     del kwargs, start_time, end_time
     usage = getattr(response, "usage", None)
     if usage is None:
         return
+    if _first_call_at is None:
+        _first_call_at = datetime.now(timezone.utc)
     _usage["calls"] += 1
     _usage["prompt_tokens"] += _number(usage, "prompt_tokens")
     _usage["completion_tokens"] += _number(usage, "completion_tokens")
@@ -88,7 +105,7 @@ def usage_stats() -> dict:
         # A rate, not a count, because the comparison between arms is a rate: 0 means every
         # token of the memory arm missed, which is the symptom this counter exists to expose.
         "cache_hit_rate": (cached / prompt) if prompt else None,
-        "cost": _cost(prompt, cached, completion),
+        "cost": _cost(prompt, cached, completion, _first_call_at),
     }
 
 
@@ -194,13 +211,19 @@ def peak_refusal(now=None) -> str:
     )
 
 
-def _cost(prompt: int, cached: int, completion: int, now=None) -> dict:
+def _cost(prompt: int, cached: int, completion: int, now=None, ended=None) -> dict:
     """The bill for one run, in the band that run actually ran in.
 
     `now` is a parameter rather than a call to the clock inside, because a function that reads the
     clock cannot be tested: the first version of this one made its own self-check pass or fail
     depending on what hour the suite was run, which is a check that cannot say no on a Tuesday
     afternoon. Every caller that means "now" passes nothing; every test passes a fixed moment.
+
+    `ended` exists for the same reason and for one fact: a phase can outlive its window. `now` is
+    the moment the phase opened, because that is the band a dispatch chose and the band the calls
+    were mostly made in; `ended` is the moment it closed, and when the two are in different bands
+    the bill is bounded rather than known. R58's evaluation crossed 06:00 UTC and its artefact
+    priced ninety-three minutes entirely at the closing band -- double what the same tokens cost.
     """
     peak = _is_peak(now)
     mine = _RATES["peak" if peak else "off_peak"]
@@ -215,6 +238,8 @@ def _cost(prompt: int, cached: int, completion: int, now=None) -> dict:
             4,
         )
 
+    ended_peak = _is_peak(ended)
+    crossed = ended_peak != peak
     return {
         "usd": bill(mine),
         "band": "peak" if peak else "off_peak",
@@ -222,6 +247,13 @@ def _cost(prompt: int, cached: int, completion: int, now=None) -> dict:
         # What the same tokens would have cost in the other band. A run that reports only its
         # own band cannot be scheduled: the reader needs to know what moving it would save.
         "usd_in_other_band": bill(other),
+        # A phase that outlived its window is bounded by two numbers and the truth is between them:
+        # `usd` prices every call in the band the phase opened in, and this one prices them all in
+        # the band it closed in. Neither is a guess about the mix, and the pair is what lets a
+        # reader see that the window moved under the run rather than assume it did not.
+        **({"band_boundary_crossed": True, "usd_if_ended_in_its_closing_band": bill(
+            _RATES["peak" if ended_peak else "off_peak"]
+        )} if crossed else {}),
     }
 
 
