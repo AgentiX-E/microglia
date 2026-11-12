@@ -636,6 +636,70 @@ describe('the instrument-readiness gate', () => {
     expect(found.actual).toContain('proposed no candidate');
   });
 
+  it('separates "the model said nothing" from "the parser threw it away"', () => {
+    // R56's re-dispatch produced 12 corrections, 0 candidates and 0 failures, and its refusal blamed
+    // the interpreter. `candidates` is counted after the parse, so that number cannot tell the two
+    // apart — the lane had no count of what the parser dropped, and no count of what it was asked.
+    const silent = withFunnel({
+      corrections: 12,
+      asked: 12,
+      dropped: {},
+      candidates: 0,
+      admitted: 0,
+      stored: 0,
+      servable: 0,
+    });
+    expect(silent.pass).toBe(false);
+    expect(silent.actual).toContain('answered all 12 event(s) with no claim');
+    expect(silent.actual).not.toContain('proposed no candidate');
+
+    const thrownAway = withFunnel({
+      corrections: 12,
+      asked: 12,
+      dropped: { 'unknown-kind': 9, 'statement-too-long': 3, 'empty-statement': 3 },
+      candidates: 0,
+      admitted: 0,
+      stored: 0,
+      servable: 0,
+    });
+    expect(thrownAway.pass).toBe(false);
+    expect(thrownAway.actual).toContain('dropped every claim the model wrote');
+    // Largest first, and ties broken by name so two runs that dropped the same claims print the same
+    // sentence: a reading whose order depends on insertion order is a reading nobody can diff.
+    expect(thrownAway.actual).toContain('unknown-kind 9, empty-statement 3, statement-too-long 3');
+  });
+
+  it('names the batch when the events never reached the interpreter', () => {
+    // A correction the journal never carried is a different break from a model with nothing to say:
+    // the first is upstream of every model call, and its sentence has to say so.
+    const found = withFunnel({
+      corrections: 12,
+      asked: 0,
+      candidates: 0,
+      admitted: 0,
+      stored: 0,
+      servable: 0,
+    });
+    expect(found.pass).toBe(false);
+    expect(found.actual).toContain('asked about none of them');
+  });
+
+  it('reports a partial drop beside the chain without failing on it', () => {
+    // Nine of sixteen refused and the store still stands: a drop count is a reading, and a gate that
+    // failed on any drop would fail every run whose statement ceiling is real.
+    const found = withFunnel({
+      corrections: 16,
+      asked: 16,
+      dropped: { 'statement-too-long': 2 },
+      candidates: 14,
+      admitted: 14,
+      stored: 14,
+      servable: 14,
+    });
+    expect(found.pass).toBe(true);
+    expect(found.actual).toContain('2 dropped');
+  });
+
   it('fails when the write path admitted nothing it was offered', () => {
     const found = withFunnel({ corrections: 32, candidates: 30, admitted: 0, stored: 0, servable: 0 });
     expect(found.pass).toBe(false);
@@ -704,6 +768,20 @@ describe('the funnel verdict', () => {
     expect(funnelVerdict({ ...healthy, candidates: 0, admitted: 0, stored: 0, servable: 0 }).reason).toContain(
       'proposed no candidate',
     );
+    expect(
+      funnelVerdict({ ...healthy, asked: 0, candidates: 0, admitted: 0, stored: 0, servable: 0 }).reason,
+    ).toContain('asked about none of them');
+    expect(
+      funnelVerdict({
+        ...healthy,
+        asked: 32,
+        dropped: { 'empty-statement': 4 },
+        candidates: 0,
+        admitted: 0,
+        stored: 0,
+        servable: 0,
+      }).reason,
+    ).toContain('dropped every claim');
     expect(funnelVerdict({ ...healthy, admitted: 0, stored: 0, servable: 0 }).reason).toContain(
       'every candidate was refused',
     );

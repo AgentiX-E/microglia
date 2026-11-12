@@ -653,6 +653,22 @@ export type FunnelInput = {
   readonly refused?: number;
   /** Events the interpreter failed on. */
   readonly failed?: number;
+  /**
+   * Feedback events the interpreter was actually asked about.
+   *
+   * `candidates` is counted *after* the reply is parsed, which is what makes it useless on the one
+   * number a stopped run reports first. R56's re-dispatch read `12 correction(s) -> 0 candidate(s)`
+   * with no failure and no refusal, and its own refusal sentence blamed the interpreter — a claim
+   * about the model made from a counter that cannot see the parser, over a batch nothing had
+   * confirmed reached it. The two counts below are the ones that separate the three cases: an event
+   * the journal never carried, a reply the parser emptied, and a reply that was empty.
+   *
+   * Optional, because twenty published artefacts predate it and reading their absent field as zero
+   * would turn "not measured" into "asked nothing".
+   */
+  readonly asked?: number;
+  /** Claims the parser parsed and did not keep, by reason. */
+  readonly dropped?: Readonly<Record<string, number>>;
 };
 
 
@@ -752,21 +768,67 @@ export function funnelVerdict(funnel: FunnelInput): FunnelVerdict {
  * the first and last numbers would move that question back to the reader.
  */
 export function funnelReading(funnel: FunnelInput, verdict: FunnelVerdict): string {
+  const drop = dropCensus(funnel.dropped);
   const refusals = [
     funnel.refused === undefined ? undefined : `${String(funnel.refused)} refused`,
     funnel.failed === undefined ? undefined : `${String(funnel.failed)} failed`,
+    drop.total === 0 ? undefined : `${String(drop.total)} dropped`,
   ].filter((entry): entry is string => entry !== undefined);
+  // `asked` sits where it happens — between the corrections the learning half produced and the
+  // candidates the parser kept — because that is the step whose silence the other two counts cannot
+  // see. Absent on every artefact written before the field existed, which is why it is conditional
+  // rather than printed as a zero.
+  const asked = funnel.asked === undefined ? '' : `${String(funnel.asked)} asked -> `;
   const chain =
-    `${String(funnel.corrections)} correction(s) -> ${String(funnel.candidates)} candidate(s) -> ` +
+    `${String(funnel.corrections)} correction(s) -> ${asked}${String(funnel.candidates)} candidate(s) -> ` +
     `${String(funnel.admitted)} admitted -> ${String(funnel.stored)} stored -> ` +
     `${String(funnel.servable)} servable`;
   const tail = refusals.length === 0 ? '' : ` (${refusals.join(', ')})`;
   return verdict.ready ? `${chain}${tail}` : `${chain}${tail}: ${verdict.reason}`;
 }
 
+/** How many claims the parser threw away, and the reasons in the form a sentence can carry. */
+function dropCensus(dropped: Readonly<Record<string, number>> | undefined): {
+  readonly total: number;
+  readonly reasons: string;
+} {
+  if (dropped === undefined) return { total: 0, reasons: '' };
+  // Largest first, ties broken by name: two runs that dropped the same claims print the same
+  // sentence, which is what makes the sentence diffable.
+  const ranked = Object.entries(dropped).sort(
+    (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+  );
+  return {
+    total: ranked.reduce((sum, [, count]) => sum + count, 0),
+    reasons: ranked.map(([reason, count]) => `${reason} ${String(count)}`).join(', '),
+  };
+}
+
 function emptyStage(funnel: FunnelInput): string | undefined {
   if (funnel.corrections === 0) {
     return 'the learning half produced no correctable episode, so no stage after it could carry anything';
+  }
+  // The three ways a zero can arrive at the candidate stage, told apart. `candidates` is counted
+  // after the reply is parsed, so it is zero in all three, and only the two counts beside it say
+  // which one happened — the defect that made R56's re-dispatch unreadable.
+  if (funnel.asked === 0) {
+    return (
+      `the learning half captured ${String(funnel.corrections)} correction(s) and the interpreter was ` +
+      'asked about none of them: the feedback events never reached the distiller'
+    );
+  }
+  const drop = dropCensus(funnel.dropped);
+  if (funnel.candidates === 0 && drop.total > 0) {
+    return (
+      `the parser dropped every claim the model wrote (${String(drop.total)} dropped: ` +
+      `${drop.reasons}): the reply arrived and did not survive the schema`
+    );
+  }
+  if (funnel.candidates === 0 && funnel.asked !== undefined) {
+    return (
+      `the interpreter answered all ${String(funnel.asked)} event(s) with no claim of its own: ` +
+      'nothing was thrown away after the reply, so the model is what carried nothing'
+    );
   }
   if (funnel.candidates === 0) return 'the interpreter proposed no candidate over any correction';
   if (funnel.admitted === 0) return 'every candidate was refused: the write path admitted nothing it was offered';

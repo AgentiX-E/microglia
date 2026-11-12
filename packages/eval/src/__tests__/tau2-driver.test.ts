@@ -164,6 +164,9 @@ describe('the L4 driver', () => {
       // its own choosing.
       const census = record?.distillUnit?.consolidation;
       const sweep = record?.consolidationSweep;
+      // The budget the calls were given is in the record beside the form that asked for them: a
+      // store built under a ceiling the artefact cannot name is a store whose size has no cause.
+      expect(record?.distillForm?.maxTokens).toBe(1_200);
       // What this stub can prove is the wiring: the pass ran over a real store, and the sweep
       // describes that same pass. It cannot prove a merge — this benchmark produces one correction,
       // and a corroboration needs two tasks — so the grouping itself is asserted where the store is
@@ -344,6 +347,104 @@ describe('the L4 driver', () => {
       delete process.env['TAU_DISTILL_MODEL'];
     }
   });
+
+  it('says the model carried nothing when the reply is an empty list', async () => {
+    // R56's re-dispatch stopped on `12 correction(s) -> 0 candidate(s) (0 refused, 0 failed)` and
+    // printed *the interpreter proposed no candidate* — a sentence about the model, written by a
+    // counter that cannot see the parser. Both halves of the distinction are driven here, because the
+    // sentence is the only thing a stopped run publishes.
+    const { dir, executable } = stubRunner();
+    process.env['TAU_PYTHON'] = executable;
+    process.env['TAU_MEMORY'] = 'true';
+    process.env['TAU_TRIALS'] = '1';
+    process.env['TAU_TRAIN_SHARE'] = '0.5';
+    process.env['TAU_WORKDIR'] = dir;
+    process.env['DEEPSEEK_API_KEY'] = 'test-key';
+    process.env['TAU_DISTILL_MODEL'] = 'deepseek/deepseek-chat';
+    let asked = 0;
+    vi.stubGlobal(
+      'fetch',
+      async () => {
+        asked += 1;
+        return new Response(
+          JSON.stringify({
+            choices: [{ message: { content: '{"candidates":[]}' } }],
+            usage: { prompt_tokens: 3, completion_tokens: 3 },
+          }),
+          { status: 200 },
+        );
+      },
+    );
+    try {
+      const driver = await import('../bin/tau2-driver.js?case=empty-reply');
+      const refusal = await driver.run().catch((error: unknown) => error);
+      const message = String((refusal as Error).message);
+      expect(message).toMatch(/answered all 1 event\(s\) with no claim/);
+      // The chain carries the count that answers the question the sentence used to leave open.
+      expect(message).toMatch(/1 correction\(s\) -> 1 asked -> 0 candidate\(s\)/);
+      // And the model was asked exactly once: the reply was read, not invented.
+      expect(asked).toBe(1);
+      expect(driver.instrument()).toBeUndefined();
+      expect(existsSync(join(dir, 'eval.json'))).toBe(false);
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env['TAU_PYTHON'];
+      delete process.env['TAU_MEMORY'];
+      delete process.env['TAU_TRIALS'];
+      delete process.env['TAU_TRAIN_SHARE'];
+      delete process.env['TAU_WORKDIR'];
+      delete process.env['DEEPSEEK_API_KEY'];
+      delete process.env['TAU_DISTILL_MODEL'];
+    }
+  }, 60_000);
+
+  it('says the parser threw the claims away when the reply does not fit the schema', async () => {
+    // The other half of the same zero. A claim the prompt never asked for — `kind` outside the five
+    // the store has — is parsed and dropped, so `candidates` is zero for a reason that belongs to the
+    // parser. R56's re-dispatch could not tell this case from the one above, and this is the count
+    // that separates them.
+    const { dir, executable } = stubRunner();
+    process.env['TAU_PYTHON'] = executable;
+    process.env['TAU_MEMORY'] = 'true';
+    process.env['TAU_TRIALS'] = '1';
+    process.env['TAU_TRAIN_SHARE'] = '0.5';
+    process.env['TAU_WORKDIR'] = dir;
+    process.env['DEEPSEEK_API_KEY'] = 'test-key';
+    process.env['TAU_DISTILL_MODEL'] = 'deepseek/deepseek-chat';
+    vi.stubGlobal(
+      'fetch',
+      async () =>
+        new Response(
+          JSON.stringify({
+            choices: [
+              {
+                message: {
+                  content: JSON.stringify([{ kind: 'insight', statement: 'Check the ticket owner first' }]),
+                },
+              },
+            ],
+            usage: { prompt_tokens: 3, completion_tokens: 3 },
+          }),
+          { status: 200 },
+        ),
+    );
+    try {
+      const driver = await import('../bin/tau2-driver.js?case=wrong-kind');
+      const refusal = await driver.run().catch((error: unknown) => error);
+      const message = String((refusal as Error).message);
+      expect(message).toMatch(/dropped every claim the model wrote \(1 dropped: unknown-kind 1\)/);
+      expect(message).toMatch(/did not survive the schema/);
+    } finally {
+      vi.unstubAllGlobals();
+      delete process.env['TAU_PYTHON'];
+      delete process.env['TAU_MEMORY'];
+      delete process.env['TAU_TRIALS'];
+      delete process.env['TAU_TRAIN_SHARE'];
+      delete process.env['TAU_WORKDIR'];
+      delete process.env['DEEPSEEK_API_KEY'];
+      delete process.env['TAU_DISTILL_MODEL'];
+    }
+  }, 60_000);
 
   it('refuses a run whose split leaves nothing held out', async () => {
     const { dir, executable } = stubRunner();

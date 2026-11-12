@@ -87,6 +87,14 @@ export type DistillFormRecord = {
   readonly toolInventory: readonly string[];
   /** Candidates the host refused for naming one of them. */
   readonly refused: number;
+  /**
+   * The completion budget this run's distillation calls were given.
+   *
+   * Absent on every artefact before the field existed, which is what made R56's re-dispatch
+   * unreadable on the one number a truncated reply would need: a store built under a 1,200-token
+   * ceiling and one built under 2,000 are two experiments, and neither artefact said which it was.
+   */
+  readonly maxTokens?: number;
 };
 
 /**
@@ -169,6 +177,15 @@ export type Tau2Raw = {
     readonly candidates?: number;
     /** Feedback events the distiller was asked about. */
     readonly events?: number;
+    /**
+     * Claims the parser parsed and did not keep, by reason.
+     *
+     * `candidates` is counted after this filter and `distillFailed` only counts throws, so a claim the
+     * schema refused is in neither — and a store built from the survivors of a filter nobody counted
+     * is a store whose size has no explanation. R56's re-dispatch read `0 candidate(s)` and the
+     * artefact had no field that could say whether the model or the parser was responsible.
+     */
+    readonly dropped?: Readonly<Record<string, number>>;
     /** Events the model interpreter threw on, answered by the rule interpreter instead. */
     readonly llmFailed?: number;
   };

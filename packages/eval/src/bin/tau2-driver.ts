@@ -310,9 +310,29 @@ const DISTILL_FORM = resolveDistillForm();
  * so a reader of the artefact never has to infer which of the two produced the store.
  */
 const DISTILL_UNIT = resolveDistillUnit();
+
 // R60: how many claims one trace may teach. Declared readback in the artefact, because two runs at
 // two ceilings are two experiments and a store cannot say which one built it.
 const TRACE_CLAIMS = resolveTraceClaims();
+
+/**
+ * The completion budget a distillation call is given in this lane.
+ *
+ * R84's defect, in the other lane, was a distiller whose ceiling was a literal at a call site while
+ * the artefact published a different number — and R56's re-dispatch was read without knowing this
+ * number at all. It is a named value for the same reason `distillBudget` is: a budget that no field
+ * carries cannot be compared with the next run's, and a budget that is shared by two forms cannot be
+ * the repair form's.
+ *
+ * τ²'s ceiling is its own rather than `distillBudget`'s because the unit is a sentence, not a
+ * trajectory: the longest statement the parser accepts is 640 characters and the form asks for 240,
+ * so 1,200 tokens is roughly four times the reply the schema can keep. The coupling to a thinking
+ * regime is not wired here because this lane's distiller never thinks — `TAU_THINKING` reaches the
+ * Python half, and this process's own client sends no reasoning parameter. Recording it is the part
+ * that had to stop being implicit; the coupling is stated in the roadmap behind R56's reading, so
+ * that a ceiling change cannot ride along with an instrument fix.
+ */
+const DISTILL_TOKENS = 1_200;
 
 /**
  * Which trajectories teach this dispatch (R62).
@@ -752,9 +772,19 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // The model first, the rules when the model fails on this event, and the run stopped when the
   // model fails on every event. See `tau2-distill.ts` for why this is the host's decision rather
   // than the combinator's.
+  //
+  // The parser's own count, taken at the only place that sees a claim the reply contained and the
+  // store never will. `distillReport.candidates` is counted *after* this filter, so a run that reads
+  // `0 candidate(s)` could not tell whether the model wrote nothing or the schema threw it away —
+  // which is exactly the number R56's re-dispatch stopped on, and exactly the sentence it printed.
+  const drops: Record<string, number> = {};
+  const noteDrop = (reason: string): void => {
+    drops[reason] = (drops[reason] ?? 0) + 1;
+  };
   const distiller = resilientInterpreter(
     createLlmInterpreter({
-      llm: { complete: async (prompt) => (await llm.chat(prompt, 1200)).text },
+      llm: { complete: async (prompt) => (await llm.chat(prompt, DISTILL_TOKENS)).text },
+      audit: noteDrop,
       // R56: the one variable. The `lesson` form asks `when` to name a property "the reader can
       // check on a different input: which tables or columns it involves" — an instruction written
       // for a database, which in a lane whose input is a customer asking to cancel an order can
@@ -962,6 +992,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const census = storeCensus(knowledge, RECALL_DOMAIN);
   const funnel = {
     corrections: corrections.length,
+    // The count that sits between the batch and the reply, recorded because `candidates` cannot see
+    // it: `events` is what the distiller was asked about, and `drops` is what the parser did with the
+    // answers. Without both, a zero at the candidate stage is three different facts wearing one
+    // sentence -- an event that never arrived, a reply that was emptied, and a reply that was empty.
+    asked: distillReport.events,
+    dropped: { ...drops },
     candidates: distillReport.candidates,
     admitted: distillReport.created + distillReport.merged,
     stored: knowledge.length,
@@ -996,7 +1032,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   ).length;
   process.stdout.write(
     `[tau2] learn: ${String(corrections.length)} correction(s) from ${String(train.length)} task(s), ` +
-      `${String(unanswered)} unreadable, ${String(distillReport.created)} created, ` +
+      `${String(unanswered)} unreadable, ${String(distillReport.events)} asked, ` +
+      `${String(distillReport.candidates)} candidate(s) ` +
+      `(${String(Object.values(drops).reduce((sum, count) => sum + count, 0))} dropped: ` +
+      `${reasonsLine(drops)}), ${String(distillReport.created)} created, ` +
       `${String(distillReport.failed)} failed, ${String(census.stored)} item(s) in the store ` +
       `(${String(census.active)} active, ${String(census.servable)} servable in ${RECALL_DOMAIN}), ` +
       `${String(faults.events)} answered by the rule fallback, reasons ` +
@@ -1354,6 +1393,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       distillFailed: distillReport.failed,
       candidates: distillReport.candidates,
       events: distillReport.events,
+      // What the parser did with the replies, by reason. `candidates` cannot see this population and
+      // `failed` counts only throws: a claim the schema refused is neither, and a store built from
+      // the survivors of a filter nobody counted is a store whose size has no explanation.
+      dropped: { ...drops },
       llmFailed: faults.events,
     },
     // Whose tally this is, stated in the record: the episodes' calls belong to the agent process and
@@ -1391,6 +1434,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       form: DISTILL_UNIT === "trace" ? "trace" : DISTILL_FORM,
       toolInventory,
       refused: toolGuard.refused(),
+      // R84's other half: the ceiling the calls were given, from the same value the calls use.
+      maxTokens: DISTILL_TOKENS,
     },
     // R58: the unit, the traces it read, and what the recurrence pass did with them. Absent
     // consolidation on a trace arm would be a pass that did not run; absent `distillUnit` on any
