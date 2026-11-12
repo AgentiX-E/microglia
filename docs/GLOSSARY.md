@@ -1124,3 +1124,12 @@ between two scenarios as a difference the memory made, so the artefact records
 `retail` store serves nothing to an `airline` question unless the caller asks in the store's own terms,
 so a transfer arm recalls under the learned scenario deliberately — that recall is the treatment, not a
 configuration detail.
+
+**Attempt watermark** — The `before` bound on a `recall`, which withholds every claim carrying an
+observation from the named attempt or a later one (`RecallQuery.before`, `EvidenceRef.trial`,
+`visibleBefore`). It exists for the case where the store is written *between* attempts: attempt *t* must
+not read what attempt *t* taught, or the result measures leakage rather than learning. Three absences
+mean three different things and are kept apart — no watermark is not `before: 0`, a claim with no
+recorded attempt predates the episode and is served to all of them, and `0` is a real attempt. The
+quantifier is *every*: a claim citing attempts 1 and 3 is one item, so the later observation withholds
+the whole claim.

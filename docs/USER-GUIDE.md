@@ -307,6 +307,35 @@ its own task and the behaviour is unchanged.
 like any other signal. Acceptance is positive evidence for whatever that attempt cited; `abandoned` and
 `escalated` are not, and `reasonCode` is preserved when you supply one.
 
+#### A recall can name the attempt it is for
+
+If you distil between attempts — the store learns from attempt 1 before attempt 2 starts — then attempt 2
+must not read what attempt 2 just taught. That is not a ranking question, so no knob on the pack can
+answer it; the filter has to be on the claim's provenance:
+
+```ts
+// attempt 1 fails, you distil, then attempt 2 recalls:
+const pack = await mg.recall({
+  task: 'retail.exchange',
+  text: question,
+  before: 2,                   // only claims from attempts strictly earlier than 2
+});
+```
+
+The rule is `before`, and it reads the attempt recorded on each claim's evidence. Three things it
+deliberately does not do:
+
+| you ask | what is served | why |
+|---|---|---|
+| nothing (`before` absent) | every claim, as before | the store was frozen before the run; there is nothing to leak, and an upgrade must not change what a published number measured |
+| `before: 1` and a claim was distilled offline | that claim | an offline claim predates the episode — it learned from no attempt, so every attempt may read it |
+| `before: 2` and a claim cites attempts 1 and 3 | nothing | the unit a pack serves is the claim, so one later observation withholds it |
+
+`/v1/recall?before=<n>` is the same filter over HTTP, and a negative value is refused rather than read as
+"no watermark": it would match everything and present itself as a store that taught nothing. Nothing
+writes `trial` for you yet — an offline `distill()` records no attempt, which is why the offline arms are
+unaffected — so a host that writes mid-run is the one that sets it.
+
 ### 3.3 `begin` — the run record
 
 ```ts

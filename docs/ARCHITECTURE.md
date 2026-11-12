@@ -183,6 +183,15 @@ Two properties are load-bearing:
   the world, the second is when the system stopped believing it. They are different questions, and a
   memory that cannot tell them apart cannot express "that rule changed last quarter".
 
+**Provenance is a filter as well as a weight.** `EvidenceRef` carries the attempt an observation came
+from (`trial`), and a recall may name the attempt it is for (`before`): only claims whose observations
+are *all* from earlier attempts are served. That is what makes a store written between attempts a
+measurement rather than a leak — attempt *t* cannot read what attempt *t* taught. Three absences stay
+three different things: no `before` is "no watermark" and not `before: 0`; a claim with no `trial`
+predates the episode and is served to every attempt; `0` is a real attempt. The filter runs on both of
+`search`'s candidate paths, because a rule that generalised out of a domain carries none of the
+question's words and is reachable only through its scope.
+
 **Two scope fields the host supplies rather than the model.** Both exist because a distiller reading one
 event is the wrong party to fill them in. `reasonCodeOf` names *what went wrong*, which is a taxonomy the
 host owns, and the model's own answer wins when it gives one. `domainOf` names *where the event happened*,
