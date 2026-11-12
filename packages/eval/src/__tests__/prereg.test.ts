@@ -7,7 +7,9 @@ import {
   armsAgainstRegistration,
   backboneProblem,
   distillFormProblem,
+  distillScopeProblem,
   distillUnitProblem,
+  traceClaimsProblem,
   essentialArms,
   facadePairSwitch,
   laneRoleProblem,
@@ -1308,6 +1310,139 @@ describe('the distiller unit, as a header field', () => {
       { where: "header 'distillUnit'", problem: "'episode' is not one of correction, trace" },
     ]);
     expect(readPrereg(withHeader('distillUnit: Trace'), 'R87-distill-unit.md').problems).toHaveLength(1);
+  });
+});
+
+describe('the distilling scope', () => {
+  const HEADER = [
+    '---',
+    'id: R87-distill-scope',
+    'step: R87',
+    'opened: 2026-11-12',
+    'arms: memory,reference',
+    'sample: 228',
+    'gates: V1,V2',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '\n## Prediction\n\n- **one claim that is long enough to count as a claim here.**\n' +
+    '\n## Refutation\n\n- **Void** — the first branch, long enough to count as a claim.\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads the population the registration distils from', () => {
+    // R62's whole treatment is this switch, and its header named nothing: the dispatch would have read
+    // `vars.TAU_DISTILL_SCOPE`, which is the same "one experiment's setting applied to every queued
+    // dispatch" defect the fourth switch closed one field over.
+    expect(readPrereg(withHeader('distillScope: all'), 'R87-distill-scope.md').prereg?.distillScope)
+      .toBe('all');
+    expect(readPrereg(withHeader('distillScope: edited'), 'R87-distill-scope.md').prereg?.distillScope)
+      .toBe('edited');
+  });
+
+  it('leaves it absent when the header does not name one', () => {
+    const reading = readPrereg(withHeader('split: dev'), 'R87-distill-scope.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.distillScope).toBeUndefined();
+  });
+
+  it('refuses a population the lane cannot distil, and the capitalised form of one', () => {
+    expect(readPrereg(withHeader('distillScope: everything'), 'R87-distill-scope.md').problems).toEqual([
+      { where: "header 'distillScope'", problem: "'everything' is not one of edited, all" },
+    ]);
+    expect(readPrereg(withHeader('distillScope: All'), 'R87-distill-scope.md').problems).toHaveLength(1);
+  });
+});
+
+describe('distillScopeProblem', () => {
+  it('says nothing when the registration names no population', () => {
+    expect(distillScopeProblem('all', undefined)).toBeUndefined();
+  });
+
+  it('says nothing when the variable is unset, because the registration decides', () => {
+    expect(distillScopeProblem('', 'all')).toBeUndefined();
+    expect(distillScopeProblem(null, 'edited')).toBeUndefined();
+  });
+
+  it('says nothing when the variable agrees', () => {
+    expect(distillScopeProblem('all', 'all')).toBeUndefined();
+  });
+
+  it('refuses a variable left behind by another experiment', () => {
+    // `TAU_DISTILL_SCOPE` was set to `all` for R62 and never cleared, so a correction arm that teaches
+    // only from failures would have taught from every trajectory while its registration said nothing.
+    expect(distillScopeProblem('all', 'edited')).toBe(
+      "this registration fixes the distilling population at 'edited' and this dispatch would run " +
+        "'all', so the population is not the only variable that moved",
+    );
+  });
+});
+
+describe('the trace ceiling', () => {
+  const HEADER = [
+    '---',
+    'id: R87-trace-claims',
+    'step: R87',
+    'opened: 2026-11-12',
+    'arms: memory,reference',
+    'sample: 228',
+    'gates: V1,V2',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '\n## Prediction\n\n- **one claim that is long enough to count as a claim here.**\n' +
+    '\n## Refutation\n\n- **Void** — the first branch, long enough to count as a claim.\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads the ceiling the registration fixes', () => {
+    // R58 asks for "up to three claims per trace" in prose and its header named nothing, so the
+    // dispatch read `vars.TAU_TRACE_CLAIMS`, which holds 6 from the round that asked whether the cap
+    // binds. A run at six is a different treatment from the one R58 describes.
+    expect(readPrereg(withHeader('traceClaims: 3'), 'R87-trace-claims.md').prereg?.traceClaims).toBe(3);
+  });
+
+  it('leaves it absent when the header does not name one', () => {
+    const reading = readPrereg(withHeader('split: dev'), 'R87-trace-claims.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.traceClaims).toBeUndefined();
+  });
+
+  it('refuses a ceiling the lane cannot enforce, and a fraction of one', () => {
+    expect(readPrereg(withHeader('traceClaims: 0'), 'R87-trace-claims.md').problems).toEqual([
+      { where: "header 'traceClaims'", problem: "'0' is not an integer in 1..8" },
+    ]);
+    expect(readPrereg(withHeader('traceClaims: 9'), 'R87-trace-claims.md').problems).toHaveLength(1);
+    expect(readPrereg(withHeader('traceClaims: 3.5'), 'R87-trace-claims.md').problems).toHaveLength(1);
+  });
+});
+
+describe('traceClaimsProblem', () => {
+  it('says nothing when the registration names no ceiling', () => {
+    expect(traceClaimsProblem('6', undefined)).toBeUndefined();
+  });
+
+  it('says nothing when the variable is unset, because the registration decides', () => {
+    expect(traceClaimsProblem('', 3)).toBeUndefined();
+    expect(traceClaimsProblem(null, 3)).toBeUndefined();
+    expect(traceClaimsProblem('   ', 3)).toBeUndefined();
+  });
+
+  it('says nothing when the variable agrees', () => {
+    expect(traceClaimsProblem('3', 3)).toBeUndefined();
+  });
+
+  it('refuses a ceiling left behind by another experiment', () => {
+    expect(traceClaimsProblem('6', 3)).toBe(
+      "this registration fixes the trace ceiling at 3 claim(s) and this dispatch would run '6', so " +
+        'the ceiling is not the only variable that moved',
+    );
   });
 });
 

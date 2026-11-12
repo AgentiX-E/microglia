@@ -11,11 +11,21 @@
  * variable is what the workflow would run, the header is what the experiment says it runs, and a stated
  * disagreement is a refusal rather than a note. An unset variable is not a second opinion.
  *
- * Usage: pnpm eval:prereg-form prereg/<id>.md [configured-form] [configured-unit]
- *   -> prints "unit=<value>" and "form=<value>" and exits 0, or prints the reason and exits 1.
+ * The fourth value in the same script is the teaching population (R62's switch), because a fifth script
+ * would be a fifth place for the three refusals to drift apart.
+ *
+ * Usage: pnpm eval:prereg-form prereg/<id>.md [configured-form] [configured-unit] [configured-scope]
+ *   -> prints "unit=<value>", "form=<value>" and "scope=<value>" and exits 0, or prints the reason and
+ *      exits 1.
  */
 import { readFileSync } from 'node:fs';
-import { distillFormProblem, distillUnitProblem, readPrereg } from '../prereg.js';
+import {
+  distillFormProblem,
+  distillScopeProblem,
+  distillUnitProblem,
+  readPrereg,
+  traceClaimsProblem,
+} from '../prereg.js';
 
 function refuse(message: string): void {
   process.stderr.write(`[prereg-form] ${message}\n`);
@@ -25,7 +35,9 @@ function refuse(message: string): void {
 function main(): void {
   const file = process.argv[2];
   if (file === undefined) {
-    refuse('usage: pnpm eval:prereg-form prereg/<id>.md [configured-form] [configured-unit]');
+    refuse(
+      'usage: pnpm eval:prereg-form prereg/<id>.md [form] [unit] [scope] [trace-claims]',
+    );
     return;
   }
   const configured = process.argv[3] ?? '';
@@ -59,7 +71,22 @@ function main(): void {
   // own variable and an expression that split a string would be a parser in YAML. The header wins when
   // it names a value, because the checks above have already refused the case where the two disagree;
   // empty means the variable stands, exactly as it did before this script existed.
-  process.stdout.write(`unit=${declaredUnit ?? ''}\nform=${declared ?? ''}\n`);
+  const declaredScope = reading.prereg.distillScope;
+  const scopeProblem = distillScopeProblem(process.argv[5] ?? null, declaredScope);
+  if (scopeProblem !== undefined) {
+    refuse(scopeProblem);
+    return;
+  }
+  const declaredClaims = reading.prereg.traceClaims;
+  const claimsProblem = traceClaimsProblem(process.argv[6] ?? null, declaredClaims);
+  if (claimsProblem !== undefined) {
+    refuse(claimsProblem);
+    return;
+  }
+  process.stdout.write(
+    `unit=${declaredUnit ?? ''}\nform=${declared ?? ''}\nscope=${declaredScope ?? ''}\n` +
+      `claims=${declaredClaims === undefined ? '' : String(declaredClaims)}\n`,
+  );
 }
 
 main();

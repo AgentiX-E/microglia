@@ -15,6 +15,7 @@
  * The header is a small subset of YAML — `key: value` lines between `---` markers — parsed by
  * hand. A YAML dependency for six scalar fields would be the largest thing in this package.
  */
+import { TRACE_CLAIM_RANGE } from './trace-claims.js';
 import type { RunGate } from './artifact-schema.js';
 import { splitProvider } from './model-id.js';
 
@@ -181,6 +182,26 @@ export type Prereg = {
    */
   readonly distillUnit?: string;
   /**
+   * Which trajectories teach: `edited` (the failures a correction was written for) or `all`.
+   *
+   * R62's entire treatment is this switch and its header named nothing, so the dispatch would have
+   * read `vars.TAU_DISTILL_SCOPE` — the fifth time a switch that belongs to one experiment was kept
+   * where every experiment reads it. The variable is still set to `all` from the round that first
+   * needed it, which is what makes the defect live rather than theoretical: a correction arm
+   * dispatched today would teach from every trajectory while its registration described a store
+   * built from failures.
+   */
+  readonly distillScope?: string;
+  /**
+   * The most claims one trace may teach, when this registration is a trace arm.
+   *
+   * R58's prose says "up to three claims per trace" and its header said nothing, so the dispatch read
+   * `vars.TAU_TRACE_CLAIMS` — which held **6**, left there by the round that asked whether the cap
+   * binds. A run at six is a different treatment from the one R58 describes, and a ceiling is neither
+   * more nor less a property of the experiment than the unit it applies to.
+   */
+  readonly traceClaims?: number;
+  /**
    * Whether this registration's dispatch asks the model to think.
    *
    * R84 asks a question the record cannot answer without it: R82 measured the expensive backbone 6.00pp
@@ -240,6 +261,8 @@ const HEADER_KEYS = [
   'lane',
   'distillForm',
   'distillUnit',
+  'distillScope',
+  'traceClaims',
   'thinking',
 ] as const;
 
@@ -273,6 +296,9 @@ const HEADER_FORMS: ReadonlySet<string> = new Set(['lesson', 'procedure', 'repai
 
 /** The two units `resolveDistillUnit` accepts, and nothing else: `correction` is the published one. */
 const HEADER_UNITS: ReadonlySet<string> = new Set(['correction', 'trace']);
+
+/** The two populations `resolveDistillScope` accepts: the failures, or every trajectory. */
+const HEADER_SCOPES: ReadonlySet<string> = new Set(['edited', 'all']);
 const LANE_LIST = 'product, transfer or hostile';
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
@@ -621,6 +647,43 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // Which trajectories teach. R62's one variable, and the fifth switch to move out of a repository
+  // variable — a header that names it makes the two populations dispatchable side by side.
+  const scopeText = values.get('distillScope');
+  let distillScope: string | undefined;
+  if (scopeText !== undefined) {
+    if (!HEADER_SCOPES.has(scopeText)) {
+      collected.push({
+        where: `header 'distillScope'`,
+        problem: `'${scopeText}' is not one of ${[...HEADER_SCOPES].join(', ')}`,
+      });
+    } else {
+      distillScope = scopeText;
+    }
+  }
+
+  // Which ceiling a trace arm runs at. R60 made the ceiling a switch and left it in a variable; R58's
+  // text assumes three and the variable held six.
+  const claimsText = values.get('traceClaims');
+  let traceClaims: number | undefined;
+  if (claimsText !== undefined) {
+    const parsed = Number(claimsText);
+    if (
+      !Number.isInteger(parsed) ||
+      parsed < TRACE_CLAIM_RANGE.min ||
+      parsed > TRACE_CLAIM_RANGE.max
+    ) {
+      collected.push({
+        where: `header 'traceClaims'`,
+        problem: `'${claimsText}' is not an integer in ${String(TRACE_CLAIM_RANGE.min)}..${String(
+          TRACE_CLAIM_RANGE.max,
+        )}`,
+      });
+    } else {
+      traceClaims = parsed;
+    }
+  }
+
   // The thinking regime, which R84 needs and which has no dispatch field to live in.
   //
   // Two values and no synonyms. `SOTA_THINKING` accepts `enabled`, `disabled`, `true` and `false`
@@ -739,6 +802,8 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(lane === undefined ? {} : { lane }),
       ...(distillForm === undefined ? {} : { distillForm }),
       ...(distillUnit === undefined ? {} : { distillUnit }),
+      ...(distillScope === undefined ? {} : { distillScope }),
+      ...(traceClaims === undefined ? {} : { traceClaims }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,
       refutation,
@@ -1101,6 +1166,50 @@ export function distillUnitProblem(
   return (
     `this registration fixes the distiller's unit at '${declared}' and this dispatch would run ` +
     `'${stated}', so the unit is not the only variable that moved`
+  );
+}
+
+/**
+ * Refuse a dispatch whose teaching population is not the one the registration fixed.
+ *
+ * The fifth field of one family, and the last switch the lane still resolves from a variable. R62's
+ * treatment is this value and its header named nothing, so a dispatch of it would have run whatever
+ * `vars.TAU_DISTILL_SCOPE` happened to hold — which was `all`, left there by the round that first
+ * needed it. A store built from every trajectory and one built from the failures are different
+ * objects; a registration that cannot say which it ran is not describing its own experiment.
+ *
+ * `null` and the empty string are the variable being unset: the registration decides.
+ */
+export function distillScopeProblem(
+  configured: string | null,
+  declared: string | undefined,
+): string | undefined {
+  if (declared === undefined) return undefined;
+  const stated = configured === null || configured === '' ? undefined : configured;
+  if (stated === undefined || stated === declared) return undefined;
+  return (
+    `this registration fixes the distilling population at '${declared}' and this dispatch would ` +
+    `run '${stated}', so the population is not the only variable that moved`
+  );
+}
+
+/**
+ * Refuse a dispatch whose trace ceiling is not the one the registration fixed.
+ *
+ * The sixth field of the family. The comparison is textual on the variable's side because the variable
+ * is a string and a registration is a number: `3.0` in the box is a stated ceiling that is not the stated
+ * three, and rounding it would be this file deciding which experiment ran.
+ */
+export function traceClaimsProblem(
+  configured: string | null,
+  declared: number | undefined,
+): string | undefined {
+  if (declared === undefined) return undefined;
+  const stated = configured === null ? '' : configured.trim();
+  if (stated === '' || stated === String(declared)) return undefined;
+  return (
+    `this registration fixes the trace ceiling at ${String(declared)} claim(s) and this dispatch ` +
+    `would run '${stated}', so the ceiling is not the only variable that moved`
   );
 }
 

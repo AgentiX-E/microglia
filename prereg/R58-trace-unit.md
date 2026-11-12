@@ -10,6 +10,8 @@ facadePair: off
 trainDomain: retail
 testDomain: retail
 recallDomain: retail
+distillUnit: trace
+traceClaims: 3
 ---
 
 # R58 — the object distilled is one task trace, and the store is consolidated after it is written

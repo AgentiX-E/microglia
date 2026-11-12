@@ -374,6 +374,9 @@ describe('every switch a registration owns is read from the registration', () =>
     ['TAU_RECALL_DOMAIN', 'recall'],
     ['TAU_DISTILL_FORM', 'form'],
     ['TAU_DISTILL_UNIT', 'unit'],
+    ['TAU_DISTILL_SCOPE', 'scope'],
+    ['TAU_INJECTION_NOTE', 'notes'],
+    ['TAU_TRACE_CLAIMS', 'claims'],
   ];
 
   /** The line a key is assigned on, in the L4 step, with its continuation lines folded in. */
@@ -384,9 +387,30 @@ describe('every switch a registration owns is read from the registration', () =>
     return lines.slice(index, index + 3).join('\n');
   }
 
+  /** Every line a key is assigned on: two arms of one experiment read the same header. */
+  function assignmentsOf(key: string): readonly string[] {
+    const lines = text.split('\n');
+    const found = lines
+      .map((line, index) => ({ line, index }))
+      .filter((entry) => entry.line.trimStart().startsWith(`${key}:`))
+      .map((entry) => lines.slice(entry.index, entry.index + 3).join('\n'));
+    expect(found.length, `${key} is not assigned anywhere in sota.yml`).toBeGreaterThan(0);
+    return found;
+  }
+
   for (const [key, output] of OWNED) {
     it(`${key} prefers the registration's ${output} over the variable`, () => {
       expect(assignmentOf(key)).toContain(`steps.recall_floor.outputs.${output}`);
+    });
+
+    it(`every arm that sets ${key} reads the registration's ${output}`, () => {
+      // The first version of this test read one assignment and passed while the reference arm read the
+      // repository variable: a control whose artefact records `lesson` beside a treatment that recorded
+      // `procedure` is two experiments in one file, and it was invisible because the assertion stopped
+      // at the first match.
+      for (const assignment of assignmentsOf(key)) {
+        expect(assignment, assignment).toContain(`steps.recall_floor.outputs.${output}`);
+      }
     });
   }
 

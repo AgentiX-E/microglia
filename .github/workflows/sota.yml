@@ -1235,6 +1235,8 @@ jobs:
           # a check that read the variable itself could not be executed against a candidate value.
           TAU_FORM_VAR: ${{ vars.TAU_DISTILL_FORM }}
           TAU_UNIT_VAR: ${{ vars.TAU_DISTILL_UNIT }}
+          TAU_SCOPE_VAR: ${{ vars.TAU_DISTILL_SCOPE }}
+          TAU_CLAIMS_VAR: ${{ vars.TAU_TRACE_CLAIMS }}
         run: |
           set -euo pipefail
           # The input is the registration ID, not the file name. A stray `.md`
@@ -1267,10 +1269,16 @@ jobs:
           # `procedure` and a dispatch whose variable still said `lesson` would publish the control
           # under the treatment's name; the script refuses that, and refuses a trace dispatch that
           # would replace the form the registration pinned.
+          # R62: the teaching population is the fifth switch of the same family and the last one the
+          # lane still resolved from a variable. A registration whose store is built from every
+          # trajectory has to be able to say so, and a dispatch that says otherwise is refused rather
+          # than silently preferred.
           pnpm --silent eval:prereg-form "$FILE" "${TAU_FORM_VAR:-}" "${TAU_UNIT_VAR:-}" \
-            > "$RUNNER_TEMP/distill.env"
+            "${TAU_SCOPE_VAR:-}" "${TAU_CLAIMS_VAR:-}" > "$RUNNER_TEMP/distill.env"
           UNIT=$(sed -n 's/^unit=//p' "$RUNNER_TEMP/distill.env")
           FORM=$(sed -n 's/^form=//p' "$RUNNER_TEMP/distill.env")
+          SCOPE=$(sed -n 's/^scope=//p' "$RUNNER_TEMP/distill.env")
+          CLAIMS=$(sed -n 's/^claims=//p' "$RUNNER_TEMP/distill.env")
           pnpm --silent eval:prereg-scenario "$FILE" > "$RUNNER_TEMP/scenario.env"
           TRAIN=$(sed -n 's/^train=//p' "$RUNNER_TEMP/scenario.env")
           TEST=$(sed -n 's/^test=//p' "$RUNNER_TEMP/scenario.env")
@@ -1283,7 +1291,9 @@ jobs:
           echo "recall=$RECALL" >> "$GITHUB_OUTPUT"
           echo "form=$FORM" >> "$GITHUB_OUTPUT"
           echo "unit=$UNIT" >> "$GITHUB_OUTPUT"
-          echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`, distiller \`${UNIT:-inherited}/${FORM:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "scope=$SCOPE" >> "$GITHUB_OUTPUT"
+          echo "claims=$CLAIMS" >> "$GITHUB_OUTPUT"
+          echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`, distiller \`${UNIT:-inherited}/${FORM:-inherited}\` over \`${SCOPE:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: L4 arm — memory
         if: github.event.inputs.l4_arms != 'reference'
@@ -1325,7 +1335,10 @@ jobs:
           #
           # Unset means empty means the default the lane has always run: `standard` with
           # `declared: false`, `lesson`, seed 7, 400 calls, and the published admission threshold.
-          TAU_INJECTION_NOTE: ${{ vars.TAU_INJECTION_NOTE }}
+          # R53's level, from the registration when it names one: `facadeNotes` in a header is what
+          # makes three note levels dispatchable, and this line read the variable until the assertion
+          # that covers *every* arm was written. The variable stands when the header names nothing.
+          TAU_INJECTION_NOTE: ${{ steps.recall_floor.outputs.notes || vars.TAU_INJECTION_NOTE }}
           # R56's one variable, from the registration when it names one and from the variable
           # otherwise. The read step refuses a disagreement before any model call, so the two can
           # never both be in force: one of them is empty by the time this line is evaluated.
@@ -1336,12 +1349,13 @@ jobs:
           TAU_DISTILL_UNIT: ${{ steps.recall_floor.outputs.unit || vars.TAU_DISTILL_UNIT }}
           # R62: `edited` (the corrections every published arm distils) or `all` (also every task that
           # passed, asked for the rule its successful trajectory follows). Unset is `edited`, so an
-          # artefact committed before this variable produced the store it always did.
-          TAU_DISTILL_SCOPE: ${{ vars.TAU_DISTILL_SCOPE }}
+          # artefact committed before this variable produced the store it always did. From the
+          # registration's header when it names one, which is the fifth switch of this family.
+          TAU_DISTILL_SCOPE: ${{ steps.recall_floor.outputs.scope || vars.TAU_DISTILL_SCOPE }}
           # R60: how many claims one trace may teach. Unset means three, which is what every
           # committed trace artefact ran at; a run at six is a different treatment and the ceiling
           # travels into the artefact so a readback can tell the two apart.
-          TAU_TRACE_CLAIMS: ${{ vars.TAU_TRACE_CLAIMS }}
+          TAU_TRACE_CLAIMS: ${{ steps.recall_floor.outputs.claims || vars.TAU_TRACE_CLAIMS }}
           # R57: which controlled distractor this leg plants, and nothing else. It comes from the
           # registration's `plantedArms` header by way of the `arms` job, not from a repository
           # variable: a variable is global, so three arms meant three dispatches in sequence and a
@@ -1445,8 +1459,16 @@ jobs:
           TAU_MEMORY: 'false'
           # The same four switches, empty. The two arms must share every setting that is not the
           # memory, and an arm that read a different seed would differ in more than its store.
-          TAU_INJECTION_NOTE: ${{ vars.TAU_INJECTION_NOTE }}
-          TAU_DISTILL_FORM: ${{ vars.TAU_DISTILL_FORM }}
+          TAU_INJECTION_NOTE: ${{ steps.recall_floor.outputs.notes || vars.TAU_INJECTION_NOTE }}
+          # The same registration values the memory arm reads. This arm distils nothing -- the memory is
+          # off -- but the two arms are one experiment, and a control whose artefact records `lesson`
+          # beside a treatment that recorded `procedure` is two experiments in one file. The previous
+          # wiring read the variables here, which is why the test that guards this only looked at the
+          # first assignment of each key.
+          TAU_DISTILL_FORM: ${{ steps.recall_floor.outputs.form || vars.TAU_DISTILL_FORM }}
+          TAU_DISTILL_UNIT: ${{ steps.recall_floor.outputs.unit || vars.TAU_DISTILL_UNIT }}
+          TAU_DISTILL_SCOPE: ${{ steps.recall_floor.outputs.scope || vars.TAU_DISTILL_SCOPE }}
+          TAU_TRACE_CLAIMS: ${{ steps.recall_floor.outputs.claims || vars.TAU_TRACE_CLAIMS }}
           TAU_SEED: ${{ vars.TAU_SEED }}
           TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}
           TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}

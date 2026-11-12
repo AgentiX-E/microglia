@@ -10,6 +10,7 @@ facadePair: off
 trainDomain: retail
 testDomain: retail
 recallDomain: retail
+distillScope: all
 ---
 
 # R62 — the population: teach from every trajectory, not the fourteen that failed
