@@ -659,33 +659,20 @@ jobs:
         if: ${{ github.event.inputs.not_before != '' }}
         env:
           NOT_BEFORE: ${{ github.event.inputs.not_before }}
+        # The arithmetic is `planBandWait`'s and is tested there. It lived here as twenty lines of `date`,
+        # which is why the L4 job -- the one that pays for an hour of τ² calls -- never ran it: two
+        # dispatches on 2026-11-12 named 04:00, started at 02:01, and were refused by the runner at
+        # `--require-off-peak` two minutes later, because the wait reached one of the two jobs.
+        run: pnpm --silent eval:wait-band
+
+      - name: Say which band the run started in
+        if: ${{ github.event.inputs.not_before != '' }}
+        # Printed after the wait, so the summary says which band the run actually started in rather than
+        # which band the dispatch was sent in. Unmasked on purpose: the audit refuses a swallowed failure,
+        # and `eval:band` does not fail -- it prints the band and warns. A step that cannot fail loudly is a
+        # step whose silence is indistinguishable from a pass.
         run: |
           set -euo pipefail
-          NOW=$(date -u +%s)
-          TARGET=$(date -u -d "today ${NOT_BEFORE}" +%s)
-          if [ "$TARGET" -le "$NOW" ]; then
-            TARGET=$(date -u -d "tomorrow ${NOT_BEFORE}" +%s)
-          fi
-          WAIT=$((TARGET - NOW))
-          WAIT_MIN=$(( (WAIT + 59) / 60 ))
-          if [ "$WAIT_MIN" -gt 240 ]; then
-            echo "::error::not_before ${NOT_BEFORE} is ${WAIT_MIN} minutes away; this lane waits at most 240, because the job limit is 340 and the run needs its own deadline after the wait"
-            exit 1
-          fi
-          echo "waiting ${WAIT_MIN} minute(s) for ${NOT_BEFORE} UTC; it is $(date -u +%H:%M) now"
-          echo "wait_min=${WAIT_MIN}" >> "$GITHUB_OUTPUT"
-          # Counted down in minutes rather than one long sleep, so a job that dies waiting says how far it
-          # got instead of showing a single silent line for two hours.
-          for minute in $(seq 1 "$WAIT_MIN"); do
-            sleep 60
-            if [ $((minute % 15)) -eq 0 ]; then echo "waited ${minute}/${WAIT_MIN} minute(s), $(date -u +%H:%M) UTC"; fi
-          done
-          echo "awake at $(date -u +%H:%M) UTC"
-          # Printed after the wait, so the summary says which band the run actually started in rather than
-          # which band the dispatch was sent in.
-          # Unmasked on purpose: the audit refuses a swallowed failure, and `eval:band` does not fail --
-          # it prints the band and warns. A step that cannot fail loudly is a step whose silence is
-          # indistinguishable from a pass.
           pnpm --silent eval:band | tee band-after-wait.txt
           {
             echo "### Cost band after the wait"
@@ -1126,6 +1113,32 @@ jobs:
           cache: pnpm
       - name: Install
         run: pnpm install --frozen-lockfile
+      # The same wait the BIRD job runs, from the same tested function. It used to live in that job's step
+      # list, so a dispatch that named a window queued here for nothing and was refused two minutes later by
+      # the runner's own `--require-off-peak` -- the guard existed and reached one of the two jobs.
+      - name: Wait for the band, when the dispatch named one
+        id: wait
+        if: ${{ github.event.inputs.not_before != '' }}
+        env:
+          NOT_BEFORE: ${{ github.event.inputs.not_before }}
+        run: pnpm --silent eval:wait-band
+      # The deadline has to fit what is left of the job, and the wait is part of it: a dispatch that sleeps
+      # 120 minutes and then asks for a 200-minute run is killed with no artefact, which is the failure this
+      # check exists for in the other job.
+      - name: Require a deadline the job can honour
+        id: deadline
+        env:
+          DEADLINE_MIN: ${{ github.event.inputs.deadline_min || '130' }}
+          WAIT_MIN: ${{ steps.wait.outputs.wait_min || '0' }}
+        run: |
+          set -euo pipefail
+          CAP=$((340 - 25 - WAIT_MIN))
+          if [ "$DEADLINE_MIN" -gt "$CAP" ]; then
+            echo "::error::deadline_min ${DEADLINE_MIN} cannot fit the job: 340 minutes of job, 25 of headroom and ${WAIT_MIN} waited leave ${CAP}. A run dispatched above it is killed by the runner with no artefact."
+            exit 1
+          fi
+          echo "deadline ${DEADLINE_MIN} min, waited ${WAIT_MIN} min, job limit 340 min"
+
       - name: Build
         run: pnpm build
 
