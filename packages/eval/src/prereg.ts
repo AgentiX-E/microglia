@@ -213,6 +213,17 @@ export type Prereg = {
   readonly trainTasks?: number;
   readonly testTasks?: number;
   /**
+   * The ceiling on one stored record, in characters, when the unit is `raw`.
+   *
+   * R85 ran at the module default of 700 and clipped **twelve of twelve** records, which turned the
+   * record arm into the summary arm it exists to be the control for. 700 was borrowed from R84's
+   * 640-character *trace* statement ceiling, and a record is a question plus an answer rather than a
+   * summary of one call: `eval/tools/record_length_census.py` puts the retail record length at p50
+   * 744, p95 1260 and max 1532. Absent means the module default, so every published arm keeps the
+   * reading it was published with.
+   */
+  readonly rawCeiling?: number;
+  /**
    * Where the admitted items are served from: the recall pack, or a prefix of the system prompt.
    *
    * R55.1's second arm. It is not a tidiness switch: the SOTA holder's published cell injects *every*
@@ -286,6 +297,7 @@ const HEADER_KEYS = [
   'traceClaims',
   'trainTasks',
   'testTasks',
+  'rawCeiling',
   'packMode',
   'thinking',
 ] as const;
@@ -725,6 +737,28 @@ export function readPrereg(markdown: string, file: string): PreregReading {
   const trainTasks = cap('trainTasks');
   const testTasks = cap('testTasks');
 
+  /**
+   * The record ceiling: a whole number of characters above the truncation marker.
+   *
+   * Two characters is the marker's own length, and a record sliced to it is a record whose entire
+   * text is " …" -- stored, counted, and serving nothing. `rawLogInterpreterFor` refuses the same
+   * value at the boundary; the duplication is deliberate, because a header is validated on every
+   * push and a dispatch is paid for once.
+   */
+  const rawCeiling = ((): number | undefined => {
+    const text = values.get('rawCeiling');
+    if (text === undefined) return undefined;
+    const parsed = Number(text);
+    if (!Number.isInteger(parsed) || parsed < 3) {
+      collected.push({
+        where: `header 'rawCeiling'`,
+        problem: `'${text}' is not a ceiling a record can fit in`,
+      });
+      return undefined;
+    }
+    return parsed;
+  })();
+
   // Where the admitted items are served from. R55.1's second arm, and the seventh switch to move out of
   // a repository variable: an arm that renders every admitted item into the system prompt is a different
   // treatment from one that retrieves two, and a run that cannot say which it ran measured neither.
@@ -863,6 +897,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(traceClaims === undefined ? {} : { traceClaims }),
       ...(trainTasks === undefined ? {} : { trainTasks }),
       ...(testTasks === undefined ? {} : { testTasks }),
+      ...(rawCeiling === undefined ? {} : { rawCeiling }),
       ...(packMode === undefined ? {} : { packMode }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,

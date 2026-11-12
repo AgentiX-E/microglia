@@ -939,6 +939,7 @@ export {
   RAWLOG_TRUST,
   rawLogCensus,
   rawLogInterpreter,
+  rawLogInterpreterFor,
   rawLogStatement,
   rawLogTruncated,
   type RawLogCensus,

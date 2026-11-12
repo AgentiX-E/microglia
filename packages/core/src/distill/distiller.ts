@@ -13,6 +13,7 @@ import {
   hasHighSeverity,
   jsonEqual,
   neighbourhood,
+  isEventKind,
   recordContradiction,
   scopeKey,
   mergeEvidence as mergeItemEvidence,
@@ -267,6 +268,10 @@ async function contradictSameScope(
   now: number,
 ): Promise<number> {
   if (candidate.trust < options.policy.singleObservationTrust) return 0;
+  // R88: an event does not contradict another event. `item.kind === candidate.kind` is checked below,
+  // so testing the candidate tests both sides. See `isEventKind` for what R85 paid to learn this:
+  // twelve records in one scope, eleven refuted by each other, one admitted.
+  if (isEventKind(candidate.kind)) return 0;
   const key = scopeKey(candidate.scope);
   let count = 0;
   for (const item of pool) {

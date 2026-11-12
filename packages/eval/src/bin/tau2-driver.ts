@@ -93,6 +93,7 @@ import {
   faithfulnessOf,
   rawLogCensus,
   rawLogInterpreter,
+  rawLogInterpreterFor,
   resolveTraceClaims,
   tracesOf,
   yieldCensus,
@@ -275,6 +276,17 @@ const TRAIN_TASKS = Math.max(
   Number(process.env["TAU_TRAIN_TASKS"] ?? 0) || 0,
 );
 const TEST_TASKS = Math.max(0, Number(process.env["TAU_TEST_TASKS"] ?? 0) || 0);
+/**
+ * The ceiling on one stored record, in characters; `0` means the module default.
+ *
+ * R85 ran with the default of 700 and clipped twelve of twelve records. 700 is R84's *trace*
+ * statement ceiling minus the marker, and a trace statement is a summary of one call while a record is
+ * a question plus an answer: the retail corpus puts the record at p50 744, p95 1260, max 1532
+ * characters. The value comes from the registration header (`rawCeiling`) rather than a repository
+ * variable for the reason every other switch does: a ceiling that lived in a variable would be decided
+ * by whichever dispatch ran last, and this one changes what the arm measures.
+ */
+const RAWLOG_CEILING = Math.max(0, Number(process.env["TAU_RAWLOG_CEILING"] ?? 0) || 0);
 /**
  * The interpreter that can import `tau2`.
  *
@@ -796,7 +808,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const distiller: ResilientInterpreter =
     DISTILL_UNIT === "raw"
       ? {
-          interpreter: rawLogInterpreter,
+          // The ceiling the registration stated, or the module default when it stated none. The
+          // interpreter refuses a ceiling no record fits, so a mis-stated header fails at the arm
+          // rather than after the episode is paid for.
+          interpreter:
+            RAWLOG_CEILING > 0 ? rawLogInterpreterFor(RAWLOG_CEILING) : rawLogInterpreter,
           faults: () => ({ events: 0, reasons: [], samples: {} }),
         }
       : resilientInterpreter(
@@ -1509,7 +1525,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // R85: the arm's own accounting, from the store. Absent on the two abstracting units, where the
     // record it counts was never written; present, it says how many records survived the ceiling and
     // that the ban was not installed.
-    ...(DISTILL_UNIT === "raw" ? { rawlog: rawLogCensus(written) } : {}),
+    ...(DISTILL_UNIT === "raw"
+      ? { rawlog: rawLogCensus(written, RAWLOG_CEILING > 0 ? RAWLOG_CEILING : undefined) }
+      : {}),
     ...(faithfulness === undefined ? {} : { faithfulness }),
     // R62: which trajectories taught, and what the store looks like split by that. `scope` is the
     // switch the dispatch read; `provenance` is the measurement of what it produced, and the two are

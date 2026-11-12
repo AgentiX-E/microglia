@@ -126,6 +126,7 @@ export {
   expireKnowledge,
   isInlinePayload,
   mergeEvidence,
+  isEventKind,
   recordContradiction,
   reinstate,
   scopeKey,

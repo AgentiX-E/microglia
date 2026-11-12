@@ -7,6 +7,7 @@ import {
   RAWLOG_TRUST,
   rawLogCensus,
   rawLogInterpreter,
+  rawLogInterpreterFor,
   rawLogStatement,
   rawLogTruncated,
 } from '../tau2-rawlog.js';
@@ -125,6 +126,32 @@ describe('rawLogStatement', () => {
     expect(rawLogTruncated('Q: short\nA: call()')).toBe(false);
   });
 
+  it('takes its ceiling from the caller, because the default was measured on another unit', () => {
+    // 700 came from R84's 640-character statement ceiling, which is a *trace* unit: a summary of one
+    // tool call. A record is the whole question and the whole answer, and the corpus says its 95th
+    // percentile is 1260 characters with a maximum of 1532. R85 was clipped at twelve of twelve and
+    // kept 58 of 137 entity values, so the constant was measuring the cap rather than the unit.
+    const long = 'x'.repeat(3000);
+    const event = edit({ after: corrected([{ name: 'answer', arguments: { text: long } }]) });
+    const wide = rawLogStatement(event, run('q'), 2400);
+    expect(wide).toHaveLength(2400);
+    expect(wide?.endsWith(RAWLOG_TRUNCATION_MARK)).toBe(true);
+    // The default is unchanged, so every published arm keeps the reading it was published with.
+    expect(rawLogStatement(event, run('q'))).toHaveLength(RAWLOG_STATEMENT_CEILING);
+  });
+
+  it('does not clip a record that fits a ceiling chosen for records', () => {
+    // The corpus's longest record is 1532 characters, and this one is deliberately just under 2000
+    // so the case is about the ceiling clearing the population rather than about a generous number.
+    const text = 'x'.repeat(1800);
+    const statement = rawLogStatement(
+      edit({ after: corrected([{ name: 'answer', arguments: { text } }]) }),
+      run('q'),
+      2000,
+    );
+    expect(rawLogTruncated(statement ?? '')).toBe(false);
+  });
+
   it('writes nothing for an event that is not a correction', () => {
     const rating = edit();
     const notAnEdit = { ...rating, signal: { type: 'rating', value: 'down', reasons: ['wrong'] } } as unknown as FeedbackEvent;
@@ -133,6 +160,32 @@ describe('rawLogStatement', () => {
 
   it('writes nothing when the event carries neither calls nor an expectation nor a question', () => {
     expect(rawLogStatement(edit(), undefined)).toBeUndefined();
+  });
+});
+
+describe('rawLogInterpreterFor', () => {
+  it('carries the ceiling into the record the interpreter writes', async () => {
+    // The ceiling is a property of the experiment, and the experiment is stated in a registration
+    // header. A factory rather than a second constant because two globals with one meaning is how a
+    // run ends up measuring a number nobody registered.
+    const long = 'x'.repeat(3000);
+    const event = edit({ after: corrected([{ name: 'answer', arguments: { text: long } }]) });
+    const [wide] = await rawLogInterpreterFor(2400)({ event, run: run('q') } as InterpretContext);
+    const [narrow] = await rawLogInterpreter({ event, run: run('q') } as InterpretContext);
+    expect(wide?.statement).toHaveLength(2400);
+    expect(narrow?.statement).toHaveLength(RAWLOG_STATEMENT_CEILING);
+    expect(rawLogTruncated(wide?.statement ?? '')).toBe(true);
+  });
+
+  it('refuses a ceiling that cannot hold a record, rather than writing an empty one', async () => {
+    // A ceiling at or below the marker's own length would slice to a mark and store a record whose
+    // entire text is "…" -- an item that exists, is counted, and says nothing. That is the shape this
+    // record has paid for twice (R55.0's unreachable store, R58's no-measurement store) and it is
+    // cheaper to refuse at the boundary.
+    // Thrown when the arm is built rather than when it is called: a dispatch that named such a
+    // ceiling has mis-specified the experiment, and the run should not pay for an episode to find out.
+    expect(() => rawLogInterpreterFor(RAWLOG_TRUNCATION_MARK.length)).toThrow(/ceiling/);
+    expect(() => rawLogInterpreterFor(2.5)).toThrow(/ceiling/);
   });
 });
 
@@ -198,5 +251,8 @@ describe('rawLogCensus', () => {
 
   it('reports zero records for an empty store, which is a measurement and not an absence', () => {
     expect(rawLogCensus([])).toEqual({ records: 0, clipped: 0, toolBan: false });
+    // The ceiling travels with the census, because R85 wrote twelve clipped records and no ceiling, so
+    // its artefact could not say whether a registration chose the number or a default did.
+    expect(rawLogCensus([], 2000)).toEqual({ records: 0, clipped: 0, toolBan: false, ceiling: 2000 });
   });
 });

@@ -1334,6 +1334,10 @@ jobs:
           echo "knobs=$KNOBS" >> "$GITHUB_OUTPUT"
           echo "trainTasks=$(echo "$CAPS" | sed -n 's/^train=//p')" >> "$GITHUB_OUTPUT"
           echo "testTasks=$(echo "$CAPS" | sed -n 's/^test=//p')" >> "$GITHUB_OUTPUT"
+          # R88: the record ceiling the registration measured its claim at. R85 ran at the module
+          # default of 700 and clipped twelve of twelve records, because 700 bounds a trace statement
+          # and a record is a question plus an answer.
+          echo "rawCeiling=$(echo "$CAPS" | sed -n 's/^ceiling=//p')" >> "$GITHUB_OUTPUT"
           echo "overrides=$OVERRIDES" >> "$GITHUB_OUTPUT"
           if [ -n "$OVERRIDES" ]; then
             echo "::warning::the registration overrides repository variables: $OVERRIDES"
@@ -1440,6 +1444,7 @@ jobs:
           TAU_RECALL_DOMAIN: ${{ steps.recall_floor.outputs.recall || vars.TAU_RECALL_DOMAIN || vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
           TAU_TRAIN_TASKS: ${{ steps.recall_floor.outputs.trainTasks || vars.TAU_TRAIN_TASKS || '0' }}
           TAU_TEST_TASKS: ${{ steps.recall_floor.outputs.testTasks || vars.TAU_TEST_TASKS || '0' }}
+          TAU_RAWLOG_CEILING: ${{ steps.recall_floor.outputs.rawCeiling || '0' }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
@@ -1502,6 +1507,7 @@ jobs:
           TAU_RECALL_DOMAIN: ${{ steps.recall_floor.outputs.recall || vars.TAU_RECALL_DOMAIN || vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
           TAU_TRAIN_TASKS: ${{ steps.recall_floor.outputs.trainTasks || vars.TAU_TRAIN_TASKS || '0' }}
           TAU_TEST_TASKS: ${{ steps.recall_floor.outputs.testTasks || vars.TAU_TEST_TASKS || '0' }}
+          TAU_RAWLOG_CEILING: ${{ steps.recall_floor.outputs.rawCeiling || '0' }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}

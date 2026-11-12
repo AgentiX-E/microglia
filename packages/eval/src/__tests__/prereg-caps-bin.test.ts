@@ -62,13 +62,22 @@ describe('prereg-caps', () => {
   it('prints both caps, one per line, for the two variables the workflow reads', () => {
     const result = run(file(['trainTasks: 57', 'testTasks: 1']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=\n');
   });
 
-  it('prints two empty lines when the registration pins nothing, so the variables stand', () => {
+  it('prints the record ceiling beside the caps, which is the switch R85 lacked', () => {
+    // Three lines because there are three numbers, and the third one decides what the arm measures
+    // rather than how much of the corpus it reads. A ceiling left in a repository variable is chosen
+    // by the last dispatch; R85's own 700 is what that costs -- twelve of twelve records clipped.
+    const result = run(file(['trainTasks: 57', 'testTasks: 1', 'rawCeiling: 2000']));
+    expect(result.code).toBe(0);
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\n');
+  });
+
+  it('prints one empty line per variable when the registration pins nothing, so the variables stand', () => {
     const result = run(file([]));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=\ntest=\n');
+    expect(result.out).toBe('train=\ntest=\nceiling=\n');
   });
 
   it('refuses half a pin instead of letting a variable decide the other half', () => {

@@ -1582,3 +1582,50 @@ describe('trainTasks and testTasks, the two caps one number used to bind at once
     expect(readPrereg(withHeader('trainTasks: 2.5\ntestTasks: 1'), 'R87-caps.md').problems).toHaveLength(1);
   });
 });
+
+describe('rawCeiling, the one number R85 was mismeasured by', () => {
+  const HEADER = [
+    '---',
+    'id: R88-ceiling',
+    'step: R88',
+    'opened: 2026-11-12',
+    'arms: memory',
+    'sample: 228',
+    'gates: V1',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '## Prediction\n\n- the record survives the write whole at this ceiling\n\n' +
+    '## Refutation\n\n- a clipped record at this ceiling means the corpus is not what it was measured as\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads the ceiling a registration states', () => {
+    // R85 ran at 700 and clipped twelve of twelve, because 700 was borrowed from the trace unit's 640
+    // and a record is a question plus an answer, not a summary of one call. The census over the
+    // retail corpus puts the record maximum at 1532 characters, so a registration that wants an
+    // uncut record has to be able to say so.
+    const reading = readPrereg(withHeader('distillUnit: raw\nrawCeiling: 2000'), 'R88-ceiling.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.rawCeiling).toBe(2000);
+  });
+
+  it('leaves it absent when the header names none, so the published arms keep their reading', () => {
+    const reading = readPrereg(withHeader('distillUnit: raw'), 'R88-ceiling.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.rawCeiling).toBeUndefined();
+  });
+
+  it('refuses a ceiling no record could fit, because the marker would be the whole record', () => {
+    // Below the truncation marker's own length the slice produces a record whose entire text is " …":
+    // stored, counted, and serving nothing. The interpreter refuses it too, and both refusals exist
+    // because a header is read on every push and a dispatch is paid for once.
+    expect(readPrereg(withHeader('distillUnit: raw\nrawCeiling: 1'), 'R88-ceiling.md').problems).toEqual([
+      { where: "header 'rawCeiling'", problem: "'1' is not a ceiling a record can fit in" },
+    ]);
+    expect(readPrereg(withHeader('distillUnit: raw\nrawCeiling: 2000.5'), 'R88-ceiling.md').problems).toHaveLength(1);
+  });
+});

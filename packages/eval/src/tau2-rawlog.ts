@@ -63,13 +63,19 @@ import type { DistillCandidate, FeedbackEvent, Json, RunRecord } from '@agentix-
 import type { Interpreter } from '@agentix-e/microglia-core/distill';
 
 /**
- * The ceiling on one record, in characters.
+ * The default ceiling on one record, in characters.
  *
- * 700 is chosen against the two numbers that constrain it: the trace unit's statements run to 640
- * characters by instruction (R84's `TRACE_STATEMENT_CEILING`), and a pack of three such records has
- * to fit the recall budget the arm's other half runs at. A record longer than this is a record whose
- * tail the pack cannot afford, and printing the truncation is how a reader tells a short episode from
- * a clipped one.
+ * **This number was wrong, and R85 is how it was found.** 700 was borrowed from R84's 640-character
+ * statement ceiling, which bounds a *trace* unit — a summary of one tool call. A record is the whole
+ * question and the whole answer, and the two are not the same size: `eval/tools/record_length_census.py`
+ * over the retail corpus puts the length of a rebuilt record at p50 744, p95 1260 and max 1532
+ * characters. R85 ran with 700 and clipped **twelve of twelve** records, which turns the arm into the
+ * thing it was the control for — a summary, written by `slice`.
+ *
+ * The constant stays at 700 for one reason and it is not preference: every arm published with it keeps
+ * the reading it was published with, and a registration that wants a different ceiling states it in
+ * its header (`rawCeiling`) rather than editing the meaning of a finished run. The census's number —
+ * 2000, the corpus maximum plus the `note:` line the run also writes — belongs to a registration.
  */
 export const RAWLOG_STATEMENT_CEILING = 700;
 
@@ -138,6 +144,7 @@ function questionOf(run: RunRecord | undefined): string | undefined {
 export function rawLogStatement(
   event: FeedbackEvent,
   run: RunRecord | undefined,
+  ceiling: number = RAWLOG_STATEMENT_CEILING,
 ): string | undefined {
   if (event.signal.type !== 'edit') return undefined;
   const question = questionOf(run);
@@ -161,9 +168,9 @@ export function rawLogStatement(
 
   if (lines.length === 0) return undefined;
   const text = lines.join('\n');
-  return text.length <= RAWLOG_STATEMENT_CEILING
+  return text.length <= ceiling
     ? text
-    : `${text.slice(0, RAWLOG_STATEMENT_CEILING - RAWLOG_TRUNCATION_MARK.length)}${RAWLOG_TRUNCATION_MARK}`;
+    : `${text.slice(0, ceiling - RAWLOG_TRUNCATION_MARK.length)}${RAWLOG_TRUNCATION_MARK}`;
 }
 
 /** Whether one record was clipped by the ceiling. Counted by the driver, so the artefact can say so. */
@@ -172,51 +179,66 @@ export function rawLogTruncated(statement: string): boolean {
 }
 
 /**
- * The interpreter slot this arm fills.
+ * The interpreter slot this arm fills, at a stated ceiling.
  *
  * Synchronous on purpose: there is nothing to wait for. A model call here would make the arm a
  * different treatment — an abstracting writer asked to be verbatim is still an abstracting writer,
  * and the eleven faults of R58 are what asking one costs.
+ *
+ * The ceiling is a parameter rather than a constant because it is the one number this arm was
+ * mismeasured by, and a number a registration has to state is a number a reader can check. A ceiling
+ * at or below the truncation marker's own length is refused instead of producing a record whose text
+ * is the marker: that item would be stored, counted, and serve nothing, which is the failure this
+ * repository has recorded twice.
  */
-export const rawLogInterpreter: Interpreter = (context) => {
-  const statement = rawLogStatement(context.event, context.run);
-  if (statement === undefined) return [];
-  const { event } = context;
-  // The event's own id first and the run's second: `begin({taskId})` stamps the event, and a capture
-  // path that did not would otherwise write records whose support cannot be counted per task -- the
-  // defect R55.0 found, where `distinctTasks` was 1 for every item by construction.
-  const taskId = event.taskId ?? context.run?.taskId;
-  const candidate: DistillCandidate = {
-    namespace: event.namespace,
-    // `exemplar`, and this arm is the first writer of one in this repository: the store's other
-    // writers produce claims (`constraint`, `procedure`, `negative`), and an exemplar is the one kind
-    // that is an *instance* rather than a statement about instances. The admission path has no
-    // kind-specific rule other than abstention's, so nothing downstream has to learn a new word.
-    kind: 'exemplar',
-    // The task, not the domain: `stampDomain` adds the domain at the host boundary, and a record
-    // scoped to a domain here would pre-empt the one switch that decides what a pack can serve.
-    scope: { task: event.task },
-    statement,
-    payload: {
-      taskId: taskId ?? event.runId,
-      runId: event.runId,
-      calls: callsOf(event.signal.type === 'edit' ? event.signal.after : null).length,
-    },
-    evidence: {
-      feedbackId: event.id,
-      runId: event.runId,
-      at: event.at,
-      ...(taskId === undefined ? {} : { taskId }),
-      weight: RAWLOG_TRUST,
-    },
-    trust: Math.min(event.trust, RAWLOG_TRUST),
-    // The run id, not the text: two corrections that happen to read the same are two episodes, and
-    // collapsing them would silently give one record the support of two — which is the abstraction
-    // this arm is the control for.
-    dedupeKey: contentKey(`rawlog|${event.runId}`),
+export function rawLogInterpreterFor(ceiling: number): Interpreter {
+  if (!Number.isInteger(ceiling) || ceiling <= RAWLOG_TRUNCATION_MARK.length) {
+    throw new Error(`rawlog ceiling ${String(ceiling)} cannot hold a record`);
+  }
+  return (context) => {
+    const statement = rawLogStatement(context.event, context.run, ceiling);
+    if (statement === undefined) return [];
+    const { event } = context;
+    // The event's own id first and the run's second: `begin({taskId})` stamps the event, and a capture
+    // path that did not would otherwise write records whose support cannot be counted per task -- the
+    // defect R55.0 found, where `distinctTasks` was 1 for every item by construction.
+    const taskId = event.taskId ?? context.run?.taskId;
+    const candidate: DistillCandidate = {
+      namespace: event.namespace,
+      // `exemplar`, and this arm is the first writer of one in this repository: the store's other
+      // writers produce claims (`constraint`, `procedure`, `negative`), and an exemplar is the one kind
+      // that is an *instance* rather than a statement about instances. The admission path has no
+      // kind-specific rule other than abstention's, so nothing downstream has to learn a new word.
+      kind: 'exemplar',
+      // The task, not the domain: `stampDomain` adds the domain at the host boundary, and a record
+      // scoped to a domain here would pre-empt the one switch that decides what a pack can serve.
+      scope: { task: event.task },
+      statement,
+      payload: {
+        taskId: taskId ?? event.runId,
+        runId: event.runId,
+        calls: callsOf(event.signal.type === 'edit' ? event.signal.after : null).length,
+        ceiling,
+      },
+      evidence: {
+        feedbackId: event.id,
+        runId: event.runId,
+        at: event.at,
+        ...(taskId === undefined ? {} : { taskId }),
+        weight: RAWLOG_TRUST,
+      },
+      trust: Math.min(event.trust, RAWLOG_TRUST),
+      // The run id, not the text: two corrections that happen to read the same are two episodes, and
+      // collapsing them would silently give one record the support of two — which is the abstraction
+      // this arm is the control for.
+      dedupeKey: contentKey(`rawlog|${event.runId}`),
+    };
+    return [candidate];
   };
-  return [candidate];
-};
+}
+
+/** The same arm at the historical ceiling, for every run that did not state one. */
+export const rawLogInterpreter: Interpreter = rawLogInterpreterFor(RAWLOG_STATEMENT_CEILING);
 
 /**
  * What the store holds on this unit, counted from the store rather than from the interpreter's reply.
@@ -231,13 +253,25 @@ export type RawLogCensus = {
   readonly records: number;
   readonly clipped: number;
   readonly toolBan: false;
+  /**
+   * The ceiling these records were written under, when the arm was told one.
+   *
+   * R85 recorded twelve clipped records and no ceiling, so an artefact could not say whether it had
+   * been cut by a number a registration chose or by a module default nobody measured on this unit.
+   * Absent means the default stands, which is the honest reading of a run that did not state one.
+   */
+  readonly ceiling?: number;
 };
 
 /** The census, from the items the store kept. */
-export function rawLogCensus(items: readonly { readonly statement: string }[]): RawLogCensus {
+export function rawLogCensus(
+  items: readonly { readonly statement: string }[],
+  ceiling?: number,
+): RawLogCensus {
   return {
     records: items.length,
     clipped: items.filter((item) => rawLogTruncated(item.statement)).length,
     toolBan: false,
+    ...(ceiling === undefined ? {} : { ceiling }),
   };
 }

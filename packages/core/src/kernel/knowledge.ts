@@ -24,6 +24,7 @@ import type {
   ProvenanceTier,
   Json,
   KnowledgeItem,
+  KnowledgeKind,
   KnowledgeScope,
   KnowledgeStatus,
   Policy,
@@ -389,6 +390,28 @@ export function mergeEvidence(
     status: decision.status,
     statusReason: decision.reason,
   };
+}
+
+/**
+ * Whether a kind's instances are **events** rather than **claims**.
+ *
+ * The distinction decides exactly one rule — whether two items of one kind in one scope with
+ * different content contradict each other — and it is not a preference about wording.
+ *
+ * A claim asserts something about a class of situations: "cancel before the order ships" and "never
+ * cancel" are two answers to one question, and a store that kept both active would be serving a
+ * contradiction. An exemplar is a record of one episode that happened: two orders cancelled on two
+ * afternoons are not two answers to one question, and a store that halved the first one's support when
+ * the second arrived would be treating chronology as disagreement.
+ *
+ * R85 is what that cost. Twelve records, one scope (its driver opened every task as `tau2.act`), and
+ * the contradiction rule fired eleven times: eleven items fell to support 0.45, under the 0.8 floor,
+ * and the store admitted exactly one. A store of candidates is the R55.0 defect in another coat —
+ * items that exist, are counted, and are reachable by nothing — and the arm read as "records do not
+ * help" when the truth was "records were refuted by each other".
+ */
+export function isEventKind(kind: KnowledgeKind): boolean {
+  return kind === 'exemplar';
 }
 
 /** Record a contradiction without overwriting the statement (evidence, not edit). */

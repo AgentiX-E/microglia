@@ -10,7 +10,11 @@
  * into its own variable, and an expression that split a string would be a parser in YAML. A
  * registration that pins nothing prints two empty lines and the repository variables stand.
  *
- * Usage: pnpm eval:prereg-caps prereg/<id>.md  ->  "train=57" "test=1"
+ * R88 added a third line for the same reason the other two exist: `rawCeiling` is the number R85 was
+ * mismeasured by, and a number that decides what an arm measures cannot live in a repository variable
+ * where the last dispatch chooses it.
+ *
+ * Usage: pnpm eval:prereg-caps prereg/<id>.md  ->  "train=57" "test=1" "ceiling=2000"
  */
 import { readFileSync } from 'node:fs';
 import { readPrereg } from '../prereg.js';
@@ -31,7 +35,7 @@ function main(): void {
     for (const problem of reading.problems) refuse(`at ${problem.where}: ${problem.problem}`);
     return;
   }
-  const { trainTasks, testTasks } = reading.prereg;
+  const { trainTasks, testTasks, rawCeiling } = reading.prereg;
   // Half a pin is the defect this exists to remove: a registration that fixes the learning half and
   // leaves the evaluation to a variable would have its cost decided by whichever dispatch ran last.
   const pinned = [trainTasks, testTasks].filter((entry) => entry !== undefined);
@@ -41,6 +45,7 @@ function main(): void {
   }
   process.stdout.write(`train=${trainTasks === undefined ? '' : String(trainTasks)}\n`);
   process.stdout.write(`test=${testTasks === undefined ? '' : String(testTasks)}\n`);
+  process.stdout.write(`ceiling=${rawCeiling === undefined ? '' : String(rawCeiling)}\n`);
 }
 
 main();
