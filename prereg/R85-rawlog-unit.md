@@ -18,7 +18,7 @@ distillScope: edited
 
 **Registered** 2026-11-12, dispatchable. R58 is read and it is `NO_MEASUREMENT` on the recurrence axis
 and informative on another: its trace store served a pack whose **median non-zero coverage was
-10.53%** against a floor of 12%, and eleven of its fifteen distillation calls faulted. R59 is
+10.53%, and eleven of its fifteen distillation calls faulted. R86 is
 dispatched to say which code they threw. This registration is the arm that answers the question
 neither of them asks, and it is the one the literature has already answered twice.
 
@@ -34,8 +34,11 @@ all eleven.
 Both papers name the same mechanism as this lane's own weakest number. A distilled claim is a
 statement *about* a class of requests, and the retriever that serves it is lexical: coverage measures
 the share of the question's content words the pack contains. `Exchange a delivered order for a
-different size` shares no word with `the shoes in W237 are too small`, so the floor drops it, and the
-arm reports a store that served nothing as a memory that did not help.
+different size` shares no word with `the shoes in W237 are too small`. The lane does not gate on that
+overlap — every registration here fixes `recallFloor: 0`, so the pack carries what is servable and
+coverage is measured — which makes the reading a statement about the text the model read rather than
+about an item a filter removed. It is the same fact one step further from the effect, and it is the
+fact a floor would act on.
 
 This arm changes **one** variable: what the store is made of. Same corpus, same split, same admission,
 same recall floor and budget, same model, same four trials. The write is a record — question, calls,
@@ -53,10 +56,11 @@ arguments — and it calls no model at all.
 - **Faithfulness is at least 0.95.** Records keep their own argument values by construction, so the
   only loss is the ceiling, and `rawlog.clipped` counts it. A number below 0.95 refutes the arm's own
   claim to be a record rather than a summary of one.
-- **Coverage clears the floor it failed at.** Median non-zero coverage **≥ 12%**, against R58's
-  **10.53%** on the same corpus and the same floor. This is the prediction the mechanism stands or
-  falls on: if records do not share the question's words either, then lexical overlap was never the
-  constraint and the two papers' finding does not transfer to this corpus.
+- **Coverage clears the bar it failed at.** Median non-zero coverage **≥ 12%**, against R58's
+  **10.53%** on the same corpus at the same setting (`recallFloor: 0`: measured, not enforced). This
+  is the prediction the mechanism stands or falls on: if records do not share the question's words
+  either, then lexical overlap was never the constraint and the two papers' finding does not transfer
+  to this corpus.
 - **`pass^4` does not fall below the published 0.575.** A lift is reported with its interval and not
   claimed at n = 57 (the registration prices the half-width at 19.66pp before the run, as R58 did);
   what is claimed is the direction and the two intermediate measurements above, which are the ones

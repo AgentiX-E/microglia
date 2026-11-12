@@ -13,11 +13,19 @@
  * single-round RAG, while two-round RAG over raw history scored **90.0%** against all eleven.
  *
  * This lane has its own version of the number and it points the same way. R58's store produced a
- * **median non-zero coverage of 10.53%** against a floor of 12%: the pack's text and the question's
- * text shared almost no content word. That is what an abstraction does to a lexical retriever — a
- * claim about *how to cancel an order* does not contain the order id the next customer quotes, so
- * coverage is low, the floor drops the item, and the arm reports a store that served nothing as a
- * memory that did not help.
+ * **median non-zero coverage of 10.53%**: the pack's text and the question's text shared almost no
+ * content word. That is what an abstraction does to a lexical retriever — a claim about *how to
+ * cancel an order* does not contain the order id the next customer quotes.
+ *
+ * Two things have to be said about that number before it is used as evidence, and the first is a
+ * correction of how it was first described here. **The lane does not gate on coverage**: every
+ * registration so far fixes `recallFloor: 0`, so the pack carries whatever is servable and coverage
+ * is *measured* rather than enforced. A low reading therefore means "the block the model read was
+ * almost unrelated to the question", not "the item was dropped" — the same text-level fact, one
+ * mechanism further from the effect, and the honest version of it. The second is that the number is
+ * what a *floor* would act on: `tau2-rawlog-recall.test.ts` shows one record surviving at
+ * `minCoverage: 0.2` for a request that shares its words and vanishing for a request about the
+ * weather, which is the discrimination an abstracted claim does not have.
  *
  * ## What this arm changes
  *
