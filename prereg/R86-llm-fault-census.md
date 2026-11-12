@@ -1,6 +1,6 @@
 ---
-id: R59-llm-fault-census
-step: R59
+id: R86-llm-fault-census
+step: R86
 opened: 2026-11-12
 arms: memory
 sample: 40
@@ -15,12 +15,18 @@ traceClaims: 3
 distillScope: edited
 ---
 
-# R59 — eleven of fifteen distillation calls threw, and the record cannot say what they threw
+# R86 — eleven of fifteen distillation calls threw, and the record cannot say what they threw
 
 **Registered** 2026-11-12, dispatchable. R58 is read and it is `NO_MEASUREMENT`: the trace unit ran
 (15 of 15 corrections carried a trace, 57 traces read, nothing dropped by the parser) and the store
 was built from **four** of those fifteen events, because eleven of them faulted and were answered by
 the rule interpreter, which writes nothing for a trace.
+
+**Renumbered** 2026-11-12 from `R59-llm-fault-census`: `R59` is `R59-containment`, dispatched
+earlier the same month, and two registrations under one number is the kind of collision that makes a
+readout ambiguous six weeks later. The dispatch that waits for the off-peak window was re-sent under
+this id rather than left running under the old one, because a run whose registration cannot be found
+at the id it was launched with is a run whose readback has no preregistration to grade against.
 
 This is not an experiment on memory. It is the measurement that has to exist before any memory
 experiment in this lane can be read, and it is registered because the alternative — dispatching a
