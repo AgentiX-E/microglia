@@ -76,8 +76,9 @@ do not help" from "the longer records were dropped", and this arm is the cell th
   `pack.capacity = 2010`, `pack.requests = 228` (±the corpus's own episode count). A run that cannot
   state what its pack was allowed measured a pack nobody can reconstruct.
 - **The write is unchanged and costs nothing.** `learning.llmFailed = 0`, `rawlog.records = 12` (±2),
-  `rawlog.clipped ≤ 1`, and `learning.events = learning.candidates` — no model call at the write, as in
-  R85 and R88.
+  `rawlog.clipped = 2` — R88's own reading at this ceiling, held rather than re-predicted; see
+  Amendment 1 — and `learning.events = learning.candidates`: no model call at the write, as in R85 and
+  R88.
 - **One recall carries two records, not one.** `pack.meanIds ≥ 2` when at least two records are
   servable, against 1 in every L4 run this lane has recorded. Two 744-character records fit 2,400
   (2 × 861 + 390 = 2,112) and do not fit 1,200, so the reading distinguishes the budget from the store.
@@ -131,3 +132,22 @@ Whether a store written *during* the evaluation helps — the in-episode arm of 
 because the store here is frozen before the first scored trial, exactly as in R85 and R88. That arm
 needs the write endpoint and a serial trial loop, and the watermark it needs (`RecallQuery.before`) is
 already built.
+
+## Amendment 1 — the write is held fixed, so its clipping is held at what R88 measured (2026-11-12, before dispatch)
+
+The prediction above said `rawlog.clipped ≤ 1`. R88 has since read `clipped = 2` at this same
+2,000-character ceiling, and the row was written before that readback existed: it was a guess about a
+quantity this arm does not move. An arm whose only variable is the pack cannot predict its write; it
+can only inherit it, so the row now states R88's measured value and this registration is graded against
+"the write did not change" rather than against a number nobody measured.
+
+The guess was wrong for a reason the census itself recorded and nobody carried forward. `record_length_census`
+rebuilds a record as `Q:` and `A:` only, and its own docstring says so: *"the reconstruction is a lower
+bound on length"*, because the run also writes a `note:` line whose text lives in the episode rather
+than in the artefact. Retail's rebuilt maximum is 1,532 characters, and 2,000 was chosen as that
+maximum plus room for the note. Two of twelve records carry a note long enough to exceed the room.
+
+**Nothing else in this registration depends on that number.** A record clipped at 2,000 is exactly 2,000
+characters, and this arm's pack states 2,010, so the two clipped records still fit: `droppedForSize = 0`
+and `meanIds` are read as registered. The ceiling is priced by the (700 / 2,400) cell in the ablation
+table, afterwards, and not by a second guess at 2,000 now.
