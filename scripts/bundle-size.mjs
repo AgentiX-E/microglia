@@ -55,10 +55,22 @@ import { build } from 'esbuild';
  *   are what make three note levels comparable over one store (R53), and the alternative
  *   was a treatment whose arms carried different packs. Measured 46,136 raw at this
  *   commit, so the raise is 864 bytes of headroom rather than a new allowance.
+ *
+ * Raised once on 2026-11-12, 47,000 -> 47,500 raw and 16,000 -> 16,200 gzip (the first
+ * time the gzip ceiling has moved), for one correction:
+ *
+ *   the reference exemption in `kernel/guard.ts` — the phone rule no longer replaces a
+ *   bare digit run under a reference key, and both redaction entry points carry the key
+ *   that decides. It is the difference between a store that quotes a product id and one
+ *   that says `product_id="[phone]"`, which R88 measured as 46 of 128 entity values lost
+ *   before persistence. Measured 47,375 raw and 16,025 gzip at this commit, so the raise
+ *   is 125 raw and 175 gzip of headroom: the smallest raise this gate has taken, and
+ *   still a deliberate one. Anything that needed more than a thousand bytes would be a
+ *   mechanism rather than a correction, and would have to be argued on its own.
  */
 const BUDGETS = [
   { name: 'browser', entry: 'packages/browser/dist/index.js', raw: 3200, gzip: 1600 },
-  { name: 'core', entry: 'packages/core/dist/index.js', raw: 47000, gzip: 16000 },
+  { name: 'core', entry: 'packages/core/dist/index.js', raw: 47500, gzip: 16200 },
 ];
 
 const probe = process.argv.includes('--probe');
