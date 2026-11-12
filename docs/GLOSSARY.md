@@ -54,6 +54,15 @@ replaying the same events creates nothing new, because evidence is deduplicated 
 Implements canonicalisation, validation, edit classification, semantic distance, and the payload
 shape. `nl2charts` is the reference.
 
+**Event kind** — the kind whose items are records of episodes rather than claims about them, and
+therefore the one kind exempt from the contradiction rule (`isEventKind`). Every other kind asserts
+what is generally the case, so two items of one kind in one scope with different content are a
+disagreement and the store resolves it. An `exemplar` asserts that something happened once: two orders
+cancelled on two afternoons both happened, and refuting the first when the second is written would be
+reading chronology as contradiction. The exemption is a statement about the object, not a tolerance in
+the ranking — records are admitted on source trust and their own confidence, so a second similar record
+does not corroborate the first, and `applied` stays zero because a record advises nothing.
+
 **Evidence** — one `EvidenceRef` pointing at a feedback event, carrying its weight. Evidence is what
 support sums; it is never edited, only added.
 

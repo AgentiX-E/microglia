@@ -263,6 +263,37 @@ Decision order, first match wins:
 The order matters: a rule is never retired for low confidence while it has a good empirical record,
 and never activated on confidence alone without support.
 
+### 6.1 Two kinds of knowledge, and the rule that must not cross between them
+
+The formula above is written for a **claim**: something several independent observations can support,
+whose application can be scored. Every kind is a claim except one. An `exemplar` is a **record of an
+episode** — a question and the actions that answered it — and the two questions the formula asks do not
+apply to it:
+
+| what the formula asks | what a record has |
+| --- | --- |
+| is it supported by several independent observations? | one observation, by definition |
+| when applied, did it help? | it is not applied as advice; `applied` stays zero |
+
+That has one consequence in this codebase, and it is `isEventKind`:
+
+> Two items of one kind in one scope with different content **contradict each other** — unless the kind
+> is an event.
+
+For claims the rule is right. Two rules of one kind in one scope answer one question, so different
+content is a disagreement, and a store that kept both active would be serving a contradiction. For
+records it is wrong: two orders cancelled on two afternoons both happened, and a store that halved the
+first one's support when the second arrived would be treating chronology as disagreement.
+
+This is not a tolerance and not a special case in the ranking — it is a statement about what the object
+is. A store built from episodes has to say so, because the alternative is a store that refutes its own
+contents: twelve records written, eleven refuted by each other, one admitted.
+
+**Why it matters to a caller.** If you write `exemplar` items, they are admitted on their **source
+trust** and their own confidence, not on repetition — so do not expect a second similar record to
+strengthen the first. If you write claims, the corroboration rule is unchanged and is what protects you
+from a single articulate user. Choosing the kind is choosing which of those two regimes you are in.
+
 ## 7. Security model
 
 | Threat | Control | Where |
