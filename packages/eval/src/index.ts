@@ -962,11 +962,14 @@ export {
 } from './tau2-pack.js';
 export { stoppedRun } from './stopped-run.js';
 export {
+  COMPETITOR_PASS4,
+  COMPETITOR_TASKS,
   DEFAULT_MIN_TASKS,
   PUBLISHED_PASS4,
   PUBLISHED_SCENARIO,
   minTasksOf,
   scenarioBarOf,
+  sotaLineOf,
   type ScenarioBar,
 } from './l4-scenario.js';
 export {

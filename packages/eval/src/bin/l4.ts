@@ -45,7 +45,7 @@ import type {
   TauTrialRow,
 } from '@agentix-e/microglia-eval';
 import { writeJson, writeResult } from './lib.js';
-import { minTasksOf, scenarioBarOf } from '@agentix-e/microglia-eval';
+import { COMPETITOR_PASS4, minTasksOf, scenarioBarOf, sotaLineOf } from '@agentix-e/microglia-eval';
 
 const BAR = 0.05;
 const K = 4;
@@ -454,6 +454,10 @@ await writeResult({
     // A bar that does not apply is reported as absent rather than as a number a reader could divide
     // by: `published_bar_applies` says which of the two this file is.
     ...(scenarioBar.published === null ? {} : { published_pass4: scenarioBar.published }),
+    // The competitor's submitted number as well as its baseline: beating `0.575` says a memory beat no
+    // memory, and beating `0.6754` says it beat ALTK-Evolve. Recorded as a number so a readback does not
+    // carry its own copy of the constant, which is how two definitions of a bar start to drift.
+    ...(scenarioBar.published === null ? {} : { competitor_pass4: COMPETITOR_PASS4 }),
     // Which arm this is, because the two are graded differently and a reader of the artefact
     // cannot otherwise tell a control that failed a bar from a treatment that missed one.
     arm: arm === 'reference' ? 0 : 1,
@@ -481,6 +485,7 @@ await writeResult({
   notes: [
     `Source: ${source} (${measured.format} form). Two arms must share the split.`,
     scenarioBar.note,
+    sotaLineOf(SCENARIO, mean, measured.tasks.length),
     `pass^4 is the unbiased C(c,4)/C(n,4) mean over ${measured.tasks.length} tasks, with success defined as \`reward == 1.0\` exactly, as upstream scores it.`,
     coversSplit
       ? `The split covers the minimum: ${measured.tasks.length} scored tasks against a floor of ${MIN_TASKS}.`
