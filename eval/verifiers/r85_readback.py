@@ -244,7 +244,21 @@ def grade(artefact: dict[str, Any], pair: dict[str, Any] | None = None) -> tuple
         kept_share = None
     else:
         kept_share = share(faithfulness.get("kept", 0), faithfulness["entities"])
-        if kept_share is None:
+        unwritten = faithfulness.get("unwritten")
+        if isinstance(unwritten, int) and unwritten > 0 and unwritten == faithfulness.get(
+            "corrections"
+        ):
+            # The store answered none of these corrections. Every entity then fails a containment test
+            # there is no text for, which prints as `0 of 15 kept (0.0%)` -- total loss at the write
+            # versus the absence of a write. Refusing the rate is the whole point of the counter.
+            report.predict(
+                f"at least {PREDICTED_FAITHFULNESS_MIN:.0%} of the corrections' own entities survive the write",
+                None,
+                f"no measurement: {faithfulness['entities']} entity(ies) in {unwritten} "
+                f"correction(s) never reached the store",
+            )
+            kept_share = None
+        elif kept_share is None:
             report.predict(
                 f"at least {PREDICTED_FAITHFULNESS_MIN:.0%} of the corrections' own entities survive the write",
                 None,
@@ -436,6 +450,17 @@ def main() -> int:
             (
                 "no faithfulness block leaves the write prediction ungraded rather than failed",
                 base_record(**{"tau2.faithfulness": None}),
+                "GRADED",
+            ),
+            (
+                # The reading that a store nobody wrote must not produce: 0 of 40 kept is what an
+                # empty store prints, and it is the absence of a write rather than a writer that
+                # destroyed everything. Ungraded, because `unwritten` says so.
+                "a store that answered no correction leaves the write prediction ungraded",
+                base_record(**{"tau2.faithfulness": {
+                    "corrections": 1, "withoutEntities": 0, "entities": 15, "kept": 0, "whole": 0,
+                    "unwritten": 1,
+                }}),
                 "GRADED",
             ),
             (

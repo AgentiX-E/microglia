@@ -59,7 +59,14 @@ describe('faithfulnessOf', () => {
       [{ runId: 'r1', entities: ['W237', 'item-9'] }],
       [item('Q: exchange W237 for item-9\nA: exchange_delivered_order(order_id="W237")', 'r1')],
     );
-    expect(census).toEqual({ corrections: 1, withoutEntities: 0, entities: 2, kept: 2, whole: 1 });
+    expect(census).toEqual({
+      corrections: 1,
+      withoutEntities: 0,
+      entities: 2,
+      kept: 2,
+      whole: 1,
+      unwritten: 0,
+    });
     expect(faithfulnessRate(census)).toBe(1);
   });
 
@@ -117,7 +124,14 @@ describe('faithfulnessOf', () => {
       ],
       [item('Q: cancel W237', 'r2')],
     );
-    expect(census).toEqual({ corrections: 1, withoutEntities: 1, entities: 1, kept: 1, whole: 1 });
+    expect(census).toEqual({
+      corrections: 1,
+      withoutEntities: 1,
+      entities: 1,
+      kept: 1,
+      whole: 1,
+      unwritten: 0,
+    });
   });
 
   it('answers undefined rather than one when no correction carried an entity', () => {
@@ -131,6 +145,43 @@ describe('faithfulnessOf', () => {
   });
 });
 
+  it('refuses to call an unwritten store an unfaithful writer', () => {
+    // The one reading this instrument must not produce. A dispatch whose distiller wrote nothing --
+    // eleven of fifteen calls faulted, in the run that motivated this module -- has an empty store,
+    // and every entity then "fails" the containment test because there is no text to contain it. That
+    // is `0 of 15 kept (0.0%)`, which reads as total destruction at the write and is really the
+    // absence of a write: the same confusion as a coverage number from a store that was never built.
+    const census = faithfulnessOf(
+      [
+        { runId: 'r1', entities: ['W237', 'item-9'] },
+        { runId: 'r2', entities: ['W999'] },
+      ],
+      [],
+    );
+    expect(census).toEqual({
+      corrections: 2,
+      withoutEntities: 0,
+      entities: 3,
+      kept: 0,
+      whole: 0,
+      unwritten: 2,
+    });
+    expect(faithfulnessRate(census)).toBeUndefined();
+    expect(faithfulnessLine(census)).toBe(
+      'faithfulness: no measurement -- 3 entity(ies) in 2 correction(s) never reached the store',
+    );
+  });
+
+  it('still counts a replaced item as lost once the store answered anything', () => {
+    // A store that holds items has a writer that ran, so a correction with no text of its own was
+    // either merged into another item or dropped -- and the module's existing rule calls that lost
+    // rather than unmeasurable. Only a store with nothing in it is exempt, because only then is there
+    // no writer to judge.
+    const census = faithfulnessOf([{ runId: 'r1', entities: ['W237'] }], [item('Q: cancel W999', 'r2')]);
+    expect(census?.unwritten).toBe(0);
+    expect(faithfulnessRate(census)).toBe(0);
+  });
+
 describe('faithfulnessLine', () => {
   it('prints the counts that give the rate meaning', () => {
     const line = faithfulnessLine({
@@ -139,6 +190,7 @@ describe('faithfulnessLine', () => {
       entities: 8,
       kept: 6,
       whole: 1,
+      unwritten: 0,
     });
     expect(line).toBe(
       'faithfulness: 6 of 8 entity(ies) kept (75.0%), whole in 1 of 3 correction(s), 1 with none to keep',

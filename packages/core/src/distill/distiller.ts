@@ -337,10 +337,21 @@ function sanitize(
   }
   const when = trimmed === undefined || trimmed.length === 0 ? undefined : trimmed;
   const payload = candidate.payload === undefined ? undefined : redactJson(candidate.payload);
+  // The attempt is stamped from the event, and the interpreter's own value is discarded. The same
+  // argument as the provenance check above, one field further: an observation knows which attempt
+  // produced it, and an interpreter — host code reading that observation — can only echo it or
+  // misstate it. Host-wins is also the rule `domainOf` follows for the event's domain, so a store has
+  // one convention here rather than two. Absent stays absent: an offline event declares no attempt,
+  // and writing `0` would be an attempt number nobody made. See `visibleBefore`.
+  const evidence =
+    event.attempt === undefined
+      ? { ...candidate.evidence }
+      : { ...candidate.evidence, attempt: event.attempt };
   return {
     ok: true,
     candidate: {
       ...rest,
+      evidence,
       statement,
       ...(when === undefined ? {} : { when }),
       ...(payload === undefined ? {} : { payload }),

@@ -62,11 +62,11 @@ export function recallQueryOf(get: (name: string) => string | undefined, fixed: 
   // had before the field existed; 0 has no meaning — it would admit a rule with no evidence at all —
   // so it is refused rather than rounded up.
   const minEvidence = whole('minEvidence', (value) => value >= 1, 'not a positive count of corrections');
-  // The in-episode arm's watermark: only claims from strictly earlier attempts may be served. Zero is
-  // the first attempt, so the bound is `>= 0` and not `>= 1` — and a negative bound is refused rather
-  // than read as "no watermark", because it would silently match every item and read as a store that
-  // taught nothing.
-  const before = whole('before', (value) => value >= 0, 'not a trial index');
+  // The in-episode arm's watermark: only claims learned from strictly earlier attempts may be served.
+  // Attempts are 1-based, so 1 — not 0 — is the first attempt, and a negative bound is refused rather
+  // than read as "no watermark", because it would silently match every item and present as a store
+  // that taught nothing.
+  const before = whole('before', (value) => value >= 1, 'not an attempt number');
 
   const rawCoverage = get('minCoverage');
   let minCoverage: number | undefined;

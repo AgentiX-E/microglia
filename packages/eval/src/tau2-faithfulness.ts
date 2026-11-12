@@ -54,6 +54,15 @@ export type FaithfulnessCensus = {
   readonly kept: number;
   /** Corrections whose every entity survived. */
   readonly whole: number;
+  /**
+   * Corrections with entities that the store never answered **because the store was empty**.
+   *
+   * Zero whenever the store held at least one item. This is the counter that keeps a store nobody
+   * wrote from being read as a writer that destroyed everything: with no items there is no text to
+   * contain an entity, so every entity would "fail" and the rate would be `0 of 15 kept (0.0%)` --
+   * which is what a dispatch whose distiller faulted eleven times out of fifteen actually printed.
+   */
+  readonly unwritten: number;
 };
 
 /** One string, when it is an identity rather than prose, from a value of any JSON shape. */
@@ -124,11 +133,17 @@ export function faithfulnessOf(
       textByRun.set(evidence.runId, `${textByRun.get(evidence.runId) ?? ''}\n${text}`);
     }
   }
+  // Whether any write happened at all. This is a property of the store rather than of a correction,
+  // and it is the only thing that can tell "the writer destroyed the detail" from "the writer never
+  // ran": per correction the two look identical, because a run with no item citing it and a run whose
+  // item was replaced by a merge both leave an empty text.
+  const storeEmpty = items.length === 0;
   let corrections = 0;
   let withoutEntities = 0;
   let entities = 0;
   let kept = 0;
   let whole = 0;
+  let unwritten = 0;
   for (const row of rows) {
     if (row.entities.length === 0) {
       withoutEntities += 1;
@@ -144,15 +159,22 @@ export function faithfulnessOf(
         here += 1;
       }
     }
+    if (storeEmpty) unwritten += 1;
     if (here === row.entities.length) whole += 1;
   }
   if (corrections === 0) return undefined;
-  return { corrections, withoutEntities, entities, kept, whole };
+  return { corrections, withoutEntities, entities, kept, whole, unwritten };
 }
 
-/** The kept share, or `undefined` when nothing was there to keep. */
+/**
+ * The kept share, or `undefined` when nothing was there to keep -- or nothing was written at all.
+ *
+ * The second absence is the one worth stating: a rate over a store no write reached is not zero, it is
+ * missing, and a `0.0` there is indistinguishable from a writer that strips every identity it is given.
+ */
 export function faithfulnessRate(census: FaithfulnessCensus | undefined): number | undefined {
   if (census === undefined || census.entities === 0) return undefined;
+  if (census.unwritten === census.corrections) return undefined;
   return census.kept / census.entities;
 }
 
@@ -160,6 +182,12 @@ export function faithfulnessRate(census: FaithfulnessCensus | undefined): number
 export function faithfulnessLine(census: FaithfulnessCensus | undefined): string {
   if (census === undefined) {
     return 'faithfulness: absent (no correction carried an argument value)';
+  }
+  if (census.unwritten === census.corrections) {
+    return (
+      `faithfulness: no measurement -- ${String(census.entities)} entity(ies) in ` +
+      `${String(census.corrections)} correction(s) never reached the store`
+    );
   }
   const rate = faithfulnessRate(census) ?? 0;
   return (

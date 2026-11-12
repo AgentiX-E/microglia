@@ -88,35 +88,39 @@ export function scopeMatches(scope: KnowledgeScope, query: RecallQuery): boolean
 }
 
 /**
- * Whether a trial may read this claim: did every observation behind it come from an earlier attempt?
+ * Whether an attempt may read this claim: did every observation behind it come from an earlier one?
  *
- * The in-episode arm writes to the store between trials, which turns one question into two — *did the
- * mechanism learn from what it just failed* and *did the pack serve it* — and makes a third possible
- * answer that is not learning at all: the pack contained the trial's own lesson, because the write
+ * The in-episode arm writes to the store *between* attempts, which turns one question into two — *did
+ * the mechanism learn from what it just failed* and *did the pack serve it* — and makes a third answer
+ * possible that is not learning at all: the pack contained the attempt's own lesson, because the write
  * landed before the recall. This predicate is what rules that out, and it is a pure function of the
- * claim's evidence so it can be checked against a store that a concurrent writer is extending.
+ * claim's evidence, so it can be checked against a store a concurrent writer is extending.
  *
  * The three cases, and why each is decided the way it is:
  *
- *  - **no watermark** — every offline arm. The store was frozen before the first evaluation trial, so
- *    there is nothing a trial could leak to itself, and `undefined` must not mean "trial zero": an
+ *  - **no watermark** — every offline arm. The store was frozen before the first evaluation attempt, so
+ *    there is nothing an attempt could leak to itself, and `undefined` must not mean "before 1": an
  *    upgrade cannot change what a published number measured.
- *  - **no trial declared on any observation** — the claim was distilled offline and predates the
- *    episode. It is served. Reading the absence as "the latest trial" would empty every store built
+ *  - **no attempt declared on any observation** — the claim was distilled offline and predates the
+ *    episode. It is served. Reading the absence as "the latest attempt" would empty every store built
  *    before the run, which is the failure that looks exactly like memory that learned nothing.
- *  - **any declared trial at or after the watermark** — withheld, and the quantifier is `every`
- *    rather than `some`: the unit the pack serves is the *item*, so a merged claim citing trial 0 and
- *    trial 2 has taught the model something trial 2 said, whatever the rest of its support is.
+ *  - **any declared attempt at or after the watermark** — withheld, and the quantifier is `every`
+ *    rather than `some`: the unit the pack serves is the *item*, so a merged claim citing attempt 1 and
+ *    attempt 3 has taught the model something attempt 3 said, whatever the rest of its support is.
+ *
+ * Attempts are 1-based, so `before: 1` is the first attempt and serves only what was learned before the
+ * episode began. The comparison is `<` and not `<=` because an attempt is exactly what must be excluded.
  */
 export function visibleBefore(
   item: Pick<KnowledgeItem, 'evidence'>,
   before: number | undefined,
 ): boolean {
   if (before === undefined) return true;
-  return item.evidence.every((ref) => ref.trial === undefined || ref.trial < before);
+  return item.evidence.every((ref) => ref.attempt === undefined || ref.attempt < before);
 }
 
-/** Number of constrained dimensions; specificity is the tie-breaker in ranking. */export function specificity(scope: KnowledgeScope): number {
+/** Number of constrained dimensions; specificity is the tie-breaker in ranking. */
+export function specificity(scope: KnowledgeScope): number {
   let count = 1;
   if (scope.domain !== undefined) count += 1;
   if (scope.schemaDigest !== undefined) count += 1;

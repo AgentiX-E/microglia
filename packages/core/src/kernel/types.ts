@@ -213,16 +213,19 @@ export type EvidenceRef = {
   /**
    * Which attempt at that task produced this evidence, when the host ran it more than once.
    *
-   * The offline arms write every claim before any evaluation trial starts, so this field is absent
-   * from all of them and their packs are unchanged. It exists for the in-episode arm, where the
-   * store is written *during* the evaluation from the trial that just failed, and where the one
-   * property that makes the reading a measurement rather than a leak is that trial *t* cannot read
-   * a claim distilled from trial *t*. See `visibleBefore`.
+   * 1-based, the same numbering `FeedbackEvent.attempt` and `RunRecord.attempt` already use, so a host
+   * that opened a task does not have to translate between two vocabularies. The offline arms write
+   * every claim before any evaluation trial starts, so this field is absent from all of them and their
+   * packs are unchanged. It exists for the in-episode arm, where the store is written *during* the
+   * evaluation from the trial that just failed, and where the one property that makes the reading a
+   * measurement rather than a leak is that attempt *t* cannot read a claim distilled from attempt *t*.
+   * See `visibleBefore`.
    *
-   * Zero is a real attempt and not a sentinel: a store written by the first trial must be invisible
-   * to the first trial, which no `if (trial)` shortcut may quietly allow.
+   * Filled by `distill` from the event's own `attempt`, not taken from the interpreter: the attempt is
+   * a property of the observation, and an interpreter is host code stating facts about someone else's
+   * evidence. One that states a different number is overruled, the way the host's `domainOf` is.
    */
-  readonly trial?: number;
+  readonly attempt?: number;
 };
 
 /**
@@ -501,17 +504,18 @@ export type RecallQuery = {
    */
   readonly note?: 'standard' | 'hardened' | 'none';
   /**
-   * The trial index whose pack this is: only claims from strictly earlier attempts may be served.
+   * The attempt whose pack this is: only claims learned from strictly earlier attempts may be served.
    *
    * Absent means "no watermark", which is every offline arm -- the store there is frozen before the
-   * evaluation starts, so there is nothing to leak. It is present only in the in-episode arm, where
-   * the write happens between trials and the whole reading depends on trial *t* not seeing what
-   * trial *t* taught. The watermark travels in the request rather than in the writer's memory
-   * because it has to hold against a write that lands while the trial is still recalling, and a
-   * filter the reader supplies is the only one a concurrent writer cannot outrun.
+   * evaluation starts, so there is nothing to leak. It is present only in an arm that writes between
+   * attempts, where the whole reading depends on attempt *t* not seeing what attempt *t* taught. The
+   * watermark travels in the request rather than in the writer's memory because it has to hold against
+   * a write that lands while the attempt is still recalling, and a filter the reader supplies is the
+   * only one a concurrent writer cannot outrun.
    *
-   * `0` is a real trial: an offline store (no trial declared on any evidence) passes every
-   * watermark, and a store written by attempt zero fails a watermark of zero.
+   * 1-based like `FeedbackEvent.attempt`: `before: 1` is the first attempt and serves only what the
+   * store held before the episode began. A claim that declares no attempt predates the episode and is
+   * served to all of them.
    */
   readonly before?: number;
 };
