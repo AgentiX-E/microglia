@@ -65,6 +65,7 @@
     "eval:prereg-scenario": "tsx packages/eval/src/bin/prereg-scenario.ts",
     "eval:prereg-form": "tsx packages/eval/src/bin/prereg-form.ts",
     "eval:pack-knobs": "tsx packages/eval/src/bin/pack-knobs.ts",
+    "eval:l4-pool": "tsx packages/eval/src/bin/l4-pool.ts",
     "eval:prereg-arms": "tsx packages/eval/src/bin/prereg-arms.ts",
     "eval:prereg-temperature": "tsx packages/eval/src/bin/prereg-temperature.ts",
     "eval:prereg-population": "tsx packages/eval/src/bin/prereg-population.ts",

@@ -912,6 +912,17 @@ export {
   type ResilientInterpreter,
 } from './tau2-distill.js';
 export {
+  detectablePp,
+  halfWidthOf,
+  poolArms,
+  poolLine,
+  type PoolArm,
+  type PoolArmReading,
+  type PoolOutcome,
+  type PoolReading,
+  type PoolTask,
+} from './l4-pool.js';
+export {
   ENTITY_MAX_CHARS,
   ENTITY_MIN_CHARS,
   entitiesOf,
