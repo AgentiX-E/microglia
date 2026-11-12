@@ -38,6 +38,13 @@ from _retention import retention_note
 
 STATES = ("GRADED", "NO_MEASUREMENT", "DISCARDED", "ABANDONED")
 
+# How much of the corpus may fail to reach the model before the store stops describing the corpus.
+#
+# R58 recorded `llmFailed: 11` of 15 asked and the readback graded "nothing recurs" on the four
+# answers that survived -- a statement about a store, presented as a statement about the unit. Half
+# is the line: below it the store is a sample with a stated hole, above it the hole is the finding.
+LLM_FAILURE_VOID_SHARE = 0.5
+
 # Quoted from `prereg/R58-trace-unit.md`, written before the measurement existed.
 PREDICTED_SUPPORT3_MIN = 1
 PREDICTED_SUPPORT2_SHARE_MIN = 0.25
@@ -185,6 +192,39 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
             # partly the control's, and a support number from it is not the treatment's.
             report.note("traced share below the floor: the unit under test did not run")
             return "NO_MEASUREMENT", report
+
+    # The chain from correction to claim passes through the model, and it is checked before the
+    # store is read rather than after: a store built from four of fifteen events cannot answer what
+    # recurs, and reporting its silence as the unit's refutation is the "three owners of a zero"
+    # defect moved one layer down -- the store is empty because the provider failed, not because the
+    # claims do not recur.
+    learning = tau2.get("learning") or {}
+    asked = learning.get("events")
+    failed = learning.get("llmFailed")
+    if isinstance(asked, int) and asked > 0 and isinstance(failed, int):
+        answered = asked - failed
+        fault_share = failed / asked
+        reasons = learning.get("llmFailedReasons")
+        detail = "" if not isinstance(reasons, dict) else " (" + ", ".join(
+            f"{code} {count}" for code, count in sorted(reasons.items())
+        ) + ")"
+        if fault_share >= LLM_FAILURE_VOID_SHARE:
+            report.note(
+                f"the model answered {answered} of {asked} event(s): {failed} faulted and the rule "
+                f"fallback took them{detail}"
+            )
+            report.predict(
+                "the model answered enough of the corpus that the store describes it",
+                None,
+                f"{failed} of {asked} event(s) faulted ({fault_share:.0%}); the store holds "
+                f"{learning.get('distilled')!r} item(s) from {answered} answer(s)",
+            )
+            return "NO_MEASUREMENT", report
+        if failed > 0:
+            report.note(
+                f"{failed} of {asked} event(s) answered by the rule fallback{detail}, under the "
+                f"void floor: the store is a sample of the corpus with a stated hole"
+            )
 
     census = census_of(tau2)
     if census is None:
@@ -402,6 +442,28 @@ def main() -> int:
                 base_artefact(**{"metrics.k": 1}),
                 "ABANDONED",
             ),
+            # The store is one layer downstream of the model, and R58's own store was built from four
+            # of fifteen answers. Grading "nothing recurs" on it would be a statement about the
+            # provider's availability published as a statement about the unit.
+            (
+                "a store built from part of the corpus does not grade the corpus",
+                base_artefact(**{
+                    "tau2.learning.events": 15,
+                    "tau2.learning.llmFailed": 11,
+                    "tau2.learning.distilled": 6,
+                    "tau2.learning.llmFailedReasons": {"MG_E_INVALID_SIGNAL": 11},
+                }),
+                "NO_MEASUREMENT",
+            ),
+            (
+                "one fallback under the void floor is a sample with a stated hole, not a void",
+                base_artefact(**{
+                    "tau2.learning.events": 15,
+                    "tau2.learning.llmFailed": 1,
+                    "tau2.learning.distilled": 20,
+                }),
+                "GRADED",
+            ),
         ]
         failures = 0
         for label, artefact, expected in cases:
@@ -467,6 +529,20 @@ def main() -> int:
                     }
                 ),
                 ["memory undefined (0 held of 0 pair(s)), 57 of 57 task(s) carried no order"],
+            ),
+            (
+                "a store built from a minority of the corpus names the layer that failed",
+                base_artefact(**{
+                    "tau2.learning.events": 15,
+                    "tau2.learning.llmFailed": 11,
+                    "tau2.learning.distilled": 6,
+                    "tau2.learning.llmFailedReasons": {"MG_E_INVALID_SIGNAL": 11},
+                }),
+                [
+                    "the model answered 4 of 15 event(s): 11 faulted and the rule fallback took them",
+                    "MG_E_INVALID_SIGNAL 11",
+                    "the model answered enough of the corpus that the store describes it",
+                ],
             ),
             (
                 "a pair written before retention existed says so instead of printing nothing",
