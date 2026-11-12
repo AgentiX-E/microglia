@@ -554,6 +554,19 @@ describe('the projection has a decision for every field, and keeps it', () => {
         },
       },
       recall: { requests: 200, served: 200, empty: 0 },
+      // R89: what the pack served and what it refused. Carried rather than reduced, because the two
+      // numbers it separates -- nothing relevant, and relevant but too long -- are the difference
+      // between a retrieval fix and a budget fix.
+      pack: {
+        budget: 2400,
+        capacity: 2010,
+        requests: 200,
+        filled: 198,
+        empty: 2,
+        emptiedBySize: 1,
+        droppedForSize: 3,
+        summary: { meanIds: 2, meanChars: 1720 },
+      },
       storeItems: {
         items: [
           {
@@ -745,6 +758,27 @@ describe('the projection has a decision for every field, and keeps it', () => {
     };
     const record = armRecordFromDriver(full({ inaction }));
     expect(record.inaction).toEqual(inaction);
+  });
+
+  it('carries the pack census, which is the only place a dropped record is not read as no memory', () => {
+    // `recall.empty` counts both "nothing relevant" and "the relevant record did not fit the budget" as
+    // one number. R88 wrote 2,000-character records into a 1,200-character pack, where the capacity is
+    // 810 characters of statement, so the second state was live on that run and unreadable in its
+    // artefact.
+    const pack = {
+      budget: 1200,
+      capacity: 810,
+      requests: 228,
+      filled: 216,
+      empty: 12,
+      emptiedBySize: 12,
+      droppedForSize: 47,
+      summary: { meanIds: 1, meanChars: 1086 },
+    };
+    // Spread after `full()` rather than through it: the fixture states its own `pack`, and an override
+    // passed through its argument is overwritten by the fixture's copy — the same trap that once made
+    // three tests assert the fixture's value instead of the case's.
+    expect(armRecordFromDriver({ ...full(), pack }).pack).toEqual(pack);
   });
 
   it('carries every field it says it carries', () => {

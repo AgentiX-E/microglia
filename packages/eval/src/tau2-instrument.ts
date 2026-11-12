@@ -46,6 +46,7 @@ import type { ConsolidationCensus } from "@agentix-e/microglia-core/distill";
 import type { InactionCensus } from "./inaction.js";
 import type { YieldCensus } from "./tau2-yield.js";
 import type { PlantCensus } from "./plant.js";
+import type { PackCensus } from "./tau2-pack.js";
 import type { ConsolidationSweep } from "./consolidation-sweep.js";
 import type { ProvenanceCensus } from "./tau2-provenance.js";
 import {
@@ -246,6 +247,19 @@ export type Tau2Raw = {
   readonly store?: StoreCensus;
   /** What the facade was asked for, and how often it had an answer. */
   readonly recall?: RecallTally;
+  /**
+   * What the pack served and what it refused, which `recall.empty` cannot separate.
+   *
+   * `recall.empty` counts one state. Two states produce it: a store with nothing relevant, and a
+   * relevant record the renderer dropped because it did not fit the character budget. R88 wrote
+   * records under a 2,000-character ceiling into a 1,200-character pack, where capacity is 810
+   * characters of statement — 41.2% of the retail corpus is above that — so the second state was
+   * available on that run and nothing in the artefact could have said so.
+   *
+   * Absent on every artefact written before the census existed, and absent rather than zero: a run that
+   * did not count its refusals did not refuse nothing.
+   */
+  readonly pack?: PackCensus;
   /**
    * What the delivered packs actually contained, one row per recall request.
    *
@@ -574,6 +588,9 @@ export const PROJECTION: {
   scenario: "carried",
   domains: "reduced",
   store: "carried",
+  // Carried verbatim: the first reading in this lane of what the pack *refused*, and the field a
+  // registration is graded on when a ceiling and a budget disagree.
+  pack: "carried",
   recall: "carried",
   useObservations: "reduced",
   coverageObservations: "reduced",
@@ -709,6 +726,7 @@ export function armRecordFromDriver(
       : { injectionNote: raw.injectionNote }),
     ...(raw.funnel === undefined ? {} : { funnel: raw.funnel }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),
+    ...(raw.pack === undefined ? {} : { pack: raw.pack }),
     ...(raw.inaction === undefined ? {} : { inaction: raw.inaction }),
     // The use census rides beside V1's rate. It is computed here, from the raw
     // observations the driver collected at the facade, so the driver carries
