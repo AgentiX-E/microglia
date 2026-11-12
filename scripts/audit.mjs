@@ -174,7 +174,10 @@ for (const internal of ['WHITEPAPER.md', 'TECH-DESIGN.md', 'ROADMAP.md', 'AUDIT.
     for (const line of text.split('\n')) {
       const match = /^\s*(?:-\s*)?run:\s*(.+)$/.exec(line);
       if (match === null) continue;
-      for (const call of match[1].matchAll(/pnpm\s+(?:run\s+)?([a-zA-Z0-9:_-]+)/g)) {
+      // Flags first: `pnpm --silent eval:wait-band` is a call to `eval:wait-band`, and the capture used
+      // to take `--silent` because `-` is a legal character in a script name. A checker that reports a
+      // flag as a missing script is a checker an operator learns to ignore.
+      for (const call of match[1].matchAll(/pnpm\s+(?:-{1,2}[^\s]+\s+)*(?:run\s+)?([a-zA-Z0-9:_-]+)/g)) {
         const name = call[1];
         if (name === 'install' || name === 'exec' || name === 'dlx') continue;
         if (!defined.has(name)) {
