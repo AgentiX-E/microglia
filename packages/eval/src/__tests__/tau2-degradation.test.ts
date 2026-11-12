@@ -71,6 +71,28 @@ describe('degradationOfPair', () => {
     expect(degradationOfPair([], rows([['a', 0, 1]]))).toBeUndefined();
   });
 
+  it('treats an unscored trial as a hole on both sides rather than as a failure', () => {
+    // `per_trial` writes `null` for a trial the harness never scored. Folding it into `false` would file
+    // it as a reference failure and credit the memory arm with a repair nobody measured — so the hole
+    // maps to `undefined` and stays out of every denominator.
+    const holes: readonly { readonly id: string; readonly trial: number; readonly reward: number | null }[] = [
+      { id: 'a', trial: 0, reward: null },
+      { id: 'b', trial: 0, reward: 1 },
+    ];
+    const reading = degradationOfPair(holes, holes);
+    expect(reading?.blankRight).toBe(1);
+    expect(reading?.broke).toBe(0);
+    expect(reading?.unmeasured).toBe(1);
+  });
+
+  it('refuses a ledger that names one trial twice, on either side', () => {
+    // A duplicated key is an instrument fault rather than a data point: `per_trial` is one row per
+    // (task, trial), so two rows for one key means the file is two runs concatenated, and the share
+    // would be taken over a population that exists only in the file.
+    expect(degradationOfPair(rows([['a', 0, 1]]), rows([['a', 0, 1], ['a', 0, 0]]))).toBeUndefined();
+    expect(degradationOfPair(rows([['a', 0, 1], ['a', 0, 0]]), rows([['a', 0, 1]]))).toBeUndefined();
+  });
+
   it('leaves a trial whose partner is missing out of the denominator', () => {
     // A hole on the other side is the absence of a denominator, not a negative result -- the same rule
     // the transfer reader applies, and the reason `unmeasured` exists beside `blankRight`.

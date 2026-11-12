@@ -1629,3 +1629,76 @@ describe('rawCeiling, the one number R85 was mismeasured by', () => {
     expect(readPrereg(withHeader('distillUnit: raw\nrawCeiling: 2000.5'), 'R88-ceiling.md').problems).toHaveLength(1);
   });
 });
+
+describe('packBudget, the other half of the ceiling', () => {
+  const HEADER = [
+    '---',
+    'id: R89-pack-carries',
+    'step: R89',
+    'opened: 2026-11-12',
+    'arms: memory',
+    'sample: 228',
+    'gates: V1',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '## Prediction\n\n- a record the pack can carry is served as it was written\n\n' +
+    '## Refutation\n\n- a record dropped for size proves the ceiling and the budget are one number\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads the budget a registration states', () => {
+    const reading = readPrereg(withHeader('packBudget: 2400'), 'R89-pack-carries.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.packBudget).toBe(2400);
+  });
+
+  it('refuses a budget no pack can carry, rather than reading zero as a default', () => {
+    // A zero budget is not "the module default": it is a pack that renders nothing, and the default is
+    // spelled by leaving the header out. The two must not be the same word.
+    expect(problemsOf(withHeader('packBudget: 0'), 'R89-pack-carries.md')).toEqual([
+      "header 'packBudget': '0' is not a budget a pack can carry in characters",
+    ]);
+    expect(problemsOf(withHeader('packBudget: 12.5'), 'R89-pack-carries.md')).toHaveLength(1);
+  });
+
+  it('accepts a ceiling the pack can carry, measured rather than assumed', () => {
+    // 2,000 + 390 = 2,390 characters of pack, so 2,400 is the smallest round budget that carries the
+    // longest retail record whole: the capacity is 810 at 1,200 and 2,010 at 2,400.
+    const reading = readPrereg(
+      withHeader('distillUnit: raw\nrawCeiling: 2000\npackBudget: 2400'),
+      'R89-pack-carries.md',
+    );
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.packBudget).toBe(2400);
+  });
+
+  it('reads a ceiling above the declared budget rather than refusing it here', () => {
+    // The reader parses; it does not measure. `prereg.ts` is read by jobs that run *before* the build,
+    // so it cannot reach the renderer that decides what a pack carries — the import-closure test enforces
+    // that boundary, and the coupling check therefore lives in `prereg-pack.ts`, where the dispatch
+    // reader and the gate over every registration both call it.
+    const reading = readPrereg(
+      withHeader('distillUnit: raw\nrawCeiling: 2000\npackBudget: 1200'),
+      'R89-pack-carries.md',
+    );
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.rawCeiling).toBe(2000);
+    expect(reading.prereg?.packBudget).toBe(1200);
+  });
+
+  it('leaves a ceiling declared without a budget alone, so finished runs keep their reading', () => {
+    // R85, R86, R87 and R88 all ran at 1,200 and none of them stated it. A validator that refused them
+    // retroactively would be rewriting the record of what was dispatched; the dispatch log carries the
+    // capacity instead (`prereg-caps` prints it), so the mismatch is visible where it is decided.
+    const reading = readPrereg(
+      withHeader('distillUnit: raw\nrawCeiling: 2000'),
+      'R89-pack-carries.md',
+    );
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.packBudget).toBeUndefined();
+  });
+});

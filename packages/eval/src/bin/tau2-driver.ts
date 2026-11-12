@@ -94,6 +94,11 @@ import {
   rawLogCensus,
   rawLogInterpreter,
   rawLogInterpreterFor,
+  rawLogItemShape,
+  DEFAULT_PACK_BUDGET,
+  ceilingLineOf,
+  packCensus,
+  packLineOf,
   resolveTraceClaims,
   tracesOf,
   yieldCensus,
@@ -118,10 +123,11 @@ import {
   type InactionCensus,
   type NoteArmReading,
   type NotedFacadeReading,
+  type PackReading,
   type ProbeAttempt,
   type ResilientInterpreter,
 } from "@agentix-e/microglia-eval";
-import type { NoteMode } from "@agentix-e/microglia-core/apply";
+import { maxStatementChars, type NoteMode } from "@agentix-e/microglia-core/apply";
 import {
   PLANT_ENV,
   plantCensus,
@@ -288,6 +294,21 @@ const TEST_TASKS = Math.max(0, Number(process.env["TAU_TEST_TASKS"] ?? 0) || 0);
  */
 const RAWLOG_CEILING = Math.max(0, Number(process.env["TAU_RAWLOG_CEILING"] ?? 0) || 0);
 /**
+ * The characters of knowledge one recall may carry; `0` means the module default of 1,200.
+ *
+ * It is a switch now for the reason the ceiling is: the two numbers are coupled and neither lane could
+ * see the coupling. At 1,200 a record in this arm's shape can state 810 characters —
+ * `maxStatementChars` measures it — so a registration that writes 2,000-character records is writing
+ * text the pack drops at render, where it reads as a request with nothing relevant. A registration
+ * states the budget in its header (`packBudget`) so the ceiling it writes can be checked against what
+ * the pack can carry, and the census (`tau2-pack.ts`) prices any loss that remains.
+ *
+ * The default is the number every published arm ran with, so an arm that does not state one keeps the
+ * reading it was published with.
+ */
+const PACK_BUDGET =
+  Math.max(0, Number(process.env["TAU_PACK_BUDGET"] ?? 0) || 0) || DEFAULT_PACK_BUDGET;
+/**
  * The interpreter that can import `tau2`.
  *
  * `uv sync` puts the benchmark in `.tau2-bench/.venv`, so the system `python3` on a
@@ -328,6 +349,18 @@ const DISTILL_FORM = resolveDistillForm();
  * so a reader of the artefact never has to infer which of the two produced the store.
  */
 const DISTILL_UNIT = resolveDistillUnit();
+
+/**
+ * The longest statement the pack can carry under this arm, measured on the shape it writes.
+ *
+ * Absent for every unit but `raw`, and the absence is the honest reading: a claim's line is as long as
+ * the model made its payload, so there is no single capacity to quote for it. For a record there is,
+ * because the record's shape is the interpreter's — nineteen-character id, task-and-domain scope, the
+ * provenance payload — and `maxStatementChars` renders one to find out. This is the number the ceiling
+ * has to fit, and until R89 nothing anywhere compared the two.
+ */
+const RECORD_CAPACITY =
+  DISTILL_UNIT === "raw" ? maxStatementChars({ budget: PACK_BUDGET }, rawLogItemShape) : null;
 
 // R60: how many claims one trace may teach. Declared readback in the artefact, because two runs at
 // two ceilings are two experiments and a store cannot say which one built it.
@@ -859,7 +892,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     namespace: "tau2",
     store,
     interpreter,
-    budget: 1200,
+    budget: PACK_BUDGET,
     clock: steppingClock(1_700_000_000_000, 1),
     random: mulberry32(Number(process.env["TAU_SEED"] ?? 7) || 7),
     // A τ² correction is gold-verified by `evaluation_criteria.actions`, not judged
@@ -999,6 +1032,19 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // is the one failure mode six nulls on this lane could not be told apart from.
   const faithfulness = faithfulnessOf(captured, written);
   process.stdout.write(`[tau2] ${faithfulnessLine(faithfulness)}\n`);
+  // R89: the ceiling against the pack, said at the write rather than discovered at the read. A ceiling
+  // above the capacity writes records the renderer drops, and a dropped record has read as "nothing was
+  // relevant" in every artefact this lane produced. Printing it here prices the decision before the
+  // first episode is paid for.
+  if (RECORD_CAPACITY !== null) {
+    process.stdout.write(
+      `[tau2] ${ceilingLineOf({
+        ceiling: RAWLOG_CEILING > 0 ? RAWLOG_CEILING : undefined,
+        budget: PACK_BUDGET,
+        capacity: RECORD_CAPACITY,
+      })}\n`,
+    );
+  }
   // R62: which population each claim came from, joined through the evidence's own run id. Taken here,
   // from the store as the distiller wrote it, for the same reason the sweep is: the pass below folds
   // items together, and a census over the folded store would attribute a merged claim to whichever of
@@ -1161,6 +1207,14 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     readonly scored: ReturnType<typeof scoredArm>;
     readonly diagnostics: Tau2PhaseDiagnostics | undefined;
     readonly servedPackSizes: number[];
+    /**
+     * One reading per served pack, for the census that separates "nothing was relevant" from
+     * "everything relevant was too long to render".
+     *
+     * Kept as the packs themselves rather than as counts so the split is derived in `packCensus` from
+     * what the renderer did, not reconstructed here from two numbers that could disagree with it.
+     */
+    readonly packReadings: PackReading[];
     readonly recallRequests: number;
     readonly recallServed: number;
     readonly useObservations: UseObservation[];
@@ -1196,6 +1250,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // agent's transcript. A mean over no request and a mean over two hundred
     // empty answers are both 0, which is why the served tally is kept too.
     const servedPackSizes: number[] = [];
+    const packReadings: PackReading[] = [];
     let recallRequests = 0;
     let recallServed = 0;
     // What each served pack actually contained, at the facade boundary. The
@@ -1225,6 +1280,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         recallRequests += 1;
         if (pack.items.length > 0) recallServed += 1;
         servedPackSizes.push(pack.items.length);
+        packReadings.push({ ids: pack.ids, truncated: pack.truncated, rendered: pack.rendered });
         useObservations.push({
           query: text,
           statements: pack.items.map((item) => item.statement),
@@ -1248,6 +1304,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       recallRequests += 1;
       recallServed += 1;
       servedPackSizes.push(pack.items.length + 1);
+      // The host's pack, before the planted line: the census prices the budget the store's items
+      // competed for, and the appended rule is not one of them.
+      packReadings.push({ ids: pack.ids, truncated: pack.truncated, rendered: pack.rendered });
       useObservations.push({
         query: text,
         statements: [
@@ -1282,6 +1341,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       scored: scoredArm(out),
       diagnostics,
       servedPackSizes,
+      packReadings,
       recallRequests,
       recallServed,
       useObservations,
@@ -1434,6 +1494,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     process.stdout.write(`[tau2] planted: ${plantSummary(primary.plant)}\n`);
   }
 
+  // R89: what the pack served and what it refused, in one line, next to the bill. `recall.empty`
+  // counts both "nothing relevant" and "the relevant record did not fit" as one number; this is the
+  // line that separates them, and it is printed unconditionally so a run with no drop still says so.
+  process.stdout.write(
+    `[tau2] ${packLineOf(
+      packCensus(primary.packReadings, { budget: PACK_BUDGET, capacity: RECORD_CAPACITY }),
+    )}\n`,
+  );
+
   const agentTurns = primary.diagnostics?.agent_turns ?? null;
   // One line, unconditional, so that a run's bill is in its own log next to its score.
   // `null` rather than an omitted line: a dispatch that could not count is a different
@@ -1568,6 +1637,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       served: primary.recallServed,
       empty: primary.recallRequests - primary.recallServed,
     },
+    // R89: what the pack refused, which `recall.isEmpty` cannot say. A request whose best record was
+    // too long to render is counted as `empty` there and as `emptiedBySize` here, and the two call for
+    // a budget change and a retrieval change respectively.
+    pack: packCensus(primary.packReadings, {
+      budget: PACK_BUDGET,
+      capacity: RECORD_CAPACITY,
+    }),
     // What the served packs contained. `withoutDomain` is the store's count of
     // `domain === undefined` items, from the same domain ledger V44 reads.
     useObservations: primary.useObservations,

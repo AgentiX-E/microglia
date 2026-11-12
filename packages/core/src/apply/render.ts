@@ -134,6 +134,60 @@ export function encodeItemLine(item: RenderableItem, conditions: boolean): strin
 }
 
 /**
+ * An item without its statement: everything about the line that does not depend on the text.
+ *
+ * The capacity of a pack is a function of this and the budget, and it is not a function of the
+ * statement — which is why the statement is the one field this type omits. A caller that quotes a
+ * capacity without saying which shape it measured is quoting a number about a different item.
+ */
+export type StatementShape = Omit<RenderableItem, 'statement'>;
+
+/**
+ * The longest statement a pack at these options can carry, **measured** rather than derived.
+ *
+ * The budget and the ceiling are two numbers that look independent and are not. A record written
+ * above what the pack can render is recalled, ranked, and then dropped at render: the write side
+ * spends characters the read side never shows, and the loss is invisible because a pack that dropped
+ * its only candidate is a pack that returns `ids: []`, which every lane reports as "nothing was
+ * relevant". R88 raised a 700-character ceiling to 2,000 while the pack stayed at 1,200 and nothing in
+ * the repository compared the two.
+ *
+ * The arithmetic is a wrapper, a line's fixed fields and the statement, and it could be written out
+ * here — a second definition of what `renderPack` charges, drifting the first time either changes.
+ * So this renders instead: an `n`-character statement is put through the real renderer at the real
+ * options and the answer is the largest `n` that survives. Twelve calls per measurement, no state.
+ *
+ * Three limits, stated because a capacity read as a guarantee is worse than no number:
+ *
+ *  - **The probe is plain ASCII.** A statement of quotes, newlines or `<` encodes longer and does not
+ *    fit at the reported length; the test that says so is the one that keeps this honest. A ceiling
+ *    should sit below the capacity by the escape cost of the text the lane actually writes.
+ *  - **It is charged for one item.** A pack carrying two items has less room per item only if the
+ *    wrapper grew, which it does not: two items of `c` characters each need `2c + 2 × lineOverhead`,
+ *    so the per-item capacity at a fixed budget is a property of how many are carried, not of this.
+ *  - **It follows the options it is given.** A longer note costs capacity under the default
+ *    `note-included` basis and costs nothing under `note-excluded`, so the number belongs to a pack
+ *    configuration rather than to the library.
+ *
+ * Returns zero when the budget cannot hold the wrapper and one line at all — the same case
+ * `renderPack` answers with an empty string, and a negative capacity would be a pack that renders
+ * text it does not have.
+ */
+export function maxStatementChars(options: RenderOptions, shape: StatementShape): number {
+  const fits = (length: number): boolean =>
+    renderPack([{ ...shape, statement: 'x'.repeat(length) }], options).ids.length === 1;
+  let low = 0;
+  let high = Math.max(0, Math.trunc(options.budget));
+  if (!fits(low)) return 0;
+  while (low < high) {
+    const middle = Math.ceil((low + high) / 2);
+    if (fits(middle)) low = middle;
+    else high = middle - 1;
+  }
+  return low;
+}
+
+/**
  * The wrapper states its own item count inside a five-character placeholder.
  *
  * That width is what makes the budget a guarantee rather than an estimate: for

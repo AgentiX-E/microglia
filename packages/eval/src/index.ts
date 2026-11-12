@@ -940,11 +940,25 @@ export {
   rawLogCensus,
   rawLogInterpreter,
   rawLogInterpreterFor,
+  rawLogItemShape,
   rawLogStatement,
   rawLogTruncated,
   type RawLogCensus,
 } from './tau2-rawlog.js';
 export { degradationLineOf, degradationOfPair } from './tau2-degradation.js';
+export {
+  DEFAULT_PACK_BUDGET,
+  CEILING_ABOVE_PACK,
+  CEILING_ABSENT,
+  CEILING_FITS,
+  ceilingLineOf,
+  ceilingVerdictOf,
+  packCensus,
+  packLineOf,
+  type CeilingVerdict,
+  type PackCensus,
+  type PackReading,
+} from './tau2-pack.js';
 export { stoppedRun } from './stopped-run.js';
 export {
   DEFAULT_MIN_TASKS,

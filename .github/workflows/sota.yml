@@ -1338,6 +1338,11 @@ jobs:
           # default of 700 and clipped twelve of twelve records, because 700 bounds a trace statement
           # and a record is a question plus an answer.
           echo "rawCeiling=$(echo "$CAPS" | sed -n 's/^ceiling=//p')" >> "$GITHUB_OUTPUT"
+          # R89: the other half of the ceiling. A pack charges a fixed wrapper plus a line per item, so
+          # a 1,200-character pack carries a record only up to 810 characters: a registration that
+          # raises the ceiling without raising this writes records the renderer drops, and a dropped
+          # record reads as a request with nothing relevant in every artefact this lane produced.
+          echo "packBudget=$(echo "$CAPS" | sed -n 's/^budget=//p')" >> "$GITHUB_OUTPUT"
           echo "overrides=$OVERRIDES" >> "$GITHUB_OUTPUT"
           if [ -n "$OVERRIDES" ]; then
             echo "::warning::the registration overrides repository variables: $OVERRIDES"
@@ -1445,6 +1450,8 @@ jobs:
           TAU_TRAIN_TASKS: ${{ steps.recall_floor.outputs.trainTasks || vars.TAU_TRAIN_TASKS || '0' }}
           TAU_TEST_TASKS: ${{ steps.recall_floor.outputs.testTasks || vars.TAU_TEST_TASKS || '0' }}
           TAU_RAWLOG_CEILING: ${{ steps.recall_floor.outputs.rawCeiling || '0' }}
+          # Empty means the lane's 1,200, which is what every published arm ran with.
+          TAU_PACK_BUDGET: ${{ steps.recall_floor.outputs.packBudget || '0' }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
@@ -1508,6 +1515,8 @@ jobs:
           TAU_TRAIN_TASKS: ${{ steps.recall_floor.outputs.trainTasks || vars.TAU_TRAIN_TASKS || '0' }}
           TAU_TEST_TASKS: ${{ steps.recall_floor.outputs.testTasks || vars.TAU_TEST_TASKS || '0' }}
           TAU_RAWLOG_CEILING: ${{ steps.recall_floor.outputs.rawCeiling || '0' }}
+          # Empty means the lane's 1,200, which is what every published arm ran with.
+          TAU_PACK_BUDGET: ${{ steps.recall_floor.outputs.packBudget || '0' }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}

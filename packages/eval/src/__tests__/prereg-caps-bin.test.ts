@@ -1,4 +1,4 @@
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -45,24 +45,23 @@ function file(extra: readonly string[]): string {
   return path;
 }
 
+/**
+ * Run the command and keep both streams.
+ *
+ * `spawnSync` rather than `execFileSync` because the capacity note is a diagnostic on a *passing* run:
+ * a harness that could only read stderr from a failure would be unable to tell "printed nothing" from
+ * "exited before printing", which is the distinction the note exists to make.
+ */
 function run(path: string): { code: number; out: string; err: string } {
-  try {
-    const out = execFileSync('npx', ['tsx', BIN, path], {
-      encoding: 'utf8',
-      stdio: ['ignore', 'pipe', 'pipe'],
-    });
-    return { code: 0, out, err: '' };
-  } catch (error) {
-    const failure = error as { status?: number; stdout?: string; stderr?: string };
-    return { code: failure.status ?? 1, out: failure.stdout ?? '', err: failure.stderr ?? '' };
-  }
+  const child = spawnSync('npx', ['tsx', BIN, path], { encoding: 'utf8' });
+  return { code: child.status ?? 1, out: child.stdout ?? '', err: child.stderr ?? '' };
 }
 
 describe('prereg-caps', () => {
   it('prints both caps, one per line, for the two variables the workflow reads', () => {
     const result = run(file(['trainTasks: 57', 'testTasks: 1']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=\n');
   });
 
   it('prints the record ceiling beside the caps, which is the switch R85 lacked', () => {
@@ -71,13 +70,39 @@ describe('prereg-caps', () => {
     // by the last dispatch; R85's own 700 is what that costs -- twelve of twelve records clipped.
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'rawCeiling: 2000']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\n');
   });
 
   it('prints one empty line per variable when the registration pins nothing, so the variables stand', () => {
     const result = run(file([]));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=\ntest=\nceiling=\n');
+    expect(result.out).toBe('train=\ntest=\nceiling=\nbudget=\n');
+  });
+
+  it('prints the capacity the inherited budget implies, so the pair is visible in the dispatch log', () => {
+    // R88's pair exactly: a 2,000-character ceiling over the lane's 1,200-character pack. The output
+    // contract cannot carry it -- no workflow input reads a capacity -- but the log can, and the log is
+    // read by whoever looks at a run that served one record out of twelve.
+    const result = run(file(['trainTasks: 57', 'testTasks: 1', 'rawCeiling: 2000', 'distillUnit: raw']));
+    expect(result.code).toBe(0);
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\n');
+    expect(result.err).toContain('ceiling 2000 is above budget 1200');
+    expect(result.err).toContain('capacity is 810 chars/record');
+  });
+
+  it('prints the budget when the registration states one, and says the ceiling fits it', () => {
+    const result = run(
+      file([
+        'trainTasks: 57',
+        'testTasks: 1',
+        'distillUnit: raw',
+        'rawCeiling: 2000',
+        'packBudget: 2400',
+      ]),
+    );
+    expect(result.code).toBe(0);
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=2400\n');
+    expect(result.err).toContain('ceiling 2000 fits budget 2400 (capacity 2010 chars/record)');
   });
 
   it('refuses half a pin instead of letting a variable decide the other half', () => {
@@ -109,5 +134,18 @@ describe('prereg-caps', () => {
     // state a registration exists to replace -- so the usage line is a refusal, not a help text.
     expect(code).toBe(1);
     expect(err).toContain('usage: pnpm eval:prereg-caps');
+  });
+});
+
+describe('prereg-caps and a ceiling the pack cannot carry', () => {
+  it('refuses the dispatch when both numbers are stated and they disagree', () => {
+    // The one refusal this command makes about the pair. It is not the same finding as a ceiling over an
+    // inherited budget — that one is a note, because the arms that predate the header keep their reading
+    // — it is a registration that stated both and got the arithmetic wrong before paying for 228
+    // episodes that would write records the renderer drops.
+    const result = run(file(['trainTasks: 57', 'testTasks: 1', 'distillUnit: raw', 'rawCeiling: 2000', 'packBudget: 1200']));
+    expect(result.code).toBe(1);
+    expect(result.err).toContain("at header 'rawCeiling'");
+    expect(result.err).toContain('exceeds the 810 characters a 1200-character pack can carry');
   });
 });

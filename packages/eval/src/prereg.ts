@@ -224,6 +224,26 @@ export type Prereg = {
    */
   readonly rawCeiling?: number;
   /**
+   * The characters of knowledge one recall may carry, in characters.
+   *
+   * The other half of `rawCeiling`, and the half that was never registered. The two numbers are
+   * coupled: a pack charges a fixed wrapper plus a line per item, so at 1,200 characters a record in
+   * this arm's shape can state **810** and anything longer is dropped at render —
+   * `maxStatementChars` measures it against the real renderer rather than deriving it a second time.
+   * `eval/tools/record_length_census.py` puts 41.2% of the retail corpus above 810, so an arm that
+   * raises the ceiling without raising the budget writes, for two records in five, text the model
+   * never sees, and the artefact reports it as a request with nothing relevant.
+   *
+   * A registration that states both is checked — `prereg-pack.ts` refuses a ceiling above the capacity,
+   * because the choice being made there is "write records to drop them" and it has to be made
+   * deliberately rather than by inheritance. The check lives there and not here for the reason the
+   * import-closure test enforces: this file is read by jobs that run *before* the build, so it cannot
+   * reach the renderer that measures capacity. A registration that states only the ceiling keeps the
+   * lane's 1,200 — the number every published arm ran with — and `prereg-caps` prints the capacity it
+   * implies so the mismatch is visible in the dispatch log even where it is not refused.
+   */
+  readonly packBudget?: number;
+  /**
    * Where the admitted items are served from: the recall pack, or a prefix of the system prompt.
    *
    * R55.1's second arm. It is not a tidiness switch: the SOTA holder's published cell injects *every*
@@ -298,6 +318,7 @@ const HEADER_KEYS = [
   'trainTasks',
   'testTasks',
   'rawCeiling',
+  'packBudget',
   'packMode',
   'thinking',
 ] as const;
@@ -759,6 +780,29 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     return parsed;
   })();
 
+  /**
+   * The pack's budget, and the ceiling checked against what it can carry.
+   *
+   * The check is only made when both numbers are declared, and that is a deliberate limit rather than a
+   * convenience: every arm published before this header ran at 1,200 and keeps the reading it was
+   * published with, and a validator that refused those retroactively would be editing finished runs
+   * rather than preventing the next mistake. A registration that states both is making a decision about
+   * the pair, and the decision is checked.
+   */
+  const packBudget = ((): number | undefined => {
+    const text = values.get('packBudget');
+    if (text === undefined) return undefined;
+    const parsed = Number(text);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      collected.push({
+        where: `header 'packBudget'`,
+        problem: `'${text}' is not a budget a pack can carry in characters`,
+      });
+      return undefined;
+    }
+    return parsed;
+  })();
+
   // Where the admitted items are served from. R55.1's second arm, and the seventh switch to move out of
   // a repository variable: an arm that renders every admitted item into the system prompt is a different
   // treatment from one that retrieves two, and a run that cannot say which it ran measured neither.
@@ -898,6 +942,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(trainTasks === undefined ? {} : { trainTasks }),
       ...(testTasks === undefined ? {} : { testTasks }),
       ...(rawCeiling === undefined ? {} : { rawCeiling }),
+      ...(packBudget === undefined ? {} : { packBudget }),
       ...(packMode === undefined ? {} : { packMode }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,

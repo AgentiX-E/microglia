@@ -8,6 +8,7 @@ import {
   rawLogCensus,
   rawLogInterpreter,
   rawLogInterpreterFor,
+  rawLogItemShape,
   rawLogStatement,
   rawLogTruncated,
 } from '../tau2-rawlog.js';
@@ -254,5 +255,132 @@ describe('rawLogCensus', () => {
     // The ceiling travels with the census, because R85 wrote twelve clipped records and no ceiling, so
     // its artefact could not say whether a registration chose the number or a default did.
     expect(rawLogCensus([], 2000)).toEqual({ records: 0, clipped: 0, toolBan: false, ceiling: 2000 });
+  });
+});
+
+describe('the record the interpreter writes, field by field', () => {
+  it('takes the task from the event, then from the run, and records which it used', async () => {
+    // `evidence.taskId` is what the support census joins on. R55.0 found a store where `distinctTasks`
+    // was 1 for every item by construction, because the id was never carried; the fallback order is the
+    // repair, and each step of it has to be exercised or a run whose capture path differs from the
+    // fixture silently writes unattributed records.
+    const stamped = { ...edit({ after: corrected([{ name: 'call', arguments: {} }]) }), taskId: 'retail/9' };
+    const [fromEvent] = await rawLogInterpreter({ event: stamped, run: run('q') } as unknown as InterpretContext);
+    expect(fromEvent?.evidence.taskId).toBe('retail/9');
+
+    // No task on the event: the run's own id stands, which is the capture path a host that never calls
+    // `begin({taskId})` produces.
+    const [fromRun] = await rawLogInterpreter({
+      event: edit({ after: corrected([{ name: 'call', arguments: {} }]) }),
+      run: run('q'),
+    } as unknown as InterpretContext);
+    expect(fromRun?.evidence.taskId).toBe('retail/3');
+
+    // Neither: the payload falls back to the run id and the evidence carries no task at all, which is
+    // the state a census has to be able to see rather than read as a task called `undefined`.
+    const bare = { ...run('q'), taskId: undefined } as unknown as RunRecord;
+    const [fromNeither] = await rawLogInterpreter({
+      event: edit({ after: corrected([{ name: 'call', arguments: {} }]) }),
+      run: bare,
+    } as unknown as InterpretContext);
+    expect(fromNeither?.evidence.taskId).toBeUndefined();
+    expect((fromNeither?.payload as { taskId?: string }).taskId).toBe('run-1');
+  });
+
+  it('writes nothing for a signal that is not an edit, rather than an empty record', async () => {
+    // A rating is an opinion about an output, not a record of one. The arm's unit is the corrected
+    // episode, so a non-edit event has nothing to write -- and an empty record would be an item that is
+    // stored, counted and serves nothing.
+    const rating = {
+      ...edit(),
+      signal: { type: 'rating', value: 1, beforeHash: 'b', afterHash: 'a', distance: 0 },
+    } as unknown as FeedbackEvent;
+    const written = await rawLogInterpreter({ event: rating, run: run('q') } as unknown as InterpretContext);
+    expect(written).toEqual([]);
+  });
+
+  it('counts the calls on the payload without re-rendering them', async () => {
+    const [one] = await rawLogInterpreter({
+      event: edit({
+        after: corrected([
+          { name: 'a', arguments: {} },
+          { name: 'b', arguments: { x: 1 } },
+        ]),
+      }),
+      run: run('q'),
+    } as unknown as InterpretContext);
+    expect((one?.payload as { calls: number }).calls).toBe(2);
+  });
+
+  it('reads an expectation only when it is prose, and ignores every other shape', () => {
+    // The `after` value comes from a host, so its shape is whatever the host had. Each refusal here is a
+    // branch that would otherwise put `[object Object]` or `null` on the record's answer line.
+    for (const after of [null, [], { actions: [] }, { actions: [], expectation: '   ' }, { actions: [], expectation: 7 }]) {
+      const statement = rawLogStatement(edit({ after: after as never }), run('q'));
+      expect(statement).toBe('Q: q');
+    }
+    expect(rawLogStatement(edit({ after: { actions: [], expectation: ' do it ' } as never }), run('q'))).toBe(
+      'Q: q\nA: do it',
+    );
+  });
+
+  it('renders every shape of call a host can put on a correction, without inventing one', () => {
+    // `renderCall` is what puts `order_id="W237"` on the record, and it is also where a host's malformed
+    // action lands. Three shapes, three different readings, and the distinction is deliberate: an empty
+    // argument object is a call that takes none (`name()`), a missing or non-object argument list is a
+    // name with nothing to say (`name`), and a call with no name at all is still its arguments.
+    const statement = rawLogStatement(
+      edit({
+        after: {
+          actions: [
+            { name: 'empty', arguments: {} },
+            { name: 'no_args' },
+            { name: 'listed', arguments: ['not', 'an', 'object'] },
+            { arguments: { orphan: true } },
+            null,
+          ],
+        },
+      }),
+      run('q'),
+    );
+    expect(statement).toBe('Q: q\nA: empty(); no_args; listed; (orphan=true)');
+  });
+
+  it('renders an argument whose value is not JSON-serialisable as null rather than as a hole', () => {
+    // `JSON.stringify(undefined)` is `undefined`, not a string, so an argument that arrived as
+    // `undefined` would otherwise interpolate as the word "undefined" — a value the episode never had.
+    // It is written as `null`, which is what the wire format would have carried.
+    const statement = rawLogStatement(
+      edit({ after: { actions: [{ name: 'call', arguments: { a: undefined as never } }] } }),
+      run('q'),
+    );
+    expect(statement).toBe('Q: q\nA: call(a=null)');
+  });
+
+  it('reads a correction that has an expectation and no action list at all', () => {
+    // The `actions` key is optional in the wire format, so a prose correction may arrive without one.
+    // Reading it as "no calls" rather than refusing the event is what lets the answer line carry the
+    // expectation instead.
+    const statement = rawLogStatement(edit({ after: { expectation: 'ask for the zip code' } as never }), run('q'));
+    expect(statement).toBe('Q: q\nA: ask for the zip code');
+  });
+
+  it('states the shape the pack is charged for, so the capacity has one item to measure', () => {
+    // `rawLogItemShape` is not decoration: `maxStatementChars` renders it, and the capacity it reports
+    // (810 at 1,200) is the number the ceiling has to fit. A shape that drifted from what the
+    // interpreter writes — an id length, a missing payload — would report a capacity for an item this
+    // arm never stores.
+    const [written] = rawLogInterpreter({
+      event: edit({ after: corrected([{ name: 'call', arguments: { a: 1 } }]) }),
+      run: run('q'),
+    } as unknown as InterpretContext);
+    expect(rawLogItemShape.kind).toBe(written?.kind);
+    // The id is the store's, not the interpreter's: eighteen characters is what this store issues
+    // (`k_` + sixteen), and the shape has to state the same length or the capacity is measured on a
+    // line shorter than the one that will be rendered.
+    expect(rawLogItemShape.id).toHaveLength(18);
+    // The payload keys are the ones the interpreter attaches, which is what the 390-character overhead
+    // between the budget and the capacity is made of.
+    expect(Object.keys(rawLogItemShape.payload ?? {}).sort()).toEqual(['calls', 'ceiling', 'runId', 'taskId']);
   });
 });

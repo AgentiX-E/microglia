@@ -60,6 +60,7 @@
  */
 import { contentKey } from '@agentix-e/microglia-core';
 import type { DistillCandidate, FeedbackEvent, Json, RunRecord } from '@agentix-e/microglia-core';
+import type { StatementShape } from '@agentix-e/microglia-core/apply';
 import type { Interpreter } from '@agentix-e/microglia-core/distill';
 
 /**
@@ -135,17 +136,20 @@ function questionOf(run: RunRecord | undefined): string | undefined {
 }
 
 /**
- * One record, in the words the episode produced, or `undefined` when the event carries nothing to
- * record.
+ * The two things the record carries that are computed rather than copied: its text, and how many calls
+ * the correction stated.
  *
- * Exported because the shape is the treatment and a treatment that is only observable through a
- * store is a treatment whose tests all assert the same thing.
+ * One function because they are one read of one event. The count used to be recomputed in the
+ * interpreter from a ternary on `signal.type`, which produced a branch that could never be taken: the
+ * interpreter only reaches it once a statement exists, and a statement exists only for an edit. Dead
+ * code that looks like a guard is worse than none — it reads as "a non-edit event is handled here" when
+ * the handling is one line above.
  */
-export function rawLogStatement(
+function recordOf(
   event: FeedbackEvent,
   run: RunRecord | undefined,
-  ceiling: number = RAWLOG_STATEMENT_CEILING,
-): string | undefined {
+  ceiling: number,
+): { readonly statement: string; readonly calls: number } | undefined {
   if (event.signal.type !== 'edit') return undefined;
   const question = questionOf(run);
   const calls = callsOf(event.signal.after);
@@ -168,9 +172,28 @@ export function rawLogStatement(
 
   if (lines.length === 0) return undefined;
   const text = lines.join('\n');
-  return text.length <= ceiling
-    ? text
-    : `${text.slice(0, ceiling - RAWLOG_TRUNCATION_MARK.length)}${RAWLOG_TRUNCATION_MARK}`;
+  return {
+    statement:
+      text.length <= ceiling
+        ? text
+        : `${text.slice(0, ceiling - RAWLOG_TRUNCATION_MARK.length)}${RAWLOG_TRUNCATION_MARK}`,
+    calls: calls.length,
+  };
+}
+
+/**
+ * One record, in the words the episode produced, or `undefined` when the event carries nothing to
+ * record.
+ *
+ * Exported because the shape is the treatment and a treatment that is only observable through a
+ * store is a treatment whose tests all assert the same thing.
+ */
+export function rawLogStatement(
+  event: FeedbackEvent,
+  run: RunRecord | undefined,
+  ceiling: number = RAWLOG_STATEMENT_CEILING,
+): string | undefined {
+  return recordOf(event, run, ceiling)?.statement;
 }
 
 /** Whether one record was clipped by the ceiling. Counted by the driver, so the artefact can say so. */
@@ -196,8 +219,8 @@ export function rawLogInterpreterFor(ceiling: number): Interpreter {
     throw new Error(`rawlog ceiling ${String(ceiling)} cannot hold a record`);
   }
   return (context) => {
-    const statement = rawLogStatement(context.event, context.run, ceiling);
-    if (statement === undefined) return [];
+    const record = recordOf(context.event, context.run, ceiling);
+    if (record === undefined) return [];
     const { event } = context;
     // The event's own id first and the run's second: `begin({taskId})` stamps the event, and a capture
     // path that did not would otherwise write records whose support cannot be counted per task -- the
@@ -213,11 +236,11 @@ export function rawLogInterpreterFor(ceiling: number): Interpreter {
       // The task, not the domain: `stampDomain` adds the domain at the host boundary, and a record
       // scoped to a domain here would pre-empt the one switch that decides what a pack can serve.
       scope: { task: event.task },
-      statement,
+      statement: record.statement,
       payload: {
         taskId: taskId ?? event.runId,
         runId: event.runId,
-        calls: callsOf(event.signal.type === 'edit' ? event.signal.after : null).length,
+        calls: record.calls,
         ceiling,
       },
       evidence: {
@@ -275,3 +298,29 @@ export function rawLogCensus(
     ...(ceiling === undefined ? {} : { ceiling }),
   };
 }
+
+/**
+ * The shape every record is written in, as the pack is charged for it.
+ *
+ * A capacity is only a number about a specific line, and this is the line this arm writes: an
+ * `exemplar` at the trust a gold correction carries, a scope carrying the task the host stamps a
+ * domain onto, a nineteen-character id — the length the store issues — and the provenance payload the
+ * interpreter attaches. `maxStatementChars` needs it to answer "how long a record can the pack still
+ * render", and the answer for a bare claim is 149 characters longer, which is why the shape is a
+ * parameter rather than a default.
+ *
+ * Not a constant in the test suite: the payload is the treatment's, and a test that carried its own
+ * copy would go on passing after the interpreter stopped attaching one.
+ */
+export const rawLogItemShape: StatementShape = {
+  id: 'k_01hf7uaq1e_9znv8',
+  kind: 'exemplar',
+  confidence: 0.6165,
+  scope: { task: '3', domain: 'retail' },
+  payload: {
+    taskId: '4f2a1c3e-9b1d-4c7a-8e11-2b3c4d5e6f70',
+    runId: 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d',
+    calls: 3,
+    ceiling: 2000,
+  },
+};

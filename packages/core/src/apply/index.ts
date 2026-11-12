@@ -12,12 +12,14 @@ export {
   emptyPack,
   encodeItemLine,
   makePack,
+  maxStatementChars,
   packFingerprint,
   renderPack,
   type NoteMode,
   type RenderableItem,
   type RenderOptions,
   type RenderedPack,
+  type StatementShape,
 } from './render.js';
 
 export { buildPack, type BuildPackOptions } from './pack.js';

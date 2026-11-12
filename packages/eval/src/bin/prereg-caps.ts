@@ -14,10 +14,20 @@
  * mismeasured by, and a number that decides what an arm measures cannot live in a repository variable
  * where the last dispatch chooses it.
  *
- * Usage: pnpm eval:prereg-caps prereg/<id>.md  ->  "train=57" "test=1" "ceiling=2000"
+ * R89 added the fourth, and it is the other half of the third. A ceiling is only a promise about what is
+ * *written*: the pack charges a fixed wrapper plus a line per item, so at 1,200 characters a record in
+ * this arm's shape can state 810 and anything longer is dropped at render, where every artefact this
+ * lane has produced reports it as a request with nothing relevant. A registration that states both is
+ * checked (`prereg.ts` refuses a ceiling above the capacity); a registration that states only the
+ * ceiling inherits the lane's budget, and this script prints the capacity that implies on stderr, so the
+ * mismatch is in the dispatch log even where it is not an error.
+ *
+ * Usage: pnpm eval:prereg-caps prereg/<id>.md  ->  "train=57" "test=1" "ceiling=2000" "budget=2400"
  */
 import { readFileSync } from 'node:fs';
 import { readPrereg } from '../prereg.js';
+import { packCouplingProblems, recordCapacityOf } from '../prereg-pack.js';
+import { DEFAULT_PACK_BUDGET, ceilingLineOf } from '../tau2-pack.js';
 
 function refuse(message: string): void {
   process.stderr.write(`[prereg-caps] ${message}\n`);
@@ -35,7 +45,16 @@ function main(): void {
     for (const problem of reading.problems) refuse(`at ${problem.where}: ${problem.problem}`);
     return;
   }
-  const { trainTasks, testTasks, rawCeiling } = reading.prereg;
+  const { trainTasks, testTasks, rawCeiling, packBudget } = reading.prereg;
+  // A ceiling the declared pack cannot carry is refused here rather than priced: the arm would write
+  // records the renderer drops, every one of which reads as a request with nothing relevant, and the
+  // dispatch costs more than the check does. Only a registration that states both is refused -- see
+  // `prereg-pack.ts` for why the arms that predate the budget keep their reading.
+  const coupling = packCouplingProblems(reading.prereg);
+  if (coupling.length > 0) {
+    for (const problem of coupling) refuse(`at ${problem.where}: ${problem.problem}`);
+    return;
+  }
   // Half a pin is the defect this exists to remove: a registration that fixes the learning half and
   // leaves the evaluation to a variable would have its cost decided by whichever dispatch ran last.
   const pinned = [trainTasks, testTasks].filter((entry) => entry !== undefined);
@@ -46,6 +65,20 @@ function main(): void {
   process.stdout.write(`train=${trainTasks === undefined ? '' : String(trainTasks)}\n`);
   process.stdout.write(`test=${testTasks === undefined ? '' : String(testTasks)}\n`);
   process.stdout.write(`ceiling=${rawCeiling === undefined ? '' : String(rawCeiling)}\n`);
+  process.stdout.write(`budget=${packBudget === undefined ? '' : String(packBudget)}\n`);
+  // The capacity that follows from the pair, on stderr because no workflow input reads it: the number
+  // exists so the dispatch log answers "what could this pack carry" without a second dispatch. Only for
+  // the record unit, whose item shape is the interpreter's; a claim's line is the model's.
+  if (reading.prereg.distillUnit === 'raw') {
+    const budget = packBudget ?? DEFAULT_PACK_BUDGET;
+    process.stderr.write(
+      `[prereg-caps] ${ceilingLineOf({
+        ceiling: rawCeiling,
+        budget,
+        capacity: recordCapacityOf(reading.prereg),
+      })}\n`,
+    );
+  }
 }
 
 main();
