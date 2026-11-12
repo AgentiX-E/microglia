@@ -221,6 +221,45 @@ Mini-Dev the median pack covered 7.1% of its question and 47% of packs covered n
 of `0.34` injected nothing at all on 352 questions. A floor of `0.15` keeps roughly the strongest
 quarter of packs.
 
+#### Or serve every admitted rule, when you are reproducing a published protocol
+
+Every knob above narrows the pack. They can also be opened, and there is one honest reason to open
+all of them: you are comparing against a published baseline whose memory protocol is *inject
+everything it ever admitted, every turn*, and you want the same request the authors ran rather than
+a better one. Four knobs do it:
+
+```ts
+const pack = await mg.recall({
+  task: 'chart.recommend',
+  text: question,
+  scope: { domain: 'sales' },
+  anchoring: 'scope',   // a scope-matched rule needs no word in common with the question
+  minCoverage: 0,       // no lexical gate at all
+  limit: 999,           // no item cap that a store of tens can reach
+  budget: 200_000,      // no character cap it can reach; `budget` is characters, not tokens
+});
+```
+
+| knob | what it decides | what it costs to open |
+| --- | --- | --- |
+| `anchoring: 'scope'` | whether a rule filed under your scope is a candidate when the question shares none of its words | rules that generalised out of the domain stay reachable — and so does everything else in it |
+| `minCoverage: 0` | the share of the question's content words the rule must mention | packs whose text is unrelated to the request, paid for in tokens |
+| `limit` | how many rules may survive ranking | a plan-shaped prompt, and a prefix the provider may cache |
+| `budget` | how many characters the rendered block may spend | the same, priced per turn |
+
+Two properties of this configuration are worth knowing before you adopt it. **It is not a
+recommendation**: every lift this repository has measured came from the narrowing knobs above, and
+an open pack spends tokens on rules the request does not mention — measured on a public benchmark,
+those rules neither helped nor hurt, which is a cost with no benefit rather than a harm, and it is
+the reason `minCoverage` exists at all. **It is not free per turn**: the block is rendered on every
+call, but an unchanged block is a prompt-cache hit, so the cost of a large prefix is dominated by
+the first call of a session rather than by the hundredth.
+
+If what you want is reproducibility rather than a comparison, keep the defaults. Open these four
+only when the number you are reproducing was produced under a protocol that injects everything,
+and say so beside the number — a pack of 1.4 rules and a prefix of 292 answer two different
+questions about the same mechanism.
+
 ### 3.2 Tasks and attempts — when one answer is not the whole job
 
 A run is one generation. A task is what the user was trying to finish, and it
