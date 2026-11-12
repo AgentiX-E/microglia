@@ -1298,6 +1298,11 @@ jobs:
           SCOPE=$(sed -n 's/^scope=//p' "$RUNNER_TEMP/distill.env")
           CLAIMS=$(sed -n 's/^claims=//p' "$RUNNER_TEMP/distill.env")
           MODE=$(sed -n 's/^mode=//p' "$RUNNER_TEMP/distill.env")
+          # Every switch the registration overrides, as a notice. Not a refusal: the arms read the
+          # registration's value, so a stale variable is overridden rather than run — the check that
+          # refused on this comparison stopped R58 before its first model call while the run would have
+          # executed exactly what its header fixed.
+          OVERRIDES=$(sed -n 's/^overrides=//p' "$RUNNER_TEMP/distill.env")
           # The mode resolved into the query fragment the lane appends to its recall, printed by the
           # resolver rather than spelled here: the workflow has no business knowing that "no retrieval"
           # is `anchoring=scope&minCoverage=0`, and a fragment written in YAML would be the copy that
@@ -1320,6 +1325,10 @@ jobs:
           echo "claims=$CLAIMS" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "knobs=$KNOBS" >> "$GITHUB_OUTPUT"
+          echo "overrides=$OVERRIDES" >> "$GITHUB_OUTPUT"
+          if [ -n "$OVERRIDES" ]; then
+            echo "::warning::the registration overrides repository variables: $OVERRIDES"
+          fi
           echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`, distiller \`${UNIT:-inherited}/${FORM:-inherited}\` over \`${SCOPE:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: L4 arm — memory

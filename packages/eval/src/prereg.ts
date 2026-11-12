@@ -1143,6 +1143,49 @@ export function thinkingProblem(
 }
 
 /**
+ * A switch the registration overrides, as a notice rather than a refusal.
+ *
+ * Four functions used to refuse a dispatch whose repository variable disagreed with the registration,
+ * and the rule they encoded was wrong in a way that cost a run. R58 fixes the trace ceiling at **3**,
+ * `vars.TAU_TRACE_CLAIMS` held **6** from the round that asked whether the cap binds, and the check
+ * refused the dispatch *before its first model call*:
+ *
+ *     [prereg-form] this registration fixes the trace ceiling at 3 claim(s) and this dispatch would
+ *                   run '6', so the ceiling is not the only variable that moved
+ *
+ * Except the dispatch would **not** have run 6. The arm reads
+ *
+ *     TAU_TRACE_CLAIMS: ${{ steps.recall_floor.outputs.claims || vars.TAU_TRACE_CLAIMS }}
+ *
+ * and the step output carries the registration's 3, so the variable is a fallback that never fires while
+ * a registration declares a value. A guard that refuses a harmless state is not a conservative guard: it
+ * stops the experiment and leaves the defect it was aimed at untouched. The real protection is what
+ * already holds — `sota-source.test.ts` asserts *every* assignment of each switch reads the registration,
+ * and the arm records what it ran, which the readback grades.
+ *
+ * The case worth saying out loud is the other one: a registration that declares **nothing** while a
+ * variable holds another experiment's value. Then the variable is exactly what runs, and the run cannot
+ * describe its own treatment. That is the notice this returns, printed in the step summary and carried by
+ * the readback — refusing it here would refuse every registration that predates the switch.
+ *
+ * Returns `<switch>: <notice>` or `undefined` when there is nothing to say.
+ */
+export function switchOverride(
+  name: string,
+  declared: string | number | undefined,
+  configured: string | null,
+): string | undefined {
+  const stated = configured === null || configured.trim() === '' ? undefined : configured.trim();
+  const fixed = declared === undefined ? undefined : String(declared);
+  if (fixed === undefined) {
+    if (stated === undefined) return undefined;
+    return `${name}: the registration declares none and the variable holds '${stated}', which this dispatch will run`;
+  }
+  if (stated === undefined || stated === fixed) return undefined;
+  return `${name}: the variable holds '${stated}', overridden by the registration's '${fixed}'`;
+}
+
+/**
  * Refuse a dispatch whose distiller form is not the one the registration fixed.
  *
  * Three ways the registration's switch can fail to be the one that ran, and each has its own sentence:
@@ -1156,7 +1199,10 @@ export function thinkingProblem(
  * registration decides, exactly as it does for the thinking regime.
  */
 export function distillFormProblem(
-  configured: string | null,
+  // Kept in the signature, and unused on purpose: the caller still has the variable to report through
+  // `switchOverride`, and a parameter that disappears from a public signature is a change every call
+  // site has to be told about. An underscore says "accepted and deliberately not compared".
+  _configured: string | null,
   declared: string | undefined,
   unit: string,
 ): string | undefined {
@@ -1167,82 +1213,14 @@ export function distillFormProblem(
       `'trace', which replaces the form, so the registered switch cannot take effect`
     );
   }
-  const stated = configured === null || configured === '' ? undefined : configured;
-  if (stated === undefined || stated === declared) return undefined;
-  return (
-    `this registration fixes the distiller's form at '${declared}' and this dispatch would run ` +
-    `'${stated}', so the form is not the only variable that moved`
-  );
+  // No longer compares `configured` with `declared`: see `switchOverride`. The arm reads the
+  // registration's value, so a stale variable is overridden rather than run, and refusing it refused a
+  // dispatch that would have executed exactly what its registration fixed.
+  return undefined;
 }
 
-/**
- * Refuse a dispatch whose distilling unit is not the one the registration fixed.
- *
- * The same sentence as `thinkingProblem` and `distillFormProblem`, because it is the same defect: a
- * repository variable is global, so it is one experiment's setting applied to every queued dispatch.
- * This one had already gone wrong in the record — `vars.TAU_DISTILL_UNIT` held `trace` when R56, whose
- * whole store is corrections, was written — and nothing in the machinery could object, because the
- * registration had no field for a value the driver was already resolving through a tested function.
- *
- * `null` and the empty string are the variable being unset: the registration decides, and that is not
- * a disagreement.
- */
-export function distillUnitProblem(
-  configured: string | null,
-  declared: string | undefined,
-): string | undefined {
-  if (declared === undefined) return undefined;
-  const stated = configured === null || configured === '' ? undefined : configured;
-  if (stated === undefined || stated === declared) return undefined;
-  return (
-    `this registration fixes the distiller's unit at '${declared}' and this dispatch would run ` +
-    `'${stated}', so the unit is not the only variable that moved`
-  );
-}
 
-/**
- * Refuse a dispatch whose teaching population is not the one the registration fixed.
- *
- * The fifth field of one family, and the last switch the lane still resolves from a variable. R62's
- * treatment is this value and its header named nothing, so a dispatch of it would have run whatever
- * `vars.TAU_DISTILL_SCOPE` happened to hold — which was `all`, left there by the round that first
- * needed it. A store built from every trajectory and one built from the failures are different
- * objects; a registration that cannot say which it ran is not describing its own experiment.
- *
- * `null` and the empty string are the variable being unset: the registration decides.
- */
-export function distillScopeProblem(
-  configured: string | null,
-  declared: string | undefined,
-): string | undefined {
-  if (declared === undefined) return undefined;
-  const stated = configured === null || configured === '' ? undefined : configured;
-  if (stated === undefined || stated === declared) return undefined;
-  return (
-    `this registration fixes the distilling population at '${declared}' and this dispatch would ` +
-    `run '${stated}', so the population is not the only variable that moved`
-  );
-}
 
-/**
- * Refuse a dispatch whose trace ceiling is not the one the registration fixed.
- *
- * The sixth field of the family. The comparison is textual on the variable's side because the variable
- * is a string and a registration is a number: `3.0` in the box is a stated ceiling that is not the stated
- * three, and rounding it would be this file deciding which experiment ran.
- */
-export function traceClaimsProblem(
-  configured: string | null,
-  declared: number | undefined,
-): string | undefined {
-  if (declared === undefined) return undefined;
-  const stated = configured === null ? '' : configured.trim();
-  if (stated === '' || stated === String(declared)) return undefined;
-  return (
-    `this registration fixes the trace ceiling at ${String(declared)} claim(s) and this dispatch ` +
-    `would run '${stated}', so the ceiling is not the only variable that moved`
-  );
-}
 
 /**
  * Refuse a registration that claims evidence its lane cannot supply.
@@ -1296,24 +1274,3 @@ export function essentialArms(arms: Iterable<string>): readonly string[] {
   return [...new Set(arms)].filter((arm) => arm !== 'none' && arm !== 'full').sort();
 }
 
-/**
- * Refuse a dispatch whose pack mode is not the one the registration fixed.
- *
- * The seventh field of the family, and the same shape as the other six: the registration is the
- * authority, an unset variable is not a second opinion, and a stated disagreement is refused before the
- * first model call. The two modes are not interchangeable — one serves a retrieved pack of 1.42 items,
- * the other every admitted item in a system-prompt prefix — so a dispatch that ran the other one under
- * this registration's name would be a control filed as a treatment.
- */
-export function packModeProblem(
-  configured: string | null,
-  declared: string | undefined,
-): string | undefined {
-  if (declared === undefined) return undefined;
-  const stated = configured === null || configured === '' ? undefined : configured;
-  if (stated === undefined || stated === declared) return undefined;
-  return (
-    `this registration fixes the pack mode at '${declared}' and this dispatch would run '${stated}', ` +
-    'so the pack mode is not the only variable that moved'
-  );
-}

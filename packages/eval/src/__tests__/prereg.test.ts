@@ -7,10 +7,6 @@ import {
   armsAgainstRegistration,
   backboneProblem,
   distillFormProblem,
-  distillScopeProblem,
-  distillUnitProblem,
-  packModeProblem,
-  traceClaimsProblem,
   essentialArms,
   facadePairSwitch,
   laneRoleProblem,
@@ -19,6 +15,7 @@ import {
   preregGateAgreement,
   populationAgainstRegistration,
   readPrereg,
+  switchOverride,
   thinkingProblem,
   unknownSampleArms,
   type Prereg,
@@ -1237,6 +1234,40 @@ describe('the distiller form, as a header field', () => {
   });
 });
 
+describe('switchOverride — a switch the registration overrides is a notice, not a refusal', () => {
+  it('reports the variable a registration overrode, with both values', () => {
+    // The exact state that stopped R58: the header fixes 3, `vars.TAU_TRACE_CLAIMS` holds 6 from the
+    // round that asked whether the cap binds, and the arm reads the header.
+    expect(switchOverride('claims', 3, '6')).toBe(
+      "claims: the variable holds '6', overridden by the registration's '3'",
+    );
+  });
+
+  it('says nothing when the variable agrees or is unset', () => {
+    expect(switchOverride('claims', 3, '3')).toBeUndefined();
+    expect(switchOverride('claims', 3, '')).toBeUndefined();
+    expect(switchOverride('claims', 3, null)).toBeUndefined();
+    expect(switchOverride('claims', 3, '   ')).toBeUndefined();
+  });
+
+  it('marks the case that is actually dangerous: a variable with no declaration behind it', () => {
+    // Here the variable *is* what runs, and the run cannot describe its own treatment. Still a notice
+    // rather than a refusal, because refusing it here would refuse every registration that predates the
+    // switch — the readback is where a value the header never named becomes a `NO_MEASUREMENT`.
+    expect(switchOverride('unit', undefined, 'trace')).toBe(
+      "unit: the registration declares none and the variable holds 'trace', which this dispatch will run",
+    );
+    expect(switchOverride('unit', undefined, '')).toBeUndefined();
+  });
+
+  it('compares numbers as the strings a header and a variable both are', () => {
+    expect(switchOverride('claims', 3, '3.0')).toBe(
+      "claims: the variable holds '3.0', overridden by the registration's '3'",
+    );
+    expect(switchOverride('claims', 3, ' 3 ')).toBeUndefined();
+  });
+});
+
 describe('distillFormProblem', () => {
   it('says nothing when the registration names no form', () => {
     expect(distillFormProblem('procedure', undefined, 'correction')).toBeUndefined();
@@ -1254,11 +1285,11 @@ describe('distillFormProblem', () => {
     expect(distillFormProblem('procedure', 'procedure', 'correction')).toBeUndefined();
   });
 
-  it('refuses a variable that would run a different form than the registration fixed', () => {
-    expect(distillFormProblem('lesson', 'procedure', 'correction')).toBe(
-      "this registration fixes the distiller's form at 'procedure' and this dispatch would run " +
-        "'lesson', so the form is not the only variable that moved",
-    );
+  it('leaves a stale variable to the notice rather than refusing the dispatch', () => {
+    // This branch used to refuse, and the refusal was the wrong instrument: the arm reads the
+    // registration's form, so `vars.TAU_DISTILL_FORM` holding `lesson` cannot make the run distil
+    // lessons. `switchOverride` reports it; `switchOverride`'s describe is where that is graded.
+    expect(distillFormProblem('lesson', 'procedure', 'correction')).toBeUndefined();
   });
 
   it('refuses a trace dispatch that would discard the registered form', () => {
@@ -1358,29 +1389,6 @@ describe('the distilling scope', () => {
   });
 });
 
-describe('distillScopeProblem', () => {
-  it('says nothing when the registration names no population', () => {
-    expect(distillScopeProblem('all', undefined)).toBeUndefined();
-  });
-
-  it('says nothing when the variable is unset, because the registration decides', () => {
-    expect(distillScopeProblem('', 'all')).toBeUndefined();
-    expect(distillScopeProblem(null, 'edited')).toBeUndefined();
-  });
-
-  it('says nothing when the variable agrees', () => {
-    expect(distillScopeProblem('all', 'all')).toBeUndefined();
-  });
-
-  it('refuses a variable left behind by another experiment', () => {
-    // `TAU_DISTILL_SCOPE` was set to `all` for R62 and never cleared, so a correction arm that teaches
-    // only from failures would have taught from every trajectory while its registration said nothing.
-    expect(distillScopeProblem('all', 'edited')).toBe(
-      "this registration fixes the distilling population at 'edited' and this dispatch would run " +
-        "'all', so the population is not the only variable that moved",
-    );
-  });
-});
 
 describe('the trace ceiling', () => {
   const HEADER = [
@@ -1467,75 +1475,8 @@ describe('packMode, the seventh switch out of a repository variable', () => {
   });
 });
 
-describe('packModeProblem', () => {
-  it('says nothing when the registration names no mode', () => {
-    expect(packModeProblem('prefix', undefined)).toBeUndefined();
-  });
 
-  it('says nothing when the variable is unset, because the registration decides', () => {
-    expect(packModeProblem('', 'prefix')).toBeUndefined();
-    expect(packModeProblem(null, 'prefix')).toBeUndefined();
-  });
 
-  it('says nothing when the variable agrees', () => {
-    expect(packModeProblem('prefix', 'prefix')).toBeUndefined();
-  });
-
-  it('refuses a mode left behind by another experiment', () => {
-    expect(packModeProblem('retrieved', 'prefix')).toBe(
-      "this registration fixes the pack mode at 'prefix' and this dispatch would run 'retrieved', so " +
-        'the pack mode is not the only variable that moved',
-    );
-  });
-});
-
-describe('traceClaimsProblem', () => {  it('says nothing when the registration names no ceiling', () => {
-    expect(traceClaimsProblem('6', undefined)).toBeUndefined();
-  });
-
-  it('says nothing when the variable is unset, because the registration decides', () => {
-    expect(traceClaimsProblem('', 3)).toBeUndefined();
-    expect(traceClaimsProblem(null, 3)).toBeUndefined();
-    expect(traceClaimsProblem('   ', 3)).toBeUndefined();
-  });
-
-  it('says nothing when the variable agrees', () => {
-    expect(traceClaimsProblem('3', 3)).toBeUndefined();
-  });
-
-  it('refuses a ceiling left behind by another experiment', () => {
-    expect(traceClaimsProblem('6', 3)).toBe(
-      "this registration fixes the trace ceiling at 3 claim(s) and this dispatch would run '6', so " +
-        'the ceiling is not the only variable that moved',
-    );
-  });
-});
-
-describe('distillUnitProblem', () => {
-  it('says nothing when the registration names no unit', () => {
-    expect(distillUnitProblem('trace', undefined)).toBeUndefined();
-  });
-
-  it('says nothing when the variable is unset, because the registration decides', () => {
-    expect(distillUnitProblem('', 'correction')).toBeUndefined();
-    expect(distillUnitProblem(null, 'trace')).toBeUndefined();
-  });
-
-  it('says nothing when the variable agrees', () => {
-    expect(distillUnitProblem('correction', 'correction')).toBeUndefined();
-  });
-
-  it('refuses a variable left behind by another experiment', () => {
-    // This is the state the repository was in when R56 was written: `vars.TAU_DISTILL_UNIT` held
-    // `trace` from the recurrence arm, so a registration that distils one correction per task would
-    // have run a different experiment under its own name, with the artefact saying `trace` and the
-    // registration saying nothing at all about it.
-    expect(distillUnitProblem('trace', 'correction')).toBe(
-      "this registration fixes the distiller's unit at 'correction' and this dispatch would run " +
-        "'trace', so the unit is not the only variable that moved",
-    );
-  });
-});
 
 describe('laneRoleProblem', () => {
   it('says nothing when the registration does not declare a role', () => {

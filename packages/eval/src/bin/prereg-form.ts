@@ -19,14 +19,7 @@
  *   -> prints one `key=value` line per switch and exits 0, or prints the reason and exits 1.
  */
 import { readFileSync } from 'node:fs';
-import {
-  distillFormProblem,
-  distillScopeProblem,
-  distillUnitProblem,
-  packModeProblem,
-  readPrereg,
-  traceClaimsProblem,
-} from '../prereg.js';
+import { distillFormProblem, readPrereg, switchOverride } from '../prereg.js';
 
 function refuse(message: string): void {
   process.stderr.write(`[prereg-form] ${message}\n`);
@@ -49,17 +42,18 @@ function main(): void {
     return;
   }
   const declaredUnit = reading.prereg.distillUnit;
+  // The switches are the registration's; the variables below are only what a dispatch with no
+  // registration would run. A disagreement is therefore a notice, not a refusal -- see
+  // `switchOverride` for the run this cost.
+  const notices: string[] = [];
+  const note = (name: string, declared: string | number | undefined, configured: string | null): void => {
+    const line = switchOverride(name, declared, configured);
+    if (line !== undefined) notices.push(line);
+  };
   // A stated disagreement is refused rather than resolved by preference: the variable is what the
   // workflow would run, the header is what the experiment says it runs, and a silent win for either
   // one is how a run ends up published under a registration it does not execute.
-  const unitProblem = distillUnitProblem(
-    process.argv[4] ?? null,
-    declaredUnit,
-  );
-  if (unitProblem !== undefined) {
-    refuse(unitProblem);
-    return;
-  }
+  note('unit', declaredUnit, process.argv[4] ?? null);
   // The unit that will actually run, which is what decides whether the form can take effect at all.
   const unit = declaredUnit ?? configuredUnit;
   const declared = reading.prereg.distillForm;
@@ -73,31 +67,22 @@ function main(): void {
   // it names a value, because the checks above have already refused the case where the two disagree;
   // empty means the variable stands, exactly as it did before this script existed.
   const declaredScope = reading.prereg.distillScope;
-  const scopeProblem = distillScopeProblem(process.argv[5] ?? null, declaredScope);
-  if (scopeProblem !== undefined) {
-    refuse(scopeProblem);
-    return;
-  }
+  note('scope', declaredScope, process.argv[5] ?? null);
   const declaredClaims = reading.prereg.traceClaims;
-  const claimsProblem = traceClaimsProblem(process.argv[6] ?? null, declaredClaims);
-  if (claimsProblem !== undefined) {
-    refuse(claimsProblem);
-    return;
-  }
+  note('claims', declaredClaims, process.argv[6] ?? null);
   // R55.1's switch, and the seventh of the family. A prefix arm renders every admitted entry into the
   // system prompt; a retrieved arm serves 1.42 items through a pack. The two are not interchangeable, so
   // a dispatch that would run the other one under this registration's name is refused here rather than
   // discovered in the readback.
   const declaredMode = reading.prereg.packMode;
-  const modeProblem = packModeProblem(process.argv[7] ?? null, declaredMode);
-  if (modeProblem !== undefined) {
-    refuse(modeProblem);
-    return;
-  }
+  note('mode', declaredMode, process.argv[7] ?? null);
   process.stdout.write(
     `unit=${declaredUnit ?? ''}\nform=${declared ?? ''}\nscope=${declaredScope ?? ''}\n` +
       `claims=${declaredClaims === undefined ? '' : String(declaredClaims)}\n` +
-      `mode=${declaredMode ?? ''}\n`,
+      `mode=${declaredMode ?? ''}\n` +
+      // One line, `;`-joined, because the workflow reads each value with `sed -n 's/^key=//p'` and an
+      // expression that split a list would be a parser in YAML. Empty when every switch agrees.
+      `overrides=${notices.join('; ')}\n`,
   );
 }
 
