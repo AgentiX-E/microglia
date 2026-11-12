@@ -365,9 +365,12 @@ export {
 export {
   compareToPublished,
   l4Verdict,
+  holdRate,
   meanPassAtK,
   passAtK,
   type L4Verdict,
+  type HoldInput,
+  type HoldRate,
   type PassAtKInput,
 } from './passk.js';
 export {
@@ -928,6 +931,7 @@ export { heldOutPlan, qualifiedId, type HeldOutPlan, type HeldOutPlanInput } fro
 export {
   pairKey,
   transferReadingOf,
+  holdRateOfTrials,
   trialRowsOf,
   type TauTrialRow,
   type PackTransferEpisode,

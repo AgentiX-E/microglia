@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { TRANSFER_FLOOR } from '../rule-probe.js';
-import { pairKey, transferReadingOf, trialRowsOf, type TauTrialRow } from '../tau2-transfer.js';
+import { holdRateOfTrials, pairKey, transferReadingOf, trialRowsOf, type TauTrialRow } from '../tau2-transfer.js';
 
 /**
  * The transfer reading over a second scenario.
@@ -196,5 +196,51 @@ describe('transferReadingOf', () => {
     expect(reading.gate.ledger).toBe(0);
     expect(reading.gate.netPp).toBe(0);
     expect(reading.gate.verdict).toBe('unmeasured');
+  });
+});
+
+describe('holdRateOfTrials — retention from the episode ledger', () => {
+  it('reads the order the arm ran, which no count reconstructs', () => {
+    // Two tasks, both 2 of 4. The ledger says one alternated and one passed first.
+    const rows = [
+      { id: 'retail::a', trial: 0, reward: 1 },
+      { id: 'retail::a', trial: 1, reward: 1 },
+      { id: 'retail::a', trial: 2, reward: 0 },
+      { id: 'retail::a', trial: 3, reward: 0 },
+      { id: 'retail::b', trial: 0, reward: 1 },
+      { id: 'retail::b', trial: 1, reward: 0 },
+      { id: 'retail::b', trial: 2, reward: 1 },
+      { id: 'retail::b', trial: 3, reward: 0 },
+    ];
+    const held = holdRateOfTrials(rows);
+    // a: t0->t1 held, t1->t2 missed. b: t0->t1 missed, t2->t3 missed. Pooled 1 of 4.
+    expect(held.pairs).toBe(4);
+    expect(held.held).toBe(1);
+    expect(held.rate).toBeCloseTo(0.25, 12);
+  });
+
+  it('sorts by trial number rather than trusting the file order', () => {
+    const rows = [
+      { id: 'retail::a', trial: 1, reward: 1 },
+      { id: 'retail::a', trial: 0, reward: 1 },
+    ];
+    // Run order is 0 then 1, both passed: one pair, held.
+    expect(holdRateOfTrials(rows)).toMatchObject({ pairs: 1, held: 1, rate: 1 });
+  });
+
+  it('drops an unscored episode instead of reading it as a failure', () => {
+    // An unscored trial is an infrastructure fact. Counting it as a miss would turn the retention
+    // number into a statement about the host.
+    const rows = [
+      { id: 'retail::a', trial: 0, reward: 1 },
+      { id: 'retail::a', trial: 1, reward: null },
+      { id: 'retail::a', trial: 2, reward: 1 },
+    ];
+    // The surviving sequence is [pass, pass]: one pair, held.
+    expect(holdRateOfTrials(rows)).toMatchObject({ pairs: 1, held: 1, rate: 1 });
+  });
+
+  it('says undefined for an empty ledger rather than zero', () => {
+    expect(holdRateOfTrials([])).toEqual({ ordered: 0, withoutOrder: 0, pairs: 0, held: 0, rate: undefined });
   });
 });

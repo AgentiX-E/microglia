@@ -30,6 +30,7 @@
 import type { TransferGateInput } from '@agentix-e/microglia-protocol';
 import { transferSummary, type TransferSummary, type TransferTrial } from './rule-probe.js';
 import { qualifiedId } from './tau2-plan.js';
+import { holdRate, type HoldInput, type HoldRate } from './passk.js';
 
 /** One episode's verdict, as the arm artefacts carry it. */
 export type TauTrialRow = {
@@ -148,4 +149,34 @@ export function transferReadingOf(input: {
       verdict: summary.verdict,
     },
   };
+}
+
+/**
+ * Retention from an arm's per-episode ledger.
+ *
+ * `per_trial` carries `{id, trial, reward}` for every episode an arm ran, which is the only place the
+ * order survives on artefacts written before `per_task` gained `outcomes` — including every artefact
+ * this project has published. Reading it here rather than reconstructing an order from counts is what
+ * makes the metric answerable for a run that is already committed.
+ *
+ * Episodes with no reward are dropped rather than read as failures: an unscored trial is an
+ * infrastructure fact, and folding it in as a miss would make the retention number a statement about
+ * the host. `holdRate` does the counting, so the two readers cannot disagree.
+ */
+export function holdRateOfTrials(rows: readonly TauTrialRow[]): HoldRate {
+  const byTask = new Map<string, { readonly trial: number; readonly reward: number | null }[]>();
+  for (const row of rows) {
+    const list = byTask.get(row.id);
+    if (list === undefined) byTask.set(row.id, [row]);
+    else list.push(row);
+  }
+  const tasks: HoldInput[] = [];
+  for (const episodes of byTask.values()) {
+    const scored = episodes
+      .filter((episode) => episode.reward !== null)
+      .sort((left, right) => left.trial - right.trial);
+    if (scored.length === 0) continue;
+    tasks.push({ outcomes: scored.map((episode) => episode.reward === 1) });
+  }
+  return holdRate(tasks);
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareToPublished, l4Verdict, meanPassAtK, passAtK } from '../passk.js';
+import { compareToPublished, holdRate, l4Verdict, meanPassAtK, passAtK } from '../passk.js';
 
 describe('pass^k', () => {
   it('is the unbiased estimator, not the plugged-in power', () => {
@@ -60,5 +60,49 @@ describe('the L4 gate', () => {
     expect(verdict.pass4).toBe(0);
     expect(verdict.meetsBar).toBe(false);
     expect(verdict.coversSplit).toBe(true);
+  });
+});
+
+describe('holdRate — does a pass at trial t predict a pass at t+1', () => {
+  it('is undefined when no task carried an order, never zero', () => {
+    // Zero would say the knowledge never held; the run cannot answer at all. The two are different
+    // facts and the second one is the honest one for every artefact written before `outcomes` existed.
+    const held = holdRate([
+      { successes: 4, trials: 4, k: 4 },
+      { successes: 3, trials: 4, k: 4 },
+    ]);
+    expect(held).toEqual({ ordered: 0, withoutOrder: 2, pairs: 0, held: 0, rate: undefined });
+  });
+
+  it('counts consecutive pairs inside a task, and pools rather than averaging', () => {
+    // Task A is T,T,T,F: three pairs, two held. Task B is F,T,T,F: the first trial failed, so it opens
+    // no pair; t1->t2 holds and t2->t3 does not. Pooled: 3 of 5 = 0.600. Averaging the two per-task
+    // rates would give (0.667 + 0.500)/2 = 0.583, and the pooled number is the one the published metric
+    // reports because a task with three pairs is more evidence than a task with two.
+    const held = holdRate([
+      { successes: 3, trials: 4, k: 4, outcomes: [true, true, true, false] },
+      { successes: 2, trials: 4, k: 4, outcomes: [false, true, true, false] },
+    ]);
+    expect(held.pairs).toBe(5);
+    expect(held.held).toBe(3);
+    expect(held.rate).toBeCloseTo(0.6, 12);
+  });
+
+  it('counts a task that only ever failed as no evidence rather than as a miss', () => {
+    // Recovery is a different measurement. Folding a never-passing task in as "not held" would make this
+    // number a re-reading of pass^1 under another name.
+    const held = holdRate([{ successes: 0, trials: 4, k: 4, outcomes: [false, false, false, false] }]);
+    expect(held).toEqual({ ordered: 1, withoutOrder: 0, pairs: 0, held: 0, rate: undefined });
+  });
+
+  it('separates the two shapes a count cannot tell apart', () => {
+    // Both are 2 of 4 successes. One alternates; the other passes twice and then fails twice. A count
+    // records one artefact for both, which is the whole reason the order had to be written down.
+    const alternating = holdRate([{ successes: 2, trials: 4, k: 4, outcomes: [true, false, true, false] }]);
+    const frontloaded = holdRate([{ successes: 2, trials: 4, k: 4, outcomes: [true, true, false, false] }]);
+    expect(frontloaded.rate).toBeCloseTo(0.5, 12);
+    expect(alternating.rate).toBe(0);
+    expect(frontloaded.pairs).toBe(2);
+    expect(alternating.pairs).toBe(2);
   });
 });

@@ -37,6 +37,7 @@ import {
   compareArms,
   resolutionOf,
   tau2ArmRecordOf,
+  holdRateOfTrials,
   tau2DetectablePp,
   tau2GateAudit,
   transferReadingOf,
@@ -246,6 +247,28 @@ const scenarioGates: readonly ValidityGate[] = pairGates({
 
 const gates = mergeGates(audit.gates, scenarioGates, inGateOrder);
 
+// Retention, per arm, from the episode ledger each arm wrote.
+//
+// `pass^4` says how often a task held on all four trials; this says how often a task that passed a trial
+// passed the next one, which is the number the published continual-learning result reports beside it
+// (*Learning on the Job*, arXiv 2607.22157; hold rate 0.88 for outcome feedback, 0.65 for verified
+// corrections). The two move separately — an arm can hold every pair it opens and still lose a task by
+// opening none — so the pair carries both rather than one replacing the other.
+//
+// It is computed from `per_trial` rather than from `per_task`: the ledger keeps `{id, trial, reward}`,
+// which is the order, and every artefact published before `per_task` gained `outcomes` carries the
+// ledger and not the order. A run whose artefact carries neither reports `undefined` rather than a zero
+// it did not measure.
+const retain = (artefact: Artefact) =>
+  artefact.per_trial === undefined ? undefined : holdRateOfTrials(artefact.per_trial);
+const firstHeld = retain(first);
+const secondHeld = retain(second);
+const retention =
+  firstHeld === undefined || secondHeld === undefined
+    ? undefined
+    : // `second` is the memory arm by construction, the same order the comparison uses.
+      { reference: firstHeld, memory: secondHeld };
+
 await writeJson('poc-l4-pair', {
   id: 'poc-l4-pair',
   title: 'L4 — memory arm against the reference arm on one split, paired per task',
@@ -255,6 +278,7 @@ await writeJson('poc-l4-pair', {
   first: { path: FIRST, ranAt: first.ranAt ?? null, pass4: first.metrics?.pass4 ?? null },
   second: { path: SECOND, ranAt: second.ranAt ?? null, pass4: second.metrics?.pass4 ?? null },
   comparison,
+  ...(retention === undefined ? {} : { retention }),
   // R57: the distractor this pair is about, when the memory arm planted one. Without it a reader sees
   // a pair artefact with no treatment gate and no reason for the omission.
   ...(plantedBarNote(plantedArm) ?? {}),

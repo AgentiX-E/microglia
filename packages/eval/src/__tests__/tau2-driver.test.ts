@@ -85,9 +85,12 @@ describe('the L4 driver', () => {
       // Each task is named by the scenario that owns it. τ² numbers its tasks from zero in every
       // domain, so a bare `t3` is a name two scenarios can both claim and the split's own overlap
       // check would read one scenario's tasks as another's leaks.
+      // `outcomes` is the order the trials ran, carried beside the counts because retention is a
+      // property of the sequence: both tasks are 2 of 4 here, and only the order tells the run that
+      // passed-first-and-last from the one that alternated.
       expect(tasks).toEqual([
-        { successes: 2, trials: 4, k: 4, taskId: 'retail/t3' },
-        { successes: 2, trials: 4, k: 4, taskId: 'retail/t4' },
+        { successes: 2, trials: 4, k: 4, taskId: 'retail/t3', outcomes: [true, false, true, false] },
+        { successes: 2, trials: 4, k: 4, taskId: 'retail/t4', outcomes: [true, false, true, false] },
       ]);
       const written = JSON.parse(readFileSync(join(dir, 'eval.json'), 'utf8')) as {
         simulations: unknown[];

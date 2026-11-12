@@ -27,6 +27,20 @@ export type PassAtKInput = {
    * be reported was the difference between two means.
    */
   readonly taskId?: string;
+  /**
+   * The trials in the order they ran, when the caller kept them.
+   *
+   * `pass^k` is a function of the counts and does not need the order. Retention does: the probability
+   * that a task still passes at trial `t+1` given that it passed at trial `t` is a property of the
+   * sequence, and an artefact that records only `4 of 4` cannot tell a run that passed four times in a
+   * row from one that passed the first and the last. The published result this metric comes from
+   * (*Learning on the Job*, arXiv 2607.22157) reports it as **hold rate** beside pass^1, and on this
+   * lane's artefacts it was not computable at all until the field existed.
+   *
+   * Optional because every artefact written before it existed carries counts only, and a reconstruction
+   * from a count would be an invention: four successes in four trials is one sequence, not four.
+   */
+  readonly outcomes?: readonly boolean[];
 };
 
 /** Unbiased pass^k for one task, in [0, 1]. */
@@ -101,4 +115,63 @@ export function l4Verdict(options: {
     meetsBar: compared.meets,
     coversSplit: options.tasks.length >= (options.minTasks ?? 60),
   };
+}
+
+/**
+ * Retention: how often a task that passed a trial passed the next one.
+ *
+ * `pass^k` answers *did it hold every time*; this answers *does it hold on*, and the two move
+ * separately. The published form is P(pass at t+1 | pass at t), pooled over consecutive pairs inside
+ * each task — pooled rather than averaged per task, because a task with one held pair is not the same
+ * evidence as a task with three.
+ *
+ * Three refusals, each for a way the number can be invented rather than measured:
+ *
+ *   - a task with no `outcomes` contributes nothing, and is counted in `withoutOrder` so a rate over
+ *     two tasks cannot be read as a rate over ten;
+ *   - a task whose first trial failed contributes no held pair — it is evidence about recovery, which
+ *     this metric does not measure, and folding it in would make the rate look like pass^1;
+ *   - no pairs at all is `undefined`, not zero. Zero says the knowledge never held; `undefined` says
+ *     this run cannot answer.
+ */
+/**
+ * What retention needs from a task: the trials in order, and nothing else.
+ *
+ * Structural rather than `PassAtKInput` because the two documents that carry an order disagree about
+ * everything else — an arm's `per_task` rows keep counts, its `per_trial` ledger keeps episodes, and a
+ * third reader keeps only `outcomes`. The statistic is the same number over all three.
+ */
+export type HoldInput = { readonly outcomes?: readonly boolean[] };
+
+export type HoldRate = {
+  /** Tasks that carried an ordered outcome list. */
+  readonly ordered: number;
+  /** Tasks that carried counts only, so they cannot contribute. */
+  readonly withoutOrder: number;
+  /** Consecutive pairs whose first trial passed. */
+  readonly pairs: number;
+  /** Of those, the ones whose second trial passed too. */
+  readonly held: number;
+  readonly rate: number | undefined;
+};
+
+export function holdRate(tasks: readonly HoldInput[]): HoldRate {
+  let ordered = 0;
+  let withoutOrder = 0;
+  let pairs = 0;
+  let held = 0;
+  for (const task of tasks) {
+    const outcomes = task.outcomes;
+    if (outcomes === undefined) {
+      withoutOrder += 1;
+      continue;
+    }
+    ordered += 1;
+    for (let index = 0; index + 1 < outcomes.length; index += 1) {
+      if (outcomes[index] !== true) continue;
+      pairs += 1;
+      if (outcomes[index + 1] === true) held += 1;
+    }
+  }
+  return { ordered, withoutOrder, pairs, held, rate: pairs === 0 ? undefined : held / pairs };
 }

@@ -256,7 +256,15 @@ export function toPassAtK(
       continue;
     }
     const successes = group.rewards.filter((reward) => reward === 1).length;
-    scoreable.push({ successes, trials: group.rewards.length, k, taskId: group.taskId });
+    // The order is carried, not just the count: retention is a property of the sequence and no count
+    // reconstructs it. `rewards` has already been checked for nulls above, so every entry is a verdict.
+    scoreable.push({
+      successes,
+      trials: group.rewards.length,
+      k,
+      taskId: group.taskId,
+      outcomes: group.rewards.map((reward) => reward === 1),
+    });
   }
 
   if (short.length > 0) {
@@ -363,7 +371,21 @@ export function compareArms(
  */
 export function perTaskRows(
   tasks: readonly PassAtKInput[],
-): readonly { readonly id: string; readonly successes: number; readonly trials: number; readonly passed_all: boolean }[] {
+): readonly {
+  readonly id: string;
+  readonly successes: number;
+  readonly trials: number;
+  readonly passed_all: boolean;
+  /**
+   * The trials in order, when the run kept them.
+   *
+   * Written into the artefact rather than computed at read time because the order is only available
+   * where the trials were folded: a readback sees a finished document, and a document with counts only
+   * cannot be asked what order they came in. Absent on every artefact written before the field, which is
+   * why the retention reader reports `undefined` rather than a zero it did not measure.
+   */
+  readonly outcomes?: readonly boolean[];
+}[] {
   return tasks.map((task) => {
     if (task.taskId === undefined) {
       throw new L4ParseError('bad-entry', 'a scored task has no id, so it cannot be paired');
@@ -373,6 +395,7 @@ export function perTaskRows(
       successes: task.successes,
       trials: task.trials,
       passed_all: task.successes === task.trials,
+      ...(task.outcomes === undefined ? {} : { outcomes: task.outcomes }),
     };
   });
 }
