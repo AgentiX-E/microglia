@@ -91,6 +91,7 @@ import {
   entitiesOf,
   faithfulnessLine,
   faithfulnessOf,
+  guardReplaces,
   rawLogCensus,
   rawLogInterpreter,
   rawLogInterpreterFor,
@@ -1030,7 +1031,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // store kept, so the number is a property of the writer and can be recomputed from any artefact
   // that carries both. `Memory Tax` reports the same quantity as "detail survival at write", and it
   // is the one failure mode six nulls on this lane could not be told apart from.
-  const faithfulness = faithfulnessOf(captured, written);
+  const faithfulness = faithfulnessOf(captured, written, guardReplaces);
   process.stdout.write(`[tau2] ${faithfulnessLine(faithfulness)}\n`);
   // R89: the ceiling against the pack, said at the write rather than discovered at the read. A ceiling
   // above the capacity writes records the renderer drops, and a dropped record has read as "nothing was

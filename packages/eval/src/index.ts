@@ -946,6 +946,7 @@ export {
   type RawLogCensus,
 } from './tau2-rawlog.js';
 export { degradationLineOf, degradationOfPair } from './tau2-degradation.js';
+export { guardReplaces } from './tau2-redaction.js';
 export {
   DEFAULT_PACK_BUDGET,
   CEILING_ABOVE_PACK,

@@ -66,6 +66,7 @@ describe('faithfulnessOf', () => {
       kept: 2,
       whole: 1,
       unwritten: 0,
+      redacted: 0,
     });
     expect(faithfulnessRate(census)).toBe(1);
   });
@@ -131,6 +132,7 @@ describe('faithfulnessOf', () => {
       kept: 1,
       whole: 1,
       unwritten: 0,
+      redacted: 0,
     });
   });
 
@@ -165,6 +167,7 @@ describe('faithfulnessOf', () => {
       kept: 0,
       whole: 0,
       unwritten: 2,
+      redacted: 0,
     });
     expect(faithfulnessRate(census)).toBeUndefined();
     expect(faithfulnessLine(census)).toBe(
@@ -194,6 +197,7 @@ describe('faithfulnessOf', () => {
       kept: 0,
       whole: 0,
       unwritten: 0,
+      redacted: 0,
     };
     expect(faithfulnessRate(census)).toBeUndefined();
     expect(faithfulnessLine(census)).toBe(
@@ -201,7 +205,87 @@ describe('faithfulnessOf', () => {
     );
   });
 
+describe('the loss the guard caused, counted apart from the loss the writer caused', () => {
+  /**
+   * R88 read `82 of 128` and the readback could not say whether the writer abstracted or the ceiling
+   * cut. Both were wrong: the value was removed by `kernel/guard.ts` before persistence. These cases
+   * pin the decomposition, and the second one is the load-bearing case — a redaction counter that
+   * absorbed every loss would become an alibi for the writer, which is the defect this module exists
+   * to catch rather than to repeat.
+   */
+  const guard = (text: string) => text === '7363354090';
+
+  it('counts a value the guard replaced as redacted rather than lost', () => {
+    const census = faithfulnessOf(
+      [{ runId: 'r1', entities: ['7363354090', '#W5199551'] }],
+      [item('Q: exchange #W5199551 for item_ids=["[phone]"]', 'r1')],
+      guard,
+    );
+    expect(census).toEqual({
+      corrections: 1,
+      withoutEntities: 0,
+      entities: 2,
+      kept: 1,
+      whole: 0,
+      unwritten: 0,
+      redacted: 1,
+    });
+  });
+
+  it('does not credit the guard with a value it would have left alone', () => {
+    // The writer dropped `#W5199551` and nothing else explains it. If this counted as redacted, the
+    // census would report a clean guard over a writer that lost an identity -- an acquittal bought by
+    // the wrong explanation.
+    const census = faithfulnessOf(
+      [{ runId: 'r1', entities: ['#W5199551'] }],
+      [item('Exchange a delivered order for a different size', 'r1')],
+      guard,
+    );
+    expect(census?.redacted).toBe(0);
+    expect(census?.kept).toBe(0);
+  });
+
+  it('counts nothing as redacted when no guard is supplied', () => {
+    // The default is the historical reading, so an arm that ran without the census does not gain a
+    // field it never measured: the same rule the lane applies to every instrument it adds late.
+    const census = faithfulnessOf(
+      [{ runId: 'r1', entities: ['7363354090'] }],
+      [item('Q: product_id="[phone]"', 'r1')],
+    );
+    expect(census?.redacted).toBe(0);
+    expect(census?.kept).toBe(0);
+  });
+
+  it('keeps a redacted value out of whole, so a correction cannot be complete by redaction', () => {
+    const census = faithfulnessOf(
+      [{ runId: 'r1', entities: ['7363354090'] }],
+      [item('Q: product_id="[phone]"', 'r1')],
+      guard,
+    );
+    expect(census?.whole).toBe(0);
+    // The rate stays over the entities that were stated: a redaction explains a loss, it does not
+    // remove it from the denominator, or an arm that redacted everything would read as perfect.
+    expect(faithfulnessRate(census)).toBe(0);
+  });
+});
+
 describe('faithfulnessLine', () => {
+  it('names the guard when it took part of the rate', () => {
+    const line = faithfulnessLine({
+      corrections: 12,
+      withoutEntities: 0,
+      entities: 128,
+      kept: 82,
+      whole: 1,
+      unwritten: 0,
+      redacted: 46,
+    });
+    expect(line).toBe(
+      'faithfulness: 82 of 128 entity(ies) kept (64.1%), 46 replaced by the redaction guard, ' +
+        'whole in 1 of 12 correction(s), 0 with none to keep',
+    );
+  });
+
   it('prints the counts that give the rate meaning', () => {
     const line = faithfulnessLine({
       corrections: 3,
@@ -210,6 +294,7 @@ describe('faithfulnessLine', () => {
       kept: 6,
       whole: 1,
       unwritten: 0,
+      redacted: 0,
     });
     expect(line).toBe(
       'faithfulness: 6 of 8 entity(ies) kept (75.0%), whole in 1 of 3 correction(s), 1 with none to keep',

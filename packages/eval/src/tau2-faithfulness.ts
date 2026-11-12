@@ -63,6 +63,22 @@ export type FaithfulnessCensus = {
    * which is what a dispatch whose distiller faulted eleven times out of fifteen actually printed.
    */
   readonly unwritten: number;
+  /**
+   * Entities that are missing from the store's text **and that the redaction guard would replace**.
+   *
+   * The fifth layer of this lane, and the one that spent three rounds looking like the first. R88 read
+   * `82 of 128` with two records clipped; the reconstruction that chose the ceiling keeps all 128 at
+   * the same ceiling, so the loss was neither the dose nor the writer. `kernel/guard.ts` redacts
+   * ten-digit numbers as phone numbers, and every τ² retail `product_id` is ten digits. The value is
+   * removed before persistence, by a rule that is right about phone numbers and cannot tell one from a
+   * product id.
+   *
+   * Counted only when a caller supplies the predicate, so an arm that ran without the census cannot
+   * gain a number it never measured. A missing entity the guard would have left alone stays out of this
+   * count: a redaction counter that absorbed every loss would be an alibi for the writer, which is the
+   * defect this module was built to catch.
+   */
+  readonly redacted: number;
 };
 
 /** One string, when it is an identity rather than prose, from a value of any JSON shape. */
@@ -125,6 +141,15 @@ export type FaithfulnessItem = {
 export function faithfulnessOf(
   rows: readonly FaithfulnessRow[],
   items: readonly FaithfulnessItem[],
+  /**
+   * Whether the redaction guard would replace a value, from `tau2-redaction.ts`.
+   *
+   * A predicate rather than a count, and optional rather than required: the guard is applied where the
+   * event payload and the statement are persisted, which is two layers above this module, so the only
+   * honest way to ask is to ask it. Absent means the arm did not measure this layer, and the census
+   * says `redacted: 0` rather than guessing.
+   */
+  redacts?: (text: string) => boolean,
 ): FaithfulnessCensus | undefined {
   const textByRun = new Map<string, string>();
   for (const item of items) {
@@ -144,6 +169,7 @@ export function faithfulnessOf(
   let kept = 0;
   let whole = 0;
   let unwritten = 0;
+  let redacted = 0;
   for (const row of rows) {
     if (row.entities.length === 0) {
       withoutEntities += 1;
@@ -157,13 +183,19 @@ export function faithfulnessOf(
       if (text.includes(entity.toLowerCase())) {
         kept += 1;
         here += 1;
+      } else if (redacts?.(entity) === true) {
+        // Missing, and the guard explains it. Counted apart rather than folded into `kept`: the value
+        // did not survive, and the arm should not be able to read as faithful because a safety rule ate
+        // its identifiers. Nor is it folded into nothing: `entities - kept` alone cannot tell a writer
+        // that abstracted from a guard that redacted, and that ambiguity cost this lane three rounds.
+        redacted += 1;
       }
     }
     if (storeEmpty) unwritten += 1;
     if (here === row.entities.length) whole += 1;
   }
   if (corrections === 0) return undefined;
-  return { corrections, withoutEntities, entities, kept, whole, unwritten };
+  return { corrections, withoutEntities, entities, kept, whole, unwritten, redacted };
 }
 
 /**
@@ -202,9 +234,12 @@ export function faithfulnessLine(census: FaithfulnessCensus | undefined): string
   // Both guards above are what make this division total: the store answered at least one correction and
   // at least one entity value exists, so there is no `?? 0` left to hide a missing denominator behind.
   const rate = census.kept / census.entities;
+  // The guard's share is named only when the census measured it, because a `0` printed beside a rate
+  // reads as "the guard took nothing" whether or not anyone asked it.
+  const guard = census.redacted === 0 ? '' : `, ${String(census.redacted)} replaced by the redaction guard`;
   return (
     `faithfulness: ${String(census.kept)} of ${String(census.entities)} entity(ies) kept ` +
-    `(${(rate * 100).toFixed(1)}%), whole in ${String(census.whole)} of ` +
+    `(${(rate * 100).toFixed(1)}%)${guard}, whole in ${String(census.whole)} of ` +
     `${String(census.corrections)} correction(s), ${String(census.withoutEntities)} with none to keep`
   );
 }
