@@ -33,6 +33,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from _funnel import STOPPED_PREFIX, funnel_notes
+
 STATES = ("GRADED", "NO_MEASUREMENT", "DISCARDED", "ABANDONED")
 
 # Quoted from `prereg/R58-trace-unit.md`, written before the measurement existed.
@@ -123,6 +125,13 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
     report = Report()
     tau2 = artefact.get("tau2") or {}
     metrics = artefact.get("metrics") or {}
+
+    # Before the treatment, the chain that was supposed to carry it. This round was supposed to move
+    # the numbers feeding the funnel — a unit that carries more than one claim, and a pass that merges
+    # them — so a run that stopped at the same zero R56 stopped at has to say so in its first line
+    # rather than after four predictions about a store that was never written. `_funnel` is the same
+    # module `r56_readback` reads, so the sentence is the driver's and the chain is one rendering.
+    funnel_notes(report, artefact)
 
     scenario = tau2.get("scenario")
     if isinstance(scenario, dict):
@@ -397,6 +406,45 @@ def main() -> int:
             print(f"  {mark} {label} -> {state}")
             if state != expected:
                 print(report.render())
+        # A run that never wrote a store still has one thing to say, and it is the thing this round
+        # exists to move. R56's re-dispatch stopped at zero candidates and its report printed the
+        # funnel as `12 -> 0` while the reason sat in the artefact, unread; the same stop here would
+        # have been filed as "no census" and nothing else.
+        context_cases: list[tuple[str, dict[str, Any], list[str]]] = [
+            (
+                "a run stopped at the funnel relays the chain and the driver's sentence",
+                {
+                    "id": "poc-l4",
+                    "metrics": {"status_no_measurement": 1, "k": 4},
+                    "notes": {
+                        "0": STOPPED_PREFIX + " 14 correction(s) -> 14 asked -> 0 candidate(s) -> "
+                             "0 admitted -> 0 stored -> 0 servable (0 refused, 0 failed, "
+                             "2 dropped: unknown-kind 2): the parser dropped every claim the model "
+                             "wrote: the reply arrived and did not survive the schema",
+                    },
+                },
+                [
+                    "stopped before measurement: 14 correction(s) -> 14 asked -> 0 candidate(s)",
+                    "2 dropped: unknown-kind 2",
+                ],
+            ),
+            (
+                "a run that wrote a store says no sentence was written rather than nothing",
+                base_artefact(),
+                ["stopped before measurement: absent"],
+            ),
+        ]
+        for label, artefact, required in context_cases:
+            _, report = grade(artefact)
+            rendered = report.render()
+            missing = [text for text in required if text not in rendered]
+            mark = "ok  " if not missing else "FAIL"
+            if missing:
+                failures += 1
+            print(f"  {mark} {label}")
+            if missing:
+                print(f"      missing from the report: {missing}")
+                print(rendered)
         print()
         print("SELF-TEST PASSED" if failures == 0 else f"SELF-TEST FAILED ({failures})")
         return 0 if failures == 0 else 1

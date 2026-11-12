@@ -56,6 +56,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from _funnel import STOPPED_PREFIX, funnel_notes
 from _pair import delta_of, verdict_of
 
 STATES = ("GRADED", "NO_MEASUREMENT", "DISCARDED", "ABANDONED")
@@ -268,15 +269,9 @@ def readings(
         report.note(f"coverage p50 {p50:.4f}{tail}")
     else:
         report.note("coverage p50 absent")
-    if funnel:
-        report.note(
-            "funnel: "
-            + " -> ".join(
-                str(funnel.get(key))
-                for key in ("corrections", "candidates", "admitted", "stored", "servable")
-            )
-            + f" (refused {funnel.get('refused')}, failed {funnel.get('failed')})"
-        )
+    # The chain and, when the run stopped inside it, the driver's own sentence for why. Both come from
+    # `_funnel`, which `r58_readback` reads too: one implementation of one claim.
+    funnel_notes(report, artefact)
     corrections, candidates, per = yield_of(tau2)
     base_per = yield_of((baseline or {}).get("tau2") or {})[2]
     if per is None:
@@ -802,7 +797,7 @@ def main() -> int:
                 "a run with no form block still reports what it measured",
                 base_artefact(**{"tau2.distillForm": None, "tau2.storeItems": None}),
                 base,
-                ["coverage p50 0.1900", "census: 16 stored, 16 servable", "funnel: 32 -> 30 -> 16 -> 16 -> 16", "yield:"],
+                ["coverage p50 0.1900", "census: 16 stored, 16 servable", "funnel: 32 correction(s) -> 30 candidate(s)", "yield:"],
             ),
             (
                 "a run with an empty inventory still reports its coverage",
@@ -827,6 +822,71 @@ def main() -> int:
                 base_artefact(),
                 base,
                 ["baseline yield not stated"],
+            ),
+            # R56's re-dispatch stopped at zero candidates and the funnel could not say which of
+            # three facts that zero was: an event that never reached the distiller, a reply the
+            # parser emptied, or a reply that arrived empty. The driver now records `asked` and
+            # `dropped` beside the counts, and this reader has to relay them -- the numbers were in
+            # the artefact the whole time and a reader that prints `12 -> 0` leaves the question it
+            # was written to answer back with the person reading it.
+            (
+                "the funnel relays how many events the distiller was asked about",
+                base_artefact(**{"tau2.funnel": {
+                    "corrections": 12, "asked": 12, "dropped": {},
+                    "candidates": 0, "admitted": 0, "stored": 0, "servable": 0,
+                    "refused": 0, "failed": 0,
+                }}),
+                base,
+                ["funnel: 12 correction(s) -> 12 asked -> 0 candidate(s) -> 0 admitted -> 0 stored -> 0 servable"],
+            ),
+            (
+                "the funnel names what the parser dropped, largest reason first",
+                base_artefact(**{"tau2.funnel": {
+                    "corrections": 32, "asked": 30, "dropped": {"unknown-kind": 1, "no-statement": 4},
+                    "candidates": 25, "admitted": 16, "stored": 16, "servable": 16,
+                    "refused": 9, "failed": 0,
+                }}),
+                base,
+                ["5 dropped: no-statement 4, unknown-kind 1"],
+            ),
+            # A run stopped before measurement is the case this reader exists for, and the sentence
+            # that says why is written by the driver's `funnelReading` and stored in the artefact's
+            # notes. Re-deriving it here would be a second implementation of one claim; relaying it
+            # is the reader's job.
+            (
+                "a run the driver stopped relays the sentence that stopped it",
+                {
+                    "id": "poc-l4",
+                    "metrics": {"status_no_measurement": 1, "k": 4},
+                    "notes": {
+                        "0": STOPPED_PREFIX + " "
+                             "12 correction(s) -> 12 asked -> 0 candidate(s) -> 0 admitted -> "
+                             "0 stored -> 0 servable (0 refused, 0 failed): the interpreter answered "
+                             "all 12 event(s) with no claim of its own: nothing was thrown away after "
+                             "the reply, so the model is what carried nothing",
+                        "1": "Claim: none. No pass^4, no paired delta and no revert is produced by this run.",
+                    },
+                },
+                base,
+                ["stopped before measurement: 12 correction(s) -> 12 asked"],
+            ),
+            (
+                "a stopped run written before the field existed is relayed as it was written",
+                {
+                    "id": "poc-l4",
+                    "metrics": {"status_no_measurement": 1, "k": 4},
+                    "notes": [STOPPED_PREFIX + " 12 correction(s) -> "
+                              "0 candidate(s) -> 0 admitted -> 0 stored -> 0 servable "
+                              "(0 refused, 0 failed): the interpreter proposed no candidate"],
+                },
+                base,
+                ["stopped before measurement: 12 correction(s) -> 0 candidate(s)"],
+            ),
+            (
+                "a run that scored tasks is not described as stopped",
+                base_artefact(),
+                base,
+                ["stopped before measurement: absent"],
             ),
         ]
 
