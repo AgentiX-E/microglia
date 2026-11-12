@@ -294,6 +294,41 @@ trust** and their own confidence, not on repetition — so do not expect a secon
 strengthen the first. If you write claims, the corroboration rule is unchanged and is what protects you
 from a single articulate user. Choosing the kind is choosing which of those two regimes you are in.
 
+### 6.2 The budget is a cost, and it decides what a whole item can say
+
+A pack is a character budget with a fixed cost: an element, a note, and a line per item carrying its id,
+kind, confidence, scope and statement. On the record arm measured here the fixed cost of **one** line is
+390 characters, so a 1,200-character pack carries a record whose statement is at most **810**. Anything
+longer is retrieved, ranked, and then dropped at render — and a pack that dropped its only candidate
+returns no ids, which every caller reports the same way it reports "nothing was relevant".
+
+`maxStatementChars(options, shape)` measures that boundary instead of deriving it: it renders a
+single-item pack through `renderPack` at the options the caller will actually use and binary-searches the
+longest statement that survives. It takes a **shape** because the capacity is a property of the line, not
+of the library — a record with a provenance payload costs 149 characters more than a bare claim, and a
+capacity quoted for the wrong item is a check that passes on a pack that cannot carry it.
+
+| budget | capacity | what one recall carries |
+| --- | --- | --- |
+| 1,200 | 810 | one 700-character record, 110 characters of headroom |
+| 1,600 | 1,210 | one record of up to 1,210 |
+| 2,400 | 2,010 | two 744-character records, or one 1,532-character record whole |
+
+**If you write long items, raise the budget with them.** A writer and a pack that disagree do not error;
+the pack just serves less than the store holds, and the loss is invisible from both sides. If your
+records can run to 2,000 characters, your pack needs 2,400 — and `recall` on a store you have written
+will tell you: `truncated` counts the items the renderer refused, so a non-zero value with a non-zero
+`ids` is a pack that served something and dropped the candidate that ranked first.
+
+**The two numbers can be registered together.** A knowledge pack is a cost per request, and a ceiling is
+a fidelity choice; neither bounds the other by itself. Where a run states both, this codebase checks that
+the ceiling fits what the pack can render, because the alternative is a store built to be dropped.
+
+**A budget below the wrapper renders nothing at all** — an empty string rather than a block with
+`items="0"`. That is deliberate and it is what makes the amount a guarantee rather than an estimate: a
+header that says zero items is 200 characters of a block that claims knowledge and carries none, which
+measured on the public lane cost 1.14pp against an empty pack.
+
 ## 7. Security model
 
 | Threat | Control | Where |
