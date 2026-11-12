@@ -12,6 +12,7 @@ testDomain: retail
 recallDomain: retail
 distillUnit: trace
 traceClaims: 3
+distillScope: edited
 ---
 
 # R58 — the object distilled is one task trace, and the store is consolidated after it is written
