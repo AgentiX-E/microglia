@@ -1186,6 +1186,44 @@ with a missing section, a placeholder, or an id that disagrees with its filename
 workflow refuses a dispatch that names none: a run whose prediction was not written down before it
 started can only ever be read as a description of what happened.
 
+**Every key a header may carry.** Six are required and the rest are optional: a registration
+opened before a key existed stays valid, and a key that is absent means "the dispatch's own setting
+stands" — except for the six switches below, where a *stated disagreement* between the header and the
+repository variable is refused before the first model call rather than resolved by either side.
+
+| Key | Meaning | Who decides when absent |
+|---|---|---|
+| `id` | bare id, must match the filename | required |
+| `step` | the roadmap step this executes | required |
+| `opened` | the date the prediction was written | required |
+| `arms` | the arms it measures, `memory,reference` for a τ² cell | required |
+| `sample` | the number of cases the run scores | required |
+| `gates` | the gates the run is judged by | required |
+| `recallFloor` | the similarity floor a pack is served at | `TAU_MIN_COVERAGE` |
+| `facadePair` | whether the run measures the paired-facade contrast | `TAU_FACADE_PAIR` |
+| `facadeNotes` | the note level: `standard`, `hardened`, `cautious`, or `three-level` | `TAU_INJECTION_NOTE` |
+| `trainDomain` / `testDomain` / `recallDomain` | the τ² scenario pair and the scope recall asks in | `TAU_TRAIN_DOMAIN` and its two siblings |
+| `split` | `minidev`, `dev` or `train` on the BIRD lane | `SOTA_SPLIT` |
+| `lane` | `product`, `transfer` or `hostile` — which claim this cell may support | the split already fixes BIRD's role |
+| `backbone` | the model this cell runs | the repository model on this provider |
+| `thinking` | `on` or `off`: the reasoning regime | `SOTA_THINKING` |
+| `distillForm` | the shape of claim the distiller is asked for: `lesson`, `procedure`, `repair`, `lexicon` | `TAU_DISTILL_FORM` |
+| `distillUnit` | `correction` (one failed task, one sentence) or `trace` (the attempt beside the reference) | `TAU_DISTILL_UNIT` |
+| `distillScope` | `edited` (the failures) or `all` (every trajectory, including the ones that passed) | `TAU_DISTILL_SCOPE` |
+| `traceClaims` | how many claims one trace may teach, 1–8; both the sentence the model reads and the count the parser keeps | `TAU_TRACE_CLAIMS` |
+
+The six switches are the ones a dispatch can be *wrong* about. Everything else has a default that is
+harmless when inherited; a switch does not, because two runs that differ in one are two experiments and
+a store cannot say which one built it. `pnpm eval:prereg-form prereg/<id>.md <form> <unit> <scope>
+<claims>` prints the six values the workflow should use, and exits non-zero naming the disagreement when
+the variable and the header say different things:
+
+```
+$ pnpm eval:prereg-form prereg/R58-trace-unit.md '' '' '' 6
+[prereg-form] this registration fixes the trace ceiling at 3 claim(s) and this dispatch would run '6',
+              so the ceiling is not the only variable that moved
+```
+
 **What a comparison is allowed to say.** `compareCell` in `packages/eval/src/reproduction.ts` refuses
 to call anything `reproduced` unless it was measured on the same split. A number from a 350-question
 subset and a published number on 1,534 questions differ by sampling error alone; the honest verdict is

@@ -154,6 +154,26 @@ significance claim; the McNemar test carries the inference.
 **Gate** — a named predicate over the study artefact with a threshold, a measured value, and a
 blocking flag. Fifteen gates; a failing blocking gate fails the build.
 
+**Registration switch** — a setting that belongs to one experiment rather than to the repository:
+the backbone, the reasoning regime, the distiller's form, its unit, the population it teaches from, and
+the trace ceiling. Six of them. Each lives in a pre-registration's header, is recorded in the artefact
+from the same value the run used, and is *refused* — not silently overridden — when the repository
+variable and the header disagree. The reason is one sentence: a repository variable is one experiment's
+setting applied to every queued dispatch, and a run published under a registration it did not execute is
+a number with the wrong label.
+
+**Distilling unit** — the object the distiller is shown. `correction` is one failed task rendered as one
+sentence, which is the unit every published τ² arm measured; `trace` is the attempt put beside the
+reference trajectory, so the difference between them can be the lesson. The unit decides the form: a
+trace arm cannot be asked for a `lesson`, because the guidance for a `lesson` asks the model to name
+columns, and a trace has none.
+
+**Trace ceiling** — the most claims one trace may teach, one to eight. It is passed to the interpreter
+where it becomes both the sentence the model reads and the count the parser keeps, so a ceiling the
+prompt states and the parser cannot apply does not exist. It is not a promise of yield: a trace with one
+failed assertion may support one claim whatever the ceiling is, and a run at six that yields 2.2 is the
+finding that the episode, not the cap, is the constraint.
+
 **Held-out domain** — a domain that receives *no* feedback in any arm and is still evaluated. The only
 clean test of generalisation, because everything else can be memorised per domain.
 
