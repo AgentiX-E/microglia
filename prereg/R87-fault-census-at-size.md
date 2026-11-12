@@ -13,6 +13,8 @@ recallDomain: retail
 distillUnit: trace
 traceClaims: 3
 distillScope: edited
+trainTasks: 57
+testTasks: 1
 ---
 
 # R87 — the census again, at the size the failure population actually has
@@ -33,7 +35,16 @@ One dispatch, `l4_tasks = 0` (all 114 retail task ids), `TAU_TRAIN_SHARE = 0.5`,
 **`TAU_TEST_TASKS = 1`**, `l4_arms = memory`, unit `trace`, three claims, `edited` scope, R58's model and
 seed. The last two numbers are the registration's whole cost argument and they are separate knobs on
 purpose: the quantity is produced by the **learning** half, and the evaluation cap only decides how much
-of the run is spent grading something this arm does not report.
+of the run is spent grading something this arm does not report. `trainTasks`/`testTasks` are headers
+rather than repository variables for the reason the floor and the scenario pair are: a cap that lived in
+a variable would be decided by whichever dispatch ran last. The dispatch itself sets `l4_tasks = 0` —
+the pool is sliced before the plan splits it, so a task cap there would cap both halves again, which is
+exactly the defect this registration exists to correct.
+
+**The job is expected to be red.** `V1` measures a coverage floor of sixty scored tasks and this
+dispatch scores one, so the gate fails and `eval:l4` exits non-zero. That is the gate doing its job: the
+artefact is the census, the pass^4 is bookkeeping, and the evidence upload runs on `always()`. A green job
+here would mean the gate had stopped measuring the split.
 
 The predicted population is therefore stated before the run rather than discovered after it:
 

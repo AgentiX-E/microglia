@@ -202,6 +202,17 @@ export type Prereg = {
    */
   readonly traceClaims?: number;
   /**
+   * How many tasks the learning half draws, and how many the evaluation half scores.
+   *
+   * R86 was dispatched with one cap — `l4_tasks = 10` — and that cap silently bound *both* halves, so
+   * a census of distillation faults bought five learning tasks, one failure and a single call. The two
+   * numbers are in different units: the quantity a store question asks about is produced by the
+   * learning half, and the evaluation only decides how much of the run is spent grading something the
+   * registration may not report. Absent means the repository variables stand, exactly as before.
+   */
+  readonly trainTasks?: number;
+  readonly testTasks?: number;
+  /**
    * Where the admitted items are served from: the recall pack, or a prefix of the system prompt.
    *
    * R55.1's second arm. It is not a tidiness switch: the SOTA holder's published cell injects *every*
@@ -273,6 +284,8 @@ const HEADER_KEYS = [
   'distillUnit',
   'distillScope',
   'traceClaims',
+  'trainTasks',
+  'testTasks',
   'packMode',
   'thinking',
 ] as const;
@@ -698,6 +711,20 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  /** A cap on one half of the split: a whole number of tasks, zero meaning every one of them. */
+  const cap = (key: 'trainTasks' | 'testTasks'): number | undefined => {
+    const text = values.get(key);
+    if (text === undefined) return undefined;
+    const parsed = Number(text);
+    if (!Number.isInteger(parsed) || parsed < 0) {
+      collected.push({ where: `header '${key}'`, problem: `'${text}' is not a count of tasks` });
+      return undefined;
+    }
+    return parsed;
+  };
+  const trainTasks = cap('trainTasks');
+  const testTasks = cap('testTasks');
+
   // Where the admitted items are served from. R55.1's second arm, and the seventh switch to move out of
   // a repository variable: an arm that renders every admitted item into the system prompt is a different
   // treatment from one that retrieves two, and a run that cannot say which it ran measured neither.
@@ -834,6 +861,8 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(distillUnit === undefined ? {} : { distillUnit }),
       ...(distillScope === undefined ? {} : { distillScope }),
       ...(traceClaims === undefined ? {} : { traceClaims }),
+      ...(trainTasks === undefined ? {} : { trainTasks }),
+      ...(testTasks === undefined ? {} : { testTasks }),
       ...(packMode === undefined ? {} : { packMode }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,

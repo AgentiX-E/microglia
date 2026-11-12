@@ -1529,3 +1529,56 @@ describe('laneRoleProblem', () => {
     expect(laneRoleProblem('Product', { split: 'dev' })).toContain('is not product, transfer or hostile');
   });
 });
+
+describe('trainTasks and testTasks, the two caps one number used to bind at once', () => {
+  const HEADER = [
+    '---',
+    'id: R87-caps',
+    'step: R87',
+    'opened: 2026-11-12',
+    'arms: memory',
+    'sample: 57',
+    'gates: V1',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '## Prediction\n\n- the learning half produces at least eight distillation calls at this cap\n\n' +
+    '## Refutation\n\n- fewer than eight calls means the population arithmetic is wrong\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads both caps when the registration pins them', () => {
+    // R86's dispatch used one number for two populations: `l4_tasks = 10` sliced the evaluated list,
+    // the plan split that slice in half, and a census of distillation faults was asked once instead
+    // of fifteen times. A cap is a property of the experiment, and there are two of them.
+    const reading = readPrereg(withHeader('trainTasks: 57\ntestTasks: 1'), 'R87-caps.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.trainTasks).toBe(57);
+    expect(reading.prereg?.testTasks).toBe(1);
+  });
+
+  it('accepts zero, which means every task rather than none', () => {
+    const reading = readPrereg(withHeader('trainTasks: 0\ntestTasks: 0'), 'R87-caps.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.trainTasks).toBe(0);
+  });
+
+  it('leaves both absent when the header names neither, so a variable still decides', () => {
+    const reading = readPrereg(withHeader('split: dev'), 'R87-caps.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.trainTasks).toBeUndefined();
+    expect(reading.prereg?.testTasks).toBeUndefined();
+  });
+
+  it('refuses a cap that is not a count of tasks', () => {
+    // A negative cap would slice from the end of the list, which is not a smaller run but a different
+    // one — and it would read as "the corpus was thinner" in every artefact downstream.
+    expect(readPrereg(withHeader('trainTasks: -1\ntestTasks: 1'), 'R87-caps.md').problems).toEqual([
+      { where: "header 'trainTasks'", problem: "'-1' is not a count of tasks" },
+    ]);
+    expect(readPrereg(withHeader('trainTasks: 2.5\ntestTasks: 1'), 'R87-caps.md').problems).toHaveLength(1);
+  });
+});

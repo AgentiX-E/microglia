@@ -106,7 +106,8 @@
     "eval:width-share": "tsx packages/eval/src/bin/width-share.ts",
     "eval:claim-check": "tsx packages/eval/src/bin/claim-check.ts",
     "eval:backbone-probe": "tsx packages/eval/src/bin/backbone-probe.ts",
-    "eval:coupling-check": "POC_RESULT_DIR=.cache/coupling pnpm eval:coupling && node scripts/check-coupling-ledger.mjs .cache/coupling"
+    "eval:coupling-check": "POC_RESULT_DIR=.cache/coupling pnpm eval:coupling && node scripts/check-coupling-ledger.mjs .cache/coupling",
+    "eval:prereg-caps": "tsx packages/eval/src/bin/prereg-caps.ts"
   },
   "devDependencies": {
     "@agentix-e/microglia-browser": "workspace:*",

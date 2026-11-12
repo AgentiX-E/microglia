@@ -1273,6 +1273,13 @@ jobs:
           # for the same reason the pair cannot: the registration is the only source of truth,
           # and a run that chose its levels after the readout would be choosing its contrasts.
           NOTES=$(pnpm --silent eval:prereg-notes "$FILE")
+          # R87: the two task caps, which one number used to bind at once. `l4_tasks = 10` sliced the
+          # evaluated list, the plan split that slice in half, and R86's census of distillation faults
+          # was asked once instead of fifteen times. The caps are a property of the experiment -- the
+          # quantity a store question asks about is produced by the learning half, and the evaluation
+          # cap only decides how much of the run is spent grading something the registration may not
+          # report -- so they come from the file, and both or neither.
+          CAPS=$(pnpm --silent eval:prereg-caps "$FILE")
           # R54: the scenario pair is a property of the experiment, like the floor. R51's
           # readback graded a retail store's rules on airline questions because this value
           # lived in a repository variable set for the transfer arm, and nothing in the
@@ -1325,6 +1332,8 @@ jobs:
           echo "claims=$CLAIMS" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "knobs=$KNOBS" >> "$GITHUB_OUTPUT"
+          echo "trainTasks=$(echo "$CAPS" | sed -n 's/^train=//p')" >> "$GITHUB_OUTPUT"
+          echo "testTasks=$(echo "$CAPS" | sed -n 's/^test=//p')" >> "$GITHUB_OUTPUT"
           echo "overrides=$OVERRIDES" >> "$GITHUB_OUTPUT"
           if [ -n "$OVERRIDES" ]; then
             echo "::warning::the registration overrides repository variables: $OVERRIDES"
@@ -1429,8 +1438,8 @@ jobs:
           TAU_TRAIN_DOMAIN: ${{ steps.recall_floor.outputs.train || vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
           TAU_TEST_DOMAIN: ${{ steps.recall_floor.outputs.test || vars.TAU_TEST_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
           TAU_RECALL_DOMAIN: ${{ steps.recall_floor.outputs.recall || vars.TAU_RECALL_DOMAIN || vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
-          TAU_TRAIN_TASKS: ${{ vars.TAU_TRAIN_TASKS || '0' }}
-          TAU_TEST_TASKS: ${{ vars.TAU_TEST_TASKS || '0' }}
+          TAU_TRAIN_TASKS: ${{ steps.recall_floor.outputs.trainTasks || vars.TAU_TRAIN_TASKS || '0' }}
+          TAU_TEST_TASKS: ${{ steps.recall_floor.outputs.testTasks || vars.TAU_TEST_TASKS || '0' }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
@@ -1491,8 +1500,8 @@ jobs:
           TAU_TRAIN_DOMAIN: ${{ steps.recall_floor.outputs.train || vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
           TAU_TEST_DOMAIN: ${{ steps.recall_floor.outputs.test || vars.TAU_TEST_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
           TAU_RECALL_DOMAIN: ${{ steps.recall_floor.outputs.recall || vars.TAU_RECALL_DOMAIN || vars.TAU_TRAIN_DOMAIN || vars.TAU_DOMAIN || 'retail' }}
-          TAU_TRAIN_TASKS: ${{ vars.TAU_TRAIN_TASKS || '0' }}
-          TAU_TEST_TASKS: ${{ vars.TAU_TEST_TASKS || '0' }}
+          TAU_TRAIN_TASKS: ${{ steps.recall_floor.outputs.trainTasks || vars.TAU_TRAIN_TASKS || '0' }}
+          TAU_TEST_TASKS: ${{ steps.recall_floor.outputs.testTasks || vars.TAU_TEST_TASKS || '0' }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
