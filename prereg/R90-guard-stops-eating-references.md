@@ -131,3 +131,33 @@ Whether a store written *during* the evaluation helps — the in-episode arm of 
 because the store here is frozen before the first scored trial. That arm is now worth building: it was
 blocked on this one, since an in-episode write would have propagated `[phone]` through every episode
 after the first.
+
+## Amendment 1 — the pack is inherited, and R89 measured it (2026-11-12, run in flight, no readback of it exists)
+
+Two rows above say `pack.droppedForSize = 0` and `pack.meanIds ≥ 2`. Both were written before R89's
+readback existed, and R89 has since read `droppedForSize = 1,596` and `meanIds = 1.0` at this exact
+budget and capacity. The rows were a guess about a quantity this arm does not move, which is the same
+mistake R89's Amendment 1 recorded one round earlier — and the fix is the same: an arm whose only
+variable is the guard cannot predict its pack, it can only inherit it.
+
+**Written after dispatch and before any reading of this run.** The sequence is stated because it
+decides whether this is an amendment or a goalpost move: the run was dispatched at 17:47 UTC, this
+paragraph was written at 18:05 UTC, and neither the arm's artefact nor its `pass^4` existed when it was
+written. What it replaces is a guess, not a result.
+
+The replacement is the stricter of the two:
+
+- **The pack carries one record, as R89 measured.** `pack.meanIds = 1`,
+  `pack.droppedForSize > 0`, `pack.filled = 228`, `pack.empty = 0`. One record of ~1,717 characters
+  plus the 390-character wrapper leaves 293 of a 2,400-character budget, so a second never fits, and the
+  eleven remaining candidates are refused every request. Graded as "did not change", because restoring
+  an identity makes a record *longer* — `[phone]` is seven characters and `7363354090` is ten — and a
+  row that predicts the same occupancy is the one that catches a record growing past a boundary.
+- **Coverage is read against R89's 25.00%, not against the 25% floor.** The floor is already met at one
+  record per pack; what this arm asks is whether real identities in that record move the share, so the
+  row is `coverage ≥ 0.25` **and the direction reported**, with no claim of a lift at n = 228 pairs.
+
+**The consequence for what this arm can conclude, stated in advance.** If `pass^4` rises over R89's
+0.7018 with the same pack and the same dose, the identity is the mechanism. If it does not, the
+placeholder was not what the negative effect was made of — and that is a reading worth having, because
+it is the last unmeasured candidate in the record itself.

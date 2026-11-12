@@ -129,11 +129,30 @@ multi-claim distillation reads, in the same way a correction is the unit a singl
 in the world; `systemUntil` is when the store stopped believing it. A rule can be superseded in system
 time while still being true in world time, and the reverse.
 
+**Pack budget / capacity** — the budget is a character ceiling on one rendered pack; the capacity is
+the longest *statement* a pack of that budget can carry, and it is measured (`maxStatementChars` renders
+a one-item pack and binary-searches the boundary) rather than derived, because the fixed cost belongs to
+the line and not to the library. A record line costs **390** characters of wrapper, payload and id, so a
+2,400-character budget states 2,010 — **one** record. Capacity is per record: two records need two
+wrappers, and a candidate that does not fit is refused at render rather than truncated, which the census
+counts as `droppedForSize`. A pack whose budget is below the wrapper renders nothing at all.
+
 **Recall text** — what a rule is matched by: its condition followed by its statement (`recallText` in
 the kernel). One definition rather than three, because the BM25 index, the `minCoverage` floor and the
 MMR diversity ranking each used to decide for themselves, and all three had settled on the statement
 alone. A rule distilled without a condition therefore has only its claim to be found by, which on an
 agentic benchmark meant an empty pack on 38% of 1,528 requests.
+
+**Reference** — a value that names a row rather than describing a person: a bare digit run under a field
+whose name declares it (`id`, `*_id`, `*_ids`). The distinction exists because a ten-digit run has no
+shape of its own that separates a product id from a telephone number, so the guard reads the field
+instead. A reference is **not** redacted; an address or a credential under the same key still is, and a
+formatted number always is.
+
+**Redaction** — the rules applied *before* persistence, so that a store built from real traffic is safe
+to keep: email addresses, telephone numbers, and `sk-…` / `gh…_` / JWT / AWS key shapes. The phone rule
+is the only one withheld from a **reference**, and it is withheld by rule id rather than by bypassing
+redaction, so a rule added later still applies to the values that arrive under `*_id`.
 
 **Trust** — a scalar in `[0, 1]` attached to a feedback event, derived from the *signal* (execution
 result > clarification > preference > rating with reason > edit > bare rating) and optionally capped by

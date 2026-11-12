@@ -312,7 +312,15 @@ capacity quoted for the wrong item is a check that passes on a pack that cannot 
 | --- | --- | --- |
 | 1,200 | 810 | one 700-character record, 110 characters of headroom |
 | 1,600 | 1,210 | one record of up to 1,210 |
-| 2,400 | 2,010 | two 744-character records, or one 1,532-character record whole |
+| 2,400 | 2,010 | one record of up to 2,010 — a measured 1,717-character record fills 2,107 |
+
+**Capacity is per record, and a pack holds fewer records than the division suggests.** At 2,400 a
+single 1,717-character record charges 2,107 of the budget and leaves 293; a second record of the same
+length is **refused, not truncated**, so the pack serves one item and the renderer counts the rest as
+`droppedForSize`. That is the measured behaviour of a real store, and it is why `droppedForSize` is in
+the census: dividing the budget by the mean record length predicts two records, and the run reads one.
+If you want two records per recall, size the budget for two *plus* the wrapper, or shorten the records —
+and check which one you did, because they are different treatments.
 
 **If you write long items, raise the budget with them.** A writer and a pack that disagree do not error;
 the pack just serves less than the store holds, and the loss is invisible from both sides. If your
@@ -335,7 +343,7 @@ measured on the public lane cost 1.14pp against an empty pack.
 |---|---|---|
 | Prompt injection in a correction | Screen at distill time; a matching claim is quarantined, not dropped | `core/guard.ts` |
 | Statement escaping the prompt block | `<` escaped in every rendered field | `apply/render.ts` |
-| Secret exfiltration | Email, phone, `sk-…` patterns redacted before persistence | `core/guard.ts` |
+| Secret exfiltration | Email, phone, `sk-…` patterns redacted before persistence; a bare digit run under a reference key is a row key, not a number | `core/guard.ts` |
 | Cross-tenant retrieval | Namespace on every record and every query | `memory/store.ts` |
 | Poisoning through a weak channel | `trustCeiling` per call; below the floor → quarantine | `capture` |
 | Model over-trust | Model output is a *candidate*; admission is unchanged | `distill/llm.ts` |
@@ -367,6 +375,36 @@ three are invariants on the store:
 (`reverseOrderView`) that bypasses the sort. The control must *disagree*: an order-invariance number
 produced by a harness that cannot detect order is not evidence. This is the cheapest form of
 self-falsification in the repository, and the reason the integrity lane costs nothing to run.
+
+### 7.2 What memory will not persist, and what it will
+
+Redaction runs before persistence, not at export: a dataset redacted on the way out has already written
+the secret to disk once. The rules are email addresses, telephone numbers, `sk-…`/`gh…_`/JWT/AWS key
+shapes, and they apply to tool arguments, notes and statements alike.
+
+**A reference is not a secret.** A ten-digit run has no property that distinguishes a row key from a
+telephone number, so the guard reads the field the value arrived under. `product_id="7363354090"` is a
+row key and is kept; `phone="7363354090"` is a number and is redacted; `user_id="+1 415-555-2671"` is
+redacted because a reference carries no separators. The key must declare itself — `id`, `*_id`,
+`*_ids` — and a bracketed list under such a key is exempt as a whole or not at all, so you never see
+`item_ids=["1615379700", "[phone]"]` where half an identity survives.
+
+| value | under `product_id` | under `phone` | in prose |
+| --- | --- | --- | --- |
+| `7363354090` | kept | `[phone]` | `[phone]` |
+| `+1 415-555-2671` | `[phone]` | `[phone]` | `[phone]` |
+| `a.b@example.com` | `[email]` | `[email]` | `[email]` |
+| `sk-…` | `[api-key]` | `[api-key]` | `[api-key]` |
+
+**An address is redacted in every position**, including an identifier slot. Real systems do use an
+address as a user id, and that value is a person's contact detail whichever field carried it; the
+cost is that a record written from such a call names the shape of the answer and not the identity, and
+this library accepts that cost rather than trading privacy for a benchmark number.
+
+**The residual, since a security document should state it.** A ten-digit telephone number written
+without separators, passed in a reference slot, is indistinguishable from a row key and will be kept.
+A formatted number is always redacted, `phone`/`mobile`/`contact` are never reference keys, and a value
+the guard objects to on its own merits — a key, a token, an address — is redacted wherever it sits.
 
 ## 8. Evaluation architecture
 
