@@ -982,6 +982,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     for (const item of consolidation.items) await store.putKnowledge(item);
   }
   const faults = distiller.faults();
+  // The reasons, not only the count: eleven of fifteen events answered by the fallback is a fact,
+  // and *which* error they threw is the fact that names the fix. Counted here because `faults()`
+  // lives in this process and the artefact is the only thing that outlives it.
+  const faultReasons = faults.reasons.reduce<Record<string, number>>((counts, code) => {
+    counts[code] = (counts[code] ?? 0) + 1;
+    return counts;
+  }, {});
   // The store's census, taken here rather than after the evaluation, because the funnel's last stage
   // is what decides whether there is anything to evaluate. R42 paid an hour of pack-free evaluation to
   // learn that the store was empty; the predicate that answers it exists and is tested, and this is
@@ -1039,7 +1046,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       `${String(distillReport.failed)} failed, ${String(census.stored)} item(s) in the store ` +
       `(${String(census.active)} active, ${String(census.servable)} servable in ${RECALL_DOMAIN}), ` +
       `${String(faults.events)} answered by the rule fallback, reasons ` +
-      `${reasonsLine(census.reasons)}\n`,
+      `${faults.events === 0 ? 'none' : reasonsLine(faultReasons)}\n`,
   );
   process.stdout.write(
     `[tau2] admission: measured=${String(census.admission.measured)} ` +
@@ -1398,6 +1405,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       // the survivors of a filter nobody counted is a store whose size has no explanation.
       dropped: { ...drops },
       llmFailed: faults.events,
+      ...(faults.events === 0 ? {} : { llmFailedReasons: faultReasons }),
     },
     // Whose tally this is, stated in the record: the episodes' calls belong to the agent process and
     // arrive as a turn count, the distillation calls are this process's own. A rate over a subset is

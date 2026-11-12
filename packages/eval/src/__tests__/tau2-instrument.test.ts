@@ -430,6 +430,30 @@ describe('armRecordFromDriver', () => {
       events: 32,
       llmFailed: 12,
     });
+    // The count without the reasons is one number for three different failures: a provider that
+    // refused, a reply that did not parse, and a timeout have three different fixes. R58 recorded
+    // `llmFailed: 11` of 15 and the artefact could not say which one it was, so the store looked
+    // like a thin store rather than like a failing one.
+    expect(record.learning?.llmFailedReasons).toBeUndefined();
+  });
+
+  it('carries why the fallback answered, by code, so the count has a cause', () => {
+    const record = armRecordFromDriver(
+      raw({
+        learning: {
+          rows: 15,
+          unanswered: 0,
+          edited: 15,
+          distilled: 6,
+          distillFailed: 0,
+          candidates: 6,
+          events: 15,
+          llmFailed: 11,
+          llmFailedReasons: { MG_E_INVALID_SIGNAL: 9, MG_E_PROVIDER: 2 },
+        },
+      }),
+    );
+    expect(record.learning?.llmFailedReasons).toEqual({ MG_E_INVALID_SIGNAL: 9, MG_E_PROVIDER: 2 });
   });
 
   it('names the population a call tally covers, because a subset is not a rate over everything', () => {

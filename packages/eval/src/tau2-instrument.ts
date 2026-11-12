@@ -188,6 +188,16 @@ export type Tau2Raw = {
     readonly dropped?: Readonly<Record<string, number>>;
     /** Events the model interpreter threw on, answered by the rule interpreter instead. */
     readonly llmFailed?: number;
+    /**
+     * Why those events threw, by `MG_E_*` code, in the order they happened to be counted.
+     *
+     * The count alone was not enough: R58's learning half recorded `llmFailed: 11` of 15 asked and
+     * the artefact had no field that could say whether the provider refused, the reply failed to
+     * parse, or a timeout fired — three causes with three different fixes, all reported as one
+     * number. The reasons were already collected in `faults()` and reached nothing that survives
+     * the process, which is the defect AUDIT 34.100 names one layer up.
+     */
+    readonly llmFailedReasons?: Readonly<Record<string, number>>;
   };
   /**
    * Calls the run made to the model, and how many of them failed after retries.
@@ -623,6 +633,9 @@ export function armRecordFromDriver(
       ...(raw.learning.llmFailed === undefined
         ? {}
         : { llmFailed: raw.learning.llmFailed }),
+      ...(raw.learning.llmFailedReasons === undefined
+        ? {}
+        : { llmFailedReasons: raw.learning.llmFailedReasons }),
     },
     domainOrigin: {
       storedWithDomain: Math.max(
