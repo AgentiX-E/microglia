@@ -376,6 +376,10 @@ describe('every switch a registration owns is read from the registration', () =>
     ['TAU_DISTILL_UNIT', 'unit'],
     ['TAU_DISTILL_SCOPE', 'scope'],
     ['TAU_TRACE_CLAIMS', 'claims'],
+    // The seventh, and the one whose absence the repository audit caught rather than a test: a switch
+    // that code reads and no workflow can set has its default as its only value, which is what
+    // `scripts/audit.mjs` refuses. R55.1's two arms differ in this line and nothing else.
+    ['TAU_PACK_MODE', 'mode'],
   ];
 
   /** The line a key is assigned on, in the L4 step, with its continuation lines folded in. */

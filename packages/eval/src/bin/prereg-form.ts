@@ -15,14 +15,15 @@
  * would be a fifth place for the three refusals to drift apart.
  *
  * Usage: pnpm eval:prereg-form prereg/<id>.md [configured-form] [configured-unit] [configured-scope]
- *   -> prints "unit=<value>", "form=<value>" and "scope=<value>" and exits 0, or prints the reason and
- *      exits 1.
+ *        [configured-claims] [configured-pack-mode]
+ *   -> prints one `key=value` line per switch and exits 0, or prints the reason and exits 1.
  */
 import { readFileSync } from 'node:fs';
 import {
   distillFormProblem,
   distillScopeProblem,
   distillUnitProblem,
+  packModeProblem,
   readPrereg,
   traceClaimsProblem,
 } from '../prereg.js';
@@ -36,7 +37,7 @@ function main(): void {
   const file = process.argv[2];
   if (file === undefined) {
     refuse(
-      'usage: pnpm eval:prereg-form prereg/<id>.md [form] [unit] [scope] [trace-claims]',
+      'usage: pnpm eval:prereg-form prereg/<id>.md [form] [unit] [scope] [trace-claims] [pack-mode]',
     );
     return;
   }
@@ -83,9 +84,20 @@ function main(): void {
     refuse(claimsProblem);
     return;
   }
+  // R55.1's switch, and the seventh of the family. A prefix arm renders every admitted entry into the
+  // system prompt; a retrieved arm serves 1.42 items through a pack. The two are not interchangeable, so
+  // a dispatch that would run the other one under this registration's name is refused here rather than
+  // discovered in the readback.
+  const declaredMode = reading.prereg.packMode;
+  const modeProblem = packModeProblem(process.argv[7] ?? null, declaredMode);
+  if (modeProblem !== undefined) {
+    refuse(modeProblem);
+    return;
+  }
   process.stdout.write(
     `unit=${declaredUnit ?? ''}\nform=${declared ?? ''}\nscope=${declaredScope ?? ''}\n` +
-      `claims=${declaredClaims === undefined ? '' : String(declaredClaims)}\n`,
+      `claims=${declaredClaims === undefined ? '' : String(declaredClaims)}\n` +
+      `mode=${declaredMode ?? ''}\n`,
   );
 }
 

@@ -202,6 +202,16 @@ export type Prereg = {
    */
   readonly traceClaims?: number;
   /**
+   * Where the admitted items are served from: the recall pack, or a prefix of the system prompt.
+   *
+   * R55.1's second arm. It is not a tidiness switch: the SOTA holder's published cell injects *every*
+   * admitted guideline into the system prompt in both ReAct phases, with no retrieval and no budget —
+   * 31 bullets, billed twice a turn — while this lane serves 1.42 items through a 1,200-character pack.
+   * Two different doses, and until this key existed neither could be named in a registration, which is
+   * why Appendix N's comparison has been arithmetic rather than a measurement.
+   */
+  readonly packMode?: string;
+  /**
    * Whether this registration's dispatch asks the model to think.
    *
    * R84 asks a question the record cannot answer without it: R82 measured the expensive backbone 6.00pp
@@ -263,6 +273,7 @@ const HEADER_KEYS = [
   'distillUnit',
   'distillScope',
   'traceClaims',
+  'packMode',
   'thinking',
 ] as const;
 
@@ -299,6 +310,9 @@ const HEADER_UNITS: ReadonlySet<string> = new Set(['correction', 'trace']);
 
 /** The two populations `resolveDistillScope` accepts: the failures, or every trajectory. */
 const HEADER_SCOPES: ReadonlySet<string> = new Set(['edited', 'all']);
+
+/** The two places a pack may be served from. `retrieved` is the lane's own protocol. */
+const HEADER_PACK_MODES: ReadonlySet<string> = new Set(['retrieved', 'prefix']);
 const LANE_LIST = 'product, transfer or hostile';
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
@@ -684,6 +698,22 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // Where the admitted items are served from. R55.1's second arm, and the seventh switch to move out of
+  // a repository variable: an arm that renders every admitted item into the system prompt is a different
+  // treatment from one that retrieves two, and a run that cannot say which it ran measured neither.
+  const packModeText = values.get('packMode');
+  let packMode: string | undefined;
+  if (packModeText !== undefined) {
+    if (!HEADER_PACK_MODES.has(packModeText)) {
+      collected.push({
+        where: `header 'packMode'`,
+        problem: `'${packModeText}' is not one of ${[...HEADER_PACK_MODES].join(', ')}`,
+      });
+    } else {
+      packMode = packModeText;
+    }
+  }
+
   // The thinking regime, which R84 needs and which has no dispatch field to live in.
   //
   // Two values and no synonyms. `SOTA_THINKING` accepts `enabled`, `disabled`, `true` and `false`
@@ -804,6 +834,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(distillUnit === undefined ? {} : { distillUnit }),
       ...(distillScope === undefined ? {} : { distillScope }),
       ...(traceClaims === undefined ? {} : { traceClaims }),
+      ...(packMode === undefined ? {} : { packMode }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,
       refutation,
@@ -1263,4 +1294,26 @@ export function unknownSampleArms(arms: Iterable<string>, known: Iterable<string
  */
 export function essentialArms(arms: Iterable<string>): readonly string[] {
   return [...new Set(arms)].filter((arm) => arm !== 'none' && arm !== 'full').sort();
+}
+
+/**
+ * Refuse a dispatch whose pack mode is not the one the registration fixed.
+ *
+ * The seventh field of the family, and the same shape as the other six: the registration is the
+ * authority, an unset variable is not a second opinion, and a stated disagreement is refused before the
+ * first model call. The two modes are not interchangeable — one serves a retrieved pack of 1.42 items,
+ * the other every admitted item in a system-prompt prefix — so a dispatch that ran the other one under
+ * this registration's name would be a control filed as a treatment.
+ */
+export function packModeProblem(
+  configured: string | null,
+  declared: string | undefined,
+): string | undefined {
+  if (declared === undefined) return undefined;
+  const stated = configured === null || configured === '' ? undefined : configured;
+  if (stated === undefined || stated === declared) return undefined;
+  return (
+    `this registration fixes the pack mode at '${declared}' and this dispatch would run '${stated}', ` +
+    'so the pack mode is not the only variable that moved'
+  );
 }

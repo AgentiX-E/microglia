@@ -1250,6 +1250,7 @@ jobs:
           TAU_UNIT_VAR: ${{ vars.TAU_DISTILL_UNIT }}
           TAU_SCOPE_VAR: ${{ vars.TAU_DISTILL_SCOPE }}
           TAU_CLAIMS_VAR: ${{ vars.TAU_TRACE_CLAIMS }}
+          TAU_PACK_VAR: ${{ vars.TAU_PACK_MODE }}
         run: |
           set -euo pipefail
           # The input is the registration ID, not the file name. A stray `.md`
@@ -1286,12 +1287,17 @@ jobs:
           # lane still resolved from a variable. A registration whose store is built from every
           # trajectory has to be able to say so, and a dispatch that says otherwise is refused rather
           # than silently preferred.
+          # R55.1: where the pack is served from, the seventh switch of the family and the one that
+          # decides whether the lane can render the SOTA holder's protocol at all (every admitted entry
+          # in a system-prompt prefix, no retrieval, no budget) or only its own (1.42 items a request
+          # through a 1,200-character pack). A run that cannot say which it served measured neither.
           pnpm --silent eval:prereg-form "$FILE" "${TAU_FORM_VAR:-}" "${TAU_UNIT_VAR:-}" \
-            "${TAU_SCOPE_VAR:-}" "${TAU_CLAIMS_VAR:-}" > "$RUNNER_TEMP/distill.env"
+            "${TAU_SCOPE_VAR:-}" "${TAU_CLAIMS_VAR:-}" "${TAU_PACK_VAR:-}" > "$RUNNER_TEMP/distill.env"
           UNIT=$(sed -n 's/^unit=//p' "$RUNNER_TEMP/distill.env")
           FORM=$(sed -n 's/^form=//p' "$RUNNER_TEMP/distill.env")
           SCOPE=$(sed -n 's/^scope=//p' "$RUNNER_TEMP/distill.env")
           CLAIMS=$(sed -n 's/^claims=//p' "$RUNNER_TEMP/distill.env")
+          MODE=$(sed -n 's/^mode=//p' "$RUNNER_TEMP/distill.env")
           pnpm --silent eval:prereg-scenario "$FILE" > "$RUNNER_TEMP/scenario.env"
           TRAIN=$(sed -n 's/^train=//p' "$RUNNER_TEMP/scenario.env")
           TEST=$(sed -n 's/^test=//p' "$RUNNER_TEMP/scenario.env")
@@ -1306,6 +1312,7 @@ jobs:
           echo "unit=$UNIT" >> "$GITHUB_OUTPUT"
           echo "scope=$SCOPE" >> "$GITHUB_OUTPUT"
           echo "claims=$CLAIMS" >> "$GITHUB_OUTPUT"
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`, distiller \`${UNIT:-inherited}/${FORM:-inherited}\` over \`${SCOPE:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: L4 arm — memory
@@ -1372,6 +1379,7 @@ jobs:
           # committed trace artefact ran at; a run at six is a different treatment and the ceiling
           # travels into the artefact so a readback can tell the two apart.
           TAU_TRACE_CLAIMS: ${{ steps.recall_floor.outputs.claims || vars.TAU_TRACE_CLAIMS }}
+          TAU_PACK_MODE: ${{ steps.recall_floor.outputs.mode || vars.TAU_PACK_MODE }}
           # R57: which controlled distractor this leg plants, and nothing else. It comes from the
           # registration's `plantedArms` header by way of the `arms` job, not from a repository
           # variable: a variable is global, so three arms meant three dispatches in sequence and a
@@ -1485,6 +1493,7 @@ jobs:
           TAU_DISTILL_UNIT: ${{ steps.recall_floor.outputs.unit || vars.TAU_DISTILL_UNIT }}
           TAU_DISTILL_SCOPE: ${{ steps.recall_floor.outputs.scope || vars.TAU_DISTILL_SCOPE }}
           TAU_TRACE_CLAIMS: ${{ steps.recall_floor.outputs.claims || vars.TAU_TRACE_CLAIMS }}
+          TAU_PACK_MODE: ${{ steps.recall_floor.outputs.mode || vars.TAU_PACK_MODE }}
           TAU_SEED: ${{ vars.TAU_SEED }}
           TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}
           TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}

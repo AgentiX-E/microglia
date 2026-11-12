@@ -9,6 +9,7 @@ import {
   distillFormProblem,
   distillScopeProblem,
   distillUnitProblem,
+  packModeProblem,
   traceClaimsProblem,
   essentialArms,
   facadePairSwitch,
@@ -1423,8 +1424,72 @@ describe('the trace ceiling', () => {
   });
 });
 
-describe('traceClaimsProblem', () => {
-  it('says nothing when the registration names no ceiling', () => {
+describe('packMode, the seventh switch out of a repository variable', () => {
+  const HEADER = [
+    '---',
+    'id: R88-pack-mode',
+    'step: R88',
+    'opened: 2026-11-12',
+    'arms: memory,reference',
+    'sample: 228',
+    'gates: V1,V2',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '\n## Prediction\n\n- **one claim that is long enough to count as a claim here.**\n' +
+    '\n## Refutation\n\n- **Void** — the first branch, long enough to count as a claim.\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads the place the registration serves a pack from', () => {
+    // R55.1's second arm injects every admitted entry into the system prompt with no retrieval and no
+    // budget; the first serves 1.42 items through a 1,200-character pack. A run that cannot say which
+    // it ran is a control filed under a treatment's name.
+    expect(readPrereg(withHeader('packMode: prefix'), 'R88-pack-mode.md').prereg?.packMode).toBe('prefix');
+    expect(readPrereg(withHeader('packMode: retrieved'), 'R88-pack-mode.md').prereg?.packMode).toBe('retrieved');
+  });
+
+  it('leaves it absent when the header does not name one', () => {
+    const reading = readPrereg(withHeader('split: dev'), 'R88-pack-mode.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.packMode).toBeUndefined();
+  });
+
+  it('refuses a place the lane cannot serve from, in either spelling', () => {
+    expect(readPrereg(withHeader('packMode: all'), 'R88-pack-mode.md').problems).toEqual([
+      { where: "header 'packMode'", problem: "'all' is not one of retrieved, prefix" },
+    ]);
+    // Case matters: a header is compared against a variable box, and `Prefix` is not `prefix`.
+    expect(readPrereg(withHeader('packMode: Prefix'), 'R88-pack-mode.md').problems).toHaveLength(1);
+  });
+});
+
+describe('packModeProblem', () => {
+  it('says nothing when the registration names no mode', () => {
+    expect(packModeProblem('prefix', undefined)).toBeUndefined();
+  });
+
+  it('says nothing when the variable is unset, because the registration decides', () => {
+    expect(packModeProblem('', 'prefix')).toBeUndefined();
+    expect(packModeProblem(null, 'prefix')).toBeUndefined();
+  });
+
+  it('says nothing when the variable agrees', () => {
+    expect(packModeProblem('prefix', 'prefix')).toBeUndefined();
+  });
+
+  it('refuses a mode left behind by another experiment', () => {
+    expect(packModeProblem('retrieved', 'prefix')).toBe(
+      "this registration fixes the pack mode at 'prefix' and this dispatch would run 'retrieved', so " +
+        'the pack mode is not the only variable that moved',
+    );
+  });
+});
+
+describe('traceClaimsProblem', () => {  it('says nothing when the registration names no ceiling', () => {
     expect(traceClaimsProblem('6', undefined)).toBeUndefined();
   });
 
