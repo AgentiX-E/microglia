@@ -25,6 +25,20 @@ record whose first line is the question the answer is yes more often than the de
 does not make the metric wrong -- it makes it an upper bound on preservation for this unit, which is
 worth knowing before it is used to acquit or convict a ceiling.
 
+**A ceiling is per domain, and the two domains differ by a factor of two.** Measured at v0.2.0:
+
+| domain | tasks | p50 | p95 | max | clipped at 2000 |
+| --- | --- | --- | --- | --- | --- |
+| retail | 114 | 744 | 1260 | 1532 | 0 |
+| airline | 50 | 684 | 1899 | **3129** | 2 (4%) |
+
+So 2000 is right for R88 and wrong for the airline arm that would transfer it: an itinerary with
+three legs renders a call list twice retail's length, and the ceiling has to be measured on the
+domain the arm will serve rather than borrowed from the one it was tuned on. This is the same defect
+as the 700 it replaced, one level up -- the constant was inherited from a *unit*, and it would be
+inherited from a *domain* next. `rawCeiling` is a registration header precisely so the number travels
+with the experiment that measured it.
+
 Usage:
 
     python3 eval/tools/record_length_census.py --tasks data/tau2/domains/retail/tasks.json
