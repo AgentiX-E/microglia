@@ -456,6 +456,27 @@ describe('armRecordFromDriver', () => {
     expect(record.learning?.llmFailedReasons).toEqual({ MG_E_INVALID_SIGNAL: 9, MG_E_PROVIDER: 2 });
   });
 
+  it('carries one specimen per fault code, because a code names a category and not a reply', () => {
+    const record = armRecordFromDriver(
+      raw({
+        learning: {
+          rows: 15,
+          unanswered: 0,
+          edited: 15,
+          distilled: 6,
+          distillFailed: 0,
+          events: 15,
+          llmFailed: 11,
+          llmFailedReasons: { MG_E_INVALID_SIGNAL: 11 },
+          llmFailedSamples: { MG_E_INVALID_SIGNAL: 'MG_E_INVALID_SIGNAL: LLM response is not JSON <- {"cand' },
+        },
+      }),
+    );
+    expect(record.learning?.llmFailedSamples).toEqual({
+      MG_E_INVALID_SIGNAL: 'MG_E_INVALID_SIGNAL: LLM response is not JSON <- {"cand',
+    });
+  });
+
   it('names the population a call tally covers, because a subset is not a rate over everything', () => {
     // The episodes' calls belong to the agent process; the distillation calls are the driver's own.
     // Supplying the second as if it were the first is the mistake; supplying nothing was the mistake

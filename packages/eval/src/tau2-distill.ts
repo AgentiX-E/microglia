@@ -37,6 +37,19 @@ export type InterpreterFaults = {
   readonly events: number;
   /** The code of each such failure, in order, or `unknown` for a non-`MicrogliaError`. */
   readonly reasons: readonly string[];
+  /**
+   * One example per code: the message, and the reply's opening characters when the error carried
+   * them.
+   *
+   * The code alone says *what kind* of failure happened and not what it was, and the two are far
+   * apart for the one code that matters most: `MG_E_INVALID_SIGNAL` covers a truncated reply, a
+   * reply in prose, and a reply of the right shape that the schema refused — three fixes, one word.
+   * `parseCandidates` already puts the reply's first 160 characters in the error's `preview`, and
+   * that string died with the process. R58 recorded eleven of these and no sample, so the round
+   * after it could not tell a provider that cut the answer off from a model that answered in the
+   * wrong register.
+   */
+  readonly samples: Readonly<Record<string, string>>;
 };
 
 export type ResilientInterpreter = {
@@ -49,6 +62,21 @@ function codeOf(error: unknown): string {
   return error instanceof MicrogliaError ? error.code : 'unknown';
 }
 
+/**
+ * A short, quotable example of one failure: its message, plus the reply's opening characters.
+ *
+ * Bounded to 200 characters so an artefact stays a document: a provider that echoes a megabyte of
+ * request back in an error would otherwise put the request in the record. The preview is appended
+ * rather than parsed, because the string is the one piece of evidence that says whether the model
+ * was cut off or merely wrong.
+ */
+function sampleOf(error: unknown): string {
+  if (!(error instanceof MicrogliaError)) return String(error).slice(0, 200);
+  const preview = error.details['preview'];
+  const tail = typeof preview === 'string' ? ` <- ${preview}` : '';
+  return `${error.message}${tail}`.slice(0, 200);
+}
+
 export function resilientInterpreter(
   primary: Interpreter,
   fallback: Interpreter,
@@ -57,13 +85,19 @@ export function resilientInterpreter(
   const fatal = options.fatal ?? stoppedRun;
   let events = 0;
   const reasons: string[] = [];
+  // First sample per code, not last: the first failure of a kind is the one that happened before any
+  // retry or fallback had a chance to change the state, and eleven identical samples say no more
+  // than one.
+  const samples: Record<string, string> = {};
 
   const interpreter: Interpreter = async (context) => {
     try {
       return await primary(context);
     } catch (error) {
       events += 1;
-      reasons.push(codeOf(error));
+      const code = codeOf(error);
+      reasons.push(code);
+      if (samples[code] === undefined) samples[code] = sampleOf(error);
       // A failure of the run rather than of the event: rethrown so the caller's `fatal` predicate
       // can stop the run, and never answered by the fallback, because a store built underneath an
       // outage is a store nobody can attribute.
@@ -84,7 +118,7 @@ export function resilientInterpreter(
     interpreter.prefetch = primary.prefetch;
   }
 
-  return { interpreter, faults: () => ({ events, reasons: [...reasons] }) };
+  return { interpreter, faults: () => ({ events, reasons: [...reasons], samples: { ...samples } }) };
 }
 
 /**

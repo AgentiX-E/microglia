@@ -1048,6 +1048,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       `${String(faults.events)} answered by the rule fallback, reasons ` +
       `${faults.events === 0 ? 'none' : reasonsLine(faultReasons)}\n`,
   );
+  // The specimen beside the category: a code says how many and this says what. One line per code,
+  // because eleven samples of one failure say no more than the first.
+  if (faults.events > 0) {
+    for (const [code, sample] of Object.entries(faults.samples)) {
+      process.stdout.write(`[tau2] distill fault ${code}: ${sample}\n`);
+    }
+  }
   process.stdout.write(
     `[tau2] admission: measured=${String(census.admission.measured)} ` +
       `trust=${census.admission.trustMean.toFixed(4)} ` +
@@ -1406,6 +1413,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       dropped: { ...drops },
       llmFailed: faults.events,
       ...(faults.events === 0 ? {} : { llmFailedReasons: faultReasons }),
+      ...(faults.events === 0 ? {} : { llmFailedSamples: faults.samples }),
     },
     // Whose tally this is, stated in the record: the episodes' calls belong to the agent process and
     // arrive as a turn count, the distillation calls are this process's own. A rate over a subset is

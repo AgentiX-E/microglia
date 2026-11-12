@@ -46,7 +46,7 @@ describe('resilientInterpreter', () => {
       async () => [candidate('from the rules')],
     );
     await expect(interpreter(context('fb-1'))).resolves.toEqual([candidate('from the model')]);
-    expect(faults()).toEqual({ events: 0, reasons: [] });
+    expect(faults()).toEqual({ events: 0, reasons: [], samples: {} });
   });
 
   it('falls back per event, and counts the event rather than the batch', async () => {
@@ -109,6 +109,35 @@ describe('resilientInterpreter', () => {
     );
     await expect(interpreter(context('fb-1'))).resolves.toEqual([]);
     expect(faults().reasons).toEqual(['unknown']);
+  });
+
+  it('keeps one specimen per fault code, because the code is a category and the round needs the reply', async () => {
+    // `MG_E_INVALID_SIGNAL` is a truncated reply, a reply written in prose, and a reply of the right
+    // shape that the schema refused. Three fixes, one word. `parseCandidates` puts the reply's first
+    // 160 characters in the error's `preview`; that string used to die with the process, so R58 could
+    // report eleven of this code and nothing about which of the three it was.
+    let call = 0;
+    const { interpreter, faults } = resilientInterpreter(
+      async () => {
+        call += 1;
+        if (call <= 2) {
+          throw new MicrogliaError('MG_E_INVALID_SIGNAL', 'LLM response is not JSON', {
+            preview: call === 1 ? 'Here is a note about the order…' : 'a second, later reply',
+          });
+        }
+        throw new MicrogliaError('MG_E_STORE_IO', 'the disk said no');
+      },
+      async () => [candidate('from the rules')],
+    );
+    for (const id of ['fb-1', 'fb-2', 'fb-3']) await interpreter(context(id));
+    const reading = faults();
+    expect(reading.reasons).toEqual(['MG_E_INVALID_SIGNAL', 'MG_E_INVALID_SIGNAL', 'MG_E_STORE_IO']);
+    // First sample per code, not last: the first failure of a kind happened before any fallback had
+    // a chance to change the state, and two samples of one failure say no more than one.
+    expect(reading.samples).toEqual({
+      MG_E_INVALID_SIGNAL: 'MG_E_INVALID_SIGNAL: LLM response is not JSON <- Here is a note about the order…',
+      MG_E_STORE_IO: 'MG_E_STORE_IO: the disk said no',
+    });
   });
 
   it('forwards the primary\u2019s prefetch, so the batch still warms its calls once', async () => {

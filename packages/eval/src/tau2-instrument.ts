@@ -198,6 +198,14 @@ export type Tau2Raw = {
      * the process, which is the defect AUDIT 34.100 names one layer up.
      */
     readonly llmFailedReasons?: Readonly<Record<string, number>>;
+    /**
+     * One example per fault code, because the code is a category and the round needs the specimen.
+     *
+     * `MG_E_INVALID_SIGNAL` is a truncated reply, a reply in prose and a reply of the right shape the
+     * schema refused, and the three have three fixes. The preview `parseCandidates` already puts in
+     * the error is the only string that separates them, and it used to die with the process.
+     */
+    readonly llmFailedSamples?: Readonly<Record<string, string>>;
   };
   /**
    * Calls the run made to the model, and how many of them failed after retries.
@@ -636,6 +644,9 @@ export function armRecordFromDriver(
       ...(raw.learning.llmFailedReasons === undefined
         ? {}
         : { llmFailedReasons: raw.learning.llmFailedReasons }),
+      ...(raw.learning.llmFailedSamples === undefined
+        ? {}
+        : { llmFailedSamples: raw.learning.llmFailedSamples }),
     },
     domainOrigin: {
       storedWithDomain: Math.max(
