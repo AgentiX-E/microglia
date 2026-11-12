@@ -215,8 +215,49 @@ describe('http surface', () => {
     expect(missingRoute.status).toBe(404);
   });
 
-  it('tells an HTTP client when a pack was silenced rather than unmatched', async () => {
-    // The driver and any other HTTP consumer sees an empty pack either way. Only one of
+  it('honours the corroboration floor and the anchoring mode, which the route never forwarded', async () => {
+    // Both fields were honoured by `buildPack` and by the store and unreachable from here, which made
+    // two registered arms ("admit at support n", "no retrieval") unrunnable from the surface every
+    // benchmark driver calls. This test is on the wire rather than on the parser because the defect was
+    // the wire: `recall-query.test.ts` covers the parse, and a parse that nothing spreads would pass it.
+    const { app, store } = await mount({ token: TOKEN });
+    await store.putKnowledge(
+      createKnowledgeItem(
+        {
+          namespace: 'acme',
+          kind: 'constraint',
+          scope: { task: 'chart.recommend' },
+          statement: 'sales by month should be a line',
+          evidence: { feedbackId: 'fb_1', runId: 'run', at: 1_700_000_000_000, weight: 0.9 },
+          trust: 0.9,
+          dedupeKey: 'k_1',
+        },
+        defaultPolicy,
+        1_700_000_000_000,
+        'k_1',
+      ),
+    );
+    const auth = { headers: { authorization: `Bearer ${TOKEN}` } };
+    const idsOf = async (query: string) =>
+      ((await (await app.request(`/v1/recall?task=chart.recommend&text=sales${query}`, auth)).json()) as {
+        ids: string[];
+      }).ids;
+
+    // One correction is on the item, so a floor of one serves it and a floor of two cannot.
+    expect(await idsOf('')).toEqual(['k_1']);
+    expect(await idsOf('&minEvidence=1')).toEqual(['k_1']);
+    expect(await idsOf('&minEvidence=2')).toEqual([]);
+    // `lexical` demands an anchor; the statement mentions the query's own term, so it survives. The
+    // point is that the value reaches the store at all -- an unknown mode is refused by the parser.
+    expect(await idsOf('&anchoring=lexical')).toEqual(['k_1']);
+    const refused = await app.request('/v1/recall?task=chart.recommend&text=sales&minEvidence=0', auth);
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toMatchObject({
+      error: 'minEvidence is not a positive count of corrections',
+    });
+  });
+
+  it('tells an HTTP client when a pack was silenced rather than unmatched', async () => {    // The driver and any other HTTP consumer sees an empty pack either way. Only one of
     // those two silences is a retrieval failure, so the reason has to cross the wire.
     const { app } = await mount({ token: TOKEN, corroborationFloor: 0.05 });
     const silenced = await app.request('/v1/recall?task=chart.recommend&text=sales', {

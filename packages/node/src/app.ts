@@ -18,6 +18,7 @@
 import { Hono } from 'hono';
 import { MicrogliaError, isMicrogliaError } from '@agentix-e/microglia-core';
 import { RPC_PARSE_ERROR, createMcpHandler } from './mcp.js';
+import { recallQueryOf } from './recall-query.js';
 import type {
   ErasureSelector,
   FeedbackInput,
@@ -244,16 +245,18 @@ export function createApp(options: AppOptions): Hono {
         ? {}
         : { reasonCode: c.req.query('reasonCode') as string }),
     };
-    const pack = await options.microglia.recall({
+    // The knobs come from `recall-query.ts`, which holds the field list once and validates every
+    // value. `minEvidence` and `anchoring` were unreachable from this surface while being honoured by
+    // the pack layer and documented in the kernel — a capability below the wire and not on it.
+    const parsed = recallQueryOf((name) => c.req.query(name), {
       task,
       text,
       ...(Object.keys(scope).length === 0 ? {} : { scope }),
-      ...(c.req.query('budget') === undefined ? {} : { budget: Number(c.req.query('budget')) }),
-      ...(c.req.query('limit') === undefined ? {} : { limit: Number(c.req.query('limit')) }),
-      ...(c.req.query('minCoverage') === undefined
-        ? {}
-        : { minCoverage: Number(c.req.query('minCoverage')) }),
     });
+    if ('error' in parsed) {
+      return c.json({ error: parsed.error }, 400);
+    }
+    const pack = await options.microglia.recall(parsed.query);
     return c.json({
       ids: pack.ids,
       rendered: pack.rendered,
