@@ -1354,6 +1354,10 @@ jobs:
             exit 1
           fi
           echo "storePin=$STORE_PIN" >> "$GITHUB_OUTPUT"
+          # R92: whose halves this arm runs on. `official` reads the boundary from the corpus's own
+          # `split_tasks.json` (retail: 74 train / 40 test), which is the only split a competitor's
+          # number was produced on; empty keeps the lane's own cut for every earlier arm.
+          echo "taskSplit=$(echo "$CAPS" | sed -n 's/^taskSplit=//p')" >> "$GITHUB_OUTPUT"
           echo "overrides=$OVERRIDES" >> "$GITHUB_OUTPUT"
           if [ -n "$OVERRIDES" ]; then
             echo "::warning::the registration overrides repository variables: $OVERRIDES"
@@ -1467,6 +1471,8 @@ jobs:
           # means learn as usual, which is what every earlier arm did; a path is joined to the
           # checkout here so the driver never has to know where the repository is.
           TAU_PIN_FILE: ${{ steps.recall_floor.outputs.storePin != '' && format('{0}/{1}', github.workspace, steps.recall_floor.outputs.storePin) || '' }}
+          # R92: the benchmark's own halves rather than this lane's cut. Empty for every earlier arm.
+          TAU_TASK_SPLIT: ${{ steps.recall_floor.outputs.taskSplit || '' }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
@@ -1536,6 +1542,8 @@ jobs:
           # means learn as usual, which is what every earlier arm did; a path is joined to the
           # checkout here so the driver never has to know where the repository is.
           TAU_PIN_FILE: ${{ steps.recall_floor.outputs.storePin != '' && format('{0}/{1}', github.workspace, steps.recall_floor.outputs.storePin) || '' }}
+          # R92: the benchmark's own halves rather than this lane's cut. Empty for every earlier arm.
+          TAU_TASK_SPLIT: ${{ steps.recall_floor.outputs.taskSplit || '' }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}

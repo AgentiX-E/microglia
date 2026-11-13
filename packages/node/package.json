@@ -21,7 +21,7 @@
   "dependencies": {
     "@agentix-e/microglia-core": "workspace:*",
     "@hono/node-server": "^2.1.8",
-    "hono": "^4.13.13"
+    "hono": "^4.13.18"
   },
   "devDependencies": {
     "@agentix-e/microglia-browser": "workspace:*"

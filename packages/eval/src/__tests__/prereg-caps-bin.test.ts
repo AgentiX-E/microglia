@@ -61,7 +61,7 @@ describe('prereg-caps', () => {
   it('prints both caps, one per line, for the two variables the workflow reads', () => {
     const result = run(file(['trainTasks: 57', 'testTasks: 1']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=\npin=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=\npin=\ntaskSplit=\n');
   });
 
   it('prints the record ceiling beside the caps, which is the switch R85 lacked', () => {
@@ -70,13 +70,13 @@ describe('prereg-caps', () => {
     // by the last dispatch; R85's own 700 is what that costs -- twelve of twelve records clipped.
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'rawCeiling: 2000']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\npin=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\npin=\ntaskSplit=\n');
   });
 
   it('prints one empty line per variable when the registration pins nothing, so the variables stand', () => {
     const result = run(file([]));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=\ntest=\nceiling=\nbudget=\npin=\n');
+    expect(result.out).toBe('train=\ntest=\nceiling=\nbudget=\npin=\ntaskSplit=\n');
   });
 
   it('prints the capacity the inherited budget implies, so the pair is visible in the dispatch log', () => {
@@ -85,7 +85,7 @@ describe('prereg-caps', () => {
     // read by whoever looks at a run that served one record out of twelve.
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'rawCeiling: 2000', 'distillUnit: raw']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\npin=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\npin=\ntaskSplit=\n');
     expect(result.err).toContain('ceiling 2000 is above budget 1200');
     expect(result.err).toContain('capacity is 810 chars/record');
   });
@@ -101,7 +101,7 @@ describe('prereg-caps', () => {
       ]),
     );
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=2400\npin=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=2400\npin=\ntaskSplit=\n');
     expect(result.err).toContain('ceiling 2000 fits budget 2400 (capacity 2010 chars/record)');
   });
 
@@ -110,7 +110,9 @@ describe('prereg-caps', () => {
     // it to the workspace -- so the command's job is to say *which* file, once, on its own line.
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'storePin: eval/pins/r90-retail.json']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=\npin=eval/pins/r90-retail.json\n');
+    expect(result.out).toBe(
+      'train=57\ntest=1\nceiling=\nbudget=\npin=eval/pins/r90-retail.json\ntaskSplit=\n',
+    );
   });
 
   it('refuses a pin that points outside the pins directory', () => {
@@ -121,6 +123,21 @@ describe('prereg-caps', () => {
     expect(result.code).toBe(1);
     expect(result.err).toContain("header 'storePin'");
     expect(result.err).toContain('is not a pin under eval/pins/');
+  });
+
+  it("prints the published split when the registration runs the benchmark's halves", () => {
+    // R92: a sixth line. `official` is the only value, because a share by another name would move the
+    // boundary the comparison against a competitor's number rests on.
+    const result = run(file(['trainTasks: 74', 'testTasks: 40', 'taskSplit: official']));
+    expect(result.code).toBe(0);
+    expect(result.out).toBe('train=74\ntest=40\nceiling=\nbudget=\npin=\ntaskSplit=official\n');
+  });
+
+  it('refuses a split stated as a share rather than named', () => {
+    const result = run(file(['trainTasks: 74', 'testTasks: 40', 'taskSplit: 0.6491']));
+    expect(result.code).toBe(1);
+    expect(result.err).toContain("header 'taskSplit'");
+    expect(result.err).toContain('is not one of official');
   });
 
   it('refuses half a pin instead of letting a variable decide the other half', () => {

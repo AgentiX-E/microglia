@@ -1630,6 +1630,48 @@ describe('rawCeiling, the one number R85 was mismeasured by', () => {
   });
 });
 
+describe('taskSplit, whose halves an arm runs on', () => {
+  const HEADER = [
+    '---',
+    'id: R92-official-split',
+    'step: R92',
+    'opened: 2026-11-13',
+    'arms: memory',
+    'sample: 160',
+    'gates: V1',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '## Prediction\n\n- the held-out half is the one the benchmark names\n\n' +
+    '## Refutation\n\n- a half this lane cut itself proves the split was not read\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads the one split a document states', () => {
+    const reading = readPrereg(withHeader('taskSplit: official'), 'R92-official-split.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.taskSplit).toBe('official');
+  });
+
+  it('refuses a split stated as a share, because a number here would move the boundary', () => {
+    expect(problemsOf(withHeader('taskSplit: 0.6491'), 'R92-official-split.md')).toEqual([
+      "header 'taskSplit': '0.6491' is not one of official",
+    ]);
+    for (const bad of ['half', 'Official', 'train']) {
+      expect(problemsOf(withHeader(`taskSplit: ${bad}`), 'R92-official-split.md')).toHaveLength(1);
+    }
+  });
+
+  it('leaves the field absent when the arm cuts the pool itself', () => {
+    const reading = readPrereg(withHeader('rawCeiling: 2000'), 'R92-official-split.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.taskSplit).toBeUndefined();
+  });
+});
+
 describe('storePin, the learn half as a file', () => {
   const HEADER = [
     '---',

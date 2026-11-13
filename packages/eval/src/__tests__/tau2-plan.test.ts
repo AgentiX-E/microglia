@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { heldOutPlan, qualifiedId } from '../tau2-plan.js';
+import { heldOutPlan, qualifiedId, splitFromOfficial } from '../tau2-plan.js';
 
 /**
  * The plan a cross-domain arm runs on.
@@ -155,5 +155,89 @@ describe('heldOutPlan invariants', () => {
     // measurement; an empty half is the driver's cue to stop.
     const plan = heldOutPlan({ ...base, learnIds: [], evalIds: [] });
     expect(plan.test).toEqual([]);
+  });
+});
+
+describe('the split the benchmark publishes', () => {
+  const ids = ['0', '1', '2', '3', '4', '5'];
+
+  it('is used as it is stated, and the share is not applied on top of it', () => {
+    // The defect this replaces: `TRAIN_SHARE = 0.5` cut the corpus itself, so the held-out half was a
+    // set the benchmark does not define and no competitor's number was ever measured on it.
+    const plan = heldOutPlan({
+      ...base,
+      learnIds: ids,
+      evalIds: ids,
+      official: { train: ['0', '1', '2', '3'], test: ['4', '5'] },
+    });
+    expect(plan.train).toEqual(['retail/0', 'retail/1', 'retail/2', 'retail/3']);
+    expect(plan.test).toEqual(['retail/4', 'retail/5']);
+    expect(plan.crossDomain).toBe(false);
+  });
+
+  it('refuses a published split that names a task this corpus does not hold', () => {
+    // A corpus mismatch that a run would otherwise absorb by evaluating fewer tasks than the
+    // registration states -- the same defect class as a percentage on an unstated denominator.
+    expect(() =>
+      heldOutPlan({
+        ...base,
+        learnIds: ids,
+        evalIds: ids,
+        official: { train: ['0', '1'], test: ['9'] },
+      }),
+    ).toThrow(/this corpus does not hold/);
+  });
+
+  it('refuses an official split on a transfer arm, where no document states the halves', () => {
+    expect(() =>
+      heldOutPlan({
+        learnIds: ['0', '1'],
+        evalIds: ['0', '1'],
+        learnScenario: 'airline',
+        testScenario: 'retail',
+        trainShare: 0.5,
+        official: { train: ['0'], test: ['1'] },
+      }),
+    ).toThrow(/transfer arm has no published halves/);
+  });
+
+  it('still applies the caps, because a smoke run is a cap on a split rather than another split', () => {
+    const plan = heldOutPlan({
+      ...base,
+      learnIds: ids,
+      evalIds: ids,
+      trainCap: 2,
+      evalCap: 1,
+      official: { train: ['0', '1', '2', '3'], test: ['4', '5'] },
+    });
+    expect(plan.train).toEqual(['retail/0', 'retail/1']);
+    expect(plan.test).toEqual(['retail/4']);
+  });
+});
+
+describe('splitFromOfficial', () => {
+  it('reads the two halves', () => {
+    expect(splitFromOfficial({ train: ['0'], test: ['1'] })).toEqual({ train: ['0'], test: ['1'] });
+  });
+
+  it('refuses a document that is not an object, or names no half', () => {
+    expect(() => splitFromOfficial([])).toThrow(/not an object/);
+    expect(() => splitFromOfficial({ train: ['0'] })).toThrow(/names no `test` tasks/);
+    expect(() => splitFromOfficial({ train: [], test: ['1'] })).toThrow(/names no `train` tasks/);
+  });
+
+  it('refuses a half that is not made of ids', () => {
+    expect(() => splitFromOfficial({ train: ['0', 1], test: ['2'] })).toThrow(/not an id/);
+    expect(() => splitFromOfficial({ train: [''], test: ['2'] })).toThrow(/not an id/);
+  });
+
+  it('refuses a repeated id, because the halves would then be a different size', () => {
+    expect(() => splitFromOfficial({ train: ['0', '0'], test: ['1'] })).toThrow(/repeats a `train` task/);
+  });
+
+  it('refuses a split whose halves intersect', () => {
+    // A leak in the published file would be published as a leak in the run; the plan cannot fix it and
+    // must not absorb it.
+    expect(() => splitFromOfficial({ train: ['0', '1'], test: ['1', '2'] })).toThrow(/in both halves: 1/);
   });
 });

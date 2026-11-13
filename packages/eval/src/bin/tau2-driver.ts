@@ -78,6 +78,7 @@ import {
   resolveWriteAdmissionPlan,
   resolveRecallFloor,
   stampDomain,
+  splitFromOfficial,
   stoppedRun,
   storeCensus,
   funnelReading,
@@ -322,6 +323,24 @@ const PIN_FILE = (process.env["TAU_PIN_FILE"] ?? "").trim();
  */
 function pinCorpusPath(domain: string): string {
   return join(REPO, ".tau2-bench", "data", "tau2", "domains", domain, "tasks.json");
+}
+
+/**
+ * Whether this arm runs the benchmark's own halves rather than this lane's cut; empty means the cut.
+ *
+ * R92. τ² publishes `split_tasks.json` per domain — 74 train and 40 test for retail — and this lane has
+ * always cut the 114 itself, so its held-out numbers were measured on a set the benchmark does not define
+ * and no competitor's number was ever produced on them. The value is `official` or nothing: a share by
+ * another name would be the same defect the key exists to remove.
+ */
+const TASK_SPLIT = (process.env["TAU_TASK_SPLIT"] ?? "").trim();
+if (TASK_SPLIT !== "" && TASK_SPLIT !== "official") {
+  throw new Error(`TAU_TASK_SPLIT is '${TASK_SPLIT}'; the only split a document states is 'official'`);
+}
+
+/** The published halves for one scenario, read from the pinned τ² checkout. */
+function officialSplitPath(domain: string): string {
+  return join(REPO, ".tau2-bench", "data", "tau2", "domains", domain, "split_tasks.json");
 }
 /**
  * The characters of knowledge one recall may carry; `0` means the module default of 1,200.
@@ -779,6 +798,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       ? drawn
       : await listTasks(LEARN_DOMAIN, join(workdir, "learn-tasks.json"));
 
+  const official =
+    TASK_SPLIT === "official"
+      ? splitFromOfficial(JSON.parse(readFileSync(officialSplitPath(TEST_DOMAIN), "utf8")) as unknown)
+      : undefined;
   const plan = heldOutPlan({
     learnIds: learnable,
     evalIds: drawn,
@@ -787,7 +810,14 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     trainShare: TRAIN_SHARE,
     trainCap: TRAIN_TASKS,
     evalCap: TEST_TASKS,
+    ...(official === undefined ? {} : { official }),
   });
+  if (official !== undefined) {
+    process.stdout.write(
+      `[tau2] split: the benchmark's own — ${String(plan.train.length)} learn / ` +
+        `${String(plan.test.length)} held out\n`,
+    );
+  }
   if (plan.test.length === 0)
     throw new Error("tau2 split left no held-out task");
   // The plan's first invariant, re-checked where it is about to be paid for: a leak is the one

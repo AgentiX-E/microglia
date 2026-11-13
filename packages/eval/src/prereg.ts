@@ -259,6 +259,19 @@ export type Prereg = {
    */
   readonly storePin?: string;
   /**
+   * Whether this arm runs the split the benchmark publishes.
+   *
+   * R92. τ² ships `data/tau2/domains/<domain>/split_tasks.json` with **74 train and 40 test** tasks for
+   * retail. This lane has always cut the corpus itself (`TRAIN_SHARE = 0.5` → 57/57), so its held-out
+   * halves were sets the benchmark does not define — and the competitor's 67.5% is measured on the 40.
+   * A number produced on a different split cannot be ranked against one produced on this one, whatever
+   * the metric agrees on.
+   *
+   * One value, `official`, because that is the only split a document states. Absent means the lane
+   * cuts the pool as every arm before R92 did, which keeps their readings as published.
+   */
+  readonly taskSplit?: string;
+  /**
    * Where the admitted items are served from: the recall pack, or a prefix of the system prompt.
    *
    * R55.1's second arm. It is not a tidiness switch: the SOTA holder's published cell injects *every*
@@ -335,6 +348,7 @@ const HEADER_KEYS = [
   'rawCeiling',
   'packBudget',
   'storePin',
+  'taskSplit',
   'packMode',
   'thinking',
 ] as const;
@@ -842,6 +856,25 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  /**
+   * The published split, and the one value that names it.
+   *
+   * A header that could say `half` or `0.65` would be a share by another spelling, and the whole point of
+   * this key is that the boundary is read from the corpus's own file rather than chosen by a number.
+   */
+  const taskSplitText = values.get('taskSplit');
+  let taskSplit: string | undefined;
+  if (taskSplitText !== undefined) {
+    if (taskSplitText !== 'official') {
+      collected.push({
+        where: `header 'taskSplit'`,
+        problem: `'${taskSplitText}' is not one of official`,
+      });
+    } else {
+      taskSplit = taskSplitText;
+    }
+  }
+
   const packModeText = values.get('packMode');
   let packMode: string | undefined;
   if (packModeText !== undefined) {
@@ -980,6 +1013,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(rawCeiling === undefined ? {} : { rawCeiling }),
       ...(packBudget === undefined ? {} : { packBudget }),
       ...(storePin === undefined ? {} : { storePin }),
+      ...(taskSplit === undefined ? {} : { taskSplit }),
       ...(packMode === undefined ? {} : { packMode }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,

@@ -27,7 +27,12 @@
  * an arm that does not fix it cannot differ from its predecessor by one variable, whatever its header
  * says. A registration that names a pin rebuilds the same store and skips the episodes that produced it.
  *
- * Usage: pnpm eval:prereg-caps prereg/<id>.md  ->  "train=57" "test=1" "ceiling=2000" "budget=2400" "pin="
+ * R92 added the sixth: `taskSplit` says whose halves the arm runs on. τ² publishes 74 train / 40 test for
+ * retail and this lane has always cut the 114 itself, so every held-out number it produced was measured
+ * on a set the benchmark does not define — and ranking it against a competitor's 67.5% is comparing two
+ * populations. `official` reads the boundary from the corpus.
+ *
+ * Usage: pnpm eval:prereg-caps prereg/<id>.md  ->  "train=57" "test=1" "ceiling=2000" "budget=2400" "pin=" "taskSplit="
  */
 import { readFileSync } from 'node:fs';
 import { readPrereg } from '../prereg.js';
@@ -50,7 +55,7 @@ function main(): void {
     for (const problem of reading.problems) refuse(`at ${problem.where}: ${problem.problem}`);
     return;
   }
-  const { trainTasks, testTasks, rawCeiling, packBudget, storePin } = reading.prereg;
+  const { trainTasks, testTasks, rawCeiling, packBudget, storePin, taskSplit } = reading.prereg;
   // A ceiling the declared pack cannot carry is refused here rather than priced: the arm would write
   // records the renderer drops, every one of which reads as a request with nothing relevant, and the
   // dispatch costs more than the check does. Only a registration that states both is refused -- see
@@ -75,6 +80,10 @@ function main(): void {
   // diff, and printed only where the registration states it -- a run without one rebuilds the half,
   // which is the behaviour every earlier arm had and must keep.
   process.stdout.write(`pin=${storePin === undefined ? '' : storePin}\n`);
+  // R92: whose halves the arm runs on. Empty means this lane's own cut, which is what every arm before
+  // R92 did; `official` reads the boundary from the corpus's own `split_tasks.json`, which is the only
+  // one a competitor's number can be compared to.
+  process.stdout.write(`taskSplit=${taskSplit === undefined ? '' : taskSplit}\n`);
   // The capacity that follows from the pair, on stderr because no workflow input reads it: the number
   // exists so the dispatch log answers "what could this pack carry" without a second dispatch. Only for
   // the record unit, whose item shape is the interpreter's; a claim's line is the model's.

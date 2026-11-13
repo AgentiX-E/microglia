@@ -990,7 +990,14 @@ export {
   type LabelCensus,
   type LabelCensusTask,
 } from './label-census.js';
-export { heldOutPlan, qualifiedId, type HeldOutPlan, type HeldOutPlanInput } from './tau2-plan.js';
+export {
+  heldOutPlan,
+  qualifiedId,
+  splitFromOfficial,
+  type HeldOutPlan,
+  type HeldOutPlanInput,
+  type TaskSplit,
+} from './tau2-plan.js';
 export {
   pairKey,
   transferReadingOf,
