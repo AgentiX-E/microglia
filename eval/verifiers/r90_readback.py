@@ -60,7 +60,6 @@ from r88_readback import (
     number,
     sampled_items,
     share,
-    statuses_of,
 )
 
 # Quoted from `prereg/R90-guard-stops-eating-references.md`, written before the measurement existed.
@@ -255,7 +254,10 @@ def grade(
 
     # ---- the read ----------------------------------------------------------------------------------
     coverage = median_nonzero(tau2)
-    store = statuses_of(tau2)
+    # The census block rather than its `statuses` sub-block: `servable` sits beside the statuses, and the
+    # nested read reported a reachable store as `active`, which is the same number here and not the same
+    # field -- the distinction matters the first time the two disagree.
+    store = tau2.get("store") if isinstance(tau2.get("store"), dict) else {}
     servable = store.get("servable") if isinstance(store.get("servable"), int) else store.get("active")
     if coverage is None:
         report.predict(
