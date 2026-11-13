@@ -136,14 +136,22 @@ async function main(): Promise<void> {
   }
   const model = restModelOf(configured).sent;
 
-  const native =
-    'You are a retail customer-service agent. ' + syntheticText(flags.nativeTokens - 12, 3);
   const block = blockOf(flags.blockTokens);
   const turns = episodeOf(flags.turns);
 
   const readings: Partial<Record<PackPlacement, RawReading[]>> = {};
   let calls = 0;
-  for (const placement of PACK_PLACEMENTS) {
+  for (const [index, placement] of PACK_PLACEMENTS.entries()) {
+    // Every shape gets its **own** policy text, and the first run of this probe is why. One shared
+    // policy meant the shapes shared a prefix, so the control's calls warmed the cache that the
+    // second shape's *first* call then read: it reported 1,964 uncached tokens on a 6,524-token
+    // prompt, which is a number about the previous shape rather than about this one. The steady
+    // state was unaffected — each shape's own prefix is internally consistent — but the first-call
+    // column was not comparable, and a column a reader cannot interpret is a column that becomes an
+    // argument. A distinct seed per shape removes the sharing and leaves everything else identical.
+    const native =
+      'You are a retail customer-service agent. ' +
+      syntheticText(flags.nativeTokens - 12, 3 + index * 1_000);
     const series: RawReading[] = [];
     for (let turn = 1; turn <= turns.length; turn += 1) {
       if (calls >= flags.maxCalls) {
