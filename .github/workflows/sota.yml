@@ -1159,6 +1159,12 @@ jobs:
 
       - name: Install tau2-bench at the pinned ref
         env:
+          # Which τ² this arm ran. R92: a `pass^4` is comparable only to one from the same release, and
+          # the artefact carries this beside the score — v0.2.0 has no `split_tasks.json` at all and its
+          # retail tasks are 0 of 114 identical to v1.0.1's, so a number without this cannot be ranked.
+          # Declared once per arm and never twice in one `env` mapping: GitHub rejects the duplicate key
+          # while PyYAML silently keeps the last one, which is how a file that parsed locally failed to
+          # parse upstream and the dispatch answered 422 with a line number.
           TAU_VERSION: ${{ vars.TAU_VERSION }}
         run: |
           set -euo pipefail
@@ -1468,6 +1474,12 @@ jobs:
           # the corrections posts that name to `api.deepseek.com`, which answers 400 to it. Empty
           # means "read TAU_MODEL and translate the provider alias", which is the default.
           TAU_DISTILL_MODEL: ${{ vars.TAU_DISTILL_MODEL }}
+          # Which τ² this arm ran. R92: a `pass^4` is comparable only to one from the same release, and
+          # the artefact carries this beside the score — v0.2.0 has no `split_tasks.json` at all and its
+          # retail tasks are 0 of 114 identical to v1.0.1's, so a number without this cannot be ranked.
+          # Declared once per arm and never twice in one `env` mapping: GitHub rejects the duplicate key
+          # while PyYAML silently keeps the last one, which is how a file that parsed locally failed to
+          # parse upstream and the dispatch answered 422 with a line number.
           TAU_VERSION: ${{ vars.TAU_VERSION }}
           # The scenario pair, stated once per arm so both arms cannot disagree about it. An
           # unset pair is a within-scenario run; a pair that differs is the transfer arm, whose
@@ -1486,9 +1498,6 @@ jobs:
           TAU_PIN_FILE: ${{ steps.recall_floor.outputs.storePin != '' && format('{0}/{1}', github.workspace, steps.recall_floor.outputs.storePin) || '' }}
           # R92: the benchmark's own halves rather than this lane's cut. Empty for every earlier arm.
           TAU_TASK_SPLIT: ${{ steps.recall_floor.outputs.taskSplit || '' }}
-          # R92: which τ² this arm ran. The repository variable is the pin; it is exported here so the
-          # artefact can carry it, because a pass^4 is comparable only to one from the same release.
-          TAU_VERSION: ${{ vars.TAU_VERSION }}
           # R92's second pin: the question. Empty on every arm that quotes an absolute number, set on an
           # arm whose subject is the pack, which prices its options only if the question is held fixed.
           TAU_QUERY_PIN: ${{ steps.recall_floor.outputs.queryPin }}
@@ -1545,6 +1554,12 @@ jobs:
           # in nothing else. An arm that reasoned and a control that did not would differ in cost,
           # in latency and in answer, and the delta would belong to none of them.
           TAU_THINKING: ${{ vars.TAU_THINKING || 'disabled' }}
+          # Which τ² this arm ran. R92: a `pass^4` is comparable only to one from the same release, and
+          # the artefact carries this beside the score — v0.2.0 has no `split_tasks.json` at all and its
+          # retail tasks are 0 of 114 identical to v1.0.1's, so a number without this cannot be ranked.
+          # Declared once per arm and never twice in one `env` mapping: GitHub rejects the duplicate key
+          # while PyYAML silently keeps the last one, which is how a file that parsed locally failed to
+          # parse upstream and the dispatch answered 422 with a line number.
           TAU_VERSION: ${{ vars.TAU_VERSION }}
           # The scenario pair, stated once per arm so both arms cannot disagree about it. An
           # unset pair is a within-scenario run; a pair that differs is the transfer arm, whose
@@ -1563,9 +1578,6 @@ jobs:
           TAU_PIN_FILE: ${{ steps.recall_floor.outputs.storePin != '' && format('{0}/{1}', github.workspace, steps.recall_floor.outputs.storePin) || '' }}
           # R92: the benchmark's own halves rather than this lane's cut. Empty for every earlier arm.
           TAU_TASK_SPLIT: ${{ steps.recall_floor.outputs.taskSplit || '' }}
-          # R92: which τ² this arm ran. The repository variable is the pin; it is exported here so the
-          # artefact can carry it, because a pass^4 is comparable only to one from the same release.
-          TAU_VERSION: ${{ vars.TAU_VERSION }}
           # R92's second pin: the question. Empty on every arm that quotes an absolute number, set on an
           # arm whose subject is the pack, which prices its options only if the question is held fixed.
           TAU_QUERY_PIN: ${{ steps.recall_floor.outputs.queryPin }}

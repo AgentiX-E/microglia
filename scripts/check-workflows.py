@@ -103,6 +103,68 @@ def input_declarations(lines: list[str]) -> list[tuple[str, int]]:
     return out
 
 
+def duplicate_keys(text: str, name) -> list[str]:
+    """Every mapping key, by the path its ancestors give it; a repeat on one path is the error.
+
+    GitHub refuses to parse a file that declares a key twice in one mapping and PyYAML keeps the last
+    one without a word, so `yaml.safe_load` cannot see this and a reader looking at the diff cannot
+    either. R92 paid for it: `sota.yml` declared `TAU_VERSION` twice inside one `env:` block, the file
+    parsed here, every push of it produced a run named after the file with **no jobs**, and the first
+    dispatch was answered `422 (Line: 1491, Col: 11): 'TAU_VERSION' is already defined` — a line number
+    in an API body, which is where the diagnosis had to come from because nothing local had one.
+
+    The path is built from a stack of enclosing keys rather than from indentation alone, because the
+    same key legitimately recurs under different parents: `TAU_VERSION` appears in both arms' `env`
+    blocks and both are correct. Sequence entries are indexed so two steps cannot look like one
+    mapping, and a block scalar's body is skipped because it is a shell script rather than YAML.
+    """
+    failures: list[str] = []
+    seen: dict[str, int] = {}
+    stack: list[tuple[int, str]] = []
+    counters: dict[tuple[str, int], int] = {}
+    scalar_above: int | None = None
+    for number, raw in enumerate(text.splitlines(), start=1):
+        stripped = raw.strip()
+        indent = len(raw) - len(raw.lstrip())
+        if scalar_above is not None:
+            if stripped == "" or indent > scalar_above:
+                continue
+            scalar_above = None
+        if stripped == "" or stripped.startswith("#"):
+            continue
+        if stripped.startswith("- "):
+            while stack and stack[-1][0] >= indent:
+                stack.pop()
+            parent = "/".join(key for _, key in stack)
+            counters[(parent, indent)] = counters.get((parent, indent), 0) + 1
+            stack.append((indent, f"[{counters[(parent, indent)]}]"))
+            stripped = stripped[2:].strip()
+            indent += 2
+            if stripped == "":
+                continue
+        while stack and stack[-1][0] >= indent:
+            stack.pop()
+        if ":" not in stripped:
+            continue
+        key, value = stripped.split(":", 1)
+        key = key.strip().strip('"').strip("'")
+        if key == "":
+            continue
+        path = "/".join([*(inner for _, inner in stack), key])
+        if path in seen:
+            failures.append(
+                f"{name}: `{key}` is declared twice in one mapping (line {seen[path]} and line {number}"
+                f", path `{path}`); GitHub refuses to parse the file, so no dispatch of it can start"
+            )
+            continue
+        seen[path] = number
+        if value.strip() in ("|", "|-", "|+", ">", ">-", ">+"):
+            scalar_above = indent
+            continue
+        stack.append((indent, key))
+    return failures
+
+
 def literal_checks(path: Path, name) -> list[str]:
     """The subset that needs no parser, used when PyYAML is absent.
 
@@ -270,9 +332,13 @@ def check(path: Path) -> list[str]:
     except ValueError:
         name = path
     if not HAS_YAML:
-        return literal_checks(path, name)
+        return duplicate_keys(path.read_text(), name) + literal_checks(path, name)
+    text = path.read_text()
+    # Before the parse, not after: a duplicate key is the one defect PyYAML resolves silently, and a
+    # file that also fails to parse should be reported for the reason GitHub would give first.
+    failures.extend(duplicate_keys(text, name))
     try:
-        document = yaml.safe_load(path.read_text())
+        document = yaml.safe_load(text)
     except yaml.YAMLError as error:
         return [f"{name}: does not parse: {error}"]
     if not isinstance(document, dict):
@@ -393,6 +459,41 @@ def self_test() -> int:
                 emit(second_step_run)
         return "\n".join(header + body + tail) + "\n"
 
+    # R92: one key twice in one `env:` block, which YAML resolves by keeping the last and GitHub refuses.
+    # The incident is in `duplicate_keys`' docstring; the two cases here are the firing and the silence,
+    # because a checker that refused every repeated key would also refuse both arms declaring the same
+    # variable -- which is required, since the two arms must differ in the store and in nothing else.
+    same_mapping = """on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: a step
+        env:
+          TAU_VERSION: one
+          TAU_THINKING: off
+          TAU_VERSION: two
+        run: |
+          echo hi
+"""
+    two_mappings = """on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: one
+        env:
+          TAU_VERSION: one
+        run: |
+          echo hi
+      - name: two
+        env:
+          TAU_VERSION: one
+        run: |
+          echo hi
+"""
     cases: list[tuple[str, str, bool, str | None]] = [
         ("a workflow at the cap is clean", workflow(MAX_INPUTS), True, None),
         (
@@ -477,6 +578,8 @@ def self_test() -> int:
             False,
             "after the",
         ),
+        ("a key declared twice in one mapping is refused", same_mapping, False, "declared twice"),
+        ("the same key in two steps' env blocks is clean", two_mappings, True, None),
         (
             "a probe before the lane is clean",
             workflow(
