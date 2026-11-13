@@ -110,6 +110,7 @@ import {
   resolveTraceClaims,
   tracesOf,
   yieldCensus,
+  mergeCensusOf,
   claimsPerCorrection,
   traceOf,
   actionSentence,
@@ -2008,6 +2009,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // a candidate the host refused is not yield, it is a claim that never reached a pack. Retired
     // items still count: a claim written and later folded into a paraphrase was written.
     yieldCensus: yieldCensus(claimsPerCorrection(captured, written)),
+    // R99: what a shape-keyed store would hold, computed from the corrections this learn half already
+    // produced. Cheap and free of model calls; it prices the merge arm before one is bought.
+    merge: mergeCensusOf(corrections),
     ...(consolidationSweep === undefined ? {} : { consolidationSweep }),
     // The treatment, recorded beside its result: an artefact cannot otherwise tell an arm
     // that switched write admission on from one that never asked, and the counters are the

@@ -718,6 +718,18 @@ describe('the projection has a decision for every field, and keeps it', () => {
           { taskId: 'retail/1', assertions: 1, claims: 1 },
         ],
       },
+      // R99: what merging by action shape would produce, priced before it was bought. Carried
+      // because the store's recurrence axis cannot be populated today (§34.122), and the census is
+      // the only place the number of routines the learn half contains is written down.
+      merge: {
+        corrections: 15,
+        shapes: 9,
+        mergeable: 6,
+        wouldStore: 9,
+        support: { max: 4, atLeastTwo: 5, atLeastThree: 3 },
+        groups: [{ shape: 'get_order_details > cancel_pending_order', corrections: 4, tasks: ['retail/2', 'retail/4', 'retail/20', 'retail/35'] }],
+        omitted: 0,
+      },
       // R57: the planted arm's census, carried because a `carried` decision is checked against the
       // fields the fixture defines — a fixture that omitted it would let the projection drop it in
       // silence, which is the defect this guard was written for.

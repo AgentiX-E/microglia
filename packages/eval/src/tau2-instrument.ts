@@ -50,6 +50,7 @@ import type { PackCensus } from "./tau2-pack.js";
 import type { ConsolidationSweep } from "./consolidation-sweep.js";
 import type { ProvenanceCensus } from "./tau2-provenance.js";
 import type { QueryCensus } from "./tau2-queries.js";
+import type { MergeCensus } from "./tau2-merge.js";
 import {
   coverageHistogram,
   servedCensus,
@@ -440,6 +441,16 @@ export type Tau2Raw = {
    */
   readonly yieldCensus?: YieldCensus;
   /**
+   * R99: what merging by action shape would produce, priced before it was bought.
+   *
+   * The store's recurrence axis cannot be populated today (§34.122): one correction, one statement, one
+   * item, support 1. ALTK's `sup3` keeps what three tasks agreed on and this lane has no arm that can
+   * produce such an item. This census answers the question a merge arm would be registered to answer —
+   * how many routines the learn half actually contains, and how many tasks taught each — from a learn
+   * half the lane has already paid for. Absent on every arm that did not compute it.
+   */
+  readonly merge?: MergeCensus;
+  /**
    * R57: the controlled distractor this arm planted, and the level it landed at.
    *
    * Absent on every artefact before this field and on every control arm — absence is "nothing was
@@ -693,6 +704,7 @@ export const PROJECTION: {
   provenance: "carried",
   traceClaims: "carried",
   yieldCensus: "carried",
+  merge: "carried",
   consolidationSweep: "carried",
   plant: "carried",
   injectionNote: "carried",
@@ -874,6 +886,7 @@ export function armRecordFromDriver(
     ...(raw.provenance === undefined ? {} : { provenance: raw.provenance }),
     ...(raw.traceClaims === undefined ? {} : { traceClaims: raw.traceClaims }),
     ...(raw.yieldCensus === undefined ? {} : { yieldCensus: raw.yieldCensus }),
+    ...(raw.merge === undefined ? {} : { merge: raw.merge }),
     ...(raw.consolidationSweep === undefined
       ? {}
       : { consolidationSweep: raw.consolidationSweep }),

@@ -715,6 +715,13 @@ export {
   type UseObservation,
 } from './tau2-use-census.js';
 export {
+  MERGE_GROUP_CAP,
+  actionShapeOf,
+  mergeCensusOf,
+  type MergeCensus,
+  type ShapeGroup,
+} from './tau2-merge.js';
+export {
   decideFloor,
   type CostWeights,
   type FloorCostRow,
