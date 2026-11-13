@@ -192,13 +192,50 @@ for (const internal of ['WHITEPAPER.md', 'TECH-DESIGN.md', 'ROADMAP.md', 'AUDIT.
 // dependency at all, so this is a statement about the artefact rather than a
 // formality; dev-only advisories are reported separately in the audit document
 // with the toolchain migration that clears them.
+//
+// The two failures are named apart because they ask an operator to do different things. An advisory is a
+// finding and the fix is a version; a registry that would not answer is not a finding, and the first
+// version of this block reported both as "published dependencies have advisories" with the exit status
+// sliced off at 200 characters. Two consecutive CI runs on 2026-11-13 failed that way while the same
+// command was clean locally, and the message could not say which of the two it was — so the detail is
+// kept, and a non-findings failure is retried once before it is believed.
 {
   const { execFile } = await import('node:child_process');
   const { promisify } = await import('node:util');
-  try {
-    await promisify(execFile)('pnpm', ['audit', '--prod'], { cwd: ROOT });
-  } catch (error) {
-    fail('dependencies', `published dependencies have advisories: ${String(error).slice(0, 200)}`);
+  const run = promisify(execFile);
+  const call = async () => {
+    try {
+      await run('pnpm', ['audit', '--prod'], { cwd: ROOT });
+      return undefined;
+    } catch (error) {
+      const text = [error?.stdout, error?.stderr]
+        .filter((part) => typeof part === 'string' && part.trim().length > 0)
+        .join('\n')
+        .trim();
+      return { text, code: typeof error?.code === 'number' ? error.code : null };
+    }
+  };
+  const tail = (text) => text.split('\n').slice(-8).join(' | ').slice(-600);
+  // `pnpm audit` exits 1 when it has findings and non-zero for its own errors. A retry is only for the
+  // second kind: retrying a finding would turn a decision into a race. Three attempts with a widening
+  // pause, because the failure this exists for is a shared runner's view of a registry, and a gate that
+  // reports "insecure" when it means "unreachable" is a gate that gets switched off.
+  let attempt = await call();
+  for (const pause of [3000, 9000]) {
+    if (attempt === undefined || /vulnerabilit/i.test(attempt.text)) break;
+    await new Promise((settle) => setTimeout(settle, pause));
+    attempt = await call();
+  }
+  if (attempt !== undefined) {
+    if (/vulnerabilit/i.test(attempt.text)) {
+      fail('dependencies', `published dependencies have advisories: ${tail(attempt.text)}`);
+    } else {
+      fail(
+        'dependencies',
+        `the published-dependency audit could not run (exit ${String(attempt.code)}): ` +
+          `${attempt.text.length === 0 ? 'no output' : tail(attempt.text)}`,
+      );
+    }
   }
 }
 
