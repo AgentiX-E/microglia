@@ -54,6 +54,12 @@ from r88_readback import Report, interval_half_width, number
 PREDICTED_DISTILLED_LOW = 60
 PREDICTED_DISTILLED_HIGH = 80
 R93_DISTILLED = 15
+# What the extra records *are*. `all` does not distil more failures — the learn half's failures are the
+# same fifteen a pin replays — it also asks every task that passed for the rule its trajectory followed.
+# So the treatment is "fifteen repair records plus the passes", and R99 is a statement about
+# success-derived guidance rather than about "more memory". The band is the corpus's own pass count.
+PREDICTED_PASSED_ITEMS_LOW = 50
+PREDICTED_PASSED_ITEMS_HIGH = 65
 PREDICTED_SAMPLE = 160
 PREDICTED_TASKS = 40
 PREDICTED_TRAIN = 74
@@ -212,6 +218,39 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         isinstance(stored, int) and stored < distilled,
         f"stored {stored!r} of {distilled!r}",
     )
+    # ---- what the extra records are -----------------------------------------------------------------
+    #
+    # This is the reading that a supply framing gets wrong, and the field that fixes it. `distilled: 73`
+    # with `edited: 15` would be read as "five times the repairs"; `provenance.itemsPassedOnly` says the
+    # fifty-eight extra records were written from trajectories that *succeeded*, which is a different
+    # treatment and a different claim. Absent on artefacts before R62 and on any arm that does not
+    # record provenance, and an arm that cannot say what its store is made of cannot be read at all.
+    provenance = tau2.get("provenance")
+    if not isinstance(provenance, dict):
+        report.predict(
+            "the artefact says which trajectories taught the store",
+            None,
+            "provenance absent: the store's composition cannot be read",
+        )
+        return "NO_MEASUREMENT", report
+    passed_items = provenance.get("itemsPassedOnly")
+    edited_items = provenance.get("itemsEditedOnly")
+    report.predict(
+        "the fifteen repair records survive the widening unchanged",
+        edited_items == R93_DISTILLED,
+        f"itemsEditedOnly {edited_items!r} against R93's {R93_DISTILLED}",
+    )
+    report.predict(
+        f"the extra records came from passes, {PREDICTED_PASSED_ITEMS_LOW}-{PREDICTED_PASSED_ITEMS_HIGH} of them",
+        isinstance(passed_items, int)
+        and PREDICTED_PASSED_ITEMS_LOW <= passed_items <= PREDICTED_PASSED_ITEMS_HIGH,
+        f"itemsPassedOnly {passed_items!r}",
+    )
+    report.refute(
+        "the widening added repairs rather than success-derived records, so it is not this treatment",
+        isinstance(edited_items, int) and edited_items > R93_DISTILLED,
+        f"itemsEditedOnly {edited_items!r} against R93's {R93_DISTILLED}",
+    )
     report.predict(
         "every stored record is servable in the scenario it learned in",
         isinstance(servable, int) and isinstance(stored, int) and servable == stored,
@@ -307,6 +346,9 @@ def base(**overrides: Any) -> dict[str, Any]:
             "split": {"train": [f"retail/{i}" for i in range(PREDICTED_TRAIN)],
                       "test": [f"retail/{i}" for i in range(PREDICTED_TASKS)]},
             "learning": {"rows": PREDICTED_TRAIN, "unanswered": 0, "edited": 15, "distilled": 73},
+            "provenance": {"edited": 15, "passed": 58, "tasksEdited": 15, "tasksPassed": 58,
+                           "itemsEditedOnly": 15, "itemsPassedOnly": 58, "itemsMixed": 0,
+                           "itemsUnattributed": 0, "evidenceUnattributed": 0},
             "store": {"stored": 73, "active": 73, "servable": 73},
             "pack": {"requests": PREDICTED_PACK_REQUESTS, "filled": PREDICTED_PACK_REQUESTS,
                      "summary": {"meanIds": 1.292, "meanChars": 1986.1}},
@@ -387,6 +429,20 @@ def self_test() -> int:
         (
             "an artefact with no lesson from the distiller cannot size the store",
             base(**{"tau2.learning": {"rows": PREDICTED_TRAIN, "unanswered": 0, "edited": 15}}),
+            "NO_MEASUREMENT",
+            None,
+        ),
+        (
+            "a store widened by more repairs rather than by passes is another treatment",
+            base(**{"tau2.provenance": {"edited": 73, "passed": 0, "tasksEdited": 73, "tasksPassed": 0,
+                                        "itemsEditedOnly": 73, "itemsPassedOnly": 0, "itemsMixed": 0,
+                                        "itemsUnattributed": 0, "evidenceUnattributed": 0}}),
+            "ABANDONED",
+            False,
+        ),
+        (
+            "an artefact that cannot say what its store is made of is not readable",
+            base(**{"tau2.provenance": None}),
             "NO_MEASUREMENT",
             None,
         ),
