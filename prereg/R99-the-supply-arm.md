@@ -33,6 +33,18 @@ The competitor's playbook holds **292 rules**. Appendix M has called the gap "an
 three rounds; this arm is the first that can price it, because it changes one thing: **the population the
 store is built from**.
 
+## What R93 changed about this arm's yardstick, written before this arm runs
+
+R93 measured the store on the benchmark's own 40 held-out tasks with the memory off in the same
+dispatch: **memory 0.700 against no memory 0.725**, paired delta **−2.50pp [−17.50, +12.50]** at
+p = 1.0000, with **13 trials repaired and 10 broken** of 160 and a bill of **2.17×** the control
+($0.8276 against $0.3807 over the same 160 conversations).
+
+So the yardstick is no longer the competitor's 0.675, which this lane's *memory-free* arm already clears.
+The question this arm answers is narrower and harder: **does five times the supply close the 2.5 points
+the memory currently costs, at the same dose and the same pack?** A store that only matches no memory is
+still not a flywheel, and this registration is written to say so rather than to celebrate 0.675.
+
 ## The one variable, and what it is not
 
 `distillScope: all` teaches from every task that states a rule, not only from the ones that failed. On
@@ -74,10 +86,12 @@ from a wide one reached 39.0 against ReAct's 28.0. This lane has only ever built
   `use.distinct` — a field this lane can report for the first time (R93) — above **30 of the 68–74**.
   A store that serves one record per request out of seventy is a store whose *ranking* is doing all the
   work; that is exactly the claim this reading tests.
-- **The score moves or the supply story is dead.** `pass^4` above **0.675** (the competitor's row) or
-  the five-fold store bought nothing and the next arm is the unit rather than the population. Between
-  0.65 and 0.675 the arm is a replication with a bigger store and the honest reading is that neither
-  population is the constraint.
+- **The score moves, and the only movement worth buying is a large one.** At n = 40 this lane resolves
+  **21.02pp**, so a 2.5pp recovery cannot be certified by any arm on this sample. The prediction is
+  therefore stated where it can be falsified: `pass^4` **at or above 0.775** (R93's memory leg + three
+  tasks) would be a supply effect large enough to certify, and it would justify the paired re-run that
+  prices it. Between 0.700 and 0.775 the arm is a replication with a bigger store; **below 0.700** the
+  five-fold store is worse than the fifteen-record one and the supply line closes.
 
 ## Refutation
 
