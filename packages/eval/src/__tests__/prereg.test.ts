@@ -1836,4 +1836,21 @@ describe('queryPin, the question as a file', () => {
     expect(reading.problems).toEqual([]);
     expect(reading.prereg?.queryPin).toBeUndefined();
   });
+
+  it('reads the release the number is about, and refuses one that is not a tag', () => {
+    // R92's header line. The tag is the decision and `vars.TAU_VERSION` is the machine; the driver refuses a
+    // run where they disagree, so this field is what makes that comparison possible at all.
+    const reading = readPrereg(withHeader('release: v1.0.1'), 'R93-one-question.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.release).toBe('v1.0.1');
+    // `latest`, a branch and a minor version are all claims nothing can hold a run to.
+    for (const bad of ['latest', 'main', 'v1.0']) {
+      expect(problemsOf(withHeader(`release: ${bad}`), 'R93-one-question.md')).toEqual([
+        `header 'release': '${bad}' is not a release tag (v<major>.<minor>.<patch>)`,
+      ]);
+    }
+    expect(
+      readPrereg(withHeader('rawCeiling: 2000'), 'R93-one-question.md').prereg?.release,
+    ).toBeUndefined();
+  });
 });

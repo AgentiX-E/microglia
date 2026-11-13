@@ -61,7 +61,7 @@ describe('prereg-caps', () => {
   it('prints both caps, one per line, for the two variables the workflow reads', () => {
     const result = run(file(['trainTasks: 57', 'testTasks: 1']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=\npin=\ntaskSplit=\nqueryPin=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
   });
 
   it('prints the record ceiling beside the caps, which is the switch R85 lacked', () => {
@@ -70,13 +70,13 @@ describe('prereg-caps', () => {
     // by the last dispatch; R85's own 700 is what that costs -- twelve of twelve records clipped.
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'rawCeiling: 2000']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\npin=\ntaskSplit=\nqueryPin=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
   });
 
   it('prints one empty line per variable when the registration pins nothing, so the variables stand', () => {
     const result = run(file([]));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=\ntest=\nceiling=\nbudget=\npin=\ntaskSplit=\nqueryPin=\n');
+    expect(result.out).toBe('train=\ntest=\nceiling=\nbudget=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
   });
 
   it('prints the capacity the inherited budget implies, so the pair is visible in the dispatch log', () => {
@@ -85,7 +85,7 @@ describe('prereg-caps', () => {
     // read by whoever looks at a run that served one record out of twelve.
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'rawCeiling: 2000', 'distillUnit: raw']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\npin=\ntaskSplit=\nqueryPin=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
     expect(result.err).toContain('ceiling 2000 is above budget 1200');
     expect(result.err).toContain('capacity is 810 chars/record');
   });
@@ -101,7 +101,7 @@ describe('prereg-caps', () => {
       ]),
     );
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=2400\npin=\ntaskSplit=\nqueryPin=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=2400\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
     expect(result.err).toContain('ceiling 2000 fits budget 2400 (capacity 2010 chars/record)');
   });
 
@@ -111,7 +111,7 @@ describe('prereg-caps', () => {
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'storePin: eval/pins/r90-retail.json']));
     expect(result.code).toBe(0);
     expect(result.out).toBe(
-      'train=57\ntest=1\nceiling=\nbudget=\npin=eval/pins/r90-retail.json\ntaskSplit=\nqueryPin=\n',
+      'train=57\ntest=1\nceiling=\nbudget=\npin=eval/pins/r90-retail.json\ntaskSplit=\nqueryPin=\nrelease=\n',
     );
   });
 
@@ -130,7 +130,25 @@ describe('prereg-caps', () => {
     // boundary the comparison against a competitor's number rests on.
     const result = run(file(['trainTasks: 74', 'testTasks: 40', 'taskSplit: official']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=74\ntest=40\nceiling=\nbudget=\npin=\ntaskSplit=official\nqueryPin=\n');
+    expect(result.out).toBe(
+      'train=74\ntest=40\nceiling=\nbudget=\npin=\ntaskSplit=official\nqueryPin=\nrelease=\n',
+    );
+  });
+
+  it('prints the release the number is about, which is the line a dispatch is held to', () => {
+    // R92: the eighth line. The header is the decision and `vars.TAU_VERSION` is the machine; before this
+    // line the only thing comparing them was a dispatch that installed the wrong release, built a store,
+    // generated a corpus and died on a file the wrong release does not ship.
+    const result = run(file(['trainTasks: 74', 'testTasks: 40', 'release: v1.0.1']));
+    expect(result.code).toBe(0);
+    expect(result.out).toContain('release=v1.0.1\n');
+  });
+
+  it('refuses a release that is not a tag, so nothing has to interpret it', () => {
+    // `latest`, `v1.0` and a branch name are all claims the driver cannot hold a run to.
+    const result = run(file(['release: latest']));
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('is not a release tag');
   });
 
   it('prints the query pin when the registration holds the question fixed', () => {
@@ -147,7 +165,7 @@ describe('prereg-caps', () => {
     );
     expect(result.code).toBe(0);
     expect(result.out).toBe(
-      'train=57\ntest=1\nceiling=\nbudget=\npin=eval/pins/r90-retail.json\ntaskSplit=\nqueryPin=eval/pins/r92-retail-queries.json\n',
+      'train=57\ntest=1\nceiling=\nbudget=\npin=eval/pins/r90-retail.json\ntaskSplit=\nqueryPin=eval/pins/r92-retail-queries.json\nrelease=\n',
     );
   });
 

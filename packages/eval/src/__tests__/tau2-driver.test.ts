@@ -238,6 +238,59 @@ describe('the L4 driver', () => {
     }
   }, 60_000);
 
+  it('refuses a registration and a pin that name different releases, before anything runs', async () => {
+    // R92's own failure, one layer up from the runner probe: the registration is about v1.0.1 and the
+    // machine had v0.2.0 pinned. The old symptom was an installed environment, a generated corpus and a
+    // phase that died on a file v0.2.0 does not ship. The comparison is one line and it is here now.
+    const { dir, executable } = stubRunner();
+    process.env['TAU_PYTHON'] = executable;
+    process.env['TAU_MEMORY'] = 'false';
+    process.env['TAU_WORKDIR'] = dir;
+    process.env['TAU_RELEASE'] = 'v1.0.1';
+    process.env['TAU_VERSION'] = 'v0.2.0';
+    try {
+      const driver = await import('../bin/tau2-driver.js?case=release-mismatch');
+      await expect(driver.run()).rejects.toThrow(/about tau2 v1\.0\.1 and this dispatch pinned v0\.2\.0/);
+      // Nothing ran: not even the version probe, which is the first thing that would have printed.
+      expect(existsSync(join(dir, 'phases.log'))).toBe(false);
+      expect(existsSync(join(dir, 'test-tasks.json'))).toBe(false);
+    } finally {
+      delete process.env['TAU_PYTHON'];
+      delete process.env['TAU_MEMORY'];
+      delete process.env['TAU_WORKDIR'];
+      delete process.env['TAU_RELEASE'];
+      delete process.env['TAU_VERSION'];
+    }
+  }, 60_000);
+
+  it('runs when the registration and the pin name the same release, and when neither names one', async () => {
+    // Two silences that must not be refusals: an arm that predates the header makes no claim, and an arm
+    // whose claim the machine meets has nothing to argue about.
+    const { dir, executable } = stubRunner();
+    process.env['TAU_PYTHON'] = executable;
+    process.env['TAU_MEMORY'] = 'false';
+    process.env['TAU_WORKDIR'] = dir;
+    process.env['TAU_RELEASE'] = 'v1.0.1';
+    process.env['TAU_VERSION'] = 'v1.0.1';
+    try {
+      const agreeing = await import('../bin/tau2-driver.js?case=release-agrees');
+      await expect(agreeing.run()).resolves.toBeDefined();
+    } finally {
+      process.env['TAU_TRIALS'] = '4';
+      process.env['TAU_TRAIN_SHARE'] = '0.5';
+      process.env['TAU_WORKDIR'] = mkdtempSync(join(tmpdir(), 'tau2-quiet-'));
+      const quiet = await import('../bin/tau2-driver.js?case=release-silent');
+      await expect(quiet.run()).resolves.toBeDefined();
+      delete process.env['TAU_PYTHON'];
+      delete process.env['TAU_MEMORY'];
+      delete process.env['TAU_TRIALS'];
+      delete process.env['TAU_TRAIN_SHARE'];
+      delete process.env['TAU_WORKDIR'];
+      delete process.env['TAU_RELEASE'];
+      delete process.env['TAU_VERSION'];
+    }
+  }, 60_000);
+
   it('stops on a release that does not speak this runner, before anything is listed', async () => {
     // The failure R92 paid for, reproduced cheaply: a τ² whose runner surface moved. The run has to end
     // here — not after the store is built, and not inside the first episode — and it has to end with the

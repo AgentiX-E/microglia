@@ -272,6 +272,19 @@ export type Prereg = {
    */
   readonly taskSplit?: string;
   /**
+   * The benchmark release this registration's number is about.
+   *
+   * R92. The port to v1.0.1 was forced by a dispatch that died on a file v0.2.0 does not ship, and by the
+   * finding that 0 of 114 retail task bodies survive the boundary — so the release is not a property of the
+   * machine a run happened on, it is part of what the number means. Stating it here makes the two places a
+   * release can be chosen (this header and `vars.TAU_VERSION`) comparable, and the driver refuses a run
+   * whose pinned release differs from the one the registration names.
+   *
+   * Absent means the registration makes no claim, which is what every arm before R92 says: their numbers
+   * were produced on v0.2.0, before the artefact carried a release at all.
+   */
+  readonly release?: string;
+  /**
    * The recall queries this arm replays, as a path inside the repository.
    *
    * R92. A pack is a function of (store, query, pack options). R91 held the first fixed and the pack still
@@ -364,6 +377,7 @@ const HEADER_KEYS = [
   'storePin',
   'taskSplit',
   'queryPin',
+  'release',
   'packMode',
   'thinking',
 ] as const;
@@ -910,6 +924,21 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // R92: a tag, not a range and not a branch. The driver compares it against the release the workflow
+  // pinned, so a header that says `latest` or `v1.0` would be a claim nothing can hold it to.
+  const releaseText = values.get('release');
+  let release: string | undefined;
+  if (releaseText !== undefined) {
+    if (!/^v\d+\.\d+\.\d+$/.test(releaseText)) {
+      collected.push({
+        where: `header 'release'`,
+        problem: `'${releaseText}' is not a release tag (v<major>.<minor>.<patch>)`,
+      });
+    } else {
+      release = releaseText;
+    }
+  }
+
   const packModeText = values.get('packMode');
   let packMode: string | undefined;
   if (packModeText !== undefined) {
@@ -1050,6 +1079,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(storePin === undefined ? {} : { storePin }),
       ...(taskSplit === undefined ? {} : { taskSplit }),
       ...(queryPin === undefined ? {} : { queryPin }),
+      ...(release === undefined ? {} : { release }),
       ...(packMode === undefined ? {} : { packMode }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,

@@ -38,6 +38,11 @@
  * benchmark number — a fixed phrasing is a stimulus no user typed — and is printed only where the
  * registration names one.
  *
+ * R92 added the eighth: `release` is the benchmark generation the number is about. R92's first dispatch
+ * died on a file v0.2.0 does not ship, and 0 of 114 retail task bodies survive to v1.0.1, so the release is
+ * part of the measurement rather than a property of the machine that ran it. A registration that names one
+ * is refused a dispatch pinned elsewhere, before the first episode is paid for.
+ *
  * Usage: pnpm eval:prereg-caps prereg/<id>.md  ->  "train=57" "test=1" "ceiling=2000" "budget=2400" "pin=" "taskSplit=" "queryPin="
  */
 import { readFileSync } from 'node:fs';
@@ -61,7 +66,7 @@ function main(): void {
     for (const problem of reading.problems) refuse(`at ${problem.where}: ${problem.problem}`);
     return;
   }
-  const { trainTasks, testTasks, rawCeiling, packBudget, storePin, taskSplit, queryPin } =
+  const { trainTasks, testTasks, rawCeiling, packBudget, storePin, taskSplit, queryPin, release } =
     reading.prereg;
   // A ceiling the declared pack cannot carry is refused here rather than priced: the arm would write
   // records the renderer drops, every one of which reads as a request with nothing relevant, and the
@@ -94,6 +99,10 @@ function main(): void {
   // R92: the question, when the arm holds it. Empty means the queries were the ones the simulator drew,
   // which is what every arm before R92 did and what an arm quoting an absolute number must keep doing.
   process.stdout.write(`queryPin=${queryPin === undefined ? '' : queryPin}\n`);
+  // R92: the release this number is a number *of*. Empty means the registration makes no claim, which is
+  // true of every arm before R92; a value is compared against the release the workflow pinned, so the
+  // mismatch that cost this round a dispatch becomes a refusal before the first episode.
+  process.stdout.write(`release=${release === undefined ? '' : release}\n`);
   // The capacity that follows from the pair, on stderr because no workflow input reads it: the number
   // exists so the dispatch log answers "what could this pack carry" without a second dispatch. Only for
   // the record unit, whose item shape is the interpreter's; a claim's line is the model's.

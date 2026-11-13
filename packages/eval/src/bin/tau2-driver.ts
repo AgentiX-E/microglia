@@ -448,6 +448,23 @@ const TASK = "tau2.act";
  * The pin is keyed by the episode's position in the phase, because nothing upstream names the episode:
  * the agent sends `task=tau2.act` on every request and `generate_next_message` receives no task id.
  */
+/**
+ * The release this registration's number is about; empty means the registration makes no claim.
+ *
+ * R92. Two places can choose a benchmark release — the registration's header and `vars.TAU_VERSION` — and
+ * before this the only thing comparing them was a failed dispatch. The header is the decision and the
+ * variable is the machine, so a disagreement is refused here, before the first episode, rather than
+ * discovered in an artefact whose number is about a corpus nobody named.
+ */
+const REGISTERED_RELEASE = (process.env["TAU_RELEASE"] ?? "").trim();
+
+/**
+ * The release the workflow pinned, which the identity record also carries.
+ *
+ * Read once so the refusal below and the artefact cannot disagree about what this run was.
+ */
+const PINNED_RELEASE = (process.env["TAU_VERSION"] ?? "").trim();
+
 const QUERY_PIN_FILE = (process.env["TAU_QUERY_PIN"] ?? "").trim();
 
 /**
@@ -483,10 +500,7 @@ export async function benchmarkIdentityOf(
 }
 
 async function benchmarkIdentity(): Promise<{ version: string; commit: string } | undefined> {
-  return benchmarkIdentityOf(
-    join(REPO, ".tau2-bench"),
-    (process.env["TAU_VERSION"] ?? "").trim(),
-  );
+  return benchmarkIdentityOf(join(REPO, ".tau2-bench"), PINNED_RELEASE);
 }
 
 /**
@@ -926,6 +940,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // the signatures the phases call, because v1.0.0 moved `run_tasks` to `(config, tasks)` and put
   // `get_tasks` in `tau2.runner.helpers` -- a mismatch costs two seconds here instead of an
   // installed environment, a built store and a phase that dies on its first task.
+  // Before the probe and before anything is paid for: a registration whose number is about one release and a
+  // dispatch pinned to another is not a run whose result means what its header says. R92 discovered this by
+  // installing v0.2.0 against a registration asking for a file v0.2.0 does not ship, and the discovery cost
+  // an environment, a corpus and an aborted phase; the comparison is one line and it is here now.
+  if (REGISTERED_RELEASE !== "" && PINNED_RELEASE !== REGISTERED_RELEASE) {
+    throw new Error(
+      `the registration is about tau2 ${REGISTERED_RELEASE} and this dispatch pinned ` +
+        `${PINNED_RELEASE === "" ? "no release" : PINNED_RELEASE}: the release is part of what the ` +
+        `number means, and these two cannot both be true`,
+    );
+  }
   await phase([SCRIPT, "--phase", "selftest"]);
   const benchmark = await benchmarkIdentity();
   if (benchmark !== undefined) {

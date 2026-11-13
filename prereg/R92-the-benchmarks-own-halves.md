@@ -17,6 +17,7 @@ packBudget: 2400
 taskSplit: official
 trainTasks: 74
 testTasks: 40
+release: v1.0.1
 ---
 
 # R92 — the held-out half has to be the one the benchmark names
@@ -38,6 +39,15 @@ The two caps are stated even though the file states them, and the reason is a re
 `TAU_TRAIN_TASKS` is **57**, left there by the arms that ran the lane's own cut, and a registration that
 said nothing would have its 74 learned tasks silently capped at the number a previous dispatch chose. The
 caps and the split now agree, and a disagreement between them would be visible as 57.
+
+**And the release, because the first dispatch of this arm died for want of it.** The lane had pinned τ²
+**v0.2.0**; `split_tasks.json` ships from v1.0.0, and the published 67.5% was produced on **v1.0.1**. The
+boundary is not a version of the software: at v1.0.1 all 114 retail tasks declare a `reward_basis` (112 of
+them `DB+NL_ASSERTION`) and 112 are graded on their prose rubric, where at v0.2.0 no retail task declared one
+and the default `DB+COMMUNICATE` applied. Airline did not move. So `release: v1.0.1` is stated here, the
+driver refuses a dispatch pinned elsewhere, and the artefact carries `benchmark {version, commit}` — a number
+without a release cannot be ranked against a published one, which is the defect this whole round is about.
+
 
 ## The question is recorded here, and deliberately not pinned
 

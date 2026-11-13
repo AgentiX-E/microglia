@@ -1501,6 +1501,10 @@ jobs:
           # R92's second pin: the question. Empty on every arm that quotes an absolute number, set on an
           # arm whose subject is the pack, which prices its options only if the question is held fixed.
           TAU_QUERY_PIN: ${{ steps.recall_floor.outputs.queryPin }}
+          # R92's third: the release the registration's number is about. Empty means it makes no claim; a
+          # value that disagrees with `TAU_VERSION` above refuses the run before the first episode, which is
+          # what R92's first dispatch cost an environment and a corpus to learn.
+          TAU_RELEASE: ${{ steps.recall_floor.outputs.release }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
@@ -1581,6 +1585,10 @@ jobs:
           # R92's second pin: the question. Empty on every arm that quotes an absolute number, set on an
           # arm whose subject is the pack, which prices its options only if the question is held fixed.
           TAU_QUERY_PIN: ${{ steps.recall_floor.outputs.queryPin }}
+          # R92's third: the release the registration's number is about. Empty means it makes no claim; a
+          # value that disagrees with `TAU_VERSION` above refuses the run before the first episode, which is
+          # what R92's first dispatch cost an environment and a corpus to learn.
+          TAU_RELEASE: ${{ steps.recall_floor.outputs.release }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
