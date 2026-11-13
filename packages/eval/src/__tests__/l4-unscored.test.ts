@@ -140,6 +140,29 @@ describe('the driver path and the denominator', () => {
     expect(gates.find((gate) => gate.id === 'l4-fully-scored')?.pass).toBe(false);
   });
 
+  it('withholds the published bar when the grid is not a pass^4', () => {
+    // The lane reads `k` from `TAU_TRIALS` since R93; before that it was the literal 4 while the
+    // driver used the variable, so a one-trial diagnostic run would have published `k: 4` beside a
+    // `pass^1` mean and a delta against a `pass^4` bar. Both numbers are withheld here rather than
+    // annotated, because a delta a reader can compute is a delta that gets quoted.
+    const dir = workdir('l4-unscored-k-');
+    const driver = join(dir, 'driver.ts');
+    writeFileSync(driver, driverModule({ scored: TASKS, unscored: 0, exposeIds: true }));
+
+    const { artefact } = runLane(dir, driver);
+    const metrics = artefact['metrics'] as Record<string, number>;
+
+    expect(metrics['k']).toBe(2);
+    expect(metrics['published_bar_applies']).toBe(0);
+    expect(metrics['published_pass4']).toBeUndefined();
+    expect(metrics['competitor_pass4']).toBeUndefined();
+    expect(metrics['delta']).toBeUndefined();
+    // The sample gates still grade the run: what is withheld is the comparison, not the coverage.
+    const gates = artefact['samples'] as readonly { id: string }[];
+    expect(gates.map((gate) => gate.id)).not.toContain('l4-pass4');
+    expect(gates.map((gate) => gate.id)).toContain('l4-coverage');
+  });
+
   it('reports zero only where the driver counted zero', () => {
     // The control for the two cases above: a forty-task grid with every verdict present stays green,
     // so the fix is not a gate that fails every driver.

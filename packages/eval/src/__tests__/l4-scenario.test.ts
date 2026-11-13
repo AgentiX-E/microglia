@@ -36,6 +36,43 @@ describe('scenarioBarOf', () => {
   });
 });
 
+describe('the backbone the bar was measured on', () => {
+  /**
+   * R92's third axis after model, prompt, split and release: the *backbone*.
+   *
+   * ALTK-Evolve's 57.5% is a GPT-4.1 ReAct agent, and this lane runs `deepseek/deepseek-flash`.
+   * Every L4 number in this record — 0.5752, 0.5614, 0.7018, 0.6316 — is therefore a comparison
+   * across backbones as well as across prompt and split, and the artefact never said so. The fix is
+   * not to delete the bar: a run above `published + 5pp` on a different backbone has still cleared a
+   * number, and the sentence a reader needs is *which* number. So the bar keeps its arithmetic and
+   * declares whose model it came from.
+   */
+  it('matches the model the published rows were measured on', () => {
+    expect(scenarioBarOf('retail', 'gpt-4.1-2025-04-14').sameBackbone).toBe(true);
+    expect(scenarioBarOf('retail', 'gpt-4.1').sameBackbone).toBe(true);
+  });
+
+  it('states a mismatch for this lane’s own model rather than hiding it', () => {
+    const bar = scenarioBarOf('retail', 'deepseek/deepseek-flash');
+    expect(bar.comparable).toBe(true);
+    expect(bar.published).toBe(PUBLISHED_PASS4);
+    expect(bar.sameBackbone).toBe(false);
+    expect(bar.note).toContain('gpt-4.1');
+    expect(bar.note).toContain('different backbone');
+  });
+
+  it('refuses to match a sibling model that shares a prefix', () => {
+    // `gpt-4.1-mini` starts with `gpt-4.1` and is not the model the rows were measured on; a prefix
+    // test would certify it, which is how a bar quietly starts to fit.
+    expect(scenarioBarOf('retail', 'gpt-4.1-mini').sameBackbone).toBe(false);
+  });
+
+  it('reports no backbone at all when it has no number', () => {
+    expect(scenarioBarOf('airline', 'gpt-4.1').sameBackbone).toBe(false);
+    expect(scenarioBarOf('airline', 'gpt-4.1').model).toBeNull();
+  });
+});
+
 describe('minTasksOf', () => {
   it('defaults to the floor the lane shipped with', () => {
     expect(minTasksOf(undefined)).toBe(DEFAULT_MIN_TASKS);

@@ -34,9 +34,11 @@ const TASKS = 48;
 function driverModule(options: { readonly passes: number; readonly plant?: string }): string {
   const rows = Array.from({ length: TASKS }, (_, index) => ({
     taskId: `retail/${String(index)}`,
-    successes: index < options.passes ? 2 : 0,
-    trials: 2,
-    k: 2,
+    // Four trials since R93: `l4.ts` derives `k` from `TAU_TRIALS` and withholds the published bar at
+    // any other value, so a two-trial fixture would exercise the arm without the bar it is about.
+    successes: index < options.passes ? 4 : 0,
+    trials: 4,
+    k: 4,
   }));
   const plant =
     options.plant === undefined
@@ -68,7 +70,7 @@ function runBin(
         ...process.env,
         POC_RESULT_DIR: out,
         TAU_MIN_TASKS: '40',
-        TAU_TRIALS: '2',
+        TAU_TRIALS: '4',
         TAU_TEST_DOMAIN: 'retail',
         TAU_TRAIN_DOMAIN: 'retail',
         TAU_RECALL_DOMAIN: 'retail',

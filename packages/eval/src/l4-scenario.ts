@@ -50,6 +50,34 @@ export const PUBLISHED_PASS4 = 0.575;
 export const COMPETITOR_PASS4 = 0.6754;
 /** The number of tasks the submission above covers, so a delta can say whether it is cross-sample. */
 export const COMPETITOR_TASKS = 114;
+/**
+ * The backbone the published rows were measured on.
+ *
+ * ALTK-Evolve's retail cell is a GPT-4.1 ReAct agent (with `gpt-5.5` as the customer simulator), and
+ * this lane runs `deepseek/deepseek-flash`. Every L4 delta in this record therefore compares two
+ * models as well as two prompts, and the artefact said nothing about it — the same defect R92 found
+ * one axis over, where the release turned out to move the reward while the sample stood still.
+ *
+ * The bar is kept rather than withdrawn: "above 57.5 + 5pp" is still a fact about a run, and a gate
+ * that disappears whenever the backbone differs would be unfalsifiable on the lane's only published
+ * reference. What changes is that the comparison now names both models, so a reader can rank the arm
+ * against its own backbone's paired control instead of against a number a different model produced.
+ */
+export const PUBLISHED_MODEL = 'gpt-4.1';
+
+/**
+ * Whether a run's model is the one the published rows were measured on.
+ *
+ * Matched exactly, with the release's dated spelling allowed: `gpt-4.1-2025-04-14` is the same model
+ * as `gpt-4.1` in the row, while `gpt-4.1-mini` is not — and a prefix test would certify the second
+ * one, which is how a bar quietly starts to fit.
+ */
+export function backboneMatches(model: string | undefined): boolean {
+  const normalized = (model ?? '').trim().toLowerCase();
+  if (normalized === '') return false;
+  return /^gpt-4\.1(-\d{4}-\d{2}-\d{2})?$/.test(normalized);
+}
+
 /** The floor the lane shipped with, and the default for a dispatch that says nothing. */
 export const DEFAULT_MIN_TASKS = 60;
 
@@ -59,23 +87,34 @@ export type ScenarioBar = {
   readonly comparable: boolean;
   /** The bar, or `null` when this scenario has none. */
   readonly published: number | null;
+  /** The model the bar belongs to, or `null` when this scenario has no bar at all. */
+  readonly model: string | null;
+  /** Whether the run this bar is applied to used that model. */
+  readonly sameBackbone: boolean;
   /** One sentence a report can print without its reader knowing this module. */
   readonly note: string;
 };
 
-export function scenarioBarOf(scenario: string): ScenarioBar {
+export function scenarioBarOf(scenario: string, model?: string): ScenarioBar {
   if (scenario === PUBLISHED_SCENARIO) {
+    const sameBackbone = backboneMatches(model);
     return {
       scenario,
       comparable: true,
       published: PUBLISHED_PASS4,
-      note: `The published bar is ALTK-Evolve's ${PUBLISHED_PASS4.toFixed(3)} on τ²-${PUBLISHED_SCENARIO} pass^4.`,
+      model: PUBLISHED_MODEL,
+      sameBackbone,
+      note: sameBackbone
+        ? `The published bar is ALTK-Evolve's ${PUBLISHED_PASS4.toFixed(3)} on τ²-${PUBLISHED_SCENARIO} pass^4, measured on ${PUBLISHED_MODEL} — the backbone this run used.`
+        : `The published bar is ALTK-Evolve's ${PUBLISHED_PASS4.toFixed(3)} on τ²-${PUBLISHED_SCENARIO} pass^4, and it was measured on ${PUBLISHED_MODEL}: this run used ${(model ?? '').trim() === '' ? 'an unstated model' : (model as string).trim()}, so the delta is a different backbone as well as a different prompt. The comparable quantity is the paired control.`,
     };
   }
   return {
     scenario,
     comparable: false,
     published: null,
+    model: null,
+    sameBackbone: false,
     note:
       `No published pass^4 exists for τ²-${scenario}, so this run is not graded against a leaderboard: ` +
       `ALTK-Evolve's ${PUBLISHED_PASS4.toFixed(3)} is a τ²-${PUBLISHED_SCENARIO} number, and comparing a ` +

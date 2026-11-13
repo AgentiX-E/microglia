@@ -48,7 +48,21 @@ import { writeJson, writeResult } from './lib.js';
 import { COMPETITOR_PASS4, minTasksOf, scenarioBarOf, sotaLineOf } from '@agentix-e/microglia-eval';
 
 const BAR = 0.05;
-const K = 4;
+/**
+ * The `k` this arm is scored at, from the same variable the driver reads.
+ *
+ * It was the literal `4` while `tau2-driver` used `TAU_TRIALS`, so a dispatch at one trial produced a
+ * `pass^1` grid that this file labelled `k: 4` — a record that would have certified the wrong
+ * statistic without any gate noticing. Derived here so the two cannot disagree, and the published
+ * bar is withheld below when it is not a `pass^4`, because `57.5% pass^4` is not a bar for `pass^1`.
+ */
+function trialsOf(value: string | undefined): number {
+  const parsed = Number((value ?? '').trim());
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : 4;
+}
+const K = trialsOf(process.env['TAU_TRIALS']);
+/** The trial count the published rows were measured at, and the only one their bar applies to. */
+const PUBLISHED_K = 4;
 /**
  * The scenario this arm answered, and whether a published number is a bar for it.
  *
@@ -57,7 +71,15 @@ const K = 4;
  * would measure the two scenarios. `l4-scenario.ts` holds the rule and its reason.
  */
 const SCENARIO = process.env['TAU_TEST_DOMAIN'] ?? process.env['TAU_DOMAIN'] ?? 'retail';
-const scenarioBar = scenarioBarOf(SCENARIO);
+/**
+ * The model this arm ran, which the bar has to know about.
+ *
+ * ALTK-Evolve's 57.5 is a GPT-4.1 ReAct agent and this lane runs DeepSeek; the comparison is
+ * therefore across backbones, and an artefact that reported only `pass^4 >= published + 0.05` was
+ * attributing a model difference to the memory. The bar keeps its arithmetic and states both names.
+ */
+const RUN_MODEL = process.env['TAU_MODEL'] ?? '';
+const scenarioBar = scenarioBarOf(SCENARIO, RUN_MODEL);
 const MIN_TASKS = minTasksOf(process.env['TAU_MIN_TASKS']);
 
 /**
@@ -382,8 +404,13 @@ const arm: 'memory' | 'reference' =
  * bar — R57's `far` arm missed it while behaving exactly as registered.
  */
 const plantedArm = (process.env['TAU_PLANTED_RULES'] ?? '').trim();
+// `pass^k` at k != 4 is a different statistic from the one the published rows report, and a delta
+// across the two would read as a memory effect. Withheld rather than annotated, because a number a
+// reader can divide by is a number that gets quoted.
 const compared =
-  scenarioBar.published === null ? undefined : compareToPublished(mean, scenarioBar.published, BAR);
+  scenarioBar.published === null || K !== PUBLISHED_K
+    ? undefined
+    : compareToPublished(mean, scenarioBar.published, BAR);
 const coversSplit = measured.tasks.length >= MIN_TASKS;
 type ReferenceTask = { readonly id: string; readonly passed_all: boolean };
 let paired: { delta: number; low: number; high: number; p: number; n: number } | undefined;
@@ -505,16 +532,27 @@ await writeResult({
     pass4: mean,
     // A bar that does not apply is reported as absent rather than as a number a reader could divide
     // by: `published_bar_applies` says which of the two this file is.
-    ...(scenarioBar.published === null ? {} : { published_pass4: scenarioBar.published }),
+    ...(scenarioBar.published === null || K !== PUBLISHED_K
+      ? {}
+      : { published_pass4: scenarioBar.published }),
     // The competitor's submitted number as well as its baseline: beating `0.575` says a memory beat no
     // memory, and beating `0.6754` says it beat ALTK-Evolve. Recorded as a number so a readback does not
     // carry its own copy of the constant, which is how two definitions of a bar start to drift.
-    ...(scenarioBar.published === null ? {} : { competitor_pass4: COMPETITOR_PASS4 }),
+    ...(scenarioBar.published === null || K !== PUBLISHED_K
+      ? {}
+      : { competitor_pass4: COMPETITOR_PASS4 }),
     // Which arm this is, because the two are graded differently and a reader of the artefact
     // cannot otherwise tell a control that failed a bar from a treatment that missed one.
     arm: arm === 'reference' ? 0 : 1,
     published_bar_applies:
-      scenarioBar.comparable && arm === 'memory' && plantedArm === '' ? 1 : 0,
+      scenarioBar.comparable && arm === 'memory' && plantedArm === '' && K === PUBLISHED_K
+        ? 1
+        : 0,
+    // Whether the bar and this arm were measured on the same model. `0` does not withdraw the gate:
+    // "above 57.5 + 5pp" is still a fact about the run, and a gate that vanishes whenever the
+    // backbone differs would be unfalsifiable on the lane's only published reference. It says the
+    // delta is a model difference as well as a prompt difference, which is what a ranking needs.
+    bar_backbone_matches: scenarioBar.sameBackbone ? 1 : 0,
     // Which of the two bars this file was graded by, as a flag rather than a name: `metrics` is a
     // record of numbers, and the name is already in the artefact where it belongs — `tau2.plant.arm`,
     // written by the driver that planted the rules. `1` here means "the published bar was not this
