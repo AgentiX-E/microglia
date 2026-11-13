@@ -1,0 +1,97 @@
+name: cache-probe
+
+# R102's premise, priced before the arm is dispatched.
+#
+# A workflow of its own rather than a job in `sota.yml`, and the reason is cost rather than tidiness:
+# `sota.yml`'s other jobs are gated on variables and inputs that a probe dispatch does not set, and
+# `vars.TAU_ENV_READY` alone is enough to start the benchmark lane — so the cheapest way to run a
+# thirty-six-call probe is to not be in the same file as a two-arm benchmark.
+#
+# What it measures: the memory arm bills 2.17× the control and the premium is uncached prompt tokens
+# (PROGRESS 179). Whether the block sits outside the cache prefix or the second system message is a
+# boundary the provider does not carry cannot be read off a ledger, and the two need opposite
+# repairs. Four prompt shapes over nine growing turns, reading `prompt_cache_hit_tokens` per call.
+#
+# Two of the four verdicts refuse the treatment, which is what makes it worth the cents:
+# `placement-is-free` refutes R102's premise, `block-never-cached` refutes it in the form it was
+# written, and `inconclusive` says the provider did not report the counter — which is not a zero.
+on:
+  workflow_dispatch:
+    inputs:
+      turns:
+        description: 'Growing turns per shape; the first call is always a miss, so two is the minimum that measures anything'
+        required: false
+        default: '9'
+      block_tokens:
+        description: 'Approximate block size. The R93 packs ran 1.0-1.8k, so 1200 is the middle of the range that was billed'
+        required: false
+        default: '1200'
+      native_tokens:
+        description: 'Approximate size of τ²''s own system policy, which is the prefix the reference arm pays for once'
+        required: false
+        default: '3000'
+      wait_ms:
+        description: 'Delay between calls, because the provider writes a cache entry after answering; too short and every shape looks like it never hits'
+        required: false
+        default: '5000'
+
+jobs:
+  probe:
+    name: 'Pack placement cache probe'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build
+      - name: Probe
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # The model the lane spends, from the variable the lane reads, because the cache behaviour
+          # of another model is a fact about another model.
+          SOTA_MODEL: ${{ vars.TAU_MODEL || 'deepseek-flash' }}
+        run: |
+          pnpm eval:cache-probe \
+            --out eval/results/cache-placement.json \
+            --turns '${{ github.event.inputs.turns }}' \
+            --block-tokens '${{ github.event.inputs.block_tokens }}' \
+            --native-tokens '${{ github.event.inputs.native_tokens }}' \
+            --wait-ms '${{ github.event.inputs.wait_ms }}'
+      - name: Say what the shapes cost
+        if: always()
+        run: |
+          if [ ! -f eval/results/cache-placement.json ]; then
+            echo 'no artefact: the probe did not finish, which is not a measurement' >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          a = json.load(open('eval/results/cache-placement.json'))
+          print(f"### {a['state']}")
+          print()
+          print(a['sentence'])
+          print()
+          print(f"- block measured **{a['block_tokens_measured']}** prompt tokens")
+          print(f"- {a['calls']} calls, {a['cache_field_reported_calls']} reported a cache field")
+          print()
+          print('| shape | first | steady | delta |')
+          print('|---|---|---|---|')
+          for row in a['readouts']:
+              print(f"| `{row['placement']}` | {row['ledger']['firstUncached']} | "
+                    f"{row['ledger']['steadyUncached']:.0f} | {row['delta']:+.0f} |")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cache-placement
+          path: eval/results/cache-placement.json
+          if-no-files-found: warn
