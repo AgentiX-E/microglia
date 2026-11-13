@@ -1514,3 +1514,42 @@ recall filters by scope, so a `retail` store answers an `airline` question with 
 facade asks in the store's own terms. Asking in the store's terms is what a transfer arm is; leaving
 the filter at the question's scenario would measure an empty pack and report a null. Both names are
 recorded, so a reader can tell a foreign pack from a pack the scenario filter emptied.
+
+### 8.17 A score is a score of a release, and the release is not a version of the software
+
+The τ² lane has quoted `pass^4` against a published figure since its first arm, and until this section
+existed it had never checked which release that figure was produced on. It was not the one the lane ran.
+The difference is not a changelog item: the benchmark publishes its own train/test halves from v1.0.0, so
+the release the lane had pinned cannot even name the sample the published number was measured on.
+
+**Three things move together, and only one of them is about tasks.** Measured out of the corpus at both
+refs rather than read from release notes:
+
+| | tau2-bench v0.2.0 | tau2-bench v1.0.1 |
+|---|---|---|
+| `data/tau2/domains/<domain>/split_tasks.json` | absent | retail `train` 74 / `test` 40 / `base` 114 |
+| retail task bodies | 114 ids | the same 114 ids, **0 identical** by content hash |
+| retail `reward_basis` | declared by 0 of 114, so the default `[DB, COMMUNICATE]` applies | declared by 114: 112 × `DB+NL_ASSERTION`, 2 × `DB` |
+| retail tasks graded on their prose rubric | 0 | 112 |
+| airline `reward_basis` | 0 of 50, same default | 50 of 50, all `COMMUNICATE+DB` — the grade is unchanged |
+
+So the sample, the bodies and the reward move together on retail, and only the sample and the bodies move
+on airline. A library that reports a number without the release it came from therefore cannot say what its
+own number measured, and the fix is a record rather than a caution: the artefact carries
+`benchmark {version, commit}` — the tag the workflow pinned and the commit the checkout is at, because a
+tag can be moved — beside `taskSplit`, which names whether the halves are the benchmark's or the lane's own
+cut.
+
+**The runner boundary is discovered, not assumed.** The two releases do not share a runner surface: v1
+moved the batch runner to `tau2.runner.*`, made it take a pydantic `TextRunConfig`, and replaced
+`register_agent` with a factory. The adapter asks what the installed package *exports* rather than what its
+version string says, because a release that back-ported half of the move would pass a string comparison and
+raise inside the first paid episode. A `selftest` phase checks the signatures, the config fields and the
+registry's capability before anything is listed, so a mismatch costs two seconds instead of an environment,
+a built store and an aborted run.
+
+**What this does not license.** A cross-release comparison is not a defect report about the benchmark and
+it is not evidence about memory: it is a statement that two numbers are not the same measurement. The
+library's own claim — that a distilled store raises the share of tasks solved in all trials — is a paired
+claim, and the paired claim survives a release boundary exactly as well as it survives a split boundary:
+by being made twice inside one of them.

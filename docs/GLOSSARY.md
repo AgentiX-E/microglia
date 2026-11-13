@@ -172,6 +172,17 @@ pin**, a query pin is not for arms quoting an absolute benchmark number: a fixed
 stimulus no user typed, and the number is meant to be comparable to a competitor's. It is for arms whose
 subject *is* the pack, where two levels must be read against one question.
 
+**Benchmark release** — the version of the benchmark a score is a score *of*. It is not a footnote: τ²
+v0.2.0 and v1.0.1 share all 114 retail task ids and differ in 114 of 114 task bodies, v1.0.1 is the only
+release that ships the 74/40 halves the published held-out figures use, and retail's `reward_basis` moves
+between them from the implicit `[DB, COMMUNICATE]` to a declared `DB+NL_ASSERTION` on 112 of 114 tasks —
+so 112 tasks are graded on their prose rubric in one release and none are in the other. Airline does not
+move: all 50 tasks declare `COMMUNICATE+DB`, which is what the default already applied. The consequence
+for this project's own record is that a `pass^4` from before R92 is *historical* rather than comparable,
+and the artefact carries `benchmark {version, commit}` — the tag from the pin and the commit from the
+checkout, because a tag can be moved — with `taskSplit` naming which halves were run and the corpus's label
+census printed beside the number.
+
 **Trust** — a scalar in `[0, 1]` attached to a feedback event, derived from the *signal* (execution
 result > clarification > preference > rating with reason > edit > bare rating) and optionally capped by
 the host. Never derived from the actor's identity.
