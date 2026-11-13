@@ -31,9 +31,9 @@ on:
         required: false
         default: '3000'
       wait_ms:
-        description: 'Delay between calls, because the provider writes a cache entry after answering; too short and every shape looks like it never hits'
+        description: 'Delay between calls. Measured, not chosen: at 5s the block-bearing shapes read 617 uncached tokens a call against a control of 180, which is a cache-write latency misread as a placement effect'
         required: false
-        default: '5000'
+        default: '15000'
 
 jobs:
   probe:

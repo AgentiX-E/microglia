@@ -44,6 +44,7 @@ type Flags = {
   readonly nativeTokens: number;
   readonly blockTokens: number;
   readonly waitMs: number;
+  readonly warmup: number;
   readonly maxCalls: number;
 };
 
@@ -67,7 +68,12 @@ function flagsOf(argv: readonly string[]): Flags {
     turns: Math.trunc(numberFlag(argv, '--turns', 9)),
     nativeTokens: Math.trunc(numberFlag(argv, '--native-tokens', 3000)),
     blockTokens: Math.trunc(numberFlag(argv, '--block-tokens', 1200)),
-    waitMs: Math.trunc(numberFlag(argv, '--wait-ms', 5000)),
+    // Fifteen seconds rather than five, and the number is measured rather than chosen: at five the
+    // second run's block-bearing shapes read 617 uncached tokens a call against a control of 180,
+    // which looks like a placement effect and is a cache-write latency. A prefix written less than
+    // ~10s ago is not reliably readable, so a shorter wait prices the provider's bookkeeping.
+    waitMs: Math.trunc(numberFlag(argv, '--wait-ms', 15_000)),
+    warmup: Math.trunc(numberFlag(argv, '--warmup', 1)),
     maxCalls: Math.trunc(numberFlag(argv, '--max-calls', 80)),
   };
 }
@@ -152,6 +158,19 @@ async function main(): Promise<void> {
     const native =
       'You are a retail customer-service agent. ' +
       syntheticText(flags.nativeTokens - 12, 3 + index * 1_000);
+    // A warmup call at the **longest** history, which warms every shorter prefix at once: a cache is
+    // a prefix, so the nine-turn prompt shares its first eight turns with the eight-turn prompt. Without
+    // it the first measured call is a cold miss by construction -- fine for a model of an episode, fatal
+    // for a comparison between shapes, because the shapes then differ in how much of their own prefix
+    // they had written by the time they were read.
+    for (let warm = 0; warm < flags.warmup; warm += 1) {
+      if (calls >= flags.maxCalls) {
+        throw new Error(`the probe's ${flags.maxCalls}-call budget is spent; raise --max-calls`);
+      }
+      calls += 1;
+      await send(url, credential.key, model, placementPromptFor(placement, { native, block, turns }), 16);
+      await new Promise((resolve) => setTimeout(resolve, flags.waitMs));
+    }
     const series: RawReading[] = [];
     for (let turn = 1; turn <= turns.length; turn += 1) {
       if (calls >= flags.maxCalls) {
@@ -200,6 +219,7 @@ async function main(): Promise<void> {
     block_tokens_target: flags.blockTokens,
     turns: flags.turns,
     wait_ms: flags.waitMs,
+    warmup_calls: flags.warmup,
     calls,
     cache_field_reported_calls: reported,
     shape: Object.fromEntries(
