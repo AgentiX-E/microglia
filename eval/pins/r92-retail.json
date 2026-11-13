@@ -1,0 +1,20 @@
+{
+  "source": "R92 (run 43414049093): 15 of the benchmark's 74 retail learn tasks failed at one trial, on v1.0.1 with deepseek-flash as both agent and judge",
+  "failures": [
+    "retail/2",
+    "retail/4",
+    "retail/20",
+    "retail/35",
+    "retail/41",
+    "retail/52",
+    "retail/76",
+    "retail/78",
+    "retail/91",
+    "retail/92",
+    "retail/95",
+    "retail/98",
+    "retail/105",
+    "retail/109",
+    "retail/112"
+  ]
+}
