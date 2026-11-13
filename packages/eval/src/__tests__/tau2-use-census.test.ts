@@ -30,6 +30,7 @@ import {
   COVERAGE_FLOORS,
   coverageHistogram,
   coverageProfile,
+  servedCensus,
   useCensus,
   zeroCoverageShare,
   type CoverageHistogram as CoverageHistogramShape,
@@ -399,5 +400,79 @@ describe('the use census reads the document the floor reads', () => {
     const legacy = coverageHistogram([{ query, statements: [statement] }]);
     expect(legacy.floors[0]?.retainedPairs).toBe(1);
     expect(legacy.nonzeroQuantiles.p50).toBe(0);
+  });
+});
+
+/**
+ * R93 — which record, not only how many.
+ *
+ * The facade has carried `pack.ids` since R45 and the driver kept them in a process-local array, so
+ * every store experiment in this record described a distribution by its mean: R92 served 1.09 items
+ * per request from fifteen records over 162 requests, and the artefact could not name one of them.
+ * A record that is never rendered and a record that is rendered on every request are different
+ * findings about the same store, and this census is the only thing that separates them.
+ */
+describe('the served-id census joins the pack back to the store', () => {
+  it('reports an uninstrumented run as unmeasured rather than as zero', () => {
+    const census = servedCensus([]);
+    expect(census).toEqual({
+      requests: 0,
+      identified: 0,
+      distinct: 0,
+      meanPerRequest: null,
+      maxPerRequest: 0,
+      byItem: [],
+    });
+  });
+
+  it('separates a request that recorded no ids from one that recorded an empty pack', () => {
+    const census = servedCensus([
+      { query: 'a', statements: [], ids: [] },
+      { query: 'b', statements: ['rule'], ids: ['k_1'] },
+      // Written before R93, or by a driver that did not instrument: no `ids` at all.
+      { query: 'c', statements: ['rule'] },
+    ]);
+    expect(census.requests).toBe(3);
+    // Two requests recorded their ids; the third says nothing, and counting it as a zero-item pack
+    // would attribute a measurement to a run that never made one.
+    expect(census.identified).toBe(2);
+    expect(census.distinct).toBe(1);
+    // The mean is over identified requests only: 1 id over 2 requests.
+    expect(census.meanPerRequest).toBe(0.5);
+    expect(census.maxPerRequest).toBe(1);
+    expect(census.byItem).toEqual([{ id: 'k_1', requests: 1 }]);
+  });
+
+  it('counts renders per record, sorted by id, and a repeat within one pack twice', () => {
+    const census = servedCensus([
+      { query: 'a', statements: ['x', 'y'], ids: ['k_b', 'k_a'] },
+      { query: 'b', statements: ['x'], ids: ['k_b'] },
+      { query: 'c', statements: ['x', 'y'], ids: ['k_b', 'k_b'] },
+    ]);
+    expect(census.distinct).toBe(2);
+    expect(census.maxPerRequest).toBe(2);
+    expect(census.meanPerRequest).toBe(5 / 3);
+    // Sorted, so two arms compare without a second sort. `k_b` was rendered four times across three
+    // requests: the count is of what the model read, not of how many packs carried it.
+    expect(census.byItem).toEqual([
+      { id: 'k_a', requests: 1 },
+      { id: 'k_b', requests: 4 },
+    ]);
+  });
+
+  it('makes "the store serves one record per request" a distribution over the records', () => {
+    // The shape R92 could not report: a store of three records, one of which carried every pack and
+    // one of which was never rendered at all. The mean (1.0 items) is identical in both stores.
+    const carried = servedCensus([
+      { query: 'a', statements: ['x'], ids: ['k_hot'] },
+      { query: 'b', statements: ['x'], ids: ['k_hot'] },
+      { query: 'c', statements: ['y'], ids: ['k_warm'] },
+    ]);
+    expect(carried.meanPerRequest).toBe(1);
+    expect(carried.distinct).toBe(2);
+    expect(carried.byItem.map((row) => row.requests)).toEqual([2, 1]);
+    // No record beyond the two that were served: `distinct` is not the store's size, and a readback
+    // that compares it with `store.stored` is asking how much of the store never reached a prompt.
+    expect(carried.distinct).toBeLessThan(3);
   });
 });

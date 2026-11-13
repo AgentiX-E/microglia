@@ -50,7 +50,7 @@ import {
   type ValidityGate,
 } from '@agentix-e/microglia-protocol';
 import { detectableDelta } from './protocol.js';
-import type { CoverageHistogram, UseCensus } from './tau2-use-census.js';
+import type { CoverageHistogram, ServedCensus, UseCensus } from './tau2-use-census.js';
 import type { InactionCensus } from './inaction.js';
 import type { DistillFormRecord, DistillUnitRecord, InjectionNoteRecord } from './tau2-instrument.js';
 import type { StoreItemSample } from './store-items.js';
@@ -309,6 +309,16 @@ export type Tau2ArmRecord = {
    * its own dispatch, as AUDIT 34.22 requires; a scalar cannot support it.
    */
   readonly coverage?: CoverageHistogram;
+  /**
+   * R93: which of the store's records were actually served, and how often.
+   *
+   * `use` says how many items a pack carried and `coverage` says how much of the question they
+   * reached; neither says *which* record, so a store experiment could not tell a record that is
+   * load-bearing from one that has never been rendered. This is the use-side join to `storeItems`,
+   * and it is what makes "the store serves one record per request on average" a distribution rather
+   * than a mean. Absent on every artefact before R93, which reads as "not measured".
+   */
+  readonly served?: ServedCensus;
 };
 
 /** The paired comparison, reduced to the three numbers a gate reads. */

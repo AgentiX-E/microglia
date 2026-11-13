@@ -52,6 +52,7 @@ import type { ProvenanceCensus } from "./tau2-provenance.js";
 import type { QueryCensus } from "./tau2-queries.js";
 import {
   coverageHistogram,
+  servedCensus,
   useCensus,
   type UseArm,
   type UseObservation,
@@ -768,6 +769,10 @@ export function armRecordFromDriver(
   // defensive `?? []` has to stand in for a branch that cannot be taken.
   const useSide = (observations: readonly UseObservation[]) => ({
     use: useCensus(observations, raw.useArm ?? "as-is", raw.widenedItems ?? 0),
+    // R93: which record, not only how many. The facade has carried `pack.ids` since R45 and the
+    // driver kept them in a process-local array, so a store of fifteen records served over 162
+    // requests was described by a mean and never by a distribution.
+    served: servedCensus(observations),
     // The seven-field census commits one scalar about coverage. U3's floor must be
     // computed from a committed histogram BEFORE its own dispatch (AUDIT 34.22), so
     // reduce the SAME facade observations to the retention curve here, while they

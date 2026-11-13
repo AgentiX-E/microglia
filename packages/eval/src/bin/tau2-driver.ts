@@ -1634,6 +1634,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
           // R51 made condition + statement the document the floor is applied to; this is the
           // same document, so the histogram cannot score a pack by text the floor never saw.
           documents: pack.items.map(recallText),
+          // R93: which record, not only how many. The ids were already in this process and the
+          // artefact could only ever report their count, so no readback could say which of fifteen
+          // records a 162-request run actually used.
+          ids: pack.ids,
         });
         return pack;
       }
@@ -1661,6 +1665,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
           planted.rule.statement,
         ],
         documents: [...pack.items.map(recallText), recallText(planted.rule)],
+        // The planted rule is not a store item and has no id, so it is absent here: an id invented
+        // for it would join to nothing in `storeItems` and read as a record the store does not hold.
+        ids: pack.ids,
       });
       return { ...pack, rendered: injection.rendered };
     });

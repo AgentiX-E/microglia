@@ -989,3 +989,39 @@ describe('the coverage curve is not computed from a filtered population', () => 
     expect(record.use?.recallRequests).toBe(2);
   });
 });
+
+describe('the served census reaches the arm record', () => {
+  it('carries the ids the facade rendered, so a record can be named', () => {
+    // R93: `use` says how many items a pack carried and `coverage` says how much of the question
+    // they reached. Neither names the record, so a store experiment could not tell a record that
+    // is load-bearing from one that has never been rendered.
+    const record = armRecordFromDriver(
+      raw({
+        useObservations: [
+          { query: 'exchange a delivered item', statements: ['rule a'], ids: ['k_a'] },
+          { query: 'cancel a pending order', statements: ['rule b'], ids: ['k_b'] },
+          { query: 'cancel a pending order', statements: ['rule b'], ids: ['k_b'] },
+        ],
+      }),
+    );
+    expect(record.served?.requests).toBe(3);
+    expect(record.served?.identified).toBe(3);
+    expect(record.served?.distinct).toBe(2);
+    expect(record.served?.meanPerRequest).toBe(1);
+    expect(record.served?.byItem).toEqual([
+      { id: 'k_a', requests: 1 },
+      { id: 'k_b', requests: 2 },
+    ]);
+  });
+
+  it('records an uninstrumented facade as unmeasured rather than as empty packs', () => {
+    const record = armRecordFromDriver(
+      raw({ useObservations: [{ query: 'q', statements: ['rule'] }] }),
+    );
+    expect(record.served?.requests).toBe(1);
+    // The observation carries a statement and no ids: the pack was not empty, this run simply did
+    // not record what was in it.
+    expect(record.served?.identified).toBe(0);
+    expect(record.served?.meanPerRequest).toBeNull();
+  });
+});

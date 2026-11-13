@@ -63,6 +63,21 @@ export type UseObservation = {
    * exactly what those runs measured.
    */
   readonly documents?: readonly string[];
+  /**
+   * The store ids of the items the pack rendered, in render order.
+   *
+   * R93. The facade has carried `pack.ids` since R45 and the driver has always pushed them into its
+   * in-memory `packReadings` — the artefact carried the *size* of each pack and never which item was
+   * in it. So no readback could answer the two questions every store experiment turns on: which
+   * record earned its place, and whether the record served to a failed task was the one that had
+   * anything to do with it. A store of fifteen records served over 162 requests is a distribution,
+   * and a distribution that is never recorded can only be described by its mean.
+   *
+   * Absent when the caller did not record them, which reads as "this arm cannot say" rather than as
+   * "the pack was empty". Ids are the store's own (`k_…`), so they join to `storeItems` and to the
+   * provenance payload without a second mapping.
+   */
+  readonly ids?: readonly string[];
 };
 
 /** The registered seven-field shape (§17.89). */
@@ -193,6 +208,70 @@ export function coverageProfile(observations: readonly UseObservation[]): Covera
 /** Share of injected pairs with zero coverage; 0 when nothing was injected. */
 export function zeroCoverageShare(census: UseCensus): number {
   return census.injectedPairs === 0 ? 0 : census.zeroCoveragePairs / census.injectedPairs;
+}
+
+/**
+ * Which records were served, and how often — the use-side counterpart of the store's own census.
+ *
+ * `storeItems` says what the store holds and `pack.summary` says how many items a pack carried; both
+ * are means over a run, and neither can answer "was this record ever used, and where". A store of
+ * fifteen records over 162 requests has a shape, and the shape is the only way to tell a record that
+ * is load-bearing from one that has never been rendered. R92's own numbers make the case: 1,119
+ * candidates were refused for size and the pack still averaged 1.09 items, so at most two of the
+ * fifteen could have been doing any work in any single request — which ones, nothing recorded.
+ *
+ * `distinct` counts ids seen at least once; `byItem` is sorted by id so two arms compare without a
+ * second sort, and `meanPerRequest` is `null` over no request because `0` would read as a measurement.
+ * `unidentified` is the count of requests whose caller recorded no ids, so a partially instrumented
+ * run says so instead of reporting its own gap as a zero.
+ */
+export type ServedCensus = {
+  readonly requests: number;
+  /** Requests that recorded ids at all. Lower than `requests` when the caller did not instrument. */
+  readonly identified: number;
+  /** Distinct item ids served anywhere in the run. */
+  readonly distinct: number;
+  /** Mean ids per identified request; `null` when no request was identified. */
+  readonly meanPerRequest: number | null;
+  /** The largest pack the run served, in items. */
+  readonly maxPerRequest: number;
+  /** Requests served each id, ascending by id. Only ids that were served at least once. */
+  readonly byItem: readonly { readonly id: string; readonly requests: number }[];
+};
+
+/**
+ * Reduce the facade's observations to the served-id census.
+ *
+ * A request that recorded `ids: []` is identified and empty — the pack rendered nothing — which is a
+ * different fact from a request that recorded no ids at all, and the two are counted separately.
+ */
+export function servedCensus(observations: readonly UseObservation[]): ServedCensus {
+  const counts = new Map<string, number>();
+  let identified = 0;
+  let total = 0;
+  let max = 0;
+  for (const observation of observations) {
+    if (observation.ids === undefined) continue;
+    identified += 1;
+    total += observation.ids.length;
+    if (observation.ids.length > max) max = observation.ids.length;
+    // A pack that rendered the same item twice is one item in the prompt and two entries here; the
+    // count is of *renders*, because the census grades what the model read.
+    for (const id of observation.ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  return {
+    requests: observations.length,
+    identified,
+    distinct: counts.size,
+    meanPerRequest: identified === 0 ? null : total / identified,
+    maxPerRequest: max,
+    byItem: [...counts.entries()]
+      // Map keys are distinct, so a tie cannot occur and the comparator needs no third arm: the
+      // `0` a three-way compare would carry is a branch no run can reach, and an unreachable branch
+      // in a comparator reads as an untested case rather than as an impossible one.
+      .sort(([left], [right]) => (left < right ? -1 : 1))
+      .map(([id, requests]) => ({ id, requests })),
+  };
 }
 
 /**
