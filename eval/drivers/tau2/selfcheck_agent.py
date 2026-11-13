@@ -224,6 +224,48 @@ def the_state_is_copied_rather_than_mutated(checks):
 
 
 @case
+def the_block_is_wrapped_once(checks):
+    """The renderer emits the element, and this wrapper used to emit a second one around it.
+
+    The prompt carried `<microglia-knowledge><microglia-knowledge version="1" note="…">`, so the
+    outer tag named no version and the inner one carried the sentence that does the work. Every
+    memory turn of every arm from R92 to R101 was delivered that way. It is a defect rather than a
+    treatment: no registration ever varied it, and R102 moves the block, so a reader comparing R102
+    with R99 would have found two differences where the file names one.
+    """
+    block = (
+        '<microglia-knowledge version="1" note="Reference data." items="1">\n'
+        '{"id":"k_1"}\n'
+        "</microglia-knowledge>"
+    )
+    agent, _, original = fresh(pack=block)
+    try:
+        state = LLMAgentState()
+        episode_step(agent, state, "t0")
+    finally:
+        subject.recall = original
+    content = agent.seen.system_messages[-1].content
+    checks.equal(content.count("<microglia-knowledge"), 1, "one element, not an element in an element")
+    checks.equal(content.count("</microglia-knowledge>"), 1, "and one closing tag")
+    checks.equal(content, block, "the message is the block the facade rendered, byte for byte")
+
+
+@case
+def a_bare_body_is_wrapped_rather_than_sent_untagged(checks):
+    """A facade that answered with data and no element is given one, so the block is still findable."""
+    agent, _, original = fresh(pack='{"id":"k_1"}')
+    try:
+        state = LLMAgentState()
+        episode_step(agent, state, "t0")
+    finally:
+        subject.recall = original
+    content = agent.seen.system_messages[-1].content
+    checks.substring(content, "<microglia-knowledge>", "a body with no element is wrapped")
+    checks.substring(content, '{"id":"k_1"}', "and the body survives intact")
+    checks.equal(content.count("<microglia-knowledge"), 1, "exactly once")
+
+
+@case
 def a_reused_agent_resets_on_a_shorter_conversation(checks):
     agent, calls, original = fresh()
     try:

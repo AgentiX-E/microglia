@@ -1734,3 +1734,20 @@ export {
   type WidthCase,
   type WidthShare,
 } from './width.js';
+
+export {
+  CACHE_TOLERANCE_TOKENS,
+  PACK_PLACEMENTS,
+  cacheLedgerOf,
+  placementVerdict,
+  placementPromptFor,
+  syntheticText,
+  type CacheLedger,
+  type CacheReading,
+  type PackPlacement,
+  type PlacementPromptInput,
+  type PlacementReadout,
+  type PlacementVerdict,
+  type PlacementVerdictState,
+  type PromptMessage,
+} from './cache-placement.js';

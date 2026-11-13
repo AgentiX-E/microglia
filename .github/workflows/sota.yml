@@ -110,7 +110,7 @@ on:
         required: false
         default: '0'
       probe:
-        description: 'Measure whether embedding similarity separates helpful from harmful rules'
+        description: 'Measure something without running the benchmark: `true` for the retrieval signal, `cache` for the pack placement R102 is registered on'
         required: false
         default: 'false'
       adjudicate:
@@ -1072,6 +1072,59 @@ jobs:
         with:
           name: embed-probe
           path: eval/results/poc-embed-probe.json
+          if-no-files-found: warn
+
+  # R102's premise, priced before the arm is dispatched.
+  #
+  # The memory arm bills 2.17× the control and the premium is uncached prompt tokens; whether that is
+  # the block sitting outside the cache prefix or the second system message being a boundary the
+  # provider does not carry is not decidable from a ledger, and the two need opposite repairs. This
+  # sends the same episode under four prompt shapes and reads the provider's own cache counters:
+  # 36 calls, cents, and it either confirms R102 or refuses it before the $0.83 is spent.
+  #
+  # Gated on `probe: cache` rather than on a new input, because the dispatch menu is at the platform's
+  # twenty-five-input cap and `probe` already asks the one question -- "measure something without
+  # running the benchmark".
+  probe-cache:
+    name: 'Pack placement cache probe'
+    if: github.event.inputs.probe == 'cache'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build
+      - name: Probe
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # The same model the lane spends, from the same variable, because the cache behaviour of
+          # another model is a fact about another model.
+          SOTA_MODEL: ${{ vars.TAU_MODEL || 'deepseek-flash' }}
+        run: pnpm eval:cache-probe --out eval/results/cache-placement.json
+      - name: Say what the shapes cost
+        run: |
+          python3 - <<'PY'
+          import json
+          a = json.load(open('eval/results/cache-placement.json'))
+          print(f"{a['state']}: {a['sentence']}")
+          print(f"block {a['block_tokens_measured']} tokens, {a['calls']} calls, "
+                f"{a['cache_field_reported_calls']} reported a cache field")
+          PY
+          cat eval/results/cache-placement.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cache-placement
+          path: eval/results/cache-placement.json
           if-no-files-found: warn
 
   # L4 — τ²-bench pass^4.

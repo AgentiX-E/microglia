@@ -10,7 +10,7 @@ What the wrapper does:
 
   1. On the episode's first turn, takes the text of the incoming message and asks a
      local microglia facade for the pack relevant to it.
-  2. Prepends that pack as one additional system message on a **copy** of the state.
+  2. Appends that pack as one additional system message on a **copy** of the state.
   3. Reuses the same pack for every later turn of that episode.
 
 **The pack is fixed per episode, and it was not before.** It used to be recalled on
@@ -149,10 +149,28 @@ def recall(text: str) -> str:
 
 
 def injected_message(pack: str) -> SystemMessage:
-    return SystemMessage(
-        role="system",
-        content=f"<{PACK_TAG}>\n{pack}\n</{PACK_TAG}>",
+    """The recalled block as one system message, given an element only if it arrives without one.
+
+    This used to wrap unconditionally, and `renderPack` already emits the element — so every memory
+    turn from R92 to R101 carried `<microglia-knowledge><microglia-knowledge version="1" note="…">`
+    and the outer tag named a version it did not have. The sentence that does the work is the inner
+    `note` attribute; the outer element was decoration that cost forty characters a call and told a
+    reader the block was a copy of something.
+
+    It is fixed as a **defect** rather than varied as a treatment, because no registration ever
+    varied it and R102 moves the block: leaving it in the control would have made the R102/R99
+    comparison differ in two places while the registration names one.
+
+    The wrapping branch is kept for the facade that answers with data and no element. A block that
+    arrives untagged is still made findable, because a host greps for one tag and a pack that no
+    reader can locate is a pack that cannot be audited.
+    """
+    body = (
+        pack
+        if pack.lstrip().startswith(f"<{PACK_TAG}")
+        else f"<{PACK_TAG}>\n{pack}\n</{PACK_TAG}>"
     )
+    return SystemMessage(role="system", content=body)
 
 
 class MicrogliaAgent(LLMAgent):
