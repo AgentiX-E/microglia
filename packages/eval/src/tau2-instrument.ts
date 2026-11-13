@@ -40,7 +40,7 @@ import type { FaithfulnessCensus } from "./tau2-faithfulness.js";
 import type { RawLogCensus } from "./tau2-rawlog.js";
 import { defaultPolicy } from "@agentix-e/microglia-core/kernel";
 import type { FunnelInput } from "@agentix-e/microglia-protocol";
-import type { AdmissionCensus, Tau2ArmRecord } from "./tau2-gates.js";
+import type { AdmissionCensus, Tau2ArmRecord, Tau2EpisodeFailure } from "./tau2-gates.js";
 import type { StoreItemSample } from "./store-items.js";
 import type { ConsolidationCensus } from "@agentix-e/microglia-core/distill";
 import type { InactionCensus } from "./inaction.js";
@@ -150,6 +150,14 @@ export type Tau2Raw = {
   readonly scenarioTasks?: { readonly learn: number; readonly test: number };
   /** Tasks dropped from the denominator because a trial carried no verdict. */
   readonly unscored: number;
+  /**
+   * The episodes behind `unscored`, with the reason τ² recorded for each.
+   *
+   * Optional because the field did not exist before R93 and because a driver reading a results file
+   * — rather than running one — has no in-process `info` block to quote. An absent record is "not
+   * collected", which the arm record reports as absent rather than as a clean run.
+   */
+  readonly failures?: readonly Tau2EpisodeFailure[];
   /** Items in each pack the recall facade served, one entry per request. */
   readonly servedPackSizes: readonly number[];
   /**
@@ -343,7 +351,21 @@ export type Tau2Raw = {
    * benchmark the number is about. Absent on every arm before R92, which reads as "the release was not
    * recorded" rather than as "the release was v0.2.0".
    */
-  readonly benchmark?: { readonly version: string; readonly commit: string };
+  readonly benchmark?: {
+    readonly version: string;
+    readonly commit: string;
+    /**
+     * The model that graded `nl_assertions`, when the release did not use its own default.
+     *
+     * τ² grades a prose assertion with `DEFAULT_LLM_NL_ASSERTIONS` (`gpt-4.1-2025-04-14` at v1.0.1),
+     * and this lane holds no OpenAI key: every task whose `reward_basis` includes `NL_ASSERTION`
+     * raised, was retried three times, and was returned as `INFRASTRUCTURE_ERROR`. R92 lost eleven
+     * of forty tasks that way — all eleven carried an assertion, none of the twenty-nine scored ones
+     * did. `run_split.py` redirects the judge, and a redirected judge is a different instrument, so
+     * the name travels with the number rather than with the dispatch log.
+     */
+    readonly judge?: string;
+  };
   /**
    * R92: what the evaluation phase's conversations cost, and what one of them cost.
    *
@@ -637,6 +659,8 @@ export const PROJECTION: {
   trials: "carried",
   scenarioTasks: "carried",
   unscored: "carried",
+  // Carried verbatim: the count says a quarter of the sample left, and only these rows say why.
+  failures: "carried",
   servedPackSizes: "reduced",
   learning: "carried",
   calls: "carried",
@@ -703,6 +727,28 @@ export const LEARNING_FIELDS: {
   pin: "carried",
 };
 
+/**
+ * The model a dispatch used to grade `nl_assertions`, read from the two variables the runner reads.
+ *
+ * τ²'s default judge is `gpt-4.1-2025-04-14` (a module constant in `tau2.config` at v1.0.1) and this
+ * lane holds no key for it, so `run_split.py` redirects the judge to `TAU_JUDGE_MODEL`, falling back
+ * to the arm's own model. A redirected judge is a different instrument on exactly the tasks whose
+ * `reward_basis` names `NL_ASSERTION` — R92 lost all eleven of its asserted tasks to the
+ * unreachable default — so the substitution is recorded beside the release rather than in a
+ * dispatch log.
+ *
+ * The order is the runner's order, and it is the only source of this value: a second derivation
+ * would make the artefact a claim about the run rather than a record of it.
+ */
+export function judgeOf(
+  env: Readonly<Record<string, string | undefined>>,
+): string | undefined {
+  const explicit = (env["TAU_JUDGE_MODEL"] ?? "").trim();
+  if (explicit !== "") return explicit;
+  const model = (env["TAU_MODEL"] ?? "").trim();
+  return model === "" ? undefined : model;
+}
+
 export function armRecordFromDriver(
   raw: Tau2Raw,
   arm = "memory",
@@ -735,6 +781,9 @@ export function armRecordFromDriver(
     tasks: distinct.size,
     trials: raw.trials,
     unscored: raw.unscored,
+    // Absent rather than empty when the driver collected none: an empty list is a run that looked and
+    // found nothing, and a driver that never asked must not be able to say that.
+    ...(raw.failures === undefined ? {} : { failures: raw.failures }),
     meanPackIds,
     ...(raw.calls.total === 0
       ? {}

@@ -1464,6 +1464,12 @@ jobs:
           TAU_DRIVER: ${{ vars.TAU_DRIVER || './packages/eval/src/bin/tau2-driver.ts' }}
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}
           TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-flash' }}
+          # R93: the judge τ² uses to grade `nl_assertions`. The release's own default is
+          # `gpt-4.1-2025-04-14`, this organisation holds no key for it, and R92 lost every one of the
+          # eleven held-out retail tasks that carries an assertion to that unreachable default. Empty
+          # means "the arm's own model", which is what the runner resolves; the value travels into the
+          # artefact beside the release, because a substituted judge is a different instrument.
+          TAU_JUDGE_MODEL: ${{ vars.TAU_JUDGE_MODEL || '' }}
           # Reasoning is billed at the output rate and tau-bench's agent makes one tool call per turn,
           # so a few hundred tokens of deliberation before `get_order_status` is paid on every turn of
           # every episode and cannot change the reward. `deepseek-flash` runs in thinking mode by
@@ -1554,6 +1560,12 @@ jobs:
           TAU_DRIVER: ${{ vars.TAU_DRIVER || './packages/eval/src/bin/tau2-driver.ts' }}
           TAU_RESULTS: ${{ vars.TAU_RESULTS }}
           TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-flash' }}
+          # R93: the judge τ² uses to grade `nl_assertions`. The release's own default is
+          # `gpt-4.1-2025-04-14`, this organisation holds no key for it, and R92 lost every one of the
+          # eleven held-out retail tasks that carries an assertion to that unreachable default. Empty
+          # means "the arm's own model", which is what the runner resolves; the value travels into the
+          # artefact beside the release, because a substituted judge is a different instrument.
+          TAU_JUDGE_MODEL: ${{ vars.TAU_JUDGE_MODEL || '' }}
           # Same value as the memory arm, and it has to be: the two arms must differ in the store and
           # in nothing else. An arm that reasoned and a control that did not would differ in cost,
           # in latency and in answer, and the delta would belong to none of them.

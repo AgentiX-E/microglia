@@ -560,6 +560,20 @@ describe('the projection has a decision for every field, and keeps it', () => {
         },
       },
       recall: { requests: 200, served: 200, empty: 0 },
+      // R93: the rows behind `unscored`. The fixture holds one for the same reason it holds every
+      // other carried field — a decision is only checked against the fields the fixture defines, so
+      // a fixture without it would let the projection drop it silently.
+      failures: [
+        {
+          task: 'retail/36',
+          trial: 0,
+          termination: 'INFRASTRUCTURE_ERROR',
+          errorType: 'BadRequestError',
+          error: 'tools: function.parameters is not an object',
+          tracebackTail: 'File "tau2/runner/progress.py", line 100, in run_with_retry',
+          attempts: 4,
+        },
+      ],
       // R89: what the pack served and what it refused. Carried rather than reduced, because the two
       // numbers it separates -- nothing relevant, and relevant but too long -- are the difference
       // between a retrieval fix and a budget fix.

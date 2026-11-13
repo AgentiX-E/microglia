@@ -219,7 +219,54 @@ type Measurement = {
    * run that never varied the note, not a failed three-level arm.
    */
   readonly notedFacades?: NotedFacadeReading;
+  /**
+   * Where the `unscored` list came from, because an empty list has two meanings.
+   *
+   * `document` is a results file, where the reader itself counted the nulls. `ids` and `count` are a
+   * driver that said so. `unreported` is a driver that exported neither channel: it is not zero, and
+   * the artefact has to be able to distinguish "no task was unscored" from "this driver never said".
+   */
+  readonly unscoredSource?: 'document' | 'ids' | 'count' | 'unreported';
 };
+
+/**
+ * The unscored tasks of a driver run, and how this file came to know about them.
+ *
+ * R92 published `pass4 0.7586` over **29 of 40** tasks with `unscored_tasks: 0`. The driver had
+ * counted eleven tasks whose episodes all ended in `INFRASTRUCTURE_ERROR`, `scoredArm` had dropped
+ * them from the grid — correctly, because a task with no verdict is not a failure — and the count
+ * never crossed the module boundary, because this path returned a literal empty list.
+ *
+ * The consequence was not cosmetic: `l4-fully-scored` read zero and passed, so the artefact
+ * certified a complete grid while its own `tau2.unscored` field said eleven. A gate that cannot see
+ * the difference between `0` and `not reported` is a green square over a missing quarter of the
+ * sample, which is the defect class this repository exists to refuse.
+ *
+ * Three channels, in order of authority:
+ *
+ *   1. the driver names them (`unscoredTasks()`): quoted verbatim;
+ *   2. the driver counts them (`instrument().unscored`): the count is carried and the ids are
+ *      placeholders that say they are placeholders, so no reader mistakes one for a task id;
+ *   3. neither: `unreported`, which is not zero.
+ */
+function unscoredOf(
+  loaded: { readonly unscoredTasks?: () => readonly string[] | undefined },
+  instrumentation: Tau2ArmRecord | undefined,
+): { readonly ids: readonly string[]; readonly source: 'ids' | 'count' | 'unreported' } {
+  const named = loaded.unscoredTasks?.();
+  if (named !== undefined && named.length > 0) return { ids: named, source: 'ids' };
+  const count = instrumentation?.unscored ?? 0;
+  if (count > 0) {
+    return {
+      ids: Array.from({ length: count }, (_, index) => `unidentified/${String(index + 1)}`),
+      source: 'count',
+    };
+  }
+  // A driver that answered "none" through either channel has said something; a driver that answered
+  // nothing has not.
+  if (instrumentation !== undefined) return { ids: [], source: 'count' };
+  return { ids: [], source: 'unreported' };
+}
 
 async function measureFromResults(path: string): Promise<Measurement> {
   let run;
@@ -232,6 +279,7 @@ async function measureFromResults(path: string): Promise<Measurement> {
       ...(run.domain === undefined ? {} : { domain: run.domain }),
       format: run.format,
       inferredTrials: run.inferredTrials,
+      unscoredSource: 'document',
     };
   } catch (error) {
     if (error instanceof L4ParseError) return refuse(error, path);
@@ -250,6 +298,7 @@ async function measureFromDriver(module: string): Promise<Measurement> {
   let loaded: {
     run: () => Promise<readonly PassAtKInput[]>;
     instrument?: () => Tau2ArmRecord | undefined;
+    unscoredTasks?: () => readonly string[] | undefined;
     trials?: () => readonly TauTrialRow[] | undefined;
     pairedFacades?: () => PairedFacadeReading | undefined;
     notedFacades?: () => NotedFacadeReading | undefined;
@@ -258,6 +307,7 @@ async function measureFromDriver(module: string): Promise<Measurement> {
     loaded = (await import(specifier)) as {
       run: () => Promise<readonly PassAtKInput[]>;
       instrument?: () => Tau2ArmRecord | undefined;
+      unscoredTasks?: () => readonly string[] | undefined;
       trials?: () => readonly TauTrialRow[] | undefined;
       pairedFacades?: () => PairedFacadeReading | undefined;
       notedFacades?: () => NotedFacadeReading | undefined;
@@ -293,15 +343,17 @@ async function measureFromDriver(module: string): Promise<Measurement> {
   const trialRows = loaded.trials?.();
   const pairedFacades = loaded.pairedFacades?.();
   const notedFacades = loaded.notedFacades?.();
+  const unscored = unscoredOf(loaded, instrumentation);
   return {
     tasks,
-    unscored: [],
+    unscored: unscored.ids,
     format: 'driver',
     inferredTrials: 0,
     ...(instrumentation === undefined ? {} : { instrumentation }),
     ...(trialRows === undefined ? {} : { trialRows }),
     ...(pairedFacades === undefined ? {} : { pairedFacades }),
     ...(notedFacades === undefined ? {} : { notedFacades }),
+    unscoredSource: unscored.source,
   };
 }
 
@@ -475,6 +527,10 @@ await writeResult({
       : { delta: compared.delta }),
     tasks: measured.tasks.length,
     unscored_tasks: measured.unscored.length,
+    // Whether the count above came from an instrument that looked, or from a driver that never said.
+    // `0` is not read as a failure here — a driver written before this field cannot answer — but it
+    // stops the artefact from presenting silence as a complete grid.
+    unscored_reported: measured.unscoredSource === 'unreported' ? 0 : 1,
     min_tasks: MIN_TASKS,
     ...(paired === undefined ? {} : { paired_delta_pp: paired.delta, paired_ci_low_pp: paired.low,
       paired_ci_high_pp: paired.high, paired_p: paired.p, paired_n: paired.n }),
@@ -490,6 +546,18 @@ await writeResult({
     coversSplit
       ? `The split covers the minimum: ${measured.tasks.length} scored tasks against a floor of ${MIN_TASKS}.`
       : `The split is short: ${measured.tasks.length} scored tasks against a minimum of ${MIN_TASKS}. Short splits and missed bars fail separately.`,
+    ...(measured.unscored.length === 0
+      ? []
+      : [
+          `Unscored: ${String(measured.unscored.length)} task(s) left the denominator${
+            measured.unscoredSource === 'ids' ? ' (named by the driver)' : ''
+          }. A task with no verdict is not a failure and does not enter pass^4, so the denominator this file reports is smaller than the split it ran.`,
+        ]),
+    ...(measured.unscoredSource === 'unreported'
+      ? [
+          'Unscored source: unreported. This driver exports neither `unscoredTasks()` nor `instrument().unscored`, so a zero in `unscored_tasks` means "never counted", not "none found".',
+        ]
+      : []),
   ],
   // Per-task outcomes, so the other arm can be paired against this artefact instead of
   // compared to its mean. Written by every run, used by `pnpm eval:l4-pair`.

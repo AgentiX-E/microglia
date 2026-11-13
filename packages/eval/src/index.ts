@@ -688,6 +688,7 @@ export {
 
 export {
   armRecordFromDriver,
+  judgeOf,
   storeCensus,
   type AdmissionCensus,
   type RecallTally,
@@ -1267,6 +1268,7 @@ export {
   type Tau2ArmArtefact,
   type Tau2ArmRecord,
   type Tau2ComparisonRecord,
+  type Tau2EpisodeFailure,
   type Tau2Evidence,
   type Tau2Field,
   type Tau2GateAudit,

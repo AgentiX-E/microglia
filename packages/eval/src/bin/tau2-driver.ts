@@ -137,6 +137,8 @@ import {
   type ResilientInterpreter,
   type QueryCensus,
   type QueryPin,
+  type Tau2EpisodeFailure,
+  judgeOf,
   type RecallInput,
 } from "@agentix-e/microglia-eval";
 import { maxStatementChars, type NoteMode } from "@agentix-e/microglia-core/apply";
@@ -499,8 +501,13 @@ export async function benchmarkIdentityOf(
   }
 }
 
-async function benchmarkIdentity(): Promise<{ version: string; commit: string } | undefined> {
-  return benchmarkIdentityOf(join(REPO, ".tau2-bench"), PINNED_RELEASE);
+async function benchmarkIdentity(): Promise<
+  { version: string; commit: string; judge?: string } | undefined
+> {
+  const identity = await benchmarkIdentityOf(join(REPO, ".tau2-bench"), PINNED_RELEASE);
+  if (identity === undefined) return undefined;
+  const judge = judgeOf(process.env);
+  return judge === undefined ? identity : { ...identity, judge };
 }
 
 /**
@@ -648,6 +655,13 @@ function scoredArm(path: string): {
   const scored = toPassAtK(run, TRIALS);
   const rows = trialRowsOf(run.trials, TEST_DOMAIN);
   observedTrials = rows;
+  // The tasks that left the denominator, named the way the scored ones are.
+  //
+  // R92 published a pass^4 over 29 of 40 tasks with `unscored_tasks: 0` because this count had no
+  // channel out of the process: `instrument().unscored` carried it and `l4.ts` did not read that
+  // field on the driver path. The ids matter as much as the number — a gate can fail on a count, and
+  // only a list says which tasks a reader has to look at before quoting the mean.
+  observedUnscored = scored.unscored.map((id) => qualifiedId(TEST_DOMAIN, id));
   return {
     // A task the reader could not name is left unnamed rather than renamed into a name it does not
     // have: `PassAtKInput.taskId` is optional, and qualifying `undefined` would invent a task.
@@ -767,6 +781,14 @@ type Tau2PhaseDiagnostics = {
   readonly agent_turns?: number | null;
   readonly simulations?: number | null;
   readonly terminated?: Readonly<Record<string, number>> | null;
+  /**
+   * The episodes behind the census, with the reason τ² recorded for each.
+   *
+   * `terminated` says forty-four episodes ended in `INFRASTRUCTURE_ERROR`; it cannot say whether the
+   * provider refused, the sandbox threw or a deadline expired, and R92 paid for a dispatch that
+   * produced exactly that sentence and nothing a reader could act on.
+   */
+  readonly failures?: readonly Tau2EpisodeFailure[] | null;
   /** Per-episode action record; absent on every run before the abstention instrument. */
   readonly inaction?: unknown;
   /** Absent on every run before the counter existed, which is not the same as zero. */
@@ -797,6 +819,20 @@ function episodeFailures(
 
 /** Every episode the evaluated half produced, with its task named the way the record names it. */
 let observedTrials: readonly TauTrialRow[] | undefined;
+
+/**
+ * The tasks of the evaluated half that have no verdict, named.
+ *
+ * Additive in the same way `trials()` is, and it exists because its absence was silent: the count
+ * lived in `instrument().unscored` and the lane's driver path did not read it, so a run missing a
+ * quarter of its sample published `unscored_tasks: 0` and certified the grid it had not seen.
+ */
+let observedUnscored: readonly string[] | undefined;
+
+/** Additive export, so a lane written before this field keeps reading `run()` exactly as it did. */
+export function unscoredTasks(): readonly string[] | undefined {
+  return observedUnscored;
+}
 
 /** The arm record the protocol's gates read, or `undefined` before a run has happened. */
 export function instrument(): Tau2ArmRecord | undefined {
@@ -1859,6 +1895,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     test: plan.test,
     trials: TRIALS,
     unscored: scored.unscored,
+    // The rows behind that count. `primary` is this arm's own evaluation phase for the same reason
+    // every counter above is: R48's defect was two readings from different dispatches.
+    ...(primary.diagnostics?.failures === undefined ||
+    primary.diagnostics.failures === null
+      ? {}
+      : { failures: primary.diagnostics.failures }),
     ...(cost === undefined ? {} : { cost }),
     servedPackSizes: primary.servedPackSizes,
     learning: {

@@ -88,6 +88,29 @@ export type AdmissionCensus = {
   readonly supportOnly: number;
 };
 
+/**
+ * One episode that produced no verdict, and why.
+ *
+ * τ² wraps an episode that failed on every retry as a `SimulationRun` whose `termination_reason` is
+ * `INFRASTRUCTURE_ERROR` and whose `info` block carries `error`, `error_type`, `error_traceback` and
+ * `failed_after_attempts` (`tau2/runner/progress.py` at v1.0.1, `max_retries = 3`). R92 dropped
+ * eleven of forty tasks that way and the artefact recorded only the count — enough to fail a gate,
+ * not enough to fix anything, because the three causes it collapses (provider, sandbox, deadline)
+ * have three different repairs.
+ *
+ * `tracebackTail` is the last frames rather than the whole stack: the line that raised is at the
+ * bottom, and a 40-line traceback times forty-four episodes is a megabyte of artefact nothing reads.
+ */
+export type Tau2EpisodeFailure = {
+  readonly task: string;
+  readonly trial: number;
+  readonly termination: string;
+  readonly errorType?: string;
+  readonly error?: string;
+  readonly tracebackTail?: string;
+  readonly attempts?: number;
+};
+
 export type Tau2ArmRecord = {
   readonly arm: string;
   /** Tasks the arm was scored on. */
@@ -96,6 +119,16 @@ export type Tau2ArmRecord = {
   readonly trials: number;
   /** Tasks dropped from the denominator because a trial carried no verdict. */
   readonly unscored: number;
+  /**
+   * Episodes that produced no verdict, with the reason upstream recorded.
+   *
+   * R92 lost eleven of forty held-out tasks to forty-four `INFRASTRUCTURE_ERROR` episodes and the
+   * artefact said `unscored: 11` and nothing else. A count fails a gate; it does not say whether the
+   * provider refused, the sandbox threw, or a deadline expired — three causes with three different
+   * fixes. τ² already knows: `run_with_retry` stores `error`, `error_type`, `error_traceback` and
+   * `failed_after_attempts` on the placeholder simulation, and this field is that block, carried.
+   */
+  readonly failures?: readonly Tau2EpisodeFailure[];
   /** Mean items the recall facade put in front of the agent, when the driver counted them. */
   readonly meanPackIds?: number;
   /**
@@ -161,7 +194,12 @@ export type Tau2ArmRecord = {
    */
   readonly queries?: QueryCensus;
   /** R92: the τ² release and commit this arm ran. See `Tau2Raw.benchmark`. */
-  readonly benchmark?: { readonly version: string; readonly commit: string };
+  readonly benchmark?: {
+    readonly version: string;
+    readonly commit: string;
+    /** The model that graded `nl_assertions`, when it is not the release's own default. */
+    readonly judge?: string;
+  };
   /** R92: the bill and the per-conversation cost of the evaluated phase. See `Tau2Raw.cost`. */
   readonly cost?: {
     readonly usd: number;

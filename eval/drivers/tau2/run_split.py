@@ -165,12 +165,46 @@ def selftest() -> int:
         registry, "register_agent_factory"
     ):
         problems.append("the registry has neither register_agent nor register_agent_factory")
+    problems.extend(_selftest_assertion_guard())
     if problems:
         for problem in problems:
             print(f"[tau2] selftest: {problem}", file=sys.stderr)
         return 1
-    print(f"[tau2] selftest: runner {TAU_RUNNER}, get_tasks{signature}, registry ok")
+    print(
+        f"[tau2] selftest: runner {TAU_RUNNER}, get_tasks{signature}, registry ok, "
+        "nl-assertion guard 5/5"
+    )
     return 0
+
+
+def _selftest_assertion_guard() -> list[str]:
+    """The guard's own answers, checked with objects rather than with a provider call.
+
+    Two of these five cases are the ones that cost a dispatch: an empty answer (which τ² would score
+    1.0) and an answer that repeats one assertion (which would let one condition stand for two).
+    The rest pin the shapes a redirected judge plausibly returns — a count short by one, a reworded
+    assertion, a verdict serialised as a string.
+    """
+    class Check:
+        def __init__(self, assertion, met):
+            self.nl_assertion = assertion
+            self.met = met
+
+    cases = [
+        ([Check("a", True), Check("b", False)], ["a", "b"], None),
+        ([], ["a", "b"], "answered 0 of 2"),
+        ([Check("a", True)], ["a", "b"], "answered 1 of 2"),
+        ([Check("a", True), Check("a", True)], ["a", "b"], "answered a different question"),
+        ([Check("a", "yes"), Check("b", True)], ["a", "b"], "answered without a verdict"),
+    ]
+    problems = []
+    for index, (checks, asked, expected) in enumerate(cases):
+        got = assertion_gap(checks, asked)
+        if got != expected:
+            problems.append(
+                f"nl-assertion guard case {index + 1}: expected {expected!r}, got {got!r}"
+            )
+    return problems
 
 # What this run spent, counted where it is spent.
 #
@@ -439,6 +473,103 @@ def _llm_args(retries: int) -> dict:
     return args
 
 
+def install_nl_judge() -> str:
+    """Point τ²'s prose-assertion judge at a model this dispatch can actually call.
+
+    **What this fixes, measured.** τ² grades `nl_assertions` by asking a model, and the model is a
+    module constant: `DEFAULT_LLM_NL_ASSERTIONS = "gpt-4.1-2025-04-14"` (`src/tau2/config.py` at
+    v1.0.1). This lane holds a DeepSeek key and no OpenAI key, so every task whose `reward_basis`
+    names `NL_ASSERTION` raised inside the evaluator, was retried three times by `run_with_retry`,
+    and came back as an `INFRASTRUCTURE_ERROR` placeholder with no reward. R92 read:
+
+      * forty held-out tasks, forty-four `INFRASTRUCTURE_ERROR` episodes over four trials;
+      * **eleven** tasks that left the denominator;
+      * those eleven, read against the corpus, carry **1–2 `nl_assertions` each**, and the
+        twenty-nine tasks that scored carry **zero**.
+
+    The correlation is the whole sample, not a coincidence of it: at v1.0.1 retail has forty tasks
+    with an assertion and the evaluator is only reached for those.
+
+    **What this is not.** A fix. An assertion graded by `deepseek-flash` is not an assertion graded by
+    `gpt-4.1-2025-04-14`, and a reader comparing this lane's `pass^4` against a published row is
+    entitled to know which judge produced it — so the name returns to the caller, is printed, and is
+    carried into the artefact beside the release. `TAU_JUDGE_MODEL` overrides it for a dispatch that
+    holds the other key, which is the path that makes this cell fully comparable rather than
+    repairable.
+
+    **What is patched.** The evaluator binds both names into its own namespace at import
+    (`from tau2.config import DEFAULT_LLM_NL_ASSERTIONS`), so writing `tau2.config` would change the
+    configuration and not the call. The module attributes are written instead, and `response_format`
+    is requested for a provider that honours it: a reply wrapped in a markdown fence makes `json.loads`
+    raise, and a judge that throws is a task that leaves the denominator — the defect this function
+    exists to remove, arriving by a second route.
+    """
+    model = os.environ.get("TAU_JUDGE_MODEL", "").strip() or os.environ.get(
+        "TAU_MODEL", "deepseek/deepseek-flash"
+    )
+    try:
+        import tau2.evaluator.evaluator_nl_assertions as judge
+    except Exception as error:  # noqa: BLE001 - a release that moved the module is not a crash here
+        print(f"[tau2] judge: cannot install ({type(error).__name__}: {error})", file=sys.stderr)
+        return model
+    args: dict = {"temperature": 0.0}
+    if model.startswith("deepseek/"):
+        args["response_format"] = {"type": "json_object"}
+    judge.DEFAULT_LLM_NL_ASSERTIONS = model
+    judge.DEFAULT_LLM_NL_ASSERTIONS_ARGS = args
+    _require_every_assertion(judge)
+    return model
+
+
+def assertion_gap(checks, asked) -> str | None:
+    """None when the answer grades every assertion exactly once, else why it does not.
+
+    Pulled out of the wrapper below so the rule is a function the self-test can call with plain
+    objects: a guard that has never been asked a bad answer is a guard nobody knows the shape of,
+    and the expensive version of that mistake is discovering it in a paid dispatch.
+    """
+    asked = [str(entry) for entry in asked]
+    if len(checks) != len(asked):
+        return f"answered {len(checks)} of {len(asked)}"
+    answered = sorted(str(getattr(check, "nl_assertion", "")) for check in checks)
+    if answered != sorted(asked):
+        return "answered a different question"
+    if not all(isinstance(getattr(check, "met", None), bool) for check in checks):
+        return "answered without a verdict"
+    return None
+
+
+def _require_every_assertion(judge) -> None:
+    """Refuse a judge answer that grades fewer assertions than the task stated.
+
+    τ² computes an assertion reward as `all(check.met for check in checks)`, and `all([])` is `True`
+    — so a judge that replies with `{"results": []}` scores **1.0** for a task whose prose conditions
+    were never examined. That is a free point manufactured by an instrument failure, and it is the
+    one failure mode a redirected judge makes *more* likely rather than less: the default judge is a
+    model whose JSON shape this lane never chose, and the replacement is a different one.
+
+    The wrapper therefore compares the answer against the question. A mismatch raises, which τ²
+    turns into a retried-then-`INFRASTRUCTURE_ERROR` episode: the task leaves the denominator and the
+    artefact says so — the honest failure this lane can read, rather than the silent 1.0 it cannot.
+
+    This is not defensive programming for its own sake. R92's whole defect was a measurement that
+    reported more than it measured; a repair that trades a missing quarter for eleven free points
+    would be the same defect with a better headline.
+    """
+    original = judge.NLAssertionsEvaluator.__dict__["evaluate_nl_assertions"].__func__
+
+    def evaluate_nl_assertions(cls, trajectory, nl_assertions):
+        checks = original(cls, trajectory, nl_assertions)
+        gap = assertion_gap(checks, nl_assertions)
+        if gap is not None:
+            raise RuntimeError(f"nl-assertion-judge-{gap.replace(' ', '-')}")
+        return checks
+
+    judge.NLAssertionsEvaluator.evaluate_nl_assertions = classmethod(
+        evaluate_nl_assertions
+    )
+
+
 def task_ids(domain: str, wanted: list[str]) -> list[str]:
     tasks = get_tasks(domain, wanted or None)
     if wanted and len(tasks) != len(wanted):
@@ -491,6 +622,71 @@ def inaction_of(simulations) -> dict | None:
     return {"observable": True, "episodes": episodes}
 
 
+# How much of each failure a reader gets. The line that raised is at the bottom of a traceback and a
+# forty-four-row census times a full stack is a megabyte of artefact nothing reads.
+ERROR_TEXT_CEILING = 400
+TRACEBACK_TAIL = 1200
+
+
+def failures_of(simulations) -> list | None:
+    """Every episode that produced no verdict, with the reason τ² recorded for it.
+
+    `diagnostics_of` counts the terminations, and a count was all R92 had: forty-four episodes ended
+    in `INFRASTRUCTURE_ERROR`, eleven of forty tasks left the denominator, and nothing in the
+    artefact could say whether the provider refused, the sandbox threw, or a deadline expired.
+
+    τ² already knows. `run_with_retry` retries an exception three times and, when the fourth attempt
+    also raises, stores the placeholder `SimulationRun` with `info = {error, error_type,
+    error_traceback, failed_after_attempts}` (`src/tau2/runner/progress.py` at v1.0.1). This
+    function quotes that block rather than re-deriving it, because the traceback is the only thing in
+    the run that names the failing frame.
+
+    `None` means the phase exposed no simulations at all; `[]` means it exposed them and every one
+    carried a verdict. The difference is a run that could not be read and a run that was clean.
+    """
+    if simulations is None:
+        return None
+    rows = []
+    for simulation in simulations:
+        reason = getattr(simulation, "termination_reason", None)
+        key = getattr(reason, "name", None) or (
+            str(reason) if reason is not None else None
+        )
+        has_reward = getattr(simulation, "reward_info", None) is not None
+        # An infrastructure error is a failure even where a reward happens to be attached, and a
+        # missing reward is one whatever the reason says. Everything else is a verdict.
+        if has_reward and key != "INFRASTRUCTURE_ERROR":
+            continue
+        task = getattr(simulation, "task_id", None)
+        trial = getattr(simulation, "trial", None)
+        if (
+            not isinstance(task, str)
+            or not isinstance(trial, int)
+            or isinstance(trial, bool)
+            or trial < 0
+        ):
+            # A failure the runner cannot place is not one this census can name, and inventing an
+            # index for it would make the row join to a task nobody ran.
+            continue
+        row: dict = {"task": task, "trial": trial, "termination": key or "unknown"}
+        info = getattr(simulation, "info", None)
+        if isinstance(info, dict):
+            error = info.get("error")
+            if isinstance(error, str) and error:
+                row["error"] = error[:ERROR_TEXT_CEILING]
+            error_type = info.get("error_type")
+            if isinstance(error_type, str) and error_type:
+                row["errorType"] = error_type
+            traceback_text = info.get("error_traceback")
+            if isinstance(traceback_text, str) and traceback_text:
+                row["tracebackTail"] = traceback_text[-TRACEBACK_TAIL:]
+            attempts = info.get("failed_after_attempts")
+            if isinstance(attempts, int) and not isinstance(attempts, bool):
+                row["attempts"] = attempts
+        rows.append(row)
+    return rows
+
+
 def diagnostics_of(simulations) -> dict:
     """What the caller needs for the protocol's reliability gate, or null where upstream hides it.
 
@@ -504,7 +700,13 @@ def diagnostics_of(simulations) -> dict:
     benchmark is worse than no diagnostic.
     """
     if simulations is None:
-        return {"agent_turns": None, "simulations": None, "terminated": None, "inaction": None}
+        return {
+            "agent_turns": None,
+            "simulations": None,
+            "terminated": None,
+            "inaction": None,
+            "failures": None,
+        }
     turns = 0
     terminated: dict[str, int] = {}
     counted_turns = True
@@ -533,6 +735,7 @@ def diagnostics_of(simulations) -> dict:
         "simulations": len(simulations),
         "terminated": terminated or None,
         "inaction": inaction_of(simulations),
+        "failures": failures_of(simulations),
     }
 
 
@@ -587,6 +790,10 @@ def main(argv: list[str]) -> int:
     os.environ.setdefault("MICROGLIA_DOMAIN", args.domain)
 
     model = os.environ.get("TAU_MODEL", "deepseek/deepseek-flash")
+    # Before the first episode, because the judge is reached by the evaluator of eleven of R92's
+    # forty tasks and a judge that cannot be called costs a whole task rather than one call.
+    judge_model = install_nl_judge()
+    print(f"[tau2] judge: {judge_model} (graded nl_assertions)", file=sys.stderr)
     # litellm raises on a 429 rather than retrying, and one raised call aborts the
     # whole `run_tasks` - 68 tasks and 272 episodes lost to a rate limit one minute
     # from the end (the first reference-arm attempt). `num_retries` is litellm's own
@@ -637,6 +844,7 @@ def main(argv: list[str]) -> int:
                 "usage": usage_stats(),
                 "thinking": os.environ.get("TAU_THINKING", "disabled"),
                 "model": model,
+                "judge": judge_model,
             }
         )
     )
