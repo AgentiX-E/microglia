@@ -163,6 +163,15 @@ the question — so pinning the list makes the store deterministic, and `pinnedL
 a task the corpus does not hold rather than building a smaller store that still reads as measured. The
 pin costs the episodes it replaces: a pinned run does not pay for its learning half.
 
+**Query pin** — the list of recall queries an arm replays, kept as a file, so that a pack becomes a
+function of the store and the options alone. The pack is otherwise a *second* draw: it is ranked on BM25
+over the question, and in a simulated conversation the question is the user's sampled first turn. A store
+pin therefore does not make a pack reproducible — one measurement replayed fifteen records character for
+character and still served 1,812.1 mean characters against the previous arm's 1,825.3. Unlike a **store
+pin**, a query pin is not for arms quoting an absolute benchmark number: a fixed phrasing is a retrieval
+stimulus no user typed, and the number is meant to be comparable to a competitor's. It is for arms whose
+subject *is* the pack, where two levels must be read against one question.
+
 **Trust** — a scalar in `[0, 1]` attached to a feedback event, derived from the *signal* (execution
 result > clarification > preference > rating with reason > edit > bare rating) and optionally capped by
 the host. Never derived from the actor's identity.

@@ -433,6 +433,16 @@ The study is a package, not a script:
   because a store is otherwise a *draw*: which learning tasks fail is one sampled trial each, and two runs
   of one configuration wrote 12 and 15 corrections with 8 ids in common — so a comparison across them is
   not single-variable whatever its registration says. A pinned run also skips the episodes it replaces.
+- `tau2-queries.ts` — the *question* as a file, which is the input a store pin cannot reach. A pack is a
+  function of (store, query, pack options); pinning the store leaves the query free, and the query is the
+  user simulator's sampled first turn, so two runs holding identical records serve different text (1,812.1
+  against 1,825.3 mean characters) and measure different coverage (0.2857 against 0.2800). `queryCensusOf`
+  records every request (`digest`, `askedDigest`, `replaced`, and the texts), `parseQueryPin` reads a list
+  of questions, and `assertQueryPinCovers` refuses a pin shorter than the phase *before* the first episode
+  is paid for — a miss at recall time is a 500 the agent survives by serving no pack. Entries are keyed by
+  the episode's position, because the agent sends one memory scope on every request and nothing upstream
+  names the episode; the digest is order-insensitive, so a pin replayed into a differently-ordered phase
+  is visible rather than silent.
 - `l4.ts` — the τ²-bench result reader: both storage forms, and four named refusals taken from
   upstream's own rules (unscored trials leave the denominator, a short grid is refused, duplicate
   trials are an error, and a trial succeeds only on `reward == 1.0`).
