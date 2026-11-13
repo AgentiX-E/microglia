@@ -275,6 +275,29 @@ describe('the per-task rows an artefact carries', () => {
     ]);
   });
 
+  it('carries the trial order, because no count reconstructs it', () => {
+    // Retention asks whether what passed on trial 3 was still there on trial 4. Two tasks with
+    // two successes out of four are the same row by count and different tasks by order, so the
+    // sequence is written into the artefact rather than recomputed at read time.
+    const rows = perTaskRows([
+      { successes: 2, trials: 4, k: 4, taskId: 'held', outcomes: [true, true, false, false] },
+      { successes: 2, trials: 4, k: 4, taskId: 'lost', outcomes: [true, false, true, false] },
+    ]);
+    expect(rows.map((row) => row.outcomes)).toEqual([
+      [true, true, false, false],
+      [true, false, true, false],
+    ]);
+  });
+
+  it('omits the order it was not given rather than writing an empty one', () => {
+    // `toEqual` cannot tell an absent key from a key holding `undefined`, and a reader that
+    // checks presence would then report a measured empty order for a run that kept no order
+    // at all. The key is the measurement, so the key has to be absent.
+    const [row] = perTaskRows([{ successes: 4, trials: 4, k: 4, taskId: 't1' }]);
+    expect(row).not.toHaveProperty('outcomes');
+    expect(Object.keys(row ?? {})).toEqual(['id', 'successes', 'trials', 'passed_all']);
+  });
+
   it('refuses a task with no id instead of labelling it', () => {
     // Two tasks called `unknown` would pair the wrong rows and report a difference that
     // belongs to neither arm.
