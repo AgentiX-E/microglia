@@ -192,9 +192,10 @@ def _selftest_assertion_guard() -> list[str]:
 
     cases = [
         ([Check("a", True), Check("b", False)], ["a", "b"], None),
+        # A reworded echo is not a failure: the scorer zips the reply in order and never matches text.
+        ([Check("A.", True), Check("b", False)], ["a", "b"], None),
         ([], ["a", "b"], "answered 0 of 2"),
         ([Check("a", True)], ["a", "b"], "answered 1 of 2"),
-        ([Check("a", True), Check("a", True)], ["a", "b"], "answered a different question"),
         ([Check("a", "yes"), Check("b", True)], ["a", "b"], "answered without a verdict"),
     ]
     problems = []
@@ -522,18 +523,28 @@ def install_nl_judge() -> str:
 
 
 def assertion_gap(checks, asked) -> str | None:
-    """None when the answer grades every assertion exactly once, else why it does not.
+    """None when the answer grades every assertion the task stated, else why it does not.
 
     Pulled out of the wrapper below so the rule is a function the self-test can call with plain
     objects: a guard that has never been asked a bad answer is a guard nobody knows the shape of,
     and the expensive version of that mistake is discovering it in a paid dispatch.
+
+    **Two checks, and deliberately not three.** The count is the one that matters: τ² scores
+    `all(check.met)`, `all([])` is `True`, and an empty reply therefore pays 1.0 for prose nobody
+    read. The boolean is the other: a verdict serialised as the string `"true"` is not a verdict, and
+    `all()` over it would read every one as true.
+
+    The third check this function used to carry — comparing the echoed assertion text against the
+    task's own — was removed before it cost a dispatch. A judge is asked to *repeat* each expectation,
+    and a model that normalises punctuation, expands an abbreviation or merges a clause produces a
+    string that differs from the task's own without answering a different question. τ² itself never
+    matches the text; it zips the reply against the assertions in order. A guard stricter than the
+    scorer it protects does not protect anything — it converts a grading difference into a dead task,
+    which is the failure mode this whole round exists to remove.
     """
-    asked = [str(entry) for entry in asked]
+    asked = list(asked)
     if len(checks) != len(asked):
         return f"answered {len(checks)} of {len(asked)}"
-    answered = sorted(str(getattr(check, "nl_assertion", "")) for check in checks)
-    if answered != sorted(asked):
-        return "answered a different question"
     if not all(isinstance(getattr(check, "met", None), bool) for check in checks):
         return "answered without a verdict"
     return None
