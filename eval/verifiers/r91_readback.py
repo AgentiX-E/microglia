@@ -16,11 +16,27 @@ equalities rather than directions:
   the write     fifteen records, 172 entity values, 171 kept, one redacted
   the pack      meanChars 1,825.3, droppedForSize 1,596, meanIds 1, 228 filled
   the read      coverage p50 0.28
+  the queries   recorded at all, and whether a pin replaced any of them
   the outcome   pass^4 with its interval and **no direction**
 
 The last row is the arm's product. At a fixed store the evaluation half is still 57 tasks x 4 trials of a
 sampled model, so its `pass^4` is the first estimate of that draw's own spread -- the number every later
 delta is read against, and the one this lane has been quoting point estimates without.
+
+## What this registration got wrong, found by its own readback
+
+Two of the five rows were mis-specified, and the refutations they fired named the wrong mechanism. A pack is
+a function of (store, query, pack options). This arm pinned the first, and the query is the user simulator's
+sampled first turn -- `microglia_agent.py` recalls on `message.content`, which τ² generates from
+`user_scenario.instructions` -- so the pack was still a draw while the arm's header said two variables had
+become one. Three arms put it beyond argument: mean pack characters 1,717.2 (R89), 1,825.3 (R90) and 1,812.1
+(R91), over stores holding 12, 15 and 15 corrections.
+
+So `the pack carries the same text` and `the coverage is R90's` are graded as written, because a registration
+is the contract, and both fail. What they establish is not that the renderer is nondeterministic and not that
+the memory did anything: it is that the instrument was one pin short. R92's `tau2-queries.ts` records every
+query, `queries.replaced` proves a pin reached the requests, and an arm that carries that block lets a later
+readback pair packs by question instead of by hope.
 
 States, the same four the other verifiers use:
 
@@ -70,7 +86,25 @@ PUBLISHED_PASS4 = 0.575
 REQUIRED_SCENARIO = {"learn": "retail", "test": "retail", "recall": "retail"}
 
 
-def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
+def store_statements(artefact: dict[str, Any]) -> list[str] | None:
+    """The statements the artefact sampled out of its store, or None when it sampled none.
+
+    The strongest determinism check this arm can make: a pin makes the store a function of the corpus and
+    the list, so two runs of it write the same fifteen records character for character. Comparing the
+    sample is enough and is cheaper than re-deriving the store from the corpus.
+    """
+    block = (artefact.get("tau2") or {}).get("storeItems")
+    if not isinstance(block, dict):
+        return None
+    items = block.get("items")
+    if not isinstance(items, list) or not items:
+        return None
+    return [str(item.get("statement", "")) for item in items if isinstance(item, dict)]
+
+
+def grade(
+    artefact: dict[str, Any], previous: dict[str, Any] | None = None
+) -> tuple[str, Report]:
     report = Report()
     tau2 = artefact.get("tau2") or {}
     metrics = artefact.get("metrics") or {}
@@ -116,25 +150,32 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
     learning = tau2.get("learning") or {}
     pin = learning.get("pin")
     if not isinstance(pin, dict):
+        # The registration says nothing below is read when this row fails, and the verdict is
+        # `ABANDONED` on that basis. What the readback still does is collect the rest of the evidence:
+        # R91's artefact dropped the field in `tau2-instrument`'s projection while its log said
+        # `learn half pinned: 15 of 57`, and a readback that stopped here would report a defect of the
+        # artefact as a defect of the arm. The store-identity row below is what separates the two.
         report.refute(
-            "the pin is on the path the driver takes", True, "learning.pin absent: the header did not reach it"
+            "the pin is on the path the driver takes",
+            True,
+            "learning.pin absent: the artefact cannot say whether this store was replayed",
         )
-        return "ABANDONED", report
-    failures = pin.get("failures")
-    tasks = pin.get("tasks")
-    report.predict(
-        "the pin names R90's failures over this run's learn half",
-        failures == PREDICTED_PIN_FAILURES and tasks == PREDICTED_PIN_TASKS,
-        f"{failures!r} failure(s) over {tasks!r} task(s), source {pin.get('source')!r}",
-    )
-    # The registration's first refutation: a pin that reached the driver with another count is a header,
-    # a workflow join or a split that disagrees with the list, and the store it built is not the one the
-    # registration priced.
-    report.refute(
-        "the pinned list is not the list this arm registered",
-        failures != PREDICTED_PIN_FAILURES,
-        f"{failures!r} failure(s) against the registered {PREDICTED_PIN_FAILURES}",
-    )
+    else:
+        failures = pin.get("failures")
+        tasks = pin.get("tasks")
+        report.predict(
+            "the pin names R90's failures over this run's learn half",
+            failures == PREDICTED_PIN_FAILURES and tasks == PREDICTED_PIN_TASKS,
+            f"{failures!r} failure(s) over {tasks!r} task(s), source {pin.get('source')!r}",
+        )
+        # The registration's first refutation: a pin that reached the driver with another count is a
+        # header, a workflow join or a split that disagrees with the list, and the store it built is not
+        # the one the registration priced.
+        report.refute(
+            "the pinned list is not the list this arm registered",
+            failures != PREDICTED_PIN_FAILURES,
+            f"{failures!r} failure(s) against the registered {PREDICTED_PIN_FAILURES}",
+        )
     report.predict(
         "the write replays rather than redraws",
         written == PREDICTED_RECORDS,
@@ -176,6 +217,60 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         f"stored {stored!r} of {PREDICTED_STORED} pinned failure(s)",
     )
 
+    # ---- the store itself: the only reading that survives a broken projection ----------------------
+    # Written by this readback rather than quoted from the registration. R91's first artefact carried no
+    # `learning.pin` -- the projection dropped the field -- while the run's log said `learn half pinned:
+    # 15 of 57`. The artefact is what a readback may read, so the row above stays a refutation; this one
+    # asks the question the field was there to answer, from the store's own text.
+    if previous is None:
+        report.note("the store-identity row cannot be read without the previous arm; pass --previous")
+    else:
+        mine = store_statements(artefact)
+        theirs = store_statements(previous)
+        if mine is None or theirs is None:
+            report.note("the store-identity row cannot be read: one arm sampled no statements")
+        else:
+            identical = mine == theirs
+            report.predict(
+                "the store is byte-identical to the previous arm's, which is what a pin buys",
+                identical,
+                f"{len(mine)} statement(s), {'identical' if identical else 'different'}",
+            )
+            if not identical:
+                differing = sum(1 for left, right in zip(mine, theirs) if left != right)
+                report.refute(
+                    "the store a pin rebuilt is not the store it names",
+                    True,
+                    f"{differing} of {min(len(mine), len(theirs))} shared position(s) differ",
+                )
+
+    # ---- the query: the pack's ranking input, and the one no arm recorded -------------------------
+    # R92. `buildPack` ranks candidates on BM25 over the query text; the query is the user simulator's
+    # first turn, which τ² samples. So a pack is a function of (store, query, options) and this arm pinned
+    # one of the three -- which is why the two rows below cannot hold, and why the absence of this block is
+    # the finding rather than a gap in the report.
+    queries = tau2.get("queries")
+    if not isinstance(queries, dict):
+        report.predict(
+            "the artefact records the questions retrieval was asked", None,
+            "queries absent: the pack's ranking input was never recorded, so a pack difference has no cause",
+        )
+    else:
+        replaced = queries.get("replaced")
+        report.predict(
+            "the artefact records the questions retrieval was asked",
+            isinstance(queries.get("requests"), int) and queries.get("digest") is not None,
+            f"{queries.get('requests')!r} request(s), mean {queries.get('meanChars')!r} chars, "
+            f"digest {queries.get('digest')!r}, replaced {replaced!r}, pin {queries.get('pin')!r}",
+        )
+        # A pin that replaced nothing is not a pin: the run would have reported itself pinned while every
+        # pack was ranked on the phrasing the simulator drew.
+        report.refute(
+            "the arm declared a query pin that reached no request",
+            queries.get("pin") is not None and replaced == 0,
+            f"pin {queries.get('pin')!r} with {replaced!r} replacement(s)",
+        )
+
     # ---- the pack and the read: inherited, because their inputs are --------------------------------
     pack = tau2.get("pack")
     if not isinstance(pack, dict):
@@ -201,24 +296,37 @@ def grade(artefact: dict[str, Any]) -> tuple[str, Report]:
         f"meanChars {mean_chars!r}, meanIds {mean_ids!r}, droppedForSize {dropped!r}, "
         f"filled {filled!r}, empty {empty!r}",
     )
-    # The registration's third refutation: two runs holding the same records served different text, which
-    # means a renderer, an admission decision or a clock is still reading something the pin does not fix.
+    # The registration's third refutation, reworded after the fact and deliberately kept as a refutation:
+    # two runs holding the same records served different text, and the registration's explanation (a
+    # renderer, an admission decision or a clock) was wrong. The cause is one level up: the two runs were
+    # asked different questions. R89 answered 1,717.2 mean characters, R90 1,825.3 and R91 1,812.1 -- three
+    # draws, over stores of 12, 15 and 15 corrections -- and no arm recorded a query, so no artefact could
+    # say so. R92 adds the census; until an arm carries one, this row prices the instrument, not the memory.
     report.refute(
         "the same records were served as different text",
         mean_chars is not None and abs(mean_chars - PREDICTED_MEAN_CHARS) > PREDICTED_MEAN_CHARS_TOLERANCE,
-        f"meanChars {mean_chars!r} against R90's {PREDICTED_MEAN_CHARS}",
+        f"meanChars {mean_chars!r} against R90's {PREDICTED_MEAN_CHARS}: the store was replayed and the "
+        "questions were not, and `buildPack` ranks on the questions",
     )
 
     coverage = median_nonzero(tau2)
+    # Coverage is measured between the query and the pack, so it inherits both draws rather than one: the
+    # registration's "because the store and the pack are [the same]" was a premise the arm had no
+    # instrument for, and the row is graded as written so the record shows the premise was wrong.
     report.predict(
         "the coverage is R90's, because the store and the pack are",
         None if coverage is None else abs(coverage - PREDICTED_COVERAGE_P50) < 1e-9,
         "coverage absent" if coverage is None else f"{coverage:.4f} against R90's {PREDICTED_COVERAGE_P50:.4f}",
     )
     report.refute(
-        "the same pack measured different coverage",
+        "the same store measured different coverage",
         coverage is not None and abs(coverage - PREDICTED_COVERAGE_P50) >= 1e-9,
-        f"{coverage if coverage is None else round(coverage, 4)} against {PREDICTED_COVERAGE_P50}",
+        f"{coverage if coverage is None else round(coverage, 4)} against {PREDICTED_COVERAGE_P50}: coverage "
+        "is a reading of (query, pack), and only the pack was held",
+    )
+    report.note(
+        "two rows of this registration were mis-specified: a pack is a function of (store, query, options), "
+        "the arm pinned the first, and the second is sampled by the user simulator on every trial"
     )
 
     # ---- the outcome: reported, not predicted -----------------------------------------------------
@@ -312,6 +420,19 @@ def base(**over: Any) -> dict[str, Any]:
                 "summary": {"meanIds": PREDICTED_MEAN_IDS, "meanChars": PREDICTED_MEAN_CHARS + 0.007},
             },
             "coverage": {"nonzeroQuantiles": {"p50": PREDICTED_COVERAGE_P50}, "measuredPairs": PREDICTED_SAMPLE},
+            # R92's census, in the fixture because the guard is only as good as the shape it grades: an
+            # artefact from this arm could not carry it, and one that does must be read rather than assumed.
+            "queries": {
+                "requests": PREDICTED_SAMPLE,
+                "distinct": PREDICTED_SAMPLE,
+                "meanChars": 214.5,
+                "p50Chars": 203,
+                "digest": "abcd1234abcd1234",
+                "askedDigest": "abcd1234abcd1234",
+                "replaced": 0,
+                "pin": None,
+                "texts": [{"index": 0, "text": "cancel my reservation"}],
+            },
         },
     }
     for path, value in over.items():
@@ -328,6 +449,7 @@ def base(**over: Any) -> dict[str, Any]:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--dir", help="directory holding the arm artefacts")
+    parser.add_argument("--previous", help="the artefact this one should reproduce, for the store row")
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args()
 
@@ -387,6 +509,19 @@ def main() -> int:
                 "NO_MEASUREMENT",
             ),
             (
+                "a declared query pin that replaced nothing is not a pin",
+                base(**{
+                    "tau2.queries": {
+                        "requests": PREDICTED_SAMPLE,
+                        "distinct": PREDICTED_SAMPLE,
+                        "digest": "abcd1234abcd1234",
+                        "replaced": 0,
+                        "pin": "eval/pins/r92-retail-queries.json",
+                    }
+                }),
+                "ABANDONED",
+            ),
+            (
                 "an arm that wrote nothing is named by its layer",
                 base(**{"tau2.rawlog": {"records": 0, "clipped": 0, "toolBan": False}}),
                 "ABANDONED",
@@ -407,6 +542,18 @@ def main() -> int:
     if not args.dir:
         parser.error("--dir or --self-test is required")
     root = Path(args.dir)
+    previous: dict[str, Any] | None = None
+    if args.previous:
+        candidate = Path(args.previous)
+        found = candidate if candidate.is_file() else next(
+            iter(sorted(candidate.glob("arms/*/poc-l4.json")) or sorted(candidate.glob("**/poc-l4.json"))),
+            None,
+        )
+        if found is None:
+            print("no previous artefact found under " + str(candidate))
+            return 2
+        previous = json.loads(Path(found).read_text())
+
     paths = sorted(root.glob("arms/*/poc-l4.json")) or sorted(root.glob("**/poc-l4.json"))
     if not paths:
         print("no artefact found: expected arms/<arm>/poc-l4.json under " + str(root))
@@ -414,7 +561,7 @@ def main() -> int:
     status = 0
     for path in paths:
         artefact = json.loads(path.read_text())
-        verdict, report = grade(artefact)
+        verdict, report = grade(artefact, previous)
         print(f"{path.parent.name}: {verdict}")
         print(report.render())
         if verdict == "ABANDONED":
