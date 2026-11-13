@@ -345,11 +345,37 @@ if (TASK_SPLIT !== "" && TASK_SPLIT !== "official") {
   throw new Error(`TAU_TASK_SPLIT is '${TASK_SPLIT}'; the only split a document states is 'official'`);
 }
 
-/** The published halves for one scenario, read from the pinned τ² checkout. */
-function officialSplitPath(domain: string): string {
-  return join(REPO, ".tau2-bench", "data", "tau2", "domains", domain, "split_tasks.json");
+/**
+ * The published halves for one scenario, read from the pinned τ² checkout.
+ *
+ * The existence check is R92's first dispatch, which died here: the file ships from τ² **v1.0.0**, the
+ * lane had pinned v0.2.0, and the failure surfaced as a bare ENOENT inside a paid dispatch. A
+ * registration that asks for the benchmark's halves against a release that has none is a registration
+ * whose premise is false, and the refusal says which release fixes it rather than which file was
+ * missing.
+ *
+ * The checkout and the release are parameters, not ambient state: the refusal is the whole point of the
+ * function and a refusal nobody can call is a refusal nobody has tested. `splitPathIn` is that callable
+ * form; the driver passes its own checkout and the release the workflow pinned.
+ */
+export function splitPathIn(checkout: string, domain: string, release: string): string {
+  const path = join(checkout, "data", "tau2", "domains", domain, "split_tasks.json");
+  if (!existsSync(path)) {
+    throw new Error(
+      `TAU_TASK_SPLIT is 'official' and ${domain}'s split file is not in this checkout: ` +
+        `the benchmark's halves ship from tau2 v1.0.0, and this run pinned ${release === "" ? "unpinned" : release}`,
+    );
+  }
+  return path;
 }
 
+function splitPathOf(domain: string): string {
+  return splitPathIn(
+    join(REPO, ".tau2-bench"),
+    domain,
+    (process.env["TAU_VERSION"] ?? "").trim(),
+  );
+}
 /**
  * Read the query pin, or nothing when the dispatch declared none.
  *
@@ -423,6 +449,45 @@ const TASK = "tau2.act";
  * the agent sends `task=tau2.act` on every request and `generate_next_message` receives no task id.
  */
 const QUERY_PIN_FILE = (process.env["TAU_QUERY_PIN"] ?? "").trim();
+
+/**
+ * Which τ² generation this arm ran, because a number is only comparable to one from the same release.
+ *
+ * R92's first dispatch died on `split_tasks.json`, which does not exist in the release the lane had
+ * pinned: `data/tau2/domains/<domain>/split_tasks.json` arrived in v1.0.0, and v1.0.0 also rewrote
+ * every retail task body (0 of 114 identical to v0.2.0's). The published held-out figure this lane
+ * ranks itself against was produced on **v1.0.1**. So the release is part of the treatment, and an
+ * artefact that does not carry it cannot say which benchmark its `pass^4` is about.
+ *
+ * The tag comes from the workflow's own pin and the commit from the checkout, because a tag can be
+ * moved and a commit cannot: an arm that quotes a tag and no commit is an arm quoting a belief.
+ */
+export async function benchmarkIdentityOf(
+  checkout: string,
+  version: string,
+): Promise<{ version: string; commit: string } | undefined> {
+  if (!existsSync(checkout)) return undefined;
+  try {
+    const commit = await runFile("git", ["-C", checkout, "rev-parse", "HEAD"], {
+      cwd: REPO,
+    });
+    return {
+      version: version === "" ? "unpinned" : version,
+      commit: commit.stdout.trim(),
+    };
+  } catch {
+    // No git in the checkout is not a measurement failure: the version the workflow pinned is still
+    // an answer, and a run that refused here would price an artefact above the episodes it paid for.
+    return version === "" ? undefined : { version, commit: "unknown" };
+  }
+}
+
+async function benchmarkIdentity(): Promise<{ version: string; commit: string } | undefined> {
+  return benchmarkIdentityOf(
+    join(REPO, ".tau2-bench"),
+    (process.env["TAU_VERSION"] ?? "").trim(),
+  );
+}
 
 /**
  * The form this dispatch asks the distiller for.
@@ -504,9 +569,21 @@ async function phase(args: readonly string[]): Promise<string> {
     // Printing the tail keeps a run's shape visible without turning the job log
     // into a transcript, and it is the only evidence that a phase ran at all when
     // the lane is green.
+    //
+    // The per-line prefix is stripped first: `run_split.py` tags the lines it wants seen with `[tau2]`
+    // because a run read straight from a terminal has no one to add it, and re-emitting those verbatim
+    // produced `[tau2] [tau2] …` in every dispatch log — which reads as two lines from two layers
+    // instead of one line from one.
     const tail = [finished.stdout, finished.stderr]
       .filter((text) => text.trim() !== "")
-      .map((text) => text.trim().split("\n").slice(-2).join("\n"))
+      .map((text) =>
+        text
+          .trim()
+          .split("\n")
+          .slice(-2)
+          .map((line) => line.replace(/^\[tau2\]\s*/, ""))
+          .join("\n"),
+      )
       .join("\n");
     if (tail !== "") process.stdout.write(`[tau2] ${tail}\n`);
     // The stdout is returned because the summary line is also the only channel on which the
@@ -834,6 +911,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const workdir =
     process.env["TAU_WORKDIR"] ??
     mkdtempSync(join(tmpdir(), "microglia-tau2-"));
+  // R92: which τ² this is, asked before anything is paid for. The probe is an import plus a look at
+  // the signatures the phases call, because v1.0.0 moved `run_tasks` to `(config, tasks)` and put
+  // `get_tasks` in `tau2.runner.helpers` -- a mismatch costs two seconds here instead of an
+  // installed environment, a built store and a phase that dies on its first task.
+  await phase([SCRIPT, "--phase", "selftest"]);
+  const benchmark = await benchmarkIdentity();
+  if (benchmark !== undefined) {
+    process.stdout.write(
+      `[tau2] benchmark: ${benchmark.version} at ${benchmark.commit.slice(0, 8)}\n`,
+    );
+  }
   const evaluated = await listTasks(
     TEST_DOMAIN,
     join(workdir, "test-tasks.json"),
@@ -848,7 +936,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
 
   const official =
     TASK_SPLIT === "official"
-      ? splitFromOfficial(JSON.parse(readFileSync(officialSplitPath(TEST_DOMAIN), "utf8")) as unknown)
+      ? splitFromOfficial(
+          JSON.parse(
+            readFileSync(splitPathOf(TEST_DOMAIN), "utf8"),
+          ) as unknown,
+        )
       : undefined;
   const plan = heldOutPlan({
     learnIds: learnable,
@@ -1854,6 +1946,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     inaction: primary.inaction,
     widenedItems: withoutDomain,
     scenario,
+    // R92: which benchmark generation this is. A `pass^4` is comparable only to one from the same
+    // release, and the release changed every retail task body between v0.2.0 and v1.0.1.
+    ...(benchmark === undefined ? {} : { benchmark }),
     // The scenario's own size, not the split's: a dispatch cap hides it, and it is what bounds the
     // resolution any split of this scenario can reach.
     scenarioTasks: { learn: learnable.length, test: evaluated.length },

@@ -1183,10 +1183,12 @@ jobs:
       # The labels are the part of this experiment the repository does not control, and two published
       # sentences about τ² already had the two scenarios' shapes the wrong way round — a claim made
       # from a run's counters that the corpus itself contradicts. Counting the files at the pinned ref
-      # beside the run that consumes them makes the corpus a measurement: at v0.2.0 no task in either
-      # scenario declares `reward_basis`, so the grade is `DB` (a hash compared to a target derived by
-      # replaying the reference calls) times `COMMUNICATE`; the prose rubrics and the call list *as a
-      # trajectory* never enter it. A step rather than a paragraph, so the next reader inherits the
+      # beside the run that consumes them makes the corpus a measurement — and R92 is the round that
+      # proved why it has to be taken every time: at v0.2.0 no retail task declares `reward_basis`, so the
+      # grade is `DB` (a hash compared to a target derived by replaying the reference calls) times
+      # `COMMUNICATE`, and the prose rubrics and the call list *as a trajectory* never enter it; at v1.0.1
+      # all 114 declare it (112 × `DB+NL_ASSERTION`) and 112 are graded on the prose rubric. Same ids, same
+      # call counts, different reward. A step rather than a paragraph, so the next reader inherits the
       # number instead of the recollection.
       - name: Count the corpus's labels
         run: |
@@ -1484,6 +1486,9 @@ jobs:
           TAU_PIN_FILE: ${{ steps.recall_floor.outputs.storePin != '' && format('{0}/{1}', github.workspace, steps.recall_floor.outputs.storePin) || '' }}
           # R92: the benchmark's own halves rather than this lane's cut. Empty for every earlier arm.
           TAU_TASK_SPLIT: ${{ steps.recall_floor.outputs.taskSplit || '' }}
+          # R92: which τ² this arm ran. The repository variable is the pin; it is exported here so the
+          # artefact can carry it, because a pass^4 is comparable only to one from the same release.
+          TAU_VERSION: ${{ vars.TAU_VERSION }}
           # R92's second pin: the question. Empty on every arm that quotes an absolute number, set on an
           # arm whose subject is the pack, which prices its options only if the question is held fixed.
           TAU_QUERY_PIN: ${{ steps.recall_floor.outputs.queryPin }}
@@ -1558,6 +1563,9 @@ jobs:
           TAU_PIN_FILE: ${{ steps.recall_floor.outputs.storePin != '' && format('{0}/{1}', github.workspace, steps.recall_floor.outputs.storePin) || '' }}
           # R92: the benchmark's own halves rather than this lane's cut. Empty for every earlier arm.
           TAU_TASK_SPLIT: ${{ steps.recall_floor.outputs.taskSplit || '' }}
+          # R92: which τ² this arm ran. The repository variable is the pin; it is exported here so the
+          # artefact can carry it, because a pass^4 is comparable only to one from the same release.
+          TAU_VERSION: ${{ vars.TAU_VERSION }}
           # R92's second pin: the question. Empty on every arm that quotes an absolute number, set on an
           # arm whose subject is the pack, which prices its options only if the question is held fixed.
           TAU_QUERY_PIN: ${{ steps.recall_floor.outputs.queryPin }}

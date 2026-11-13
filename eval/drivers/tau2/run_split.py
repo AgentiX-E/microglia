@@ -33,7 +33,144 @@ from pathlib import Path
 
 import litellm
 from tau2.registry import registry
-from tau2.run import get_tasks, run_tasks
+
+# Which τ² this is, decided by what the package exports rather than by a version string.
+#
+# v0.2.0 has `tau2.run.get_tasks(domain, task_ids)` and one flat `run_tasks(**kwargs)`.
+# v1.0.0 moved the runner to `tau2.runner.*`, made `run_tasks(config, tasks, …)` take a
+# `TextRunConfig`, and — the reason this matters — started shipping
+# `data/tau2/domains/<domain>/split_tasks.json` (retail: 74 train / 40 test), which is the
+# partition the published held-out figures were produced on. R92 ran on v0.2.0 and died on the
+# first read: the file it was registered to read does not exist in that release.
+#
+# The probe is an import, not a version comparison: a release that back-ports one half and not
+# the other would pass a string test and fail at the first call. `--phase selftest` prints what
+# this found and checks the surface the run is about to use, so a mismatch costs two seconds
+# instead of an installed environment and an aborted phase.
+try:
+    from tau2.runner.batch import run_tasks as _run_tasks_v1
+    from tau2.runner.helpers import get_tasks as _get_tasks_v1
+    from tau2.data_model.simulation import TextRunConfig
+
+    TAU_RUNNER = "v1"
+except ImportError:  # v0.2.0 — the ref every arm before R92 ran
+    from tau2.run import get_tasks as _get_tasks_v0
+    from tau2.run import run_tasks as _run_tasks_v0
+
+    TAU_RUNNER = "v0"
+
+
+def get_tasks(domain: str, wanted: list[str] | None = None):
+    """The tasks of a domain, or the named ones, in whichever shape this τ² takes.
+
+    v1's `get_tasks` raises `ValueError` when an id is missing, which is the behaviour this lane
+    wants and had to implement itself on v0.2.0 (`tau2-task-missing`). Both are kept because the
+    caller's contract — ids in, tasks out, a missing id is a refusal — is one contract.
+    """
+    if TAU_RUNNER == "v1":
+        return _get_tasks_v1(domain, task_ids=list(wanted) if wanted else None)
+    return _get_tasks_v0(domain, wanted or None)
+
+
+def run_tasks(
+    *,
+    domain: str,
+    tasks,
+    agent: str,
+    model: str,
+    llm_args: dict,
+    trials: int,
+    max_steps: int,
+    out: str,
+    seed: int | None,
+    concurrency: int,
+    save_to: str,
+):
+    """One phase of episodes, on either runner.
+
+    The two signatures are not reconcilable by keyword forwarding: v1 wants one `TextRunConfig`
+    and reads `save_path` from a keyword, v0 wants twelve keywords and reads `save_to` from them.
+    So the translation lives here, in one function a reader can check against both, rather than
+    in two call sites that would drift the first time one of them changed.
+    """
+    if TAU_RUNNER == "v1":
+        config = TextRunConfig(
+            domain=domain,
+            agent=agent,
+            llm_agent=model,
+            llm_args_agent=llm_args,
+            user="user_simulator",
+            llm_user=model,
+            llm_args_user=llm_args,
+            num_trials=trials,
+            max_steps=max_steps,
+            max_concurrency=concurrency,
+            **({} if seed is None else {"seed": seed}),
+        )
+        return _run_tasks_v1(
+            config,
+            list(tasks),
+            save_path=Path(out),
+            console_display=False,
+            results_format="json",
+        )
+    return _run_tasks_v0(
+        domain=domain,
+        tasks=tasks,
+        agent=agent,
+        user="user_simulator",
+        llm_agent=model,
+        llm_args_agent=llm_args,
+        llm_user=model,
+        llm_args_user=llm_args,
+        num_trials=trials,
+        max_steps=max_steps,
+        save_to=save_to,
+        console_display=False,
+        max_concurrency=concurrency,
+        seed=seed,
+    )
+
+
+def selftest() -> int:
+    """What this τ² exposes, and whether it is what the phase below is about to call.
+
+    Run before the episodes, not after: the expensive failure mode is a signature that moved, and
+    the cheap place to find it is here. Every check is a property of the installed package.
+    """
+    import inspect
+
+    problems: list[str] = []
+    signature = inspect.signature(get_tasks)
+    if "domain" not in signature.parameters:
+        problems.append(f"get_tasks has no `domain` parameter: {signature}")
+    runner = _run_tasks_v1 if TAU_RUNNER == "v1" else _run_tasks_v0
+    runner_params = inspect.signature(runner).parameters
+    if TAU_RUNNER == "v1":
+        if "config" not in runner_params or "tasks" not in runner_params:
+            problems.append(f"run_tasks is not (config, tasks): {list(runner_params)[:4]}")
+        if "save_path" not in runner_params or "results_format" not in runner_params:
+            problems.append(f"run_tasks lost save_path/results_format: {list(runner_params)[:8]}")
+        fields = set(TextRunConfig.model_fields)
+        for field in ("domain", "agent", "llm_agent", "llm_args_agent", "user", "num_trials"):
+            if field not in fields:
+                problems.append(f"TextRunConfig has no `{field}`")
+    else:
+        for field in ("domain", "tasks", "agent", "save_to", "num_trials"):
+            if field not in runner_params:
+                problems.append(f"run_tasks has no `{field}`")
+    if not hasattr(registry, "get_agents"):
+        problems.append("the registry has no get_agents")
+    if not hasattr(registry, "register_agent") and not hasattr(
+        registry, "register_agent_factory"
+    ):
+        problems.append("the registry has neither register_agent nor register_agent_factory")
+    if problems:
+        for problem in problems:
+            print(f"[tau2] selftest: {problem}", file=sys.stderr)
+        return 1
+    print(f"[tau2] selftest: runner {TAU_RUNNER}, get_tasks{signature}, registry ok")
+    return 0
 
 # What this run spent, counted where it is spent.
 #
@@ -260,10 +397,15 @@ def _cost(prompt: int, cached: int, completion: int, now=None, ended=None) -> di
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="tau2 phase runner for the microglia L4 lane")
     parser.add_argument("--domain", default="retail")
-    parser.add_argument("--phase", choices=["list", "learn", "eval"], required=True)
+    parser.add_argument(
+        "--phase", choices=["list", "learn", "eval", "selftest"], required=True
+    )
     parser.add_argument("--agent", default="llm_agent")
     parser.add_argument("--trials", type=int, default=1)
-    parser.add_argument("--out", required=True)
+    # Not required: `selftest` decides nothing about a run and writes nothing, and requiring an
+    # output path for a two-second import check is the kind of flag that teaches a reader to pass
+    # `--out /dev/null` rather than to ask what the phase needs.
+    parser.add_argument("--out", default="")
     parser.add_argument("--tasks", default="")
     parser.add_argument("--memory-url", default="")
     parser.add_argument("--max-steps", type=int, default=100)
@@ -406,6 +548,12 @@ def main(argv: list[str]) -> int:
         if refusal:
             raise SystemExit(refusal)
 
+    if args.phase == "selftest":
+        # Before the registry import and before any provider call: the question is whether the
+        # installed τ² is the one this runner speaks, and both of those are cheaper to skip than
+        # to answer.
+        return selftest()
+
     if args.phase == "list":
         ids = task_ids(args.domain, wanted)
         with open(args.out, "w", encoding="utf-8") as stream:
@@ -420,7 +568,20 @@ def main(argv: list[str]) -> int:
         from microglia_agent import MicrogliaAgent
 
         if "microglia_agent" not in registry.get_agents():
-            registry.register_agent(MicrogliaAgent, "microglia_agent")
+            if hasattr(registry, "register_agent_factory"):
+                # v1.0.0 registers a *factory* and calls it with the environment's tools, the
+                # policy, the model and its arguments — plus `task` and `audio_native_config`,
+                # which a text agent does not take. So the adapter takes what it needs by keyword
+                # and ignores the rest, which is also what stops a later upstream keyword from
+                # turning into a TypeError inside a paid episode.
+                registry.register_agent_factory(
+                    lambda *, tools, domain_policy, llm, llm_args=None, **_: MicrogliaAgent(
+                        tools=tools, domain_policy=domain_policy, llm=llm, llm_args=llm_args
+                    ),
+                    "microglia_agent",
+                )
+            else:  # v0.2.0 takes the class itself
+                registry.register_agent(MicrogliaAgent, "microglia_agent")
     if args.memory_url:
         os.environ["MICROGLIA_MEMORY_URL"] = args.memory_url
     os.environ.setdefault("MICROGLIA_DOMAIN", args.domain)
@@ -448,21 +609,18 @@ def main(argv: list[str]) -> int:
         domain=args.domain,
         tasks=tasks,
         agent=args.agent,
-        user="user_simulator",
-        llm_agent=model,
+        model=model,
         # Upstream's `run_tasks` does `if "seed" in llm_args_agent`, so passing None
         # raises `TypeError: argument of type 'NoneType' is not iterable` before the
         # first episode. The parameters are optional in the signature and required by
         # the body; two empty dicts are the difference between a run and a traceback.
-        llm_args_agent=llm_args,
-        llm_user=model,
-        llm_args_user=llm_args,
-        num_trials=args.trials,
+        llm_args=llm_args,
+        trials=args.trials,
         max_steps=args.max_steps,
         save_to=args.out,
-        console_display=False,
-        max_concurrency=int(os.environ.get("TAU_CONCURRENCY", "4")),
+        out=args.out,
         seed=args.seed,
+        concurrency=int(os.environ.get("TAU_CONCURRENCY", "4")),
     )
     simulations = getattr(results, "simulations", None)
     print(

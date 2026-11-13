@@ -22,10 +22,27 @@
  *    target end state, not a trajectory the agent has to walk — which is why `pathScored` and `calls`
  *    are different numbers, and why "the reward does not read these calls" would be the wrong sentence.
  *
- * The prose rubric is the label that *is* read by nothing in the default configuration: `nl_assertions`
- * gates the reward only under `NL_ASSERTION`, and no task in either shipped scenario declares it. A
- * learner that turns that prose into a lesson is learning from commentary on the graded outcome, which
- * is admissible and is a weaker claim about the benchmark than a replay-derived end state.
+ * The prose rubric is the label that *is* read by nothing **at v0.2.0**: `nl_assertions` gates the
+ * reward only under `NL_ASSERTION`, and no retail task in that release declares it. A learner that turns
+ * that prose into a lesson is, on that corpus, learning from commentary on a graded outcome it does not
+ * touch — admissible, and a weaker claim about the benchmark than a replay-derived end state.
+ *
+ * ## And that is a property of the release, not of the benchmark
+ *
+ * R92 ported the lane to v1.0.1 — the release the published figure it ranks against was produced on — and
+ * ran this census against both. The corpus kept its shape and changed what it grades:
+ *
+ * | corpus | tasks | calls | rubric | basis declared | rubric graded |
+ * | --- | --- | --- | --- | --- | --- |
+ * | retail v0.2.0 | 114 | 112 (98.2%) | 8 (7.0%) | 0 | **0** |
+ * | retail v1.0.1 | 114 | 112 (98.2%) | 40 (35.1%) | **114** | **112** |
+ *
+ * So the sentence above is true of the release this repository ran until R92 and false of the one it runs
+ * now: every retail task in v1.0.1 states its basis (112 × `DB+NL_ASSERTION`, 2 × `DB`), the prose rubric
+ * went from 8 tasks to 40, and 112 of 114 tasks are graded on it. v1.0.1's own field comment calls
+ * `NL_ASSERTION` "experimental / WIP". A number on one release is therefore not a number on the other
+ * even when the task ids and the call counts match to the digit, which is why the artefact carries
+ * `benchmark {version, commit}` beside the score.
  *
  * ## Three distinctions the census keeps
  *

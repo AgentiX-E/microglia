@@ -54,7 +54,15 @@ import urllib.request
 
 from tau2.agent.llm_agent import LLMAgent, LLMAgentState
 from tau2.data_model.message import Message, SystemMessage
-from tau2.agent.base import ValidAgentInputMessage
+
+# `ValidAgentInputMessage` moved in τ² v1.0.0: it lived in `tau2.agent.base` and now lives in
+# `tau2.agent.base_agent`, beside the `HalfDuplexAgent` that `LLMAgent` extends. Both are tried
+# because R92 runs one τ² and the arms before it ran another, and an import that names only one of
+# them is a lane that can only reproduce half its own record.
+try:
+    from tau2.agent.base_agent import ValidAgentInputMessage
+except ImportError:  # v0.2.0
+    from tau2.agent.base import ValidAgentInputMessage
 
 DEFAULT_TIMEOUT_S = 5.0
 MAX_QUERY_CHARS = 500

@@ -335,6 +335,16 @@ export type Tau2Raw = {
    */
   readonly queries?: QueryCensus;
   /**
+   * R92: which τ² release this arm ran, as a tag and a commit.
+   *
+   * A `pass^4` is comparable only to one produced on the same release. `split_tasks.json` — the 74/40
+   * partition the published held-out figures use — does not exist before v1.0.0, and v1.0.0 rewrote
+   * every retail task body, so an artefact that carries a number and not this cannot say which
+   * benchmark the number is about. Absent on every arm before R92, which reads as "the release was not
+   * recorded" rather than as "the release was v0.2.0".
+   */
+  readonly benchmark?: { readonly version: string; readonly commit: string };
+  /**
    * R56: the form the distiller was asked for, and the inventory its ban refused names from.
    *
    * Absent on artefacts written before this field, which reads as "the form was not recorded" rather
@@ -628,6 +638,8 @@ export const PROJECTION: {
   // Carried verbatim: without it a pack difference between two arms has three candidate causes and the
   // artefact names none of them. See the field's own comment.
   queries: "carried",
+  // Carried for the same reason as the query census: it is an input to what the number means.
+  benchmark: "carried",
   distillForm: "carried",
   distillUnit: "carried",
   rawlog: "carried",
@@ -778,6 +790,7 @@ export function armRecordFromDriver(
     // is a function of both, and R91's artefact carried one of them and reported the other's movement
     // as a mystery.
     ...(raw.queries === undefined ? {} : { queries: raw.queries }),
+    ...(raw.benchmark === undefined ? {} : { benchmark: raw.benchmark }),
     ...(raw.distillForm === undefined ? {} : { distillForm: raw.distillForm }),
     ...(raw.distillUnit === undefined ? {} : { distillUnit: raw.distillUnit }),
     ...(raw.rawlog === undefined ? {} : { rawlog: raw.rawlog }),

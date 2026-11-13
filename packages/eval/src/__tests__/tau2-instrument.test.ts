@@ -731,6 +731,9 @@ describe('the projection has a decision for every field, and keeps it', () => {
         pin: null,
         texts: [{ index: 0, text: 'cancel my reservation' }],
       },
+      // R92: which benchmark generation this is. Carried because a number is comparable only to one
+      // from the same release, and the release moved every retail task body between v0.2.0 and v1.0.1.
+      benchmark: { version: 'v1.0.1', commit: 'f2c1ab3d4e5f60718293a4b5c6d7e8f901234567' },
       injectionNote: { mode: 'standard', declared: false },
       funnel: {
         corrections: 2,
@@ -867,6 +870,19 @@ describe('the projection has a decision for every field, and keeps it', () => {
       texts: [{ index: 0, text: 'cancel my reservation' }],
     };
     expect(armRecordFromDriver({ ...full(), queries }).queries).toEqual(queries);
+  });
+
+  it('carries the benchmark release beside the number, because the number is about that release', () => {
+    // R92's first dispatch died on a file that does not exist before v1.0.0, and the same release
+    // boundary rewrote every retail task body. An artefact quoting `pass^4` without this cannot be
+    // ranked against a published figure, and the omission reads as a compatible run.
+    const benchmark = { version: 'v1.0.1', commit: 'f2c1ab3d4e5f60718293a4b5c6d7e8f901234567' };
+    expect(armRecordFromDriver({ ...full(), benchmark }).benchmark).toEqual(benchmark);
+  });
+
+  it('omits the release when the checkout could not say, rather than guessing one', () => {
+    const record = armRecordFromDriver({ ...full(), benchmark: undefined } as Tau2Raw);
+    expect(record.benchmark).toBeUndefined();
   });
 
   it('omits the query census when the arm did not record one, rather than implying it was pinned', () => {

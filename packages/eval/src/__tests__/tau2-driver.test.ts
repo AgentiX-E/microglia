@@ -1,7 +1,15 @@
-import { existsSync, mkdtempSync, readFileSync, writeFileSync, chmodSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { dirname, join } from 'node:path';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 
 /**
  * The L4 driver's orchestration, against a stand-in for τ²-bench.
@@ -25,7 +33,19 @@ const read = (flag) => {
 };
 const phase = read('--phase');
 const out = read('--out');
-if (phase === 'list') {
+// Every phase this stand-in is asked for, in order, beside the script rather than in the workdir: the
+// driver's version probe is an ordering claim — it is worth nothing if it runs after the first episode
+// has been paid for — and an order is only observable from outside.
+require('node:fs').appendFileSync(
+  require('node:path').join(__dirname, 'phases.log'),
+  phase + '\\n',
+);
+if (phase === 'selftest') {
+  // What the real runner prints: which runner it found, the surface it is about to call, and the
+  // registry's capability. A stand-in that answered this with an exit code alone would let the driver
+  // stop checking and keep passing.
+  process.stdout.write('[tau2] selftest: runner v1, get_tasks(domain), registry ok\\n');
+} else if (phase === 'list') {
   require('node:fs').writeFileSync(out, JSON.stringify({ domain: 'retail', tasks: ['t4', 't1', 't3', 't2'] }));
 } else {
   const tasks = (read('--tasks') || '').split(',').filter(Boolean);
@@ -108,6 +128,75 @@ describe('the L4 driver', () => {
       delete process.env['TAU_MEMORY'];
       delete process.env['TAU_TRIALS'];
       delete process.env['TAU_TRAIN_SHARE'];
+      delete process.env['TAU_WORKDIR'];
+    }
+  }, 60_000);
+
+  it('asks which τ² this is before the first episode, and says so out loud', async () => {
+    // R92's first dispatch installed τ² v0.2.0, built a store, generated a corpus, and died on the
+    // first read of a file that release does not ship. The probe is only worth its two seconds if it
+    // runs first, so the claim under test is an *order*: selftest, then the listing, then the episodes.
+    const { dir, executable } = stubRunner();
+    process.env['TAU_PYTHON'] = executable;
+    process.env['TAU_MEMORY'] = 'false';
+    process.env['TAU_TRIALS'] = '4';
+    process.env['TAU_TRAIN_SHARE'] = '0.5';
+    process.env['TAU_WORKDIR'] = dir;
+    const said: string[] = [];
+    const write = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array): boolean => {
+        said.push(String(chunk));
+        return true;
+      });
+    try {
+      const driver = await import('../bin/tau2-driver.js?case=selftest-first');
+      await driver.run();
+      const phases = readFileSync(join(dir, 'phases.log'), 'utf8')
+        .split('\n')
+        .filter((line) => line !== '');
+      expect(phases[0]).toBe('selftest');
+      // Nothing else may come before it: a probe after the listing is a probe after the money.
+      expect(phases.indexOf('selftest')).toBeLessThan(phases.indexOf('list'));
+      // And the answer is a line a reader of the log can grade. A silent probe is indistinguishable in
+      // the log from a probe that never ran.
+      expect(said.join('')).toContain('selftest: runner');
+    } finally {
+      write.mockRestore();
+      delete process.env['TAU_PYTHON'];
+      delete process.env['TAU_MEMORY'];
+      delete process.env['TAU_TRIALS'];
+      delete process.env['TAU_TRAIN_SHARE'];
+      delete process.env['TAU_WORKDIR'];
+    }
+  }, 60_000);
+
+  it('stops on a release that does not speak this runner, before anything is listed', async () => {
+    // The failure R92 paid for, reproduced cheaply: a τ² whose runner surface moved. The run has to end
+    // here — not after the store is built, and not inside the first episode — and it has to end with the
+    // probe's own words rather than a traceback from somewhere downstream.
+    const { dir } = stubRunner();
+    const refusing = join(dir, 'refusing-runner');
+    writeFileSync(
+      refusing,
+      `#!/usr/bin/env node
+process.stderr.write('[tau2] selftest: run_tasks is not (config, tasks)\\n');
+process.exit(9);
+`,
+      'utf8',
+    );
+    chmodSync(refusing, 0o755);
+    process.env['TAU_PYTHON'] = refusing;
+    process.env['TAU_MEMORY'] = 'false';
+    process.env['TAU_WORKDIR'] = dir;
+    try {
+      const driver = await import('../bin/tau2-driver.js?case=selftest-refuses');
+      await expect(driver.run()).rejects.toThrow(/selftest: run_tasks is not/);
+      // The listing is the first thing that writes, so its absence is the receipt for "nothing ran".
+      expect(existsSync(join(dir, 'test-tasks.json'))).toBe(false);
+    } finally {
+      delete process.env['TAU_PYTHON'];
+      delete process.env['TAU_MEMORY'];
       delete process.env['TAU_WORKDIR'];
     }
   }, 60_000);
@@ -523,5 +612,72 @@ describe('the L4 driver', () => {
       delete process.env['TAU_TRIALS'];
       delete process.env['TAU_WORKDIR'];
     }
+  });
+
+  describe('the two facts a number is only comparable with', () => {
+    // Imported once here rather than per case: both functions take everything they read as an
+    // argument, so this is a lookup table and not a piece of state the cases share.
+    let driver: typeof import('../bin/tau2-driver.js');
+    beforeAll(async () => {
+      driver = await import('../bin/tau2-driver.js?case=identity');
+    });
+
+    it('names the release that would have the split file, rather than the path that is missing', () => {
+      // The refusal a dispatch reads. `ENOENT` on a path inside a clone says which file the checkout
+      // lacks; it does not say that the release cannot have it, which is the whole decision.
+      const empty = mkdtempSync(join(tmpdir(), 'tau2-checkout-'));
+      expect(() => driver.splitPathIn(empty, 'retail', 'v0.2.0')).toThrow(
+        /retail's split file is not in this checkout.*ship from tau2 v1\.0\.0.*pinned v0\.2\.0/,
+      );
+      // And an arm that pinned nothing says so, instead of printing an empty release.
+      expect(() => driver.splitPathIn(empty, 'retail', '')).toThrow(/pinned unpinned/);
+    });
+
+    it('reads the published halves from the checkout it is given', () => {
+      const checkout = mkdtempSync(join(tmpdir(), 'tau2-checkout-'));
+      const path = join(checkout, 'data', 'tau2', 'domains', 'retail', 'split_tasks.json');
+      mkdirSync(dirname(path), { recursive: true });
+      writeFileSync(path, JSON.stringify({ train: ['0'], test: ['5'], base: ['0', '5'] }), 'utf8');
+      expect(driver.splitPathIn(checkout, 'retail', 'v1.0.1')).toBe(path);
+    });
+
+    it('carries the tag the workflow pinned and the commit the checkout is at', async () => {
+      // The tag can be moved; the commit cannot. An arm that quotes a tag and no commit is an arm
+      // quoting a belief, so both are read — and the commit is `git`'s answer, not ours.
+      const checkout = mkdtempSync(join(tmpdir(), 'tau2-git-'));
+      execFileSync('git', ['init', '--quiet'], { cwd: checkout });
+      execFileSync(
+        'git',
+        ['-c', 'user.name=t', '-c', 'user.email=t@example.invalid', 'commit', '--quiet', '--allow-empty', '-m', 'x'],
+        { cwd: checkout },
+      );
+      const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: checkout })
+        .toString()
+        .trim();
+      expect(await driver.benchmarkIdentityOf(checkout, 'v1.0.1')).toEqual({
+        version: 'v1.0.1',
+        commit: head,
+      });
+      // No tag from the workflow still records the commit: the number is about a commit either way.
+      expect(await driver.benchmarkIdentityOf(checkout, '')).toEqual({
+        version: 'unpinned',
+        commit: head,
+      });
+    });
+
+    it('says nothing rather than guessing when the checkout cannot date itself', async () => {
+      // Absent is "not recorded", which is a different claim from "v0.2.0". The two cases are a
+      // checkout that is not there and one that is not a repository.
+      expect(await driver.benchmarkIdentityOf(join(tmpdir(), 'tau2-absent-xyz'), 'v1.0.1')).toBe(
+        undefined,
+      );
+      const notARepo = mkdtempSync(join(tmpdir(), 'tau2-plain-'));
+      expect(await driver.benchmarkIdentityOf(notARepo, '')).toBe(undefined);
+      // With a release pinned, the tag is still an answer and the commit is honestly unknown.
+      expect(await driver.benchmarkIdentityOf(notARepo, 'v1.0.1')).toEqual({
+        version: 'v1.0.1',
+        commit: 'unknown',
+      });
+    });
   });
 });

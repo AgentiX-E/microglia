@@ -160,6 +160,8 @@ export type Tau2ArmRecord = {
    * a nondeterministic renderer, which is a defect in the wrong module.
    */
   readonly queries?: QueryCensus;
+  /** R92: the τ² release and commit this arm ran. See `Tau2Raw.benchmark`. */
+  readonly benchmark?: { readonly version: string; readonly commit: string };
   readonly distillForm?: DistillFormRecord;
   /** R58: the unit distilled, the traces read, and the recurrence pass's census. */
   readonly distillUnit?: DistillUnitRecord;
