@@ -222,6 +222,14 @@ export type Tau2ArmRecord = {
    * `V0` absent rather than green.
    */
   readonly funnel?: FunnelInput;
+  /**
+   * Whether the store was empty because the arm declared it before it ran.
+   *
+   * R101's flag, carried on the arm for the same reason `funnel` is: the arm is where the store and
+   * its learning half meet, and `V0`/`V1` invert on it. Absent on every artefact written before it,
+   * which reads as "not a declared-empty arm" and leaves every committed gate row unchanged.
+   */
+  readonly declaredEmptyStore?: boolean;
   /** Provenance of the stored items' `scope.domain`, which is the ceiling on every transfer claim. */
   readonly domainOrigin?: {
     readonly storedWithDomain: number;
@@ -559,6 +567,7 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
   // be able to overwrite a field after `supplied` had already been computed from it.
   const extra: {
     funnel?: FunnelInput;
+    declaredEmptyStore?: boolean;
     meanPackIds?: number;
     packPopulation?: NonNullable<ProtocolGateInput['packPopulation']>;
     partition?: NonNullable<ProtocolGateInput['partition']>;
@@ -579,6 +588,11 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
     // thing `V0` exists to catch is two counts taken over different populations.
     extra.funnel = memory.funnel;
     supplied.push('funnel');
+  }
+  // Read beside the funnel rather than instead of it: the declaration changes what a zero *means*,
+  // and it is only meaningful on the same record that carries the counts.
+  if (memory?.declaredEmptyStore !== undefined) {
+    extra.declaredEmptyStore = memory.declaredEmptyStore;
   }
   if (memory?.meanPackIds !== undefined) {
     extra.meanPackIds = memory.meanPackIds;
@@ -736,6 +750,8 @@ export type Tau2ArmArtefact = {
      * not carry, and nothing in the failing artefact said the field was missing.
      */
     readonly funnel?: FunnelInput;
+    /** R101: the arm's declaration that its store is empty by construction. */
+    readonly declaredEmptyStore?: boolean;
   };
 };
 
@@ -783,5 +799,11 @@ export function tau2ArmRecordOf(arm: string, artefact: Tau2ArmArtefact): Tau2Arm
     // rather than derived here. A projection that carried the counts but not the chain would let a
     // zero be reported without the stage it happened at.
     ...(artefact.tau2?.funnel === undefined ? {} : { funnel: artefact.tau2.funnel }),
+    // The arm's own declaration, read from the arm rather than inferred from the counts above it: a
+    // pair whose memory side has an empty funnel is a broken memory arm or a scaffold arm, and only
+    // the arm can say which. Inference would have graded R101 by the reading it was built to replace.
+    ...(artefact.tau2?.declaredEmptyStore === undefined
+      ? {}
+      : { declaredEmptyStore: artefact.tau2.declaredEmptyStore }),
   };
 }

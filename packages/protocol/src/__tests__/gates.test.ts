@@ -4,6 +4,7 @@ import {
   POWER_TARGET_PP,
   SUBSTRATE_FLOOR,
   buildProtocolGates,
+  declaredEmptyVerdict,
   funnelVerdict,
   inGateOrder,
   transferGates,
@@ -593,6 +594,63 @@ describe('the substrate floor', () => {
  * and three published rounds were read as "the mechanism does not work" when the stage that had
  * failed was upstream of every gate the report carried. So the funnel is graded for a zero first.
  */
+/**
+ * The two gates an empty store inverts, and the declaration that inverts them.
+ *
+ * R93 measured the wrapper-plus-pack arm at `pass^4` 0.700 against 0.725 for τ²'s stock agent, and the
+ * two arms differ in two things at once: the pack, and the wrapper that carries it. R101's arm is the
+ * wrapper with a store that is empty by construction, and it is only a control if the two gates that
+ * exist to catch an empty store neither pass it by accident nor fail it by definition. Both directions
+ * are asserted here, because an exemption that only ever passes is the vacuous gate this project keeps
+ * finding: a declared-empty arm that carries one item must be refused.
+ */
+describe('the declared-empty arm', () => {
+  const emptyFunnel = { corrections: 0, candidates: 0, admitted: 0, stored: 0, servable: 0 };
+
+  it('is ready only when every stage carried nothing, and names the stage that did not', () => {
+    expect(declaredEmptyVerdict(emptyFunnel)).toEqual({
+      ready: true,
+      reason: 'every stage carried nothing, which is what a declared-empty arm asserts',
+    });
+    const carried = declaredEmptyVerdict({ ...emptyFunnel, servable: 3 });
+    expect(carried.ready).toBe(false);
+    expect(carried.reason).toContain('servable stage carried 3');
+    expect(carried.reason).toContain('no longer the control');
+  });
+
+  it('grades the same zero two opposite ways, depending on who declared it', () => {
+    // The identical funnel, read twice: a memory arm that produced nothing has a broken pipeline, and a
+    // scaffold arm that produced nothing has done exactly what it was bought to do.
+    const undeclared = gate({ ...minimal, funnel: emptyFunnel }, 'V0-instrument-ready');
+    expect(undeclared.pass).toBe(false);
+    expect(undeclared.criterion).toBe(
+      'every stage from a correction to a servable rule carried something, and the stages reconcile',
+    );
+    const declared = gate(
+      { ...minimal, funnel: emptyFunnel, declaredEmptyStore: true },
+      'V0-instrument-ready',
+    );
+    expect(declared.pass).toBe(true);
+    expect(declared.criterion).toBe('a declared-empty arm carried nothing at every stage, which is what it declared');
+  });
+
+  it('inverts the pack gate, so a scaffold arm that injects a rule fails it', () => {
+    const scaffold = gate({ ...minimal, meanPackIds: 0, declaredEmptyStore: true }, 'V1-pack-not-empty');
+    expect(scaffold.pass).toBe(true);
+    expect(scaffold.criterion).toBe(
+      'the scaffold arm injected no rule at all, so what it measures is the wrapper',
+    );
+    // The arm is no longer the control the moment one rule reaches it, and the gate says so instead of
+    // tolerating the difference the way a waiver would.
+    expect(gate({ ...minimal, meanPackIds: 1.4, declaredEmptyStore: true }, 'V1-pack-not-empty').pass).toBe(
+      false,
+    );
+    // And the memory arm's own direction is unchanged: absence of the declaration keeps the old reading.
+    expect(gate({ ...minimal, meanPackIds: 0 }, 'V1-pack-not-empty').pass).toBe(false);
+    expect(gate({ ...minimal, meanPackIds: 1.4 }, 'V1-pack-not-empty').pass).toBe(true);
+  });
+});
+
 describe('the instrument-readiness gate', () => {
   const withFunnel = (funnel: NonNullable<ProtocolGateInput['funnel']>) =>
     gate({ ...minimal, funnel }, 'V0-instrument-ready');

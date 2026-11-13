@@ -477,6 +477,17 @@ export type Tau2Raw = {
    * every artefact before R55, which leaves `V0` absent rather than passing.
    */
   readonly funnel?: FunnelInput;
+  /**
+   * Whether the store was empty because the arm declared it before it ran.
+   *
+   * R101's arm, and the reason it is a field rather than an inference: `funnel.stored === 0` is true
+   * of a broken memory arm and of a scaffold arm, and the two need opposite readings. Present and
+   * `true`, the two gates that an empty store inverts *require* emptiness; absent, they read a zero
+   * as the pipeline defect they were written for. Absence is every arm before this field, which is
+   * why the default is not `false` written out: a boolean written into every artefact would claim a
+   * measurement where the lane only ever had a default.
+   */
+  readonly declaredEmptyStore?: boolean;
   /** The write path's own census, when the driver ran with admission switched on. */
   readonly writeAdmission?: {
     readonly mode: "off" | "neighbours";
@@ -709,6 +720,7 @@ export const PROJECTION: {
   plant: "carried",
   injectionNote: "carried",
   funnel: "carried",
+  declaredEmptyStore: "carried",
   writeAdmission: "carried",
 };
 
@@ -895,6 +907,9 @@ export function armRecordFromDriver(
       ? {}
       : { injectionNote: raw.injectionNote }),
     ...(raw.funnel === undefined ? {} : { funnel: raw.funnel }),
+    ...(raw.declaredEmptyStore === undefined
+      ? {}
+      : { declaredEmptyStore: raw.declaredEmptyStore }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),
     ...(raw.pack === undefined ? {} : { pack: raw.pack }),
     ...(raw.inaction === undefined ? {} : { inaction: raw.inaction }),

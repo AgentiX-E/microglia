@@ -367,6 +367,30 @@ describe('the projection supplies what the record holds and nothing else', () =>
     expect(input.domainOrigin?.storedWithDomain).toBe(59);
   });
 
+  it('carries the declared-empty flag only when the arm declared one', () => {
+    // Absence is every arm before R101, and it reads as "not declared" rather than as `false`: a
+    // boolean written everywhere would be a measurement about arms that were never asked.
+    const declared = tau2ProtocolInput({
+      domain: 'retail',
+      trialCount: 4,
+      memory: {
+        arm: 'memory',
+        tasks: 40,
+        trials: 4,
+        unscored: 0,
+        funnel: { corrections: 0, candidates: 0, admitted: 0, stored: 0, servable: 0 },
+        declaredEmptyStore: true,
+      },
+    });
+    expect(declared.input.declaredEmptyStore).toBe(true);
+    const undeclared = tau2ProtocolInput({
+      domain: 'retail',
+      trialCount: 4,
+      memory: { arm: 'memory', tasks: 40, trials: 4, unscored: 0 },
+    });
+    expect(undeclared.input.declaredEmptyStore).toBeUndefined();
+  });
+
   it('computes the parse rate from the denominator the reader actually dropped', () => {
     const { input } = tau2ProtocolInput({
       domain: 'retail',
@@ -756,6 +780,20 @@ describe('reading an arm artefact', () => {
   it('reports zero rather than NaN for an artefact with no metrics at all', () => {
     const record = tau2ArmRecordOf('reference', {});
     expect(record).toMatchObject({ tasks: 0, trials: 0, unscored: 0 });
+  });
+
+  it('carries the arm declaration across the artefact boundary, and only when it is there', () => {
+    // The pair step reads this arm's artefact, not the driver's process, so a flag the bridge drops is
+    // a `V0`/`V1` inversion that silently does not happen — and both would then grade a scaffold arm as
+    // a broken memory arm. The second assertion is the one that keeps the bridge from inventing a
+    // declaration for the arms that never made one.
+    const declared = tau2ArmRecordOf('memory', {
+      n: 40,
+      metrics: { tasks: 40, k: 4 },
+      tau2: { declaredEmptyStore: true },
+    });
+    expect(declared.declaredEmptyStore).toBe(true);
+    expect(tau2ArmRecordOf('memory', { n: 40, metrics: { tasks: 40, k: 4 } }).declaredEmptyStore).toBeUndefined();
   });
 
   it('carries the optional block forward only when it is there', () => {

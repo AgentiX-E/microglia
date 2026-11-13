@@ -60,6 +60,19 @@ describe('the sample gates of one arm', () => {
     expect(gates.find((gate) => gate.id === 'l4-control-arm')?.pass).toBe(false);
     expect(gates.find((gate) => gate.id === 'l4-coverage')?.pass).toBe(false);
   });
+
+  it('grades the wrapper-only arm as a control, with its own sentence', () => {
+    // R101's arm carries the treatment's agent and none of its pack, so `published + 5pp` is not a
+    // statement about it — and its job is still to hand the pairing step a complete per-task record,
+    // which is what the control gate asks. Same gate, different sentence, because a reader who cannot
+    // tell which control they are looking at cannot tell which half of R93's delta it explains.
+    const gates = sampleGates({ ...memory, arm: 'scaffold' });
+    expect(ids(gates)).toEqual(['l4-control-arm', 'l4-coverage', 'l4-fully-scored']);
+    expect(gates[0]?.criterion).toBe(
+      'the wrapper-only control scored every task it claims, so the pair separates the wrapper from the pack',
+    );
+    expect(sampleGates({ ...memory, arm: 'scaffold', unscored: 1 })[0]?.pass).toBe(false);
+  });
 });
 
 /**

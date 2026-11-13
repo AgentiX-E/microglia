@@ -295,6 +295,20 @@ export type ProtocolGateInput = {
     readonly served: number;
   };
   /**
+   * Whether this arm's store was empty because the arm says so.
+   *
+   * R101's arm, and the reason it needs a field rather than an inference: two null results are
+   * indistinguishable in the counts alone. A memory arm that produced nothing has a broken pipeline
+   * and no reading; a scaffold arm that produced nothing has measured the wrapper with no rules, which
+   * is exactly what it was bought to measure. `V0` and `V1` invert on this flag — each one *requires*
+   * the emptiness instead of tolerating it — so the declaration buys an inverted assertion rather than
+   * a waiver. A run that sets it and then carries an item is refused by both.
+   *
+   * Absent on every artefact written before it, which reads as "not a declared-empty arm" and keeps
+   * every committed gate row exactly as it was.
+   */
+  readonly declaredEmptyStore?: boolean;
+  /**
    * The fold accounting: evaluated, total, duplicated, leaked.
    *
    * Absent when the lane cannot show its split. A gate that guessed zero leaks would certify the
@@ -704,6 +718,7 @@ export const POWER_TARGET_PP = 6;
 
 /**
  * `V1`'s sentence, with the population behind the rate when the lane recorded one.
+
  *
  * The three zeros are distinct facts and the sentence is the only place they can be told apart:
  *
@@ -759,6 +774,40 @@ export function funnelVerdict(funnel: FunnelInput): FunnelVerdict {
   }
   const empty = emptyStage(funnel);
   return empty === undefined ? { ready: true, reason: 'every stage carried something' } : { ready: false, reason: empty };
+}
+
+/**
+ * The same question for an arm that declared its store empty *before* it ran.
+ *
+ * `funnelVerdict` reads an empty stage as a broken chain, and it is right to: on a memory arm a store
+ * that carried nothing cannot support a claim about memory. A scaffold arm is the case the predicate
+ * was not written for — its store is empty because the arm is *defined* as the wrapper with no rules,
+ * and grading it by `funnelVerdict` would refuse the one run that can decompose R93's −2.50pp into a
+ * wrapper term and a pack term.
+ *
+ * The exemption is inverted rather than waived, which is the property that keeps it from becoming a
+ * hole. A declared-empty arm must carry **nothing** at every stage; a single item anywhere in the
+ * chain means the arm is no longer the control it says it is, and the run is refused rather than
+ * graded — the same shape as `V1`'s inversion, and for the same reason. Waiving the gate would have
+ * made "this arm is empty" unfalsifiable, and an unfalsifiable control is worse than no control.
+ */
+export function declaredEmptyVerdict(funnel: FunnelInput): FunnelVerdict {
+  const stages: readonly (readonly [string, number])[] = [
+    ['corrections', funnel.corrections],
+    ['candidates', funnel.candidates],
+    ['admitted', funnel.admitted],
+    ['stored', funnel.stored],
+    ['servable', funnel.servable],
+  ];
+  const carried = stages.find(([, count]) => count !== 0);
+  return carried === undefined
+    ? { ready: true, reason: 'every stage carried nothing, which is what a declared-empty arm asserts' }
+    : {
+        ready: false,
+        reason:
+          `the arm declared an empty store and its ${carried[0]} stage carried ${String(carried[1])}: ` +
+          'this is no longer the control it was registered as',
+      };
 }
 
 /**
@@ -845,10 +894,16 @@ export function buildProtocolGates(
   const gates: ValidityGate[] = [];
   if (input.funnel !== undefined) {
     const funnel = input.funnel;
-    const verdict = funnelVerdict(funnel);
+    // One flag decides both gates that an empty store inverts, and it comes from the arm rather than
+    // from the counts: a run whose store is empty *and* which did not declare it is the defect `V0`
+    // exists to catch, and reading the emptiness as the declaration would let it through.
+    const declaredEmpty = input.declaredEmptyStore === true;
+    const verdict = declaredEmpty ? declaredEmptyVerdict(funnel) : funnelVerdict(funnel);
     gates.push({
       id: 'V0-instrument-ready',
-      criterion: 'every stage from a correction to a servable rule carried something, and the stages reconcile',
+      criterion: declaredEmpty
+        ? 'a declared-empty arm carried nothing at every stage, which is what it declared'
+        : 'every stage from a correction to a servable rule carried something, and the stages reconcile',
       actual: funnelReading(funnel, verdict),
       pass: verdict.ready,
       blocking: true,
@@ -857,9 +912,14 @@ export function buildProtocolGates(
   if (input.meanPackIds !== undefined) {
     gates.push({
       id: 'V1-pack-not-empty',
-      criterion: 'the memory arm injected at least one rule per question on average',
+      // The same inversion one layer up: the memory arm has to inject a rule, and the scaffold arm has
+      // to inject none. Both are the arm asserting what it is; neither is a gate standing down.
+      criterion:
+        input.declaredEmptyStore === true
+          ? 'the scaffold arm injected no rule at all, so what it measures is the wrapper'
+          : 'the memory arm injected at least one rule per question on average',
       actual: packReading(input.meanPackIds, input.packPopulation),
-      pass: input.meanPackIds > 0,
+      pass: input.declaredEmptyStore === true ? input.meanPackIds === 0 : input.meanPackIds > 0,
       blocking: true,
     });
   }

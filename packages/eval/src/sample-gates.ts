@@ -27,8 +27,16 @@ export type SampleGate = {
 };
 
 export type SampleGateInput = {
-  /** Which arm this is. The distinction is the whole point of this module. */
-  readonly arm: 'memory' | 'reference';
+  /**
+   * Which arm this is. The distinction is the whole point of this module.
+   *
+   * `scaffold` is R101's wrapper-only arm: the same agent as the memory arm over a store that is empty
+   * by construction. It is a control for the same reason `reference` is — no bar in the published table
+   * is a statement about a wrapper with no rules — and it owes the pairing step the same complete
+   * per-task record, so it is graded by the control gate with its own sentence rather than by the
+   * treatment's bar.
+   */
+  readonly arm: 'memory' | 'reference' | 'scaffold';
   /**
    * The distractor this arm planted, when it planted one.
    *
@@ -56,7 +64,7 @@ export function sampleGates(input: SampleGateInput): readonly SampleGate[] {
   return [
     // The published bar is a statement about the treatment. Omitting the gate is a statement, not a
     // pass: the metric carries `published_bar_applies: 0` and the note says which arm this is.
-    ...(input.published === undefined || input.arm === 'reference' || input.planted !== undefined
+    ...(input.published === undefined || input.arm !== 'memory' || input.planted !== undefined
       ? []
       : [
           {
@@ -67,16 +75,19 @@ export function sampleGates(input: SampleGateInput): readonly SampleGate[] {
           },
         ]),
     // What the control owes the pairing step, in place of a bar it cannot be held to.
-    ...(input.arm === 'reference'
-      ? [
+    ...(input.arm === 'memory'
+      ? []
+      : [
           {
             id: 'l4-control-arm',
             pass: input.unscored === 0 && input.tasks > 0,
             actual: `${String(input.tasks)} scored, ${String(input.unscored)} unscored`,
-            criterion: 'the memory-free control scored every task it claims, so the pairing step joins on all of them',
+            criterion:
+              input.arm === 'scaffold'
+                ? 'the wrapper-only control scored every task it claims, so the pair separates the wrapper from the pack'
+                : 'the memory-free control scored every task it claims, so the pairing step joins on all of them',
           },
-        ]
-      : []),
+        ]),
     {
       id: 'l4-coverage',
       pass: input.tasks >= input.minTasks,

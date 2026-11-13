@@ -87,6 +87,9 @@ import {
   storeCensus,
   funnelReading,
   funnelVerdict,
+  declaredEmptyVerdict,
+  resolveArmKind,
+  declaresEmptyStore,
   noMeasurementRefusal,
   guardAgainstToolNames,
   noteFacadeReading,
@@ -185,7 +188,19 @@ const TEST_DOMAIN =
 const LEARN_DOMAIN =
   process.env["TAU_TRAIN_DOMAIN"] ?? process.env["TAU_DOMAIN"] ?? "retail";
 const RECALL_DOMAIN = process.env["TAU_RECALL_DOMAIN"] ?? LEARN_DOMAIN;
-const MEMORY = (process.env["TAU_MEMORY"] ?? "true") !== "false";
+/**
+ * Which of the three arms this process is running.
+ *
+ * `memory` and `reference` are the two `TAU_MEMORY` already named, resolved through one function so a
+ * conflicting pair of variables is a refusal rather than a precedence. `scaffold` is R101: the wrapper
+ * over a store that is empty by construction, which is the only arm that separates R93's −2.50pp into
+ * a wrapper term and a pack term — the stock agent has no facade, no recall call and no `<rules>`
+ * block, so the two arms R93 compared differ in two things at once. See `tau2-arm-kind.ts`.
+ */
+const ARM = resolveArmKind(process.env);
+const MEMORY = ARM !== "reference";
+/** Whether this arm declared its store empty before it ran, which two gates invert on. */
+const DECLARED_EMPTY = declaresEmptyStore(ARM);
 /**
  * U3's only treatment knob. Unset (every dispatch before U3) resolves to zero,
  * so the facade keeps every hit and the as-is artefact stays comparable. A
@@ -1123,7 +1138,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const learnPath = join(workdir, "learn.json");
   // R91: the learn half is either run or pinned, and the rest of this function cannot tell which --
   // that is the property that makes a pinned arm comparable to a rebuild rather than a parallel lane.
-  const learned = await learnHalf(learnPath, train);
+  //
+  // R101 adds the third state and it is not a rewrite of either: a scaffold arm learns from nothing,
+  // so the half it would have run is the empty one. The rest of this function reads `learned` the same
+  // way it always did and the store that follows is empty by construction rather than by accident.
+  // Paying for 74 learn episodes to obtain a store nobody reads would have cost the arm its own reason
+  // for existing — it is the decomposition leg, and the decomposition is one held-out half wide.
+  const learned: Awaited<ReturnType<typeof learnHalf>> = DECLARED_EMPTY
+    ? { tasks: [], rewards: new Map<string, number>(), traces: new Map<string, TaskTrace>() }
+    : await learnHalf(learnPath, train);
   const learnedTasks = learned.tasks;
   const traces = learned.traces;
   const rewards = learned.rewards;
@@ -1456,12 +1479,16 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       `the trace arm read 0 traces from ${String(corrections.length)} correction(s): the learning document carries no simulate messages, so the unit under test did not run`,
     );
   }
-  const funnelState = funnelVerdict(funnel);
+  const funnelState = DECLARED_EMPTY ? declaredEmptyVerdict(funnel) : funnelVerdict(funnel);
   if (!funnelState.ready) {
     // A run whose pipeline did not carry anything has no reading to publish, and evaluating it would
     // spend the expensive half of the dispatch producing a number about an empty store. Recorded as
     // no-measurement rather than as a failure: the provider answered, the distiller ran, and what
     // broke is the chain between them.
+    //
+    // The declared-empty arm reaches this line with the other predicate rather than with an exemption:
+    // `declaredEmptyVerdict` passes only when every stage carried nothing, so a scaffold arm that
+    // quietly distilled an item is refused here instead of being graded as the control.
     throw noMeasurementRefusal(funnelReading(funnel, funnelState));
   }
   // The domain ledger, from the store rather than from the driver's intentions: an item that lost its
@@ -1912,7 +1939,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     ...(cost === undefined ? {} : { cost }),
     servedPackSizes: primary.servedPackSizes,
     learning: {
-      rows: train.length,
+      // Zero on a declared-empty arm, because zero rows were read: the split still has `train.length`
+      // tasks in it, but nothing was learned from any of them, and a `74` here would be read as a learn
+      // half that ran and produced nothing — the defect this arm is not.
+      rows: DECLARED_EMPTY ? 0 : train.length,
       unanswered,
       // R91: whether this store was rebuilt or replayed. A pin is the treatment that makes two arms
       // differ by one variable, so the record states its source, its size and the corpus it was priced
@@ -2032,6 +2062,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // carried. The counts are the driver's own, taken at the boundaries it can see, and they must
     // reconcile or `V0` says the two populations differ rather than reporting the last one.
     funnel,
+    // R101: the declaration, beside the counts it makes interpretable rather than instead of them.
+    // Written only when the arm is the declared-empty one: absence is every arm before this field, and
+    // a `false` written everywhere would be a measured statement about arms that never declared.
+    ...(DECLARED_EMPTY ? { declaredEmptyStore: true } : {}),
     recall: {
       requests: primary.recallRequests,
       served: primary.recallServed,

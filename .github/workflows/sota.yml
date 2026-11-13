@@ -122,7 +122,7 @@ on:
         required: false
         default: 'absolute'
       l4_arms:
-        description: 'L4 arms to run: both (memory then reference, paired), memory, or reference'
+        description: 'L4 arms to run: both (memory then reference, paired), memory, reference, or scaffold (R101: the memory step with a store that is empty by construction, then the reference arm, paired — the arm that separates R93''s wrapper term from its pack term)'
         required: false
         default: 'both'
       l4_train_share:
@@ -1516,6 +1516,14 @@ jobs:
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
           TAU_TRIALS: ${{ vars.TAU_TRIALS || '4' }}
           TAU_MEMORY: 'true'
+          # R101: the third arm. `scaffold` runs this same step — same agent, same facade, same model —
+          # with a store that is empty by construction: no learn episodes, no distillation, no rules.
+          # R93 compared the memory arm against τ²'s stock `llm_agent`, and those two differ in the
+          # pack *and* in the wrapper (facade, recall call, `<rules>` block, tool-name guard), so its
+          # −2.50pp belongs to neither. This variable is what makes the middle leg runnable, and the
+          # word is `empty-pack` rather than `true` because the arm's claim is that the emptiness was
+          # declared before the first episode rather than discovered after it.
+          TAU_SCAFFOLD: ${{ github.event.inputs.l4_arms == 'scaffold' && 'empty-pack' || '' }}
           TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
           # One task at a time, because the two numbers are in different units.
           #
@@ -1639,7 +1647,12 @@ jobs:
         # `''` is a push-triggered run, where no dispatch input exists and both arms ran
         # by default; without it the pairing would silently not happen on the scheduled
         # path, which is the path nobody is watching.
-        if: always() && (github.event.inputs.l4_arms == 'both' || github.event.inputs.l4_arms == '')
+        #
+        # `scaffold` is here rather than with the single-arm values because R101 buys a *pair*: the
+        # wrapper with no rules against the stock agent. The pairing step is where the protocol's
+        # `V0`/`V1` are graded, and those two are the gates that must invert for this arm — an
+        # unpaired scaffold run would carry no verdict about the arm at all.
+        if: always() && (github.event.inputs.l4_arms == 'both' || github.event.inputs.l4_arms == 'scaffold' || github.event.inputs.l4_arms == '')
         timeout-minutes: 10
         run: pnpm eval:l4-pair
 

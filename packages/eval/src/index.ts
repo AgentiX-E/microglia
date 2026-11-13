@@ -722,6 +722,13 @@ export {
   type ShapeGroup,
 } from './tau2-merge.js';
 export {
+  SCAFFOLD_EMPTY_PACK,
+  TAU2_ARM_KINDS,
+  declaresEmptyStore,
+  resolveArmKind,
+  type Tau2ArmKind,
+} from './tau2-arm-kind.js';
+export {
   decideFloor,
   type CostWeights,
   type FloorCostRow,
@@ -746,7 +753,12 @@ export { gateRows, renderMatrix, type GateRow } from './gate-matrix.js';
 // The funnel predicate travels with the lane so the driver can stop a run on the same condition the
 // gate publishes and a readback refuses on. Re-exported rather than re-implemented: three callers
 // with three definitions is the defect the funnel exists to remove.
-export { funnelReading, funnelVerdict, type FunnelVerdict } from '@agentix-e/microglia-protocol';
+export {
+  declaredEmptyVerdict,
+  funnelReading,
+  funnelVerdict,
+  type FunnelVerdict,
+} from '@agentix-e/microglia-protocol';
 
 export {
   resolveDistillForm,

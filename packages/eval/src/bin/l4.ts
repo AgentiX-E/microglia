@@ -35,7 +35,9 @@ import {
   sampleGates,
   perTaskRows,
   toPassAtK,
+  resolveArmKind,
   type PassAtKInput,
+  type Tau2ArmKind,
 } from '@agentix-e/microglia-eval';
 import type {
   NoMeasurementMarker,
@@ -393,8 +395,19 @@ const mean = meanPassAtK(measured.tasks);
  * control the memory arm is paired against, so it is not held to the published bar — see
  * `sampleGates` for the six dispatches that ended red before this distinction existed.
  */
-const arm: 'memory' | 'reference' =
-  (process.env['TAU_MEMORY'] ?? 'true') === 'false' ? 'reference' : 'memory';
+/**
+ * Which arm this file is grading.
+ *
+ * `TAU_MEMORY=false` is the reference arm: the same tasks, the same model, no store. It is the
+ * control the memory arm is paired against, so it is not held to the published bar — see
+ * `sampleGates` for the six dispatches that ended red before this distinction existed.
+ *
+ * `TAU_SCAFFOLD=empty-pack` is R101's wrapper-only arm. Read through the same resolver the driver
+ * reads, so the two processes cannot disagree about which arm was bought: this file decides what the
+ * artefact says about the run, and an artefact whose `arm` disagreed with the episodes behind it would
+ * be the one error a paired readback cannot detect.
+ */
+const arm: Tau2ArmKind = resolveArmKind(process.env);
 /**
  * The distractor this dispatch planted, when it planted one.
  *
@@ -408,7 +421,7 @@ const plantedArm = (process.env['TAU_PLANTED_RULES'] ?? '').trim();
 // across the two would read as a memory effect. Withheld rather than annotated, because a number a
 // reader can divide by is a number that gets quoted.
 const compared =
-  scenarioBar.published === null || K !== PUBLISHED_K
+  scenarioBar.published === null || K !== PUBLISHED_K || arm !== 'memory'
     ? undefined
     : compareToPublished(mean, scenarioBar.published, BAR);
 const coversSplit = measured.tasks.length >= MIN_TASKS;
@@ -542,8 +555,11 @@ await writeResult({
       ? {}
       : { competitor_pass4: COMPETITOR_PASS4 }),
     // Which arm this is, because the two are graded differently and a reader of the artefact
-    // cannot otherwise tell a control that failed a bar from a treatment that missed one.
+    // cannot otherwise tell a control that failed a bar from a treatment that missed one. R101's third
+    // arm keeps the `0`/`1` pair meaning what it always meant and states itself in the flag below, so a
+    // readback written before the scaffold arm existed still reads this field the same way.
     arm: arm === 'reference' ? 0 : 1,
+    scaffold_arm: arm === 'scaffold' ? 1 : 0,
     published_bar_applies:
       scenarioBar.comparable && arm === 'memory' && plantedArm === '' && K === PUBLISHED_K
         ? 1
@@ -560,7 +576,7 @@ await writeResult({
     planted_arm: plantedArm === '' ? 0 : 1,
     // Omitted for a planted arm as well, for the same reason the gate is: a delta against the published
     // number is the competitive reading, and a distractor arm is graded by its paired ledger instead.
-    ...(compared === undefined || arm === 'reference' || plantedArm !== ''
+    ...(compared === undefined || arm !== 'memory' || plantedArm !== ''
       ? {}
       : { delta: compared.delta }),
     tasks: measured.tasks.length,

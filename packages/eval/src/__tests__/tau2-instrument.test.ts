@@ -772,6 +772,7 @@ describe('the projection has a decision for every field, and keeps it', () => {
         refused: 0,
         failed: 0,
       },
+      declaredEmptyStore: true,
       writeAdmission: { mode: 'off', rephrased: 0, suppressed: 0 },
       useObservations: [{ query: 'cancel my reservation', statements: ['cancel reservation'] }],
       useArm: 'as-is',

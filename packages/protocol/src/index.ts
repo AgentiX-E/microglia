@@ -40,6 +40,7 @@
  */
 export {
   buildProtocolGates,
+  declaredEmptyVerdict,
   funnelReading,
   funnelVerdict,
   inGateOrder,
