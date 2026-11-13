@@ -162,6 +162,13 @@ export type Tau2ArmRecord = {
   readonly queries?: QueryCensus;
   /** R92: the τ² release and commit this arm ran. See `Tau2Raw.benchmark`. */
   readonly benchmark?: { readonly version: string; readonly commit: string };
+  /** R92: the bill and the per-conversation cost of the evaluated phase. See `Tau2Raw.cost`. */
+  readonly cost?: {
+    readonly usd: number;
+    readonly band: string;
+    readonly conversations: number;
+    readonly perConversation: number;
+  };
   readonly distillForm?: DistillFormRecord;
   /** R58: the unit distilled, the traces read, and the recurrence pass's census. */
   readonly distillUnit?: DistillUnitRecord;

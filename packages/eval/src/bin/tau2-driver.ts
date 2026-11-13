@@ -736,6 +736,17 @@ type Tau2PhaseUsage = {
   readonly cached_tokens?: number | null;
   readonly uncached_tokens?: number | null;
   readonly cache_hit_rate?: number | null;
+  /**
+   * The phase's bill, priced by `run_split._cost` in the band it actually ran in.
+   *
+   * Forwarded rather than recomputed, because there are two copies of the rate card in this repository
+   * (`eval/drivers/tau2/run_split.py` and `packages/eval/src/cost.ts`) and a third would be the one that
+   * disagreed. Absent on every arm before the counter existed.
+   */
+  readonly cost?: {
+    readonly usd?: number | null;
+    readonly band?: string | null;
+  } | null;
 };
 
 type Tau2PhaseDiagnostics = {
@@ -1789,6 +1800,33 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   process.stdout.write(
     `[tau2] usage: ${JSON.stringify(primary.diagnostics?.usage ?? null)}\n`,
   );
+  // R92: the number the competitor prints beside its score and this lane never has — cost per
+  // conversation, on the same run that produced the pass^4. `primary` is the *evaluation* phase's own
+  // document, and the two phases are separate processes, so this is inference spend and not the
+  // distillation's: a figure that mixed them would not be comparable to a published one. The
+  // competitor's retail 0.084 → 0.139 USD is the same quantity, which is what makes "cheaper at the
+  // same score" a claim rather than a hope.
+  const spend = primary.diagnostics?.usage?.cost;
+  const conversations = test.length * TRIALS;
+  const cost =
+    spend === undefined || spend === null || typeof spend.usd !== "number"
+      ? undefined
+      : {
+          usd: spend.usd,
+          band: spend.band ?? "unknown",
+          conversations,
+          // No zero guard: `run()` refuses a plan with an empty held-out half before it pays for
+          // anything, so the divisor is a count of conversations that were bought. A guard here would
+          // be a branch no run can reach, which is the shape of code this repository deletes.
+          perConversation: Math.round((spend.usd / conversations) * 1e4) / 1e4,
+        };
+  if (cost !== undefined) {
+    process.stdout.write(
+      `[tau2] cost: $${cost.usd.toFixed(4)} over ${String(cost.conversations)} conversation(s) = ` +
+        `$${cost.perConversation.toFixed(4)} each ` +
+        `(${cost.band})\n`,
+    );
+  }
   const scored = primary.scored;
   const llmStats = llm.stats;
   observed = {
@@ -1796,6 +1834,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     test: plan.test,
     trials: TRIALS,
     unscored: scored.unscored,
+    ...(cost === undefined ? {} : { cost }),
     servedPackSizes: primary.servedPackSizes,
     learning: {
       rows: train.length,

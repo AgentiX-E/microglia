@@ -734,6 +734,8 @@ describe('the projection has a decision for every field, and keeps it', () => {
       // R92: which benchmark generation this is. Carried because a number is comparable only to one
       // from the same release, and the release moved every retail task body between v0.2.0 and v1.0.1.
       benchmark: { version: 'v1.0.1', commit: 'f2c1ab3d4e5f60718293a4b5c6d7e8f901234567' },
+      // R92: what the score was bought for. The competitor publishes this beside its own number.
+      cost: { usd: 13.4857, band: 'off_peak', conversations: 160, perConversation: 0.0843 },
       injectionNote: { mode: 'standard', declared: false },
       funnel: {
         corrections: 2,
@@ -878,6 +880,20 @@ describe('the projection has a decision for every field, and keeps it', () => {
     // ranked against a published figure, and the omission reads as a compatible run.
     const benchmark = { version: 'v1.0.1', commit: 'f2c1ab3d4e5f60718293a4b5c6d7e8f901234567' };
     expect(armRecordFromDriver({ ...full(), benchmark }).benchmark).toEqual(benchmark);
+  });
+
+  it('carries the bill and the cost of one conversation, which is the number beside the score', () => {
+    // T.4 of the competitive record: the competitor reports USD per conversation on the same run that
+    // produced its pass^4, and this lane printed a token census and left the arithmetic to a reader.
+    const cost = { usd: 13.4857, band: 'off_peak', conversations: 160, perConversation: 0.0843 };
+    expect(armRecordFromDriver({ ...full(), cost }).cost).toEqual(cost);
+  });
+
+  it('omits the cost when the phase could not price itself, rather than writing a zero', () => {
+    // A zero would read as "the run was free" — the same defect as an unscored attempt counted as a
+    // failure, one field over. Absent reads as "not priced".
+    const record = armRecordFromDriver({ ...full(), cost: undefined } as Tau2Raw);
+    expect(record.cost).toBeUndefined();
   });
 
   it('omits the release when the checkout could not say, rather than guessing one', () => {

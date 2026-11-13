@@ -72,6 +72,17 @@ if (phase === 'selftest') {
       simulations,
     }),
   );
+  // The in-process diagnostics arrive on stdout rather than in the document: run_split.py prints one
+  // JSON line and the driver keeps the last one carrying diagnostics. A stand-in that printed none
+  // would leave the usage and the per-conversation cost untested while every case still passed.
+  process.stdout.write(
+    JSON.stringify({
+      phase,
+      diagnostics: {
+        usage: { calls: simulations.length, cost: { usd: 4, band: 'off_peak' } },
+      },
+    }) + '\\n',
+  );
 }
 `;
 
@@ -129,6 +140,62 @@ describe('the L4 driver', () => {
       delete process.env['TAU_TRIALS'];
       delete process.env['TAU_TRAIN_SHARE'];
       delete process.env['TAU_WORKDIR'];
+    }
+  }, 60_000);
+
+  it('prices the conversations it bought, which is the number the competitor prints', async () => {
+    // T.4 of the competitive record: ALTK reports USD per conversation on the run that produced its
+    // pass^4 and this lane reported a token census instead. The quotient is derived from the evaluation
+    // phase's own document rather than from a rate card here, because there are two copies of the rate
+    // card in this repository and a third would be the one that disagreed.
+    //
+    // A memory arm, because the record this field lives in is the memory arm's: a reference arm has no
+    // store to describe, so it reports trials and no instrument.
+    const { dir, executable } = stubRunner();
+    process.env['TAU_PYTHON'] = executable;
+    process.env['TAU_MEMORY'] = 'true';
+    process.env['TAU_TRIALS'] = '4';
+    process.env['TAU_TRAIN_SHARE'] = '0.5';
+    // The raw arm: records are written verbatim and the model is never asked, so this case prices the
+    // conversations without also having to fake a provider. An arm whose distiller returned nothing is
+    // refused earlier, by the no-measurement guard, which is a different test's subject.
+    process.env['TAU_DISTILL_UNIT'] = 'raw';
+    process.env['TAU_WORKDIR'] = dir;
+    process.env['DEEPSEEK_API_KEY'] = 'test-key';
+    process.env['TAU_DISTILL_MODEL'] = 'deepseek/deepseek-chat';
+    vi.stubGlobal('fetch', async () => {
+      throw new Error('a raw arm must not call a model');
+    });
+    const said: string[] = [];
+    const write = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array): boolean => {
+        said.push(String(chunk));
+        return true;
+      });
+    try {
+      const driver = await import('../bin/tau2-driver.js?case=cost');
+      await driver.run();
+      // Two held-out tasks at four trials each: the divisor is the conversations the evaluation phase
+      // ran, not the tasks it ran them on.
+      expect(driver.instrument()?.cost).toEqual({
+        usd: 4,
+        band: 'off_peak',
+        conversations: 8,
+        perConversation: 0.5,
+      });
+      expect(said.join('')).toContain('cost: $4.0000 over 8 conversation(s) = $0.5000 each');
+    } finally {
+      write.mockRestore();
+      vi.unstubAllGlobals();
+      delete process.env['TAU_PYTHON'];
+      delete process.env['TAU_MEMORY'];
+      delete process.env['TAU_TRIALS'];
+      delete process.env['TAU_TRAIN_SHARE'];
+      delete process.env['TAU_DISTILL_UNIT'];
+      delete process.env['TAU_WORKDIR'];
+      delete process.env['DEEPSEEK_API_KEY'];
+      delete process.env['TAU_DISTILL_MODEL'];
     }
   }, 60_000);
 

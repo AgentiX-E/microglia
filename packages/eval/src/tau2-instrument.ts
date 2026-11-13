@@ -345,6 +345,24 @@ export type Tau2Raw = {
    */
   readonly benchmark?: { readonly version: string; readonly commit: string };
   /**
+   * R92: what the evaluation phase's conversations cost, and what one of them cost.
+   *
+   * The competitor publishes this beside its score (retail 0.084 → 0.139 USD per conversation with the
+   * full guideline set) and this lane has always printed a usage line instead — a token census a reader
+   * has to price themselves. `usd` is the evaluation phase's own bill, priced by the Python half in the
+   * band it ran in; the learning phase is a separate process and is deliberately not folded in, because
+   * a number that mixed the two would not be comparable to a published one.
+   *
+   * `perConversation` is the quotient, not an estimate: the driver refuses a plan with no held-out task
+   * before it pays for one, so the divisor counts conversations that were actually bought.
+   */
+  readonly cost?: {
+    readonly usd: number;
+    readonly band: string;
+    readonly conversations: number;
+    readonly perConversation: number;
+  };
+  /**
    * R56: the form the distiller was asked for, and the inventory its ban refused names from.
    *
    * Absent on artefacts written before this field, which reads as "the form was not recorded" rather
@@ -640,6 +658,8 @@ export const PROJECTION: {
   queries: "carried",
   // Carried for the same reason as the query census: it is an input to what the number means.
   benchmark: "carried",
+  // Carried for the same reason: it is what the score was bought for.
+  cost: "carried",
   distillForm: "carried",
   distillUnit: "carried",
   rawlog: "carried",
@@ -791,6 +811,7 @@ export function armRecordFromDriver(
     // as a mystery.
     ...(raw.queries === undefined ? {} : { queries: raw.queries }),
     ...(raw.benchmark === undefined ? {} : { benchmark: raw.benchmark }),
+    ...(raw.cost === undefined ? {} : { cost: raw.cost }),
     ...(raw.distillForm === undefined ? {} : { distillForm: raw.distillForm }),
     ...(raw.distillUnit === undefined ? {} : { distillUnit: raw.distillUnit }),
     ...(raw.rawlog === undefined ? {} : { rawlog: raw.rawlog }),
