@@ -10,6 +10,7 @@ produced on the 40.
 So this arm is not a treatment. It is the same lane, on the sample the benchmark defines, and its rows are
 equalities about the instrument before they are anything about memory:
 
+  the release   the artefact names v1.0.1, the release the 67.5% was produced on
   the halves    74 learned, 40 held out, and `metrics.tasks` = 40
   the store     built from the wider half: `learning.edited` in [10, 25]
   the write     whole: `store.stored` = `learning.edited`, at least one servable
@@ -55,6 +56,10 @@ PREDICTED_EDITED_HIGH = 25
 PREDICTED_BUDGET = 2400
 PREDICTED_CAPACITY = 2010
 PUBLISHED_PASS4 = 0.575
+# The release the published figure was produced on, and the one this registration pinned. R92's first
+# dispatch ran v0.2.0, which does not ship the split file at all; the bodies and the retail reward moved
+# between the two, so a number is comparable to 67.5% only inside this release.
+REQUIRED_RELEASE = "v1.0.1"
 REQUIRED_SCENARIO = {"learn": "retail", "test": "retail", "recall": "retail"}
 
 
@@ -146,6 +151,27 @@ def grade(
         "the run absorbed a corpus mismatch and reported a number anyway",
         scored is not None and scored != PREDICTED_TASKS,
         f"metrics.tasks {scored!r} for {test} held-out task(s)",
+    )
+
+    # ---- the release: the axis this round added, and the one a dispatch paid for ---------------------
+    #
+    # `split_tasks.json` ships from v1.0.0 and the competitor's held-out figure was produced on v1.0.1, so
+    # the release is part of what the number means: 0 of 114 retail task bodies survive the boundary, and
+    # retail's `reward_basis` moves from the implicit `DB+COMMUNICATE` to a declared `DB+NL_ASSERTION` on
+    # 112 tasks. An artefact that does not name it cannot be ranked against a published figure, and
+    # "absent" is graded as a failure rather than read as the release the lane used to pin.
+    benchmark = tau2.get("benchmark")
+    version = benchmark.get("version") if isinstance(benchmark, dict) else None
+    commit = benchmark.get("commit") if isinstance(benchmark, dict) else None
+    report.predict(
+        f"the artefact names the release it ran ({REQUIRED_RELEASE})",
+        version == REQUIRED_RELEASE,
+        f"{version!r} at {str(commit)[:8]!r}",
+    )
+    report.refute(
+        "the run changed the release between the registration and the measurement",
+        version is not None and version != REQUIRED_RELEASE,
+        f"release {version!r} against the registered {REQUIRED_RELEASE}",
     )
 
     # ---- the store: rebuilt from the wider half ---------------------------------------------------
@@ -305,6 +331,7 @@ def base(**over: Any) -> dict[str, Any]:
             },
             "rawlog": {"records": 16, "clipped": 1, "toolBan": False, "ceiling": 2000},
             "store": {"stored": 16, "active": 16, "servable": 16},
+            "benchmark": {"version": REQUIRED_RELEASE, "commit": "b711c1ead46f55111bf765cf44d5da8bacc2d28c"},
             "queries": {
                 "requests": PREDICTED_SAMPLE,
                 "distinct": PREDICTED_SAMPLE,
@@ -363,6 +390,18 @@ def main() -> int:
     if args.self_test:
         cases: list[tuple[str, dict[str, Any], str]] = [
             ("the benchmark's halves over a store built from 74 grades", base(), "GRADED"),
+            # The axis this round added. A number is comparable only inside the release it was measured
+            # on, so an artefact that does not name it is a failure to grade, not a default.
+            (
+                "an artefact that does not name its release cannot be ranked",
+                base(**{"tau2.benchmark": None}),
+                "ABANDONED",
+            ),
+            (
+                "the release this lane used to pin is not this arm",
+                base(**{"tau2.benchmark": {"version": "v0.2.0", "commit": "0" * 40}}),
+                "ABANDONED",
+            ),
             (
                 "this lane's own cut is not this arm",
                 base(**{
