@@ -39,6 +39,23 @@ The two caps are stated even though the file states them, and the reason is a re
 said nothing would have its 74 learned tasks silently capped at the number a previous dispatch chose. The
 caps and the split now agree, and a disagreement between them would be visible as 57.
 
+## The question is recorded here, and deliberately not pinned
+
+R91's readback found the second draw: `buildPack` ranks on the question, the question is the user
+simulator's sampled first turn, and no arm in this record had ever recorded one. This arm carries
+`tau2.queries` — every request, its position, and a digest of the mapping — so that its packs are
+explainable and so that a later pin can be derived from this run, which is exactly how R90's `storeItems`
+made the store pin possible.
+
+It does not set `queryPin`, and the absence is the decision rather than an omission. This arm's product is
+an **absolute** number to rank against ALTK-Evolve's 67.5% on the same 40 tasks; a pinned phrasing is a
+retrieval stimulus no user typed, and a pack matched to a sentence nobody sent is a weaker treatment than
+the one deployment gives. The pin belongs to the arms whose subject *is* the pack — R93's grid, where two
+floors are only two levels if they are read against one question.
+
+So this arm's `pack.meanChars` and `coverage.p50` are readings of (question draw, pack), and its readback
+will say so rather than quoting them to four figures.
+
 
 ## What moved, and what did not
 

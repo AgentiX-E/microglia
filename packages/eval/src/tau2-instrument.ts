@@ -49,6 +49,7 @@ import type { PlantCensus } from "./plant.js";
 import type { PackCensus } from "./tau2-pack.js";
 import type { ConsolidationSweep } from "./consolidation-sweep.js";
 import type { ProvenanceCensus } from "./tau2-provenance.js";
+import type { QueryCensus } from "./tau2-queries.js";
 import {
   coverageHistogram,
   useCensus,
@@ -209,6 +210,21 @@ export type Tau2Raw = {
      * the error is the only string that separates them, and it used to die with the process.
      */
     readonly llmFailedSamples?: Readonly<Record<string, string>>;
+    /**
+     * Whether this store was rebuilt or replayed, and from what.
+     *
+     * R91. The store is normally a *draw* — it is built from whichever learn tasks failed, one trial
+     * each — so two arms differ by their store as well as their treatment. A pin replaces the draw with
+     * a list, and this field is what lets a reader tell a replayed store from a redrawn one: R91 pinned
+     * fifteen failures over 57 tasks and its store was byte-identical to R90's, which is the whole claim
+     * the arm exists to make.
+     */
+    readonly pin?: {
+      readonly source: string;
+      readonly failures: number;
+      readonly tasks: number;
+      readonly corpus: string;
+    };
   };
   /**
    * Calls the run made to the model, and how many of them failed after retries.
@@ -307,6 +323,17 @@ export type Tau2Raw = {
    */
   /** R54: the store's own words, bounded. See `storeItemSample`. */
   readonly storeItems?: StoreItemSample;
+  /**
+   * R92: what retrieval was asked, which is the input the pack pin could not reach.
+   *
+   * R91 replayed a store character for character and produced a different pack — `meanChars` 1,812.1
+   * against 1,825.3 — because `buildPack` ranks on BM25 over the query and the query is the user
+   * simulator's sampled first turn. An arm that does not carry this field leaves its pack difference
+   * unattributable: two arms can differ in the store, in the pack options, or in the questions they were
+   * asked, and the artefact cannot say which. Absent on every artefact before R92, which reads as "the
+   * queries were not recorded" rather than as "the queries were identical".
+   */
+  readonly queries?: QueryCensus;
   /**
    * R56: the form the distiller was asked for, and the inventory its ban refused names from.
    *
@@ -598,6 +625,9 @@ export const PROJECTION: {
   useArm: "reduced",
   widenedItems: "reduced",
   storeItems: "carried",
+  // Carried verbatim: without it a pack difference between two arms has three candidate causes and the
+  // artefact names none of them. See the field's own comment.
+  queries: "carried",
   distillForm: "carried",
   distillUnit: "carried",
   rawlog: "carried",
@@ -611,6 +641,34 @@ export const PROJECTION: {
   injectionNote: "carried",
   funnel: "carried",
   writeAdmission: "carried",
+};
+
+/**
+ * Every field of the learning block, and whether the artefact carries it.
+ *
+ * The table above is exhaustive over the *top* level of the driver's record and the block it named
+ * `learning` was still hand-written field by field inside the projection — so two fields were dropped
+ * in silence: `dropped` (written since R56, never carried, which is why a refused claim had no
+ * explanation anywhere in a file) and `pin` (R91's, whose absence made the first replayed store read
+ * as a drawn one). `keyof Tau2Raw['learning']` with `-?` is the same device as `PROJECTION`: a field
+ * added to the block fails to compile until it is given a decision here, and the projection's own test
+ * asserts that every key marked `carried` reaches the artefact.
+ */
+export const LEARNING_FIELDS: {
+  readonly [K in keyof Tau2Raw["learning"]]-?: "carried";
+} = {
+  rows: "carried",
+  unanswered: "carried",
+  edited: "carried",
+  distilled: "carried",
+  distillFailed: "carried",
+  candidates: "carried",
+  events: "carried",
+  dropped: "carried",
+  llmFailed: "carried",
+  llmFailedReasons: "carried",
+  llmFailedSamples: "carried",
+  pin: "carried",
 };
 
 export function armRecordFromDriver(
@@ -680,6 +738,13 @@ export function armRecordFromDriver(
       ...(raw.learning.llmFailedSamples === undefined
         ? {}
         : { llmFailedSamples: raw.learning.llmFailedSamples }),
+      // Two fields this block was silently dropping. `dropped` has been written by the driver since
+      // R56 and never reached an artefact -- the reason a claim was refused was in the run's record and
+      // in no file that survives it. `pin` is R91's, and its absence is how the first pinned arm read as
+      // an unpinned one: the run printed `learn half pinned: 15 of 57` and the artefact had no field to
+      // say so. Both are carried, and `LEARNING_FIELDS` makes the next one a compile error.
+      ...(raw.learning.dropped === undefined ? {} : { dropped: raw.learning.dropped }),
+      ...(raw.learning.pin === undefined ? {} : { pin: raw.learning.pin }),
     },
     domainOrigin: {
       storedWithDomain: Math.max(
@@ -709,6 +774,10 @@ export function armRecordFromDriver(
     // could not be explained. A projection that silently drops a field is worse than one that
     // refuses, because the artefact still looks complete.
     ...(raw.storeItems === undefined ? {} : { storeItems: raw.storeItems }),
+    // R92: the questions retrieval was asked. Beside the store's text and for the same reason — a pack
+    // is a function of both, and R91's artefact carried one of them and reported the other's movement
+    // as a mystery.
+    ...(raw.queries === undefined ? {} : { queries: raw.queries }),
     ...(raw.distillForm === undefined ? {} : { distillForm: raw.distillForm }),
     ...(raw.distillUnit === undefined ? {} : { distillUnit: raw.distillUnit }),
     ...(raw.rawlog === undefined ? {} : { rawlog: raw.rawlog }),

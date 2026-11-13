@@ -272,6 +272,20 @@ export type Prereg = {
    */
   readonly taskSplit?: string;
   /**
+   * The recall queries this arm replays, as a path inside the repository.
+   *
+   * R92. A pack is a function of (store, query, pack options). R91 held the first fixed and the pack still
+   * moved — `meanChars` 1,812.1 against R90's 1,825.3, coverage p50 0.2857 against 0.28 — because the query
+   * is the user simulator's sampled first turn and no arm had ever recorded it. A pack experiment (one
+   * store, two floors, two diversities, two budgets) prices its options only if the question is held fixed.
+   *
+   * Absent is the honest default for any arm quoting an absolute benchmark number: a fixed phrasing is a
+   * retrieval stimulus no user types, and pinning one would be measuring against a sentence the corpus does
+   * not contain. The key exists so that a *pack* arm can say it held the question, and so that the value it
+   * names is in the diff rather than in a job variable.
+   */
+  readonly queryPin?: string;
+  /**
    * Where the admitted items are served from: the recall pack, or a prefix of the system prompt.
    *
    * R55.1's second arm. It is not a tidiness switch: the SOTA holder's published cell injects *every*
@@ -349,6 +363,7 @@ const HEADER_KEYS = [
   'packBudget',
   'storePin',
   'taskSplit',
+  'queryPin',
   'packMode',
   'thinking',
 ] as const;
@@ -875,6 +890,26 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  /**
+   * The query pin, held to the same rule as the store pin.
+   *
+   * Same directory, same restriction, same reason: a header read by a paid dispatch must not be able to
+   * name a file outside the repository, and every pin living in one reviewable directory is what makes the
+   * pinned stimulus part of the diff rather than part of the job configuration.
+   */
+  const queryPinText = values.get('queryPin');
+  let queryPin: string | undefined;
+  if (queryPinText !== undefined) {
+    if (!/^eval\/pins\/[A-Za-z0-9._-]+\.json$/.test(queryPinText)) {
+      collected.push({
+        where: `header 'queryPin'`,
+        problem: `'${queryPinText}' is not a pin under eval/pins/`,
+      });
+    } else {
+      queryPin = queryPinText;
+    }
+  }
+
   const packModeText = values.get('packMode');
   let packMode: string | undefined;
   if (packModeText !== undefined) {
@@ -1014,6 +1049,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(packBudget === undefined ? {} : { packBudget }),
       ...(storePin === undefined ? {} : { storePin }),
       ...(taskSplit === undefined ? {} : { taskSplit }),
+      ...(queryPin === undefined ? {} : { queryPin }),
       ...(packMode === undefined ? {} : { packMode }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,

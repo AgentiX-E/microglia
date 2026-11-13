@@ -54,6 +54,7 @@ import type { CoverageHistogram, UseCensus } from './tau2-use-census.js';
 import type { InactionCensus } from './inaction.js';
 import type { DistillFormRecord, DistillUnitRecord, InjectionNoteRecord } from './tau2-instrument.js';
 import type { StoreItemSample } from './store-items.js';
+import type { QueryCensus } from './tau2-queries.js';
 
 /**
  * One arm's records, as far as the protocol is concerned.
@@ -151,6 +152,14 @@ export type Tau2ArmRecord = {
   readonly inaction?: InactionCensus;
   /** R54/R56: the store's own words, bounded, and the form the distiller was asked for. */
   readonly storeItems?: StoreItemSample;
+  /**
+   * R92: what retrieval was asked, and whether a pin replaced it.
+   *
+   * The subject of R91's second refutation. A pack is a function of the store and the query, and every
+   * artefact before this one recorded only the first — so a pack that changed under a pinned store read as
+   * a nondeterministic renderer, which is a defect in the wrong module.
+   */
+  readonly queries?: QueryCensus;
   readonly distillForm?: DistillFormRecord;
   /** R58: the unit distilled, the traces read, and the recurrence pass's census. */
   readonly distillUnit?: DistillUnitRecord;

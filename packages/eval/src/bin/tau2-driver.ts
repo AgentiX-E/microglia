@@ -29,7 +29,7 @@ import { execFile } from "node:child_process";
 import { createServer, type Server } from "node:http";
 import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 import {
@@ -72,6 +72,10 @@ import {
   parseTauResults,
   parseTauTasks,
   pinnedLearn,
+  assertQueryPinCovers,
+  parseQueryPin,
+  pinnedQueryText,
+  queryCensusOf,
   qualifiedId,
   resilientInterpreter,
   resolveInjectionNotePlan,
@@ -131,6 +135,9 @@ import {
   type PackReading,
   type ProbeAttempt,
   type ResilientInterpreter,
+  type QueryCensus,
+  type QueryPin,
+  type RecallInput,
 } from "@agentix-e/microglia-eval";
 import { maxStatementChars, type NoteMode } from "@agentix-e/microglia-core/apply";
 import {
@@ -342,6 +349,34 @@ if (TASK_SPLIT !== "" && TASK_SPLIT !== "official") {
 function officialSplitPath(domain: string): string {
   return join(REPO, ".tau2-bench", "data", "tau2", "domains", domain, "split_tasks.json");
 }
+
+/**
+ * Read the query pin, or nothing when the dispatch declared none.
+ *
+ * Two refusals rather than a warning, both before the first episode is paid for: a file that is not there,
+ * and a file too short for the phase. The second is the one that would otherwise be invisible — the facade
+ * answers a failed recall by telling the agent to continue without memory, so an uncovered episode is an
+ * episode that served no pack *and* an artefact that still calls itself pinned.
+ *
+ * The line it prints is the declaration, and `queries.pin` in the artefact is the record. R91 wrote the
+ * first and not the second, and its central claim had to be graded by inference.
+ */
+function readQueryPin(file: string, episodes: number): QueryPin | undefined {
+  if (file === "") return undefined;
+  // A registration names a path in the checkout, and the artefact records that name rather than the
+  // runner's absolute prefix: an artefact whose provenance changes with the machine that produced it
+  // cannot be compared against one from another dispatch.
+  const path = isAbsolute(file) ? file : join(REPO, file);
+  if (!existsSync(path)) {
+    throw new Error(`TAU_QUERY_PIN names ${file}, which is not in this checkout`);
+  }
+  const pin = parseQueryPin(JSON.parse(readFileSync(path, "utf8")) as unknown);
+  assertQueryPinCovers(pin, episodes);
+  process.stdout.write(
+    `[tau2] queries pinned: ${String(pin.texts.length)} text(s) from ${pin.source}\n`,
+  );
+  return pin;
+}
 /**
  * The characters of knowledge one recall may carry; `0` means the module default of 1,200.
  *
@@ -375,6 +410,19 @@ function pythonPath(): string {
 
 const PYTHON = pythonPath();
 const TASK = "tau2.act";
+/**
+ * The recall queries frozen to a list an earlier arm recorded; empty means ask the ones the simulator writes.
+ *
+ * R92. R91 held the store fixed and the pack still moved — `meanChars` 1,812.1 against 1,825.3, coverage
+ * p50 0.2857 against 0.28 — because a pack is ranked on BM25 over the query and the query is the user
+ * simulator's sampled first turn. The census below records those queries; this replays them, which is what
+ * a pack experiment (one store, two floors, two diversities) needs and what an absolute benchmark number
+ * does not: a fixed phrasing is a retrieval stimulus no user typed.
+ *
+ * The pin is keyed by the episode's position in the phase, because nothing upstream names the episode:
+ * the agent sends `task=tau2.act` on every request and `generate_next_message` receives no task id.
+ */
+const QUERY_PIN_FILE = (process.env["TAU_QUERY_PIN"] ?? "").trim();
 
 /**
  * The form this dispatch asks the distiller for.
@@ -833,6 +881,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // neither naming is right for the other's job.
   const train = plan.train.map(unqualified(LEARN_DOMAIN));
   const test = plan.test.map(unqualified(TEST_DOMAIN));
+  // R92: read the query pin before the first episode is paid for, not at the first recall. A pin that
+  // cannot cover the phase would otherwise surface as a 500 inside an episode, and the agent treats a
+  // failed recall by continuing without memory -- one episode silently served no pack while the artefact
+  // would still call itself pinned.
+  const queryPin = readQueryPin(QUERY_PIN_FILE, test.length * TRIALS);
   const scenario = {
     learn: LEARN_DOMAIN,
     test: TEST_DOMAIN,
@@ -1330,6 +1383,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     readonly packReadings: PackReading[];
     readonly recallRequests: number;
     readonly recallServed: number;
+    /**
+     * R92: what retrieval was asked, which no arm recorded before this one.
+     *
+     * Taken from THIS facade's phase for the same reason every counter above is: R48's defect was two
+     * readings from different dispatches.
+     */
+    readonly queryCensus: QueryCensus;
     readonly useObservations: UseObservation[];
     /**
      * The observations the coverage curve is built from.
@@ -1375,10 +1435,19 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // resemble it, which is the confound the arm exists to remove.
     const plantReadings: PlantedItem[] = [];
     let plantCreatedBlock = 0;
+    // R92: every question retrieval was asked, in the order the phase asked it. The position is the key
+    // because the facade is never told which task an episode belongs to -- the agent sends
+    // `task=tau2.act` on all 228 requests -- so an episode IS its position here.
+    const recallInputs: RecallInput[] = [];
     const facade = await startRecall(async ({ text }) => {
+      const index = recallInputs.length;
+      // The pin replaces the *retrieval* query and not the user's message: the episode still reads the
+      // phrasing the simulator wrote, and only what the pack is ranked on is held fixed.
+      const used = queryPin === undefined ? text : pinnedQueryText(queryPin, index);
+      recallInputs.push({ index, asked: text, used });
       const pack = await host.recall({
         task: TASK,
-        text,
+        text: used,
         scope: { domain: RECALL_DOMAIN },
         minCoverage: floor,
         // R53: the level is a rendering option of THIS recall. `undefined` keeps the host's,
@@ -1388,14 +1457,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       const planted =
         PLANTED === undefined
           ? undefined
-          : plantedFor(PLANT_PLAN.arm, text, PLANTED);
+          : plantedFor(PLANT_PLAN.arm, used, PLANTED);
       if (planted === undefined || PLANTED === undefined) {
         recallRequests += 1;
         if (pack.items.length > 0) recallServed += 1;
         servedPackSizes.push(pack.items.length);
         packReadings.push({ ids: pack.ids, truncated: pack.truncated, rendered: pack.rendered });
         useObservations.push({
-          query: text,
+          // The query the pack was ranked on, which is the only text a coverage reading is about.
+          query: used,
           statements: pack.items.map((item) => item.statement),
           // R51 made condition + statement the document the floor is applied to; this is the
           // same document, so the histogram cannot score a pack by text the floor never saw.
@@ -1421,7 +1491,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       // competed for, and the appended rule is not one of them.
       packReadings.push({ ids: pack.ids, truncated: pack.truncated, rendered: pack.rendered });
       useObservations.push({
-        query: text,
+        query: used,
         statements: [
           ...pack.items.map((item) => item.statement),
           planted.rule.statement,
@@ -1457,6 +1527,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       packReadings,
       recallRequests,
       recallServed,
+      queryCensus: queryCensusOf(
+        recallInputs,
+        queryPin === undefined ? {} : { pin: QUERY_PIN_FILE },
+      ),
       useObservations,
       // The census is taken from THIS facade's phase, for the same reason every counter above is:
       // R48's defect was two readings from different dispatches, and sharing one census between two
@@ -1754,6 +1828,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       served: primary.recallServed,
       empty: primary.recallRequests - primary.recallServed,
     },
+    // R92: the questions the packs were ranked on. Recorded beside the store because the two are the
+    // function's arguments: R91 replayed one exactly and the other moved by 13 characters a pack, and
+    // nothing in the artefact could say so.
+    queries: primary.queryCensus,
     // R89: what the pack refused, which `recall.isEmpty` cannot say. A request whose best record was
     // too long to render is counted as `empty` there and as `emptiedBySize` here, and the two call for
     // a budget change and a retrieval change respectively.

@@ -796,6 +796,17 @@ export {
   type PinnedLearn,
   type StorePin,
 } from './tau2-pin.js';
+// R92: the query is the second draw. Exported as one unit for the same reason as the store pin: a
+// caller that took the pin alone could replay a list it never checked against its own phase.
+export {
+  assertQueryPinCovers,
+  parseQueryPin,
+  pinnedQueryText,
+  queryCensusOf,
+  type QueryCensus,
+  type QueryPin,
+  type RecallInput,
+} from './tau2-queries.js';
 export {
   provenanceCensus,
   type ProvenanceCensus,

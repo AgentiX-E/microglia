@@ -32,7 +32,13 @@
  * on a set the benchmark does not define — and ranking it against a competitor's 67.5% is comparing two
  * populations. `official` reads the boundary from the corpus.
  *
- * Usage: pnpm eval:prereg-caps prereg/<id>.md  ->  "train=57" "test=1" "ceiling=2000" "budget=2400" "pin=" "taskSplit="
+ * R92 added the seventh: `queryPin` is the *question*. A pack is a function of (store, query, options),
+ * the first is pinned by `storePin`, and the third is the arm; until this key existed the second moved
+ * freely and an arm could not hold two of its three inputs. It stays empty for any arm quoting an absolute
+ * benchmark number — a fixed phrasing is a stimulus no user typed — and is printed only where the
+ * registration names one.
+ *
+ * Usage: pnpm eval:prereg-caps prereg/<id>.md  ->  "train=57" "test=1" "ceiling=2000" "budget=2400" "pin=" "taskSplit=" "queryPin="
  */
 import { readFileSync } from 'node:fs';
 import { readPrereg } from '../prereg.js';
@@ -55,7 +61,8 @@ function main(): void {
     for (const problem of reading.problems) refuse(`at ${problem.where}: ${problem.problem}`);
     return;
   }
-  const { trainTasks, testTasks, rawCeiling, packBudget, storePin, taskSplit } = reading.prereg;
+  const { trainTasks, testTasks, rawCeiling, packBudget, storePin, taskSplit, queryPin } =
+    reading.prereg;
   // A ceiling the declared pack cannot carry is refused here rather than priced: the arm would write
   // records the renderer drops, every one of which reads as a request with nothing relevant, and the
   // dispatch costs more than the check does. Only a registration that states both is refused -- see
@@ -84,6 +91,9 @@ function main(): void {
   // R92 did; `official` reads the boundary from the corpus's own `split_tasks.json`, which is the only
   // one a competitor's number can be compared to.
   process.stdout.write(`taskSplit=${taskSplit === undefined ? '' : taskSplit}\n`);
+  // R92: the question, when the arm holds it. Empty means the queries were the ones the simulator drew,
+  // which is what every arm before R92 did and what an arm quoting an absolute number must keep doing.
+  process.stdout.write(`queryPin=${queryPin === undefined ? '' : queryPin}\n`);
   // The capacity that follows from the pair, on stderr because no workflow input reads it: the number
   // exists so the dispatch log answers "what could this pack carry" without a second dispatch. Only for
   // the record unit, whose item shape is the interpreter's; a claim's line is the model's.

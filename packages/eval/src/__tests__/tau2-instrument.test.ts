@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { COVERAGE_FLOORS } from '../tau2-use-census.js';
-import { PROJECTION, armRecordFromDriver, storeCensus, type Tau2Raw } from '../tau2-instrument.js';
+import {
+  LEARNING_FIELDS,
+  PROJECTION,
+  armRecordFromDriver,
+  storeCensus,
+  type Tau2Raw,
+} from '../tau2-instrument.js';
 
 function raw(over: Partial<Tau2Raw> = {}): Tau2Raw {
   return {
@@ -712,6 +718,19 @@ describe('the projection has a decision for every field, and keeps it', () => {
         byRule: { 'near-address': 120, 'near-refund': 80 },
         digest: 'abc123abc123abcd',
       },
+      // R92: the questions the packs were ranked on. Carried because a pack is a function of the store
+      // *and* the query, and R91's artefact held the first while the second moved.
+      queries: {
+        requests: 200,
+        distinct: 187,
+        meanChars: 214.5,
+        p50Chars: 203,
+        digest: 'abcd1234abcd1234',
+        askedDigest: 'abcd1234abcd1234',
+        replaced: 0,
+        pin: null,
+        texts: [{ index: 0, text: 'cancel my reservation' }],
+      },
       injectionNote: { mode: 'standard', declared: false },
       funnel: {
         corrections: 2,
@@ -788,6 +807,76 @@ describe('the projection has a decision for every field, and keeps it', () => {
     // And the list is not trivially everything: the decision has two values and both are used.
     expect(reduced.length).toBeGreaterThan(0);
     expect(carried.length + reduced.length).toBe(Object.keys(full()).length);
+  });
+
+  it('carries every learning field, including the two the block used to drop', () => {
+    // The table above is exhaustive over the top level and the `learning` block was still hand-written
+    // inside the projection, so two fields were dropped in silence: `dropped` (written since R56, which
+    // is why a refused claim had no explanation in any file) and `pin` (R91's, whose absence made the
+    // first replayed store read as a drawn one). `LEARNING_FIELDS` makes the next one a compile error;
+    // this test holds the runtime half.
+    const learning: Tau2Raw['learning'] = {
+      rows: 57,
+      unanswered: 0,
+      edited: 15,
+      distilled: 15,
+      distillFailed: 0,
+      candidates: 15,
+      events: 15,
+      dropped: { 'schema-refused': 2 },
+      llmFailed: 0,
+      llmFailedReasons: { MG_E_TIMEOUT: 1 },
+      llmFailedSamples: { MG_E_TIMEOUT: 'read timed out' },
+      pin: {
+        source: 'R90 (run 43273198959)',
+        failures: 15,
+        tasks: 57,
+        corpus: '/work/.tau2-bench/data/tau2/domains/retail/tasks.json',
+      },
+    };
+    const record = armRecordFromDriver({ ...full(), learning });
+    const out = record.learning as unknown as Record<string, unknown>;
+    expect(out).toEqual(learning);
+    const missing = Object.keys(LEARNING_FIELDS).filter((field) => out[field] === undefined);
+    expect(missing).toEqual([]);
+  });
+
+  it('omits a learning field the driver did not report, rather than inventing a value', () => {
+    // Absent is not zero: an artefact written before the pin existed must not claim a store was drawn.
+    const record = armRecordFromDriver({
+      ...full(),
+      learning: { rows: 57, unanswered: 0, edited: 15, distilled: 15, distillFailed: 0 },
+    });
+    const out = record.learning as unknown as Record<string, unknown>;
+    expect(out['pin']).toBeUndefined();
+    expect(out['dropped']).toBeUndefined();
+  });
+
+  it('carries the query census beside the store it was ranked against', () => {
+    // R92. R91's artefact carried the store and not the question, so a pack that moved under a pinned
+    // store had no explanation in any file and read as a nondeterministic renderer.
+    const queries = {
+      requests: 228,
+      distinct: 228,
+      meanChars: 214.5,
+      p50Chars: 203,
+      digest: 'abcd1234abcd1234',
+      askedDigest: 'abcd1234abcd1234',
+      replaced: 0,
+      pin: null,
+      texts: [{ index: 0, text: 'cancel my reservation' }],
+    };
+    expect(armRecordFromDriver({ ...full(), queries }).queries).toEqual(queries);
+  });
+
+  it('omits the query census when the arm did not record one, rather than implying it was pinned', () => {
+    // An artefact written before R92 cannot say whether two arms asked the same questions. The absence
+    // has to read as "not recorded", because a `replaced: 0` would read as "the same queries ran".
+    const record = armRecordFromDriver({
+      ...full(),
+      queries: undefined,
+    } as Tau2Raw);
+    expect(record.queries).toBeUndefined();
   });
 
   it('folds every field it says it folds, and does not pass it through under its own name', () => {

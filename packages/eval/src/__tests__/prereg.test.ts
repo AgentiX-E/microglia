@@ -1788,3 +1788,52 @@ describe('packBudget, the other half of the ceiling', () => {
     expect(reading.prereg?.packBudget).toBeUndefined();
   });
 });
+
+describe('queryPin, the question as a file', () => {
+  const HEADER = [
+    '---',
+    'id: R93-one-question',
+    'step: R93',
+    'opened: 2026-11-14',
+    'arms: memory',
+    'sample: 228',
+    'gates: V1',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '## Prediction\n\n- two floors read the same pack\n\n' +
+    '## Refutation\n\n- a pack ranked on two questions proves neither floor was priced\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads a pin under eval/pins', () => {
+    // R92: the second pin. A pack is a function of (store, query, options) and this is the question, so a
+    // registration whose subject is the pack has to be able to say it held one.
+    const reading = readPrereg(
+      withHeader('queryPin: eval/pins/r90-retail-queries.json'),
+      'R93-one-question.md',
+    );
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.queryPin).toBe('eval/pins/r90-retail-queries.json');
+  });
+
+  it('refuses a path outside the pins directory, for the same reason the store pin does', () => {
+    expect(problemsOf(withHeader('queryPin: /etc/passwd'), 'R93-one-question.md')).toEqual([
+      "header 'queryPin': '/etc/passwd' is not a pin under eval/pins/",
+    ]);
+    for (const bad of ['pins/queries.json', 'eval/pins/../prereg/R92.md', 'eval/pins/x.txt']) {
+      expect(problemsOf(withHeader(`queryPin: ${bad}`), 'R93-one-question.md')).toHaveLength(1);
+    }
+  });
+
+  it('leaves the field absent when the registration pins no question, which is the default', () => {
+    // Absent is not "no queries ran": it means the queries were the ones the simulator drew, which is what
+    // an arm quoting an absolute benchmark number must keep doing.
+    const reading = readPrereg(withHeader('rawCeiling: 2000'), 'R93-one-question.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.queryPin).toBeUndefined();
+  });
+});

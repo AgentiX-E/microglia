@@ -12,8 +12,14 @@
  * The fix is not statistical. A correction's *content* is a function of the task and nothing else:
  * `taskCorrection` reads `evaluation_criteria.actions`, which is data the corpus publishes. The only
  * thing the learn half decides is **which tasks taught a lesson**, and that is a list. Pin the list and
- * the store is deterministic — same 15 records, same 172 values, same 1,825-character mean pack — and a
- * run that skips the learn half costs 57 episodes less than one that rebuilds it.
+ * the store is deterministic — R91 replayed R90's fifteen records, 172 values and one redaction exactly,
+ * and a run that skips the learn half costs 57 episodes less than one that rebuilds it.
+ *
+ * **The store is not the whole pack.** This module's first paragraph claimed a pinned list gave "the same
+ * 1,825-character mean pack", and R91 measured 1,812.1 against R90's 1,825.3: `buildPack` ranks on BM25
+ * over the *query*, and the query is the user simulator's sampled first turn, which no arm had ever
+ * recorded. A store pin buys the store. `tau2-queries.ts` is the other half, and the two are pinned
+ * separately because they answer different questions.
  *
  * ## Why a pinned list rather than a pinned document
  *
