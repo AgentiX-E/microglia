@@ -1,0 +1,20 @@
+{
+  "source": "R90 (run 43273198959): 15 of 57 retail learn tasks failed at one trial",
+  "failures": [
+    "retail/0",
+    "retail/15",
+    "retail/18",
+    "retail/20",
+    "retail/27",
+    "retail/31",
+    "retail/32",
+    "retail/33",
+    "retail/34",
+    "retail/38",
+    "retail/103",
+    "retail/104",
+    "retail/107",
+    "retail/109",
+    "retail/111"
+  ]
+}

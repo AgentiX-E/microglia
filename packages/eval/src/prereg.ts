@@ -244,6 +244,21 @@ export type Prereg = {
    */
   readonly packBudget?: number;
   /**
+   * The list of learn-half failures this arm rebuilds its store from, as a path inside the repository.
+   *
+   * R91. R90's readback showed that the store is a *draw*: it is made from whichever learn tasks failed,
+   * the learn half is one trial per task, and two runs of the same configuration wrote 12 and 15
+   * corrections with 8 ids in common. A registration that changes one variable therefore could not,
+   * until this key existed, differ by one variable — the store moved underneath the treatment.
+   *
+   * The value is a path rather than an id so the list itself is in the diff a reviewer reads, and it is
+   * restricted to `eval/pins/` so a header cannot point at a file that arrived from somewhere else. The
+   * list is small (one line per failed task), it is priced against the pinned τ² corpus in the same
+   * checkout, and a run that carries it skips the learn half entirely — 57 episodes it no longer pays
+   * for, and a store that is identical across two dispatches by construction rather than by luck.
+   */
+  readonly storePin?: string;
+  /**
    * Where the admitted items are served from: the recall pack, or a prefix of the system prompt.
    *
    * R55.1's second arm. It is not a tidiness switch: the SOTA holder's published cell injects *every*
@@ -319,6 +334,7 @@ const HEADER_KEYS = [
   'testTasks',
   'rawCeiling',
   'packBudget',
+  'storePin',
   'packMode',
   'thinking',
 ] as const;
@@ -806,6 +822,26 @@ export function readPrereg(markdown: string, file: string): PreregReading {
   // Where the admitted items are served from. R55.1's second arm, and the seventh switch to move out of
   // a repository variable: an arm that renders every admitted item into the system prompt is a different
   // treatment from one that retrieves two, and a run that cannot say which it ran measured neither.
+  /**
+   * The pinned failure list, and the shape a path has to have to be one.
+   *
+   * R91. The path is restricted to `eval/pins/*.json` rather than merely "a path": a header read by a
+   * paid dispatch must not be able to name a file outside the repository, and the restriction is also
+   * what makes the list reviewable — every pin lives in one directory whose contents are a diff.
+   */
+  const storePinText = values.get('storePin');
+  let storePin: string | undefined;
+  if (storePinText !== undefined) {
+    if (!/^eval\/pins\/[A-Za-z0-9._-]+\.json$/.test(storePinText)) {
+      collected.push({
+        where: `header 'storePin'`,
+        problem: `'${storePinText}' is not a pin under eval/pins/`,
+      });
+    } else {
+      storePin = storePinText;
+    }
+  }
+
   const packModeText = values.get('packMode');
   let packMode: string | undefined;
   if (packModeText !== undefined) {
@@ -943,6 +979,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(testTasks === undefined ? {} : { testTasks }),
       ...(rawCeiling === undefined ? {} : { rawCeiling }),
       ...(packBudget === undefined ? {} : { packBudget }),
+      ...(storePin === undefined ? {} : { storePin }),
       ...(packMode === undefined ? {} : { packMode }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,

@@ -68,8 +68,10 @@ import {
   correctionEdit,
   heldOutPlan,
   learnableCorrections,
+  parseStorePin,
   parseTauResults,
   parseTauTasks,
+  pinnedLearn,
   qualifiedId,
   resilientInterpreter,
   resolveInjectionNotePlan,
@@ -118,6 +120,7 @@ import {
   type TaskTrace,
   type Tau2ArmRecord,
   type Tau2Raw,
+  type TauTask,
   type TauTrialRow,
   type UseObservation,
   type PairedFacadeReading,
@@ -294,6 +297,32 @@ const TEST_TASKS = Math.max(0, Number(process.env["TAU_TEST_TASKS"] ?? 0) || 0);
  * by whichever dispatch ran last, and this one changes what the arm measures.
  */
 const RAWLOG_CEILING = Math.max(0, Number(process.env["TAU_RAWLOG_CEILING"] ?? 0) || 0);
+/**
+ * The learn half, frozen to the failures an earlier arm read; empty means learn as usual.
+ *
+ * R90's readback showed why this exists. The store is built from whichever learn tasks failed, the
+ * learn half is one trial per task, and one trial of a sampled model is a draw: R89 wrote 12 corrections
+ * and R90 wrote 15 from the same 57 tasks at the same one trial, with 8 ids in common. Two runs whose
+ * registrations said "one variable" therefore differed by two, and no arithmetic could untangle them.
+ * A pinned list makes the store a function of the corpus and the list, which is what lets the *next*
+ * arm differ by one thing, and it costs 57 episodes less than rebuilding the half that produced it.
+ *
+ * The corpus is read rather than the previous run's document: a correction is written from
+ * `evaluation_criteria.actions`, so the only thing the learn half decides is *which* tasks taught, and
+ * that is a list small enough to review in a diff. The trace unit is refused with the pin, because a
+ * trace arm's correction is written from an attempt this lane would no longer hold.
+ */
+const PIN_FILE = (process.env["TAU_PIN_FILE"] ?? "").trim();
+/**
+ * The corpus a pinned list is priced against: the pinned τ² checkout, and nothing else.
+ *
+ * Not a variable. A pin is only reproducible against the corpus it was drawn from, and a corpus chosen by
+ * whichever dispatch ran last would be the same class of defect the pin exists to remove -- the treatment
+ * decided by history rather than by the registration.
+ */
+function pinCorpusPath(domain: string): string {
+  return join(REPO, ".tau2-bench", "data", "tau2", "domains", domain, "tasks.json");
+}
 /**
  * The characters of knowledge one recall may carry; `0` means the module default of 1,200.
  *
@@ -662,6 +691,78 @@ function unqualified(domain: string): (id: string) => string {
   return (id) => (id.startsWith(prefix) ? id.slice(prefix.length) : id);
 }
 
+/** What the learn half produced, whether it was run or pinned. */
+type LearnHalf = {
+  readonly tasks: readonly TauTask[];
+  readonly rewards: ReadonlyMap<string, number>;
+  readonly traces: ReadonlyMap<string, TaskTrace>;
+  /** Present only when the half was pinned, and written into the artefact so a reader can see it. */
+  readonly pin?: { readonly source: string; readonly failures: number; readonly tasks: number; readonly corpus: string };
+};
+
+/**
+ * Build the learn half: run it, or rebuild it from a pinned list of failures.
+ *
+ * Two branches and one return shape, because everything downstream -- the corrections, the trace map,
+ * the unanswered count -- must read the same whether or not a model was asked. The pinned branch reads
+ * the corpus the pin is priced against and refuses a trace unit: a trace correction is written from the
+ * attempt a run observed, and a pinned list records no attempt.
+ */
+async function learnHalf(learnPath: string, train: readonly string[]): Promise<LearnHalf> {
+  if (PIN_FILE === "") {
+    await phase(
+      driverArgs({
+        script: SCRIPT,
+        domain: LEARN_DOMAIN,
+        phase: "learn",
+        agent: "llm_agent",
+        taskIds: train,
+        trials: 1,
+        out: learnPath,
+        requireOffPeak: REQUIRE_OFF_PEAK,
+      }),
+    );
+    const learned = readFileSync(learnPath, "utf8");
+    // Parsed once: two readers of one document is two chances to describe two different documents,
+    // and the trace arm's honesty depends on both halves coming from the same run.
+    const learnedDocument = JSON.parse(learned) as unknown;
+    const learnedTasks = parseTauTasks(learnedDocument);
+    // The traces, only for the arm that reads them: `tracesOf` walks every message of every
+    // simulation, and paying that on a correction arm would be work whose result the arm never uses.
+    const traces: ReadonlyMap<string, TaskTrace> =
+      DISTILL_UNIT === "trace" ? tracesOf(learnedDocument) : new Map<string, TaskTrace>();
+    return { tasks: learnedTasks, rewards: bestRewards(learned), traces };
+  }
+
+  if (DISTILL_UNIT === "trace") {
+    throw new Error(
+      "a pinned store cannot serve the trace unit: its corrections are written from an attempt a pin does not carry",
+    );
+  }
+  const corpus = pinCorpusPath(LEARN_DOMAIN);
+  const pinned = pinnedLearn(
+    JSON.parse(readFileSync(corpus, "utf8")) as unknown,
+    parseStorePin(JSON.parse(readFileSync(PIN_FILE, "utf8")) as unknown),
+    train,
+    LEARN_DOMAIN,
+  );
+  process.stdout.write(
+    `[tau2] learn half pinned: ${String(pinned.failures)} of ${String(pinned.tasks.length)} task(s) ` +
+      `failed in ${pinned.pin.source}\n`,
+  );
+  return {
+    tasks: pinned.tasks,
+    rewards: pinned.rewards,
+    traces: new Map<string, TaskTrace>(),
+    pin: {
+      source: pinned.pin.source,
+      failures: pinned.failures,
+      tasks: pinned.tasks.length,
+      corpus,
+    },
+  };
+}
+
 export async function run(): Promise<readonly PassAtKInput[]> {
   const workdir =
     process.env["TAU_WORKDIR"] ??
@@ -772,31 +873,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   }
 
   const learnPath = join(workdir, "learn.json");
-  await phase(
-    driverArgs({
-      script: SCRIPT,
-      domain: LEARN_DOMAIN,
-      phase: "learn",
-      agent: "llm_agent",
-      taskIds: train,
-      trials: 1,
-      out: learnPath,
-      requireOffPeak: REQUIRE_OFF_PEAK,
-    }),
-  );
-
-  const learned = readFileSync(learnPath, "utf8");
-  // Parsed once: two readers of one document is two chances to describe two different documents,
-  // and the trace arm's honesty depends on both halves coming from the same run.
-  const learnedDocument = JSON.parse(learned) as unknown;
-  const learnedTasks = parseTauTasks(learnedDocument);
-  // The traces, only for the arm that reads them: `tracesOf` walks every message of every
-  // simulation, and paying that on a correction arm would be work whose result the arm never uses.
-  const traces: ReadonlyMap<string, TaskTrace> =
-    DISTILL_UNIT === "trace"
-      ? tracesOf(learnedDocument)
-      : new Map<string, TaskTrace>();
-  const rewards = bestRewards(learned);
+  // R91: the learn half is either run or pinned, and the rest of this function cannot tell which --
+  // that is the property that makes a pinned arm comparable to a rebuild rather than a parallel lane.
+  const learned = await learnHalf(learnPath, train);
+  const learnedTasks = learned.tasks;
+  const traces = learned.traces;
+  const rewards = learned.rewards;
   const corrections: Correction[] = learnableCorrections(learnedTasks, rewards, 1, DISTILL_SCOPE);
   // The two ways a training task can leave the store without a correction are not the same fact, and
   // V32 grades the difference: a task the model *passed* needed nothing, so a store built from every
@@ -1522,6 +1604,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     learning: {
       rows: train.length,
       unanswered,
+      // R91: whether this store was rebuilt or replayed. A pin is the treatment that makes two arms
+      // differ by one variable, so the record states its source, its size and the corpus it was priced
+      // against -- an artefact that says "pinned" and not what to cannot be audited.
+      ...(learned.pin === undefined ? {} : { pin: learned.pin }),
       // R62: corrections *from a repair*. Under `scope: all` the store also holds records made from a
       // pass, and folding those into this count would make a widened store and a repaired one report
       // the same number -- the field's name and its value finally agree, and the population is read

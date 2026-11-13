@@ -1343,6 +1343,17 @@ jobs:
           # raises the ceiling without raising this writes records the renderer drops, and a dropped
           # record reads as a request with nothing relevant in every artefact this lane produced.
           echo "packBudget=$(echo "$CAPS" | sed -n 's/^budget=//p')" >> "$GITHUB_OUTPUT"
+          # R91: the learn half, frozen to a list. Emitted as a repository-relative path and joined to
+          # the workspace where it is used, because a pin is a file in the checkout rather than a
+          # variable -- the list itself is the treatment, and it has to be in the diff.
+          STORE_PIN=$(echo "$CAPS" | sed -n 's/^pin=//p')
+          # A pin that is not in the checkout is the one failure this check can catch before the
+          # evaluation is paid for: the driver would refuse it, but a refusal costs the dispatch.
+          if [ -n "$STORE_PIN" ] && [ ! -f "$STORE_PIN" ]; then
+            echo "::error::the registration names the store pin $STORE_PIN, which is not in this checkout"
+            exit 1
+          fi
+          echo "storePin=$STORE_PIN" >> "$GITHUB_OUTPUT"
           echo "overrides=$OVERRIDES" >> "$GITHUB_OUTPUT"
           if [ -n "$OVERRIDES" ]; then
             echo "::warning::the registration overrides repository variables: $OVERRIDES"
@@ -1452,6 +1463,10 @@ jobs:
           TAU_RAWLOG_CEILING: ${{ steps.recall_floor.outputs.rawCeiling || '0' }}
           # Empty means the lane's 1,200, which is what every published arm ran with.
           TAU_PACK_BUDGET: ${{ steps.recall_floor.outputs.packBudget || '0' }}
+          # R91: the learn half this arm rebuilds its store from, when the registration names one. Empty
+          # means learn as usual, which is what every earlier arm did; a path is joined to the
+          # checkout here so the driver never has to know where the repository is.
+          TAU_PIN_FILE: ${{ steps.recall_floor.outputs.storePin != '' && format('{0}/{1}', github.workspace, steps.recall_floor.outputs.storePin) || '' }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
@@ -1517,6 +1532,10 @@ jobs:
           TAU_RAWLOG_CEILING: ${{ steps.recall_floor.outputs.rawCeiling || '0' }}
           # Empty means the lane's 1,200, which is what every published arm ran with.
           TAU_PACK_BUDGET: ${{ steps.recall_floor.outputs.packBudget || '0' }}
+          # R91: the learn half this arm rebuilds its store from, when the registration names one. Empty
+          # means learn as usual, which is what every earlier arm did; a path is joined to the
+          # checkout here so the driver never has to know where the repository is.
+          TAU_PIN_FILE: ${{ steps.recall_floor.outputs.storePin != '' && format('{0}/{1}', github.workspace, steps.recall_floor.outputs.storePin) || '' }}
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}

@@ -154,6 +154,15 @@ to keep: email addresses, telephone numbers, and `sk-…` / `gh…_` / JWT / AWS
 is the only one withheld from a **reference**, and it is withheld by rule id rather than by bypassing
 redaction, so a rule added later still applies to the values that arrive under `*_id`.
 
+**Store pin** — a list of the learning tasks whose episodes **failed**, kept as a file, so that a store
+can be rebuilt without running those episodes again. The store is otherwise a *draw*: which tasks teach
+is decided by one sampled trial each, so two runs of the same configuration build different stores (12
+records in one measurement, 15 in the next, 8 task ids in common) and nothing measured across them is a
+single-variable comparison. A correction's *content* is a function of the corpus — the expected calls and
+the question — so pinning the list makes the store deterministic, and `pinnedLearn` refuses a list naming
+a task the corpus does not hold rather than building a smaller store that still reads as measured. The
+pin costs the episodes it replaces: a pinned run does not pay for its learning half.
+
 **Trust** — a scalar in `[0, 1]` attached to a feedback event, derived from the *signal* (execution
 result > clarification > preference > rating with reason > edit > bare rating) and optionally capped by
 the host. Never derived from the actor's identity.

@@ -1630,6 +1630,50 @@ describe('rawCeiling, the one number R85 was mismeasured by', () => {
   });
 });
 
+describe('storePin, the learn half as a file', () => {
+  const HEADER = [
+    '---',
+    'id: R91-store-frozen',
+    'step: R91',
+    'opened: 2026-11-12',
+    'arms: memory',
+    'sample: 228',
+    'gates: V1',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '## Prediction\n\n- the store is the same store\n\n' +
+    '## Refutation\n\n- a store that differs proves the list does not determine it\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads a pin under eval/pins', () => {
+    const reading = readPrereg(withHeader('storePin: eval/pins/r90-retail.json'), 'R91-store-frozen.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.storePin).toBe('eval/pins/r90-retail.json');
+  });
+
+  it('refuses a path outside the pins directory, so a header cannot reach the filesystem', () => {
+    // The restriction is the check: a pin is a treatment and it has to live where a reviewer reads it,
+    // and a header that could name any path could name a file this repository never reviewed.
+    expect(problemsOf(withHeader('storePin: /etc/passwd'), 'R91-store-frozen.md')).toEqual([
+      "header 'storePin': '/etc/passwd' is not a pin under eval/pins/",
+    ]);
+    for (const bad of ['pins/r90.json', 'eval/pins/../prereg/R90.md', 'eval/pins/x.txt']) {
+      expect(problemsOf(withHeader(`storePin: ${bad}`), 'R91-store-frozen.md')).toHaveLength(1);
+    }
+  });
+
+  it('leaves the field absent when the registration pins nothing, because a rebuild is the default', () => {
+    const reading = readPrereg(withHeader('rawCeiling: 2000'), 'R91-store-frozen.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.storePin).toBeUndefined();
+  });
+});
+
 describe('packBudget, the other half of the ceiling', () => {
   const HEADER = [
     '---',

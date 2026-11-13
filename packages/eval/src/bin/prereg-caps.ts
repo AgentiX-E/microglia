@@ -22,7 +22,12 @@
  * ceiling inherits the lane's budget, and this script prints the capacity that implies on stderr, so the
  * mismatch is in the dispatch log even where it is not an error.
  *
- * Usage: pnpm eval:prereg-caps prereg/<id>.md  ->  "train=57" "test=1" "ceiling=2000" "budget=2400"
+ * R91 added the fifth: `storePin` is the learn half itself. R90's readback showed the store is a draw —
+ * 12 corrections in R89 and 15 in R90 from the same 57 tasks at the same one trial, 8 ids in common — so
+ * an arm that does not fix it cannot differ from its predecessor by one variable, whatever its header
+ * says. A registration that names a pin rebuilds the same store and skips the episodes that produced it.
+ *
+ * Usage: pnpm eval:prereg-caps prereg/<id>.md  ->  "train=57" "test=1" "ceiling=2000" "budget=2400" "pin="
  */
 import { readFileSync } from 'node:fs';
 import { readPrereg } from '../prereg.js';
@@ -45,7 +50,7 @@ function main(): void {
     for (const problem of reading.problems) refuse(`at ${problem.where}: ${problem.problem}`);
     return;
   }
-  const { trainTasks, testTasks, rawCeiling, packBudget } = reading.prereg;
+  const { trainTasks, testTasks, rawCeiling, packBudget, storePin } = reading.prereg;
   // A ceiling the declared pack cannot carry is refused here rather than priced: the arm would write
   // records the renderer drops, every one of which reads as a request with nothing relevant, and the
   // dispatch costs more than the check does. Only a registration that states both is refused -- see
@@ -66,6 +71,10 @@ function main(): void {
   process.stdout.write(`test=${testTasks === undefined ? '' : String(testTasks)}\n`);
   process.stdout.write(`ceiling=${rawCeiling === undefined ? '' : String(rawCeiling)}\n`);
   process.stdout.write(`budget=${packBudget === undefined ? '' : String(packBudget)}\n`);
+  // R91: the learn half, frozen to a list. A path rather than an id because the list is read in the
+  // diff, and printed only where the registration states it -- a run without one rebuilds the half,
+  // which is the behaviour every earlier arm had and must keep.
+  process.stdout.write(`pin=${storePin === undefined ? '' : storePin}\n`);
   // The capacity that follows from the pair, on stderr because no workflow input reads it: the number
   // exists so the dispatch log answers "what could this pack carry" without a second dispatch. Only for
   // the record unit, whose item shape is the interpreter's; a claim's line is the model's.

@@ -426,6 +426,13 @@ The study is a package, not a script:
   protocol codes, tool failures as readable results.
 - `lanes/delivery.ts` — POC-19: a real HTTP receiver that verifies HMAC and de-duplicates, an
   acknowledgement lost on purpose, and a delayed response that proves the latency measurement is live.
+- `tau2-pin.ts` — the store as a file: the failures an earlier measurement learned from, priced against
+  the pinned corpus instead of re-derived from a fresh rollout. `parseStorePin` reads the list,
+  `pinRewards` refuses an id the corpus does not hold, and `pinnedLearn` returns the same three things the
+  run branch returns, so nothing downstream can tell a rebuilt store from a replayed one. It exists
+  because a store is otherwise a *draw*: which learning tasks fail is one sampled trial each, and two runs
+  of one configuration wrote 12 and 15 corrections with 8 ids in common — so a comparison across them is
+  not single-variable whatever its registration says. A pinned run also skips the episodes it replaces.
 - `l4.ts` — the τ²-bench result reader: both storage forms, and four named refusals taken from
   upstream's own rules (unscored trials leave the denominator, a short grid is refused, duplicate
   trials are an error, and a trial succeeds only on `reward == 1.0`).

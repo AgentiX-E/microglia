@@ -785,6 +785,17 @@ export {
 // switches -- one says what shape a record has, the other says which tasks produce one -- and a
 // driver that could import one and not the other would decide the population by accident.
 export { resolveDistillScope, type DistillScope } from './tau2-scope.js';
+// R91: the store is a draw unless it is pinned. Exported as one unit -- the parser, the reward map and
+// the corpus wrapper -- because a caller that took the parser alone could build a store from a list it
+// never validated, which is the failure the module exists to refuse.
+export {
+  parseStorePin,
+  pinRewards,
+  pinnedLearn,
+  tasksDocumentOf,
+  type PinnedLearn,
+  type StorePin,
+} from './tau2-pin.js';
 export {
   provenanceCensus,
   type ProvenanceCensus,
