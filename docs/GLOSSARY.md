@@ -1287,3 +1287,25 @@ the fallback's when every claim in it is the model's. `microglia` records `disti
 therefore an estimate of the lane's run-to-run noise rather than a contribution. It is reported
 separately from a treatment contrast and never merged with one: a delta inside it cannot be
 attributed to anything, so any claimed effect smaller than the null contrast is not a measurement.
+
+**Writer grid** — One correction asked of every candidate `(model, form)` pair, one call each, read for
+a claim that carries a `when`. A *grid* rather than a probe because a writer is two axes and neither
+alone describes one: a form is a prompt and a model is a capacity, and a lane that has only ever run
+one pair cannot say which of the two failed. The verdicts are `viable`, `no-writer` and `unanswered`,
+and the last two are never merged — `no-writer` is a result that was paid for, `unanswered` is an
+outage that was not measured. Run it with `pnpm eval:writer-probe`; it costs cents and refuses rather
+than certifies, because a fixture that states a rule is not a population that does.
+
+**Entity survival** — The share of the concrete values in a correction (order ids, item ids, emails,
+amounts) that reach a stored claim. `faithfulness.kept` and `whole` count it, and it is expected to be
+low: a claim that carries an order id cannot transfer to an unseen order. It is recorded anyway because
+the opposite failure has no symptom — a store of pure abstractions looks healthy at every count and
+cannot answer *this* order, and the only way to see the trade is to print both sides. R104's store read
+`0` of `667` entities across 71 corrections.
+
+**Abstraction tax** — What a tool-name ban removes in exchange for making a claim transferable. The
+ban is right in principle: a claim naming `cancel_pending_order` cannot generalise past the scenario
+that taught it. But the candidates it refuses are the ones that say *which operation applies*, and what
+survives is the residue a schema validator already knows — the JSON shape of an action, the order two
+calls go in. The tax is measurable on any artefact that carries both `distillForm.refused` and the
+store's own text, and no arm had priced it until R117.

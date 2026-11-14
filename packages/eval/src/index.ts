@@ -1802,3 +1802,20 @@ export {
 } from './no-measurement-note.js';
 export { replyCensus, replyCensusLine, classifyReply, EMPTY_PREVIEW_CHARS, type DistillReplyCensus, type DistillReplyKind, type DistillReplyCounter } from './distill-replies.js';
 export { writerOf, type WriterReading, type WriterState } from './distill-writer.js';
+export {
+  DISTILL_THINKING,
+  TRIAL_PREVIEW_CHARS,
+  candidateGrid,
+  probeWriters,
+  readWriterProbe,
+  trialOf,
+  trialPreview,
+  writerLabel,
+  writerProbeMarkdown,
+  type ProbeTokens,
+  type WriterCandidate,
+  type WriterOutcome,
+  type WriterProbe,
+  type WriterProbeState,
+  type WriterTrial,
+} from './writer-probe.js';

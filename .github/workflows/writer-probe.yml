@@ -1,0 +1,90 @@
+name: writer-probe
+
+# R112's question, priced before an arm is dispatched.
+#
+# A workflow of its own rather than a job in `sota.yml`, for the reason `cache-probe.yml` gives: the
+# benchmark file's jobs are gated on variables a probe dispatch does not set, and `vars.TAU_ENV_READY`
+# alone is enough to start the lane — so the cheapest way to run eight calls is to not share a file
+# with a two-arm benchmark.
+#
+# What it measures: one correction that states a rule, through every candidate `(model, form)` pair,
+# one call each, read for a claim carrying a `when`. R104 ran a single pair (`deepseek-flash/lesson`)
+# and answered 10 of 73 events, and no artefact could say whether the cause was the model, the form,
+# or the corrections: `procedure`, `repair` and `lexicon` have never been run on this lane at all.
+#
+# Two of the three verdicts refuse the treatment rather than confirm it: `no-writer` says a grid
+# returned and wrote nothing usable, `unanswered` says the provider never answered — an outage, which
+# is not a finding about writers. The distinction is the whole point: R111's fifteen empty replies
+# were read as fifteen healthy calls.
+#
+# The summary is rendered by the command (`--summary`), not by a `run:` block. §R111 recorded why: a
+# `node -e` step in `sota.yml` died on a double quote inside a comment, and no test could see it.
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: 'Comma-separated model ids; empty asks the lane model and the endpoint''s other served id'
+        required: false
+        default: ''
+      forms:
+        description: 'Comma-separated distillation forms'
+        required: false
+        default: 'lesson,repair,procedure,lexicon'
+      max_calls:
+        description: 'Hard call budget. The grid is models x forms, and the run refuses to exceed this'
+        required: false
+        default: '24'
+      max_tokens:
+        description: 'Reply ceiling per call. The lane distils at 1200, so a probe above that prices room no arm grants'
+        required: false
+        default: '1200'
+
+jobs:
+  probe:
+    name: 'Writer grid'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install
+        run: pnpm install --frozen-lockfile
+      - name: Build
+        run: pnpm build
+      - name: Probe
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          # The model the lane spends, from the variable the lane reads: the grid's first row has to be
+          # the pair a dispatch would actually buy.
+          TAU_MODEL: ${{ vars.TAU_MODEL || 'deepseek/deepseek-flash' }}
+        run: |
+          set -eu
+          pnpm eval:writer-probe \
+            --out eval/results/writer-probe.json \
+            --summary eval/results/writer-probe.md \
+            --models '${{ github.event.inputs.models }}' \
+            --forms '${{ github.event.inputs.forms }}' \
+            --max-calls '${{ github.event.inputs.max_calls }}' \
+            --max-tokens '${{ github.event.inputs.max_tokens }}'
+      - name: Say what the writers did
+        if: always()
+        run: |
+          if [ -f eval/results/writer-probe.md ]; then
+            cat eval/results/writer-probe.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf '%s\n' 'no artefact: the probe did not finish, which is not a measurement about writers' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: writer-probe
+          path: |
+            eval/results/writer-probe.json
+            eval/results/writer-probe.md
+          if-no-files-found: warn

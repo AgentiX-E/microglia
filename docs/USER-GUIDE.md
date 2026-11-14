@@ -2291,6 +2291,56 @@ the fallback's because the fallback ran. `modelCoverage` sits beside it — the 
 the model answered at all — which is the number that tells you whether a store represents its
 population.
 
+### 13.20 When the store is full and all of it is format
+
+A store can pass every count and still be useless, and the failure has no symptom: items are stored,
+`recall` serves them, the pack is full, and the score does not move. This project's own benchmark
+produced exactly that store — six claims, five of six carrying a `when`, `pass^4` 0.550 against a bar
+of 0.575 — and every one of the six was a fact about the wire format:
+
+```
+Action list entries are objects with a name field and an arguments object …
+A pending-order item change records the id in item_ids and the replacement in new_item_ids …
+The address update is ordered before the item modification on the same pending order …
+```
+
+Nothing there says *what a request of a given shape requires*. A schema validator already knows the
+first, second and fourth; the third is the only one a store is needed for. Three numbers tell the two
+kinds apart, and all three are cheap to read:
+
+| number | where it comes from | what a low value means |
+| --- | --- | --- |
+| **entity survival** — concrete values that reach a claim | `faithfulness.kept` / `.entities` | `0 of 667` means no claim is about any particular order, which is fine for transfer and fatal for answering |
+| **median coverage of an injected pair** | `coverage.medians.medianAllPairs` | `4.76%` means the median injected item matches one word in twenty of a request |
+| **refused share at the ban** | `distillForm.refused` / `distillUnit.claims` | `10 of 16` means the filter removed most of what was written, and the survivors are the abstracted half |
+
+If all three are low, the problem is upstream of retrieval and no amount of recall tuning reaches it.
+
+**The ban is usually the cause, and it is one boolean.** A tool-name ban refuses any claim that names
+one of the actions the scenario defines, so a claim cannot say `cancel_pending_order`. It exists so a
+claim can transfer to an unseen scenario, and it works: the six survivors name no tool. What it also
+does is delete the candidates that say *which operation applies* — the operational half — leaving the
+residue that generalises because it says almost nothing. Measure both sides before choosing: run the
+same population with and without `accept: toolGuard.accept` and read the store's own text, not only
+the score.
+
+**Before you change the ban, check the writer.** `pnpm eval:writer-probe` asks one correction through
+every `(model, form)` pair you name, one call each, and reports which pairs write a claim carrying a
+`when`:
+
+```bash
+pnpm eval:writer-probe \
+  --models deepseek-flash,deepseek-chat \
+  --forms lesson,repair,procedure,lexicon \
+  --out eval/results/writer-probe.json --summary eval/results/writer-probe.md
+```
+
+Three verdicts, and the difference between the last two matters: `viable` means at least one pair
+wrote a conditioned claim, `no-writer` means every call returned and none did (a result — change the
+form or the ban), `unanswered` means the calls threw (an outage — change nothing, rerun). It asks about
+a fixture, so `viable` permits a dispatch and does not promise one: the fixture states a rule and your
+corrections may not.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

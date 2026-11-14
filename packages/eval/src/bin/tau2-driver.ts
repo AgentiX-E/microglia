@@ -174,6 +174,7 @@ import { tau2ShapeOf } from "../tau2-shape.js";
 import { runDistillPreflight, type PreflightReading } from "../distill-preflight.js";
 import { replyCensus, replyCensusLine } from "../distill-replies.js";
 import { writerOf } from "../distill-writer.js";
+import { DISTILL_THINKING } from "../writer-probe.js";
 import { startRecallFacade } from "../tau2-facade.js";
 import {
   resolveShapeArmPlan,
@@ -641,8 +642,10 @@ const DISTILL_TOKENS = 1_200;
  *
  * One factory rather than two constructor calls, because the pre-flight and the arm must ask the same
  * provider under the same regime — a pre-flight that passed under one regime and an arm that ran
- * under another would certify a writer that never wrote. `thinking: 'off'` is stated rather than left
- * to the provider's default; `answerBudget` exists in this package for the lane that does think.
+ * under another would certify a writer that never wrote. The regime is `DISTILL_THINKING`, a constant
+ * this file no longer owns: the writer grid (`eval:writer-probe`) asks the same backend about the
+ * same fixture, and two literals for one regime is how R104's `thinking` was inherited from an
+ * endpoint default instead of being stated.
  */
 function distillClient(maxCalls: number): LlmClient {
   return new LlmClient({
@@ -652,7 +655,7 @@ function distillClient(maxCalls: number): LlmClient {
       process.env["TAU_MODEL"] ||
       "deepseek-chat",
     maxCalls,
-    thinking: "off",
+    thinking: DISTILL_THINKING,
   });
 }
 
