@@ -2,17 +2,13 @@
 id: R119-the-regime-paired
 step: R119
 opened: 2026-11-15
-# Two arms, because a delta needs something to be a delta from. R104 bought `memory` alone and
-# published a `pass^4` against a bar from another paper; `armsAgainstRegistration` now compares this
-# list with what a dispatch buys in both directions, so a dispatch of one arm is refused rather than
-# quietly producing a number that has no control in it.
-arms: memory, reference
-# 68 tasks × k=4 = 272 episodes. Not a round number: 68 is the split the `-67` evidence files were
-# drawn on, so this is comparable with the one τ² pairing on disk. The floor is stated in tasks, not
-# episodes — a pairing is one per task — and 40 tasks would put it at 44.30pp against this design's
-# 33.98pp, which is the difference between a reading that could see a large effect and one that
-# could not.
-sample: 272
+# One arm, and the reason is arithmetic rather than preference. This arm claims an absolute score
+# against a fixed bar, not a delta between two arms, so it does not need a control inside the
+# dispatch — and it could not afford one: R104's single arm took 177 wall-clock minutes for 160
+# episodes, and the L4 job's ceiling is 340. Two arms at 68 tasks is 544 episodes, about ten hours.
+# A registration that names a control it cannot finish is a registration that buys nothing.
+arms: memory
+sample: 160
 gates: V0,V1,V2,V3,V5,V8
 recallFloor: 0
 facadePair: off
@@ -29,95 +25,95 @@ recallDomain: retail
 packBudget: 2400
 taskSplit: official
 trainTasks: 74
-testTasks: 68
+testTasks: 40
 release: v1.0.1
 ---
 
-# R119 — the regime, paid for: one store built under a stated regime, measured against its own control
+# R119 — the regime, paid for: what a store fourteen times larger does to a score, at R104's own `n`
 
-**Registered** 2026-11-15, after R118 answered the question this arm exists to price. Three readings
-are on disk and none of them is this one:
+**Registered** 2026-11-15, after R118 answered the question this arm exists to price.
 
-> **R104** (`43589735959`) asked 73 corrections and got **10 answers**: `distillReplies {calls: 73,
-> answered: 10, blank: 63}`, 16 candidates, 6 stored, one store served whole to 164 requests at a
-> 4.76% median coverage, `pass^4 0.550` against a 0.575 bar.
+> **R104** (`43589735959`) asked 73 corrections and got **10 answers**: `answered: 10, blank: 63`, 16
+> candidates, 6 stored, one store served whole to 164 requests at a 4.76% median coverage,
+> `pass^4 0.550` on 40 tasks.
 
-> **R112** (`43621097332`) asked one fixture of 8 candidate `(model, form)` pairs under a stated
-> `thinking: 'off'` and **every one answered**, `reasoningTokens: 0` on every call, `lesson` best of
-> the four forms. Model and form are excluded as explanations.
+> **R118** (`43623858218`) ran the same 73 corrections under a stated `thinking: 'off'` and got
+> **73 of 73 answered**, `blank: 0`, 143 candidates, **86 stored**, 67,859 characters,
+> `silence.state: answered-everywhere`.
 
-> **R118** (`43623858218`) ran the same 73 corrections under the same stated regime and got
-> **73 of 73 answered**, `blank: 0`, `143 candidates`, **86 stored**, 67,859 characters,
-> `silence.state: answered-everywhere`. The regime was the whole of it.
-
-So the store this registration evaluates is not R104's store. It is fourteen times larger, built from
-seven times as many answers, and **nothing has ever measured what it does to a score**.
+So the store this registration evaluates is not R104's store. It is fourteen times larger, and
+nothing has measured what it does to a score.
 
 ## What one dispatch changes
 
-Nothing about the arm. This is R104's lane with a regime that R112 and R118 have both documented, and
-one change to the dispatch rather than to the experiment:
+Nothing about the arm. This is R104's lane, R104's split, R104's `n`, R104's form and model, with the
+regime R112 and R118 have both documented.
 
-| change | what it is | why it is not a treatment |
-| --- | --- | --- |
-| `memory` **and** `reference` bought together | R104 named one arm | the reference arm is the control the delta is measured against, so it cannot move what the memory arm does |
+| change | what it is |
+| --- | --- |
+| `thinking: 'off'` stated by the client | R104's regime was an inherited endpoint default |
+| `storeItems`, `store`, `yield` in the artefact | R118 wrote a store and could not say what was in it |
 
-Everything else is R104's: `distillScope: all`, `distillUnit: correction`, `distillForm: lesson`, the
-official 74/68 split, `packBudget: 2400`, `release v1.0.1`, `deepseek/deepseek-flash`,
-`facadeShapes: two-unit`.
+## The three rulers, and which one this registration is measured with
+
+The record has been reading its own numbers with one ruler and stating conclusions with another.
+Three different quantities are in play and they differ by nearly a factor of three:
+
+| what is claimed | the ruler | at n = 40 | at n = 68 |
+| --- | --- | --- | --- |
+| a paired delta, from one dispatch's two arms | `detectableDelta(tasks, d)` | 44.30pp (`d=1`) / 27.91pp (`d=0.397`) | 33.98pp / 21.41pp |
+| **an absolute score against a fixed bar** | `1.96·sqrt(p(1−p)/n)` over tasks | **±15.42pp** | ±11.86pp |
+| two runs from different samples | `1.96·sqrt(p₁(1−p₁)/n₁ + p₂(1−p₂)/n₂)` | 17.65pp against ALTK's 114 | 14.65pp |
+
+**This registration claims the second row.** It does not claim that memory beats a control inside
+this dispatch — that claim needs two arms and the wall clock will not carry them, which is why `arms:
+memory` and not `memory, reference`. What it claims is a score on 40 tasks, measured against a bar
+fixed before the run.
 
 ## Prediction
 
 - `distillReplies` reads `answered: 73, blank: 0` and `funnel.stored` is **86**, not 6 — the regime
   reproduces on a dispatch that goes on to evaluate.
-- `storeItems` carries the text of the stored claims, and `faithfulness`/`coverage` are the readings
-  this registration is really buying: whether 86 claims are still format, and how much of a request
-  an injected claim now covers.
-- The paired delta is reported with its interval and its floor, and the facade split is reported
-  beside it rather than instead of it.
+- `storeItems` carries the text of the 86 claims, `faithfulness.kept`/`.entities` and
+  `coverage.medians` are the readings this arm is really buying, and `yieldCensus` says which
+  corrections taught nothing.
+- The score is reported with its binomial interval, not as a point.
 
 ## Refutation
 
-**The floor is 33.98pp on 68 paired tasks**, from `detectableDelta(68, 1)` — complete discordance,
-which no run reaches. So:
-
-- A paired delta **below 33.98pp is not a finding** and this registration forbids quoting it as one,
-  whatever its sign. The most likely outcome of this dispatch is a number in that band.
-- At the discordance the last τ² pairing actually showed — 27 of 68 tasks changing hands — the
-  minimum detectable difference is **21.41pp**, which is the number a result on this lane is measured
-  against in practice.
-- A delta **above those bounds in favour of memory** is the first effect this lane has ever been able
-  to resolve, and it is attributable to the store the stated regime builds.
-- A delta **above those bounds against memory** refutes the repaired store on its own population and makes
-  R117 (the ban, on and off) the next dollar rather than R113a.
-- `funnel.stored` far below 86 on an evaluating dispatch refutes the reproduction, not the regime:
-  R118's census and this arm share a distiller and differ in what happens after it.
-- A `blank` count above zero refutes the regime statement itself, because `distillClient` states
+- **The score must clear 0.75 to be called above the 0.575 bar.** At n = 40 the interval's lower
+  bound is `p − 15.42pp`, so 0.65 gives 0.502 and 0.70 gives 0.558 — both below the bar. A score of
+  0.72 reported as *beating* 0.575 refutes this registration's own arithmetic, not the bar.
+- **A score below 0.55 with 86 claims where 6 gave 0.550** refutes the reading that the memory null
+  was a store-size problem, and moves the lever to what the claims say — §192's finding that all six
+  were format, and R117's ban, become the next dollar.
+- **A `blank` count above zero** refutes the regime statement, because `distillClient` states
   `thinking: 'off'` and the artefact carries `reasoningTokens`.
+- **`funnel.stored` far below 86** refutes the reproduction rather than the regime: this arm and R118
+  share a distiller and differ only in what happens after it.
 
-## Why `effectClaimPp` is absent
+## Why `effectClaimPp` is absent, and what that costs
 
-A header field now refuses a claimed effect its own sample could not resolve, and on this design it
-would have to be **above 33.98pp** to pass — which is honest and is also larger than any effect this
-project has measured anywhere. It is not written because the size of this effect is the question, not
-the premise: a registration that states a number it does not believe is a registration that has
-already decided what it will find.
+A header field refuses a claimed effect its own sample could not resolve. On 40 paired tasks the floor
+is 44.30pp, so any delta claim here would be refused — correctly, and that is why no delta is claimed.
+The field's other job is moot: with one arm there is no delta to claim at all.
 
-The field's second job is done anyway. `armsAgainstRegistration` compares this header's two arms with
-what a dispatch buys in both directions, so a dispatch of `memory` alone against this file is refused
-before it spends anything.
+**This is a descriptive arm.** It buys a store's text and a point estimate with an interval, for $0.89
+in 177 minutes. It cannot buy a SOTA statement, and the arithmetic above says why: 40 tasks resolve a
+15.42pp half-width on an absolute score, which separates 0.55 from 0.75 and does not separate 0.55
+from 0.575.
 
 ## Cost
 
-**~$3.04**, which is two arms at R85's billed band: 272 episodes each, about 4,100 agent calls, and
-73 distillation calls charged once. R104's `memory` arm alone cost $0.8938 for 160 episodes, so this
-is that number scaled to 272 and doubled — and the doubling is the part R104 skipped.
+**~$0.89**, R104's own billed figure for the same shape: 160 episodes, about 2,400 agent calls,
+73 distillation calls, 177 wall-clock minutes against a 340-minute ceiling.
 
 ## What this unlocks
 
 | reading | question it answers | what it decides |
 | --- | --- | --- |
-| the paired delta and its interval | what a 14× store does to `pass^4` | whether the memory null was ever about memory |
-| `storeItems` + `faithfulness.kept` + `coverage` | whether 86 claims are operational or still format | whether R117 (the ban) or R113a (the unit) is next |
-| the facade split | whether the 17.5pp null contrast survives a larger sample | whether any number on this board can be ordered at all |
-| `yieldCensus` | which corrections taught nothing and which taught six | whether the population or the writer is the ceiling |
+| `storeItems` on 86 claims | whether the 14× store is operational or still format | whether R117 (the ban) or R113a (the unit) is the next dollar |
+| `faithfulness.kept` / `.entities` | how much concrete value survives the abstraction | whether the ban is the thing removing it |
+| `coverage.medians` | how much of a request an injected claim covers | whether 4.76% was the store or the population |
+| the absolute score and its interval | whether 14× the store moves a score at all | what the next `n` has to be, and on which lane |
+| the facade split | whether the 17.5pp null contrast survives a different store | whether any τ² number can be ordered |
