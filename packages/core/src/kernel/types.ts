@@ -178,6 +178,25 @@ export const TIER_RANK: Readonly<Record<ProvenanceTier, number>> = {
 };
 
 /**
+ * Which side of a run a lesson came from.
+ *
+ * `repair` is a lesson learned from something that did not stand — a correction, a rejection, a
+ * question that had to be asked, an answer that was not given. `pass` is a lesson learned from an
+ * artefact that worked.
+ *
+ * The distinction is not cosmetic: the retrospection lane consolidates repairs into guidelines and
+ * lets a pass only contradict one, because a store of successes taught by one instance is what R99
+ * measured at 62.5% against fifteen corrections at 70.0%. Without this field the side is
+ * unrecoverable from a store — `kind` is what the distiller's model chose to write, and the τ²
+ * distiller writes `exemplar` for a correction and for a success alike — so a consolidator reading
+ * a dump could only guess, and the guess had a systematic sign.
+ *
+ * Absent means **not classified**, never `pass`: every record written before this field existed
+ * carries no side, and a reader that fills the silence in has invented the answer it was asked for.
+ */
+export type KnowledgePolarity = 'repair' | 'pass';
+
+/**
  * A scope is a conjunction of optional filters. Every present field must match.
  *
  * Scopes are deliberately coarse and human-auditable: a correction learned in
@@ -365,6 +384,15 @@ export type KnowledgeItem = {
   readonly statusReason?: string;
   /** The strongest tier among the evidence that produced this item. */
   readonly tier?: ProvenanceTier;
+  /**
+   * The side of the observation that taught this item, when the distiller could name one.
+   *
+   * Adopted once and then held, the way `when` is: the side is what the claim was learned *from*,
+   * so a later observation from the other side is support, not a change of side. The mixture it
+   * produces is still measurable — the evaluation lane's provenance census counts items citing
+   * both populations through their evidence, independently of this field.
+   */
+  readonly polarity?: KnowledgePolarity;
   /** Number of runs in which this item was retrieved and injected. */
   readonly applied: number;
   /** Number of those runs whose observed outcome was positive. */
@@ -509,6 +537,14 @@ export type DistillCandidate = {
   readonly dedupeKey: string;
   /** Set by the distiller from the event kind; absent means "not classified". */
   readonly tier?: ProvenanceTier;
+  /**
+   * Set by the distiller from the event's own signal; absent means "not classified".
+   *
+   * An interpreter may state one and the distiller discards it, the way it discards the
+   * interpreter's attempt number: which side an observation is on is a property of the
+   * observation, and an interpreter is host code reading someone else's evidence.
+   */
+  readonly polarity?: KnowledgePolarity;
 };
 
 export type RecallQuery = {

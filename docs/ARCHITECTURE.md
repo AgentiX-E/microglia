@@ -79,6 +79,16 @@ screen, the exact-key merge, generalisation, write admission, contradiction reso
 admission — happens in the distiller, once, for every interpreter. That is what makes an LLM-backed
 interpreter safe to enable: the model's output is untrusted input to a pipeline that already exists.
 
+**Two fields are stamped from the event, and the candidate's own value is discarded.** The *tier*
+comes from the event's kind, and the *side* — `repair` or `pass`, which half of the run the lesson came
+from — comes from its signal. An interpreter is host code reading someone else's observation, so a
+claim that says "this was a success" over a failed outcome is a statement about evidence it did not
+collect; the event is the authority, exactly as it is for the attempt number. The side is not
+decoration: retrospection consolidates corrections into guidelines and may only let a success
+contradict one, so a store that cannot say which records came from a correction cannot feed it. It is
+adopted once and then held, like a condition — a success repeating a lesson learned from a failure is
+support for the lesson, not evidence about where it came from.
+
 The order of those four store decisions is load-bearing rather than incidental:
 
 | Step | Asks | Runs when |

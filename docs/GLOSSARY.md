@@ -614,6 +614,16 @@ rather than deleted, so the audit trail and past-tense queries survive.
 **Provenance tier** — the shape of a signal: `user-text`, `structured-edit`, `outcome`, `host-asserted`.
 Set from the event kind, never by configuration, and used to cap how far a lesson may travel.
 
+**Side (polarity)** — which half of a run a lesson came from: `repair` (something did not stand — a
+correction, a rejection, a question that had to be asked, an answer that was not given) or `pass` (an
+artefact that worked). Read from the **signal**, not the kind, because one kind carries both sides: a
+`rating` with `value: 'up'` and one with `value: 'down'` are one kind and two sides, and so are a successful
+and a failed `outcome`. Recorded on the item by the distiller and adopted once, like a condition — a success
+that repeats a lesson learned from a failure is support for the lesson, not evidence that it was learned
+from a success. Absent means *not classified*, which is what every record written before the field existed
+is, and a reader that fills that silence in has invented its answer: a store of pure repairs was read as a
+store of pure successes for exactly as long as the side was guessed from the kind.
+
 **Promotion gate** — the rule that a `user-text` item cannot activate on one task's word. It stays a
 candidate with `needs-corroboration` until a second distinct task, or evidence of a stronger tier, endorses
 the same claim.

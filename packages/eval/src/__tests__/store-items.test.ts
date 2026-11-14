@@ -164,4 +164,14 @@ describe('the store sample the artefact carries', () => {
     expect(sample.items).toEqual([]);
     expect(sample.omitted).toBe(0);
   });
+
+  it('carries the side the distiller recorded, and omits the field on a store that has none', () => {
+    // R110. Without it a consolidator reading a dump cannot tell a correction from a success — the
+    // `kind` of both is whatever the model chose to write — and the lane has to refuse rather than
+    // treat the whole store as successes. The absent case is a record written before the field
+    // existed, and it must stay absent rather than acquire a default.
+    const sample = storeItemSample([item({ polarity: 'repair' }), item({ id: 'k2' })]);
+    expect(sample.items[0]?.polarity).toBe('repair');
+    expect(Object.hasOwn(sample.items[1] ?? {}, 'polarity')).toBe(false);
+  });
 });

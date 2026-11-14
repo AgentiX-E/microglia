@@ -835,6 +835,16 @@ export {
   type ProvenanceItem,
   type ProvenanceRecord,
 } from './tau2-provenance.js';
+export {
+  readStoreDump,
+  reconcileSides,
+  refusalOf,
+  storeDumpItems,
+  type SideReconciliation,
+  type StoreDump,
+  type StoreDumpItem,
+  type StoreReading,
+} from './retrospect-store.js';
 
 export {
   INJECTION_NOTE_LEVELS,

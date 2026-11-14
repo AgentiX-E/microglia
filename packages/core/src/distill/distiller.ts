@@ -24,7 +24,7 @@ import {
   scoreKnowledge,
   decideStatus,
 } from '../kernel/index.js';
-import { tierFor } from '../kernel/index.js';
+import { tierFor, polarityFor } from '../kernel/index.js';
 import type { DistillCandidate, FeedbackEvent, KnowledgeItem } from '../kernel/index.js';
 import { generalizationPlan, mergeEvidence as mergeSiblingEvidence } from './generalize.js';
 import type { DistillOptions, DistillReport, InterpretContext } from './types.js';
@@ -358,6 +358,12 @@ function sanitize(
       ...rest,
       evidence,
       statement,
+      // The side, stamped from the signal for the same reason the attempt is stamped from the
+      // event: it is a property of the observation, and an interpreter can only echo it or
+      // misstate it. Written after the spread because it is not the interpreter's to declare —
+      // unlike the tier, which reads the *shape* of a signal and which a host pack may know better,
+      // the side is the signal's content and is sitting in the event being interpreted.
+      polarity: polarityFor(event.signal),
       ...(when === undefined ? {} : { when }),
       ...(payload === undefined ? {} : { payload }),
     },

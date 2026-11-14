@@ -82,10 +82,22 @@ import { build } from 'esbuild';
  *   The rest is the `fold` field on the pack, the hook in `buildPack`, and the two names of the mode.
  *   Measured 50,478 raw and 17,203 gzip at this commit: 122 bytes of raw headroom and 197 of gzip, so
  *   the raise is an allowance for what shipped rather than for what might.
+ *
+ * Raised once on 2026-11-14, 50,600 -> 51,000 raw (gzip untouched: 17,291 measured against the 17,400
+ * ceiling), for one field:
+ *
+ *   `KnowledgePolarity` — the side a lesson came from, derived by `polarityFor` from the event's own
+ *   signal rather than from its kind, carried on the item and adopted once through a merge. It is 388
+ *   bytes of raw bundle and it is the difference between a retrospection lane that can be fed and one
+ *   that has to refuse: without a side, a consolidator reads `kind`, the τ² distiller writes `exemplar`
+ *   for a correction and a success alike, and every real store of corrections reads as a store of
+ *   successes. Measured 50,886 raw at this commit, so the raise is 114 bytes of headroom — the same
+ *   shape as the guard correction above, and for the same reason: a field is not a mechanism, and
+ *   anything larger would have to be argued as one.
  */
 const BUDGETS = [
   { name: 'browser', entry: 'packages/browser/dist/index.js', raw: 3200, gzip: 1600 },
-  { name: 'core', entry: 'packages/core/dist/index.js', raw: 50600, gzip: 17400 },
+  { name: 'core', entry: 'packages/core/dist/index.js', raw: 51000, gzip: 17400 },
 ];
 
 const probe = process.argv.includes('--probe');

@@ -1,16 +1,22 @@
 /**
  * Build a review batch from a store an experiment already wrote.
  *
- * Two refusals are deliberate. A store with no repair records produces no batch — a corpus of
- * successes has nothing to consolidate, and synthesising proposals from it is how a pass
- * record becomes a confident rule. A cluster whose members carry no condition produces no
- * proposal either, because a guideline's trigger is the intersection of its sources' and an
- * empty intersection is the one thing the witness will not accept.
+ * Two refusals are deliberate. A corpus with no repair in it produces no batch — a corpus of
+ * successes has nothing to consolidate, and synthesising proposals from it is how a pass record
+ * becomes a confident rule. A cluster whose members carry no condition produces no proposal either,
+ * because a guideline's trigger is the intersection of its sources' and an empty intersection is
+ * the one thing the witness will not accept.
  *
- * The proposals here are the **deterministic** ones: the shared trigger, the medoid's claim,
- * no model in the path. That is the arm as well as the fallback — if a model-written
- * guideline cannot beat a merge that copies a sentence, the model's contribution is the
- * selection rather than the prose, and the review console should be about grouping.
+ * The side of each record is **read from the store** (R110), not guessed from its kind. Until the
+ * store carried `polarity`, this program mapped `exemplar` and `procedure` to successes, and every
+ * record the τ² lane produces is one of those — so a store of pure repairs read as a store of pure
+ * successes and the pipeline refused to run. The reader is in `retrospect-store.ts` and it counts
+ * what it could not classify instead of filling the gap in.
+ *
+ * The proposals here are the **deterministic** ones: the shared trigger, the medoid's claim, no
+ * model in the path. That is the arm as well as the fallback — if a model-written guideline cannot
+ * beat a merge that copies a sentence, the model's contribution is the selection rather than the
+ * prose, and the review console should be about grouping.
  */
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -23,21 +29,9 @@ import {
   DEFAULT_RETROSPECT_POLICY,
   CHAIN_COHESION_FLOOR,
   summaryOf,
-  type RetrospectSource,
 } from '@agentix-e/microglia-core/retrospect';
-
-type StoreItem = {
-  readonly id?: string;
-  readonly kind?: string;
-  /** Per-item polarity, when the dump carries one. Neither τ² artefact does yet. */
-  readonly polarity?: 'repair' | 'pass';
-  readonly statement?: string;
-  readonly when?: string;
-  readonly confidence?: number;
-  readonly trust?: number;
-  readonly createdAt?: number;
-  readonly scope?: { readonly task?: string; readonly domain?: string; readonly intent?: string };
-};
+import type { ProvenanceCensus } from '../tau2-provenance.js';
+import { readStoreDump, reconcileSides, refusalOf, storeDumpItems } from '../retrospect-store.js';
 
 function flag(argv: readonly string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -52,43 +46,6 @@ function numberFlag(argv: readonly string[], name: string, fallback: number): nu
   return value;
 }
 
-/**
- * Polarity, from the field if the dump carries one and from `kind` if it does not.
- *
- * Neither artifact this lane has produced carries the field, and every record in both is an
- * `exemplar` — 15 of them distilled from corrections and 58 from successes. So the store knows
- * *how strong* each record's evidence is and not *which side* it came from, which is enough to
- * rank a pack and not enough to consolidate one. That is an instrumentation gap rather than a
- * missing feature here: the dump needs a per-item polarity, and until it has one a batch built
- * from a real artefact would call the whole store a success and refuse to run.
- */
-function outcomeOf(item: StoreItem): 'repair' | 'pass' {
-  if (item.polarity === 'repair' || item.polarity === 'pass') return item.polarity;
-  return item.kind === 'exemplar' || item.kind === 'procedure' ? 'pass' : 'repair';
-}
-
-function sourcesFrom(items: readonly StoreItem[], fallbackTask: string): RetrospectSource[] {
-  return items
-    .filter((item): item is StoreItem & { id: string; statement: string } =>
-      typeof item.id === 'string' && typeof item.statement === 'string',
-    )
-    .map((item) => {
-      const scope = item.scope ?? {};
-      const task = scope.task ?? scope.domain ?? fallbackTask;
-      return {
-        id: item.id,
-        statement: item.statement,
-        ...(item.when === undefined ? {} : { when: item.when }),
-        task,
-        // Distinct-task identity: the narrowest declared scope, as `sourcesOf` reads it.
-        taskId: scope.intent ?? scope.domain ?? scope.task ?? item.id,
-        outcome: outcomeOf(item),
-        confidence: item.confidence ?? item.trust ?? 0.5,
-        at: item.createdAt ?? 0,
-      } satisfies RetrospectSource;
-    });
-}
-
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
   const from = flag(argv, '--from');
@@ -97,42 +54,26 @@ async function main(): Promise<void> {
     throw new Error('usage: retrospect --from <artefact.json> --out <batch.json> [--threshold 0.6] [--min-sources 2]');
   }
   const raw = JSON.parse(await readFile(resolve(from), 'utf8')) as Record<string, unknown>;
-  // An l4 artefact nests the store under `tau2.storeItems.items`; a bare dump is an array.
-  const containers = [raw, (raw['tau2'] as Record<string, unknown> | undefined)?.['storeItems']];
-  const items = containers
-    .map((container) => {
-      if (Array.isArray(container)) return container as StoreItem[];
-      const nested = (container as Record<string, unknown> | undefined)?.['items'];
-      return Array.isArray(nested) ? (nested as StoreItem[]) : undefined;
-    })
-    .find((candidate) => candidate !== undefined);
-  if (items === undefined) throw new Error(`${from} is not a store dump: no item array found`);
-
-  const sources = sourcesFrom(items, 'unknown');
-  const repairs = sources.filter((source) => source.outcome === 'repair');
-  if (repairs.length === 0) {
-    const kinds = [...new Set(sources.length === 0 ? [] : items.map((item) => item.kind ?? '?'))].join(', ');
-    throw new Error(
-      `the store holds ${sources.length} record(s) and none of them is a repair (kinds: ${kinds}); ` +
-        'nothing to consolidate. Either the run distilled only successes, or the dump carries no ' +
-        'per-item polarity and every record reads as one — both are refusals rather than empty batches',
-    );
-  }
+  const dump = storeDumpItems(raw, from);
+  const reading = readStoreDump(dump.items, 'unknown');
+  const refusal = refusalOf(reading, from);
+  if (refusal !== undefined) throw new Error(`${refusal}. Nothing to consolidate.`);
 
   const threshold = numberFlag(argv, '--threshold', DEFAULT_CLUSTER_OPTIONS.threshold);
   const policy = { ...DEFAULT_RETROSPECT_POLICY, minSources: numberFlag(argv, '--min-sources', 2) };
-  const clusters = clusterSources(sources, { ...DEFAULT_CLUSTER_OPTIONS, threshold });
+  const repairs = reading.sources.filter((source) => source.outcome === 'repair');
+  const clusters = clusterSources(repairs, { ...DEFAULT_CLUSTER_OPTIONS, threshold });
   const proposals = clusters.map(deterministicProposal);
   // The M1 reading, taken from the same objects the batch is built from rather than recomputed by a
   // reader: fragmentation is the share of repairs no cluster reached, which is where lexical
   // clustering's known cost shows up, and `chained` counts the clusters single-link pulled together.
-  const census = clusterCensusOf(sources, clusters, CHAIN_COHESION_FLOOR);
+  const census = clusterCensusOf(reading.sources, clusters, CHAIN_COHESION_FLOOR);
   const batch = buildBatch({
     id: `retrospect-${Date.now().toString(36)}`,
     createdAt: Date.now(),
     namespace: String((raw['namespace'] as string | undefined) ?? 'microglia'),
     policy,
-    corpus: sources,
+    corpus: reading.sources,
     proposals,
     census,
   });
@@ -140,9 +81,21 @@ async function main(): Promise<void> {
   await mkdir(dirname(resolve(out)), { recursive: true });
   await writeFile(resolve(out), `${JSON.stringify(batch, null, 1)}\n`, 'utf8');
   const summary = summaryOf(batch);
+  // R110: the artefact's own census, when it carries one, is an independent read of the same fact.
+  // Comparing them costs nothing and is the only way the field can be caught disagreeing with the
+  // run that wrote it.
+  const runCensus = (raw['tau2'] as Record<string, unknown> | undefined)?.['provenance'] as
+    | ProvenanceCensus
+    | undefined;
+  const sides = reconcileSides(reading, {
+    ...(runCensus === undefined ? {} : { census: runCensus }),
+    omitted: dump.omitted,
+  });
   process.stdout.write(
     [
-      `store      ${sources.length} record(s): ${repairs.length} repair(s), ${sources.length - repairs.length} pass(es)`,
+      `store      ${reading.total} record(s): ${reading.repairs} repair(s), ${reading.passes} pass(es), ` +
+        `${reading.unclassified} with no side${reading.skipped === 0 ? '' : `, ${reading.skipped} unreadable`}`,
+      `sides      ${sides.state.toUpperCase()} — ${sides.sentence}`,
       `clusters   ${clusters.length} at threshold ${threshold}${clusters.length === 0 ? ' — no two repairs share a condition' : ''}`,
       `census     fragmentation ${census.fragmentation.toFixed(3)} (${census.orphans}/${census.repairs} repair(s) no cluster claims), ` +
         `chained ${census.chained}/${census.clusters} under ${CHAIN_COHESION_FLOOR}, mean cohesion ${census.meanCohesion.toFixed(3)}`,

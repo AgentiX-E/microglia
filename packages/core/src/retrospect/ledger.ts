@@ -378,6 +378,10 @@ export function toDistillCandidate(
     },
     evidence,
     trust: Number(Math.min(0.99, 0.5 + 0.1 * covered.length).toFixed(4)),
+    // A guideline is written from corrections by construction — the batch refuses to be built
+    // without at least one — so its side is known rather than inferred, and recording it keeps a
+    // guideline readable by the same reader that reads a distilled record.
+    polarity: 'repair',
     // The trigger is part of the identity: two guidelines with one statement and different
     // conditions are two rules, and merging them would silently widen both.
     dedupeKey: `guideline:${digest}`,

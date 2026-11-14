@@ -26,6 +26,7 @@ export type {
   KnowledgeItem,
   KnowledgeKind,
   KnowledgePack,
+  KnowledgePolarity,
   KnowledgeScope,
   KnowledgeStatus,
   Policy,
@@ -63,6 +64,8 @@ export { TIER_RANK } from './types.js';
 /** Value, not a type: the two names a `shape` knob may carry, in the order a table lists them. */
 export { SHAPE_MODES } from './types.js';
 export { tierFor } from './provenance.js';
+/** Value, not a type: the side an event's signal sits on, derived from the signal rather than the kind. */
+export { polarityFor } from './provenance.js';
 
 export {
   contentKey,

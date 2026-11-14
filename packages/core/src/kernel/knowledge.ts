@@ -25,6 +25,7 @@ import type {
   Json,
   KnowledgeItem,
   KnowledgeKind,
+  KnowledgePolarity,
   KnowledgeScope,
   KnowledgeStatus,
   Policy,
@@ -270,6 +271,7 @@ export function createKnowledgeItem(
     ...(candidate.when === undefined ? {} : { when: candidate.when }),
     ...(candidate.payload === undefined ? {} : { payload: candidate.payload }),
     ...(candidate.tier === undefined ? {} : { tier: candidate.tier }),
+    ...(candidate.polarity === undefined ? {} : { polarity: candidate.polarity }),
     ...(quarantined ? { statusReason: 'source-trust-below-quarantine' } : {}),
   };
   const confidence = scoreKnowledge(base, policy, now);
@@ -298,7 +300,8 @@ export function createKnowledgeItem(
  *    evidence;
  *  - the observation names a condition the item does not have yet;
  *  - the payloads disagree (a merge replaces the payload, so this is a change);
- *  - the observation is a stronger tier (an outcome measured on the same claim).
+ *  - the observation is a stronger tier (an outcome measured on the same claim);
+ *  - the item has no side yet and the observation names one.
  */
 export function wouldChange(
   item: KnowledgeItem,
@@ -323,10 +326,20 @@ export function wouldChange(
    * changed, which keeps this a no-op like any other repeat.
    */
   const adopts = item.when === undefined && candidate.when !== undefined;
+  /**
+   * A side is adopted once and then held, on the same argument as the condition above.
+   *
+   * An item written before the field existed has no side and a merge that knows one gives it one,
+   * which is a change. An item that already has a side keeps it — including when the observation
+   * arriving is from the other side, because a success that repeats a lesson learned from a failure
+   * is support for the lesson and not evidence that it was learned from a success.
+   */
+  const adoptsSide = item.polarity === undefined && candidate.polarity !== undefined;
   return (
     !duplicate ||
     rehabilitate ||
     adopts ||
+    adoptsSide ||
     !samePayload ||
     (tier !== undefined && tier !== item.tier)
   );
@@ -369,6 +382,7 @@ export function mergeEvidence(
     : [...base.evidence, candidate.evidence];
   const support = duplicate ? base.support : base.support + candidate.evidence.weight;
   const adopts = base.when === undefined && candidate.when !== undefined;
+  const adoptsSide = base.polarity === undefined && candidate.polarity !== undefined;
   const merged: KnowledgeItem = {
     ...base,
     evidence,
@@ -381,6 +395,7 @@ export function mergeEvidence(
       : { tier: strongestTier(base.tier, candidate.tier) as ProvenanceTier }),
     updatedAt: now,
     ...(adopts ? { when: candidate.when as string } : {}),
+    ...(adoptsSide ? { polarity: candidate.polarity as KnowledgePolarity } : {}),
     ...(candidate.payload === undefined ? {} : { payload: candidate.payload }),
   };
   const decision = decideStatus({ ...merged, confidence: scoreKnowledge(merged, policy, now) }, policy, now);

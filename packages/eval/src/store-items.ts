@@ -60,6 +60,15 @@ export type StoreItemRecord = {
    * that interpreted it would break when the store gains another reason.
    */
   readonly statusReason?: string;
+  /**
+   * The side the distiller recorded for this item, when it recorded one.
+   *
+   * R110. The retrospection lane consolidates corrections and may not use successes, and no dump
+   * before this field carried the distinction: `kind` is what the model chose to write, so a reader
+   * could only guess, and the guess read every τ² record as a success. Absent on a store written
+   * before the field existed, which is why the reader counts silence rather than assuming.
+   */
+  readonly polarity?: 'repair' | 'pass';
 };
 
 export type StoreItemSample = {
@@ -91,6 +100,8 @@ export function storeItemSample(
     readonly evidence: readonly { readonly taskId?: string; readonly runId: string }[];
     /** The store's own reason for the item's status, which the recurrence pass uses to name a survivor. */
     readonly statusReason?: string;
+    /** The side the distiller recorded, absent on a store that predates the field. */
+    readonly polarity?: 'repair' | 'pass';
   }[],
   options: { readonly limit?: number; readonly maxChars?: number } = {},
 ): StoreItemSample {
@@ -112,6 +123,7 @@ export function storeItemSample(
       supportTasks: countDistinctTasks(item.evidence),
       evidence: item.evidence.length,
       ...(item.statusReason === undefined ? {} : { statusReason: item.statusReason }),
+      ...(item.polarity === undefined ? {} : { polarity: item.polarity }),
     };
   });
   return { items: sampled, limit, maxChars, omitted: Math.max(0, items.length - sampled.length), truncated };

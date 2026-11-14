@@ -389,6 +389,15 @@ describe('an admitted guideline enters the store through the ordinary write path
     expect(candidate.when).toBe('when a refund is requested for a damaged item');
   });
 
+  it('records the guideline as a repair, because a batch with no correction cannot be built', () => {
+    // R110. The side is known here rather than derived: the batch refuses to be built without at
+    // least one correction, and every member a guideline covers is one. Recording it keeps a
+    // guideline readable by the same reader that reads a distilled record, so a store's sides add
+    // up across the two write paths instead of one of them being silent.
+    const candidate = toDistillCandidate(accepted(), accepted().items[0]!, { decisionId: 'd1' });
+    expect(candidate.polarity).toBe('repair');
+  });
+
   it('counts distinct tasks rather than records', () => {
     const candidate = toDistillCandidate(accepted(), accepted().items[0]!, { decisionId: 'd1' });
     expect((candidate.payload as { distinctTasks: number }).distinctTasks).toBe(2);
