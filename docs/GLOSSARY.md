@@ -59,6 +59,13 @@ the routine. This is the unit ExpeL's `UPVOTE` merges and the unit a workflow-sh
 by; `RecallQuery.shape: 'collapse'` is how a pack delivers one line per routine instead of one per
 failure.
 
+**Containment control** — the check that makes a two-unit run a comparison rather than two experiments:
+on every request the character budget did not cut, the folded pack's ids must be a subset of the
+per-failure pack's, and the two sizes must differ by exactly what the fold reports removing. Requests a
+cut pack excludes from the assertion are counted and printed, never silently skipped. Its counterpart in
+a note or floor experiment is an *identity* control, which asserts the packs are equal; a fold cannot
+have that, because changing the pack is what it does.
+
 **Support** — the number of distinct tasks behind an item, as distinct from the number of feedback
 events. `evidence.length` counts observations; support counts the tasks they came from, and a memory
 whose items each came from one task has support 1 however many events it holds. Reported per rendered

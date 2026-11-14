@@ -28,4 +28,5 @@ export {
   DEFAULT_FOLD_SUPPORT,
   foldByShape,
   type ShapeFoldOptions,
+  type ShapeMode,
 } from './shape-fold.js';

@@ -1284,6 +1284,10 @@ jobs:
           # for the same reason the pair cannot: the registration is the only source of truth,
           # and a run that chose its levels after the readout would be choosing its contrasts.
           NOTES=$(pnpm --silent eval:prereg-notes "$FILE")
+          # R109a: two pack units over ONE store. Same rule as the note levels and the pair: the
+          # registration is the only source of truth, because a run that chose its units after the
+          # readout would be choosing its contrasts.
+          SHAPES=$(pnpm --silent eval:prereg-shapes "$FILE")
           # R87: the two task caps, which one number used to bind at once. `l4_tasks = 10` sliced the
           # evaluated list, the plan split that slice in half, and R86's census of distillation faults
           # was asked once instead of fifteen times. The caps are a property of the experiment -- the
@@ -1330,6 +1334,13 @@ jobs:
           # is `anchoring=scope&minCoverage=0`, and a fragment written in YAML would be the copy that
           # drifts the first time an arm is refined. Empty for `retrieved`, which keeps the request
           # byte-identical to every committed artefact's.
+          # R109a: a two-unit dispatch renders BOTH units, so a single unit declared anywhere is two
+          # answers to one question. Refused here, before the arm is built, because the driver's refusal
+          # is the second line of defence and a running job has already paid for its learning phase.
+          if [ "$SHAPES" = "true" ] && [ -n "$(printf '%s%s' "$SHAPE" "${TAU_SHAPE_VAR:-}")" ]; then
+            echo "::error::a two-unit registration renders both units, and TAU_PACK_SHAPE names one"
+            exit 1
+          fi
           KNOBS=$(pnpm --silent eval:pack-knobs "${MODE:-}" "${SHAPE:-}")
           pnpm --silent eval:prereg-scenario "$FILE" > "$RUNNER_TEMP/scenario.env"
           TRAIN=$(sed -n 's/^train=//p' "$RUNNER_TEMP/scenario.env")
@@ -1338,6 +1349,7 @@ jobs:
           echo "floor=$FLOOR" >> "$GITHUB_OUTPUT"
           echo "pair=$PAIR" >> "$GITHUB_OUTPUT"
           echo "notes=$NOTES" >> "$GITHUB_OUTPUT"
+          echo "shapes=$SHAPES" >> "$GITHUB_OUTPUT"
           echo "train=$TRAIN" >> "$GITHUB_OUTPUT"
           echo "test=$TEST" >> "$GITHUB_OUTPUT"
           echo "recall=$RECALL" >> "$GITHUB_OUTPUT"
@@ -1389,7 +1401,7 @@ jobs:
           if [ -n "$OVERRIDES" ]; then
             echo "::warning::the registration overrides repository variables: $OVERRIDES"
           fi
-          echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`, distiller \`${UNIT:-inherited}/${FORM:-inherited}\` over \`${SCOPE:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
+          echo "Registered floor \`$FLOOR\`, paired facade \`$PAIR\`, note levels \`$NOTES\`, pack units \`$SHAPES\`, scenario \`${TRAIN:-inherited}/${TEST:-inherited}/${RECALL:-inherited}\`, distiller \`${UNIT:-inherited}/${FORM:-inherited}\` over \`${SCOPE:-inherited}\`." >> "$GITHUB_STEP_SUMMARY"
 
       - name: L4 arm — memory
         if: github.event.inputs.l4_arms != 'reference'
@@ -1406,6 +1418,10 @@ jobs:
           # fixed budget the hardened sentence is longer than the standard one and used to
           # buy that room by dropping the last rule -- the arms would differ in their packs.
           TAU_FACADE_NOTES: ${{ steps.recall_floor.outputs.notes }}
+          # R109a's arm: both pack units over ONE store. Enabling it also refuses a declared
+          # `TAU_PACK_SHAPE`, because that variable names the single unit and a dispatch cannot hold
+          # two answers to one question.
+          TAU_FACADE_SHAPES: ${{ steps.recall_floor.outputs.shapes }}
           TAU_PREREG: ${{ github.event.inputs.prereg }}
           # Defect 27: a bounded pre-flight probe, registered by R49. An
           # outage writes an explicit no-measurement artefact instead of a zero.
@@ -1698,6 +1714,18 @@ jobs:
         env:
           POC_RESULT_DIR: eval/results/arms/memory
         run: pnpm eval:note-facade-readback
+
+      # R109a: both pack units over one store, its own artefact and its own four states.
+      # `CONTAINMENT_BROKEN` blocks — a treatment pack that is not the control pack under the fold
+      # means the arms differed in something the registration did not name — and `NO_TREATMENT`
+      # warns, because a fold that removed nothing is a finding about the store and not about the
+      # unit, and the two must not be read as the same result.
+      - name: Read back the pack units
+        if: always()
+        timeout-minutes: 5
+        env:
+          POC_RESULT_DIR: eval/results/arms/memory
+        run: pnpm eval:shape-arm-readback
 
       # A not-run that nobody notices is a skip. The annotation is the notice: it
       # names the variable that points at nothing, and the job stays green because

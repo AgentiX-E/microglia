@@ -63,6 +63,15 @@ export type Prereg = {
    */
   readonly facadeNotes?: 'three-level' | 'off';
   /**
+   * Whether this registration runs R109a's two pack units as two facades of ONE dispatch.
+   *
+   * `off` (or an absent key) keeps every earlier registration on the single-unit path. The value is a
+   * declaration, not a knob: the unit set is the registered one (`per-failure`, `collapse`), and a
+   * registration that paired the unit with the floor or with the note would vary two treatments at once,
+   * which the driver refuses before its first model call.
+   */
+  readonly facadeShapes?: 'two-unit' | 'off';
+  /**
    * The planted distractor arms this registration runs, when it runs any.
    *
    * R57 declared three — `far`, `near`, `adversarial` — and dispatched them one at a time, because
@@ -364,6 +373,7 @@ const HEADER_KEYS = [
   'recallFloor',
   'facadePair',
   'facadeNotes',
+  'facadeShapes',
   'trainDomain',
   'testDomain',
   'recallDomain',
@@ -585,6 +595,42 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     collected.push({
       where: `header 'facadeNotes'`,
       problem: 'a three-level note arm and a paired recall facade vary two treatments in one dispatch',
+    });
+  }
+
+  const shapesText = values.get('facadeShapes');
+  let facadeShapes: Prereg['facadeShapes'];
+  if (shapesText !== undefined) {
+    if (shapesText !== 'two-unit' && shapesText !== 'off') {
+      collected.push({
+        where: `header 'facadeShapes'`,
+        problem: `must be 'two-unit' or 'off', received '${shapesText}'`,
+      });
+    } else {
+      facadeShapes = shapesText;
+    }
+  }
+  // One dispatch varies one thing. Checked here as well as in the driver because a registration that
+  // declares two treatments is refused at read time, before a dispatch is queued and paid for, and the
+  // driver's refusal is the second line of defence rather than the only one.
+  if (facadeShapes === 'two-unit' && facadePair === 'as-is-floored') {
+    collected.push({
+      where: `header 'facadeShapes'`,
+      problem: 'a two-unit arm and a paired recall facade vary two treatments in one dispatch',
+    });
+  }
+  if (facadeShapes === 'two-unit' && facadeNotes === 'three-level') {
+    collected.push({
+      where: `header 'facadeShapes'`,
+      problem: 'a two-unit arm and a three-level note arm vary two treatments in one dispatch',
+    });
+  }
+  // A unit is not a pack mode: `packShape` names the one unit a single-unit dispatch renders, and this
+  // header renders both. Declaring both would leave the driver two answers to one question.
+  if (facadeShapes === 'two-unit' && values.get('packShape') !== undefined) {
+    collected.push({
+      where: `header 'facadeShapes'`,
+      problem: "a two-unit arm renders both units, so 'packShape' cannot also name one",
     });
   }
 
@@ -1114,6 +1160,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(release === undefined ? {} : { release }),
       ...(packMode === undefined ? {} : { packMode }),
       ...(packShape === undefined ? {} : { packShape }),
+      ...(facadeShapes === undefined ? {} : { facadeShapes }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,
       refutation,

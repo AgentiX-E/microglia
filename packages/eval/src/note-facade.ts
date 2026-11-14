@@ -290,7 +290,15 @@ export function noteFacadeState(reading: NotedFacadeReading): string {
   return 'MEASURED';
 }
 
-/** One line for the workflow's readback step and the job summary. */
+/**
+ * One line for the workflow's readback step and the job summary.
+ *
+ * The contrast clause is printed only in the state that reports a contribution. `readNotedFacadeArtifact`
+ * already refused a contrast in the other two, and this line did not: a `NO_DELIVERY` run whose arms
+ * served nothing carries two identical task rows, so its summary published `0.00pp [0.00, 0.00] p=1.0000`
+ * beside a state that says nothing was delivered. Found while building R109a's arm, which is the same
+ * reading in a different variable — the readback was right and the sentence a human reads was not.
+ */
 export function noteFacadeSummary(reading: NotedFacadeReading): string {
   const arms = reading.arms
     .map(
@@ -299,7 +307,8 @@ export function noteFacadeSummary(reading: NotedFacadeReading): string {
         `/${String(arm.recallRequests)} items/req ${arm.itemsPerRequest.toFixed(3)}`,
     )
     .join(' | ');
-  const contrasts = reading.contrasts
+  const measured = noteFacadeState(reading) === 'MEASURED';
+  const contrasts = (measured ? reading.contrasts : [])
     .map(
       (contrast) =>
         `${contrast.arm} vs ${contrast.baseline} ${contrast.comparison.deltaPp.toFixed(2)}pp ` +

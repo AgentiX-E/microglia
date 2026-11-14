@@ -28,6 +28,8 @@ import {
   facadePairState,
   isNoMeasurementRefusal,
   notedFacadeArtifact,
+  shapeArmArtifact,
+  type ShapeArmRecord,
   pairedFacadeArtifact,
   pairedVerdict,
   parseTauResults,
@@ -244,6 +246,13 @@ type Measurement = {
    */
   readonly notedFacades?: NotedFacadeReading;
   /**
+   * R109a's two-unit record, when the driver exports `shapeArms()`.
+   *
+   * Absent on a re-scored document and on every driver before R109a; an absent field is a run that
+   * never varied the unit, not a failed two-unit arm.
+   */
+  readonly shapeArms?: ShapeArmRecord;
+  /**
    * Where the `unscored` list came from, because an empty list has two meanings.
    *
    * `document` is a results file, where the reader itself counted the nulls. `ids` and `count` are a
@@ -326,6 +335,7 @@ async function measureFromDriver(module: string): Promise<Measurement> {
     trials?: () => readonly TauTrialRow[] | undefined;
     pairedFacades?: () => PairedFacadeReading | undefined;
     notedFacades?: () => NotedFacadeReading | undefined;
+    shapeArms?: () => ShapeArmRecord | undefined;
   };
   try {
     loaded = (await import(specifier)) as {
@@ -335,6 +345,7 @@ async function measureFromDriver(module: string): Promise<Measurement> {
       trials?: () => readonly TauTrialRow[] | undefined;
       pairedFacades?: () => PairedFacadeReading | undefined;
       notedFacades?: () => NotedFacadeReading | undefined;
+      shapeArms?: () => ShapeArmRecord | undefined;
     };
   } catch (error) {
     // A driver that cannot be *resolved* is an absent environment, not a failed
@@ -367,6 +378,7 @@ async function measureFromDriver(module: string): Promise<Measurement> {
   const trialRows = loaded.trials?.();
   const pairedFacades = loaded.pairedFacades?.();
   const notedFacades = loaded.notedFacades?.();
+  const shapeArmRecord = loaded.shapeArms?.();
   const unscored = unscoredOf(loaded, instrumentation);
   return {
     tasks,
@@ -377,6 +389,7 @@ async function measureFromDriver(module: string): Promise<Measurement> {
     ...(trialRows === undefined ? {} : { trialRows }),
     ...(pairedFacades === undefined ? {} : { pairedFacades }),
     ...(notedFacades === undefined ? {} : { notedFacades }),
+    ...(shapeArmRecord === undefined ? {} : { shapeArms: shapeArmRecord }),
     unscoredSource: unscored.source,
   };
 }
@@ -643,6 +656,15 @@ if (measured.notedFacades !== undefined) {
   const artefact = notedFacadeArtifact(measured.notedFacades, new Date().toISOString());
   await writeJson('poc-l4-facade-notes', artefact);
   process.stdout.write(`[poc-l4-facade-notes] ${artefact.summary}\n`);
+}
+
+// R109a: two units over one store is its OWN artefact, for the reason the floor pair and the note
+// levels are: the main document grades the memory arm against the memory-free reference, and a unit
+// contrast is neither that nor a floor contrast nor a note contrast.
+if (measured.shapeArms !== undefined) {
+  const artefact = shapeArmArtifact(measured.shapeArms, new Date().toISOString());
+  await writeJson('poc-l4-facade-shapes', artefact);
+  process.stdout.write(`[poc-l4-facade-shapes] ${artefact.summary}\n`);
 }
 
 for (const gate of gates) {

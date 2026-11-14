@@ -539,6 +539,51 @@ describe('the facadeNotes header', () => {
   });
 });
 
+/**
+ * R109a's declaration: two pack units over ONE store.
+ *
+ * The round trip is asserted for the reason the note header's is: this lane has spent iterations on
+ * values that were parsed, validated and never returned, and the header is the only place a declaration
+ * can live that is neither a global variable nor a twenty-sixth dispatch input.
+ */
+describe('the facadeShapes header', () => {
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${PREDICTION}${REFUTATION}`;
+  }
+
+  it('registers both pack units over one store', () => {
+    const reading = readPrereg(withHeader('facadeShapes: two-unit'), 'R8.3-xiyan-cell.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.facadeShapes).toBe('two-unit');
+  });
+
+  it('leaves every registration opened before R109a on the single-unit path', () => {
+    expect(readPrereg(VALID, 'R8.3-xiyan-cell.md').prereg?.facadeShapes).toBeUndefined();
+    expect(
+      readPrereg(withHeader('facadeShapes: off'), 'R8.3-xiyan-cell.md').prereg?.facadeShapes,
+    ).toBe('off');
+  });
+
+  it('refuses a value the arm never declared', () => {
+    expect(
+      problemsOf(withHeader('facadeShapes: three-unit')).some((entry) =>
+        entry.includes("header 'facadeShapes'"),
+      ),
+    ).toBe(true);
+  });
+
+  it('refuses a second treatment in the same registration', () => {
+    for (const [extra, needle] of [
+      ['recallFloor: 0.01\nfacadePair: as-is-floored\nfacadeShapes: two-unit', 'paired recall facade'],
+      ['facadeNotes: three-level\nfacadeShapes: two-unit', 'three-level note arm'],
+      ['facadeShapes: two-unit\npackShape: collapse', "cannot also name one"],
+    ] as const) {
+      const reading = readPrereg(withHeader(extra), 'R8.3-xiyan-cell.md');
+      expect(reading.problems.some((entry) => entry.problem.includes(needle))).toBe(true);
+    }
+  });
+});
+
 describe('the sampling temperature', () => {
   // R70 measures the same arms at T = 1.0 that R69 measures at the lane's default. The value used
   // to live in `SOTA_SAMPLE_TEMPERATURE`, a repository variable, so setting it for one experiment

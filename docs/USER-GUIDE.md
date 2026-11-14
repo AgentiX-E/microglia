@@ -312,6 +312,39 @@ characters, and five units carry support ≥2 with one at 3. At a 2,400-characte
 is the honest expectation to hold: if your store's items are already one-per-routine, or every routine
 was taught once, `shape: 'collapse'` changes nothing and `pack.fold.folded` will say so.
 
+#### Compare the two units in one run
+
+`shape` is a per-request option, which is what makes a controlled comparison possible at all: two
+dispatches of the same configuration distil two stores — a correction is written by the model at run
+time, so the second run's store is not the first's — and two stores cannot be paired by any statistic.
+One process can, however, build two packs from one store. The driver does exactly that when a
+pre-registration declares `facadeShapes: two-unit`: two recall facades, one store, one floor, one
+budget, one seed stream, and only the unit differing.
+
+If you are wiring this yourself, the shape of it is:
+
+```ts
+const [asFailures, asRoutines] = await Promise.all([
+  mg.recall({ task, text, shape: 'per-failure' }),
+  mg.recall({ task, text, shape: 'collapse' }),
+]);
+```
+
+Two things to check before you believe any difference between them:
+
+- **Containment.** On any request the budget did not cut, the `collapse` pack's ids must be a subset of
+  the `per-failure` pack's, and the two sizes must differ by exactly `asRoutines.fold.folded`. If they
+  do not, the two packs came from different selections — a different store, a different query, a
+  different floor — and the comparison is between two experiments rather than two units.
+- **That the fold fired.** `asRoutines.fold.folded > 0` on some request. A run where it stayed at zero
+  compared one unit with itself, and the honest reading is "this store has no recurrence to collapse",
+  not "the unit does not matter".
+
+The characters each pack cost are the second half of the reading, and they are worth printing next to
+the score: `rendered.length` per request. On the 32-task corpus in this repository the folded store is
+**82.9%** of the per-failure store's characters, and at a 2,400-character budget both serve the same
+number of lines — so the fold's claim is corroboration per slot, not more slots.
+
 ### 3.2 Tasks and attempts — when one answer is not the whole job
 
 A run is one generation. A task is what the user was trying to finish, and it

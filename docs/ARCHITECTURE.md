@@ -158,6 +158,16 @@ never rewrites a survivor's statement and never writes the group's evidence back
 provenance described a corroboration no task contributed would be an item a ledger could not join back
 to the store.
 
+Because the unit is a request option and the store is untouched, one process can serve both units from
+one store, and that is the only arrangement in which the two are comparable: a dispatch's corrections
+are written by a model at run time, so two dispatches distil two stores and no pairing statistic can
+repair it. The comparison is guarded by a **containment** control rather than an identity one — on every
+request the budget did not cut, the folded pack must be the per-failure pack minus exactly the items the
+fold reports removing — because an identity control asserts the packs are equal and a fold whose packs
+are equal did nothing. The arm that runs the pair is `packages/eval/src/shape-pair.ts`, and it is turned
+on by a pre-registration's `facadeShapes: two-unit` rather than by a menu item, so a run cannot choose
+its units after its readout.
+
 ### 2.5 `capture` is the only stateful facade
 
 `Microglia` holds configuration, a clock, and a random source. A `RunHandle` holds one run. Nothing

@@ -236,6 +236,24 @@ describe('the reading carries one store and three arms', () => {
     expect(noteFacadeState(broken)).toBe('IDENTITY_BROKEN');
   });
 
+  it('prints no contrast in the two states that report none', () => {
+    // The readback refused a contrast in these states from the beginning; the sentence did not, and a
+    // `NO_DELIVERY` run published `0.00pp [0.00, 0.00] p=1.0000` beside a state saying nothing arrived.
+    const undelivered = noteFacadeReading({
+      dispatchId: '42463064049',
+      preregId: 'R53-use-time-calibration',
+      scope,
+      arms: [
+        arm('none', { servedPacks: 0, observations: [] }),
+        arm('standard', { servedPacks: 0, observations: [] }),
+      ],
+      seed: 300,
+      model: 'deepseek-chat',
+    });
+    expect(noteFacadeState(undelivered)).toBe('NO_DELIVERY');
+    expect(noteFacadeSummary(undelivered)).not.toContain('vs standard');
+  });
+
   it('is NO_DELIVERY when no arm ever served a pack', () => {
     const undelivered = noteFacadeReading({
       dispatchId: 'x',

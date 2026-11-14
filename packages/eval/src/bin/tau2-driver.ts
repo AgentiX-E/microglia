@@ -147,7 +147,11 @@ import {
   judgeOf,
   type RecallInput,
 } from "@agentix-e/microglia-eval";
-import { maxStatementChars, type NoteMode } from "@agentix-e/microglia-core/apply";
+import {
+  maxStatementChars,
+  type NoteMode,
+  type ShapeMode,
+} from "@agentix-e/microglia-core/apply";
 import {
   PLANT_ENV,
   plantCensus,
@@ -167,6 +171,15 @@ import type { Tau2PhaseUsage } from "../tau2-instrument.js";
 import { cacheCensusVerdict } from "../cache-census.js";
 import { tau2ShapeOf } from "../tau2-shape.js";
 import { startRecallFacade } from "../tau2-facade.js";
+import {
+  resolveShapeArmPlan,
+  shapeArmReading,
+  shapeArmSummary,
+  shapeObservationOf,
+  type ShapeArmReading,
+  type ShapeArmRecord,
+  type ShapeObservation,
+} from "../shape-pair.js";
 import { defaultPolicy } from "@agentix-e/microglia-core";
 
 const runFile = promisify(execFile);
@@ -264,6 +277,18 @@ const NOTE_PLAN = resolveInjectionNotePlan(process.env);
  * treatment.
  */
 const NOTE_ARMS = resolveFacadeNotePlan(process.env, PAIR_PLAN);
+/**
+ * R109a's two-unit arm, resolved at module load and after the note plan.
+ *
+ * Off by default, so every artefact committed before it is produced by the path that wrote it. Enabled
+ * is the only arrangement in which the two units can be compared at all: R109 shipped a per-request
+ * switch (`RecallQuery.shape`), and a switch renders one dispatch's packs one way — two dispatches
+ * distil two stores, because a dispatch's corrections are produced by the model at run time.
+ *
+ * It is resolved after `NOTE_ARMS` because it refuses the combination: the note varies the sentence and
+ * this varies the unit, and a dispatch carrying both could not say which one its delta belonged to.
+ */
+const SHAPE_ARMS = resolveShapeArmPlan(process.env, { pair: PAIR_PLAN, notes: NOTE_ARMS });
 /**
  * R57's controlled distractor, resolved at module load.
  *
@@ -794,6 +819,9 @@ let observedPair: PairedFacadeReading | undefined;
 /** The three-level note record, when this dispatch registered one. */
 let observedNotes: NotedFacadeReading | undefined;
 
+/** The two-unit record, when this dispatch registered one. */
+let observedShapes: ShapeArmRecord | undefined;
+
 /**
  * Additive, like `instrument()`: `l4.ts` was written against a driver exporting
  * `run()`, and a driver that does not export this (every driver before R49) is
@@ -812,6 +840,11 @@ export function pairedFacades(): PairedFacadeReading | undefined {
  */
 export function notedFacades(): NotedFacadeReading | undefined {
   return observedNotes;
+}
+
+/** R109a's two-unit record, when this dispatch registered one. Additive in the same way. */
+export function shapeArms(): ShapeArmRecord | undefined {
+  return observedShapes;
 }
 
 /**
@@ -1522,6 +1555,14 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     readonly queryCensus: QueryCensus;
     readonly useObservations: UseObservation[];
     /**
+     * R109a: one row per served pack, in the terms a unit comparison is read in.
+     *
+     * Taken at the same boundary and in the same loop as `packReadings`, because it describes the same
+     * object: the control's assertion is about the ids and the size of the pack the model actually read,
+     * and a second reading taken anywhere else would let the two disagree.
+     */
+    readonly shapeObservations: ShapeObservation[];
+    /**
      * The observations the coverage curve is built from.
      *
      * The same as `useObservations` unless this facade ran behind another one: a
@@ -1547,6 +1588,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     floor: number,
     out: string,
     note?: NoteMode,
+    shape?: ShapeMode,
   ): Promise<FacadeEvaluation> => {
     // What V1 grades: the pack is rendered in this process and read in another,
     // so its size is counted at the boundary rather than reconstructed from the
@@ -1559,6 +1601,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // What each served pack actually contained, at the facade boundary. The
     // recall scope, the floor and the pack are exactly as R45 ran them.
     const useObservations: UseObservation[] = [];
+    // R109a: the pack in the terms a unit comparison is read in. Pushed at both serving sites, beside
+    // `packReadings`, because it describes the same object at the same instant.
+    const shapeObservations: ShapeObservation[] = [];
     // R57: one reading per request that received the planted rule. The rule is appended to the
     // rendered block rather than added to the store, because the registration asks for exactly one
     // rule in every pack — an item the store merely held would be retrieved on the requests that
@@ -1587,6 +1632,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         // R53: the level is a rendering option of THIS recall. `undefined` keeps the host's,
         // which is what every single-facade and paired dispatch does.
         ...(note === undefined ? {} : { note }),
+        // R109a: the unit, for the same reason and with the same default. The host declares how to
+        // recognise a routine (`shapeOf`, below); the request says which unit this arm wants.
+        ...(shape === undefined ? {} : { shape }),
       });
       const planted =
         PLANTED === undefined
@@ -1602,6 +1650,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
           rendered: pack.rendered,
           ...(pack.fold === undefined ? {} : { fold: pack.fold }),
         });
+        shapeObservations.push(shapeObservationOf(used, pack));
         useObservations.push({
           // The query the pack was ranked on, which is the only text a coverage reading is about.
           query: used,
@@ -1638,6 +1687,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         rendered: pack.rendered,
         ...(pack.fold === undefined ? {} : { fold: pack.fold }),
       });
+      // The host's pack again: the planted line is not a store item and the containment control is about
+      // what the store's units were, so an arm that added a line would otherwise be read as a fold that
+      // invented one.
+      shapeObservations.push(shapeObservationOf(used, pack));
       useObservations.push({
         query: used,
         statements: [
@@ -1683,6 +1736,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         queryPin === undefined ? {} : { pin: QUERY_PIN_FILE },
       ),
       useObservations,
+      shapeObservations,
       // The census is taken from THIS facade's phase, for the same reason every counter above is:
       // R48's defect was two readings from different dispatches, and sharing one census between two
       // facades would recreate it one layer down.
@@ -1703,7 +1757,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // Attest the single store before either facade recalls. A second learning
   // phase would produce a second fingerprint and be refused by the invariant.
   const sharedScope =
-    PAIR_PLAN.enabled || NOTE_ARMS.enabled
+    PAIR_PLAN.enabled || NOTE_ARMS.enabled || SHAPE_ARMS.enabled
       ? attestPairScope({
           dispatchId: DISPATCH_ID,
           preregId: PREREG_ID,
@@ -1821,6 +1875,53 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       process.stdout.write(
         `[tau2] note arms: ${noteFacadeSummary(observedNotes)}\n`,
       );
+    } else if (SHAPE_ARMS.enabled && sharedScope !== undefined) {
+      // R109a: two facades of ONE run over ONE store, one line different. The floor is the dispatch's
+      // registered one for both arms: the unit is the variable, so anything else that could differ
+      // between them must not.
+      const evaluations = new Map<ShapeMode, FacadeEvaluation>();
+      const arms: ShapeArmReading[] = [];
+      for (const shape of SHAPE_ARMS.arms) {
+        const evaluation = await evaluateFacade(
+          MIN_COVERAGE,
+          join(workdir, `eval-shape-${shape}.json`),
+          undefined,
+          shape,
+        );
+        evaluations.set(shape, evaluation);
+        let tasks;
+        try {
+          tasks = facadeArmTasks(evaluation.scored.tasks);
+        } catch (error) {
+          // Same rule as the note arms: a facade whose task rows cannot be paired is an instrument that
+          // did not measure, not a run that crashed, and the lane gets the labelled refusal it gets for
+          // an outage rather than a partial artefact.
+          throw noMeasurementRefusal((error as Error).message);
+        }
+        arms.push({
+          shape,
+          servedPacks: evaluation.recallServed,
+          recallRequests: evaluation.recallRequests,
+          unscored: evaluation.scored.unscored,
+          tasks,
+          inaction: evaluation.inaction,
+          observations: evaluation.shapeObservations,
+        });
+      }
+      observedShapes = shapeArmReading({
+        dispatchId: DISPATCH_ID,
+        preregId: PREREG_ID,
+        scope: sharedScope,
+        arms,
+        seed: PAIR_SEED,
+        model: llm.model,
+      });
+      const graded = evaluations.get(SHAPE_ARMS.primary);
+      if (graded === undefined) {
+        throw noMeasurementRefusal(`the primary unit '${SHAPE_ARMS.primary}' did not run`);
+      }
+      primary = graded;
+      process.stdout.write(`[tau2] shape arms: ${shapeArmSummary(observedShapes)}\n`);
     } else {
       primary = await evaluateFacade(MIN_COVERAGE, evalPath);
     }

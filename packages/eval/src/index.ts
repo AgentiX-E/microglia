@@ -933,6 +933,27 @@ export {
   type PackIdentity,
 } from './note-facade.js';
 export {
+  PRIMARY_SHAPE,
+  SHAPE_ARMS_ENV,
+  SHAPE_UNITS,
+  readShapeArmArtifact,
+  resolveShapeArmPlan,
+  shapeArmArtifact,
+  shapeArmReading,
+  shapeArmState,
+  shapeArmSummary,
+  shapeContainment,
+  shapeObservationOf,
+  type ShapeArmArtifact,
+  type ShapeArmPlan,
+  type ShapeArmReadback,
+  type ShapeArmReading,
+  type ShapeArmRecord,
+  type ShapeContrast,
+  type ShapeContainment,
+  type ShapeObservation,
+} from './shape-pair.js';
+export {
   NO_MEASUREMENT_ERROR_NAME,
   PROBE_MIN_SUCCESSES,
   ProviderNoMeasurementError,
