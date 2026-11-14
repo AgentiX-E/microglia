@@ -76,6 +76,13 @@ jobs:
       - name: Pair contrast lane (L2b single vs pair)
         run: pnpm eval:pairs
 
+      # R110: the retrospection program itself, on a committed store. Its reader is covered to
+      # 100/100/100/100, and `bin/` is excluded from coverage — so the wiring between the two is
+      # checked by running it. The fixture's numbers are asserted by a test, which is what keeps this
+      # step from passing on a fixture that stopped meaning what it says.
+      - name: Retrospection lane (store dump → review batch)
+        run: pnpm eval:retrospect-fixture
+
       # The L4 reader is exercised without the tau2 environment: a full grid must
       # score and a short grid must be refused rather than averaged. Both fixtures
       # are synthetic and say so in their `info` block.
