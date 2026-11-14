@@ -32,7 +32,7 @@ import {
 } from '@agentix-e/microglia-core/retrospect';
 import type { ProvenanceCensus } from '../tau2-provenance.js';
 import { readStoreDump, reconcileSides, refusalOf, storeDumpItems } from '../retrospect-store.js';
-import { carriedDims, scopeCensus } from '../scope-census.js';
+import { carriedDims, scopeCensus, universalityCensus } from '../scope-census.js';
 
 function flag(argv: readonly string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -52,7 +52,10 @@ async function main(): Promise<void> {
   const from = flag(argv, '--from');
   const out = flag(argv, '--out');
   if (from === undefined || out === undefined) {
-    throw new Error('usage: retrospect --from <artefact.json> --out <batch.json> [--threshold 0.6] [--min-sources 2]');
+    throw new Error(
+      'usage: retrospect --from <artefact.json> --out <batch.json> [--threshold 0.6] [--min-sources 2] ' +
+        '[--carried domain,intent]',
+    );
   }
   const raw = JSON.parse(await readFile(resolve(from), 'utf8')) as Record<string, unknown>;
   const dump = storeDumpItems(raw, from);
@@ -60,7 +63,16 @@ async function main(): Promise<void> {
   // R113: how wide the rules are, read from the same dump and printed before the batch is built.
   // It refuses when the dump did not declare what it carried, and a refusal here is a reading of
   // the document rather than a fault in it — the batch below does not depend on the answer.
-  const scope = scopeCensus(dump.items, { carried: carriedDims(dump.scopeDims) });
+  // A dump written before R113 does not declare what it projected, and a reader that asked it would
+  // be reading a silence as a list. The operator can state it instead, with a reason that is
+  // auditable against the build that wrote the dump — `--carried domain` is a claim about a commit,
+  // not an inference from the JSON.
+  const carriedFlag = flag(argv, '--carried');
+  const carried = carriedFlag === undefined ? carriedDims(dump.scopeDims) : carriedDims(carriedFlag.split(','));
+  const scope = scopeCensus(dump.items, { carried });
+  // The population every 2026 memory-harm result is about: a rule with no condition and no scope
+  // dimension. Counted from the same dump, so the census and the batch describe one document.
+  const universal = universalityCensus(dump.items, { carried });
   const refusal = refusalOf(reading, from);
   if (refusal !== undefined) throw new Error(`${refusal}. Nothing to consolidate.`);
 
@@ -106,6 +118,7 @@ async function main(): Promise<void> {
         `${reading.unclassified} with no side${reading.skipped === 0 ? '' : `, ${reading.skipped} unreadable`}`,
       `sides      ${sides.state.toUpperCase()} — ${sides.sentence}`,
       `scope      ${scope.state.toUpperCase()} — ${scope.sentence}`,
+      `universal  ${universal.state.toUpperCase()} — ${universal.sentence}`,
       `clusters   ${clusters.length} at threshold ${threshold}${clusters.length === 0 ? ' — no two repairs share a condition' : ''}`,
       `census     fragmentation ${census.fragmentation.toFixed(3)} (${census.orphans}/${census.repairs} repair(s) no cluster claims), ` +
         `chained ${census.chained}/${census.clusters} under ${CHAIN_COHESION_FLOOR}, mean cohesion ${census.meanCohesion.toFixed(3)}`,

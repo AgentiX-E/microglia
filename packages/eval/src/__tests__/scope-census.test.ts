@@ -8,7 +8,7 @@
  * record with no scope object is counted as `unscoped` rather than as the widest possible rule.
  */
 import { describe, expect, it } from 'vitest';
-import { SCOPE_DIMS, carriedDims, scopeCensus } from '../scope-census.js';
+import { SCOPE_DIMS, carriedDims, scopeCensus, universalityCensus } from '../scope-census.js';
 import type { StoreDumpItem } from '../retrospect-store.js';
 
 const all = SCOPE_DIMS;
@@ -166,5 +166,108 @@ describe('narrowing a declared dimension list', () => {
     expect(scopeCensus([item({ task: 'retail' })], { carried: carriedDims(undefined) }).state).toBe(
       'unavailable',
     );
+  });
+});
+
+/**
+ * The universal rule: no condition and no scope dimension.
+ *
+ * This is the object the 2026 memory-harm results are about, and the only reason it can be counted at
+ * $0 is that the artefact already carries `storeItems`. The tests keep the two silences apart, because
+ * a rule with a condition but no scope and a rule with a scope but no condition are different objects
+ * and only their intersection is universal.
+ */
+describe('counting universal rules', () => {
+  it('reads the intersection, not either silence on its own', () => {
+    const census = universalityCensus(
+      [
+        { id: 'both', statement: 's' },
+        { id: 'condition-only', statement: 's', when: 'when the order is delivered' },
+        { id: 'scope-only', statement: 's', scope: { task: 'retail' } },
+        { id: 'neither-gap', statement: 's', when: 'w', scope: { task: 'retail', intent: 'x' } },
+      ],
+      { carried: ['intent'] },
+    );
+    expect(census.state).toBe('read');
+    expect(census.records).toBe(4);
+    // `both` states no condition and has no scope object at all, so it is counted as unplaceable
+    // rather than as a measured zero-dimension scope: the dump cannot say whether the record has no
+    // scope or the projection dropped it.
+    expect(census.unconditioned).toBe(2);
+    expect(census.narrowest).toBe(1);
+    expect(census.universal).toBe(1);
+    expect(census.universalShare).toBe(0.25);
+    expect(census.unplaceable).toBe(1);
+    expect(census.sample).toEqual(['scope-only']);
+  });
+
+  it('keeps a bounded sample of the ids, so a reader can read one record instead of a count', () => {
+    const items = Array.from({ length: 9 }, (_, index) => ({
+      id: `k${index}`,
+      statement: 's',
+      scope: { task: 'retail' },
+    }));
+    const census = universalityCensus(items, { carried: ['intent'], sample: 3 });
+    expect(census.universal).toBe(9);
+    expect(census.sample).toEqual(['k0', 'k1', 'k2']);
+  });
+
+  it('treats a blank condition as no condition, because an empty trigger matches everything', () => {
+    const census = universalityCensus([{ id: 'k', statement: 's', when: '   ' }], { carried: ['intent'] });
+    expect(census.unconditioned).toBe(1);
+  });
+
+  it('does not count a record it cannot place as narrow, because that would be a claim about the dump', () => {
+    const census = universalityCensus([{ id: 'k', statement: 's' }], { carried: ['intent'] });
+    // No scope object at all: the record is unscoped rather than narrow, and the two censuses agree
+    // that this is a silence to count rather than a dimension count to average.
+    expect(census.narrowest).toBe(0);
+    expect(census.universal).toBe(0);
+    expect(census.unplaceable).toBe(1);
+  });
+
+  it('refuses to call a record narrow when the dump never said which dimensions it carried', () => {
+    const census = universalityCensus([{ id: 'k', statement: 's', scope: { task: 'retail' } }], { carried: [] });
+    expect(census.state).toBe('read');
+    expect(census.narrowest).toBe(0);
+    expect(census.universal).toBe(0);
+    expect(census.sentence).toContain('does not say which scope dimensions it carried');
+  });
+
+  it('counts only records with an id, which are the only ones a reader can look up again', () => {
+    const census = universalityCensus(
+      [{ statement: 's' }, { id: 'k', statement: 's', scope: { task: 'retail' } }],
+      { carried: ['intent'] },
+    );
+    expect(census.records).toBe(1);
+    expect(census.universal).toBe(1);
+  });
+
+  it('reports an empty population as empty rather than as a share of zero', () => {
+    const census = universalityCensus([], { carried: ['intent'] });
+    expect(census.state).toBe('empty');
+    expect(census.records).toBe(0);
+    expect(census.universalShare).toBe(0);
+    expect(census.sentence).toContain('no record with an id');
+  });
+});
+
+describe('a projection that carried one dimension and no task', () => {
+  it('still answers whether a record declares anything, bounded to what it carried', () => {
+    // This is the shape every artefact before R113 has: `scope` is `{}` or `{domain}` and there is no
+    // task, because the projection kept the domain and dropped the rest. A census that refused this
+    // store would refuse the only population the record actually has.
+    const census = universalityCensus(
+      [
+        { id: 'empty-scope', statement: 's', scope: {} },
+        { id: 'domain-only', statement: 's', scope: { domain: 'retail' } },
+      ],
+      { carried: ['domain'] },
+    );
+    expect(census.state).toBe('read');
+    expect(census.narrowest).toBe(1);
+    expect(census.universal).toBe(1);
+    expect(census.unplaceable).toBe(0);
+    expect(census.sentence).toContain('read within the 1 optional dimension(s) the dump carried');
   });
 });

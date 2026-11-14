@@ -76,8 +76,16 @@ const zeroDims = (): Record<ScopeDim, number> => ({
   reasonCode: 0,
 });
 
+/**
+ * A share of a population the caller has already refused to let be empty.
+ *
+ * There is no zero guard on purpose. Every call site returns before this is reached when the
+ * population is empty, so a guard would be a branch no test could reach — and an unreachable branch
+ * is removed here rather than exempted, which is the rule `TECH-DESIGN` §13.6 states for the four
+ * that remain in the tree.
+ */
 function share(part: number, whole: number): number {
-  return whole === 0 ? 0 : part / whole;
+  return part / whole;
 }
 
 /**
@@ -196,5 +204,120 @@ export function scopeCensus(
     bySpecificity,
     broad,
     broadShare: share(broad, scoped),
+  };
+}
+
+/** How many of them the universe census keeps as examples. Bounded: an artefact is a document. */
+export const UNIVERSAL_SAMPLE = 5;
+
+export type UniversalityCensus = {
+  readonly state: 'read' | 'empty';
+  readonly sentence: string;
+  /** Records with an id, which are the only ones a reader can look up again. */
+  readonly records: number;
+  /** Records stating no `when`: nothing says what they are for. */
+  readonly unconditioned: number;
+  /** Records whose scope declares no dimension at all, among those the dump carried. */
+  readonly narrowest: number;
+  /** Both at once: a rule that says neither where it applies nor what it is for. */
+  readonly universal: number;
+  readonly universalShare: number;
+  /**
+   * Records with no condition and no placeable scope at all.
+   *
+   * They are almost certainly universal too, and they are not counted as such: a record the dump
+   * cannot place may be a real absence or a projection that dropped the field, and this project has
+   * already paid once for reading that silence as a value (AUDIT 34.135).
+   */
+  readonly unplaceable: number;
+  /** The first few universal records by id, so a reader can read one instead of trusting a count. */
+  readonly sample: readonly string[];
+};
+
+/**
+ * The population the memory-harm results are about.
+ *
+ * A record can be bounded in two ways: by its `scope` (where it applies) and by its `when` (what it is
+ * for). A record with neither is a **universal rule** — it applies everywhere and to everything — and
+ * that is the object *The Memory Trap* measures (arXiv 2611.07554), the object whose applicability
+ * *Useful Memories Become Faulty* (2605.12978) says consolidation strips, and the object *MemDev-Bench*
+ * (2610.27524) finds reused without reassessment. Counting it costs nothing on an artefact that
+ * already carries `storeItems`, which is why this census comes before any arm that would act on it.
+ *
+ * Two silences, counted together and separately: a rule with a condition but no scope is bounded but
+ * unplaceable, and a rule with a scope but no condition is placeable but unbounded. Only the
+ * intersection is universal.
+ */
+export function universalityCensus(
+  items: readonly StoreDumpItem[],
+  options: { readonly carried: readonly ScopeDim[]; readonly sample?: number },
+): UniversalityCensus {
+  const carried = options.carried;
+  const bound = Math.max(0, Math.trunc(options.sample ?? UNIVERSAL_SAMPLE));
+  const readable = items.filter((item) => typeof item.id === 'string') as readonly (StoreDumpItem & {
+    id: string;
+  })[];
+  let unconditioned = 0;
+  let narrowest = 0;
+  let universal = 0;
+  let unplaceable = 0;
+  const sample: string[] = [];
+
+  for (const item of readable) {
+    const statesNothing = item.when === undefined || item.when.trim() === '';
+    const scope = item.scope;
+    // A scope *object* is what makes the question answerable here: "does this record declare any
+    // dimension" needs the object and not its task, which is why this census can read a dump whose
+    // projection carried one dimension and no task — the reading is then bounded to that dimension
+    // and says so, rather than refusing a store it can still describe.
+    const placeable = scope !== undefined && scope !== null && typeof scope === 'object';
+    // And a dimension count over dimensions the dump never carried would be a statement about the
+    // dump: with an empty `carried`, every record would read as declaring nothing.
+    const declaresNothing = placeable && carried.length > 0 && carried.every((dim) => scope[dim] === undefined);
+    if (statesNothing) unconditioned += 1;
+    if (declaresNothing) narrowest += 1;
+    if (statesNothing && declaresNothing) {
+      universal += 1;
+      if (sample.length < bound) sample.push(item.id);
+    }
+    // Counted, never folded in: a record with no placeable scope is a record the dump cannot place,
+    // and calling it universal would make a projection's silence into a finding.
+    if (statesNothing && !placeable) unplaceable += 1;
+  }
+
+  const records = readable.length;
+  if (records === 0) {
+    return {
+      state: 'empty',
+      sentence: 'the dump holds no record with an id, so there is no population to count',
+      records: 0,
+      unconditioned: 0,
+      narrowest: 0,
+      universal: 0,
+      universalShare: 0,
+      unplaceable: 0,
+      sample: [],
+    };
+  }
+  const shareOf = share(universal, records);
+  const unread =
+    carried.length === 0
+      ? '; the dump does not say which scope dimensions it carried, so a scope dimension count is not a fact here'
+      : `; read within the ${carried.length} optional dimension(s) the dump carried`;
+  const unplaced =
+    unplaceable === 0 ? '' : `; ${unplaceable} state no condition and cannot be placed at all`;
+  return {
+    state: 'read',
+    sentence:
+      `${universal} of ${records} record(s) state no condition and declare no scope dimension ` +
+      `(${shareOf.toFixed(4)}) — ${unconditioned} state no condition, ${narrowest} declare no ` +
+      `dimension${unplaced}${unread}`,
+    records,
+    unconditioned,
+    narrowest,
+    universal,
+    universalShare: shareOf,
+    unplaceable,
+    sample,
   };
 }
