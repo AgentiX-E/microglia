@@ -13,6 +13,7 @@
    "maxChars": 240,
    "omitted": 0,
    "truncated": 0,
+   "scopeDims": ["task", "intent"],
    "items": [
     {
      "id": "k_join_1",

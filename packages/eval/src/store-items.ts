@@ -35,7 +35,27 @@ export type StoreItemRecord = {
   /** The claim as written, truncated. */
   readonly statement: string;
   readonly trust: number;
-  readonly scope: { readonly domain?: string };
+  /**
+   * The item's scope, as the store declared it.
+   *
+   * R113. This projection used to keep `domain` and drop everything else, so the one artefact
+   * field that records *where a rule applies* recorded one dimension of five — and the scope
+   * census, whose whole question is how many dimensions a record leaves open, could not be run on
+   * any real store. The four dimensions here are the ones a `KnowledgeScope` may declare; `task`
+   * is carried because it is the outermost dimension and the only one every record has.
+   *
+   * Absent fields mean the record declared nothing on that dimension. That is a fact about the
+   * record and not about the dump — `scopeDims` on the sample says which dimensions the projection
+   * carried, so the two silences cannot be confused.
+   */
+  readonly scope: {
+    readonly task?: string;
+    readonly domain?: string;
+    readonly schemaDigest?: string;
+    readonly intent?: string;
+    readonly field?: string;
+    readonly reasonCode?: string;
+  };
   /**
    * Distinct tasks among the item's evidence — the support the score actually credits.
    *
@@ -79,9 +99,45 @@ export type StoreItemSample = {
   readonly omitted: number;
   /** Items in the sample whose statement or condition was cut to fit `maxChars`. */
   readonly truncated: number;
+  /**
+   * Which scope dimensions this projection carried, declared by the writer.
+   *
+   * R113. A reader asked "how many records leave `field` open" cannot tell an empty `field` from a
+   * projection that never carried it, and this project has already paid once for filling that
+   * silence in (AUDIT 34.135). The writer knows the answer, so it states it, and a sample without
+   * this list is one the scope census refuses rather than interprets.
+   */
+  readonly scopeDims: readonly StoreScopeDim[];
 };
 
+/** The dimensions `StoreItemRecord.scope` can carry. Kept beside the record it describes. */
+export const STORE_SCOPE_DIMS = ['task', 'domain', 'schemaDigest', 'intent', 'field', 'reasonCode'] as const;
+
+export type StoreScopeDim = (typeof STORE_SCOPE_DIMS)[number];
+
 const ELLIPSIS = '…';
+
+/**
+ * Copy the scope dimensions the record actually declared.
+ *
+ * Omitted keys stay omitted: a projection that wrote `domain: null` would give a reader two
+ * spellings of "not declared" and one of them would eventually be read as a value.
+ */
+function projectScope(scope: {
+  readonly task?: string;
+  readonly domain?: string;
+  readonly schemaDigest?: string;
+  readonly intent?: string;
+  readonly field?: string;
+  readonly reasonCode?: string;
+}): StoreItemRecord['scope'] {
+  const out: Record<string, string> = {};
+  for (const dim of STORE_SCOPE_DIMS) {
+    const value = scope[dim];
+    if (typeof value === 'string') out[dim] = value;
+  }
+  return out as StoreItemRecord['scope'];
+}
 
 function clip(text: string, maxChars: number): { readonly text: string; readonly cut: boolean } {
   if (text.length <= maxChars) return { text, cut: false };
@@ -96,7 +152,14 @@ export function storeItemSample(
     readonly when?: string;
     readonly statement: string;
     readonly trust: number;
-    readonly scope: { readonly domain?: string };
+    readonly scope: {
+      readonly task?: string;
+      readonly domain?: string;
+      readonly schemaDigest?: string;
+      readonly intent?: string;
+      readonly field?: string;
+      readonly reasonCode?: string;
+    };
     readonly evidence: readonly { readonly taskId?: string; readonly runId: string }[];
     /** The store's own reason for the item's status, which the recurrence pass uses to name a survivor. */
     readonly statusReason?: string;
@@ -119,12 +182,19 @@ export function storeItemSample(
       ...(when === undefined ? {} : { when: when.text }),
       statement: statement.text,
       trust: item.trust,
-      scope: item.scope.domain === undefined ? {} : { domain: item.scope.domain },
+      scope: projectScope(item.scope),
       supportTasks: countDistinctTasks(item.evidence),
       evidence: item.evidence.length,
       ...(item.statusReason === undefined ? {} : { statusReason: item.statusReason }),
       ...(item.polarity === undefined ? {} : { polarity: item.polarity }),
     };
   });
-  return { items: sampled, limit, maxChars, omitted: Math.max(0, items.length - sampled.length), truncated };
+  return {
+    items: sampled,
+    limit,
+    maxChars,
+    omitted: Math.max(0, items.length - sampled.length),
+    truncated,
+    scopeDims: STORE_SCOPE_DIMS,
+  };
 }

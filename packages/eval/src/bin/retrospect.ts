@@ -32,6 +32,7 @@ import {
 } from '@agentix-e/microglia-core/retrospect';
 import type { ProvenanceCensus } from '../tau2-provenance.js';
 import { readStoreDump, reconcileSides, refusalOf, storeDumpItems } from '../retrospect-store.js';
+import { carriedDims, scopeCensus } from '../scope-census.js';
 
 function flag(argv: readonly string[], name: string): string | undefined {
   const index = argv.indexOf(name);
@@ -56,6 +57,10 @@ async function main(): Promise<void> {
   const raw = JSON.parse(await readFile(resolve(from), 'utf8')) as Record<string, unknown>;
   const dump = storeDumpItems(raw, from);
   const reading = readStoreDump(dump.items, 'unknown');
+  // R113: how wide the rules are, read from the same dump and printed before the batch is built.
+  // It refuses when the dump did not declare what it carried, and a refusal here is a reading of
+  // the document rather than a fault in it — the batch below does not depend on the answer.
+  const scope = scopeCensus(dump.items, { carried: carriedDims(dump.scopeDims) });
   const refusal = refusalOf(reading, from);
   if (refusal !== undefined) throw new Error(`${refusal}. Nothing to consolidate.`);
 
@@ -100,6 +105,7 @@ async function main(): Promise<void> {
       `store      ${reading.total} record(s): ${reading.repairs} repair(s), ${reading.passes} pass(es), ` +
         `${reading.unclassified} with no side${reading.skipped === 0 ? '' : `, ${reading.skipped} unreadable`}`,
       `sides      ${sides.state.toUpperCase()} — ${sides.sentence}`,
+      `scope      ${scope.state.toUpperCase()} — ${scope.sentence}`,
       `clusters   ${clusters.length} at threshold ${threshold}${clusters.length === 0 ? ' — no two repairs share a condition' : ''}`,
       `census     fragmentation ${census.fragmentation.toFixed(3)} (${census.orphans}/${census.repairs} repair(s) no cluster claims), ` +
         `chained ${census.chained}/${census.clusters} under ${CHAIN_COHESION_FLOOR}, mean cohesion ${census.meanCohesion.toFixed(3)}`,

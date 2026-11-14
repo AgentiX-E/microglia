@@ -847,6 +847,15 @@ export {
 } from './retrospect-store.js';
 
 export {
+  SCOPE_DIMS,
+  carriedDims,
+  scopeCensus,
+  type DimCounts,
+  type ScopeCensus,
+  type ScopeDim,
+} from './scope-census.js';
+
+export {
   INJECTION_NOTE_LEVELS,
   resolveInjectionNotePlan,
   type InjectionNotePlan,

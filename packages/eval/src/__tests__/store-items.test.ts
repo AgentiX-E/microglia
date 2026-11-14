@@ -150,8 +150,7 @@ describe('the store sample the artefact carries', () => {
     expect(sample.items[0]?.evidence).toBe(0);
   });
 
-  it('omits the scope domain when the item has none, which V44 counts separately', () => {
-    // An item stored without a domain is unreachable by every recall that asks in one, so a
+  it('omits the scope domain when the item has none, which V44 counts separately', () => {    // An item stored without a domain is unreachable by every recall that asks in one, so a
     // sample that rendered it as `domain: ''` would hide the defect it is supposed to expose.
     const sample = storeItemSample([item({ scope: {} })]);
     expect(sample.items[0]?.scope).toEqual({});
@@ -173,5 +172,70 @@ describe('the store sample the artefact carries', () => {
     const sample = storeItemSample([item({ polarity: 'repair' }), item({ id: 'k2' })]);
     expect(sample.items[0]?.polarity).toBe('repair');
     expect(Object.hasOwn(sample.items[1] ?? {}, 'polarity')).toBe(false);
+  });
+});
+
+/**
+ * R113: the sample used to keep one scope dimension of five.
+ *
+ * The scope census asks how many dimensions a record leaves open, which is the number every
+ * 2026 memory-harm result turns on (arXiv 2611.07554, 2605.12978, 2610.27524). A projection that
+ * carried `domain` alone made that question unaskable on any real artefact, and the reader could
+ * not tell an empty dimension from an unprojected one — the same defect as reading a `kind`
+ * default as a side.
+ */
+describe('the scope the sample carries', () => {
+  it('carries every dimension the record declared, not only the domain', () => {
+    const sample = storeItemSample([
+      item({
+        scope: {
+          task: 'retail',
+          domain: 'orders',
+          schemaDigest: 'sha256:abc',
+          intent: 'order.items',
+          field: 'status',
+          reasonCode: 'disputed',
+        },
+      }),
+    ]);
+    expect(sample.items[0]?.scope).toEqual({
+      task: 'retail',
+      domain: 'orders',
+      schemaDigest: 'sha256:abc',
+      intent: 'order.items',
+      field: 'status',
+      reasonCode: 'disputed',
+    });
+  });
+
+  it('leaves an undeclared dimension out rather than writing a null for it', () => {
+    // Two spellings of "not declared" is one spelling too many: a reader that meets `domain: null`
+    // will eventually read it as a value, and the census would count it as declared.
+    const sample = storeItemSample([item({ scope: { task: 'retail' } })]);
+    expect(sample.items[0]?.scope).toEqual({ task: 'retail' });
+    expect(Object.hasOwn(sample.items[0]?.scope ?? {}, 'domain')).toBe(false);
+  });
+
+  it('declares which dimensions it carried, so a reader can tell silence from an omission', () => {
+    const sample = storeItemSample([item()]);
+    expect(sample.scopeDims).toEqual(['task', 'domain', 'schemaDigest', 'intent', 'field', 'reasonCode']);
+    // The declaration has to describe this projection, not a wish: every dimension it names must
+    // come back out when the record declares one. A dimension named here and dropped by
+    // `projectScope` would be reported as open on every record in the store.
+    const every = storeItemSample([
+      item({
+        scope: {
+          task: 'retail',
+          domain: 'orders',
+          schemaDigest: 'sha256:abc',
+          intent: 'order.items',
+          field: 'status',
+          reasonCode: 'disputed',
+        },
+      }),
+    ]);
+    for (const dim of sample.scopeDims) {
+      expect(Object.hasOwn(every.items[0]?.scope ?? {}, dim)).toBe(true);
+    }
   });
 });

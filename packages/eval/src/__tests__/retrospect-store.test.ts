@@ -256,4 +256,23 @@ describe('finding the store inside an artefact', () => {
       storeDumpItems({ tau2: { storeItems: { items: [record()], omitted: Number.NaN } } }, 'x.json').omitted,
     ).toBe(0);
   });
+
+  it('carries the dimensions the sample says it projected', () => {
+    // R113. Without this the scope census cannot tell a dimension no record declared from a
+    // dimension the projection never carried, and it refuses to answer rather than guess.
+    const found = storeDumpItems(
+      { tau2: { storeItems: { items: [record()], scopeDims: ['task', 'domain', 'intent'] } } },
+      'x.json',
+    );
+    expect(found.scopeDims).toEqual(['task', 'domain', 'intent']);
+  });
+
+  it('drops a malformed dimension list rather than repairing it, so silence stays silence', () => {
+    const bare = storeDumpItems([record()], 'x.json');
+    expect(Object.hasOwn(bare, 'scopeDims')).toBe(false);
+    for (const dims of [3, 'task,domain', ['task', 3], [null]]) {
+      const found = storeDumpItems({ tau2: { storeItems: { items: [record()], scopeDims: dims } } }, 'x.json');
+      expect(Object.hasOwn(found, 'scopeDims')).toBe(false);
+    }
+  });
 });

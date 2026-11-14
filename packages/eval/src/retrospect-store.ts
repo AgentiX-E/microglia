@@ -50,7 +50,22 @@ export type StoreDumpItem = {
   readonly confidence?: number;
   readonly trust?: number;
   readonly createdAt?: number;
-  readonly scope?: { readonly task?: string; readonly domain?: string; readonly intent?: string };
+  /**
+   * The store's own scope, as the sample carried it.
+   *
+   * Every dimension is optional because the sample is a projection: a dump written before the
+   * scope census existed carried task, domain and intent only. A reader that fills in an unlisted
+   * dimension has invented the value it was asked for — see `scopeCensus`, which refuses rather
+   * than defaults when it is not told what the dump carried.
+   */
+  readonly scope?: {
+    readonly task?: string;
+    readonly domain?: string;
+    readonly schemaDigest?: string;
+    readonly intent?: string;
+    readonly field?: string;
+    readonly reasonCode?: string;
+  };
 };
 
 /** The store a document carries, and how much of it the document left out. */
@@ -64,6 +79,14 @@ export type StoreDump = {
    * the number travels with the items instead of being rediscovered by a reader.
    */
   readonly omitted: number;
+  /**
+   * Which scope dimensions the dump's projection carried, when the writer said so.
+   *
+   * Absent on every dump written before R113, and absent is not "all of them": a projection that
+   * kept `domain` and dropped `field` produces the same records as a store in which no record ever
+   * declared a field. The scope census refuses rather than guesses when this is missing.
+   */
+  readonly scopeDims?: readonly string[];
 };
 
 export type StoreReading = {
@@ -239,9 +262,16 @@ export function storeDumpItems(raw: unknown, from: string): StoreDump {
     const items = record?.['items'];
     if (!Array.isArray(items)) continue;
     const omitted = record?.['omitted'];
+    const dims = record?.['scopeDims'];
     return {
       items: items as readonly StoreDumpItem[],
       omitted: typeof omitted === 'number' && Number.isFinite(omitted) ? Math.max(0, omitted) : 0,
+      // Carried as written when it is a list of strings, and dropped otherwise: a malformed
+      // declaration is the same reading as no declaration, and a reader that repaired it would be
+      // inventing the very boundary the field exists to state.
+      ...(Array.isArray(dims) && dims.every((dim) => typeof dim === 'string')
+        ? { scopeDims: dims as readonly string[] }
+        : {}),
     };
   }
   throw new Error(`${from} is not a store dump: no item array found`);
