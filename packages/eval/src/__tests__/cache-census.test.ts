@@ -4,6 +4,7 @@ import {
   PREFIX_BROKEN,
   PREFIX_HONOURED,
   cacheCensusVerdict,
+  premiumSplitOf,
   type PhaseCacheCensus,
 } from '../cache-census.js';
 
@@ -162,5 +163,83 @@ describe('the state list', () => {
       ].map((verdict) => verdict.state),
     );
     expect([...produced].sort()).toEqual([...CACHE_CENSUS_STATES].sort());
+  });
+});
+
+describe('the premium, split into what the block can and cannot explain', () => {
+  // The five arms of PROGRESS 185, as the artefacts report them. These are committed numbers: the
+  // decomposition below is the sentence the round published, and a change to any constant in
+  // `cache-census.ts` has to move them.
+  const arms = {
+    r93Reference: { calls: 2_726, uncachedTokens: 1_112_267, servedChars: 0 },
+    r101Scaffold: { calls: 2_660, uncachedTokens: 1_100_517, servedChars: 0 },
+    r93Memory: { calls: 2_667, uncachedTokens: 4_087_772, servedChars: 1_745 },
+    r99Memory: { calls: 2_646, uncachedTokens: 4_235_349, servedChars: 1_986 },
+  };
+
+  it('prices the wrapper at five tokens a call, which is one percent of the memory premium', () => {
+    // R101's scaffold arm is the same agent class with an empty pack: 413.7 uncached tokens a call
+    // against the reference's 408.0. The wrapper is not free, it is *indistinguishable* — 5.7 tokens
+    // on a 1,124.7 premium — and the difference matters, because "costs nothing" would still be true
+    // if an agent class cost twenty tokens a call and nobody had multiplied it by 2,660.
+    const split = premiumSplitOf({ control: arms.r93Reference, treatment: arms.r101Scaffold });
+    expect(split?.perCall).toBeCloseTo(5.7, 1);
+    expect(split?.blockShare[0]).toBe(0);
+    expect(split?.sentence).toContain('0 served character(s)');
+  });
+
+  it('refuses a premium that is not one, rather than reporting a share of a negative', () => {
+    expect(
+      premiumSplitOf({
+        control: { calls: 100, uncachedTokens: 50_000 },
+        treatment: { calls: 100, uncachedTokens: 40_000, servedChars: 1_000 },
+      }),
+    ).toBeNull();
+  });
+
+  it('bounds the block and leaves the rest to the turn', () => {
+    const split = premiumSplitOf({ control: arms.r93Reference, treatment: arms.r93Memory });
+    expect(split).not.toBeNull();
+    // 1,532.7 against 408.0 uncached tokens a call, each arm divided by its own calls.
+    expect(split?.perCall).toBeCloseTo(1_124.7, 1);
+    // 1,745 characters: 436.3 tokens at 4.0 characters each, 498.6 at 3.5.
+    expect(split?.blockTokens[0]).toBeCloseTo(436.25, 2);
+    expect(split?.blockTokens[1]).toBeCloseTo(498.57, 2);
+    expect(split?.blockShare[0]).toBeCloseTo(0.388, 3);
+    expect(split?.blockShare[1]).toBeCloseTo(0.443, 3);
+    // And therefore more than half of the premium is not the pack at all.
+    expect(split?.flatPerCall[0]).toBeCloseTo(626.1, 0);
+    expect(split?.flatPerCall[1]).toBeCloseTo(688.4, 0);
+    expect(split?.sentence).toContain('the pack does not contain');
+  });
+
+  it('prices a bigger pack without pretending its size is the whole premium', () => {
+    // R99 served 241 more characters than R93 and paid 67.9 more uncached tokens a call: the
+    // size-dependent slope is 0.2819, and the flat component barely moves. Both arms are the same
+    // mechanism at two sizes, which is what makes the slope a measurement rather than a coincidence.
+    const small = premiumSplitOf({ control: arms.r93Reference, treatment: arms.r93Memory });
+    const large = premiumSplitOf({ control: arms.r93Reference, treatment: arms.r99Memory });
+    expect(large!.perCall - small!.perCall).toBeCloseTo(67.9, 1);
+    expect(
+      (large!.perCall - small!.perCall) / (arms.r99Memory.servedChars - arms.r93Memory.servedChars),
+    ).toBeCloseTo(0.2819, 3);
+    // The flat component moves by 10 tokens when the pack grows by 241 characters, i.e. it is not
+    // tracking the pack: it is the arm's own turn, and it is the majority of both premiums.
+    expect(Math.abs(large!.flatPerCall[0] - small!.flatPerCall[0])).toBeLessThan(25);
+  });
+
+  it('refuses to divide by an arm that made no call', () => {
+    // A rate over no calls is not a rate, and a premium computed from one would be infinite.
+    expect(
+      premiumSplitOf({
+        control: { calls: 0, uncachedTokens: 0 },
+        treatment: { calls: 0, uncachedTokens: 500, servedChars: 100 },
+      }),
+    ).toBeNull();
+    const split = premiumSplitOf({
+      control: { calls: 0, uncachedTokens: 0 },
+      treatment: { calls: 10, uncachedTokens: 500, servedChars: 100 },
+    });
+    expect(split?.perCall).toBeCloseTo(50, 6);
   });
 });

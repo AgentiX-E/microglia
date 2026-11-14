@@ -50,7 +50,7 @@ import {
 import { writeJson } from './lib.js';
 import { pairedVerdict } from '../paired-verdict.js';
 import { pairGates, plantedBarNote } from '../pair-gates.js';
-import { cacheCensusVerdict } from '../cache-census.js';
+import { cacheCensusVerdict, premiumSplitOf } from '../cache-census.js';
 
 type TaskRow = { readonly id: string; readonly passed_all: boolean };
 
@@ -94,6 +94,8 @@ type Artefact = {
      * carries no plant census planted nothing, and its pair must be graded as the control it was.
      */
     readonly plant?: { readonly arm: string };
+    /** The pack the arm served; `summary.meanChars` is what the premium is priced against. */
+    readonly pack?: { readonly summary: { readonly meanChars: number } | null };
   };
   readonly per_task?: readonly TaskRow[];
   /** One row per evaluated episode; absent on artefacts written before R29 stage 2. */
@@ -453,6 +455,30 @@ for (const [name, record] of [
 ] as const) {
   const census = cacheCensusVerdict(record.tau2?.usage?.cache);
   process.stdout.write(`[l4-pair] cache ${name} (${record.tau2?.arm ?? 'unstated'}): ${census.state} — ${census.sentence}\n`);
+}
+// And the premium, split, when both arms carry the columns it is computed from. This is the sentence
+// R103 published — and printing it per pair is what keeps it a measurement rather than a paragraph:
+// the next arm to serve a different pack re-derives it instead of quoting it.
+const firstUsage = first.tau2?.usage;
+const secondUsage = second.tau2?.usage;
+const servedChars = second.tau2?.pack?.summary?.meanChars ?? 0;
+if (
+  firstUsage?.calls != null &&
+  firstUsage.uncached_tokens != null &&
+  secondUsage?.calls != null &&
+  secondUsage.uncached_tokens != null
+) {
+  const premium = premiumSplitOf({
+    control: { calls: firstUsage.calls, uncachedTokens: firstUsage.uncached_tokens },
+    treatment: {
+      calls: secondUsage.calls,
+      uncachedTokens: secondUsage.uncached_tokens,
+      servedChars,
+    },
+  });
+  process.stdout.write(
+    `[l4-pair] premium: ${premium === null ? 'the second arm was not more expensive per call, so there is no premium to attribute' : premium.sentence}\n`,
+  );
 }
 process.stdout.write(
   `[l4-pair] protocol: ${audit.evaluable.length} gate(s) fired, ${audit.vacuous.length} vacuous, ` +

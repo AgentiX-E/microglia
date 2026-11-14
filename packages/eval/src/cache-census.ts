@@ -176,3 +176,74 @@ function unmeasured(sentence: string): CacheCensusVerdict {
     sentence,
   };
 }
+
+/**
+ * Characters per token, as a range rather than a number, for pricing a block.
+ *
+ * The census measures this ratio on the phase's first call when a run reports one (3.55 on R93's
+ * corpus). It is a range here because the attribution has to be computable from artefacts that
+ * predate the census, and a single borrowed constant would turn an estimate into a claim.
+ */
+export const CHARS_PER_TOKEN = { dense: 3.5, sparse: 4.0 } as const;
+
+/** Two arms' uncached columns, and the characters the treatment served per call. */
+export type PremiumInput = {
+  readonly control: { readonly calls: number; readonly uncachedTokens: number };
+  readonly treatment: {
+    readonly calls: number;
+    readonly uncachedTokens: number;
+    /** Mean characters of the pack the treatment served, including its wrapper. */
+    readonly servedChars: number;
+  };
+};
+
+/**
+ * What the treatment's uncached premium can and cannot be the block.
+ *
+ * The decomposition this answers is the one PROGRESS 179 could not: a premium is a single number, and
+ * the block is only one of two things that can produce it. Dividing the served characters by the
+ * characters-per-token range gives the block's **ceiling** — the most it could cost if every call paid
+ * for it in full, in a regime where the provider caches nothing — and whatever is left over is material
+ * the pack does not contain, which is the arm's own turn.
+ *
+ * `null` when the treatment was not more expensive per call: a negative premium is not a small premium,
+ * and a share-of-a-negative is the arithmetic that produces −40%.
+ */
+export function premiumSplitOf(input: PremiumInput): PremiumSplit | null {
+  const control = input.control.calls > 0 ? input.control.uncachedTokens / input.control.calls : 0;
+  const treatment =
+    input.treatment.calls > 0 ? input.treatment.uncachedTokens / input.treatment.calls : 0;
+  const perCall = treatment - control;
+  if (!(perCall > 0)) return null;
+  const dense = input.treatment.servedChars / CHARS_PER_TOKEN.dense;
+  const sparse = input.treatment.servedChars / CHARS_PER_TOKEN.sparse;
+  const share = (tokens: number): number => tokens / perCall;
+  const flatDense = perCall - dense;
+  const flatSparse = perCall - sparse;
+  return {
+    perCall,
+    blockTokens: [sparse, dense],
+    blockShare: [share(sparse), share(dense)],
+    // Ascending, like `blockTokens`: the block priced at its most expensive leaves the least for the
+    // turn, and a range is read low-to-high.
+    flatPerCall: [Math.max(0, flatDense), Math.max(0, flatSparse)],
+    sentence:
+      `+${perCall.toFixed(1)} uncached tokens a call over the control, of which the ` +
+      `${String(Math.round(input.treatment.servedChars))} served character(s) can account for ` +
+      `${(share(sparse) * 100).toFixed(1)}–${(share(dense) * 100).toFixed(1)}% even if every call paid ` +
+      `for the block in full; ${Math.max(0, flatSparse).toFixed(1)}–${Math.max(0, flatDense).toFixed(1)} ` +
+      `tokens a call are material the pack does not contain`,
+  };
+}
+
+export type PremiumSplit = {
+  /** Uncached tokens a call beyond the control's. */
+  readonly perCall: number;
+  /** The block's cost at 4.0 and at 3.5 characters a token, in that order. */
+  readonly blockTokens: readonly [number, number];
+  /** The same two, as a share of `perCall`. */
+  readonly blockShare: readonly [number, number];
+  /** What is left when the block is priced at its most expensive: the arm's own turn material. */
+  readonly flatPerCall: readonly [number, number];
+  readonly sentence: string;
+};
