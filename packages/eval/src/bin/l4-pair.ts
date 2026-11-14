@@ -369,6 +369,11 @@ await writeJson('poc-l4-pair', {
     absent: audit.absent,
     supplyable: audit.supplyable,
     armIndexed: audit.armIndexed,
+    // R106: the gates this arm has no subject for, because it declared its store empty. Present only
+    // when there are some — an `omitted: []` on every memory arm would be a column nobody reads — and
+    // carried here rather than dropped because "not graded, and here is why" is a statement while a
+    // missing gate is a silence.
+    ...(audit.omitted === undefined ? {} : { omitted: audit.omitted }),
   },
   gates,
   // Where each half ran, when the arms recorded it. A reader of a cross-domain pair has to be able
