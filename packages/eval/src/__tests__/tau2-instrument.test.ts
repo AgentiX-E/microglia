@@ -705,6 +705,17 @@ describe('the projection has a decision for every field, and keeps it', () => {
       // because the round's only reading is a comparison between two populations and a reader that
       // had to infer one from the other would be comparing a store with itself.
       distillScope: 'all' as const,
+      // R111: what the distiller's replies contained, and whether a pre-flight preceded them. Both
+      // are carried rather than reduced: the reply census is the only counter that can see a model
+      // choosing silence, and a pre-flight's absence is not a failure.
+      distillReplies: { calls: 15, empty: 0, chars: 2400, clientCalls: 15 },
+      distillModel: 'deepseek-chat',
+      distillPreflight: {
+        state: 'answered' as const,
+        reason: 'the distiller wrote 1 claim(s) from one correction',
+        candidates: 1,
+        chars: 220,
+      },
       provenance: {
         edited: 2,
         passed: 5,

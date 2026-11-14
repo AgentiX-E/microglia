@@ -9,6 +9,11 @@ recallFloor: 0
 facadePair: off
 facadeNotes: off
 facadeShapes: two-unit
+# Amended before any measurement (see the note below the sentence). The store this arm's premise
+# quotes is R99's: 73 records, 53 routines, ten taught by two tasks. That is the mixed population, and
+# leaving the switch to a repository variable resolved it to `edited` — fifteen records from fifteen
+# failures, which cannot hold the ten corroborated routines the claim is about.
+distillScope: all
 trainDomain: retail
 testDomain: retail
 recallDomain: retail
@@ -37,6 +42,32 @@ R109 put the fold at the delivery boundary — a pure function over the pack the
 and R109a made it a pair: one dispatch, one learning phase, one store, two facades that differ in one
 `RecallQuery.shape`. This registration is that pair, with the control being the unit every committed
 artefact ran.
+
+## Amended before any measurement: the population
+
+The first dispatch (run `43578774040`, 2026-11-14) **produced no measurement** and therefore no result
+to amend anything in the light of. It ran 74 learn episodes for $0.1875, produced fifteen corrections,
+asked the distiller about all fifteen, and got fifteen empty replies — `0 candidate(s)`, `0 stored`,
+`0 servable`. The arm stopped there, as it should.
+
+That dispatch also resolved `distillScope` from a repository variable that was empty, so the driver
+defaulted to `edited`: **fifteen corrections from fifteen failures.** The census this registration
+quotes is R99's, which was built from every trajectory — 73 records, 53 shapes, ten taught by two
+tasks and five by three. Fifteen records cannot hold ten corroborated routines: R99's own ratio
+(73 records → 53 shapes → ten at support ≥2) puts the expected count at fifteen near one. So the
+dispatched arm could not have measured the claim it registered **whatever the distiller had done**,
+and nothing in the header said which store the claim lived in.
+
+Two changes follow, both before any measurement exists:
+
+1. The header now pins `distillScope: all`. The predictions and the refutations are unchanged.
+2. `prereg.ts` refuses a `two-unit` arm that leaves the population to a variable, for the reason it
+   already refuses a floor, a pair, note levels, units, a form and a pack mode there: a repository
+   variable is global, and the fold's supply is exactly what the population decides.
+
+The fifteen empty replies are a separate defect and are not amended here. They are instrumented
+(`distillReplies`, the pre-flight, and the diagnostics a stop now carries), and whether the model
+answers this population at all is the next run's question rather than a prediction of this one.
 
 ## The two legs
 

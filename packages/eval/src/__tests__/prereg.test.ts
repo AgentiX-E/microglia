@@ -552,9 +552,24 @@ describe('the facadeShapes header', () => {
   }
 
   it('registers both pack units over one store', () => {
-    const reading = readPrereg(withHeader('facadeShapes: two-unit'), 'R8.3-xiyan-cell.md');
+    // R111: the population is part of the declaration. A fold's supply is the store's, and the store
+    // is the population, so the header that renders both units names the population they fold.
+    const reading = readPrereg(
+      withHeader('distillScope: all\nfacadeShapes: two-unit'),
+      'R8.3-xiyan-cell.md',
+    );
     expect(reading.problems).toEqual([]);
     expect(reading.prereg?.facadeShapes).toBe('two-unit');
+    expect(reading.prereg?.distillScope).toBe('all');
+  });
+
+  it('refuses a two-unit arm that leaves the population to a variable', () => {
+    // R104's defect, made unrepresentable. The registration quoted R99's 73-record census and pinned
+    // no population; the dispatch read an empty repository variable, the driver defaulted to
+    // `edited`, and fifteen corrections arrived where the premise was about seventy-three records
+    // and ten corroborated routines. Nothing in the header said which store the claim lived in.
+    const problems = problemsOf(withHeader('facadeShapes: two-unit'), 'R8.3-xiyan-cell.md');
+    expect(problems.some((entry) => entry.includes("declare distillScope"))).toBe(true);
   });
 
   it('leaves every registration opened before R109a on the single-unit path', () => {

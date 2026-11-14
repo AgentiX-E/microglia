@@ -628,6 +628,24 @@ store of pure successes for exactly as long as the side was guessed from the kin
 candidate with `needs-corroboration` until a second distinct task, or evidence of a stronger tier, endorses
 the same claim.
 
+**Distiller pre-flight** — one fixture correction, asked of the interpreter **before** a learning phase is
+bought. It answers the question a provider probe cannot: not "does the endpoint reply" but "does this prompt
+form, on this population, produce a claim from a correction that states one". A refusal writes a
+no-measurement record and stops the dispatch, so a distiller that has stopped learning costs one call instead
+of a whole episode run. Off by default, because an added call is an added call in a sequence a published arm's
+number was produced under; the artefact records whether it ran, so an arm with a pre-flight is distinguishable
+from one without.
+
+**Reply census** — how many replies the distiller's model returned, how many of them were **empty**, and the
+first empty one verbatim. It exists because the funnel's four counts cannot see an empty reply: one event
+asked, zero candidates, zero drops. A model choosing silence and an interpreter that was never called produce
+the same numbers without it.
+
+**Population** — the set of trajectories a store is distilled from: `edited` (the failures) or `all` (every
+trajectory, successes included). It decides how many routines the store holds and how many are corroborated,
+so it is part of a registration rather than a variable a dispatch inherits: a fold whose supply is a
+repository variable is a treatment nobody declared.
+
 **Abstention** — a knowledge item recording that a kind of question cannot be answered as asked. Rendered in
 its own block with an instruction not to invent an answer, and it speaks only when no positive rule clears
 the activation threshold.

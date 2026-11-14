@@ -478,6 +478,49 @@ export type Tau2Raw = {
    * differ in the only way this round moves.
    */
   readonly distillScope?: "edited" | "all";
+  /**
+   * R111: what the distiller's model put in its replies.
+   *
+   * `drops` counts claims the parser threw away and `candidates` counts what it kept, so a reply
+   * with nothing in it is invisible to both: fifteen empty arrays and an interpreter that was never
+   * called produce the same five numbers. R104's stop is exactly that ambiguity, and the reply text
+   * — the one artefact that would have settled it — was discarded before anything could record it.
+   * `firstEmpty` is the verbatim reply, so "the model wrote `[]`" is a fact and not an inference.
+   */
+  readonly distillReplies?: {
+    readonly calls: number;
+    readonly empty: number;
+    readonly chars: number;
+    readonly firstEmpty?: string;
+    /** The model client's own call count, which must agree with `calls` on a working run. */
+    readonly clientCalls?: number;
+  };
+  /**
+   * R111: which model wrote the memory, named in the artefact because it is not the arm's own.
+   *
+   * `TAU_DISTILL_MODEL` is empty unless a dispatch sets it, and the driver then inherits `TAU_MODEL` —
+   * the model that *acts*. The two roles are different components (ACE's Reflector against its
+   * Generator) and the same weight is not obviously right for both, but until this field existed a
+   * reader could not tell which model wrote a store without opening the captured rows. Recorded on
+   * every arm, so "the reflector changed" is a visible event rather than an inference.
+   */
+  readonly distillModel?: string;
+  /**
+   * R111: one fixture correction asked before the learn half was bought.
+   *
+   * Absent on every arm before this field and on every arm that did not run a pre-flight, which is
+   * the distinction that matters: a passing pre-flight is a claim that the instrument was working
+   * when the arm ran, and a reader must not read its absence as one.
+   */
+  readonly distillPreflight?: {
+    readonly state: "answered" | "empty" | "error";
+    readonly reason: string;
+    readonly candidates?: number;
+    readonly chars?: number;
+    readonly preview?: string;
+    readonly code?: string;
+    readonly sample?: string;
+  };
   readonly provenance?: ProvenanceCensus;
   /**
    * R60: how many claims each correction yielded. See `YieldCensus`.
@@ -763,6 +806,9 @@ export const PROJECTION: {
   rawlog: "carried",
   faithfulness: "carried",
   distillScope: "carried",
+  distillReplies: "carried",
+  distillPreflight: "carried",
+  distillModel: "carried",
   provenance: "carried",
   traceClaims: "carried",
   yieldCensus: "carried",
@@ -950,6 +996,9 @@ export function armRecordFromDriver(
     ...(raw.rawlog === undefined ? {} : { rawlog: raw.rawlog }),
     ...(raw.faithfulness === undefined ? {} : { faithfulness: raw.faithfulness }),
     ...(raw.distillScope === undefined ? {} : { distillScope: raw.distillScope }),
+    ...(raw.distillReplies === undefined ? {} : { distillReplies: raw.distillReplies }),
+    ...(raw.distillModel === undefined ? {} : { distillModel: raw.distillModel }),
+    ...(raw.distillPreflight === undefined ? {} : { distillPreflight: raw.distillPreflight }),
     ...(raw.provenance === undefined ? {} : { provenance: raw.provenance }),
     ...(raw.traceClaims === undefined ? {} : { traceClaims: raw.traceClaims }),
     ...(raw.yieldCensus === undefined ? {} : { yieldCensus: raw.yieldCensus }),

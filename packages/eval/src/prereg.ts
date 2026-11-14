@@ -633,6 +633,25 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       problem: "a two-unit arm renders both units, so 'packShape' cannot also name one",
     });
   }
+  // R111: a fold's supply is the store's, and the store's supply is the population's.
+  //
+  // R104 is why. Its premise quotes R99's census — 73 records, 53 routines, ten of them taught by
+  // two tasks — and it declared no population, so the dispatch resolved `TAU_DISTILL_SCOPE` from a
+  // repository variable that was empty and the driver fell back to `edited`: fifteen corrections
+  // from fifteen failures instead of seventy-three from every trajectory. Fifteen records cannot
+  // hold the ten corroborated routines the arm's own premise is about, so the treatment that was
+  // dispatched is not the treatment that was registered, and nothing in the header said which
+  // population the claim lived in. Every other switch in this family — the floor, the pair, the note
+  // levels, the units, the form — is refused when a two-unit arm leaves it to a variable, because a
+  // variable is global and the fold is exactly the treatment whose supply it decides.
+  if (facadeShapes === 'two-unit' && values.get('distillScope') === undefined) {
+    collected.push({
+      where: `header 'facadeShapes'`,
+      problem:
+        'a two-unit arm folds a store, and the store is the population: declare distillScope ' +
+        "(edited or all) so the supply the claim is about is the registration's rather than a variable's",
+    });
+  }
 
   if (facadePair === 'as-is-floored' && (recallFloor === undefined || recallFloor <= 0)) {
     collected.push({

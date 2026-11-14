@@ -178,6 +178,14 @@ async function noMeasurement(marker: NoMeasurementMarker): Promise<never> {
       bar: BAR,
       k: K,
     },
+    // R111: what the run knew when it stopped, kept beside the sentence that says it stopped.
+    //
+    // A no-measurement artefact is the one file with no result in it, so it is the one file whose
+    // whole value is diagnostic -- and it used to carry three lines. R104's stop cost a learn half
+    // (74 episodes) and left behind a sentence about fifteen corrections and no record of those
+    // corrections, of the store's shape supply, or of what the distiller replied. Every one of those
+    // was in the driver's process and died with it.
+    ...(marker.diagnostics === undefined ? {} : { diagnostics: marker.diagnostics }),
     notes: [
       `The run stopped before any task was scored: ${marker.reason}`,
       `Claim: ${marker.claim}. No pass^4, no paired delta and no revert is produced by this run.`,

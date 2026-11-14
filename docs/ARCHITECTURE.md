@@ -90,7 +90,6 @@ adopted once and then held, like a condition — a success repeating a lesson le
 support for the lesson, not evidence about where it came from.
 
 The order of those four store decisions is load-bearing rather than incidental:
-
 | Step | Asks | Runs when |
 |---|---|---|
 | exact-key merge | is this the same claim in the same scope? | always |
@@ -564,6 +563,13 @@ The study is a package, not a script:
   arm missed one, if an ablated arm carried one anyway (an ablation that removed nothing is `none` under
   a second name), or if the ablated arm reached fewer questions than the arm it ablates.
 - `stats.ts` — paired McNemar with a bootstrap interval.
+- `distill-preflight.ts` — one fixture correction, asked of the interpreter **before** a learning phase
+  is bought, and `distill-replies.ts` — how many replies came back, how many were empty, and the first
+  empty one verbatim. The pair exists because a funnel cannot see silence: one event asked, zero
+  candidates and zero dropped claims is the same reading whether the model wrote `[]` or the
+  interpreter never ran, and a learning phase is the most expensive thing in the lane to spend on that
+  ambiguity. The pre-flight is off unless a dispatch enables it, and the artefact records whether it
+  ran, so an arm that was checked is distinguishable from one that was not.
 - `report.ts` — the artefact, rendered from the result object so prose cannot contain a number the
   artefact does not.
 

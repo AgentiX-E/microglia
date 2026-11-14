@@ -39,6 +39,7 @@ import {
 import { openMicroglia } from "@agentix-e/microglia-core/capture";
 import {
   createLlmInterpreter,
+  parseCandidates,
   ruleInterpreter,
 } from "@agentix-e/microglia-core/distill";
 import {
@@ -170,6 +171,8 @@ import { sweepConsolidation, sweepSummary } from "../consolidation-sweep.js";
 import type { Tau2PhaseUsage } from "../tau2-instrument.js";
 import { cacheCensusVerdict } from "../cache-census.js";
 import { tau2ShapeOf } from "../tau2-shape.js";
+import { runDistillPreflight, type PreflightReading } from "../distill-preflight.js";
+import { replyCensus } from "../distill-replies.js";
 import { startRecallFacade } from "../tau2-facade.js";
 import {
   resolveShapeArmPlan,
@@ -565,6 +568,17 @@ async function benchmarkIdentity(): Promise<
  * the record rather than in a comment.
  */
 const DISTILL_FORM = resolveDistillForm();
+
+/**
+ * Whether this dispatch asks the distiller one fixture correction before buying the learn half.
+ *
+ * R111. Off unless a dispatch turns it on, because an extra call is an extra call in a sequence a
+ * published arm's number was produced under. R104 is the arm that pays for it: it lost a learn half
+ * to a distiller that answered fifteen corrections with fifteen empty replies.
+ */
+const DISTILL_PREFLIGHT = /^(1|true|yes)$/i.test(
+  (process.env["TAU_DISTILL_PREFLIGHT"] ?? "").trim(),
+);
 
 /**
  * The unit this dispatch distils, resolved once and recorded from the same value.
@@ -1102,6 +1116,59 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   }
 
   const learnPath = join(workdir, "learn.json");
+  // R111: the distiller is asked one correction before the learn half is bought.
+  //
+  // R104 spent 74 episodes to obtain fifteen corrections and fifteen empty replies. The provider
+  // probe would have passed that run: the endpoint answered, twice, in three hundred milliseconds.
+  // What failed was the distiller, and the cheapest place to observe that is one call against a
+  // fixture correction — this arm's form, this arm's population, no ban (the ban's inventory is
+  // built from corrections that do not exist yet).
+  //
+  // Off by default, for the reason every added call is off by default here: a published arm's call
+  // sequence is part of what it measured.
+  let distillPreflight: PreflightReading | undefined;
+  if (DISTILL_PREFLIGHT && !DECLARED_EMPTY && DISTILL_UNIT !== "raw") {
+    const preflightLlm = new LlmClient({
+      apiKey: process.env["DEEPSEEK_API_KEY"] ?? "",
+      model:
+        process.env["TAU_DISTILL_MODEL"]?.trim() ||
+        process.env["TAU_MODEL"] ||
+        "deepseek-chat",
+      maxCalls: 2,
+    });
+    const preflightReplies: string[] = [];
+    const preflightInterpreter = createLlmInterpreter({
+      llm: {
+        complete: async (prompt) => {
+          const reply = (await preflightLlm.chat(prompt, DISTILL_TOKENS)).text;
+          preflightReplies.push(reply);
+          return reply;
+        },
+      },
+      form: DISTILL_UNIT === "trace" ? "trace" : DISTILL_FORM,
+      ...(DISTILL_SCOPE === "all" ? { passScope: true } : {}),
+    });
+    const reading = await runDistillPreflight(
+      stampDomain(preflightInterpreter, LEARN_DOMAIN),
+      { replyOf: () => preflightReplies.join("") },
+    );
+    distillPreflight = reading;
+    process.stdout.write(
+      `[tau2] distill pre-flight: ${reading.state} — ${reading.reason}\n`,
+    );
+    if (reading.state !== "answered") {
+      throw noMeasurementRefusal(reading.reason, {
+        preflight: reading,
+        distill: {
+          scope: DISTILL_SCOPE,
+          form: DISTILL_UNIT === "trace" ? "trace" : DISTILL_FORM,
+          unit: DISTILL_UNIT,
+          model: preflightLlm.model,
+          replies: preflightReplies.length,
+        },
+      });
+    }
+  }
   // R91: the learn half is either run or pinned, and the rest of this function cannot tell which --
   // that is the property that makes a pinned arm comparable to a rebuild rather than a parallel lane.
   //
@@ -1152,6 +1219,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const noteDrop = (reason: string): void => {
     drops[reason] = (drops[reason] ?? 0) + 1;
   };
+  // R111: what came back, not only what survived.
+  //
+  // `drops` counts claims the parser threw away, and `candidates` counts what it kept, so the one
+  // reply shape neither counter can see is a reply with *nothing in it*: fifteen empty arrays read
+  // exactly like a model that was never asked. R104 stopped on that sentence — "nothing was thrown
+  // away after the reply, so the model is what carried nothing" — and could not say whether the
+  // reply was `[]`, `{"candidates":[]}`, or a sentence in prose, because the reply itself was
+  // discarded before anything could record it. Kept here, at the only seam that sees the text.
+  const replies = replyCensus();
   // R85: a raw arm asks the model nothing, so there is no primary interpreter that can fail and no
   // rule fallback to answer for it. The slot keeps the resilient pair's shape rather than becoming a
   // second code path, because every line below -- the fault counts, the form record, the ban -- reads
@@ -1170,7 +1246,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         }
       : resilientInterpreter(
           createLlmInterpreter({
-            llm: { complete: async (prompt) => (await llm.chat(prompt, DISTILL_TOKENS)).text },
+            llm: {
+              complete: async (prompt) => replies.note((await llm.chat(prompt, DISTILL_TOKENS)).text),
+            },
             audit: noteDrop,
             // R56: the one variable. The `lesson` form asks `when` to name a property "the reader can
             // check on a different input: which tables or columns it involves" — an instruction written
@@ -1460,7 +1538,58 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // The declared-empty arm reaches this line with the other predicate rather than with an exemption:
     // `declaredEmptyVerdict` passes only when every stage carried nothing, so a scaffold arm that
     // quietly distilled an item is refused here instead of being graded as the control.
-    throw noMeasurementRefusal(funnelReading(funnel, funnelState));
+    //
+    // R111: the stop carries the census it was drawn from. This is the artefact class with no result
+    // in it, so its whole value is diagnostic — and it kept one sentence. R104's stop printed
+    // "0 candidates" and could not say whether the store had any routines to fold (which decides
+    // whether the arm could have measured anything even with a distiller that worked), what the
+    // replies looked like, or how the corrections were shaped. All of it was in this process.
+    throw noMeasurementRefusal(funnelReading(funnel, funnelState), {
+      funnel,
+      distill: {
+        scope: DISTILL_SCOPE,
+        unit: DISTILL_UNIT,
+        form: DISTILL_UNIT === "trace" ? "trace" : DISTILL_FORM,
+        model: llm.model,
+        replies: { ...replies.reading() },
+        // The client's own count, beside the replies the seam saw. Two numbers that must agree: a
+        // distiller that answered fifteen events and a client that made fifteen calls is a model
+        // choosing silence, and a client that made none is a pipeline that never asked.
+        client: { calls: llm.stats.calls, failures: llm.stats.failures },
+        faults: { events: faults.events, reasons: faultReasons, samples: faults.samples },
+        report: {
+          created: distillReport.created,
+          merged: distillReport.merged,
+          superseded: distillReport.superseded,
+          contradicted: distillReport.contradicted,
+          quarantined: distillReport.quarantined,
+          suppressed: distillReport.suppressed,
+          rephrased: distillReport.rephrased,
+        },
+      },
+      // The population question, priced at nothing: a fold needs two tasks behind one routine, and
+      // this is the count of routines that have them. An arm whose treatment is the fold and whose
+      // census reads `atLeastTwo: 0` could not have measured its claim whatever the distiller did.
+      merge: mergeCensusOf(corrections),
+      learn: {
+        tasks: train.length,
+        corrections: corrections.length,
+        unanswered,
+        traces: traces.size,
+        traced: withTrace,
+      },
+      // The corrections themselves, bounded: five is enough to recognise a population, and an
+      // artefact is a document rather than a dump.
+      corrections: corrections.slice(0, 5).map((correction) => ({
+        taskId: correction.taskId,
+        provenance: correction.provenance,
+        actions: correction.actions.length,
+        assertions: correction.assertions.length,
+        instructionChars: correction.instruction.length,
+        statementChars: correction.statement.length,
+        traced: traces.has(correction.taskId),
+      })),
+    });
   }
   // The domain ledger, from the store rather than from the driver's intentions: an item that lost its
   // domain somewhere nobody instrumented is exactly what V44 exists to catch.
@@ -1485,6 +1614,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       process.stdout.write(`[tau2] distill fault ${code}: ${sample}\n`);
     }
   }
+  const replyReading = replies.reading();
+  // R111: the replies, on one line, because "0 candidates" has four causes and only three of them
+  // were countable before this. A run whose replies were all empty prints `15 empty of 15` and the
+  // first one verbatim, which is what turns "the model carried nothing" into a diagnosis.
+  process.stdout.write(
+    `[tau2] distill replies: ${String(replyReading.calls)} call(s), ${String(replyReading.empty)} empty, ` +
+      `${String(replyReading.chars)} character(s) returned` +
+      `${replyReading.firstEmpty === undefined ? '' : `, first empty "${replyReading.firstEmpty}"`}\n`,
+  );
   process.stdout.write(
     `[tau2] admission: measured=${String(census.admission.measured)} ` +
       `trust=${census.admission.trustMean.toFixed(4)} ` +
@@ -2092,6 +2230,16 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // recorded separately because a dispatch that asked for `all` and produced only repairs has to be
     // distinguishable from one that asked for `edited`.
     distillScope: DISTILL_SCOPE,
+    // R111: what the distiller's model put in its replies. `drops` counts claims thrown away and
+    // `candidates` counts what was kept, so the gap between them and `asked` is the only place an
+    // empty reply can be seen — and on the arm that failed it was fifteen of fifteen.
+    distillReplies: { ...replyReading, clientCalls: llm.stats.calls },
+    // R111: the model that wrote the memory, which is not the arm's own unless a dispatch says so.
+    distillModel: llm.model,
+    // R111: the pre-flight, when this dispatch ran one. Absence is every arm before this field, and
+    // an arm that ran with a passing pre-flight is distinguishable from one that ran without — the
+    // distinction matters because the pre-flight is a claim that the instrument was working.
+    ...(distillPreflight === undefined ? {} : { distillPreflight }),
     provenance,
     // R57: the controlled distractor, when this dispatch armed one. Absent is the control arm.
     ...(primary.plant === undefined ? {} : { plant: primary.plant }),

@@ -47,6 +47,7 @@ export {
   MAX_STATEMENT,
   buildDistillPrompt,
   createLlmInterpreter,
+  parseCandidates,
   parseDistillResponse,
   type DistillForm,
   type DropReason,

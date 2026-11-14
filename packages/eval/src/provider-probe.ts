@@ -192,11 +192,34 @@ export type NoMeasurementMarker = {
   readonly status_not_run: 0;
   readonly claim: 'none';
   readonly reason: string;
+  /**
+   * What the run had established when it stopped, for a reader who will otherwise see one sentence.
+   *
+   * R111. A stop before measurement is the case that needs evidence most — the arm produced no
+   * result, so nothing else in the file explains it — and it was the case that carried least: the
+   * artefact kept the funnel sentence and dropped the census that sentence was drawn from, so
+   * "0 candidates" could not be told apart from "a store that could not have folded anyway" without
+   * paying for the learn half a second time.
+   *
+   * Unknown shape on purpose: the marker crosses a JSON boundary between the driver and `l4.ts`, and
+   * a typed field would have to be declared twice — once by the producer and once by the reader that
+   * only copies it.
+   */
+  readonly diagnostics?: Readonly<Record<string, unknown>>;
 };
 
-export function noMeasurementMarker(reason: string): NoMeasurementMarker {
+export function noMeasurementMarker(
+  reason: string,
+  diagnostics?: Readonly<Record<string, unknown>>,
+): NoMeasurementMarker {
   if (reason.trim() === '') throw new Error('a no-measurement marker needs a reason');
-  return { status_no_measurement: 1, status_not_run: 0, claim: 'none', reason };
+  return {
+    status_no_measurement: 1,
+    status_not_run: 0,
+    claim: 'none',
+    reason,
+    ...(diagnostics === undefined ? {} : { diagnostics }),
+  };
 }
 
 export type ProbeGate =
@@ -231,8 +254,11 @@ export const NO_MEASUREMENT_ERROR_NAME = 'NoMeasurementError';
  * An empty reason is refused: an unlabelled refusal is a bare crash, and the
  * whole point of the marker is that the lane can say what it did not measure.
  */
-export function noMeasurementRefusal(reason: string): NoMeasurementRefusal {
-  const marker = noMeasurementMarker(reason);
+export function noMeasurementRefusal(
+  reason: string,
+  diagnostics?: Readonly<Record<string, unknown>>,
+): NoMeasurementRefusal {
+  const marker = noMeasurementMarker(reason, diagnostics);
   const error = new Error(marker.reason) as Error & { marker: NoMeasurementMarker };
   error.name = NO_MEASUREMENT_ERROR_NAME;
   error.marker = marker;

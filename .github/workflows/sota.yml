@@ -1422,6 +1422,12 @@ jobs:
           # `TAU_PACK_SHAPE`, because that variable names the single unit and a dispatch cannot hold
           # two answers to one question.
           TAU_FACADE_SHAPES: ${{ steps.recall_floor.outputs.shapes }}
+          # R111: one fixture correction before the learn half is bought. R104 spent 74 episodes to
+          # learn that its distiller returned fifteen empty replies; this asks the same question for
+          # one call, and refuses the arm before the expensive half when the answer is nothing. The
+          # artefact records that it ran, so an arm with a pre-flight is distinguishable from one
+          # without.
+          TAU_DISTILL_PREFLIGHT: '1'
           TAU_PREREG: ${{ github.event.inputs.prereg }}
           # Defect 27: a bounded pre-flight probe, registered by R49. An
           # outage writes an explicit no-measurement artefact instead of a zero.
@@ -1739,8 +1745,28 @@ jobs:
             if (!fs.existsSync(path)) { console.log('::warning::L4 wrote no artefact'); process.exit(0); }
             const r = require('./' + path);
             if (r.metrics.status_no_measurement === 1) {
-              console.log('::warning::L4 stopped before measuring: the provider failed its pre-flight probe');
-              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'L4 produced NO MEASUREMENT: the provider failed its pre-flight probe. No result is claimed.\n');
+              // R111: say what the driver said, not what this step guesses.
+              //
+              // The sentence here used to read "the provider failed its pre-flight probe" for every
+              // stop before measurement, and R104's stop was not that: the probe was off, the
+              // endpoint answered 1,233 calls, and the distiller returned fifteen empty replies.
+              // The warning named a cause no part of the run had observed, on the one artefact whose
+              // whole value is diagnosis. The driver's first note is the reason, verbatim.
+              const why = (r.notes && r.notes[0]) ? r.notes[0] : 'the driver wrote no reason';
+              console.log('::warning::L4 produced no measurement: ' + why);
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'L4 produced NO MEASUREMENT: ' + why + '\nNo result is claimed.\n');
+              const funnel = r.diagnostics && r.diagnostics.funnel;
+              if (funnel) {
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Funnel: ' + JSON.stringify(funnel) + '\n');
+              }
+              const replies = r.diagnostics && r.diagnostics.distill && r.diagnostics.distill.replies;
+              if (replies) {
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Distiller replies: ' + JSON.stringify(replies) + '\n');
+              }
+              const merge = r.diagnostics && r.diagnostics.merge;
+              if (merge) {
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Store shape supply: ' + JSON.stringify(merge) + '\n');
+              }
             } else if (r.metrics.status_not_run === 1) {
               const why = r.metrics.status_driver_missing === 1
                 ? 'TAU_DRIVER names a module that does not exist'

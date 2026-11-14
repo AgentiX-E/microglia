@@ -189,6 +189,14 @@ describe('probeGate and noMeasurementMarker', () => {
   it('refuses an empty reason, which would make the marker unreadable', () => {
     expect(() => noMeasurementMarker('  ')).toThrow(/reason/);
   });
+
+  it('carries diagnostics only when a caller has some, so absence stays readable', () => {
+    // R111. A marker without diagnostics is every refusal before this field, and a refusal that
+    // wrote `diagnostics: {}` would be indistinguishable from one that had nothing to say.
+    expect(noMeasurementMarker('empty store')).not.toHaveProperty('diagnostics');
+    const carried = noMeasurementMarker('empty store', { funnel: { asked: 15 } });
+    expect(carried.diagnostics).toEqual({ funnel: { asked: 15 } });
+  });
 });
 
 describe('ProviderNoMeasurementError', () => {
@@ -225,6 +233,11 @@ describe('the no-measurement refusal is a structural contract', () => {
 
   it('recognises every refusal the lane may raise, by structure rather than by class', () => {
     expect(isNoMeasurementRefusal(noMeasurementRefusal('empty store'))).toBe(true);
+    // R111: diagnostics ride on the marker without changing what the marker is. `l4.ts` decides by
+    // structure, so a field it does not know must not be able to turn a refusal into a crash.
+    expect(isNoMeasurementRefusal(noMeasurementRefusal('empty store', { funnel: { asked: 0 } }))).toBe(
+      true,
+    );
     // The provider refusal is one case of the contract, not the contract itself.
     const gate = probeGate(classifyProviderProbe(outage));
     expect(gate.proceed).toBe(false);

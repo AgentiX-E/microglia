@@ -198,6 +198,59 @@ export async function run() {
     expect(notes).toMatch(/Claim: none/);
   });
 
+  /**
+   * R111: a stop before measurement is the artefact class whose whole value is diagnostic, and it
+   * kept one sentence. R104's stop cost a learn half and left behind the funnel line and nothing
+   * else — no reply census, no shape supply, no population — so the run could not be read without
+   * paying for it again. The diagnostics the driver raises with the refusal now survive into the
+   * file; this asserts the boundary, because the boundary is where they were lost.
+   */
+  const DRIVER_WITH_DIAGNOSTICS = `
+export async function run() {
+  const error = new Error('15 correction(s) -> 15 asked -> 0 candidate(s) -> 0 admitted -> 0 stored -> 0 servable');
+  error.name = 'NoMeasurementError';
+  error.marker = {
+    status_no_measurement: 1,
+    status_not_run: 0,
+    claim: 'none',
+    reason: error.message,
+    diagnostics: {
+      funnel: { corrections: 15, asked: 15, candidates: 0, stored: 0 },
+      distill: { scope: 'edited', replies: { calls: 15, empty: 15, chars: 30, firstEmpty: '[]' } },
+      merge: { routines: 15, atLeastTwo: 0, atLeastThree: 0 },
+    },
+  };
+  throw error;
+}
+`;
+
+  it('keeps the census a stop was drawn from, not only the sentence it printed', async () => {
+    const { dir } = await lane(DRIVER_WITH_DIAGNOSTICS);
+    const main = read(dir, 'poc-l4.json');
+    const diagnostics = main['diagnostics'] as Record<string, Record<string, unknown>>;
+    expect(diagnostics['funnel']).toEqual({
+      corrections: 15,
+      asked: 15,
+      candidates: 0,
+      stored: 0,
+    });
+    expect(diagnostics['distill']).toMatchObject({
+      scope: 'edited',
+      replies: { calls: 15, empty: 15, firstEmpty: '[]' },
+    });
+    expect(diagnostics['merge']).toMatchObject({ atLeastTwo: 0 });
+    // Still a refusal: the diagnostics are what the run knew, not a reading of it.
+    const metrics = main['metrics'] as Record<string, unknown>;
+    expect(metrics['status_no_measurement']).toBe(1);
+    expect(metrics).not.toHaveProperty('pass4');
+    expect(main['tau2']).toBeUndefined();
+  });
+
+  it('omits the field when the refusal carries nothing, rather than writing an empty object', async () => {
+    const { dir } = await lane(DRIVER_EMPTY_STORE);
+    expect(read(dir, 'poc-l4.json')).not.toHaveProperty('diagnostics');
+  });
+
   it('still rethrows an ordinary driver crash, because that is a bug and not an instrument', async () => {
     await expect(
       lane(`
