@@ -161,6 +161,27 @@ if (pack.ids.length === 0) {
 }
 ```
 
+#### What an empty scope means
+
+**An absent scope dimension matches every request on that dimension.** A rule that declares `domain`
+and no `intent` is returned for every intent; a rule that declares only its task is returned for every
+question in that task. This is deliberate — a store written from a handful of corrections would
+otherwise serve almost nothing — but it means two silences that look alike are not:
+
+| what is missing | what it means | what to do |
+| --- | --- | --- |
+| a dimension on the **item** | the rule applies everywhere on it (wildcard) | write the dimension when your host knows it; `reasonCode` is the one a host should always fill |
+| a dimension on the **query** | you did not say, so nothing is filtered on it | pass the scope you actually know; an empty query scope returns the widest pack |
+| an item's `polarity` | **unclassified**, never `pass` | nothing — a reader counts it rather than guessing |
+
+The middle row is where packs get expensive: `recall` cannot tell "this rule applies to every intent"
+from "the host did not say which intent this request has", and both produce the same pack. If you want a
+pack that earns its tokens, set `minCoverage` (above) or fill the scope you have.
+
+A rule with **neither** a declared dimension nor a `when` condition is a *universal rule* — it applies
+everywhere and to everything. `universalityCensus` counts them from a store artefact at no cost, and if
+your store is mostly universal rules, the gate you want is `minEvidence`, not more memory.
+
 #### Inject only what has been seen more than once
 
 The third gate is corroboration, and it is the one that decides whether a pack is worth having at all on
