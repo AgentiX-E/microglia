@@ -120,8 +120,35 @@ evidence is rehabilitated and its application ledger resets.
 `schemaDigest`, `reasonCode`. Scope is both a filter and an index: supplying it lets a widened rule
 reach a question whose text does not contain the domain word.
 
+**An absent scope dimension is a wildcard, and that is a decision rather than a detail.** A rule that
+states a `domain` and no `intent` matches every intent; a rule that states neither matches every
+question in its task. This is what makes a store written from few examples usable at all, and it is
+also the difference between *bounded* and *unbounded*: only `when` (the condition the rule was learned
+under) survives as a bound once every dimension is open. The asymmetry is worth knowing because the
+neighbouring field does the opposite — an absent `polarity` means **unclassified, never `pass`** — so a
+record that is silent about *where* it applies is treated as universal while a record that is silent
+about *which side* it came from is treated as unknown. Read the two together before trusting a store's
+width.
+
+**Universal rule** — a stored record that states no condition (`when`) **and** declares no optional
+scope dimension. It applies everywhere in its task and to everything, which makes it the object the
+memory-harm literature measures: *The Memory Trap* (arXiv 2611.07554) finds notes from benign sessions
+governing high-stakes ones in 35–81% of episodes, *Useful Memories Become Faulty* (2605.12978) shows
+consolidation stripping the applicability condition, and *MemDev-Bench* (2610.27524) attributes its
+failures to reusing a rule without reassessing its applicability. `universalityCensus` counts them from
+any artefact that carries `storeItems`, at no cost, and `pnpm eval:retrospect` prints the number beside
+the side reconciliation.
+
+**Applicability** — whether a stored rule holds *for the task in front of it*, as distinct from whether
+it is in scope. Scope is a filter over declared dimensions; applicability is a judgement about the
+current request, and microglia does **not** make one: retrieval ranks by BM25 and filters by scope, and
+nothing reads a rule against the task. This is a named gap rather than an oversight — it is the
+operation 2610.27524 reports as the failure mode, and no system surveyed in this project's competitive
+record implements it either.
+
 **Specificity** — the number of scope dimensions an item states (plus one). At equal confidence, the
-more specific rule wins, which is how a domain exception overrides a general rule.
+more specific rule wins, which is how a domain exception overrides a general rule. Specificity is a
+ranking weight, not an admission rule: a rule at specificity 1 is still delivered.
 
 **Support** — the sum of evidence weights. A threshold rather than a count, so one strong observation
 can equal several weak ones.
