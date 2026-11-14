@@ -367,6 +367,42 @@ describe('the projection supplies what the record holds and nothing else', () =>
     expect(input.domainOrigin?.storedWithDomain).toBe(59);
   });
 
+  it('scopes a declared-empty arm, and records the gates it had no subject for', () => {
+    // R101's arm as the audit sees it: a store that carried nothing because the arm said so, and a
+    // pack-based control list that is empty because there is no pack. Before R106 the run was red on
+    // a gate nobody had listed and the omission of `V6` was silent; now the set is derived and the
+    // omission is a row in the report.
+    const audit = tau2GateAudit({
+      domain: 'retail',
+      trialCount: 4,
+      memory: {
+        arm: 'memory',
+        tasks: 40,
+        trials: 4,
+        unscored: 0,
+        meanPackIds: 0,
+        funnel: { corrections: 0, candidates: 0, admitted: 0, stored: 0, servable: 0 },
+        learning: { rows: 0, unanswered: 0, edited: 0, distillFailed: 0 },
+        domainOrigin: { storedWithDomain: 0, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
+        declaredEmptyStore: true,
+      },
+      comparison: { paired: 40, onlyFirst: 0, onlySecond: 0, lost: 7, gained: 5, deltaPp: -5 },
+    });
+    const byId = new Map(audit.gates.map((gate) => [gate.id, gate]));
+    // The three gates that read the store are inverted rather than waived, and each of them passes
+    // because the quantity it requires to be non-zero is zero.
+    expect(byId.get('V1-pack-not-empty')?.pass).toBe(true);
+    expect(byId.get('V32-fold-learning-intact')?.pass).toBe(true);
+    expect(byId.get('V44-domain-accounted')?.pass).toBe(true);
+    expect(byId.get('V44-domain-accounted')?.criterion).toContain('declared its store empty');
+    // `V6` has no subject on this arm, and the omission says why rather than leaving a gap.
+    expect(byId.has('V6-controls-inject')).toBe(false);
+    expect(audit.omitted?.map((entry) => entry.id)).toEqual(['V6-controls-inject']);
+    expect(audit.omitted?.[0]?.reason).toContain('serves no pack');
+    // And it is not reported as an arm the lane never ran, which is a different statement.
+    expect(audit.absent.map((entry) => entry.id)).not.toContain('V6-controls-inject');
+  });
+
   it('carries the declared-empty flag only when the arm declared one', () => {
     // Absence is every arm before R101, and it reads as "not declared" rather than as `false`: a
     // boolean written everywhere would be a measurement about arms that were never asked.

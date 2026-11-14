@@ -96,6 +96,37 @@ const SECOND = process.env['L4_SECOND'] ?? join(RESULTS, 'arms', 'memory', 'poc-
 /** The domain the run was scored in; the protocol's strata never read it, but the artefact names it. */
 const DOMAIN = process.env['TAU_DOMAIN'] ?? 'retail';
 
+/**
+ * The interval the registration held this pair to, when it registered one.
+ *
+ * A control pair does not claim an effect: it claims a band, stated before the dispatch, and the
+ * reading that matters is whether the delta landed inside it. R101 registered `[−7.5, +2.5]pp`
+ * around its reference arm and read −5.00pp; graded by `l4-effect-resolved` it came back
+ * `UNRESOLVED: |-5.00pp| against 24.27pp minimum detectable difference`, which is a true sentence
+ * about a question the arm never asked (§34.128).
+ *
+ * The band travels in the environment rather than in the artefact because a run cannot discover the
+ * interval it was held to, and a band written by the run that is graded against it is not a
+ * registration. Format: `lo,hi` in percentage points, e.g. `-7.5,2.5`.
+ */
+function bandOf(raw: string | undefined): { loPp: number; hiPp: number } | undefined {
+  if (raw === undefined || raw.trim() === '') return undefined;
+  const parts = raw.split(',').map((part) => Number(part.trim()));
+  if (parts.length !== 2 || parts.some((value) => !Number.isFinite(value))) {
+    throw new Error(
+      `TAU_BAND must be 'lo,hi' in percentage points, not '${raw}': a band a reader has to guess ` +
+        'at is a band that cannot fail',
+    );
+  }
+  const [loPp, hiPp] = parts as [number, number];
+  if (loPp > hiPp) {
+    throw new Error(`TAU_BAND is inverted: lo ${loPp} is above hi ${hiPp}`);
+  }
+  return { loPp, hiPp };
+}
+
+const registeredBand = bandOf(process.env['TAU_BAND']);
+
 function load(path: string): Artefact {
   if (!existsSync(path)) {
     process.stderr.write(`[l4-pair] missing artefact: ${path}\n`);
@@ -244,6 +275,7 @@ const scenarioGates: readonly ValidityGate[] = pairGates({
   onlyFirst: comparison.onlyFirst,
   onlySecond: comparison.onlySecond,
   ...(plantedArm === undefined ? {} : { plantedArm }),
+  ...(registeredBand === undefined ? {} : { registeredBand }),
 });
 
 const gates = mergeGates(audit.gates, scenarioGates, inGateOrder);

@@ -63,6 +63,16 @@
  * matching, and would then be a second copy of the lane it was extracted from.
  */
 
+import {
+  packGate,
+  scopeGates,
+  storeReading,
+  trialReading,
+  type ScopedGates,
+} from './declaration.js';
+
+export type { Declaration, GateSubject, OmittedGate, ScopedGates } from './declaration.js';
+
 export type FramingDelivery = {
   readonly arm: string;
   /** Prompts this arm put to the model, one per question per fold it was scored in. */
@@ -119,7 +129,13 @@ export function transferGates(
   const { trials, informative, repaired, blankRight, unmeasured, measured, broke, netPp, verdict } =
     input;
   const blankHoles = input.unmeasuredBlank ?? 0;
-  const out: ValidityGate[] = [
+  /**
+   * Every gate here reads trials that exist because a rule was served, so an arm that declared its
+   * store empty has no subject for any of them. R101 read `18 informative trial(s), 11 repair(s)` on
+   * exactly such an arm: the trials were real, they came from the reference half of the pair, and
+   * `informative >= 100` cannot be satisfied by an arm that had nothing to transfer.
+   */
+  const trialSpec: ValidityGate[] = [
     {
       id: ids.reconcile,
       criterion: 'every transfer trial is measured, informative, or a target that needed nothing',
@@ -173,7 +189,12 @@ export function transferGates(
       blocking: true,
     },
   ];
-  return out;
+  return trialSpec.map((gate) =>
+    trialReading(gate, {
+      kind: 'omit',
+      reason: 'a transfer trial presupposes a rule the arm served, and this arm declared it served none',
+    }),
+  );
 }
 
 /** One substrate's transfer bookkeeping, as the gates read it. */
@@ -888,15 +909,24 @@ function emptyStage(funnel: FunnelInput): string | undefined {
   return undefined;
 }
 
-export function buildProtocolGates(
-  input: ProtocolGateInput & ScenarioGateInput,
-): ValidityGate[] {
+/**
+ * Every gate this input can fire, in the sequence the branches push them.
+ *
+ * Untouched by an arm's declaration: {@link buildProtocolGatesWithScope} is the only caller, and it
+ * applies the declaration once, at the end, where the set of gates that depend on it is a filter
+ * rather than a list somebody maintains.
+ */
+function protocolGateList(input: ProtocolGateInput & ScenarioGateInput): readonly ValidityGate[] {
   const gates: ValidityGate[] = [];
   if (input.funnel !== undefined) {
     const funnel = input.funnel;
-    // One flag decides both gates that an empty store inverts, and it comes from the arm rather than
-    // from the counts: a run whose store is empty *and* which did not declare it is the defect `V0`
-    // exists to catch, and reading the emptiness as the declaration would let it through.
+    // `V0` keeps its own branch rather than going through the declaration, because it is the gate
+    // that makes every other inversion safe: `declaredEmptyVerdict` requires the funnel to carry
+    // nothing at *every* stage and refuses the arm the moment one carries anything, so a declaration
+    // that contradicts its own run is caught here before any scoped gate is read. The flag comes
+    // from the arm rather than from the counts — a run whose store is empty *and* which did not
+    // declare it is the defect this gate exists to catch, and reading the emptiness as the
+    // declaration would let it through.
     const declaredEmpty = input.declaredEmptyStore === true;
     const verdict = declaredEmpty ? declaredEmptyVerdict(funnel) : funnelVerdict(funnel);
     gates.push({
@@ -910,18 +940,25 @@ export function buildProtocolGates(
     });
   }
   if (input.meanPackIds !== undefined) {
-    gates.push({
-      id: 'V1-pack-not-empty',
-      // The same inversion one layer up: the memory arm has to inject a rule, and the scaffold arm has
-      // to inject none. Both are the arm asserting what it is; neither is a gate standing down.
-      criterion:
-        input.declaredEmptyStore === true
-          ? 'the scaffold arm injected no rule at all, so what it measures is the wrapper'
-          : 'the memory arm injected at least one rule per question on average',
-      actual: packReading(input.meanPackIds, input.packPopulation),
-      pass: input.declaredEmptyStore === true ? input.meanPackIds === 0 : input.meanPackIds > 0,
-      blocking: true,
-    });
+    // The inversion moved out of this literal and into the declaration: the memory arm has to inject
+    // a rule and the scaffold arm has to inject none, and which of the two this gate states is now a
+    // property of the arm rather than a branch that a registration had to remember to reach.
+    gates.push(
+      packGate(
+        {
+          id: 'V1-pack-not-empty',
+          criterion: 'the memory arm injected at least one rule per question on average',
+          actual: packReading(input.meanPackIds, input.packPopulation),
+          pass: input.meanPackIds > 0,
+          blocking: true,
+        },
+        {
+          kind: 'null',
+          measure: input.meanPackIds,
+          reading: `the pack carried ${input.meanPackIds.toFixed(2)} rule(s) per question`,
+        },
+      ),
+    );
   }
   if (input.partition !== undefined) {
     gates.push({
@@ -984,16 +1021,24 @@ export function buildProtocolGates(
       blocking: true,
     });
   }
-  gates.push({
-    id: 'V6-controls-inject',
-    criterion: 'every pack-based control arm injected at least one rule on average',
-    actual:
-      input.packControls
-        .map((entry) => `${entry.arm}: ${entry.meanPackIds.toFixed(2)} rules/question`)
-        .join(', ') || 'no pack-based controls configured',
-    pass: input.packControls.every((entry) => entry.meanPackIds > 0),
-    blocking: true,
-  });
+  gates.push(
+    packGate(
+      {
+        id: 'V6-controls-inject',
+        criterion: 'every pack-based control arm injected at least one rule on average',
+        actual:
+          input.packControls
+            .map((entry) => `${entry.arm}: ${entry.meanPackIds.toFixed(2)} rules/question`)
+            .join(', ') || 'no pack-based controls configured',
+        pass: input.packControls.every((entry) => entry.meanPackIds > 0),
+        blocking: true,
+      },
+      // Not inverted but omitted: a control that carries no pack cannot inject one rule, so there is
+      // no quantity here for a declaration to drive to zero. `every()` over an empty list is true,
+      // which is the vacuous pass this file keeps finding — the omission is the honest reading.
+      { kind: 'omit', reason: 'an arm that serves no pack has no pack-based control to hold to a rule' },
+    ),
+  );
   gates.push({
     id: 'V7-channel',
     criterion: 'a stated control moves accuracy by at least 10pp',
@@ -1021,29 +1066,51 @@ export function buildProtocolGates(
     const { rows, unanswered, edited, distillFailed } = input.learning;
     const unansweredShare = rows === 0 ? 0 : unanswered / rows;
     const distillShare = rows === 0 ? 0 : distillFailed / rows;
-    gates.push({
-      id: 'V32-fold-learning-intact',
-      criterion:
-        'at most 10% of the learning questions went unanswered and at most 10% of the corrections ' +
-        'failed to distil, so the store is the one the fold paid for',
-      actual:
-        `${unanswered}/${rows} unanswered question(s) (${(unansweredShare * 100).toFixed(1)}%), ` +
-        `${edited} correction(s), ${distillFailed} distillation failure(s) ` +
-        `(${(distillShare * 100).toFixed(1)}%)`,
-      pass: unansweredShare <= 0.1 && distillShare <= 0.1,
-      blocking: true,
-    });
+    gates.push(
+      storeReading(
+        {
+          id: 'V32-fold-learning-intact',
+          criterion:
+            'at most 10% of the learning questions went unanswered and at most 10% of the corrections ' +
+            'failed to distil, so the store is the one the fold paid for',
+          actual:
+            `${unanswered}/${rows} unanswered question(s) (${(unansweredShare * 100).toFixed(1)}%), ` +
+            `${edited} correction(s), ${distillFailed} distillation failure(s) ` +
+            `(${(distillShare * 100).toFixed(1)}%)`,
+          pass: unansweredShare <= 0.1 && distillShare <= 0.1,
+          blocking: true,
+        },
+        {
+          kind: 'null',
+          measure: rows,
+          // `0 <= 0.1` is true, and a share with a zero denominator is a gate certifying nothing —
+          // the same shape as `V44`'s `0 <= 0`. The declaration replaces the vacuous comparison with
+          // the one that can fail: there were no rows because the arm declared none.
+          reading: `the fold read ${rows} learning row(s)`,
+        },
+      ),
+    );
   }
   if (input.packConditions !== undefined) {
     const { injected, withCondition } = input.packConditions;
     const share = injected === 0 ? 0 : withCondition / injected;
-    gates.push({
-      id: 'V12-shape-present',
-      criterion: 'at least 50% of injected rules state when they apply, or the two shapes are the same pack',
-      actual: `${withCondition}/${injected} injected rule(s) carried a condition (${(share * 100).toFixed(1)}%)`,
-      pass: share >= 0.5,
-      blocking: false,
-    });
+    gates.push(
+      packGate(
+        {
+          id: 'V12-shape-present',
+          criterion:
+            'at least 50% of injected rules state when they apply, or the two shapes are the same pack',
+          actual: `${withCondition}/${injected} injected rule(s) carried a condition (${(share * 100).toFixed(1)}%)`,
+          pass: share >= 0.5,
+          blocking: false,
+        },
+        {
+          kind: 'null',
+          measure: injected,
+          reading: `${withCondition}/${injected} injected rule(s) carried a condition`,
+        },
+      ),
+    );
   }
   if (input.subset !== undefined) {
     gates.push({
@@ -1066,39 +1133,59 @@ export function buildProtocolGates(
   if (input.probe !== undefined) {
     const { rules, kept, noVerifiedSource, brokeItsSource, unsupported, packDiffers, questions } = input.probe;
     const counted = kept + noVerifiedSource + brokeItsSource + unsupported;
-    gates.push({
-      id: 'V13-probe-reconciles',
-      criterion: 'the reproducibility gate accounts for every rule it was given',
-      actual: `${counted}/${rules} rule(s): ${kept} kept, ${unsupported} unsupported, ${brokeItsSource} broke its source, ${noVerifiedSource} unprobed`,
-      pass: counted === rules,
-      blocking: true,
-    });
-    gates.push({
-      id: 'V14-probe-applied',
-      criterion: 'the gate changed at least one held-out pack, or the arm is `full` under a second name',
-      actual: `${packDiffers}/${questions} question(s)`,
-      pass: packDiffers > 0,
-      blocking: false,
-    });
+    gates.push(
+      storeReading(
+        {
+          id: 'V13-probe-reconciles',
+          criterion: 'the reproducibility gate accounts for every rule it was given',
+          actual: `${counted}/${rules} rule(s): ${kept} kept, ${unsupported} unsupported, ${brokeItsSource} broke its source, ${noVerifiedSource} unprobed`,
+          pass: counted === rules,
+          blocking: true,
+        },
+        { kind: 'null', measure: rules, reading: `the probe was given ${rules} rule(s)` },
+      ),
+    );
+    gates.push(
+      storeReading(
+        {
+          id: 'V14-probe-applied',
+          criterion: 'the gate changed at least one held-out pack, or the arm is `full` under a second name',
+          actual: `${packDiffers}/${questions} question(s)`,
+          pass: packDiffers > 0,
+          blocking: false,
+        },
+        { kind: 'null', measure: packDiffers, reading: `${packDiffers} of ${questions} pack(s) changed` },
+      ),
+    );
   }
   if (input.probeRepair !== undefined) {
     const { rules, kept, noVerifiedSource, brokeItsSource, unsupported, packDiffers, questions } =
       input.probeRepair;
     const counted = kept + noVerifiedSource + brokeItsSource + unsupported;
-    gates.push({
-      id: 'V37-repair-probe-reconciles',
-      criterion: 'the second substrate accounts for every rule its gate was given',
-      actual: `${counted}/${rules} rule(s): ${kept} kept, ${unsupported} unsupported, ${brokeItsSource} broke its source, ${noVerifiedSource} unprobed`,
-      pass: counted === rules,
-      blocking: true,
-    });
-    gates.push({
-      id: 'V38-repair-probe-applied',
-      criterion: "the second substrate's gate changed at least one held-out pack",
-      actual: `${packDiffers}/${questions} question(s)`,
-      pass: packDiffers > 0,
-      blocking: false,
-    });
+    gates.push(
+      storeReading(
+        {
+          id: 'V37-repair-probe-reconciles',
+          criterion: 'the second substrate accounts for every rule its gate was given',
+          actual: `${counted}/${rules} rule(s): ${kept} kept, ${unsupported} unsupported, ${brokeItsSource} broke its source, ${noVerifiedSource} unprobed`,
+          pass: counted === rules,
+          blocking: true,
+        },
+        { kind: 'null', measure: rules, reading: `the probe was given ${rules} rule(s)` },
+      ),
+    );
+    gates.push(
+      storeReading(
+        {
+          id: 'V38-repair-probe-applied',
+          criterion: "the second substrate's gate changed at least one held-out pack",
+          actual: `${packDiffers}/${questions} question(s)`,
+          pass: packDiffers > 0,
+          blocking: false,
+        },
+        { kind: 'null', measure: packDiffers, reading: `${packDiffers} of ${questions} pack(s) changed` },
+      ),
+    );
   }
   if (input.transfer !== undefined) {
     gates.push(
@@ -1256,17 +1343,29 @@ export function buildProtocolGates(
     // was the reason the pair looked valid.
     const { storedWithDomain, storedWithoutDomain, unscopedIn, widenedIn } = input.domainOrigin;
     const stored = storedWithDomain + storedWithoutDomain;
-    gates.push({
-      id: 'V44-domain-accounted',
-      criterion:
-        'the store holds at least one item, and every item with no domain either arrived without one or lost it to a recorded widening',
-      actual:
-        stored === 0
-          ? 'the store holds no item, so there is no ledger to account for'
-          : `${storedWithoutDomain} of ${stored} item(s) with no domain, ${unscopedIn} arrived unscoped, ${widenedIn} widened`,
-      pass: stored > 0 && storedWithoutDomain <= unscopedIn + widenedIn,
-      blocking: true,
-    });
+    gates.push(
+      storeReading(
+        {
+          id: 'V44-domain-accounted',
+          criterion:
+            'the store holds at least one item, and every item with no domain either arrived without one or lost it to a recorded widening',
+          actual:
+            stored === 0
+              ? 'the store holds no item, so there is no ledger to account for'
+              : `${storedWithoutDomain} of ${stored} item(s) with no domain, ${unscopedIn} arrived unscoped, ${widenedIn} widened`,
+          pass: stored > 0 && storedWithoutDomain <= unscopedIn + widenedIn,
+          blocking: true,
+        },
+        {
+          kind: 'null',
+          measure: stored,
+          // R101 read this gate as a failure because the ledger reconciled an empty population, and
+          // `0 <= 0` is true. The declaration does not exempt it: it asks the question that can be
+          // false, which is whether the store is empty at all.
+          reading: `the store holds ${stored} item(s)`,
+        },
+      ),
+    );
   }
   if (input.clearance !== undefined) {
     // Two ways this pair stops being an experiment. If the control dropped a different number of
@@ -1276,17 +1375,26 @@ export function buildProtocolGates(
     // instrument rather than of the hypothesis, so neither is allowed to reach a published number.
     const { questions, mismatched, identical, dropped, meanCleared, meanControl, arm, control } =
       input.clearance;
-    gates.push({
-      id: 'V45-clearance-dose-matched',
-      criterion:
-        'the clearance arm and its control carried the same number of items on every question, and clearance changed at least one pack',
-      actual:
-        `${mismatched} mismatched of ${questions} question(s), ${identical} identical, ` +
-        `${dropped} item(s) cleared, mean items ${meanCleared.toFixed(2)} (${arm}) vs ` +
-        `${meanControl.toFixed(2)} (${control})`,
-      pass: mismatched === 0 && identical < questions,
-      blocking: true,
-    });
+    gates.push(
+      packGate(
+        {
+          id: 'V45-clearance-dose-matched',
+          criterion:
+            'the clearance arm and its control carried the same number of items on every question, and clearance changed at least one pack',
+          actual:
+            `${mismatched} mismatched of ${questions} question(s), ${identical} identical, ` +
+            `${dropped} item(s) cleared, mean items ${meanCleared.toFixed(2)} (${arm}) vs ` +
+            `${meanControl.toFixed(2)} (${control})`,
+          pass: mismatched === 0 && identical < questions,
+          blocking: true,
+        },
+        {
+          kind: 'null',
+          measure: dropped,
+          reading: `${dropped} item(s) cleared across ${questions} question(s)`,
+        },
+      ),
+    );
   }
   if (input.raw !== undefined) {
     // Two failures, and both of them end the claim rather than the run. A block that is not
@@ -1302,16 +1410,21 @@ export function buildProtocolGates(
     // the short single-line `Attempt:` cells matched, and the multi-line ones could not. A block is
     // the only unit that can carry the claim the arm makes.
     const { arm, cells, verbatim, skipped, sample } = input.raw;
-    gates.push({
-      id: 'V46-raw-is-verbatim',
-      criterion:
-        'every block of a raw pack is byte-identical to the correction event it was rendered from, and the arm rendered at least one',
-      actual:
-        `${verbatim}/${cells} rendered event(s) byte-identical (${arm}), ${skipped} event(s) ` +
-        `skipped as too long${sample === undefined ? '' : `, first mismatch: ${JSON.stringify(sample)}`}`,
-      pass: cells > 0 && verbatim === cells,
-      blocking: true,
-    });
+    gates.push(
+      packGate(
+        {
+          id: 'V46-raw-is-verbatim',
+          criterion:
+            'every block of a raw pack is byte-identical to the correction event it was rendered from, and the arm rendered at least one',
+          actual:
+            `${verbatim}/${cells} rendered event(s) byte-identical (${arm}), ${skipped} event(s) ` +
+            `skipped as too long${sample === undefined ? '' : `, first mismatch: ${JSON.stringify(sample)}`}`,
+          pass: cells > 0 && verbatim === cells,
+          blocking: true,
+        },
+        { kind: 'null', measure: cells, reading: `${cells} rendered event(s) in ${arm}'s packs` },
+      ),
+    );
   }
   if (input.evidence !== undefined && input.evidence.length > 0) {
     // The ablation's validity, in both directions. An arm that removed nothing is `none` under a
@@ -1355,21 +1468,30 @@ export function buildProtocolGates(
     // second is legitimate and the gate accepts it, so the criterion is about the ceiling rather
     // than the mean, and about whether the arm's prompts differ from `full`'s at all.
     const share = input.dose.questions === 0 ? 0 : input.dose.differsFromFull / input.dose.questions;
-    gates.push({
-      id: 'V49-dose-truncated',
-      criterion:
-        'every prompt of the one-slot arm carried at most one item, it asked every question, ' +
-        'and its pack differed from full on at least a fifth of them',
-      actual:
-        `${input.dose.arm}: ${input.dose.prompts} prompts, ${input.dose.overBudget} over one item, ` +
-        `${input.dose.differsFromFull}/${input.dose.questions} differ from full ` +
-        `(${(share * 100).toFixed(1)}%)`,
-      pass:
-        input.dose.overBudget === 0 &&
-        input.dose.prompts === input.dose.questions &&
-        share >= 0.2,
-      blocking: true,
-    });
+    gates.push(
+      packGate(
+        {
+          id: 'V49-dose-truncated',
+          criterion:
+            'every prompt of the one-slot arm carried at most one item, it asked every question, ' +
+            'and its pack differed from full on at least a fifth of them',
+          actual:
+            `${input.dose.arm}: ${input.dose.prompts} prompts, ${input.dose.overBudget} over one item, ` +
+            `${input.dose.differsFromFull}/${input.dose.questions} differ from full ` +
+            `(${(share * 100).toFixed(1)}%)`,
+          pass:
+            input.dose.overBudget === 0 &&
+            input.dose.prompts === input.dose.questions &&
+            share >= 0.2,
+          blocking: true,
+        },
+        {
+          kind: 'null',
+          measure: input.dose.differsFromFull,
+          reading: `${input.dose.differsFromFull} of ${input.dose.questions} pack(s) differed from full`,
+        },
+      ),
+    );
   }
 
   if (input.admission !== undefined) {
@@ -1380,29 +1502,38 @@ export function buildProtocolGates(
     const admittedShare =
       input.admission.questions === 0 ? 0 : input.admission.admitted / input.admission.questions;
     const unevidenced = input.admission.folds.filter((fold) => fold.reason !== 'fitted');
-    gates.push({
-      id: 'V50-admission-engaged',
-      criterion:
-        'every fold fitted its floor from decisive learning rows, and the arm both admitted and ' +
-        'refused questions, so its comparison with the one-slot control is a decision',
-      actual:
-        input.admission.folds
-          .map(
-            (fold) =>
-              `fold ${fold.fold}: floor ${fold.floor.toFixed(3)}, kept ${fold.kept}/${fold.total}, ` +
-              `net ${fold.helped - fold.harmed}, ${fold.reason}`,
-          )
-          .join('; ') +
-        ` — admitted ${input.admission.admitted}/${input.admission.questions} ` +
-        `(${(admittedShare * 100).toFixed(1)}%)` +
-        (unevidenced.length === 0 ? '' : `, unevidenced folds ${unevidenced.length}`),
-      pass:
-        input.admission.folds.length > 0 &&
-        unevidenced.length === 0 &&
-        input.admission.admitted > 0 &&
-        input.admission.admitted < input.admission.questions,
-      blocking: true,
-    });
+    gates.push(
+      storeReading(
+        {
+          id: 'V50-admission-engaged',
+          criterion:
+            'every fold fitted its floor from decisive learning rows, and the arm both admitted and ' +
+            'refused questions, so its comparison with the one-slot control is a decision',
+          actual:
+            input.admission.folds
+              .map(
+                (fold) =>
+                  `fold ${fold.fold}: floor ${fold.floor.toFixed(3)}, kept ${fold.kept}/${fold.total}, ` +
+                  `net ${fold.helped - fold.harmed}, ${fold.reason}`,
+              )
+              .join('; ') +
+            ` — admitted ${input.admission.admitted}/${input.admission.questions} ` +
+            `(${(admittedShare * 100).toFixed(1)}%)` +
+            (unevidenced.length === 0 ? '' : `, unevidenced folds ${unevidenced.length}`),
+          pass:
+            input.admission.folds.length > 0 &&
+            unevidenced.length === 0 &&
+            input.admission.admitted > 0 &&
+            input.admission.admitted < input.admission.questions,
+          blocking: true,
+        },
+        {
+          kind: 'null',
+          measure: input.admission.admitted,
+          reading: `${input.admission.admitted} of ${input.admission.questions} question(s) admitted`,
+        },
+      ),
+    );
   }
   if (input.channels !== undefined && input.channels.length > 0) {
     // A channel arm's null is about the channel only if the channel moved the prompt. `values`
@@ -1437,5 +1568,37 @@ export function buildProtocolGates(
     });
   }
 
-  return inGateOrder(gates);
+  return gates;
+}
+
+/**
+ * The gates, plus the ones this arm has no subject for.
+ *
+ * R101's registration inverted two gates by hand and the run failed three more (§34.128). The repair
+ * is not a longer list in the registration: it is that each gate says what it reads where it is
+ * built, and the arm's declaration decides the disposition of the whole set at once. A gate that
+ * reads a store and states no empty form cannot be graded here at all, which is how the next gate
+ * somebody adds announces itself instead of quietly becoming R101's fourth failure.
+ */
+export function buildProtocolGatesWithScope(
+  input: ProtocolGateInput & ScenarioGateInput,
+): ScopedGates {
+  const scoped = scopeGates(protocolGateList(input), {
+    declaredEmptyStore: input.declaredEmptyStore === true,
+  });
+  return { gates: inGateOrder(scoped.gates), omitted: scoped.omitted };
+}
+
+/**
+ * The published gate list, in publication order.
+ *
+ * A thin read of {@link buildProtocolGatesWithScope} that drops the omissions: every caller that
+ * existed before the declaration did wants the array, and none of them should have to learn a new
+ * shape to keep publishing the same report. The lanes that *can* record an omission pass their
+ * declaration and read the scoped form.
+ */
+export function buildProtocolGates(
+  input: ProtocolGateInput & ScenarioGateInput,
+): ValidityGate[] {
+  return [...buildProtocolGatesWithScope(input).gates];
 }

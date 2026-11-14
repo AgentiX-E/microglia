@@ -14,11 +14,14 @@
  * second, privileged way to write knowledge.
  */
 export {
+  CHAIN_COHESION_FLOOR,
   DEFAULT_CLUSTER_OPTIONS,
+  clusterCensusOf,
   clusterSources,
   deterministicProposal,
   seedTriggerOf,
   sourcesOf,
+  type ClusterCensus,
   type ClusterOptions,
   type RetrospectCluster,
   type SourcesOptions,

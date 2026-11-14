@@ -53,6 +53,17 @@ export type PairGateInput = {
    * is a control arm with a misleading name, and its pair should be graded as one.
    */
   readonly plantedArm?: string | undefined;
+  /**
+   * The interval the pair registered for its own delta, when it registered one.
+   *
+   * A control pair does not claim an effect, it claims a *band*: R101 registered `[−7.5, +2.5]pp`
+   * around the reference arm and read −5.00pp, which is the arm agreeing with its registration.
+   * Grading that with `l4-effect-resolved` asks a significance question the pair never posed — R101
+   * came back `UNRESOLVED: |-5.00pp| against 24.27pp minimum detectable difference`, which is true
+   * and is not a defect. When a band is present it replaces the resolution question rather than
+   * sitting beside it, because two conditions on one gate is how a gate stops saying one thing.
+   */
+  readonly registeredBand?: { readonly loPp: number; readonly hiPp: number } | undefined;
 };
 
 /** Whether an arm planted a distractor. `none` is the control arm's own name for planting nothing. */
@@ -83,16 +94,32 @@ export function pairGates(input: PairGateInput): readonly ValidityGate[] {
           {
             id: 'l4-effect-resolved',
             criterion:
-              'the pair resolves the effect it reports: |delta| >= minimum detectable difference, or no direction is claimed',
+              input.registeredBand === undefined
+                ? 'the pair resolves the effect it reports: |delta| >= minimum detectable difference, or no direction is claimed'
+                : 'the pair landed inside the interval it registered before the dispatch, which is the only claim a control pair makes',
             actual:
-              input.state === 'UNRESOLVED'
-                ? `UNRESOLVED: |${input.deltaPp.toFixed(2)}pp| against ${
-                    input.detectablePp === undefined
-                      ? 'an unestimable'
-                      : `${input.detectablePp.toFixed(2)}pp`
-                  } minimum detectable difference`
-                : (input.claim ?? input.state),
-            pass: input.state !== 'UNRESOLVED',
+              input.registeredBand !== undefined
+                ? `${input.deltaPp.toFixed(2)}pp against the registered band ` +
+                  `[${input.registeredBand.loPp.toFixed(2)}, ${input.registeredBand.hiPp.toFixed(2)}]pp` +
+                  (input.deltaPp >= input.registeredBand.loPp &&
+                  input.deltaPp <= input.registeredBand.hiPp
+                    ? ''
+                    : ' — outside it, which is a finding about the arm rather than a defect in it')
+                : input.state === 'UNRESOLVED'
+                  ? `UNRESOLVED: |${input.deltaPp.toFixed(2)}pp| against ${
+                      input.detectablePp === undefined
+                        ? 'an unestimable'
+                        : `${input.detectablePp.toFixed(2)}pp`
+                    } minimum detectable difference`
+                  : (input.claim ?? input.state),
+            // Non-blocking in both readings, and for the same reason: an effect the sample could not
+            // resolve and a delta outside its registered band are facts about the arm, and R45's
+            // revert rule is the gate that blocks a pair for costing accuracy.
+            pass:
+              input.registeredBand === undefined
+                ? input.state !== 'UNRESOLVED'
+                : input.deltaPp >= input.registeredBand.loPp &&
+                  input.deltaPp <= input.registeredBand.hiPp,
             blocking: false,
           },
         ]),

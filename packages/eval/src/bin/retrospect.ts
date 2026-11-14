@@ -16,10 +16,12 @@ import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import {
   buildBatch,
+  clusterCensusOf,
   clusterSources,
   deterministicProposal,
   DEFAULT_CLUSTER_OPTIONS,
   DEFAULT_RETROSPECT_POLICY,
+  CHAIN_COHESION_FLOOR,
   summaryOf,
   type RetrospectSource,
 } from '@agentix-e/microglia-core/retrospect';
@@ -121,6 +123,10 @@ async function main(): Promise<void> {
   const policy = { ...DEFAULT_RETROSPECT_POLICY, minSources: numberFlag(argv, '--min-sources', 2) };
   const clusters = clusterSources(sources, { ...DEFAULT_CLUSTER_OPTIONS, threshold });
   const proposals = clusters.map(deterministicProposal);
+  // The M1 reading, taken from the same objects the batch is built from rather than recomputed by a
+  // reader: fragmentation is the share of repairs no cluster reached, which is where lexical
+  // clustering's known cost shows up, and `chained` counts the clusters single-link pulled together.
+  const census = clusterCensusOf(sources, clusters, CHAIN_COHESION_FLOOR);
   const batch = buildBatch({
     id: `retrospect-${Date.now().toString(36)}`,
     createdAt: Date.now(),
@@ -128,6 +134,7 @@ async function main(): Promise<void> {
     policy,
     corpus: sources,
     proposals,
+    census,
   });
 
   await mkdir(dirname(resolve(out)), { recursive: true });
@@ -137,6 +144,8 @@ async function main(): Promise<void> {
     [
       `store      ${sources.length} record(s): ${repairs.length} repair(s), ${sources.length - repairs.length} pass(es)`,
       `clusters   ${clusters.length} at threshold ${threshold}${clusters.length === 0 ? ' — no two repairs share a condition' : ''}`,
+      `census     fragmentation ${census.fragmentation.toFixed(3)} (${census.orphans}/${census.repairs} repair(s) no cluster claims), ` +
+        `chained ${census.chained}/${census.clusters} under ${CHAIN_COHESION_FLOOR}, mean cohesion ${census.meanCohesion.toFixed(3)}`,
       `batch      ${out} (${summary.total} candidate(s))`,
       ...clusters.map((cluster) => {
         const item = batch.items.find((entry) => entry.proposal.id === `gp_${cluster.id.slice(3)}`);

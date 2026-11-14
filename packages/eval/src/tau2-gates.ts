@@ -42,8 +42,9 @@
 import type { FaithfulnessCensus } from "./tau2-faithfulness.js";
 import {
   GATE_ORDER,
-  buildProtocolGates,
+  buildProtocolGatesWithScope,
   type FunnelInput,
+  type OmittedGate,
   type ProtocolGateInput,
   type ScenarioGateInput,
   type TransferGateInput,
@@ -672,6 +673,14 @@ export type Tau2GateAudit = {
   readonly supplyable: number;
   /** Gates that need an arm this lane never ran. */
   readonly armIndexed: number;
+  /**
+   * Gates this arm has no subject for, because it declared its store empty.
+   *
+   * Absent on every arm that declared nothing, which is every committed artefact: a field that said
+   * "omitted nothing" on every normal run would be a column nobody reads. Present, it is the record
+   * §34.128 asks for — the omission is a statement in the report rather than a silence.
+   */
+  readonly omitted?: readonly OmittedGate[];
 };
 
 /**
@@ -683,9 +692,12 @@ export type Tau2GateAudit = {
  */
 export function tau2GateAudit(evidence: Tau2Evidence): Tau2GateAudit {
   const projection = tau2ProtocolInput(evidence);
-  const gates = buildProtocolGates(projection.input);
+  const { gates, omitted } = buildProtocolGatesWithScope(projection.input);
   const evaluable = gates.map((gate) => gate.id);
   const present = new Set(evaluable);
+  // A gate the declaration removed is not an absent gate: `absent` means "this lane has no arm that
+  // could fire it", and this one had an arm — the arm said it had nothing for the gate to read.
+  const declaredAway = new Set(omitted.map((entry) => entry.id));
 
   // Two gates fire on an empty list by construction — `every` over nothing is true — so they are
   // separated from the ones that read a measurement. The test is on the input rather than on the
@@ -694,16 +706,19 @@ export function tau2GateAudit(evidence: Tau2Evidence): Tau2GateAudit {
   if (projection.input.packControls.length === 0) vacuous.push('V6-controls-inject');
   if (projection.input.channelBest === undefined) vacuous.push('V7-channel');
 
-  const absent = ARM_INDEXED.filter((entry) => !present.has(entry.id));
+  const absent = ARM_INDEXED.filter((entry) => !present.has(entry.id) && !declaredAway.has(entry.id));
   const unrecorded = SUPPLYABLE.filter(
     (entry) => !projection.supplied.includes(entry.field) && !present.has(entry.id),
-  ).map((entry) => ({
-    id: entry.id,
-    needs: `the lane's own record, which this run did not carry: ${FIELD_OF[entry.field]}`,
-  }));
+  )
+    .filter((entry) => !declaredAway.has(entry.id))
+    .map((entry) => ({
+      id: entry.id,
+      needs: `the lane's own record, which this run did not carry: ${FIELD_OF[entry.field]}`,
+    }));
 
   return {
     gates,
+    ...(omitted.length === 0 ? {} : { omitted }),
     evaluable,
     vacuous: vacuous.filter((id) => present.has(id)),
     absent: [...absent, ...unrecorded].sort(

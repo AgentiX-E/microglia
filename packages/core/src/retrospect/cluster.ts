@@ -181,6 +181,71 @@ export function clusterSources(
   return clusters.sort((a, b) => (a.task === b.task ? a.id.localeCompare(b.id) : a.task.localeCompare(b.task)));
 }
 
+/**
+ * What the grouping did with the corpus, before any proposal is written.
+ *
+ * These are the M1 numbers — compile time, no model, deterministic — and two of them exist because
+ * this pipeline's known weakness is *recall of the grouping* rather than the prose:
+ *
+ *  - **fragmentation** is the share of repairs that no cluster claims. Lexical clustering pays for
+ *    its reproducibility with a synonym problem: two corrections that fire in the same situation and
+ *    share no word land in different clusters, or in none. A high fragmentation with a high witness
+ *    rate says the bottleneck is grouping, which is the case for an embedding edge or a model
+ *    splitter; a low one says those would buy nothing and the money belongs elsewhere.
+ *  - **chained** counts clusters whose mean pairwise cohesion is under the floor. Single-link
+ *    clustering is chosen because one clear pair is enough to argue for a merge, and its cost is
+ *    that a run of near-neighbours can drag two distant corrections together. A chained cluster is
+ *    where a `split` should be offered first.
+ *
+ * Both are derived from the same objects the batch is built from, so a reviewer reading a card can
+ * be shown the state of the corpus that produced it.
+ */
+export type ClusterCensus = {
+  /** Repairs the corpus offered to the consolidator. */
+  readonly repairs: number;
+  /** Repairs a cluster claims. */
+  readonly clustered: number;
+  /** Repairs left alone: the number the grouping failed to reach. */
+  readonly orphans: number;
+  /** `orphans / repairs`, so 1.0 means nothing was grouped at all. */
+  readonly fragmentation: number;
+  readonly clusters: number;
+  /** Clusters whose mean pairwise cohesion is under the floor. */
+  readonly chained: number;
+  readonly meanCohesion: number;
+};
+
+/** The cohesion below which a cluster is a chain of near-neighbours rather than a group. */
+export const CHAIN_COHESION_FLOOR = 0.5;
+
+export function clusterCensusOf(
+  sources: readonly RetrospectSource[],
+  clusters: readonly RetrospectCluster[],
+  floor: number = CHAIN_COHESION_FLOOR,
+): ClusterCensus {
+  const repairs = sources.filter((source) => source.outcome === 'repair').length;
+  const clustered = clusters.reduce((total, cluster) => total + cluster.members.length, 0);
+  const orphans = repairs - clustered;
+  const meanCohesion =
+    clusters.length === 0
+      ? 0
+      : Number(
+          (clusters.reduce((total, cluster) => total + cluster.cohesion, 0) / clusters.length).toFixed(4),
+        );
+  return {
+    repairs,
+    clustered,
+    orphans,
+    // `repairs === 0` is a corpus with nothing to group rather than a perfect grouping, and a share
+    // with a zero denominator is the vacuous reading this project keeps finding. Zero says "no
+    // fragmentation was measured", and the counts beside it say why.
+    fragmentation: repairs === 0 ? 0 : Number((orphans / repairs).toFixed(4)),
+    clusters: clusters.length,
+    chained: clusters.filter((cluster) => cluster.cohesion < floor).length,
+    meanCohesion,
+  };
+}
+
 function cohesionOf(members: readonly RetrospectSource[], words: Map<string, Set<string>>): number {
   let total = 0;
   // Every caller has at least two members, which is what makes the divisor non-zero.

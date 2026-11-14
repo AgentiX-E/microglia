@@ -87,6 +87,64 @@ describe('a treatment pair', () => {
   });
 });
 
+describe('a control pair grades the band it registered, not a significance it never claimed', () => {
+  /**
+   * R101's pair, as it was reported.
+   *
+   * The scaffold arm read 0.700 against the reference arm's 0.750 — −5.00pp — and the registration
+   * had withheld a band of `[−7.5, +2.5]pp` around zero before the dispatch. `l4-effect-resolved`
+   * graded it `UNRESOLVED: |-5.00pp| against 24.27pp minimum detectable difference`, which is true,
+   * and is not the question the arm was bought to answer (§34.128).
+   */
+  const control: PairGateInput = {
+    state: 'UNRESOLVED',
+    claim: null,
+    deltaPp: -5,
+    p: 0.7744,
+    paired: 40,
+    served: 0,
+    detectablePp: 24.27,
+    splitMatches: true,
+    onlyFirst: 0,
+    onlySecond: 0,
+    registeredBand: { loPp: -7.5, hiPp: 2.5 },
+  };
+
+  it('passes a delta inside the registered interval, though the sample cannot resolve it', () => {
+    const resolved = pairGates(control).find((gate) => gate.id === 'l4-effect-resolved');
+    expect(resolved?.pass).toBe(true);
+    // Non-blocking still: a band is a prediction, and missing it is a finding rather than a defect.
+    expect(resolved?.blocking).toBe(false);
+    expect(resolved?.actual).toBe('-5.00pp against the registered band [-7.50, 2.50]pp');
+  });
+
+  it('fails a delta outside the interval, and says which side of the finding it is', () => {
+    const resolved = pairGates({ ...control, deltaPp: -12, state: 'HARM' }).find(
+      (gate) => gate.id === 'l4-effect-resolved',
+    );
+    expect(resolved?.pass).toBe(false);
+    expect(resolved?.actual).toContain('outside it, which is a finding about the arm');
+  });
+
+  it('replaces the resolution question rather than sitting beside it', () => {
+    // One gate states one thing. With a band present the sentence is about the band, and the minimum
+    // detectable difference does not appear — a reader cannot then mistake the band for a second,
+    // laxer test of the same claim.
+    const resolved = pairGates(control).find((gate) => gate.id === 'l4-effect-resolved');
+    expect(resolved?.actual).not.toContain('24.27pp');
+    expect(resolved?.criterion).toContain('registered before the dispatch');
+  });
+
+  it('leaves every pair that registered no band exactly as it read before', () => {
+    expect(pairGates(treatment).find((gate) => gate.id === 'l4-effect-resolved')?.criterion).toContain(
+      'the pair resolves the effect it reports',
+    );
+    expect(pairGates({ ...control, registeredBand: undefined }).find((gate) => gate.id === 'l4-effect-resolved')?.pass).toBe(
+      false,
+    );
+  });
+});
+
 describe('a planted distractor pair', () => {
   const planted: PairGateInput = { ...treatment, plantedArm: 'near', state: 'HARM', deltaPp: -3.5 };
 

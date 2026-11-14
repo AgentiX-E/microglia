@@ -1654,6 +1654,14 @@ jobs:
         # unpaired scaffold run would carry no verdict about the arm at all.
         if: always() && (github.event.inputs.l4_arms == 'both' || github.event.inputs.l4_arms == 'scaffold' || github.event.inputs.l4_arms == '')
         timeout-minutes: 10
+        env:
+          # R106: a control pair is registered to a band rather than to a significance it never
+          # claimed. The band is a property of the registration, so it travels as a repository
+          # variable and is empty on every arm that registered none — where `l4-effect-resolved`
+          # keeps the reading it always had. It is a variable rather than a dispatch input because
+          # this file already declares the twenty-five inputs GitHub will parse, and a twenty-sixth
+          # makes every `workflow_dispatch` in the repository unparseable.
+          TAU_BAND: ${{ vars.TAU_BAND }}
         run: pnpm eval:l4-pair
 
       # R49: the floor's contribution has its OWN artefact and its own three

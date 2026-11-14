@@ -637,9 +637,12 @@ describe('the declared-empty arm', () => {
   it('inverts the pack gate, so a scaffold arm that injects a rule fails it', () => {
     const scaffold = gate({ ...minimal, meanPackIds: 0, declaredEmptyStore: true }, 'V1-pack-not-empty');
     expect(scaffold.pass).toBe(true);
-    expect(scaffold.criterion).toBe(
-      'the scaffold arm injected no rule at all, so what it measures is the wrapper',
-    );
+    // The sentence is the declaration's, not this gate's. It read "the scaffold arm injected no rule
+    // at all" while the inversion was a branch inside this literal; §34.128 found three more gates
+    // the registration had not thought of, and a per-gate phrasing is what let each of them invent
+    // its own reading. The claim is one claim and it is written once.
+    expect(scaffold.criterion).toContain('declared its store empty before the first episode');
+    expect(scaffold.criterion).toContain('required to be zero');
     // The arm is no longer the control the moment one rule reaches it, and the gate says so instead of
     // tolerating the difference the way a waiver would.
     expect(gate({ ...minimal, meanPackIds: 1.4, declaredEmptyStore: true }, 'V1-pack-not-empty').pass).toBe(

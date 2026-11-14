@@ -425,3 +425,36 @@ describe('an admitted guideline enters the store through the ordinary write path
     expect(toDistillCandidate(accepted(), accepted().items[0]!, { decisionId: 'd1' }).scope.domain).toBeUndefined();
   });
 });
+
+describe('the batch carries the census of the grouping that produced it', () => {
+  it('writes the census when a consolidator measured one', () => {
+    const measured = buildBatch({
+      id: 'batch-c',
+      createdAt: at,
+      namespace: 'acme',
+      policy: DEFAULT_RETROSPECT_POLICY,
+      corpus,
+      proposals: [proposal()],
+      census: {
+        repairs: 3,
+        clustered: 2,
+        orphans: 1,
+        fragmentation: 0.3333,
+        clusters: 1,
+        chained: 0,
+        meanCohesion: 0.72,
+      },
+    });
+    expect(measured.census?.fragmentation).toBe(0.3333);
+    // A fold that dropped the page would lose the reading the cards are judged against, so the
+    // replay has to keep it.
+    const decided = applyDecision(measured, decision());
+    expect(decided.census).toEqual(measured.census);
+  });
+
+  it('omits the field entirely when no grouping was measured, rather than writing zeroes', () => {
+    // A hand-built batch has no grouping behind it, and `fragmentation: 0` there would read as a
+    // perfect merge — the vacuous pass in one more place.
+    expect('census' in batch()).toBe(false);
+  });
+});

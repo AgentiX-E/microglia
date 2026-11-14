@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createKnowledgeItem, defaultPolicy, type DistillCandidate, type KnowledgeItem } from '../../kernel/index.js';
 import {
+  clusterCensusOf,
   clusterSources,
   deterministicProposal,
   seedTriggerOf,
@@ -247,5 +248,64 @@ describe('the no-model proposal copies rather than paraphrases', () => {
     // The medoid's trigger would be narrower than the other member's, and a narrower
     // guideline does not cover the member it was merged with.
     expect(deterministicProposal(cluster).when).toBe('refund requested damaged item');
+  });
+});
+
+describe('the census prices the grouping before a proposal is written', () => {
+  it('counts the repairs no cluster claims, which is the price of a lexical key', () => {
+    // Two repairs that fire together and one that shares no word with them: the synonym case this
+    // pipeline's own header names as its cost. The orphan count is what an embedding edge or a model
+    // splitter would have to earn back, so it is measured rather than argued.
+    const sources = [
+      source({ id: 'k1', when: 'when a refund is requested for a damaged item' }),
+      source({ id: 'k2', when: 'when a refund is requested for a damaged item' }),
+      source({ id: 'k3', when: 'when an address change arrives mid-delivery' }),
+    ];
+    const clusters = clusterSources(sources);
+    const census = clusterCensusOf(sources, clusters);
+    expect(census.repairs).toBe(3);
+    expect(census.clustered).toBe(2);
+    expect(census.orphans).toBe(1);
+    expect(census.fragmentation).toBe(0.3333);
+    expect(census.clusters).toBe(1);
+  });
+
+  it('reads a corpus nothing grouped as total fragmentation rather than as a perfect merge', () => {
+    const sources = [
+      source({ id: 'k1', when: 'when a refund is requested' }),
+      source({ id: 'k2', when: 'when an address change arrives' }),
+    ];
+    const census = clusterCensusOf(sources, clusterSources(sources));
+    expect(census.clusters).toBe(0);
+    expect(census.fragmentation).toBe(1);
+    expect(census.meanCohesion).toBe(0);
+  });
+
+  it('does not price a corpus with no repair at all, and says so with the counts', () => {
+    // `0/0` is the vacuous share this project keeps catching. Zero here means "not measured", and
+    // `repairs: 0` beside it is what says why.
+    const sources = [source({ id: 'k1', outcome: 'pass' }), source({ id: 'k2', outcome: 'pass' })];
+    const census = clusterCensusOf(sources, clusterSources(sources));
+    expect(census.repairs).toBe(0);
+    expect(census.fragmentation).toBe(0);
+    expect(census.orphans).toBe(0);
+  });
+
+  it('names the clusters single-link pulled together, which are where a split belongs', () => {
+    // A chain: `a~b` and `b~c` are each above the floor and `a~c` is not, so the cluster holds three
+    // members whose mean pairwise cohesion is under it. The reviewer is offered a split, and this
+    // count is what says how often that offer is worth making.
+    const loose = [
+      source({ id: 'k1', when: 'refund requested damaged item arrived' }),
+      source({ id: 'k2', when: 'refund requested damaged item arrived late' }),
+      source({ id: 'k3', when: 'refund requested late parcel' }),
+    ];
+    const clusters = clusterSources(loose, { threshold: 0.4, crossTask: false });
+    const census = clusterCensusOf(loose, clusters, 0.9);
+    // The floor is set above every observable cohesion on purpose: the assertion is that the count
+    // follows the number the cluster already reports rather than a second definition of "loose".
+    expect(census.chained).toBe(clusters.length);
+    const strict = clusterCensusOf(loose, clusters, 0);
+    expect(strict.chained).toBe(0);
   });
 });

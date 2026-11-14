@@ -40,6 +40,7 @@
  */
 export {
   buildProtocolGates,
+  buildProtocolGatesWithScope,
   declaredEmptyVerdict,
   funnelReading,
   funnelVerdict,
@@ -52,11 +53,24 @@ export {
   type FramingDelivery,
   type FunnelInput,
   type FunnelVerdict,
+  type OmittedGate,
   type ProtocolGateInput,
   type ScenarioGateInput,
+  type ScopedGates,
   type TransferGateInput,
   type ValidityGate,
 } from './gates.js';
+
+export {
+  packGate,
+  scopeGates,
+  storeReading,
+  subjectOf,
+  trialReading,
+  type Declaration,
+  type EmptyForm,
+  type GateSubject,
+} from './declaration.js';
 
 export {
   blockingFailure,

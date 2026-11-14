@@ -37,6 +37,7 @@ import { MicrogliaError, hashText } from '../kernel/index.js';
 import type { DistillCandidate, EvidenceRef } from '../kernel/index.js';
 import { admissibilityOf, witnessOf, type RetrospectPolicy } from './witness.js';
 import type { AdmissibilityReport } from './witness.js';
+import type { ClusterCensus } from './cluster.js';
 import type { GuidelineProposal, RetrospectSource } from './types.js';
 
 export type ReviewAction =
@@ -89,6 +90,15 @@ export type ReviewBatch = {
   readonly policy: RetrospectPolicy;
   readonly corpus: readonly RetrospectSource[];
   readonly items: readonly ReviewItem[];
+  /**
+   * What the grouping did with the corpus, when the batch was built by a consolidator.
+   *
+   * Optional and absent from every batch that predates it: a `census` of zeroes on a hand-built
+   * batch would be a measurement about a grouping that never ran. Present, it is the M1 reading a
+   * reviewer can check the cards against — how much of the corpus no card claims, and which cards
+   * are chains rather than groups.
+   */
+  readonly census?: ClusterCensus;
 };
 
 export function buildBatch(input: {
@@ -98,6 +108,7 @@ export function buildBatch(input: {
   readonly policy: RetrospectPolicy;
   readonly corpus: readonly RetrospectSource[];
   readonly proposals: readonly GuidelineProposal[];
+  readonly census?: ClusterCensus;
 }): ReviewBatch {
   const items = input.proposals.map((proposal) => ({
     proposal,
@@ -113,6 +124,7 @@ export function buildBatch(input: {
     policy: input.policy,
     corpus: input.corpus,
     items,
+    ...(input.census === undefined ? {} : { census: input.census }),
   };
 }
 
