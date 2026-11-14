@@ -524,6 +524,26 @@ export type Tau2Raw = {
    * readable only from a log line. `events` and `answered` disagree whenever the run was stopped by
    * a fatal error or the fallback threw too.
    */
+  /**
+   * R114: the distillation client's own census, which no artefact carried before.
+   *
+   * `reasoningTokens` is the point: the lane's driver left the thinking regime to the provider's
+   * default and asserted in a comment that the distiller "never thinks". A document that does not
+   * record the tokens cannot tell a model that answered nothing from a model that spent 1,200 tokens
+   * thinking and had no budget left to answer.
+   */
+  readonly distillClient?: {
+    readonly calls: number;
+    readonly prompts: number;
+    readonly failures: number;
+    readonly retries: number;
+    readonly tokens: number;
+    readonly promptTokens: number;
+    readonly cachedTokens: number;
+    readonly completionTokens: number;
+    readonly reasoningTokens: number;
+    readonly timeouts: number;
+  };
   readonly distillFaults?: {
     readonly events: number;
     readonly answered: number;
@@ -857,6 +877,7 @@ export const PROJECTION: {
   distillReplies: "carried",
   distillWriter: "carried",
   distillFaults: "carried",
+  distillClient: "carried",
   distillPreflight: "carried",
   distillModel: "carried",
   provenance: "carried",
@@ -1049,6 +1070,7 @@ export function armRecordFromDriver(
     ...(raw.distillReplies === undefined ? {} : { distillReplies: raw.distillReplies }),
     ...(raw.distillWriter === undefined ? {} : { distillWriter: raw.distillWriter }),
     ...(raw.distillFaults === undefined ? {} : { distillFaults: raw.distillFaults }),
+    ...(raw.distillClient === undefined ? {} : { distillClient: raw.distillClient }),
     ...(raw.distillModel === undefined ? {} : { distillModel: raw.distillModel }),
     ...(raw.distillPreflight === undefined ? {} : { distillPreflight: raw.distillPreflight }),
     ...(raw.provenance === undefined ? {} : { provenance: raw.provenance }),

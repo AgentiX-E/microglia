@@ -622,13 +622,39 @@ const TRACE_CLAIMS = resolveTraceClaims();
  *
  * τ²'s ceiling is its own rather than `distillBudget`'s because the unit is a sentence, not a
  * trajectory: the longest statement the parser accepts is 640 characters and the form asks for 240,
- * so 1,200 tokens is roughly four times the reply the schema can keep. The coupling to a thinking
- * regime is not wired here because this lane's distiller never thinks — `TAU_THINKING` reaches the
- * Python half, and this process's own client sends no reasoning parameter. Recording it is the part
- * that had to stop being implicit; the coupling is stated in the roadmap behind R56's reading, so
- * that a ceiling change cannot ride along with an instrument fix.
+ * so 1,200 tokens is roughly four times the reply the schema can keep.
+ *
+ * **The regime is no longer inherited.** The first version of this comment said "the coupling to a
+ * thinking regime is not wired here because this lane's distiller never thinks — this process's own
+ * client sends no reasoning parameter", and the second half of that sentence is true while the first
+ * half does not follow from it: a client that sends no parameter gets the **provider's default**,
+ * which is not a statement about this lane. R104 is what it cost: 73 distillation calls, **63 replies
+ * with no visible character**, six claims from ten answers, and an artefact that could not say
+ * whether the model had spent its budget thinking. `thinking: 'off'` is now sent, which is what the
+ * lane always claimed to run, and `distillClient` records the reasoning tokens the provider
+ * attributes, so the next arm can price the difference instead of arguing about it.
  */
 const DISTILL_TOKENS = 1_200;
+
+/**
+ * The client every distillation call in this lane goes through.
+ *
+ * One factory rather than two constructor calls, because the pre-flight and the arm must ask the same
+ * provider under the same regime — a pre-flight that passed under one regime and an arm that ran
+ * under another would certify a writer that never wrote. `thinking: 'off'` is stated rather than left
+ * to the provider's default; `answerBudget` exists in this package for the lane that does think.
+ */
+function distillClient(maxCalls: number): LlmClient {
+  return new LlmClient({
+    apiKey: process.env["DEEPSEEK_API_KEY"] ?? "",
+    model:
+      process.env["TAU_DISTILL_MODEL"]?.trim() ||
+      process.env["TAU_MODEL"] ||
+      "deepseek-chat",
+    maxCalls,
+    thinking: "off",
+  });
+}
 
 /**
  * Which trajectories teach this dispatch (R62).
@@ -1129,14 +1155,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // sequence is part of what it measured.
   let distillPreflight: PreflightReading | undefined;
   if (DISTILL_PREFLIGHT && !DECLARED_EMPTY && DISTILL_UNIT !== "raw") {
-    const preflightLlm = new LlmClient({
-      apiKey: process.env["DEEPSEEK_API_KEY"] ?? "",
-      model:
-        process.env["TAU_DISTILL_MODEL"]?.trim() ||
-        process.env["TAU_MODEL"] ||
-        "deepseek-chat",
-      maxCalls: 2,
-    });
+    const preflightLlm = distillClient(2);
     const preflightReplies: string[] = [];
     const preflightInterpreter = createLlmInterpreter({
       llm: {
@@ -1195,19 +1214,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const unanswered = unansweredTasks(learnedTasks, rewards).length;
 
   const store = await EmbeddedMemory.open(new MemoryJournal());
-  const llm = new LlmClient({
-    apiKey: process.env["DEEPSEEK_API_KEY"] ?? "",
-    // The distillation client speaks the endpoint's own REST shape, and `TAU_MODEL` names the model
-    // the way litellm does because τ²'s Python half is a litellm caller. `LlmClient` translates the
-    // alias, and `TAU_DISTILL_MODEL` exists for a caller that wants to say the REST id outright.
-    // Empty is read as unset: a workflow variable that is not configured renders as `''`, and `??`
-    // would have kept it.
-    model:
-      process.env["TAU_DISTILL_MODEL"]?.trim() ||
-      process.env["TAU_MODEL"] ||
-      "deepseek-chat",
-    maxCalls: Number(process.env["TAU_MAX_CALLS"] ?? 400) || 400,
-  });
+  // The distillation client speaks the endpoint's own REST shape, and `TAU_MODEL` names the model
+  // the way litellm does because τ²'s Python half is a litellm caller. `LlmClient` translates the
+  // alias, and `TAU_DISTILL_MODEL` exists for a caller that wants to say the REST id outright.
+  // Empty is read as unset: a workflow variable that is not configured renders as `''`, and `??`
+  // would have kept it.
+  const llm = distillClient(Number(process.env["TAU_MAX_CALLS"] ?? 400) || 400);
   // The model first, the rules when the model fails on this event, and the run stopped when the
   // model fails on every event. See `tau2-distill.ts` for why this is the host's decision rather
   // than the combinator's.
@@ -2263,6 +2275,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // R114: the pair's own counts, which the artefact did not carry at all. R104's 63 fallbacks
     // existed only in the log line, so no reader of the document could see that 63 of 73 events had
     // no model answer — and the arm's score was read as a measurement of a store the model wrote.
+    // R114: the distiller's own bill and regime. R104's 73 calls carried no token census anywhere in
+    // the document, so "the replies were blank" could not be priced and "the model spent the budget
+    // thinking" could not be checked. `reasoningTokens` is the field that settles it on the next arm.
+    distillClient: { ...llm.stats },
     distillFaults: {
       events: faults.events,
       answered: faults.answered,

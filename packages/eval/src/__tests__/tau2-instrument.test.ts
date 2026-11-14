@@ -711,6 +711,18 @@ describe('the projection has a decision for every field, and keeps it', () => {
       distillReplies: { calls: 15, answered: 15, empty: 0, blank: 0, unparsed: 0, chars: 2400, clientCalls: 15 },
       // R114: which writer produced the store. Carried because `stored` cannot say whose claims
       // they are — the resilient pair answers a faulting event with the rule interpreter.
+      distillClient: {
+        calls: 15,
+        prompts: 15,
+        failures: 0,
+        retries: 0,
+        tokens: 3000,
+        promptTokens: 2400,
+        cachedTokens: 0,
+        completionTokens: 600,
+        reasoningTokens: 0,
+        timeouts: 0,
+      },
       distillFaults: {
         events: 0,
         answered: 0,
