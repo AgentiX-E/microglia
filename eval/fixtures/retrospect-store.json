@@ -1,0 +1,101 @@
+{
+ "id": "retrospect-store",
+ "title": "A store with its sides recorded, which is the only kind the retrospection lane can read",
+ "source": "synthetic; the shape of a tau2 learn half after R110, not a run",
+ "namespace": "microglia",
+ "notes": [
+  "Four corrections and two successes over one retail scope. The three corrections about the order/item join share a trigger and must cluster into one proposal; the fourth does not, and is the fragmentation the census reports.",
+  "The provenance census below is written by hand and is what the store's own sides must reconcile against — `pnpm eval:retrospect` refuses the batch when the two disagree. It is consistent by construction, and the test that reads this file asserts it stays that way."
+ ],
+ "tau2": {
+  "storeItems": {
+   "limit": 64,
+   "maxChars": 240,
+   "omitted": 0,
+   "truncated": 0,
+   "items": [
+    {
+     "id": "k_join_1",
+     "kind": "exemplar",
+     "status": "active",
+     "polarity": "repair",
+     "statement": "The attempt counted items by joining orders to items on item id. The correction joins on order id before the count is taken, which returns one row per item of the order asked about.",
+     "when": "the question asks how many items an order holds",
+     "trust": 0.9,
+     "scope": { "task": "retail", "intent": "order.items" },
+     "supportTasks": 1,
+     "evidence": 1
+    },
+    {
+     "id": "k_join_2",
+     "kind": "exemplar",
+     "status": "active",
+     "polarity": "repair",
+     "statement": "The attempt counted items by joining orders to items on sku. The correction joins on order id before the count is taken, which returns one row per item of the order asked about.",
+     "when": "the question asks how many items an order holds",
+     "trust": 0.9,
+     "scope": { "task": "retail", "intent": "order.items" },
+     "supportTasks": 1,
+     "evidence": 1
+    },
+    {
+     "id": "k_join_3",
+     "kind": "exemplar",
+     "status": "active",
+     "polarity": "repair",
+     "statement": "The attempt counted items by joining orders to items on product id. The correction joins on order id before the count is taken, which returns one row per item of the order asked about.",
+     "when": "the question asks how many items an order holds",
+     "trust": 0.9,
+     "scope": { "task": "retail", "intent": "order.items" },
+     "supportTasks": 2,
+     "evidence": 2
+    },
+    {
+     "id": "k_refund",
+     "kind": "exemplar",
+     "status": "active",
+     "polarity": "repair",
+     "statement": "The attempt issued a refund without checking the payment method. The correction refunds to the original payment method, which is the only one the store records.",
+     "when": "the question asks for a refund",
+     "trust": 0.9,
+     "scope": { "task": "retail", "intent": "order.refund" },
+     "supportTasks": 1,
+     "evidence": 1
+    },
+    {
+     "id": "k_ship_1",
+     "kind": "exemplar",
+     "status": "active",
+     "polarity": "pass",
+     "statement": "Shipments are looked up on order id, which is the key the shipment record is indexed by.",
+     "trust": 0.9,
+     "scope": { "task": "retail", "intent": "order.shipments" },
+     "supportTasks": 1,
+     "evidence": 1
+    },
+    {
+     "id": "k_ship_2",
+     "kind": "exemplar",
+     "status": "active",
+     "polarity": "pass",
+     "statement": "An exchange is only offered on a delivered order, so the status is read before the exchange is attempted.",
+     "trust": 0.9,
+     "scope": { "task": "retail", "intent": "order.exchange" },
+     "supportTasks": 1,
+     "evidence": 1
+    }
+   ]
+  },
+  "provenance": {
+   "edited": 4,
+   "passed": 2,
+   "tasksEdited": 4,
+   "tasksPassed": 2,
+   "itemsEditedOnly": 4,
+   "itemsPassedOnly": 2,
+   "itemsMixed": 0,
+   "itemsUnattributed": 0,
+   "evidenceUnattributed": 0
+  }
+ }
+}

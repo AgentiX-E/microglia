@@ -61,6 +61,20 @@ async function main(): Promise<void> {
 
   const threshold = numberFlag(argv, '--threshold', DEFAULT_CLUSTER_OPTIONS.threshold);
   const policy = { ...DEFAULT_RETROSPECT_POLICY, minSources: numberFlag(argv, '--min-sources', 2) };
+  // R110: the store's own sides are checked against the artefact's run-level census **before** a
+  // batch is written, because the two are independent reads of one fact and a disagreement means one
+  // of them is wrong — a wrong side is a wrong corpus, and a corpus is what the reviewer is shown.
+  // `unavailable` is not a refusal: a document that cannot support the comparison is not a document
+  // that contradicts itself.
+  const runCensus = (raw['tau2'] as Record<string, unknown> | undefined)?.['provenance'] as
+    | ProvenanceCensus
+    | undefined;
+  const sides = reconcileSides(reading, {
+    ...(runCensus === undefined ? {} : { census: runCensus }),
+    omitted: dump.omitted,
+  });
+  if (sides.state === 'disagree') throw new Error(`refusing the batch: ${sides.sentence}`);
+
   const repairs = reading.sources.filter((source) => source.outcome === 'repair');
   const clusters = clusterSources(repairs, { ...DEFAULT_CLUSTER_OPTIONS, threshold });
   const proposals = clusters.map(deterministicProposal);
@@ -81,16 +95,6 @@ async function main(): Promise<void> {
   await mkdir(dirname(resolve(out)), { recursive: true });
   await writeFile(resolve(out), `${JSON.stringify(batch, null, 1)}\n`, 'utf8');
   const summary = summaryOf(batch);
-  // R110: the artefact's own census, when it carries one, is an independent read of the same fact.
-  // Comparing them costs nothing and is the only way the field can be caught disagreeing with the
-  // run that wrote it.
-  const runCensus = (raw['tau2'] as Record<string, unknown> | undefined)?.['provenance'] as
-    | ProvenanceCensus
-    | undefined;
-  const sides = reconcileSides(reading, {
-    ...(runCensus === undefined ? {} : { census: runCensus }),
-    omitted: dump.omitted,
-  });
   process.stdout.write(
     [
       `store      ${reading.total} record(s): ${reading.repairs} repair(s), ${reading.passes} pass(es), ` +
