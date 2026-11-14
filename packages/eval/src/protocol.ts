@@ -76,20 +76,10 @@ export function interleaveByKey<T>(rows: readonly T[], key: (row: T) => string):
   return out;
 }
 
-/**
- * Smallest difference a paired design can detect at the stated power.
- *
- * Inverts the McNemar sample-size formula `n ≈ z²·(p01+p10)/(p01−p10)²`: given n
- * and the expected share of discordant pairs, the detectable difference is
- * `sqrt(z²·d/n)`. `z = 2.802` is α=0.05 two-sided with 80% power. A design that
- * cannot detect the effect it claims to look for is not a test of that claim.
- */
-export function detectableDelta(n: number, discordance: number, z = 2.802): number {
-  if (n <= 0) return Number.POSITIVE_INFINITY;
-  if (!(discordance > 0)) return Number.POSITIVE_INFINITY;
-  const d = Math.min(1, discordance);
-  return Math.sqrt((z * z * d) / n);
-}
+// The formula is re-exported rather than defined here, because `prereg.ts` needs the same one and
+// cannot reach this module: the registration runs before anything is built, and this file imports
+// the core package. One definition, in `detectable.ts`, reached from both.
+export { detectableDelta, POWER_Z } from './detectable.js';
 
 /** Share of pairs where the two arms disagree, in [0, 1]. */
 export function discordanceOf(baseline: readonly boolean[], treatment: readonly boolean[]): number {

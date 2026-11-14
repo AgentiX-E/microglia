@@ -6,6 +6,7 @@ import { DEFAULT_SELECTED_ARM } from '../width.js';
 import {
   armsAgainstRegistration,
   backboneProblem,
+  claimAgainstResolution,
   distillFormProblem,
   essentialArms,
   facadePairSwitch,
@@ -1945,5 +1946,153 @@ describe('queryPin, the question as a file', () => {
     expect(
       readPrereg(withHeader('rawCeiling: 2000'), 'R93-one-question.md').prereg?.release,
     ).toBeUndefined();
+  });
+});
+
+describe('a claimed effect against the sample that would have to resolve it', () => {
+  const claim = (effectClaimPp: number, sample: number, arms: string[]): Parameters<typeof claimAgainstResolution>[0] => ({
+    effectClaimPp,
+    sample,
+    arms,
+  });
+
+  it('says nothing about a registration that claims no effect, which is most of them', () => {
+    const reading = claimAgainstResolution({ sample: 160, arms: ['memory'] });
+    expect(reading.ok).toBe(true);
+    expect(reading.claimPp).toBeNull();
+    expect(reading.floorPp).toBeNull();
+  });
+
+  it('says nothing about a hand run, which has no registration to disagree with', () => {
+    expect(claimAgainstResolution(undefined).ok).toBe(true);
+  });
+
+  it('computes the floor at complete discordance, which no run can exceed', () => {
+    // Forty paired tasks: sqrt(2.802² · 1 / 160) = 22.15pp is the *best* this design could ever do,
+    // reached only if every single pair changed hands. Any effect below it is unresolvable in
+    // advance, not merely unlikely.
+    const reading = claimAgainstResolution(claim(20, 160, ['memory', 'reference']));
+    expect(reading.floorPp).toBeCloseTo(22.15, 2);
+    expect(reading.ok).toBe(false);
+    expect(reading.problems).toHaveLength(1);
+    expect(reading.problems[0]).toMatch(/cannot be resolved/);
+  });
+
+  it('accepts a claim the design could reach even at complete discordance', () => {
+    const reading = claimAgainstResolution(claim(25, 160, ['memory', 'reference']));
+    expect(reading.ok).toBe(true);
+    expect(reading.problems).toEqual([]);
+  });
+
+  it('treats equality as unresolvable, because the edge is not a detection', () => {
+    const reading = claimAgainstResolution(claim(22.15, 160, ['memory', 'reference']));
+    expect(reading.ok).toBe(false);
+  });
+
+  it('refuses a claimed effect with only one arm, because a treatment without its control is not a measurement', () => {
+    const reading = claimAgainstResolution(claim(25, 160, ['memory']));
+    expect(reading.ok).toBe(false);
+    expect(reading.problems.some((problem) => /control/.test(problem))).toBe(true);
+  });
+
+  it('says a header that names no arm names nothing, rather than naming an empty string', () => {
+    // `arms:` with no value parses to an empty list, and a message quoting `''` would read as a
+    // header that named a real arm and lost it.
+    const reading = claimAgainstResolution(claim(25, 160, []));
+    expect(reading.ok).toBe(false);
+    expect(reading.problems[0]).toMatch(/name only nothing/);
+  });
+
+  it('counts the arms before it filters the baselines, so `full` and `none` are two arms', () => {
+    const reading = claimAgainstResolution(claim(25, 160, ['none', 'full']));
+    expect(reading.ok).toBe(true);
+  });
+
+  it('refuses an effect of zero or less, which is not a claim about a difference', () => {
+    for (const value of [0, -3]) {
+      const reading = claimAgainstResolution(claim(value, 160, ['memory', 'reference']));
+      expect(reading.ok).toBe(false);
+      expect(reading.problems.some((problem) => /positive/.test(problem))).toBe(true);
+    }
+  });
+
+  it('reports both problems at once rather than the first one it finds', () => {
+    // A registration can be wrong twice, and a reader who fixes the arm list and is then told about
+    // the sample has been sent round the loop twice for one edit.
+    const reading = claimAgainstResolution(claim(5, 160, ['memory']));
+    expect(reading.problems).toHaveLength(2);
+  });
+
+  it('counts tasks rather than episodes, because a pairing is one per task', () => {
+    // The τ² lane's whole retail split is 115 tasks and 460 episodes. Reading `sample` would report
+    // a 13.06pp floor for a design whose floor is 26.13pp — the arithmetic is right and the
+    // denominator is four times too generous, which is the direction a gate must never err in.
+    const episodes = claimAgainstResolution(claim(10, 460, ['memory', 'reference']));
+    expect(episodes.floorPp).toBeCloseTo(13.06, 2);
+    const tasks = claimAgainstResolution({
+      effectClaimPp: 10,
+      sample: 460,
+      testTasks: 115,
+      arms: ['memory', 'reference'],
+    });
+    expect(tasks.floorPp).toBeCloseTo(26.13, 2);
+    expect(tasks.ok).toBe(false);
+  });
+
+  it('takes the header at its own word when it states no task count, as every BIRD header does', () => {
+    // A BIRD question is a task; there is no second unit to divide by and no field to read.
+    expect(claimAgainstResolution(claim(20, 350, ['none', 'full'])).floorPp).toBeCloseTo(14.98, 2);
+  });
+});
+
+describe('effectClaimPp in a registration header', () => {
+  const build = (extra: string): string =>
+    [
+      '---',
+      'id: R119-the-regime-paired',
+      'step: R119',
+      'opened: 2026-11-15',
+      extra,
+      'gates: V0',
+      '---',
+      '',
+      PREDICTION,
+      REFUTATION,
+    ].join('\n');
+
+  it('reads a claim and a sample that could resolve it', () => {
+    const reading = readPrereg(build('arms: memory, reference\nsample: 160\neffectClaimPp: 25'), 'R119-the-regime-paired.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.effectClaimPp).toBe(25);
+  });
+
+  it('refuses a claim the sample could not have resolved, naming the floor', () => {
+    const reading = readPrereg(build('arms: memory, reference\nsample: 160\neffectClaimPp: 5'), 'R119-the-regime-paired.md');
+    expect(reading.problems).toHaveLength(1);
+    expect(reading.problems[0]?.where).toBe("header 'effectClaimPp'");
+    expect(reading.problems[0]?.problem).toMatch(/22\.15pp/);
+  });
+
+  it('refuses a claim with one arm, which is R104 published without a pair', () => {
+    const reading = readPrereg(build('arms: memory\nsample: 160\neffectClaimPp: 25'), 'R119-the-regime-paired.md');
+    expect(reading.problems).toHaveLength(1);
+    expect(reading.problems[0]?.problem).toMatch(/control/);
+  });
+
+  it('reports a header wrong in both ways at once', () => {
+    const reading = readPrereg(build('arms: memory\nsample: 160\neffectClaimPp: 5'), 'R119-the-regime-paired.md');
+    expect(reading.problems).toHaveLength(2);
+  });
+
+  it('leaves a header without a claim alone, which is every census arm', () => {
+    const reading = readPrereg(build('arms: memory\nsample: 160'), 'R119-the-regime-paired.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.effectClaimPp).toBeUndefined();
+  });
+
+  it('refuses a value that is not a number before it tries to compare one', () => {
+    const reading = readPrereg(build('arms: memory, reference\nsample: 160\neffectClaimPp: twenty'), 'R119-the-regime-paired.md');
+    expect(reading.problems).toHaveLength(1);
+    expect(reading.problems[0]?.problem).toMatch(/not a number/);
   });
 });

@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { HALF_WIDTH_Z, pairedWidths, powerOf, readPower, type PairedCase, type PowerRow } from '../power.js';
+import {
+  HALF_WIDTH_Z,
+  pairedWidths,
+  pairRowOf,
+  powerFromComparison,
+  powerFromCounts,
+  powerOf,
+  readPower,
+  type PairedCase,
+  type PowerRow,
+} from '../power.js';
 
 const cases = (helped: number, harmed: number, concordant: number): PairedCase[] => [
   ...Array.from({ length: helped }, () => ({ correct: true, withoutMemoryCorrect: false })),
@@ -128,5 +138,152 @@ describe('readPower', () => {
   it('breaks a tie at the first row, so a recomputation of the same record agrees', () => {
     const rows = [row('a.json', 10, 27, 313), row('b.json', 10, 27, 313)];
     expect(readPower(rows).largest?.artefact).toBe('a.json');
+  });
+});
+
+describe('powerFromCounts', () => {
+  it('reaches the same row as the per-case route, from the counts a pair artefact carries', () => {
+    // The τ² lane's pair artefact stores `lost`/`gained`/`paired` rather than per-question outcomes,
+    // because the τ² agent owns the questions and reports totals. Two routes to one row are only
+    // safe if they agree, so this is the assertion that keeps them agreeing.
+    const fromCases = powerOf('a.json', cases(10, 27, 313));
+    const fromCounts = powerFromCounts('a.json', { helped: 10, harmed: 27, n: 350 });
+    expect(fromCounts).toEqual(fromCases);
+  });
+
+  it('refuses an empty sample rather than publishing a row of zeros', () => {
+    expect(() => powerFromCounts('empty.json', { helped: 0, harmed: 0, n: 0 })).toThrow(/no pairs/);
+  });
+
+  it('refuses counts that cannot come from one sample', () => {
+    // A pair artefact whose tallies exceed its own sample is not a row this audit may publish: the
+    // arithmetic would still produce a number, and the number would be about nothing.
+    expect(() => powerFromCounts('bad.json', { helped: 60, harmed: 50, n: 100 })).toThrow(/exceed/);
+    expect(() => powerFromCounts('bad.json', { helped: -1, harmed: 0, n: 10 })).toThrow(/negative/);
+  });
+
+  it('reads the τ² lane at the resolution it actually has', () => {
+    // The number this audit did not carry until now: thirteen lost, fourteen gained over sixty-eight
+    // paired tasks is a 21.4pp design, five times coarser than the loosest BIRD row.
+    const entry = powerFromCounts('poc-l4-pair.json', { helped: 14, harmed: 13, n: 68 });
+    expect(entry.deltaPp).toBeCloseTo(1.4706, 4);
+    expect(entry.minDetectablePp).toBeCloseTo(21.4112, 3);
+    expect(entry.resolvable).toBe(false);
+    expect(entry.significant95).toBe(false);
+  });
+});
+
+describe('readPower, the coarsest design', () => {
+  it('is null on an empty record', () => {
+    expect(readPower([]).coarsest).toBeNull();
+  });
+
+  it('names the design that could resolve the least, which is not the sharpest one', () => {
+    const rows = [
+      row('bird.json', 10, 27, 313),
+      powerFromCounts('tau2.json', { helped: 14, harmed: 13, n: 68 }),
+    ];
+    const summary = readPower(rows);
+    expect(summary.sharpest?.artefact).toBe('bird.json');
+    expect(summary.coarsest?.artefact).toBe('tau2.json');
+  });
+
+  it('is the same row as the sharpest when the record holds one', () => {
+    const summary = readPower([row('only.json', 10, 27, 313)]);
+    expect(summary.coarsest?.artefact).toBe('only.json');
+    expect(summary.sharpest?.artefact).toBe('only.json');
+  });
+
+  it('breaks a tie at the first row, so a recomputation of the same record agrees', () => {
+    const rows = [row('a.json', 10, 27, 313), row('b.json', 10, 27, 313)];
+    expect(readPower(rows).coarsest?.artefact).toBe('a.json');
+  });
+});
+
+describe('powerFromComparison', () => {
+  const block = (over: Record<string, unknown> = {}): Record<string, unknown> => ({
+    paired: 68,
+    lost: 13,
+    gained: 14,
+    deltaPp: 1.4705882352941175,
+    ...over,
+  });
+
+  it('reads a file that agrees with its own delta', () => {
+    const entry = powerFromComparison('poc-l4-pair.json', block());
+    expect(entry.n).toBe(68);
+    expect(entry.helped).toBe(14);
+    expect(entry.harmed).toBe(13);
+    expect(entry.minDetectablePp).toBeCloseTo(21.4112, 3);
+  });
+
+  it('refuses a file whose two sides are the wrong way round', () => {
+    // The sign of a paired delta is the whole claim. A file that wrote `gained`/`lost` swapped would
+    // still produce a row, and every downstream reader would quote the opposite direction.
+    expect(() => powerFromComparison('swapped.json', block({ gained: 13, lost: 14 }))).toThrow(
+      /the wrong way round/,
+    );
+  });
+
+  it('accepts a file that states no delta of its own, because the counts are the evidence', () => {
+    const entry = powerFromComparison('counts-only.json', block({ deltaPp: undefined }));
+    expect(entry.deltaPp).toBeCloseTo(1.4706, 4);
+  });
+
+  it('refuses a comparison block missing one of the three counts', () => {
+    // Not skipped: a file that looks paired and is not must not silently leave the audit.
+    for (const missing of ['paired', 'lost', 'gained'] as const) {
+      expect(() => powerFromComparison('partial.json', block({ [missing]: undefined }))).toThrow(
+        new RegExp(missing),
+      );
+    }
+  });
+
+  it('tolerates a delta rounded to the precision an artefact usually carries', () => {
+    // A file that wrote `1.47` is counting the same pairs, and refusing it would make the audit
+    // fail on formatting rather than on arithmetic.
+    expect(powerFromComparison('rounded.json', block({ deltaPp: 1.47 })).n).toBe(68);
+  });
+});
+
+describe('pairRowOf, the selector a directory scan needs', () => {
+  const casesOf = (helped: number, harmed: number, concordant: number): PairedCase[] =>
+    cases(helped, harmed, concordant);
+
+  it('reads per-question outcomes when the artefact carries them', () => {
+    const entry = pairRowOf('bird.json', { per_case: casesOf(8, 24, 318) });
+    expect(entry?.n).toBe(350);
+    expect(entry?.resolvable).toBe(true);
+  });
+
+  it('falls back to the comparison block when it does not', () => {
+    const entry = pairRowOf('tau2.json', { comparison: { paired: 68, lost: 13, gained: 14 } });
+    expect(entry?.n).toBe(68);
+    expect(entry?.minDetectablePp).toBeCloseTo(21.4112, 3);
+  });
+
+  it('prefers the per-question route when both are present, because it is the raw data', () => {
+    // A file carrying both is a file that measured the questions and summarised them, and the
+    // summary must not become the evidence.
+    const entry = pairRowOf('both.json', {
+      per_case: casesOf(8, 24, 318),
+      comparison: { paired: 68, lost: 13, gained: 14 },
+    });
+    expect(entry?.n).toBe(350);
+  });
+
+  it('leaves a file with neither shape out of the audit instead of refusing the whole run', () => {
+    // A directory of artefacts holds many things; only a paired run has a delta to audit, and a
+    // scan that threw on the first unpaired file would audit nothing at all.
+    expect(pairRowOf('single-arm.json', {})).toBeNull();
+    expect(pairRowOf('empty.json', { per_case: [] })).toBeNull();
+  });
+
+  it('leaves out a per_case list whose rows are not paired, because a name is not evidence', () => {
+    expect(pairRowOf('unpaired.json', { per_case: [{ correct: true } as PairedCase] })).toBeNull();
+  });
+
+  it('refuses a comparison block that is missing a count, rather than skipping it', () => {
+    expect(() => pairRowOf('partial.json', { comparison: { paired: 68, lost: 13 } })).toThrow(/gained/);
   });
 });

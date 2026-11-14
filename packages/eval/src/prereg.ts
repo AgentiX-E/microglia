@@ -18,6 +18,7 @@
 import { TRACE_CLAIM_RANGE } from './trace-claims.js';
 import type { RunGate } from './artifact-schema.js';
 import { splitProvider } from './model-id.js';
+import { detectableDelta } from './detectable.js';
 
 export type Prereg = {
   readonly id: string;
@@ -213,6 +214,16 @@ export type Prereg = {
    */
   readonly learnOnly?: boolean;
   /**
+   * The effect this registration claims, in percentage points, when it claims one.
+   *
+   * Absent on most headers, and its absence is a statement: R118 asks for a census and buys one arm,
+   * which is right. Present, it commits the registration to two things a claim needs and an
+   * experiment does not: a control arm to differ from, and a sample that could have resolved the
+   * difference if it were there. R104 bought one arm and published a `pass^4`, and nothing in the
+   * header had to say which of those two it was.
+   */
+  readonly effectClaimPp?: number;
+  /**
    * The most claims one trace may teach, when this registration is a trace arm.
    *
    * R58's prose says "up to three claims per trace" and its header said nothing, so the dispatch read
@@ -399,6 +410,7 @@ const HEADER_KEYS = [
   'distillUnit',
   'distillScope',
   'learnOnly',
+  'effectClaimPp',
   'traceClaims',
   'trainTasks',
   'testTasks',
@@ -895,6 +907,23 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // The effect this registration claims, when it claims one. A number rather than a boolean, because
+  // the question it has to answer is not "does this arm claim an effect" but "could this sample have
+  // seen the effect it claims" — and only the size of the claim can be compared with the floor.
+  const claimText = values.get('effectClaimPp');
+  let effectClaimPp: number | undefined;
+  if (claimText !== undefined) {
+    const parsed = Number(claimText);
+    if (!Number.isFinite(parsed)) {
+      collected.push({
+        where: `header 'effectClaimPp'`,
+        problem: `'${claimText}' is not a number of percentage points`,
+      });
+    } else {
+      effectClaimPp = parsed;
+    }
+  }
+
   // Which ceiling a trace arm runs at. R60 made the ceiling a switch and left it in a variable; R58's
   // text assumes three and the variable held six.
   const claimsText = values.get('traceClaims');
@@ -1171,6 +1200,16 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // A claimed effect is a relation between three header fields, so no single field's parser can
+  // check it: the claim, the sample that would have to resolve it, and the arms that could differ.
+  // Run here, after every field is parsed and before anything is returned, it can report a header
+  // that is wrong in both ways at once rather than one round trip at a time.
+  if (effectClaimPp !== undefined) {
+    for (const problem of claimAgainstResolution({ effectClaimPp, sample, arms }).problems) {
+      collected.push({ where: `header 'effectClaimPp'`, problem });
+    }
+  }
+
   const prediction = sectionBullets(body, 'Prediction') ?? [];
   const refutation = sectionBullets(body, 'Refutation') ?? [];
   if (collected.length > 0) return { prereg: undefined, problems: collected };
@@ -1199,6 +1238,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(distillUnit === undefined ? {} : { distillUnit }),
       ...(distillScope === undefined ? {} : { distillScope }),
       ...(learnOnly === undefined ? {} : { learnOnly }),
+      ...(effectClaimPp === undefined ? {} : { effectClaimPp }),
       ...(traceClaims === undefined ? {} : { traceClaims }),
       ...(trainTasks === undefined ? {} : { trainTasks }),
       ...(testTasks === undefined ? {} : { testTasks }),
@@ -1388,6 +1428,80 @@ export function armsAgainstRegistration(
   // A registration with no header is a hand run: there is no claim to disagree with.
   const ok = prereg === undefined || (unbought.length === 0 && undeclared.length === 0);
   return { ok, declared, requested: bought, unbought, undeclared };
+}
+
+/** A registration's claimed effect beside the smallest effect its own sample could resolve. */
+export type ClaimResolution = {
+  readonly ok: boolean;
+  /** The claimed effect in percentage points, or `null` when the header claims none. */
+  readonly claimPp: number | null;
+  /**
+   * The minimum detectable difference at **complete discordance**, in percentage points.
+   *
+   * Complete discordance is the floor of the floor: it assumes every pair changed hands, which no
+   * run does, so this is the smallest effect the design could resolve under the most favourable
+   * outcome it could possibly have. A claim below it is unresolvable before the run starts rather
+   * than merely unlikely after it, and that is the only kind of resolution statement that can be
+   * made about a registration — the discordance is not known until the run is paid for.
+   */
+  readonly floorPp: number | null;
+  readonly problems: readonly string[];
+};
+
+/**
+ * Whether a registration could resolve the effect it claims.
+ *
+ * Two things follow from claiming an effect rather than asking for a census, and the header had no
+ * way to say either before this. First, a claim needs a control: R104 bought `memory` alone and
+ * published a `pass^4` against a published bar, which is a comparison between a run and a number
+ * from another paper rather than between two arms of one dispatch. Second, a claim needs a sample
+ * that could have seen it: the τ² lane's whole retail split at k=4 is 460 episodes, and even there
+ * the floor is 13.06pp, so a 5pp claim on this lane is not a measurement of anything.
+ *
+ * Both checks report together. A reader who fixes the arm list and is then told about the sample has
+ * been sent round the same loop twice for one edit.
+ */
+export function claimAgainstResolution(
+  prereg: Pick<Prereg, 'effectClaimPp' | 'sample' | 'arms' | 'testTasks'> | undefined,
+): ClaimResolution {
+  if (prereg?.effectClaimPp === undefined) return { ok: true, claimPp: null, floorPp: null, problems: [] };
+  const claimPp = prereg.effectClaimPp;
+  // The unit matters and it is not `sample`. `sample` is episodes everywhere on this record, and a
+  // paired delta is measured over **tasks**: the τ² pair artefact reads `paired: 68` for a dispatch
+  // whose registration says `sample: 272`, because one task contributes four episodes and one
+  // pairing. A floor computed over 272 would be 16.99pp where the truth is 33.98pp — the same
+  // arithmetic, a denominator eighteen points too generous, and a gate that passes claims its own
+  // design cannot see. `testTasks` is the task count when a header states one; a BIRD header has no
+  // such field because a question and a task are the same thing there.
+  const resolvedOn = prereg.testTasks ?? prereg.sample;
+  const floorPp = detectableDelta(resolvedOn, 1) * 100;
+  const problems: string[] = [];
+  if (!(claimPp > 0)) {
+    problems.push(
+      `a claimed effect of ${String(claimPp)}pp is not a claim about a difference; a registration ` +
+        `that claims none should omit 'effectClaimPp' rather than write a positive that is not one`,
+    );
+  } else if (claimPp <= floorPp) {
+    problems.push(
+      `a claim of ${claimPp.toFixed(2)}pp on ${String(resolvedOn)} paired tasks cannot be resolved: ` +
+        `this design's floor is ${floorPp.toFixed(2)}pp even if every pair disagrees, so the run ` +
+        `could not see the effect it was bought to measure`,
+    );
+  }
+  // The arms are counted before the baselines are filtered: `none` and `full` are a control and a
+  // treatment, and `essentialArms` removes both, which would leave a two-arm BIRD header reading as
+  // a single arm and a one-arm L4 header reading as none.
+  const distinct = [...new Set(prereg.arms)].sort();
+  if (distinct.length < 2) {
+    // The whole list is named rather than its first element: `distinct[0] ?? ''` would have been a
+    // fallback no branch can reach, and a join needs none.
+    const named = distinct.length === 0 ? 'nothing' : distinct.map((arm) => `'${arm}'`).join(', ');
+    problems.push(
+      `a registration that claims an effect must buy a control: its arms name only ${named}, ` +
+        `so no delta of its own exists`,
+    );
+  }
+  return { ok: problems.length === 0, claimPp, floorPp, problems };
 }
 
 /**

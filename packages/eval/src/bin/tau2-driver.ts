@@ -1561,6 +1561,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   };
   const distillDiagnostics = (): Readonly<Record<string, unknown>> => ({
     funnel,
+    // R118 wrote a store and did not carry it. The artefact from that dispatch held a complete
+    // census — 73 of 73 answered, 143 candidates, 86 stored — and not one word of what the 86 said,
+    // because `storeItems` was written only on the path that goes on to evaluate. The next question
+    // after "how many" is always "which ones", and answering it then cost another dispatch.
+    //
+    // The sample carries its own `omitted` count rather than pretending to be the store, and the
+    // census beside it is whole: a reader can see the six kinds, the status split and the reasons
+    // without a second run, and a store larger than the sample says so.
+    store: census,
+    storeItems: storeItemSample(knowledge),
+    yield: yieldCensus(claimsPerCorrection(captured, knowledge)),
     distill: {
       scope: DISTILL_SCOPE,
       unit: DISTILL_UNIT,

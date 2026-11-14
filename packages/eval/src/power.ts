@@ -16,7 +16,7 @@
  * Nothing here re-runs anything. Every row is arithmetic over a committed artefact, which is the
  * only reason the audit is cheap enough to be part of the build rather than a paper.
  */
-import { detectableDelta } from './protocol.js';
+import { detectableDelta } from './detectable.js';
 
 /** `z` for a two-sided 95% interval. */
 export const HALF_WIDTH_Z = 1.96;
@@ -56,6 +56,150 @@ export function pairedWidths(helped: number, harmed: number, n: number): PairedW
   };
 }
 
+/** The counts a pair artefact carries when it does not carry per-question outcomes. */
+export type PairedCounts = {
+  /** Pairs the treatment got right and the control got wrong. */
+  readonly helped: number;
+  /** Pairs the control got right and the treatment got wrong. */
+  readonly harmed: number;
+  /** Pairs in the comparison, concordant ones included. */
+  readonly n: number;
+};
+
+/**
+ * One row, from a pair artefact's aggregate counts.
+ *
+ * Two lanes report differently and both are honest: BIRD writes per-question outcomes, because it
+ * owns the questions, while the τ² agent reports `lost`/`gained` over the tasks it ran. The audit
+ * read only the first shape, so the τ² lane — the one that carries this project's SOTA statement —
+ * was the one lane whose delta was never put beside its own resolution. That is a gap of exactly
+ * the kind the audit exists to find, and it was in the audit.
+ *
+ * The three refusals are the arithmetic's own preconditions rather than style: a sample of no pairs
+ * has no delta, and counts that are negative or exceed their sample describe a pair that cannot
+ * exist. Each would still produce a number, which is why each is refused.
+ */
+export function powerFromCounts(artefact: string, counts: PairedCounts): PowerRow {
+  const { helped, harmed, n } = counts;
+  if (n <= 0) {
+    throw new Error(`${artefact} has no pairs, so it has no delta to audit`);
+  }
+  if (helped < 0 || harmed < 0) {
+    throw new Error(`${artefact} reports negative counts (${String(helped)}, ${String(harmed)}), which no sample can hold`);
+  }
+  if (helped + harmed > n) {
+    throw new Error(
+      `${artefact} reports ${String(helped + harmed)} discordant pairs of ${String(n)}, which exceed its own sample`,
+    );
+  }
+  const widths = pairedWidths(helped, harmed, n);
+  if (widths === null) {
+    throw new Error(`${artefact} has no pairs, so it has no delta to audit`);
+  }
+  return {
+    artefact,
+    n,
+    helped,
+    harmed,
+    deltaPp: widths.deltaPp,
+    halfWidthPp: widths.halfWidthPp,
+    minDetectablePp: widths.minDetectablePp,
+    resolvable: Math.abs(widths.deltaPp) > widths.minDetectablePp,
+    significant95: Math.abs(widths.deltaPp) > widths.halfWidthPp,
+  };
+}
+
+/**
+ * The `comparison` block a lane writes when it does not own the questions.
+ *
+ * Every field is optional in the type because this arrives as parsed JSON: a file may carry the
+ * block without any of it, and the reader has to be able to see that rather than assume a shape.
+ */
+export type ComparisonBlock = {
+  readonly paired?: number;
+  readonly lost?: number;
+  readonly gained?: number;
+  readonly deltaPp?: number;
+};
+
+/**
+ * How far a file's own delta may sit from the one its counts produce, in percentage points.
+ *
+ * A digest of rounding, not of disagreement: an artefact that wrote `1.47` is counting the same
+ * pairs as one that wrote `1.4705882352941175`, and failing on formatting would be a check that
+ * reports a defect it does not describe.
+ */
+const DELTA_AGREEMENT_PP = 0.01;
+
+/**
+ * One row, from an artefact's `comparison` block.
+ *
+ * The direction check is the reason this is a function and not three lines in the command that
+ * calls it. `gained` means the treatment won; a file that recorded the two sides the other way
+ * round still yields a row, with the opposite sign, and nothing downstream would notice — the audit
+ * would publish a sign nobody verified. Written here it is covered by tests; written in the command
+ * it is a check that runs once per dispatch and is never exercised on the failure it exists for.
+ *
+ * A file that states no delta of its own is read from its counts, which is the evidence itself. A
+ * file that states one and disagrees is refused, because at that point the counts and the claim are
+ * two different measurements and this audit has to know which it is quoting.
+ */
+export function powerFromComparison(artefact: string, block: ComparisonBlock): PowerRow {
+  const { paired, lost, gained, deltaPp } = block;
+  for (const [name, value] of [
+    ['paired', paired],
+    ['lost', lost],
+    ['gained', gained],
+  ] as const) {
+    if (value === undefined) {
+      throw new Error(
+        `${artefact} carries a 'comparison' block without '${name}', so this audit cannot tell which ` +
+          `sample its delta is over; a file that looks paired and is not must not be skipped`,
+      );
+    }
+  }
+  if (paired === undefined || lost === undefined || gained === undefined) {
+    // Unreachable after the loop above, kept so the compiler narrows the three to numbers. A cast
+    // would have hidden the same information from the reader.
+    throw new Error(`${artefact} carries no comparison`);
+  }
+  const row = powerFromCounts(artefact, { helped: gained, harmed: lost, n: paired });
+  if (deltaPp !== undefined && Math.abs(deltaPp - row.deltaPp) > DELTA_AGREEMENT_PP) {
+    throw new Error(
+      `${artefact} reports delta ${deltaPp.toFixed(2)}pp but gained − lost over paired gives ` +
+        `${row.deltaPp.toFixed(2)}pp; one of the two has its two sides the wrong way round`,
+    );
+  }
+  return row;
+}
+
+/** The two shapes a pair artefact may take, both optional because this arrives as parsed JSON. */
+export type PairArtefact = {
+  readonly per_case?: readonly (PairedCase & { readonly id?: string })[];
+  readonly comparison?: ComparisonBlock;
+};
+
+/**
+ * The row a scanned artefact contributes, or `null` when it contributes none.
+ *
+ * A directory of artefacts holds many things and only a paired run has a delta to audit, so the
+ * scan needs a selector that can say "not this file" without throwing — but it must also be able to
+ * say "this file claims to be paired and is not", which is a defect rather than a category. Those
+ * two are different answers and this function returns different things for them: `null` for a file
+ * that is not a pair, an error for a comparison block that is missing a count.
+ *
+ * `per_case` wins when both shapes are present. A file carrying both measured the questions and
+ * summarised them, and the summary must not become the evidence.
+ */
+export function pairRowOf(artefact: string, parsed: PairArtefact): PowerRow | null {
+  const cases = parsed.per_case;
+  if (cases !== undefined && cases.length > 0 && 'withoutMemoryCorrect' in (cases[0] as object)) {
+    return powerOf(artefact, cases);
+  }
+  if (parsed.comparison !== undefined) return powerFromComparison(artefact, parsed.comparison);
+  return null;
+}
+
 /** One published artefact's paired delta beside the difference its sample could have resolved. */
 export type PowerRow = {
   readonly artefact: string;
@@ -92,6 +236,15 @@ export type PowerSummary = {
   readonly largest: PowerRow | null;
   /** The artefact whose design could resolve the most, or `null` for an empty record. */
   readonly sharpest: PowerRow | null;
+  /**
+   * The artefact whose design could resolve the least, or `null` for an empty record.
+   *
+   * `sharpest` is the instrument the record is proudest of; this is the one it leans on hardest,
+   * and until the τ² pair artefact reached this audit they were never the same lane. A summary
+   * that reports only the best design is a summary that hides which design a published claim
+   * rested on — and the coarsest row here is the one that decides this project's SOTA statement.
+   */
+  readonly coarsest: PowerRow | null;
 };
 
 export type PairedCase = {
@@ -130,17 +283,20 @@ export function powerOf(artefact: string, cases: readonly PairedCase[]): PowerRo
 /**
  * Summarise the record.
  *
- * `largest` and `sharpest` are separate fields because they answer different questions: the first
- * is the biggest claim anyone made, the second is the best instrument anyone pointed at the
- * question. A record where those are different rows is a record whose best measurement was not the
- * one it was most confident about.
+ * `largest`, `sharpest` and `coarsest` are separate fields because they answer different questions:
+ * the first is the biggest claim anyone made, the second the best instrument anyone pointed at the
+ * question, the third the instrument a published claim most likely rested on. A record where the
+ * first and the second are different rows is a record whose best measurement was not the one it was
+ * most confident about; a record where the third is not the second has a claim standing on its
+ * weakest design, and no summary that omits it can say so.
  */
 export function readPower(rows: readonly PowerRow[]): PowerSummary {
   if (rows.length === 0) {
-    return { rows, resolvable: 0, significant95: 0, total: 0, largest: null, sharpest: null };
+    return { rows, resolvable: 0, significant95: 0, total: 0, largest: null, sharpest: null, coarsest: null };
   }
   const largest = rows.reduce((left, right) => (Math.abs(right.deltaPp) > Math.abs(left.deltaPp) ? right : left));
   const sharpest = rows.reduce((left, right) => (right.minDetectablePp < left.minDetectablePp ? right : left));
+  const coarsest = rows.reduce((left, right) => (right.minDetectablePp > left.minDetectablePp ? right : left));
   return {
     rows,
     resolvable: rows.filter((row) => row.resolvable).length,
@@ -148,5 +304,6 @@ export function readPower(rows: readonly PowerRow[]): PowerSummary {
     total: rows.length,
     largest,
     sharpest,
+    coarsest,
   };
 }
