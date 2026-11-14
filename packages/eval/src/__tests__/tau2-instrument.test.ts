@@ -22,7 +22,7 @@ function raw(over: Partial<Tau2Raw> = {}): Tau2Raw {
       distilled: 2,
       distillFailed: 0,
     },
-    calls: { total: 40, failed: 0, scope: 'run' },
+    turns: { total: 40, failed: 0, scope: 'run' },
     domains: { stored: 2, withoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
     scenario: { learn: 'retail', test: 'retail', recall: 'retail' },
     ...over,
@@ -169,7 +169,7 @@ describe('armRecordFromDriver', () => {
     expect(record.trials).toBe(4);
     expect(record.unscored).toBe(0);
     expect(record.meanPackIds).toBeCloseTo(1.5, 12);
-    expect(record.calls).toEqual({ calls: 40, failures: 0, scope: 'run' });
+    expect(record.turns).toEqual({ total: 40, failures: 0, scope: 'run' });
     expect(record.learning).toEqual({
       rows: 2,
       unanswered: 0,
@@ -385,9 +385,9 @@ describe('armRecordFromDriver', () => {
 
   it('omits the reliability record when the run made no call', () => {
     // Zero calls is not perfect reliability, and a default of zero would say it was.
-    const record = armRecordFromDriver(raw({ calls: { total: 0, failed: 0 } }));
-    expect(record.calls).toBeUndefined();
-    expect(Object.hasOwn(record, 'calls')).toBe(false);
+    const record = armRecordFromDriver(raw({ turns: { total: 0, failed: 0 } }));
+    expect(record.turns).toBeUndefined();
+    expect(Object.hasOwn(record, 'turns')).toBe(false);
   });
 
   it('reports the learning record even when it says nothing was learned', () => {
@@ -488,10 +488,10 @@ describe('armRecordFromDriver', () => {
     // Supplying the second as if it were the first is the mistake; supplying nothing was the mistake
     // that let a run whose every distillation prompt was refused reach a reader as a quiet store.
     const record = armRecordFromDriver(
-      raw({ calls: { total: 32, failed: 32, scope: 'distillation' } }),
+      raw({ turns: { total: 32, failed: 32, scope: 'distillation' } }),
     );
-    expect(record.calls).toEqual({
-      calls: 32,
+    expect(record.turns).toEqual({
+      total: 32,
       failures: 32,
       scope: 'distillation',
     });
@@ -500,9 +500,9 @@ describe('armRecordFromDriver', () => {
   it('leaves the scope unnamed when the arm did not name one', () => {
     // Every artefact written before this field existed. Inventing a scope for them would be a claim
     // about which calls the tally covered, and nobody made it.
-    const record = armRecordFromDriver(raw({ calls: { total: 40, failed: 1 } }));
-    expect(record.calls).toEqual({ calls: 40, failures: 1 });
-    expect(record.calls === undefined ? true : Object.hasOwn(record.calls, 'scope')).toBe(false);
+    const record = armRecordFromDriver(raw({ turns: { total: 40, failed: 1 } }));
+    expect(record.turns).toEqual({ total: 40, failures: 1 });
+    expect(record.turns === undefined ? true : Object.hasOwn(record.turns, 'scope')).toBe(false);
   });
 
   it('splits the store into the two domain buckets the ledger compares', () => {
@@ -547,6 +547,17 @@ describe('the projection has a decision for every field, and keeps it', () => {
     raw({
       ...over,
       scenarioTasks: { learn: 115, test: 115 },
+      // The provider's own account, so `PROJECTION.usage` has something to carry: a table entry marked
+      // `carried` whose fixture never states the field is a decision nothing exercises.
+      usage: {
+        calls: 2_667,
+        prompt_tokens: 17_313_848,
+        cached_tokens: 13_226_076,
+        uncached_tokens: 4_087_772,
+        cache_hit_rate: 0.7639,
+        cache: { measured: true, prefix_tokens: 4_120, prefix_coverage: 0.96 },
+        cost: { usd: 0.8276, band: 'off_peak' },
+      },
       store: {
         stored: 14,
         active: 14,

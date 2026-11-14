@@ -50,6 +50,7 @@ import {
 import { writeJson } from './lib.js';
 import { pairedVerdict } from '../paired-verdict.js';
 import { pairGates, plantedBarNote } from '../pair-gates.js';
+import { cacheCensusVerdict } from '../cache-census.js';
 
 type TaskRow = { readonly id: string; readonly passed_all: boolean };
 
@@ -57,8 +58,18 @@ type Artefact = {
   readonly n?: number;
   readonly metrics?: { readonly pass4?: number; readonly k?: number; readonly tasks?: number };
   readonly tau2?: {
+    /**
+     * Which arm wrote the file — `memory`, `reference`, or a declared-empty one under either name.
+     *
+     * Read rather than inferred from the filename, because the pair's readbacks are printed per arm and
+     * a directory called `memory` that carries no pack is the scaffold arm this lane has now measured.
+     */
+    readonly arm?: string;
     readonly meanPackIds?: number;
-    readonly calls?: { readonly calls: number; readonly failures: number };
+    /** The agent's turns, and the failed episodes among them. Named for what it counts since R103. */
+    readonly turns?: { readonly total: number; readonly failures: number };
+    /** The provider's own account of the phase, census included; absent before R103. */
+    readonly usage?: Tau2ArmRecord['usage'];
     readonly learning?: {
       readonly rows: number;
       readonly unanswered: number;
@@ -413,7 +424,7 @@ await writeJson('poc-l4-pair', {
     'The pair is defined on the intersection of task ids; tasks scored by one arm only are counted, not dropped silently.',
     'Published reference for scale: ALTK-Evolve pass^4 = 0.575 on tau2-retail.',
     'The protocol gates are the shared forty, not a τ² copy of them; `absent` names the arm each of the rest would need.',
-    'Call reliability is graded over the population the arm recorded: `calls.scope` is `distillation` when the episodes\u2019 tally came from a process that does not report one.',
+    'Call reliability is graded over the population the arm recorded: `turns.scope` is `distillation` when the episodes\u2019 tally came from a process that does not report one, and `turns` holds agent turns rather than model calls — the provider\u2019s own count is `usage.calls`.',
     '`transfer` pairs the two arms episode by episode, so a repair is one episode the control failed and the treatment passed. The treatment is the whole pack: `repaired` says the pack fixed an episode, not which item in it did.',
   ],
 });
@@ -430,6 +441,18 @@ if (transfer !== undefined) {
       `${transfer.gate.measured} measured (${transfer.gate.informative} informative), ` +
       `net ${transfer.gate.netPp.toFixed(2)}pp, verdict \`${transfer.gate.verdict}\`\n`,
   );
+}
+// The bill's mechanism, per arm, read off each artefact's own census.
+//
+// A pair that reports a delta and a cost but not this has reported that the memory arm paid twice as
+// much without saying what it bought, which is the state PROGRESS 179 left the lane in for two rounds
+// and the reason R102.1 was nearly dispatched against a placement theory the probe then refused.
+for (const [name, record] of [
+  ['first', first],
+  ['second', second],
+] as const) {
+  const census = cacheCensusVerdict(record.tau2?.usage?.cache);
+  process.stdout.write(`[l4-pair] cache ${name} (${record.tau2?.arm ?? 'unstated'}): ${census.state} — ${census.sentence}\n`);
 }
 process.stdout.write(
   `[l4-pair] protocol: ${audit.evaluable.length} gate(s) fired, ${audit.vacuous.length} vacuous, ` +

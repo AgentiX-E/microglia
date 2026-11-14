@@ -327,7 +327,7 @@ describe('the projection supplies what the record holds and nothing else', () =>
     const { input, supplied } = tau2ProtocolInput({
       domain: 'retail',
       trialCount: 4,
-      memory: { arm: 'memory', tasks: 68, trials: 4, unscored: 0, calls: { calls: 0, failures: 0 } },
+      memory: { arm: 'memory', tasks: 68, trials: 4, unscored: 0, turns: { total: 0, failures: 0 } },
     });
     expect(input.callFailureRate).toBeUndefined();
     expect(supplied).not.toContain('callFailureRate');
@@ -337,7 +337,7 @@ describe('the projection supplies what the record holds and nothing else', () =>
     const { input, supplied } = tau2ProtocolInput({
       domain: 'retail',
       trialCount: 4,
-      memory: { arm: 'memory', tasks: 68, trials: 4, unscored: 0, calls: { calls: 200, failures: 3 } },
+      memory: { arm: 'memory', tasks: 68, trials: 4, unscored: 0, turns: { total: 200, failures: 3 } },
     });
     expect(supplied).toContain('callFailureRate');
     expect(input.callFailureRate).toBeCloseTo(0.015, 6);
@@ -584,7 +584,7 @@ describe('the audit accounts for every gate in the protocol', () => {
         trials: 4,
         unscored: 0,
         meanPackIds: 2.5,
-        calls: { calls: 200, failures: 1 },
+        turns: { total: 200, failures: 1 },
         learning: { rows: 60, unanswered: 0, edited: 60, distillFailed: 0 },
         domainOrigin: { storedWithDomain: 60, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
         split: { train: ['1', '2'], test: ['7', '9'] },
@@ -629,7 +629,7 @@ describe('the audit accounts for every gate in the protocol', () => {
         trials: 4,
         unscored: 0,
         meanPackIds: 0,
-        calls: { calls: 32, failures: 32, scope: 'distillation' },
+        turns: { total: 32, failures: 32, scope: 'distillation' },
         learning: { rows: 32, unanswered: 0, edited: 32, distilled: 0, distillFailed: 32 },
         domainOrigin: { storedWithDomain: 0, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
       },
@@ -640,6 +640,8 @@ describe('the audit accounts for every gate in the protocol', () => {
     expect(byId.get('V32-fold-learning-intact')?.pass).toBe(false);
     expect(byId.get('V44-domain-accounted')?.pass).toBe(false);
     expect(byId.get('V8-call-reliability')?.pass).toBe(false);
+    // A distillation tally counts calls, because the distillation client makes them: only the
+    // episode population is a turn count. The label follows the scope rather than the field name.
     expect(byId.get('V8-call-reliability')?.actual).toContain('32/32 calls');
     expect(audit.absent.map((entry) => entry.id)).not.toContain('V32-fold-learning-intact');
     expect(audit.absent.map((entry) => entry.id)).not.toContain('V8-call-reliability');
@@ -656,7 +658,7 @@ describe('the audit accounts for every gate in the protocol', () => {
         trials: 4,
         unscored: 0,
         meanPackIds: 2.1,
-        calls: { calls: 32, failures: 0, scope: 'distillation' },
+        turns: { total: 32, failures: 0, scope: 'distillation' },
         learning: { rows: 32, unanswered: 0, edited: 32, distilled: 30, distillFailed: 0 },
         domainOrigin: { storedWithDomain: 30, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
       },
@@ -682,7 +684,7 @@ describe('the audit accounts for every gate in the protocol', () => {
         trials: 4,
         unscored: 0,
         meanPackIds: 0,
-        calls: { calls: 7, failures: 0, scope: 'distillation' },
+        turns: { total: 7, failures: 0, scope: 'distillation' },
         learning: { rows: 32, unanswered: 25, edited: 7, distilled: 14, distillFailed: 0 },
         domainOrigin: { storedWithDomain: 14, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
         store: {
@@ -835,7 +837,7 @@ describe('reading an arm artefact', () => {
   it('carries the optional block forward only when it is there', () => {
     const bare = tau2ArmRecordOf('memory', { n: 1, metrics: {} });
     expect(bare.meanPackIds).toBeUndefined();
-    expect(bare.calls).toBeUndefined();
+    expect(bare.turns).toBeUndefined();
     expect(bare.learning).toBeUndefined();
     expect(bare.domainOrigin).toBeUndefined();
     expect(bare.split).toBeUndefined();
@@ -849,7 +851,7 @@ describe('reading an arm artefact', () => {
       metrics: {},
       tau2: {
         meanPackIds: 3,
-        calls: { calls: 10, failures: 1 },
+        turns: { total: 10, failures: 1 },
         learning: { rows: 1, unanswered: 0, edited: 1, distillFailed: 0 },
         domainOrigin: { storedWithDomain: 1, storedWithoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
         split: { train: ['a'], test: ['b'] },
@@ -859,7 +861,7 @@ describe('reading an arm artefact', () => {
       },
     });
     expect(rich.meanPackIds).toBe(3);
-    expect(rich.calls).toEqual({ calls: 10, failures: 1 });
+    expect(rich.turns).toEqual({ total: 10, failures: 1 });
     expect(rich.split).toEqual({ train: ['a'], test: ['b'] });
     // A cross-domain arm's provenance survives the file: without it a reader of one arm cannot tell
     // which scenario the store learned in, and the transfer measurement's treatment is unnamed.

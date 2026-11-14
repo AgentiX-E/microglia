@@ -53,7 +53,12 @@ import {
 import { detectableDelta } from './protocol.js';
 import type { CoverageHistogram, ServedCensus, UseCensus } from './tau2-use-census.js';
 import type { InactionCensus } from './inaction.js';
-import type { DistillFormRecord, DistillUnitRecord, InjectionNoteRecord } from './tau2-instrument.js';
+import type {
+  DistillFormRecord,
+  DistillUnitRecord,
+  InjectionNoteRecord,
+  Tau2PhaseUsage,
+} from './tau2-instrument.js';
 import type { StoreItemSample } from './store-items.js';
 import type { QueryCensus } from './tau2-queries.js';
 
@@ -133,18 +138,29 @@ export type Tau2ArmRecord = {
   /** Mean items the recall facade put in front of the agent, when the driver counted them. */
   readonly meanPackIds?: number;
   /**
-   * The model calls this arm made, and how many failed.
+   * The agent's turns this arm ran, and how many episodes failed.
    *
    * `scope` names the population the tally covers. On τ² the episodes' calls happen in the agent
    * process and are visible only as a turn count, so the tally the driver can always produce is its
    * own distillation client's — a subset, stated as one, rather than a rate over everything with a
    * numerator nobody counted.
+   *
+   * This key was called `calls` and held turns, which is how §179 divided a bill by the wrong
+   * population. The provider's call count is `usage.calls`, and the two are different numbers about
+   * the same run: R93's memory arm was 1,803 turns and 2,667 calls.
    */
-  readonly calls?: {
-    readonly calls: number;
+  readonly turns?: {
+    readonly total: number;
     readonly failures: number;
     readonly scope?: 'run' | 'distillation';
   };
+  /**
+   * What the provider said the phase was sent and charged for, with the composition of what was sent.
+   *
+   * Absent on every arm written before the census; `usage.cache` is absent on every arm written
+   * before R103. Both are read as "not measured", never as zero.
+   */
+  readonly usage?: Tau2PhaseUsage;
   /**
    * The learning half's bookkeeping: corrections written, unanswered, edited, failed to distil.
    *
@@ -578,6 +594,7 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
     callFailureRate?: number;
     calls?: number;
     callFailures?: number;
+    callPopulation?: NonNullable<ProtocolGateInput['callPopulation']>;
     learning?: NonNullable<ProtocolGateInput['learning']>;
     domainOrigin?: NonNullable<ProtocolGateInput['domainOrigin']>;
     transfer?: TransferGateInput;
@@ -635,10 +652,12 @@ export function tau2ProtocolInput(evidence: Tau2Evidence): Tau2Projection {
   // artefacts written before this field existed carry `calls: 0` beside sixty-eight scored tasks,
   // which is impossible. Reading that as a rate would report the best possible score for the least
   // possible evidence, so the guard is on the count rather than on the ratio.
-  if (memory?.calls !== undefined && memory.calls.calls > 0) {
-    extra.callFailureRate = memory.calls.failures / memory.calls.calls;
-    extra.calls = memory.calls.calls;
-    extra.callFailures = memory.calls.failures;
+  if (memory?.turns !== undefined && memory.turns.total > 0) {
+    extra.callFailureRate = memory.turns.failures / memory.turns.total;
+    extra.calls = memory.turns.total;
+    extra.callFailures = memory.turns.failures;
+    // Named, because this lane's counter counts turns: the model calls happen in the agent process.
+    extra.callPopulation = memory.turns.scope === 'distillation' ? 'calls' : 'turns';
     supplied.push('callFailureRate');
   }
   if (memory?.learning !== undefined) {
@@ -746,8 +765,11 @@ export type Tau2ArmArtefact = {
   readonly n?: number;
   readonly metrics?: Readonly<Record<string, unknown>>;
   readonly tau2?: {
+    readonly arm?: string;
     readonly meanPackIds?: number;
-    readonly calls?: { readonly calls: number; readonly failures: number };
+    readonly turns?: { readonly total: number; readonly failures: number };
+    /** The provider's own account of the phase; absent on every artefact written before R103. */
+    readonly usage?: Tau2ArmRecord['usage'];
     readonly learning?: Tau2ArmRecord['learning'];
     readonly domainOrigin?: Tau2ArmRecord['domainOrigin'];
     readonly split?: { readonly train: readonly string[]; readonly test: readonly string[] };
@@ -791,7 +813,7 @@ export function tau2ArmRecordOf(arm: string, artefact: Tau2ArmArtefact): Tau2Arm
     trials: countOf(metrics['k'], 0),
     unscored: countOf(metrics['unscored_tasks'], 0),
     ...(artefact.tau2?.meanPackIds === undefined ? {} : { meanPackIds: artefact.tau2.meanPackIds }),
-    ...(artefact.tau2?.calls === undefined ? {} : { calls: artefact.tau2.calls }),
+    ...(artefact.tau2?.turns === undefined ? {} : { turns: artefact.tau2.turns }),
     ...(artefact.tau2?.learning === undefined ? {} : { learning: artefact.tau2.learning }),
     ...(artefact.tau2?.domainOrigin === undefined
       ? {}

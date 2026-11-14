@@ -522,6 +522,15 @@ export type ProtocolGateInput = {
   readonly calls?: number;
   readonly callFailures?: number;
   /**
+   * What `calls` counts, when the lane's counter does not count model calls.
+   *
+   * τ² can only see the agent's **turns**: the calls happen in another process. Reporting a turn
+   * count under the word "calls" is the defect that made §179 divide a bill by 1,803 and call it
+   * 2,667, so a lane whose population is something else names it. Absent means "calls", which is
+   * what every existing report says and what every lane that counts its own calls actually means.
+   */
+  readonly callPopulation?: 'calls' | 'turns';
+  /**
    * The learning half's bookkeeping.
    *
    * A fold's treatment is a store distilled from its corrections, so a correction that never
@@ -1050,10 +1059,11 @@ function protocolGateList(input: ProtocolGateInput & ScenarioGateInput): readonl
     blocking: true,
   });
   if (input.callFailureRate !== undefined) {
+    const population = input.callPopulation ?? 'calls';
     const tally =
       input.calls === undefined || input.callFailures === undefined
         ? ''
-        : ` (${input.callFailures}/${input.calls} calls)`;
+        : ` (${input.callFailures}/${input.calls} ${population})`;
     gates.push({
       id: 'V8-call-reliability',
       criterion: 'at most 2% of calls failed after retries, so the outcome is about knowledge',

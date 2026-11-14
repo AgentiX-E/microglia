@@ -221,6 +221,74 @@ def _selftest_assertion_guard() -> list[str]:
 _usage: Counter = Counter()
 
 
+# What each call's prompt was made of, summed rather than listed.
+#
+# The phase totals say the memory arm was billed 3.7× the control's uncached tokens on each of its
+# sixteen calls, and they cannot say whether those tokens were the pack, the conversation in front of
+# it, or the observation appended behind it — three mechanisms with three different repairs. The
+# messages of every call pass through this callback, so the composition is free to measure: the
+# provider's `prompt_cache_hit_tokens` is a count of what it held, and the prompt's own shape is a
+# count of what it was asked to hold. A census of the second beside the first is the difference
+# between a bill and an attribution.
+#
+# Sums, not a series: 2,700 calls an arm is a list nobody reads and a file that grows with the
+# workload. The first call is kept apart because it is the only one whose prefix was never offered
+# to the cache before.
+_cache: Counter = Counter()
+_first_call: "dict[str, int] | None" = None
+
+
+def _content_chars(message) -> int:
+    """The character count of one message, through both shapes the provider accepts."""
+    content = getattr(message, "content", None)
+    if content is None and isinstance(message, dict):
+        content = message.get("content")
+    if isinstance(content, str):
+        return len(content)
+    if isinstance(content, (list, tuple)):
+        # Multimodal content arrives as parts; a part that is not text contributes a boundary
+        # rather than a guess, so the census understates rather than invents.
+        total = 0
+        for part in content:
+            if isinstance(part, str):
+                total += len(part)
+            elif isinstance(part, dict) and isinstance(part.get("text"), str):
+                total += len(part["text"])
+        return total
+    return 0
+
+
+def _role_of(message) -> str:
+    role = getattr(message, "role", None)
+    if role is None and isinstance(message, dict):
+        role = message.get("role")
+    return role if isinstance(role, str) else ""
+
+
+def _census_of(messages) -> "dict[str, int] | None":
+    """One call's prompt shape, or `None` when the callback was given no messages."""
+    if not isinstance(messages, (list, tuple)) or not messages:
+        return None
+    sizes = [_content_chars(message) for message in messages]
+    system = sum(size for size, message in zip(sizes, messages) if _role_of(message) == "system")
+    return {
+        "messages": len(sizes),
+        "chars": sum(sizes),
+        # Everything before the final message is what the previous request ended with, so it is the
+        # part the provider should already hold. The final message is the turn's new material.
+        "prefix_chars": sum(sizes[:-1]),
+        # And the material before the last *two* messages is the part the provider provably saw in
+        # an earlier request: a tool loop appends the assistant's call and the tool's result
+        # together, and the cache is built from request prefixes, never from what the model wrote.
+        # Zero on a call too short to have one, which is why its own count travels beside it.
+        "seen_chars": sum(sizes[:-2]) if len(sizes) > 2 else 0,
+        "seen_calls": 1 if len(sizes) > 2 else 0,
+        "last_chars": sizes[-1],
+        "system_chars": system,
+        "conversation_chars": sum(sizes) - system,
+    }
+
+
 def _number(usage, name: str) -> int:
     value = getattr(usage, name, None)
     if value is None and isinstance(usage, dict):
@@ -239,17 +307,40 @@ _first_call_at: "datetime | None" = None
 
 
 def _record_usage(kwargs, response, start_time, end_time) -> None:
-    global _first_call_at
-    del kwargs, start_time, end_time
+    global _first_call_at, _first_call
+    del start_time, end_time
+    census = _census_of(kwargs.get("messages") if isinstance(kwargs, dict) else None)
     usage = getattr(response, "usage", None)
     if usage is None:
         return
     if _first_call_at is None:
         _first_call_at = datetime.now(timezone.utc)
+    if census is not None:
+        _cache["calls"] += 1
+        for name, value in census.items():
+            _cache[name] += value
+        if _first_call is None:
+            # The first call of the phase is the only one the provider had never seen, so its
+            # prompt is the one measurement of this corpus's characters per token that is not
+            # contaminated by a cache hit.
+            _first_call = {
+                **census,
+                "prompt_tokens": _number(usage, "prompt_tokens"),
+                "cached_tokens": _number(usage, "prompt_cache_hit_tokens"),
+            }
     _usage["calls"] += 1
     _usage["prompt_tokens"] += _number(usage, "prompt_tokens")
     _usage["completion_tokens"] += _number(usage, "completion_tokens")
     _usage["cached_tokens"] += _number(usage, "prompt_cache_hit_tokens")
+
+
+def reset_usage() -> None:
+    """Clear the counters, so a self-check's second case is not billed for its first."""
+    global _first_call_at, _first_call
+    _usage.clear()
+    _cache.clear()
+    _first_call_at = None
+    _first_call = None
 
 
 # litellm's callbacks are process-global and this module is imported once per process, but
@@ -257,6 +348,58 @@ def _record_usage(kwargs, response, start_time, end_time) -> None:
 # different names. Guarding on identity keeps the count from doubling.
 if _record_usage not in litellm.success_callback:
     litellm.success_callback.append(_record_usage)
+
+
+def cache_census() -> dict:
+    """The prompt's shape against the cache the provider credited.
+
+    `prefix_coverage` is the whole point: it is the share of the material the provider provably saw
+    in an earlier request (everything before the final two messages, since a tool loop appends the
+    assistant's call and the tool's result together) that the provider's own
+    `prompt_cache_hit_tokens` actually credited. Near 1.0 the prefix is held and every miss is the
+    turn's new material; near 0 the lane is re-billing a prefix it thinks is stable, which is a
+    cadence or a boundary rather than a size.
+
+    Absent rather than zeroed when the callback saw no messages, because `0.0` reads as "the
+    provider credited nothing" and that is a claim about a measurement that did not happen.
+    """
+    prompt = _usage["prompt_tokens"]
+    cached = _usage["cached_tokens"]
+    calls = _usage["calls"]
+    if _cache["calls"] == 0 or prompt <= 0 or calls == 0:
+        return {"measured": False, "calls_with_messages": _cache["calls"]}
+    first = _first_call or {}
+    first_prompt = int(first.get("prompt_tokens") or 0)
+    # Measured on the one call the provider had never seen, and only there: a ratio taken from the
+    # phase total would be the average of a hit and a miss, which is not a property of the text.
+    ratio = (first.get("chars", 0) / first_prompt) if first_prompt > 0 else 0.0
+    if ratio <= 0:
+        return {"measured": False, "calls_with_messages": _cache["calls"], "reason": "no first call"}
+    seen = _cache["calls"]
+    mean_seen_tokens = (
+        (_cache["seen_chars"] / _cache["seen_calls"]) / ratio if _cache["seen_calls"] else 0.0
+    )
+    mean_last_tokens = (_cache["last_chars"] / seen) / ratio
+    mean_cached = cached / calls
+    return {
+        "measured": True,
+        "calls_with_messages": seen,
+        "chars_per_token": round(ratio, 4),
+        # Mean per call, so it is comparable to the provider's mean per call.
+        "prefix_tokens": round(mean_seen_tokens, 1),
+        "last_tokens": round(mean_last_tokens, 1),
+        "cached_tokens_per_call": round(mean_cached, 1),
+        "uncached_tokens_per_call": round(max(0, prompt - cached) / calls, 1),
+        "prefix_coverage": round(mean_cached / mean_seen_tokens, 4)
+        if mean_seen_tokens > 0
+        else None,
+        "first_call": {
+            "messages": first.get("messages", 0),
+            "chars": first.get("chars", 0),
+            "prompt_tokens": first_prompt,
+            "cached_tokens": int(first.get("cached_tokens") or 0),
+        },
+    }
 
 
 def usage_stats() -> dict:
@@ -277,6 +420,10 @@ def usage_stats() -> dict:
         # A rate, not a count, because the comparison between arms is a rate: 0 means every
         # token of the memory arm missed, which is the symptom this counter exists to expose.
         "cache_hit_rate": (cached / prompt) if prompt else None,
+        # The composition of what was sent, beside the counts of what was held. A phase total says
+        # the memory arm missed 3.7× as much; only this says whether the missed material was the
+        # pack (once), the prefix (a cadence) or the turn (an observation).
+        "cache": cache_census(),
         "cost": _cost(prompt, cached, completion, _first_call_at),
     }
 

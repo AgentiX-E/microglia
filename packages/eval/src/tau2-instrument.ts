@@ -20,7 +20,7 @@
  * 1. **An empty pack set is `0`, not absent.** V1 asks whether the memory injected anything; a run
  *    that served no items is V1's failure case, and `undefined` would turn "injected nothing" into
  *    "not applicable".
- * 2. **No calls is not perfect reliability.** `calls` is omitted when the run made none, because
+ * 2. **No calls is not perfect reliability.** `turns` is omitted when the run made none, because
  *    `0/0` reported as `0` is the strongest possible reliability claim made on no evidence.
  * 3. **An unobservable count omits its gate rather than defaulting — and nothing here is
  *    unobservable.** The first version of this file argued that the distillation failure count could
@@ -36,6 +36,7 @@
  *    zero items from a store of fourteen and the record could not say which of the two it was, so the
  *    arm's census (`storeCensus`) and the request tally (`recall`) travel beside the rate.
  */
+import type { PhaseCacheCensus } from "./cache-census.js";
 import type { FaithfulnessCensus } from "./tau2-faithfulness.js";
 import type { RawLogCensus } from "./tau2-rawlog.js";
 import { defaultPolicy } from "@agentix-e/microglia-core/kernel";
@@ -132,6 +133,40 @@ export type InjectionNoteRecord = {
 };
 
 /** What the driver observed, exactly as it observed it. */
+/**
+ * What the provider says a phase cost, and the shape of what it was asked to hold.
+ *
+ * `cache_hit_rate` is the field this started for. Two arms send the same system prompt and the same
+ * growing conversation, so a hit rate that differs between them by a factor is not a provider
+ * fluctuation — it is one arm changing a prefix the other leaves alone, and it is billed at roughly
+ * fifty times the rate on every token after the divergence point.
+ *
+ * `cache` is the field that ends the argument. A hit rate says *that* a prefix was not held; the
+ * census says which part of the prompt was re-billed, by comparing the messages the lane sent against
+ * the tokens the provider credited (see `cache-census.ts`).
+ */
+export type Tau2PhaseUsage = {
+  readonly calls?: number | null;
+  readonly prompt_tokens?: number | null;
+  readonly completion_tokens?: number | null;
+  readonly cached_tokens?: number | null;
+  readonly uncached_tokens?: number | null;
+  readonly cache_hit_rate?: number | null;
+  /** Absent on every phase before the census, which is not the same as a phase that measured none. */
+  readonly cache?: PhaseCacheCensus | null;
+  /**
+   * The phase's bill, priced by `run_split._cost` in the band it actually ran in.
+   *
+   * Forwarded rather than recomputed, because there are two copies of the rate card in this repository
+   * (`eval/drivers/tau2/run_split.py` and `packages/eval/src/cost.ts`) and a third would be the one
+   * that disagreed. Absent on every arm before the counter existed.
+   */
+  readonly cost?: {
+    readonly usd?: number | null;
+    readonly band?: string | null;
+  } | null;
+};
+
 export type Tau2Raw = {
   /** Task ids the store learned from. */
   readonly train: readonly string[];
@@ -237,18 +272,31 @@ export type Tau2Raw = {
     };
   };
   /**
-   * Calls the run made to the model, and how many of them failed after retries.
+   * The agent's **turns** on this run, and how many episodes failed.
    *
-   * `scope` says whose tally this is. The episodes' calls belong to the agent process, which reports
-   * a turn count rather than a call count and only when it feels like it; the distillation calls are
-   * the driver's own. A rate is only a rate over a stated population, and the two are not the same
-   * population.
+   * This key used to be called `calls`, and its own comment already said what it held: "the episodes'
+   * calls belong to the agent process, which reports a turn count rather than a call count". The name
+   * won, and PROGRESS 181 divided a bill by §179's `2,667` beside an artefact that said `1,803` — two
+   * populations, one name, and a reader with no way to tell which was which. The provider's own call
+   * count is in `usage.calls`, measured by the provider rather than by the agent, and the two are now
+   * different keys.
+   *
+   * `scope` says whose tally this is: `distillation` counts this process's own model calls, which is
+   * the only population the driver can see when the episodes ran somewhere else.
    */
-  readonly calls: {
+  readonly turns: {
     readonly total: number;
     readonly failed: number;
     readonly scope?: "run" | "distillation";
   };
+  /**
+   * What the phase's provider said it was sent and charged for, and the composition of what was sent.
+   *
+   * Absent on every arm before the census. It is carried because the alternative is what PROGRESS 181
+   * had to do: read a workflow log, by hand, to divide a bill — and then divide it by the wrong
+   * population because the artefact had a field called `calls` that held turns.
+   */
+  readonly usage?: Tau2PhaseUsage;
   /**
    * Which scenario each half ran in, and the scope the facade recalled under.
    *
@@ -686,7 +734,10 @@ export const PROJECTION: {
   failures: "carried",
   servedPackSizes: "reduced",
   learning: "carried",
-  calls: "carried",
+  turns: "carried",
+  // Carried because the provider's own call count, its hit rate and the composition of what it was
+  // sent are the only fields that can attribute a bill. Absent on every run before the census.
+  usage: "carried",
   scenario: "carried",
   domains: "reduced",
   store: "carried",
@@ -814,17 +865,21 @@ export function armRecordFromDriver(
     // found nothing, and a driver that never asked must not be able to say that.
     ...(raw.failures === undefined ? {} : { failures: raw.failures }),
     meanPackIds,
-    ...(raw.calls.total === 0
+    ...(raw.turns.total === 0
       ? {}
       : {
-          calls: {
-            calls: raw.calls.total,
-            failures: raw.calls.failed,
-            ...(raw.calls.scope === undefined
+          turns: {
+            total: raw.turns.total,
+            failures: raw.turns.failed,
+            ...(raw.turns.scope === undefined
               ? {}
-              : { scope: raw.calls.scope }),
+              : { scope: raw.turns.scope }),
           },
         }),
+    // The provider's own account of the phase, carried rather than summarised. A reader who has the
+    // artefacts of a pair can subtract the two bills; a reader who has one artefact and one log line
+    // can subtract nothing, which is how §179 came to divide by a turn count.
+    ...(raw.usage === undefined ? {} : { usage: raw.usage }),
     // Always present: see the field's own comment. A run that distilled nothing is the reading this
     // record exists to carry, and `undefined` would turn it into a run that did not report.
     learning: {

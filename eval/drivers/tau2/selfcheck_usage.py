@@ -337,8 +337,120 @@ def a_card_without_a_band_is_refused_rather_than_defaulted(checks):
         os.unlink(path)
 
 
-# ------------------------------------------------------------------------- runner
+# ------------------------------------------------------------------ the cache census
 
+
+def _usage(prompt_tokens: int, cached: int, completion: int = 10):
+    return types.SimpleNamespace(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion,
+        prompt_cache_hit_tokens=cached,
+    )
+
+
+def _call(messages, prompt_tokens: int, cached: int) -> None:
+    response = types.SimpleNamespace(usage=_usage(prompt_tokens, cached))
+    subject._record_usage({"messages": messages}, response, 0, 0)
+
+
+SYSTEM = "s" * 400
+TASK = "t" * 100
+REPLY = "a" * 60
+OBSERVATION = "o" * 400
+
+
+@case
+def a_prefix_the_provider_held_reads_as_full_coverage(checks):
+    # The three messages a tool loop produces: system, task, and the pair appended per turn. The
+    # provider is given exactly the material it saw in an earlier request -- 500 characters at four
+    # characters a token -- and the census must credit it as such. This is the reading that says the
+    # prefix is held and the miss is the turn.
+    subject.reset_usage()
+    first = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": TASK}]
+    _call(first, 125, 0)
+    for _ in range(2):
+        _call(first + [{"role": "assistant", "content": REPLY}, {"role": "tool", "content": OBSERVATION}], 240, 125)
+    census = subject.cache_census()
+    checks.equal(census["measured"], True, "three calls with messages are a measurement")
+    checks.equal(census["chars_per_token"], 4.0, "500 characters over 125 tokens minus the hit")
+    checks.equal(census["prefix_tokens"], 125.0, "the prefix the provider provably saw")
+    # The mean over every call, the first included -- whose last message is the task rather than an
+    # observation, because a phase's first call has no turn behind it.
+    checks.equal(census["last_tokens"], 75.0, "900 characters of new material over three calls")
+    # Two of three calls were credited for 125 tokens; the first never could be, because nothing
+    # preceded it. A census that reported 1.0 here would be reporting a cache that cannot exist.
+    checks.equal(census["prefix_coverage"], 0.6667, "two credited calls of three")
+
+
+@case
+def a_prefix_the_provider_did_not_hold_reads_as_no_coverage(checks):
+    # The R103 question, as an assertion: same prompt shapes, no credit. The two mechanisms this
+    # separates -- a prefix that is held and a turn that is large, against a prefix that is re-billed
+    # on every call -- differ by a factor of the conversation, and nothing else in the ledger does.
+    subject.reset_usage()
+    first = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": TASK}]
+    _call(first, 125, 0)
+    for _ in range(2):
+        _call(first + [{"role": "assistant", "content": REPLY}, {"role": "tool", "content": OBSERVATION}], 240, 0)
+    census = subject.cache_census()
+    checks.equal(census["prefix_coverage"], 0.0, "nothing was credited, so nothing was held")
+    checks.equal(census["uncached_tokens_per_call"], 201.7, "and every call pays for the whole prompt")
+
+
+@case
+def a_phase_without_messages_is_unmeasured_rather_than_zero(checks):
+    # `0.0` coverage would read as "the provider credited nothing", which is a much stronger claim
+    # than "this callback was never given the messages" -- and it is the claim a reader would act on.
+    subject.reset_usage()
+    subject._record_usage({}, types.SimpleNamespace(usage=_usage(1000, 900)), 0, 0)
+    census = subject.cache_census()
+    checks.equal(census["measured"], False, "a call with no messages is not a census")
+    checks.equal(census["calls_with_messages"], 0, "and it says how much it did not see")
+    checks.equal(census["prefix_coverage"] if "prefix_coverage" in census else None, None, "no coverage")
+
+
+@case
+def the_ratio_is_measured_on_the_one_call_that_was_never_cached(checks):
+    # A ratio taken from the phase totals is the average of a hit and a miss, and a hit is priced
+    # per token, not per character: two calls whose text differs in density would produce a ratio
+    # that is a property of the cache rather than of the corpus. The first call is the only
+    # uncached one by construction, so it is the only one the ratio may come from.
+    subject.reset_usage()
+    _call([{"role": "system", "content": "x" * 800}], 200, 0)
+    _call([{"role": "system", "content": "y" * 100}], 900, 890)
+    checks.equal(subject.cache_census()["chars_per_token"], 4.0, "800 characters over 200 tokens")
+
+
+@case
+def a_multimodal_part_counts_its_text_and_a_boundary_for_the_rest(checks):
+    # Content arrives as a list of parts on some providers. A part that is not text contributes
+    # nothing, so the census understates the prompt rather than inventing a length for it.
+    parts = [{"type": "text", "text": "abc"}, {"type": "image_url", "image_url": {"url": "data:,"}}, "de"]
+    checks.equal(subject._content_chars({"role": "user", "content": parts}), 5, "3 + 2 characters")
+    checks.equal(subject._content_chars({"role": "user", "content": None}), 0, "an empty message")
+    checks.equal(subject._content_chars({"role": "user", "content": 7}), 0, "a non-text scalar")
+
+
+@case
+def the_census_counts_a_system_message_wherever_it_sits(checks):
+    # The memory arm's block is a *second* system message, which is the arrangement this whole
+    # module is about. A census that assumed one system message at index zero would attribute the
+    # pack to the conversation and the repair would be aimed at the wrong half of the prompt.
+    census = subject._census_of(
+        [
+            {"role": "system", "content": "native"},
+            {"role": "system", "content": "pack"},
+            {"role": "user", "content": "task"},
+            {"role": "tool", "content": "obs"},
+        ]
+    )
+    checks.equal(census["system_chars"], 10, "both system messages are system")
+    checks.equal(census["conversation_chars"], 7, "and the rest is the conversation")
+    checks.equal(census["seen_chars"], 10, "everything before the final two messages")
+    checks.equal(census["last_chars"], 3, "the newest observation")
+
+
+# ------------------------------------------------------------------------- runner
 
 class Checks:
     def __init__(self) -> None:

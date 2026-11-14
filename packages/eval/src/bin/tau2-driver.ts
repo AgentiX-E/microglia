@@ -161,6 +161,8 @@ import {
 } from "../plant.js";
 import { consolidateKnowledge } from "@agentix-e/microglia-core/distill";
 import { sweepConsolidation, sweepSummary } from "../consolidation-sweep.js";
+import type { Tau2PhaseUsage } from "../tau2-instrument.js";
+import { cacheCensusVerdict } from "../cache-census.js";
 import { defaultPolicy } from "@agentix-e/microglia-core";
 
 const runFile = promisify(execFile);
@@ -763,35 +765,6 @@ function diagnosticsOf(stdout: string): Tau2PhaseDiagnostics | undefined {
   }
   return undefined;
 }
-
-/**
- * What the provider says the phase cost, forwarded rather than recomputed.
- *
- * `cache_hit_rate` is the field this exists for. The reference arm and the memory arm send the
- * same system prompt and the same growing conversation, so a cache-hit rate that differs between
- * them by a factor is not a provider fluctuation — it is one arm changing a prefix the other arm
- * leaves alone, and it is billed at roughly fifty times the hit rate on every token after the
- * divergence point.
- */
-type Tau2PhaseUsage = {
-  readonly calls?: number | null;
-  readonly prompt_tokens?: number | null;
-  readonly completion_tokens?: number | null;
-  readonly cached_tokens?: number | null;
-  readonly uncached_tokens?: number | null;
-  readonly cache_hit_rate?: number | null;
-  /**
-   * The phase's bill, priced by `run_split._cost` in the band it actually ran in.
-   *
-   * Forwarded rather than recomputed, because there are two copies of the rate card in this repository
-   * (`eval/drivers/tau2/run_split.py` and `packages/eval/src/cost.ts`) and a third would be the one that
-   * disagreed. Absent on every arm before the counter existed.
-   */
-  readonly cost?: {
-    readonly usd?: number | null;
-    readonly band?: string | null;
-  } | null;
-};
 
 type Tau2PhaseDiagnostics = {
   readonly agent_turns?: number | null;
@@ -1896,6 +1869,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   process.stdout.write(
     `[tau2] usage: ${JSON.stringify(primary.diagnostics?.usage ?? null)}\n`,
   );
+  // And the sentence a reader would otherwise have to write themselves: whether the arm's uncached
+  // tokens were the memory or the turn. Printed even when the census is absent, because "this phase
+  // could not attribute its bill" is the reading that makes the next arm worth paying for.
+  const cacheVerdict = cacheCensusVerdict(primary.diagnostics?.usage?.cache);
+  process.stdout.write(`[tau2] cache: ${cacheVerdict.state} — ${cacheVerdict.sentence}\n`);
   // R92: the number the competitor prints beside its score and this lane never has — cost per
   // conversation, on the same run that produced the pass^4. `primary` is the *evaluation* phase's own
   // document, and the two phases are separate processes, so this is inference spend and not the
@@ -1970,7 +1948,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // arrive as a turn count, the distillation calls are this process's own. A rate over a subset is
     // a rate over a subset, and the alternative — reporting nothing — is how a run whose every
     // distillation call was refused reached a reader as a store that had nothing to say.
-    calls:
+    turns:
       agentTurns === null
         ? {
             total: llmStats.prompts,
@@ -1982,6 +1960,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
             failed: episodeFailures(primary.diagnostics),
             scope: "run" as const,
           },
+    // The provider's own account of the phase, carried so a bill can be divided from the artefact
+    // alone. §179 divided one by a number it had read out of a workflow log, and §181 found the
+    // artefact's `calls` field was a turn count; a reader with this block never has to leave the file.
+    ...(primary.diagnostics?.usage == null ? {} : { usage: primary.diagnostics.usage }),
     domains: {
       stored: knowledge.length,
       withoutDomain,
