@@ -1324,6 +1324,10 @@ jobs:
           # R109: the unit the pack is written in, from the registration's header. Empty means the
           # variable stands, which is what every artefact committed before this switch ran.
           SHAPE=$(sed -n 's/^shape=//p' "$RUNNER_TEMP/distill.env")
+          # R118: the stop after the learning half, when the registration's claim is a census. Header
+          # only — there is no variable to reconcile it against, because a global that could turn it
+          # off would let a dispatch pay for an evaluation the registration never asked for.
+          LEARN_ONLY=$(sed -n 's/^learnOnly=//p' "$RUNNER_TEMP/distill.env")
           # Every switch the registration overrides, as a notice. Not a refusal: the arms read the
           # registration's value, so a stale variable is overridden rather than run — the check that
           # refused on this comparison stopped R58 before its first model call while the run would have
@@ -1359,6 +1363,9 @@ jobs:
           echo "claims=$CLAIMS" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "shape=$SHAPE" >> "$GITHUB_OUTPUT"
+          # R118: whether the arm stops after the learning half. Header-only, because the stop is the
+          # registration's own statement about what it will read.
+          echo "learn_only=$LEARN_ONLY" >> "$GITHUB_OUTPUT"
           echo "knobs=$KNOBS" >> "$GITHUB_OUTPUT"
           echo "trainTasks=$(echo "$CAPS" | sed -n 's/^train=//p')" >> "$GITHUB_OUTPUT"
           echo "testTasks=$(echo "$CAPS" | sed -n 's/^test=//p')" >> "$GITHUB_OUTPUT"
@@ -1473,6 +1480,9 @@ jobs:
           # artefact committed before this variable produced the store it always did. From the
           # registration's header when it names one, which is the fifth switch of this family.
           TAU_DISTILL_SCOPE: ${{ steps.recall_floor.outputs.scope || vars.TAU_DISTILL_SCOPE }}
+          # R118: a registration whose claim is a census stops after the learning half. Empty for every
+          # other arm, which is what keeps a full dispatch the default.
+          TAU_LEARN_ONLY: ${{ steps.recall_floor.outputs.learn_only }}
           # R60: how many claims one trace may teach. Unset means three, which is what every
           # committed trace artefact ran at; a run at six is a different treatment and the ceiling
           # travels into the artefact so a readback can tell the two apart.

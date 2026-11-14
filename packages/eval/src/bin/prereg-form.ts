@@ -81,11 +81,17 @@ function main(): void {
   // dispatch whose variable says the other would publish one arm under the other's name.
   const declaredShape = reading.prereg.packShape;
   note('shape', declaredShape, process.argv[8] ?? null);
+  // R118: whether the arm stops after the learning half. Header-only, and deliberately not reconciled
+  // against a repository variable: the stop is the registration's own statement about what it will
+  // read, so a global that could turn it off would let a dispatch pay for an evaluation the
+  // registration never wanted. An absent header leaves the full arm, which is every arm but this one.
+  const declaredLearnOnly = reading.prereg.learnOnly;
   process.stdout.write(
     `unit=${declaredUnit ?? ''}\nform=${declared ?? ''}\nscope=${declaredScope ?? ''}\n` +
       `claims=${declaredClaims === undefined ? '' : String(declaredClaims)}\n` +
       `mode=${declaredMode ?? ''}\n` +
       `shape=${declaredShape ?? ''}\n` +
+      `learnOnly=${declaredLearnOnly === undefined ? '' : String(declaredLearnOnly)}\n` +
       // One line, `;`-joined, because the workflow reads each value with `sed -n 's/^key=//p'` and an
       // expression that split a list would be a parser in YAML. Empty when every switch agrees.
       `overrides=${notices.join('; ')}\n`,

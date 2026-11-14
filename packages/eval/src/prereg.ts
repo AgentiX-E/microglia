@@ -202,6 +202,17 @@ export type Prereg = {
    */
   readonly distillScope?: string;
   /**
+   * Whether this arm stops after the learning half, because the census is the reading.
+   *
+   * R118. A registration whose claim is about a *census* — how many replies were blank, how the four
+   * states divided — is buying an evaluation it will not read: forty tasks resolve ±10pp, and R104's
+   * own `pass^4` could not be ordered against anything. Learned from R104's `distillScope`: a switch
+   * that belongs to one experiment and lives in a repository variable is dispatched under another
+   * experiment's value, so this one is a header field and `prereg.ts` refuses a value that is not a
+   * boolean rather than letting `''` read as false.
+   */
+  readonly learnOnly?: boolean;
+  /**
    * The most claims one trace may teach, when this registration is a trace arm.
    *
    * R58's prose says "up to three claims per trace" and its header said nothing, so the dispatch read
@@ -387,6 +398,7 @@ const HEADER_KEYS = [
   'distillForm',
   'distillUnit',
   'distillScope',
+  'learnOnly',
   'traceClaims',
   'trainTasks',
   'testTasks',
@@ -434,6 +446,9 @@ const HEADER_UNITS: ReadonlySet<string> = new Set(['correction', 'trace', 'raw']
 
 /** The two populations `resolveDistillScope` accepts: the failures, or every trajectory. */
 const HEADER_SCOPES: ReadonlySet<string> = new Set(['edited', 'all']);
+
+/** The two spellings a boolean header field may take. `1`/`yes` are refused: a header is prose. */
+const HEADER_BOOLEANS: ReadonlySet<string> = new Set(['true', 'false']);
 
 /** The two places a pack may be served from. `retrieved` is the lane's own protocol. */
 const HEADER_PACK_MODES: ReadonlySet<string> = new Set(['retrieved', 'prefix']);
@@ -865,6 +880,21 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // Whether the arm stops after the learning half. Its claim is a census, and an evaluation it will
+  // not read is the cheapest thing on this roster to not buy.
+  const learnOnlyText = values.get('learnOnly');
+  let learnOnly: boolean | undefined;
+  if (learnOnlyText !== undefined) {
+    if (!HEADER_BOOLEANS.has(learnOnlyText)) {
+      collected.push({
+        where: `header 'learnOnly'`,
+        problem: `'${learnOnlyText}' is not one of ${[...HEADER_BOOLEANS].join(', ')}`,
+      });
+    } else {
+      learnOnly = learnOnlyText === 'true';
+    }
+  }
+
   // Which ceiling a trace arm runs at. R60 made the ceiling a switch and left it in a variable; R58's
   // text assumes three and the variable held six.
   const claimsText = values.get('traceClaims');
@@ -1168,6 +1198,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(distillForm === undefined ? {} : { distillForm }),
       ...(distillUnit === undefined ? {} : { distillUnit }),
       ...(distillScope === undefined ? {} : { distillScope }),
+      ...(learnOnly === undefined ? {} : { learnOnly }),
       ...(traceClaims === undefined ? {} : { traceClaims }),
       ...(trainTasks === undefined ? {} : { trainTasks }),
       ...(testTasks === undefined ? {} : { testTasks }),

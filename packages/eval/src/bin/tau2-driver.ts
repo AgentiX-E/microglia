@@ -174,6 +174,7 @@ import { tau2ShapeOf } from "../tau2-shape.js";
 import { runDistillPreflight, type PreflightReading } from "../distill-preflight.js";
 import { replyCensus, replyCensusLine } from "../distill-replies.js";
 import { writerOf } from "../distill-writer.js";
+import { learnOnlyReason, silenceOf } from "../learn-only.js";
 import { DISTILL_THINKING } from "../writer-probe.js";
 import { startRecallFacade } from "../tau2-facade.js";
 import {
@@ -581,6 +582,19 @@ const DISTILL_FORM = resolveDistillForm();
 const DISTILL_PREFLIGHT = /^(1|true|yes)$/i.test(
   (process.env["TAU_DISTILL_PREFLIGHT"] ?? "").trim(),
 );
+
+/**
+ * Whether this dispatch stops after the learning half, because the census is the reading.
+ *
+ * R118. R104 paid $1.21 for a `pass^4` that no design on this board can order — 40 tasks resolve
+ * ±10pp, and two facades of the same dispatch differed by 17.5pp with no treatment. What that run
+ * did establish was a census: 63 of 73 replies carried no visible character. R112 then excluded form
+ * and model (8 of 8 pairs answer, `lesson` best), which leaves the regime the 73 calls ran under.
+ *
+ * Off unless a dispatch turns it on, for the reason every switch here is off by default: a published
+ * arm's call sequence is part of what it measured, and a stop is the most visible change to it.
+ */
+const LEARN_ONLY = /^(1|true|yes)$/i.test((process.env["TAU_LEARN_ONLY"] ?? "").trim());
 
 /**
  * The unit this dispatch distils, resolved once and recorded from the same value.
@@ -1545,6 +1559,52 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       distillReport.rejectedByHost,
     failed: distillReport.failed,
   };
+  const distillDiagnostics = (): Readonly<Record<string, unknown>> => ({
+    funnel,
+    distill: {
+      scope: DISTILL_SCOPE,
+      unit: DISTILL_UNIT,
+      form: DISTILL_UNIT === "trace" ? "trace" : DISTILL_FORM,
+      model: llm.model,
+      replies: { ...replies.reading() },
+      // The client's own count, beside the replies the seam saw. Two numbers that must agree: a
+      // distiller that answered fifteen events and a client that made fifteen calls is a model
+      // choosing silence, and a client that made none is a pipeline that never asked.
+      client: { calls: llm.stats.calls, failures: llm.stats.failures },
+      faults: { events: faults.events, reasons: faultReasons, samples: faults.samples },
+      report: {
+        created: distillReport.created,
+        merged: distillReport.merged,
+        superseded: distillReport.superseded,
+        contradicted: distillReport.contradicted,
+        quarantined: distillReport.quarantined,
+        suppressed: distillReport.suppressed,
+        rephrased: distillReport.rephrased,
+      },
+    },
+    // The population question, priced at nothing: a fold needs two tasks behind one routine, and
+    // this is the count of routines that have them. An arm whose treatment is the fold and whose
+    // census reads `atLeastTwo: 0` could not have measured its claim whatever the distiller did.
+    merge: mergeCensusOf(corrections),
+    learn: {
+      tasks: train.length,
+      corrections: corrections.length,
+      unanswered,
+      traces: traces.size,
+      traced: withTrace,
+    },
+    // The corrections themselves, bounded: five is enough to recognise a population, and an
+    // artefact is a document rather than a dump.
+    corrections: corrections.slice(0, 5).map((correction) => ({
+      taskId: correction.taskId,
+      provenance: correction.provenance,
+      actions: correction.actions.length,
+      assertions: correction.assertions.length,
+      instructionChars: correction.instruction.length,
+      statementChars: correction.statement.length,
+      traced: traces.has(correction.taskId),
+    })),
+  });
   // The arm is defined by reading traces. A learning document that carried none — an older τ²
   // whose writer did not persist simulations, or a parse that met a different shape — would distil
   // the correction arm's object under the trace arm's name, and report the control's store as the
@@ -1570,51 +1630,26 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // "0 candidates" and could not say whether the store had any routines to fold (which decides
     // whether the arm could have measured anything even with a distiller that worked), what the
     // replies looked like, or how the corrections were shaped. All of it was in this process.
-    throw noMeasurementRefusal(funnelReading(funnel, funnelState), {
-      funnel,
-      distill: {
-        scope: DISTILL_SCOPE,
-        unit: DISTILL_UNIT,
-        form: DISTILL_UNIT === "trace" ? "trace" : DISTILL_FORM,
-        model: llm.model,
-        replies: { ...replies.reading() },
-        // The client's own count, beside the replies the seam saw. Two numbers that must agree: a
-        // distiller that answered fifteen events and a client that made fifteen calls is a model
-        // choosing silence, and a client that made none is a pipeline that never asked.
-        client: { calls: llm.stats.calls, failures: llm.stats.failures },
-        faults: { events: faults.events, reasons: faultReasons, samples: faults.samples },
-        report: {
-          created: distillReport.created,
-          merged: distillReport.merged,
-          superseded: distillReport.superseded,
-          contradicted: distillReport.contradicted,
-          quarantined: distillReport.quarantined,
-          suppressed: distillReport.suppressed,
-          rephrased: distillReport.rephrased,
-        },
+    throw noMeasurementRefusal(funnelReading(funnel, funnelState), distillDiagnostics());
+  }
+  // R118: the stop when the census is the reading.
+  //
+  // The score a full dispatch produces cannot be ordered against anything on this board: forty tasks
+  // resolve ±10pp on the difference, and two facades of R104's one dispatch differed by 17.5pp with no
+  // treatment at all. The census is the informative half, and it is complete by this line — the store
+  // is written, the replies are counted, and the four states are separated. What the stop keeps is
+  // `distillDiagnostics()` unchanged, so a learn-only artefact and a refused one describe the same run
+  // in the same keys; what it adds is the one sentence that says which state the silence was in.
+  if (LEARN_ONLY) {
+    const silence = silenceOf(replies.reading());
+    process.stdout.write(`[tau2] learn-only: ${silence.state} — ${silence.sentence}\n`);
+    throw noMeasurementRefusal(learnOnlyReason(silence), {
+      ...distillDiagnostics(),
+      silence: {
+        state: silence.state,
+        blankShare: silence.blankShare,
+        emptyShare: silence.emptyShare,
       },
-      // The population question, priced at nothing: a fold needs two tasks behind one routine, and
-      // this is the count of routines that have them. An arm whose treatment is the fold and whose
-      // census reads `atLeastTwo: 0` could not have measured its claim whatever the distiller did.
-      merge: mergeCensusOf(corrections),
-      learn: {
-        tasks: train.length,
-        corrections: corrections.length,
-        unanswered,
-        traces: traces.size,
-        traced: withTrace,
-      },
-      // The corrections themselves, bounded: five is enough to recognise a population, and an
-      // artefact is a document rather than a dump.
-      corrections: corrections.slice(0, 5).map((correction) => ({
-        taskId: correction.taskId,
-        provenance: correction.provenance,
-        actions: correction.actions.length,
-        assertions: correction.assertions.length,
-        instructionChars: correction.instruction.length,
-        statementChars: correction.statement.length,
-        traced: traces.has(correction.taskId),
-      })),
     });
   }
   // The domain ledger, from the store rather than from the driver's intentions: an item that lost its

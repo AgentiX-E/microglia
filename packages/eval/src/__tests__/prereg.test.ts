@@ -1470,6 +1470,25 @@ describe('the distilling scope', () => {
     ]);
     expect(readPrereg(withHeader('distillScope: All'), 'R87-distill-scope.md').problems).toHaveLength(1);
   });
+
+  it('reads a registration that stops after the learning half', () => {
+    // R118: the claim is a census, so the evaluation it would pay for is one it will not read.
+    expect(readPrereg(withHeader('learnOnly: true'), 'R87-distill-scope.md').prereg?.learnOnly).toBe(true);
+    expect(readPrereg(withHeader('learnOnly: false'), 'R87-distill-scope.md').prereg?.learnOnly).toBe(false);
+  });
+
+  it('leaves it absent when the header does not name one, so a full arm stays the default', () => {
+    const reading = readPrereg(withHeader('split: dev'), 'R87-distill-scope.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.learnOnly).toBeUndefined();
+  });
+
+  it('refuses a spelling that is not a boolean, because `1` and `yes` read as neither in prose', () => {
+    expect(readPrereg(withHeader('learnOnly: yes'), 'R87-distill-scope.md').problems).toEqual([
+      { where: "header 'learnOnly'", problem: "'yes' is not one of true, false" },
+    ]);
+    expect(readPrereg(withHeader('learnOnly: 1'), 'R87-distill-scope.md').problems).toHaveLength(1);
+  });
 });
 
 

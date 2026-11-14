@@ -1802,6 +1802,7 @@ export {
 } from './no-measurement-note.js';
 export { replyCensus, replyCensusLine, classifyReply, EMPTY_PREVIEW_CHARS, type DistillReplyCensus, type DistillReplyKind, type DistillReplyCounter } from './distill-replies.js';
 export { writerOf, type WriterReading, type WriterState } from './distill-writer.js';
+export { learnOnlyReason, silenceOf, type ReplySilenceReading, type ReplySilenceState } from './learn-only.js';
 export {
   DISTILL_THINKING,
   TRIAL_PREVIEW_CHARS,
