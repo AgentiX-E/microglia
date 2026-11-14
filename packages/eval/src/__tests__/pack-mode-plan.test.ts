@@ -10,11 +10,14 @@
  */
 import { describe, expect, it } from 'vitest';
 
+import { HEADER_PACK_SHAPES } from '../prereg.js';
 import {
   PACK_MODES,
+  PACK_SHAPES,
   PREFIX_CHAR_CEILING,
   PREFIX_ITEM_CEILING,
   resolvePackModePlan,
+  resolvePackShapePlan,
 } from '../pack-mode-plan.js';
 
 describe('resolvePackModePlan', () => {
@@ -65,5 +68,49 @@ describe('resolvePackModePlan', () => {
     // registration declaring a mode the resolver refuses — a dispatch that dies before its first call
     // with a message about a typo nobody made.
     expect([...PACK_MODES]).toEqual(['retrieved', 'prefix']);
+  });
+});
+
+/**
+ * The shape switch, tested on the same two claims as the mode: the default reproduces the pack every
+ * committed artefact rendered, and a declared arm carries the knob that actually changes the unit.
+ *
+ * The third claim is the one that failed in the field before this switch existed: a knob that never
+ * reaches the request is an arm that silently repeats its own control, and the only place to catch that
+ * is the fragment this resolver renders and the facade parses. The facade's half is covered where the
+ * facade lives; this is the half that decides what travels.
+ */
+describe('resolvePackShapePlan', () => {
+  it('defaults to the unit every committed artefact rendered, and says it was not declared', () => {
+    expect(resolvePackShapePlan({})).toEqual({ shape: 'per-failure', declared: false, knobs: {} });
+  });
+
+  it('treats a declared per-failure pack as the arm rather than as the default', () => {
+    expect(resolvePackShapePlan({ TAU_PACK_SHAPE: 'per-failure' })).toEqual({
+      shape: 'per-failure',
+      declared: true,
+      knobs: {},
+    });
+  });
+
+  it('carries the one knob that changes the unit, and nothing the library already decides', () => {
+    const plan = resolvePackShapePlan({ TAU_PACK_SHAPE: 'collapse' });
+    expect(plan.shape).toBe('collapse');
+    expect(plan.declared).toBe(true);
+    // The support floor, the medoid and the kind guard are the mechanism's, not the dispatch's.
+    expect(plan.knobs).toEqual({ shape: 'collapse' });
+  });
+
+  it('refuses a shape it cannot honour, with the two names it accepts', () => {
+    expect(() => resolvePackShapePlan({ TAU_PACK_SHAPE: 'merge' })).toThrow(
+      /TAU_PACK_SHAPE must be unset or one of per-failure, collapse/,
+    );
+  });
+
+  it('has exactly the two shapes the registration header accepts', () => {
+    expect([...PACK_SHAPES]).toEqual(['per-failure', 'collapse']);
+    // The header's set is spelled in `prereg.ts` and cannot be imported from here, because the
+    // registration reader runs before anything is built. This assertion is what keeps the copy honest.
+    expect([...HEADER_PACK_SHAPES]).toEqual([...PACK_SHAPES]);
   });
 });

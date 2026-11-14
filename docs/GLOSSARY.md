@@ -47,6 +47,24 @@ generation time. Counts `applied` and `succeeded` on exactly the items whose ids
 half-life floored at 0.2 so fresh evidence can revive a rule. Distinct from retirement, which is a
 status change.
 
+**Fold** — collapsing items that state the same routine into one line at the render boundary, keeping
+the group's medoid and reporting the support the group carries. A delivery decision, not a store
+mutation: the items the store holds are untouched, so one dispatch can serve the per-failure pack and
+the folded one from the same recall. Requires two distinct tasks behind a group; folding two records of
+one task would report a task as having been taught twice.
+
+**Routine (shape)** — the ordered list of tool names a record states, without their arguments:
+`get_order_details > exchange_delivered_order_items`. The arguments are the instance, the sequence is
+the routine. This is the unit ExpeL's `UPVOTE` merges and the unit a workflow-shaped memory is organised
+by; `RecallQuery.shape: 'collapse'` is how a pack delivers one line per routine instead of one per
+failure.
+
+**Support** — the number of distinct tasks behind an item, as distinct from the number of feedback
+events. `evidence.length` counts observations; support counts the tasks they came from, and a memory
+whose items each came from one task has support 1 however many events it holds. Reported per rendered
+unit on `KnowledgePack.fold.support`, at the two levels the literature's cells are named after (≥2 and
+≥3 tasks).
+
 **Distillation** — the batch process that turns feedback events into knowledge items. Idempotent:
 replaying the same events creates nothing new, because evidence is deduplicated by feedback id.
 

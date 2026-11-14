@@ -9,6 +9,7 @@ import { defaultPolicy, mmrSelect, queryCoverage, recallText } from '../kernel/i
 import type { KnowledgeItem, KnowledgePack, RecallQuery } from '../kernel/index.js';
 import type { MemoryPort } from '../memory/index.js';
 import { makePack, type NoteMode } from './render.js';
+import { foldByShape, type ShapeFold, type ShapeMode } from './shape-fold.js';
 
 export type BuildPackOptions = {
   readonly memory: MemoryPort;
@@ -62,6 +63,26 @@ export type BuildPackOptions = {
    * sentence displaces the last rule and the arms differ in their packs as well as their wording.
    */
   readonly budgetBasis?: 'note-included' | 'note-excluded';
+  /**
+   * The unit the pack renders: one line per failure, or one line per routine.
+   *
+   * Absent means `per-failure`, which is what every committed artefact measured, so a caller that never
+   * heard of this option renders the pack it always rendered. `collapse` folds same-shape items at the
+   * render boundary and changes nothing else — see `foldByShape` for what a shape is, why the fold
+   * needs two distinct tasks, and why the survivor's statement is copied rather than rewritten.
+   *
+   * The switch is per request rather than per host because that is what lets one dispatch carry both
+   * arms over one store: the same recall, the same ranking, the same budget, one line different.
+   */
+  readonly shape?: ShapeMode;
+  /**
+   * The routine an item states, when the host can name one.
+   *
+   * Absent means the host has no vocabulary for shapes: the pack carries no `fold` census at all, which
+   * is the honest reading of a host that never asked, and it is what keeps every existing caller's
+   * packs byte-identical.
+   */
+  readonly shapeOf?: (item: KnowledgeItem) => string | undefined;
 };
 
 export async function buildPack(
@@ -111,10 +132,36 @@ export async function buildPack(
       ? positive
       : [absence.reduce((best, item) => (item.trust > best.trust ? item : best))];
 
-  return makePack(chosen, {
-    budget,
-    ...(options.tag === undefined ? {} : { tag: options.tag }),
-    ...(options.note === undefined ? {} : { note: options.note }),
-    ...(options.budgetBasis === undefined ? {} : { budgetBasis: options.budgetBasis }),
-  });
+  // The fold is the last thing that happens to the selection: one line per routine instead of one per
+  // failure, with every other decision — which rules, what order, how much room — already made.
+  const fold = foldOf(chosen, options, query);
+  return makePack(
+    fold?.items ?? chosen,
+    {
+      budget,
+      ...(options.tag === undefined ? {} : { tag: options.tag }),
+      ...(options.note === undefined ? {} : { note: options.note }),
+      ...(options.budgetBasis === undefined ? {} : { budgetBasis: options.budgetBasis }),
+    },
+    fold,
+  );
+}
+
+/**
+ * The fold, or nothing when the host cannot name a shape.
+ *
+ * `per-failure` still computes the census — a control that reports `atLeastTwo: 0` on its own pack is a
+ * reading, and the alternative is an arm whose field exists only where the treatment is. The items it
+ * returns are the items it was given, in order.
+ */
+function foldOf(
+  items: readonly KnowledgeItem[],
+  options: BuildPackOptions,
+  query: RecallQuery,
+): ShapeFold | undefined {
+  const { shapeOf } = options;
+  if (shapeOf === undefined) return undefined;
+  // The option wins over the query, as `budget` and `limit` do: an option is the host's decision about
+  // this pack, and the query is a request that a host without the option would still honour.
+  return foldByShape(items, { mode: options.shape ?? query.shape ?? 'per-failure', shapeOf });
 }

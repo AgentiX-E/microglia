@@ -998,12 +998,15 @@ export {
   CEILING_FITS,
   ceilingLineOf,
   ceilingVerdictOf,
+  foldCensus,
   packCensus,
   packLineOf,
   type CeilingVerdict,
+  type FoldCensus,
   type PackCensus,
   type PackReading,
 } from './tau2-pack.js';
+export { callsOfStatement, tau2ShapeOf } from './tau2-shape.js';
 export { stoppedRun } from './stopped-run.js';
 export {
   COMPETITOR_PASS4,

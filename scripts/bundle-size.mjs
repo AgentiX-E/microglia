@@ -67,10 +67,25 @@ import { build } from 'esbuild';
  *   is 125 raw and 175 gzip of headroom: the smallest raise this gate has taken, and
  *   still a deliberate one. Anything that needed more than a thousand bytes would be a
  *   mechanism rather than a correction, and would have to be argued on its own.
+ *
+ * Raised once on 2026-11-14, 47,500 -> 50,600 raw and 16,200 -> 17,400 gzip, for one mechanism
+ * and the thing that makes its switch reachable:
+ *
+ *   `apply/shape-fold.ts` (1,250 B of the measurement) — R109's fold: one line per routine instead of
+ *   one per failure, the medoid that survives it, and the support census the artefact reads. It ships
+ *   because the arm it prices is the only store-side mechanism left with a counted target (53 shapes,
+ *   5 taught by three tasks) and because a mechanism that exists only in a document is not a mechanism.
+ *   `kernel/recall-query.ts` (1,004 B) — the wire's field list, moved out of the HTTP package. This is
+ *   the part that is not optional: the driver grades the arm through its own facade, the facade read
+ *   `task` and `text` and dropped every other pair, and the switch R109 needs would have been inert in
+ *   exactly the way the prefix arm's four knobs were. One parser, two callers.
+ *   The rest is the `fold` field on the pack, the hook in `buildPack`, and the two names of the mode.
+ *   Measured 50,478 raw and 17,203 gzip at this commit: 122 bytes of raw headroom and 197 of gzip, so
+ *   the raise is an allowance for what shipped rather than for what might.
  */
 const BUDGETS = [
   { name: 'browser', entry: 'packages/browser/dist/index.js', raw: 3200, gzip: 1600 },
-  { name: 'core', entry: 'packages/core/dist/index.js', raw: 47500, gzip: 16200 },
+  { name: 'core', entry: 'packages/core/dist/index.js', raw: 50600, gzip: 17400 },
 ];
 
 const probe = process.argv.includes('--probe');

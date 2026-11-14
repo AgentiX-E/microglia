@@ -2,19 +2,19 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 214,
+  "scanned": 217,
   "totals": {
-    "modules": 214,
-    "lines": 58144,
+    "modules": 217,
+    "lines": 58902,
     "adapterLines": 1956,
     "deferredLines": 9043,
-    "coupledShare": 0.187
+    "coupledShare": 0.1846
   },
   "layers": [
     {
       "layer": "core",
-      "modules": 44,
-      "lines": 9493,
+      "modules": 46,
+      "lines": 9968,
       "adapterLines": 0,
       "deferredLines": 0,
       "coupled": 0
@@ -37,8 +37,8 @@
     },
     {
       "layer": "eval",
-      "modules": 151,
-      "lines": 43107,
+      "modules": 153,
+      "lines": 43491,
       "adapterLines": 0,
       "deferredLines": 9043,
       "coupled": 24
@@ -53,8 +53,8 @@
     },
     {
       "layer": "node",
-      "modules": 7,
-      "lines": 1386,
+      "modules": 6,
+      "lines": 1285,
       "adapterLines": 0,
       "deferredLines": 0,
       "coupled": 0
@@ -70,7 +70,7 @@
     {
       "from": "eval",
       "to": "core",
-      "files": 59,
+      "files": 60,
       "upward": false
     },
     {
@@ -88,7 +88,7 @@
     {
       "from": "node",
       "to": "core",
-      "files": 7,
+      "files": 6,
       "upward": false
     }
   ],
@@ -700,7 +700,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "214 modules, 24 deferred with a reason"
+      "detail": "217 modules, 24 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -712,8 +712,8 @@
       "id": "V74-core-is-scenario-free",
       "pass": true,
       "blocking": true,
-      "detail": "44 core modules, zero scenario words in code"
+      "detail": "46 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 58144 production lines across 214 modules: 7 adapter modules in `sql`, 24 deferred with a reason, and `core` at 0 coupled modules of 44; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 58902 production lines across 217 modules: 7 adapter modules in `sql`, 24 deferred with a reason, and `core` at 0 coupled modules of 46; 5 package edges, 0 of them upward."
 }

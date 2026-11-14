@@ -28,7 +28,7 @@
  * prefer complete records for the tasks that can carry them — and it is the census's job to price that
  * choice rather than to refuse it.
  */
-import type { KnowledgePack } from '@agentix-e/microglia-core';
+import type { FoldSupport, KnowledgePack } from '@agentix-e/microglia-core';
 
 /**
  * The pack budget every published arm ran with, and the default an arm that states none inherits.
@@ -39,8 +39,15 @@ import type { KnowledgePack } from '@agentix-e/microglia-core';
  */
 export const DEFAULT_PACK_BUDGET = 1200;
 
-/** The three fields the census reads. Narrowed so a synthetic pack in a test is a pack. */
-export type PackReading = Pick<KnowledgePack, 'ids' | 'truncated' | 'rendered'>;
+/**
+ * The fields the census reads. Narrowed so a synthetic pack in a test is a pack.
+ *
+ * `fold` is optional because most packs do not carry one: only a host that declared a shape extractor
+ * produces it, and a reading without it is a pack whose unit nobody varied rather than a pack that
+ * folded nothing.
+ */
+export type PackReading = Pick<KnowledgePack, 'ids' | 'truncated' | 'rendered'> &
+  Pick<Partial<KnowledgePack>, 'fold'>;
 
 export type PackCensus = {
   /** Characters of knowledge the pack was allowed, as it rendered them. */
@@ -69,7 +76,63 @@ export type PackCensus = {
    * repaired four times already.
    */
   readonly summary: { readonly meanIds: number; readonly meanChars: number } | null;
+  /**
+   * What the fold did, over the packs that carried one.
+   *
+   * R109's readback channel. The counts are sums over requests and the support figure is a distribution
+   * over the *units actually rendered*, because that is the object the competitor's `sup2`/`sup3` cells
+   * are counted in and the one number this arm can move.
+   */
+  readonly fold: FoldCensus | null;
 };
+
+/** The fold, aggregated over a run's requests. `null` when no pack carried one. */
+export type FoldCensus = {
+  /** Packs that carried a shape census. */
+  readonly packs: number;
+  /** Units the fold removed across the run. */
+  readonly folded: number;
+  /** Groups that folded. */
+  readonly groups: number;
+  /** Groups of ≥2 members that did not fold because their distinct tasks fell short. */
+  readonly refused: number;
+  /** Rendered units across those packs, the denominator of the two shares below. */
+  readonly units: number;
+  /** Units taught by ≥2 and ≥3 tasks, summed over packs. */
+  readonly atLeastTwo: number;
+  readonly atLeastThree: number;
+  /** The largest support any single rendered unit carried. */
+  readonly max: number;
+};
+
+/**
+ * The fold, summed over the packs that reported one.
+ *
+ * Sums rather than means: a mean over requests would make a store's recurrence depend on how many times
+ * it was asked, and the question here is what the store could express, not how often it was consulted.
+ */
+export function foldCensus(readings: readonly PackReading[]): FoldCensus | null {
+  const folded = readings.filter((pack) => pack.fold !== undefined);
+  if (folded.length === 0) return null;
+  let foldedItems = 0;
+  let groups = 0;
+  let refused = 0;
+  let units = 0;
+  let atLeastTwo = 0;
+  let atLeastThree = 0;
+  let max = 0;
+  for (const pack of folded) {
+    const fold = pack.fold as { readonly folded: number; readonly groups: readonly unknown[]; readonly refused: number; readonly support: FoldSupport };
+    foldedItems += fold.folded;
+    groups += fold.groups.length;
+    refused += fold.refused;
+    units += pack.ids.length;
+    atLeastTwo += fold.support.atLeastTwo;
+    atLeastThree += fold.support.atLeastThree;
+    if (fold.support.max > max) max = fold.support.max;
+  }
+  return { packs: folded.length, folded: foldedItems, groups, refused, units, atLeastTwo, atLeastThree, max };
+}
 
 export function packCensus(
   readings: readonly PackReading[],
@@ -89,6 +152,7 @@ export function packCensus(
     emptiedBySize: readings.filter((pack) => pack.ids.length === 0 && pack.truncated > 0).length,
     droppedForSize: readings.reduce((sum, pack) => sum + pack.truncated, 0),
     summary: requests === 0 ? null : { meanIds: total / requests, meanChars: chars / requests },
+    fold: foldCensus(readings),
   };
 }
 
@@ -107,10 +171,21 @@ export function packLineOf(census: PackCensus): string {
   const head = `pack: budget ${String(census.budget)}, ${capacity}`;
   const summary = census.summary;
   if (summary === null) return `${head}; absent (no recall request)`;
+  // R109's line, printed only when a pack carried the census: a run whose host cannot name a shape has
+  // nothing to say about units, and printing `folded 0` there would be the reading this arm exists to
+  // separate from a fold that ran and found nothing.
+  const fold = census.fold;
+  const foldLine =
+    fold === null
+      ? ''
+      : `; fold ${String(fold.folded)} of ${String(fold.folded + fold.units)} units ` +
+        `(${String(fold.groups)} groups, ${String(fold.refused)} refused for want of a second task), ` +
+        `support ≥2 ${String(fold.atLeastTwo)}, ≥3 ${String(fold.atLeastThree)}, max ${String(fold.max)}`;
   return (
     `${head}; served ${String(census.filled)} of ${String(census.requests)} ` +
     `(mean ${summary.meanIds.toFixed(1)} items, ${summary.meanChars.toFixed(0)} chars); ` +
-    `dropped for size ${String(census.droppedForSize)}, of which ${String(census.emptiedBySize)} emptied a pack`
+    `dropped for size ${String(census.droppedForSize)}, of which ${String(census.emptiedBySize)} emptied a pack` +
+    foldLine
   );
 }
 

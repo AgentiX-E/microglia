@@ -394,6 +394,72 @@ export type KnowledgePack = {
    * retrieval failure and lower thresholds until the noise returns.
    */
   readonly suppressed?: 'uncorroborated-store';
+  /**
+   * What the pack's units carry, when the host can name a shape.
+   *
+   * Present in both modes: `per-failure` folds nothing and reports the pack as it stands, which is how
+   * the control arm's own support distribution becomes a number rather than an assumption. Absent on
+   * every host that never declared a shape extractor, so no pack written before this field existed
+   * changes.
+   */
+  readonly fold?: ShapeFold;
+};
+
+/**
+ * The two units a pack can carry: one line per failure, or one line per routine.
+ *
+ * The names are words rather than a boolean for the reason every switch in this project is: a
+ * `boolean` reads as "on" in a table nobody annotated, and the thing being varied is a *unit*, which
+ * has two spellings and no default meaning outside the arm that chose one.
+ */
+export type ShapeMode = 'per-failure' | 'collapse';
+
+export const SHAPE_MODES: readonly ShapeMode[] = ['per-failure', 'collapse'];
+
+/** One routine, the members that taught it, and the survivor a folded pack carries. */
+export type FoldedGroup = {
+  /** The shape as the host's extractor spelled it, with the kind removed: one shape may be two groups. */
+  readonly shape: string;
+  /** The member id the pack renders. */
+  readonly kept: string;
+  /** Every member id the group held, in pack order, `kept` included. */
+  readonly members: readonly string[];
+  /** Distinct tasks behind the group — the quantity the fold exists to make visible. */
+  readonly support: number;
+};
+
+/**
+ * What the pack's units carry, over the items it will render.
+ *
+ * The same three numbers on both arms, which is what makes the control's reading a reading rather than
+ * an absence: `per-failure` reports `atLeastTwo: 0` on a store of single-task records, and that zero is
+ * R92's finding reproduced inside the arm instead of argued from the store's size.
+ */
+export type FoldSupport = {
+  readonly max: number;
+  /** Units taught by ≥2 tasks — ALTK's `sup2`. */
+  readonly atLeastTwo: number;
+  /** Units taught by ≥3 tasks — the cell ALTK's `sup3` keeps. */
+  readonly atLeastThree: number;
+};
+
+/** What folding a pack did, and what the units it kept carry. */
+export type ShapeFold = {
+  /** The items to render, in their original order, with each folded group's survivor in place. */
+  readonly items: readonly KnowledgeItem[];
+  /** How many items the fold removed: `input − items`. */
+  readonly folded: number;
+  /** Groups that folded, in pack order. Empty in `per-failure` mode, which folds nothing. */
+  readonly groups: readonly FoldedGroup[];
+  /**
+   * Groups of ≥2 members that did **not** fold because their distinct tasks fell short.
+   *
+   * Counted rather than dropped: a store where nothing folded because every shape was taught once and a
+   * store where nothing folded because nothing recurs are different findings, and an arm that reported
+   * only `folded: 0` could not tell them apart.
+   */
+  readonly refused: number;
+  readonly support: FoldSupport;
 };
 
 export type Policy = {
@@ -518,4 +584,13 @@ export type RecallQuery = {
    * served to all of them.
    */
   readonly before?: number;
+  /**
+   * The unit this request wants: one line per failure, or one line per routine.
+   *
+   * Absent means `per-failure`, the shape every committed artefact measured. `collapse` folds items
+   * that state the same routine into one line, keeping the group's medoid and reporting the support the
+   * group carries — see `apply/shape-fold.ts`, and note that the request can only fold what the host can
+   * name: a host opened without a `shapeOf` extractor folds nothing whatever this says.
+   */
+  readonly shape?: 'per-failure' | 'collapse';
 };

@@ -260,6 +260,58 @@ only when the number you are reproducing was produced under a protocol that inje
 and say so beside the number — a pack of 1.4 rules and a prefix of 292 answer two different
 questions about the same mechanism.
 
+#### Serve one line per routine instead of one per failure
+
+Everything above tunes *which* items a pack carries. This one tunes what an item **is**, and it is the
+only knob in this guide that changes the unit rather than the selection.
+
+A store built from failures records one item per failure. If three different tasks failed the same way —
+same tools, same order, different order ids — that store holds three items whose statements share no
+literal token, because the dedupe key is the normalized statement and the entity is the only thing that
+differs. The recurrence is real and the store cannot say so.
+
+```ts
+const mg = await openMicroglia({
+  app: 'support',
+  namespace: 'acme',
+  store,
+  // How to recognise a routine in *your* records. Return undefined for a record that states none:
+  // it is then its own unit, which is the honest reading of a record that names no routine.
+  shapeOf: (item) => {
+    const line = item.statement.split('\n').find((entry) => entry.startsWith('A: '));
+    return line === undefined ? undefined : line.slice(3).split('; ').map((c) => c.split('(')[0]).join(' > ');
+  },
+});
+
+const pack = await mg.recall({
+  task: 'support.act',
+  text: request,
+  shape: 'collapse',        // one line per routine; absent means 'per-failure'
+});
+
+pack.fold;
+// { folded: 6, groups: [{ shape: 'get_order > exchange_item', kept: 'k_…', members: ['k_…','k_…'], support: 3 }],
+//   refused: 0, support: { max: 3, atLeastTwo: 5, atLeastThree: 1 } }
+```
+
+Three rules make the fold predictable, and each one is a refusal rather than a heuristic:
+
+- **A group folds only when two distinct tasks taught it.** Folding two records of one task produces no
+  support; it produces a task that looks like it was taught twice. Groups that fell short are counted
+  (`refused`) rather than silently kept apart.
+- **The survivor is the group's medoid and its sentence is copied.** Containment over content terms
+  decides which member the others restate; ties go to the earliest-ranked one. Nothing is rewritten — a
+  merge that paraphrases is the operation measured to lose 9.6 points elsewhere.
+- **Nothing else about the item changes.** The union of the group's evidence is *reported*, not written
+  back onto the survivor, so every id in the pack still joins to a record your ledger holds.
+
+Measured offline on the 32-task retail corpus in this repository's fixtures (`pnpm eval:pack-shape`):
+32 records collapse to 26 units (18.75% folded), the whole store costs **82.9%** of its per-failure
+characters, and five units carry support ≥2 with one at 3. At a 2,400-character budget both units serve
+**five** items — so the fold does not buy more rules, it makes the same slots carry corroboration. That
+is the honest expectation to hold: if your store's items are already one-per-routine, or every routine
+was taught once, `shape: 'collapse'` changes nothing and `pack.fold.folded` will say so.
+
 ### 3.2 Tasks and attempts — when one answer is not the whole job
 
 A run is one generation. A task is what the user was trying to finish, and it

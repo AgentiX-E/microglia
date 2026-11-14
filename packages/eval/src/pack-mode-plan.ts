@@ -83,3 +83,44 @@ export function resolvePackModePlan(
     },
   };
 }
+
+/**
+ * Where the pack's *unit* comes from: one line per failure, or one line per routine.
+ *
+ * R109's switch, and the second of the family. `TAU_PACK_MODE` decides which items are served; this
+ * decides what one served item *is*. They are separate variables rather than one because the arms they
+ * carry answer different questions — a prefix arm asks "every admitted rule or a retrieved pack", and a
+ * shape arm asks "one record per failure or one per routine, over the same store" — and a single
+ * variable with four values would make the two questions one experiment that cannot be read as either.
+ *
+ * Both rules of the family apply unchanged: unset means `per-failure`, which is what every committed
+ * artefact measured, and a set value must be one of two names.
+ */
+export type PackShape = 'per-failure' | 'collapse';
+
+export type PackShapePlan = {
+  readonly shape: PackShape;
+  /** Whether this dispatch *is* the arm rather than a dispatch nobody set the switch on. */
+  readonly declared: boolean;
+  /** The recall knobs this shape adds, by query name. Empty for `per-failure`. */
+  readonly knobs: Readonly<Record<string, string>>;
+};
+
+export const PACK_SHAPES: readonly PackShape[] = ['per-failure', 'collapse'];
+
+export function resolvePackShapePlan(
+  env: Readonly<Record<string, string | undefined>>,
+): PackShapePlan {
+  const raw = (env['TAU_PACK_SHAPE'] ?? '').trim();
+  if (raw === '') return { shape: 'per-failure', declared: false, knobs: {} };
+  if (!PACK_SHAPES.includes(raw as PackShape)) {
+    throw new Error(
+      `TAU_PACK_SHAPE must be unset or one of ${PACK_SHAPES.join(', ')}, not '${raw}': ` +
+        'a spelling that is not one of the two would render a pack whose unit nobody declared',
+    );
+  }
+  if (raw === 'per-failure') return { shape: 'per-failure', declared: true, knobs: {} };
+  // The fold's own knob and nothing else: the support floor, the medoid and the kind guard are the
+  // library's decisions, and restating any of them here would be a second home for the mechanism.
+  return { shape: 'collapse', declared: true, knobs: { shape: 'collapse' } };
+}

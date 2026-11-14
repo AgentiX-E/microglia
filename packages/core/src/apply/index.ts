@@ -23,3 +23,9 @@ export {
 } from './render.js';
 
 export { buildPack, type BuildPackOptions } from './pack.js';
+
+export {
+  DEFAULT_FOLD_SUPPORT,
+  foldByShape,
+  type ShapeFoldOptions,
+} from './shape-fold.js';

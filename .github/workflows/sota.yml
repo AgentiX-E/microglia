@@ -1259,6 +1259,9 @@ jobs:
           TAU_SCOPE_VAR: ${{ vars.TAU_DISTILL_SCOPE }}
           TAU_CLAIMS_VAR: ${{ vars.TAU_TRACE_CLAIMS }}
           TAU_PACK_VAR: ${{ vars.TAU_PACK_MODE }}
+          # R109's switch, carried the same way: the header is the experiment's, the variable is what a
+          # dispatch with no registration would run, and the two are reconciled before any model call.
+          TAU_SHAPE_VAR: ${{ vars.TAU_PACK_SHAPE }}
         run: |
           set -euo pipefail
           # The input is the registration ID, not the file name. A stray `.md`
@@ -1307,12 +1310,16 @@ jobs:
           # in a system-prompt prefix, no retrieval, no budget) or only its own (1.42 items a request
           # through a 1,200-character pack). A run that cannot say which it served measured neither.
           pnpm --silent eval:prereg-form "$FILE" "${TAU_FORM_VAR:-}" "${TAU_UNIT_VAR:-}" \
-            "${TAU_SCOPE_VAR:-}" "${TAU_CLAIMS_VAR:-}" "${TAU_PACK_VAR:-}" > "$RUNNER_TEMP/distill.env"
+            "${TAU_SCOPE_VAR:-}" "${TAU_CLAIMS_VAR:-}" "${TAU_PACK_VAR:-}" "${TAU_SHAPE_VAR:-}" \
+            > "$RUNNER_TEMP/distill.env"
           UNIT=$(sed -n 's/^unit=//p' "$RUNNER_TEMP/distill.env")
           FORM=$(sed -n 's/^form=//p' "$RUNNER_TEMP/distill.env")
           SCOPE=$(sed -n 's/^scope=//p' "$RUNNER_TEMP/distill.env")
           CLAIMS=$(sed -n 's/^claims=//p' "$RUNNER_TEMP/distill.env")
           MODE=$(sed -n 's/^mode=//p' "$RUNNER_TEMP/distill.env")
+          # R109: the unit the pack is written in, from the registration's header. Empty means the
+          # variable stands, which is what every artefact committed before this switch ran.
+          SHAPE=$(sed -n 's/^shape=//p' "$RUNNER_TEMP/distill.env")
           # Every switch the registration overrides, as a notice. Not a refusal: the arms read the
           # registration's value, so a stale variable is overridden rather than run — the check that
           # refused on this comparison stopped R58 before its first model call while the run would have
@@ -1323,7 +1330,7 @@ jobs:
           # is `anchoring=scope&minCoverage=0`, and a fragment written in YAML would be the copy that
           # drifts the first time an arm is refined. Empty for `retrieved`, which keeps the request
           # byte-identical to every committed artefact's.
-          KNOBS=$(pnpm --silent eval:pack-knobs "${MODE:-}")
+          KNOBS=$(pnpm --silent eval:pack-knobs "${MODE:-}" "${SHAPE:-}")
           pnpm --silent eval:prereg-scenario "$FILE" > "$RUNNER_TEMP/scenario.env"
           TRAIN=$(sed -n 's/^train=//p' "$RUNNER_TEMP/scenario.env")
           TEST=$(sed -n 's/^test=//p' "$RUNNER_TEMP/scenario.env")
@@ -1339,6 +1346,7 @@ jobs:
           echo "scope=$SCOPE" >> "$GITHUB_OUTPUT"
           echo "claims=$CLAIMS" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "shape=$SHAPE" >> "$GITHUB_OUTPUT"
           echo "knobs=$KNOBS" >> "$GITHUB_OUTPUT"
           echo "trainTasks=$(echo "$CAPS" | sed -n 's/^train=//p')" >> "$GITHUB_OUTPUT"
           echo "testTasks=$(echo "$CAPS" | sed -n 's/^test=//p')" >> "$GITHUB_OUTPUT"
@@ -1448,6 +1456,9 @@ jobs:
           # travels into the artefact so a readback can tell the two apart.
           TAU_TRACE_CLAIMS: ${{ steps.recall_floor.outputs.claims || vars.TAU_TRACE_CLAIMS }}
           TAU_PACK_MODE: ${{ steps.recall_floor.outputs.mode || vars.TAU_PACK_MODE }}
+          # R109: one variable, and the second arm reads the same value as the first — the two arms are
+          # one experiment and a control that ran a different unit is not a control.
+          TAU_PACK_SHAPE: ${{ steps.recall_floor.outputs.shape || vars.TAU_PACK_SHAPE }}
           MICROGLIA_PACK_KNOBS: ${{ steps.recall_floor.outputs.knobs }}
           # R57: which controlled distractor this leg plants, and nothing else. It comes from the
           # registration's `plantedArms` header by way of the `arms` job, not from a repository
@@ -1627,6 +1638,9 @@ jobs:
           TAU_DISTILL_SCOPE: ${{ steps.recall_floor.outputs.scope || vars.TAU_DISTILL_SCOPE }}
           TAU_TRACE_CLAIMS: ${{ steps.recall_floor.outputs.claims || vars.TAU_TRACE_CLAIMS }}
           TAU_PACK_MODE: ${{ steps.recall_floor.outputs.mode || vars.TAU_PACK_MODE }}
+          # R109: one variable, and the second arm reads the same value as the first — the two arms are
+          # one experiment and a control that ran a different unit is not a control.
+          TAU_PACK_SHAPE: ${{ steps.recall_floor.outputs.shape || vars.TAU_PACK_SHAPE }}
           MICROGLIA_PACK_KNOBS: ${{ steps.recall_floor.outputs.knobs }}
           TAU_SEED: ${{ vars.TAU_SEED }}
           TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}

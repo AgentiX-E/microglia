@@ -5,6 +5,7 @@ import {
   CEILING_FITS,
   ceilingLineOf,
   ceilingVerdictOf,
+  foldCensus,
   packCensus,
   packLineOf,
 } from '../tau2-pack.js';
@@ -129,5 +130,73 @@ describe('ceilingLineOf', () => {
     expect(ceilingLineOf({ ceiling: undefined, budget: 1200, capacity: 810 })).toBe(
       'ceiling absent (the module default stands; capacity 810 at budget 1200)',
     );
+  });
+});
+
+/**
+ * R109's readback channel: what the fold did to the packs a run served.
+ *
+ * The counts are sums and not means, because a mean over requests would make a store's recurrence depend
+ * on how often it was consulted. The one figure that is not a sum is `max`, the largest support any
+ * rendered unit carried — the quantity the competitor's `sup2`/`sup3` cells are counted in.
+ */
+describe('foldCensus', () => {
+  const folded = (foldedItems: number, support: { max: number; atLeastTwo: number; atLeastThree: number }) => ({
+    folded: foldedItems,
+    groups: Array.from({ length: foldedItems }, () => ({})),
+    refused: 0,
+    support,
+    items: [],
+  });
+
+  it('sums what the fold removed and what the units it kept carry', () => {
+    const census = foldCensus([
+      { ids: ['a', 'b'], truncated: 0, rendered: 'x', fold: folded(2, { max: 3, atLeastTwo: 2, atLeastThree: 1 }) },
+      { ids: ['c'], truncated: 0, rendered: 'y', fold: folded(1, { max: 2, atLeastTwo: 1, atLeastThree: 0 }) },
+    ]);
+    expect(census).toEqual({
+      packs: 2,
+      folded: 3,
+      groups: 3,
+      refused: 0,
+      units: 3,
+      atLeastTwo: 3,
+      atLeastThree: 1,
+      max: 3,
+    });
+  });
+
+  it('reports nothing when no pack carried a census, which is not a pack that folded nothing', () => {
+    // A host that never declared a shape extractor produces no `fold` field, and a zero here would read
+    // as "the fold ran and changed nothing" — the state this whole arm is measured to distinguish.
+    expect(foldCensus([{ ids: ['a'], truncated: 0, rendered: 'x' }])).toBeNull();
+    expect(foldCensus([])).toBeNull();
+  });
+
+  it('counts a pack that carried a census and folded nothing as a reading', () => {
+    const census = foldCensus([
+      { ids: ['a', 'b'], truncated: 0, rendered: 'x', fold: folded(0, { max: 1, atLeastTwo: 0, atLeastThree: 0 }) },
+    ]);
+    expect(census).toMatchObject({ packs: 1, folded: 0, units: 2, atLeastTwo: 0, max: 1 });
+  });
+
+  it('prints what the fold did, and prints nothing at all when no pack carried one', () => {
+    const withFold = packCensus(
+      [{ ids: ['a'], truncated: 0, rendered: 'x', fold: folded(3, { max: 3, atLeastTwo: 4, atLeastThree: 1 }) }],
+      { budget: 2400, capacity: 810 },
+    );
+    expect(packLineOf(withFold)).toContain(
+      'fold 3 of 4 units (3 groups, 0 refused for want of a second task), support ≥2 4, ≥3 1, max 3',
+    );
+    const without = packCensus([{ ids: ['a'], truncated: 0, rendered: 'x' }], { budget: 2400, capacity: 810 });
+    expect(packLineOf(without)).not.toContain('fold');
+  });
+
+  it('travels on the pack census, so an artefact cannot report one without the other', () => {
+    const census = packCensus(
+      [{ ids: ['a'], truncated: 0, rendered: 'x', fold: folded(1, { max: 2, atLeastTwo: 1, atLeastThree: 0 }) }],
+      { budget: 2400, capacity: 810 },
+    );
+    expect(census.fold).toMatchObject({ packs: 1, folded: 1, max: 2 });
   });
 });

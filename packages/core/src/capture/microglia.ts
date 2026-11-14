@@ -25,6 +25,7 @@ import type {
   FeedbackEvent,
   FeedbackSignal,
   Json,
+  KnowledgeItem,
   KnowledgePack,
   Policy,
   RandomSource,
@@ -73,6 +74,8 @@ export class Microglia implements RunHost {
   private readonly note: NoteMode | undefined;
   /** See `RenderOptions.budgetBasis`; `undefined` is the historical accounting. */
   private readonly budgetBasis: 'note-included' | 'note-excluded' | undefined;
+  /** See `MicrogliaOptions.shapeOf`; `undefined` means this host cannot name a shape at all. */
+  private readonly shapeOf: ((item: KnowledgeItem) => string | undefined) | undefined;
   private readonly creditEnabled: boolean;
   private readonly corroborationFloor: number | undefined;
   /**
@@ -115,6 +118,7 @@ export class Microglia implements RunHost {
     this.tag = options.tag;
     this.note = options.note;
     this.budgetBasis = options.budgetBasis;
+    this.shapeOf = options.shapeOf;
     this.creditEnabled = options.credit ?? true;
     this.editSemantics = options.editSemantics;
     this.corroborationFloor = options.corroborationFloor;
@@ -181,6 +185,10 @@ export class Microglia implements RunHost {
         ...(this.tag === undefined ? {} : { tag: this.tag }),
         ...(note === undefined ? {} : { note }),
         ...(this.budgetBasis === undefined ? {} : { budgetBasis: this.budgetBasis }),
+        // The unit is the request's, the vocabulary is the host's: a request that asks for `collapse`
+        // on a host that cannot name a shape folds nothing, which is why the two travel separately.
+        ...(query.shape === undefined ? {} : { shape: query.shape }),
+        ...(this.shapeOf === undefined ? {} : { shapeOf: this.shapeOf }),
       },
     );
     // An empty pack for a reason is not the same as an empty pack for no reason, and a

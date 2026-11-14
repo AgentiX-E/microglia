@@ -18,7 +18,7 @@
 import { Hono } from 'hono';
 import { MicrogliaError, isMicrogliaError } from '@agentix-e/microglia-core';
 import { RPC_PARSE_ERROR, createMcpHandler } from './mcp.js';
-import { recallQueryOf } from './recall-query.js';
+import { recallQueryOf } from '@agentix-e/microglia-core';
 import type {
   ErasureSelector,
   FeedbackInput,

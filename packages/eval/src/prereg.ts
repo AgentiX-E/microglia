@@ -309,6 +309,14 @@ export type Prereg = {
    */
   readonly packMode?: string;
   /**
+   * The unit this registration's packs are written in: one line per failure, or one per routine.
+   *
+   * R109's switch, registered the same way the pack mode is and for the same reason: the arm is one
+   * variable, and a variable that lives only in a repository setting is global — one registration's
+   * unit applied to every queued dispatch, with no way to run the other one beside it.
+   */
+  readonly packShape?: string;
+  /**
    * Whether this registration's dispatch asks the model to think.
    *
    * R84 asks a question the record cannot answer without it: R82 measured the expensive backbone 6.00pp
@@ -379,6 +387,7 @@ const HEADER_KEYS = [
   'queryPin',
   'release',
   'packMode',
+  'packShape',
   'thinking',
 ] as const;
 
@@ -418,6 +427,16 @@ const HEADER_SCOPES: ReadonlySet<string> = new Set(['edited', 'all']);
 
 /** The two places a pack may be served from. `retrieved` is the lane's own protocol. */
 const HEADER_PACK_MODES: ReadonlySet<string> = new Set(['retrieved', 'prefix']);
+/**
+ * The two units, spelled here for `HEADER_PACK_MODES`' reason and one of its own.
+ *
+ * It was imported from the core package first, and `prereg-imports.test.ts` refused it: reading a
+ * registration happens before anything is built, so this file's relative closure may not reach a package
+ * whose entry point is `dist/`. That guard is right and the import was wrong. A copy risks drift, so the
+ * test beside the pack's own plan asserts the two sets are equal — the drift is caught by a test rather
+ * than by a comment asking future editors to be careful.
+ */
+export const HEADER_PACK_SHAPES: ReadonlySet<string> = new Set(['per-failure', 'collapse']);
 const LANE_LIST = 'product, transfer or hostile';
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
@@ -939,6 +958,19 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  const packShapeText = values.get('packShape');
+  let packShape: string | undefined;
+  if (packShapeText !== undefined) {
+    if (!HEADER_PACK_SHAPES.has(packShapeText)) {
+      collected.push({
+        where: `header 'packShape'`,
+        problem: `'${packShapeText}' is not one of ${[...HEADER_PACK_SHAPES].join(', ')}`,
+      });
+    } else {
+      packShape = packShapeText;
+    }
+  }
+
   const packModeText = values.get('packMode');
   let packMode: string | undefined;
   if (packModeText !== undefined) {
@@ -1081,6 +1113,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(queryPin === undefined ? {} : { queryPin }),
       ...(release === undefined ? {} : { release }),
       ...(packMode === undefined ? {} : { packMode }),
+      ...(packShape === undefined ? {} : { packShape }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,
       refutation,

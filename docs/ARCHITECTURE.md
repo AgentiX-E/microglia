@@ -145,6 +145,19 @@ accounting every published number used; a host that varies the note declares `no
 longer sentence cannot buy its characters by dropping a rule. Both are properties of the boundary, so
 both belong here rather than in a caller.
 
+The third is the newest and the one with the largest scope: **the unit a pack is written in is a
+delivery decision** (`RecallQuery.shape`, defaulting to `per-failure`). A store that records one item per
+failure cannot express that three tasks taught the same routine, because the dedupe key is the
+normalized statement and two failures of one routine differ in every literal token. Folding those items
+at the render boundary — keeping the group's medoid, reporting the support the group carries — makes the
+store's recurrence visible to the model without changing what the store holds, which is what lets one
+dispatch compare the two units over one store. Two halves are deliberately in different places: the
+**request** says which unit it wants, and the **host** declares how to recognise a routine
+(`shapeOf`), because the shape of a record is the lane's vocabulary rather than the library's. Folding
+never rewrites a survivor's statement and never writes the group's evidence back onto it: an item whose
+provenance described a corroboration no task contributed would be an item a ledger could not join back
+to the store.
+
 ### 2.5 `capture` is the only stateful facade
 
 `Microglia` holds configuration, a clock, and a random source. A `RunHandle` holds one run. Nothing

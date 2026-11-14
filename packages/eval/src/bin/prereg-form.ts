@@ -15,7 +15,7 @@
  * would be a fifth place for the three refusals to drift apart.
  *
  * Usage: pnpm eval:prereg-form prereg/<id>.md [configured-form] [configured-unit] [configured-scope]
- *        [configured-claims] [configured-pack-mode]
+ *        [configured-claims] [configured-pack-mode] [configured-pack-shape]
  *   -> prints one `key=value` line per switch and exits 0, or prints the reason and exits 1.
  */
 import { readFileSync } from 'node:fs';
@@ -30,7 +30,7 @@ function main(): void {
   const file = process.argv[2];
   if (file === undefined) {
     refuse(
-      'usage: pnpm eval:prereg-form prereg/<id>.md [form] [unit] [scope] [trace-claims] [pack-mode]',
+      'usage: pnpm eval:prereg-form prereg/<id>.md [form] [unit] [scope] [trace-claims] [pack-mode] [pack-shape]',
     );
     return;
   }
@@ -76,10 +76,16 @@ function main(): void {
   // discovered in the readback.
   const declaredMode = reading.prereg.packMode;
   note('mode', declaredMode, process.argv[7] ?? null);
+  // R109's switch, the eighth of the family. The unit a pack is written in is a property of the
+  // experiment, exactly as the place it is served from is: a registration that fixes one unit and a
+  // dispatch whose variable says the other would publish one arm under the other's name.
+  const declaredShape = reading.prereg.packShape;
+  note('shape', declaredShape, process.argv[8] ?? null);
   process.stdout.write(
     `unit=${declaredUnit ?? ''}\nform=${declared ?? ''}\nscope=${declaredScope ?? ''}\n` +
       `claims=${declaredClaims === undefined ? '' : String(declaredClaims)}\n` +
       `mode=${declaredMode ?? ''}\n` +
+      `shape=${declaredShape ?? ''}\n` +
       // One line, `;`-joined, because the workflow reads each value with `sed -n 's/^key=//p'` and an
       // expression that split a list would be a parser in YAML. Empty when every switch agrees.
       `overrides=${notices.join('; ')}\n`,

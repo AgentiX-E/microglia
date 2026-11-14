@@ -42,9 +42,11 @@ import {
   ruleInterpreter,
 } from "@agentix-e/microglia-core/distill";
 import {
+  recallQueryOf,
   recallText,
   steppingClock,
   mulberry32,
+  type RecallQuery,
 } from "@agentix-e/microglia-core";
 import {
   AS_IS_FLOOR,
@@ -163,6 +165,8 @@ import { consolidateKnowledge } from "@agentix-e/microglia-core/distill";
 import { sweepConsolidation, sweepSummary } from "../consolidation-sweep.js";
 import type { Tau2PhaseUsage } from "../tau2-instrument.js";
 import { cacheCensusVerdict } from "../cache-census.js";
+import { tau2ShapeOf } from "../tau2-shape.js";
+import { startRecallFacade } from "../tau2-facade.js";
 import { defaultPolicy } from "@agentix-e/microglia-core";
 
 const runFile = promisify(execFile);
@@ -694,50 +698,6 @@ function scoredArm(path: string): {
 }
 
 /**
- * A one-endpoint facade: the agent process reads packs, and writes nothing.
- *
- * The agent states the scenario it is answering in and the facade does not use it. That is the
- * treatment of a transfer arm rather than an oversight: the store's scope decides what can be
- * served, and the episode's scenario would filter a foreign pack down to nothing.
- */
-function startRecall(
-  recall: (input: {
-    task: string;
-    text: string;
-  }) => Promise<{ rendered: string }>,
-): Promise<{ url: string; close: () => Promise<void> }> {
-  const server: Server = createServer((request, response) => {
-    const url = new URL(request.url ?? "/", "http://127.0.0.1");
-    if (url.pathname !== "/v1/recall") {
-      response.writeHead(404).end();
-      return;
-    }
-    const task = url.searchParams.get("task") ?? TASK;
-    const text = url.searchParams.get("text") ?? "";
-    recall({ task, text })
-      .then((pack) => {
-        response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ rendered: pack.rendered }));
-      })
-      .catch(() => response.writeHead(500).end());
-  });
-  return new Promise((resolve) => {
-    server.listen(0, "127.0.0.1", () => {
-      const address = server.address();
-      const port =
-        typeof address === "object" && address !== null ? address.port : 0;
-      resolve({
-        url: `http://127.0.0.1:${port}`,
-        close: () =>
-          new Promise<void>((done) => {
-            server.close(() => done());
-          }),
-      });
-    });
-  });
-}
-
-/**
  * What `run()` saw, and the shape the protocol's gates read it in.
  *
  * Two functions rather than one return value because `l4.ts` was written against
@@ -1233,6 +1193,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // by dropping the last rule. Declared only for the arm that needs it, because an upgrade
     // must not change what a published number measured.
     ...(NOTE_ARMS.enabled ? { budgetBasis: NOTE_ARMS.budgetBasis } : {}),
+    // R109: the host's half of the shape fold. The lane's records state their calls on an `A:` line and
+    // nothing else knows that, so the vocabulary is declared here and the request only says which unit it
+    // wants. A dispatch that declares `shape=per-failure` gets the same census over the same pack, which
+    // is what makes the two arms one experiment.
+    shapeOf: tau2ShapeOf,
   });
 
   let withTrace = 0;
@@ -1604,17 +1569,21 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // because the facade is never told which task an episode belongs to -- the agent sends
     // `task=tau2.act` on all 228 requests -- so an episode IS its position here.
     const recallInputs: RecallInput[] = [];
-    const facade = await startRecall(async ({ text }) => {
+    const facade = await startRecallFacade(async ({ text, query }) => {
       const index = recallInputs.length;
       // The pin replaces the *retrieval* query and not the user's message: the episode still reads the
       // phrasing the simulator wrote, and only what the pack is ranked on is held fixed.
       const used = queryPin === undefined ? text : pinnedQueryText(queryPin, index);
       recallInputs.push({ index, asked: text, used });
+      // The request's knobs first, then the two this file owns: the task label the store is scoped to,
+      // and the scope itself. The registration's floor is the fallback and not the value, so an arm that
+      // asks for `minCoverage=0` is served the pack it declared instead of the one the header rescued.
       const pack = await host.recall({
+        ...query,
         task: TASK,
         text: used,
         scope: { domain: RECALL_DOMAIN },
-        minCoverage: floor,
+        minCoverage: query.minCoverage ?? floor,
         // R53: the level is a rendering option of THIS recall. `undefined` keeps the host's,
         // which is what every single-facade and paired dispatch does.
         ...(note === undefined ? {} : { note }),
@@ -1627,7 +1596,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         recallRequests += 1;
         if (pack.items.length > 0) recallServed += 1;
         servedPackSizes.push(pack.items.length);
-        packReadings.push({ ids: pack.ids, truncated: pack.truncated, rendered: pack.rendered });
+        packReadings.push({
+          ids: pack.ids,
+          truncated: pack.truncated,
+          rendered: pack.rendered,
+          ...(pack.fold === undefined ? {} : { fold: pack.fold }),
+        });
         useObservations.push({
           // The query the pack was ranked on, which is the only text a coverage reading is about.
           query: used,
@@ -1658,7 +1632,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       servedPackSizes.push(pack.items.length + 1);
       // The host's pack, before the planted line: the census prices the budget the store's items
       // competed for, and the appended rule is not one of them.
-      packReadings.push({ ids: pack.ids, truncated: pack.truncated, rendered: pack.rendered });
+      packReadings.push({
+        ids: pack.ids,
+        truncated: pack.truncated,
+        rendered: pack.rendered,
+        ...(pack.fold === undefined ? {} : { fold: pack.fold }),
+      });
       useObservations.push({
         query: used,
         statements: [
@@ -1671,7 +1650,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         ids: pack.ids,
       });
       return { ...pack, rendered: injection.rendered };
-    });
+    }, { task: TASK });
     let evalStdout = "";
     try {
       evalStdout = await phase(

@@ -11,6 +11,7 @@ import type {
   Clock,
   Json,
   JsonObject,
+  KnowledgeItem,
   KnowledgePack,
   Policy,
   RandomSource,
@@ -65,6 +66,15 @@ export type MicrogliaOptions = {
    * last rule, so the arms would differ in their packs as well as in their wording.
    */
   readonly budgetBasis?: 'note-included' | 'note-excluded';
+  /**
+   * The routine a record states, in this host's own vocabulary, or `undefined` when it states none.
+   *
+   * The host's half of the shape fold (`apply/shape-fold.ts`): a request asks for `collapse`, and only
+   * the host can say what a record's shape *is*, because that is the lane's format rather than the
+   * library's. Absent means no fold census is produced at all, which keeps every existing host's packs
+   * byte-identical and is the honest reading of one that never asked.
+   */
+  readonly shapeOf?: (item: KnowledgeItem) => string | undefined;
   /** Apply feedback to the knowledge that was in the run's prompt. Default true. */
   readonly credit?: boolean;
   /**

@@ -14,6 +14,7 @@
  */
 import { MicrogliaError, hashText, hashJson } from '../kernel/index.js';
 import type { Json, KnowledgeItem, KnowledgePack, RecallQuery } from '../kernel/index.js';
+import type { ShapeFold } from './shape-fold.js';
 
 export const OPEN_TAG = '<microglia-knowledge';
 export const CLOSE_TAG = '</microglia-knowledge>';
@@ -306,6 +307,7 @@ export function renderPack(items: readonly RenderableItem[], options: RenderOpti
 export function makePack(
   items: readonly KnowledgeItem[],
   options: RenderOptions,
+  fold?: ShapeFold,
 ): KnowledgePack {
   // `suppressed` is set by the caller that decided to silence the pack, not by the
   // renderer: this function only knows what it was given.
@@ -322,6 +324,9 @@ export function makePack(
     hash: hashText(rendered.rendered),
     budget: options.budget,
     truncated: rendered.truncated,
+    // Carried rather than merged into `items`: a pack that rewrote its survivors' evidence trails
+    // would be a pack a ledger could not join back to the store.
+    ...(fold === undefined ? {} : { fold }),
   };
 }
 

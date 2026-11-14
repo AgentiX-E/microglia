@@ -18,7 +18,8 @@
  *
  * Every problem is reported rather than the first, because the caller is reading a URL they wrote.
  */
-import type { RecallQuery } from '@agentix-e/microglia-core';
+import type { RecallQuery, ShapeMode } from './types.js';
+import { SHAPE_MODES } from './types.js';
 
 /** What the route needs from the request besides the knobs, all already read. */
 export type RecallFixed = Pick<RecallQuery, 'task' | 'text'> & {
@@ -84,6 +85,14 @@ export function recallQueryOf(get: (name: string) => string | undefined, fixed: 
     problems.push(`anchoring is not one of ${ANCHORINGS.join(', ')}`);
   }
 
+  // The unit this request wants. R109's switch, and the same rule as every other name here: a spelling
+  // that is not one of the two would render a pack whose unit nobody declared, which is precisely the
+  // confound the arm exists to remove.
+  const rawShape = get('shape');
+  if (rawShape !== undefined && !SHAPE_MODES.includes(rawShape as ShapeMode)) {
+    problems.push(`shape is not one of ${SHAPE_MODES.join(', ')}`);
+  }
+
   if (problems.length > 0) return { error: problems.join('; ') };
 
   return {
@@ -95,6 +104,7 @@ export function recallQueryOf(get: (name: string) => string | undefined, fixed: 
       ...(minCoverage === undefined ? {} : { minCoverage }),
       ...(rawAnchoring === undefined ? {} : { anchoring: rawAnchoring as 'lexical' | 'scope' }),
       ...(before === undefined ? {} : { before }),
+      ...(rawShape === undefined ? {} : { shape: rawShape as ShapeMode }),
     },
   };
 }

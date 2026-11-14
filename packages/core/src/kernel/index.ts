@@ -18,6 +18,8 @@ export type {
   FeedbackEvent,
   FeedbackKind,
   FeedbackSignal,
+  FoldSupport,
+  FoldedGroup,
   Json,
   JsonObject,
   JsonPath,
@@ -32,6 +34,8 @@ export type {
   RunProvenance,
   RunRecord,
   ProvenanceTier,
+  ShapeFold,
+  ShapeMode,
   TaskRecord,
   TaskStatus,
   Utility,
@@ -40,8 +44,24 @@ export type {
 
 export { MicrogliaError, isMicrogliaError, type MicrogliaErrorCode } from './errors.js';
 
+/**
+ * The wire's field list, beside the type it reflects.
+ *
+ * Moved here from the HTTP package in R109: the driver that grades the shape arm builds its own facade
+ * and has to parse the same knobs, and a second copy of the list is the defect this file exists to
+ * prevent. A seventh knob added to `RecallQuery` arrives as a compile error one directory from the type
+ * rather than one package away.
+ */
+export {
+  recallQueryOf,
+  type RecallFixed,
+  type RecallParsed,
+} from './recall-query.js';
+
 /** Value, not a type: the ordering the promotion gate compares tiers with. */
 export { TIER_RANK } from './types.js';
+/** Value, not a type: the two names a `shape` knob may carry, in the order a table lists them. */
+export { SHAPE_MODES } from './types.js';
 export { tierFor } from './provenance.js';
 
 export {
