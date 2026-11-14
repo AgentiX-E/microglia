@@ -587,6 +587,20 @@ describe('the facadeShapes header', () => {
     ).toBe(true);
   });
 
+  it('carries a pack shape it recognises through to the dispatch', () => {
+    expect(readPrereg(withHeader('packShape: collapse'), 'R8.3-xiyan-cell.md').prereg?.packShape).toBe(
+      'collapse',
+    );
+  });
+
+  it('refuses a pack shape the renderer does not know, rather than passing it through', () => {
+    // The header names a rendering mode the driver has to honour; a typo that reached the dispatch
+    // would render the lane's default shape under a registration claiming another one.
+    const problems = problemsOf(withHeader('packShape: collapsed'));
+    expect(problems.some((entry) => entry.includes("header 'packShape'"))).toBe(true);
+    expect(problems.some((entry) => entry.includes("'collapsed' is not one of"))).toBe(true);
+  });
+
   it('refuses a second treatment in the same registration', () => {
     for (const [extra, needle] of [
       ['recallFloor: 0.01\nfacadePair: as-is-floored\nfacadeShapes: two-unit', 'paired recall facade'],

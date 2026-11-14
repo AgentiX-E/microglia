@@ -1270,3 +1270,20 @@ mean three different things and are kept apart — no watermark is not `before: 
 recorded attempt predates the episode and is served to all of them, and `0` is a real attempt. The
 quantifier is *every*: a claim citing attempts 1 and 3 is one item, so the later observation withholds
 the whole claim.
+
+**Blank reply** — A distiller reply with no visible character: `""`, `"\n\n"`, spaces. It is **not**
+the same as an *empty* reply (`[]` or `{"candidates":[]}`, where the model chose silence) and not the
+same as an *unparsed* one (prose the parser cannot read). The three have different fixes and a
+census that merges them reports `0 empty` while most of its calls returned nothing — which is what
+happened to this project's lane on a full dispatch before the states were separated.
+
+**Writer census** — Which side of the resilient pair produced the claims in a store, and how much of
+the population it covered. Decided by *claims*, never by calls: a rule fallback that is invoked and
+returns nothing has produced nothing, and reading the invocation count as authorship calls a store
+the fallback's when every claim in it is the model's. `microglia` records `distillWriter` and
+`distillFaults` on every arm, so "what wrote this store" is a field and not an inference.
+
+**Null contrast** — The paired difference between two arms that received the **same** treatment, and
+therefore an estimate of the lane's run-to-run noise rather than a contribution. It is reported
+separately from a treatment contrast and never merged with one: a delta inside it cannot be
+attributed to anything, so any claimed effect smaller than the null contrast is not a measurement.

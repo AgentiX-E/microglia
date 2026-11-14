@@ -708,7 +708,26 @@ describe('the projection has a decision for every field, and keeps it', () => {
       // R111: what the distiller's replies contained, and whether a pre-flight preceded them. Both
       // are carried rather than reduced: the reply census is the only counter that can see a model
       // choosing silence, and a pre-flight's absence is not a failure.
-      distillReplies: { calls: 15, empty: 0, chars: 2400, clientCalls: 15 },
+      distillReplies: { calls: 15, answered: 15, empty: 0, blank: 0, unparsed: 0, chars: 2400, clientCalls: 15 },
+      // R114: which writer produced the store. Carried because `stored` cannot say whose claims
+      // they are — the resilient pair answers a faulting event with the rule interpreter.
+      distillFaults: {
+        events: 0,
+        answered: 0,
+        primaryClaims: 15,
+        fallbackClaims: 0,
+        reasons: [],
+        samples: {},
+      },
+      distillWriter: {
+        state: 'model' as const,
+        asked: 15,
+        faults: 0,
+        primaryClaims: 15,
+        fallbackClaims: 0,
+        modelCoverage: 1,
+        sentence: 'the model wrote 15 claim(s) from 15 of 15 event(s) (1.0000) and no event fell back',
+      },
       distillModel: 'deepseek-chat',
       distillPreflight: {
         state: 'answered' as const,

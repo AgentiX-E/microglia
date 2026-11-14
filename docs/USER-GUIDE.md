@@ -2262,6 +2262,35 @@ A memory that must be retrieved by the question's own words can only act on word
 building a definitional layer over your own corpus, measure that recurrence; the number is available without
 a model call.
 
+### 13.19 When the distiller answers nothing — three silences, three fixes
+
+A distillation call can come back with nothing in it in three different ways, and they are not the
+same problem. The census in `distillReplies` separates them, and so should your reading of a store
+that came out smaller than you expected.
+
+| state | what came back | what it means | what to change |
+| --- | --- | --- | --- |
+| `empty` | `[]` or `{"candidates":[]}` | the model read the correction and chose silence | the example or the instruction: there was nothing to generalise |
+| `blank` | `""`, `"\n\n"` — no visible character | the call returned nothing at all | the model, the form, or the completion budget — this is not a prompt-tuning problem |
+| `unparsed` | prose or a truncated object | the model answered and the parser could not read it | the format instruction, or the token ceiling |
+
+A real dispatch from this project's own benchmark read `73 call(s), 0 empty, 6824 character(s)
+returned` and looked healthy; 63 of the 73 were **blank**, six claims reached the store, and the pack
+limit then served five of those six to every request. Two lessons transfer:
+
+- **Check the partition, not the total.** `answered + empty + blank + unparsed` must equal `calls`.
+  Any line that reports one of them without the others can call a broken writer healthy.
+- **Check what the store covers.** Six items against a five-item pack limit is not a retrieval any
+  more: it is a constant prefix on every prompt, and a score measured under it says nothing about
+  what retrieval would do with a store as wide as your corpus.
+
+**And check which writer wrote it.** `distillWriter` reports `model`, `fallback`, `mixed` or `none`,
+decided by which side produced *claims* and not by which side was called: a rule interpreter can be
+invoked on every event and return nothing, and a store whose every claim came from the model is not
+the fallback's because the fallback ran. `modelCoverage` sits beside it — the share of corrections
+the model answered at all — which is the number that tells you whether a store represents its
+population.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

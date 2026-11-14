@@ -288,6 +288,17 @@ export type ShapeArmRecord = {
     readonly inaction: InactionCensus;
   }[];
   readonly contrasts: readonly ShapeContrast[];
+  /**
+   * R114: the same pair, computed when the treatment did not fire.
+   *
+   * `NO_TREATMENT` means the fold removed nothing, so both arms rendered the same pack and the two
+   * evaluations are two draws of **one** configuration. That is not a contribution — and it is the
+   * most useful number in the dispatch, because the difference between two draws of one
+   * configuration is this lane's run-to-run noise, which is the floor every contrast here has to
+   * clear. R104 printed `per-failure pass4 55.00% | collapse pass4 72.50%` and called the pair
+   * `NO_TREATMENT`, leaving a reader with two numbers and no way to know they are not a comparison.
+   */
+  readonly nullContrasts: readonly ShapeContrast[];
   readonly containment: ShapeContainment;
   readonly seed: number;
   readonly model: string;
@@ -334,23 +345,35 @@ export function shapeArmReading(input: {
       inaction: arm.inaction,
     })),
     contrasts: [],
+    nullContrasts: [],
     containment: shapeContainment(input.arms),
     seed: input.seed,
     model: input.model,
   };
-  if (shapeArmState(draft) !== 'MEASURED') return draft;
-  const primary = input.arms.find((arm) => arm.shape === PRIMARY_SHAPE);
+  const state = shapeArmState(draft);
+  // `CONTAINMENT_BROKEN` and `NO_DELIVERY` invalidate the pair and report nothing, for the reason
+  // above. `NO_TREATMENT` does not: both arms delivered packs from one store over one split, so the
+  // pair is valid and its delta is a measurement — of the lane's noise rather than of the unit. The
+  // first version returned no contrast for all three, which threw away the only free estimate of the
+  // resolution every other contrast is graded against.
+  if (state !== 'MEASURED' && state !== 'NO_TREATMENT') return draft;
+  const pairs = pairwiseContrasts(input.arms);
+  return state === 'MEASURED' ? { ...draft, contrasts: pairs } : { ...draft, nullContrasts: pairs };
+}
+
+/** Every treatment arm against the primary one, on the tasks both scored. */
+function pairwiseContrasts(arms: readonly ShapeArmReading[]): ShapeContrast[] {
+  const primary = arms.find((arm) => arm.shape === PRIMARY_SHAPE);
+  if (primary === undefined) return [];
   const contrasts: ShapeContrast[] = [];
-  if (primary !== undefined) {
-    for (const arm of input.arms) {
-      if (arm.shape === PRIMARY_SHAPE) continue;
-      if (arm.tasks.length === 0 || primary.tasks.length === 0) continue;
-      const comparison = compareArms(primary.tasks, arm.tasks, PAIR_SEED, PAIR_RESAMPLES);
-      if (comparison.paired === 0) continue;
-      contrasts.push({ kind: 'shape-contrast', baseline: PRIMARY_SHAPE, arm: arm.shape, comparison });
-    }
+  for (const arm of arms) {
+    if (arm.shape === PRIMARY_SHAPE) continue;
+    if (arm.tasks.length === 0 || primary.tasks.length === 0) continue;
+    const comparison = compareArms(primary.tasks, arm.tasks, PAIR_SEED, PAIR_RESAMPLES);
+    if (comparison.paired === 0) continue;
+    contrasts.push({ kind: 'shape-contrast', baseline: PRIMARY_SHAPE, arm: arm.shape, comparison });
   }
-  return { ...draft, contrasts };
+  return contrasts;
 }
 
 /**
@@ -381,17 +404,32 @@ export function shapeArmSummary(reading: ShapeArmRecord): string {
         ` chars/req ${arm.charsPerRequest.toFixed(0)} folded ${String(arm.folded)}`,
     )
     .join(' | ');
-  const contrasts = reading.contrasts
-    .map(
-      (contrast) =>
-        `${contrast.arm} vs ${contrast.baseline} ${contrast.comparison.deltaPp.toFixed(2)}pp ` +
-        `[${contrast.comparison.ciLowPp.toFixed(2)}, ${contrast.comparison.ciHighPp.toFixed(2)}] ` +
-        `p=${contrast.comparison.p.toFixed(4)} n=${String(contrast.comparison.paired)}`,
-    )
-    .join(' | ');
+  const render = (contrasts: readonly ShapeContrast[], label: string): string =>
+    contrasts
+      .map(
+        (contrast) =>
+          `${label} ${contrast.arm} vs ${contrast.baseline} ${contrast.comparison.deltaPp.toFixed(2)}pp ` +
+          `[${contrast.comparison.ciLowPp.toFixed(2)}, ${contrast.comparison.ciHighPp.toFixed(2)}] ` +
+          `p=${contrast.comparison.p.toFixed(4)} n=${String(contrast.comparison.paired)}`,
+      )
+      .join(' | ');
+  const contrasts = render(reading.contrasts, '');
+  // The null contrast is printed with its own sentence rather than as a delta, because a delta
+  // beside a `NO_TREATMENT` state is exactly the misreading it exists to prevent: two evaluations of
+  // one configuration are not a comparison, they are this lane's resolution at this sample size.
+  // Read the first element rather than indexing past a guard: a `nulls !== ''` test followed by
+  // `[0]?.… ?? 0` is a branch no run can take, and this repository deletes those.
+  const firstNull = reading.nullContrasts[0];
+  const nullClause =
+    firstNull === undefined
+      ? ''
+      : ` | ${render(reading.nullContrasts, 'null-contrast')} — the fold removed nothing, so the two ` +
+        `arms are one treatment: this delta is the lane's run-to-run noise at ` +
+        `n=${String(firstNull.comparison.paired)}, and no arm here may claim an effect smaller than it`;
   return (
     `${shapeArmState(reading)}: ${arms}` +
     `${contrasts === '' ? '' : ` | ${contrasts}`}` +
+    nullClause +
     ` | containment on ${String(reading.containment.compared)} request(s), ` +
     `${String(reading.containment.mismatched)} mismatch, ` +
     `${String(reading.containment.excluded)} excluded for a cut pack`
@@ -422,7 +460,7 @@ export function shapeArmArtifact(reading: ShapeArmRecord, ranAt: string): ShapeA
       '`shapeContainment` is the control, not a result: on every request the budget did not cut, the treatment pack must be the control pack minus exactly the items the fold reports removing. Requests a cut pack excludes from the assertion are counted, not skipped.',
       '`NO_TREATMENT` is a real state: the fold removing nothing is a finding about the store, not evidence that the unit does not matter.',
       'This is a shape-contrast, NOT the l4-paired memory-versus-reference gate the R45 revert rule grades, and not the l4-facade-pair floor contrast or R53 note levels.',
-      'Only MEASURED reports a contrast; CONTAINMENT_BROKEN, NO_DELIVERY and NO_TREATMENT report none.',
+      'Only MEASURED reports a treatment contrast. NO_TREATMENT reports a null contrast instead: the fold removed nothing, so the two arms are two evaluations of one configuration and their delta is the lane\'s run-to-run noise — the floor every other contrast must clear. CONTAINMENT_BROKEN and NO_DELIVERY report none.',
     ],
   };
 }
@@ -451,6 +489,19 @@ export type ShapeArmReadback = {
   readonly contrasts: readonly {
     readonly arm: string;
     /** The unit the contrast is against, read from the artefact rather than assumed by the reader. */
+    readonly baseline: string;
+    readonly deltaPp: number;
+    readonly ciLowPp: number;
+    readonly ciHighPp: number;
+    readonly p: number;
+    readonly paired: number;
+  }[];
+  /**
+   * R114: the pair recorded when the treatment did not fire, which is a noise estimate and not a
+   * contribution. Empty in every state but `NO_TREATMENT`.
+   */
+  readonly nullContrasts: readonly {
+    readonly arm: string;
     readonly baseline: string;
     readonly deltaPp: number;
     readonly ciLowPp: number;
@@ -521,14 +572,34 @@ export function readShapeArmArtifact(value: unknown): ShapeArmReadback {
       units,
       arms,
       contrasts: [],
+      // A null contrast is read back only where the artefact claims one, and it is never promoted
+      // into `contrasts`: a reader that merged the two lists would grade a noise estimate as a
+      // contribution, which is the defect this field was added to make impossible.
+      nullContrasts: state === 'NO_TREATMENT' ? readContrasts(record['nullContrasts'], false) : [],
       containment,
     };
   }
-  const rawContrasts = record['contrasts'];
-  if (!Array.isArray(rawContrasts) || rawContrasts.length === 0) {
-    throw new Error('a MEASURED artefact must carry at least one contrast');
+  const contrasts = readContrasts(record['contrasts'], true);
+  return { state: 'MEASURED', summary, units, arms, contrasts, nullContrasts: [], containment };
+}
+
+/**
+ * Read one contrast list, refusing what cannot be read.
+ *
+ * `required` is the MEASURED case, where an artefact with no contrast is not a result. The null list
+ * is optional by construction: every artefact written before R114 has no such field, and refusing to
+ * read those would make the lane's own history unreadable.
+ */
+function readContrasts(
+  value: unknown,
+  required: boolean,
+): ShapeArmReadback['contrasts'] {
+  if (value === undefined && !required) return [];
+  if (!Array.isArray(value) || value.length === 0) {
+    if (required) throw new Error('a MEASURED artefact must carry at least one contrast');
+    return [];
   }
-  const contrasts = rawContrasts.map((entry) => {
+  return value.map((entry) => {
     const contrast = recordOf(entry, 'contrast');
     if (typeof contrast['arm'] !== 'string') throw new Error('a contrast names no arm');
     if (typeof contrast['baseline'] !== 'string') throw new Error('a contrast names no baseline');
@@ -543,5 +614,4 @@ export function readShapeArmArtifact(value: unknown): ShapeArmReadback {
       paired: numeric(comparison['paired'], `paired count for '${contrast['arm']}'`),
     };
   });
-  return { state: 'MEASURED', summary, units, arms, contrasts, containment };
 }

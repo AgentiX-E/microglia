@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { createLlmInterpreter, parseCandidates, parseDistillResponse, repairJson } from '../llm.js';
+import {
+  PREVIEW_CHARS,
+  createLlmInterpreter,
+  parseCandidates,
+  parseDistillResponse,
+  replyPreview,
+  repairJson,
+} from '../llm.js';
 
 const base = { namespace: 'n', task: 't', eventId: 'e', runId: 'r', at: 1 };
 
@@ -141,5 +148,37 @@ describe('candidate parsing', () => {
       const details = (error as { details?: Record<string, unknown> }).details;
       expect(String(details?.['preview'])).toContain('the model refused');
     }
+  });
+
+  it('describes a silent reply instead of quoting nothing, because an arrow is not a sample', () => {
+    // R104 printed `MG_E_INVALID_SIGNAL: LLM response is not JSON <- ` sixty-three times: the
+    // preview was the trim of an empty reply, so the one field a reader acts on was empty. The
+    // count is kept because a model that spent a completion budget returning four newlines is a
+    // different fault from one that returned nothing at all.
+    for (const [reply, expected] of [
+      ['', 'the reply was empty (0 characters)'],
+      ['\n\n  ', 'the reply held no visible character (4 whitespace character(s))'],
+    ] as const) {
+      try {
+        parseCandidates(reply);
+        throw new Error('expected a refusal');
+      } catch (error) {
+        const details = (error as { details?: Record<string, unknown> }).details;
+        expect(details?.['preview']).toBe(expected);
+      }
+    }
+  });
+
+});
+
+describe('previewing a reply for a diagnostic', () => {
+  it('quotes a readable reply and bounds it', () => {
+    expect(replyPreview('  {"candidates":[]}  ')).toBe('{"candidates":[]}');
+    expect(replyPreview('x'.repeat(500)).length).toBe(PREVIEW_CHARS);
+  });
+
+  it('describes the two kinds of silence differently, because only one of them cost tokens', () => {
+    expect(replyPreview('')).toContain('0 characters');
+    expect(replyPreview('\n\n')).toContain('2 whitespace character(s)');
   });
 });

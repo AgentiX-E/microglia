@@ -1736,45 +1736,16 @@ jobs:
       # A not-run that nobody notices is a skip. The annotation is the notice: it
       # names the variable that points at nothing, and the job stays green because
       # nothing was measured rather than because something failed quietly.
+      # R114: the decision lives in `no-measurement-note.ts` and is covered by tests. R111 wrote it
+      # inline, and R104 crashed it at a comment that quoted a sentence containing a double quote:
+      # the quote closed the shell's own string and the script was cut in half. A workflow file is a
+      # place where logic cannot be tested, and the one time this logic mattered it had never run.
       - name: Say so when nothing was measured
         if: always()
-        run: |
-          node -e "
-            const fs = require('node:fs');
-            const path = 'eval/results/arms/memory/poc-l4.json';
-            if (!fs.existsSync(path)) { console.log('::warning::L4 wrote no artefact'); process.exit(0); }
-            const r = require('./' + path);
-            if (r.metrics.status_no_measurement === 1) {
-              // R111: say what the driver said, not what this step guesses.
-              //
-              // The sentence here used to read "the provider failed its pre-flight probe" for every
-              // stop before measurement, and R104's stop was not that: the probe was off, the
-              // endpoint answered 1,233 calls, and the distiller returned fifteen empty replies.
-              // The warning named a cause no part of the run had observed, on the one artefact whose
-              // whole value is diagnosis. The driver's first note is the reason, verbatim.
-              const why = (r.notes && r.notes[0]) ? r.notes[0] : 'the driver wrote no reason';
-              console.log('::warning::L4 produced no measurement: ' + why);
-              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'L4 produced NO MEASUREMENT: ' + why + '\nNo result is claimed.\n');
-              const funnel = r.diagnostics && r.diagnostics.funnel;
-              if (funnel) {
-                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Funnel: ' + JSON.stringify(funnel) + '\n');
-              }
-              const replies = r.diagnostics && r.diagnostics.distill && r.diagnostics.distill.replies;
-              if (replies) {
-                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Distiller replies: ' + JSON.stringify(replies) + '\n');
-              }
-              const merge = r.diagnostics && r.diagnostics.merge;
-              if (merge) {
-                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'Store shape supply: ' + JSON.stringify(merge) + '\n');
-              }
-            } else if (r.metrics.status_not_run === 1) {
-              const why = r.metrics.status_driver_missing === 1
-                ? 'TAU_DRIVER names a module that does not exist'
-                : 'neither TAU_RESULTS nor TAU_DRIVER is set';
-              console.log('::warning::L4 did not run: ' + why);
-              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, 'L4 did not run: ' + why + '. No result is claimed.\n');
-            }
-          "
+        env:
+          POC_RESULT_DIR: eval/results/arms/memory
+        run: pnpm eval:say-what-happened
+
       - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4

@@ -1794,3 +1794,11 @@ export {
   type PlacementVerdictState,
   type PromptMessage,
 } from './cache-placement.js';
+
+export {
+  noMeasurementNote,
+  type NoMeasurementNote,
+  type NoteArtefact,
+} from './no-measurement-note.js';
+export { replyCensus, replyCensusLine, classifyReply, EMPTY_PREVIEW_CHARS, type DistillReplyCensus, type DistillReplyKind, type DistillReplyCounter } from './distill-replies.js';
+export { writerOf, type WriterReading, type WriterState } from './distill-writer.js';

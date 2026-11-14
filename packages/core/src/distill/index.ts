@@ -45,10 +45,12 @@ export {
 } from './consolidate.js';
 export {
   MAX_STATEMENT,
+  PREVIEW_CHARS,
   buildDistillPrompt,
   createLlmInterpreter,
   parseCandidates,
   parseDistillResponse,
+  replyPreview,
   type DistillForm,
   type DropReason,
   type LlmInterpreterOptions,

@@ -489,11 +489,59 @@ export type Tau2Raw = {
    */
   readonly distillReplies?: {
     readonly calls: number;
+    readonly answered?: number;
     readonly empty: number;
+    /**
+     * R114: replies with no visible character at all.
+     *
+     * Absent on every artefact written before this field, and its absence is the reason the arms
+     * before it could print `0 empty` beside 63 fallbacks: a whitespace-only reply is not `[]`, so
+     * the two-state census counted it as healthy.
+     */
+    readonly blank?: number;
+    readonly unparsed?: number;
     readonly chars: number;
     readonly firstEmpty?: string;
+    readonly firstBlank?: string;
+    readonly firstUnparsed?: string;
     /** The model client's own call count, which must agree with `calls` on a working run. */
     readonly clientCalls?: number;
+  };
+  /**
+   * R114: which writer produced the store this arm evaluated.
+   *
+   * The distiller is a resilient pair — a model-backed interpreter and a rule interpreter that
+   * answers any faulting event — so `store.stored` cannot say whose claims those are. R104's store
+   * was 63/73 the fallback's, and the arm's score was read for three iterations as a measurement of
+   * memory. Absent on every artefact before this field; `state: 'none'` is the `raw` unit, which asks
+   * no writer at all.
+   */
+  /**
+   * R114: the resilient pair's own counts: events the model threw on, events the fallback answered,
+   * and the claims each side produced.
+   *
+   * Absent on every artefact before this field, which is why R104's sixty-three fallbacks were
+   * readable only from a log line. `events` and `answered` disagree whenever the run was stopped by
+   * a fatal error or the fallback threw too.
+   */
+  readonly distillFaults?: {
+    readonly events: number;
+    readonly answered: number;
+    readonly primaryClaims: number;
+    readonly fallbackClaims: number;
+    readonly reasons: readonly string[];
+    readonly samples: Readonly<Record<string, string>>;
+  };
+  readonly distillWriter?: {
+    readonly state: "model" | "fallback" | "mixed" | "none";
+    readonly asked: number;
+    readonly faults: number;
+    /** R114: claims each side produced. Authorship is decided here, not by the fault count. */
+    readonly primaryClaims?: number;
+    readonly fallbackClaims?: number;
+    /** Events the model answered at all, as a share of `asked`. */
+    readonly modelCoverage?: number;
+    readonly sentence: string;
   };
   /**
    * R111: which model wrote the memory, named in the artefact because it is not the arm's own.
@@ -807,6 +855,8 @@ export const PROJECTION: {
   faithfulness: "carried",
   distillScope: "carried",
   distillReplies: "carried",
+  distillWriter: "carried",
+  distillFaults: "carried",
   distillPreflight: "carried",
   distillModel: "carried",
   provenance: "carried",
@@ -997,6 +1047,8 @@ export function armRecordFromDriver(
     ...(raw.faithfulness === undefined ? {} : { faithfulness: raw.faithfulness }),
     ...(raw.distillScope === undefined ? {} : { distillScope: raw.distillScope }),
     ...(raw.distillReplies === undefined ? {} : { distillReplies: raw.distillReplies }),
+    ...(raw.distillWriter === undefined ? {} : { distillWriter: raw.distillWriter }),
+    ...(raw.distillFaults === undefined ? {} : { distillFaults: raw.distillFaults }),
     ...(raw.distillModel === undefined ? {} : { distillModel: raw.distillModel }),
     ...(raw.distillPreflight === undefined ? {} : { distillPreflight: raw.distillPreflight }),
     ...(raw.provenance === undefined ? {} : { provenance: raw.provenance }),

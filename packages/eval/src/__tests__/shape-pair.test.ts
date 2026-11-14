@@ -518,3 +518,98 @@ describe('the artefact', () => {
     ).toThrow(/no numeric interval low/);
   });
 });
+
+/**
+ * R114: the pair a `NO_TREATMENT` dispatch still contains.
+ *
+ * When the fold removes nothing, the two arms render the same pack from the same store over the same
+ * split — so their two scores are two evaluations of **one** configuration, and the difference
+ * between them is this lane's run-to-run noise. R104's dispatch printed `per-failure pass4 55.00% |
+ * collapse pass4 72.50%` under the state `NO_TREATMENT` and reported no contrast, which left a reader
+ * with two numbers side by side and nothing to say they are not a comparison.
+ *
+ * The tests hold three properties: the delta is computed (it is arithmetic on task rows, not a
+ * treatment), it is never promoted into `contrasts` (a reader that merged the lists would grade noise
+ * as a contribution), and the summary says in words what the state means.
+ */
+describe('the null contrast a NO_TREATMENT dispatch carries', () => {
+  const nullPair = shapeArmReading({
+    dispatchId: scope.dispatchId,
+    preregId: scope.preregId,
+    scope,
+    arms: [
+      arm('per-failure', {
+        tasks: tasks('retail', [true, false, true, true]),
+        observations: [pack('q1', ['a', 'b']), pack('q2', ['c'], { folded: 0 })],
+      }),
+      arm('collapse', {
+        tasks: tasks('retail', [true, true, true, true]),
+        observations: [pack('q1', ['a', 'b'], { folded: 0 }), pack('q2', ['c'], { folded: 0 })],
+      }),
+    ],
+    seed: 300,
+    model: 'deepseek-chat',
+  });
+
+  it('is still NO_TREATMENT, because the fold removed nothing in either arm', () => {
+    expect(shapeArmState(nullPair)).toBe('NO_TREATMENT');
+    expect(nullPair.arms.map((entry) => entry.folded)).toEqual([0, 0]);
+  });
+
+  it('computes the delta anyway, because it is arithmetic on task rows and not a treatment', () => {
+    expect(nullPair.contrasts).toEqual([]);
+    expect(nullPair.nullContrasts).toHaveLength(1);
+    const contrast = nullPair.nullContrasts[0];
+    expect(contrast?.baseline).toBe('per-failure');
+    expect(contrast?.arm).toBe('collapse');
+    // One of four tasks changed hands on the same four tasks, so the pair is on four tasks.
+    expect(contrast?.comparison.paired).toBe(4);
+    expect(contrast?.comparison.deltaPp).toBeCloseTo(25, 6);
+  });
+
+  it('says in words that the delta is noise, and what that forbids', () => {
+    const summary = shapeArmSummary(nullPair);
+    expect(summary.startsWith('NO_TREATMENT:')).toBe(true);
+    expect(summary).toContain('null-contrast collapse vs per-failure');
+    expect(summary).toContain("the lane's run-to-run noise at n=4");
+    expect(summary).toContain('no arm here may claim an effect smaller than it');
+  });
+
+  it('keeps computing nothing when the pair is invalid or never delivered', () => {
+    // The two states the early return exists for, and the reason the new list is not a reopening of
+    // them: identical task rows or an undelivered pack pair produce a delta that describes nothing.
+    for (const state of ['CONTAINMENT_BROKEN', 'NO_DELIVERY'] as const) {
+      const broken = shapeArmReading({
+        dispatchId: scope.dispatchId,
+        preregId: scope.preregId,
+        scope,
+        arms:
+          state === 'NO_DELIVERY'
+            ? [arm('per-failure', { servedPacks: 0 }), arm('collapse', { servedPacks: 0, observations: [] })]
+            : [
+                arm('per-failure', { observations: [pack('q1', ['a', 'b'])] }),
+                arm('collapse', { observations: [pack('q1', ['z'], { folded: 1 })] }),
+              ],
+        seed: 300,
+        model: 'deepseek-chat',
+      });
+      expect(shapeArmState(broken)).toBe(state);
+      expect(broken.contrasts).toEqual([]);
+      expect(broken.nullContrasts).toEqual([]);
+      expect(shapeArmSummary(broken)).not.toContain('null-contrast');
+    }
+  });
+
+  it('reads the null contrast back without promoting it into the treatment list', () => {
+    const back = readShapeArmArtifact(shapeArmArtifact(nullPair, 'now'));
+    expect(back.state).toBe('NO_TREATMENT');
+    expect(back.contrasts).toEqual([]);
+    expect(back.nullContrasts).toHaveLength(1);
+    expect(back.nullContrasts[0]).toMatchObject({ arm: 'collapse', baseline: 'per-failure', paired: 4 });
+  });
+
+  it('reads an artefact written before the field as having no null contrast, rather than refusing', () => {
+    const { nullContrasts: _dropped, ...older } = shapeArmArtifact(nullPair, 'now');
+    expect(readShapeArmArtifact({ ...older, state: 'NO_TREATMENT' }).nullContrasts).toEqual([]);
+  });
+});

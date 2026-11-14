@@ -35,6 +35,19 @@ import { stoppedRun } from './stopped-run.js';
 export type InterpreterFaults = {
   /** Events the primary interpreter threw on. */
   readonly events: number;
+  /**
+   * Events the fallback was invoked for **and returned from without throwing**.
+   *
+   * Not the same number as `events`, and the difference is not pedantry: a fatal error is rethrown
+   * before the fallback runs, and a fallback that throws is counted in `events` and not here. Before
+   * this field the learn line printed `63 answered by the rule fallback` for a run in which the rule
+   * interpreter answered 63 events **with nothing** — the line counted an invocation as an answer.
+   */
+  readonly answered: number;
+  /** Candidates the model returned, summed over the events it answered. */
+  readonly primaryClaims: number;
+  /** Candidates the fallback returned, summed over the events it answered. */
+  readonly fallbackClaims: number;
   /** The code of each such failure, in order, or `unknown` for a non-`MicrogliaError`. */
   readonly reasons: readonly string[];
   /**
@@ -73,7 +86,17 @@ function codeOf(error: unknown): string {
 function sampleOf(error: unknown): string {
   if (!(error instanceof MicrogliaError)) return String(error).slice(0, 200);
   const preview = error.details['preview'];
-  const tail = typeof preview === 'string' ? ` <- ${preview}` : '';
+  // A preview that is present but empty used to produce `… <- ` and nothing after it, which is the
+  // shape R104 printed 63 times: an arrow pointing at the one piece of evidence the sample exists
+  // to carry. A caller that supplies an empty string is saying "there was nothing to quote", and
+  // that has to be said in words. The parser now describes an empty reply instead of quoting it
+  // (AUDIT 34.142), and this line keeps any other caller from reinstating the dangling arrow.
+  const tail =
+    typeof preview !== 'string'
+      ? ''
+      : preview.trim() === ''
+        ? ' <- the error carried no preview'
+        : ` <- ${preview}`;
   return `${error.message}${tail}`.slice(0, 200);
 }
 
@@ -84,6 +107,9 @@ export function resilientInterpreter(
 ): ResilientInterpreter {
   const fatal = options.fatal ?? stoppedRun;
   let events = 0;
+  let answered = 0;
+  let primaryClaims = 0;
+  let fallbackClaims = 0;
   const reasons: string[] = [];
   // First sample per code, not last: the first failure of a kind is the one that happened before any
   // retry or fallback had a chance to change the state, and eleven identical samples say no more
@@ -92,7 +118,9 @@ export function resilientInterpreter(
 
   const interpreter: Interpreter = async (context) => {
     try {
-      return await primary(context);
+      const claims = await primary(context);
+      primaryClaims += claims.length;
+      return claims;
     } catch (error) {
       events += 1;
       const code = codeOf(error);
@@ -103,7 +131,13 @@ export function resilientInterpreter(
       // outage is a store nobody can attribute.
       if (fatal(error)) throw error;
       try {
-        return await fallback(context);
+        const claims = await fallback(context);
+        // Counted even when empty: `answered` is a fact about the fallback running, and
+        // `fallbackClaims` is a fact about what it produced. Folding the second into the first is
+        // how 63 empty fallbacks became "63 answered by the rule fallback".
+        answered += 1;
+        fallbackClaims += claims.length;
+        return claims;
       } catch {
         // The fallback failing too is not a second fact: a rule interpreter that cannot answer an
         // event is usually a consequence of whatever broke upstream, and the first error is the one
@@ -118,7 +152,17 @@ export function resilientInterpreter(
     interpreter.prefetch = primary.prefetch;
   }
 
-  return { interpreter, faults: () => ({ events, reasons: [...reasons], samples: { ...samples } }) };
+  return {
+    interpreter,
+    faults: () => ({
+      events,
+      answered,
+      primaryClaims,
+      fallbackClaims,
+      reasons: [...reasons],
+      samples: { ...samples },
+    }),
+  };
 }
 
 /**

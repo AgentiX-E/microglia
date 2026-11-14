@@ -172,7 +172,8 @@ import type { Tau2PhaseUsage } from "../tau2-instrument.js";
 import { cacheCensusVerdict } from "../cache-census.js";
 import { tau2ShapeOf } from "../tau2-shape.js";
 import { runDistillPreflight, type PreflightReading } from "../distill-preflight.js";
-import { replyCensus } from "../distill-replies.js";
+import { replyCensus, replyCensusLine } from "../distill-replies.js";
+import { writerOf } from "../distill-writer.js";
 import { startRecallFacade } from "../tau2-facade.js";
 import {
   resolveShapeArmPlan,
@@ -1242,7 +1243,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
           // rather than after the episode is paid for.
           interpreter:
             RAWLOG_CEILING > 0 ? rawLogInterpreterFor(RAWLOG_CEILING) : rawLogInterpreter,
-          faults: () => ({ events: 0, reasons: [], samples: {} }),
+          // A raw arm asks nothing, so it has no faults and no claims from either side. The zero
+          // is still a measurement: the fields are written rather than omitted, which is how an arm
+          // that had no faults stays distinguishable from one that never counted them.
+          faults: () => ({
+            events: 0,
+            answered: 0,
+            primaryClaims: 0,
+            fallbackClaims: 0,
+            reasons: [],
+            samples: {},
+          }),
         }
       : resilientInterpreter(
           createLlmInterpreter({
@@ -1604,7 +1615,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       `${reasonsLine(drops)}), ${String(distillReport.created)} created, ` +
       `${String(distillReport.failed)} failed, ${String(census.stored)} item(s) in the store ` +
       `(${String(census.active)} active, ${String(census.servable)} servable in ${RECALL_DOMAIN}), ` +
-      `${String(faults.events)} answered by the rule fallback, reasons ` +
+      `${String(faults.events)} fell back to the rule interpreter ` +
+      `(${String(faults.answered)} answered, ${String(faults.fallbackClaims)} claim(s)), reasons ` +
       `${faults.events === 0 ? 'none' : reasonsLine(faultReasons)}\n`,
   );
   // The specimen beside the category: a code says how many and this says what. One line per code,
@@ -1615,14 +1627,22 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     }
   }
   const replyReading = replies.reading();
+  // R114: which writer wrote the store, which the two lines above state but nothing joins. The pair
+  // is a model and a rule interpreter, and `63 answered by the rule fallback` beside `6 created` is
+  // the whole finding: the arm evaluates the fallback's store. Derived rather than left to a reader,
+  // because a reader has to know both lines to see it and three iterations did not.
+  const writer = writerOf({
+    asked: distillReport.events,
+    faults: faults.events,
+    primaryClaims: faults.primaryClaims,
+    fallbackClaims: faults.fallbackClaims,
+  });
+  process.stdout.write(`[tau2] distill writer: ${writer.state.toUpperCase()} — ${writer.sentence}\n`);
   // R111: the replies, on one line, because "0 candidates" has four causes and only three of them
-  // were countable before this. A run whose replies were all empty prints `15 empty of 15` and the
-  // first one verbatim, which is what turns "the model carried nothing" into a diagnosis.
-  process.stdout.write(
-    `[tau2] distill replies: ${String(replyReading.calls)} call(s), ${String(replyReading.empty)} empty, ` +
-      `${String(replyReading.chars)} character(s) returned` +
-      `${replyReading.firstEmpty === undefined ? '' : `, first empty "${replyReading.firstEmpty}"`}\n`,
-  );
+  // were countable before this. R114 adds the fourth: a reply with no visible character, which the
+  // first version counted as healthy and left to the interpreter's preview — and the interpreter's
+  // preview was empty, so the run printed `0 empty` beside 63 faults with nothing to quote.
+  process.stdout.write(`[tau2] distill replies: ${replyCensusLine(replyReading)}\n`);
   process.stdout.write(
     `[tau2] admission: measured=${String(census.admission.measured)} ` +
       `trust=${census.admission.trustMean.toFixed(4)} ` +
@@ -2234,6 +2254,25 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // `candidates` counts what was kept, so the gap between them and `asked` is the only place an
     // empty reply can be seen — and on the arm that failed it was fifteen of fifteen.
     distillReplies: { ...replyReading, clientCalls: llm.stats.calls },
+    // R114: which writer produced the store this arm evaluated. The resilient pair answers a faulting
+    // event with the rule interpreter, so `stored` alone cannot say whether the store is the model's
+    // or the fallback's — and on the arm that prompted this field it was the fallback's, 63 events
+    // out of 73. Recorded on every arm, because a store written by nobody (`raw`) and a store written
+    // by a model both reach this line.
+    distillWriter: writer,
+    // R114: the pair's own counts, which the artefact did not carry at all. R104's 63 fallbacks
+    // existed only in the log line, so no reader of the document could see that 63 of 73 events had
+    // no model answer — and the arm's score was read as a measurement of a store the model wrote.
+    distillFaults: {
+      events: faults.events,
+      answered: faults.answered,
+      primaryClaims: faults.primaryClaims,
+      fallbackClaims: faults.fallbackClaims,
+      // The ordered codes, not the histogram: `faultReasons` is what the learn line renders and a
+      // reader of the artefact wants the sequence a run actually met.
+      reasons: [...faults.reasons],
+      samples: faults.samples,
+    },
     // R111: the model that wrote the memory, which is not the arm's own unless a dispatch says so.
     distillModel: llm.model,
     // R111: the pre-flight, when this dispatch ran one. Absence is every arm before this field, and

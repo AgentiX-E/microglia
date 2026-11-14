@@ -75,6 +75,7 @@
     "eval:facade-pair-readback": "tsx packages/eval/src/bin/facade-pair-readback.ts",
     "eval:note-facade-readback": "tsx packages/eval/src/bin/note-facade-readback.ts",
     "eval:shape-arm-readback": "tsx packages/eval/src/bin/shape-arm-readback.ts",
+    "eval:say-what-happened": "tsx packages/eval/src/bin/say-what-happened.ts",
     "eval:protocol": "tsx packages/eval/src/bin/protocol.ts",
     "eval:gate-matrix": "tsx packages/eval/src/bin/gate-matrix.ts",
     "eval:arm-coverage": "tsx packages/eval/src/bin/arm-coverage.ts",

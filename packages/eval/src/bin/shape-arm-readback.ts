@@ -61,9 +61,29 @@ function main(): void {
         `${String(arm.folded)} |`,
     )
     .join('\n');
+  const render = (contrasts: typeof back.contrasts): string =>
+    contrasts
+      .map(
+        (contrast) =>
+          `\`${contrast.arm}\` against \`${contrast.baseline}\`: \`${contrast.deltaPp.toFixed(2)}pp\` ` +
+          `[\`${contrast.ciLowPp.toFixed(2)}\`, \`${contrast.ciHighPp.toFixed(2)}\`] ` +
+          `at p=\`${contrast.p.toFixed(4)}\` over \`${String(contrast.paired)}\` paired tasks.`,
+      )
+      .join('\n\n');
+  // R114: a `NO_TREATMENT` dispatch still carries a pair, and it is the lane's resolution rather
+  // than a contribution. Printed with that sentence, because the two scores in the table above are
+  // otherwise two numbers a reader will subtract.
+  const nulls =
+    back.nullContrasts.length === 0
+      ? ''
+      : '\n\n**Null contrast — noise estimate, not a contribution.**\n\n' +
+        render(back.nullContrasts) +
+        '\n\nBoth arms rendered the same pack from one store over one split, so these are two ' +
+        'evaluations of one configuration: the delta is this lane\'s run-to-run noise at this ' +
+        'sample size, and no contrast on this board may be read as an effect smaller than it.';
   const contrasts =
     back.contrasts.length === 0
-      ? 'No contribution is reported.'
+      ? `No contribution is reported.${nulls}`
       : back.contrasts
           .map(
             (contrast) =>
@@ -79,7 +99,7 @@ function main(): void {
       '| --- | --- | --- | --- | --- | --- |',
       table,
       '',
-      contrasts,
+      `${contrasts}${back.contrasts.length === 0 ? '' : nulls}`,
       '',
       `Containment: \`${String(back.containment.mismatched)}\` mismatch over ` +
         `\`${String(back.containment.compared)}\` shared request(s), ` +
@@ -104,9 +124,15 @@ function main(): void {
     return;
   }
   if (back.state === 'NO_TREATMENT') {
+    const noise =
+      back.nullContrasts.length === 0
+        ? ''
+        : ` The pair still ran, and its delta of ` +
+          `${back.nullContrasts[0]!.deltaPp.toFixed(2)}pp over ${String(back.nullContrasts[0]!.paired)} ` +
+          `tasks is this lane's run-to-run noise: no arm here may claim an effect smaller than it.`;
     process.stderr.write(
       '::warning::the fold removed nothing on this store: the unit was registered and never applied, ' +
-        'which is a finding about the store and not about the unit\n',
+        `which is a finding about the store and not about the unit.${noise}\n`,
     );
   }
 }

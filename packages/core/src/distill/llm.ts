@@ -616,9 +616,36 @@ export function parseCandidates(raw: string): unknown[] {
     }
   }
   throw new MicrogliaError('MG_E_INVALID_SIGNAL', 'LLM response is not JSON', {
+    // `jsonSlices` always yields the whole reply as its first slice, so `lastError` is written on
+    // every path that reaches here: a reply with no delimiter at all fails the strict parse of the
+    // whole text. That is why there is no empty-string fallback here — it would be a branch no run
+    // can take, and this repository deletes those rather than exempting them.
     cause: lastError,
-    preview: text.slice(0, 160),
+    preview: replyPreview(raw),
   });
+}
+
+/** How much of an unreadable reply the error carries. */
+export const PREVIEW_CHARS = 160;
+
+/**
+ * Describe an unreadable reply, never with an empty string.
+ *
+ * The diagnostic field of an error is what a reader acts on, and it was silently empty in the one
+ * case that mattered: a reply with no visible character trims to `''`, so `preview` was `''`, and
+ * the driver printed `MG_E_INVALID_SIGNAL: LLM response is not JSON <- ` — an arrow pointing at
+ * nothing. R104 ran 73 distillation calls and printed that fault 63 times; the artefact could not
+ * say what any of them returned (AUDIT 34.142).
+ *
+ * So an empty reply is *described* rather than quoted. The count of characters matters: a model
+ * that returned `"\n\n"` and a model that returned `""` are both silent, and only one of them spent
+ * a completion budget.
+ */
+export function replyPreview(reply: string, bound = PREVIEW_CHARS): string {
+  const trimmed = reply.trim();
+  if (trimmed !== '') return trimmed.slice(0, bound);
+  if (reply.length === 0) return 'the reply was empty (0 characters)';
+  return `the reply held no visible character (${String(reply.length)} whitespace character(s))`;
 }
 
 /**

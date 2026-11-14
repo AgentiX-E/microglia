@@ -46,7 +46,14 @@ describe('resilientInterpreter', () => {
       async () => [candidate('from the rules')],
     );
     await expect(interpreter(context('fb-1'))).resolves.toEqual([candidate('from the model')]);
-    expect(faults()).toEqual({ events: 0, reasons: [], samples: {} });
+    expect(faults()).toEqual({
+      events: 0,
+      answered: 0,
+      primaryClaims: 1,
+      fallbackClaims: 0,
+      reasons: [],
+      samples: {},
+    });
   });
 
   it('falls back per event, and counts the event rather than the batch', async () => {
@@ -138,6 +145,45 @@ describe('resilientInterpreter', () => {
       MG_E_INVALID_SIGNAL: 'MG_E_INVALID_SIGNAL: LLM response is not JSON <- Here is a note about the order…',
       MG_E_STORE_IO: 'MG_E_STORE_IO: the disk said no',
     });
+  });
+
+  it('counts what the fallback produced, not only that it was called', async () => {
+    // The learn line read `63 answered by the rule fallback` on R104, where the fallback ran 63 times
+    // and produced no candidate at all — because `distillUnit: correction` leaves it no trace to copy
+    // from. An invocation is not an answer, and the two counts have to be able to disagree.
+    let call = 0;
+    const { interpreter, faults } = resilientInterpreter(
+      async () => {
+        call += 1;
+        if (call === 1) throw new MicrogliaError('MG_E_INVALID_SIGNAL', 'LLM response is not JSON');
+        return [candidate('from the model')];
+      },
+      async () => [],
+    );
+    for (const id of ['fb-1', 'fb-2']) await interpreter(context(id));
+    const reading = faults();
+    expect(reading.events).toBe(1);
+    expect(reading.answered).toBe(1);
+    expect(reading.primaryClaims).toBe(1);
+    // Invoked once, answered once, and contributed nothing: the store is the model's.
+    expect(reading.fallbackClaims).toBe(0);
+  });
+
+  it('never leaves the specimen with an arrow and nothing after it', async () => {
+    // R104 printed `MG_E_INVALID_SIGNAL: LLM response is not JSON <- ` sixty-three times. The reply
+    // had no visible character, `parseCandidates` previewed its trim, and the sample ended at the
+    // arrow — the one field a reader acts on, emptied by the case that most needed it. A caller that
+    // supplies an empty preview is saying "there was nothing to quote", and that has to be words.
+    const { interpreter, faults } = resilientInterpreter(
+      async () => {
+        throw new MicrogliaError('MG_E_INVALID_SIGNAL', 'LLM response is not JSON', { preview: '' });
+      },
+      async () => [candidate('from the rules')],
+    );
+    await interpreter(context('fb-1'));
+    expect(faults().samples['MG_E_INVALID_SIGNAL']).toBe(
+      'MG_E_INVALID_SIGNAL: LLM response is not JSON <- the error carried no preview',
+    );
   });
 
   it('forwards the primary\u2019s prefetch, so the batch still warms its calls once', async () => {
