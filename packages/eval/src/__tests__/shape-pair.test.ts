@@ -417,8 +417,10 @@ describe('shapeArmSummary', () => {
     });
     const summary = shapeArmSummary(reading);
     expect(summary).toContain('MEASURED:');
-    expect(summary).toContain('per-failure pass4 75.00% served 1/1 items/req 2.000 chars/req 400 folded 0');
-    expect(summary).toContain('collapse pass4 75.00% served 1/1 items/req 1.000 chars/req 200 folded 1');
+    // The interval travels with the score: four tasks put the half-width at 42.44pp, and a reader
+    // who saw only "75.00%" would take it for a measurement of something.
+    expect(summary).toContain('per-failure pass4 75.00% ±42.44pp served 1/1 items/req 2.000 chars/req 400 folded 0');
+    expect(summary).toContain('collapse pass4 75.00% ±42.44pp served 1/1 items/req 1.000 chars/req 200 folded 1');
     expect(summary).toContain('containment on 1 request(s), 0 mismatch, 0 excluded for a cut pack');
   });
 
@@ -611,5 +613,41 @@ describe('the null contrast a NO_TREATMENT dispatch carries', () => {
   it('reads an artefact written before the field as having no null contrast, rather than refusing', () => {
     const { nullContrasts: _dropped, ...older } = shapeArmArtifact(nullPair, 'now');
     expect(readShapeArmArtifact({ ...older, state: 'NO_TREATMENT' }).nullContrasts).toEqual([]);
+  });
+});
+
+describe('the interval a score is printed with', () => {
+  it('says no tasks were scored rather than printing a bound of zero', () => {
+    // An arm that scored nothing has an unknown score, not a perfect one, and a zero width is the
+    // most confident thing the line could say about it.
+    const reading = shapeArmReading({
+      dispatchId: scope.dispatchId,
+      preregId: scope.preregId,
+      scope,
+      arms: [
+        arm('per-failure', { servedPacks: 1, tasks: [] }),
+        arm('collapse', { servedPacks: 1, tasks: [], observations: [pack('q1', ['a'], { folded: 1 })] }),
+      ],
+      seed: 300,
+      model: 'deepseek-chat',
+    });
+    expect(shapeArmSummary(reading)).toContain('(no tasks scored)');
+  });
+
+  it('narrows as the sample grows, which is the only lever a score has', () => {
+    const four = shapeArmSummary(
+      shapeArmReading({
+        dispatchId: scope.dispatchId,
+        preregId: scope.preregId,
+        scope,
+        arms: [arm('per-failure', { servedPacks: 1, observations: [pack('q1', ['a'])] }), arm('collapse', { servedPacks: 1, observations: [pack('q1', ['a'], { folded: 1 })] })],
+        seed: 300,
+        model: 'deepseek-chat',
+      }),
+    );
+    const widths = [...four.matchAll(/±([0-9.]+)pp/g)].map((match) => Number(match[1]));
+    expect(widths.length).toBe(2);
+    expect(widths[0]).toBeCloseTo(widths[1] as number, 10);
+    expect(widths[0] as number).toBeGreaterThan(40);
   });
 });

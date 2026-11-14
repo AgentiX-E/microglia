@@ -528,6 +528,7 @@ export {
   powerFromCounts,
   powerOf,
   readPower,
+  scoreHalfWidthPp,
   type ComparisonBlock,
   type PairArtefact,
   type PairedCase,

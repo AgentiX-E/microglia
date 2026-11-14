@@ -2341,6 +2341,51 @@ form or the ban), `unanswered` means the calls threw (an outage — change nothi
 a fixture, so `viable` permits a dispatch and does not promise one: the fixture states a rule and your
 corrections may not.
 
+### 13.21 Reading a score without inventing a result
+
+Every score this project prints now carries its interval, because a point estimate beside a
+published bar is the reading that turns "0.550 against 0.575" into a result when the two numbers are
+2.50pp apart on a measurement whose half-width is 15.42pp:
+
+```
+per-failure pass4 55.00% ±15.42pp served 164/164 items/req 5.000 chars/req 2102 folded 0
+```
+
+**Which ruler, before which sentence.** Three quantities are in play and they are not
+interchangeable:
+
+| your sentence | the ruler | at 40 tasks | at 68 tasks |
+| --- | --- | --- | --- |
+| "memory helped by X compared with no memory" | `detectableDelta(tasks, 0.397)` | 27.91pp | 21.41pp |
+| "our score is above 0.575" | `±1.96·sqrt(p(1−p)/n)` | **15.42pp** | 11.86pp |
+| "we are behind ALTK-Evolve" | difference of two scores | 17.65pp | 14.65pp |
+
+A **paired delta** compares two arms of one dispatch over the same tasks, so the pairs that did not
+change hands cancel and the width depends on how many did — that is why it is both the most sensitive
+ruler when few pairs change and the most brutal when many do. An **absolute score** carries only its
+own sample's variance. A **cross-sample** comparison carries both, and none of the pairing.
+
+**Three rules that follow, and each one is arithmetic rather than caution.**
+
+1. **To claim a score is above a bar, the interval's lower bound must clear it.** At 40 tasks that
+   needs **p ≥ 0.75**; 0.70 gives a lower bound of 0.558 and 0.65 gives 0.502.
+2. **A paired delta below its floor is not a finding, whatever its sign.** At 40 tasks the floor is
+   44.30pp at complete discordance; R104's 17.5pp null contrast is inside it, which is what a null
+   contrast means.
+3. **A cross-sample gap must be compared with the *difference's* width, not with either run's.** The
+   τ² lane's 0.5500 against ALTK-Evolve's 0.6754 is 12.54pp with a 17.65pp half-width on the
+   difference: indistinguishable, and the same is true of every adjacent pair on that board.
+
+**Where each number comes from, and what to run.**
+
+```bash
+pnpm eval:power          # every published paired delta beside its own floor, plus coarsest/sharpest
+pnpm eval:prereg <file>  # refuses a header that claims an effect its sample could not resolve
+```
+
+`eval:power` prints `coarsest design … at N pp — no delta smaller than that is a finding on this
+record`. That line is the honest ceiling on every claim written against this run.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

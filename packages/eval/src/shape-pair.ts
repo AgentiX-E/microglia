@@ -31,6 +31,7 @@
  */
 import type { KnowledgePack, ShapeMode } from '@agentix-e/microglia-core';
 import { compareArms, type ArmComparison, type ArmTask } from './l4.js';
+import { scoreHalfWidthPp } from './power.js';
 import { PAIR_RESAMPLES, PAIR_SEED, type RunScope } from './within-run-pair.js';
 import type { FacadePairPlan } from './facade-pair.js';
 import type { FacadeNotePlan } from './note-facade.js';
@@ -394,12 +395,28 @@ export function shapeArmState(reading: ShapeArmRecord): string {
   return 'MEASURED';
 }
 
+/**
+ * The interval clause for one unit's score, or nothing when there is no sample to bound.
+ *
+ * Not `±0.00pp`: an arm that scored nothing has an unknown score rather than a perfect one, and a
+ * zero width is the most confident thing this line could say.
+ */
+function scoreSpan(pass4: number, scoredTasks: number): string {
+  if (scoredTasks <= 0) return ' (no tasks scored)';
+  return ` ±${scoreHalfWidthPp(pass4, scoredTasks).toFixed(2)}pp`;
+}
+
 /** One line for the workflow's readback step and the job summary. */
 export function shapeArmSummary(reading: ShapeArmRecord): string {
   const arms = reading.arms
     .map(
       (arm) =>
-        `${arm.shape} pass4 ${(arm.pass4 * 100).toFixed(2)}% served ${String(arm.servedPacks)}` +
+        // The interval travels with the score. A point estimate beside a published bar is the reading
+        // that produced R104's "0.550 against 0.575" as though a 2.50pp gap were a result; at 40 tasks
+        // the half-width is 15.42pp and at zero tasks there is nothing to bound, which is a different
+        // statement from a bound of zero and is printed as one.
+        `${arm.shape} pass4 ${(arm.pass4 * 100).toFixed(2)}%${scoreSpan(arm.pass4, arm.scoredTasks)}` +
+        ` served ${String(arm.servedPacks)}` +
         `/${String(arm.recallRequests)} items/req ${arm.itemsPerRequest.toFixed(3)}` +
         ` chars/req ${arm.charsPerRequest.toFixed(0)} folded ${String(arm.folded)}`,
     )

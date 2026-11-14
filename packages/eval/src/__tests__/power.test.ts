@@ -7,6 +7,7 @@ import {
   powerFromCounts,
   powerOf,
   readPower,
+  scoreHalfWidthPp,
   type PairedCase,
   type PowerRow,
 } from '../power.js';
@@ -285,5 +286,40 @@ describe('pairRowOf, the selector a directory scan needs', () => {
 
   it('refuses a comparison block that is missing a count, rather than skipping it', () => {
     expect(() => pairRowOf('partial.json', { comparison: { paired: 68, lost: 13 } })).toThrow(/gained/);
+  });
+});
+
+describe('scoreHalfWidthPp, the ruler an absolute score is read with', () => {
+  it('is the binomial half-width over tasks, which is a third of the paired floor', () => {
+    // 0.55 on 40 tasks: +-15.42pp. The paired floor at the same n is 44.30pp, and the two numbers
+    // are not interchangeable — one measures a score, the other a difference between two arms.
+    expect(scoreHalfWidthPp(0.55, 40)).toBeCloseTo(15.42, 2);
+    expect(scoreHalfWidthPp(0.5294, 68)).toBeCloseTo(11.86, 2);
+  });
+
+  it('is zero at a perfect or a null score, where there is no variance left to report', () => {
+    expect(scoreHalfWidthPp(1, 40)).toBe(0);
+    expect(scoreHalfWidthPp(0, 40)).toBe(0);
+  });
+
+  it('is infinite for no sample, because no score has a bound with nothing behind it', () => {
+    expect(scoreHalfWidthPp(0.5, 0)).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it('says what it is given rather than quietly clamping a score that is not one', () => {
+    expect(() => scoreHalfWidthPp(1.2, 40)).toThrow(/not a share/);
+    expect(() => scoreHalfWidthPp(-0.1, 40)).toThrow(/not a share/);
+    // A negative task count is not "no sample" and does not get the empty-sample answer.
+    expect(() => scoreHalfWidthPp(0.5, -1)).toThrow(/not a number of tasks/);
+  });
+
+  it('is symmetric about a half, which is the same statement as a fair coin having no skew', () => {
+    expect(scoreHalfWidthPp(0.3, 100)).toBeCloseTo(scoreHalfWidthPp(0.7, 100), 12);
+  });
+
+  it('shows that 0.70 does not clear a 0.575 bar on 40 tasks and 0.75 does', () => {
+    // The arithmetic R119 is registered against, and the reason a point estimate is not a result.
+    expect(0.70 - scoreHalfWidthPp(0.70, 40) / 100).toBeLessThan(0.575);
+    expect(0.75 - scoreHalfWidthPp(0.75, 40) / 100).toBeGreaterThan(0.575);
   });
 });

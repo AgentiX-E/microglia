@@ -1309,3 +1309,26 @@ that taught it. But the candidates it refuses are the ones that say *which opera
 survives is the residue a schema validator already knows — the JSON shape of an action, the order two
 calls go in. The tax is measurable on any artefact that carries both `distillForm.refused` and the
 store's own text, and no arm had priced it until R117.
+
+**Three rulers** — A paired delta, an absolute score and a cross-sample difference are three different
+quantities, and at forty tasks they are 44.30pp, 15.42pp and 17.65pp wide respectively. The first
+measures two arms of one dispatch over the same questions and conditions on how many pairs changed
+hands; the second measures a score on its own; the third compares two papers' separate samples, which
+is what a leaderboard row is. This record spent several iterations reading one and concluding with
+another, so every claim now names its ruler: "memory helped by X" needs the first, "our score beats
+the bar" needs the second, "we are behind ALTK" needs the third. They differ by nearly a factor of
+three and none of them substitutes for another.
+
+**Score interval** — `1.96·sqrt(p(1−p)/n)` over the tasks a score was computed on, printed beside every
+`pass^4` the readback emits. It exists because a point estimate beside a published bar reads as a
+result: at forty tasks the half-width is 15.42pp, so a score must reach **0.75** before its lower
+bound clears a 0.575 bar, and 0.70 (lower bound 0.558) does not clear it however confident the sentence
+sounds. A zero width is printed as `(no tasks scored)` rather than `±0.00pp`, because an arm that
+scored nothing has an unknown score and not a perfect one.
+
+**Effect claim** — The header field `effectClaimPp`, present only when a registration claims a
+difference. Its presence commits the header to two things a census arm does not need: at least two
+arms, so a delta of its own exists, and a sample whose floor — `detectableDelta(tasks, 1)`, complete
+discordance, the bound no run can exceed — is smaller than the claim. Absent, it says nothing, which
+is correct for an arm that buys a census or a store's text. The distinction is what stops a dispatch
+from publishing a number no design could have supported.

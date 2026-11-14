@@ -462,3 +462,28 @@ describe('the readback refuses every shape it cannot attest', () => {
   });
   /* eslint-enable @typescript-eslint/no-explicit-any */
 });
+
+describe('the interval a score is printed with', () => {
+  const build = (overrides: Partial<NoteArmReading>[]): ReturnType<typeof noteFacadeSummary> =>
+    noteFacadeSummary(
+      noteFacadeReading({
+        dispatchId: 'x',
+        preregId: 'y',
+        scope,
+        arms: overrides.map((over, index) => arm(index === 0 ? 'none' : 'standard', over)),
+        seed: 300,
+        model: 'deepseek-chat',
+      }),
+    );
+
+  it('carries the binomial half-width beside the point estimate', () => {
+    // Four scored tasks at 0.50: 1.96 * sqrt(0.25/4) = 49.00pp. The number is large and it is the
+    // point — a score on four tasks is not a measurement, and the line said otherwise for as long as
+    // it printed one.
+    expect(build([{}, {}])).toContain('pass4 50.00% ±49.00pp');
+  });
+
+  it('says no tasks were scored rather than printing a bound of zero', () => {
+    expect(build([{ tasks: [] }, { tasks: [] }])).toContain('(no tasks scored)');
+  });
+});

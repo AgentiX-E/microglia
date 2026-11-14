@@ -26,6 +26,7 @@
  */
 import type { NoteMode } from '@agentix-e/microglia-core/apply';
 import { compareArms, type ArmComparison, type ArmTask } from './l4.js';
+import { scoreHalfWidthPp } from './power.js';
 import { PAIR_RESAMPLES, PAIR_SEED, type RunScope } from './within-run-pair.js';
 import type { FacadePairPlan } from './facade-pair.js';
 import type { InactionCensus } from './inaction.js';
@@ -303,8 +304,12 @@ export function noteFacadeSummary(reading: NotedFacadeReading): string {
   const arms = reading.arms
     .map(
       (arm) =>
-        `${arm.note} pass4 ${(arm.pass4 * 100).toFixed(2)}% served ${String(arm.servedPacks)}` +
-        `/${String(arm.recallRequests)} items/req ${arm.itemsPerRequest.toFixed(3)}`,
+        // Same clause as the shape readback, for the same reason: a point estimate beside a bar is the
+        // reading that turns 0.550-against-0.575 into a result, and the two facades differ in how the
+        // note is delivered rather than in how many tasks they scored.
+        `${arm.note} pass4 ${(arm.pass4 * 100).toFixed(2)}%` +
+        `${arm.scoredTasks <= 0 ? ' (no tasks scored)' : ` ±${scoreHalfWidthPp(arm.pass4, arm.scoredTasks).toFixed(2)}pp`}` +
+        ` served ${String(arm.servedPacks)}/${String(arm.recallRequests)} items/req ${arm.itemsPerRequest.toFixed(3)}`,
     )
     .join(' | ');
   const measured = noteFacadeState(reading) === 'MEASURED';

@@ -200,6 +200,32 @@ export function pairRowOf(artefact: string, parsed: PairArtefact): PowerRow | nu
   return null;
 }
 
+/**
+ * Half-width of an absolute score's 95% interval, in percentage points.
+ *
+ * A different quantity from every other number in this module, and the record has been reading one
+ * while stating the other. `pairedWidths` measures a difference between two arms over the same
+ * questions and conditions on the discordance; this measures a score on its own, over the tasks it
+ * was computed on, with no pairing to cancel anything. At 40 tasks the two are **15.42pp** and
+ * **44.30pp** — a factor of three — and a sentence about "our score is above theirs" needs the
+ * first while a sentence about "memory helped" needs the second.
+ *
+ * A score of exactly 0 or 1 has no variance and therefore a zero width, which reads as certainty
+ * and is: on that sample nothing else was observed. `Infinity` for no tasks rather than zero, for
+ * the reason every other width here is: a bound over nothing describes nothing.
+ */
+export function scoreHalfWidthPp(score: number, tasks: number): number {
+  if (!(score >= 0 && score <= 1)) {
+    throw new Error(`${String(score)} is not a share, so it has no binomial width`);
+  }
+  // A count of zero is an empty sample and gets `Infinity`, the same answer `detectableDelta` and
+  // `pairedWidths` give; a negative count is not a sample at all and is refused, because the two are
+  // different statements and a single `<= 0` guard would merge them.
+  if (tasks < 0) throw new Error(`${String(tasks)} is not a number of tasks, so it has no binomial width`);
+  if (tasks === 0) return Number.POSITIVE_INFINITY;
+  return HALF_WIDTH_Z * Math.sqrt((score * (1 - score)) / tasks) * 100;
+}
+
 /** One published artefact's paired delta beside the difference its sample could have resolved. */
 export type PowerRow = {
   readonly artefact: string;
