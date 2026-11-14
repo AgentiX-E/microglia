@@ -107,6 +107,8 @@
     "eval:claim-check": "tsx packages/eval/src/bin/claim-check.ts",
     "eval:backbone-probe": "tsx packages/eval/src/bin/backbone-probe.ts",
     "eval:cache-probe": "tsx packages/eval/src/bin/cache-probe.ts",
+    "eval:retrospect": "tsx packages/eval/src/bin/retrospect.ts",
+    "review:serve": "tsx packages/eval/src/bin/review.ts",
     "eval:coupling-check": "POC_RESULT_DIR=.cache/coupling pnpm eval:coupling && node scripts/check-coupling-ledger.mjs .cache/coupling",
     "eval:prereg-caps": "tsx packages/eval/src/bin/prereg-caps.ts"
   },

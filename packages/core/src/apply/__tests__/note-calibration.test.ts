@@ -166,12 +166,24 @@ describe('the pack note has three levels, and silence is one of them', () => {
     expect(explicit.ids).toEqual(implicit.ids);
   });
 
-  it('never puts a double quote in a note it adds, because the note is an attribute', () => {
-    // `note="..."` is delimited by double quotes and the existing condition-checking text
-    // already spends one pair on the word `when`. A third level that adds more would make
-    // the attribute unparseable for any host that reads it with a real parser.
+  it('escapes the quote the condition sentence carries, because the note is an attribute', () => {
+    // This assertion used to read `expect(note.split('"').length - 1).toBe(2)` — that is, it
+    // asserted that the attribute contained a pair of raw double quotes and called it the
+    // intended shape. It is not: `note="..."` ends at the second quote, so every conditioned
+    // pack since iteration 62 delivered a truncated note plus stray text to any host that
+    // parsed the tag. The count is now zero, and the sentence survives as entities.
     const hardened = renderPack([conditioned()], { budget: 1200, note: 'hardened' });
     const note = noteOf(hardened.rendered);
-    expect(note.split('"').length - 1).toBe(2);
+    expect(note.split('"').length - 1).toBe(0);
+    expect(note).toContain('carries a &quot;when&quot; condition');
+  });
+
+  it('round-trips the note through a parser that only understands attributes', () => {
+    // The reason escaping matters is that the block is data: a host reads the element name,
+    // its version and its item count, and a note that swallows the rest of the tag makes all
+    // three wrong rather than merely ugly.
+    const { rendered } = renderPack([conditioned()], { budget: 1200 });
+    const tag = rendered.slice(0, rendered.indexOf('>') + 1);
+    expect(tag).toMatch(/^<microglia-knowledge version="1" note="[^"]*" items="1">$/);
   });
 });

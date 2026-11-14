@@ -1,0 +1,230 @@
+{
+ "note": "Authored fixture, not a measurement. It exercises the retrospection pipeline and the review console end to end: two clusters that should be reviewable, one that should be refused as a restatement, and five pass records that exist only as counter-evidence.",
+ "namespace": "tau2-retail-fixture",
+ "items": [
+  {
+   "id": "k_01",
+   "kind": "exemplar",
+   "polarity": "repair",
+   "statement": "Refund the shipping fee as well as the item price when the item arrived damaged.",
+   "when": "when a refund is requested for a damaged item",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-01"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000001
+  },
+  {
+   "id": "k_02",
+   "kind": "exemplar",
+   "polarity": "repair",
+   "statement": "Refund the shipping fee as well as the item price when the item arrived damaged and the box was opened.",
+   "when": "when a refund is requested for a damaged item and the packaging was opened",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-02"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000002
+  },
+  {
+   "id": "k_03",
+   "kind": "exemplar",
+   "polarity": "repair",
+   "statement": "Issue the refund to the original payment method when the item arrived damaged and the customer asks for a refund.",
+   "when": "when a refund is requested for a damaged item and the customer names the original payment method",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-03"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000003
+  },
+  {
+   "id": "k_04",
+   "kind": "exemplar",
+   "polarity": "repair",
+   "statement": "Do not ask the customer to return a damaged item before refunding it.",
+   "when": "when a refund is requested for a damaged item and the customer has not shipped it back",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-04"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000004
+  },
+  {
+   "id": "k_05",
+   "kind": "exemplar",
+   "polarity": "repair",
+   "statement": "Change the delivery address without a cancellation when the order has not shipped yet.",
+   "when": "when an address change is requested for an order that has not shipped",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-05"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000005
+  },
+  {
+   "id": "k_06",
+   "kind": "exemplar",
+   "polarity": "repair",
+   "statement": "Change the delivery address in place when the order has not shipped and the customer gives a new suite number.",
+   "when": "when an address change is requested for an order that has not shipped and the customer supplies a suite number",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-06"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000006
+  },
+  {
+   "id": "k_07",
+   "kind": "exemplar",
+   "polarity": "repair",
+   "statement": "Confirm the new address before writing it when the order has not shipped.",
+   "when": "when an address change is requested for an order that has not shipped and the customer has not confirmed the new address",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-07"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000007
+  },
+  {
+   "id": "k_08",
+   "kind": "exemplar",
+   "polarity": "repair",
+   "statement": "Offer an exchange for a different size before offering a refund.",
+   "when": "when an exchange is requested for a different size",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-08"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000008
+  },
+  {
+   "id": "k_09",
+   "kind": "exemplar",
+   "polarity": "repair",
+   "statement": "Offer an exchange for a different size and reserve the item before offering a refund.",
+   "when": "when an exchange is requested for a different size and the item is in stock",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-09"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000009
+  },
+  {
+   "id": "k_10",
+   "kind": "exemplar",
+   "polarity": "repair",
+   "statement": "Read the order id from the conversation rather than asking for it again.",
+   "when": "when the customer has already stated an order id",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-10"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000010
+  },
+  {
+   "id": "k_11",
+   "kind": "exemplar",
+   "polarity": "repair",
+   "statement": "State the refund timing when the customer asks how long it takes.",
+   "when": "when the customer asks how long a refund takes",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-11"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000011
+  },
+  {
+   "id": "k_12",
+   "kind": "exemplar",
+   "polarity": "pass",
+   "statement": "Q: I want to return a hose. A: return_delivered_order_items(order_id=\"#W1\", item_ids=[...])",
+   "when": "when a return is requested for a delivered order",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-12"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000012
+  },
+  {
+   "id": "k_13",
+   "kind": "exemplar",
+   "polarity": "pass",
+   "statement": "Q: Where is my order? A: get_order_details(order_id=\"#W2\")",
+   "when": "when a customer asks for tracking on a shipped order",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-13"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000013
+  },
+  {
+   "id": "k_14",
+   "kind": "exemplar",
+   "polarity": "pass",
+   "statement": "Q: Cancel everything. A: cancel_pending_order(order_id=\"#W3\", reason=\"ordered by mistake\")",
+   "when": "when a cancellation is requested for a pending order",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-14"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000014
+  },
+  {
+   "id": "k_15",
+   "kind": "exemplar",
+   "polarity": "pass",
+   "statement": "Q: Exchange the boots for the waterproof version. A: exchange_delivered_order_items(...)",
+   "when": "when an exchange is requested for a delivered item",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-15"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000015
+  },
+  {
+   "id": "k_16",
+   "kind": "exemplar",
+   "polarity": "pass",
+   "statement": "Q: I need a bigger water bottle. A: exchange_delivered_order_items(...)",
+   "when": "when an exchange is requested for a different size and the item was delivered",
+   "scope": {
+    "task": "retail.support",
+    "domain": "retail",
+    "intent": "task-16"
+   },
+   "trust": 0.9,
+   "createdAt": 1763000000016
+  }
+ ]
+}

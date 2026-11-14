@@ -242,7 +242,13 @@ export function renderPack(items: readonly RenderableItem[], options: RenderOpti
       : mode === 'hardened'
         ? `${base} ${CALIBRATION}`
         : base;
-  const open = `<${tag} version="1" note="${note}" items="__N__">`;
+  // The sentence quotes the field name — `carries a "when" condition` — and a raw double quote
+  // inside a double-quoted attribute ends it: a host that parses the tag read a truncated note
+  // followed by stray text, and every conditioned pack since iteration 62 was delivered that
+  // way. Found by the review console printing a block for a human to read, which is the only
+  // place the defect was ever going to be visible.
+  const noteAttr = note.replace(/"/g, '&quot;');
+  const open = `<${tag} version="1" note="${noteAttr}" items="__N__">`;
   // What the budget is charged for. Under `note-excluded` the wrapper is counted as if it
   // carried no note, so the sentence and the rules stop competing for the same characters;
   // see `budgetBasis`. The note itself is rendered either way — this changes only the

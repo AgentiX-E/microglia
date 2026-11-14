@@ -41,6 +41,10 @@
       "types": "./dist/delivery/index.d.ts",
       "import": "./dist/delivery/index.js",
       "default": "./dist/delivery/index.js"
+    },
+    "./retrospect": {
+      "types": "./dist/retrospect/index.d.ts",
+      "default": "./dist/retrospect/index.js"
     }
   },
   "files": [
