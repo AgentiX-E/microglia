@@ -104,6 +104,28 @@ _episode_starts: list = []
 # a phase that really did run 162 episodes, and both R123's serve split and R128's attribution were reading
 # it. The counter is what makes the sentence checkable: `len(episodeStarts) + recallRepeats == recalls`.
 _recall_repeats = 0
+# R136. The task each boundary opened for, taken from the query text this side of the socket already
+# holds. `_episode_starts` says *where* an episode began and nothing about *which* task it was, so on
+# R135's arm — 41 boundaries for 40 scored episodes — the extra boundary was an unattributable row and
+# every join in this lane refused. The text is recorded at the same moment as the index, because both
+# are properties of the boundary rather than of the request, and the query the recall would send is
+# already normalised to `MAX_QUERY_CHARS`, so two boundaries of one task carry equal strings and a
+# retry is *named* by comparison rather than inferred from a count.
+_boundary_tasks: list = []
+# Characters of the message this agent actually injects, and of the pack the facade served. R135 measured
+# 559 tokens of system growth per call against a 725-character pack and could not say whether the other
+# ~400 tokens were the pack's carriage or material no field had ever named: the census counts every system
+# message together, so the pack and the adapter's preamble are one column. The three lengths recorded here
+# are the layers that column has — the pack as served, the message as injected, and (in the census) the
+# column as billed — and each is taken where it is produced so no ratio has to be assumed.
+_pack_chars: list = []
+_injected_chars = 0
+_injected_lengths: list = []
+# Generated messages, which is the denominator the per-call comparison needs. Not the same number as the
+# census's call count: litellm's callback sees every model call the simulation makes, including the user
+# simulator's, and the pack rides only this agent's. A per-call figure divided by the wrong one of those
+# two is the arithmetic that would make a 750-character message look like 300.
+_calls = 0
 
 # Sentinel rather than `None`, because "" is a real answer: a facade that was asked
 # and had nothing to say must not be asked again on the next turn.
@@ -310,10 +332,18 @@ class MicrogliaAgent(LLMAgent):
             # request (R123: `[0..161]` over 160 episodes), which is a position, not a boundary.
             if held is _UNSET:
                 _episode_starts.append(_recalls)
+                # The same moment as the index, from the same string the recall will send. A boundary
+                # that named its index and not its task is what made R135's 41-versus-40 a refusal.
+                _boundary_tasks.append((text or "")[:MAX_QUERY_CHARS])
             else:
                 global _recall_repeats
                 _recall_repeats += 1
             held = recall(text)
+            if held:
+                # The pack as the facade rendered it, before this agent adds anything. The difference
+                # between this and the injected length is the wrapper's own carriage, and the difference
+                # between that and the census's system column is the preamble's.
+                _pack_chars.append(len(held))
         self._pack = held
         self._turn = turn
         return held
@@ -321,6 +351,8 @@ class MicrogliaAgent(LLMAgent):
     def generate_next_message(
         self, message: ValidAgentInputMessage, state: LLMAgentState
     ) -> tuple:
+        global _injected_chars, _calls
+        _calls += 1
         text = getattr(message, "content", None)
         pack = self.pack_for(state, text if isinstance(text, str) else "")
         if pack:
@@ -328,7 +360,13 @@ class MicrogliaAgent(LLMAgent):
             # pack accumulate once per turn, and a ten-turn episode would carry ten
             # copies of it.
             state = state.model_copy(deep=True)
-            state.system_messages = list(state.system_messages) + [injected_message(pack)]
+            injected = injected_message(pack)
+            # R136: the length is taken from the message object rather than from the pack, because the
+            # question is what the prompt *carried* — the element `injected_message` adds is part of the
+            # bill, and a census that only knows the pack's length cannot see it.
+            _injected_chars += len(injected.content)
+            _injected_lengths.append(len(injected.content))
+            state.system_messages = list(state.system_messages) + [injected]
         return super().generate_next_message(message, state)
 
 
@@ -354,6 +392,26 @@ def memory_stats() -> dict:
         # difference between two consecutive entries is the requests one episode spent.
         "episodeStarts": list(_episode_starts),
         "recallRepeats": _recall_repeats,
+        # R136: the task each boundary opened for, by the text the recall was built from. Same length and
+        # same order as `episodeStarts` when the instrument ran, so a reader can subtract the two lists and
+        # see a task that appears twice instead of a boundary count that disagrees with a trial count. The
+        # *id* is not knowable on this side of the socket — the agent is never told which task it is in —
+        # so the text travels and the runner resolves it against the messages it holds.
+        "boundaryTexts": list(_boundary_tasks),
+        # R136: the three lengths, in characters, that the system column is made of. `packChars` is what
+        # the facade served, `injectedChars` is the message this agent built from it, and the census
+        # carries the column the provider billed. `injectedCharsPerCall` divides by *this agent's* calls,
+        # which is the only denominator the pack rides on: the census sees the user simulator's calls too.
+        "packChars": round(sum(_pack_chars) / len(_pack_chars), 1) if _pack_chars else None,
+        "injectedChars": round(sum(_injected_lengths) / len(_injected_lengths), 1)
+        if _injected_lengths
+        else None,
+        "injectedMessages": len(_injected_lengths),
+        # The sum, not only the mean: the census divides it by the calls *it* saw carrying a pack, and that
+        # denominator is not this module's to assume — the two counts disagreeing is itself a reading.
+        "injectedCharsTotal": _injected_chars,
+        "injectedCharsPerCall": round(_injected_chars / _calls, 1) if _calls else None,
+        "calls": _calls,
         "rivaled": len(_margins) if _census else None,
         "margin_p10": quantile_of(_margins, 0.10),
         "margin_p50": quantile_of(_margins, 0.50),

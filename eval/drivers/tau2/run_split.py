@@ -39,7 +39,7 @@ from tau2.registry import registry
 # without a provider, a harness, or a network, and a reader that only loads inside this process is a
 # reader whose contract with the TypeScript side can never be tested.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from turns import turn_census  # noqa: E402
+from turns import field as message_field, turn_census  # noqa: E402
 
 # Which τ² this is, decided by what the package exports rather than by a version string.
 #
@@ -277,7 +277,16 @@ def _census_of(messages) -> "dict[str, int] | None":
     if not isinstance(messages, (list, tuple)) or not messages:
         return None
     sizes = [_content_chars(message) for message in messages]
-    system = sum(size for size, message in zip(sizes, messages) if _role_of(message) == "system")
+    roles = [_role_of(message) for message in messages]
+    system = sum(size for size, role in zip(sizes, roles) if role == "system")
+    systems = sum(1 for role in roles if role == "system")
+    # R136. A call that carries the pack carries it as a **second** system message, and that is visible
+    # from the roles alone — no tag, no import from the agent, nothing that can drift. It matters because
+    # this callback sees every model call the simulation makes, the user simulator's included, and the
+    # simulator's system prompt is neither the agent's policy nor the pack. A `system_chars` mean over all
+    # of them is a mixture whose composition moves with how many turns each side took, and R135 read a 559
+    # token growth in it without being able to say which column it was in.
+    packed = 1 if systems > 1 else 0
     return {
         "messages": len(sizes),
         "chars": sum(sizes),
@@ -300,6 +309,14 @@ def _census_of(messages) -> "dict[str, int] | None":
         "tail2_chars": sizes[-2] if len(sizes) > 2 else 0,
         "system_chars": system,
         "conversation_chars": sum(sizes) - system,
+        # R136: the two halves of the system column, split by whether the call carried an injected
+        # message. `system_chars_packed` is the column as billed on the calls that carry a pack and
+        # `system_chars_unpacked` is the rest, so subtracting an injected length from the first is an
+        # attribution rather than an average of two different prompts.
+        "system_messages": systems,
+        "packed_calls": packed,
+        "system_chars_packed": system if packed else 0,
+        "system_chars_unpacked": 0 if packed else system,
     }
 
 
@@ -380,7 +397,7 @@ if _record_usage not in litellm.success_callback:
     litellm.success_callback.append(_record_usage)
 
 
-def cache_census() -> dict:
+def cache_census(memory: "dict | None" = None) -> dict:
     """The prompt's shape against the cache the provider credited.
 
     `prefix_coverage` is the whole point: it is the share of the material the provider provably saw
@@ -398,6 +415,13 @@ def cache_census() -> dict:
 
     Absent rather than zeroed when the callback saw no messages, because `0.0` reads as "the
     provider credited nothing" and that is a claim about a measurement that did not happen.
+
+    `memory` is the agent's own block when this phase had one, and it is the only thing that can turn the
+    system column into an attribution. R135 measured a 559-token system growth a call against a
+    725-character pack and stopped there: the column holds the pack, the element the agent wraps it in and
+    the adapter's preamble, and a census that counts them together cannot say which grew. The agent records
+    the lengths it produced — pack, message — and subtracting the message from the column *on the calls
+    that carried one* leaves the carriage, which no field on this record has ever named.
     """
     prompt = _usage["prompt_tokens"]
     cached = _usage["cached_tokens"]
@@ -430,7 +454,7 @@ def cache_census() -> dict:
     # reference's 179.5, which is 99.7% of a premium that is 45% a longer prompt and 45% a worse cache).
     # A residual of a residual is not an attribution, and this one was read as if it were.
     mean_framing_tokens = mean_prompt - mean_system_tokens - mean_conversation_tokens - mean_tools_tokens
-    return {
+    block = {
         "measured": True,
         "calls_with_messages": seen,
         "chars_per_token": round(ratio, 4),
@@ -446,6 +470,11 @@ def cache_census() -> dict:
         "residual_tokens_per_call": round(max(0.0, mean_framing_tokens), 1),
         "cached_tokens_per_call": round(mean_cached, 1),
         "uncached_tokens_per_call": round(mean_uncached, 1),
+        # R136: the same two columns in characters, because the one measurement that can attribute them — the
+        # length of the message the agent injected — is recorded in characters. Converting either side through
+        # `chars_per_token` to compare them is how a ratio becomes a conclusion.
+        "system_chars_per_call": round(_cache["system_chars"] / seen, 1),
+        "conversation_chars_per_call": round(_cache["conversation_chars"] / seen, 1),
         "prefix_coverage": round(mean_cached / mean_seen_tokens, 4)
         if mean_seen_tokens > 0
         else None,
@@ -456,10 +485,54 @@ def cache_census() -> dict:
             "cached_tokens": int(first.get("cached_tokens") or 0),
         },
     }
+    # R136. The system column is a mixture: this callback sees the user simulator's calls as well as the
+    # agent's, and the simulator's prompt carries neither the pack nor the agent's policy. The split is by
+    # structure rather than by name — a call that carries the pack carries it as a second system message —
+    # so it survives a release that renames the tag.
+    packed = _cache["packed_calls"]
+    unpacked = seen - packed
+    if packed:
+        per_packed = _cache["system_chars_packed"] / packed
+        block["packed_calls"] = packed
+        block["system_chars_per_packed_call"] = round(per_packed, 1)
+        if unpacked:
+            block["system_chars_per_unpacked_call"] = round(
+                _cache["system_chars_unpacked"] / unpacked, 1
+            )
+        total_injected = _injected_total(memory)
+        if total_injected is not None:
+            # Per *packed call*, not per call: the injection rides this agent's calls only, and dividing it
+            # by a denominator that includes the simulator's would make a 750-character message look like
+            # a 300-character one.
+            injected_per_call = total_injected / packed
+            carriage = max(0.0, per_packed - injected_per_call)
+            block["injected_chars_per_packed_call"] = round(injected_per_call, 1)
+            block["carriage_chars_per_packed_call"] = round(carriage, 1)
+            block["carriage_tokens_per_call"] = round(carriage / ratio, 1)
+    return block
 
 
-def usage_stats() -> dict:
-    """The run's bill, with the derived figures a reader would otherwise compute wrong."""
+def _injected_total(memory) -> "float | None":
+    """The agent's own count of injected characters, or `None` when it reported none.
+
+    `None` rather than `0`: an arm whose agent predates the instrument has no injection count, and a zero
+    there would say the pack was injected empty — which is the absence-as-zero defect this lane has paid
+    for twice.
+    """
+    if not isinstance(memory, dict):
+        return None
+    value = memory.get("injectedCharsTotal")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value) if value > 0 else None
+
+
+def usage_stats(memory: "dict | None" = None) -> dict:
+    """The run's bill, with the derived figures a reader would otherwise compute wrong.
+
+    `memory` is the phase's agent block when there is one, forwarded to the census because the injected
+    message's length is the only thing that can turn the system column into an attribution (R136).
+    """
     prompt = _usage["prompt_tokens"]
     cached = _usage["cached_tokens"]
     completion = _usage["completion_tokens"]
@@ -479,7 +552,7 @@ def usage_stats() -> dict:
         # The composition of what was sent, beside the counts of what was held. A phase total says
         # the memory arm missed 3.7× as much; only this says whether the missed material was the
         # pack (once), the prefix (a cadence) or the turn (an observation).
-        "cache": cache_census(),
+        "cache": cache_census(memory),
         "cost": _cost(prompt, cached, completion, _first_call_at),
     }
 
@@ -958,11 +1031,95 @@ def diagnostics_of(simulations) -> dict:
     }
 
 
-def _memory_stats() -> dict:
-    """The sidecar's own counters, imported where the agent that owns them was imported."""
+def _memory_stats(simulations=None) -> dict:
+    """The sidecar's own counters, imported where the agent that owns them was imported.
+
+    R136: the agent records the *text* of the query each episode boundary opened for and cannot record the
+    task id, because τ² never tells an agent which task it is in. The runner has both — the boundary texts
+    from the agent and the first user message of every simulation it just ran — so the identity is resolved
+    here, where both are in hand, and the block carries the resolved ids beside the texts they came from.
+    """
     from microglia_agent import memory_stats
 
-    return memory_stats()
+    block = memory_stats()
+    texts = block.get("boundaryTexts")
+    resolved, unmatched = boundary_task_ids(
+        texts if isinstance(texts, list) else [], _first_user_texts(simulations)
+    )
+    block["boundaryTasks"] = resolved
+    block["boundaryTasksUnmatched"] = unmatched
+    return block
+
+
+def _first_user_texts(simulations) -> list:
+    """`(task id, first user message)` for every simulation this phase ran, in the runner's order.
+
+    The message rather than the task's `instruction`: the agent's boundary text is the content τ² handed it,
+    and any normalisation between the two would be a claim about upstream's prompt rather than a reading of
+    this run. A simulation whose messages cannot be read is skipped rather than guessed at.
+    """
+    pairs = []
+    for simulation in simulations or []:
+        reader = getattr(simulation, "get_messages", None)
+        if not callable(reader):
+            continue
+        try:
+            messages = reader()
+        except Exception:  # noqa: BLE001 - upstream shape, not our error
+            continue
+        task = str(getattr(simulation, "task_id", "") or "")
+        for message in messages or []:
+            # Both shapes: τ² hands this process objects, and the same messages arrive as JSON when the
+            # runner is exercised from a document. A reader that knew only one would resolve nothing on the
+            # other and report an instrument fault.
+            role = message_field(message, "role")
+            if role not in ("user", "human"):
+                continue
+            content = message_field(message, "content")
+            if isinstance(content, str) and content.strip():
+                pairs.append((task, content))
+            break
+    return pairs
+
+
+def boundary_task_ids(texts, first_texts) -> "tuple[list, int]":
+    """The task each boundary opened for, resolved by matching text rather than by position.
+
+    R135 opened **41** boundaries for **40** scored episodes: `queries.distinct` was 41 with 41 different
+    texts and `recallRepeats` was 0, so one task was simulated twice and the retry's pack became a ledger row
+    no `per_task` row named. `serve split` printed `boundary-disagrees` and `itemLedgerOf` refused, which is
+    the right behaviour for a positional join and no help at all: the instrument could not say *which* task
+    the extra boundary belonged to.
+
+    The match is exact after stripping — the agent records `text[:MAX_QUERY_CHARS]` of the same content τ²
+    gave it, so the boundary text is a prefix of the message. A boundary whose text matches messages from two
+    different tasks is left unresolved rather than resolved to the first: that is a collision in the
+    instrument, and picking one of the two would be a positional join wearing an identity's name.
+
+    Returns `(ids, unmatched)` with `ids` in boundary order and `None` where nothing matched. An empty
+    boundary text is unresolved rather than silently grouped with the next empty one: a boundary the agent
+    reached without a message is a fact about the episode, not a task.
+    """
+    index: dict = {}
+    for task, text in first_texts:
+        if not isinstance(text, str) or task == "":
+            continue
+        index.setdefault(text.strip(), []).append(task)
+    ids = []
+    resolved = 0
+    for text in texts:
+        needle = text.strip() if isinstance(text, str) else ""
+        found = set()
+        if needle:
+            for key, tasks in index.items():
+                if key.startswith(needle):
+                    found.update(tasks)
+        if len(found) == 1:
+            ids.append(next(iter(found)))
+            resolved += 1
+        else:
+            ids.append(None)
+    return ids, len(ids) - resolved
 
 
 def main(argv: list[str]) -> int:
@@ -1056,6 +1213,10 @@ def main(argv: list[str]) -> int:
         concurrency=int(os.environ.get("TAU_CONCURRENCY", "4")),
     )
     simulations = getattr(results, "simulations", None)
+    # Computed once, before the diagnostics that consume it: the census needs the agent's injected lengths
+    # and the artefact needs the agent's own counters, and two calls to a counter reader is two places for
+    # a denominator to disagree with itself.
+    memory = _memory_stats(simulations) if args.agent == "microglia_agent" else None
     print(
         json.dumps(
             {
@@ -1068,14 +1229,14 @@ def main(argv: list[str]) -> int:
                 "memory_url": args.memory_url,
                 "diagnostics": {
                     **diagnostics_of(simulations),
-                    "usage": usage_stats(),
+                    "usage": usage_stats(memory),
                     # R123: only the phase that consulted a sidecar reports on one. A phase without the
                     # agent would otherwise carry `recalls: 0`, which reads as a memory that was never
                     # asked rather than one that was never wired -- the distinction this driver's own
                     # `recall_failures` counter was added for and never reached an artefact to make.
-                    **({"memory": _memory_stats()} if args.agent == "microglia_agent" else {}),
+                    **({"memory": memory} if memory is not None else {}),
                 },
-                "usage": usage_stats(),
+                "usage": usage_stats(memory),
                 "thinking": os.environ.get("TAU_THINKING", "disabled"),
                 "model": model,
                 "judge": judge_model,

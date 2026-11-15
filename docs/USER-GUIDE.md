@@ -3311,3 +3311,63 @@ four harmed and two repaired requests and no field said where in the ladder they
 One caution, learned twice: a per-request array is only as good as its alignment. If `perRequest`,
 `ledger` and `per_task` disagree in length, the join reports a number rather than a defect, so check the
 three lengths before reading anything else.
+
+### 24.4 When the boundary counts more boundaries than there are trials
+
+`memory.boundaryTasks` names the task each episode boundary opened for, and it is what makes the joins in
+§24.3 safe on an arm that simulated a task twice. R135 opened **41** boundaries for **40** scored
+episodes: one task was simulated twice, its second pack became a ledger row no `per_task` row named, and
+every positional join in the toolkit refused — correctly, since a positional join would have attributed
+one trial's claims to another's outcome.
+
+The field is recorded where the boundary is, from the query the agent already sends to the facade, and the
+runner resolves it to a task id by matching that query against the first user message of every simulation
+it ran. Two properties follow:
+
+- **a boundary's requests are still delimited by position** — `episodeStarts` is a partition of the request
+  stream and no name changes that;
+- **a boundary's trial comes from the task it names**, so a repeated task is one episode with two ranges
+  rather than two episodes with one outcome each.
+
+Read it with:
+
+```
+[tau2] boundary: 41 boundar(ies) for 40 task(s); repeated retail/5 2
+```
+
+Three sentences come out of that line. `none repeated` with equal counts is an ordinary arm. A `repeated`
+entry is a retried task, named — which is what R135 could not do. An `unresolved` count is an instrument
+fault: the boundary named a task the arm never scored, and the requests it opened belong to no trial, so
+the split refuses (`tasks-unresolved`) rather than falling back to position.
+
+> **A missing name is not a zero.** An artefact written before R136 carries `episodeStarts` and no
+> `boundaryTasks`, and the join then behaves exactly as it did: positional, and refusing any pair whose
+> counts disagree. That refusal is the reason the instrument exists, not a defect in it.
+
+### 24.5 How much of the system column is the message
+
+`memory.injectedChars` is the length of the message the agent actually injects — the pack plus the element
+it wraps it in — and `memory.packChars` is the length of the pack the facade served. Together with the
+census's system column they are the three layers a memory's cost is made of:
+
+| layer | field | what it is |
+| --- | --- | --- |
+| the knowledge | `memory.packChars` | what the store served |
+| the message | `memory.injectedChars` | what the agent put in the prompt |
+| the column | `usage.cache.system_chars_per_call` | what the provider billed as system |
+
+The census splits the column by structure rather than by name: a call that carries a pack carries it as a
+**second system message**, so `packed_calls` counts the calls the pack rode on and
+`system_chars_per_unpacked_call` is the column on the calls it did not. That split matters because the
+provider's callback sees the user simulator's calls too, and a mean over both is a mixture whose
+composition moves with how many turns each side took.
+
+`carriage_chars_per_packed_call` is `system_chars_per_packed_call` minus the injected message: the
+adapter's preamble, which no field on the record had ever named. Measured on R135's arm, 559 tokens of
+system growth against a 725-character pack meant about 409 tokens sat in a column that was reported as one
+number — and this is the subtraction that says so.
+
+```text
+[tau2] the provider credited 96.0% of the 4120-token prefix it had seen … ; on the 16 call(s) that carried
+a pack the injected message was 726 characters and the system column carried 1986 more (about 505 tokens)
+```

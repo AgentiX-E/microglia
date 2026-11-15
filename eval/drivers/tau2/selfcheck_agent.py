@@ -327,12 +327,19 @@ def memory_stats_exposes_the_recall_count(checks):
     checks.contains(
         sorted(stats),
         [
+            "boundaryTexts",
+            "calls",
             "census",
             "episodeStarts",
+            "injectedChars",
+            "injectedCharsPerCall",
+            "injectedCharsTotal",
+            "injectedMessages",
             "margin_ladder",
             "margin_p10",
             "margin_p50",
             "margin_p90",
+            "packChars",
             "recallRepeats",
             "recall_empty",
             "recall_failures",
@@ -398,6 +405,94 @@ def an_empty_response_is_attributed_to_the_gate_that_withheld_it(checks):
     checks.equal(subject.empty_bucket({}), "unattributed", "no reason is a state, not a zero")
     checks.equal(subject.empty_bucket({"suppressed": ""}), "unattributed", "an empty string is no reason")
     checks.equal(subject.empty_bucket({"suppressed": 7}), "unattributed", "and neither is a non-string")
+
+
+@case
+def the_boundary_records_the_task_it_opened_for(checks):
+    """R136. A boundary index with no task is what made R135's 41-versus-40 a refusal.
+
+    The two lists are positional against each other — same length, same order — because both are appended on
+    the same branch: a new agent instance, which is the only episode signal this side of the socket has.
+    """
+    agent, _, original = fresh("PACK")
+    try:
+        before = subject.memory_stats()
+        state = LLMAgentState()
+        episode_step(agent, state, "where is my order 1234")
+        after = subject.memory_stats()
+    finally:
+        subject.recall = original
+    grown = after["boundaryTexts"][len(before["boundaryTexts"]) :]
+    checks.equal(grown, ["where is my order 1234"], "the text the recall was built from")
+    checks.equal(
+        len(after["boundaryTexts"]),
+        len(after["episodeStarts"]),
+        "one task name per boundary, in the same order",
+    )
+
+
+@case
+def a_boundary_text_is_recorded_at_the_length_the_recall_used(checks):
+    """Truncated to `MAX_QUERY_CHARS`, because the text names the request that was made rather than the
+    instruction the benchmark holds, and the runner matches the two by prefix."""
+    agent, _, original = fresh("PACK")
+    long_text = "q" * (subject.MAX_QUERY_CHARS + 200)
+    try:
+        before = subject.memory_stats()
+        state = LLMAgentState()
+        episode_step(agent, state, long_text)
+        after = subject.memory_stats()
+    finally:
+        subject.recall = original
+    grown = after["boundaryTexts"][len(before["boundaryTexts"]) :]
+    checks.equal(len(grown[0]), subject.MAX_QUERY_CHARS, "the same slice the recall sends")
+
+
+@case
+def the_injected_message_is_measured_where_it_is_injected(checks):
+    """R136's second instrument: the length of the message, not of the pack.
+
+    The element `injected_message` adds is part of the bill, and a census that only knew the pack's length
+    would price the pack and leave the wrapper unattributed — which is how a 725-character pack became a
+    559-token system column nobody could decompose.
+    """
+    pack = "y" * 40
+    agent, _, original = fresh(pack)
+    expected = len(subject.injected_message(pack).content)
+    try:
+        before = subject.memory_stats()
+        state = LLMAgentState()
+        episode_step(agent, state, "t1")
+        episode_step(agent, state, "t2")
+        after = subject.memory_stats()
+    finally:
+        subject.recall = original
+    checks.equal(
+        after["injectedCharsTotal"] - before["injectedCharsTotal"],
+        2 * expected,
+        "two turns, two injections of the same message",
+    )
+    checks.equal(after["injectedMessages"] - before["injectedMessages"], 2, "and two messages counted")
+    checks.equal(after["calls"] - before["calls"], 2, "over two generated messages, which is the denominator")
+    checks.equal(after["packChars"] is not None, True, "the pack as served is recorded beside it")
+
+
+@case
+def an_episode_with_no_pack_injects_nothing_and_says_so(checks):
+    """Every field stays absent rather than becoming a zero: a pack that was never served is not a pack of
+    length zero, and a mean taken over it would report the wrapper as free."""
+    agent, _, original = fresh("")
+    try:
+        before = subject.memory_stats()
+        state = LLMAgentState()
+        episode_step(agent, state, "t1")
+        after = subject.memory_stats()
+    finally:
+        subject.recall = original
+    checks.equal(after["injectedCharsTotal"], before["injectedCharsTotal"], "nothing was injected")
+    checks.equal(after["injectedMessages"], before["injectedMessages"], "and nothing was counted")
+    checks.equal(after["packChars"], before["packChars"], "no pack length was recorded either")
+    checks.equal(after["calls"] - before["calls"], 1, "the call still happened")
 
 
 # ------------------------------------------------------------------------- runner

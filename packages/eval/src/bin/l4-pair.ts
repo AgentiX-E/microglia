@@ -34,6 +34,9 @@ import { join } from 'node:path';
 import { inGateOrder, mergeGates, type ValidityGate } from '@agentix-e/microglia-protocol';
 import { degradationLineOf, degradationOfPair } from '../tau2-degradation.js';
 import {
+  boundaryJoin,
+  boundaryLine,
+  boundaryTasksOf,
   episodeStartsOf,
   itemTransferLine,
   pairAttribution,
@@ -369,6 +372,9 @@ function attributionOf(reference: Artefact, memory: Artefact) {
   return pairAttribution({
     ledger: memory.tau2?.pack?.ledger,
     episodeStarts: episodeStartsOf(memory.tau2?.memory),
+    // R136: the task each boundary opened for, when the arm names them. Absent on every artefact before the
+    // instrument, which leaves the join positional and therefore refusing a 41-versus-40 pair.
+    boundaryTasks: boundaryTasksOf(memory.tau2?.memory),
     memoryTrials: memory.per_trial,
     referenceTrials: reference.per_trial,
   });
@@ -383,8 +389,17 @@ if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribut
 const split = serveSplit({
   ledger: second.tau2?.pack?.ledger,
   episodeStarts: episodeStartsOf(second.tau2?.memory),
+  boundaryTasks: boundaryTasksOf(second.tau2?.memory),
   memoryTrials: second.per_trial,
 });
+// R136: printed beside the split, because a split that refuses and a split that measures are both readings
+// and only this line says whether the boundary could be joined by identity.
+const boundary = boundaryJoin({
+  episodeStarts: episodeStartsOf(second.tau2?.memory),
+  boundaryTasks: boundaryTasksOf(second.tau2?.memory),
+  memoryTrials: second.per_trial,
+});
+process.stdout.write(`${boundaryLine(boundary)}\n`);
 // Printed whether or not it could be measured. R123's split returned `undefined`, the caller printed nothing,
 // and the arm's registered mechanism check disappeared between a green gate and an artefact with no field.
 process.stdout.write(`${serveSplitLine(split)}\n`);

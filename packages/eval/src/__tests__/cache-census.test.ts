@@ -321,3 +321,88 @@ describe('the premium, split into what the block can and cannot explain', () => 
     expect(split?.perCall).toBeCloseTo(50, 6);
   });
 });
+
+/**
+ * R136 — the system column split into the message it carries and the carriage it does not.
+ *
+ * R135 measured a 559-token growth in the system column against a 725-character pack and stopped there,
+ * because the column is one number: the pack, the element the agent wraps it in, and the adapter's preamble
+ * were billed together. These cases are about the arithmetic that separates them, and about saying nothing
+ * when the phase never recorded an injection — an absent carriage is not a carriage of zero.
+ */
+describe('the carriage the system column carries beyond the message', () => {
+  const carried = (over: Partial<PhaseCacheCensus> = {}): PhaseCacheCensus =>
+    measured({
+      system_tokens_per_call: 604,
+      conversation_tokens_per_call: 3_000,
+      tools_tokens_per_call: 900,
+      prompt_tokens_per_call: 4_588,
+      residual_tokens_per_call: 84,
+      packed_calls: 16,
+      system_chars_per_call: 2_700,
+      system_chars_per_packed_call: 2_700,
+      injected_chars_per_packed_call: 750,
+      carriage_chars_per_packed_call: 1_950,
+      carriage_tokens_per_call: 505,
+      ...over,
+    });
+
+  it('names the injected message and the carriage beside it', () => {
+    const verdict = cacheCensusVerdict(carried());
+    expect(verdict.sentence).toContain('on the 16 call(s) that carried a pack');
+    expect(verdict.sentence).toContain('the injected message was 750 characters');
+    expect(verdict.sentence).toContain('carried 1950 more');
+    expect(verdict.sentence).toContain('about 505 tokens');
+  });
+
+  it('reports the share of the column the message itself occupies, which decides the next dollar', () => {
+    // 750 of 2,700 is 28%: the pack is a minority of the column it rides in, so the renderer and the
+    // preamble are the lever rather than the item's length.
+    expect(cacheCensusVerdict(carried()).carriageShare).toBeCloseTo(750 / 2_700, 6);
+    expect(cacheCensusVerdict(carried({ injected_chars_per_packed_call: 2_700, carriage_chars_per_packed_call: 0 })).carriageShare).toBe(1);
+  });
+
+  it('says nothing about carriage when the phase recorded no injection', () => {
+    // Every artefact before R136. A zero here would read as "the pack was injected empty", which is the
+    // absence-as-zero defect this lane has paid for twice.
+    const verdict = cacheCensusVerdict(measured());
+    expect(verdict.carriageShare).toBeNull();
+    expect(verdict.sentence).not.toContain('carried a pack');
+  });
+
+  it('omits the token figure when only the characters were recorded', () => {
+    const verdict = cacheCensusVerdict(carried({ carriage_tokens_per_call: undefined }));
+    expect(verdict.sentence).toContain('carried 1950 more');
+    expect(verdict.sentence).not.toContain('about');
+  });
+
+  it('says nothing when the call count the carriage is per is missing', () => {
+    // A rate without its denominator is the shape that made R123a report a store result it had not measured,
+    // so the pair is only a reading when the population it is a rate over travelled with it.
+    const verdict = cacheCensusVerdict(carried({ packed_calls: undefined }));
+    expect(verdict.carriageShare).toBeNull();
+    expect(verdict.sentence).not.toContain('carried a pack');
+  });
+
+  it('says nothing when the phase recorded the injection but not the column it rides in', () => {
+    // A pair is two lengths. Half of one would price the pack against a column the phase never measured.
+    const verdict = cacheCensusVerdict(carried({ carriage_chars_per_packed_call: undefined }));
+    expect(verdict.carriageShare).toBeNull();
+    expect(verdict.sentence).not.toContain('carried a pack');
+  });
+
+  it('reports no share when the column is empty rather than dividing by zero', () => {
+    const verdict = cacheCensusVerdict(
+      carried({ injected_chars_per_packed_call: 0, carriage_chars_per_packed_call: 0, carriage_tokens_per_call: 0 }),
+    );
+    expect(verdict.carriageShare).toBeNull();
+    // No share means no sentence: printing "0 of 0" would be a measurement of nothing.
+    expect(verdict.sentence).not.toContain('carried a pack');
+  });
+
+  it('prints the carriage in every state that reads a bill, not only the honoured one', () => {
+    for (const coverage of [0.10, 0.60, 0.96, 1.50]) {
+      expect(cacheCensusVerdict(carried({ prefix_coverage: coverage })).sentence).toContain('carried 1950 more');
+    }
+  });
+});

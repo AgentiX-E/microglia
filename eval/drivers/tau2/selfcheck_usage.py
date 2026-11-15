@@ -516,10 +516,14 @@ def every_counter_the_census_keeps_is_a_field_the_verdict_reports(checks):
             "conversation_chars",
             "last_chars",
             "messages",
+            "packed_calls",
             "prefix_chars",
             "seen_calls",
             "seen_chars",
             "system_chars",
+            "system_chars_packed",
+            "system_chars_unpacked",
+            "system_messages",
             "tail2_chars",
         ],
         "the counters the census keeps, as a declared set",
@@ -534,8 +538,82 @@ def every_counter_the_census_keeps_is_a_field_the_verdict_reports(checks):
         "tools_tokens_per_call",
         "last_tokens",
         "prefix_tokens",
+        # R136: the character columns the carriage is subtracted in, and the split they are subtracted on.
+        "system_chars_per_call",
+        "conversation_chars_per_call",
     ):
         checks.equal(field in census, True, f"{field} is reported rather than counted and dropped")
+
+
+@case
+def a_boundary_is_named_by_the_text_the_recall_was_built_from(checks):
+    """R136. The identity that replaces a positional join, tested where text and id are both known.
+
+    The agent cannot know which task it is in — τ² never tells it — so it records the query, and the runner
+    matches that against the first user message of each simulation it just ran. The match is a prefix,
+    because the agent records `text[:MAX_QUERY_CHARS]` of the same content.
+    """
+    ids, unmatched = subject.boundary_task_ids(
+        ["Where is my order 1234"],
+        [("5", "Where is my order 1234"), ("9", "Cancel the order 77")],
+    )
+    checks.equal(ids, ["5"], "the boundary names the task whose message it opened")
+    checks.equal(unmatched, 0, "and nothing is unresolved")
+
+    long_text = "w" * 500
+    truncated, _ = subject.boundary_task_ids([long_text], [("5", long_text + " and more")])
+    checks.equal(truncated, ["5"], "a truncated boundary is still the same task")
+
+
+@case
+def a_retry_names_its_task_twice_rather_than_becoming_an_unattributable_row(checks):
+    """The shape of R135: 41 boundaries, 40 tasks, one task simulated twice."""
+    ids, unmatched = subject.boundary_task_ids(
+        ["open the ticket", "cancel the ticket", "open the ticket"],
+        [("5", "open the ticket"), ("9", "cancel the ticket")],
+    )
+    checks.equal(ids, ["5", "9", "5"], "the third boundary is the first task again")
+    checks.equal(len(ids), 3, "one id per boundary, whatever the count")
+    checks.equal(unmatched, 0, "and a repeat is not an unresolved row")
+
+
+@case
+def a_boundary_that_could_be_two_tasks_is_left_unresolved(checks):
+    """A collision in the instrument, not a tie to break: picking either would be a positional join
+    wearing an identity's name."""
+    ids, unmatched = subject.boundary_task_ids(
+        ["the same opening words", "", "an unrelated request"],
+        [("5", "the same opening words"), ("9", "the same opening words and more")],
+    )
+    checks.equal(ids, [None, None, None], "two candidates, and no message at all")
+    checks.equal(unmatched, 3, "every one of them is counted")
+
+
+@case
+def a_phase_that_recorded_no_messages_resolves_nothing(checks):
+    ids, unmatched = subject.boundary_task_ids(["anything"], [])
+    checks.equal(ids, [None], "no simulation to match against")
+    checks.equal(unmatched, 1, "and it says so rather than guessing")
+
+
+@case
+def the_first_user_message_is_the_one_the_agent_saw(checks):
+    """The reader, on the two message shapes τ² produces: objects and the JSON that crossed a socket."""
+    class Sim:
+        task_id = "5"
+
+        def __init__(self, messages):
+            self._messages = messages
+
+        def get_messages(self):
+            return self._messages
+
+    object_shaped = [types.SimpleNamespace(role="user", content="  open the ticket  ")]
+    mapping_shaped = [{"role": "assistant", "content": "hi"}, {"role": "user", "content": "open the ticket"}]
+    texts = subject._first_user_texts([Sim(object_shaped), Sim(mapping_shaped), Sim([])])
+    checks.equal(texts, [("5", "  open the ticket  "), ("5", "open the ticket")], "the first user turn, twice")
+    # No readable reader at all: skipped rather than guessed at.
+    checks.equal(subject._first_user_texts([types.SimpleNamespace(task_id="5")]), [], "no reader, no pair")
 
 
 # ------------------------------------------------------------------------- runner
@@ -559,6 +637,72 @@ class Checks:
         self.total += 1
         if forbidden in actual:
             self.failed.append(f"{why}: {forbidden!r} should not appear")
+
+
+@case
+def the_system_column_splits_into_the_message_and_its_carriage(checks):
+    """R136. The column R135 measured as one number, split on the calls that carried a pack.
+
+    The callback sees the user simulator's calls as well as the agent's, and the pack rides only the agent's
+    — as a *second* system message. A mean over both is a mixture whose composition moves with how many turns
+    each side took, which is why a 559-token growth could not be attributed. This case is that arithmetic on
+    a population where the right answer is known: two packed calls carrying 400 + 200 characters of system
+    plus a 150-character injected message each, and one unpacked call carrying 400.
+    """
+    subject.reset_usage()
+    injected = 100
+    packed = [
+        {"role": "system", "content": "p" * 400},
+        {"role": "system", "content": "i" * injected},
+        {"role": "user", "content": TASK},
+    ]
+    unpacked = [{"role": "system", "content": "q" * 400}, {"role": "user", "content": TASK}]
+    # 600 characters over 150 tokens on the first call, which is the only one the ratio may come from.
+    _call(list(packed), 150, 0)
+    _call(list(packed), 125, 0)
+    _call(list(unpacked), 125, 0)
+    # The agent's own count, which the phase passes in as its `memory` block.
+    memory = {"injectedCharsTotal": injected * 2}
+    census = subject.cache_census(memory)
+    checks.equal(census["packed_calls"], 2, "two calls carried a second system message")
+    checks.equal(census["system_chars_per_packed_call"], 500.0, "400 of policy and 100 of message")
+    checks.equal(census["system_chars_per_unpacked_call"], 400.0, "and the simulator's call carries the policy alone")
+    checks.equal(census["injected_chars_per_packed_call"], 100.0, "the agent injected 100 characters a call")
+    # 500 minus 100: what the system column carries that the pack's own message does not.
+    checks.equal(census["carriage_chars_per_packed_call"], 400.0, "and 400 characters are carriage")
+    checks.equal(census["carriage_tokens_per_call"], 100.0, "at four characters a token")
+
+
+@case
+def a_phase_that_recorded_no_injection_reports_no_carriage(checks):
+    """The absence, not a zero: an arm without the agent has no injected length to subtract."""
+    subject.reset_usage()
+    _call([{"role": "system", "content": "p" * 400}, {"role": "system", "content": "i" * 150}], 150, 0)
+    census = subject.cache_census()
+    checks.equal("carriage_chars_per_packed_call" in census, False, "no memory block, no carriage")
+    # And the same arm with a memory block that carries no injection count is still silent rather than zero.
+    silent = subject.cache_census({"recalls": 3})
+    checks.equal("injected_chars_per_packed_call" in silent, False, "a block without the count is not a zero")
+
+
+@case
+def a_carriage_below_zero_is_clamped_rather_than_reported_negative(checks):
+    """An injected length larger than the column it rides in is an instrument fault, and a negative
+    carriage would be read as a pack that shrank the prompt."""
+    subject.reset_usage()
+    _call([{"role": "system", "content": "p" * 100}, {"role": "system", "content": "i" * 50}], 40, 0)
+    census = subject.cache_census({"injectedCharsTotal": 900})
+    checks.equal(census["carriage_chars_per_packed_call"], 0.0, "clamped at zero")
+    checks.equal(census["carriage_tokens_per_call"], 0.0, "and its token figure with it")
+
+
+@case
+def a_phase_with_no_packed_call_reports_no_per_packed_column(checks):
+    subject.reset_usage()
+    _call([{"role": "system", "content": SYSTEM}, {"role": "user", "content": TASK}], 125, 0)
+    census = subject.cache_census({"injectedCharsTotal": 100})
+    checks.equal("packed_calls" in census, False, "no call carried a pack, so nothing is divided by zero")
+    checks.equal("carriage_chars_per_packed_call" in census, False, "and no carriage is invented")
 
 
 def main(argv: list[str]) -> int:

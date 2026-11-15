@@ -1561,3 +1561,25 @@ the end by construction, so the ratio above 1 measures the denominator. Such an 
 `null` where the pack carried no decision. Aligned by position with `pack.ledger` and `per_task`, so a
 rung's withheld set can be joined to the outcomes of exactly those requests. The `ladder` counts requests
 under each rung and cannot say *which* ones, which is why a conditioning arm could not be designed from it.
+
+**Boundary task** — `memory.boundaryTasks`: the task each episode boundary opened for, as a task id, with
+`null` where the runner could not resolve one. The agent records the query text at the boundary — it is
+never told which task it is in — and the runner matches that against the first user message of every
+simulation it ran, so the id is derived from identity rather than from order. R135 opened 41 boundaries for
+40 scored episodes and every positional join in this lane refused; the refusal was correct and the repair
+was the name. The two lists are positional against each other (`boundaryTexts` and `episodeStarts`), which
+is why an unresolved entry is kept in place rather than filtered out.
+
+**Carriage** — `carriage_chars_per_packed_call`: what the system column carries beyond the message the
+agent injected, per call that carried a pack. It is the adapter's preamble and the renderer's wrapper, and
+until R136 it had no name: the census counted every system message together, so a 559-token growth against
+a 725-character pack was reported as one number and read as if it were the memory's text. Measured against
+`system_chars_per_packed_call` rather than against the mean over all calls, because the callback sees the
+user simulator's calls and those carry neither the pack nor the agent's policy. A reading exists only when
+the injection, the column and the call count all travelled: half a pair is not a carriage.
+
+**Packed call** — A model call whose messages carry **two or more system messages**, i.e. one that the pack
+rode on. Structural rather than nominal: it is visible from the roles alone, so a release that renames the
+pack's element cannot move the split. `system_chars_per_unpacked_call` is the same column on the calls the
+pack did not ride, which is the mixture R135's mean hid — the user simulator's prompt is neither the
+agent's policy nor the pack, and its weight in the mean moves with how many turns each side took.

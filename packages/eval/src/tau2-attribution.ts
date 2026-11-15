@@ -39,6 +39,16 @@ import { wilsonInterval } from './reproduction.js';
 export type EpisodeOutcome = {
   /** Request index this episode opened at, from `memory.episodeStarts`. */
   readonly startsAt: number;
+  /**
+   * The half-open request ranges this episode spent.
+   *
+   * R136. One episode normally spends one range — from its boundary to the next — but a task simulated
+   * twice opens two boundaries, and under a concurrent runner they need not be adjacent. A reading that
+   * delimited an episode by "its start to the next start" would then hand the second boundary's requests to
+   * whichever task opened in between, which is a positional join at the only place identity is known.
+   * Absent on episodes joined by position: the fallback is exactly that range, computed from the list.
+   */
+  readonly spans?: readonly (readonly [number, number])[];
   /** Whether the memory arm passed, and whether the control did. */
   readonly memory: boolean;
   readonly control: boolean;
@@ -68,6 +78,14 @@ export function itemTransfer(input: {
   readonly ledger: readonly (readonly string[])[];
   /** Requests with no episode behind them — a recall that fired outside any trial. Excluded, and counted. */
 }): { readonly items: readonly ItemTransfer[]; readonly unmatchedRequests: number } {
+  // A row that is not a list of ids is a malformed ledger, not a request that served nothing. Thrown rather
+  // than tolerated: a hole read as an empty pack would make the request count the table's denominator while
+  // contributing no observation, and every rate derived from it would be a rate over the wrong population.
+  for (const row of input.ledger) {
+    if (!Array.isArray(row)) {
+      throw new TypeError('the ledger carries a request with no id list, so it is not a ledger of packs');
+    }
+  }
   const ordered = [...input.episodes].sort((left, right) => left.startsAt - right.startsAt);
   const tallies = new Map<string, { episodes: number; kept: number; broke: number }>();
   let unmatchedRequests = 0;
@@ -79,17 +97,24 @@ export function itemTransfer(input: {
     const start = Math.min(episode.startsAt, input.ledger.length);
     // A repeated boundary is legal (`recall` that returned without a request leaves the index unchanged),
     // and an empty range is the correct reading of it: that episode spent no request of its own.
-    if (end <= start) continue;
-    // The union of the episode's served ids: a claim served twice into one trajectory is still one
-    // observation of that trajectory, and counting it twice would weight a long episode's claims by how
-    // often they happened to be rendered.
+    // R136: a joined episode carries its own ranges, one per boundary it opened, because a task simulated
+    // twice has two of them and only the identity join knows that they are the same episode. Clamped to the
+    // ledger, because a caller without one leaves the last range open.
+    const spans = (episode.spans ?? [[start, end] as const]).map(
+      ([from, to]) =>
+        [Math.min(from, input.ledger.length), Math.min(to, input.ledger.length)] as const,
+    );
     const served = new Set<string>();
-    for (let request = start; request < end; request += 1) {
-      // `ledger` is one entry per request by construction and `end` is clamped to its length, so the
-      // element exists: a `?? []` here was a branch no artefact could reach, which is the shape this
-      // record deletes rather than exempts.
-      for (const id of input.ledger[request] as readonly string[]) served.add(id);
+    for (const [from, to] of spans) {
+      if (to <= from) continue;
+      for (let request = from; request < to; request += 1) {
+        // `ledger` is one entry per request by construction, every `to` is clamped to its length and every
+        // row was checked to be a list above, so the element exists: a `?? []` here was a branch no artefact
+        // could reach, which is the shape this record deletes rather than exempts.
+        for (const id of input.ledger[request] as readonly string[]) served.add(id);
+      }
     }
+    if (spans.every(([from, to]) => to <= from)) continue;
     for (const id of served) {
       const tally = tallies.get(id) ?? { episodes: 0, kept: 0, broke: 0 };
       tally.episodes += 1;
@@ -154,13 +179,45 @@ export function pairedEpisodes(input: {
   readonly referenceTrials: readonly TauTrialRow[];
   readonly memoryTrials: readonly TauTrialRow[];
   readonly episodeStarts: readonly number[];
+  /** R136: the task each boundary opened for, when the arm names them. */
+  readonly boundaryTasks?: readonly (string | null)[];
+  /** The request count the last boundary's range ends at. Absent when the caller has no ledger. */
+  readonly ledgerLength?: number;
 }): readonly EpisodeOutcome[] | undefined {
-  // One boundary per episode and one row per episode. Anything else cannot be joined by index, and a
-  // positional fallback is the exact assumption R128 exists to remove.
-  if (input.episodeStarts.length !== input.memoryTrials.length) return undefined;
+  const ledgerLength = input.ledgerLength ?? Number.MAX_SAFE_INTEGER;
   const control = new Map(
     input.referenceTrials.map((row) => [`${row.id}#${String(row.trial)}`, row.reward]),
   );
+  // Identity first, for the reason `serveSplit` gives: it is the only path that can pair 41 boundaries with
+  // 40 trials, and the only one that knows a repeated task is one episode with two ranges.
+  const join =
+    input.boundaryTasks === undefined
+      ? undefined
+      : boundaryJoin({
+          episodeStarts: input.episodeStarts,
+          boundaryTasks: input.boundaryTasks,
+          memoryTrials: input.memoryTrials,
+        });
+  if (join !== undefined) {
+    // A named boundary that resolves to nothing is not a case for the positional path: the arm said which
+    // task it opened and the reader could not honour it, which is an instrument finding.
+    if (!('measured' in join) || join.unresolved > 0 || join.measured.length === 0) return undefined;
+    const episodes: EpisodeOutcome[] = [];
+    for (const group of join.measured) {
+      // The trial index came from this array, so the row exists: a `=== undefined` guard here was a branch
+      // no artefact could reach, which is the shape this record deletes rather than exempts.
+      const row = input.memoryTrials[group.trial] as TauTrialRow;
+      const other = control.get(`${row.id}#${String(row.trial)}`);
+      if (other === null || other === undefined || row.reward === null) continue;
+      const spans = group.boundaries.map((index) => boundarySpan(input.episodeStarts, index, ledgerLength));
+      const startsAt = Math.min(...spans.map(([from]) => from));
+      episodes.push({ startsAt, spans, memory: row.reward === 1, control: other === 1 });
+    }
+    return episodes;
+  }
+  // One boundary per episode and one row per episode. Anything else cannot be joined by index, and a
+  // positional fallback is the exact assumption R128 exists to remove.
+  if (input.episodeStarts.length !== input.memoryTrials.length) return undefined;
   const episodes: EpisodeOutcome[] = [];
   input.memoryTrials.forEach((row, index) => {
     const other = control.get(`${row.id}#${String(row.trial)}`);
@@ -186,15 +243,18 @@ export function pairedEpisodes(input: {
 export function pairAttribution(input: {
   readonly ledger?: readonly (readonly string[])[];
   readonly episodeStarts?: readonly number[];
+  readonly boundaryTasks?: readonly (string | null)[];
   readonly memoryTrials?: readonly TauTrialRow[];
   readonly referenceTrials?: readonly TauTrialRow[];
 }): { readonly items: readonly ItemTransfer[]; readonly unmatchedRequests: number } | undefined {
-  const { ledger, episodeStarts, memoryTrials, referenceTrials } = input;
+  const { ledger, episodeStarts, memoryTrials, referenceTrials, boundaryTasks } = input;
   if (ledger === undefined || episodeStarts === undefined || memoryTrials === undefined) return undefined;
   const episodes = pairedEpisodes({
     referenceTrials: referenceTrials ?? [],
     memoryTrials,
     episodeStarts,
+    ledgerLength: ledger.length,
+    ...(boundaryTasks === undefined ? {} : { boundaryTasks }),
   });
   if (episodes === undefined) return undefined;
   return itemTransfer({ episodes, ledger });
@@ -236,12 +296,160 @@ export function episodeStartsOf(memory: unknown): readonly number[] | undefined 
 }
 
 /**
+ * The task each boundary opened for, from `memory.boundaryTasks`, or `undefined` when the arm carries none.
+ *
+ * R136. A `null` entry is a boundary the runner could not resolve to a task, and it is kept in place rather
+ * than filtered out: the list is positional against `episodeStarts`, and dropping an entry would shift every
+ * boundary after it onto the wrong task — the exact failure the field exists to end.
+ */
+export function boundaryTasksOf(memory: unknown): readonly (string | null)[] | undefined {
+  if (memory === null || typeof memory !== 'object') return undefined;
+  const raw = (memory as Record<string, unknown>)['boundaryTasks'];
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  if (!raw.every((entry) => entry === null || (typeof entry === 'string' && entry !== ''))) return undefined;
+  return raw as readonly (string | null)[];
+}
+
+/** A task id without the domain prefix, so `retail/5` from `per_task` matches `5` from τ². */
+export function taskKey(id: string): string {
+  const cut = id.lastIndexOf('/');
+  return cut === -1 ? id : id.slice(cut + 1);
+}
+
+/** One task's boundaries: the requests they opened and the trial they scored. */
+export type BoundaryGroup = {
+  readonly task: string;
+  /** Indexes into `episodeStarts`, in request order. More than one means the task was simulated twice. */
+  readonly boundaries: readonly number[];
+  /** Index into the arm's trial rows. */
+  readonly trial: number;
+};
+
+export type BoundaryAbsence =
+  /** The arm carries no boundary at all, so there is no request partition to name. */
+  | 'no-boundary'
+  /** The arm predates the instrument: `episodeStarts` without `boundaryTasks`. */
+  | 'no-tasks'
+  /** The two lists are positional against each other and their lengths disagree: the instrument is broken. */
+  | 'length-disagrees'
+  /** A boundary names a task the arm never scored, which is a mislabelled artefact rather than a retry. */
+  | 'unknown-task';
+
+export type BoundaryJoinReading =
+  | {
+      readonly measured: readonly BoundaryGroup[];
+      /** The tasks that opened more than one boundary, i.e. the retries the old join refused on. */
+      readonly retried: readonly BoundaryGroup[];
+      /** Boundaries no task could be resolved for. Their requests belong to no trial and are excluded. */
+      readonly unresolved: number;
+    }
+  | { readonly absent: BoundaryAbsence; readonly detail: string };
+
+/**
+ * Join a phase's boundaries to its trials **by the task each boundary opened for**.
+ *
+ * R135 spent its course on a join that could not be made: 41 boundaries for 40 scored episodes, one task
+ * simulated twice, and every positional join in this package refusing for the right reason and offering no
+ * repair. The repair is not a better guess about order — it is the identity the boundary already carries.
+ *
+ * Two properties make this a reading rather than a convention:
+ *
+ *  - a boundary's *requests* are still delimited by position, because `episodeStarts` is a partition of the
+ *    request stream and no identity changes that;
+ *  - a boundary's *trial* comes from the task it names, so a repeated task contributes one episode with two
+ *    ranges instead of two episodes with one outcome each.
+ *
+ * `absent` rather than an empty list on every way this can fail, because a join that returns nothing and a
+ * join that finds nothing are different findings and this record has confused them before.
+ */
+export function boundaryJoin(input: {
+  readonly episodeStarts?: readonly number[];
+  readonly boundaryTasks?: readonly (string | null)[];
+  readonly memoryTrials?: readonly TauTrialRow[];
+}): BoundaryJoinReading {
+  const { episodeStarts, boundaryTasks, memoryTrials } = input;
+  if (episodeStarts === undefined || episodeStarts.length === 0) {
+    return { absent: 'no-boundary', detail: 'the arm recorded no episode boundary, so no request belongs to a trial' };
+  }
+  if (boundaryTasks === undefined || boundaryTasks.length === 0) {
+    return {
+      absent: 'no-tasks',
+      detail: `${String(episodeStarts.length)} boundar(ies) with no task named for any of them`,
+    };
+  }
+  if (boundaryTasks.length !== episodeStarts.length) {
+    return {
+      absent: 'length-disagrees',
+      detail: `${String(boundaryTasks.length)} task name(s) against ${String(episodeStarts.length)} boundar(ies); the two lists are positional`,
+    };
+  }
+  const trials = memoryTrials ?? [];
+  const trialOf = new Map<string, number>();
+  trials.forEach((row, index) => {
+    const key = taskKey(row.id);
+    if (!trialOf.has(key)) trialOf.set(key, index);
+  });
+  const groups = new Map<string, { boundaries: number[]; trial: number }>();
+  let unresolved = 0;
+  boundaryTasks.forEach((task, index) => {
+    if (task === null) {
+      unresolved += 1;
+      return;
+    }
+    const key = taskKey(task);
+    const trial = trialOf.get(key);
+    if (trial === undefined) {
+      unresolved += 1;
+      return;
+    }
+    const group = groups.get(key) ?? { boundaries: [], trial };
+    group.boundaries.push(index);
+    groups.set(key, group);
+  });
+  // A boundary that named a task the arm never scored is a mislabelled artefact, not a retry: pairing it
+  // would attribute one task's requests to another's outcome, which is the direction this join exists to
+  // get right. It is named rather than dropped.
+  const orphan = boundaryTasks.find((task) => task !== null && !trialOf.has(taskKey(task)));
+  if (orphan !== null && orphan !== undefined && groups.size === 0) {
+    return {
+      absent: 'unknown-task',
+      detail: `every boundary names a task this arm never scored (first: ${orphan})`,
+    };
+  }
+  const measured = [...groups.entries()].map(([task, group]) => ({
+    task,
+    boundaries: group.boundaries,
+    trial: group.trial,
+  }));
+  return { measured, retried: measured.filter((group) => group.boundaries.length > 1), unresolved };
+}
+
+/**
+ * The line a run prints about its own boundary, which is the one sentence R135 could not write.
+ *
+ * A count of boundaries and a count of trials are not the same number and never were: the difference is a
+ * task simulated twice, and a line that prints only the counts leaves a reader unable to tell a retry from a
+ * broken instrument.
+ */
+export function boundaryLine(reading: BoundaryJoinReading): string {
+  if ('absent' in reading) {
+    return `boundary: not joined (${reading.absent}) — ${reading.detail}`;
+  }
+  const boundaries = reading.measured.reduce((sum, group) => sum + group.boundaries.length, 0);
+  const named = reading.retried.map((group) => `${group.task} ${String(group.boundaries.length)}`);
+  return (
+    `boundary: ${String(boundaries)} boundar(ies) for ${String(reading.measured.length)} task(s)` +
+    (named.length === 0 ? ', none repeated' : `; repeated ${named.join(', ')}`) +
+    (reading.unresolved === 0 ? '' : `; ${String(reading.unresolved)} unresolved`)
+  );
+}
+
+/**
  * Why a serve split could not be computed.
  *
- * Four sentences, because four different things go wrong and the repair differs for each. `undefined` was
- * this function's first answer and it cost R123 its registered core reading: the split returned nothing, the
- * caller printed nothing, and a run whose mechanism check was unmeasurable looked exactly like a run that did
- * not have one.
+ * One sentence per way it fails, because the repair differs for each. `undefined` was this function's first
+ * answer and it cost R123 its registered core reading: the split returned nothing, the caller printed
+ * nothing, and a run whose mechanism check was unmeasurable looked exactly like a run that did not have one.
  */
 export type ServeSplitAbsence =
   /** The arm recorded no ledger: no request reached the facade, or the field predates the census. */
@@ -249,7 +457,9 @@ export type ServeSplitAbsence =
   /** The arm recorded no episode boundary, so a request cannot be attributed to a trial. */
   | 'no-boundary'
   /** The boundary exists but its length disagrees with the trials it would be joined to. */
-  | 'boundary-disagrees';
+  | 'boundary-disagrees'
+  /** R136: the arm names its boundaries and some of them name no task, so identity cannot decide. */
+  | 'tasks-unresolved';
 
 export type ServeSplitReading =
   | { readonly measured: ServeSplit }
@@ -264,15 +474,28 @@ export type ServeSplitReading =
  * which passes a length check against the ledger and fails the one that matters. So the boundary is validated
  * as a boundary: strictly increasing, inside the ledger, and one entry per trial. Anything else is reported
  * as an absence with the numbers that disagreed, which is what a reader needs to repair it.
+ *
+ * R136 added `boundaryTasks`, and it changes what "one entry per trial" means. R135 had 41 boundaries for 40
+ * trials — a task simulated twice — and no positional repair exists for that, so the count check refused an
+ * arm whose treatment was fine and the arm's mechanism reading was lost. With the boundary's task named, the
+ * count is allowed to differ: the boundary count is the number of *ranges*, the group count is the number of
+ * episodes, and the two are equal only on an arm that retried nothing.
  */
 export function serveSplit(input: {
   readonly ledger?: readonly (readonly string[])[];
   readonly episodeStarts?: readonly number[];
   readonly memoryTrials?: readonly TauTrialRow[];
+  readonly boundaryTasks?: readonly (string | null)[];
 }): ServeSplitReading {
-  const { ledger, episodeStarts, memoryTrials } = input;
+  const { ledger, episodeStarts, memoryTrials, boundaryTasks } = input;
   if (ledger === undefined || ledger.length === 0) {
     return { absent: 'no-ledger', detail: 'the arm recorded no request, so there is nothing to split' };
+  }
+  if (!ledger.every((row) => Array.isArray(row))) {
+    return {
+      absent: 'no-ledger',
+      detail: 'the ledger carries a request with no id list, so its rows are not packs',
+    };
   }
   if (episodeStarts === undefined || episodeStarts.length === 0) {
     return {
@@ -283,23 +506,50 @@ export function serveSplit(input: {
   if (memoryTrials === undefined || memoryTrials.length === 0) {
     return { absent: 'boundary-disagrees', detail: 'the arm recorded no trial rows to join the boundary to' };
   }
-  // A boundary is strictly increasing and inside the ledger. `[0..161]` is neither a partition nor a subset
-  // when the phase spent 162 requests on 160 episodes, and a joiner that accepted it would place every
-  // request in an episode of its own and call the result a split.
-  for (let index = 1; index < episodeStarts.length; index += 1) {
-    if ((episodeStarts[index] as number) <= (episodeStarts[index - 1] as number)) {
+  const defect = boundaryDefect(episodeStarts, ledger.length);
+  if (defect !== undefined) return { absent: 'boundary-disagrees', detail: defect };
+  // The identity path first: it is the only one that can pair 41 boundaries with 40 trials, and it is the
+  // only one that knows a repeated task is one episode with two ranges rather than two episodes.
+  const join =
+    boundaryTasks === undefined
+      ? undefined
+      : boundaryJoin({ episodeStarts, boundaryTasks, memoryTrials });
+  if (join !== undefined) {
+    // Identity decides when it is available, and it does not fall back: a boundary that names no task cannot
+    // be positioned either, and a positional fallback here would be the join R136 exists to replace, wearing
+    // the name of the one it replaced.
+    if (!('measured' in join)) {
+      return { absent: 'boundary-disagrees', detail: join.detail };
+    }
+    if (join.unresolved > 0 || join.measured.length === 0) {
       return {
-        absent: 'boundary-disagrees',
-        detail: `the boundary repeats or decreases at entry ${String(index)} (${String(episodeStarts[index])} after ${String(episodeStarts[index - 1])}), so it is a position rather than an episode start`,
+        absent: 'tasks-unresolved',
+        detail:
+          `${String(join.unresolved)} of ${String(episodeStarts.length)} boundar(ies) name no task this ` +
+          'arm scored, so the requests they opened belong to no trial',
       };
     }
-  }
-  const last = episodeStarts[episodeStarts.length - 1] as number;
-  if (last >= ledger.length) {
-    return {
-      absent: 'boundary-disagrees',
-      detail: `the last boundary is request ${String(last)} of ${String(ledger.length)}, so an episode starts past the ledger`,
-    };
+    const served = { episodes: 0, passed: 0 };
+    const withheld = { episodes: 0, passed: 0 };
+    for (const group of join.measured) {
+      const row = memoryTrials[group.trial] as TauTrialRow;
+      // `null` is the harness declining to score, which is not a failure and must not enter either rate.
+      if (row.reward === null) continue;
+      // No empty-range guard here: `boundaryDefect` has already established a strictly increasing list
+      // inside the ledger, so every span this group owns is non-empty by construction.
+      const spans = group.boundaries.map((index) => boundarySpan(episodeStarts, index, ledger.length));
+      const carried = spans.some(([from, to]) => {
+        for (let request = from; request < to; request += 1) {
+          // No `?? []`: every row was checked to be a list before the join ran, so a hole cannot reach here.
+          if ((ledger[request] as readonly string[]).length > 0) return true;
+        }
+        return false;
+      });
+      const bucket = carried ? served : withheld;
+      bucket.episodes += 1;
+      if (row.reward === 1) bucket.passed += 1;
+    }
+    return { measured: { served, withheld } };
   }
   if (episodeStarts.length !== memoryTrials.length) {
     return {
@@ -310,18 +560,14 @@ export function serveSplit(input: {
   const served = { episodes: 0, passed: 0 };
   const withheld = { episodes: 0, passed: 0 };
   for (let index = 0; index < episodeStarts.length; index += 1) {
-    const start = episodeStarts[index] as number;
-    const next = episodeStarts[index + 1];
-    // The boundary is a request index, so the range is half-open: `[start, next)`.
-    const end = next === undefined ? ledger.length : next;
-    const row = memoryTrials[index];
-    if (row === undefined) continue;
-    // An episode that spent no request cannot have been refused one, so it counts on neither side: charging
-    // it to `withheld` would make a gate look like it fired more often than it did.
-    if (end <= start) continue;
+    // The ranges and the rows are one per boundary by the check above, and `boundaryDefect` has already
+    // established that every range is non-empty and inside the ledger: the two guards that used to sit here
+    // (`row === undefined`, `end <= start`) were branches no artefact could reach.
+    const [start, end] = boundarySpan(episodeStarts, index, ledger.length);
+    const row = memoryTrials[index] as TauTrialRow;
     let carried = false;
     for (let request = start; request < end; request += 1) {
-      if (((ledger[request] as readonly string[] | undefined) ?? []).length > 0) {
+      if ((ledger[request] as readonly string[]).length > 0) {
         carried = true;
         break;
       }
@@ -333,6 +579,40 @@ export function serveSplit(input: {
     if (row.reward === 1) bucket.passed += 1;
   }
   return { measured: { served, withheld } };
+}
+
+/** The half-open request range one boundary owns: from its own index to the next boundary's. */
+export function boundarySpan(
+  episodeStarts: readonly number[],
+  index: number,
+  ledgerLength: number,
+): readonly [number, number] {
+  const start = episodeStarts[index] as number;
+  const next = episodeStarts[index + 1];
+  const end = next === undefined ? ledgerLength : Math.min(next, ledgerLength);
+  return [Math.min(start, ledgerLength), end];
+}
+
+/**
+ * What is wrong with a boundary list read as a partition, or `undefined` when nothing is.
+ *
+ * Shared by both join paths: identity decides *which* episode a range belongs to, and cannot rescue a list
+ * that is not a list of boundaries.
+ */
+export function boundaryDefect(
+  episodeStarts: readonly number[],
+  ledgerLength: number,
+): string | undefined {
+  for (let index = 1; index < episodeStarts.length; index += 1) {
+    if ((episodeStarts[index] as number) <= (episodeStarts[index - 1] as number)) {
+      return `the boundary repeats or decreases at entry ${String(index)} (${String(episodeStarts[index])} after ${String(episodeStarts[index - 1])}), so it is a position rather than an episode start`;
+    }
+  }
+  const last = episodeStarts[episodeStarts.length - 1] as number;
+  if (last >= ledgerLength) {
+    return `the last boundary is request ${String(last)} of ${String(ledgerLength)}, so an episode starts past the ledger`;
+  }
+  return undefined;
 }
 
 /**

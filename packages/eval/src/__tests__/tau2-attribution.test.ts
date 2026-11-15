@@ -9,6 +9,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  boundaryDefect,
+  boundaryJoin,
+  boundaryLine,
+  boundarySpan,
+  boundaryTasksOf,
   episodeStartsOf,
   itemTransfer,
   itemTransferLine,
@@ -16,6 +21,7 @@ import {
   pairedEpisodes,
   serveSplit,
   serveSplitLine,
+  taskKey,
 } from '../tau2-attribution.js';
 
 describe('attributing a trial to the claims it was served', () => {
@@ -349,5 +355,306 @@ describe('what the gate did to the trials it withheld from', () => {
     expect(episodeStartsOf({ episodeStarts: 'nope' })).toBeUndefined();
     expect(episodeStartsOf(undefined)).toBeUndefined();
     expect(episodeStartsOf(null)).toBeUndefined();
+  });
+});
+
+/**
+ * R136 — the join by identity, on the shape R135 actually produced.
+ *
+ * R135 opened 41 boundaries for 40 scored episodes: one task was simulated twice, `serve split` printed
+ * `boundary-disagrees`, and the arm's registered mechanism check was lost to a count. The fixtures below are
+ * that shape, because a join tested only on one-boundary-per-task is a join that has never been tested — the
+ * same reason the earlier describe block is built on the double-recall episode.
+ */
+describe('joining a boundary to the task it opened for', () => {
+  const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
+
+  it('reads the task list off a sidecar block and drops one that is not a list of names', () => {
+    expect(boundaryTasksOf({ boundaryTasks: ['a', null, 'b'] })).toEqual(['a', null, 'b']);
+    expect(boundaryTasksOf({ boundaryTasks: [] })).toBeUndefined();
+    expect(boundaryTasksOf({ boundaryTasks: ['a', ''] })).toBeUndefined();
+    expect(boundaryTasksOf({ boundaryTasks: ['a', 3] })).toBeUndefined();
+    expect(boundaryTasksOf({ boundaryTasks: 'a' })).toBeUndefined();
+    expect(boundaryTasksOf(undefined)).toBeUndefined();
+    expect(boundaryTasksOf(null)).toBeUndefined();
+  });
+
+  it('compares a task id with or without the domain prefix', () => {
+    // `per_task` names the task `retail/5` and the runner's boundary names it `5`. A join that compared the
+    // two strings as written would resolve nothing and call the instrument broken.
+    expect(taskKey('retail/5')).toBe('5');
+    expect(taskKey('5')).toBe('5');
+    expect(taskKey('a/b/c')).toBe('c');
+  });
+
+  it('names the task a repeated boundary belongs to instead of refusing on the count', () => {
+    const join = boundaryJoin({
+      episodeStarts: [0, 2, 4],
+      boundaryTasks: ['a', 'b', 'a'],
+      memoryTrials: [row('retail/a', 0, 1), row('retail/b', 0, 0)],
+    });
+    // Two groups for three boundaries: `a` opened twice, `b` once.
+    expect(join).toMatchObject({
+      measured: [
+        { task: 'a', boundaries: [0, 2], trial: 0 },
+        { task: 'b', boundaries: [1], trial: 1 },
+      ],
+      retried: [{ task: 'a', boundaries: [0, 2], trial: 0 }],
+      unresolved: 0,
+    });
+  });
+
+  it('declines each way the two lists can fail to be a join', () => {
+    // Absent, positional-but-shorter, and a name the arm never scored. Each is a different repair: run the
+    // instrument, fix the writer, or find the artefact that was labelled with the wrong task.
+    expect(boundaryJoin({ memoryTrials: [row('a', 0, 1)], boundaryTasks: ['a'] })).toMatchObject({
+      absent: 'no-boundary',
+    });
+    expect(
+      boundaryJoin({ episodeStarts: [0], memoryTrials: [row('a', 0, 1)] }),
+    ).toMatchObject({ absent: 'no-tasks' });
+    expect(
+      boundaryJoin({
+        episodeStarts: [0, 2],
+        boundaryTasks: ['a'],
+        memoryTrials: [row('a', 0, 1)],
+      }),
+    ).toMatchObject({ absent: 'length-disagrees' });
+    const orphaned = boundaryJoin({
+      episodeStarts: [0, 2],
+      boundaryTasks: ['a', 'zzz'],
+      memoryTrials: [row('a', 0, 1)],
+    });
+    // One resolvable task and one orphan: measured, with the orphan counted rather than dropped into `a`.
+    expect(orphaned).toMatchObject({ unresolved: 1 });
+    const allOrphaned = boundaryJoin({
+      episodeStarts: [0, 2],
+      boundaryTasks: ['yyy', 'zzz'],
+      memoryTrials: [row('a', 0, 1)],
+    });
+    expect(allOrphaned).toMatchObject({ absent: 'unknown-task' });
+  });
+
+  it('prints the count, the repeats and the unresolved boundaries in one line', () => {
+    expect(
+      boundaryLine(
+        boundaryJoin({
+          episodeStarts: [0, 2, 4],
+          boundaryTasks: ['a', 'b', 'a'],
+          memoryTrials: [row('a', 0, 1), row('b', 0, 0)],
+        }),
+      ),
+    ).toBe('boundary: 3 boundar(ies) for 2 task(s); repeated a 2');
+    expect(
+      boundaryLine(
+        boundaryJoin({
+          episodeStarts: [0, 1],
+          boundaryTasks: ['a', 'b'],
+          memoryTrials: [row('a', 0, 1), row('b', 0, 0)],
+        }),
+      ),
+    ).toBe('boundary: 2 boundar(ies) for 2 task(s), none repeated');
+    expect(
+      boundaryLine(
+        boundaryJoin({
+          episodeStarts: [0, 2],
+          boundaryTasks: ['a', 'zzz'],
+          memoryTrials: [row('a', 0, 1)],
+        }),
+      ),
+    ).toBe('boundary: 1 boundar(ies) for 1 task(s), none repeated; 1 unresolved');
+    expect(boundaryLine({ absent: 'no-tasks', detail: 'nothing named' })).toContain('not joined (no-tasks)');
+  });
+
+  it('splits a 41-boundary arm into the 40 trials it scored', () => {
+    // The exact shape that cost R135 its mechanism reading: five requests, three boundaries, two tasks, and
+    // the first task's second boundary sitting *after* the second task's. `a` was served in its first
+    // boundary and refused in its retry, so it counts once, as served; `b` was refused throughout.
+    const split = serveSplit({
+      ledger: [['k'], [], [], [], []],
+      episodeStarts: [0, 2, 4],
+      boundaryTasks: ['a', 'b', 'a'],
+      memoryTrials: [row('retail/a', 0, 0), row('retail/b', 0, 1)],
+    });
+    expect(split).toEqual({
+      measured: { served: { episodes: 1, passed: 0 }, withheld: { episodes: 1, passed: 1 } },
+    });
+  });
+
+  it('refuses a named boundary that resolves to no task rather than falling back to position', () => {
+    // The fallback would be the join this instrument replaces, wearing its name. `b` was never scored, so
+    // the requests it opened belong to no trial and the split says so.
+    const split = serveSplit({
+      ledger: [['k'], ['k'], ['k']],
+      episodeStarts: [0, 1, 2],
+      boundaryTasks: ['a', 'b', 'c'],
+      memoryTrials: [row('a', 0, 1), row('b', 0, 1)],
+    });
+    expect(split).toMatchObject({ absent: 'tasks-unresolved' });
+    if ('absent' in split) expect(split.detail).toContain('1 of 3');
+    expect(serveSplitLine(split)).toContain('not measured (tasks-unresolved)');
+  });
+
+  it('still refuses the count when the arm names no tasks at all', () => {
+    // The pre-R136 behaviour, kept and tested: without identity a 3-versus-2 pair is a refusal, because a
+    // positional join would report a number rather than a defect.
+    const split = serveSplit({
+      ledger: [['k'], [], [], [], []],
+      episodeStarts: [0, 2, 4],
+      memoryTrials: [row('a', 0, 0), row('b', 0, 1)],
+    });
+    expect(split).toMatchObject({ absent: 'boundary-disagrees' });
+    if ('absent' in split) expect(split.detail).toContain('3 boundar(ies) against 2 trial row(s)');
+  });
+
+  it('reports the joins own refusal through the split rather than swallowing it', () => {
+    const split = serveSplit({
+      ledger: [['k'], []],
+      episodeStarts: [0, 1],
+      boundaryTasks: ['a'],
+      memoryTrials: [row('a', 0, 1), row('b', 0, 1)],
+    });
+    expect(split).toMatchObject({ absent: 'boundary-disagrees' });
+    if ('absent' in split) expect(split.detail).toContain('task name(s)');
+  });
+});
+
+describe('pairing a repeated task into one episode with two ranges', () => {
+  const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
+
+  it('gives one episode both of its boundaries and no episode its neighbours', () => {
+    const episodes = pairedEpisodes({
+      referenceTrials: [row('a', 0, 1), row('b', 0, 0)],
+      memoryTrials: [row('a', 0, 0), row('b', 0, 1)],
+      episodeStarts: [0, 2, 4],
+      boundaryTasks: ['a', 'b', 'a'],
+      ledgerLength: 5,
+    });
+    expect(episodes).toEqual([
+      { startsAt: 0, spans: [[0, 2], [4, 5]], memory: false, control: true },
+      { startsAt: 2, spans: [[2, 4]], memory: true, control: false },
+    ]);
+  });
+
+  it('attributes the claims of both ranges to the one episode they were served into', () => {
+    const reading = pairAttribution({
+      ledger: [['k_a'], ['k_a'], ['k_b'], [], ['k_a']],
+      episodeStarts: [0, 2, 4],
+      boundaryTasks: ['a', 'b', 'a'],
+      memoryTrials: [row('a', 0, 0), row('b', 0, 1)],
+      referenceTrials: [row('a', 0, 1), row('b', 0, 0)],
+    });
+    // `k_a` was served in `a`'s first boundary and again in its retry, and `a` lost: one episode, broken
+    // once. A positional join would have handed requests 3 and 4 to `b` and cleared the claim.
+    expect(reading?.items).toEqual([
+      { id: 'k_a', episodes: 1, kept: 0, broke: 1, net: -1 },
+      { id: 'k_b', episodes: 1, kept: 1, broke: 0, net: 1 },
+    ]);
+  });
+
+  it('declines the pair when a named boundary resolves to nothing', () => {
+    expect(
+      pairedEpisodes({
+        referenceTrials: [row('a', 0, 1)],
+        memoryTrials: [row('a', 0, 1)],
+        episodeStarts: [0, 2],
+        boundaryTasks: ['a', 'zzz'],
+        ledgerLength: 3,
+      }),
+    ).toBeUndefined();
+  });
+
+  it('reads a span as half-open and stops the last one at the ledger', () => {
+    expect(boundarySpan([0, 4], 0, 9)).toEqual([0, 4]);
+    expect(boundarySpan([0, 4], 1, 9)).toEqual([4, 9]);
+    // A boundary past the end is clamped rather than read as a range over requests that do not exist.
+    expect(boundarySpan([0, 12], 1, 9)).toEqual([9, 9]);
+    expect(boundaryDefect([0, 4, 7], 9)).toBeUndefined();
+    expect(boundaryDefect([0, 4, 4], 9)).toContain('repeats or decreases');
+    expect(boundaryDefect([0, 9], 9)).toContain('starts past the ledger');
+  });
+});
+
+describe('the joins tolerance and its refusals', () => {
+  const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
+
+  it('refuses a ledger whose rows are not lists of ids', () => {
+    // A malformed artefact, and the two possible tolerances are both wrong: reading the hole as an empty pack
+    // keeps the request in the denominator while contributing no observation, and dropping the row shifts
+    // every later request onto the wrong episode. So the table throws and the split says why.
+    const holed = [['k'], undefined as unknown as string[], ['k']] as readonly (readonly string[])[];
+    expect(() =>
+      itemTransfer({ episodes: [{ startsAt: 0, memory: true, control: false }], ledger: holed }),
+    ).toThrow(TypeError);
+    const split = serveSplit({
+      ledger: holed,
+      episodeStarts: [0, 1, 2],
+      boundaryTasks: ['a', 'b', 'c'],
+      memoryTrials: [row('a', 0, 1), row('b', 0, 1), row('c', 0, 1)],
+    });
+    expect(split).toMatchObject({ absent: 'no-ledger' });
+    if ('absent' in split) expect(split.detail).toContain('no id list');
+  });
+
+  it('declines a split whose arm recorded no trial rows at all', () => {
+    expect(
+      serveSplit({ ledger: [['k']], episodeStarts: [0], memoryTrials: [] }),
+    ).toMatchObject({ absent: 'boundary-disagrees', detail: 'the arm recorded no trial rows to join the boundary to' });
+  });
+
+  it('counts a boundary that names no task rather than grouping it with the next one', () => {
+    const join = boundaryJoin({
+      episodeStarts: [0, 2, 4],
+      boundaryTasks: ['a', null, 'a'],
+      memoryTrials: [row('a', 0, 1)],
+    });
+    expect(join).toMatchObject({ unresolved: 1, measured: [{ task: 'a', boundaries: [0, 2], trial: 0 }] });
+  });
+
+  it('resolves nothing when the arm carries no trial rows', () => {
+    const join = boundaryJoin({ episodeStarts: [0], boundaryTasks: ['a'] });
+    expect(join).toMatchObject({ absent: 'unknown-task' });
+  });
+
+  it('propagates the refusal of the pair rather than reporting an empty table', () => {
+    // A positional pair whose counts disagree: `pairedEpisodes` returns `undefined` and the caller must say so
+    // instead of handing back `{items: [], unmatchedRequests: 0}`.
+    expect(
+      pairAttribution({
+        ledger: [['k'], ['k']],
+        episodeStarts: [0, 1],
+        memoryTrials: [row('a', 0, 1)],
+        referenceTrials: [row('a', 0, 1)],
+      }),
+    ).toBeUndefined();
+  });
+
+  it('drops a named trial the control arm never ran', () => {
+    const episodes = pairedEpisodes({
+      referenceTrials: [row('a', 0, 1)],
+      memoryTrials: [row('a', 0, 1), row('z', 0, 1)],
+      episodeStarts: [0, 2],
+      boundaryTasks: ['a', 'z'],
+      ledgerLength: 4,
+    });
+    expect(episodes).toEqual([{ startsAt: 0, spans: [[0, 2]], memory: true, control: true }]);
+  });
+});
+
+describe('a joined trial the harness declined to score', () => {
+  const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
+
+  it('counts on neither side of the split, because a null reward is not a failure', () => {
+    // The defect `tau2-degradation` was written against: folding `null` into a failure inflates the withheld
+    // bucket with trials nobody scored.
+    const split = serveSplit({
+      ledger: [['k'], [], [], [], []],
+      episodeStarts: [0, 2, 4],
+      boundaryTasks: ['a', 'b', 'a'],
+      memoryTrials: [row('a', 0, null), row('b', 0, 0)],
+    });
+    expect(split).toEqual({
+      measured: { served: { episodes: 0, passed: 0 }, withheld: { episodes: 1, passed: 0 } },
+    });
   });
 });

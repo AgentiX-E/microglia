@@ -12,15 +12,26 @@
  * second about which task a row is, the ledger stops and says so.
  */
 import { readFileSync } from 'node:fs';
+import {
+  boundaryJoin,
+  boundaryLine,
+  boundaryTasksOf,
+  episodeStartsOf,
+} from '../tau2-attribution.js';
 import { itemLedgerLine, itemLedgerOf } from '../item-ledger.js';
 
 type L4 = {
   readonly per_task?: readonly { readonly id: string; readonly outcomes?: readonly boolean[] }[];
+  readonly per_trial?: readonly { readonly id: string; readonly trial: number; readonly reward: number | null }[];
   readonly tau2?: {
     readonly pack?: { readonly ledger?: readonly (readonly string[])[] };
     readonly turnCensus?: { readonly rows?: readonly { readonly task: string }[] };
     readonly storeItems?: { readonly items?: readonly unknown[] };
-    readonly memory?: { readonly census?: number };
+    readonly memory?: {
+      readonly census?: number;
+      readonly episodeStarts?: readonly number[];
+      readonly boundaryTasks?: readonly (string | null)[];
+    };
   };
 };
 
@@ -54,6 +65,15 @@ function main(): void {
   const arm = read(path);
   const packs = arm.tau2?.pack?.ledger ?? [];
   const tasks = (arm.per_task ?? []).map((row) => row.id);
+  // R136: the boundary is printed before the count is checked, because the count is what fails on a retried
+  // task — and a refusal that cannot say *which* task repeated is the refusal R135 spent a course on. The
+  // join is the repair; this guard still refuses until the repair is priced.
+  const boundary = boundaryJoin({
+    episodeStarts: episodeStartsOf(arm.tau2?.memory),
+    boundaryTasks: boundaryTasksOf(arm.tau2?.memory),
+    memoryTrials: arm.per_trial,
+  });
+  process.stdout.write(`[item-ledger] ${boundaryLine(boundary)}\n`);
   if (packs.length !== tasks.length) {
     refuse(
       `the pack ledger carries ${String(packs.length)} request(s) and the arm ${String(tasks.length)} episode(s); ` +

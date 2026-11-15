@@ -83,6 +83,39 @@ export type PhaseCacheCensus = {
   readonly residual_tokens_per_call?: number;
   /** Mean prompt tokens a call, so the three message-and-tool columns have a denominator to subtract from. */
   readonly prompt_tokens_per_call?: number;
+  /**
+   * Mean characters of the system messages a call, and of the rest.
+   *
+   * R136. The character columns exist because the one measurement that can attribute the system column is
+   * a *length*, and the agent records its injected message in characters. Converting either side through
+   * `chars_per_token` to compare them is how a ratio becomes a conclusion; comparing them where they are
+   * measured is how it stays a measurement.
+   */
+  readonly system_chars_per_call?: number;
+  readonly conversation_chars_per_call?: number;
+  /**
+   * Calls that carried a second system message, i.e. the calls the pack rode on.
+   *
+   * The callback sees every model call a simulation makes, the user simulator's included, and the
+   * simulator's system prompt is neither the agent's policy nor the pack. A mean over both is a mixture
+   * whose composition moves with how many turns each side took, which is why R135 could read a 559-token
+   * system growth and not say what it was made of.
+   */
+  readonly packed_calls?: number;
+  readonly system_chars_per_packed_call?: number;
+  readonly system_chars_per_unpacked_call?: number;
+  /** The agent's own injected characters, divided by the calls the census saw carrying a pack. */
+  readonly injected_chars_per_packed_call?: number;
+  /**
+   * What the system column carries beyond the injected message, per packed call: the adapter's preamble.
+   *
+   * This is the column no field on this record has ever named. R135 priced a 559-token system growth
+   * against a 725-character pack, and the remainder — about 409 tokens a call — was neither the pack nor
+   * the conversation: it was material the pack's own length cannot account for, sitting in a column that
+   * was reported as one number.
+   */
+  readonly carriage_chars_per_packed_call?: number;
+  readonly carriage_tokens_per_call?: number;
   /** Why there is no census, when the phase says why. */
   readonly reason?: string;
   readonly first_call?: {
@@ -136,6 +169,14 @@ export type CacheCensusVerdict = {
   readonly tailPerCall: number | null;
   /** What the reading points a repair at. `unmeasured` when the census cannot attribute the bill. */
   readonly repair: 'the-turn' | 'the-prefix' | 'the-framing' | 'unmeasured';
+  /**
+   * The injected message's share of the system column it rides in, when both were measured.
+   *
+   * R136. `null` when the phase reported no carriage, which is every artefact written before this
+   * instrument: a pack that is 27% of its own column and a pack that is 90% of it call for different next
+   * dollars, and only a share says which one this is.
+   */
+  readonly carriageShare: number | null;
   readonly sentence: string;
 };
 
@@ -193,6 +234,17 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       : `; of the ${String(Math.round(prompt))} prompt tokens a call, ${String(Math.round(system))} were ` +
         `system, ${String(Math.round(conversation))} conversation, ${String(Math.round(tools))} tool ` +
         `schemas and ${String(Math.round(residual))} framing`;
+  // R136: the system column split into the message the agent injected and the carriage it did not. Printed
+  // only when the phase reports both, so an arm that predates the instrument says nothing rather than zero.
+  const pair = carriagePair(census);
+  const carriageShare = pair === null ? null : pair.injected / (pair.injected + pair.carriage);
+  const carriage =
+    pair === null
+      ? ''
+      : `; on the ${String(Math.round(pair.calls))} call(s) that carried a pack the injected message was ` +
+        `${String(Math.round(pair.injected))} characters and the system column carried ` +
+        `${String(Math.round(pair.carriage))} more` +
+        (pair.tokens === null ? '' : ` (about ${String(Math.round(pair.tokens))} tokens)`);
 
   if (coverage > PREFIX_UNDERCOUNTED) {
     return {
@@ -201,10 +253,12 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       uncachedPerCall,
       tailPerCall,
       repair: 'unmeasured',
+      carriageShare,
       sentence:
         `the provider credited ${percent}% of the ${String(prefix)}-token prefix this census counts as ` +
         `seen, which is more than it was shown: the share is above 1 because the denominator stops two ` +
-        `messages short, not because the provider credited more than it held${split}${composition}; the ` +
+        `messages short, not because the provider credited more than it held${split}${composition}` +
+        `${carriage}; the ` +
         `${String(uncached)} uncached tokens a call cannot be attributed from this reading: the ` +
         `attribution R134's arms were read with is a guess until the split is read beside the prompt's ` +
         `own composition`,
@@ -217,9 +271,10 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       uncachedPerCall,
       tailPerCall,
       repair: 'the-turn',
+      carriageShare,
       sentence:
         `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen, and the ` +
-        `newest message was ${String(tail)} tokens${split}${composition}: the ${String(uncached)} ` +
+        `newest message was ${String(tail)} tokens${split}${composition}${carriage}: the ${String(uncached)} ` +
         `uncached tokens a call are the turn's own material`,
     };
   }
@@ -230,10 +285,11 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       uncachedPerCall,
       tailPerCall,
       repair: 'the-prefix',
+      carriageShare,
       sentence:
         `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen, against ` +
-        `a ${String(tail)}-token newest message${split}${composition}: the lane is re-billing a prefix it ` +
-        `believes is cached`,
+        `a ${String(tail)}-token newest message${split}${composition}${carriage}: the lane is re-billing a ` +
+        `prefix it believes is cached`,
     };
   }
   return {
@@ -242,15 +298,40 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
     uncachedPerCall,
     tailPerCall,
     repair: 'the-prefix',
+    carriageShare,
     sentence:
       `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen${split}` +
-      `${composition}: part of the prefix is re-billed on some calls, which is a boundary that moves ` +
-      `rather than a size`,
+      `${composition}${carriage}: part of the prefix is re-billed on some calls, which is a boundary that ` +
+      `moves rather than a size`,
   };
 }
 
 function finiteOrNull(value: number | undefined | null): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+/**
+ * The two lengths the carriage is made of, or `null` when the phase did not record both.
+ *
+ * One function rather than a condition at the call site, because the call site needed three conjunctions to
+ * say "both halves and a denominator" and each of them is a branch that has to be reachable to be tested.
+ * Here every rejection is an input the reader can be handed: a census without the injection, a census with
+ * the injection but no column, an empty column (nothing to divide), and no call count (nothing to divide by).
+ */
+function carriagePair(census: PhaseCacheCensus): {
+  readonly injected: number;
+  readonly carriage: number;
+  readonly calls: number;
+  readonly tokens: number | null;
+} | null {
+  const injected = finiteOrNull(census.injected_chars_per_packed_call);
+  if (injected === null) return null;
+  const carriage = finiteOrNull(census.carriage_chars_per_packed_call);
+  if (carriage === null) return null;
+  if (injected + carriage <= 0) return null;
+  const calls = finiteOrNull(census.packed_calls);
+  if (calls === null) return null;
+  return { injected, carriage, calls, tokens: finiteOrNull(census.carriage_tokens_per_call) };
 }
 
 function unmeasured(sentence: string): CacheCensusVerdict {
@@ -260,6 +341,7 @@ function unmeasured(sentence: string): CacheCensusVerdict {
     uncachedPerCall: null,
     tailPerCall: null,
     repair: 'unmeasured',
+    carriageShare: null,
     sentence,
   };
 }
