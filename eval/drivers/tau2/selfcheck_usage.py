@@ -496,6 +496,44 @@ def the_tool_schemas_are_billed_and_counted(checks):
     checks.equal(subject._tools_chars({"tools": []}), 0, "and an empty list is not a schema")
 
 
+@case
+def every_counter_the_census_keeps_is_a_field_the_verdict_reports(checks):
+    # AUDIT 34.169. `_census_of` returned `system_chars` and `conversation_chars` for the whole life of the
+    # census, `_record_usage` summed them, and `cache_census()` read neither -- so every artefact's
+    # `prefix_tokens` was system plus history under one name, and the mechanism published from it (AUDIT
+    # 34.166) was refuted by its own successor. The check is mechanical: the keys the census counts are a
+    # declared set, and each one has a field in the verdict.
+    subject.reset_usage()
+    _call([{"role": "system", "content": "s" * 40}, {"role": "user", "content": "t" * 40}], 20, 0)
+    keys = sorted(subject._census_of([{"role": "system", "content": "a"}]).keys())
+    checks.equal(
+        keys,
+        [
+            "chars",
+            "conversation_chars",
+            "last_chars",
+            "messages",
+            "prefix_chars",
+            "seen_calls",
+            "seen_chars",
+            "system_chars",
+            "tail2_chars",
+        ],
+        "the counters the census keeps, as a declared set",
+    )
+    census = subject.cache_census()
+    for field in (
+        "system_tokens_per_call",
+        "conversation_tokens_per_call",
+        "tail2_tokens",
+        "residual_tokens_per_call",
+        "tools_tokens_per_call",
+        "last_tokens",
+        "prefix_tokens",
+    ):
+        checks.equal(field in census, True, f"{field} is reported rather than counted and dropped")
+
+
 # ------------------------------------------------------------------------- runner
 
 class Checks:
