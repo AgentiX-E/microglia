@@ -1378,3 +1378,34 @@ task and one whose misses landed once in each of two, differ by **15pp** in the 
 in the rate. Report both. The rate is what an arm can be graded on at forty tasks; `pass^4` is the
 interface to a published table and must be quoted with its `n`. A headline above `rate⁴` is a finding —
 the misses clustered — rather than a result.
+
+**Served concentration** — How the renders of a run's packs are spread over the records that took them:
+`topOne`, `topFive`, `once`, and `effective` (`exp(entropy)`, the number of records actually doing the work),
+carried on `tau2.served.concentration` and printed by every run. The mean it sits beside is a *size* — four
+items a request — and a size cannot see a monopoly. R120's store served 4.01 items a request, and its own
+census shows **one of 63 served records took 88 of 162 requests (54%)**, the five most-served took 31% of 650
+renders, eight were rendered once and ten were never rendered at all. The record that dominated was a negative
+instruction about a rare situation. **When a census reports a mean over renders, ask what the distribution
+over records looks like before believing anything about the store.**
+
+**Pair population** — The number of unordered pairs of items a consolidation pass could test, `C(n,2)`, and
+the three filters that remove them before any refusal is counted: `skippedKind`, `skippedScope`,
+`skippedOverlap`. R121 reported `groups 0, merged 0` with every refusal counter at zero, which is consistent
+with "nothing to merge" and with "the key removed everything". It was the second: the linkage key includes the
+distiller's free-text `intent`, 64 items fell into **60** buckets, and **4 of 2,016** pairs were ever tested.
+A census that counts refusals but not the population they were drawn from cannot tell those two apart.
+
+**Two denominators** — `pass^4` is the fraction of *tasks* whose k trials all passed; `episode_rate` is the
+fraction of *episodes* that passed. The first is `p^k` averaged over tasks and is a nonlinear function of the
+second, so at forty tasks it is roughly three times as coarse. Every `poc-l4` line now carries `episode_rate`,
+`episode_half_width_pp`, `rate_to_the_k` and `episode_trials` beside the headline, because a headline without
+its rate is the number a reader will rank and a coin is what it behaves like: two runs of one lane measured
+**0.600** and **0.750** off **140** and **141** episodes of 160.
+
+**Effect of memory, measured** — The record's own contrasts, which do not agree and are not resolved:
+BIRD-dev `full − none` **−0.46pp** [−1.89, +0.91] (52 gained, 45 lost) and **−1.7pp per rule injected**;
+τ²-retail R93 **−2.50pp** (memory 0.700 against a memory-free 0.725, separate dispatches, 1.1 items a
+request); τ²-retail R121 **+5.00pp** of episode rate and **+15.00pp** of headline (141/160 against 133/160,
+within one dispatch, 4.06 items a request, 9 tasks improved and 4 harmed, p = 0.2668). **Nothing here supports
+a claim that memory helps or hurts; what it supports is that the contrast is not resolvable at forty tasks,
+and that the store's size moves the sign.**

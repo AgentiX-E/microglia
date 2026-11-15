@@ -2700,3 +2700,48 @@ fold 0 of 650 units (0 groups, 3 refused for want of a second task, 79 unnamed),
 The suffixes print only when non-zero, so a run with nothing to say keeps the older line byte for byte.
 A line that shows `0 groups` and nothing else is only evidence about the store if `suppressed` is zero
 too; if `suppressed` is absent, the arm does not fold and the zero is about the arm.
+
+### 13.25 Reading a memory run's distribution instead of its mean
+
+Every run prints three lines about delivery, and they answer three different questions:
+
+```
+[tau2] pack: budget 2400 …; served 161 of 161 (mean 4.1 items, 2206 chars); dropped for size 635 …
+[tau2] served: 161 of 161 request(s) recorded ids, 653 render(s) from 66 record(s); top1 52.1%,
+       top5 30.2%, 8 rendered once, effective 38.5 — the mean items per request is a size,
+       and these are the supply
+[tau2] fold 0 of 653 units (0 groups, 58 suppressed by the unit, 11 refused for want of a second task,
+       38 unnamed), support ≥2 0, ≥3 0, max 1
+```
+
+| line | question | what a bad reading looks like |
+|---|---|---|
+| `pack` | how many requests were served, and how big each pack | `served N of N` means **the gate was not applied** — with `minCoverage 0` every hit is kept |
+| `served` | *which* records, and how unevenly | `top1` above ~20% means one rule is speaking for the store |
+| `fold` | whether records were recognised as the same routine | `groups 0` with `unnamed 0` means the store genuinely did not recur; `unnamed` above 0 means the **key** failed |
+
+Three habits that follow:
+
+1. **Never read `served N of N` as coverage.** It is the floor's default. A registration that wants the pack
+   withheld must name a `recallFloor`, and the run's own retention curve prices the rungs: on one 650-pair
+   store, 0.05 still served 162 of 162 packs, 0.10 served 154, and **0.15 served 75**.
+2. **Compare `top1` against the number of records, not against the pack size.** R120 served four items a
+   request from 73 records and one record took 54% of the requests; the pack size was healthy and the
+   supply was not.
+3. **When `groups` is 0, read `pairs` and `skippedScope` before concluding anything about the store.** A
+   merge keyed on the model's own scope spelling will report zero groups on a store full of paraphrases —
+   the pass tested 4 of 2,016 pairs, which is a statement about the key.
+
+### 13.26 Why a merge census and a merge are not the same number
+
+A store can report two very different counts of "things taught twice", and both are honest:
+
+| census | keyed on | R121's store |
+|---|---|---|
+| `merge.support.atLeastTwo` | the **routine** a correction used (`cancel > get_order > cancel`) | **12** of 44 shapes taught by ≥2 corrections, max 8 |
+| `consolidation.merged` | the **claim** an item states, compared by wording + scope | **0** of 79 items, with 4 candidate pairs |
+
+Twelve routines taught twice and zero claims written twice are both true of that store: 79 items, every one
+with `supportTasks: 1`. **A merge raises `supportTasks`; a recurrence census does not.** If you want the second
+number to move, the pass has to key on the object the census keyed on — which is what R124 changes, and what
+`skippedScope` will show it doing.
