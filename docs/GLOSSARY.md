@@ -1545,10 +1545,11 @@ the memory's own text; the conversation half is what the agent grew, so a premiu
 split exists because every artefact before R135 reported one `prefix_tokens` that was both, under one
 name, and a 2.25× per-episode premium was then attributed to the wrong half.
 
-**Residual** — `residual_tokens_per_call`: uncached tokens a call that neither of the two newest messages
-accounts for. On this benchmark it is the `tools` block and the chat template's framing, which the message
-census never sees: a census that divides only message characters cannot reach the provider's
-`prompt_tokens`, and the gap used to be charged silently to the agent's turn.
+**Residual** — `residual_tokens_per_call`: prompt tokens a call beyond the messages and the tool schemas,
+i.e. the **chat template's framing**. Measured at 84.2 tokens a call against a reference arm's 83.7, so it
+is not where a premium lives. The field was first defined as `uncached` minus the two newest messages, which
+absorbed the whole premium by construction (1,409.7 against 179.5 on R135's arms, 99.7% of it) — a residual
+of a residual attributes nothing, and artefacts before R136 carry the old meaning.
 
 **Prefix undercounted** — The state of a cache census whose credited tokens exceed the tokens it counted
 as seen (`prefix_coverage > 1.02`). It is not a cache that held extra: `seen` stops two messages short of

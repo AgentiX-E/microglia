@@ -3254,7 +3254,14 @@ contained. Read it in this order:
 | `system_tokens_per_call` | the system messages, per call | the pack and the adapter's preamble: **the memory's own text** |
 | `conversation_tokens_per_call` | everything else, per call | the conversation the agent grew: **its behaviour** |
 | `tail2_tokens` | the second-newest message | the tool result the last turn appended |
-| `residual_tokens_per_call` | uncached, minus the two newest messages | material no message carries — the **tools block** and the chat template |
+| `tools_tokens_per_call` | the `tools` array, from the request | schemas the provider bills and no message carries |
+| `prompt_tokens_per_call` | the provider's prompt | the sum of the four columns below, as a denominator |
+| `residual_tokens_per_call` | prompt minus messages minus tools | the **chat template's framing**, and nothing else |
+
+The four columns add to the prompt; the cache credit is a part of that prompt, not a column beside it. So a
+premium is `Δprompt + Δmiss`, where `Δmiss = −Δcached`, and it takes **both** numbers to say where the money
+went. Measured on R135's two arms: prompt **+675.7** a call (system **+559.3**, conversation **+26.7**, tools
+**+5.5**, framing **+0.5**) and cached **−558.3** — two things of nearly equal size.
 
 The distinction is not cosmetic. Measured on the same 40 tasks with the same backbone:
 
@@ -3267,8 +3274,12 @@ The distinction is not cosmetic. Measured on the same 40 tasks with the same bac
 
 **2.25× the bill.** Shrinking the pack from four items (2,239 characters) to one (747) moved it by 16%,
 not by the two thirds the text shrank — so the premium is not the pack's length. That is what the split
-is for: it says whether the money is in the memory's text, in the agent's own turns, or in the framing
-the census never looked at.
+is for: it says whether the money is in the memory's text, in the agent's own turns, or in the framing.
+
+**One caution, learned the hard way.** `residual_tokens_per_call` used to be defined as `uncached` minus the
+two newest messages, and it therefore absorbed the entire premium whenever two arms cached differently — a
+residual of a residual is not an attribution. It is measured against the prompt now. If you are reading an
+artefact produced before R136, that field means something else and cannot be compared with a later one.
 
 ### 24.2 A share above 100% is a defect, not a cache
 
