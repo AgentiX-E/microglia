@@ -176,6 +176,20 @@ export type ConsolidationCensus = {
   readonly largestGroup: number;
   /** Groups whose evidence union covers more tasks than any one member did — merges that bought support. */
   readonly crossTaskGroups: number;
+  /**
+   * Unordered pairs the pass could have tested: `C(considered, 2)`.
+   *
+   * R121 read `considered 79, groups 0, merged 0` with every refusal counter at zero and could not say
+   * whether the store had nothing to merge or every candidate had been refused. This is the denominator
+   * that makes the answer legible, and it is a function of the store's size alone.
+   */
+  readonly pairs: number;
+  /** Pairs removed before the similarity test because the two items are not the same kind. */
+  readonly skippedKind: number;
+  /** Pairs removed because the two scopes do not spell the same key — the filter R121 died on. */
+  readonly skippedScope: number;
+  /** Pairs removed because their claim overlap fell short of `threshold`. */
+  readonly skippedOverlap: number;
 };
 
 export type ConsolidationResult = {
@@ -407,6 +421,11 @@ export function consolidateKnowledge(
   let refusedPayload = 0;
   let refusedDuplicateEvidence = 0;
   let refusedLinkage = 0;
+  // The three filters that remove a pair before any refusal counter: counted because a censors that
+  // reports only refusals cannot tell "nothing to merge" from "nothing survived the key".
+  let skippedKind = 0;
+  let skippedScope = 0;
+  let skippedOverlap = 0;
 
   for (let left = 0; left < consideredIndexes.length; left += 1) {
     const leftIndex = consideredIndexes[left] as number;
@@ -414,10 +433,19 @@ export function consolidateKnowledge(
     for (let right = left + 1; right < consideredIndexes.length; right += 1) {
       const rightIndex = consideredIndexes[right] as number;
       const rightItem = items[rightIndex] as KnowledgeItem;
-      if (leftItem.kind !== rightItem.kind) continue;
-      if (scopeKey(leftItem.scope) !== scopeKey(rightItem.scope)) continue;
+      if (leftItem.kind !== rightItem.kind) {
+        skippedKind += 1;
+        continue;
+      }
+      if (scopeKey(leftItem.scope) !== scopeKey(rightItem.scope)) {
+        skippedScope += 1;
+        continue;
+      }
       const overlap = overlapOf(leftIndex, rightIndex);
-      if (overlap < threshold) continue;
+      if (overlap < threshold) {
+        skippedOverlap += 1;
+        continue;
+      }
       if (
         conditionMinShared > 0 &&
         conditionSharedOf(leftIndex, rightIndex) < conditionMinShared
@@ -613,6 +641,18 @@ export function consolidateKnowledge(
         1,
       ),
       crossTaskGroups: groupDetail.filter((group) => group.crossTask).length,
+      // C(n,2) over the considered population, computed here rather than counted in the loop: the loop
+      // breaks early on some filters and a counter inside it would silently miss the pairs it skipped
+      // before incrementing anything -- which is the defect these three fields exist to repair.
+      // `n < 2` rather than the product, because `0 * -1 / 2` is `-0` and a census that prints `-0`
+      // is a census whose reader has to know how the language represents nothing.
+      pairs:
+        consideredIndexes.length < 2
+          ? 0
+          : (consideredIndexes.length * (consideredIndexes.length - 1)) / 2,
+      skippedKind,
+      skippedScope,
+      skippedOverlap,
     },
   };
 }

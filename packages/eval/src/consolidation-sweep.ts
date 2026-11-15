@@ -25,6 +25,7 @@
  * what each setting would have produced, with the operating point marked. A readback can then ask
  * what the floor cost instead of assuming it cost nothing.
  */
+import type { ConsolidationCensus } from '@agentix-e/microglia-core/distill';
 import {
   consolidateKnowledge,
   type ConsolidatedGroup,
@@ -156,4 +157,40 @@ export function sweepSummary(sweep: ConsolidationSweep): readonly string[] {
         `maxSupport=${String(point.maxSupport)} crossTask=${String(point.crossTaskGroups)} ` +
         `largest=${String(point.largestGroup)} weakest=${point.weakestPair.toFixed(2)}`,
     );
+}
+
+/**
+ * The operating point, on the log, beside the sweep that prices the alternatives.
+ *
+ * R121 printed nine `sweep:` lines and not one for the point it ran at, so its refutation was on screen
+ * only as one row among nine — and the arithmetic that explains it was three fields away in a JSON file.
+ * The line therefore leads with the population, says which filter removed it and how much, then states
+ * what survived. **A zero group count is a statement about the key when the key removed the population
+ * and a statement about the store when the similarity did**, and nothing in the census said which.
+ */
+export function consolidationLineOf(census: ConsolidationCensus): string {
+  const head =
+    `${String(census.considered)} considered, ${String(census.pairs)} pair(s) ` +
+    `(${String(census.skippedKind)} kind, ${String(census.skippedScope)} scope, ` +
+    `${String(census.skippedOverlap)} overlap removed)`;
+  const survived =
+    `${String(census.groups)} groups, ${String(census.merged)} merged, ` +
+    `${String(census.retained)} retained; cross-task ${String(census.crossTaskGroups)}, ` +
+    `support ≥2 ${String(census.supportBefore[2] ?? 0)}→${String(census.supportAfter[2] ?? 0)}, ` +
+    `max ${String(census.maxSupportBefore)}→${String(census.maxSupportAfter)}; ` +
+    `refused ${String(census.refusedCondition)} condition / ${String(census.refusedPayload)} payload / ` +
+    `${String(census.refusedDuplicateEvidence)} evidence / ${String(census.refusedLinkage)} linkage; ` +
+    `threshold ${census.threshold.toFixed(2)}, conditionMinShared ${String(census.conditionMinShared)}`;
+  // The sentence a reader needs most, and the one no counter states: which filter took the population.
+  const scope = census.skippedScope;
+  const overlap = census.skippedOverlap;
+  const verdict =
+    census.pairs === 0
+      ? 'no pair to test: the store holds fewer than two items of one kind'
+      : scope >= overlap && scope > 0
+        ? `the scope key removed ${String(scope)} of ${String(census.pairs)} pair(s) — a merge keyed on the model's own scope spelling`
+        : overlap > 0
+          ? `the claim overlap removed ${String(overlap)} of ${String(census.pairs)} pair(s) — the store holds distinct claims`
+          : 'every pair reached the similarity test';
+  return `${head}: ${survived}. ${verdict}`;
 }

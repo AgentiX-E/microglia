@@ -1096,3 +1096,73 @@ describe("the measure itself", () => {
     expect(sharedTerms(empty, empty)).toBe(0);
   });
 });
+
+/**
+ * The population the pass never tested, which `groups: 0` could not name.
+ *
+ * R121 ran this pass on the published unit for the first time and reported
+ * `considered 79, groups 0, merged 0` with **all four refusal counters at zero**. That reading is
+ * indistinguishable from "the store had nothing to merge" and from "every candidate pair was refused",
+ * and it was the second outcome: the pair loop skips on three conditions *before* any counter, so a
+ * population of pairs can vanish without a trace. The store answers it — 64 items fell into **60**
+ * `scopeKey` buckets, four of which held two items, so at most four pairs of 2,016 were ever tested and
+ * none reached 0.60. **The linkage key carries the model's free-text `intent`, which R119 had already
+ * disqualified as a key**: one routine arrives spelled `return_items`, `return_item` and `items to return`.
+ *
+ * These counters make the next run say which filter removed the population.
+ */
+describe("the pair population, by the filter that removed it", () => {
+  it("counts a pair that never reached the similarity test because the model spelled the scope differently", () => {
+    // One claim, one task, one statement — and two `intent` strings, which is what a distiller writes.
+    const base = candidate("A return carries the item ids being returned.", { id: "a", taskId: "task-1" });
+    const other = { ...base, evidence: { ...base.evidence, feedbackId: "fb_b", runId: "run_b" }, dedupeKey: "key_b" };
+    const left = item({ ...base, scope: { task: "retail", intent: "return_items" } }, "k1");
+    const right = item({ ...other, scope: { task: "retail", intent: "return_item" } }, "k2");
+
+    const { report } = consolidateKnowledge([left, right], { now: AT, policy: defaultPolicy });
+    expect(report).toMatchObject({
+      considered: 2,
+      pairs: 1,
+      skippedKind: 0,
+      skippedScope: 1,
+      skippedOverlap: 0,
+      groups: 0,
+      merged: 0,
+      retained: 2,
+    });
+  });
+
+  it("counts the pairs that passed the scope filter and failed the threshold", () => {
+    const left = item(candidate("A cancellation includes the order id and a reason.", { id: "a", taskId: "task-1" }), "k1");
+    const right = item(
+      candidate("An exchange needs the payment method of the original order.", { id: "b", taskId: "task-2" }),
+      "k2",
+    );
+    const { report } = consolidateKnowledge([left, right], { now: AT, policy: defaultPolicy });
+    // Same scope, different subject: the pair is tested and the similarity is what removes it.
+    expect(report).toMatchObject({ pairs: 1, skippedScope: 0, skippedOverlap: 1, merged: 0 });
+  });
+
+  it("counts a kind mismatch separately, because a constraint and a procedure are not one claim", () => {
+    const left = item(candidate("A cancellation includes the order id and a reason.", { id: "a", kind: "procedure" }), "k1");
+    const right = item(candidate("A cancellation includes the order id and a reason.", { id: "b", kind: "constraint" }), "k2");
+    const { report } = consolidateKnowledge([left, right], { now: AT, policy: defaultPolicy });
+    expect(report).toMatchObject({ pairs: 1, skippedKind: 1, skippedScope: 0, skippedOverlap: 0, merged: 0 });
+  });
+
+  it("counts every unordered pair, so a store's candidate population is a function of its size", () => {
+    const one = item(candidate("A cancellation includes the order id and a reason.", { id: "a" }), "k1");
+    const two = item(candidate("An exchange needs the payment method of the original order.", { id: "b" }), "k2");
+    const three = item(candidate("A return carries the item ids being returned.", { id: "c" }), "k3");
+    // C(3,2) = 3. The number a reader needs to weigh `groups: 0` against.
+    expect(consolidateKnowledge([one, two, three], { now: AT, policy: defaultPolicy }).report.pairs).toBe(3);
+    expect(consolidateKnowledge([], { now: AT, policy: defaultPolicy }).report.pairs).toBe(0);
+    // And one item has no pair at all, which is not a refusal.
+    expect(consolidateKnowledge([one], { now: AT, policy: defaultPolicy }).report).toMatchObject({
+      pairs: 0,
+      skippedKind: 0,
+      skippedScope: 0,
+      skippedOverlap: 0,
+    });
+  });
+});

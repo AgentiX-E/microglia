@@ -16,6 +16,7 @@ import {
 import {
   SWEEP_CONDITIONS,
   SWEEP_THRESHOLDS,
+  consolidationLineOf,
   sweepConsolidation,
   sweepSummary,
 } from "../consolidation-sweep.js";
@@ -238,3 +239,89 @@ describe("sweepSummary", () => {
     ]);
   });
 });
+
+/**
+ * The operating point, on the log, beside the sweep that prices the alternatives.
+ *
+ * R121 printed nine `sweep:` lines and **not one line for the point it actually ran at**. The refutation
+ * was therefore on screen only as "0.60: groups=0 merged=0" among nine similar lines, and the arithmetic
+ * that explains it — the pair population and the filter that removed it — was three fields away in a JSON
+ * file. R121's own store says 64 items fell into 60 scopes, so **four pairs of 2,016 were ever tested**.
+ */
+describe('the operating-line for the recurrence pass', () => {
+  it('states the population, the filters that removed it, and what survived', () => {
+    const line = consolidationLineOf({
+      considered: 79,
+      groups: 0,
+      merged: 0,
+      retained: 79,
+      threshold: 0.6,
+      conditionMinShared: 0,
+      refusedCondition: 0,
+      refusedPayload: 0,
+      refusedDuplicateEvidence: 0,
+      refusedLinkage: 0,
+      supportBefore: { 1: 79 },
+      supportAfter: { 1: 79 },
+      maxSupportBefore: 1,
+      maxSupportAfter: 1,
+      groupDetail: [],
+      weakestPair: 1,
+      largestGroup: 1,
+      crossTaskGroups: 0,
+      pairs: 3081,
+      skippedKind: 12,
+      skippedScope: 2900,
+      skippedOverlap: 169,
+    });
+    expect(line).toContain('79 considered, 3081 pair(s)');
+    expect(line).toContain('12 kind, 2900 scope, 169 overlap');
+    expect(line).toContain('0 groups, 0 merged, 79 retained');
+    expect(line).toContain('cross-task 0');
+    expect(line).toContain('support ≥2 0→0');
+    expect(line).toContain('threshold 0.60');
+  });
+
+  it('names the filter that took the largest share, which is the one to look at first', () => {
+    // The sentence R121 needed: a zero group count is a statement about the *key* when the key removed
+    // the population, and a statement about the *store* when the similarity did.
+    const scopeEaten = consolidationLineOf(report({ skippedScope: 90, skippedOverlap: 8, pairs: 100 }));
+    expect(scopeEaten).toContain('the scope key removed 90 of 100');
+    const overlapEaten = consolidationLineOf(report({ skippedScope: 2, skippedOverlap: 90, pairs: 100 }));
+    expect(overlapEaten).toContain('the claim overlap removed 90 of 100');
+    // Neither: nothing was removed, so the pass tested every pair and found nothing to merge.
+    expect(consolidationLineOf(report({ skippedScope: 0, skippedOverlap: 0, pairs: 100 }))).toContain(
+      'every pair reached the similarity test',
+    );
+  });
+});
+
+/** A census with the fields these cases vary, defaulted to R121's shape otherwise. */
+function report(overrides: {
+  readonly pairs: number;
+  readonly skippedScope: number;
+  readonly skippedOverlap: number;
+}) {
+  return {
+    considered: 64,
+    groups: 0,
+    merged: 0,
+    retained: 64,
+    threshold: 0.6,
+    conditionMinShared: 0,
+    refusedCondition: 0,
+    refusedPayload: 0,
+    refusedDuplicateEvidence: 0,
+    refusedLinkage: 0,
+    supportBefore: { 1: 64 },
+    supportAfter: { 1: 64 },
+    maxSupportBefore: 1,
+    maxSupportAfter: 1,
+    groupDetail: [],
+    weakestPair: 1,
+    largestGroup: 1,
+    crossTaskGroups: 0,
+    skippedKind: 0,
+    ...overrides,
+  };
+}
