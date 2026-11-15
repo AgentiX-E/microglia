@@ -306,6 +306,41 @@ describe('what the gate did to the trials it withheld from', () => {
     expect(absent).toContain('162 request(s) with no episode boundary');
   });
 
+  // The shape R123 actually recorded, with its own numbers: 162 boundaries (`[0..161]`), 162 ledger entries,
+  // 160 trials. Not a hypothetical — this is the field the phase wrote, and the reader that printed nothing has
+  // to be able to name it, because the next round's reader will meet the same shape in any artefact written
+  // before the repair.
+  it('refuses the exact shape R123 recorded, and reports both counts', () => {
+    const reading = serveSplit({
+      ledger: Array.from({ length: 162 }, () => ['k']),
+      episodeStarts: Array.from({ length: 162 }, (_, index) => index),
+      memoryTrials: Array.from({ length: 160 }, (_, index) => row(`t${String(index)}`, 0, 1)),
+    });
+    expect(reading).toMatchObject({ absent: 'boundary-disagrees' });
+    if ('absent' in reading) expect(reading.detail).toContain('162 boundar(ies) against 160 trial row(s)');
+    // And the sentence the log would have carried, which is what R123's run did not print.
+    expect(serveSplitLine(reading)).toContain('not measured (boundary-disagrees)');
+  });
+
+  // R131's registered self-check, in miniature: with no gate every request is served, so every episode is in
+  // the served bucket and the split's rate must equal the arm's own episode rate. A split that reports anything
+  // else has mis-assigned requests, and on an ungated arm there is no other explanation available.
+  it('reproduces the arm rate when nothing was withheld', () => {
+    const trials = Array.from({ length: 160 }, (_, index) => row(`t${String(index)}`, 0, index % 4 === 0 ? 0 : 1));
+    const reading = serveSplit({
+      ledger: Array.from({ length: 162 }, () => ['k']),
+      // Two episodes spent two requests, which is the shape a real phase produces: 162 requests, 160 episodes.
+      episodeStarts: [...Array.from({ length: 159 }, (_, index) => index), 160],
+      memoryTrials: trials,
+    });
+    expect(reading).toMatchObject({ measured: { withheld: { episodes: 0, passed: 0 } } });
+    if ('measured' in reading) {
+      expect(reading.measured.served.episodes).toBe(160);
+      // 120 of the 160 trials passed, which is 0.75 — the same number the arm would report.
+      expect(reading.measured.served.passed).toBe(120);
+    }
+  });
+
   it('reads the boundary off a sidecar block, and drops one that is not a list of indices', () => {
     expect(episodeStartsOf({ episodeStarts: [0, 3, 7] })).toEqual([0, 3, 7]);
     expect(episodeStartsOf({ episodeStarts: [] })).toBeUndefined();
