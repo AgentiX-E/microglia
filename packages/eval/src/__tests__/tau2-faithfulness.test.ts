@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   ENTITY_MAX_CHARS,
+  FORM_FORBIDS_THE_CASE,
   entitiesOf,
   faithfulnessLine,
   faithfulnessOf,
@@ -67,6 +68,7 @@ describe('faithfulnessOf', () => {
       whole: 1,
       unwritten: 0,
       redacted: 0,
+      formForbidsTheCase: false,
     });
     expect(faithfulnessRate(census)).toBe(1);
   });
@@ -133,6 +135,7 @@ describe('faithfulnessOf', () => {
       whole: 1,
       unwritten: 0,
       redacted: 0,
+      formForbidsTheCase: false,
     });
   });
 
@@ -168,6 +171,7 @@ describe('faithfulnessOf', () => {
       whole: 0,
       unwritten: 2,
       redacted: 0,
+      formForbidsTheCase: false,
     });
     expect(faithfulnessRate(census)).toBeUndefined();
     expect(faithfulnessLine(census)).toBe(
@@ -229,6 +233,7 @@ describe('the loss the guard caused, counted apart from the loss the writer caus
       whole: 0,
       unwritten: 0,
       redacted: 1,
+      formForbidsTheCase: false,
     });
   });
 
@@ -279,6 +284,7 @@ describe('faithfulnessLine', () => {
       whole: 1,
       unwritten: 0,
       redacted: 46,
+      formForbidsTheCase: false,
     });
     expect(line).toBe(
       'faithfulness: 82 of 128 entity(ies) kept (64.1%), 46 replaced by the redaction guard, ' +
@@ -295,9 +301,49 @@ describe('faithfulnessLine', () => {
       whole: 1,
       unwritten: 0,
       redacted: 0,
+      formForbidsTheCase: false,
     });
     expect(line).toBe(
       'faithfulness: 6 of 8 entity(ies) kept (75.0%), whole in 1 of 3 correction(s), 1 with none to keep',
     );
+  });
+});
+
+describe('the form travels with the number', () => {
+  // Three rounds printed `0 of 667 kept` and read it as a writer that destroyed detail. The lesson form's
+  // own prompt says a statement must not restate one answer, so the store could not have been faithful by
+  // construction: the number measured the question, not the writer.
+  const rows = [{ runId: 'r1', entities: ['7363354090'] }];
+  const written = [item('Ask for an exchange before quoting a price.', 'r1')];
+
+  it('labels a form whose instructions forbid the case', () => {
+    const census = faithfulnessOf(rows, written, undefined, 'lesson');
+    expect(census?.kept).toBe(0);
+    expect(census?.form).toBe('lesson');
+    expect(census?.formForbidsTheCase).toBe(true);
+    const line = faithfulnessLine(census);
+    expect(line).toContain('the lesson form instructs the distiller not to restate the case');
+    expect(line).toContain('0 of 1 entity(ies) kept');
+  });
+
+  it('says so when the form permits the case, because then the loss is the writer', () => {
+    const census = faithfulnessOf(rows, written, undefined, 'repair');
+    expect(census?.formForbidsTheCase).toBe(false);
+    expect(faithfulnessLine(census)).toContain('the repair form permits the case');
+  });
+
+  it('adds no label when no form was named, rather than guessing one', () => {
+    const census = faithfulnessOf(rows, written);
+    expect(census?.form).toBeUndefined();
+    expect(census?.formForbidsTheCase).toBe(false);
+    expect(faithfulnessLine(census)).not.toContain('the ');
+    expect(faithfulnessLine(census)).toContain('0 of 1 entity(ies) kept');
+  });
+
+  it('keeps the lexicon form in the set that forbids values', () => {
+    // It says it in as many words: the statement "must not contain ... the values of this case".
+    expect(FORM_FORBIDS_THE_CASE.has('lexicon')).toBe(true);
+    expect(FORM_FORBIDS_THE_CASE.has('procedure')).toBe(true);
+    expect(FORM_FORBIDS_THE_CASE.has('trace')).toBe(false);
   });
 });

@@ -79,7 +79,40 @@ export type FaithfulnessCensus = {
    * defect this module was built to catch.
    */
   readonly redacted: number;
+  /**
+   * The form the arm asked the distiller for, when it named one.
+   *
+   * Present because `0 of 667 kept` means two entirely different things depending on it: a writer that
+   * destroyed the detail, or a form that was **instructed** to abstract it away. The `lesson` form's own
+   * prompt says a statement "must not [restate] one answer", and the `lexicon` form says the statement
+   * "must not contain the values of this case" — so a lesson-form store cannot be faithful by
+   * construction, and three rounds of `0 of 667` were read as a writer defect.
+   */
+  readonly form?: FaithfulnessForm;
+  /**
+   * Whether the form's own instructions exclude the case, and therefore its values.
+   *
+   * `true` does not excuse the number; it labels it. The rate is still printed, and a reader who wants
+   * value retention must re-run with a form that permits it (`repair`, `trace`).
+   */
+  readonly formForbidsTheCase: boolean;
 };
+
+/** The forms the distiller can be asked for, as this census needs to name them. */
+export type FaithfulnessForm = 'lesson' | 'procedure' | 'lexicon' | 'repair' | 'trace';
+
+/**
+ * The forms whose instructions forbid naming the case that taught the claim.
+ *
+ * Written out rather than derived from the prompt text, because a set that parsed the prompt would
+ * silently change meaning the day the prompt was reworded. `procedure` goes further than `lesson` — it
+ * forbids tables and columns — and `lexicon` forbids the values explicitly.
+ */
+export const FORM_FORBIDS_THE_CASE: ReadonlySet<FaithfulnessForm> = new Set([
+  'lesson',
+  'procedure',
+  'lexicon',
+]);
 
 /** One string, when it is an identity rather than prose, from a value of any JSON shape. */
 function entityValues(value: Json): readonly string[] {
@@ -150,6 +183,13 @@ export function faithfulnessOf(
    * says `redacted: 0` rather than guessing.
    */
   redacts?: (text: string) => boolean,
+  /**
+   * The form the arm asked for, so the number can be labelled with what was asked of the writer.
+   *
+   * Optional for the same reason `redacts` is: an arm that never named a form did not measure this, and
+   * the census says `formForbidsTheCase: false` rather than guessing.
+   */
+  form?: FaithfulnessForm,
 ): FaithfulnessCensus | undefined {
   const textByRun = new Map<string, string>();
   for (const item of items) {
@@ -195,7 +235,17 @@ export function faithfulnessOf(
     if (here === row.entities.length) whole += 1;
   }
   if (corrections === 0) return undefined;
-  return { corrections, withoutEntities, entities, kept, whole, unwritten, redacted };
+  return {
+    corrections,
+    withoutEntities,
+    entities,
+    kept,
+    whole,
+    unwritten,
+    redacted,
+    ...(form === undefined ? {} : { form }),
+    formForbidsTheCase: form !== undefined && FORM_FORBIDS_THE_CASE.has(form),
+  };
 }
 
 /**
@@ -237,9 +287,18 @@ export function faithfulnessLine(census: FaithfulnessCensus | undefined): string
   // The guard's share is named only when the census measured it, because a `0` printed beside a rate
   // reads as "the guard took nothing" whether or not anyone asked it.
   const guard = census.redacted === 0 ? '' : `, ${String(census.redacted)} replaced by the redaction guard`;
+  // The label the three rounds of `0 of 667` were missing. A lesson-form store is *asked* to abstract the
+  // case, so its faithfulness is a property of the question and not of the writer; the number is printed
+  // unchanged and the sentence beside it says which of the two it is.
+  const asked =
+    census.form === undefined
+      ? ''
+      : census.formForbidsTheCase
+        ? ` [the ${census.form} form instructs the distiller not to restate the case, so this rate measures the form]`
+        : ` [the ${census.form} form permits the case]`;
   return (
     `faithfulness: ${String(census.kept)} of ${String(census.entities)} entity(ies) kept ` +
     `(${(rate * 100).toFixed(1)}%)${guard}, whole in ${String(census.whole)} of ` +
-    `${String(census.corrections)} correction(s), ${String(census.withoutEntities)} with none to keep`
+    `${String(census.corrections)} correction(s), ${String(census.withoutEntities)} with none to keep${asked}`
   );
 }

@@ -1556,7 +1556,16 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // store kept, so the number is a property of the writer and can be recomputed from any artefact
   // that carries both. `Memory Tax` reports the same quantity as "detail survival at write", and it
   // is the one failure mode six nulls on this lane could not be told apart from.
-  const faithfulness = faithfulnessOf(captured, written, guardReplaces);
+  // The form travels with the number, because `0 of 667 kept` means a writer that destroyed detail under a
+  // form that permits the case and a form that was *instructed* to abstract it, and three rounds read the
+  // second as the first. The trace unit asks for `trace` whatever the header says, so the label follows the
+  // unit rather than the registration.
+  const faithfulness = faithfulnessOf(
+    captured,
+    written,
+    guardReplaces,
+    DISTILL_UNIT === "trace" ? "trace" : DISTILL_FORM,
+  );
   process.stdout.write(`[tau2] ${faithfulnessLine(faithfulness)}\n`);
   // R89: the ceiling against the pack, said at the write rather than discovered at the read. A ceiling
   // above the capacity writes records the renderer drops, and a dropped record has read as "nothing was
