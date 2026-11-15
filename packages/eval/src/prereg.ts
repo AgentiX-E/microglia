@@ -245,6 +245,14 @@ export type Prereg = {
    */
   readonly speakMargin?: number;
   /**
+   * R125: how many trials per task this arm buys, when it names a number.
+   *
+   * A `TAU_TRIALS` repository variable applies to every queued dispatch, which is the defect the `TAU_*`
+   * audit was written against one layer up: an experiment's resolution is a property of the experiment.
+   * Naming it here also lets the header be refused when the arm cannot fit one job — see the ceiling below.
+   */
+  readonly trials?: number;
+  /**
    * The effect this registration claims, in percentage points, when it claims one.
    *
    * Absent on most headers, and its absence is a statement: R118 asks for a census and buys one arm,
@@ -458,6 +466,7 @@ const HEADER_KEYS = [
   'consolidate',
   'consolidateKey',
   'speakMargin',
+  'trials',
   'effectClaimPp',
   'traceClaims',
   'trainTasks',
@@ -530,6 +539,15 @@ const HEADER_CLAIM_RULERS: ReadonlySet<string> = new Set(['point', 'interval']);
  * than by a comment asking future editors to be careful.
  */
 export const HEADER_PACK_SHAPES: ReadonlySet<string> = new Set(['per-failure', 'collapse']);
+
+/**
+ * The largest number of episodes one dispatch carries.
+ *
+ * Measured, not assumed: R123a and R124 each spent about 165 minutes on 160 episodes **including** the
+ * learning half, which is 0.75 minutes an episode plus roughly 40 for the store, against a 240-minute job
+ * limit. A registration above this is not wrong about the science; it is wrong about the machine.
+ */
+export const DISPATCH_EPISODE_CEILING = 300;
 const LANE_LIST = 'product, transfer or hostile';
 type HeaderKey = (typeof HEADER_KEYS)[number];
 
@@ -1032,6 +1050,38 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     });
   }
 
+  // R125: the trial count, refused when the arm cannot be paid for in one job.
+  //
+  // The ceiling is measured rather than assumed: two dispatches at 160 episodes took 169 and 162 minutes
+  // including the learning half, which is 0.75 minutes an episode plus about 40, against a 240-minute job
+  // limit. 300 episodes is therefore the largest arm one dispatch carries, and a registration above it is
+  // not wrong about the science — it is wrong about the machine, and the fix is a split rather than a
+  // smaller claim.
+  const trialsText = values.get('trials');
+  let trials: number | undefined;
+  if (trialsText !== undefined) {
+    const parsed = Number(trialsText);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      collected.push({
+        where: `header 'trials'`,
+        problem: `'${trialsText}' is not a whole number of trials >= 1`,
+      });
+    } else {
+      trials = parsed;
+      const tasks = Number(values.get('testTasks') ?? 40);
+      const episodes = parsed * (Number.isFinite(tasks) && tasks > 0 ? tasks : 40);
+      if (episodes > DISPATCH_EPISODE_CEILING) {
+        collected.push({
+          where: `header 'trials'`,
+          problem:
+            `${String(parsed)} trial(s) over ${String(tasks)} task(s) is ${String(episodes)} episode(s), ` +
+            `above the ${String(DISPATCH_EPISODE_CEILING)} one 240-minute job carries at the measured ` +
+            '0.75 minutes an episode; split the arm rather than shrinking the claim',
+        });
+      }
+    }
+  }
+
   // The effect this registration claims, when it claims one. A number rather than a boolean, because
   // the question it has to answer is not "does this arm claim an effect" but "could this sample have
   // seen the effect it claims" — and only the size of the claim can be compared with the floor.
@@ -1379,6 +1429,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(consolidate === undefined ? {} : { consolidate }),
       ...(consolidateKey === undefined ? {} : { consolidateKey }),
       ...(speakMargin === undefined ? {} : { speakMargin }),
+      ...(trials === undefined ? {} : { trials }),
       ...(effectClaimPp === undefined ? {} : { effectClaimPp }),
       ...(traceClaims === undefined ? {} : { traceClaims }),
       ...(trainTasks === undefined ? {} : { trainTasks }),

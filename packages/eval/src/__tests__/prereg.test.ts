@@ -1564,6 +1564,39 @@ describe('the distilling scope', () => {
     }
   });
 
+  it('reads the trial count, and refuses one this machine cannot pay for', () => {
+    // R125. The resolution an arm buys is a property of the experiment, so it belongs in the header rather
+    // than in a repository variable that would apply to every queued dispatch.
+    expect(readPrereg(withHeader('trials: 6'), 'R87-distill-scope.md').prereg?.trials).toBe(6);
+    expect(readPrereg(withHeader('split: dev'), 'R87-distill-scope.md').prereg?.trials).toBeUndefined();
+    for (const bad of ['0', '1.5', 'four']) {
+      expect(readPrereg(withHeader(`trials: ${bad}`), 'R87-distill-scope.md').problems).toEqual([
+        { where: "header 'trials'", problem: `'${bad}' is not a whole number of trials >= 1` },
+      ]);
+    }
+    // The ceiling is the machine's, not the science's: 8 trials over 40 tasks is 320 episodes, and two
+    // measured dispatches put an episode at 0.75 minutes against a 240-minute job.
+    expect(readPrereg(withHeader(['trials: 7', 'testTasks: 40'].join('\n')), 'R87-distill-scope.md').problems).toEqual([]);
+    // A task count that is not a usable number falls back to the lane's forty rather than to zero: a
+    // ceiling computed against zero episodes would pass every arm.
+    expect(readPrereg(withHeader(['trials: 8', 'testTasks: 0'].join('\n')), 'R87-distill-scope.md').problems).toEqual([
+      {
+        where: "header 'trials'",
+        problem:
+          '8 trial(s) over 0 task(s) is 320 episode(s), above the 300 one 240-minute job carries at the ' +
+          'measured 0.75 minutes an episode; split the arm rather than shrinking the claim',
+      },
+    ]);
+    expect(readPrereg(withHeader(['trials: 8', 'testTasks: 40'].join('\n')), 'R87-distill-scope.md').problems).toEqual([
+      {
+        where: "header 'trials'",
+        problem:
+          '8 trial(s) over 40 task(s) is 320 episode(s), above the 300 one 240-minute job carries at the ' +
+          'measured 0.75 minutes an episode; split the arm rather than shrinking the claim',
+      },
+    ]);
+  });
+
   it('refuses a margin on an arm that serves no pack', () => {
     // A learnOnly arm stops after the learning half, so a margin on it is a switch with nothing to gate --
     // the same defect as `consolidateKey` without `consolidate`, and refused for the same reason.

@@ -100,6 +100,9 @@ function main(): void {
       // R123: the gate on whether a pack is served. Header-only, like the two above, and absent leaves
       // the variable unset so the lane serves every non-empty pack exactly as every committed artefact did.
       `speakMargin=${reading.prereg.speakMargin === undefined ? '' : String(reading.prereg.speakMargin)}\n` +
+      // R125: the arm's resolution, from the header rather than from a repository variable that would
+      // apply to every queued dispatch.
+      `trials=${reading.prereg.trials === undefined ? '' : String(reading.prereg.trials)}\n` +
       // R123a: naming a margin at all -- including 0 -- is a request for the census, because the arm that
       // measures the distribution and the arm that gates on a rung are the same instrument at two settings.
       `speakCensus=${reading.prereg.speakMargin === undefined ? '' : '1'}\n` +

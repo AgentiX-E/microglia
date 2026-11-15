@@ -1386,6 +1386,10 @@ jobs:
           echo "consolidate_key=$CONSOLIDATE_KEY" >> "$GITHUB_OUTPUT"
           echo "speak_margin=$SPEAK_MARGIN" >> "$GITHUB_OUTPUT"
           echo "speak_census=$SPEAK_CENSUS" >> "$GITHUB_OUTPUT"
+          # R125: the arm's resolution, from the registration's header. A repository variable would apply
+          # to every queued dispatch — the defect the `TAU_*` audit was written against, one layer up — so
+          # the header wins and the variable is only the fallback every artefact before this one ran on.
+          echo "trials=$(sed -n 's/^trials=//p' "$RUNNER_TEMP/distill.env")" >> "$GITHUB_OUTPUT"
           echo "knobs=$KNOBS" >> "$GITHUB_OUTPUT"
           echo "trainTasks=$(echo "$CAPS" | sed -n 's/^train=//p')" >> "$GITHUB_OUTPUT"
           echo "testTasks=$(echo "$CAPS" | sed -n 's/^test=//p')" >> "$GITHUB_OUTPUT"
@@ -1593,7 +1597,7 @@ jobs:
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
-          TAU_TRIALS: ${{ vars.TAU_TRIALS || '4' }}
+          TAU_TRIALS: ${{ steps.recall_floor.outputs.trials || vars.TAU_TRIALS || '4' }}
           TAU_MEMORY: 'true'
           # R101: the third arm. `scaffold` runs this same step — same agent, same facade, same model —
           # with a store that is empty by construction: no learn episodes, no distillation, no rules.
@@ -1691,7 +1695,7 @@ jobs:
           # The split floor, from the dispatch rather than from the scenario the lane shipped with:
           # a sixty-task floor chosen for retail reports every smaller scenario as too short.
           TAU_MIN_TASKS: ${{ vars.TAU_MIN_TASKS || '60' }}
-          TAU_TRIALS: ${{ vars.TAU_TRIALS || '4' }}
+          TAU_TRIALS: ${{ steps.recall_floor.outputs.trials || vars.TAU_TRIALS || '4' }}
           TAU_MEMORY: 'false'
           # The same four switches, empty. The two arms must share every setting that is not the
           # memory, and an arm that read a different seed would differ in more than its store.
