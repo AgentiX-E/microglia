@@ -157,15 +157,19 @@ describe('the store on the cases it was built from', () => {
     expect(line).not.toContain('request(s) served');
   });
 
-  it('refuses a switch it cannot read rather than reading it as off', () => {
-    // `1`/`0` are the driver's spelling; `true`/`yes` are the header's. A value outside both sets is a
-    // dispatch whose premise nobody stated, and falling back to off would publish the control as the arm.
+  it('refuses a switch it cannot read rather than reading it as off, and reads the bridge\'s own spelling', () => {
+    // Two bridges reach this switch: `prereg-form` prints a header boolean as `true`/`false`, and a hand-set
+    // variable would say `1`/`0`. The first version read only the second pair and R132's first dispatch died on it
+    // — `RangeError: received 'true'` — so the bridge's spelling is asserted here rather than assumed.
+    expect(resolveRehearsal(String(true))).toBe(true);
+    expect(resolveRehearsal(String(false))).toBe(false);
     expect(resolveRehearsal('')).toBe(false);
     expect(resolveRehearsal(undefined)).toBe(false);
     expect(resolveRehearsal('0')).toBe(false);
     expect(resolveRehearsal(' 0 ')).toBe(false);
     expect(resolveRehearsal('1')).toBe(true);
+    expect(resolveRehearsal('TRUE')).toBe(true);
     expect(() => resolveRehearsal('yes')).toThrow(/TAU_REHEARSAL/);
-    expect(() => resolveRehearsal('true')).toThrow(/must be unset, '0' or '1'/);
+    expect(() => resolveRehearsal('on')).toThrow(/must be unset, '0'\/'false' or '1'\/'true'/);
   });
 });

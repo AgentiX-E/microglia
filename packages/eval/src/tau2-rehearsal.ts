@@ -213,18 +213,28 @@ export function rehearsalRecordOf(input: {
 /**
  * Whether this dispatch buys a rehearsal.
  *
- * Unset and `0` are the same fact (no replay), and both are distinct from `1`. Any other value is refused before
- * the first model call for `resolveSpeakMargin`'s reason: a misread switch that fell back to "off" would leave
- * an arm whose registration asked the question reporting nothing at all, and the reader would have no way to
- * tell that from a store that repaired nothing.
+ * Four spellings and two facts, because two bridges reach this switch and they do not agree on a spelling:
+ * `prereg-form` prints a header boolean the way the header wrote it (`true`/`false`, the same wire
+ * `TAU_CONSOLIDATE` rides), and a hand-dispatched variable would say `1`/`0` the way `TAU_SPEAK_CENSUS` does.
+ * Both are unambiguous booleans, so both are read; anything else is refused before the first model call for
+ * `resolveSpeakMargin`'s reason — a misread switch that fell back to "off" would leave an arm whose registration
+ * asked the question reporting nothing at all, and the reader would have no way to tell that from a store that
+ * repaired nothing.
  *
- * This is a purchase, not an instrument: every run carries the turn census because the phase computes it
- * anyway, and no run carries a rehearsal unless a registration asked. That is why the plan is resolved here
- * rather than printed unconditionally.
+ * The first version of this function read only `1`/`0`, and R132's first dispatch died on it: the bridge printed
+ * `true`, the driver threw, and no episode ran. That is the defect class AUDIT 34.159 is about — a switch whose
+ * two ends were never joined — and it is now caught by a test that pushes the bridge's own spelling through this
+ * resolver instead of a spelling the test chose.
+ *
+ * This is a purchase, not an instrument: every run carries the turn census because the phase computes it anyway,
+ * and no run carries a rehearsal unless a registration asked. That is why the plan is resolved here rather than
+ * printed unconditionally.
  */
 export function resolveRehearsal(raw = process.env['TAU_REHEARSAL']): boolean {
-  const value = (raw ?? '').trim();
-  if (value === '' || value === '0') return false;
-  if (value === '1') return true;
-  throw new RangeError(`TAU_REHEARSAL must be unset, '0' or '1'; received '${String(raw)}'`);
+  const value = (raw ?? '').trim().toLowerCase();
+  if (value === '' || value === '0' || value === 'false') return false;
+  if (value === '1' || value === 'true') return true;
+  throw new RangeError(
+    `TAU_REHEARSAL must be unset, '0'/'false' or '1'/'true'; received '${String(raw)}'`,
+  );
 }
