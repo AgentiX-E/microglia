@@ -800,12 +800,16 @@ export {
   type TraceClaimsPlan,
 } from './trace-claims.js';
 
+export { speakLineOf, type RecallTraffic } from './tau2-speak.js';
+
 export {
   TRACE_CALL_CAP,
   parseTraceCalls,
   resolveConsolidation,
   resolveConsolidationKey,
   resolveDistillUnit,
+  resolveSpeakCensus,
+  resolveSpeakMargin,
   traceOf,
   tracesOf,
   type ConsolidationKey,

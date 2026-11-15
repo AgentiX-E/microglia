@@ -1551,6 +1551,32 @@ describe('the distilling scope', () => {
     ]);
   });
 
+  it('reads the margin below which a contested pack is withheld, and refuses what it cannot use', () => {
+    // R123. Zero is the default and it is not "off" -- it is "serve every non-empty pack" -- so a value
+    // that fell back to zero would publish the control under the treatment's name.
+    expect(readPrereg(withHeader('speakMargin: 0.05'), 'R87-distill-scope.md').prereg?.speakMargin).toBe(0.05);
+    expect(readPrereg(withHeader('speakMargin: 0'), 'R87-distill-scope.md').prereg?.speakMargin).toBe(0);
+    expect(readPrereg(withHeader('split: dev'), 'R87-distill-scope.md').prereg?.speakMargin).toBeUndefined();
+    for (const bad of ['-0.1', 'abc']) {
+      expect(readPrereg(withHeader(`speakMargin: ${bad}`), 'R87-distill-scope.md').problems).toEqual([
+        { where: "header 'speakMargin'", problem: `'${bad}' is not a finite number >= 0` },
+      ]);
+    }
+  });
+
+  it('refuses a margin on an arm that serves no pack', () => {
+    // A learnOnly arm stops after the learning half, so a margin on it is a switch with nothing to gate --
+    // the same defect as `consolidateKey` without `consolidate`, and refused for the same reason.
+    expect(
+      readPrereg(withHeader('speakMargin: 0.05\nlearnOnly: true'), 'R87-distill-scope.md').problems,
+    ).toEqual([
+      {
+        where: "header 'speakMargin'",
+        problem: 'a learnOnly arm serves no pack, so a margin has nothing to withhold',
+      },
+    ]);
+  });
+
   it('refuses the pass on the unit that stores episodes, because it merges claims', () => {
     // `raw` writes one verbatim event per episode and asks no model; the pass merges two claims into one.
     // A dispatch that ran both would score a store the registration does not describe, so the pair is

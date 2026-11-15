@@ -71,6 +71,19 @@ PACK_TAG = "microglia-knowledge"
 _failures = 0
 _reported = False
 _recalls = 0
+# A recall that succeeded and returned nothing is not a recall that failed, and R123 is the first arm
+# whose treatment *is* that state. Counted separately, and bucketed by the reason the facade reported,
+# because "the pack was empty" has five causes (`nothing-matched`, `nothing-covered`,
+# `nothing-corroborated`, `nothing-selected`, `no-leader`) and a run that reported one number for all of
+# them could not say whether the gate withheld anything or the store had nothing to say.
+_empty = 0
+_silent_because: dict = {}
+# The margin between the top two candidates, once per request that had one. This is R123a's whole
+# instrument: the gate withholds a pack when the store's leader is not far enough ahead of its runner-up,
+# and the *number* that decides how much traffic such a rule costs is a property of the store rather than
+# of the rule. Recording the margins costs nothing (the facade computes them anyway), and the ladder they
+# produce is exact -- `withheld 87 of 162` can be read off before a single dollar is spent on the arm.
+_margins: list = []
 
 # Sentinel rather than `None`, because "" is a real answer: a facade that was asked
 # and had nothing to say must not be asked again on the next turn.
@@ -128,7 +141,7 @@ def recall(text: str) -> str:
     measuring the agent, and an unreachable sidecar is an infrastructure fact that
     should appear in the run's notes rather than as a crashed simulation.
     """
-    global _failures, _reported, _recalls
+    global _failures, _reported, _recalls, _empty
     base = _memory_url()
     if base == "" or text.strip() == "":
         return ""
@@ -144,8 +157,84 @@ def recall(text: str) -> str:
             _reported = True
             print(f"[microglia] recall failed ({type(error).__name__}: {error}); continuing without it", file=sys.stderr)
         return ""
+    _record_margin(payload)
     rendered = payload.get("rendered", "")
-    return rendered if isinstance(rendered, str) else ""
+    if not isinstance(rendered, str):
+        return ""
+    if rendered == "":
+        # The facade answered and had nothing to serve. The reason travels on the same response, so a
+        # silence is attributed here rather than inferred later from an empty prompt.
+        _empty += 1
+        bucket = empty_bucket(payload)
+        _silent_because[bucket] = _silent_because.get(bucket, 0) + 1
+    return rendered
+
+
+#: The rungs a margin ladder is priced at. The same ladder the relevance floor was priced on, so the two
+#: curves are directly comparable: `0.00` is the default the lane has always run, and each rung above it
+#: is a threshold nobody has ever charged a request for.
+MARGIN_RUNGS = (0.01, 0.02, 0.05, 0.10, 0.15, 0.20, 0.30)
+
+
+def decision_margin(payload: dict):
+    """The margin the facade measured between its top two candidates, or `None` when it measured none.
+
+    `None` is three facts and one of them is not a zero: the response carried no census, the pack had a
+    single candidate (no rival, so nothing was contested), or the store returned nothing. A ladder built
+    over a `0.0` standing in for those would report the whole run as contested.
+    """
+    decision = payload.get("decision")
+    if not isinstance(decision, dict):
+        return None
+    margin = decision.get("margin")
+    # `bool` is an `int` in Python, and `True` would otherwise enter the ladder as a margin of 1.0.
+    if isinstance(margin, bool) or not isinstance(margin, (int, float)):
+        return None
+    return float(margin)
+
+
+def margin_ladder(margins) -> dict:
+    """How many of these requests each rung would withhold, exactly.
+
+    `buildPack` withholds a pack when `margin < speakMargin`, so the count is strict and a margin equal
+    to the rung serves. The denominator is the number of rivaled requests rather than the number of
+    recalls: a request with one candidate cannot be contested at any rung, and putting it in the divisor
+    would make every rung look cheaper than it is.
+    """
+    values = list(margins)
+    return {f"{rung:.2f}": sum(1 for value in values if value < rung) for rung in MARGIN_RUNGS}
+
+
+def _record_margin(payload: dict) -> None:
+    margin = decision_margin(payload)
+    if margin is not None:
+        _margins.append(margin)
+
+
+def quantile_of(values, q: float):
+    """Nearest-rank quantile, or `None` for an empty population.
+
+    Nearest-rank rather than interpolated: a margin the store never produced is not a margin, and the
+    readback quotes this number as "the rung below which a quarter of the requests fell" — which is a
+    statement about an observed request, not about a fitted line between two of them.
+    """
+    ordered = sorted(values)
+    if not ordered:
+        return None
+    rank = max(1, min(len(ordered), int(-(-q * len(ordered) // 1))))
+    return ordered[rank - 1]
+
+
+def empty_bucket(payload: dict) -> str:
+    """Which silence one empty response belongs to.
+
+    The facade reports a `suppressed` reason when the memory chose to withhold and nothing when it merely
+    had nothing, so the split is read here rather than guessed later from an empty prompt. `unattributed`
+    is a state and not a catch-all: a facade that answered with no reason and no pack is one this driver
+    cannot explain, and a bucket named for that is a bucket a reader can act on.
+    """
+    reason = payload.get("suppressed")
+    return reason if isinstance(reason, str) and reason != "" else "unattributed"
 
 
 def injected_message(pack: str) -> SystemMessage:
@@ -214,4 +303,18 @@ def memory_stats() -> dict:
         "recall_url": _memory_url(),
         "recall_failures": _failures,
         "recalls": _recalls,
+        # The population behind a treatment that withholds packs: `recalls - recall_empty` is what was
+        # served, and `silent_because` is why the rest was not. A run that reports `recall_empty: 0` on
+        # an arm whose gate never fired is a finding about the wiring, not about the store.
+        "recall_empty": _empty,
+        "silent_because": dict(_silent_because),
+        # R123a: the population a margin gate would act on, and what each rung of it would cost. `rivaled`
+        # is the denominator -- requests whose store returned at least two candidates -- and a run that
+        # reports `rivaled: 0` on an arm whose gate never fired is a finding about the store rather than
+        # about the rung.
+        "rivaled": len(_margins),
+        "margin_p10": quantile_of(_margins, 0.10),
+        "margin_p50": quantile_of(_margins, 0.50),
+        "margin_p90": quantile_of(_margins, 0.90),
+        "margin_ladder": margin_ladder(_margins),
     }

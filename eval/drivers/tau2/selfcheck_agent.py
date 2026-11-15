@@ -321,9 +321,75 @@ def memory_stats_exposes_the_recall_count(checks):
     stats = subject.memory_stats()
     checks.contains(
         sorted(stats),
-        ["recall_failures", "recall_url", "recalls"],
-        "the artefact can tell a store that was consulted from one that was not",
+        [
+            "margin_ladder",
+            "margin_p10",
+            "margin_p50",
+            "margin_p90",
+            "recall_empty",
+            "recall_failures",
+            "recall_url",
+            "recalls",
+            "rivaled",
+            "silent_because",
+        ],
+        "the artefact can tell a store that was consulted from one that was not, and a pack that was "
+        "withheld from one that had nothing to say",
     )
+
+
+@case
+def the_margin_ladder_prices_every_rung_at_once(checks):
+    """R123a's instrument: what each threshold would cost, from one run that gates on none of them."""
+    margins = [0.0, 0.005, 0.01, 0.03, 0.07, 0.14, 0.5]
+    ladder = subject.margin_ladder(margins)
+    # Strict, because `buildPack` withholds on `margin < speakMargin`: a margin equal to the rung serves.
+    checks.equal(ladder["0.01"], 2, "0.000 and 0.005 fall below the first rung, and 0.010 does not")
+    checks.equal(ladder["0.05"], 4, "the rung at five points withholds four of seven")
+    checks.equal(ladder["0.30"], 6, "everything but the leader at half a point")
+    checks.equal(list(ladder), ["0.01", "0.02", "0.05", "0.10", "0.15", "0.20", "0.30"], "the ladder is fixed")
+    checks.equal(
+        subject.margin_ladder([]),
+        {"0.01": 0, "0.02": 0, "0.05": 0, "0.10": 0, "0.15": 0, "0.20": 0, "0.30": 0},
+        "an empty population prices every rung at zero rather than being absent",
+    )
+
+
+@case
+def a_margin_is_read_only_when_the_facade_measured_one(checks):
+    """`None` is three facts, and a `0.0` standing in for them would report the run as contested."""
+    checks.equal(subject.decision_margin({"decision": {"margin": 0.25}}), 0.25, "a measured margin is read")
+    checks.equal(subject.decision_margin({"decision": {"margin": 0}}), 0.0, "a measured tie is a zero, not a None")
+    checks.equal(subject.decision_margin({"decision": {"margin": None}}), None, "no rival is not a tie")
+    checks.equal(subject.decision_margin({"decision": {"margin": True}}), None, "a bool is not a margin")
+    checks.equal(subject.decision_margin({"decision": {"margin": "0.2"}}), None, "a string is not a margin")
+    checks.equal(subject.decision_margin({"decision": None}), None, "a null census measured nothing")
+    checks.equal(subject.decision_margin({}), None, "a response without a census measured nothing")
+
+
+@case
+def a_quantile_names_an_observed_request(checks):
+    """Nearest-rank, because a margin the store never produced is not a margin."""
+    checks.equal(subject.quantile_of([], 0.5), None, "an empty population has no quantile")
+    checks.equal(subject.quantile_of([0.4], 0.9), 0.4, "one value is every quantile of itself")
+    values = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0]
+    checks.equal(subject.quantile_of(values, 0.10), 0.1, "the tenth percentile of ten is the first value")
+    checks.equal(subject.quantile_of(values, 0.50), 0.5, "the median of ten is the fifth, not a fit between two")
+    checks.equal(subject.quantile_of(values, 0.90), 0.9, "the ninetieth is the ninth")
+
+
+@case
+def an_empty_response_is_attributed_to_the_gate_that_withheld_it(checks):
+    """R123's readback, as a pure function: the reason travels on the response or it is not stated."""
+    checks.equal(subject.empty_bucket({"suppressed": "no-leader"}), "no-leader", "a withheld pack names its gate")
+    checks.equal(
+        subject.empty_bucket({"suppressed": "uncorroborated-store"}),
+        "uncorroborated-store",
+        "the corroboration floor keeps its own word",
+    )
+    checks.equal(subject.empty_bucket({}), "unattributed", "no reason is a state, not a zero")
+    checks.equal(subject.empty_bucket({"suppressed": ""}), "unattributed", "an empty string is no reason")
+    checks.equal(subject.empty_bucket({"suppressed": 7}), "unattributed", "and neither is a non-string")
 
 
 # ------------------------------------------------------------------------- runner

@@ -232,6 +232,19 @@ export type Prereg = {
    */
   readonly consolidateKey?: 'scope' | 'routine';
   /**
+   * How far ahead of its runner-up the best candidate must be for the pack to be served at all.
+   *
+   * R123. The lane has served a pack on every request for twelve rounds and `served 162 of 162` was read as
+   * coverage; it is a default, because the floor that would refuse a request was never above 0 and the first
+   * rung that withholds anything withholds 87 of 162. Absent means 0, which serves every non-empty pack and
+   * is what every artefact before R123 measured.
+   *
+   * A header rather than a repository variable for R56's reason: a global would let a dispatch publish the
+   * control under the treatment's name. It is also the one switch here that changes what reaches the prompt
+   * without changing the store, so the readback is `diagnostics.memory` rather than a census of items.
+   */
+  readonly speakMargin?: number;
+  /**
    * The effect this registration claims, in percentage points, when it claims one.
    *
    * Absent on most headers, and its absence is a statement: R118 asks for a census and buys one arm,
@@ -444,6 +457,7 @@ const HEADER_KEYS = [
   'learnOnly',
   'consolidate',
   'consolidateKey',
+  'speakMargin',
   'effectClaimPp',
   'traceClaims',
   'trainTasks',
@@ -993,6 +1007,31 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // R123: the gate on whether a pack is served. A number, and refusing a negative or non-finite one
+  // matters more than usual here: `0` is the default and it is *not* "off" — it is "serve every non-empty
+  // pack" — so a misspelt value that fell back to 0 would publish the control under the treatment's name.
+  const speakMarginText = values.get('speakMargin');
+  let speakMargin: number | undefined;
+  if (speakMarginText !== undefined) {
+    const parsed = Number(speakMarginText);
+    if (!Number.isFinite(parsed) || parsed < 0) {
+      collected.push({
+        where: `header 'speakMargin'`,
+        problem: `'${speakMarginText}' is not a finite number >= 0`,
+      });
+    } else {
+      speakMargin = parsed;
+    }
+  }
+  // A learning-only arm serves no pack, so a margin on it would be a switch with nothing to gate — the
+  // same defect as `consolidateKey` without `consolidate`. Refused here rather than read as inert.
+  if (speakMargin !== undefined && learnOnly === true) {
+    collected.push({
+      where: `header 'speakMargin'`,
+      problem: 'a learnOnly arm serves no pack, so a margin has nothing to withhold',
+    });
+  }
+
   // The effect this registration claims, when it claims one. A number rather than a boolean, because
   // the question it has to answer is not "does this arm claim an effect" but "could this sample have
   // seen the effect it claims" — and only the size of the claim can be compared with the floor.
@@ -1339,6 +1378,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(learnOnly === undefined ? {} : { learnOnly }),
       ...(consolidate === undefined ? {} : { consolidate }),
       ...(consolidateKey === undefined ? {} : { consolidateKey }),
+      ...(speakMargin === undefined ? {} : { speakMargin }),
       ...(effectClaimPp === undefined ? {} : { effectClaimPp }),
       ...(traceClaims === undefined ? {} : { traceClaims }),
       ...(trainTasks === undefined ? {} : { trainTasks }),

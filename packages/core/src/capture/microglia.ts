@@ -81,6 +81,11 @@ export class Microglia implements RunHost {
    * the store could answer — and is kept distinct from 0 so no host changes on an upgrade.
    */
   private readonly speakMargin: number | undefined;
+  /**
+   * See `MicrogliaOptions.speakCensus`. Recorded independently of `speakMargin`, because the arm that
+   * measures the margin distribution must be able to do so while gating nothing.
+   */
+  private readonly speakCensus: boolean;
   private readonly creditEnabled: boolean;
   private readonly corroborationFloor: number | undefined;
   /**
@@ -125,6 +130,7 @@ export class Microglia implements RunHost {
     this.budgetBasis = options.budgetBasis;
     this.shapeOf = options.shapeOf;
     this.speakMargin = options.speakMargin;
+    this.speakCensus = options.speakCensus === true;
     this.creditEnabled = options.credit ?? true;
     this.editSemantics = options.editSemantics;
     this.corroborationFloor = options.corroborationFloor;
@@ -195,11 +201,14 @@ export class Microglia implements RunHost {
         // on a host that cannot name a shape folds nothing, which is why the two travel separately.
         ...(query.shape === undefined ? {} : { shape: query.shape }),
         ...(this.shapeOf === undefined ? {} : { shapeOf: this.shapeOf }),
-        // Both travel together: a host that named a margin is a host that wants to read back what the
-        // margin withheld, and a census nobody asked for is a field every other host would have to
-        // ignore. The census never moves the rendered bytes — `__tests__/speak.test.ts` pins that.
+        // A host that named a margin wants to read back what it withheld, and a census nobody asked for
+        // is a field every other host would have to ignore; `speakCensus` is the same request without the
+        // gate, which is what lets a rung be priced from a store rather than guessed for one. The census
+        // never moves the rendered bytes — `__tests__/speak.test.ts` pins that.
         ...(this.speakMargin === undefined
-          ? {}
+          ? this.speakCensus
+            ? { decision: true }
+            : {}
           : { speakMargin: this.speakMargin, decision: true }),
       },
     );

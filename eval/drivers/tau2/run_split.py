@@ -897,6 +897,13 @@ def diagnostics_of(simulations) -> dict:
     }
 
 
+def _memory_stats() -> dict:
+    """The sidecar's own counters, imported where the agent that owns them was imported."""
+    from microglia_agent import memory_stats
+
+    return memory_stats()
+
+
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
     wanted = [entry for entry in args.tasks.split(",") if entry]
@@ -998,7 +1005,15 @@ def main(argv: list[str]) -> int:
                 "simulations": len(simulations) if simulations is not None else None,
                 "agent": args.agent,
                 "memory_url": args.memory_url,
-                "diagnostics": {**diagnostics_of(simulations), "usage": usage_stats()},
+                "diagnostics": {
+                    **diagnostics_of(simulations),
+                    "usage": usage_stats(),
+                    # R123: only the phase that consulted a sidecar reports on one. A phase without the
+                    # agent would otherwise carry `recalls: 0`, which reads as a memory that was never
+                    # asked rather than one that was never wired -- the distinction this driver's own
+                    # `recall_failures` counter was added for and never reached an artefact to make.
+                    **({"memory": _memory_stats()} if args.agent == "microglia_agent" else {}),
+                },
                 "usage": usage_stats(),
                 "thinking": os.environ.get("TAU_THINKING", "disabled"),
                 "model": model,

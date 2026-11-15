@@ -229,6 +229,25 @@ export type Tau2ArmRecord = {
   readonly distillUnit?: DistillUnitRecord;
   /** R85: what the write preserved of the corrections' own entities. See `tau2-faithfulness.ts`. */
   readonly faithfulness?: FaithfulnessCensus;
+  /**
+   * R123: what the recall facade was asked, what it served, and why it withheld the rest.
+   *
+   * `recalls` counts requests that reached the facade; `recall_empty` is the subset that came back with
+   * nothing, bucketed in `silentBecause` by the reason the facade reported. Without the pair, an arm
+   * whose gate withheld every pack is indistinguishable from an arm whose store had nothing to say —
+   * and `recalls - recall_empty` is the served population the rate was actually measured over.
+   *
+   * Absent on every artefact written before the counters reached the driver, and absent on a phase that
+   * ran no sidecar at all: a `0` there would read as a memory that was never asked rather than one that
+   * was never wired.
+   */
+  readonly memory?: {
+    readonly recall_url: string;
+    readonly recalls: number;
+    readonly recall_failures: number;
+    readonly recall_empty: number;
+    readonly silent_because: Readonly<Record<string, number>>;
+  };
   readonly injectionNote?: InjectionNoteRecord;
   /**
    * How far the pipeline from a correction to a servable rule got, when the driver counted it.

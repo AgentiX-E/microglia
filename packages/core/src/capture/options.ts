@@ -88,6 +88,20 @@ export type MicrogliaOptions = {
    * is to read back what it withheld.
    */
   readonly speakMargin?: number;
+  /**
+   * Whether `recall` records the decision it made, independently of whether it gates on one.
+   *
+   * R123a exists because the margin is a property of the *store*: a rung that withholds 15-35% of one
+   * store's requests can withhold all of another's, so pricing a threshold requires the distribution of
+   * margins the store actually produces — and that distribution can be recorded at **zero cost** by an
+   * arm that gates nothing. Declaring a `speakMargin` already implies this (a host that named a rung
+   * wants to read back what it withheld); declaring this alone is the arm that measures without
+   * treating, which is what makes the rung choosable before it is bought.
+   *
+   * The census is an observer: the rendered bytes, the ids and the fingerprint are identical with it
+   * on and off, which `apply/__tests__/speak.test.ts` pins.
+   */
+  readonly speakCensus?: boolean;
   /** Apply feedback to the knowledge that was in the run's prompt. Default true. */
   readonly credit?: boolean;
   /**

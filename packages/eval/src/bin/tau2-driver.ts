@@ -102,6 +102,8 @@ import {
   resolveDistillScope,
   resolveConsolidation,
   resolveConsolidationKey,
+  resolveSpeakCensus,
+  resolveSpeakMargin,
   resolveDistillUnit,
   provenanceCensus,
   entitiesOf,
@@ -173,6 +175,7 @@ import {
 } from "../plant.js";
 import { consolidateKnowledge } from "@agentix-e/microglia-core/distill";
 import { consolidationLineOf, sweepConsolidation, sweepSummary } from "../consolidation-sweep.js";
+import { speakLineOf } from "../tau2-speak.js";
 import type { Tau2PhaseUsage } from "../tau2-instrument.js";
 import { cacheCensusVerdict } from "../cache-census.js";
 import { shapeByTaskOf, tau2ShapeWithFallback } from "../tau2-shape.js";
@@ -642,6 +645,22 @@ const CONSOLIDATE_KEY = resolveConsolidationKey();
 const CONSOLIDATION_RUNS = CONSOLIDATE || DISTILL_UNIT === "trace";
 
 /**
+ * How far ahead of its runner-up the best candidate must be for a pack to be served, R123's one variable.
+ *
+ * Read here rather than at the host so a misspelt value refuses the run before the first model call.
+ * Unset is 0, which serves every non-empty pack and is the behaviour every committed artefact measured.
+ */
+const SPEAK_MARGIN = resolveSpeakMargin();
+
+/**
+ * R123a: record the margin census without gating on it.
+ *
+ * One switch, and it is not the same question as the margin: this arm spends nothing extra and produces
+ * the ladder that decides the *next* arm's rung. Declaring a positive margin implies it.
+ */
+const SPEAK_CENSUS = resolveSpeakCensus();
+
+/**
  * The longest statement the pack can carry under this arm, measured on the shape it writes.
  *
  * Absent for every unit but `raw`, and the absence is the honest reading: a claim's line is as long as
@@ -856,6 +875,21 @@ type Tau2PhaseDiagnostics = {
   readonly inaction?: unknown;
   /** Absent on every run before the counter existed, which is not the same as zero. */
   readonly usage?: Tau2PhaseUsage | null;
+  /**
+   * R123: what the recall facade was asked, served and withheld.
+   *
+   * Absent on a phase that ran no sidecar, and on every artefact before the counters reached the driver.
+   * The speak line reads it, and a missing block makes that line say it cannot say rather than print a
+   * zero — an arm at margin 0.05 that reports `withheld 0` is either a gate that never fired or a
+   * counter that never ran, and only the presence of this block tells them apart.
+   */
+  readonly memory?: {
+    readonly recall_url: string;
+    readonly recalls: number;
+    readonly recall_failures: number;
+    readonly recall_empty: number;
+    readonly silent_because: Readonly<Record<string, number>>;
+  } | null;
 };
 
 /** The admission reasons, most frequent first, for the one line a run prints about its own store. */
@@ -1386,6 +1420,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // wants. A dispatch that declares `shape=per-failure` gets the same census over the same pack, which
     // is what makes the two arms one experiment.
     shapeOf,
+    // R123: the gate on whether the pack speaks. Declared only when the dispatch named one, because a
+    // host that never heard of the option must serve the pack it always served.
+    ...(SPEAK_MARGIN === 0 ? {} : { speakMargin: SPEAK_MARGIN }),
+    ...(SPEAK_CENSUS ? { speakCensus: true } : {}),
   });
 
   let withTrace = 0;
@@ -2227,6 +2265,14 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         ? 'not measured — this facade kept no id list, so the run cannot say which records its packs carried'
         : servedLineOf(servedCensusOfPrimary)
     }\n`,
+  );
+
+  // R123: the gate's own line, printed unconditionally and beside the served census, because the two
+  // numbers are only readable together: `served 161 of 168` is a gate at work and `served 168 of 168` at
+  // a margin above zero is a gate that never fired. See `tau2-speak.ts` for the partition it prints.
+  process.stdout.write(
+    `[tau2] ${speakLineOf(SPEAK_MARGIN, primary.diagnostics?.memory)}
+`,
   );
 
   const agentTurns = primary.diagnostics?.agent_turns ?? null;

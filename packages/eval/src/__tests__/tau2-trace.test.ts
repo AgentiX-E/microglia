@@ -21,6 +21,8 @@ import {
   resolveConsolidation,
   resolveConsolidationKey,
   resolveDistillUnit,
+  resolveSpeakCensus,
+  resolveSpeakMargin,
   traceOf,
   tracesOf,
   type TraceCall,
@@ -430,6 +432,54 @@ describe('resolveConsolidationKey', () => {
       expect(() => resolveConsolidationKey(bad)).toThrow(/TAU_CONSOLIDATE_KEY must be/);
     }
   });
+
+describe('resolveSpeakMargin', () => {
+  it('defaults to zero, which serves every non-empty pack', () => {
+    // Zero is the world every committed artefact measured. It is not "off": it is "no leader required",
+    // and the two readings differ the moment a registration names a positive margin.
+    expect(resolveSpeakMargin(undefined)).toBe(0);
+    expect(resolveSpeakMargin('')).toBe(0);
+    expect(resolveSpeakMargin('   ')).toBe(0);
+  });
+
+  it('reads a margin the registration named', () => {
+    expect(resolveSpeakMargin('0.05')).toBeCloseTo(0.05, 12);
+    expect(resolveSpeakMargin(' 0.5 ')).toBe(0.5);
+    expect(resolveSpeakMargin('0')).toBe(0);
+  });
+
+  it('refuses a value it cannot use, before any model call', () => {
+    // A negative or unparseable value that fell back to 0 would publish the control under the
+    // treatment's name, which is the failure `resolveConsolidation` exists to refuse.
+    for (const bad of ['-1', 'abc', 'Infinity', 'NaN', '1e999']) {
+      expect(() => resolveSpeakMargin(bad)).toThrow(/TAU_SPEAK_MARGIN must be/);
+    }
+  });
+});
+
+describe('resolveSpeakCensus', () => {
+  it('is off unless the registration asked for it', () => {
+    // Off is every arm before R123a, and it is not the same fact as a margin of zero: an arm can name
+    // `speakMargin: 0` and still want the ladder.
+    expect(resolveSpeakCensus(undefined)).toBe(false);
+    expect(resolveSpeakCensus('')).toBe(false);
+    expect(resolveSpeakCensus('  ')).toBe(false);
+    expect(resolveSpeakCensus('0')).toBe(false);
+  });
+
+  it('reads the one value that turns it on', () => {
+    expect(resolveSpeakCensus('1')).toBe(true);
+    expect(resolveSpeakCensus(' 1 ')).toBe(true);
+  });
+
+  it('refuses anything else, rather than reading it as off', () => {
+    // A misspelt `yes` that fell back to off would leave the artefact reporting `rivaled: 0` and invite
+    // the reader to conclude the store had no contested requests.
+    for (const bad of ['true', 'yes', '2', '-1']) {
+      expect(() => resolveSpeakCensus(bad)).toThrow(/TAU_SPEAK_CENSUS must be/);
+    }
+  });
+});
 });
 
 describe('resolveDistillUnit', () => {

@@ -97,6 +97,12 @@ function main(): void {
       `learnOnly=${declaredLearnOnly === undefined ? '' : String(declaredLearnOnly)}\n` +
       `consolidate=${declaredConsolidate === undefined ? '' : String(declaredConsolidate)}\n` +
       `consolidateKey=${reading.prereg.consolidateKey ?? ''}\n` +
+      // R123: the gate on whether a pack is served. Header-only, like the two above, and absent leaves
+      // the variable unset so the lane serves every non-empty pack exactly as every committed artefact did.
+      `speakMargin=${reading.prereg.speakMargin === undefined ? '' : String(reading.prereg.speakMargin)}\n` +
+      // R123a: naming a margin at all -- including 0 -- is a request for the census, because the arm that
+      // measures the distribution and the arm that gates on a rung are the same instrument at two settings.
+      `speakCensus=${reading.prereg.speakMargin === undefined ? '' : '1'}\n` +
       // One line, `;`-joined, because the workflow reads each value with `sed -n 's/^key=//p'` and an
       // expression that split a list would be a parser in YAML. Empty when every switch agrees.
       `overrides=${notices.join('; ')}\n`,

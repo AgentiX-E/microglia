@@ -273,6 +273,50 @@ export function resolveConsolidationKey(raw = process.env['TAU_CONSOLIDATE_KEY']
   );
 }
 
+/**
+ * How far ahead of its runner-up the best candidate must be for the pack to speak at all.
+ *
+ * The lane has served a pack on **every** request for twelve rounds, and `served 162 of 162` was read as a
+ * coverage figure. It is a default: `buildPack` keeps every hit at floor 0, so no request was able to be
+ * refused. The first relevance rung that withholds anything withholds 87 of 162 requests, which is why the
+ * question this resolver carries is not a threshold — it is whether the store held *an* answer or several.
+ *
+ * Unset means 0, the world every artefact committed before this resolver ran: a pack whose store returned
+ * anything is served. A positive value is the treatment. A negative, NaN or empty-but-not-empty value is
+ * refused before the first model call, for `resolveConsolidation`'s reason — a misread switch that fell back
+ * to 0 would publish the control under the treatment's name.
+ */
+/**
+ * Whether the arm records the margin census without gating on it. R123a's one switch.
+ *
+ * The margin between a store's top two candidates is a property of the store, so a rung that withholds
+ * 15-35% of one store's requests can withhold all of another's. Recording the distribution costs nothing —
+ * the pack computes the margin anyway — and it is what makes the rung **choosable** rather than guessed:
+ * the ladder in the artefact prices every rung at once, on the store the next arm will serve.
+ *
+ * Unset and `0` are the same fact (no census), and both are distinct from `1`. Any other value is refused
+ * before the first model call for `resolveSpeakMargin`'s reason: a misread switch that fell back to "off"
+ * would leave an arm reporting `rivaled: 0` and invite the reader to conclude the store had no rivals.
+ */
+export function resolveSpeakCensus(raw = process.env['TAU_SPEAK_CENSUS']): boolean {
+  const value = (raw ?? '').trim();
+  if (value === '' || value === '0') return false;
+  if (value === '1') return true;
+  throw new RangeError(`TAU_SPEAK_CENSUS must be unset, '0' or '1'; received '${String(raw)}'`);
+}
+
+export function resolveSpeakMargin(raw = process.env['TAU_SPEAK_MARGIN']): number {
+  const value = (raw ?? '').trim();
+  if (value === '') return 0;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new RangeError(
+      `TAU_SPEAK_MARGIN must be unset or a finite number >= 0; received '${String(raw)}'`,
+    );
+  }
+  return parsed;
+}
+
 export function resolveDistillUnit(raw = process.env['TAU_DISTILL_UNIT']): DistillUnit {
   const value = (raw ?? '').trim().toLowerCase();
   if (value === '' || value === 'correction') return 'correction';

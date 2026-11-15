@@ -1337,6 +1337,13 @@ jobs:
           # above is: a variable would apply to every queued dispatch and would re-read earlier artefacts as
           # runs that had a treatment they never had.
           CONSOLIDATE_KEY=$(sed -n 's/^consolidateKey=//p' "$RUNNER_TEMP/distill.env")
+          # R123: the gate on whether a pack is served. Header-only, for the reason the two above are: a
+          # repository variable would apply to every queued dispatch, and the lane has served a pack on
+          # every request for twelve rounds precisely because nothing ever set one.
+          SPEAK_MARGIN=$(sed -n 's/^speakMargin=//p' "$RUNNER_TEMP/distill.env")
+          # R123a: record the margin ladder without gating. Header-derived like the margin itself, and
+          # distinct from it: `speakMargin: 0` with this set is the free arm that prices every rung.
+          SPEAK_CENSUS=$(sed -n 's/^speakCensus=//p' "$RUNNER_TEMP/distill.env")
           # Every switch the registration overrides, as a notice. Not a refusal: the arms read the
           # registration's value, so a stale variable is overridden rather than run — the check that
           # refused on this comparison stopped R58 before its first model call while the run would have
@@ -1377,6 +1384,8 @@ jobs:
           echo "learn_only=$LEARN_ONLY" >> "$GITHUB_OUTPUT"
           echo "consolidate=$CONSOLIDATE" >> "$GITHUB_OUTPUT"
           echo "consolidate_key=$CONSOLIDATE_KEY" >> "$GITHUB_OUTPUT"
+          echo "speak_margin=$SPEAK_MARGIN" >> "$GITHUB_OUTPUT"
+          echo "speak_census=$SPEAK_CENSUS" >> "$GITHUB_OUTPUT"
           echo "knobs=$KNOBS" >> "$GITHUB_OUTPUT"
           echo "trainTasks=$(echo "$CAPS" | sed -n 's/^train=//p')" >> "$GITHUB_OUTPUT"
           echo "testTasks=$(echo "$CAPS" | sed -n 's/^test=//p')" >> "$GITHUB_OUTPUT"
@@ -1506,6 +1515,10 @@ jobs:
           # R124: the linkage key the pass compares items by. Empty for every registration that does not name
           # it, which leaves the pass on its own scope key exactly as R121 ran it.
           TAU_CONSOLIDATE_KEY: ${{ steps.recall_floor.outputs.consolidate_key }}
+          # R123: the margin below which a contested ranking is withheld. Empty means 0, which serves every
+          # non-empty pack — the behaviour every artefact committed before this switch measured.
+          TAU_SPEAK_MARGIN: ${{ steps.recall_floor.outputs.speak_margin }}
+          TAU_SPEAK_CENSUS: ${{ steps.recall_floor.outputs.speak_census }}
           # R60: how many claims one trace may teach. Unset means three, which is what every
           # committed trace artefact ran at; a run at six is a different treatment and the ceiling
           # travels into the artefact so a readback can tell the two apart.

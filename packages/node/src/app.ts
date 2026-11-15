@@ -267,6 +267,12 @@ export function createApp(options: AppOptions): Hono {
       // and an HTTP client that cannot see the difference will treat the policy as a
       // retrieval failure and weaken the threshold.
       ...(pack.suppressed === undefined ? {} : { suppressed: pack.suppressed }),
+      // R123a: the decision the pack made, when the host asked for it. It travels on the response for the
+      // same reason `suppressed` does — a client that cannot see *why* a pack was withheld will read a
+      // deliberate silence as a retrieval failure — and it carries the margin between the top two
+      // candidates, which is the number a rung is priced on. Served packs carry it too: the ladder is
+      // built from every request that had a rival, not only from the ones a gate refused.
+      ...(pack.decision === undefined ? {} : { decision: pack.decision }),
     });
   });
 
