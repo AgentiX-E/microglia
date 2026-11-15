@@ -188,6 +188,10 @@ describe('the L4 driver', () => {
       // And the served census is on the log, not only in the artefact. This facade kept no id list, so the
       // line says so rather than printing `0 of 0` — an uninstrumented reading is not an empty store.
       expect(said.join('')).toContain('[tau2] served: not measured');
+      // R130: the memory path's record has a decision for every key it emits. This is the only test that
+      // drives the real arm to completion, and the assertion is the one R123 needed: two fields reached the
+      // record through a spread and were dropped, so the artefact looked complete while carrying neither.
+      expect(driver.instrument()?.unprojected).toBeUndefined();
     } finally {
       write.mockRestore();
       vi.unstubAllGlobals();
