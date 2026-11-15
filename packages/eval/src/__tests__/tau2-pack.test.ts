@@ -323,6 +323,11 @@ describe('the pack ledger', () => {
     expect(ledgerDiff([], [])).toMatchObject({ requests: 0, unpaired: 0 });
     expect(ledgerLineOf(undefined)).toContain('no ledger');
     expect(ledgerLineOf(ledgerDiff([['a']], [['a']]))).toContain('1 of 1 request(s) identical');
+    // A repack with nothing left unpaired prints no clause at all rather than `0 unpaired`: the counter's
+    // denominator is the requests the two ledgers share, and a zero there is the normal case, not a reading.
+    const repacked = ledgerLineOf(ledgerDiff([['a', 'b']], [['a']]));
+    expect(repacked).toContain('1 repacked');
+    expect(repacked).not.toContain('unpaired');
   });
   // R126. R124 printed `52 unnamed of 697 units` from three records and the reader had no way to see it:
   // `unnamed` sums a per-pack unit count, so it counts serves. Two denominators, printed together, is
