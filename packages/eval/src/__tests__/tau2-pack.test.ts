@@ -106,6 +106,16 @@ describe('packLineOf', () => {
       'pack: budget 1200, capacity 810 chars/record; absent (no recall request)',
     );
   });
+
+  it('quotes the median and the ladder only where something was contested', () => {
+    // The other side of the guard above: a pack with a decision carries a margin, and a line that omitted
+    // the ladder for every arm would have made R123a's rung unrecoverable from the log twice.
+    const contested = (margin: number) => ({ ...pack(['a'], 0), decision: { margin, spoke: true, silentBecause: null } });
+    const line = packLineOf(packCensus([contested(0.02), contested(0.2)], { budget: 2400, capacity: null }));
+    expect(line).toContain('margins 2 rivaled of 2 censused');
+    expect(line).toContain('p50 0.0200');
+    expect(line).toContain('ladder 0.01 0 / 0.02 0 / 0.05 1');
+  });
 });
 
 describe('ceilingVerdictOf', () => {
@@ -328,6 +338,11 @@ describe('the pack ledger', () => {
     const repacked = ledgerLineOf(ledgerDiff([['a', 'b']], [['a']]));
     expect(repacked).toContain('1 repacked');
     expect(repacked).not.toContain('unpaired');
+    // And the opposite case, which is not a zero to be hidden: one ledger is longer than the other, so those
+    // positions were never compared and the denominator above is the shared ones alone.
+    const stopped = ledgerLineOf(ledgerDiff([['a'], ['b'], ['c']], [['a'], ['b']]));
+    expect(stopped).toContain('2 of 2 request(s) identical');
+    expect(stopped).toContain(', 1 unpaired');
   });
   // R126. R124 printed `52 unnamed of 697 units` from three records and the reader had no way to see it:
   // `unnamed` sums a per-pack unit count, so it counts serves. Two denominators, printed together, is
@@ -433,6 +448,35 @@ describe('the pack ledger', () => {
     expect(census.margins.p10).toBeCloseTo(0.049, 6);
     expect(census.margins.p50).toBeCloseTo(0.05, 6);
     expect(census.margins.p90).toBeCloseTo(0.3, 6);
+  });
+
+  it('keeps the margins in request order, so a rung can be joined to the requests it would withhold', () => {
+    // R135. The ladder is a count of requests under each rung, and R134 needed the *identity* of the
+    // requests rather than the count: its four harmed and two repaired requests sat somewhere in the ladder
+    // and no field said where, so the conditioning branch of its decision table could not be entered.
+    //
+    // The rows are deliberately not in ascending order and one has no decision at all, because the two ways
+    // this can go wrong are sorting in place (which would silently reorder the array the ledger is indexed
+    // by) and dropping a row (which would make index i mean a different request in `ledger` and in
+    // `perRequest`).
+    const pack = (margin: number | null, hasDecision = true) => ({
+      ids: ['k_1'],
+      truncated: 0,
+      rendered: 'x',
+      ...(hasDecision ? { decision: { margin, spoke: true, silentBecause: null } } : {}),
+    });
+    const census = packCensus(
+      [pack(0.3), pack(null, false), pack(0.01), pack(0.05)],
+      { budget: 2400, capacity: null },
+    );
+    expect(census.margins.perRequest).toEqual([0.3, null, 0.01, 0.05]);
+    // Same length as the ledger it is joined to, which is the property the join depends on.
+    expect(census.margins.perRequest).toHaveLength(census.ledger.length);
+    // And the ladder is still counted over the measured ones alone: the null is not a zero, which would price
+    // every rung as if the uncontested pack were at the bottom of the ranking.
+    expect(census.margins.rivaled).toBe(3);
+    expect(census.margins.ladder['0.02']).toBe(1);
+    expect(census.margins.ladder['0.30']).toBe(2);
   });
 
   // The ladder is counted on both sides of the socket now (R127 counted `rivaled` there), and two lists that

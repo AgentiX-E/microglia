@@ -49,6 +49,77 @@ describe('a census that says the prefix was held', () => {
   });
 });
 
+describe('a share above 1 is the denominator, not the provider', () => {
+  it('refuses the attribution when the credited tokens exceed what the census counted as seen', () => {
+    // R134's two arms: 1.4752 and 2.2639. Both were classified `prefix-honoured` and both printed
+    // "the provider credited 226.4% of the 1880-token prefix it had seen, and ... the 420 uncached
+    // tokens a call are the turn's own material, not the memory's". A share above 100% of what a
+    // provider was shown is not a cache that held extra; it is a denominator that stops two messages
+    // short. The conclusion drawn from it was mine, in AUDIT 34.166, and it was wrong.
+    const verdict = cacheCensusVerdict(
+      measured({ prefix_coverage: 2.2639, cached_tokens_per_call: 4_255, uncached_tokens_per_call: 420 }),
+    );
+    expect(verdict.state).toBe('prefix-undercounted');
+    expect(verdict.repair).toBe('unmeasured');
+    expect(verdict.sentence).toContain('226.4%');
+    expect(verdict.sentence).toContain('more than it was shown');
+    expect(verdict.sentence).toContain('cannot be attributed from this reading');
+    // The claim that made 34.166 wrong is not printed at all.
+    expect(verdict.sentence).not.toContain("the turn's own material");
+  });
+
+  it('keeps a share of exactly 1 as held, because 1.0 is a prefix that was fully counted', () => {
+    // The guard is above the honest case by construction, not at it: an arm whose two newest messages
+    // were exactly the ones the census excludes reports 1.0 and is held.
+    expect(cacheCensusVerdict(measured({ prefix_coverage: 1 })).state).toBe('prefix-honoured');
+    expect(cacheCensusVerdict(measured({ prefix_coverage: 1.03 })).state).toBe(
+      'prefix-undercounted',
+    );
+  });
+});
+
+describe('the split, once the census reports one', () => {
+  it('names the system share, the conversation share, and the residual', () => {
+    // R135. R134's arms differed by 642 tokens of prefix and the artefact had no field saying whether
+    // that was the pack or the conversation, because the Python half computed both and then summed them
+    // into a counter nothing read.
+    const verdict = cacheCensusVerdict(
+      measured({
+        prefix_coverage: 0.72,
+        prefix_tokens: 2_522,
+        last_tokens: 155,
+        tail2_tokens: 2_683,
+        system_tokens_per_call: 2_522,
+        conversation_tokens_per_call: 2_838,
+        residual_tokens_per_call: 1_485,
+      }),
+    );
+    expect(verdict.sentence).toContain('5360 message tokens a call');
+    expect(verdict.sentence).toContain('2522 were system');
+    expect(verdict.sentence).toContain('2838 were conversation');
+    // 1,485 tokens a call are neither the newest message nor the one before it, so the sentence says
+    // where they can be rather than calling them the turn's.
+    expect(verdict.sentence).toContain('1485 of them sit outside every message this census saw');
+    expect(verdict.sentence).toContain("the tools block and the chat template's framing");
+  });
+
+  it('says the two newest messages account for the bill when they do', () => {
+    const verdict = cacheCensusVerdict(
+      measured({ prefix_coverage: 0.9, last_tokens: 100, tail2_tokens: 400, residual_tokens_per_call: 3 }),
+    );
+    expect(verdict.sentence).toContain('account for all of them');
+    expect(verdict.sentence).not.toContain('sit outside every message');
+  });
+
+  it('leaves the split out rather than inventing a zero for an arm that predates it', () => {
+    // Every artefact before R135 has no split. Printing "0 were system" would be an absence read as a
+    // measurement -- the defect this module's own docstring is about.
+    const verdict = cacheCensusVerdict(measured());
+    expect(verdict.sentence).not.toContain('were system');
+    expect(verdict.sentence).not.toContain('account for all of them');
+  });
+});
+
 describe('a census that says the prefix was not held', () => {
   it('names the prefix as the repair', () => {
     const verdict = cacheCensusVerdict(measured({ prefix_coverage: 0.08 }));
@@ -160,6 +231,7 @@ describe('the state list', () => {
         cacheCensusVerdict(measured()),
         cacheCensusVerdict(measured({ prefix_coverage: 0.6 })),
         cacheCensusVerdict(measured({ prefix_coverage: 0.05 })),
+        cacheCensusVerdict(measured({ prefix_coverage: 2.2639 })),
       ].map((verdict) => verdict.state),
     );
     expect([...produced].sort()).toEqual([...CACHE_CENSUS_STATES].sort());

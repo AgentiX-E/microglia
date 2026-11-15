@@ -348,9 +348,12 @@ def _usage(prompt_tokens: int, cached: int, completion: int = 10):
     )
 
 
-def _call(messages, prompt_tokens: int, cached: int) -> None:
+def _call(messages, prompt_tokens: int, cached: int, tools=None) -> None:
     response = types.SimpleNamespace(usage=_usage(prompt_tokens, cached))
-    subject._record_usage({"messages": messages}, response, 0, 0)
+    payload = {"messages": messages}
+    if tools is not None:
+        payload["tools"] = tools
+    subject._record_usage(payload, response, 0, 0)
 
 
 SYSTEM = "s" * 400
@@ -448,6 +451,49 @@ def the_census_counts_a_system_message_wherever_it_sits(checks):
     checks.equal(census["conversation_chars"], 7, "and the rest is the conversation")
     checks.equal(census["seen_chars"], 10, "everything before the final two messages")
     checks.equal(census["last_chars"], 3, "the newest observation")
+    checks.equal(census["tail2_chars"], 4, "and the tool result the turn appended before it")
+
+
+@case
+def the_bill_is_split_into_system_conversation_and_a_named_residual(checks):
+    # R135. The census has computed `system_chars` and `conversation_chars` since it was written and
+    # summed them into a counter nothing read, so every artefact reported one `prefix_tokens` that was
+    # system plus history under a single name. R134's two arms then differed by 642 tokens of prefix and
+    # there was no way to say whether that was the pack or the conversation.
+    subject.reset_usage()
+    first = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": TASK}]
+    _call(first, 125, 0)
+    for _ in range(2):
+        _call(first + [{"role": "assistant", "content": REPLY}, {"role": "tool", "content": OBSERVATION}], 240, 125)
+    census = subject.cache_census()
+    checks.equal(census["system_tokens_per_call"], 100.0, "400 characters of system on every call, over 4")
+    checks.equal(census["conversation_tokens_per_call"], 101.7, "and the rest is the conversation: 1220 characters over three calls")
+    # The newest message is the 400-character observation on two calls of three and the 100-character
+    # task on the first: (400 + 400 + 100) / 3 / 4.
+    checks.equal(census["last_tokens"], 75.0, "the turn's newest message, averaged")
+    checks.equal(census["tail2_tokens"], 10.0, "and the assistant call it followed: 120 characters over three calls")
+    # 118.3 uncached a call minus 75.0 and 10.0 is material no message carries, which is what the
+    # residual is for: this fixture sends no tools, so the residual is the census's own gap and is
+    # reported rather than attributed to the turn.
+    checks.equal(census["residual_tokens_per_call"], 33.3, "uncached less the two newest messages")
+
+
+@case
+def the_tool_schemas_are_billed_and_counted(checks):
+    # The provider's `prompt_tokens` covers the `tools` array, and a census that divides only message
+    # characters cannot reach it. On the real arms that gap is a dozen JSON schemas, which is larger
+    # than the pack a request is served: an instrument that did not count them would attribute their
+    # cost to the agent's turn, which is what R134's premium sentence did.
+    subject.reset_usage()
+    tools = [{"type": "function", "function": {"name": "exchange", "description": "x" * 400}}]
+    _call([{"role": "system", "content": "s" * 100}], 25, 0, tools=tools)
+    census = subject.cache_census()
+    checks.equal(census["tools_tokens_per_call"] > 100, True, "the schemas are the bulk of the prompt")
+    checks.equal(
+        subject._tools_chars({"tools": tools}) > 400, True, "counted from the request, not from a guess"
+    )
+    checks.equal(subject._tools_chars({"messages": []}), 0, "a request without tools carries none")
+    checks.equal(subject._tools_chars({"tools": []}), 0, "and an empty list is not a schema")
 
 
 # ------------------------------------------------------------------------- runner

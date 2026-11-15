@@ -291,9 +291,30 @@ def _census_of(messages) -> "dict[str, int] | None":
         "seen_chars": sum(sizes[:-2]) if len(sizes) > 2 else 0,
         "seen_calls": 1 if len(sizes) > 2 else 0,
         "last_chars": sizes[-1],
+        # The second-newest message, which is the tool result the previous turn appended. R135: without
+        # it the census can say what the newest message was and nothing about the rest of the bill, and
+        # the residual it reports below is the only number that separates "the turn grew" from
+        # "material the census never saw".
+        # Three messages, not two: on a two-message call the second-newest is the system prompt, which
+        # is not the tool result a turn appended and is already counted in `system_chars`.
+        "tail2_chars": sizes[-2] if len(sizes) > 2 else 0,
         "system_chars": system,
         "conversation_chars": sum(sizes) - system,
     }
+
+
+def _tools_chars(kwargs) -> int:
+    """Characters of the tool schemas the request carried, which the provider bills and messages miss.
+
+    R135. `prompt_tokens` is the provider's count of everything it was asked to read: the messages *and*
+    the `tools` array, which for this benchmark is a dozen JSON schemas. The census only ever divided
+    message characters, so `sum(messages) / ratio` could never reach `prompt_tokens` and the residual was
+    silently attributed to the turn.
+    """
+    tools = kwargs.get("tools") if isinstance(kwargs, dict) else None
+    if not isinstance(tools, (list, tuple)) or not tools:
+        return 0
+    return len(json.dumps(tools))
 
 
 def _number(usage, name: str) -> int:
@@ -326,6 +347,8 @@ def _record_usage(kwargs, response, start_time, end_time) -> None:
         _cache["calls"] += 1
         for name, value in census.items():
             _cache[name] += value
+        # R135: the tool schemas are part of the prompt the provider bills and no message contains them.
+        _cache["tools_chars"] += _tools_chars(kwargs)
         if _first_call is None:
             # The first call of the phase is the only one the provider had never seen, so its
             # prompt is the one measurement of this corpus's characters per token that is not
@@ -367,6 +390,12 @@ def cache_census() -> dict:
     turn's new material; near 0 the lane is re-billing a prefix it thinks is stable, which is a
     cadence or a boundary rather than a size.
 
+    **It is a lower bound, so it can exceed 1.** The provider routinely credits the newer of the two
+    messages this census excludes, so the ratio lands at 1.2-2.3 on arms whose prefix is held perfectly
+    well. R135 added `PREFIX_UNDERCOUNTED` to the TypeScript verdict for exactly that reason: a share
+    above 100% is the denominator's defect, and every sentence drawn from it before that guard existed
+    (AUDIT 34.166's) was a guess wearing a measurement's clothes.
+
     Absent rather than zeroed when the callback saw no messages, because `0.0` reads as "the
     provider credited nothing" and that is a claim about a measurement that did not happen.
     """
@@ -387,7 +416,15 @@ def cache_census() -> dict:
         (_cache["seen_chars"] / _cache["seen_calls"]) / ratio if _cache["seen_calls"] else 0.0
     )
     mean_last_tokens = (_cache["last_chars"] / seen) / ratio
+    mean_tail2_tokens = (_cache["tail2_chars"] / seen) / ratio
+    mean_system_tokens = (_cache["system_chars"] / seen) / ratio
+    mean_conversation_tokens = (_cache["conversation_chars"] / seen) / ratio
     mean_cached = cached / calls
+    mean_uncached = max(0, prompt - cached) / calls
+    # What the two newest messages cannot account for. Named a residual rather than attributed: the
+    # tools block is the largest thing it can be, and a census that has not counted the tools cannot say
+    # so -- which is why `tools_tokens_per_call` is reported beside it.
+    mean_tools_tokens = (_cache["tools_chars"] / seen) / ratio
     return {
         "measured": True,
         "calls_with_messages": seen,
@@ -395,8 +432,16 @@ def cache_census() -> dict:
         # Mean per call, so it is comparable to the provider's mean per call.
         "prefix_tokens": round(mean_seen_tokens, 1),
         "last_tokens": round(mean_last_tokens, 1),
+        # R135: the three numbers that turn the bill into an attribution.
+        "tail2_tokens": round(mean_tail2_tokens, 1),
+        "system_tokens_per_call": round(mean_system_tokens, 1),
+        "conversation_tokens_per_call": round(mean_conversation_tokens, 1),
+        "tools_tokens_per_call": round(mean_tools_tokens, 1),
+        "residual_tokens_per_call": round(
+            max(0.0, mean_uncached - mean_last_tokens - mean_tail2_tokens), 1
+        ),
         "cached_tokens_per_call": round(mean_cached, 1),
-        "uncached_tokens_per_call": round(max(0, prompt - cached) / calls, 1),
+        "uncached_tokens_per_call": round(mean_uncached, 1),
         "prefix_coverage": round(mean_cached / mean_seen_tokens, 4)
         if mean_seen_tokens > 0
         else None,

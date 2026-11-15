@@ -3236,3 +3236,67 @@ items against a declared integer. If you set `packLimit: 1` and read `meanIds: 3
 the query — the driver, the workflow variable and the registration are three places for one number, and the
 artefact is where you find out. `pack.empty` moving while `meanIds` is right is the opposite failure: one item
 did not fit the budget, so you are measuring the renderer.
+
+## 24. Reading a bill, and reading a gate
+
+Two questions come up the moment a memory arm costs more than its control, and both of them are
+answerable from the artefact without another dispatch: **what is the extra money made of**, and **which
+requests would a gate withhold**.
+
+### 24.1 The bill is three numbers, not one
+
+`usage.cache` reports the provider's own count of what it held beside a census of what the request
+contained. Read it in this order:
+
+| field | what it is | what it means |
+| --- | --- | --- |
+| `uncached_tokens_per_call` | prompt minus the provider's cache credit | the part of the bill that is not discounted |
+| `system_tokens_per_call` | the system messages, per call | the pack and the adapter's preamble: **the memory's own text** |
+| `conversation_tokens_per_call` | everything else, per call | the conversation the agent grew: **its behaviour** |
+| `tail2_tokens` | the second-newest message | the tool result the last turn appended |
+| `residual_tokens_per_call` | uncached, minus the two newest messages | material no message carries — the **tools block** and the chat template |
+
+The distinction is not cosmetic. Measured on the same 40 tasks with the same backbone:
+
+| | memory on | memory off |
+| --- | --- | --- |
+| episodes | 40 | 40 |
+| cost | $0.2183 | $0.0969 |
+| **per episode** | **$0.00546** | **$0.00242** |
+| uncached tokens a call | 1,639 | 420 |
+
+**2.25× the bill.** Shrinking the pack from four items (2,239 characters) to one (747) moved it by 16%,
+not by the two thirds the text shrank — so the premium is not the pack's length. That is what the split
+is for: it says whether the money is in the memory's text, in the agent's own turns, or in the framing
+the census never looked at.
+
+### 24.2 A share above 100% is a defect, not a cache
+
+`prefix_coverage` is `credited / seen`, where `seen` deliberately stops two messages short of the end —
+those are the messages a tool loop appends together, and only the ones before them were provably offered
+in an earlier request. That makes `seen` a **lower bound**, so the ratio can exceed 1: it did, at 1.4752
+and 2.2639, on two arms whose prefix was held perfectly well.
+
+An arm reading above 1 is reported as `prefix-undercounted` with `repair: unmeasured`, and the sentence
+says why. Do not read such a value as "cached very well": it means the denominator is too small to
+attribute anything, and any sentence that attributes the rest to the agent is a guess.
+
+### 24.3 Which requests a gate would withhold
+
+`pack.margins.perRequest` is the margin of **every** request, in arrival order, with `null` where the
+pack carried no decision. Aligned by position with `pack.ledger` and with the driver's `per_task`, so the
+three join:
+
+```python
+for margin, ids, task in zip(pack["margins"]["perRequest"], pack["ledger"], per_task):
+    print(margin, task["passed_all"], ids)
+```
+
+That is the whole conditioning question. A rung withholds exactly the requests whose margin is below it,
+so joining the margin to the outcome says whether the requests a rung would silence are the ones that did
+damage. The ladder in `margins.ladder` counts requests *under* each rung and cannot answer it — R134 had
+four harmed and two repaired requests and no field said where in the ladder they sat.
+
+One caution, learned twice: a per-request array is only as good as its alignment. If `perRequest`,
+`ledger` and `per_task` disagree in length, the join reports a number rather than a defect, so check the
+three lengths before reading anything else.

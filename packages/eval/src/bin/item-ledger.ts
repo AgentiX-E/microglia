@@ -81,8 +81,11 @@ function main(): void {
     ...(baselineAt === -1 ? {} : { baseline: rewardsOf(read(args[baselineAt + 1] ?? '')) }),
   });
   const store = arm.tau2?.storeItems?.items?.length ?? arm.tau2?.memory?.census ?? 0;
+  // Whether the sum is a bound is read off the packs this arm served: a request that carried two ids shares
+  // its case between them, and a request that carried one does not.
+  const sharedRequests = packs.filter((ids) => ids.length > 1).length;
   process.stdout.write(`[item-ledger] ${path}\n`);
-  process.stdout.write(`[item-ledger] ${itemLedgerLine(readings, store)}\n`);
+  process.stdout.write(`[item-ledger] ${itemLedgerLine(readings, store, sharedRequests)}\n`);
   for (const row of readings.filter((entry) => (entry.net ?? 0) < 0).slice(0, 10)) {
     process.stdout.write(
       `[item-ledger]   ${row.id} served ${String(row.served)}: ${String(row.passed)} passed, ` +

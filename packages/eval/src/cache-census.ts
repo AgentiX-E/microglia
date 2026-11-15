@@ -56,6 +56,27 @@ export type PhaseCacheCensus = {
   readonly uncached_tokens_per_call?: number;
   /** Credited over provably-seen. Absent when no call was long enough to have a prefix. */
   readonly prefix_coverage?: number | null;
+  /**
+   * Mean tokens of the system messages a call, which is where a pack and an adapter's preamble live.
+   *
+   * R135. The Python half has computed this per call since the census was written and then summed it into
+   * a counter that nothing read, so every artefact reported a `prefix_tokens` that is *system + history*
+   * under one name. The split is the attribution: a premium that sits in `systemTokensPerCall` is the
+   * memory's own text, and one that sits in `conversationTokensPerCall` is the agent's behaviour.
+   */
+  readonly system_tokens_per_call?: number;
+  /** Mean tokens of the non-system messages a call — the conversation the agent grew. */
+  readonly conversation_tokens_per_call?: number;
+  /** Mean tokens of the second-newest message a call: the tool result the turn appended. */
+  readonly tail2_tokens?: number;
+  /**
+   * Mean uncached tokens a call that neither newest message accounts for.
+   *
+   * The number that decides whether `the-turn` is an attribution or a guess. `prompt - cached` is the
+   * bill; the two newest messages are the largest thing the census can see behind it; what is left is
+   * material the census never looked at — the tools block and the chat template's framing.
+   */
+  readonly residual_tokens_per_call?: number;
   /** Why there is no census, when the phase says why. */
   readonly reason?: string;
   readonly first_call?: {
@@ -71,6 +92,7 @@ export const CACHE_CENSUS_STATES = [
   'prefix-honoured',
   'prefix-partial',
   'prefix-broken',
+  'prefix-undercounted',
   'unmeasured',
 ] as const;
 
@@ -82,6 +104,23 @@ export const PREFIX_HONOURED = 0.85;
 /** Below this, it is not holding it at all, and the reading is about the boundary. */
 export const PREFIX_BROKEN = 0.35;
 
+/**
+ * Above this share, the *denominator* is wrong rather than the prefix being held extra well.
+ *
+ * R135. `prefix_coverage` is `credited / seen`, and `seen` deliberately stops two messages short: a tool
+ * loop appends the assistant's call and the tool's result together, so before the last two messages
+ * everything was provably offered to the provider in an earlier request. That makes `seen` a **lower
+ * bound**, and the provider routinely credits the newest of those excluded messages as well — so the
+ * ratio lands above 1 by construction.
+ *
+ * R134's two arms printed 1.4752 and 2.2639, and both were classified `prefix-honoured` with the sentence
+ * "the provider credited 226.4% of the 1880-token prefix it had seen, and the newest message was 163
+ * tokens: the 420 uncached tokens a call are the turn's own material, not the memory's". A share above
+ * 100% is not a provider being generous; it is the lane dividing by a number it knows is too small, and
+ * the conclusion drawn from it — mine, in AUDIT 34.166 — was wrong for exactly that reason.
+ */
+export const PREFIX_UNDERCOUNTED = 1.02;
+
 export type CacheCensusVerdict = {
   readonly state: CacheCensusState;
   readonly coverage: number | null;
@@ -89,8 +128,8 @@ export type CacheCensusVerdict = {
   readonly uncachedPerCall: number | null;
   /** Mean tokens of newest message a call — the candidate explanation for `uncachedPerCall`. */
   readonly tailPerCall: number | null;
-  /** What the reading points a repair at. `none` when the arm is not paying for a prefix. */
-  readonly repair: 'the-turn' | 'the-prefix' | 'unmeasured';
+  /** What the reading points a repair at. `unmeasured` when the census cannot attribute the bill. */
+  readonly repair: 'the-turn' | 'the-prefix' | 'the-framing' | 'unmeasured';
   readonly sentence: string;
 };
 
@@ -124,7 +163,41 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
   const tail = Math.round(tailPerCall ?? 0);
   const uncached = Math.round(uncachedPerCall ?? 0);
   const percent = (coverage * 100).toFixed(1);
+  const system = finiteOrNull(census.system_tokens_per_call);
+  const conversation = finiteOrNull(census.conversation_tokens_per_call);
+  const residual = finiteOrNull(census.residual_tokens_per_call);
+  // The split turns "the turn" or "the memory" from a preference into a measurement, so it is printed
+  // whenever the phase reports it and omitted when it does not — an arm that predates R135 has no split,
+  // and inventing a zero for it would be the absence-as-zero defect this module was written against.
+  const split =
+    system === null || conversation === null
+      ? ''
+      : `; of the ${String(Math.round(system + conversation))} message tokens a call, ` +
+        `${String(Math.round(system))} were system (the pack and the adapter's preamble) and ` +
+        `${String(Math.round(conversation))} were conversation`;
+  const attribution =
+    residual === null
+      ? ''
+      : residual <= Math.max(1, 0.1 * uncached)
+        ? `, and the two newest messages account for all of them`
+        : `, and ${String(Math.round(residual))} of them sit outside every message this census saw — ` +
+          `the tools block and the chat template's framing`;
 
+  if (coverage > PREFIX_UNDERCOUNTED) {
+    return {
+      state: 'prefix-undercounted',
+      coverage,
+      uncachedPerCall,
+      tailPerCall,
+      repair: 'unmeasured',
+      sentence:
+        `the provider credited ${percent}% of the ${String(prefix)}-token prefix this census counts as ` +
+        `seen, which is more than it was shown: the share is above 1 because the denominator stops two ` +
+        `messages short, not because the provider credited more than it held${split}; the ` +
+        `${String(uncached)} uncached tokens a call cannot be attributed from this reading: the ` +
+        `attribution R134's arms were read with is a guess until the split below is reported`,
+    };
+  }
   if (coverage >= PREFIX_HONOURED) {
     return {
       state: 'prefix-honoured',
@@ -134,8 +207,8 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       repair: 'the-turn',
       sentence:
         `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen, and the ` +
-        `newest message was ${String(tail)} tokens: the ${String(uncached)} uncached tokens a call are ` +
-        `the turn's own material, not the memory's`,
+        `newest message was ${String(tail)} tokens${split}: the ${String(uncached)} uncached tokens a ` +
+        `call are the turn's own material${attribution}`,
     };
   }
   if (coverage < PREFIX_BROKEN) {
@@ -147,7 +220,8 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       repair: 'the-prefix',
       sentence:
         `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen, against ` +
-        `a ${String(tail)}-token newest message: the lane is re-billing a prefix it believes is cached`,
+        `a ${String(tail)}-token newest message${split}: the lane is re-billing a prefix it believes is ` +
+        `cached${attribution}`,
     };
   }
   return {
@@ -157,8 +231,9 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
     tailPerCall,
     repair: 'the-prefix',
     sentence:
-      `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen: part of ` +
-      `the prefix is re-billed on some calls, which is a boundary that moves rather than a size`,
+      `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen${split}: part ` +
+      `of the prefix is re-billed on some calls, which is a boundary that moves rather than a size` +
+      `${attribution}`,
   };
 }
 

@@ -97,6 +97,20 @@ export type PackCensus = {
     readonly p10: number | null;
     readonly p50: number | null;
     readonly p90: number | null;
+    /**
+     * The margin of each request, in request order, or `null` where the pack carried no decision.
+     *
+     * R135. The ladder above is a *count* of requests under each rung, which prices a rung in advance but
+     * cannot answer the question a rung is chosen by: **which** requests the gate would withhold, and
+     * whether the ones it withholds are the ones that did damage. R134's four harmed requests and two
+     * repaired ones sat somewhere in the ladder and there was no way to say where, so the conditioning
+     * branch of its decision table could not be entered at all.
+     *
+     * Aligned by position with `ledger`, and with the driver's `per_task`, because all three are one row
+     * per request in arrival order. Length is always `requests`: a missing margin is `null` rather than a
+     * dropped element, so an index means the same request in all three arrays.
+     */
+    readonly perRequest: readonly (number | null)[];
   };
   /**
    * The means, or absent when no request was made.
@@ -287,11 +301,14 @@ function nearestRank(sorted: readonly number[], q: number): number | null {
 export function marginCensus(readings: readonly PackReading[]): PackCensus['margins'] {
   const decisions = readings.map((pack) => pack.decision);
   const censused = decisions.filter((decision) => decision !== undefined).length;
-  const margins: number[] = [];
-  for (const decision of decisions) {
+  // Kept in request order for `perRequest` before anything sorts it: the ladder and the quantiles are
+  // counted on a sorted copy, and an array sorted in place would silently reorder the row that indexes
+  // the ledger.
+  const perRequest = decisions.map((decision): number | null => {
     const margin = decision?.margin;
-    if (typeof margin === 'number' && Number.isFinite(margin)) margins.push(margin);
-  }
+    return typeof margin === 'number' && Number.isFinite(margin) ? margin : null;
+  });
+  const margins = perRequest.filter((margin): margin is number => margin !== null);
   margins.sort((left, right) => left - right);
   const ladder: Record<string, number> = {};
   for (const rung of MARGIN_RUNGS) {
@@ -304,6 +321,7 @@ export function marginCensus(readings: readonly PackReading[]): PackCensus['marg
     p10: nearestRank(margins, 0.1),
     p50: nearestRank(margins, 0.5),
     p90: nearestRank(margins, 0.9),
+    perRequest,
   };
 }
 

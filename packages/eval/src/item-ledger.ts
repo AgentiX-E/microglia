@@ -104,7 +104,11 @@ export function itemLedgerOf(input: ItemLedgerInput): readonly ItemReading[] {
  * the line says which. The bound is named as a bound: `Σ|net|` over the negative items is what deleting them
  * would recover *if* each item's cases were its own, and four-item packs guarantee they are not.
  */
-export function itemLedgerLine(readings: readonly ItemReading[], storeItems: number): string {
+export function itemLedgerLine(
+  readings: readonly ItemReading[],
+  storeItems: number,
+  sharedRequests: number,
+): string {
   if (readings.length === 0) {
     return (
       `item ledger: none of the ${String(storeItems)} item(s) in the store was served on a scored request, so ` +
@@ -128,10 +132,19 @@ export function itemLedgerLine(readings: readonly ItemReading[], storeItems: num
   const positive = signed.filter((row) => row.net > 0);
   const loss = negative.reduce((total, row) => total - row.net, 0);
   const gain = positive.reduce((total, row) => total + row.net, 0);
+  // Whether the sum is a bound is a property of the packs this arm served, not of the module's history. R134
+  // served one item a request, so every case an item carries is its own and `Σ|net|` is the exact number a
+  // deletion would recover; printing the four-item caveat over that measurement would make a reader
+  // discount a figure that needs no discount.
+  const isBound =
+    sharedRequests === 0
+      ? 'and no served request carried a second item, so each case is that item\'s own: the sum is exact, ' +
+        'not a bound'
+      : `and ${String(sharedRequests)} served request(s) carried more than one item, so their cases are ` +
+        'shared: this is an upper bound on a deletion arm, not a prediction of one';
   return (
     `${head}; ${String(negative.length)} negative summing -${String(loss)}, ${String(positive.length)} positive ` +
     `summing +${String(gain)}, ${String(unreached)} never served. Deleting the negative ones recovers at most ` +
-    `+${String(loss)} case(s) if each item's cases are its own, and a pack that serves four guarantees they ` +
-    'are not: this is an upper bound on a deletion arm, not a prediction of one'
+    `+${String(loss)} case(s), ${isBound}`
   );
 }
