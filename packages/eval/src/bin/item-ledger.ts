@@ -78,7 +78,7 @@ function main(): void {
     packs,
     tasks,
     rewards: rewardsOf(arm),
-    ...(baselineAt === -1 ? {} : { baseline: rewardsOf(read(read(args[baselineAt + 1] ?? ''))) }),
+    ...(baselineAt === -1 ? {} : { baseline: rewardsOf(read(args[baselineAt + 1] ?? '')) }),
   });
   const store = arm.tau2?.storeItems?.items?.length ?? arm.tau2?.memory?.census ?? 0;
   process.stdout.write(`[item-ledger] ${path}\n`);
