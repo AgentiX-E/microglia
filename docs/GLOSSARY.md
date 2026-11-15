@@ -1423,3 +1423,23 @@ floor jumps from serving 162 to serving 75 between two adjacent rungs on the sam
 switch rather than a threshold; a gate whose ladder degrades smoothly is one whose rung can be chosen. It is
 recorded by an arm that gates on nothing (`speakMargin: 0`, `speakCensus: true`), which is why the rung can
 be priced before it is bought.
+
+**Episode boundary** — The request index at which an episode opened, recorded by the agent as
+`memory.episodeStarts`. It exists because a recall fires once per episode and the counts are therefore nearly
+equal (164 requests over 160 episodes), which makes a positional join between `pack.ledger` and `per_trial`
+correct for most rows and silently wrong after the first episode that recalled twice. The agent records the
+boundary because it is never told which task or trial it is in: the episode is the only unit visible on that
+side of the socket.
+
+**Item transfer** — Per rule: the trials it was served into, how many of those only the memory arm passed
+(`kept`), how many only the control passed (`broke`), and the difference. A negative `net` means the rule was
+present whenever the memory failed, which is a screening reading and not a cause — the cause needs the
+ablation that withholds the rule. A rule whose `episodes` is a large share of the arm describes the store
+rather than the rule, and withholding it is a store change disguised as a probe.
+
+**Harm share** — The share of *changed* trials that changed for the worse: `broke / (kept + broke)` over the
+trials where the two arms disagreed. It is the one memory quantity comparable across backbones and sample
+sizes, because it conditions on the trials where something moved and is a property of the treatment's
+direction rather than its size. The published figure for memory-augmented agents is 52%; this lane measured
+57.1% on one dispatch (12 of 21) and 32.3% on another (10 of 31), which are the same measurement as each other
+and as the literature's.

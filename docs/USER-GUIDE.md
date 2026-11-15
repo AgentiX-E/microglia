@@ -2755,12 +2755,18 @@ memory.
 
 Three steps, and the first one is free:
 
-```bash
-# 1. Price every rung, treating nothing. Costs a control run and no extra calls.
-TAU_SPEAK_MARGIN=0 TAU_SPEAK_CENSUS=1 pnpm eval:tau2
+The arm that prices every rung is the arm that gates on none: a registration whose header carries
+`speakMargin: 0` and `speakCensus: true`. It costs no extra model call — the census rides the run you were
+going to make — and it is one dispatch:
+
+```yaml
+# In the registration's header, which is where a τ² arm's switches belong:
+speakMargin: 0
+speakCensus: true
 ```
 
 ```text
+# The shape of the line. A real run prints its own numbers; these are one store's.
 [tau2] speak: margin 0 (the default: every non-empty pack is served); 162 request(s) reached the facade,
 160 served, 2 withheld (nothing-matched 2), 0 failed; 118 rivaled request(s) (the population a rung acts
 on), p50 0.0312, ladder 0.01 6 / 0.02 12 / 0.05 24 / 0.10 61 / 0.15 88 / 0.20 101 / 0.30 115
@@ -2772,9 +2778,10 @@ on), p50 0.0312, ladder 0.01 6 / 0.02 12 / 0.05 24 / 0.10 61 / 0.15 88 / 0.20 10
 #    0.10 is the largest rung under the 40% ceiling here, so it is the rung to buy.
 ```
 
-```bash
-# 3. Buy that rung, with the census still on so the withheld count can be checked against the prediction.
-TAU_SPEAK_MARGIN=0.10 pnpm eval:tau2
+```yaml
+# 3. Buy that rung, with the census left on so the withheld count can be checked against the prediction.
+speakMargin: 0.10
+speakCensus: true
 ```
 
 What to check on the treatment run:
@@ -2789,3 +2796,82 @@ What to check on the treatment run:
 A rung that withholds more than two requests in five has replaced the store rather than filtered it. If the
 **lowest** rung already does that, do not buy a rung at all: that store's top two candidates are always
 within a point of each other, and the honest report is the ladder itself.
+
+## 17. When the memory makes things worse, which rule did it
+
+A store can lower a benchmark score while every gate reports success. The pack was served, the ids were the
+ones the ranking chose, the audit trail is complete — and the arm still lost trials it used to pass. Nothing
+in the pipeline so far answers the only question a reader asks at that point: **which rule**.
+
+This section is about the instrument that answers it, the assumption it rests on, and the mistake it invites.
+
+### 17.1 What the instrument needs
+
+Three things, all of which a paired run already writes:
+
+| artefact field | what it is |
+|---|---|
+| `tau2.pack.ledger` | the ids served at each recall request, in request order |
+| `per_trial` | one row per episode: `{ id, trial, reward }` |
+| `tau2.memory.episodeStarts` | the request index at which each episode opened |
+
+The third is the one that had to be added, and the reason is worth knowing before you trust a join. A recall
+fires **once per episode**, so a run's request count is very close to its episode count — 164 requests over
+160 episodes in the run that motivated this. *Close* is the trap: a join that assumes one request per episode
+is correct for the first 160 rows and wrong after the first episode that recalled twice, and it is wrong
+silently, attributing one episode's rules to another episode's outcome.
+
+### 17.2 Reading the table
+
+```bash
+# The pair report prints a line whenever the join can be made.
+pnpm eval:l4-pair
+# attribution: 61 item(s) over 160 served episode(s);
+#              9 with a negative net, 12 positive;
+#              worst k_01hf7uaq7f_5pqmn -4 of 7, k_01hf7uaq89_9r5gs -3 of 12
+```
+
+| column | meaning |
+|---|---|
+| `episodes` | trials this rule was served into, counted once per trial however many turns it rendered on |
+| `kept` | of those, trials only the memory arm passed |
+| `broke` | of those, trials only the control passed |
+| `net` | `kept − broke` |
+
+The full table is in the pair artefact under `attribution.items`, ordered worst first with ties broken by id,
+so two readbacks of the same artefacts can be diffed.
+
+### 17.3 What `net` is not
+
+`net < 0` means **the rule was present whenever the memory failed**. It does not mean the rule caused the
+failure: a trial is a ten-turn trajectory and the store served four rules into it. Treat the table as a
+screening list and not a verdict, for the same reason a 40-task score cannot rank two arms — the evidence is
+real and it is not the evidence the question needs.
+
+The verdict is a second run: withhold exactly the named rules and measure again. If the score recovers, the
+rule was the cause; if it does not, the loss lives somewhere the pack cannot reach, and the next place to look
+is the harness rather than the store.
+
+The table is written by any paired run once the agent records episode boundaries — there is no screening
+arm to buy, because the run you were going to make anyway carries it. Read it from the memory arm's artefact,
+name at most three rules, and register the ablation **before** running it:
+
+```bash
+node -e "const a=require('./eval/results/arms/memory/poc-l4.json');
+         console.log(a.attribution.items.slice(0,3))"
+```
+
+A run whose arm predates the boundary field writes no `attribution` at all. That is the same distinction the
+rest of this guide makes between a measured zero and an absent measurement, and it is why the field is missing
+rather than empty.
+
+### 17.4 Three ways the table misleads
+
+1. **A rule served into most trials.** If `episodes` is a large share of the arm, `net` describes the store
+   rather than the rule, and withholding it is a store change disguised as a probe. Prefer rules with
+   `episodes` under half the arm.
+2. **A rule present in one losing trial.** That is noise. Two episodes is the smallest count worth naming,
+   and three is the smallest count worth a dispatch.
+3. **A table that is absent.** `attribution` is written only when all three fields exist. An artefact without
+   it is not a store with no harmful rules — it is a run whose boundaries were not recorded, and the record
+   distinguishes the two in the same way it distinguishes `rivaled: 0` from `rivaled: null`.
