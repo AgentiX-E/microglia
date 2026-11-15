@@ -2641,3 +2641,62 @@ createServer({ dir, namespace, llm: { id: 'gateway', endpoint: 'https://llm.inte
 prompts, which is why a host can wrap its own transport (tracing, rate limits, caching) without forking
 the library.
 
+
+### 13.23 Why two runs of one lane can differ by fifteen points and mean nothing
+
+A benchmark that reports `pass^4` is reporting the fraction of **tasks** whose four trials all passed.
+That is a nonlinear function of the per-episode success rate, and at forty tasks it is a coarse
+instrument:
+
+| | run A | run B |
+|---|---|---|
+| episodes passed | 140 / 160 | 141 / 160 |
+| rate | 87.50% ±5.12pp | 88.13% ±5.01pp |
+| tasks at 4/4 | 24 | 30 |
+| `pass^4` | **0.600** | **0.750** |
+
+One episode apart over one hundred and sixty, fifteen points apart in the headline. Run A missed twice
+in the same thirteen tasks; run B missed once in each of ten. Both are the same experiment.
+
+**What to do about it, in three habits:**
+
+1. **Read the rate first.** It has the episode count as its denominator, so at 160 episodes its
+   half-width is about 5pp where the headline's is about 15pp.
+2. **Compare `pass^4` only at equal `n`.** A 40-task figure and a 114-task figure are not the same
+   measurement, and the difference between them (17.65pp of cross-sample half-width) is larger than
+   most published deltas.
+3. **Treat a headline above `rate⁴` as a finding, not a result.** It means the misses clustered into
+   fewer tasks. `rate⁴` is what a change in the underlying rate can explain; the gap between the two is
+   the clustering.
+
+`pnpm eval:pack-repeat <control.json> <treatment.json>` prints all three — rate with its interval,
+`rate⁴`, the measured headline — beside the per-task flip table and the pack ledger, so a pair of runs
+is read the same way every time:
+
+```
+control:   140 of 160 episode(s) passed (87.50% ±5.12pp over 40 task(s) × 4)
+treatment: 141 of 160 episode(s) passed (88.13% ±5.01pp over 40 task(s) × 4)
+headline if the rate were the only thing that moved: 0.6031 against the measured 0.7500
+tasks: 40 paired, 20 passed both, 6 failed both, 10 gained, 4 lost
+```
+
+### 13.24 Reading a fold census without being misled by it
+
+A pack line that carries a fold prints four counts, and they answer four different questions:
+
+```
+fold 0 of 650 units (0 groups, 14 refused for want of a second task), support ≥2 0, max 1
+fold 0 of 650 units (0 groups, 12 suppressed by the unit, 14 refused for want of a second task), …
+fold 0 of 650 units (0 groups, 3 refused for want of a second task, 79 unnamed), support ≥2 0, max 1
+```
+
+| count | means | what to do |
+|---|---|---|
+| `groups` | groups that **folded** | non-zero: the mechanism fired, and `support ≥2` is real |
+| `suppressed` | met the floor, the **unit** did not fold | you are reading the control arm; the store may still recur |
+| `refused` | a group existed and its distinct tasks fell short | the store repeats one task, not two |
+| `unnamed` | items the key could not name at all | the **key** is broken, not the store — this is a defect |
+
+The suffixes print only when non-zero, so a run with nothing to say keeps the older line byte for byte.
+A line that shows `0 groups` and nothing else is only evidence about the store if `suppressed` is zero
+too; if `suppressed` is absent, the arm does not fold and the zero is about the arm.

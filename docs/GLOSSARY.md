@@ -1352,3 +1352,29 @@ only at infinite `n`, and the difference is not academic: at forty tasks a score
 point ruler and fails the interval one, so a gate that applies the point to a registration that wrote
 the interval can publish a claim its own file refuses. Absent means `point`, which is what every
 artefact before the header existed was graded by, so no past verdict changes when it is added.
+
+**Suppressed group** — A group of pack items that met the fold's floor (two members, two distinct
+tasks) and that the arm's *unit* did not fold. `foldByShape` folds only in `collapse` mode, so on the
+`per-failure` arm the count of folded groups is zero by construction — and a census that printed only
+that zero was read, by a registration that asked for it, as a fact about the store. The three counts now
+partition one population: `groups` folded, `suppressed` met the floor and were withheld by the unit,
+`refused` fell short of the floor. A fourth, `unnamed`, counts the items that never entered a group at
+all. **A number whose value is a function of the harness is not a measurement of the world**, and the
+distinction costs a dollar to discover and nothing to print.
+
+**Pack ledger** — The ids each request was served, in the order the requests arrived, carried on the
+artefact as `tau2.pack.ledger`. Its purpose is attribution: two dispatches of one lane measured
+**0.600** and **0.750**, and neither artefact could say which packs differed, because the census kept
+counts and dropped the ids. `ledgerDiff` compares two ledgers by position — the same key `queries` uses,
+since nothing upstream names the episode — and reports positions repacked, records that entered and
+records that left. A fold, a merge, a recall floor and a budget all change *which* knowledge a request
+sees; without the ledger that change is a score difference with no evidence behind it.
+
+**Trial rate** — Episodes passed divided by episodes run, against `pass^4`, which is the fraction of
+*tasks* whose four trials all passed. The two denominators differ by the number of trials, so the same
+run reports **0.8812 ±5.01pp** over 160 episodes and **0.7500 ±15.18pp** over 40 tasks. `pass^4`
+estimates `p⁴`, a nonlinear function: two runs at the same rate, one whose misses landed twice in one
+task and one whose misses landed once in each of two, differ by **15pp** in the headline and **0.6pp**
+in the rate. Report both. The rate is what an arm can be graded on at forty tasks; `pass^4` is the
+interface to a published table and must be quoted with its `n`. A headline above `rate⁴` is a finding —
+the misses clustered — rather than a result.
