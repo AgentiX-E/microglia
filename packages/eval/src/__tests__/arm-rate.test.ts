@@ -7,7 +7,7 @@
  * module exists to make visible — a 15pp difference produced by one episode changing side.
  */
 import { describe, expect, it } from 'vitest';
-import { independenceOf, rateLineOf, trialRateOf } from '../arm-rate.js';
+import { denominatorFieldsOf, independenceOf, rateLineOf, trialRateOf } from '../arm-rate.js';
 
 /** `count` rows that each passed `successes` of four trials. */
 function rows(count: number, successes: number): { successes: number; trials: number }[] {
@@ -55,5 +55,43 @@ describe('the trial rate', () => {
     const r120 = trialRateOf([...rows(30, 4), ...rows(6, 3), ...rows(1, 2), ...rows(1, 1), ...rows(2, 0)]);
     expect(independenceOf(r120) as number).toBeCloseTo(0.6031, 3);
     expect(independenceOf(trialRateOf([]))).toBeNull();
+  });
+});
+
+/**
+ * The denominator a run line has to carry, or the reader ranks a coin.
+ *
+ * R120's log line read `[poc-l4] pass4=0.75 published_pass4=0.575 …` and nothing else. Every number a
+ * reader needed to know that the score was the tail of four trials — 141 of 160 episodes, the rate, the
+ * `rate⁴` the rate implies — was *in the same artefact* and not on the line, so the honest reading cost a
+ * download and the dishonest one cost nothing. The fields below are computed from `per_task`, which every
+ * run since R85 writes, so this is a change of one line and no change of measurement.
+ */
+describe('the denominator fields a run line carries', () => {
+  it('reports the rate and its interval beside the headline it produced', () => {
+    const fields = denominatorFieldsOf(
+      trialRateOf([...rows(30, 4), ...rows(6, 3), ...rows(1, 2), ...rows(1, 1), ...rows(2, 0)]),
+    );
+    expect(fields).not.toBeNull();
+    expect(fields?.episode_rate).toBeCloseTo(0.88125, 5);
+    // 1.96·sqrt(.88125·.11875/160) = 5.01pp, against the 13.42pp the measured 0.75 is quoted with.
+    expect(fields?.episode_half_width_pp).toBeCloseTo(5.01, 2);
+    expect(fields?.rate_to_the_k).toBeCloseTo(0.6031, 3);
+    expect(fields?.episode_trials).toBe(160);
+  });
+
+  it('is absent rather than zero when no episode recorded an outcome', () => {
+    // A run that measured nothing must not print `episode_rate=0`, which is a rate no episode produced
+    // and which would be read as a run in which everything failed.
+    expect(denominatorFieldsOf(trialRateOf([]))).toBeNull();
+  });
+
+  it('keeps the two levels apart when they agree, which is the case a reader cannot check by eye', () => {
+    // Forty tasks at 3/4 is rate 0.75 and headline 0.0 — agreement is not required and is not evidence.
+    // The fields exist so that "they agree" is read rather than assumed, and so that "they disagree" is
+    // visible on the line that states the score.
+    const fields = denominatorFieldsOf(trialRateOf(rows(40, 3)));
+    expect(fields?.episode_rate).toBeCloseTo(0.75, 6);
+    expect(fields?.rate_to_the_k).toBeCloseTo(0.3164, 3);
   });
 });

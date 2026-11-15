@@ -709,6 +709,7 @@ export {
   coverageMedians,
   coverageProfile,
   servedCensus,
+  servedLineOf,
   useCensus,
   zeroCoverageShare,
   type CoverageFloorRow,
@@ -1058,9 +1059,11 @@ export {
   type PackReading,
 } from './tau2-pack.js';
 export {
+  denominatorFieldsOf,
   independenceOf,
   rateLineOf,
   trialRateOf,
+  type DenominatorFields,
   type TaskSuccessRow,
   type TrialRate,
 } from './arm-rate.js';

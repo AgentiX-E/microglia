@@ -94,3 +94,40 @@ export function independenceOf(rate: TrialRate): number | null {
   if (rate.rate === null || rate.k === 0) return null;
   return rate.rate ** rate.k;
 }
+
+/**
+ * The fields that put a run's second denominator on the line that states its score.
+ *
+ * A `[poc-l4]` line is what a dispatch's log shows and what a readback quotes, and until this existed it
+ * carried the headline and nothing else — `pass4=0.75 published_pass4=0.575 …`. The 141 of 160 episodes
+ * behind that 0.75 were in the same artefact, one download away, so the honest reading cost work and the
+ * dishonest one cost nothing. `writeResult` renders every key of `metrics`, so a field added here reaches
+ * the log, the artefact and a readback at once, and no reader has to remember to compute it.
+ *
+ * `null` over no episode rather than zeros: a run that measured nothing has no rate, and `0` would be a
+ * rate no episode produced — the same distinction `unscored`/`unscored_reported` and `absent`/`empty` have
+ * carried in this record since R85.
+ */
+export type DenominatorFields = {
+  /** Episodes passed over episodes run, the level at which this `n` has resolution. */
+  readonly episode_rate: number;
+  /** Half-width of the 95% interval on that rate, in percentage points, beside the headline's own. */
+  readonly episode_half_width_pp: number;
+  /** `rate^k` under independence: what a change in the rate alone would have scored. */
+  readonly rate_to_the_k: number;
+  /** The denominator of `episode_rate`, so the interval can be recomputed by a reader who doubts it. */
+  readonly episode_trials: number;
+};
+
+export function denominatorFieldsOf(rate: TrialRate): DenominatorFields | null {
+  // One guard for all three preconditions, because the second of them is the only one `independenceOf`
+  // refuses for a reason of its own and a second check here would be a branch no caller can reach --
+  // which is a defect this record has deleted five times rather than exempted.
+  if (rate.rate === null || rate.halfWidth === null || rate.k === 0) return null;
+  return {
+    episode_rate: rate.rate,
+    episode_half_width_pp: Number((rate.halfWidth * 100).toFixed(2)),
+    rate_to_the_k: rate.rate ** rate.k,
+    episode_trials: rate.trials,
+  };
+}

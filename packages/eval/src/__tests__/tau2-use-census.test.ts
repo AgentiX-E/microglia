@@ -31,6 +31,7 @@ import {
   coverageHistogram,
   coverageProfile,
   servedCensus,
+  servedLineOf,
   useCensus,
   zeroCoverageShare,
   type CoverageHistogram as CoverageHistogramShape,
@@ -422,6 +423,7 @@ describe('the served-id census joins the pack back to the store', () => {
       meanPerRequest: null,
       maxPerRequest: 0,
       byItem: [],
+      concentration: null,
     });
   });
 
@@ -474,5 +476,93 @@ describe('the served-id census joins the pack back to the store', () => {
     // No record beyond the two that were served: `distinct` is not the store's size, and a readback
     // that compares it with `store.stored` is asking how much of the store never reached a prompt.
     expect(carried.distinct).toBeLessThan(3);
+  });
+});
+
+/**
+ * The mean is the one summary that cannot see a monopoly.
+ *
+ * R120's τ² store held 73 records and served **4.01 items per request**, which reads as a pack built from
+ * many records. Its own `byItem` says otherwise: one record was rendered on **88 of 162 requests (54%)**,
+ * the five most-served took **31% of 650 renders**, and eight records were rendered exactly once. The
+ * record served to a majority of requests is a *negative* instruction — "no return action is invoked" —
+ * written from a single episode, and on the requests that are not about return-checking it can only
+ * suppress a correct call. A census that reports a mean cannot say any of that, and a reader who sees only
+ * the mean will tune the store's size.
+ *
+ * These fields are the distribution: what share one record takes, what share five take, how many were
+ * rendered once, and `effective` — `exp(entropy)` — the number of records actually doing the work.
+ */
+describe('the served census reports the distribution the mean hides', () => {
+  it('is absent rather than zero when no pack rendered anything', () => {
+    expect(servedCensus([]).concentration).toBeNull();
+    // A store whose every pack was empty has renders of zero and therefore no distribution to describe;
+    // reporting `topOne: 0` would read as a perfectly even spread.
+    expect(servedCensus([{ query: 'a', statements: [], ids: [] }]).concentration).toBeNull();
+  });
+
+  it('prices a monopoly: one record in three of four renders, and 1.75 records doing the work', () => {
+    const census = servedCensus([
+      { query: 'a', statements: ['x'], ids: ['k_hot'] },
+      { query: 'b', statements: ['x'], ids: ['k_hot'] },
+      { query: 'c', statements: ['x', 'y'], ids: ['k_hot', 'k_warm'] },
+    ]);
+    expect(census.concentration).toEqual({ topOne: 0.75, topFive: 1, once: 1, effective: 1.7548 });
+    // The mean is identical to a perfectly even two-record store's 1.0 items per request, which is why
+    // the mean was never the reading.
+    expect(census.meanPerRequest).toBeCloseTo(1.3333, 4);
+  });
+
+  it('prices an even spread at its own size, so the two readings are comparable', () => {
+    const ids = ['k1', 'k2', 'k3', 'k4', 'k5', 'k6', 'k7', 'k8'];
+    const census = servedCensus(ids.map((id) => ({ query: id, statements: ['x'], ids: [id] })));
+    expect(census.concentration).toEqual({ topOne: 0.125, topFive: 0.625, once: 8, effective: 8 });
+  });
+
+  it('caps the five-record share at the records that exist', () => {
+    // Two records cannot take five sixths of the renders; `topFive` is a share of what was served, so a
+    // small store reads 1 rather than 0.83 of a population it does not have.
+    const census = servedCensus([
+      { query: 'a', statements: ['x', 'y'], ids: ['k1', 'k2'] },
+      { query: 'b', statements: ['x', 'y'], ids: ['k1', 'k2'] },
+    ]);
+    expect(census.concentration?.topFive).toBe(1);
+    expect(census.concentration?.effective).toBe(2);
+  });
+});
+
+/**
+ * The line, because a census nobody prints is a census nobody reads.
+ *
+ * `tau2.served` has been in the artefact since R93 and no run's log ever said what it found. R120's log
+ * printed `served 162 of 162` — a *pack* count — and a reader could not learn from it that one record had
+ * been rendered on 88 of those 162 requests. The line states the renders, the records, the top shares and
+ * the effective count, so the reading is on screen before anyone opens the file.
+ */
+describe('the served line', () => {
+  it('names the renders, the records, and the concentration in one sentence', () => {
+    const line = servedLineOf(
+      servedCensus([
+        { query: 'a', statements: ['x'], ids: ['k_hot'] },
+        { query: 'b', statements: ['x'], ids: ['k_hot'] },
+        { query: 'c', statements: ['x', 'y'], ids: ['k_hot', 'k_warm'] },
+      ]),
+    );
+    // Four renders over three requests: the count is of what the model read, not of how many packs ran.
+    expect(line).toContain('4 render(s)');
+    expect(line).toContain('3 of 3 request(s)');
+    expect(line).toContain('2 record(s)');
+    expect(line).toContain('top1 75.0%');
+    expect(line).toContain('top5 100.0%');
+    expect(line).toContain('1 rendered once');
+    expect(line).toContain('effective 1.75');
+  });
+
+  it('says the run never served rather than describing an empty distribution', () => {
+    // `0 renders` is the measurement; a `top1 0.0%` would be a share of nothing.
+    const line = servedLineOf(servedCensus([{ query: 'a', statements: [], ids: [] }]));
+    expect(line).toContain('0 render(s)');
+    expect(line).toContain('no distribution to describe');
+    expect(line).not.toContain('top1');
   });
 });

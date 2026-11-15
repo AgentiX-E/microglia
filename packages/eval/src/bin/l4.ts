@@ -25,6 +25,8 @@ import {
   L4ParseError,
   comparePaired,
   compareToPublished,
+  denominatorFieldsOf,
+  trialRateOf,
   meanPassAtK,
   facadePairState,
   isNoMeasurementRefusal,
@@ -593,6 +595,12 @@ const gates = [
       ]),
 ];
 
+// The second denominator, computed before the artefact is written so the log line and the file cannot
+// disagree. `writeResult` renders every key of `metrics`, so these four fields reach the dispatch's log,
+// the committed artefact and a readback at once -- and a reader of the log no longer has to download
+// anything to learn that a 0.750 came from 141 of 160 episodes.
+const episodeFields = denominatorFieldsOf(trialRateOf(perTaskRows(measured.tasks)));
+
 await writeResult({
   id: 'poc-l4',
   title: 'L4 — τ²-bench pass^4 against ALTK-Evolve',
@@ -602,6 +610,10 @@ await writeResult({
   calls: 0,
   metrics: {
     pass4: mean,
+    // R120: the level at which this `n` has resolution, beside the level the competitor's table is
+    // written at. Two runs of one lane measured 0.600 and 0.750 off 140 and 141 episodes of 160, so a
+    // headline without its rate is a number a reader cannot tell from a coin.
+    ...(episodeFields ?? {}),
     // A bar that does not apply is reported as absent rather than as a number a reader could divide
     // by: `published_bar_applies` says which of the two this file is.
     ...(scenarioBar.published === null || K !== PUBLISHED_K
@@ -655,6 +667,13 @@ await writeResult({
     `Source: ${source} (${measured.format} form). Two arms must share the split.`,
     scenarioBar.note,
     sotaLineOf(SCENARIO, mean, measured.tasks.length),
+    ...(episodeFields === null
+      ? []
+      : [
+          `Two denominators: pass^4 is p^k over ${String(measured.tasks.length)} task(s) and \`episode_rate\` is over ${String(
+            episodeFields.episode_trials,
+          )} episode(s), whose half-width is ${episodeFields.episode_half_width_pp.toFixed(2)}pp against the headline's. \`rate_to_the_k\` is what the rate alone implies; a pass^4 above it is a *finding* — the misses clustered into fewer tasks — and not an improvement.`,
+        ]),
     `pass^4 is the unbiased C(c,4)/C(n,4) mean over ${measured.tasks.length} tasks, with success defined as \`reward == 1.0\` exactly, as upstream scores it.`,
     coversSplit
       ? `The split covers the minimum: ${measured.tasks.length} scored tasks against a floor of ${MIN_TASKS}.`

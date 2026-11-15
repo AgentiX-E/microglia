@@ -115,6 +115,8 @@ import {
   ceilingLineOf,
   packCensus,
   packLineOf,
+  servedCensus,
+  servedLineOf,
   resolveTraceClaims,
   tracesOf,
   yieldCensus,
@@ -169,7 +171,7 @@ import {
   type PlantedItem,
 } from "../plant.js";
 import { consolidateKnowledge } from "@agentix-e/microglia-core/distill";
-import { sweepConsolidation, sweepSummary } from "../consolidation-sweep.js";
+import { consolidationLineOf, sweepConsolidation, sweepSummary } from "../consolidation-sweep.js";
 import type { Tau2PhaseUsage } from "../tau2-instrument.js";
 import { cacheCensusVerdict } from "../cache-census.js";
 import { shapeByTaskOf, tau2ShapeWithFallback } from "../tau2-shape.js";
@@ -1548,6 +1550,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     }
   }
   if (consolidation !== undefined) {
+    // R121: the point the pass actually ran at, before the grid that prices the alternatives. The sweep
+    // printed nine rows and not this one, so a refutation arrived as one row among nine.
+    process.stdout.write(`[tau2] consolidation: ${consolidationLineOf(consolidation.report)}\n`);
     for (const item of consolidation.items) await store.putKnowledge(item);
   }
   const faults = distiller.faults();
@@ -2192,6 +2197,21 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     `[tau2] ${packLineOf(
       packCensus(primary.packReadings, { budget: PACK_BUDGET, capacity: RECORD_CAPACITY }),
     )}\n`,
+  );
+
+  // R120: the pack line says how many, and this one says which and how concentrated. The census has been
+  // in the artefact since R93 and no log ever printed it, so `served 162 of 162 (mean 4.0 items)` was read
+  // as a store at work when one record was taking 54% of the renders. Printed unconditionally, because a
+  // run that served nothing is the reading this line exists to make legible.
+  // A facade that kept no id list says so rather than printing `0 of 0`: an uninstrumented reading and a
+  // run whose packs were empty are different facts, and only one of them is about the store.
+  const servedCensusOfPrimary = servedCensus(primary.useObservations);
+  process.stdout.write(
+    `[tau2] served: ${
+      servedCensusOfPrimary.identified === 0
+        ? 'not measured — this facade kept no id list, so the run cannot say which records its packs carried'
+        : servedLineOf(servedCensusOfPrimary)
+    }\n`,
   );
 
   const agentTurns = primary.diagnostics?.agent_turns ?? null;

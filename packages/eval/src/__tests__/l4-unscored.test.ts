@@ -43,10 +43,12 @@ function driverModule(options: {
   readonly scored: number;
   readonly unscored: number;
   readonly exposeIds: boolean;
+  /** Trials won per task. Two of two by default, so the default grid is a perfect headline. */
+  readonly successes?: number;
 }): string {
   const rows = Array.from({ length: options.scored }, (_, index) => ({
     taskId: `retail/${String(index)}`,
-    successes: 2,
+    successes: options.successes ?? 2,
     trials: 2,
     k: 2,
   }));
@@ -67,11 +69,12 @@ function driverModule(options: {
 function runLane(
   dir: string,
   driver: string,
-): { readonly artefact: Record<string, unknown>; readonly code: number } {
+): { readonly artefact: Record<string, unknown>; readonly code: number; readonly stdout: string } {
   const out = join(dir, 'out');
   let code = 0;
+  let stdout = '';
   try {
-    execFileSync(TSX, [L4], {
+    stdout = String(execFileSync(TSX, [L4], {
       cwd: ROOT,
       encoding: 'utf8',
       env: {
@@ -87,13 +90,16 @@ function runLane(
         TAU_MEMORY: 'true',
         TAU_DRIVER: driver,
       },
-    });
+    }));
   } catch (error) {
     code = (error as { status?: number }).status ?? 1;
+    // A lane that exits non-zero still printed its line, and the line is what this file now grades.
+    stdout = String((error as { stdout?: string }).stdout ?? '');
   }
   return {
     artefact: JSON.parse(readFileSync(join(out, 'poc-l4.json'), 'utf8')) as Record<string, unknown>,
     code,
+    stdout,
   };
 }
 
@@ -177,5 +183,57 @@ describe('the driver path and the denominator', () => {
     expect(metrics['unscored_tasks']).toBe(0);
     expect(gates.find((gate) => gate.id === 'l4-fully-scored')?.pass).toBe(true);
     expect(code).toBe(0);
+  });
+});
+
+/**
+ * The line a dispatch's log shows, which is the artefact's front door.
+ *
+ * R120's line read `[poc-l4] pass4=0.75 published_pass4=0.575 competitor_pass4=0.6754 …`. The run behind
+ * it passed **141 of 160 episodes**, and the previous dispatch of the same lane passed 140 and scored
+ * 0.600. Every number needed to see that was in the artefact and none of it was on the line, so the
+ * ranking cost a download and the misreading cost nothing. These fields close that: they are computed
+ * from `per_task`, which every run since R85 writes, and `writeResult` renders every key it is given.
+ */
+describe('the second denominator, on the line that states the score', () => {
+  it('prints the episode rate, its interval and the headline the rate alone implies', () => {
+    const dir = workdir('l4-rate-line-');
+    const driver = join(dir, 'driver.ts');
+    // Half the trials won, so the headline collapses to zero and the rate does not: the case that shows
+    // the two levels answering different questions on one line.
+    writeFileSync(driver, driverModule({ scored: TASKS, unscored: 0, exposeIds: true, successes: 1 }));
+
+    const { artefact, code, stdout } = runLane(dir, driver);
+    const metrics = artefact['metrics'] as Record<string, number>;
+
+    expect(metrics['pass4']).toBe(0);
+    expect(stdout).toContain('pass4=0 ');
+    expect(metrics['episode_rate']).toBeCloseTo(0.5, 6);
+    expect(metrics['episode_trials']).toBe(80);
+    // 1.96·sqrt(.25/80) = 10.96pp over the episodes, against the headline's own interval on forty tasks.
+    expect(metrics['episode_half_width_pp']).toBeCloseTo(10.96, 2);
+    expect(metrics['rate_to_the_k']).toBeCloseTo(0.25, 6);
+    // The line, not only the file: this is the assertion that would have caught R120's silence.
+    expect(stdout).toMatch(/\[poc-l4\] pass4=0 .*episode_rate=0\.5 .*episode_half_width_pp=10\.96 .*rate_to_the_k=0\.25 /);
+    // The fields are additive: a zero headline at k = 2 is still not graded against a pass^4 bar, which
+    // is why this run is green on coverage and carries no published comparison at all.
+    const gates = artefact['samples'] as readonly { id: string; pass: boolean }[];
+    expect(gates.map((gate) => gate.id)).not.toContain('l4-pass4');
+    expect(metrics['published_bar_applies']).toBe(0);
+    expect(code).toBe(0);
+  });
+
+  it('says nothing rather than zero when the denominator is absent', () => {
+    // A no-measurement artefact has no episodes, and `episode_rate=0` on it would read as a run in which
+    // every episode failed — the flattening this record has refused since `unscored`/`unscored_reported`.
+    const dir = workdir('l4-rate-absent-');
+    const driver = join(dir, 'driver.ts');
+    writeFileSync(driver, driverModule({ scored: TASKS, unscored: 0, exposeIds: true }));
+
+    const { artefact } = runLane(dir, driver);
+    const metrics = artefact['metrics'] as Record<string, number>;
+    // The control's own reading: every trial won is a rate of one, printed as one rather than dropped.
+    expect(metrics['episode_rate']).toBe(1);
+    expect(metrics['rate_to_the_k']).toBe(1);
   });
 });

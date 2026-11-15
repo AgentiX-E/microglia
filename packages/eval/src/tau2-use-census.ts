@@ -237,7 +237,72 @@ export type ServedCensus = {
   readonly maxPerRequest: number;
   /** Requests served each id, ascending by id. Only ids that were served at least once. */
   readonly byItem: readonly { readonly id: string; readonly requests: number }[];
+  /**
+   * The shape of the render distribution, which the mean above cannot carry.
+   *
+   * `null` over no render rather than zeros, because a store whose every pack was empty has no
+   * distribution to describe and `topOne: 0` would read as a perfectly even spread.
+   */
+  readonly concentration: ServedConcentration | null;
 };
+
+/**
+ * How the renders were spread over the records that took them.
+ *
+ * R120's store is the reason these exist. Seventy-three records, 4.01 items per request, and **one record
+ * rendered on 88 of 162 requests (54%)** — the five most-served took 31% of 650 renders and eight records
+ * were rendered once. A mean cannot say that, and the record it hid is a negative instruction ("no return
+ * action is invoked") that a majority of requests were not about. **A store's size is not its supply**: the
+ * question a readback needs to ask is how many records are doing the work, and `effective` answers it.
+ */
+export type ServedConcentration = {
+  /** Share of all renders taken by the single most-served record. */
+  readonly topOne: number;
+  /** Share taken by the five most-served records, or by every record when fewer than five were served. */
+  readonly topFive: number;
+  /** Records rendered exactly once: supply that reached one prompt out of the run. */
+  readonly once: number;
+  /** `exp(entropy)` over the render distribution — the records actually doing the work. */
+  readonly effective: number;
+};
+
+/**
+ * Reduce a render distribution to the four readings above.
+ *
+ * `effective` is the perplexity of the empirical distribution: equal to the record count when every
+ * record took the same share, and to 1 when one record took all of it. It is the only one of the four
+ * that a reader can compare against a store's size without also knowing how the store was written.
+ */
+function concentrationOf(byItem: readonly { readonly requests: number }[]): ServedConcentration | null {
+  let total = 0;
+  let max = 0;
+  let once = 0;
+  for (const row of byItem) {
+    total += row.requests;
+    if (row.requests > max) max = row.requests;
+    if (row.requests === 1) once += 1;
+  }
+  if (total === 0) return null;
+  // Sorted descending here rather than trusting the caller: `byItem` is ordered by id, and a share of
+  // the five largest must not depend on the alphabet.
+  const shares = byItem
+    .map((row) => row.requests / total)
+    .sort((left, right) => right - left);
+  let entropy = 0;
+  for (const share of shares) entropy -= share * Math.log(share);
+  const top = shares.slice(0, 5).reduce((sum, share) => sum + share, 0);
+  return {
+    topOne: round(max / total),
+    topFive: round(top),
+    once,
+    effective: round(Math.exp(entropy)),
+  };
+}
+
+/** Four decimal places: the same precision `writeResult` renders, so the artefact and the log agree. */
+function round(value: number): number {
+  return Number(value.toFixed(4));
+}
 
 /**
  * Reduce the facade's observations to the served-id census.
@@ -271,7 +336,37 @@ export function servedCensus(observations: readonly UseObservation[]): ServedCen
       // in a comparator reads as an untested case rather than as an impossible one.
       .sort(([left], [right]) => (left < right ? -1 : 1))
       .map(([id, requests]) => ({ id, requests })),
+    ...concentrationTail(counts),
   };
+}
+
+/** The concentration field, computed from the same counts the `byItem` list is built from. */
+function concentrationTail(counts: ReadonlyMap<string, number>): { readonly concentration: ServedConcentration | null } {
+  return { concentration: concentrationOf([...counts.values()].map((requests) => ({ requests }))) };
+}
+
+/**
+ * One line for the run log: what the packs rendered, and how unevenly.
+ *
+ * The pack census already prints how many requests were served and the mean items each carried, and R120's
+ * `served 162 of 162 (mean 4.0 items)` was read as a store at work. Its own `byItem` says one record was
+ * rendered on 88 of those requests. **A mean is the one summary that cannot see a monopoly**, so the line
+ * states the distribution beside it — and states the renders rather than only the requests, because a pack
+ * of four items is four chances for a wrong rule to be read.
+ */
+export function servedLineOf(census: ServedCensus): string {
+  let renders = 0;
+  for (const row of census.byItem) renders += row.requests;
+  const head =
+    `${String(census.identified)} of ${String(census.requests)} request(s) recorded ids, ` +
+    `${String(renders)} render(s) from ${String(census.distinct)} record(s)`;
+  const shape = census.concentration;
+  if (shape === null) return `${head}: no distribution to describe`;
+  return (
+    `${head}; top1 ${(shape.topOne * 100).toFixed(1)}%, top5 ${(shape.topFive * 100).toFixed(1)}%, ` +
+    `${String(shape.once)} rendered once, effective ${shape.effective.toFixed(2)} — ` +
+    'the mean items per request is a size, and these are the supply'
+  );
 }
 
 /**

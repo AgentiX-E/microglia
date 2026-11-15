@@ -185,6 +185,9 @@ describe('the L4 driver', () => {
         perConversation: 0.5,
       });
       expect(said.join('')).toContain('cost: $4.0000 over 8 conversation(s) = $0.5000 each');
+      // And the served census is on the log, not only in the artefact. This facade kept no id list, so the
+      // line says so rather than printing `0 of 0` — an uninstrumented reading is not an empty store.
+      expect(said.join('')).toContain('[tau2] served: not measured');
     } finally {
       write.mockRestore();
       vi.unstubAllGlobals();
