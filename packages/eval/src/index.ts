@@ -1906,3 +1906,6 @@ export {
   type WriterProbeState,
   type WriterTrial,
 } from './writer-probe.js';
+
+export { itemLedgerLine, itemLedgerOf } from './item-ledger.js';
+export type { ItemLedgerInput, ItemReading } from './item-ledger.js';
