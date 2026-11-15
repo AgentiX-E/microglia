@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import {
   CEILING_ABOVE_PACK,
   CEILING_ABSENT,
@@ -8,9 +11,12 @@ import {
   foldCensus,
   ledgerDiff,
   ledgerLineOf,
+  MARGIN_RUNGS,
   packCensus,
   packLineOf,
 } from '../tau2-pack.js';
+
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 /**
  * The pack's own refusals, counted.
@@ -371,13 +377,69 @@ describe('the pack ledger', () => {
       budget: 2400,
       capacity: null,
     });
-    expect(census.margins).toEqual({ censused: 2, rivaled: 1 });
+    expect(census.margins).toMatchObject({
+      censused: 2,
+      rivaled: 1,
+      // R123a's readback needed this and the artefact did not carry it: the ladder was printed to a job log
+      // and dropped, so choosing a rung meant downloading 103 KB of log. One rivaled request at 0.5 is
+      // withheld by no rung on the ladder, and the three quantiles are that one value.
+      ladder: { '0.01': 0, '0.02': 0, '0.05': 0, '0.10': 0, '0.15': 0, '0.20': 0, '0.30': 0 },
+      p10: 0.5,
+      p50: 0.5,
+      p90: 0.5,
+    });
     expect(packLineOf(census)).toContain('margins 1 rivaled of 2 censused');
+    expect(packLineOf(census)).toContain('p50 0.5000');
     // A phase whose host asked for no census prints nothing rather than a zero: the reader of a `0 rivaled`
     // cannot tell it from the absence R123a mistook for one.
     const silent = packCensus([{ ids: ['k_2'], truncated: 0, rendered: 'y' }], { budget: 2400, capacity: null });
-    expect(silent.margins).toEqual({ censused: 0, rivaled: 0 });
+    expect(silent.margins).toMatchObject({ censused: 0, rivaled: 0, p50: null });
     expect(packLineOf(silent)).not.toContain('margins');
+    // A census that ran and found **no contest**: one candidate in every pack. The population is printed and
+    // the ladder is not, because seven zeros over an empty population would price a rung at nothing when the
+    // truth is that no rung applies — the store had no second candidate for a rung to separate.
+    const uncontested = packCensus([pack(null), pack(null)], { budget: 2400, capacity: null });
+    expect(uncontested.margins).toMatchObject({ censused: 2, rivaled: 0, p50: null });
+    expect(packLineOf(uncontested)).toContain('margins 0 rivaled of 2 censused');
+    expect(packLineOf(uncontested)).not.toContain('ladder');
   });
 
+  // R123a measured 163 rivaled requests with a median margin of 0.0993 and a rung at 0.05 withholding 49 of
+  // them. The three facts have to agree, or the rung a registration names is not the rung the pack runs:
+  // `buildPack` withholds on `margin < speakMargin`, so the rung equal to the median withholds exactly the
+  // half below it, and a `<=` in either half would move 49 to 50 without failing anything else.
+  it('prices each rung with the comparison the pack actually runs', () => {
+    const pack = (margin: number) => ({
+      ids: ['k_1'],
+      truncated: 0,
+      rendered: 'x',
+      decision: { margin, spoke: true, silentBecause: null },
+    });
+    const census = packCensus([pack(0.05), pack(0.049), pack(0.2), pack(0.3)], {
+      budget: 2400,
+      capacity: null,
+    });
+    // Strict: a margin equal to the rung is served, so the 0.05 request is not withheld at 0.05.
+    expect(census.margins.ladder['0.05']).toBe(1);
+    expect(census.margins.ladder['0.10']).toBe(2);
+    expect(census.margins.ladder['0.30']).toBe(3);
+    expect(census.margins.rivaled).toBe(4);
+    // Nearest rank over four values: the 10th percentile is the first, the median the second.
+    expect(census.margins.p10).toBeCloseTo(0.049, 6);
+    expect(census.margins.p50).toBeCloseTo(0.05, 6);
+    expect(census.margins.p90).toBeCloseTo(0.3, 6);
+  });
+
+  // The ladder is counted on both sides of the socket now (R127 counted `rivaled` there), and two lists that
+  // drift are worse than one list: the artefact would price seven rungs the Python half never prices, and the
+  // difference would show up as two unequal ladders in one artefact rather than as a failure.
+  it('prices the same seven rungs the Python half prices', () => {
+    const read = spawnSync(
+      'python3',
+      ['-c', 'import sys; sys.path.insert(0, "eval/drivers/tau2"); import microglia_agent; print(",".join(str(r) for r in microglia_agent.MARGIN_RUNGS))'],
+      { cwd: REPO_ROOT, encoding: 'utf8' },
+    );
+    if (read.status !== 0 || read.stdout.trim() === '') return;
+    expect(MARGIN_RUNGS.map((rung) => rung.toFixed(2)).join(',')).toBe(read.stdout.trim().split(',').map((v) => Number(v).toFixed(2)).join(','));
+  });
 });

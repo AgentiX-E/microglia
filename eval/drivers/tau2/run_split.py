@@ -34,6 +34,13 @@ from pathlib import Path
 import litellm
 from tau2.registry import registry
 
+# The per-turn census (R125) lives beside this script rather than inside it, and carries no third-party
+# import at all: the module that reads trajectories is the module the self-check must be able to run
+# without a provider, a harness, or a network, and a reader that only loads inside this process is a
+# reader whose contract with the TypeScript side can never be tested.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from turns import turn_census  # noqa: E402
+
 # Which τ² this is, decided by what the package exports rather than by a version string.
 #
 # v0.2.0 has `tau2.run.get_tasks(domain, task_ids)` and one flat `run_tasks(**kwargs)`.
@@ -864,6 +871,7 @@ def diagnostics_of(simulations) -> dict:
             "terminated": None,
             "inaction": None,
             "failures": None,
+            "turnCensus": None,
         }
     turns = 0
     terminated: dict[str, int] = {}
@@ -894,6 +902,10 @@ def diagnostics_of(simulations) -> dict:
         "terminated": terminated or None,
         "inaction": inaction_of(simulations),
         "failures": failures_of(simulations),
+        # R125. The per-turn census, computed here because this is the only process that ever holds the
+        # messages: `results.json` carries them, but the lane uploads derived artefacts and a 20 MB
+        # document per arm, so a reader downstream cannot recompute what this line makes available.
+        "turnCensus": turn_census(simulations),
     }
 
 

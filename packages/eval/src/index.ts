@@ -802,12 +802,30 @@ export {
 
 export { speakLineOf, type RecallTraffic } from './tau2-speak.js';
 export {
+  episodeKey,
+  pairedTurnCount,
+  pairedTurnLine,
+  pairedTurns,
+  poissonInterval,
+  turnCensusLine,
+  turnCensusOf,
+  turnCensusOfBlock,
+  turnEpisodeOf,
+  type PairedTurnReading,
+  type TurnCensus,
+  type TurnEpisode,
+  type TurnMeasure,
+} from './tau2-turn.js';
+export {
   itemTransfer,
   itemTransferLine,
   pairAttribution,
   pairedEpisodes,
+  serveSplit,
+  serveSplitLine,
   type EpisodeOutcome,
   type ItemTransfer,
+  type ServeSplit,
 } from './tau2-attribution.js';
 
 export {
@@ -1064,6 +1082,8 @@ export {
   foldCensus,
   ledgerDiff,
   ledgerLineOf,
+  marginCensus,
+  MARGIN_RUNGS,
   packCensus,
   packLineOf,
   type CeilingVerdict,

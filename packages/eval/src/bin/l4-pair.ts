@@ -33,7 +33,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inGateOrder, mergeGates, type ValidityGate } from '@agentix-e/microglia-protocol';
 import { degradationLineOf, degradationOfPair } from '../tau2-degradation.js';
-import { itemTransferLine, pairAttribution } from '../tau2-attribution.js';
+import { itemTransferLine, pairAttribution, serveSplit, serveSplitLine } from '../tau2-attribution.js';
+import { pairedTurnLine, pairedTurns, turnCensusLine, turnCensusOfBlock } from '../tau2-turn.js';
 import {
   ceilingOf,
   compareArms,
@@ -108,7 +109,20 @@ type Artefact = {
      * "cannot join" rather than as "one request per episode", because the second is the assumption that
      * makes the join wrong exactly at the episodes that recalled twice (164 requests, 160 episodes).
      */
-    readonly memory?: { readonly episodeStarts?: readonly number[] };
+    /**
+     * R123a's census, now projected into the artefact rather than printed and dropped: `rivaled` is the
+     * population a rung acts on and `margin_ladder` is what each rung withholds of it. Its absence is a
+     * phase without a sidecar, not a store with nothing contested.
+     */
+    readonly memory?: {
+      readonly episodeStarts?: readonly number[];
+      readonly rivaled?: number | null;
+      readonly census?: number;
+      readonly margin_p50?: number | null;
+      readonly margin_ladder?: Readonly<Record<string, number>>;
+    };
+    /** R125: the per-turn census this phase wrote, one row per episode, or absent before the instrument. */
+    readonly turnCensus?: unknown;
   };
   readonly per_task?: readonly TaskRow[];
   /** One row per evaluated episode; absent on artefacts written before R29 stage 2. */
@@ -353,6 +367,25 @@ function attributionOf(reference: Artefact, memory: Artefact) {
 const attribution = attributionOf(first, second);
 if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribution)}\n`);
 
+// R123's mechanism check: the arm's own episodes, split by whether the gate let their pack through. This is
+// the only within-arm comparison the lane has, and it is free — an empty ledger entry already records a
+// refusal, so the split costs no dispatch and no model call.
+const split = serveSplit({
+  ledger: second.tau2?.pack?.ledger,
+  episodeStarts: second.tau2?.memory?.episodeStarts,
+  memoryTrials: second.per_trial,
+});
+if (split !== undefined) process.stdout.write(`${serveSplitLine(split)}\n`);
+
+// R125: the per-turn census, paired across the two arms. Printed here rather than per arm because the
+// question it answers is a *difference*: either arm alone reports 1,800 turns of activity, and only the
+// pair says whether the memory's turns were more or less likely to come back in error.
+const memoryTurns = turnCensusOfBlock(second.tau2?.turnCensus);
+const controlTurns = turnCensusOfBlock(first.tau2?.turnCensus);
+if (memoryTurns !== undefined) process.stdout.write(`${turnCensusLine(memoryTurns)}\n`);
+const turns = pairedTurns(memoryTurns, controlTurns);
+if (turns.length > 0) process.stdout.write(`${pairedTurnLine(turns)}\n`);
+
 const retain = (artefact: Artefact) =>
   artefact.per_trial === undefined ? undefined : holdRateOfTrials(artefact.per_trial);
 const firstHeld = retain(first);
@@ -398,6 +431,12 @@ await writeJson('poc-l4-pair', {
           unmatchedRequests: attribution.unmatchedRequests,
         },
       }),
+  // R125: the paired per-turn reading. Absent when neither arm carried a census — a pair whose phases both
+  // predate the instrument cannot be read as a pair without wrong actions, which is what an empty object
+  // would say.
+  ...(turns.length === 0 ? {} : { turnCensus: turns }),
+  // R123: what the gate did to the trials it withheld from, when the arm carries a boundary.
+  ...(split === undefined ? {} : { serveSplit: split }),
   // R57: the distractor this pair is about, when the memory arm planted one. Without it a reader sees
   // a pair artefact with no treatment gate and no reason for the omission.
   ...(plantedBarNote(plantedArm) ?? {}),

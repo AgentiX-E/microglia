@@ -33,6 +33,7 @@
  */
 
 import type { TauTrialRow } from './tau2-transfer.js';
+import { wilsonInterval } from './reproduction.js';
 
 /** One episode, as the analysis needs it: the requests it spent and how the two arms scored it. */
 export type EpisodeOutcome = {
@@ -197,4 +198,89 @@ export function pairAttribution(input: {
   });
   if (episodes === undefined) return undefined;
   return itemTransfer({ episodes, ledger });
+}
+
+/**
+ * What a gate that withheld a pack did to the trials it withheld it from.
+ *
+ * R123's mechanism check, and it is free: the ledger already records an empty list for the requests the
+ * gate refused, so the arm's own episodes split into the ones that ran with knowledge and the ones that did
+ * not, and the two rates are a within-arm comparison nothing else on this lane can make. The alternative
+ * reading — the arm's rate against its control — cannot attribute a drop to the gate, because the control
+ * differs in every other way too.
+ *
+ * The prediction R123 registers is directional and can fail: if the withheld trials score like the served
+ * ones, the gate removed traffic without removing harm, which is a filter rather than a treatment.
+ */
+export type ServeSplit = {
+  /** Episodes where at least one request in the episode's range was served a non-empty pack. */
+  readonly served: { readonly episodes: number; readonly passed: number };
+  /** Episodes where every request in range was refused. */
+  readonly withheld: { readonly episodes: number; readonly passed: number };
+};
+
+/**
+ * Split one arm's episodes by whether its pack was served.
+ *
+ * `undefined` when the join cannot be made — no boundary, or a boundary count that disagrees with the trial
+ * count — for `pairAttribution`'s reason: a zero here would read as "the gate withheld nothing", which is
+ * the sentence R123 exists to distinguish from "the gate was never installed".
+ */
+export function serveSplit(input: {
+  readonly ledger?: readonly (readonly string[])[];
+  readonly episodeStarts?: readonly number[];
+  readonly memoryTrials?: readonly TauTrialRow[];
+}): ServeSplit | undefined {
+  const { ledger, episodeStarts, memoryTrials } = input;
+  if (ledger === undefined || episodeStarts === undefined || memoryTrials === undefined) return undefined;
+  if (episodeStarts.length !== memoryTrials.length) return undefined;
+  const served = { episodes: 0, passed: 0 };
+  const withheld = { episodes: 0, passed: 0 };
+  const ordered = memoryTrials.map((row, index) => ({ row, startsAt: episodeStarts[index] as number }));
+  ordered.sort((left, right) => left.startsAt - right.startsAt);
+  for (let index = 0; index < ordered.length; index += 1) {
+    const entry = ordered[index] as (typeof ordered)[number];
+    const next = ordered[index + 1];
+    const start = Math.min(entry.startsAt, ledger.length);
+    const end = next === undefined ? ledger.length : Math.min(next.startsAt, ledger.length);
+    // An episode that spent no request cannot have been refused one, so it counts on neither side: charging
+    // it to `withheld` would make a gate look like it fired more often than it did.
+    if (end <= start) continue;
+    let carried = false;
+    for (let request = start; request < end; request += 1) {
+      if ((ledger[request] as readonly string[]).length > 0) {
+        carried = true;
+        break;
+      }
+    }
+    // `null` is the harness declining to score, which is not a failure and must not enter either rate.
+    if (entry.row.reward === null) continue;
+    const bucket = carried ? served : withheld;
+    bucket.episodes += 1;
+    if (entry.row.reward === 1) bucket.passed += 1;
+  }
+  return { served, withheld };
+}
+
+/**
+ * The split as one line, with both rates and both intervals.
+ *
+ * A rate without its interval is the reading this record has refused for three rounds: `served 90.4%,
+ * withheld 83.7%` invites a reader to see a 6.7pp gap where the sample can only resolve 25pp. The two
+ * intervals are printed beside the two counts so the gap can be compared with the noise that produced it.
+ */
+export function serveSplitLine(split: ServeSplit | undefined): string {
+  if (split === undefined) {
+    return 'serve split: this arm has no episode boundary, so served and withheld trials cannot be separated';
+  }
+  const render = (bucket: { readonly episodes: number; readonly passed: number }): string => {
+    if (bucket.episodes === 0) return 'none measured';
+    const rate = bucket.passed / bucket.episodes;
+    const { low, high } = wilsonInterval({ accuracy: rate, n: bucket.episodes });
+    return (
+      `${String(bucket.passed)} of ${String(bucket.episodes)} = ${(rate * 100).toFixed(2)}% ` +
+      `[${(low * 100).toFixed(1)}, ${(high * 100).toFixed(1)}]`
+    );
+  };
+  return `serve split: served ${render(split.served)}; withheld ${render(split.withheld)}`;
 }

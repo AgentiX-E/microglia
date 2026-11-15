@@ -1443,3 +1443,29 @@ sizes, because it conditions on the trials where something moved and is a proper
 direction rather than its size. The published figure for memory-augmented agents is 52%; this lane measured
 57.1% on one dispatch (12 of 21) and 32.3% on another (10 of 31), which are the same measurement as each other
 and as the literature's.
+
+**Turn census** — The per-episode counts a phase can read from the trajectories it already recorded: assistant
+turns, tool results that came back in error, calls that repeat an earlier call with identical arguments, and
+the user turns that follow either. It exists because the task-level test cannot resolve this lane's effects:
+forty held-out tasks give 7.76pp of standard error and a 26.21pp minimum detectable difference, while one
+phase writes about 1,800 turns. It costs no model calls.
+
+**Flagged result** — A tool result that carried the `error` field. The census reports `toolErrors: null` rather
+than `0` when no result carried it, because a release that stopped serialising the flag is a different fact
+from a run in which no tool failed. `toolResultsWithFlag` is the denominator of the sentence.
+
+**Poisson interval** — The interval a count of rare events carries, as distinct from the interval a proportion
+carries. Zero observed events are consistent with up to 3.69 expected (`−ln 0.025`), so an arm reporting no
+tool errors has bounded a rate rather than established safety. Two arms' counts are **separated** when their
+Poisson intervals do not overlap, which is the test the turn census is registered against.
+
+**Serve split** — One arm's own trials, split by whether the gate let a pack through: the served bucket's pass
+rate and the withheld bucket's. It is the only *within-arm* comparison this record has, so the store and the
+model are held fixed and a difference cannot be attributed to anything but the gate. An episode whose pack was
+refused is not control data — it is a trial the memory was absent from, by decision.
+
+**Rung** — A value of `speakMargin`: the margin below which a pack is withheld. A rung is not a constant of the
+lane, it is a property of a store — which is why R123a measured the store's margin distribution before R123
+named one, and why a rung chosen on one store and dispatched against another is a substitution rather than a
+treatment. The rung is chosen by a rule fixed before the data: the smallest rung withholding at least 15% of
+the contested requests, provided that share is at most 40%.

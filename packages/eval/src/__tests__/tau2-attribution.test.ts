@@ -8,7 +8,14 @@
  * only tested on one-request-per-episode is a join that has never been tested.
  */
 import { describe, expect, it } from 'vitest';
-import { itemTransfer, itemTransferLine, pairAttribution, pairedEpisodes } from '../tau2-attribution.js';
+import {
+  itemTransfer,
+  itemTransferLine,
+  pairAttribution,
+  pairedEpisodes,
+  serveSplit,
+  serveSplitLine,
+} from '../tau2-attribution.js';
 
 describe('attributing a trial to the claims it was served', () => {
   it('splits the ledger at the boundaries the agent recorded', () => {
@@ -202,5 +209,71 @@ describe('reading the three fields off an artefact', () => {
     // The request is counted as unattributed rather than attributed to a loss: with no control row there is
     // no outcome to pair, and the one served request belongs to an episode that was never measured.
     expect(reading).toEqual({ items: [], unmatchedRequests: 1 });
+  });
+});
+
+describe('what the gate did to the trials it withheld from', () => {
+  const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
+
+  // R123's mechanism check, and the fixture is the shape the lane produces: 163 requests over 160 episodes,
+  // so one episode spends two requests. An empty ledger entry is a refusal — `buildPack` returns no ids —
+  // and that is the only signal the artefact carries, which is why the split can be read for free.
+  it('splits one arm by whether a pack reached the episode', () => {
+    const split = serveSplit({
+      ledger: [['k_1'], [], ['k_2'], ['k_3']],
+      episodeStarts: [0, 1, 2, 3],
+      memoryTrials: [row('a', 0, 1), row('b', 0, 0), row('c', 0, 1), row('d', 0, 1)],
+    });
+    expect(split).toEqual({
+      served: { episodes: 3, passed: 3 },
+      withheld: { episodes: 1, passed: 0 },
+    });
+  });
+
+  it('counts an episode as served when any of its requests carried a pack', () => {
+    // Episode `a` spends requests 0 and 1: the first was refused and the second was served. Reading only the
+    // first request would call this episode withheld and understate the gate's reach by half.
+    const split = serveSplit({
+      ledger: [[], [], ['k_2']],
+      episodeStarts: [0, 2],
+      memoryTrials: [row('a', 0, 1), row('b', 0, 0)],
+    });
+    expect(split).toEqual({
+      served: { episodes: 1, passed: 0 },
+      withheld: { episodes: 1, passed: 1 },
+    });
+  });
+
+  it('declines to split what it cannot join, and never reads a missing field as "withheld nothing"', () => {
+    expect(serveSplit({ ledger: [['k']], memoryTrials: [row('a', 0, 1)] })).toBeUndefined();
+    expect(serveSplit({ episodeStarts: [0], memoryTrials: [row('a', 0, 1)] })).toBeUndefined();
+    // One boundary per row, or the join is by position — the assumption this whole file was written against.
+    expect(
+      serveSplit({ ledger: [['k'], ['k']], episodeStarts: [0], memoryTrials: [row('a', 0, 1), row('b', 0, 1)] }),
+    ).toBeUndefined();
+    expect(serveSplitLine(undefined)).toContain('has no episode boundary');
+  });
+
+  it('keeps an unscored episode out of both rates', () => {
+    const split = serveSplit({
+      ledger: [['k_1'], []],
+      episodeStarts: [0, 1],
+      memoryTrials: [row('a', 0, null), row('b', 0, 1)],
+    });
+    expect(split).toEqual({ served: { episodes: 0, passed: 0 }, withheld: { episodes: 1, passed: 1 } });
+  });
+
+  it('prints both rates with their intervals, so the gap can be compared with its own noise', () => {
+    const line = serveSplitLine({
+      served: { episodes: 100, passed: 90 },
+      withheld: { episodes: 40, passed: 30 },
+    });
+    expect(line).toContain('served 90 of 100 = 90.00%');
+    expect(line).toContain('withheld 30 of 40 = 75.00%');
+    // Wilson, not Wald: 40 episodes is small enough that the two disagree at the edge.
+    expect(line).toMatch(/\[\d+\.\d, \d+\.\d\]/);
+    expect(serveSplitLine({ served: { episodes: 0, passed: 0 }, withheld: { episodes: 0, passed: 0 } })).toContain(
+      'served none measured',
+    );
   });
 });

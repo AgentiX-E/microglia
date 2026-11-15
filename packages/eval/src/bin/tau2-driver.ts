@@ -176,6 +176,7 @@ import {
 import { consolidateKnowledge } from "@agentix-e/microglia-core/distill";
 import { consolidationLineOf, sweepConsolidation, sweepSummary } from "../consolidation-sweep.js";
 import { speakLineOf } from "../tau2-speak.js";
+import { turnCensusLine, turnCensusOf, type TurnCensus } from "../tau2-turn.js";
 import type { Tau2PhaseUsage } from "../tau2-instrument.js";
 import { cacheCensusVerdict } from "../cache-census.js";
 import { shapeByTaskOf, tau2ShapeWithFallback } from "../tau2-shape.js";
@@ -905,8 +906,36 @@ type Tau2PhaseDiagnostics = {
     readonly census?: number;
     readonly margin_p50?: number | null;
     readonly margin_ladder?: Readonly<Record<string, number>>;
+    /**
+     * R128: the request index at which each episode opened.
+     *
+     * One request per episode is an assumption, not a fact: `recall` fires once per episode but a retried
+     * turn asks again, and R123a's phase spent **163 requests on 160 episodes**. A join that pairs the
+     * ledger to trials by position therefore drifts at exactly the episodes that asked twice.
+     */
+    readonly episodeStarts?: readonly number[];
   } | null;
+  /**
+   * R125: the per-turn census, written by the half of the driver that holds the messages.
+   *
+   * Absent on every artefact before this instrument existed, and read as "cannot say" rather than as "no
+   * wrong actions" — the distinction the whole module is built around.
+   */
+  readonly turnCensus?: unknown;
 };
+
+/**
+ * R125: the census block for the artefact, or nothing when the phase wrote none.
+ *
+ * A helper rather than an inline spread so the census is read once: `turnCensusOf` sorts and copies rows,
+ * and an artefact built from two calls could carry a block whose `measurable` disagrees with its own rows.
+ */
+function turnCensusBlock(
+  diagnostics: Tau2PhaseDiagnostics | undefined,
+): { readonly turnCensus?: TurnCensus } {
+  const census = turnCensusOf(diagnostics);
+  return census === undefined ? {} : { turnCensus: census };
+}
 
 /** The admission reasons, most frequent first, for the one line a run prints about its own store. */
 function reasonsLine(reasons: Readonly<Record<string, number>>): string {
@@ -2303,6 +2332,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
 `,
   );
 
+  // R125: the per-turn census, printed for the same reason the serve and speak lines are — it is the only
+  // reading on this lane whose denominator is large enough to resolve a 5-10pp effect, and a number that
+  // only ever existed inside an uploaded artefact is a number nobody checks while the run is still cheap to
+  // repeat. `undefined` prints as "no census reached this phase", never as a zero.
+  process.stdout.write(`[tau2] ${turnCensusLine(turnCensusOf(primary.diagnostics))}\n`);
+
   const agentTurns = primary.diagnostics?.agent_turns ?? null;
   // One line, unconditional, so that a run's bill is in its own log next to its score.
   // `null` rather than an omitted line: a dispatch that could not count is a different
@@ -2539,6 +2574,16 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       budget: PACK_BUDGET,
       capacity: RECORD_CAPACITY,
     }),
+    // R123a's readback had to download a 103 KB job log to find the ladder, because the driver read
+    // `diagnostics.memory` to print one line and dropped the block: `margin_ladder`, `census` and
+    // `episodeStarts` were computed, printed, and then lost. A reading that survives only in a log cannot be
+    // re-examined, and both of the joins this artefact feeds — the attribution's episode boundary and the
+    // rung's population — are in this block. Absent rather than `null`, so an arm without a sidecar keeps
+    // saying that it had none.
+    ...(primary.diagnostics?.memory == null ? {} : { memory: primary.diagnostics.memory }),
+    // R125: the per-turn census, with one row per episode so the pair can join it. Absent on an arm whose
+    // phase wrote no census — the artefact then says the instrument never reached it.
+    ...turnCensusBlock(primary.diagnostics),
     // What the served packs contained. `withoutDomain` is the store's count of
     // `domain === undefined` items, from the same domain ledger V44 reads.
     useObservations: primary.useObservations,

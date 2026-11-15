@@ -527,6 +527,57 @@ def an_episode_boundary_is_recorded_where_a_join_can_use_it(checks):
         subject.recall = original
 
 
+@case
+def a_repeated_call_needs_a_readable_payload(checks):
+    """R125: the census may not manufacture the behaviour it counts.
+
+    Two calls with no arguments are two calls, not a repeat — a reader that keyed on the name alone would
+    report `retail` as an agent that calls `get_order_details` twice on every episode, and the resulting
+    number would be large, stable, and about this reader rather than about the memory.
+    """
+    sys.path.insert(0, HERE)
+    from turns import turn_census
+
+    row = turn_census(
+        [
+            {
+                "task_id": "5",
+                "trial": 0,
+                "messages": [
+                    {"role": "assistant", "tool_calls": [{"name": "lookup"}, {"name": "lookup"}]},
+                    {
+                        "role": "assistant",
+                        "tool_calls": [
+                            {"name": "lookup", "arguments": {"id": 1}},
+                            {"name": "lookup", "arguments": {"id": 1}},
+                            {"name": "lookup", "arguments": {"id": 2}},
+                        ],
+                    },
+                ],
+            }
+        ]
+    )
+    checks.equal(row["toolCalls"], 5, "five calls were made")
+    checks.equal(row["callsWithoutArguments"], 2, "the two without a payload are counted, not called repeats")
+    checks.equal(row["repeatCalls"], 1, "one of the three readable calls repeats the first")
+
+
+@case
+def an_unreadable_episode_is_not_a_quiet_one(checks):
+    """R125: the denominator that keeps `toolErrors: 0` from meaning two things."""
+    sys.path.insert(0, HERE)
+    from turns import turn_census
+
+    quiet = turn_census([{"task_id": "5", "trial": 0, "messages": [{"role": "tool", "error": False}]}])
+    checks.equal(quiet["toolErrors"], 0, "a result that carried the flag and did not fail is a measured zero")
+    checks.equal(quiet["toolResultsWithFlag"], 1, "and it is the denominator")
+    blind = turn_census([{"task_id": "5", "trial": 0, "messages": [{"role": "tool", "content": "ok"}]}])
+    checks.equal(blind["toolErrors"], None, "a result without the flag leaves the count unmeasured")
+    empty = turn_census([{"task_id": "5", "trial": 0}])
+    checks.equal(empty["measurable"], 0, "an episode with no messages was not measured")
+    checks.equal(empty["episodes"], 1, "and it still counts as an episode that ran")
+
+
 def dump_stats() -> int:
     """Print `memory_stats()` as JSON, for the TypeScript side to read back.
 
@@ -568,11 +619,30 @@ def parse_decision() -> int:
     return 0
 
 
+def parse_turns() -> int:
+    """Read a phase's episodes as JSON and report the census the driver writes for it.
+
+    R125. `turn_census` runs inside `run_split.py`, which imports the provider client and the harness, so a
+    contract test that reached it through that module would be skipped on every machine without a 400 MB
+    benchmark installed — and a skipped contract test is not a contract. The reader was therefore moved into
+    `turns.py`, which imports nothing, and this entry point feeds it the same JSON the TypeScript side will
+    read back: whatever is asserted here is asserted about the payload that ships.
+    """
+    sys.path.insert(0, HERE)
+    from turns import turn_census  # noqa: PLC0415 - the module this entry point exists to exercise
+
+    episodes = json.load(sys.stdin)
+    print(json.dumps(turn_census(episodes), sort_keys=True))
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if "--dump-stats" in argv:
         return dump_stats()
     if "--parse-decision" in argv:
         return parse_decision()
+    if "--parse-turns" in argv:
+        return parse_turns()
     if "--self-test" not in argv:
         print(__doc__)
         return 2

@@ -83,6 +83,20 @@ export type PackCensus = {
     readonly censused: number;
     /** Of those, the ones with at least two candidates — the population a rung acts on. */
     readonly rivaled: number;
+    /**
+     * How many of the rivaled requests each rung would withhold — the ladder R123's rung is chosen by.
+     *
+     * R123a's readback needed this number and the artefact did not have it. The Python half computed the
+     * ladder from the bytes that crossed the socket and printed it to the job log, so recovering the
+     * quantity a registered decision rule selects on required downloading a 103 KB log and grepping it —
+     * a reading that lives in a log is a reading that no artefact can be re-examined against. The
+     * decisions are already in this process, one per pack, so the ladder is counted here as well.
+     */
+    readonly ladder: Readonly<Record<string, number>>;
+    /** Nearest-rank quantiles of the rivaled margins, or `null` when nothing was contested. */
+    readonly p10: number | null;
+    readonly p50: number | null;
+    readonly p90: number | null;
   };
   /**
    * The means, or absent when no request was made.
@@ -235,12 +249,61 @@ export function packCensus(
     droppedForSize: readings.reduce((sum, pack) => sum + pack.truncated, 0),
     summary: requests === 0 ? null : { meanIds: total / requests, meanChars: chars / requests },
     fold: foldCensus(readings),
-    margins: {
-      censused: readings.filter((pack) => pack.decision !== undefined).length,
-      // `margin === null` is one candidate: the ranking was not contested, and a rung acts on nothing.
-      rivaled: readings.filter((pack) => pack.decision?.margin != null).length,
-    },
+    margins: marginCensus(readings),
     ledger: readings.map((pack) => pack.ids),
+  };
+}
+
+/**
+ * The rungs a margin ladder is priced at.
+ *
+ * The same seven values the Python half prices (`MARGIN_RUNGS` in `eval/drivers/tau2/microglia_agent.py`),
+ * for the reason the two halves are compared at all: R127 counted the population on both sides of the
+ * socket so a dropped field could not be read as an empty store, and a ladder counted on both sides is the
+ * same check one level in. The two lists are pinned equal by a contract test rather than by this comment.
+ */
+export const MARGIN_RUNGS = [0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3] as const;
+
+/** Nearest-rank quantile of an ascending list, or `null` for an empty one. */
+function nearestRank(sorted: readonly number[], q: number): number | null {
+  if (sorted.length === 0) return null;
+  const rank = Math.ceil(q * sorted.length);
+  const index = Math.min(sorted.length - 1, Math.max(0, rank - 1));
+  return sorted[index] as number;
+}
+
+/**
+ * The margin census, from the decisions the packs already carry.
+ *
+ * Three states are kept apart because the record has paid for conflating them three times: a pack with
+ * **no decision** (the host never asked for a census), a pack whose decision says **`margin: null`** (one
+ * candidate — nothing was contested, so no rung can act on it), and a pack with a **measured margin**. The
+ * ladder's denominator is the third population alone: a rung that withheld 30% of everything including the
+ * uncontested requests is a rung whose cost the reader cannot reproduce.
+ *
+ * The rung comparison is strict (`margin < rung` serves nothing) because that is what `buildPack` does
+ * with `speakMargin`; a ladder computed with `<=` would price a rung the pack never runs at.
+ */
+export function marginCensus(readings: readonly PackReading[]): PackCensus['margins'] {
+  const decisions = readings.map((pack) => pack.decision);
+  const censused = decisions.filter((decision) => decision !== undefined).length;
+  const margins: number[] = [];
+  for (const decision of decisions) {
+    const margin = decision?.margin;
+    if (typeof margin === 'number' && Number.isFinite(margin)) margins.push(margin);
+  }
+  margins.sort((left, right) => left - right);
+  const ladder: Record<string, number> = {};
+  for (const rung of MARGIN_RUNGS) {
+    ladder[rung.toFixed(2)] = margins.filter((margin) => margin < rung).length;
+  }
+  return {
+    censused,
+    rivaled: margins.length,
+    ladder,
+    p10: nearestRank(margins, 0.1),
+    p50: nearestRank(margins, 0.5),
+    p90: nearestRank(margins, 0.9),
   };
 }
 
@@ -348,9 +411,19 @@ export function packLineOf(census: PackCensus): string {
         `support ≥2 ${String(fold.atLeastTwo)}, ≥3 ${String(fold.atLeastThree)}, max ${String(fold.max)}`;
   // R127. Printed only when the host asked for a census — a phase whose packs carry no decision has no
   // ranking to report, and `0 rivaled` there would be a claim about the store that the phase never asked.
+  //
+  // R123a's readback added the ladder, because the rung a registration selects on is a share of this
+  // population and the population alone does not price it: `163 rivaled` with a median margin of 0.0993
+  // and a rung at 0.05 withholding 30% are three facts about one store, and only the third one can be
+  // registered against. A rung equal to the printed median is the check that the two agree.
   const margins = census.margins.censused === 0
     ? ''
-    : `; margins ${String(census.margins.rivaled)} rivaled of ${String(census.margins.censused)} censused`;
+    : `; margins ${String(census.margins.rivaled)} rivaled of ${String(census.margins.censused)} censused` +
+      (census.margins.rivaled === 0
+        ? ''
+        : `, p50 ${(census.margins.p50 ?? 0).toFixed(4)}, ladder ${Object.entries(census.margins.ladder)
+            .map(([rung, withheld]) => `${rung} ${String(withheld)}`)
+            .join(' / ')}`);
   return (
     `${head}; served ${String(census.filled)} of ${String(census.requests)} ` +
     `(mean ${summary.meanIds.toFixed(1)} items, ${summary.meanChars.toFixed(0)} chars); ` +

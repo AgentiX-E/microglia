@@ -2875,3 +2875,70 @@ rather than empty.
 3. **A table that is absent.** `attribution` is written only when all three fields exist. An artefact without
    it is not a store with no harmful rules — it is a run whose boundaries were not recorded, and the record
    distinguishes the two in the same way it distinguishes `rivaled: 0` from `rivaled: null`.
+
+## 18. Counting turns, because counting tasks does not resolve anything
+
+Every paired comparison in this guide so far is over **tasks**, and a benchmark's task count is fixed by
+whoever published it. That is the constraint this section is about: on τ²-retail there are forty held-out
+tasks, forty tasks give a standard error of 7.76pp on a paired difference, and no number of trials changes it
+— six trials on forty tasks is still forty tasks. If your effect is five points, the task-level test will not
+see it, and it will not tell you it could not.
+
+What a run *does* record in quantity is turns. One 160-episode phase writes about 1,800 assistant turns, and a
+memory that induces a wrong action shows up in them as a call that came back in error rather than as a lost
+episode.
+
+### 18.1 What is counted
+
+```bash
+# The pair report prints the census for the memory arm and then the paired reading.
+pnpm eval:l4-pair
+# turns: 160 of 160 episode(s), 1813 assistant turn(s), 2712 call(s) (14 repeated);
+#        37 tool error(s) of 2698 flagged result(s); 402 user turn(s) after an action, 31 after an error
+# turns paired: toolErrors 37 vs 41 over 160 pair(s), -0.025 per episode (not separated);
+#               repeatCalls 14 vs 11 over 160 pair(s), +0.019 per episode (not separated)
+```
+
+| field | what it counts | why it is not a zero by default |
+|---|---|---|
+| `toolErrors` | tool results that came back marked in error | **`null`** when no result carried the flag — a release that stopped saying is not a run without failures |
+| `toolResultsWithFlag` | results that carried the flag | the denominator of the line above |
+| `repeatCalls` | a call whose name *and* arguments repeat an earlier call in the same episode | a call with no readable payload is excluded and counted separately, so the reader cannot invent a repetition |
+| `callsWithoutArguments` | calls the reader could not read | the population `repeatCalls` cannot see |
+| `userAfterAction` | user turns after the agent's first action | excludes the opening instruction, which no error can precede |
+| `userAfterError` | user turns after a tool error | the cost of the error, in conversation |
+
+### 18.2 How the two arms are compared
+
+Two intervals, both printed with the counts:
+
+- **per arm**, a Poisson interval — a count of rare events is not a proportion. **Zero observed errors is
+  consistent with up to 3.69 expected**, and an arm that reports `0` has shown that its rate is below 3.7 per
+  phase, not that it is safe.
+- **on the difference**, a paired interval over the per-episode deltas. A trial present in one arm and not the
+  other is dropped, and `episodes` on the line says how many pairs survived.
+
+### 18.3 The rule that makes it a test
+
+> The two arms' counts are **separated** when their Poisson intervals do not overlap.
+
+That is the whole test, and its value is that it can come out either way. A task-level comparison at forty
+tasks usually cannot, which is why this section exists.
+
+### 18.4 Four ways it misleads
+
+1. **A census with `measurable` below `episodes`.** The reader could not see every episode's messages, and the
+   counts are a sample rather than the phase.
+2. **`toolErrors: null` read as zero.** It means no result carried the flag. The line says so; do not read past
+   it.
+3. **`repeatCalls` on an arm with many `callsWithoutArguments`.** Those calls are outside the repetition
+   population, and a large count means the reader saw less of the traffic than the total suggests.
+4. **A turn-level difference treated as a score.** A memory can reduce tool errors and still lose episodes —
+   errors are how an agent recovers, and an agent that avoids the call avoids the recovery. Read the two units
+   together, never one as a proxy for the other.
+
+### 18.5 What it costs
+
+Nothing in model calls. The census is computed from the `simulations` document the runner has already written,
+in the same process that ran the episodes; it adds one JSON block to the arm artefact (one row per episode) and
+one line per phase to the log.
