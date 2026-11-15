@@ -804,6 +804,7 @@ export { speakLineOf, type RecallTraffic } from './tau2-speak.js';
 export {
   itemTransfer,
   itemTransferLine,
+  pairAttribution,
   pairedEpisodes,
   type EpisodeOutcome,
   type ItemTransfer,

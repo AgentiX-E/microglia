@@ -174,3 +174,27 @@ export function pairedEpisodes(input: {
   });
   return episodes;
 }
+
+/**
+ * The whole reading, from the three fields as they appear in an artefact.
+ *
+ * `undefined` for any missing field rather than an empty table: an artefact written before the episode
+ * boundary existed cannot be joined, and a table of zero items would read as "no claim was served into a
+ * measured trial" — the same collapse of absent into zero that cost R123a a dispatch.
+ */
+export function pairAttribution(input: {
+  readonly ledger?: readonly (readonly string[])[];
+  readonly episodeStarts?: readonly number[];
+  readonly memoryTrials?: readonly TauTrialRow[];
+  readonly referenceTrials?: readonly TauTrialRow[];
+}): { readonly items: readonly ItemTransfer[]; readonly unmatchedRequests: number } | undefined {
+  const { ledger, episodeStarts, memoryTrials, referenceTrials } = input;
+  if (ledger === undefined || episodeStarts === undefined || memoryTrials === undefined) return undefined;
+  const episodes = pairedEpisodes({
+    referenceTrials: referenceTrials ?? [],
+    memoryTrials,
+    episodeStarts,
+  });
+  if (episodes === undefined) return undefined;
+  return itemTransfer({ episodes, ledger });
+}

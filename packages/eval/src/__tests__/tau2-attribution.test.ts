@@ -8,7 +8,7 @@
  * only tested on one-request-per-episode is a join that has never been tested.
  */
 import { describe, expect, it } from 'vitest';
-import { itemTransfer, itemTransferLine, pairedEpisodes } from '../tau2-attribution.js';
+import { itemTransfer, itemTransferLine, pairAttribution, pairedEpisodes } from '../tau2-attribution.js';
 
 describe('attributing a trial to the claims it was served', () => {
   it('splits the ledger at the boundaries the agent recorded', () => {
@@ -168,5 +168,39 @@ describe('pairing two arms into episodes', () => {
       episodeStarts: [0, 1],
     });
     expect(episodes).toEqual([{ startsAt: 0, memory: true, control: true }]);
+  });
+});
+
+describe('reading the three fields off an artefact', () => {
+  const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
+
+  it('declines each missing field rather than reporting an empty store', () => {
+    // The three ways an artefact can predate the instrument. Every one of them must be `undefined`, because
+    // an empty table reads as "no claim was served into a measured trial" and the truth is "this run could
+    // not say" — the distinction R123a cost a dispatch to learn.
+    expect(pairAttribution({ episodeStarts: [0], memoryTrials: [row('a', 0, 1)] })).toBeUndefined();
+    expect(pairAttribution({ ledger: [['k']], memoryTrials: [row('a', 0, 1)] })).toBeUndefined();
+    expect(pairAttribution({ ledger: [['k']], episodeStarts: [0] })).toBeUndefined();
+  });
+
+  it('produces the table when all three are present', () => {
+    const reading = pairAttribution({
+      ledger: [['k_1']],
+      episodeStarts: [0],
+      memoryTrials: [row('a', 0, 0)],
+      referenceTrials: [row('a', 0, 1)],
+    });
+    expect(reading).toEqual({ items: [{ id: 'k_1', episodes: 1, kept: 0, broke: 1, net: -1 }], unmatchedRequests: 0 });
+  });
+
+  it('treats a memory arm with no reference rows as unpaired rather than as all losses', () => {
+    const reading = pairAttribution({
+      ledger: [['k_1']],
+      episodeStarts: [0],
+      memoryTrials: [row('a', 0, 0)],
+    });
+    // The request is counted as unattributed rather than attributed to a loss: with no control row there is
+    // no outcome to pair, and the one served request belongs to an episode that was never measured.
+    expect(reading).toEqual({ items: [], unmatchedRequests: 1 });
   });
 });

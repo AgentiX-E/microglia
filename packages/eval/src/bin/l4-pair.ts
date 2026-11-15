@@ -33,7 +33,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inGateOrder, mergeGates, type ValidityGate } from '@agentix-e/microglia-protocol';
 import { degradationLineOf, degradationOfPair } from '../tau2-degradation.js';
-import { itemTransfer, itemTransferLine, pairedEpisodes } from '../tau2-attribution.js';
+import { itemTransferLine, pairAttribution } from '../tau2-attribution.js';
 import {
   ceilingOf,
   compareArms,
@@ -342,17 +342,12 @@ process.stdout.write(`${degradationLineOf(degradation)}\n`);
  * which is the class of defect this round spent its whole dispatch learning to refuse.
  */
 function attributionOf(reference: Artefact, memory: Artefact) {
-  const ledger = memory.tau2?.pack?.ledger;
-  const starts = memory.tau2?.memory?.episodeStarts;
-  const rows = memory.per_trial;
-  if (ledger === undefined || starts === undefined || rows === undefined) return undefined;
-  const episodes = pairedEpisodes({
-    referenceTrials: reference.per_trial ?? [],
-    memoryTrials: rows,
-    episodeStarts: starts,
+  return pairAttribution({
+    ledger: memory.tau2?.pack?.ledger,
+    episodeStarts: memory.tau2?.memory?.episodeStarts,
+    memoryTrials: memory.per_trial,
+    referenceTrials: reference.per_trial,
   });
-  if (episodes === undefined) return undefined;
-  return itemTransfer({ episodes, ledger });
 }
 
 const attribution = attributionOf(first, second);

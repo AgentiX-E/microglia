@@ -261,6 +261,12 @@ export type Tau2ArmRecord = {
      * two, and it is read by `speakLineOf`.
      */
     readonly census?: number;
+    /**
+     * R128: the request index that opened each episode, so a served pack can be joined to the trial it was
+     * served into. Absent on every artefact written before the instrument, and the attribution reads absence
+     * as "cannot join" rather than assuming one request per episode.
+     */
+    readonly episodeStarts?: readonly number[];
     readonly margin_p50?: number | null;
     readonly margin_ladder?: Readonly<Record<string, number>>;
   };
