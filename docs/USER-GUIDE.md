@@ -2942,3 +2942,49 @@ tasks usually cannot, which is why this section exists.
 Nothing in model calls. The census is computed from the `simulations` document the runner has already written,
 in the same process that ran the episodes; it adds one JSON block to the arm artefact (one row per episode) and
 one line per phase to the log.
+
+## 19. When a reading is missing, the run has to say why
+
+Every artefact in this project is expected to let a reader recompute its numbers without the job log. That
+expectation fails in two ways, and they look identical from outside: a field can be **absent**, and a field can
+be **zero**. A third way is worse than either — a reading that could not be computed printing **nothing at
+all**, so the log has no sentence and the artefact has no field.
+
+R123 was the third. Its phase computed a serve split, found it could not be joined (the episode boundary it
+needed had been written as one entry per request), returned nothing, and the caller skipped the print. The arm's
+registered mechanism check vanished between a green gate and a complete-looking artefact.
+
+### 19.1 What a run now tells you
+
+```bash
+# A reading that was computed:
+serve split: served 109 of 109 = 100.00% [96.6, 100.0]; withheld none measured
+# A reading that could not be, with the reason and the numbers that disagreed:
+serve split: not measured (no-boundary) — 162 request(s) with no episode boundary, so no request belongs to a trial
+```
+
+The four reasons, and what each one means for your run:
+
+| reason | what it means | what to look at |
+|---|---|---|
+| `no-ledger` | no request reached the facade, or the arm predates the census | the facade's own count, and whether memory was on at all |
+| `no-boundary` | the boundary field is missing or empty | the sidecar's `episodeStarts`, and whether the agent was the microglia one |
+| `boundary-disagrees` | the boundary exists but is not a partition — it repeats, decreases, starts past the ledger, or does not match the trial count | the numbers in the sentence; the first and last are usually enough |
+| (absent field) | `serveSplitAbsent` in the pair artefact carries the same sentence in machine-readable form | the artefact, not the log |
+
+### 19.2 The two checks that make it trustworthy
+
+- **A field either arm emitted is in its artefact.** The projection table is typed so that a plain field cannot
+  be forgotten; a field added through a spread is exempt, which is how two blocks were dropped. A record that
+  carries an undecided key reports it, and the pair's `l4-projection-complete` gate fails the arm. If you see
+  that gate red, the arms are fine and the projection needs a decision for the named keys.
+- **The split reproduces the arm rate when nothing is withheld.** On an arm with no gate, every episode lands in
+  the served bucket, so `serve split: served` must equal the arm's own episode rate. If it does not, the join has
+  mis-assigned requests and every gated split in the record is unreadable.
+
+### 19.3 What the control arm carries
+
+The reference arm used to return before its bookkeeping was written, so no control artefact had a `tau2` block:
+no usage, no bill, no turn census. Every pair reported `cache first (unstated): unmeasured` because of a missing
+writer, not because of the provider. The control arm now records its turns, its usage, its bill (divided by the
+phase's own episode count) and its turn census, which is what makes a *paired* turn reading possible at all.

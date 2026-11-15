@@ -1469,3 +1469,21 @@ lane, it is a property of a store — which is why R123a measured the store's ma
 named one, and why a rung chosen on one store and dispatched against another is a substitution rather than a
 treatment. The rung is chosen by a rule fixed before the data: the smallest rung withholding at least 15% of
 the contested requests, provided that share is at most 40%.
+
+**Episode boundary** — The request index at which one episode's requests begin. It is a *partition*, not a
+count: consecutive entries bracket the requests that belong to one trial, and the last entry brackets the
+remainder. A list that grows by one per request is a position, and a join on it places every request in an
+episode of its own — which is what R123 recorded (162 entries over 160 episodes) before the writer was repaired.
+The identity `len(episodeStarts) + recallRepeats == recalls` is how a reader checks it.
+
+**Projection** — The step that turns what the driver observed into the block an artefact carries. Every field
+of the driver's record needs a decision (`carried` or `reduced`), and the table is typed so a *plain* field
+cannot be forgotten. A field added through a spread is exempt from that check, which is how two blocks reached
+the record and never reached the artefact. A record that carries a key the table has no decision for reports it
+as `unprojected`, the run says so on stderr, and the pair refuses the arm.
+
+**Absent reading** — A field or line that says *why* it could not be computed, as distinct from a field that is
+missing and a reading of zero. `serveSplitAbsent` names one of `no-ledger`, `no-boundary` or
+`boundary-disagrees` with the numbers that disagreed. A run whose registered mechanism check could not be
+computed is a finding, and a silent caller is how R123's check disappeared between a green gate and an artefact
+with no field.
