@@ -89,6 +89,10 @@ function main(): void {
   // R121: the pass the unit has never run. Printed only when the header names it, so a registration
   // that says nothing leaves the variable unset and the lane exactly as every committed artefact ran it.
   const declaredConsolidate = reading.prereg.consolidate;
+  // R132: the replay of the learn half against its own store. Header-only, like the stop above and for the
+  // same reason: it is a second paid phase, and a global that could turn it on would buy it on every
+  // dispatch the repository has queued.
+  const declaredRehearsal = reading.prereg.rehearsal;
   process.stdout.write(
     `unit=${declaredUnit ?? ''}\nform=${declared ?? ''}\nscope=${declaredScope ?? ''}\n` +
       `claims=${declaredClaims === undefined ? '' : String(declaredClaims)}\n` +
@@ -97,6 +101,7 @@ function main(): void {
       `learnOnly=${declaredLearnOnly === undefined ? '' : String(declaredLearnOnly)}\n` +
       `consolidate=${declaredConsolidate === undefined ? '' : String(declaredConsolidate)}\n` +
       `consolidateKey=${reading.prereg.consolidateKey ?? ''}\n` +
+      `rehearsal=${declaredRehearsal === undefined ? '' : String(declaredRehearsal)}\n` +
       // R123: the gate on whether a pack is served. Header-only, like the two above, and absent leaves
       // the variable unset so the lane serves every non-empty pack exactly as every committed artefact did.
       `speakMargin=${reading.prereg.speakMargin === undefined ? '' : String(reading.prereg.speakMargin)}\n` +

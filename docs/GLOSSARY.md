@@ -1495,3 +1495,10 @@ that separates the two explanations for a held-out harm share: a store that repa
 **right but misapplied** (a conditioning problem), and one that repairs few is **inert or wrong** (a distillation
 problem). `repairRate` divides by the population that failed without memory, and `harmShare` by the outcomes the
 store changed; the two are never quoted beside a held-out score, because these are not held-out tasks.
+
+The block also carries the replay's own `tasks`, `requests` and `served`, because the four cells cannot see the
+third explanation for "repaired nothing": an empty pack. A replay that served 0 of 74 requests and one that
+served 74 and changed nothing produce the same four cells, and only `served` separates a retrieval finding from
+a distillation one. Inside the block, `reading` is the field that may be absent — the phase ran and nothing
+paired — which is a different sentence from the block itself being absent, meaning the registration never
+bought the phase.

@@ -606,6 +606,15 @@ describe('the projection has a decision for every field, and keeps it', () => {
         margin_ladder: { '0.05': 53 },
       },
       turnCensus: { episodes: 160, measurable: 160, toolErrors: 24, rows: [] },
+      // R132: the replay, with all three counts and the four cells. Stated here rather than left to a
+      // `carried` entry the fixture omits: a decision nothing exercises is how R123's drop survived a green
+      // gate, and this field is the one that says whether the store repairs its own cases.
+      rehearsal: {
+        tasks: 74,
+        requests: 74,
+        served: 71,
+        reading: { paired: 74, repaired: 12, broke: 16, kept: 38, inert: 8, repairRate: 0.6, harmShare: 0.5714 },
+      },
       // R89: what the pack served and what it refused. Carried rather than reduced, because the two
       // numbers it separates -- nothing relevant, and relevant but too long -- are the difference
       // between a retrieval fix and a budget fix.

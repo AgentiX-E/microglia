@@ -153,6 +153,11 @@ import {
   type QueryPin,
   type Tau2EpisodeFailure,
   judgeOf,
+  rehearsalLine,
+  rehearsalRecordOf,
+  rehearsalRefused,
+  resolveRehearsal,
+  type RehearsalRecord,
   type RecallInput,
 } from "@agentix-e/microglia-eval";
 import {
@@ -235,6 +240,20 @@ const ARM = resolveArmKind(process.env);
 const MEMORY = ARM !== "reference";
 /** Whether this arm declared its store empty before it ran, which two gates invert on. */
 const DECLARED_EMPTY = declaresEmptyStore(ARM);
+/**
+ * R132: whether this dispatch also replays the learn half's own cases with the store.
+ *
+ * A second paid phase, so it is off unless a registration buys it. Refused here, at module load, when the arm
+ * has no store: a reference arm has nothing to replay, and the alternative — running it and reporting "nothing
+ * paired" — would spend an hour to say that the arm it was not meant for ran.
+ */
+const REHEARSAL = resolveRehearsal();
+if (REHEARSAL && !MEMORY) {
+  throw new RangeError(
+    `a rehearsal replays a store and this arm is '${ARM}': there is nothing to replay, and the phase would ` +
+      "buy a reading about a memory the arm does not have",
+  );
+}
 /**
  * U3's only treatment knob. Unset (every dispatch before U3) resolves to zero,
  * so the facade keeps every hit and the as-is artefact stays comparable. A
@@ -1999,6 +2018,19 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   );
 
   /**
+   * What a facade serves, as the three values a second facade has to reproduce to serve the same memory.
+   *
+   * R132 reads it: a rehearsal of a memory the run does not ship would answer a question about an arm nobody
+   * dispatched, and the alternative — restating the floor, the note and the unit at the call site — is a copy
+   * that drifts the first time an arm is refined.
+   */
+  type FacadeTreatment = {
+    readonly floor: number;
+    readonly note?: NoteMode;
+    readonly shape?: ShapeMode;
+  };
+
+  /**
    * One facade's evaluation over the same held-out split, against the ONE
    * distilled store.
    *
@@ -2009,6 +2041,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
    * property rather than an accident of `run_split.py`'s default of 300.
    */
   type FacadeEvaluation = {
+    readonly treatment: FacadeTreatment;
     readonly scored: ReturnType<typeof scoredArm>;
     readonly diagnostics: Tau2PhaseDiagnostics | undefined;
     readonly servedPackSizes: number[];
@@ -2204,6 +2237,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     }
     const diagnostics = diagnosticsOf(evalStdout);
     return {
+      // The three arguments this facade was asked for, so a second phase can serve the same memory without
+      // restating them. Recorded from the parameters rather than from the branch that called them.
+      treatment: {
+        floor,
+        ...(note === undefined ? {} : { note }),
+        ...(shape === undefined ? {} : { shape }),
+      },
       scored: scoredArm(out),
       diagnostics,
       servedPackSizes,
@@ -2233,6 +2273,89 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     };
   };
 
+  /**
+   * R132: the store on the cases it was written from.
+   *
+   * The learn half ran every training task with **no** memory and its rewards are already in `rewards`. This
+   * phase runs the same tasks again through a facade over the same store, so the two reward sets pair by task
+   * and answer the question no held-out number can: whether an item repairs the failure it was distilled from.
+   *
+   * Four decisions here, each of which is a way the reading could have been about something else:
+   *
+   *  - **Its own facade, and no collector behind it.** The packs this phase serves are the store answering its
+   *    own cases, so counting them in `recall.requests`, `useObservations` or the query census would price a
+   *    second experiment into the first arm's retrieval numbers — R48's defect one layer down. The two counters
+   *    kept are the ones the reading needs: how many requests the facade answered, and how many carried an item.
+   *  - **The treatment of the arm being graded.** Floor, note and unit come from `primary.treatment`, because a
+   *    rehearsal of a memory the run does not ship answers a question about an arm nobody dispatched.
+   *  - **One trial, and the same reduction on both sides.** The learn half ran one trial per task; the replay
+   *    runs one, and both are reduced with `bestRewards`, so a task is one cell on each side. A replay at four
+   *    trials against a learn half at one would compare episodes to cases and report the store on a population
+   *    its own learning never saw.
+   *  - **No query pin.** `TAU_QUERY_PIN` holds *the eval's* phrasings fixed so two arms are asked the same
+   *    question; a replay of the learn half's questions is not that population, and pinning it would rank the
+   *    store on a query no learn episode ever wrote.
+   */
+  const rehearsalHalf = async (
+    treatment: FacadeTreatment,
+    out: string,
+  ): Promise<RehearsalRecord> => {
+    let requests = 0;
+    let served = 0;
+    const facade = await startRecallFacade(async ({ text, query }) => {
+      const pack = await host.recall({
+        ...query,
+        task: TASK,
+        text,
+        scope: { domain: RECALL_DOMAIN },
+        minCoverage: query.minCoverage ?? treatment.floor,
+        ...(treatment.note === undefined ? {} : { note: treatment.note }),
+        ...(treatment.shape === undefined ? {} : { shape: treatment.shape }),
+      });
+      requests += 1;
+      if (pack.items.length > 0) served += 1;
+      return pack;
+    }, { task: TASK });
+    let stdout = "";
+    try {
+      stdout = await phase(
+        driverArgs({
+          script: SCRIPT,
+          domain: LEARN_DOMAIN,
+          phase: "eval",
+          agent: "microglia_agent",
+          taskIds: train,
+          trials: 1,
+          out,
+          memoryUrl: facade.url,
+          requireOffPeak: REQUIRE_OFF_PEAK,
+        }),
+      );
+    } catch (error) {
+      // The window can close between the graded facade and this phase — two hours is plenty of episode for a
+      // boundary to be crossed — and a second phase that refuses must not take the primary measurement with it:
+      // the store and the held-out half are already paid for. So the one refusal `run_split.py` produces before
+      // its first call is recorded as a reading. Every other failure is thrown, because a rehearsal that crashed
+      // mid-phase did spend money and its loss is not a scheduling fact.
+      if (!(error as Error).message.includes("tau2-peak-window")) throw error;
+      return rehearsalRefused({ tasks: train.length, reason: "peak-window" });
+    } finally {
+      await facade.close();
+    }
+    const usage = diagnosticsOf(stdout)?.usage;
+    return rehearsalRecordOf({
+      tasks: train.length,
+      requests,
+      served,
+      ...(usage === undefined || usage === null ? {} : { usage }),
+      learnRewards: rewards,
+      rehearsalRewards: [...bestRewards(readFileSync(out, "utf8"))].map(([task, reward]) => ({
+        task,
+        reward,
+      })),
+    });
+  };
+
   // Attest the single store before either facade recalls. A second learning
   // phase would produce a second fingerprint and be refused by the invariant.
   const sharedScope =
@@ -2250,6 +2373,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       : undefined;
 
   let primary: FacadeEvaluation;
+  /**
+   * R132's reading, absent on every arm whose registration did not buy the replay.
+   *
+   * `undefined` is "not bought" and is written nowhere; the block's presence says the phase ran, and inside it
+   * `reading` is the field that may be absent when nothing paired. Two absences, two sentences.
+   */
+  let rehearsalReading: RehearsalRecord | undefined;
   try {
     if (PAIR_PLAN.enabled && sharedScope !== undefined) {
       const asIs = await evaluateFacade(
@@ -2403,6 +2533,14 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       process.stdout.write(`[tau2] shape arms: ${shapeArmSummary(observedShapes)}\n`);
     } else {
       primary = await evaluateFacade(MIN_COVERAGE, evalPath);
+    }
+    // R132: the replay of the learn half, after the graded facade so the treatment is known and before
+    // `host.close()` so the store can still be asked. A dispatch that did not buy it prints nothing at all:
+    // this is a phase, not an instrument every run carries, and a line saying "not measured" on every arm
+    // that never asked would be the noise that makes a missing reading hard to see.
+    if (REHEARSAL) {
+      rehearsalReading = await rehearsalHalf(primary.treatment, join(workdir, "rehearsal.json"));
+      process.stdout.write(`[tau2] ${rehearsalLine(rehearsalReading)}\n`);
     }
   } finally {
     await host.close();
@@ -2696,6 +2834,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // R125: the per-turn census, with one row per episode so the pair can join it. Absent on an arm whose
     // phase wrote no census — the artefact then says the instrument never reached it.
     ...turnCensusBlock(primary.diagnostics),
+    // R132: the store on the cases it was built from, and the requests that replay cost. Absent on every arm
+    // that did not buy it: the block's presence is the statement that the phase ran, and `reading` inside it
+    // is the field that may be absent when the two reward sets paired nothing.
+    ...(rehearsalReading === undefined ? {} : { rehearsal: rehearsalReading }),
     // What the served packs contained. `withoutDomain` is the store's count of
     // `domain === undefined` items, from the same domain ledger V44 reads.
     useObservations: primary.useObservations,

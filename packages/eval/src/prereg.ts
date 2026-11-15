@@ -224,6 +224,18 @@ export type Prereg = {
    */
   readonly consolidate?: boolean;
   /**
+   * Whether this arm replays the learn half's cases with the store, to separate a misapplied item from a
+   * wrong one.
+   *
+   * R132. Every held-out number this lane publishes mixes two failures — an item that is wrong and an item
+   * that is right but applied where it does not belong — and R123's 56.7% harm share cannot say which. The
+   * learn half already ran every training task with no memory, so replaying them with the store asks whether
+   * an item repairs the case it was written from. It is a second paid phase over the same store, which is why
+   * it is a registration's switch rather than something every dispatch inherits: a push run must not buy it,
+   * and an arm whose question is a held-out score must not pay for a reading it will not quote.
+   */
+  readonly rehearsal?: boolean;
+  /**
    * Which key the recurrence pass compares items by: their scope (the default) or the routine behind them.
    *
    * R124. R121 measured the default's cost — `scope.intent` is a phrase the distiller writes per episode, so
@@ -463,6 +475,7 @@ const HEADER_KEYS = [
   'distillUnit',
   'distillScope',
   'learnOnly',
+  'rehearsal',
   'consolidate',
   'consolidateKey',
   'speakMargin',
@@ -1025,6 +1038,29 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // R132: the replay of the learn half's own cases. A second paid phase, so the header states it and the
+  // dispatch inherits it -- and a `learnOnly` arm refuses it, because that arm stops before the evaluation
+  // whose favours the replay is paired against: a rehearsal with no learn-half rewards to pair with would
+  // cost an hour and produce `nothing paired`.
+  const rehearsalText = values.get('rehearsal');
+  let rehearsal: boolean | undefined;
+  if (rehearsalText !== undefined) {
+    if (!HEADER_BOOLEANS.has(rehearsalText)) {
+      collected.push({
+        where: `header 'rehearsal'`,
+        problem: `'${rehearsalText}' is not one of ${[...HEADER_BOOLEANS].join(', ')}`,
+      });
+    } else {
+      rehearsal = rehearsalText === 'true';
+    }
+  }
+  if (rehearsal === true && learnOnly === true) {
+    collected.push({
+      where: `header 'rehearsal'`,
+      problem: 'a learnOnly arm stops before the evaluation, so a replay would have nothing to pair against',
+    });
+  }
+
   // R123: the gate on whether a pack is served. A number, and refusing a negative or non-finite one
   // matters more than usual here: `0` is the default and it is *not* "off" — it is "serve every non-empty
   // pack" — so a misspelt value that fell back to 0 would publish the control under the treatment's name.
@@ -1079,6 +1115,29 @@ export function readPrereg(markdown: string, file: string): PreregReading {
             '0.75 minutes an episode; split the arm rather than shrinking the claim',
         });
       }
+    }
+  }
+
+  // R132: the replay is two more halves of episodes on the same clock, and a job that outlives its limit
+  // produces nothing — the failure mode is not a refusal but a cancelled run whose learning half was paid for.
+  // The learn half runs once and the replay runs it again, so a rehearsal arm carries `trials * testTasks +
+  // 2 * trainTasks` episodes. Only checked when the registration states both caps, because a cap of "all" is
+  // not a number this file can read without the benchmark's task list.
+  if (rehearsal === true) {
+    const testTasks = Number(values.get('testTasks') ?? 40);
+    const trainTasks = Number(values.get('trainTasks') ?? 40);
+    const armTrials = trials ?? 4;
+    const episodes = armTrials * (Number.isFinite(testTasks) && testTasks > 0 ? testTasks : 40) +
+      2 * (Number.isFinite(trainTasks) && trainTasks > 0 ? trainTasks : 40);
+    if (episodes > DISPATCH_EPISODE_CEILING) {
+      collected.push({
+        where: `header 'rehearsal'`,
+        problem:
+          `a replay adds the learn half a second time, so this arm carries ${String(episodes)} episode(s) ` +
+          `(${String(armTrials)} x ${String(testTasks)} evaluated + 2 x ${String(trainTasks)} learned), above ` +
+          `the ${String(DISPATCH_EPISODE_CEILING)} one 240-minute job carries at the measured 0.75 minutes an ` +
+          'episode; lower the trial count or split the arm',
+      });
     }
   }
 
@@ -1426,6 +1485,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(distillUnit === undefined ? {} : { distillUnit }),
       ...(distillScope === undefined ? {} : { distillScope }),
       ...(learnOnly === undefined ? {} : { learnOnly }),
+      ...(rehearsal === undefined ? {} : { rehearsal }),
       ...(consolidate === undefined ? {} : { consolidate }),
       ...(consolidateKey === undefined ? {} : { consolidateKey }),
       ...(speakMargin === undefined ? {} : { speakMargin }),

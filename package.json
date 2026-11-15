@@ -64,6 +64,7 @@
     "eval:prereg-pair": "tsx packages/eval/src/bin/prereg-pair.ts",
     "eval:prereg-notes": "tsx packages/eval/src/bin/prereg-notes.ts",
     "eval:prereg-shapes": "tsx packages/eval/src/bin/prereg-shapes.ts",
+    "eval:prereg-rehearsal": "tsx packages/eval/src/bin/prereg-rehearsal.ts",
     "eval:prereg-scenario": "tsx packages/eval/src/bin/prereg-scenario.ts",
     "eval:prereg-form": "tsx packages/eval/src/bin/prereg-form.ts",
     "eval:pack-knobs": "tsx packages/eval/src/bin/pack-knobs.ts",

@@ -61,6 +61,7 @@ import type {
 } from './tau2-instrument.js';
 import type { StoreItemSample } from './store-items.js';
 import type { QueryCensus } from './tau2-queries.js';
+import type { RehearsalRecord } from './tau2-rehearsal.js';
 
 /**
  * One arm's records, as far as the protocol is concerned.
@@ -156,6 +157,15 @@ export type Tau2ArmRecord = {
   };
   /** R125's per-turn census, carried verbatim, absent on arms that predate the instrument. */
   readonly turnCensus?: unknown;
+  /**
+   * R132's replay of the learn half against the store it wrote, carried verbatim.
+   *
+   * Absent on an arm whose registration did not buy one. This is the lane's only reading whose denominator is
+   * the store's own cases rather than tasks it was never taught, which is why it travels in the arm record and
+   * not only in the driver's log line: a harm share of 56.7% is either a store that is wrong or a store that is
+   * applied where it does not belong, and the four cells are what tells the two apart.
+   */
+  readonly rehearsal?: RehearsalRecord;
   /**
    * Keys the driver emitted that `PROJECTION` has no decision for.
    *

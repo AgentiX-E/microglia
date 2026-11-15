@@ -819,8 +819,12 @@ export {
 export {
   rehearsalLine,
   rehearsalOf,
+  rehearsalRecordOf,
+  rehearsalRefused,
+  resolveRehearsal,
   type Rehearsal,
   type RehearsalCell,
+  type RehearsalRecord,
 } from './tau2-rehearsal.js';
 export {
   itemTransfer,

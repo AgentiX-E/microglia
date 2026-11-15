@@ -16,6 +16,7 @@
  * counts. It does not run anything, because the thing that runs a phase is the driver and a harness that could
  * take either input would be two descriptions of one experiment.
  */
+import type { Tau2PhaseUsage } from './tau2-instrument.js';
 
 /** One training task's outcome on each side of the replay. */
 export type RehearsalCell = {
@@ -105,20 +106,125 @@ export function rehearsalOf(input: {
  * held-out harm share are separated by, and it names the held-out half nowhere: this reading is about the store's
  * own cases and quoting it beside a held-out score would invite exactly the confusion it exists to remove.
  */
-export function rehearsalLine(rehearsal: Rehearsal | undefined, tasks: number): string {
+export function rehearsalLine(record: RehearsalRecord): string {
+  if (record.refused !== undefined) {
+    return (
+      `rehearsal: not run — the phase refused to open in a peak-rate window, so the ${String(record.tasks)} ` +
+      "task(s) it would have replayed were never asked; the store was not replayed against its own cases"
+    );
+  }
+  const served = `${String(record.served)} of ${String(record.requests)} request(s) served`;
+  const rehearsal = record.reading;
   if (rehearsal === undefined) {
     return (
-      'rehearsal: not measured — no task carried a reward on both sides, so the store was not replayed against ' +
-      'the cases it was built from'
+      `rehearsal: ${String(record.tasks)} task(s) replayed, ${served} — no task carried a reward on both ` +
+      'sides, so the store was replayed but nothing paired'
     );
   }
   const share = (value: number | null): string => (value === null ? 'none' : `${(value * 100).toFixed(2)}%`);
   const failed = rehearsal.repaired + rehearsal.inert;
   return (
-    `rehearsal: ${String(rehearsal.paired)} of ${String(tasks)} task(s) replayed, ` +
+    `rehearsal: ${String(rehearsal.paired)} of ${String(record.tasks)} task(s) replayed, ${served}, ` +
     `${String(rehearsal.repaired)} repaired / ${String(rehearsal.inert)} inert of the ${String(failed)} that ` +
     `failed without memory (${share(rehearsal.repairRate)}); ` +
     `${String(rehearsal.broke)} broken and ${String(rehearsal.kept)} kept of the rest` +
     (rehearsal.harmShare === null ? '' : `; harm share ${share(rehearsal.harmShare)}`)
   );
+}
+
+/**
+ * Everything one rehearsal phase measured, in the shape the artefact carries.
+ *
+ * The counts travel beside the four cells because they answer the question the cells cannot: a replay in which
+ * the pack was empty for every task and one in which the pack was served and had no effect produce **the same
+ * four cells**, and only `served` separates them. A reading that cannot make that distinction would report a
+ * retrieval failure as a distillation failure — which is the defect this whole round exists to stop repeating.
+ *
+ * `reading` is required and may be `undefined`, so the two absences stay distinguishable in the artefact: the
+ * field is written and its pairing is empty (the phase ran, nothing paired) versus the block itself being
+ * absent (the phase was never bought). A `?? {}` in the driver would collapse them.
+ *
+ * `usage` is the phase's own bill, when the phase printed one. Optional because a phase that reported no
+ * provider account is a different fact from one that spent nothing, and because the rehearsal is a second paid
+ * phase whose cost an artefact has to be able to attribute without reading a workflow log.
+ */
+export type RehearsalRecord = {
+  /** The tasks the replay was asked to run, which is the learn half's own list. */
+  readonly tasks: number;
+  /** Requests the facade answered, and the ones that carried at least one item. */
+  readonly requests: number;
+  readonly served: number;
+  readonly reading: Rehearsal | undefined;
+  /**
+   * Why the phase never ran, when it was bought and then refused.
+   *
+   * One value, because there is one refusal that can arrive here: `run_split.py` declines to open a phase in a
+   * peak-rate window, and the window can close between the graded facade and this one. The refusal is recorded
+   * rather than thrown because the arm has already been paid for — a second phase must not take the primary
+   * measurement with it — and it is recorded *here* rather than left as an absent block, because an absent
+   * block would say the registration never bought the phase.
+   */
+  readonly refused?: 'peak-window';
+  readonly usage?: Tau2PhaseUsage;
+};
+
+/** The record of a phase that was bought and refused before its first call. */
+export function rehearsalRefused(input: {
+  readonly tasks: number;
+  readonly reason: 'peak-window';
+}): RehearsalRecord {
+  return {
+    tasks: input.tasks,
+    // Zero requests, and stated as zero rather than hidden: no call was made, so the store was not asked.
+    requests: 0,
+    served: 0,
+    reading: undefined,
+    refused: input.reason,
+  };
+}
+
+/**
+ * Reduce one replay to the artefact's block.
+ *
+ * The one decision here is that the pairing is derived from the two reward sets rather than accepted already
+ * computed: a caller handing in four numbers could hand in four different ones than the ones its own line
+ * printed, and this lane has paid for that twice (R48's two dispatches, R123's seven zeros).
+ */
+export function rehearsalRecordOf(input: {
+  readonly tasks: number;
+  readonly requests: number;
+  readonly served: number;
+  readonly learnRewards: ReadonlyMap<string, number> | Readonly<Record<string, number>>;
+  readonly rehearsalRewards: readonly { readonly task: string; readonly reward: number | null }[];
+  readonly usage?: Tau2PhaseUsage;
+}): RehearsalRecord {
+  return {
+    tasks: input.tasks,
+    requests: input.requests,
+    served: input.served,
+    reading: rehearsalOf({
+      learnRewards: input.learnRewards,
+      rehearsalRewards: input.rehearsalRewards,
+    }),
+    ...(input.usage === undefined ? {} : { usage: input.usage }),
+  };
+}
+
+/**
+ * Whether this dispatch buys a rehearsal.
+ *
+ * Unset and `0` are the same fact (no replay), and both are distinct from `1`. Any other value is refused before
+ * the first model call for `resolveSpeakMargin`'s reason: a misread switch that fell back to "off" would leave
+ * an arm whose registration asked the question reporting nothing at all, and the reader would have no way to
+ * tell that from a store that repaired nothing.
+ *
+ * This is a purchase, not an instrument: every run carries the turn census because the phase computes it
+ * anyway, and no run carries a rehearsal unless a registration asked. That is why the plan is resolved here
+ * rather than printed unconditionally.
+ */
+export function resolveRehearsal(raw = process.env['TAU_REHEARSAL']): boolean {
+  const value = (raw ?? '').trim();
+  if (value === '' || value === '0') return false;
+  if (value === '1') return true;
+  throw new RangeError(`TAU_REHEARSAL must be unset, '0' or '1'; received '${String(raw)}'`);
 }

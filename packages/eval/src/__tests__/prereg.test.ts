@@ -1514,6 +1514,25 @@ describe('the distilling scope', () => {
     expect(readPrereg(withHeader('learnOnly: 1'), 'R87-distill-scope.md').problems).toHaveLength(1);
   });
 
+  it("reads whether this arm replays its own cases, and refuses the arm that has nothing to pair", () => {
+    // R132: the replay is a second paid phase over the same store, so the registration states it and the
+    // dispatch inherits it. A header that said nothing leaves the arm exactly as every arm before it ran.
+    expect(readPrereg(withHeader('rehearsal: true'), 'R87-distill-scope.md').prereg?.rehearsal).toBe(true);
+    expect(readPrereg(withHeader('rehearsal: false'), 'R87-distill-scope.md').prereg?.rehearsal).toBe(false);
+    expect(readPrereg(withHeader('split: dev'), 'R87-distill-scope.md').prereg?.rehearsal).toBeUndefined();
+    expect(readPrereg(withHeader('rehearsal: 1'), 'R87-distill-scope.md').problems).toEqual([
+      { where: "header 'rehearsal'", problem: "'1' is not one of true, false" },
+    ]);
+    // A learn-only arm stops before the evaluation whose rewards the replay is paired against, so buying one
+    // would spend an hour to report `nothing paired` — a plan defect wearing a store result's clothes.
+    expect(readPrereg(withHeader('rehearsal: true\nlearnOnly: true'), 'R87-distill-scope.md').problems).toEqual([
+      {
+        where: "header 'rehearsal'",
+        problem: 'a learnOnly arm stops before the evaluation, so a replay would have nothing to pair against',
+      },
+    ]);
+  });
+
   it('reads whether the recurrence pass runs on this unit, which is R121\'s one variable', () => {
     // `consolidateKnowledge` has run only under `distillUnit: trace` since R58, so every arm on the
     // published unit has held single-task items while its own two censuses priced 39-53 claims. The

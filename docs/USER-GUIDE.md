@@ -2988,3 +2988,75 @@ The reference arm used to return before its bookkeeping was written, so no contr
 no usage, no bill, no turn census. Every pair reported `cache first (unstated): unmeasured` because of a missing
 writer, not because of the provider. The control arm now records its turns, its usage, its bill (divided by the
 phase's own episode count) and its turn census, which is what makes a *paired* turn reading possible at all.
+
+## 20. The store on the cases it was built from
+
+A held-out score answers "does the memory help on tasks it never saw", and that question mixes two failures that
+call for opposite fixes: an item that is **wrong** (fix the write side) and an item that is **right but served on
+a case it does not belong to** (fix the trigger, the floor or the margin). A harm share cannot separate them — a
+store can be harmful on 57% of the trials it changes and still be right about everything it says.
+
+A rehearsal separates them, because the learn half already knows which cases wrote the store. Every training task
+ran with no memory, the ones that failed are what the corrections were distilled from, and replaying those same
+tasks **with** the store asks whether an item repairs the case that produced it.
+
+### 20.1 Buying one
+
+The replay is a second paid phase over the same store, so it is a registration's switch and not a repository
+variable:
+
+```yaml
+rehearsal: true
+trials: 2          # 74 learned + 80 evaluated + 74 replayed = 228 episodes, inside one 240-minute job
+```
+
+`pnpm eval:prereg` refuses three shapes before the first model call: a `rehearsal: true` arm that would not fit
+one job (it counts `trials x testTasks + 2 x trainTasks` episodes), a rehearsing `learnOnly` arm (it stops before
+the evaluation whose rewards the replay pairs against), and a value that is not `true` or `false`. The driver
+refuses one more: a rehearsal on a reference arm, which has no store to replay.
+
+### 20.2 What it prints
+
+```bash
+[tau2] rehearsal: 74 of 74 task(s) replayed, 71 of 74 request(s) served, 12 repaired / 31 inert of the 43 that
+failed without memory (27.91%); 4 broken and 27 kept of the rest; harm share 25.00%
+# And when the phase ran but the two reward sets paired nothing:
+[tau2] rehearsal: 74 task(s) replayed, 0 of 74 request(s) served — no task carried a reward on both sides, so the
+store was replayed but nothing paired
+```
+
+Four cells, from two reward sets paired by task:
+
+| cell | meaning |
+|---|---|
+| repaired | failed without memory, passed with it — the item worked on its own case |
+| broke | passed without memory, failed with it — the store made a case worse that needed no help |
+| inert | failed both times — absent, irrelevant, or wrong in a way that changed nothing |
+| kept | passed both times |
+
+### 20.3 The two rates, and why their denominators differ
+
+- `repairRate = repaired / (repaired + inert)` divides by the **failures** the store was written from. A task the
+  model already passed teaches nothing and asks the store nothing, so including it would dilute the number into
+  something that reads like a held-out score.
+- `harmShare = broke / (repaired + broke)` divides by the **outcomes the store changed**. It is the own-case
+  analogue of the held-out harm share, so it is the number R123's 56.7% can be compared with.
+
+Read together: a **high** repair rate with a **low** own-case harm share means the store is right and misapplied
+elsewhere — a conditioning problem. A **low** repair rate means the items do not fix the failures that wrote them
+— a distillation problem, and the next arm belongs on the write side.
+
+### 20.4 The three absences
+
+| what you see | what it means |
+|---|---|
+| no `rehearsal` block, no line | the registration did not buy the phase — every arm before R132 |
+| the block, with `reading` absent | the phase ran and no task carried a reward on both sides |
+| the block, with `served` far below `requests` | the store could not reach its own cases: a retrieval or scoping finding, not a distillation one |
+| the block, with `refused: peak-window` | the window closed before the replay opened, so no request was made and the store was not asked |
+
+The third row is why `served` travels with the four cells: an empty pack and an inert item produce the same
+counts, and only one of them is about what the store says. The fourth row is why the refusal is a field rather
+than a crash: the graded facade has already been paid for by the time the replay opens, and a second phase must
+never take the primary measurement with it. `run_split.py` declines to open a phase in a peak-rate window; the
+driver records that one refusal and throws every other failure.

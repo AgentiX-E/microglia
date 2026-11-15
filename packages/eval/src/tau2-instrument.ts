@@ -38,6 +38,7 @@
  */
 import type { PhaseCacheCensus } from "./cache-census.js";
 import type { FaithfulnessCensus } from "./tau2-faithfulness.js";
+import type { RehearsalRecord } from "./tau2-rehearsal.js";
 import type { RawLogCensus } from "./tau2-rawlog.js";
 import { defaultPolicy } from "@agentix-e/microglia-core/kernel";
 import type { FunnelInput } from "@agentix-e/microglia-protocol";
@@ -366,6 +367,15 @@ export type Tau2Raw = {
    * R125's per-turn census, carried verbatim for the same reason and with the same absence rule.
    */
   readonly turnCensus?: unknown;
+  /**
+   * R132's replay of the learn half against the store it wrote, when the registration bought one.
+   *
+   * Absent on every arm that did not, which is every arm before this field and every arm whose header does not
+   * say `rehearsal: true`. Inside the block, `reading` is the field that may itself be absent — the phase ran and
+   * nothing paired — so the artefact can separate "not bought" from "bought and empty", which are the two
+   * readings a reader must not confuse.
+   */
+  readonly rehearsal?: RehearsalRecord;
   /**
    * What the delivered packs actually contained, one row per recall request.
    *
@@ -899,6 +909,9 @@ export const PROJECTION: {
   // dropped — the rung's population, the serve split's episode boundary and R128's item attribution.
   memory: "carried",
   turnCensus: "carried",
+  // Carried verbatim: R132's replay is the only reading in this lane whose denominator is the store's own
+  // cases, and a block the record dropped would leave a phase that cost an hour with nowhere to land.
+  rehearsal: "carried",
   recall: "carried",
   useObservations: "reduced",
   coverageObservations: "reduced",
@@ -1153,6 +1166,7 @@ export function armRecordFromDriver(
     ...(raw.pack === undefined ? {} : { pack: raw.pack }),
     ...(raw.memory === undefined ? {} : { memory: raw.memory }),
     ...(raw.turnCensus === undefined ? {} : { turnCensus: raw.turnCensus }),
+    ...(raw.rehearsal === undefined ? {} : { rehearsal: raw.rehearsal }),
     ...(raw.inaction === undefined ? {} : { inaction: raw.inaction }),
     // The use census rides beside V1's rate. It is computed here, from the raw
     // observations the driver collected at the facade, so the driver carries
