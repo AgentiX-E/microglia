@@ -145,6 +145,10 @@ export function foldByShape(
 
   const buckets = new Map<string, KnowledgeItem[]>();
   const keyOf = items.map((item) => shapeKeyOf(item, options.shapeOf));
+  // Counted before the buckets, because it is the population that never reaches one. A fold that
+  // reports only `folded` and `refused` cannot distinguish a store of unique routines from a host whose
+  // extractor names nothing, and the second is what a distilled store produced for three rounds.
+  const unnamed = keyOf.filter((key) => key === undefined).length;
   items.forEach((item, index) => {
     const key = keyOf[index];
     if (key === undefined) return;
@@ -213,6 +217,7 @@ export function foldByShape(
     folded: items.length - kept.length,
     groups,
     refused,
+    unnamed,
     support: { max, atLeastTwo, atLeastThree },
   };
 }

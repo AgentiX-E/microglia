@@ -145,6 +145,7 @@ describe('foldCensus', () => {
     folded: foldedItems,
     groups: Array.from({ length: foldedItems }, () => ({})),
     refused: 0,
+    unnamed: 0,
     support,
     items: [],
   });
@@ -159,6 +160,7 @@ describe('foldCensus', () => {
       folded: 3,
       groups: 3,
       refused: 0,
+      unnamed: 0,
       units: 3,
       atLeastTwo: 3,
       atLeastThree: 1,
@@ -190,6 +192,29 @@ describe('foldCensus', () => {
     );
     const without = packCensus([{ ids: ['a'], truncated: 0, rendered: 'x' }], { budget: 2400, capacity: 810 });
     expect(packLineOf(without)).not.toContain('fold');
+  });
+
+  it('names the population the fold could not key, so a zero fold is a finding and not a silence', () => {
+    // R120's line is the one this test is about. A run on a distilled store printed `fold 0 of 631 units
+    // (0 groups, 0 refused for want of a second task)` and nothing else, and every reader of it — this
+    // record included — took it as a property of the store. The count below is what makes the next
+    // occurrence self-reporting: `unnamed 79` says the extractor named nothing, which is a defect, while
+    // `unnamed 0` with `folded 0` says the store holds one record per routine, which is a finding.
+    const blind = packCensus(
+      [
+        { ids: ['a', 'b', 'c'], truncated: 0, rendered: 'x', fold: { items: [], folded: 0, groups: [], refused: 0, unnamed: 3, support: { max: 1, atLeastTwo: 0, atLeastThree: 0 } } },
+      ],
+      { budget: 2400, capacity: null },
+    );
+    expect(packLineOf(blind)).toContain('0 refused for want of a second task, 3 unnamed');
+    expect(blind.fold?.unnamed).toBe(3);
+    // And it is not printed when it is zero, so a store the fold could read keeps the old line byte for
+    // byte: an artefact written before this count existed must still compare.
+    const readable = packCensus(
+      [{ ids: ['a'], truncated: 0, rendered: 'x', fold: folded(0, { max: 1, atLeastTwo: 0, atLeastThree: 0 }) }],
+      { budget: 2400, capacity: null },
+    );
+    expect(packLineOf(readable)).not.toContain('unnamed');
   });
 
   it('travels on the pack census, so an artefact cannot report one without the other', () => {

@@ -264,12 +264,60 @@ describe('what the pack reports', () => {
     expect(DEFAULT_FOLD_SUPPORT).toBe(2);
   });
 
+  it('counts the items it could not name, which is what a zero fold was hiding', () => {
+    // R120. `folded: 0, groups: 0, refused: 0` was printed for three rounds on a distilled store and no
+    // reader could tell it from a store of unique routines. `refused` counts groups that existed and fell
+    // short in support; this counts the population that never entered a group, which on a distilled store
+    // is all of it — the extractor reads an `A:` line and a distiller writes a sentence.
+    const distilled = [
+      createKnowledgeItem(
+        {
+          namespace: 'tau2',
+          kind: 'procedure',
+          scope: { task: 'tau2.act' },
+          statement: 'A return action carries the item_ids being returned.',
+          payload: {},
+          evidence: { feedbackId: 'f_1', runId: 'r_1', at: AT, taskId: 't1', weight: 0.9 },
+          trust: 0.9,
+          dedupeKey: 'claim|1',
+        },
+        defaultPolicy,
+        AT,
+        'd1',
+      ),
+      createKnowledgeItem(
+        {
+          namespace: 'tau2',
+          kind: 'procedure',
+          scope: { task: 'tau2.act' },
+          statement: 'An exchange action carries the payment_method_id the user preferred.',
+          payload: {},
+          evidence: { feedbackId: 'f_2', runId: 'r_2', at: AT, taskId: 't2', weight: 0.9 },
+          trust: 0.9,
+          dedupeKey: 'claim|2',
+        },
+        defaultPolicy,
+        AT,
+        'd2',
+      ),
+    ];
+    const disabled = foldByShape(distilled, { mode: 'collapse' });
+    expect(disabled.unnamed).toBe(2);
+    expect(disabled.folded).toBe(0);
+    expect(disabled.refused).toBe(0);
+    // The same two items with a key that names their routine are named, and one of them folds.
+    const named = foldByShape(distilled, { mode: 'collapse', shapeOf: () => EXCHANGE.join(' > ') });
+    expect(named.unnamed).toBe(0);
+    expect(named.folded).toBe(1);
+  });
+
   it('is a function of the pack and not of its size', () => {
     expect(foldByShape([], { mode: 'collapse', shapeOf })).toEqual({
       items: [],
       folded: 0,
       groups: [],
       refused: 0,
+      unnamed: 0,
       support: { max: 0, atLeastTwo: 0, atLeastThree: 0 },
     });
   });

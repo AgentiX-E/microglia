@@ -96,6 +96,14 @@ export type FoldCensus = {
   readonly groups: number;
   /** Groups of ≥2 members that did not fold because their distinct tasks fell short. */
   readonly refused: number;
+  /**
+   * Items across those packs that stated no routine the host could name.
+   *
+   * The count that makes a zero readable: `folded: 0, refused: 0` says nothing about *why* nothing
+   * folded, and `unnamed` equal to the store's size says the key had no input rather than the store
+   * having no recurrence.
+   */
+  readonly unnamed: number;
   /** Rendered units across those packs, the denominator of the two shares below. */
   readonly units: number;
   /** Units taught by ≥2 and ≥3 tasks, summed over packs. */
@@ -117,21 +125,29 @@ export function foldCensus(readings: readonly PackReading[]): FoldCensus | null 
   let foldedItems = 0;
   let groups = 0;
   let refused = 0;
+  let unnamed = 0;
   let units = 0;
   let atLeastTwo = 0;
   let atLeastThree = 0;
   let max = 0;
   for (const pack of folded) {
-    const fold = pack.fold as { readonly folded: number; readonly groups: readonly unknown[]; readonly refused: number; readonly support: FoldSupport };
+    const fold = pack.fold as {
+      readonly folded: number;
+      readonly groups: readonly unknown[];
+      readonly refused: number;
+      readonly unnamed: number;
+      readonly support: FoldSupport;
+    };
     foldedItems += fold.folded;
     groups += fold.groups.length;
     refused += fold.refused;
+    unnamed += fold.unnamed;
     units += pack.ids.length;
     atLeastTwo += fold.support.atLeastTwo;
     atLeastThree += fold.support.atLeastThree;
     if (fold.support.max > max) max = fold.support.max;
   }
-  return { packs: folded.length, folded: foldedItems, groups, refused, units, atLeastTwo, atLeastThree, max };
+  return { packs: folded.length, folded: foldedItems, groups, refused, unnamed, units, atLeastTwo, atLeastThree, max };
 }
 
 export function packCensus(
@@ -179,7 +195,10 @@ export function packLineOf(census: PackCensus): string {
     fold === null
       ? ''
       : `; fold ${String(fold.folded)} of ${String(fold.folded + fold.units)} units ` +
-        `(${String(fold.groups)} groups, ${String(fold.refused)} refused for want of a second task), ` +
+        `(${String(fold.groups)} groups, ${String(fold.refused)} refused for want of a second task` +
+        // Printed only when it is non-zero, because it is the one number that turns a zero into a
+        // finding: a run whose fold had no key said `folded 0, groups 0, refused 0` for three rounds.
+        `${fold.unnamed === 0 ? '' : `, ${String(fold.unnamed)} unnamed`}), ` +
         `support ≥2 ${String(fold.atLeastTwo)}, ≥3 ${String(fold.atLeastThree)}, max ${String(fold.max)}`;
   return (
     `${head}; served ${String(census.filled)} of ${String(census.requests)} ` +

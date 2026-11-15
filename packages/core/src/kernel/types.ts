@@ -487,6 +487,18 @@ export type ShapeFold = {
    * only `folded: 0` could not tell them apart.
    */
   readonly refused: number;
+  /**
+   * Items the host could not name — no routine the extractor recognises, and no evidence task whose
+   * routine it knows.
+   *
+   * R120. Without this count a run reported `folded: 0, groups: 0, refused: 0` and a reader had no way
+   * to tell "the store has no two records of one routine" from "the key had no input" — and on a
+   * distilled store it was the second, for three rounds, because the extractor reads an `A:` line that
+   * a distiller never writes. `refused` counts groups that existed and fell short in support; this
+   * counts the population that never entered a group at all. They are different findings and an arm
+   * that reports only one of them can be read as the other.
+   */
+  readonly unnamed: number;
   readonly support: FoldSupport;
 };
 
