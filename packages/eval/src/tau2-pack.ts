@@ -84,6 +84,16 @@ export type PackCensus = {
    * are counted in and the one number this arm can move.
    */
   readonly fold: FoldCensus | null;
+  /**
+   * The ids each request was served, in the order the requests arrived.
+   *
+   * R120. Two dispatches of one lane — one form, one split, one seed, one model — measured 0.600 and
+   * 0.750, and neither artefact could say which packs differed: the census kept counts and dropped the
+   * ids. A difference larger than every effect this record has reported was therefore unattributable to a
+   * claim even in principle. The ledger makes the next such pair legible, and it is keyed by position in
+   * the phase, the same key `queries` uses, because nothing upstream names the episode.
+   */
+  readonly ledger: readonly (readonly string[])[];
 };
 
 /** The fold, aggregated over a run's requests. `null` when no pack carried one. */
@@ -104,6 +114,15 @@ export type FoldCensus = {
    * having no recurrence.
    */
   readonly unnamed: number;
+  /**
+   * Groups that met the fold's floor and that this arm's unit did not fold.
+   *
+   * The count that keeps `groups: 0` from reading as a fact about the store: on the `per-failure` arm
+   * the fold never runs by construction, so its `groups` is zero whether the store recurs or not. Zero
+   * here with zero `groups` is a store with nothing to fold; non-zero here is a control that folded
+   * nothing because it is the control.
+   */
+  readonly suppressed: number;
   /** Rendered units across those packs, the denominator of the two shares below. */
   readonly units: number;
   /** Units taught by ≥2 and ≥3 tasks, summed over packs. */
@@ -126,6 +145,7 @@ export function foldCensus(readings: readonly PackReading[]): FoldCensus | null 
   let groups = 0;
   let refused = 0;
   let unnamed = 0;
+  let suppressed = 0;
   let units = 0;
   let atLeastTwo = 0;
   let atLeastThree = 0;
@@ -136,18 +156,32 @@ export function foldCensus(readings: readonly PackReading[]): FoldCensus | null 
       readonly groups: readonly unknown[];
       readonly refused: number;
       readonly unnamed: number;
+      /** Absent on artefacts written before R120, which is a different reading from a measured zero. */
+      readonly suppressed?: number;
       readonly support: FoldSupport;
     };
     foldedItems += fold.folded;
     groups += fold.groups.length;
     refused += fold.refused;
     unnamed += fold.unnamed;
+    suppressed += fold.suppressed ?? 0;
     units += pack.ids.length;
     atLeastTwo += fold.support.atLeastTwo;
     atLeastThree += fold.support.atLeastThree;
     if (fold.support.max > max) max = fold.support.max;
   }
-  return { packs: folded.length, folded: foldedItems, groups, refused, unnamed, units, atLeastTwo, atLeastThree, max };
+  return {
+    packs: folded.length,
+    folded: foldedItems,
+    groups,
+    refused,
+    unnamed,
+    suppressed,
+    units,
+    atLeastTwo,
+    atLeastThree,
+    max,
+  };
 }
 
 export function packCensus(
@@ -169,7 +203,73 @@ export function packCensus(
     droppedForSize: readings.reduce((sum, pack) => sum + pack.truncated, 0),
     summary: requests === 0 ? null : { meanIds: total / requests, meanChars: chars / requests },
     fold: foldCensus(readings),
+    ledger: readings.map((pack) => pack.ids),
   };
+}
+
+/** Two runs' ledgers, compared by the position they were served at. */
+export type LedgerDiff = {
+  /** Positions both ledgers cover: the denominator of the three counts below. */
+  readonly requests: number;
+  /** Positions served exactly the same ids, in the same order. */
+  readonly identical: number;
+  /** Positions served a different set, so the two arms delivered different knowledge there. */
+  readonly differ: number;
+  /** Ids in the treatment's pack that the control's pack at that position did not carry. */
+  readonly entered: number;
+  /** Ids the control carried that the treatment did not. */
+  readonly left: number;
+  /** Positions only the longer ledger covers: a stopped or differently shaped phase, not a repeat. */
+  readonly unpaired: number;
+};
+
+/**
+ * What two runs of one lane delivered differently, position by position.
+ *
+ * Counts positions rather than ids, because a repack is not a rewrite: an arm that moved one record one
+ * rank down changed no decision, and an arm that replaced two records changed the treatment. `entered`
+ * and `left` price the second, and the pair of them is the only reading that can attribute a score
+ * difference to a claim rather than to a mechanism.
+ */
+export function ledgerDiff(left: readonly (readonly string[])[], right: readonly (readonly string[])[]): LedgerDiff {
+  const requests = Math.min(left.length, right.length);
+  let identical = 0;
+  let differ = 0;
+  let entered = 0;
+  let leftOver = 0;
+  for (let index = 0; index < requests; index += 1) {
+    const before = left[index] as readonly string[];
+    const after = right[index] as readonly string[];
+    // Sets, not sequences: the pack's own order is a ranking, and `meanPackIds` already reports whether
+    // the ranking moved. What a treatment changed is *which knowledge was delivered*.
+    const beforeSet = new Set(before);
+    const afterSet = new Set(after);
+    const same = beforeSet.size === afterSet.size && [...beforeSet].every((id) => afterSet.has(id));
+    if (same) {
+      identical += 1;
+      continue;
+    }
+    differ += 1;
+    for (const id of afterSet) if (!beforeSet.has(id)) entered += 1;
+    for (const id of beforeSet) if (!afterSet.has(id)) leftOver += 1;
+  }
+  return { requests, identical, differ, entered, left: leftOver, unpaired: Math.abs(left.length - right.length) };
+}
+
+/**
+ * One line for the run log.
+ *
+ * Absence is stated rather than counted: an artefact written before the ledger existed has no ledger, and
+ * reporting `0 of 0 identical` for it would be a measurement of the instrument rather than of the run.
+ */
+export function ledgerLineOf(diff: LedgerDiff | undefined): string {
+  if (diff === undefined) return 'pack ledger: no ledger in this artefact (written before R120)';
+  const unpaired = diff.unpaired === 0 ? '' : `, ${String(diff.unpaired)} unpaired`;
+  return (
+    `pack ledger: ${String(diff.identical)} of ${String(diff.requests)} request(s) identical, ` +
+    `${String(diff.differ)} repacked (${String(diff.entered)} record(s) in, ${String(diff.left)} out` +
+    `${unpaired})`
+  );
 }
 
 /**
@@ -195,7 +295,11 @@ export function packLineOf(census: PackCensus): string {
     fold === null
       ? ''
       : `; fold ${String(fold.folded)} of ${String(fold.folded + fold.units)} units ` +
-        `(${String(fold.groups)} groups, ${String(fold.refused)} refused for want of a second task` +
+        `(${String(fold.groups)} groups, ` +
+        // R120. Printed only when it is non-zero: on the `per-failure` arm a group that met the floor
+        // cannot fold, and a bare `0 groups` there was read by a registration as a fact about the store.
+        `${fold.suppressed === 0 ? '' : `${String(fold.suppressed)} suppressed by the unit, `}` +
+        `${String(fold.refused)} refused for want of a second task` +
         // Printed only when it is non-zero, because it is the one number that turns a zero into a
         // finding: a run whose fold had no key said `folded 0, groups 0, refused 0` for three rounds.
         `${fold.unnamed === 0 ? '' : `, ${String(fold.unnamed)} unnamed`}), ` +

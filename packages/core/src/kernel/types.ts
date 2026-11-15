@@ -499,6 +499,18 @@ export type ShapeFold = {
    * that reports only one of them can be read as the other.
    */
   readonly unnamed: number;
+  /**
+   * Groups that met the floor and that this arm's unit did not fold.
+   *
+   * R120. `groups` is a count of groups that *folded*, so on the `per-failure` arm it is zero by
+   * construction — and the registration that read it as a fact about the store asked a counter whose
+   * value is a function of the mode to answer a question about the world. A control arm that folds
+   * nothing because its unit does not fold and a store that has nothing to fold are different findings,
+   * and `suppressed` is the count that separates them: every group that met the floor is either in
+   * `groups` (folded) or here (not folded by the unit), and a group that fell short is in `refused`.
+   * `groups.length + suppressed + refused` is then the population of multi-member buckets.
+   */
+  readonly suppressed: number;
   readonly support: FoldSupport;
 };
 

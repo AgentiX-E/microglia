@@ -168,12 +168,14 @@ export function foldByShape(
   const unitSupport = new Map<string, number>();
   const groups: FoldedGroup[] = [];
   let refused = 0;
+  let qualifying = 0;
   for (const [key, members] of buckets) {
     const tasks = new Set<string>();
     for (const member of members) for (const task of tasksOf(member)) tasks.add(task);
     const support = tasks.size;
-    const folds = options.mode === 'collapse' && members.length > 1 && support >= minSupport;
-    if (folds) {
+    const meetsFloor = members.length > 1 && support >= minSupport;
+    if (meetsFloor) qualifying += 1;
+    if (meetsFloor && options.mode === 'collapse') {
       const survivor = medoidOf(members);
       keep.add(survivor.id);
       foldedKeys.add(key);
@@ -218,6 +220,7 @@ export function foldByShape(
     groups,
     refused,
     unnamed,
+    suppressed: qualifying - groups.length,
     support: { max, atLeastTwo, atLeastThree },
   };
 }

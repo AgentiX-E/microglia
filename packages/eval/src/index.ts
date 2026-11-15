@@ -1046,13 +1046,23 @@ export {
   ceilingLineOf,
   ceilingVerdictOf,
   foldCensus,
+  ledgerDiff,
+  ledgerLineOf,
   packCensus,
   packLineOf,
   type CeilingVerdict,
   type FoldCensus,
+  type LedgerDiff,
   type PackCensus,
   type PackReading,
 } from './tau2-pack.js';
+export {
+  independenceOf,
+  rateLineOf,
+  trialRateOf,
+  type TaskSuccessRow,
+  type TrialRate,
+} from './arm-rate.js';
 export { callsOfStatement, shapeByTaskOf, tau2ShapeOf, tau2ShapeWithFallback } from './tau2-shape.js';
 export {
   REDUNDANCY_FLOOR,

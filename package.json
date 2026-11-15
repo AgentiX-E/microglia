@@ -116,7 +116,9 @@
     "eval:retrospect-fixture": "tsx packages/eval/src/bin/retrospect.ts --from eval/fixtures/retrospect-store.json --out .cache/retrospect/batch.json",
     "review:serve": "tsx packages/eval/src/bin/review.ts",
     "eval:coupling-check": "POC_RESULT_DIR=.cache/coupling pnpm eval:coupling && node scripts/check-coupling-ledger.mjs .cache/coupling",
-    "eval:prereg-caps": "tsx packages/eval/src/bin/prereg-caps.ts"
+    "eval:prereg-caps": "tsx packages/eval/src/bin/prereg-caps.ts",
+    "eval:pack-repeat": "tsx packages/eval/src/bin/pack-repeat.ts",
+    "eval:store-redundancy": "tsx packages/eval/src/bin/store-redundancy.ts"
   },
   "devDependencies": {
     "@agentix-e/microglia-browser": "workspace:*",

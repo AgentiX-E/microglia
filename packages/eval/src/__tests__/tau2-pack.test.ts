@@ -6,6 +6,8 @@ import {
   ceilingLineOf,
   ceilingVerdictOf,
   foldCensus,
+  ledgerDiff,
+  ledgerLineOf,
   packCensus,
   packLineOf,
 } from '../tau2-pack.js';
@@ -146,6 +148,7 @@ describe('foldCensus', () => {
     groups: Array.from({ length: foldedItems }, () => ({})),
     refused: 0,
     unnamed: 0,
+    suppressed: 0,
     support,
     items: [],
   });
@@ -161,6 +164,7 @@ describe('foldCensus', () => {
       groups: 3,
       refused: 0,
       unnamed: 0,
+      suppressed: 0,
       units: 3,
       atLeastTwo: 3,
       atLeastThree: 1,
@@ -194,7 +198,54 @@ describe('foldCensus', () => {
     expect(packLineOf(without)).not.toContain('fold');
   });
 
+  it('separates a store with nothing to fold from a control that folds nothing', () => {
+    // R120's registration asked for a non-zero `fold.groups` on the primary arm and could not have got
+    // one: the field counts groups that *folded*, and the primary arm's unit never folds. The census
+    // printed `0 groups` beside a collapse arm that removed 58 items in one dispatch, and the two
+    // numbers were read as contradictory because neither of them was about the same population.
+    const control = packCensus(
+      [
+        {
+          ids: ['a', 'b'],
+          truncated: 0,
+          rendered: 'x',
+          fold: {
+            items: [],
+            folded: 0,
+            groups: [],
+            refused: 0,
+            unnamed: 0,
+            suppressed: 2,
+            support: { max: 1, atLeastTwo: 0, atLeastThree: 0 },
+          },
+        },
+      ],
+      { budget: 2400, capacity: null },
+    );
+    expect(packLineOf(control)).toContain('0 groups, 2 suppressed by the unit, 0 refused');
+    expect(control.fold?.suppressed).toBe(2);
+    // A store of one record per routine keeps the old line: the suffix is only printed when it can
+    // distinguish two findings, so an artefact written before this count existed still compares.
+    const unique = packCensus(
+      [{ ids: ['a'], truncated: 0, rendered: 'x', fold: folded(0, { max: 1, atLeastTwo: 0, atLeastThree: 0 }) }],
+      { budget: 2400, capacity: null },
+    );
+    expect(packLineOf(unique)).not.toContain('suppressed');
+    // An artefact written before R120 carries no field at all, and a missing count is not a measured
+    // zero: it is summed as zero without inventing a reading for a run that never had one.
+    const older = foldCensus([
+      {
+        ids: ['a'],
+        truncated: 0,
+        rendered: 'x',
+        fold: { items: [], folded: 0, groups: [], refused: 0, unnamed: 0, support: { max: 1, atLeastTwo: 0, atLeastThree: 0 } },
+      },
+    ]);
+    expect(older?.suppressed).toBe(0);
+  });
+
   it('names the population the fold could not key, so a zero fold is a finding and not a silence', () => {
+
     // R120's line is the one this test is about. A run on a distilled store printed `fold 0 of 631 units
     // (0 groups, 0 refused for want of a second task)` and nothing else, and every reader of it — this
     // record included — took it as a property of the store. The count below is what makes the next
@@ -202,7 +253,7 @@ describe('foldCensus', () => {
     // `unnamed 0` with `folded 0` says the store holds one record per routine, which is a finding.
     const blind = packCensus(
       [
-        { ids: ['a', 'b', 'c'], truncated: 0, rendered: 'x', fold: { items: [], folded: 0, groups: [], refused: 0, unnamed: 3, support: { max: 1, atLeastTwo: 0, atLeastThree: 0 } } },
+        { ids: ['a', 'b', 'c'], truncated: 0, rendered: 'x', fold: { items: [], folded: 0, groups: [], refused: 0, unnamed: 3, suppressed: 0, support: { max: 1, atLeastTwo: 0, atLeastThree: 0 } } },
       ],
       { budget: 2400, capacity: null },
     );
@@ -223,5 +274,42 @@ describe('foldCensus', () => {
       { budget: 2400, capacity: 810 },
     );
     expect(census.fold).toMatchObject({ packs: 1, folded: 1, max: 2 });
+  });
+});
+
+/**
+ * The ledger, and the diff two runs of one lane need.
+ *
+ * R119 and R120 run one lane, one split, one seed, one model, and their scores are 0.600 and 0.750. Neither
+ * artefact can say *which packs* differed, because the census kept counts and dropped the ids — so a
+ * fifteen-point difference that is larger than every effect this record has reported could not be
+ * attributed to a claim even in principle. The ledger is the input that makes the next such pair legible,
+ * and the diff is the reading: positions where the two packs are the same, positions where they are not,
+ * and how many records entered or left.
+ */
+describe('the pack ledger', () => {
+  it('carries the ids each request was served, in request order', () => {
+    const census = packCensus([pack(['a', 'b']), pack(['c'])], { budget: 2400, capacity: null });
+    expect(census.ledger).toEqual([['a', 'b'], ['c']]);
+  });
+
+  it('counts positions rather than ids, because a repack is not a rewrite', () => {
+    const diff = ledgerDiff([['a', 'b'], ['c']], [['a', 'b'], ['d']]);
+    expect(diff).toEqual({ requests: 2, identical: 1, differ: 1, entered: 1, left: 1, unpaired: 0 });
+  });
+
+  it('reports an unpaired tail rather than treating two phases of different lengths as equal', () => {
+    // A stopped run writes fewer requests. Comparing the prefix and calling the rest identical would
+    // read a truncated phase as a faithful repeat — the same defect `stoppedRun` exists to make visible.
+    const diff = ledgerDiff([['a'], ['b'], ['c']], [['a']]);
+    expect(diff).toEqual({ requests: 1, identical: 1, differ: 0, entered: 0, left: 0, unpaired: 2 });
+  });
+
+  it('says nothing rather than zero when the artefact predates the ledger', () => {
+    // A missing ledger is not an empty one: `identical: 0` on a run that never recorded its packs would be
+    // a measurement of the instrument, which is the class of defect R120 found in `fold.groups`.
+    expect(ledgerDiff([], [])).toMatchObject({ requests: 0, unpaired: 0 });
+    expect(ledgerLineOf(undefined)).toContain('no ledger');
+    expect(ledgerLineOf(ledgerDiff([['a']], [['a']]))).toContain('1 of 1 request(s) identical');
   });
 });

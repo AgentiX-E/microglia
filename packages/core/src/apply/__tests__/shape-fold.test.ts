@@ -223,6 +223,10 @@ describe('what the pack reports', () => {
     expect(fold.groups).toEqual([]);
     // R92's finding, reproduced inside the arm instead of argued from the store's size.
     expect(fold.support).toEqual({ max: 1, atLeastTwo: 0, atLeastThree: 0 });
+    // R120. The group met the floor and the arm's unit did not fold it. Without this count the control
+    // arm prints `0 groups`, which is a fact about the mode and reads as a fact about the store — the
+    // registration that asked for a non-zero `groups` on this arm could not have got one.
+    expect(fold.suppressed).toBe(1);
   });
 
   it('falls back to the run id when evidence names no task, and never invents a count', () => {
@@ -318,8 +322,19 @@ describe('what the pack reports', () => {
       groups: [],
       refused: 0,
       unnamed: 0,
+      suppressed: 0,
       support: { max: 0, atLeastTwo: 0, atLeastThree: 0 },
     });
+  });
+
+  it('counts a group the collapse arm folded as signed for, not suppressed', () => {
+    const items = [record('a', EXCHANGE, { task: '1' }), record('b', EXCHANGE, { task: '2' })];
+    const fold = foldByShape(items, { mode: 'collapse', shapeOf });
+    expect(fold.suppressed).toBe(0);
+    expect(fold.groups).toHaveLength(1);
+    // The two counts partition the groups that met the floor: every such group is either folded or
+    // suppressed by the unit, and a group that fell short is in neither — it is `refused`.
+    expect(fold.groups.length + fold.suppressed).toBe(1);
   });
 });
 
