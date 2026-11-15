@@ -84,6 +84,11 @@ _silent_because: dict = {}
 # of the rule. Recording the margins costs nothing (the facade computes them anyway), and the ladder they
 # produce is exact -- `withheld 87 of 162` can be read off before a single dollar is spent on the arm.
 _margins: list = []
+# How many requests carried a census at all. R123a measured the need: the facade served `{ rendered }`,
+# nothing arrived here, and an empty list of margins printed as `0 rivaled request(s)` -- a claim about the
+# store made by a run that never asked it. The counter is what lets `rivaled` be `None` (no census) rather
+# than `0` (a census that found no rival), and the two are different sentences in the run's log.
+_census = 0
 
 # Sentinel rather than `None`, because "" is a real answer: a facade that was asked
 # and had nothing to say must not be asked again on the next turn.
@@ -206,6 +211,9 @@ def margin_ladder(margins) -> dict:
 
 
 def _record_margin(payload: dict) -> None:
+    global _census
+    if isinstance(payload.get("decision"), dict):
+        _census += 1
     margin = decision_margin(payload)
     if margin is not None:
         _margins.append(margin)
@@ -312,7 +320,10 @@ def memory_stats() -> dict:
         # is the denominator -- requests whose store returned at least two candidates -- and a run that
         # reports `rivaled: 0` on an arm whose gate never fired is a finding about the store rather than
         # about the rung.
-        "rivaled": len(_margins),
+        # `None` rather than `0` when no decision arrived: R123a read the absence as a zero and the run
+        # printed a store result it had not measured. `census` is the denominator that tells them apart.
+        "census": _census,
+        "rivaled": len(_margins) if _census else None,
         "margin_p10": quantile_of(_margins, 0.10),
         "margin_p50": quantile_of(_margins, 0.50),
         "margin_p90": quantile_of(_margins, 0.90),

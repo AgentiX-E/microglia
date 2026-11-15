@@ -894,7 +894,15 @@ type Tau2PhaseDiagnostics = {
      * gate would withhold of them. `null` on a phase before the ladder existed, which is why these are
      * optional rather than defaulted: a `0` would read as a store with nothing contested.
      */
-    readonly rivaled?: number;
+    readonly rivaled?: number | null;
+    /**
+     * R127: how many requests carried a census, which is the denominator `rivaled` is a zero over.
+     *
+     * R123a printed `0 rivaled request(s)` from a phase where the census never left the facade's process,
+     * so a missing measurement and a measured zero were the same string in the log. The counter makes them
+     * two, and it is read by `speakLineOf`.
+     */
+    readonly census?: number;
     readonly margin_p50?: number | null;
     readonly margin_ladder?: Readonly<Record<string, number>>;
   } | null;
@@ -1976,6 +1984,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
           truncated: pack.truncated,
           rendered: pack.rendered,
           ...(pack.fold === undefined ? {} : { fold: pack.fold }),
+          // R127: the in-process half of the margin census, so the ladder the Python half prices from the
+          // wire has a second count on the side that measured it. Absent when the host asked for neither.
+          ...(pack.decision === undefined ? {} : { decision: pack.decision }),
         });
         shapeObservations.push(shapeObservationOf(used, pack));
         useObservations.push({

@@ -18,19 +18,24 @@
  *    "the provider refused" and "the registration asked for a spelling that does not exist".
  *  - **The two required fields keep their defaults.** An agent that omits `text` gets an empty query,
  *    which the pack layer already answers with an empty pack — the same behaviour as before.
- *  - **The response carries only `rendered`.** What a host needs is the block; the census travels
- *    in-process on the pack the callback returns, so a facade cannot become a second artefact channel.
+ *  - **The response carries `rendered` and, when the host asked for a census, `decision`.** The first
+ *    draft carried only the block, and the note that explained it — "the census travels in-process, so a
+ *    facade cannot become a second artefact channel" — was right while the only reader was this file's
+ *    own `packReadings`. R123a priced a margin ladder from the other side of this socket: the run printed
+ *    seven zeros on a store serving 4.05 items per pack, because `{ rendered }` has no margin and the
+ *    reader could not tell a missing field from a measured zero. The census is now on the wire, and only
+ *    when the pack carries one, so a host that never asked sees the response it always saw.
  */
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { recallQueryOf, type RecallQuery } from '@agentix-e/microglia-core';
+import { recallQueryOf, type RecallQuery, type SpeakDecision } from '@agentix-e/microglia-core';
 
 export type FacadeRecall = (input: {
   readonly task: string;
   readonly text: string;
   /** Everything else the request asked for, validated. The driver owns `task`, `text` and the scope. */
   readonly query: Omit<RecallQuery, 'namespace' | 'task' | 'text'>;
-}) => Promise<{ rendered: string }>;
+}) => Promise<{ readonly rendered: string; readonly decision?: SpeakDecision }>;
 
 export type FacadeOptions = {
   /** The task label an agent that sends none is assumed to be asking in. */
@@ -65,7 +70,15 @@ export function startRecallFacade(recall: FacadeRecall, options: FacadeOptions):
     recall({ task, text, query })
       .then((pack) => {
         response.writeHead(200, { 'content-type': 'application/json' });
-        response.end(JSON.stringify({ rendered: pack.rendered }));
+        // The census only when the pack carries one, so the wire is exactly as wide as the question:
+        // absent means "this host did not ask", which is a different reading from a decision that
+        // withheld nothing.
+        response.end(
+          JSON.stringify({
+            rendered: pack.rendered,
+            ...(pack.decision === undefined ? {} : { decision: pack.decision }),
+          }),
+        );
       })
       .catch(() => response.writeHead(500).end());
   });

@@ -323,6 +323,7 @@ def memory_stats_exposes_the_recall_count(checks):
     checks.contains(
         sorted(stats),
         [
+            "census",
             "margin_ladder",
             "margin_p10",
             "margin_p50",
@@ -452,6 +453,41 @@ def a_malformed_knob_is_dropped_rather_than_sent(checks):
     checks.equal(sorted(knobs), ["anchoring", "limit"], "only the two well-formed pairs survive")
 
 
+@case
+def the_census_denominator_separates_an_absent_measurement_from_a_zero(checks):
+    """R127, from the run that made it necessary.
+
+    R123a printed `0 rivaled request(s)` for 164 requests, and the truth was that no decision had crossed
+    the facade's socket at all: the response was `{ rendered }`, `_margins` stayed empty, and an empty list
+    printed as a fact about the store. The counter below is what lets the payload say `None` — no census —
+    instead of `0`, and the two produce different sentences in a run's log.
+    """
+    saved_census = subject._census  # noqa: SLF001 - the counter is the thing under test
+    saved_margins = list(subject._margins)  # noqa: SLF001
+    try:
+        subject._census = 0  # noqa: SLF001
+        subject._margins.clear()  # noqa: SLF001
+        stats = subject.memory_stats()
+        checks.equal(stats["census"], 0, "a module that received nothing says so")
+        checks.equal(
+            stats["rivaled"],
+            None,
+            "and claims nothing about the store: `None` is not `0`, which is the whole repair",
+        )
+        # Three requests: one with no decision (the R123a wire), one with a decision and no rival, one with
+        # a rival. Only the last can be withheld at any rung.
+        subject._record_margin({"rendered": "x"})
+        subject._record_margin({"rendered": "x", "decision": {"margin": None}})
+        subject._record_margin({"rendered": "x", "decision": {"margin": 0.4}})
+        stats = subject.memory_stats()
+        checks.equal(stats["census"], 2, "two of the three carried a decision")
+        checks.equal(stats["rivaled"], 1, "one of those had a rival")
+        checks.equal(stats["margin_ladder"]["0.30"], 0, "a margin of 0.4 is above every rung")
+    finally:
+        subject._census = saved_census  # noqa: SLF001
+        subject._margins[:] = saved_margins  # noqa: SLF001
+
+
 def dump_stats() -> int:
     """Print `memory_stats()` as JSON, for the TypeScript side to read back.
 
@@ -464,9 +500,40 @@ def dump_stats() -> int:
     return 0
 
 
+def parse_decision() -> int:
+    """Read one recall response and report what the lane's own reader makes of it.
+
+    R127. The ladder is priced by `decision_margin`, and the payload it is handed is written by a
+    TypeScript facade in another process. `--dump-stats` pins the shape of what this half *reports*; this
+    pins what it *reads*, from bytes the other half produced. R123a is the run that made it necessary:
+    the facade's response was `{ rendered }` by an explicit design note, the census stayed in-process,
+    and the ladder printed seven zeros on a store serving 4.05 items per pack. Nothing failed. A missing
+    field and a measured zero were the same reading, which is the defect class this record keeps finding
+    and can only close where the two languages meet.
+    """
+    payload = json.load(sys.stdin)
+    margin = subject.decision_margin(payload)
+    print(
+        json.dumps(
+            {
+                "margin": margin,
+                "bucket": subject.empty_bucket(payload),
+                # A `null` margin is not a rung reading: `margin_ladder` counts a population, and the
+                # population of contested requests is what a rung costs.
+                "ladder": subject.margin_ladder([] if margin is None else [margin]),
+                "rungs": list(subject.MARGIN_RUNGS),
+            },
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
 def main(argv: list[str]) -> int:
     if "--dump-stats" in argv:
         return dump_stats()
+    if "--parse-decision" in argv:
+        return parse_decision()
     if "--self-test" not in argv:
         print(__doc__)
         return 2

@@ -37,7 +37,17 @@ export type RecallTraffic = {
    * candidate and a served pack with eight are the same count and different populations, and the second
    * is the only one a rung can withhold.
    */
-  readonly rivaled?: number;
+  readonly rivaled?: number | null;
+  /**
+   * How many requests carried a census at all — the denominator `rivaled` is zero over.
+   *
+   * R123a printed `0 rivaled request(s)` for a phase in which the census never crossed the process
+   * boundary: the facade answered `{ rendered }`, the Python half read no `decision`, and an empty set of
+   * margins became a zero. The two facts — "the store contested nothing" and "this run never measured
+   * contest" — were the same string. `census` is what separates them, and it is why `rivaled` is now
+   * nullable rather than merely optional: `null` is "no census", `0` is a measured zero.
+   */
+  readonly census?: number;
   /** Nearest-rank median of the margins, or null when no request had a rival. */
   readonly margin_p50?: number | null;
   /** How many requests each rung would withhold, exactly. Keys are the rungs, formatted `0.05`. */
@@ -85,9 +95,14 @@ export function speakLineOf(margin: number, traffic: RecallTraffic | null | unde
  * adjacent rungs is the difference between a threshold and an off switch.
  */
 function censusOf(traffic: RecallTraffic): string {
-  if (traffic.rivaled === undefined) {
-    return '; no margin census on this phase, so this run cannot say what a rung would withhold';
+  // `null` is a measured absence: the host asked, the pack carried no decision. Both it and `undefined`
+  // print the same sentence because both leave the reader unable to price a rung, and the sentence says
+  // that rather than printing a zero that reads like a result.
+  if (traffic.rivaled === undefined || traffic.rivaled === null) {
+    return '; no margin census reached this phase, so this run cannot say what a rung would withhold';
   }
+  const censused =
+    traffic.census === undefined ? '' : ` (${String(traffic.census)} request(s) carried one)`;
   const ladder = traffic.margin_ladder;
   const p50 = traffic.margin_p50;
   const median =
@@ -95,11 +110,11 @@ function censusOf(traffic: RecallTraffic): string {
       ? 'no median (no request had a rival)'
       : `p50 ${p50.toFixed(4)}`;
   if (ladder === undefined) {
-    return `; ${String(traffic.rivaled)} rivaled request(s), ${median}, and no ladder was reported`;
+    return `; ${String(traffic.rivaled)} rivaled request(s)${censused}, ${median}, and no ladder was reported`;
   }
   const rungs = Object.keys(ladder)
     .sort((left, right) => Number(left) - Number(right))
     .map((rung) => `${rung} ${String(ladder[rung])}`)
     .join(' / ');
-  return `; ${String(traffic.rivaled)} rivaled request(s) (the population a rung acts on), ${median}, ladder ${rungs}`;
+  return `; ${String(traffic.rivaled)} rivaled request(s)${censused} (the population a rung acts on), ${median}, ladder ${rungs}`;
 }

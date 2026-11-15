@@ -68,7 +68,7 @@ describe('a margin census is three states, not one zero', () => {
     // Every arm before R123a. A `rivaled 0` here would be a claim about the store that the phase never
     // measured, which is the defect this whole module exists to refuse.
     const line = speakLineOf(0, traffic());
-    expect(line).toContain('no margin census on this phase');
+    expect(line).toContain('no margin census reached this phase');
     expect(line).not.toContain('rivaled');
   });
 
@@ -88,9 +88,18 @@ describe('a margin census is three states, not one zero', () => {
     expect(line).toContain('ladder 0.01 6 / 0.05 24 / 0.10 61 / 0.30 115');
   });
 
+  it('treats a null rivaled count as no census, because that is what the payload now says', () => {
+    // R123a's exact payload: the facade answered `{ rendered }`, so `decision` never arrived and the
+    // Python half reported `rivaled: 0`. The fix reports `null`, and a line that printed `0 rivaled` here
+    // would be repeating the reading the fix exists to prevent.
+    const line = speakLineOf(0, traffic({ census: 0, rivaled: null, margin_p50: null, margin_ladder: {} }));
+    expect(line).toContain('no margin census reached this phase');
+    expect(line).not.toContain('rivaled request(s)');
+  });
+
   it('says a store gave nothing to be contested when the count is a real zero', () => {
-    const line = speakLineOf(0, traffic({ rivaled: 0, margin_p50: null, margin_ladder: {} }));
-    expect(line).toContain('0 rivaled request(s)');
+    const line = speakLineOf(0, traffic({ census: 164, rivaled: 0, margin_p50: null, margin_ladder: {} }));
+    expect(line).toContain('0 rivaled request(s) (164 request(s) carried one)');
     expect(line).toContain('no median');
     expect(line).not.toContain('no margin census');
   });
@@ -115,6 +124,7 @@ describe('the reader and the writer agree on the field names', () => {
     const stats = JSON.parse(dumped.stdout) as Record<string, unknown>;
     expect(Object.keys(stats).sort()).toEqual(
       [
+        'census',
         'margin_ladder',
         'margin_p10',
         'margin_p50',
@@ -135,7 +145,9 @@ describe('the reader and the writer agree on the field names', () => {
     // The keys, not the numbers: the payload of a fresh module is all zeros, and what is under test is
     // that `rivaled` and `margin_ladder` arrive under the names the line reads them by.
     expect(line).toContain('0 request(s) reached the facade');
-    expect(line).toContain('0 rivaled request(s)');
-    expect(line).toContain('ladder 0.01 0 / 0.02 0 / 0.05 0 / 0.10 0 / 0.15 0 / 0.20 0 / 0.30 0');
+    // A module that has served nothing has measured no contest, and says so: `rivaled` is `null` in the
+    // payload and the line refuses to turn it into a zero.
+    expect(stats.census).toBe(0);
+    expect(line).toContain('no margin census reached this phase');
   });
 });

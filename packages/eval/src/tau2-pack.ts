@@ -47,7 +47,7 @@ export const DEFAULT_PACK_BUDGET = 1200;
  * folded nothing.
  */
 export type PackReading = Pick<KnowledgePack, 'ids' | 'truncated' | 'rendered'> &
-  Pick<Partial<KnowledgePack>, 'fold'>;
+  Pick<Partial<KnowledgePack>, 'fold' | 'decision'>;
 
 export type PackCensus = {
   /** Characters of knowledge the pack was allowed, as it rendered them. */
@@ -68,6 +68,22 @@ export type PackCensus = {
   readonly emptiedBySize: number;
   /** Items the renderer refused for length, whether or not the pack still served another. */
   readonly droppedForSize: number;
+  /**
+   * The margin census, counted in this process rather than in the driver's other half.
+   *
+   * R127. Every other number on this census is a count of something the pack did; this one is a count of
+   * what the *ranking* looked like, and it is here twice on purpose. The ladder a run prices a rung with
+   * is computed by the Python half from bytes that crossed a socket, and the only way to know those bytes
+   * carried the measurement is a second count of the same quantity on the side that measured it. R123a is
+   * the run that proves the need: the wire dropped `decision`, and a single-sided census printed seven
+   * zeros as a fact about the store.
+   */
+  readonly margins: {
+    /** Requests whose pack carried a decision. */
+    readonly censused: number;
+    /** Of those, the ones with at least two candidates — the population a rung acts on. */
+    readonly rivaled: number;
+  };
   /**
    * The means, or absent when no request was made.
    *
@@ -219,6 +235,11 @@ export function packCensus(
     droppedForSize: readings.reduce((sum, pack) => sum + pack.truncated, 0),
     summary: requests === 0 ? null : { meanIds: total / requests, meanChars: chars / requests },
     fold: foldCensus(readings),
+    margins: {
+      censused: readings.filter((pack) => pack.decision !== undefined).length,
+      // `margin === null` is one candidate: the ranking was not contested, and a rung acts on nothing.
+      rivaled: readings.filter((pack) => pack.decision?.margin != null).length,
+    },
     ledger: readings.map((pack) => pack.ids),
   };
 }
@@ -325,11 +346,17 @@ export function packLineOf(census: PackCensus): string {
         // artefact that predates the ids keeps the old wording rather than claiming the item count.
         `${fold.unnamed === 0 ? '' : fold.unnamedItems === null ? `, ${String(fold.unnamed)} unnamed` : `, ${String(fold.unnamedItems)} item(s) / ${String(fold.unnamed)} render(s) unnamed`}), ` +
         `support ≥2 ${String(fold.atLeastTwo)}, ≥3 ${String(fold.atLeastThree)}, max ${String(fold.max)}`;
+  // R127. Printed only when the host asked for a census — a phase whose packs carry no decision has no
+  // ranking to report, and `0 rivaled` there would be a claim about the store that the phase never asked.
+  const margins = census.margins.censused === 0
+    ? ''
+    : `; margins ${String(census.margins.rivaled)} rivaled of ${String(census.margins.censused)} censused`;
   return (
     `${head}; served ${String(census.filled)} of ${String(census.requests)} ` +
     `(mean ${summary.meanIds.toFixed(1)} items, ${summary.meanChars.toFixed(0)} chars); ` +
     `dropped for size ${String(census.droppedForSize)}, of which ${String(census.emptiedBySize)} emptied a pack` +
-    foldLine
+    foldLine +
+    margins
   );
 }
 

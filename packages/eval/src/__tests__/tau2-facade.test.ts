@@ -9,6 +9,8 @@
  * So each test below starts the server, sends a query, and reads what the callback was told. No mocks:
  * the callback is a real function and the transport is a real socket on port 0.
  */
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { startRecallFacade, type Facade } from '../tau2-facade.js';
 
@@ -98,4 +100,74 @@ describe('the recall facade', () => {
     const response = await fetch(`${facade.url}/v1/recall?text=x`);
     expect(response.status).toBe(500);
   });
+/**
+ * R127. The census has to cross the boundary, because the reader of it is in another language.
+ *
+ * R123a registered `speakMargin: 0` with the census on, and the run printed:
+ *
+ *     [tau2] speak: margin 0 ...; 0 rivaled request(s) ...; ladder 0.01 0 / 0.02 0 / ...
+ *
+ * on a store serving **4.05 items per pack**. The decision was computed, the pack carried it, and this
+ * facade's response was `{ rendered }` — the census stayed in-process by an explicit design note, which
+ * was right while the only reader was `packReadings` and wrong the moment a registration priced a rung
+ * from it. `rivaled: 0` then read as "no request had a rival", which is the same shape as §34.154 and
+ * §34.158: a missing field cannot be told from a measured zero, and the field that would show the
+ * difference is the one that is absent.
+ *
+ * The contract is therefore pinned between two real programs: this server's bytes, and the Python
+ * function the lane prices a ladder with. A fixture of the response would have agreed with itself.
+ */
+describe('the census crosses the process boundary', () => {
+  const DECISION = {
+    candidates: 4,
+    afterCoverage: 4,
+    afterEvidence: 4,
+    belowCoverage: 0,
+    belowEvidence: 0,
+    overLimit: 0,
+    topScore: 0.8255,
+    runnerUpScore: 0.3089,
+    margin: 0.5166,
+    spoke: true,
+    silentBecause: null,
+  };
+
+  it('serves the decision the pack made, so a reader in another language can price a rung', async () => {
+    facade = await startRecallFacade(
+      async () => ({ rendered: '<microglia-knowledge version="1" items="1"></microglia-knowledge>', decision: DECISION }),
+      { task: 'tau2.act' },
+    );
+    const payload = (await (await fetch(`${facade.url}/v1/recall?text=cancel`)).json()) as Record<string, unknown>;
+    expect(payload.decision).toEqual(DECISION);
+  });
+
+  it('omits the field when the host did not ask for a census, so no artefact grows a null', async () => {
+    facade = await startRecallFacade(async () => ({ rendered: 'block' }), { task: 'tau2.act' });
+    const payload = (await (await fetch(`${facade.url}/v1/recall?text=cancel`)).json()) as Record<string, unknown>;
+    expect('decision' in payload).toBe(false);
+  });
+
+  it('is read by the Python half as the same number this half wrote', async () => {
+    facade = await startRecallFacade(
+      async () => ({ rendered: 'block', decision: DECISION }),
+      { task: 'tau2.act' },
+    );
+    const body = await (await fetch(`${facade.url}/v1/recall?text=cancel`)).text();
+    // The lane's own reader, not a re-implementation of it: `--parse-decision` installs the tau2 stubs
+    // and calls the same `decision_margin` the ladder is built from, so a drift between the two halves
+    // fails here rather than in a dispatch that already cost a dollar.
+    const python = spawnSync('python3', ['eval/drivers/tau2/selfcheck_agent.py', '--parse-decision'], {
+      cwd: fileURLToPath(new URL('../../../..', import.meta.url)),
+      input: body,
+      encoding: 'utf8',
+    });
+    expect(python.status, python.stderr).toBe(0);
+    const parsed = JSON.parse(python.stdout) as { margin: number; ladder: Record<string, number> };
+    expect(parsed.margin).toBeCloseTo(0.5166, 10);
+    // The rung is strict, so a margin above 0.30 is withheld by none of the ladder — the reading that
+    // makes the census a price rather than a verdict.
+    expect(Object.values(parsed.ladder).every((n) => n === 0)).toBe(true);
+  });
+});
+
 });

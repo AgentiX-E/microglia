@@ -345,4 +345,39 @@ describe('the pack ledger', () => {
     expect(packLineOf(pack)).toContain('1 item(s) / 8 render(s) unnamed');
   });
 
+  // R127. The ladder is priced on the far side of a socket, and R123a is the run where that side received
+  // nothing and reported seven zeros. Two counts of one quantity is the only check that can tell a wire
+  // that dropped a field from a store that had nothing to say.
+  it('counts the ranking census in this process, beside the count of what was served', () => {
+    const pack = (margin: number | null) => ({
+      ids: ['k_1'],
+      truncated: 0,
+      rendered: 'x',
+      decision: {
+        candidates: 2,
+        afterCoverage: 2,
+        afterEvidence: 2,
+        belowCoverage: 0,
+        belowEvidence: 0,
+        overLimit: 0,
+        topScore: 0.9,
+        runnerUpScore: margin === null ? null : 0.9 - margin,
+        margin,
+        spoke: true,
+        silentBecause: null,
+      },
+    });
+    const census = packCensus([pack(0.5), pack(null), { ids: ['k_2'], truncated: 0, rendered: 'y' }], {
+      budget: 2400,
+      capacity: null,
+    });
+    expect(census.margins).toEqual({ censused: 2, rivaled: 1 });
+    expect(packLineOf(census)).toContain('margins 1 rivaled of 2 censused');
+    // A phase whose host asked for no census prints nothing rather than a zero: the reader of a `0 rivaled`
+    // cannot tell it from the absence R123a mistook for one.
+    const silent = packCensus([{ ids: ['k_2'], truncated: 0, rendered: 'y' }], { budget: 2400, capacity: null });
+    expect(silent.margins).toEqual({ censused: 0, rivaled: 0 });
+    expect(packLineOf(silent)).not.toContain('margins');
+  });
+
 });

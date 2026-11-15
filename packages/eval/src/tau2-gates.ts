@@ -252,7 +252,15 @@ export type Tau2ArmRecord = {
      * gate would withhold of them. `null` on a phase before the ladder existed, which is why these are
      * optional rather than defaulted: a `0` would read as a store with nothing contested.
      */
-    readonly rivaled?: number;
+    readonly rivaled?: number | null;
+    /**
+     * R127: how many requests carried a census, which is the denominator `rivaled` is a zero over.
+     *
+     * R123a printed `0 rivaled request(s)` from a phase where the census never left the facade's process,
+     * so a missing measurement and a measured zero were the same string in the log. The counter makes them
+     * two, and it is read by `speakLineOf`.
+     */
+    readonly census?: number;
     readonly margin_p50?: number | null;
     readonly margin_ladder?: Readonly<Record<string, number>>;
   };
