@@ -1166,3 +1166,66 @@ describe("the pair population, by the filter that removed it", () => {
     });
   });
 });
+
+/**
+ * The linkage key, which R121 proved was the pass's only real constraint.
+ *
+ * `scopeKey` includes `scope.intent`, and the distiller fills that field with a phrase per episode: R121's
+ * 64 items fell into **60** buckets, so the pass tested four pairs of 2,016 and merged none. A host that
+ * knows the routine an item came from can supply the key — the τ² lane passes the same `actionShapeOf`
+ * function its fold and its merge census already share, so all three numbers are one function of one
+ * object instead of three functions of three.
+ *
+ * The fallback is deliberate: an item whose routine the host cannot name is not thereby unlike every
+ * other item, and a key that refused it would make the merge depend on how much of the trace a run had.
+ */
+describe("the linkage key a host may supply", () => {
+  it("merges two spellings of one scope when the host names the routine behind both", () => {
+    const base = candidate("A return carries the item ids being returned.", { id: "a", taskId: "task-1" });
+    const other = { ...base, evidence: { ...base.evidence, feedbackId: "fb_b", runId: "run_b" }, dedupeKey: "key_b" };
+    const left = item({ ...base, scope: { task: "retail", intent: "return_items" } }, "k1");
+    const right = item({ ...other, scope: { task: "retail", intent: "items to return" } }, "k2");
+
+    // Without a host key the pair never reaches the similarity test — R121's defect, in four lines.
+    const byScope = consolidateKnowledge([left, right], { now: AT, policy: defaultPolicy });
+    expect(byScope.report).toMatchObject({ skippedScope: 1, pairs: 1, merged: 0, linkage: "scope" });
+
+    // With one, the two spellings are the same object and the claims are compared on what they say.
+    const byRoutine = consolidateKnowledge([left, right], {
+      now: AT,
+      policy: defaultPolicy,
+      keyOf: () => "return_delivered_order_items",
+    });
+    expect(byRoutine.report).toMatchObject({ skippedScope: 0, groups: 1, merged: 1, linkage: "host" });
+  });
+
+  it("falls back to the scope for an item the host cannot name", () => {
+    const base = candidate("A return carries the item ids being returned.", { id: "a", taskId: "task-1" });
+    const other = { ...base, evidence: { ...base.evidence, feedbackId: "fb_b", runId: "run_b" }, dedupeKey: "key_b" };
+    const left = item({ ...base, scope: { task: "retail", intent: "return_items" } }, "k1");
+    const right = item({ ...other, scope: { task: "retail", intent: "items to return" } }, "k2");
+
+    // One known routine and one unknown: the unknown side is compared by its scope, so the pair still
+    // fails the filter. A key that named only half the store would otherwise merge by accident.
+    const mixed = consolidateKnowledge([left, right], {
+      now: AT,
+      policy: defaultPolicy,
+      keyOf: (entry) => (entry.id === "k1" ? "return_delivered_order_items" : undefined),
+    });
+    expect(mixed.report).toMatchObject({ skippedScope: 1, merged: 0 });
+  });
+
+  it("does not let a host key merge two claims that differ in what they say", () => {
+    // The key only admits a pair to the similarity test; it never decides the merge. Two items from one
+    // routine that state different things stay two items, which is what keeps the pass a merge of claims
+    // rather than a collapse of routines.
+    const left = item(candidate("A cancellation includes the order id and a reason.", { id: "a" }), "k1");
+    const right = item(candidate("An exchange needs the payment method of the original order.", { id: "b" }), "k2");
+    const { report } = consolidateKnowledge([left, right], {
+      now: AT,
+      policy: defaultPolicy,
+      keyOf: () => "cancel_pending_order",
+    });
+    expect(report).toMatchObject({ pairs: 1, skippedScope: 0, skippedOverlap: 1, groups: 0, merged: 0 });
+  });
+});

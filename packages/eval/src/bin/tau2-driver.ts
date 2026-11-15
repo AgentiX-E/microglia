@@ -101,6 +101,7 @@ import {
   resolveDistillForm,
   resolveDistillScope,
   resolveConsolidation,
+  resolveConsolidationKey,
   resolveDistillUnit,
   provenanceCensus,
   entitiesOf,
@@ -628,6 +629,14 @@ const DISTILL_UNIT = resolveDistillUnit();
  * abstraction this arm is the control for.
  */
 const CONSOLIDATE = resolveConsolidation() && DISTILL_UNIT !== "raw";
+
+/**
+ * Which key the pass uses, R124's one variable.
+ *
+ * Read here rather than at the call site so a misspelt value refuses the run before the first model call.
+ * `scope` is the default and reproduces R121 exactly; `routine` is the arm.
+ */
+const CONSOLIDATE_KEY = resolveConsolidationKey();
 
 /** Where the pass runs: the unit it has always run on, plus any unit a registration asked for. */
 const CONSOLIDATION_RUNS = CONSOLIDATE || DISTILL_UNIT === "trace";
@@ -1521,9 +1530,15 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // items together, and a census over the folded store would attribute a merged claim to whichever of
   // its two records the survivor happened to cite first.
   const provenance = provenanceCensus(captured, written);
+  // R124: the linkage key. `scope` is the pass's own default and reproduces R121; `routine` supplies the
+  // routine each correction taught — the same function the fold's key and the merge census share — so a
+  // store whose items spell one routine eight ways is bucketed by the routine rather than by the spelling.
   const consolidationOptions = {
     now: Date.now(),
     policy: defaultPolicy,
+    ...(CONSOLIDATE_KEY === "routine"
+      ? { keyOf: (entry: Parameters<typeof shapeOf>[0]) => shapeOf(entry) }
+      : {}),
   } as const;
   // Not for the raw unit, and the reason is the arm rather than the pass: a record is one event, and
   // merging two records by statement similarity produces a third record neither episode wrote --

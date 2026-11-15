@@ -224,6 +224,14 @@ export type Prereg = {
    */
   readonly consolidate?: boolean;
   /**
+   * Which key the recurrence pass compares items by: their scope (the default) or the routine behind them.
+   *
+   * R124. R121 measured the default's cost — `scope.intent` is a phrase the distiller writes per episode, so
+   * 64 items made 60 buckets and 4 of 2,016 pairs were tested. `routine` supplies the key the fold and the
+   * merge census already share. Absent means the scope, which is what every artefact before R124 ran.
+   */
+  readonly consolidateKey?: 'scope' | 'routine';
+  /**
    * The effect this registration claims, in percentage points, when it claims one.
    *
    * Absent on most headers, and its absence is a statement: R118 asks for a census and buys one arm,
@@ -435,6 +443,7 @@ const HEADER_KEYS = [
   'distillScope',
   'learnOnly',
   'consolidate',
+  'consolidateKey',
   'effectClaimPp',
   'traceClaims',
   'trainTasks',
@@ -940,6 +949,26 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       consolidate = consolidateText === 'true';
     }
   }
+  // R124: the key the pass compares items by. Only meaningful when the pass runs, so a registration that
+  // names it without `consolidate: true` is refused rather than silently measured as the control.
+  const consolidateKeyText = values.get('consolidateKey');
+  let consolidateKey: 'scope' | 'routine' | undefined;
+  if (consolidateKeyText !== undefined) {
+    if (consolidateKeyText !== 'scope' && consolidateKeyText !== 'routine') {
+      collected.push({
+        where: `header 'consolidateKey'`,
+        problem: `'${consolidateKeyText}' is not one of scope, routine`,
+      });
+    } else {
+      consolidateKey = consolidateKeyText;
+    }
+  }
+  if (consolidateKey !== undefined && consolidate !== true) {
+    collected.push({
+      where: `header 'consolidateKey'`,
+      problem: 'the key decides how the recurrence pass compares items, so it needs consolidate: true',
+    });
+  }
   // R121's switch and the unit it cannot apply to. `raw` writes one verbatim event per episode and the
   // pass merges claims; asking for both is not an arm, and a dispatch that ran it would score a store the
   // registration does not describe.
@@ -1309,6 +1338,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(distillScope === undefined ? {} : { distillScope }),
       ...(learnOnly === undefined ? {} : { learnOnly }),
       ...(consolidate === undefined ? {} : { consolidate }),
+      ...(consolidateKey === undefined ? {} : { consolidateKey }),
       ...(effectClaimPp === undefined ? {} : { effectClaimPp }),
       ...(traceClaims === undefined ? {} : { traceClaims }),
       ...(trainTasks === undefined ? {} : { trainTasks }),

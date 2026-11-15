@@ -248,6 +248,31 @@ export function resolveConsolidation(raw = process.env['TAU_CONSOLIDATE']): bool
   throw new RangeError(`TAU_CONSOLIDATE must be unset, 'true' or 'false'; received '${String(raw)}'`);
 }
 
+/**
+ * Which key the recurrence pass uses to decide two items are about the same thing.
+ *
+ * R121 answered the question the hard way. The pass's default key is `scopeKey(item.scope)`, which includes
+ * `scope.intent` — a phrase the distiller writes per episode — so a store of 64 items fell into **60**
+ * buckets and **4 of 2,016** pairs were ever tested; `merged` was 0 and every refusal counter was 0 with it.
+ * `routine` supplies the key the fold and the merge census already share (`actionShapeOf`, the correction's
+ * tool sequence), which makes the three numbers one function of one object.
+ *
+ * Default `scope`, which is exactly what every artefact committed before this resolver ran, so no past
+ * reading is reinterpreted. An unrecognised value is refused before the first model call, for the reason
+ * `resolveConsolidation` refuses one: a misspelt switch that fell back to the default would publish the
+ * control under the treatment's name.
+ */
+export type ConsolidationKey = 'scope' | 'routine';
+
+export function resolveConsolidationKey(raw = process.env['TAU_CONSOLIDATE_KEY']): ConsolidationKey {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (value === '') return 'scope';
+  if (value === 'scope' || value === 'routine') return value;
+  throw new RangeError(
+    `TAU_CONSOLIDATE_KEY must be unset, 'scope' or 'routine'; received '${String(raw)}'`,
+  );
+}
+
 export function resolveDistillUnit(raw = process.env['TAU_DISTILL_UNIT']): DistillUnit {
   const value = (raw ?? '').trim().toLowerCase();
   if (value === '' || value === 'correction') return 'correction';

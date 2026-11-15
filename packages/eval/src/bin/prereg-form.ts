@@ -96,6 +96,7 @@ function main(): void {
       `shape=${declaredShape ?? ''}\n` +
       `learnOnly=${declaredLearnOnly === undefined ? '' : String(declaredLearnOnly)}\n` +
       `consolidate=${declaredConsolidate === undefined ? '' : String(declaredConsolidate)}\n` +
+      `consolidateKey=${reading.prereg.consolidateKey ?? ''}\n` +
       // One line, `;`-joined, because the workflow reads each value with `sed -n 's/^key=//p'` and an
       // expression that split a list would be a parser in YAML. Empty when every switch agrees.
       `overrides=${notices.join('; ')}\n`,

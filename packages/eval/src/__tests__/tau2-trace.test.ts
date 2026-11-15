@@ -19,6 +19,7 @@ import type { FeedbackEvent, RunRecord } from '@agentix-e/microglia-core';
 import {
   parseTraceCalls,
   resolveConsolidation,
+  resolveConsolidationKey,
   resolveDistillUnit,
   traceOf,
   tracesOf,
@@ -405,6 +406,28 @@ describe('resolveConsolidation', () => {
     // treatment's name -- the defect `resolveDistillUnit` refuses for the same reason.
     for (const bad of ['yes', 'on', '1', 'trace']) {
       expect(() => resolveConsolidation(bad)).toThrow(/TAU_CONSOLIDATE must be/);
+    }
+  });
+});
+
+describe('resolveConsolidationKey', () => {
+  it('defaults to the scope, which is what every artefact before R124 ran', () => {
+    // The pass's own key is `scopeKey(item.scope)`. Defaulting to anything else would reinterpret the one
+    // reading this resolver exists to answer — R121's 60 buckets for 64 items.
+    expect(resolveConsolidationKey(undefined)).toBe('scope');
+    expect(resolveConsolidationKey('')).toBe('scope');
+    expect(resolveConsolidationKey('  SCOPE ')).toBe('scope');
+  });
+
+  it('reads the arm that asks for the routine', () => {
+    expect(resolveConsolidationKey('routine')).toBe('routine');
+    expect(resolveConsolidationKey(' ROUTINE ')).toBe('routine');
+  });
+
+  it('refuses a value it does not know, before any model call', () => {
+    // A misspelt switch that fell back to the default would run R121's arm and publish it under R124's name.
+    for (const bad of ['intent', 'shape', '1', 'host']) {
+      expect(() => resolveConsolidationKey(bad)).toThrow(/TAU_CONSOLIDATE_KEY must be/);
     }
   });
 });

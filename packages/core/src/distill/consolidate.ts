@@ -111,6 +111,20 @@ export type ConsolidationOptions = {
    * separation, by the statement.
    */
   readonly conditionMinShared?: number;
+  /**
+   * How two items are decided to be *about the same thing* before their claims are compared.
+   *
+   * Defaults to `scopeKey(item.scope)`, which is what this pass has always used — and R121 measured what
+   * that costs: the key includes `scope.intent`, a field the distiller fills with a phrase per episode, so
+   * a store of 64 items fell into **60** buckets and the pass tested **4 of 2,016** pairs. A host that
+   * knows the routine behind an item can supply it here; the τ² lane passes the same `actionShapeOf` key
+   * its fold and its merge census already share, so the three numbers become one function of one object.
+   *
+   * A host key that returns `undefined` falls back to the scope, because an item whose routine the host
+   * cannot name is not thereby unlike every other item — and a key that refused it would make the merge
+   * depend on how much of the trace a run happened to have.
+   */
+  readonly keyOf?: (item: KnowledgeItem) => string | undefined;
 };
 
 /** One group of items the pass folded into one, and the two readings that say how strong it is. */
@@ -188,6 +202,8 @@ export type ConsolidationCensus = {
   readonly skippedKind: number;
   /** Pairs removed because the two scopes do not spell the same key — the filter R121 died on. */
   readonly skippedScope: number;
+  /** Which key admitted a pair: the item's scope (the default) or one the host supplied. */
+  readonly linkage: 'scope' | 'host';
   /** Pairs removed because their claim overlap fell short of `threshold`. */
   readonly skippedOverlap: number;
 };
@@ -417,6 +433,11 @@ export function consolidateKnowledge(
     return root;
   };
 
+  // The linkage key, resolved through the host when it has one. Written as a function rather than
+  // compared inline so the fallback is in one place: a host key that answers for some items and not
+  // others must not read as two different keys for the same item.
+  const keyFor = (entry: KnowledgeItem): string => options.keyOf?.(entry) ?? scopeKey(entry.scope);
+
   let refusedCondition = 0;
   let refusedPayload = 0;
   let refusedDuplicateEvidence = 0;
@@ -437,7 +458,7 @@ export function consolidateKnowledge(
         skippedKind += 1;
         continue;
       }
-      if (scopeKey(leftItem.scope) !== scopeKey(rightItem.scope)) {
+      if (keyFor(leftItem) !== keyFor(rightItem)) {
         skippedScope += 1;
         continue;
       }
@@ -653,6 +674,7 @@ export function consolidateKnowledge(
       skippedKind,
       skippedScope,
       skippedOverlap,
+      linkage: options.keyOf === undefined ? 'scope' : 'host',
     },
   };
 }

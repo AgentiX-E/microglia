@@ -1527,6 +1527,30 @@ describe('the distilling scope', () => {
     ]);
   });
 
+  it('reads which key the recurrence pass compares items by, and only beside the pass itself', () => {
+    // R124. A key without the pass is not an arm: the pass would not run and the dispatch would measure the
+    // control under the treatment's name, which is the defect every header in this family exists to refuse.
+    expect(
+      readPrereg(withHeader('consolidate: true\nconsolidateKey: routine'), 'R87-distill-scope.md').prereg
+        ?.consolidateKey,
+    ).toBe('routine');
+    expect(
+      readPrereg(withHeader('consolidate: true\nconsolidateKey: scope'), 'R87-distill-scope.md').prereg
+        ?.consolidateKey,
+    ).toBe('scope');
+    expect(readPrereg(withHeader('consolidate: true'), 'R87-distill-scope.md').prereg?.consolidateKey)
+      .toBeUndefined();
+    expect(
+      readPrereg(withHeader('consolidate: true\nconsolidateKey: intent'), 'R87-distill-scope.md').problems,
+    ).toEqual([{ where: "header 'consolidateKey'", problem: "'intent' is not one of scope, routine" }]);
+    expect(readPrereg(withHeader('consolidateKey: routine'), 'R87-distill-scope.md').problems).toEqual([
+      {
+        where: "header 'consolidateKey'",
+        problem: 'the key decides how the recurrence pass compares items, so it needs consolidate: true',
+      },
+    ]);
+  });
+
   it('refuses the pass on the unit that stores episodes, because it merges claims', () => {
     // `raw` writes one verbatim event per episode and asks no model; the pass merges two claims into one.
     // A dispatch that ran both would score a store the registration does not describe, so the pair is
