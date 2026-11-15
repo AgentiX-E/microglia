@@ -52,6 +52,39 @@ describe('a shape is the routine, not the instance', () => {
     expect(left.statement).not.toBe(right.statement);
   });
 
+  it('does not count a retry as a step, so a task that retried and one that did not share a shape', () => {
+    // R120. The store's own items answer this: `cancel_pending_order > cancel_pending_order` was the
+    // shape of four sampled items and `cancel_pending_order` of another, and 23 of the 64 sampled shapes
+    // carried a consecutive repeat. A call repeated because the previous one failed is the same step
+    // tried twice, and a key that counts it as two steps gives one routine as many shapes as it has
+    // retry patterns — which is why this census reported 53 shapes for a store of ~30 routines.
+    const retried = correction('1', [
+      'find_user_id_by_name_zip',
+      'get_order_details',
+      'get_order_details',
+      'cancel_pending_order',
+    ]);
+    const once = correction('2', ['find_user_id_by_name_zip', 'get_order_details', 'cancel_pending_order']);
+    expect(actionShapeOf(retried)).toBe(actionShapeOf(once));
+    expect(mergeCensusOf([retried, once])).toMatchObject({
+      shapes: 1,
+      support: { max: 2, atLeastTwo: 1 },
+    });
+  });
+
+  it('keeps a repeat that is not consecutive, because it is a second step and not the same one', () => {
+    // `calculate > get_product_details > calculate` is two calculations around a lookup. Collapsing it
+    // would be a different error in the opposite direction, and the fixture is here so the fix cannot
+    // be widened to "dedupe the sequence" by someone reading only the test above.
+    expect(actionShapeOf(correction('3', ['calculate', 'get_product_details', 'calculate']))).toBe(
+      'calculate > get_product_details > calculate',
+    );
+    // A run of three is one step, not two: the collapse is a run, not a pair.
+    expect(actionShapeOf(correction('4', ['get_user_details', 'get_user_details', 'get_user_details']))).toBe(
+      'get_user_details',
+    );
+  });
+
   it('keeps a correction that states no calls from merging with any other', () => {
     // A rubric-only task has no routine. Two rubrics are two requirements, and a shared empty key would
     // merge a policy about gift cards with one about addresses.

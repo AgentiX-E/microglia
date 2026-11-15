@@ -88,7 +88,20 @@ export function actionShapeOf(correction: {
   readonly taskId: string;
 }): string {
   if (correction.actions.length === 0) return `task:${correction.taskId}`;
-  return correction.actions.map((action) => action.name).join(' > ');
+  // A run of one call is one step. The actions are the episode's calls in order, and an episode that
+  // failed a call retried it — so `cancel_pending_order > cancel_pending_order` and
+  // `cancel_pending_order` were two shapes for one routine, and the census counted a store's routines
+  // with as many keys as the episode had retry patterns. R120's own items show the size of it: 23 of
+  // 64 sampled shapes carried a consecutive repeat, and `merge.shapes` said 53 for ~30 routines.
+  //
+  // A repeat that is *not* consecutive stays: `calculate > get_product_details > calculate` is two
+  // calculations around a lookup, and deduping the sequence instead of its runs would fuse them.
+  const steps: string[] = [];
+  for (const action of correction.actions) {
+    if (steps.at(-1) === action.name) continue;
+    steps.push(action.name);
+  }
+  return steps.join(' > ');
 }
 
 /**
