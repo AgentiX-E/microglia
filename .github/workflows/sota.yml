@@ -1411,6 +1411,11 @@ jobs:
           # raises the ceiling without raising this writes records the renderer drops, and a dropped
           # record reads as a request with nothing relevant in every artefact this lane produced.
           echo "packBudget=$(echo "$CAPS" | sed -n 's/^budget=//p')" >> "$GITHUB_OUTPUT"
+          # R134: how many items the pack may serve. The budget above bounds a pack in characters, which
+          # leaves the count to how long the distiller wrote its records -- R133 served 3.975 items and
+          # dropped 161 for size over 40 requests. A treatment that is "one procedure instead of four"
+          # has to be a number in the header, not a length that happens to fit one.
+          echo "packLimit=$(echo "$CAPS" | sed -n 's/^limit=//p')" >> "$GITHUB_OUTPUT"
           # R91: the learn half, frozen to a list. Emitted as a repository-relative path and joined to
           # the workspace where it is used, because a pin is a file in the checkout rather than a
           # variable -- the list itself is the treatment, and it has to be in the diff.
@@ -1596,6 +1601,7 @@ jobs:
           TAU_RAWLOG_CEILING: ${{ steps.recall_floor.outputs.rawCeiling || '0' }}
           # Empty means the lane's 1,200, which is what every published arm ran with.
           TAU_PACK_BUDGET: ${{ steps.recall_floor.outputs.packBudget || '0' }}
+          TAU_PACK_LIMIT: ${{ steps.recall_floor.outputs.packLimit || '0' }}
           # R91: the learn half this arm rebuilds its store from, when the registration names one. Empty
           # means learn as usual, which is what every earlier arm did; a path is joined to the
           # checkout here so the driver never has to know where the repository is.
@@ -1694,6 +1700,7 @@ jobs:
           TAU_RAWLOG_CEILING: ${{ steps.recall_floor.outputs.rawCeiling || '0' }}
           # Empty means the lane's 1,200, which is what every published arm ran with.
           TAU_PACK_BUDGET: ${{ steps.recall_floor.outputs.packBudget || '0' }}
+          TAU_PACK_LIMIT: ${{ steps.recall_floor.outputs.packLimit || '0' }}
           # R91: the learn half this arm rebuilds its store from, when the registration names one. Empty
           # means learn as usual, which is what every earlier arm did; a path is joined to the
           # checkout here so the driver never has to know where the repository is.

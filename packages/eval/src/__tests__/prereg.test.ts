@@ -1641,6 +1641,38 @@ describe('the distilling scope', () => {
     ]);
   });
 
+  it('counts a replay arm for the passes it actually buys', () => {
+    // R132 and R133 added a second and a third pass over the learn half, and the ceiling has to see them or an
+    // arm that cannot finish inside the job is dispatched as if it could -- the failure mode is not a refusal
+    // but a cancelled run whose learning half was already paid for. R133's registration states the arithmetic
+    // in prose ("a third pass at R132's two trials would be 302, one over the reader's ceiling") and nothing
+    // checked it.
+    const problems = (header: string) =>
+      readPrereg(withHeader(header), 'R87-distill-scope.md').problems.map((entry) => entry.problem);
+    // 1 x 40 evaluated + 2 x 74 learned = 188: a replay without a control fits with room to spare.
+    expect(problems(['rehearsal: true', 'trials: 1', 'testTasks: 40', 'trainTasks: 74'].join('\n'))).toEqual([]);
+    // 1 x 40 + 3 x 74 = 262: R133's own arm, which is the largest rehearsal this machine has carried.
+    expect(
+      problems(['rehearsal: true', 'rehearsalControl: true', 'trials: 1', 'testTasks: 40', 'trainTasks: 74'].join('\n')),
+    ).toEqual([]);
+    // 2 x 40 + 3 x 74 = 302 -- the number R133's registration names as the reason it cut to one trial.
+    expect(
+      problems(['rehearsal: true', 'rehearsalControl: true', 'trials: 2', 'testTasks: 40', 'trainTasks: 74'].join('\n')),
+    ).toEqual([
+      'a replay adds the learn half a second time, so this arm carries 302 episode(s) ' +
+        '(2 x 40 evaluated + 3 x 74 learned), above the 300 one 240-minute job carries at the measured ' +
+        '0.75 minutes an episode; lower the trial count or split the arm',
+    ]);
+    // A replay arm that states neither cap is priced at the lane's forty on both halves, and the sentence
+    // prints those forty rather than the absence: a message that reported what the header spelled would
+    // state a total its own numbers cannot reconstruct.
+    expect(problems(['rehearsal: true', 'trials: 6'].join('\n'))).toEqual([
+      'a replay adds the learn half a second time, so this arm carries 320 episode(s) ' +
+        '(6 x 40 evaluated + 2 x 40 learned), above the 300 one 240-minute job carries at the measured ' +
+        '0.75 minutes an episode; lower the trial count or split the arm',
+    ]);
+  });
+
   it('refuses a margin on an arm that serves no pack', () => {
     // A learnOnly arm stops after the learning half, so a margin on it is a switch with nothing to gate --
     // the same defect as `consolidateKey` without `consolidate`, and refused for the same reason.
@@ -1990,6 +2022,54 @@ describe('storePin, the learn half as a file', () => {
     const reading = readPrereg(withHeader('rawCeiling: 2000'), 'R91-store-frozen.md');
     expect(reading.problems).toEqual([]);
     expect(reading.prereg?.storePin).toBeUndefined();
+  });
+});
+
+describe('packLimit, the count a character budget cannot state', () => {
+  const HEADER = [
+    '---',
+    'id: R134-one-script',
+    'step: R134',
+    'opened: 2026-11-16',
+    'arms: memory',
+    'sample: 114',
+    'gates: V1',
+    '---',
+    '',
+    '## Prediction',
+    '',
+    '- **one claim that is long enough to count as a claim here.**',
+    '',
+    '## Refutation',
+    '',
+    '- **Void** — the first branch, long enough to count as a claim.',
+    '',
+  ].join('\n');
+
+  function withHeader(extra: string): string {
+    return HEADER.replace(/^---\n/, `---\n${extra}\n`);
+  }
+
+  it('reads the count a registration states, and leaves it absent otherwise', () => {
+    // Absent is the host's room, which every arm before R134 ran with. The key exists because a treatment of
+    // "one procedure instead of four" cannot be written as a character budget: R133 served 3.975 items and
+    // 2,239 of a 2,400-character budget on every request, so a length that fits one record today fits two
+    // when the distiller writes shorter ones.
+    expect(readPrereg(withHeader('packLimit: 1'), 'R134-one-script.md').prereg?.packLimit).toBe(1);
+    expect(readPrereg(HEADER, 'R134-one-script.md').prereg?.packLimit).toBeUndefined();
+  });
+
+  it('refuses a count that is not a positive whole number, rather than reading zero as "the default"', () => {
+    const problems = (extra: string) =>
+      readPrereg(withHeader(extra), 'R134-one-script.md').problems.map(
+        (entry) => `at ${entry.where}: ${entry.problem}`,
+      );
+    expect(problems('packLimit: 0')).toEqual([
+      "at header 'packLimit': '0' is not a number of items a pack can serve",
+    ]);
+    expect(problems('packLimit: 1.5')).toHaveLength(1);
+    expect(problems('packLimit: -2')).toHaveLength(1);
+    expect(problems('packLimit: two')).toHaveLength(1);
   });
 });
 

@@ -3175,3 +3175,64 @@ cannot rank; the harm share is not one number; the episode rate is, and it is wh
 | two `k` values | `RangeError` naming both: a `pass^2` is not a `pass^4` |
 | a rate outside [0, 1], or a task count under 1 | `RangeError` — nothing is dropped, because a pool over the readable subset of a record's runs is a selection |
 | an artefact with no `metrics.k` | the reader exits 2 and names the field: `pass4` predates `k`, and R132 published `pass4: 0.825` at `k: 2` |
+
+## 23. How many scripts a pack serves, and what that costs
+
+A pack is bounded in two different things, and until R134 only one of them could be stated. `packBudget` is a
+**character** ceiling; the number of items that fit is whatever the distiller's sentence lengths allow. Measured
+on a real store, that left **3.975 items and 2,239 of a 2,400-character budget on every request**, with 161
+further items dropped for size over 40 requests. An arm whose question is "should the agent be handed one
+procedure or four" cannot ask it with a length.
+
+```yaml
+packBudget: 2400    # characters
+packLimit: 1        # items — the count, stated rather than inferred
+```
+
+`packLimit` is a one-line header and prints on its own line of the dispatch log:
+
+```bash
+pnpm eval:prereg-caps prereg/R134-one-script.md
+```
+```
+train=74
+test=40
+ceiling=
+budget=2400
+limit=1
+...
+```
+
+Leave it out and the host's own room stands, which is what every arm published before R134 ran with. Zero is
+refused rather than read as "no limit": a registration that asks for an empty pack is a registration that
+measures nothing.
+
+### 23.1 What the count is worth, in dollars
+
+Running the same 74 tasks twice — once with the store and once without — prices the pack's count directly. The
+store-on replay cost **$0.00655 an episode against the store-off control's $0.00270**, on the same backbone, the
+same tasks and the same hour:
+
+| | store on | store off |
+| --- | --- | --- |
+| prompt tokens | 8,558,308 | 6,068,231 |
+| uncached | 2,508,270 | 594,961 |
+| cache hit rate | 0.7069 | 0.9020 |
+| cost, 74 episodes | $0.4847 | $0.1996 |
+| **per episode** | **$0.00655** | **$0.00270** |
+
+The mechanism is not the items' length — it is that a four-item pack is **different text on every call**, so the
+provider's prefix cache is replaced instead of reused. Two consequences worth knowing before you set a budget:
+
+- **A pack you cannot reuse is a pack you pay for twice.** The cheat sheet is in `uncached`, not in `prompt`: 2.5M
+  against 0.59M is the same tasks read cold.
+- **The count is the knob that moves it.** Not `packBudget` — a 2,400-character budget still served four items,
+  because the distiller's records were 560 characters each. `packLimit` says the number you mean.
+
+### 23.2 Reading the count back
+
+`pack.summary.meanIds` is the number to check first, and it is exact rather than estimated: it is a count of
+items against a declared integer. If you set `packLimit: 1` and read `meanIds: 3.975`, the header did not reach
+the query — the driver, the workflow variable and the registration are three places for one number, and the
+artefact is where you find out. `pack.empty` moving while `meanIds` is right is the opposite failure: one item
+did not fit the budget, so you are measuring the renderer.

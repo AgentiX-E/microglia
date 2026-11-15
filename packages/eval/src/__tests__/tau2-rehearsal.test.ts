@@ -105,7 +105,7 @@ describe('the store on the cases it was built from', () => {
     // Nothing failed without memory, so there is no repair population: the sentence prints the empty
     // denominator rather than a rate over it.
     expect(rehearsalLine(record(nothingFailed))).toContain(
-      '0 repaired / 0 inert of the 0 that failed without memory (none)',
+      '0 repaired / 0 inert of the 0 the learn half itself failed (none)',
     );
   });
 
@@ -116,7 +116,7 @@ describe('the store on the cases it was built from', () => {
     });
     const line = rehearsalLine(record(rehearsal));
     expect(line).toContain('4 of 74 task(s) replayed');
-    expect(line).toContain('1 repaired / 3 inert of the 4 that failed without memory (25.00%)');
+    expect(line).toContain('1 repaired / 3 inert of the 4 the learn half itself failed (25.00%)');
   });
 
   it('carries the phase\'s own counts beside the reading, so a replay that served nothing reads as one', () => {
@@ -210,7 +210,51 @@ describe('the control the replay was missing', () => {
     // effect with the draw held fixed. It is signed: a zero here says the store changed nothing net, which is a
     // different claim from "it changed nothing".
     const line = rehearsalLine(fixture());
-    expect(line).toContain('against a no-memory replay: 1 repaired / 2 broken = -1 net of 4 task(s)');
+    expect(line).toContain('against a fresh no-memory draw of the same task(s): 1 repaired / 2 broken = -1 net of 4 task(s)');
+  });
+
+  it('gives each of the two `repaired` counts its own without-side, because they are not the same number', () => {
+    // R133's readback printed `11 repaired` against the learn half and `9 repaired` against the control, in one
+    // sentence, both called `repaired`. The two numbers are correct and about different populations: the first
+    // divides by the draw that *selected* the store's cases, the second by a fresh draw of the same tasks. A
+    // sentence that prints the word twice without naming its reference reads as an arithmetic error, and R132's
+    // lesson is that the reader has no way to recover which clause was which after the fact.
+    const line = rehearsalLine(
+      rehearsalRecordOf({
+        tasks: 6,
+        requests: 6,
+        served: 6,
+        learnRewards: { 'retail/t1': 0, 'retail/t2': 0, 'retail/t3': 0, 'retail/t4': 0, 'retail/t5': 1, 'retail/t6': 1 },
+        rehearsalRewards: rows(
+          ['retail/t1', 1],
+          ['retail/t2', 1],
+          ['retail/t3', 0],
+          ['retail/t4', 0],
+          ['retail/t5', 1],
+          ['retail/t6', 0],
+        ),
+        // A second draw that agrees on four tasks and disagrees on two, in opposite directions: `t2` passes
+        // here and fails in the replay, `t3` the other way round. Two repaired against the learn half, one
+        // against the control -- which is the shape R133 produced.
+        control: {
+          rewards: rows(
+            ['retail/t1', 1],
+            ['retail/t2', 0],
+            ['retail/t3', 1],
+            ['retail/t4', 0],
+            ['retail/t5', 1],
+            ['retail/t6', 0],
+          ),
+        },
+      }),
+    );
+    expect(line).toContain('2 repaired / 2 inert of the 4 the learn half itself failed (50.00%)');
+    expect(line).toContain('against a fresh no-memory draw of the same task(s): 1 repaired / 1 broken');
+    // Each count sits after its own reference, so the two are ordered the way they are named.
+    expect(line.indexOf('the learn half itself failed')).toBeLessThan(line.indexOf('a fresh no-memory draw'));
+    // The population the store passed is stated rather than left as "the rest", which is the same defect one
+    // clause over: `broke` and `kept` are cells over the tasks the learn draw passed.
+    expect(line).toContain('1 broken and 1 kept of the 2 it passed');
   });
 
   it('says the control was not bought rather than leaving the clause out', () => {
@@ -221,7 +265,7 @@ describe('the control the replay was missing', () => {
       rehearsalRewards: rows(['retail/t1', 0]),
     });
     const line = rehearsalLine(record(reading));
-    expect(line).toContain('against a no-memory replay: not measured');
+    expect(line).toContain('against a fresh no-memory draw: not measured');
     expect(line).toContain('the registration bought no control phase');
   });
 

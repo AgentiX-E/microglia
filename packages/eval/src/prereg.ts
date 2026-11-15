@@ -333,6 +333,20 @@ export type Prereg = {
    */
   readonly packBudget?: number;
   /**
+   * How many items a pack may serve, when the arm wants fewer than the host would hand it.
+   *
+   * R134. The budget above bounds a pack in *characters*, and R133's readback showed what that leaves:
+   * 3.975 items and 2,239 of a 2,400-character budget on every request, with 161 items dropped for size
+   * over 40 requests. A character budget cannot state "one script", because how many scripts fit depends
+   * on how long the distiller happened to write them — so an arm whose treatment is "the agent is handed
+   * one procedure instead of four" needs a count, not a length.
+   *
+   * Absent keeps the host's room, which is what every arm published before this header ran with. The
+   * host clamps it the same way it clamps a request's `limit`: a declared count is the arm's decision, and
+   * a pack cannot be emptied by a registration that asks for zero.
+   */
+  readonly packLimit?: number;
+  /**
    * The list of learn-half failures this arm rebuilds its store from, as a path inside the repository.
    *
    * R91. R90's readback showed that the store is a *draw*: it is made from whichever learn tasks failed,
@@ -494,6 +508,7 @@ const HEADER_KEYS = [
   'testTasks',
   'rawCeiling',
   'packBudget',
+  'packLimit',
   'storePin',
   'taskSplit',
   'queryPin',
@@ -1163,13 +1178,18 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     const armTrials = trials ?? 4;
     // The third pass is the control replay, which runs the learn half a third time with the store off.
     const passes = rehearsalControl === true ? 3 : 2;
-    const learnTasks = Number.isFinite(trainTasks) && trainTasks > 0 ? trainTasks : 40;
-    const episodes = armTrials * (Number.isFinite(testTasks) && testTasks > 0 ? testTasks : 40) +
-      passes * learnTasks;
+    // Both counts are already the lane's forty when the header omits them, and a header that states one the
+    // parser refused never reaches a reader: `episodes` is NaN and no ceiling is compared. The two `> 0 ? : 40`
+    // fallbacks that stood here were unreachable for that reason and are deleted rather than covered -- the
+    // count a registration declares and the count its arm carries are the same number or the arm is refused.
+    const episodes = armTrials * testTasks + passes * trainTasks;
     if (episodes > DISPATCH_EPISODE_CEILING) {
       collected.push({
         where: `header 'rehearsal'`,
         problem:
+          // The two counts printed are the two the arithmetic used, not the two the header happened to spell:
+          // a header of `trainTasks: all` resolves to 40 and a sentence reporting `NaN learned` beside a total
+          // computed from 40 is a reading whose own numbers do not reconstruct it (AUDIT 34.168's family).
           `a replay adds the learn half a second time, so this arm carries ${String(episodes)} episode(s) ` +
           `(${String(armTrials)} x ${String(testTasks)} evaluated + ${String(passes)} x ${String(trainTasks)} ` +
           'learned), above ' +
@@ -1271,6 +1291,20 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       collected.push({
         where: `header 'packBudget'`,
         problem: `'${text}' is not a budget a pack can carry in characters`,
+      });
+      return undefined;
+    }
+    return parsed;
+  })();
+
+  const packLimit = ((): number | undefined => {
+    const text = values.get('packLimit');
+    if (text === undefined) return undefined;
+    const parsed = Number(text);
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      collected.push({
+        where: `header 'packLimit'`,
+        problem: `'${text}' is not a number of items a pack can serve`,
       });
       return undefined;
     }
@@ -1535,6 +1569,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(testTasks === undefined ? {} : { testTasks }),
       ...(rawCeiling === undefined ? {} : { rawCeiling }),
       ...(packBudget === undefined ? {} : { packBudget }),
+      ...(packLimit === undefined ? {} : { packLimit }),
       ...(storePin === undefined ? {} : { storePin }),
       ...(taskSplit === undefined ? {} : { taskSplit }),
       ...(queryPin === undefined ? {} : { queryPin }),

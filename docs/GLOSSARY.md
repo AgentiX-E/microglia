@@ -1521,3 +1521,20 @@ an estimate of one quantity. The quantile follows the variance the estimate is m
 the dispatches disagree, the normal quantile when they do not. Two differences from the domain pool: a dispatch
 pool *requires* the same tasks to appear again, and two dispatches at different `k` are refused rather than
 averaged.
+
+**Pack limit** — `packLimit`: how many items a pack may serve, as distinct from `packBudget`, which is how many
+characters it may carry. A character budget leaves the count to how long the distiller happened to write its
+records — measured at 3.975 items and 2,239 of a 2,400-character budget on every request, with 161 further items
+dropped for size over 40 — so a treatment of "one procedure instead of four" has to state a count. Absent means
+the host's room, which is what every arm before R134 ran with; zero is refused rather than read as unlimited.
+
+**Pack saturation** — A pack that is at or near its character budget on every request, with items left over. It
+is a *reachability* finding of a different kind from an empty pack: `served` is 100% and the item the request
+needed may still have been dropped, because assembly stops when the budget runs out and what did not fit is not
+ordered by need. The census prints it as `meanChars` against `budget` beside `droppedForSize`.
+
+**Per-episode bill** — The cost of one episode, which is the only unit two phases of an arm have in common. A
+store-on replay and a store-off control on the same 74 tasks differ by **2.43×** per episode ($0.00655 against
+$0.00270) and the mechanism shows in the cache: 2.5M uncached prompt tokens against 0.59M, a hit rate of 0.7069
+against 0.9020. A multi-item pack is different text on every call, so the provider's prefix cache is replaced
+rather than reused, and the bill is the count's, not the items' length.

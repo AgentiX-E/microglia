@@ -505,6 +505,17 @@ function readQueryPin(file: string, episodes: number): QueryPin | undefined {
 const PACK_BUDGET =
   Math.max(0, Number(process.env["TAU_PACK_BUDGET"] ?? 0) || 0) || DEFAULT_PACK_BUDGET;
 /**
+ * How many items the pack may serve, when the registration states a count.
+ *
+ * R134. `PACK_BUDGET` bounds a pack in characters and therefore leaves the *count* to how long the
+ * distiller happened to write its records: R133's readback served 3.975 items and 2,239 of a 2,400
+ * character budget on every request, and the census counted 161 items dropped for size over 40 requests.
+ * An arm whose treatment is "one procedure instead of four" cannot state that with a length, so the count
+ * is its own switch. Absent (`0`) keeps the host's room, which is what every earlier arm ran with.
+ */
+const PACK_LIMIT =
+  Math.max(0, Number(process.env["TAU_PACK_LIMIT"] ?? 0) || 0);
+/**
  * The interpreter that can import `tau2`.
  *
  * `uv sync` puts the benchmark in `.tau2-bench/.venv`, so the system `python3` on a
@@ -2141,6 +2152,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         text: used,
         scope: { domain: RECALL_DOMAIN },
         minCoverage: query.minCoverage ?? floor,
+        // R134: the count the registration declared, when it declared one. The request's own `limit`
+        // still wins, for the reason the floor's does: an arm that asks for a count is served the pack it
+        // asked for, and the header is the fallback rather than the value.
+        ...(query.limit === undefined && PACK_LIMIT > 0 ? { limit: PACK_LIMIT } : {}),
         // R53: the level is a rendering option of THIS recall. `undefined` keeps the host's,
         // which is what every single-facade and paired dispatch does.
         ...(note === undefined ? {} : { note }),
@@ -2312,6 +2327,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         text,
         scope: { domain: RECALL_DOMAIN },
         minCoverage: query.minCoverage ?? treatment.floor,
+        // R134: the rehearsal must be served the pack the graded half was served, or its four cells
+        // describe an arm nobody dispatched.
+        ...(query.limit === undefined && PACK_LIMIT > 0 ? { limit: PACK_LIMIT } : {}),
         ...(treatment.note === undefined ? {} : { note: treatment.note }),
         ...(treatment.shape === undefined ? {} : { shape: treatment.shape }),
       });

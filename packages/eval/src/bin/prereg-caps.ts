@@ -66,7 +66,7 @@ function main(): void {
     for (const problem of reading.problems) refuse(`at ${problem.where}: ${problem.problem}`);
     return;
   }
-  const { trainTasks, testTasks, rawCeiling, packBudget, storePin, taskSplit, queryPin, release } =
+  const { trainTasks, testTasks, rawCeiling, packBudget, packLimit, storePin, taskSplit, queryPin, release } =
     reading.prereg;
   // A ceiling the declared pack cannot carry is refused here rather than priced: the arm would write
   // records the renderer drops, every one of which reads as a request with nothing relevant, and the
@@ -88,6 +88,10 @@ function main(): void {
   process.stdout.write(`test=${testTasks === undefined ? '' : String(testTasks)}\n`);
   process.stdout.write(`ceiling=${rawCeiling === undefined ? '' : String(rawCeiling)}\n`);
   process.stdout.write(`budget=${packBudget === undefined ? '' : String(packBudget)}\n`);
+  // R134: how many items the pack may serve. Printed separately from the budget because the two bound
+  // different things -- a character budget leaves the count to how long the distiller wrote its records,
+  // which is exactly the number R133's readback found unstated (3.975 items a pack, 161 dropped for size).
+  process.stdout.write(`limit=${packLimit === undefined ? '' : String(packLimit)}\n`);
   // R91: the learn half, frozen to a list. A path rather than an id because the list is read in the
   // diff, and printed only where the registration states it -- a run without one rebuilds the half,
   // which is the behaviour every earlier arm had and must keep.

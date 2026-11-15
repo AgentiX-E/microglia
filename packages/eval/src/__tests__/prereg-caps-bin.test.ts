@@ -61,7 +61,7 @@ describe('prereg-caps', () => {
   it('prints both caps, one per line, for the two variables the workflow reads', () => {
     const result = run(file(['trainTasks: 57', 'testTasks: 1']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=\nlimit=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
   });
 
   it('prints the record ceiling beside the caps, which is the switch R85 lacked', () => {
@@ -70,13 +70,13 @@ describe('prereg-caps', () => {
     // by the last dispatch; R85's own 700 is what that costs -- twelve of twelve records clipped.
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'rawCeiling: 2000']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\nlimit=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
   });
 
   it('prints one empty line per variable when the registration pins nothing, so the variables stand', () => {
     const result = run(file([]));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=\ntest=\nceiling=\nbudget=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
+    expect(result.out).toBe('train=\ntest=\nceiling=\nbudget=\nlimit=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
   });
 
   it('prints the capacity the inherited budget implies, so the pair is visible in the dispatch log', () => {
@@ -85,7 +85,7 @@ describe('prereg-caps', () => {
     // read by whoever looks at a run that served one record out of twelve.
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'rawCeiling: 2000', 'distillUnit: raw']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\nlimit=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
     expect(result.err).toContain('ceiling 2000 is above budget 1200');
     expect(result.err).toContain('capacity is 810 chars/record');
   });
@@ -101,8 +101,18 @@ describe('prereg-caps', () => {
       ]),
     );
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=2400\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=2400\nlimit=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
     expect(result.err).toContain('ceiling 2000 fits budget 2400 (capacity 2010 chars/record)');
+  });
+
+  it('prints the item count on its own line, because a length cannot state a count', () => {
+    // R134. `budget` and `limit` bound different things: the budget is characters and leaves the number of
+    // scripts to how long the distiller wrote them, which is how R133 came to serve four of them. An arm that
+    // declares one item must be read by the workflow as one item, so the line exists even though the two are
+    // usually set together.
+    const result = run(file(['trainTasks: 57', 'testTasks: 1', 'packBudget: 700', 'packLimit: 1']));
+    expect(result.code).toBe(0);
+    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=700\nlimit=1\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
   });
 
   it('prints the store pin when the registration freezes its learn half', () => {
@@ -111,7 +121,7 @@ describe('prereg-caps', () => {
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'storePin: eval/pins/r90-retail.json']));
     expect(result.code).toBe(0);
     expect(result.out).toBe(
-      'train=57\ntest=1\nceiling=\nbudget=\npin=eval/pins/r90-retail.json\ntaskSplit=\nqueryPin=\nrelease=\n',
+      'train=57\ntest=1\nceiling=\nbudget=\nlimit=\npin=eval/pins/r90-retail.json\ntaskSplit=\nqueryPin=\nrelease=\n',
     );
   });
 
@@ -131,7 +141,7 @@ describe('prereg-caps', () => {
     const result = run(file(['trainTasks: 74', 'testTasks: 40', 'taskSplit: official']));
     expect(result.code).toBe(0);
     expect(result.out).toBe(
-      'train=74\ntest=40\nceiling=\nbudget=\npin=\ntaskSplit=official\nqueryPin=\nrelease=\n',
+      'train=74\ntest=40\nceiling=\nbudget=\nlimit=\npin=\ntaskSplit=official\nqueryPin=\nrelease=\n',
     );
   });
 
@@ -165,7 +175,7 @@ describe('prereg-caps', () => {
     );
     expect(result.code).toBe(0);
     expect(result.out).toBe(
-      'train=57\ntest=1\nceiling=\nbudget=\npin=eval/pins/r90-retail.json\ntaskSplit=\nqueryPin=eval/pins/r92-retail-queries.json\nrelease=\n',
+      'train=57\ntest=1\nceiling=\nbudget=\nlimit=\npin=eval/pins/r90-retail.json\ntaskSplit=\nqueryPin=eval/pins/r92-retail-queries.json\nrelease=\n',
     );
   });
 

@@ -125,9 +125,11 @@ export function rehearsalLine(record: RehearsalRecord): string {
   const failed = rehearsal.repaired + rehearsal.inert;
   return (
     `rehearsal: ${String(rehearsal.paired)} of ${String(record.tasks)} task(s) replayed, ${served}, ` +
-    `${String(rehearsal.repaired)} repaired / ${String(rehearsal.inert)} inert of the ${String(failed)} that ` +
-    `failed without memory (${share(rehearsal.repairRate)}); ` +
-    `${String(rehearsal.broke)} broken and ${String(rehearsal.kept)} kept of the rest` +
+    `${String(rehearsal.repaired)} repaired / ${String(rehearsal.inert)} inert of the ${String(failed)} the ` +
+    `learn half itself failed (${share(rehearsal.repairRate)}); ` +
+    `${String(rehearsal.broke)} broken and ${String(rehearsal.kept)} kept of the ${String(
+      rehearsal.broke + rehearsal.kept,
+    )} it passed` +
     (rehearsal.harmShare === null ? '' : `; harm share ${share(rehearsal.harmShare)}`) +
     controlClause(record.control)
   );
@@ -146,18 +148,18 @@ export function rehearsalLine(record: RehearsalRecord): string {
  */
 function controlClause(control: RehearsalControl | undefined): string {
   if (control === undefined) {
-    return '; against a no-memory replay: not measured (the registration bought no control phase)';
+    return '; against a fresh no-memory draw: not measured (the registration bought no control phase)';
   }
   if (control.refused !== undefined) {
     return (
-      '; against a no-memory replay: not measured (the control phase refused at the rate window, so the store ' +
+      '; against a fresh no-memory draw: not measured (the control phase refused at the rate window, so the store ' +
       'was never compared with a fresh draw of its own population)'
     );
   }
   const reading = control.reading;
   if (reading === undefined) {
     return (
-      '; against a no-memory replay: not measured (no task carried a reward on both sides, so the control ran ' +
+      '; against a fresh no-memory draw: not measured (no task carried a reward on both sides, so the control ran ' +
       'and paired nothing)'
     );
   }
@@ -165,7 +167,8 @@ function controlClause(control: RehearsalControl | undefined): string {
   const signed = `${net > 0 ? '+' : ''}${String(net)}`;
   const share = reading.harmShare === null ? 'none' : `${(reading.harmShare * 100).toFixed(2)}%`;
   return (
-    `; against a no-memory replay: ${String(reading.repaired)} repaired / ${String(reading.broke)} broken = ` +
+    `; against a fresh no-memory draw of the same task(s): ${String(reading.repaired)} repaired / ` +
+    `${String(reading.broke)} broken = ` +
     `${signed} net of ${String(reading.paired)} task(s) (${((net / reading.paired) * 100).toFixed(2)}%)` +
     (reading.repaired + reading.broke === 0 ? '' : `, harm share ${share}`)
   );
