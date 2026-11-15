@@ -1053,7 +1053,7 @@ export {
   type PackCensus,
   type PackReading,
 } from './tau2-pack.js';
-export { callsOfStatement, tau2ShapeOf } from './tau2-shape.js';
+export { callsOfStatement, shapeByTaskOf, tau2ShapeOf, tau2ShapeWithFallback } from './tau2-shape.js';
 export { stoppedRun } from './stopped-run.js';
 export {
   COMPETITOR_PASS4,

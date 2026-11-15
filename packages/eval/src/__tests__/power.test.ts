@@ -3,6 +3,7 @@ import {
   HALF_WIDTH_Z,
   pairedWidths,
   pairRowOf,
+  pairedWidths,
   powerFromComparison,
   powerFromCounts,
   powerOf,
@@ -321,5 +322,42 @@ describe('scoreHalfWidthPp, the ruler an absolute score is read with', () => {
     // The arithmetic R119 is registered against, and the reason a point estimate is not a result.
     expect(0.70 - scoreHalfWidthPp(0.70, 40) / 100).toBeLessThan(0.575);
     expect(0.75 - scoreHalfWidthPp(0.75, 40) / 100).toBeGreaterThan(0.575);
+  });
+});
+
+/**
+ * R120 — the two refusals a `comparison` block earns, and the dead branch that used to sit between them.
+ *
+ * The missing-field guard was a loop over the three names, which throws for the reader and narrows
+ * nothing for the compiler — so the function had to keep a second `throw` beneath it to make the types
+ * line up, and that branch was unreachable by construction. The project's rule is that an unreachable
+ * branch is deleted rather than exempted, and the version below meets it by writing the three guards
+ * out. These two tests are the ones that would have caught the branch surviving: a block with no pairs
+ * is refused by the width calculation, and a block missing one of its three counts is refused by name.
+ */
+describe('the refusals a comparison block earns', () => {
+  it('refuses a block whose sample is empty, because it has no delta to audit', () => {
+    // The refusal comes from the count guard, not from the width calculation: `pairedWidths` returns null
+    // only when `n <= 0`, which this guard has already refused with the same sentence — so the second
+    // `if (widths === null)` branch that used to sit here was unreachable twice over. It is deleted, and
+    // this test is what stops it coming back: the sentence is still produced, once.
+    expect(() =>
+      powerFromComparison('empty.json', { paired: 0, lost: 0, gained: 0 }),
+    ).toThrow(/has no pairs/);
+    // The public nullable form still answers `null` for the same input, which is the shape a caller that
+    // has *not* refused an empty sample needs.
+    expect(pairedWidths(0, 0, 0)).toBeNull();
+  });
+
+  it('names the count a block is missing rather than reporting a type it never had', () => {
+    for (const [over, name] of [
+      [{ paired: undefined }, 'paired'],
+      [{ lost: undefined }, 'lost'],
+      [{ gained: undefined }, 'gained'],
+    ] as const) {
+      expect(() => powerFromComparison('thin.json', { paired: 68, lost: 13, gained: 14, ...over })).toThrow(
+        new RegExp(`comparison' block without '${name}'`),
+      );
+    }
   });
 });

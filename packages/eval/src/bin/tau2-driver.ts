@@ -170,7 +170,7 @@ import { consolidateKnowledge } from "@agentix-e/microglia-core/distill";
 import { sweepConsolidation, sweepSummary } from "../consolidation-sweep.js";
 import type { Tau2PhaseUsage } from "../tau2-instrument.js";
 import { cacheCensusVerdict } from "../cache-census.js";
-import { tau2ShapeOf } from "../tau2-shape.js";
+import { shapeByTaskOf, tau2ShapeWithFallback } from "../tau2-shape.js";
 import { runDistillPreflight, type PreflightReading } from "../distill-preflight.js";
 import { replyCensus, replyCensusLine } from "../distill-replies.js";
 import { writerOf } from "../distill-writer.js";
@@ -1317,6 +1317,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // counted. The inventory is built from the corrections themselves rather than from a constant: a
   // hand-written list would go stale the moment the scenario renames an action, and a stale ban is a
   // green reading on a store nobody constrained.
+  // R120: the routine behind every correction, joined to the items it wrote. Built once, used by the
+  // fold's key and by the store sample, so the census in the artefact and the unit the pack folded on
+  // are the same function of the same corrections — a second derivation would let the two disagree
+  // about the number that explains a null contrast.
+  const shapeByTask = shapeByTaskOf(corrections);
+  const shapeOf = tau2ShapeWithFallback(shapeByTask);
   const toolInventory = toolInventoryOf(corrections);
   const toolGuard = guardAgainstToolNames(toolInventory);
   // The domain on every claim is the host's, not the interpreter's: `parseScope` takes it from the
@@ -1348,7 +1354,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // nothing else knows that, so the vocabulary is declared here and the request only says which unit it
     // wants. A dispatch that declares `shape=per-failure` gets the same census over the same pack, which
     // is what makes the two arms one experiment.
-    shapeOf: tau2ShapeOf,
+    shapeOf,
   });
 
   let withTrace = 0;
@@ -1570,7 +1576,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // census beside it is whole: a reader can see the six kinds, the status split and the reasons
     // without a second run, and a store larger than the sample says so.
     store: census,
-    storeItems: storeItemSample(knowledge),
+    storeItems: storeItemSample(knowledge, { shapeOf }),
     yield: yieldCensus(claimsPerCorrection(captured, knowledge)),
     distill: {
       scope: DISTILL_SCOPE,
@@ -2272,7 +2278,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // R54: what the store said, not only how many items said it. R51 could count conditions
     // and read none of them, so its readback could not tell a trigger in the user's register
     // from one in the procedure's — and those two predict opposite coverage.
-    storeItems: storeItemSample(knowledge),
+    storeItems: storeItemSample(knowledge, { shapeOf }),
     // R56: the treatment and the subject it acted on, recorded beside the store it produced. The
     // form is what the prompt asked for; the inventory is what the ban refused names from; the
     // count is how often it fired. An artefact that carried the form alone would read the same

@@ -348,6 +348,20 @@ export type Prereg = {
    */
   readonly packShape?: string;
   /**
+   * Which bar this registration's absolute score is graded by: a point estimate, or an interval's
+   * lower bound.
+   *
+   * R120. R119's file states its bar in prose — "to be called above 0.575 the interval's lower bound
+   * must clear it, which needs p ≥ 0.75" — while the gate compared a point to `published + 5pp`. One
+   * dispatch, two bars, and the gate's was the lenient one: a run at 0.63 would have been green under a
+   * registration that says the claim cannot be made below 0.75. A bar that lives only in prose is a bar
+   * the gate cannot read, so it becomes a header, and the gate states which of the two it applied.
+   *
+   * Absent means `point`, because that is what every dispatch before R120 ran and an artefact's verdict
+   * must not change retrospectively because a second ruler was added to the file.
+   */
+  readonly claimRuler?: 'point' | 'interval';
+  /**
    * Whether this registration's dispatch asks the model to think.
    *
    * R84 asks a question the record cannot answer without it: R82 measured the expensive backbone 6.00pp
@@ -422,6 +436,7 @@ const HEADER_KEYS = [
   'release',
   'packMode',
   'packShape',
+  'claimRuler',
   'thinking',
 ] as const;
 
@@ -464,6 +479,13 @@ const HEADER_BOOLEANS: ReadonlySet<string> = new Set(['true', 'false']);
 
 /** The two places a pack may be served from. `retrieved` is the lane's own protocol. */
 const HEADER_PACK_MODES: ReadonlySet<string> = new Set(['retrieved', 'prefix']);
+/**
+ * The two bars an absolute score can be graded by, spelled here for `HEADER_PACK_MODES`' reason.
+ *
+ * `point` is `score >= published + bar`. `interval` is `score - halfWidth(score, n) > published`: the
+ * registration's own sentence, made readable by the gate instead of restated in a comment.
+ */
+const HEADER_CLAIM_RULERS: ReadonlySet<string> = new Set(['point', 'interval']);
 /**
  * The two units, spelled here for `HEADER_PACK_MODES`' reason and one of its own.
  *
@@ -1108,6 +1130,19 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  const claimRulerText = values.get('claimRuler');
+  let claimRuler: 'point' | 'interval' | undefined;
+  if (claimRulerText !== undefined) {
+    if (!HEADER_CLAIM_RULERS.has(claimRulerText)) {
+      collected.push({
+        where: `header 'claimRuler'`,
+        problem: `'${claimRulerText}' is not one of ${[...HEADER_CLAIM_RULERS].join(', ')}`,
+      });
+    } else {
+      claimRuler = claimRulerText === 'interval' ? 'interval' : 'point';
+    }
+  }
+
   // The thinking regime, which R84 needs and which has no dispatch field to live in.
   //
   // Two values and no synonyms. `SOTA_THINKING` accepts `enabled`, `disabled`, `true` and `false`
@@ -1249,6 +1284,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(queryPin === undefined ? {} : { queryPin }),
       ...(release === undefined ? {} : { release }),
       ...(packMode === undefined ? {} : { packMode }),
+      ...(claimRuler === undefined ? {} : { claimRuler }),
       ...(packShape === undefined ? {} : { packShape }),
       ...(facadeShapes === undefined ? {} : { facadeShapes }),
       ...(thinking === undefined ? {} : { thinking }),

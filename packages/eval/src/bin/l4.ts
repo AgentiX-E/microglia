@@ -17,6 +17,7 @@
  * non-zero, and names the reason. That is the difference between "we could not
  * measure" and "we measured something invalid".
  */
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -35,6 +36,7 @@ import {
   parseTauResults,
   recurrenceGate,
   sampleGates,
+  readPrereg,
   perTaskRows,
   toPassAtK,
   resolveArmKind,
@@ -445,6 +447,41 @@ const compared =
   scenarioBar.published === null || K !== PUBLISHED_K || arm !== 'memory'
     ? undefined
     : compareToPublished(mean, scenarioBar.published, BAR);
+
+/**
+ * R120 — the bar the registration named, read from the registration rather than assumed here.
+ *
+ * R119's file states that the claim needs the interval's lower bound to clear 0.575, and the gate
+ * compared a point estimate to `published + 5pp`. The two bars are not the same test, and the gate's
+ * was the lenient one: a run at 0.63 would have been green under a file that says 0.75 is the floor.
+ * The header is the only place the two can be reconciled, so it is read here and passed through.
+ *
+ * A registration that does not parse **stops the run** rather than falling back to `point`: a dispatch
+ * graded by a ruler nobody declared is the defect this exists to remove, and a silent fallback would
+ * reproduce it in the one case where the file is definitely wrong.
+ */
+const claimRuler = ((): 'point' | 'interval' | undefined => {
+  const file = (process.env['TAU_PREREG_FILE'] ?? '').trim();
+  if (file === '') return undefined;
+  // Named but unreadable is a different statement from unnamed: a dispatch that pointed at a path and
+  // silently fell back to the point ruler would be the defect this whole branch removes. A push run
+  // names no file at all, and that is the case the empty check above covers.
+  let markdown: string;
+  try {
+    markdown = readFileSync(file, 'utf8');
+  } catch {
+    process.stderr.write(`[l4] TAU_PREREG_FILE names ${file}, which cannot be read\n`);
+    process.exit(2);
+  }
+  const reading = readPrereg(markdown, file);
+  if (reading.prereg === undefined || reading.problems.length > 0) {
+    const first = reading.problems[0];
+    const detail = first === undefined ? 'no header' : `${first.where} ${first.problem}`;
+    process.stderr.write(`[l4] registration ${file} does not parse: ${detail}\n`);
+    process.exit(2);
+  }
+  return reading.prereg.claimRuler;
+})();
 const coversSplit = measured.tasks.length >= MIN_TASKS;
 type ReferenceTask = { readonly id: string; readonly passed_all: boolean };
 let paired: { delta: number; low: number; high: number; p: number; n: number } | undefined;
@@ -476,8 +513,9 @@ const gates = [
     tasks: measured.tasks.length,
     unscored: measured.unscored.length,
     minTasks: MIN_TASKS,
-    published: compared,
+    published: compared === undefined || scenarioBar.published === null ? undefined : { value: scenarioBar.published },
     bar: BAR,
+    ...(claimRuler === undefined ? {} : { ruler: claimRuler }),
     ...(plantedArm === '' ? {} : { planted: { arm: plantedArm } }),
   }),
   // R50. This arm has no reference arm of its own. When one is supplied the gate

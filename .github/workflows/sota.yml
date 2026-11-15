@@ -1436,6 +1436,12 @@ jobs:
           # without.
           TAU_DISTILL_PREFLIGHT: '1'
           TAU_PREREG: ${{ github.event.inputs.prereg }}
+          # R120: the bar the registration named, as a file the gate can read. R119's file states that
+          # the claim needs the interval's lower bound to clear 0.575, and the gate compared a point to
+          # `published + 5pp` — one dispatch, two bars, and the gate's was the lenient one. The path is
+          # empty when no registration is named, which is how a push run keeps the point ruler every
+          # artefact before R120 was graded by.
+          TAU_PREREG_FILE: ${{ github.event.inputs.prereg && format('prereg/{0}.md', github.event.inputs.prereg) || '' }}
           # Defect 27: a bounded pre-flight probe, registered by R49. An
           # outage writes an explicit no-measurement artefact instead of a zero.
           TAU_PROVIDER_PROBE: ${{ steps.recall_floor.outputs.pair == 'true' && 'true' || 'false' }}

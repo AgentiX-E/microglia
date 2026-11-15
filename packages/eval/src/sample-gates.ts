@@ -19,6 +19,8 @@
  * has paid for before (AUDIT 34.57, 34.59), and a `bin/` file is excluded from coverage.
  */
 
+import { scoreHalfWidthPp } from './power.js';
+
 export type SampleGate = {
   readonly id: string;
   readonly pass: boolean;
@@ -55,10 +57,60 @@ export type SampleGateInput = {
   readonly tasks: number;
   readonly unscored: number;
   readonly minTasks: number;
-  /** `meets` from `compareToPublished`, or `undefined` when no published number applies. */
-  readonly published: { readonly meets: boolean } | undefined;
+  /**
+   * The published number this arm may be held to, or `undefined` when none applies.
+   *
+   * R120. This used to carry the **verdict** (`{ meets: boolean }`) rather than the number, and the
+   * defect that hid in that shape was found by reading R119's own output: the registration states the
+   * bar as "the interval's lower bound must clear 0.575", the caller computed `meets` with a point
+   * comparison, and the gate printed `criterion: '>= published + 0.05'` beside it. One dispatch, two
+   * bars, and the gate's was the lenient one — a run at 0.63 would have been green under a file that
+   * says the claim needs 0.75. A gate that cannot compute its own verdict cannot state which ruler it
+   * used, so this file now takes the number, the ruler, and the count.
+   */
+  readonly published: { readonly value: number } | undefined;
   readonly bar: number;
+  /**
+   * Which bar the registration named: a point estimate, or an interval's lower bound.
+   *
+   * `point` is the default because it is what every dispatch before R120 ran, and an artefact's verdict
+   * must not change retrospectively because a second ruler was added to the file. `interval` subtracts
+   * the sample's own binomial half-width from the score before comparing, so the same score clears a
+   * lower bar at a larger `n` — which is the only sense in which a bar is about evidence rather than
+   * about luck.
+   */
+  readonly ruler?: 'point' | 'interval';
 };
+
+/**
+ * The one gate the two rulers disagree about, computed here so the criterion cannot disagree with it.
+ *
+ * The point ruler is the default and is byte-for-byte what every dispatch before R120 ran: a score is
+ * compared to `published + bar`, and `bar` is a share (0.05 → five points). The interval ruler asks a
+ * strictly harder question — does the score minus its own 95% half-width still clear the published
+ * number — and the two are the same test only at infinite `n`. A registration that states the interval
+ * is stating a claim about evidence, and grading it by the point would be answering a different
+ * question with a lenient instrument.
+ */
+function publishedGate(input: SampleGateInput, published: number): SampleGate {
+  if (input.ruler !== 'interval') {
+    return {
+      id: 'l4-pass4',
+      pass: input.pass4 >= published + input.bar,
+      actual: input.pass4,
+      criterion: `>= published + ${String(input.bar)}`,
+    };
+  }
+  const halfWidthPp = scoreHalfWidthPp(input.pass4, input.tasks);
+  return {
+    id: 'l4-pass4',
+    // Strictly greater: the registration says the lower bound must *clear* the published number, and a
+    // lower bound exactly equal to it is a tie between "the claim holds" and "the sample cannot tell".
+    pass: input.pass4 - halfWidthPp / 100 > published,
+    actual: input.pass4,
+    criterion: `> published + the sample's half-width (${halfWidthPp.toFixed(2)}pp at n=${String(input.tasks)})`,
+  };
+}
 
 export function sampleGates(input: SampleGateInput): readonly SampleGate[] {
   return [
@@ -66,14 +118,7 @@ export function sampleGates(input: SampleGateInput): readonly SampleGate[] {
     // pass: the metric carries `published_bar_applies: 0` and the note says which arm this is.
     ...(input.published === undefined || input.arm !== 'memory' || input.planted !== undefined
       ? []
-      : [
-          {
-            id: 'l4-pass4',
-            pass: input.published.meets,
-            actual: input.pass4,
-            criterion: `>= published + ${String(input.bar)}`,
-          },
-        ]),
+      : [publishedGate(input, input.published.value)]),
     // What the control owes the pairing step, in place of a bar it cannot be held to.
     ...(input.arm === 'memory'
       ? []

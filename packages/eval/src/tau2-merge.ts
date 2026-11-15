@@ -77,8 +77,16 @@ export const MERGE_GROUP_CAP = 32;
  *
  * Names only: two failures of one routine differ in exactly the arguments a shape has to ignore. A
  * correction that states no calls is keyed by its task so it can never merge with another.
+ *
+ * The parameter asks for names and nothing else rather than for a `Correction`. That is what lets R120's
+ * fold key — `shapeByTaskOf`, which reads corrections the lane has already distilled — call this function
+ * instead of keeping a second copy of the definition; a copy would drift, and the two numbers it produces
+ * are compared in one artefact.
  */
-export function actionShapeOf(correction: Pick<Correction, 'actions' | 'taskId'>): string {
+export function actionShapeOf(correction: {
+  readonly actions: readonly { readonly name: string }[];
+  readonly taskId: string;
+}): string {
   if (correction.actions.length === 0) return `task:${correction.taskId}`;
   return correction.actions.map((action) => action.name).join(' > ');
 }

@@ -16,7 +16,7 @@ const memory: SampleGateInput = {
   tasks: 57,
   unscored: 0,
   minTasks: 40,
-  published: { meets: false },
+  published: { value: 0.575 },
   bar: 0.05,
 };
 
@@ -124,5 +124,69 @@ describe('a planted distractor arm', () => {
       '>= 40 tasks',
       '= 0 unscored tasks',
     ]);
+  });
+});
+
+/**
+ * R120 — one dispatch, two bars, and the lenient one was the gate.
+ *
+ * R119's registration states its own bar in prose: "to be called above 0.575 the interval's lower bound
+ * must clear it, which needs p ≥ 0.75; 0.70 gives 0.558 and 0.65 gives 0.502". The gate that actually
+ * ran compared a **point** estimate to `published + 5pp` — 0.625 — so a run at 0.63 would have been
+ * green under a registration that says the claim cannot be made below 0.75. That is the same defect the
+ * last three rounds were about, in its most expensive form: the gate is the number a reader trusts, and
+ * it was grading a different claim than the file beside it.
+ *
+ * The repair is not a stricter constant. It is that the gate **computes** its own verdict from the
+ * numbers and the ruler the registration names, so a caller cannot hand it a boolean decided elsewhere
+ * under a different ruler, and `criterion` always states which bar was applied.
+ */
+describe('the bar a registration names, rather than the one the caller computed', () => {
+  const r119: SampleGateInput = {
+    arm: 'memory',
+    pass4: 0.6,
+    tasks: 40,
+    unscored: 0,
+    minTasks: 40,
+    published: { value: 0.575 },
+    bar: 0.05,
+  };
+
+  it('fails the interval bar at the score R119 measured, and says how wide the sample is', () => {
+    // 0.600 ± 15.18pp → [0.448, 0.752]. The lower bound is 12.7pp short of 0.575, and the registration
+    // says the lower bound is the bar, so the claim is refused at this n whatever the point estimate is.
+    const gates = sampleGates({ ...r119, ruler: 'interval' });
+    const bar = gates.find((gate) => gate.id === 'l4-pass4');
+    expect(bar?.pass).toBe(false);
+    expect(bar?.criterion).toBe("> published + the sample's half-width (15.18pp at n=40)");
+  });
+
+  it('passes the point bar at a score the interval bar refuses', () => {
+    // The defect, asserted: 0.63 clears 0.575 + 0.05 and does not clear 0.575 once its own half-width
+    // is subtracted. A registration that names the interval must not be graded by the point.
+    expect(sampleGates({ ...r119, pass4: 0.63, ruler: 'interval' })[0]?.pass).toBe(false);
+    expect(sampleGates({ ...r119, pass4: 0.63, ruler: 'point' })[0]?.pass).toBe(true);
+  });
+
+  it('passes both when the sample is wide enough to carry the claim', () => {
+    // 0.78 ± 12.84pp → lower bound 0.652, which clears 0.575 by 7.7pp. A stronger score at the same n
+    // is the only way to clear the interval bar, which is what makes it a bar at all.
+    const gates = sampleGates({ ...r119, pass4: 0.78, ruler: 'interval' });
+    expect(gates[0]?.pass).toBe(true);
+    expect(gates[0]?.criterion).toBe("> published + the sample's half-width (12.84pp at n=40)");
+  });
+
+  it('cannot clear an interval bar with an empty sample', () => {
+    // A half-width over no tasks is infinite, so the lower bound is −∞: an arm that scored nothing is
+    // not an arm with a narrow interval. `scoreHalfWidthPp` returns `Infinity` here rather than throwing,
+    // and this is the consumer that has to read it as a refusal.
+    expect(sampleGates({ ...r119, tasks: 0, ruler: 'interval' })[0]?.pass).toBe(false);
+  });
+
+  it('keeps the point ruler when the registration names none', () => {
+    // The default is what every dispatch before R120 ran, so an artefact's verdict does not change
+    // retrospectively because a second ruler was added to the file.
+    expect(sampleGates(r119)[0]?.criterion).toBe('>= published + 0.05');
+    expect(sampleGates({ ...r119, pass4: 0.63 })[0]?.pass).toBe(true);
   });
 });

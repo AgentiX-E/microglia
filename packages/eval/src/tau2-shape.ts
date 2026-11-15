@@ -17,6 +17,7 @@
  * argument, and a split on the separator would turn one call into two and invent a routine that no task
  * taught. Names only: the arguments are the instance, which is the distinction the whole fold rests on.
  */
+import { actionShapeOf } from './tau2-merge.js';
 
 /**
  * The call names on a record's `A:` line, in order.
@@ -72,4 +73,82 @@ export function callsOfStatement(statement: string): string[] {
 export function tau2ShapeOf(item: { readonly statement: string }): string | undefined {
   const names = callsOfStatement(item.statement);
   return names.length === 0 ? undefined : names.join(' > ');
+}
+
+/**
+ * R120 — the routine behind every correction the learn half produced, keyed by the task it taught.
+ *
+ * R119 printed `fold: units 631, folded 0, groups 0, atLeastTwo 0, max 1` beside `merge: shapes 53,
+ * support.atLeastTwo 10, max 5`: one store, one dispatch, one question, two keys — and only one of
+ * the keys had an input. The fold reads the `A:` line of an item's statement, and a record written by
+ * the distiller is a sentence ("return actions carry the order_id, the item_ids and a
+ * payment_method_id") with no answer line at all, so `callsOfStatement` returned `[]` for all 79
+ * servable items and every item was its own unit. The fold could not fire, and the run reported its
+ * inertness as a property of the store: "the fold removed nothing, so the two arms are one treatment".
+ * That sentence was true and its reason was not the one given.
+ *
+ * The key is `actionShapeOf`, imported rather than re-derived: the census that priced the merge and
+ * the key the fold reads must be one function, or the two numbers will drift and no reader can tell
+ * which of them a result is about. What this function adds is the join — the correction's task is what
+ * an item's evidence names — and one deliberate omission: a correction that called nothing taught no
+ * routine, so it has no entry. `actionShapeOf` still keys it as `task:<id>` for the census, which needs
+ * a bucket for every correction to size a store; the fold needs a routine, and an item that names none
+ * is its own unit.
+ */
+export function shapeByTaskOf(
+  corrections: readonly {
+    readonly taskId: string;
+    readonly actions: readonly { readonly name: string }[];
+  }[],
+): ReadonlyMap<string, string> {
+  const byTask = new Map<string, string>();
+  for (const correction of corrections) {
+    if (correction.actions.length === 0) continue;
+    byTask.set(correction.taskId, actionShapeOf(correction));
+  }
+  return byTask;
+}
+
+/** The item's side of the join: the distinct tasks its own evidence cites. */
+type ShapeEvidence = { readonly evidence?: readonly { readonly taskId?: string }[] };
+
+/**
+ * The fold's extractor, with the correction's routine as a fallback for a record that states none.
+ *
+ * Four decisions, each of which a looser version gets wrong:
+ *
+ * **The record's own answer line wins.** A capture record states the calls it *made*, which is not
+ * always the routine its reference trajectory asked for. A fallback that overrode the text would
+ * replace a measurement with a task's intention.
+ *
+ * **The fallback reads the evidence, not the scope.** The scope's `intent` is free text the model
+ * writes, and R119's store spells one routine three ways — `return_items`, `return_item`, and
+ * `return_items` again under a different field — so it cannot key anything: 9 of 64 sampled items
+ * shared an intent string and every one of them still carried `supportTasks: 1`.
+ *
+ * **Evidence that names two routines names none.** An item citing an exchange and a return is not one
+ * routine, and folding it into either would credit one shape with the other's support — the laundering
+ * R99 already paid for. `undefined` is the honest answer and it makes the item its own unit.
+ *
+ * **A task with no known routine contributes nothing rather than a veto.** A claim the store wrote from
+ * a run whose correction is not in the learn half — a hand-written rule, a store another arm wrote —
+ * cannot be named, and letting that silence forbid a name the other evidence does supply would make the
+ * key depend on which half of the corpus a reader happened to have.
+ */
+export function tau2ShapeWithFallback(
+  byTask: ReadonlyMap<string, string>,
+): (item: { readonly statement: string } & ShapeEvidence) => string | undefined {
+  return (item) => {
+    const stated = tau2ShapeOf(item);
+    if (stated !== undefined) return stated;
+    let shape: string | undefined;
+    for (const entry of item.evidence ?? []) {
+      if (entry.taskId === undefined) continue;
+      const candidate = byTask.get(entry.taskId);
+      if (candidate === undefined) continue;
+      if (shape === undefined) shape = candidate;
+      else if (shape !== candidate) return undefined;
+    }
+    return shape;
+  };
 }

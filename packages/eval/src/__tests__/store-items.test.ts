@@ -239,3 +239,42 @@ describe('the scope the sample carries', () => {
     }
   });
 });
+
+/**
+ * R120 — the fold's key, carried on the row so the census can be re-derived from the artefact.
+ *
+ * R119's store sample carried the statement but not the routine the fold keys on, so `fold: units 631,
+ * folded 0, groups 0, atLeastTwo 0` was unfalsifiable **from the file that printed it**: no reader could
+ * tell "the store has no two records of one routine" from "the key had no input". It was the second, and
+ * it took reading the extractor to find out. A measurement whose input is not in the artefact is a claim.
+ */
+describe('the routine a sampled item states', () => {
+  it('is carried when the lane asks for it, and says that it asked', () => {
+    const sample = storeItemSample([item()], { shapeOf: () => 'find_user > cancel_pending_order' });
+    expect(sample.items[0]?.shape).toBe('find_user > cancel_pending_order');
+    expect(sample.shapeCarried).toBe(true);
+  });
+
+  it('is absent on a sample that never asked, so the silence is not read as a finding', () => {
+    // The same discipline `scopeDims` follows: an item with no routine and a projection that never
+    // looked for one produce the same missing key, and a reader who cannot tell them apart will report
+    // a store of unnamed routines.
+    const sample = storeItemSample([item()]);
+    expect(sample.items[0]?.shape).toBeUndefined();
+    expect(sample.shapeCarried).toBe(false);
+  });
+
+  it('is asked with the item the store holds rather than with the clipped copy', () => {
+    // A routine named past the clip point is still the routine. Deriving the shape from the truncated
+    // statement would turn a projection setting into a fact about the store — the class of defect the
+    // `maxChars` bound exists to keep visible.
+    const long = item({ statement: `${'x'.repeat(400)} find_user > cancel_pending_order` });
+    const sample = storeItemSample([long], {
+      maxChars: 24,
+      shapeOf: (entry) => (entry.statement.includes('cancel_pending_order') ? 'find_user > cancel_pending_order' : undefined),
+    });
+    expect(sample.items[0]?.statement).not.toContain('cancel_pending_order');
+    expect(sample.truncated).toBe(1);
+    expect(sample.items[0]?.shape).toBe('find_user > cancel_pending_order');
+  });
+});

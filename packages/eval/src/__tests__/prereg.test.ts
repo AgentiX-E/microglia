@@ -602,6 +602,29 @@ describe('the facadeShapes header', () => {
     expect(problems.some((entry) => entry.includes("'collapsed' is not one of"))).toBe(true);
   });
 
+  it('names the ruler an absolute score is graded by, because the gate cannot invent one', () => {
+    // R120. R119's bar lives in the prose — "the interval's lower bound must clear 0.575" — and the gate
+    // compared a point estimate to `published + 5pp`. Two bars, one dispatch, and the gate's was the
+    // lenient one. A header is the only form the gate can read, so a registration that wants the strong
+    // claim has to write it down.
+    expect(readPrereg(withHeader('claimRuler: interval'), 'R8.3-xiyan-cell.md').prereg?.claimRuler).toBe(
+      'interval',
+    );
+    expect(readPrereg(withHeader('claimRuler: point'), 'R8.3-xiyan-cell.md').prereg?.claimRuler).toBe(
+      'point',
+    );
+    // Absent is not `point` by luck: it is absent, and the gate's default is the ruler every dispatch
+    // before R120 ran. The two are distinguishable in the reading, which is what lets a reader tell a
+    // registration that chose the point bar from one that never considered it.
+    expect(readPrereg(withHeader('arm: memory'), 'R8.3-xiyan-cell.md').prereg?.claimRuler).toBeUndefined();
+  });
+
+  it('refuses a ruler the gate does not implement', () => {
+    const problems = problemsOf(withHeader('claimRuler: bayes'));
+    expect(problems.some((entry) => entry.includes("header 'claimRuler'"))).toBe(true);
+    expect(problems.some((entry) => entry.includes("'bayes' is not one of"))).toBe(true);
+  });
+
   it('refuses a second treatment in the same registration', () => {
     for (const [extra, needle] of [
       ['recallFloor: 0.01\nfacadePair: as-is-floored\nfacadeShapes: two-unit', 'paired recall facade'],

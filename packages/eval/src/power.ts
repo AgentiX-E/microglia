@@ -44,7 +44,19 @@ export type PairedWidths = {
  * look expensive.
  */
 export function pairedWidths(helped: number, harmed: number, n: number): PairedWidths | null {
-  if (n <= 0) return null;
+  return n <= 0 ? null : widthsAt(helped, harmed, n);
+}
+
+/**
+ * The same three numbers, over a sample that has pairs — which is the only sample they exist for.
+ *
+ * Split out because `pairedWidths`'s null case is *exactly* `n <= 0`, and every caller that has already
+ * refused an empty sample was carrying an `if (widths === null)` branch no input could reach, with the
+ * same message as the guard three lines above it. Two of them were, and the second was found by a
+ * coverage row rather than by a reader. A null return is the right shape for a public function that may
+ * be handed any sample; it is not the right shape for one that may not.
+ */
+function widthsAt(helped: number, harmed: number, n: number): PairedWidths {
   const discordant = helped + harmed;
   const standardErrorPp = (Math.sqrt(discordant) / n) * 100;
   return {
@@ -92,10 +104,8 @@ export function powerFromCounts(artefact: string, counts: PairedCounts): PowerRo
       `${artefact} reports ${String(helped + harmed)} discordant pairs of ${String(n)}, which exceed its own sample`,
     );
   }
-  const widths = pairedWidths(helped, harmed, n);
-  if (widths === null) {
-    throw new Error(`${artefact} has no pairs, so it has no delta to audit`);
-  }
+  // No null branch: `n <= 0` is refused above with the same sentence, so this call cannot miss.
+  const widths = widthsAt(helped, harmed, n);
   return {
     artefact,
     n,
@@ -131,6 +141,14 @@ export type ComparisonBlock = {
  */
 const DELTA_AGREEMENT_PP = 0.01;
 
+/** The refusal a `comparison` block earns when it names a delta over a sample it does not state. */
+function missingField(artefact: string, name: 'paired' | 'lost' | 'gained'): Error {
+  return new Error(
+    `${artefact} carries a 'comparison' block without '${name}', so this audit cannot tell which ` +
+      `sample its delta is over; a file that looks paired and is not must not be skipped`,
+  );
+}
+
 /**
  * One row, from an artefact's `comparison` block.
  *
@@ -146,23 +164,14 @@ const DELTA_AGREEMENT_PP = 0.01;
  */
 export function powerFromComparison(artefact: string, block: ComparisonBlock): PowerRow {
   const { paired, lost, gained, deltaPp } = block;
-  for (const [name, value] of [
-    ['paired', paired],
-    ['lost', lost],
-    ['gained', gained],
-  ] as const) {
-    if (value === undefined) {
-      throw new Error(
-        `${artefact} carries a 'comparison' block without '${name}', so this audit cannot tell which ` +
-          `sample its delta is over; a file that looks paired and is not must not be skipped`,
-      );
-    }
-  }
-  if (paired === undefined || lost === undefined || gained === undefined) {
-    // Unreachable after the loop above, kept so the compiler narrows the three to numbers. A cast
-    // would have hidden the same information from the reader.
-    throw new Error(`${artefact} carries no comparison`);
-  }
+  // Three explicit guards rather than a loop over the three names, and the reason is the compiler's:
+  // a loop throws for the reader but nothing narrows after it, so the version that used one had to
+  // keep a second `throw` below to make the types line up — a branch no input can reach, exempted from
+  // coverage by a comment instead of deleted. Written out, each guard narrows its own name and the
+  // unreachable branch does not exist.
+  if (paired === undefined) throw missingField(artefact, 'paired');
+  if (lost === undefined) throw missingField(artefact, 'lost');
+  if (gained === undefined) throw missingField(artefact, 'gained');
   const row = powerFromCounts(artefact, { helped: gained, harmed: lost, n: paired });
   if (deltaPp !== undefined && Math.abs(deltaPp - row.deltaPp) > DELTA_AGREEMENT_PP) {
     throw new Error(

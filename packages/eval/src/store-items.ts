@@ -81,6 +81,24 @@ export type StoreItemRecord = {
    */
   readonly statusReason?: string;
   /**
+   * The routine this item states, when the lane can name one.
+   *
+   * R120. `fold` reported `units 631, folded 0, groups 0, atLeastTwo 0, max 1` on R119's store and
+   * nothing in the artefact could tell a reader whether that was a property of the store or of the key:
+   * the fold's input was an `A:` line on the item's statement, and the sample carried the statement but
+   * not the key derived from it. So the census was unfalsifiable from the artefact that printed it, and
+   * three rounds read it as "the fold removed nothing, so the two arms are one treatment".
+   *
+   * Carried as the resolved shape rather than as the evidence's task ids, because the resolution is the
+   * measurement: an item citing two tasks of two routines resolves to none, and a sample of task ids
+   * would leave every reader to re-derive that rule and some of them to derive it differently.
+   *
+   * Absent means the lane could not name a routine — a record that states no `A:` line and whose
+   * evidence cites no correction in the learn half. That is a fact about the item, and `shapeCarried`
+   * on the sample says whether the projection asked at all, so the two silences stay distinguishable.
+   */
+  readonly shape?: string;
+  /**
    * The side the distiller recorded for this item, when it recorded one.
    *
    * R110. The retrospection lane consolidates corrections and may not use successes, and no dump
@@ -108,6 +126,14 @@ export type StoreItemSample = {
    * this list is one the scope census refuses rather than interprets.
    */
   readonly scopeDims: readonly StoreScopeDim[];
+  /**
+   * Whether this sample asked for the item's routine at all.
+   *
+   * The same discipline `scopeDims` follows and for the same reason (AUDIT 34.135): an absent `shape` on
+   * every row of a sample that never asked is not a store of unnamed routines, and a reader cannot tell
+   * the two apart from the rows alone.
+   */
+  readonly shapeCarried: boolean;
 };
 
 /** The dimensions `StoreItemRecord.scope` can carry. Kept beside the record it describes. */
@@ -166,7 +192,12 @@ export function storeItemSample(
     /** The side the distiller recorded, absent on a store that predates the field. */
     readonly polarity?: 'repair' | 'pass';
   }[],
-  options: { readonly limit?: number; readonly maxChars?: number } = {},
+  options: {
+    readonly limit?: number;
+    readonly maxChars?: number;
+    /** The lane's own extractor, when the lane has one. Absent means the sample did not ask. */
+    readonly shapeOf?: (item: { readonly statement: string }) => string | undefined;
+  } = {},
 ): StoreItemSample {
   const limit = Math.max(1, Math.trunc(options.limit ?? 64));
   const maxChars = Math.max(8, Math.trunc(options.maxChars ?? 240));
@@ -175,6 +206,10 @@ export function storeItemSample(
     const statement = clip(item.statement, maxChars);
     const when = item.when === undefined ? undefined : clip(item.when, maxChars);
     if (statement.cut || when?.cut === true) truncated += 1;
+    // Asked with the item the store holds, not with the clipped copy: a routine named past the clip
+    // point is still the routine, and deriving the shape from the truncated text would make a
+    // projection of the store into a fact about the store.
+    const shape = options.shapeOf?.(item);
     return {
       id: item.id,
       kind: item.kind,
@@ -185,6 +220,7 @@ export function storeItemSample(
       scope: projectScope(item.scope),
       supportTasks: countDistinctTasks(item.evidence),
       evidence: item.evidence.length,
+      ...(shape === undefined ? {} : { shape }),
       ...(item.statusReason === undefined ? {} : { statusReason: item.statusReason }),
       ...(item.polarity === undefined ? {} : { polarity: item.polarity }),
     };
@@ -196,5 +232,6 @@ export function storeItemSample(
     omitted: Math.max(0, items.length - sampled.length),
     truncated,
     scopeDims: STORE_SCOPE_DIMS,
+    shapeCarried: options.shapeOf !== undefined,
   };
 }
