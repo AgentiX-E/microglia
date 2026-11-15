@@ -2386,6 +2386,41 @@ pnpm eval:prereg <file>  # refuses a header that claims an effect its sample cou
 `eval:power` prints `coarsest design … at N pp — no delta smaller than that is a finding on this
 record`. That line is the honest ceiling on every claim written against this run.
 
+### 13.22 Which bar a score is graded by, and how to tell from the output
+
+Two different bars appear in this project and they differ by more than a rounding:
+
+| bar | rule | at 40 tasks, published 0.575 |
+|---|---|---|
+| `point` | `score >= published + 0.05` | **0.625** clears it |
+| `interval` | `score − 1.96·sqrt(p(1−p)/n) > published` | **0.750** clears it, 0.63 does not |
+
+A registration names which one it is graded by, in its header:
+
+```
+claimRuler: interval
+```
+
+Absent means `point`, which is what every dispatch before the header existed ran, so adding the key
+does not change what an old artefact's verdict was. The gate prints the rule it applied, including the
+half-width it subtracted:
+
+```
+PASS l4-pass4 0.78 (> published + the sample's half-width (12.84pp at n=40))
+FAIL l4-pass4 0.63 (> published + the sample's half-width (14.43pp at n=40))
+```
+
+The second line is the case worth recognising: 0.63 beats the published 0.575 by 5.5 points and is
+still not a claim, because a 40-task sample cannot separate a 5.5-point lead from zero. If you see a
+green `l4-pass4` whose criterion says `>= published + 0.05`, you are looking at the point ruler — the
+score cleared a fixed margin, not its own interval.
+
+**Why the gate computes this itself.** It used to be handed a boolean computed somewhere else, and
+printed a criterion beside it that could disagree with the number it was grading. A gate that receives
+a verdict cannot state the rule, and a rule that lives only in a registration's prose cannot be applied
+by anything. Both halves are now the same function, and a registration whose header does not parse
+stops the run rather than falling back to the weaker bar.
+
 ## 14. Performance and limits
 
 Measured on a 2-vCPU CI runner, Node 22, no GPU:

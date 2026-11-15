@@ -1332,3 +1332,23 @@ arms, so a delta of its own exists, and a sample whose floor — `detectableDelt
 discordance, the bound no run can exceed — is smaller than the claim. Absent, it says nothing, which
 is correct for an arm that buys a census or a store's text. The distinction is what stops a dispatch
 from publishing a number no design could have supported.
+
+**Fold key** — The string a pack folds on, and the reason a mechanism can be installed, registered on
+every arm, and never fire. `foldByShape` groups a pack's items by the *routine* each one states and
+replaces a group with its medoid when at least two distinct tasks taught it. Two keys were tried
+before one worked: the normalized statement (which two failures of one routine never share) and the
+`A:` line of the record's text (which a distilled record does not have — it is a sentence). The key
+that works is the **tool sequence of the correction that wrote the item**, joined through the item's
+evidence, and it is the same function the merge census prices with. What the missing key cost: three
+rounds in which `folded: 0` was read as "the store has no recurrence" instead of "the key had no
+input", and a 7.50pp null contrast that was a valid noise reading only because the treatment had
+failed to apply.
+
+**Claim ruler** — Which of the three rulers a score is graded by, stated in the registration as
+`claimRuler: point | interval`. `point` compares a score to `published + bar`; `interval` requires the
+score minus its own 95% half-width to clear the published number, which is what "the lower bound must
+clear 0.575" means and what a registration in this record actually asked for. The two are the same test
+only at infinite `n`, and the difference is not academic: at forty tasks a score of **0.63** passes the
+point ruler and fails the interval one, so a gate that applies the point to a registration that wrote
+the interval can publish a claim its own file refuses. Absent means `point`, which is what every
+artefact before the header existed was graded by, so no past verdict changes when it is added.
