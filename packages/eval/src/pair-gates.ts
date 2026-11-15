@@ -64,6 +64,16 @@ export type PairGateInput = {
    * sitting beside it, because two conditions on one gate is how a gate stops saying one thing.
    */
   readonly registeredBand?: { readonly loPp: number; readonly hiPp: number } | undefined;
+  /**
+   * Arm artefacts whose driver emitted fields the projection table has no decision for.
+   *
+   * A list of `{ arm, keys }`, empty or absent when every field was carried. R123's phase computed the
+   * sidecar census and the arm record dropped it — the driver added both through a spread, which TypeScript
+   * exempts from the excess-property check, so `PROJECTION` stayed "exhaustive" while the artefact lost two
+   * fields that three readings depend on. This gate makes that a blocking failure rather than a discovery
+   * made a round later by a reader comparing a log line with a JSON file.
+   */
+  readonly unprojected?: readonly { readonly arm: string; readonly keys: readonly string[] }[];
 };
 
 /** Whether an arm planted a distractor. `none` is the control arm's own name for planting nothing. */
@@ -128,6 +138,18 @@ export function pairGates(input: PairGateInput): readonly ValidityGate[] {
       criterion: 'both arms scored exactly the same tasks',
       actual: `${String(input.onlyFirst)} only in first, ${String(input.onlySecond)} only in second`,
       pass: input.splitMatches,
+      blocking: true,
+    },
+    {
+      id: 'l4-projection-complete',
+      criterion: 'every field either arm emitted reached its artefact',
+      actual:
+        input.unprojected === undefined || input.unprojected.length === 0
+          ? 'both arms carried every field the driver emitted'
+          : input.unprojected
+              .map((entry) => `${entry.arm}: ${entry.keys.join(', ')}`)
+              .join('; '),
+      pass: input.unprojected === undefined || input.unprojected.length === 0,
       blocking: true,
     },
   ];

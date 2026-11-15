@@ -220,46 +220,119 @@ export type ServeSplit = {
 };
 
 /**
+ * The episode boundary from a phase's sidecar census, or `undefined` when it carried none.
+ *
+ * Validated rather than asserted: the block is the sidecar's own payload and a release that renamed the field
+ * would otherwise hand this reader `undefined` inside a `readonly number[]`, which is the shape that makes a
+ * join silently return nothing. An entry that is not a non-negative integer drops the whole boundary, because
+ * a partially read boundary would split some episodes and merge others without saying which.
+ */
+export function episodeStartsOf(memory: unknown): readonly number[] | undefined {
+  if (memory === null || typeof memory !== 'object') return undefined;
+  const raw = (memory as Record<string, unknown>)['episodeStarts'];
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  if (!raw.every((entry) => Number.isInteger(entry) && (entry as number) >= 0)) return undefined;
+  return raw as readonly number[];
+}
+
+/**
+ * Why a serve split could not be computed.
+ *
+ * Four sentences, because four different things go wrong and the repair differs for each. `undefined` was
+ * this function's first answer and it cost R123 its registered core reading: the split returned nothing, the
+ * caller printed nothing, and a run whose mechanism check was unmeasurable looked exactly like a run that did
+ * not have one.
+ */
+export type ServeSplitAbsence =
+  /** The arm recorded no ledger: no request reached the facade, or the field predates the census. */
+  | 'no-ledger'
+  /** The arm recorded no episode boundary, so a request cannot be attributed to a trial. */
+  | 'no-boundary'
+  /** The boundary exists but its length disagrees with the trials it would be joined to. */
+  | 'boundary-disagrees';
+
+export type ServeSplitReading =
+  | { readonly measured: ServeSplit }
+  | { readonly absent: ServeSplitAbsence; readonly detail: string };
+
+/**
  * Split one arm's episodes by whether its pack was served.
  *
- * `undefined` when the join cannot be made — no boundary, or a boundary count that disagrees with the trial
- * count — for `pairAttribution`'s reason: a zero here would read as "the gate withheld nothing", which is
- * the sentence R123 exists to distinguish from "the gate was never installed".
+ * The join is by **boundary value**, not by array length. `episodeStarts` holds the request index at which
+ * each episode's requests begin, so its length is the episode count and consecutive entries bracket one
+ * episode's requests — but R123's phase recorded one entry per *request* (`[0..161]` over 160 episodes),
+ * which passes a length check against the ledger and fails the one that matters. So the boundary is validated
+ * as a boundary: strictly increasing, inside the ledger, and one entry per trial. Anything else is reported
+ * as an absence with the numbers that disagreed, which is what a reader needs to repair it.
  */
 export function serveSplit(input: {
   readonly ledger?: readonly (readonly string[])[];
   readonly episodeStarts?: readonly number[];
   readonly memoryTrials?: readonly TauTrialRow[];
-}): ServeSplit | undefined {
+}): ServeSplitReading {
   const { ledger, episodeStarts, memoryTrials } = input;
-  if (ledger === undefined || episodeStarts === undefined || memoryTrials === undefined) return undefined;
-  if (episodeStarts.length !== memoryTrials.length) return undefined;
+  if (ledger === undefined || ledger.length === 0) {
+    return { absent: 'no-ledger', detail: 'the arm recorded no request, so there is nothing to split' };
+  }
+  if (episodeStarts === undefined || episodeStarts.length === 0) {
+    return {
+      absent: 'no-boundary',
+      detail: `${String(ledger.length)} request(s) with no episode boundary, so no request belongs to a trial`,
+    };
+  }
+  if (memoryTrials === undefined || memoryTrials.length === 0) {
+    return { absent: 'boundary-disagrees', detail: 'the arm recorded no trial rows to join the boundary to' };
+  }
+  // A boundary is strictly increasing and inside the ledger. `[0..161]` is neither a partition nor a subset
+  // when the phase spent 162 requests on 160 episodes, and a joiner that accepted it would place every
+  // request in an episode of its own and call the result a split.
+  for (let index = 1; index < episodeStarts.length; index += 1) {
+    if ((episodeStarts[index] as number) <= (episodeStarts[index - 1] as number)) {
+      return {
+        absent: 'boundary-disagrees',
+        detail: `the boundary repeats or decreases at entry ${String(index)} (${String(episodeStarts[index])} after ${String(episodeStarts[index - 1])}), so it is a position rather than an episode start`,
+      };
+    }
+  }
+  const last = episodeStarts[episodeStarts.length - 1] as number;
+  if (last >= ledger.length) {
+    return {
+      absent: 'boundary-disagrees',
+      detail: `the last boundary is request ${String(last)} of ${String(ledger.length)}, so an episode starts past the ledger`,
+    };
+  }
+  if (episodeStarts.length !== memoryTrials.length) {
+    return {
+      absent: 'boundary-disagrees',
+      detail: `${String(episodeStarts.length)} boundar(ies) against ${String(memoryTrials.length)} trial row(s)`,
+    };
+  }
   const served = { episodes: 0, passed: 0 };
   const withheld = { episodes: 0, passed: 0 };
-  const ordered = memoryTrials.map((row, index) => ({ row, startsAt: episodeStarts[index] as number }));
-  ordered.sort((left, right) => left.startsAt - right.startsAt);
-  for (let index = 0; index < ordered.length; index += 1) {
-    const entry = ordered[index] as (typeof ordered)[number];
-    const next = ordered[index + 1];
-    const start = Math.min(entry.startsAt, ledger.length);
-    const end = next === undefined ? ledger.length : Math.min(next.startsAt, ledger.length);
+  for (let index = 0; index < episodeStarts.length; index += 1) {
+    const start = episodeStarts[index] as number;
+    const next = episodeStarts[index + 1];
+    // The boundary is a request index, so the range is half-open: `[start, next)`.
+    const end = next === undefined ? ledger.length : next;
+    const row = memoryTrials[index];
+    if (row === undefined) continue;
     // An episode that spent no request cannot have been refused one, so it counts on neither side: charging
     // it to `withheld` would make a gate look like it fired more often than it did.
     if (end <= start) continue;
     let carried = false;
     for (let request = start; request < end; request += 1) {
-      if ((ledger[request] as readonly string[]).length > 0) {
+      if (((ledger[request] as readonly string[] | undefined) ?? []).length > 0) {
         carried = true;
         break;
       }
     }
     // `null` is the harness declining to score, which is not a failure and must not enter either rate.
-    if (entry.row.reward === null) continue;
+    if (row.reward === null) continue;
     const bucket = carried ? served : withheld;
     bucket.episodes += 1;
-    if (entry.row.reward === 1) bucket.passed += 1;
+    if (row.reward === 1) bucket.passed += 1;
   }
-  return { served, withheld };
+  return { measured: { served, withheld } };
 }
 
 /**
@@ -269,9 +342,11 @@ export function serveSplit(input: {
  * withheld 83.7%` invites a reader to see a 6.7pp gap where the sample can only resolve 25pp. The two
  * intervals are printed beside the two counts so the gap can be compared with the noise that produced it.
  */
-export function serveSplitLine(split: ServeSplit | undefined): string {
-  if (split === undefined) {
-    return 'serve split: this arm has no episode boundary, so served and withheld trials cannot be separated';
+export function serveSplitLine(reading: ServeSplitReading): string {
+  if ('absent' in reading) {
+    // Printed, not skipped. A run whose registered mechanism check could not be computed is a finding, and a
+    // silent caller is how R123's split disappeared between a green gate and an artefact with no field.
+    return `serve split: not measured (${reading.absent}) — ${reading.detail}`;
   }
   const render = (bucket: { readonly episodes: number; readonly passed: number }): string => {
     if (bucket.episodes === 0) return 'none measured';
@@ -282,5 +357,5 @@ export function serveSplitLine(split: ServeSplit | undefined): string {
       `[${(low * 100).toFixed(1)}, ${(high * 100).toFixed(1)}]`
     );
   };
-  return `serve split: served ${render(split.served)}; withheld ${render(split.withheld)}`;
+  return `serve split: served ${render(reading.measured.served)}; withheld ${render(reading.measured.withheld)}`;
 }

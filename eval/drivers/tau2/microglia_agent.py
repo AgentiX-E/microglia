@@ -97,6 +97,13 @@ _census = 0
 # episode was recognised, which is the boundary a join needs and the only one this side of the socket
 # can observe: the agent is never told which task or trial it is in.
 _episode_starts: list = []
+# Recalls that happened *inside* an episode: a retry that reset the conversation, or a host that asked again
+# on the same episode. R123 measured the need. `episodeStarts` was appended on every recall rather than on
+# every boundary, so on a phase with 162 recalls over 160 episodes it held `[0, 1, ..., 161]` -- strictly
+# increasing, one entry per request, and therefore carrying no boundary at all. A reader cannot tell that from
+# a phase that really did run 162 episodes, and both R123's serve split and R128's attribution were reading
+# it. The counter is what makes the sentence checkable: `len(episodeStarts) + recallRepeats == recalls`.
+_recall_repeats = 0
 
 # Sentinel rather than `None`, because "" is a real answer: a facade that was asked
 # and had nothing to say must not be asked again on the next turn.
@@ -294,11 +301,18 @@ class MicrogliaAgent(LLMAgent):
         turn = len(state.messages)
         held = self.__dict__.get("_pack", _UNSET)
         if held is _UNSET or turn <= self.__dict__.get("_turn", -1):
-            # R128. The boundary is recorded before the request, because the request is what it names:
-            # `_recalls` is already the count of requests that succeeded, so it is the index this one will
-            # take. A recall that returns without a request leaves the index unchanged and the next episode
-            # records it again -- a repeated index is harmless to a join, a missing one is not.
-            _episode_starts.append(_recalls)
+            # R128, repaired in R130. The boundary is recorded before the request, because the request is
+            # what it names: `_recalls` is already the count of requests that succeeded, so it is the index
+            # this one will take. It is recorded **only when a new instance opens**, which is the one
+            # condition this side of the socket can distinguish: τ² constructs an agent per simulation, so
+            # `_UNSET` means this episode has never recalled, while `turn <= _turn` can also mean a retry
+            # inside the episode that already has a boundary. Appending on both made the list one entry per
+            # request (R123: `[0..161]` over 160 episodes), which is a position, not a boundary.
+            if held is _UNSET:
+                _episode_starts.append(_recalls)
+            else:
+                global _recall_repeats
+                _recall_repeats += 1
             held = recall(text)
         self._pack = held
         self._turn = turn
@@ -339,6 +353,7 @@ def memory_stats() -> dict:
         # R128: where each episode's requests begin. `len(episodeStarts)` is the episode count, and the
         # difference between two consecutive entries is the requests one episode spent.
         "episodeStarts": list(_episode_starts),
+        "recallRepeats": _recall_repeats,
         "rivaled": len(_margins) if _census else None,
         "margin_p10": quantile_of(_margins, 0.10),
         "margin_p50": quantile_of(_margins, 0.50),

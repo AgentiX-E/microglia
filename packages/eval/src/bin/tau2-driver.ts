@@ -904,7 +904,9 @@ type Tau2PhaseDiagnostics = {
      * two, and it is read by `speakLineOf`.
      */
     readonly census?: number;
+    readonly margin_p10?: number | null;
     readonly margin_p50?: number | null;
+    readonly margin_p90?: number | null;
     readonly margin_ladder?: Readonly<Record<string, number>>;
     /**
      * R128: the request index at which each episode opened.
@@ -914,6 +916,8 @@ type Tau2PhaseDiagnostics = {
      * ledger to trials by position therefore drifts at exactly the episodes that asked twice.
      */
     readonly episodeStarts?: readonly number[];
+    /** R130: recalls inside an episode, which the boundary count is short by. */
+    readonly recallRepeats?: number;
   } | null;
   /**
    * R125: the per-turn census, written by the half of the driver that holds the messages.
@@ -976,9 +980,107 @@ export function unscoredTasks(): readonly string[] | undefined {
   return observedUnscored;
 }
 
+/** The one summary line a phase writes, found among the benchmark's thousands. */
+export function phaseSummary(stdout: string): Record<string, unknown> | undefined {
+  const lines = stdout.split("\n");
+  for (let index = lines.length - 1; index >= 0; index -= 1) {
+    const line = (lines[index] ?? "").trim();
+    if (!line.startsWith("{")) continue;
+    try {
+      const parsed: unknown = JSON.parse(line);
+      if (parsed !== null && typeof parsed === "object" && "phase" in parsed) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      // A line that starts with `{` and is not JSON is the benchmark's, not ours.
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The record a control arm can produce, which until R130 it produced none of.
+ *
+ * The reference path returned before `observed` was assigned, so **no control artefact has ever carried a
+ * `tau2` block**: no usage, no cost, no turn census, no scenario. The pair then reported
+ * `cache first (unstated): unmeasured`, and R125's paired turn reading could not fire on any run because the
+ * half it is differenced against was absent — an instrument with a reader and a writer that only ever ran for
+ * one of the two arms.
+ *
+ * The values come from the phase's own summary line, which is the only channel its diagnostics travel on: the
+ * episodes run in a child process and `eval.json` is upstream's document. `train` is empty because this arm
+ * learned nothing — the store it serves is empty by construction — and that absence is recorded rather than
+ * filled with a zero that would read as a learning phase which produced nothing.
+ */
+export function controlRaw(
+  summary: Record<string, unknown> | undefined,
+  test: readonly string[],
+  unscored: number,
+): Tau2Raw {
+  const diagnostics = (summary?.["diagnostics"] ?? {}) as Record<string, unknown>;
+  const usage = diagnostics["usage"] as Tau2PhaseUsage | undefined;
+  const failures = diagnostics["failures"] as readonly Tau2EpisodeFailure[] | undefined;
+  const simulations =
+    typeof summary?.["simulations"] === "number" ? (summary["simulations"] as number) : 0;
+  // The phase's own bill, rebuilt from the two fields it always reports. `Tau2PhaseUsage.cost` is the
+  // provider's partial view — a `usd` and a `band` — while an arm's cost block names the conversations it
+  // divided by, so the divisor comes from the phase's simulation count rather than from a field that may not
+  // be there. Absent when any part is: a bill with an invented denominator is not a reading.
+  const bill =
+    usage?.cost != null &&
+    typeof usage.cost.usd === "number" &&
+    typeof usage.cost.band === "string" &&
+    simulations > 0
+      ? {
+          usd: usage.cost.usd,
+          band: usage.cost.band,
+          conversations: simulations,
+          perConversation: usage.cost.usd / simulations,
+        }
+      : undefined;
+  return {
+    train: [],
+    test,
+    trials: TRIALS,
+    unscored,
+    servedPackSizes: [],
+    learning: { rows: 0, unanswered: 0, edited: 0, distilled: 0, distillFailed: 0 },
+    turns: {
+      total: typeof diagnostics["agent_turns"] === "number" ? (diagnostics["agent_turns"] as number) : 0,
+      failed: failures === undefined || failures === null ? 0 : failures.length,
+      scope: "run",
+    },
+    scenario: { learn: LEARN_DOMAIN, test: TEST_DOMAIN, recall: RECALL_DOMAIN },
+    domains: { stored: 0, withoutDomain: 0, unscopedIn: 0, widenedIn: 0 },
+    declaredEmptyStore: DECLARED_EMPTY,
+    ...(usage === undefined ? {} : { usage }),
+    ...(bill === undefined ? {} : { cost: bill }),
+    ...(failures === undefined || failures === null ? {} : { failures }),
+    ...(diagnostics["turnCensus"] === undefined || diagnostics["turnCensus"] === null
+      ? {}
+      : { turnCensus: diagnostics["turnCensus"] }),
+    ...(diagnostics["inaction"] === undefined || diagnostics["inaction"] === null
+      ? {}
+      : { inaction: diagnostics["inaction"] as InactionCensus }),
+  };
+}
+
 /** The arm record the protocol's gates read, or `undefined` before a run has happened. */
 export function instrument(): Tau2ArmRecord | undefined {
-  return observed === undefined ? undefined : armRecordFromDriver(observed);
+  if (observed === undefined) return undefined;
+  // `ARM` rather than the default: the record's own `arm` field names which half of the pair it is, and a
+  // control arm labelled `memory` is the kind of mislabelling a cache comparison then quotes.
+  const record = armRecordFromDriver(observed, ARM);
+  // Loud rather than silent: a key the projection table has no decision for is a field this run computed and
+  // the artefact will not carry. R123 lost the sidecar's census this way — two printed lines, no field — so
+  // the refusal is announced where the run ends rather than discovered by a reader who cannot tell a missing
+  // reading from a reading of zero.
+  if (record.unprojected !== undefined) {
+    process.stderr.write(
+      `[tau2] projection: ${record.unprojected.join(', ')} reached the driver and no decision in PROJECTION, so this arm carries none of them\n`,
+    );
+  }
+  return record;
 }
 
 /** The one paired-facade record, when this dispatch registered a pair. */
@@ -1251,7 +1353,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
 
   const evalPath = join(workdir, "eval.json");
   if (!MEMORY) {
-    await phase(
+    const summaryText = await phase(
       driverArgs({
         script: SCRIPT,
         domain: TEST_DOMAIN,
@@ -1266,7 +1368,17 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // The reference arm's episodes are as much a part of the transfer ledger as the memory arm's:
     // they are the control half of every pair, so they are recorded here rather than left in a
     // temporary file the job deletes.
-    return scoredArm(evalPath).tasks;
+    const scored = scoredArm(evalPath);
+    // R130: and so is its bookkeeping. Until this line the control arm returned no instrument at all, which
+    // is why the pair has reported `cache first (unstated)` on every dispatch and why R125's paired turn
+    // reading could not fire: the half it differences against carried nothing to difference.
+    const summary = phaseSummary(summaryText);
+    observed = controlRaw(
+      summary,
+      scored.tasks.flatMap((task) => (task.taskId === undefined ? [] : [task.taskId])),
+      scored.unscored,
+    );
+    return scored.tasks;
   }
 
   const learnPath = join(workdir, "learn.json");

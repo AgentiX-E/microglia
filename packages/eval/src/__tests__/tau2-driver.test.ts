@@ -804,3 +804,86 @@ process.exit(9);
     });
   });
 });
+
+// R130: the control arm carried no instrument at all until this round. `l4.ts` attaches `tau2` only when the
+// driver exports a record, and the reference path returned before anything was observed — so every pair since
+// R49 has read `cache first (unstated): unmeasured`, and R125's paired turn reading could not fire because the
+// half it differences against did not exist.
+describe("the control arm's own record", () => {
+  // One line from a real phase, trimmed: the shape `run_split.py` prints for the reference arm.
+  const summary = JSON.stringify({
+    phase: 'eval',
+    tasks: 40,
+    trials: 4,
+    simulations: 160,
+    agent: 'llm_agent',
+    memory_url: '',
+    diagnostics: {
+      agent_turns: 1830,
+      failures: [{ task: 'retail/36', trial: 0, termination: 'INFRASTRUCTURE_ERROR' }],
+      turnCensus: { episodes: 160, measurable: 160, toolErrors: 31, rows: [] },
+      usage: {
+        calls: 2410,
+        prompt_tokens: 15_100_000,
+        completion_tokens: 290_000,
+        cached_tokens: 11_000_000,
+        uncached_tokens: 4_100_000,
+        cache_hit_rate: 0.7285,
+        cost: { usd: 0.669, band: 'off_peak', conversations: 160, perConversation: 0.0042 },
+      },
+    },
+  });
+
+  it('finds the one summary line among the benchmark’s thousands', async () => {
+    process.env['TAU_MEMORY'] = 'false';
+    const driver = await import('../bin/tau2-driver.js?case=control-summary');
+    expect(driver.phaseSummary(`tau2 view\n${summary}\n`)?.['phase']).toBe('eval');
+    // The last one wins, because a phase prints one and a log holds many.
+    const two = [JSON.stringify({ phase: 'learn' }), JSON.stringify({ phase: 'eval' })].join('\n');
+    expect(driver.phaseSummary(two)?.['phase']).toBe('eval');
+    // A brace that is not JSON is the benchmark's, not ours — and a log with none is absent rather than empty.
+    expect(driver.phaseSummary('{not json}\n')).toBeUndefined();
+    expect(driver.phaseSummary('no json here')).toBeUndefined();
+  });
+
+  it('carries the usage, the bill and the turn census the control arm paid for', async () => {
+    process.env['TAU_MEMORY'] = 'false';
+    const driver = await import('../bin/tau2-driver.js?case=control-raw');
+    const raw = driver.controlRaw(driver.phaseSummary(summary), ['retail/t3', 'retail/t4'], 1);
+    expect(raw.train).toEqual([]);
+    expect(raw.test).toEqual(['retail/t3', 'retail/t4']);
+    expect(raw.servedPackSizes).toEqual([]);
+    expect(raw.learning).toEqual({ rows: 0, unanswered: 0, edited: 0, distilled: 0, distillFailed: 0 });
+    expect(raw.turns).toEqual({ total: 1830, failed: 1, scope: 'run' });
+    expect(raw.usage?.cost?.usd).toBe(0.669);
+    // The divisor is the phase's own simulation count, not the provider's per-call view: a bill divided by a
+    // number the provider never charged for is the §179 defect with a different population.
+    expect(raw.cost).toEqual({
+      usd: 0.669,
+      band: 'off_peak',
+      conversations: 160,
+      perConversation: 0.669 / 160,
+    });
+    expect(raw.turnCensus).toEqual({ episodes: 160, measurable: 160, toolErrors: 31, rows: [] });
+    expect(raw.failures).toHaveLength(1);
+    // `declaredEmptyStore` is the *scaffold* arm's flag — a wrapper over a store that is empty by
+    // construction — so a reference arm carries `false`, and its emptiness is legible from `train: []` and
+    // `servedPackSizes: []` instead. Two booleans for one fact would be a second place to disagree.
+    expect(raw.declaredEmptyStore).toBe(false);
+    delete process.env['TAU_MEMORY'];
+  });
+
+  it('omits what the phase did not report rather than filling it with a zero', async () => {
+    process.env['TAU_MEMORY'] = 'false';
+    const driver = await import('../bin/tau2-driver.js?case=control-empty');
+    const raw = driver.controlRaw(undefined, ['retail/t3'], 1);
+    // No summary means no diagnostics, which means no bill and no census: absent, not zero — the reading a
+    // reader must be able to tell from "the phase measured no tool errors".
+    expect(raw.usage).toBeUndefined();
+    expect(raw.cost).toBeUndefined();
+    expect(raw.turnCensus).toBeUndefined();
+    expect(raw.failures).toBeUndefined();
+    expect(raw.turns).toEqual({ total: 0, failed: 0, scope: 'run' });
+    delete process.env['TAU_MEMORY'];
+  });
+});

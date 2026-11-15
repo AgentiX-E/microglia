@@ -33,7 +33,13 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inGateOrder, mergeGates, type ValidityGate } from '@agentix-e/microglia-protocol';
 import { degradationLineOf, degradationOfPair } from '../tau2-degradation.js';
-import { itemTransferLine, pairAttribution, serveSplit, serveSplitLine } from '../tau2-attribution.js';
+import {
+  episodeStartsOf,
+  itemTransferLine,
+  pairAttribution,
+  serveSplit,
+  serveSplitLine,
+} from '../tau2-attribution.js';
 import { pairedTurnLine, pairedTurns, turnCensusLine, turnCensusOfBlock } from '../tau2-turn.js';
 import {
   ceilingOf,
@@ -114,13 +120,7 @@ type Artefact = {
      * population a rung acts on and `margin_ladder` is what each rung withholds of it. Its absence is a
      * phase without a sidecar, not a store with nothing contested.
      */
-    readonly memory?: {
-      readonly episodeStarts?: readonly number[];
-      readonly rivaled?: number | null;
-      readonly census?: number;
-      readonly margin_p50?: number | null;
-      readonly margin_ladder?: Readonly<Record<string, number>>;
-    };
+    readonly memory?: unknown;
     /** R125: the per-turn census this phase wrote, one row per episode, or absent before the instrument. */
     readonly turnCensus?: unknown;
   };
@@ -303,6 +303,15 @@ const evidence: Tau2Evidence = {
 };
 const audit = tau2GateAudit(evidence);
 
+// R123: the fields each arm's driver emitted and its artefact did not carry. Read from the arm's own record
+// rather than recomputed here, because the record is what the projection wrote.
+const unprojectedArms = [first, second]
+  .map((arm) => ({
+    arm: arm.tau2?.arm ?? 'unstated',
+    keys: (arm.tau2 as { readonly unprojected?: readonly string[] } | undefined)?.unprojected ?? [],
+  }))
+  .filter((entry) => entry.keys.length > 0);
+
 const scenarioGates: readonly ValidityGate[] = pairGates({
   state: verdict.state,
   claim: verdict.claim ?? null,
@@ -316,6 +325,7 @@ const scenarioGates: readonly ValidityGate[] = pairGates({
   onlySecond: comparison.onlySecond,
   ...(plantedArm === undefined ? {} : { plantedArm }),
   ...(registeredBand === undefined ? {} : { registeredBand }),
+  ...(unprojectedArms.length === 0 ? {} : { unprojected: unprojectedArms }),
 });
 
 const gates = mergeGates(audit.gates, scenarioGates, inGateOrder);
@@ -358,7 +368,7 @@ process.stdout.write(`${degradationLineOf(degradation)}\n`);
 function attributionOf(reference: Artefact, memory: Artefact) {
   return pairAttribution({
     ledger: memory.tau2?.pack?.ledger,
-    episodeStarts: memory.tau2?.memory?.episodeStarts,
+    episodeStarts: episodeStartsOf(memory.tau2?.memory),
     memoryTrials: memory.per_trial,
     referenceTrials: reference.per_trial,
   });
@@ -372,17 +382,29 @@ if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribut
 // refusal, so the split costs no dispatch and no model call.
 const split = serveSplit({
   ledger: second.tau2?.pack?.ledger,
-  episodeStarts: second.tau2?.memory?.episodeStarts,
+  episodeStarts: episodeStartsOf(second.tau2?.memory),
   memoryTrials: second.per_trial,
 });
-if (split !== undefined) process.stdout.write(`${serveSplitLine(split)}\n`);
+// Printed whether or not it could be measured. R123's split returned `undefined`, the caller printed nothing,
+// and the arm's registered mechanism check disappeared between a green gate and an artefact with no field.
+process.stdout.write(`${serveSplitLine(split)}\n`);
 
 // R125: the per-turn census, paired across the two arms. Printed here rather than per arm because the
 // question it answers is a *difference*: either arm alone reports 1,800 turns of activity, and only the
 // pair says whether the memory's turns were more or less likely to come back in error.
 const memoryTurns = turnCensusOfBlock(second.tau2?.turnCensus);
 const controlTurns = turnCensusOfBlock(first.tau2?.turnCensus);
-if (memoryTurns !== undefined) process.stdout.write(`${turnCensusLine(memoryTurns)}\n`);
+// Both arms, and both sentences when one is missing. An absent census is "the instrument never reached this
+// arm", which is a different fact from a phase in which no tool failed, and the difference is the whole reason
+// the census reports `toolErrors: null` rather than zero.
+if (memoryTurns === undefined) {
+  process.stdout.write('turns: the memory arm carried no census, so nothing about its turns is measured\n');
+} else {
+  process.stdout.write(`${turnCensusLine(memoryTurns)}\n`);
+}
+if (controlTurns === undefined) {
+  process.stdout.write('turns: the reference arm carried no census, so the pair cannot be differenced\n');
+}
 const turns = pairedTurns(memoryTurns, controlTurns);
 if (turns.length > 0) process.stdout.write(`${pairedTurnLine(turns)}\n`);
 
@@ -435,8 +457,9 @@ await writeJson('poc-l4-pair', {
   // predate the instrument cannot be read as a pair without wrong actions, which is what an empty object
   // would say.
   ...(turns.length === 0 ? {} : { turnCensus: turns }),
-  // R123: what the gate did to the trials it withheld from, when the arm carries a boundary.
-  ...(split === undefined ? {} : { serveSplit: split }),
+  // R123: what the gate did to the trials it withheld from. Measured or absent, and the absent form names the
+  // reason — an artefact that simply omitted the field could not be told from one whose split was level.
+  ...('measured' in split ? { serveSplit: split.measured } : { serveSplitAbsent: split }),
   // R57: the distractor this pair is about, when the memory arm planted one. Without it a reader sees
   // a pair artefact with no treatment gate and no reason for the omission.
   ...(plantedBarNote(plantedArm) ?? {}),

@@ -9,6 +9,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  episodeStartsOf,
   itemTransfer,
   itemTransferLine,
   pairAttribution,
@@ -215,65 +216,103 @@ describe('reading the three fields off an artefact', () => {
 describe('what the gate did to the trials it withheld from', () => {
   const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
 
-  // R123's mechanism check, and the fixture is the shape the lane produces: 163 requests over 160 episodes,
-  // so one episode spends two requests. An empty ledger entry is a refusal — `buildPack` returns no ids —
-  // and that is the only signal the artefact carries, which is why the split can be read for free.
+  // R123's mechanism check, and the fixture is the shape the lane produces: four requests over four episodes,
+  // so the boundary is `[0, 1, 2, 3]` and each episode owns one request. An empty ledger entry is a refusal —
+  // `buildPack` returns no ids — and that is the only signal the artefact carries.
   it('splits one arm by whether a pack reached the episode', () => {
-    const split = serveSplit({
+    const reading = serveSplit({
       ledger: [['k_1'], [], ['k_2'], ['k_3']],
       episodeStarts: [0, 1, 2, 3],
       memoryTrials: [row('a', 0, 1), row('b', 0, 0), row('c', 0, 1), row('d', 0, 1)],
     });
-    expect(split).toEqual({
-      served: { episodes: 3, passed: 3 },
-      withheld: { episodes: 1, passed: 0 },
+    expect(reading).toEqual({
+      measured: { served: { episodes: 3, passed: 3 }, withheld: { episodes: 1, passed: 0 } },
     });
   });
 
-  it('counts an episode as served when any of its requests carried a pack', () => {
-    // Episode `a` spends requests 0 and 1: the first was refused and the second was served. Reading only the
-    // first request would call this episode withheld and understate the gate's reach by half.
-    const split = serveSplit({
-      ledger: [[], [], ['k_2']],
+  // The boundary is an *index*, so an episode's range is half-open and can span requests. This is the case a
+  // positional join gets wrong and the case R123's writer produced by accident: two requests, one episode.
+  it('counts an episode as served when any request in its range carried a pack', () => {
+    const reading = serveSplit({
+      ledger: [[], ['k_1'], ['k_2']],
       episodeStarts: [0, 2],
       memoryTrials: [row('a', 0, 1), row('b', 0, 0)],
     });
-    expect(split).toEqual({
-      served: { episodes: 1, passed: 0 },
-      withheld: { episodes: 1, passed: 1 },
+    // Episode `a` owns requests 0 and 1: refused, then served. A join that read only the episode's first
+    // request would call it withheld and understate the gate's reach by half; it is served, and it passed.
+    // Episode `b` owns request 2, which was served, and it failed.
+    expect(reading).toEqual({
+      measured: { served: { episodes: 2, passed: 1 }, withheld: { episodes: 0, passed: 0 } },
     });
   });
 
-  it('declines to split what it cannot join, and never reads a missing field as "withheld nothing"', () => {
-    expect(serveSplit({ ledger: [['k']], memoryTrials: [row('a', 0, 1)] })).toBeUndefined();
-    expect(serveSplit({ episodeStarts: [0], memoryTrials: [row('a', 0, 1)] })).toBeUndefined();
-    // One boundary per row, or the join is by position — the assumption this whole file was written against.
-    expect(
+  // R123's actual defect, and the reason this function can no longer answer with `undefined`. Its phase
+  // recorded one boundary per *request* — `[0, 1, ..., 161]` over 160 episodes — so the array was a position,
+  // not a partition. A joiner that accepted it would have called every request an episode, and every gate
+  // decision would have been attributed to a trial of its own.
+  it('refuses a boundary that repeats or decreases, and says which entry', () => {
+    const reading = serveSplit({
+      ledger: [['k'], ['k'], ['k']],
+      episodeStarts: [0, 0, 2],
+      memoryTrials: [row('a', 0, 1), row('b', 0, 1), row('c', 0, 1)],
+    });
+    expect(reading).toMatchObject({ absent: 'boundary-disagrees' });
+    if ('absent' in reading) expect(reading.detail).toContain('repeats or decreases at entry 1');
+  });
+
+  it('names the absent reason rather than returning nothing, for each of the three ways it can fail', () => {
+    const three = [
+      serveSplit({ memoryTrials: [row('a', 0, 1)] }),
+      serveSplit({ ledger: [['k']], memoryTrials: [row('a', 0, 1)] }),
       serveSplit({ ledger: [['k'], ['k']], episodeStarts: [0], memoryTrials: [row('a', 0, 1), row('b', 0, 1)] }),
-    ).toBeUndefined();
-    expect(serveSplitLine(undefined)).toContain('has no episode boundary');
+    ];
+    expect(three.map((reading) => ('absent' in reading ? reading.absent : 'measured'))).toEqual([
+      'no-ledger',
+      'no-boundary',
+      'boundary-disagrees',
+    ]);
+    // And a boundary that starts past the ledger is the fourth shape, reported with both numbers.
+    const past = serveSplit({
+      ledger: [['k']],
+      episodeStarts: [0, 3],
+      memoryTrials: [row('a', 0, 1), row('b', 0, 1)],
+    });
+    expect(past).toMatchObject({ absent: 'boundary-disagrees' });
+    if ('absent' in past) expect(past.detail).toContain('request 3 of 1');
   });
 
   it('keeps an unscored episode out of both rates', () => {
-    const split = serveSplit({
+    const reading = serveSplit({
       ledger: [['k_1'], []],
       episodeStarts: [0, 1],
       memoryTrials: [row('a', 0, null), row('b', 0, 1)],
     });
-    expect(split).toEqual({ served: { episodes: 0, passed: 0 }, withheld: { episodes: 1, passed: 1 } });
+    expect(reading).toEqual({ measured: { served: { episodes: 0, passed: 0 }, withheld: { episodes: 1, passed: 1 } } });
   });
 
-  it('prints both rates with their intervals, so the gap can be compared with its own noise', () => {
+  it('prints both rates with their intervals, and prints the absence instead of printing nothing', () => {
     const line = serveSplitLine({
-      served: { episodes: 100, passed: 90 },
-      withheld: { episodes: 40, passed: 30 },
+      measured: { served: { episodes: 100, passed: 90 }, withheld: { episodes: 40, passed: 30 } },
     });
     expect(line).toContain('served 90 of 100 = 90.00%');
     expect(line).toContain('withheld 30 of 40 = 75.00%');
     // Wilson, not Wald: 40 episodes is small enough that the two disagree at the edge.
     expect(line).toMatch(/\[\d+\.\d, \d+\.\d\]/);
-    expect(serveSplitLine({ served: { episodes: 0, passed: 0 }, withheld: { episodes: 0, passed: 0 } })).toContain(
-      'served none measured',
-    );
+    const empty = serveSplitLine({ measured: { served: { episodes: 0, passed: 0 }, withheld: { episodes: 0, passed: 0 } } });
+    expect(empty).toContain('served none measured');
+    // The sentence R123 needed and did not get: a run whose registered mechanism check could not be computed.
+    const absent = serveSplitLine({ absent: 'no-boundary', detail: '162 request(s) with no episode boundary' });
+    expect(absent).toContain('not measured (no-boundary)');
+    expect(absent).toContain('162 request(s) with no episode boundary');
+  });
+
+  it('reads the boundary off a sidecar block, and drops one that is not a list of indices', () => {
+    expect(episodeStartsOf({ episodeStarts: [0, 3, 7] })).toEqual([0, 3, 7]);
+    expect(episodeStartsOf({ episodeStarts: [] })).toBeUndefined();
+    expect(episodeStartsOf({ episodeStarts: [0, -1] })).toBeUndefined();
+    expect(episodeStartsOf({ episodeStarts: [0, 1.5] })).toBeUndefined();
+    expect(episodeStartsOf({ episodeStarts: 'nope' })).toBeUndefined();
+    expect(episodeStartsOf(undefined)).toBeUndefined();
+    expect(episodeStartsOf(null)).toBeUndefined();
   });
 });

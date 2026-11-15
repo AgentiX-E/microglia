@@ -588,6 +588,24 @@ describe('the projection has a decision for every field, and keeps it', () => {
           attempts: 4,
         },
       ],
+      // R123's sidecar census and R125's turn census: two blocks the phase computed, printed and dropped,
+      // because the driver added them through a spread and `PROJECTION` never heard of them. A table entry
+      // marked `carried` whose fixture never states the field is a decision nothing exercises -- which is
+      // exactly how the drop survived a green gate.
+      memory: {
+        recall_url: 'http://127.0.0.1:34341',
+        recalls: 162,
+        recall_failures: 0,
+        recall_empty: 0,
+        silent_because: {},
+        rivaled: 162,
+        census: 162,
+        episodeStarts: [0, 1, 2],
+        recallRepeats: 0,
+        margin_p50: 0.0928,
+        margin_ladder: { '0.05': 53 },
+      },
+      turnCensus: { episodes: 160, measurable: 160, toolErrors: 24, rows: [] },
       // R89: what the pack served and what it refused. Carried rather than reduced, because the two
       // numbers it separates -- nothing relevant, and relevant but too long -- are the difference
       // between a retrieval fix and a budget fix.
@@ -895,6 +913,18 @@ describe('the projection has a decision for every field, and keeps it', () => {
     // And the list is not trivially everything: the decision has two values and both are used.
     expect(reduced.length).toBeGreaterThan(0);
     expect(carried.length + reduced.length).toBe(Object.keys(full()).length);
+  });
+
+  it('names any key the table has no decision for, instead of dropping it', () => {
+    // The exhaustiveness of `Tau2Raw` covers plain properties only: every conditional field enters the
+    // driver's record through a spread, and TypeScript exempts spread members from the excess-property check.
+    // R123's phase emitted `memory` and `turnCensus` that way, the projection dropped both, and the artefact
+    // looked complete -- so the record now says which keys nobody decided about.
+    const record = armRecordFromDriver({ ...full(), undeclaredCensus: { n: 1 } } as Tau2Raw);
+    expect(record.unprojected).toEqual(['undeclaredCensus']);
+    // Absent, not empty, when the table covers everything: a run with nothing to report must not carry a
+    // field that reads as a defect.
+    expect(armRecordFromDriver(full()).unprojected).toBeUndefined();
   });
 
   it('carries every learning field, including the two the block used to drop', () => {

@@ -120,6 +120,9 @@ describe('the reader and the writer agree on the field names', () => {
   });
   const available = dumped.status === 0 && dumped.stdout.trim() !== '';
 
+  // R130 added `recallRepeats`: the count a boundary list is short by, so `len(episodeStarts) + repeats ==
+  // recalls` is an identity rather than a hope. The list is exhaustive in both directions, which is why it
+  // failed here the moment the writer grew a field the reader had not been told about.
   it.skipIf(!available)('carries every field the speak line reads', () => {
     const stats = JSON.parse(dumped.stdout) as Record<string, unknown>;
     expect(Object.keys(stats).sort()).toEqual(
@@ -130,6 +133,7 @@ describe('the reader and the writer agree on the field names', () => {
         'margin_p10',
         'margin_p50',
         'margin_p90',
+        'recallRepeats',
         'recall_empty',
         'recall_failures',
         'recall_url',

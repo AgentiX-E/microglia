@@ -154,6 +154,15 @@ export type Tau2ArmRecord = {
     readonly failures: number;
     readonly scope?: 'run' | 'distillation';
   };
+  /** R125's per-turn census, carried verbatim, absent on arms that predate the instrument. */
+  readonly turnCensus?: unknown;
+  /**
+   * Keys the driver emitted that `PROJECTION` has no decision for.
+   *
+   * Present only when the projection dropped something, which is a defect rather than a reading: the pair
+   * refuses such an arm, because an artefact that silently omits a field still looks complete.
+   */
+  readonly unprojected?: readonly string[];
   /**
    * What the provider said the phase was sent and charged for, with the composition of what was sent.
    *
@@ -267,7 +276,18 @@ export type Tau2ArmRecord = {
      * as "cannot join" rather than assuming one request per episode.
      */
     readonly episodeStarts?: readonly number[];
+    /**
+     * R130: recalls that happened inside an episode rather than at its start.
+     *
+     * `len(episodeStarts) + recallRepeats === recalls` is the identity that makes the boundary checkable. R123
+     * appended an entry per *recall*, so a phase with 162 recalls over 160 episodes recorded `[0..161]` — one
+     * entry per request, strictly increasing, and carrying no boundary at all. A reader could not tell that
+     * from a phase that really ran 162 episodes.
+     */
+    readonly recallRepeats?: number;
+    readonly margin_p10?: number | null;
     readonly margin_p50?: number | null;
+    readonly margin_p90?: number | null;
     readonly margin_ladder?: Readonly<Record<string, number>>;
   };
   readonly injectionNote?: InjectionNoteRecord;

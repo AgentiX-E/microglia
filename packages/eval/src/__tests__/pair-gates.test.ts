@@ -32,7 +32,7 @@ function ids(gates: readonly { id: string }[]): string[] {
 describe('a treatment pair', () => {
   it('carries the finding gate and the resolution report', () => {
     const gates = pairGates(treatment);
-    expect(ids(gates)).toEqual(['l4-paired', 'l4-effect-resolved', 'l4-same-split']);
+    expect(ids(gates)).toEqual(['l4-paired', 'l4-effect-resolved', 'l4-same-split', 'l4-projection-complete']);
     expect(gates.every((gate) => gate.pass)).toBe(true);
   });
 
@@ -76,6 +76,23 @@ describe('a treatment pair', () => {
     // an empty one reads as a gate that measured nothing.
     const gates = pairGates({ ...treatment, claim: null });
     expect(gates.find((gate) => gate.id === 'l4-effect-resolved')?.actual).toBe('BENEFIT');
+  });
+
+  it('refuses an arm that dropped a field, because an incomplete artefact still looks complete', () => {
+    // R123 computed the sidecar census and the turn census, printed both, and carried neither: the driver
+    // added them through a spread, which TypeScript exempts from the excess-property check, so the
+    // exhaustiveness of `PROJECTION` held while two fields three readings depend on went missing.
+    const gates = pairGates({
+      ...treatment,
+      unprojected: [{ arm: 'memory', keys: ['memory', 'turnCensus'] }],
+    });
+    const gate = gates.find((entry) => entry.id === 'l4-projection-complete');
+    expect(gate?.pass).toBe(false);
+    expect(gate?.blocking).toBe(true);
+    expect(gate?.actual).toBe('memory: memory, turnCensus');
+    // And absent, not empty, when both arms carried everything: a pair with nothing to report must not carry
+    // a sentence that reads as a defect.
+    expect(pairGates(treatment).find((entry) => entry.id === 'l4-projection-complete')?.pass).toBe(true);
   });
 
   it('always grades the split, because a pair on two splits is not a pair', () => {
@@ -152,7 +169,7 @@ describe('a planted distractor pair', () => {
     // `near` predicts it breaks more episodes than it repairs. A pair verdict of `HARM` is that
     // prediction confirmed, and the gate that reads it as a defect would turn the arm being right into
     // a red job — the seventh instance of one defect class (AUDIT 34.86).
-    expect(ids(pairGates(planted))).toEqual(['l4-same-split']);
+    expect(ids(pairGates(planted))).toEqual(['l4-same-split', 'l4-projection-complete']);
   });
 
   it('keeps the split gate, which is about the two files rather than about either arm', () => {

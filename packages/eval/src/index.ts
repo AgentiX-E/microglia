@@ -819,6 +819,7 @@ export {
 export {
   itemTransfer,
   itemTransferLine,
+  episodeStartsOf,
   pairAttribution,
   pairedEpisodes,
   serveSplit,
@@ -826,6 +827,8 @@ export {
   type EpisodeOutcome,
   type ItemTransfer,
   type ServeSplit,
+  type ServeSplitAbsence,
+  type ServeSplitReading,
 } from './tau2-attribution.js';
 
 export {

@@ -114,6 +114,10 @@ def fresh(pack: str = "RULE", *, fail: bool = False):
         calls.append(text)
         if fail:
             raise AssertionError("recall must not be called")
+        # The real `recall` increments this, and it is the request index a boundary records: a stub that
+        # left it still would make every boundary `0`, which is a fixture that cannot fail the check it
+        # exists for.
+        subject._recalls += 1  # noqa: SLF001
         return pack
 
     original = subject.recall
@@ -329,6 +333,7 @@ def memory_stats_exposes_the_recall_count(checks):
             "margin_p10",
             "margin_p50",
             "margin_p90",
+            "recallRepeats",
             "recall_empty",
             "recall_failures",
             "recall_url",
@@ -502,6 +507,7 @@ def an_episode_boundary_is_recorded_where_a_join_can_use_it(checks):
     """
     agent, _, original = fresh()
     saved = list(subject._episode_starts)  # noqa: SLF001
+    saved_repeats = subject._recall_repeats  # noqa: SLF001
     try:
         subject._episode_starts.clear()  # noqa: SLF001
         state = LLMAgentState()
@@ -514,9 +520,28 @@ def an_episode_boundary_is_recorded_where_a_join_can_use_it(checks):
             "a second turn of the same episode is not a new boundary, which is the whole difference "
             "between a request count and an episode count",
         )
-        # A fresh state is what a new episode looks like to an agent that is never told it is new.
-        episode_step(agent, LLMAgentState(), "next episode")
-        checks.equal(len(subject._episode_starts), 2, "a new state opens a new episode")  # noqa: SLF001
+        # A fresh *state* on the same instance is not a new episode: τ² builds one agent per task and trial
+        # (`build_orchestrator` runs inside `run_single_task`, once per unit), so the instance is the episode.
+        # R123's writer appended on this branch too, which is how 160 episodes were recorded as 162 boundaries.
+        episode_step(agent, LLMAgentState(), "retry inside the episode")
+        checks.equal(
+            len(subject._episode_starts),  # noqa: SLF001
+            1,
+            "a reset conversation on the same instance is a repeat, not a boundary",
+        )
+        checks.equal(
+            subject._recall_repeats - saved_repeats,  # noqa: SLF001
+            1,
+            "and it is counted, so the identity below can be checked",
+        )
+        # A new instance is what a new episode looks like to an agent that is never told it is new.
+        second, _, _ = fresh()
+        episode_step(second, LLMAgentState(), "next episode")
+        # Absolute indices, because `_recalls` is a module counter other cases have advanced. What the
+        # boundary means is the gap: two requests after the first episode opened, the second one did.
+        boundaries = subject._episode_starts  # noqa: SLF001
+        checks.equal(len(boundaries), 2, "two instances, two boundaries")
+        checks.equal(boundaries[1] - boundaries[0], 2, "the second opened two requests after the first")
         checks.equal(
             sorted(subject.memory_stats()["episodeStarts"]),
             subject.memory_stats()["episodeStarts"],
@@ -576,6 +601,59 @@ def an_unreadable_episode_is_not_a_quiet_one(checks):
     empty = turn_census([{"task_id": "5", "trial": 0}])
     checks.equal(empty["measurable"], 0, "an episode with no messages was not measured")
     checks.equal(empty["episodes"], 1, "and it still counts as an episode that ran")
+
+
+@case
+def a_boundary_is_an_episode_and_not_a_request(checks):
+    """R130: the field named `episodeStarts` has to be a boundary, and R123's was a position.
+
+    R123's phase recorded one entry per *recall* -- 162 recalls over 160 episodes produced `[0..161]`, one
+    entry per request, strictly increasing -- so a reader could not tell it from a phase that really ran 162
+    episodes, and both the serve split and R128's attribution read it. The repair is that only a fresh agent
+    instance opens a boundary; a recall inside an episode is a repeat and is counted as one.
+    """
+    sys.path.insert(0, HERE)
+    import microglia_agent as ma
+
+    def fake_recall(text):
+        ma._recalls += 1
+        return "pack" if text else ""
+
+    original = ma.recall
+    starts_before = len(ma._episode_starts)
+    repeats_before = ma._recall_repeats
+    ma.recall = fake_recall
+    try:
+        # One episode, three turns: the pack is settled on the first and held for the rest, so this is one
+        # recall and therefore one boundary.
+        agent = object.__new__(ma.MicrogliaAgent)
+        state = type("State", (), {"messages": []})()
+        for turn in (1, 2, 3):
+            state.messages = [None] * turn
+            agent.pack_for(state, "hello")
+        # A retry that resets the conversation, on the same instance: a recall, and NOT a boundary.
+        state.messages = [None]
+        agent.pack_for(state, "hello")
+        # A second episode is a second instance, which is the one signal this side of the socket can read.
+        second = object.__new__(ma.MicrogliaAgent)
+        fresh = type("State", (), {"messages": [None]})()
+        second.pack_for(fresh, "hello")
+    finally:
+        ma.recall = original
+
+    checks.equal(len(ma._episode_starts) - starts_before, 2, "two episodes opened two boundaries")
+    checks.equal(ma._recall_repeats - repeats_before, 1, "the retry inside the episode is a repeat")
+    boundaries = ma._episode_starts[starts_before:]
+    checks.equal(len(boundaries), 2, "two boundaries for two episodes")
+    checks.equal(
+        boundaries[1] - boundaries[0],
+        2,
+        "the second episode opened two requests after the first: one turn, one retry",
+    )
+    # The identity the artefact's reader relies on: every recall is either a boundary or a repeat, so a
+    # boundary list that is short by more than the repeat count means a recall went uncounted.
+    checks.equal(len(boundaries) + (ma._recall_repeats - repeats_before), 3, "three recalls, two of them starts")
+
 
 
 def dump_stats() -> int:

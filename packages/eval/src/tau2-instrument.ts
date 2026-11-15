@@ -336,6 +336,37 @@ export type Tau2Raw = {
    */
   readonly pack?: PackCensus;
   /**
+   * R123's sidecar census, carried verbatim: the episode boundary, the margin ladder and the count of
+   * requests a rung would withhold.
+   *
+   * Verbatim and untyped on purpose. A typed copy here would be a second place to forget a field — the
+   * defect this block has already paid for twice — so the payload travels as the sidecar wrote it and the
+   * readers that consume it (`episodeStartsOf`, `turnCensusOfBlock`) validate at the boundary.
+   *
+   * Absent on an arm with no sidecar, and absent on every artefact written before the projection carried
+   * it: R123's phase computed all of it, printed one line and dropped the block, so its serve split and
+   * R128's attribution join both had a reader and no writer.
+   */
+  readonly memory?: {
+    readonly recall_url: string;
+    readonly recalls: number;
+    readonly recall_failures: number;
+    readonly recall_empty: number;
+    readonly silent_because: Readonly<Record<string, number>>;
+    readonly rivaled?: number | null;
+    readonly census?: number;
+    readonly episodeStarts?: readonly number[];
+    readonly recallRepeats?: number;
+    readonly margin_p10?: number | null;
+    readonly margin_p50?: number | null;
+    readonly margin_p90?: number | null;
+    readonly margin_ladder?: Readonly<Record<string, number>>;
+  };
+  /**
+   * R125's per-turn census, carried verbatim for the same reason and with the same absence rule.
+   */
+  readonly turnCensus?: unknown;
+  /**
    * What the delivered packs actually contained, one row per recall request.
    *
    * Absent on drivers that did not instrument the use side (every artefact
@@ -864,6 +895,10 @@ export const PROJECTION: {
   // Carried verbatim: the first reading in this lane of what the pack *refused*, and the field a
   // registration is graded on when a ceiling and a budget disagree.
   pack: "carried",
+  // Carried verbatim: three readings depend on this block and all three were unreadable while it was
+  // dropped — the rung's population, the serve split's episode boundary and R128's item attribution.
+  memory: "carried",
+  turnCensus: "carried",
   recall: "carried",
   useObservations: "reduced",
   coverageObservations: "reduced",
@@ -958,6 +993,15 @@ export function armRecordFromDriver(
   raw: Tau2Raw,
   arm = "memory",
 ): Tau2ArmRecord {
+  // A field the driver emits and this table has never heard of is dropped without a trace, because the
+  // exhaustiveness of `Tau2Raw` only covers plain properties: every conditional field enters the driver's
+  // record through a spread, and TypeScript exempts spread members from the excess-property check. R123 lost
+  // `memory` and `turnCensus` exactly that way — the phase computed both, printed two lines and the artefact
+  // carried neither. So the record now names the keys nobody decided about, and the pair refuses an arm
+  // that has one.
+  const unprojected = Object.keys(raw)
+    .filter((key) => !(key in PROJECTION))
+    .sort();
   const served = raw.servedPackSizes;
   const meanPackIds =
     served.length === 0
@@ -988,6 +1032,7 @@ export function armRecordFromDriver(
   return {
     arm,
     tasks: distinct.size,
+    ...(unprojected.length === 0 ? {} : { unprojected }),
     trials: raw.trials,
     unscored: raw.unscored,
     // Absent rather than empty when the driver collected none: an empty list is a run that looked and
@@ -1106,6 +1151,8 @@ export function armRecordFromDriver(
       : { declaredEmptyStore: raw.declaredEmptyStore }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),
     ...(raw.pack === undefined ? {} : { pack: raw.pack }),
+    ...(raw.memory === undefined ? {} : { memory: raw.memory }),
+    ...(raw.turnCensus === undefined ? {} : { turnCensus: raw.turnCensus }),
     ...(raw.inaction === undefined ? {} : { inaction: raw.inaction }),
     // The use census rides beside V1's rate. It is computed here, from the raw
     // observations the driver collected at the facade, so the driver carries
