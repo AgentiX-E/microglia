@@ -61,6 +61,7 @@ import {
   facadePairVerdict,
   facadeScope,
   inactionCensusOf,
+  redundancyOfSample,
   storeItemSample,
   inactionContrastOrNull,
   meanPassAtK,
@@ -1546,6 +1547,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // One read of the store, shared by the census, the funnel and the domain ledger: three reads of
   // one store in a row would be three chances to describe three slightly different stores.
   const knowledge = await store.listKnowledge({});
+  // R120: one projection of the store, used by both diagnostics blocks. Two calls would be two samples of
+  // one store, and a reader comparing the learn-only census with the evaluator's could not tell that from a
+  // store that changed between them.
+  const storeItems = storeItemSample(knowledge, { shapeOf });
   const census = storeCensus(knowledge, RECALL_DOMAIN);
   const funnel = {
     corrections: corrections.length,
@@ -1576,7 +1581,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // census beside it is whole: a reader can see the six kinds, the status split and the reasons
     // without a second run, and a store larger than the sample says so.
     store: census,
-    storeItems: storeItemSample(knowledge, { shapeOf }),
+    storeItems,
+    // R120: how many distinct claims the store contains, by the consolidator's own key. Taken from the
+    // sample that ships beside it, so the number and the text it was read from travel together — and it
+    // costs nothing, because it is arithmetic over statements the run already paid for.
+    redundancy: redundancyOfSample(storeItems),
     yield: yieldCensus(claimsPerCorrection(captured, knowledge)),
     distill: {
       scope: DISTILL_SCOPE,
@@ -2278,7 +2287,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // R54: what the store said, not only how many items said it. R51 could count conditions
     // and read none of them, so its readback could not tell a trigger in the user's register
     // from one in the procedure's — and those two predict opposite coverage.
-    storeItems: storeItemSample(knowledge, { shapeOf }),
+    storeItems,
+    redundancy: redundancyOfSample(storeItems),
     // R56: the treatment and the subject it acted on, recorded beside the store it produced. The
     // form is what the prompt asked for; the inventory is what the ban refused names from; the
     // count is how often it fired. An artefact that carried the form alone would read the same

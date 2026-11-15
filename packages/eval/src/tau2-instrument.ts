@@ -42,6 +42,7 @@ import type { RawLogCensus } from "./tau2-rawlog.js";
 import { defaultPolicy } from "@agentix-e/microglia-core/kernel";
 import type { FunnelInput } from "@agentix-e/microglia-protocol";
 import type { AdmissionCensus, Tau2ArmRecord, Tau2EpisodeFailure } from "./tau2-gates.js";
+import type { RedundancyCensus } from './store-redundancy.js';
 import type { StoreItemSample } from "./store-items.js";
 import type { ConsolidationCensus } from "@agentix-e/microglia-core/distill";
 import type { InactionCensus } from "./inaction.js";
@@ -381,6 +382,14 @@ export type Tau2Raw = {
    */
   /** R54: the store's own words, bounded. See `storeItemSample`. */
   readonly storeItems?: StoreItemSample;
+  /**
+   * R120: how many distinct claims the store contains, by the consolidator's own key.
+   *
+   * The store is one item per correction and `supportTasks: 1` on every one of them, so "how much of this
+   * is a restatement" had no number on any artefact. It is arithmetic over the sample beside it, so it
+   * costs nothing and cannot disagree with the text it was read from.
+   */
+  readonly redundancy?: RedundancyCensus;
   /**
    * R92: what retrieval was asked, which is the input the pack pin could not reach.
    *
@@ -862,6 +871,9 @@ export const PROJECTION: {
   useArm: "reduced",
   widenedItems: "reduced",
   storeItems: "carried",
+  // Carried verbatim: a store's size does not say how many claims it holds, and an arm that reported only
+  // the size could not tell a store of 80 facts from a store of 49 facts written 80 times.
+  redundancy: "carried",
   // Carried verbatim: without it a pack difference between two arms has three candidate causes and the
   // artefact names none of them. See the field's own comment.
   queries: "carried",
@@ -1056,6 +1068,10 @@ export function armRecordFromDriver(
     // could not be explained. A projection that silently drops a field is worse than one that
     // refuses, because the artefact still looks complete.
     ...(raw.storeItems === undefined ? {} : { storeItems: raw.storeItems }),
+    // R120: the census read off that sample. Beside it rather than inside it, because it is a statement
+    // about the store rather than a projection of it — and a sample that carried its own interpretation
+    // would make a store's text and a reading of it one field.
+    ...(raw.redundancy === undefined ? {} : { redundancy: raw.redundancy }),
     // R92: the questions retrieval was asked. Beside the store's text and for the same reason — a pack
     // is a function of both, and R91's artefact carried one of them and reported the other's movement
     // as a mystery.

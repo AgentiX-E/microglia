@@ -1054,6 +1054,14 @@ export {
   type PackReading,
 } from './tau2-pack.js';
 export { callsOfStatement, shapeByTaskOf, tau2ShapeOf, tau2ShapeWithFallback } from './tau2-shape.js';
+export {
+  REDUNDANCY_FLOOR,
+  redundancyLine,
+  redundancyOfSample,
+  storeRedundancy,
+  type RedundancyCensus,
+  type RedundancyInput,
+} from './store-redundancy.js';
 export { stoppedRun } from './stopped-run.js';
 export {
   COMPETITOR_PASS4,

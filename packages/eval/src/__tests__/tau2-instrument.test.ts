@@ -547,6 +547,9 @@ describe('the projection has a decision for every field, and keeps it', () => {
     raw({
       ...over,
       scenarioTasks: { learn: 115, test: 115 },
+      // R120: the redundancy census travels beside the sample it was computed from, and a table entry
+      // marked `carried` whose fixture never states the field is a decision nothing exercises.
+      redundancy: { statements: 2, pairs: 1, joined: 1, groups: 1, redundancy: 0.5, largest: 2, floor: 0.6, truncated: 0 },
       // The provider's own account, so `PROJECTION.usage` has something to carry: a table entry marked
       // `carried` whose fixture never states the field is a decision nothing exercises.
       usage: {
