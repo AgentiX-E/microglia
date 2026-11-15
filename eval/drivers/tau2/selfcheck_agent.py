@@ -23,6 +23,7 @@ Run: `python3 eval/drivers/tau2/selfcheck_agent.py --self-test`
 from __future__ import annotations
 
 import os
+import json
 import sys
 import types
 
@@ -451,7 +452,21 @@ def a_malformed_knob_is_dropped_rather_than_sent(checks):
     checks.equal(sorted(knobs), ["anchoring", "limit"], "only the two well-formed pairs survive")
 
 
+def dump_stats() -> int:
+    """Print `memory_stats()` as JSON, for the TypeScript side to read back.
+
+    The counter that had no caller (AUDIT 34.154) is the reason this exists. A self-check certifies the
+    function; it never certifies that the shape the function returns is the shape the reader expects. The
+    lane's reader is `speakLineOf`, which lives in TypeScript, so the only honest contract test is one that
+    hands the real payload across the language boundary and asserts the real line prints it.
+    """
+    print(json.dumps(subject.memory_stats(), sort_keys=True))
+    return 0
+
+
 def main(argv: list[str]) -> int:
+    if "--dump-stats" in argv:
+        return dump_stats()
     if "--self-test" not in argv:
         print(__doc__)
         return 2

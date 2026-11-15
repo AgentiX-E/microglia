@@ -29,6 +29,19 @@ export type RecallTraffic = {
   readonly recall_failures: number;
   readonly recall_empty: number;
   readonly silent_because: Readonly<Record<string, number>>;
+  /**
+   * Requests whose store returned at least two candidates — the population a margin gate acts on.
+   *
+   * Absent on every artefact written before R123a, and absent on a phase whose host asked for no census.
+   * It is not a subset of `recalls - recall_empty` that a reader can derive: a served pack with one
+   * candidate and a served pack with eight are the same count and different populations, and the second
+   * is the only one a rung can withhold.
+   */
+  readonly rivaled?: number;
+  /** Nearest-rank median of the margins, or null when no request had a rival. */
+  readonly margin_p50?: number | null;
+  /** How many requests each rung would withhold, exactly. Keys are the rungs, formatted `0.05`. */
+  readonly margin_ladder?: Readonly<Record<string, number>>;
 };
 
 /** One line, computed from two numbers the artefact already carries. */
@@ -59,5 +72,34 @@ export function speakLineOf(margin: number, traffic: RecallTraffic | null | unde
   // The partition is printed as arithmetic rather than as prose, so a reader can check it against the
   // artefact's own fields: `served + withheld + failed` must equal `recalls`, and a line that does not
   // add up is a counter that counted something twice.
-  return `speak: ${point}; ${String(traffic.recalls)} request(s) reached the facade, ${String(served)} served, ${String(empty)} withheld${named === '' ? '' : ` (${named})`}, ${String(failed)} failed`;
+  return `speak: ${point}; ${String(traffic.recalls)} request(s) reached the facade, ${String(served)} served, ${String(empty)} withheld${named === '' ? '' : ` (${named})`}, ${String(failed)} failed${censusOf(traffic)}`;
+}
+
+/**
+ * The margin census, when the phase kept one.
+ *
+ * Three states, deliberately distinguishable. Absent means the host asked for no census — every arm
+ * before R123a — and says so rather than printing zeros. `rivaled: 0` means the census ran and the store
+ * gave nothing to be contested, which at 160 requests is a finding about the store. And a ladder is
+ * printed rung by rung, because R123a's entire readback is the *shape* of that ladder: a jump between two
+ * adjacent rungs is the difference between a threshold and an off switch.
+ */
+function censusOf(traffic: RecallTraffic): string {
+  if (traffic.rivaled === undefined) {
+    return '; no margin census on this phase, so this run cannot say what a rung would withhold';
+  }
+  const ladder = traffic.margin_ladder;
+  const p50 = traffic.margin_p50;
+  const median =
+    p50 === undefined || p50 === null
+      ? 'no median (no request had a rival)'
+      : `p50 ${p50.toFixed(4)}`;
+  if (ladder === undefined) {
+    return `; ${String(traffic.rivaled)} rivaled request(s), ${median}, and no ladder was reported`;
+  }
+  const rungs = Object.keys(ladder)
+    .sort((left, right) => Number(left) - Number(right))
+    .map((rung) => `${rung} ${String(ladder[rung])}`)
+    .join(' / ');
+  return `; ${String(traffic.rivaled)} rivaled request(s) (the population a rung acts on), ${median}, ladder ${rungs}`;
 }

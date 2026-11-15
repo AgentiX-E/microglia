@@ -1409,3 +1409,17 @@ request); τ²-retail R121 **+5.00pp** of episode rate and **+15.00pp** of headl
 within one dispatch, 4.06 items a request, 9 tasks improved and 4 harmed, p = 0.2668). **Nothing here supports
 a claim that memory helps or hurts; what it supports is that the contrast is not resolvable at forty tasks,
 and that the store's size moves the sign.**
+
+**Rivaled population** — The requests whose store returned at least two candidates, and therefore the only
+ones a margin gate can withhold. It is not derivable from the served count: a pack served from one
+candidate and a pack served from eight are the same `served` and different populations, and only the second
+is what a rung acts on. On a 160-episode arm, `rivaled` below about 40 would mean most packs carried a
+single line and the gate would be deciding on a minority of the traffic.
+
+**Margin ladder** — For each rung of `0.01 0.02 0.05 0.10 0.15 0.20 0.30`, how many of the rivaled requests
+that rung would withhold, counted exactly rather than fitted. `buildPack` withholds on `margin < rung`, so
+the count is strict and a margin equal to the rung serves. The ladder's *shape* is the reading: a relevance
+floor jumps from serving 162 to serving 75 between two adjacent rungs on the same pairs, which is an off
+switch rather than a threshold; a gate whose ladder degrades smoothly is one whose rung can be chosen. It is
+recorded by an arm that gates on nothing (`speakMargin: 0`, `speakCensus: true`), which is why the rung can
+be priced before it is bought.

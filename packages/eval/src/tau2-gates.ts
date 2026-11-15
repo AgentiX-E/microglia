@@ -247,6 +247,14 @@ export type Tau2ArmRecord = {
     readonly recall_failures: number;
     readonly recall_empty: number;
     readonly silent_because: Readonly<Record<string, number>>;
+    /**
+     * R123a: the requests whose store returned at least two candidates, and what each rung of a margin
+     * gate would withhold of them. `null` on a phase before the ladder existed, which is why these are
+     * optional rather than defaulted: a `0` would read as a store with nothing contested.
+     */
+    readonly rivaled?: number;
+    readonly margin_p50?: number | null;
+    readonly margin_ladder?: Readonly<Record<string, number>>;
   };
   readonly injectionNote?: InjectionNoteRecord;
   /**

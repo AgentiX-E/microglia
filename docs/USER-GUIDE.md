@@ -2745,3 +2745,47 @@ Twelve routines taught twice and zero claims written twice are both true of that
 with `supportTasks: 1`. **A merge raises `supportTasks`; a recurrence census does not.** If you want the second
 number to move, the pass has to key on the object the census keyed on — which is what R124 changes, and what
 `skippedScope` will show it doing.
+
+### 13.27 Choosing a margin rung without buying a wrong one
+
+`speakMargin` withholds a pack when the store's best candidate is not far enough ahead of its runner-up.
+The number is a **quantile of the store's own margin distribution**, so naming one from intuition buys one
+of two outcomes — it withholds almost everything or almost nothing — and both are read as a result about
+memory.
+
+Three steps, and the first one is free:
+
+```bash
+# 1. Price every rung, treating nothing. Costs a control run and no extra calls.
+TAU_SPEAK_MARGIN=0 TAU_SPEAK_CENSUS=1 pnpm eval:tau2
+```
+
+```text
+[tau2] speak: margin 0 (the default: every non-empty pack is served); 162 request(s) reached the facade,
+160 served, 2 withheld (nothing-matched 2), 0 failed; 118 rivaled request(s) (the population a rung acts
+on), p50 0.0312, ladder 0.01 6 / 0.02 12 / 0.05 24 / 0.10 61 / 0.15 88 / 0.20 101 / 0.30 115
+```
+
+```bash
+# 2. Read the ladder, not the rate.
+#    0.05 costs 24 of 118 rivaled requests (20%); 0.15 costs 88 of them (75%).
+#    0.10 is the largest rung under the 40% ceiling here, so it is the rung to buy.
+```
+
+```bash
+# 3. Buy that rung, with the census still on so the withheld count can be checked against the prediction.
+TAU_SPEAK_MARGIN=0.10 pnpm eval:tau2
+```
+
+What to check on the treatment run:
+
+| reading | what it means |
+|---|---|
+| withheld ≈ the ladder's number for that rung | the gate fired as priced; anything else is a different store |
+| `no-leader` is the largest bucket | the gate withheld contested rankings, not empty ones |
+| `nothing-matched` rising | the gate is not the cause; the store stopped matching |
+| `rivaled 0` | the census never reached the driver — a wiring defect, not a store finding |
+
+A rung that withholds more than two requests in five has replaced the store rather than filtered it. If the
+**lowest** rung already does that, do not buy a rung at all: that store's top two candidates are always
+within a point of each other, and the honest report is the ladder itself.

@@ -1,5 +1,10 @@
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 import { speakLineOf, type RecallTraffic } from '../tau2-speak.js';
+
+const REPO_ROOT = fileURLToPath(new URL('../../../../', import.meta.url));
 
 const traffic = (overrides: Partial<RecallTraffic> = {}): RecallTraffic => ({
   recalls: 168,
@@ -55,5 +60,82 @@ describe('the speak line partitions the requests the facade saw', () => {
       expect(line).toContain('cannot say how many packs the gate withheld');
       expect(line).not.toContain('0 withheld');
     }
+  });
+});
+
+describe('a margin census is three states, not one zero', () => {
+  it('says the phase kept no census rather than printing zeros', () => {
+    // Every arm before R123a. A `rivaled 0` here would be a claim about the store that the phase never
+    // measured, which is the defect this whole module exists to refuse.
+    const line = speakLineOf(0, traffic());
+    expect(line).toContain('no margin census on this phase');
+    expect(line).not.toContain('rivaled');
+  });
+
+  it('prints the ladder rung by rung, in rung order', () => {
+    const line = speakLineOf(
+      0,
+      traffic({
+        rivaled: 118,
+        margin_p50: 0.0312,
+        margin_ladder: { '0.30': 115, '0.01': 6, '0.05': 24, '0.10': 61 },
+      }),
+    );
+    expect(line).toContain('118 rivaled request(s)');
+    expect(line).toContain('p50 0.0312');
+    // Numerically sorted, not lexicographically: `0.30` would sort before `0.05` as a string, and a
+    // ladder that prints its rungs out of order is a ladder a reader misreads at a glance.
+    expect(line).toContain('ladder 0.01 6 / 0.05 24 / 0.10 61 / 0.30 115');
+  });
+
+  it('says a store gave nothing to be contested when the count is a real zero', () => {
+    const line = speakLineOf(0, traffic({ rivaled: 0, margin_p50: null, margin_ladder: {} }));
+    expect(line).toContain('0 rivaled request(s)');
+    expect(line).toContain('no median');
+    expect(line).not.toContain('no margin census');
+  });
+
+  it('reports a missing ladder rather than pretending the rungs are empty', () => {
+    const line = speakLineOf(0, traffic({ rivaled: 3, margin_p50: 0.004 }));
+    expect(line).toContain('no ladder was reported');
+  });
+});
+
+describe('the reader and the writer agree on the field names', () => {
+  // AUDIT 34.154's cheapest check, for the field it was written about. A self-check certifies the
+  // function; nothing certified that the *shape* it returns is the shape the reader reads. If the Python
+  // side renames `margin_ladder`, the line silently loses the ladder and every local gate stays green.
+  const dumped = spawnSync('python3', ['eval/drivers/tau2/selfcheck_agent.py', '--dump-stats'], {
+    cwd: REPO_ROOT,
+    encoding: 'utf8',
+  });
+  const available = dumped.status === 0 && dumped.stdout.trim() !== '';
+
+  it.skipIf(!available)('carries every field the speak line reads', () => {
+    const stats = JSON.parse(dumped.stdout) as Record<string, unknown>;
+    expect(Object.keys(stats).sort()).toEqual(
+      [
+        'margin_ladder',
+        'margin_p10',
+        'margin_p50',
+        'margin_p90',
+        'recall_empty',
+        'recall_failures',
+        'recall_url',
+        'recalls',
+        'rivaled',
+        'silent_because',
+      ],
+    );
+  });
+
+  it.skipIf(!available)('prints a line from the payload the driver actually writes', () => {
+    const stats = JSON.parse(dumped.stdout) as RecallTraffic;
+    const line = speakLineOf(0, stats);
+    // The keys, not the numbers: the payload of a fresh module is all zeros, and what is under test is
+    // that `rivaled` and `margin_ladder` arrive under the names the line reads them by.
+    expect(line).toContain('0 request(s) reached the facade');
+    expect(line).toContain('0 rivaled request(s)');
+    expect(line).toContain('ladder 0.01 0 / 0.02 0 / 0.05 0 / 0.10 0 / 0.15 0 / 0.20 0 / 0.30 0');
   });
 });
