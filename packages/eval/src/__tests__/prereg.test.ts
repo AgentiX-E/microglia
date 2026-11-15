@@ -1513,6 +1513,39 @@ describe('the distilling scope', () => {
     ]);
     expect(readPrereg(withHeader('learnOnly: 1'), 'R87-distill-scope.md').problems).toHaveLength(1);
   });
+
+  it('reads whether the recurrence pass runs on this unit, which is R121\'s one variable', () => {
+    // `consolidateKnowledge` has run only under `distillUnit: trace` since R58, so every arm on the
+    // published unit has held single-task items while its own two censuses priced 39-53 claims. The
+    // switch is a header rather than a repository variable for R56's reason, and absent means the pass
+    // runs where it always ran, so no artefact written before this key existed is reinterpreted.
+    expect(readPrereg(withHeader('consolidate: true'), 'R87-distill-scope.md').prereg?.consolidate).toBe(true);
+    expect(readPrereg(withHeader('consolidate: false'), 'R87-distill-scope.md').prereg?.consolidate).toBe(false);
+    expect(readPrereg(withHeader('split: dev'), 'R87-distill-scope.md').prereg?.consolidate).toBeUndefined();
+    expect(readPrereg(withHeader('consolidate: on'), 'R87-distill-scope.md').problems).toEqual([
+      { where: "header 'consolidate'", problem: "'on' is not one of true, false" },
+    ]);
+  });
+
+  it('refuses the pass on the unit that stores episodes, because it merges claims', () => {
+    // `raw` writes one verbatim event per episode and asks no model; the pass merges two claims into one.
+    // A dispatch that ran both would score a store the registration does not describe, so the pair is
+    // refused at the header rather than discovered in the readback.
+    const reading = readPrereg(
+      withHeader('distillUnit: raw\nconsolidate: true'),
+      'R87-distill-scope.md',
+    );
+    expect(reading.problems).toEqual([
+      {
+        where: "header 'consolidate'",
+        problem: 'the recurrence pass merges claims and the raw unit stores episodes, so it cannot run there',
+      },
+    ]);
+    // And the same header on the published unit is admissible, which is the arm R121 buys.
+    expect(
+      readPrereg(withHeader('distillUnit: correction\nconsolidate: true'), 'R87-distill-scope.md').problems,
+    ).toEqual([]);
+  });
 });
 
 

@@ -86,12 +86,16 @@ function main(): void {
   // read, so a global that could turn it off would let a dispatch pay for an evaluation the
   // registration never wanted. An absent header leaves the full arm, which is every arm but this one.
   const declaredLearnOnly = reading.prereg.learnOnly;
+  // R121: the pass the unit has never run. Printed only when the header names it, so a registration
+  // that says nothing leaves the variable unset and the lane exactly as every committed artefact ran it.
+  const declaredConsolidate = reading.prereg.consolidate;
   process.stdout.write(
     `unit=${declaredUnit ?? ''}\nform=${declared ?? ''}\nscope=${declaredScope ?? ''}\n` +
       `claims=${declaredClaims === undefined ? '' : String(declaredClaims)}\n` +
       `mode=${declaredMode ?? ''}\n` +
       `shape=${declaredShape ?? ''}\n` +
       `learnOnly=${declaredLearnOnly === undefined ? '' : String(declaredLearnOnly)}\n` +
+      `consolidate=${declaredConsolidate === undefined ? '' : String(declaredConsolidate)}\n` +
       // One line, `;`-joined, because the workflow reads each value with `sed -n 's/^key=//p'` and an
       // expression that split a list would be a parser in YAML. Empty when every switch agrees.
       `overrides=${notices.join('; ')}\n`,

@@ -214,6 +214,16 @@ export type Prereg = {
    */
   readonly learnOnly?: boolean;
   /**
+   * Whether the store's recurrence pass runs on this unit.
+   *
+   * R121. `consolidateKnowledge` is invoked only under `distillUnit: trace`, and every arm since R104
+   * runs `correction`, so the store has kept one item per correction while its own two censuses priced
+   * 39-53 claims with support up to 5. The switch is a header rather than a repository variable for
+   * R56's reason -- a global would let a dispatch publish the control under the treatment's name -- and
+   * absent means the pass runs exactly where it always ran, so no older artefact is reinterpreted.
+   */
+  readonly consolidate?: boolean;
+  /**
    * The effect this registration claims, in percentage points, when it claims one.
    *
    * Absent on most headers, and its absence is a statement: R118 asks for a census and buys one arm,
@@ -424,6 +434,7 @@ const HEADER_KEYS = [
   'distillUnit',
   'distillScope',
   'learnOnly',
+  'consolidate',
   'effectClaimPp',
   'traceClaims',
   'trainTasks',
@@ -914,6 +925,30 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // R121: whether the store's recurrence pass runs on this unit. A boolean rather than a mode name,
+  // because the pass has one meaning and the question is only whether it is invoked — `distillUnit`
+  // already decides which items it would see.
+  const consolidateText = values.get('consolidate');
+  let consolidate: boolean | undefined;
+  if (consolidateText !== undefined) {
+    if (!HEADER_BOOLEANS.has(consolidateText)) {
+      collected.push({
+        where: `header 'consolidate'`,
+        problem: `'${consolidateText}' is not one of ${[...HEADER_BOOLEANS].join(', ')}`,
+      });
+    } else {
+      consolidate = consolidateText === 'true';
+    }
+  }
+  // R121's switch and the unit it cannot apply to. `raw` writes one verbatim event per episode and the
+  // pass merges claims; asking for both is not an arm, and a dispatch that ran it would score a store the
+  // registration does not describe.
+  if (consolidate === true && distillUnit === 'raw') {
+    collected.push({
+      where: `header 'consolidate'`,
+      problem: 'the recurrence pass merges claims and the raw unit stores episodes, so it cannot run there',
+    });
+  }
   // Whether the arm stops after the learning half. Its claim is a census, and an evaluation it will
   // not read is the cheapest thing on this roster to not buy.
   const learnOnlyText = values.get('learnOnly');
@@ -1273,6 +1308,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(distillUnit === undefined ? {} : { distillUnit }),
       ...(distillScope === undefined ? {} : { distillScope }),
       ...(learnOnly === undefined ? {} : { learnOnly }),
+      ...(consolidate === undefined ? {} : { consolidate }),
       ...(effectClaimPp === undefined ? {} : { effectClaimPp }),
       ...(traceClaims === undefined ? {} : { traceClaims }),
       ...(trainTasks === undefined ? {} : { trainTasks }),

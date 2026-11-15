@@ -802,6 +802,7 @@ export {
 export {
   TRACE_CALL_CAP,
   parseTraceCalls,
+  resolveConsolidation,
   resolveDistillUnit,
   traceOf,
   tracesOf,

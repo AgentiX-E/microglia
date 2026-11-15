@@ -228,6 +228,26 @@ export type DistillUnit = 'correction' | 'trace' | 'raw';
  * artefact says which one ran, while a unit whose name is misspelt measures the control and reports
  * the control's numbers under a treatment's name. The refusal happens before the first model call.
  */
+/**
+ * Whether this dispatch runs the store's recurrence pass on its unit.
+ *
+ * `consolidateKnowledge` has run only under `distillUnit: trace` since R58, and every arm since R104 runs
+ * `correction` — so the store has kept one item per correction while its own censuses priced 39-53 claims
+ * with support up to 5. R121's treatment is one variable: the same lane with the pass enabled.
+ *
+ * Default `false`, which is exactly what every artefact committed before this resolver existed ran: the
+ * trace unit keeps its pass and the correction unit keeps its absence, so no past number is
+ * reinterpreted. An unrecognised value is refused for `resolveDistillUnit`'s reason — a misspelt switch
+ * that silently measured the control would publish the control under the treatment's name, and the
+ * refusal happens before the first model call.
+ */
+export function resolveConsolidation(raw = process.env['TAU_CONSOLIDATE']): boolean {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (value === '' || value === 'false') return false;
+  if (value === 'true') return true;
+  throw new RangeError(`TAU_CONSOLIDATE must be unset, 'true' or 'false'; received '${String(raw)}'`);
+}
+
 export function resolveDistillUnit(raw = process.env['TAU_DISTILL_UNIT']): DistillUnit {
   const value = (raw ?? '').trim().toLowerCase();
   if (value === '' || value === 'correction') return 'correction';

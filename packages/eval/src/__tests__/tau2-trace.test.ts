@@ -18,6 +18,7 @@ import { buildDistillPrompt } from '@agentix-e/microglia-core/distill';
 import type { FeedbackEvent, RunRecord } from '@agentix-e/microglia-core';
 import {
   parseTraceCalls,
+  resolveConsolidation,
   resolveDistillUnit,
   traceOf,
   tracesOf,
@@ -379,6 +380,32 @@ describe('traceOf and the record a passing trajectory makes', () => {
     expect(traceOf(trace, { expected: ['a(b="1")'], rubric: ['r'] })).toEqual(
       traceOf(trace, { expected: ['a(b="1")'], rubric: ['r'], met: false }),
     );
+  });
+});
+
+describe('resolveConsolidation', () => {
+  it('defaults to off, which is what every artefact before R121 ran', () => {
+    // The pass has run only on the trace unit since R58. Off is therefore not a neutral default: it is
+    // the behaviour every committed number was measured under, and turning it on by omission would
+    // reinterpret them all without touching a single file.
+    expect(resolveConsolidation(undefined)).toBe(false);
+    expect(resolveConsolidation('')).toBe(false);
+    expect(resolveConsolidation('   ')).toBe(false);
+    expect(resolveConsolidation('false')).toBe(false);
+    expect(resolveConsolidation(' FALSE ')).toBe(false);
+  });
+
+  it('reads the arm that asks for it', () => {
+    expect(resolveConsolidation('true')).toBe(true);
+    expect(resolveConsolidation(' True ')).toBe(true);
+  });
+
+  it('refuses a value it does not know, before any model call', () => {
+    // A misspelt switch that fell back to the default would run the control and publish it under the
+    // treatment's name -- the defect `resolveDistillUnit` refuses for the same reason.
+    for (const bad of ['yes', 'on', '1', 'trace']) {
+      expect(() => resolveConsolidation(bad)).toThrow(/TAU_CONSOLIDATE must be/);
+    }
   });
 });
 

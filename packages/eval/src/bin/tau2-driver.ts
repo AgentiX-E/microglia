@@ -100,6 +100,7 @@ import {
   noteFacadeSummary,
   resolveDistillForm,
   resolveDistillScope,
+  resolveConsolidation,
   resolveDistillUnit,
   provenanceCensus,
   entitiesOf,
@@ -610,6 +611,24 @@ const LEARN_ONLY = /^(1|true|yes)$/i.test((process.env["TAU_LEARN_ONLY"] ?? "").
  * so a reader of the artefact never has to infer which of the two produced the store.
  */
 const DISTILL_UNIT = resolveDistillUnit();
+
+/**
+ * Whether the store's recurrence pass runs, R121's one variable.
+ *
+ * The pass has run only on the trace unit since R58, so the published unit has held one item per
+ * correction with `supportTasks: 1` on every one of them while the merge census priced a third of the
+ * store as recurrence. The switch is the registration's (R56's rule: a global would let a dispatch
+ * publish the control under the treatment's name), and it is read here so a misspelt value refuses the
+ * run before the first model call.
+ *
+ * `raw` is excluded whatever the header says: its "store" is one verbatim event per episode, and a
+ * claim-merging pass over records that are not claims produces a third record no episode wrote — the
+ * abstraction this arm is the control for.
+ */
+const CONSOLIDATE = resolveConsolidation() && DISTILL_UNIT !== "raw";
+
+/** Where the pass runs: the unit it has always run on, plus any unit a registration asked for. */
+const CONSOLIDATION_RUNS = CONSOLIDATE || DISTILL_UNIT === "trace";
 
 /**
  * The longest statement the pack can carry under this arm, measured on the shape it writes.
@@ -1507,23 +1526,22 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   // Not for the raw unit, and the reason is the arm rather than the pass: a record is one event, and
   // merging two records by statement similarity produces a third record neither episode wrote --
   // which is exactly the abstraction this arm is the control for. The pass is a claim-merging pass;
-  // `written` on this unit is not a set of claims.
-  const consolidation =
-    DISTILL_UNIT === "trace"
-      ? consolidateKnowledge(written, consolidationOptions)
-      : undefined;
+  // `written` on this unit is not a set of claims. `CONSOLIDATION_RUNS` carries that exclusion, and it
+  // is the only gate left: R121 asked for the pass on the correction unit and got it by stating so.
+  const consolidation = CONSOLIDATION_RUNS
+    ? consolidateKnowledge(written, consolidationOptions)
+    : undefined;
   // R61: what every floor in the grid would have done with this store, at the setting the pass just
   // ran at and at the ones it did not. Computed before any evaluation so the reading is a property
   // of the store rather than of the episodes, and from `written` rather than from the pass's output,
   // because a sweep over already-consolidated items would report the last pass's answer for ever.
-  const consolidationSweep =
-    DISTILL_UNIT === "trace"
-      ? sweepConsolidation(written, {
-          ...consolidationOptions,
-          threshold: consolidation?.report.threshold ?? 0.6,
-          conditionMinShared: consolidation?.report.conditionMinShared ?? 0,
-        })
-      : undefined;
+  const consolidationSweep = CONSOLIDATION_RUNS
+    ? sweepConsolidation(written, {
+        ...consolidationOptions,
+        threshold: consolidation?.report.threshold ?? 0.6,
+        conditionMinShared: consolidation?.report.conditionMinShared ?? 0,
+      })
+    : undefined;
   if (consolidationSweep !== undefined) {
     for (const line of sweepSummary(consolidationSweep)) {
       process.stdout.write(`[tau2] sweep: ${line}\n`);

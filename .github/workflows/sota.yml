@@ -1328,6 +1328,11 @@ jobs:
           # only — there is no variable to reconcile it against, because a global that could turn it
           # off would let a dispatch pay for an evaluation the registration never asked for.
           LEARN_ONLY=$(sed -n 's/^learnOnly=//p' "$RUNNER_TEMP/distill.env")
+          # R121: the store's recurrence pass on a unit it has never run on. Header-only, for R118's
+          # reason and one of its own: a repository variable that turned the pass on would apply to
+          # every queued dispatch, and every artefact committed before it would be re-read as a run
+          # that had a treatment it never had.
+          CONSOLIDATE=$(sed -n 's/^consolidate=//p' "$RUNNER_TEMP/distill.env")
           # Every switch the registration overrides, as a notice. Not a refusal: the arms read the
           # registration's value, so a stale variable is overridden rather than run — the check that
           # refused on this comparison stopped R58 before its first model call while the run would have
@@ -1366,6 +1371,7 @@ jobs:
           # R118: whether the arm stops after the learning half. Header-only, because the stop is the
           # registration's own statement about what it will read.
           echo "learn_only=$LEARN_ONLY" >> "$GITHUB_OUTPUT"
+          echo "consolidate=$CONSOLIDATE" >> "$GITHUB_OUTPUT"
           echo "knobs=$KNOBS" >> "$GITHUB_OUTPUT"
           echo "trainTasks=$(echo "$CAPS" | sed -n 's/^train=//p')" >> "$GITHUB_OUTPUT"
           echo "testTasks=$(echo "$CAPS" | sed -n 's/^test=//p')" >> "$GITHUB_OUTPUT"
@@ -1489,6 +1495,9 @@ jobs:
           # R118: a registration whose claim is a census stops after the learning half. Empty for every
           # other arm, which is what keeps a full dispatch the default.
           TAU_LEARN_ONLY: ${{ steps.recall_floor.outputs.learn_only }}
+          # R121: the recurrence pass on the published unit. Empty for every registration that does not
+          # name it, which leaves the lane exactly as every committed artefact ran it.
+          TAU_CONSOLIDATE: ${{ steps.recall_floor.outputs.consolidate }}
           # R60: how many claims one trace may teach. Unset means three, which is what every
           # committed trace artefact ran at; a run at six is a different treatment and the ceiling
           # travels into the artefact so a readback can tell the two apart.
