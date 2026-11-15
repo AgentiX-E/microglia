@@ -817,6 +817,12 @@ export {
   type TurnMeasure,
 } from './tau2-turn.js';
 export {
+  rehearsalLine,
+  rehearsalOf,
+  type Rehearsal,
+  type RehearsalCell,
+} from './tau2-rehearsal.js';
+export {
   itemTransfer,
   itemTransferLine,
   episodeStartsOf,

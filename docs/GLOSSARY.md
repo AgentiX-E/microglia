@@ -1487,3 +1487,11 @@ missing and a reading of zero. `serveSplitAbsent` names one of `no-ledger`, `no-
 `boundary-disagrees` with the numbers that disagreed. A run whose registered mechanism check could not be
 computed is a finding, and a silent caller is how R123's check disappeared between a green gate and an artefact
 with no field.
+
+**Rehearsal** — Replaying the tasks a store was *built from* with the store on. The learn half runs every
+training task with no memory and distils one claim from each failure, so the store already knows which cases it
+was written for; a rehearsal asks whether each of those cases now passes. It is the only reading in this lane
+that separates the two explanations for a held-out harm share: a store that repairs most of its own cases is
+**right but misapplied** (a conditioning problem), and one that repairs few is **inert or wrong** (a distillation
+problem). `repairRate` divides by the population that failed without memory, and `harmShare` by the outcomes the
+store changed; the two are never quoted beside a held-out score, because these are not held-out tasks.
