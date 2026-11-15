@@ -69,14 +69,20 @@ export type PhaseCacheCensus = {
   readonly conversation_tokens_per_call?: number;
   /** Mean tokens of the second-newest message a call: the tool result the turn appended. */
   readonly tail2_tokens?: number;
+  /** Mean tokens of the tool schemas a call, counted from the request because no message carries them. */
+  readonly tools_tokens_per_call?: number;
   /**
-   * Mean uncached tokens a call that neither newest message accounts for.
+   * Mean prompt tokens a call beyond the messages and the tool schemas: the chat template's framing.
    *
-   * The number that decides whether `the-turn` is an attribution or a guess. `prompt - cached` is the
-   * bill; the two newest messages are the largest thing the census can see behind it; what is left is
-   * material the census never looked at — the tools block and the chat template's framing.
+   * R135 defined this field as `uncached - last - tail2` and then read it as "material no message
+   * carries". That arithmetic makes it inherit the entire premium by construction whenever two arms cache
+   * differently — memory 1409.7 against the reference's 179.5, which is 99.7% of a premium that is 45% a
+   * longer prompt and 45% a worse cache. A residual of a residual is not an attribution. It is measured
+   * against the prompt column now, so it means what its name says: the framing, and nothing else.
    */
   readonly residual_tokens_per_call?: number;
+  /** Mean prompt tokens a call, so the three message-and-tool columns have a denominator to subtract from. */
+  readonly prompt_tokens_per_call?: number;
   /** Why there is no census, when the phase says why. */
   readonly reason?: string;
   readonly first_call?: {
@@ -175,13 +181,18 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       : `; of the ${String(Math.round(system + conversation))} message tokens a call, ` +
         `${String(Math.round(system))} were system (the pack and the adapter's preamble) and ` +
         `${String(Math.round(conversation))} were conversation`;
-  const attribution =
-    residual === null
+  const prompt = finiteOrNull(census.prompt_tokens_per_call);
+  const tools = finiteOrNull(census.tools_tokens_per_call);
+  // Descriptive, not causal: the four columns of the prompt and the cache credit beside them. R135's
+  // sentence claimed an attribution from a residual that could not carry one, and the repair is to print
+  // the composition and let the reader subtract -- the arithmetic of a premium is a subtraction, and a
+  // sentence that performs it in prose has to get the same answer as the numbers.
+  const composition =
+    prompt === null || system === null || conversation === null || tools === null || residual === null
       ? ''
-      : residual <= Math.max(1, 0.1 * uncached)
-        ? `, and the two newest messages account for all of them`
-        : `, and ${String(Math.round(residual))} of them sit outside every message this census saw — ` +
-          `the tools block and the chat template's framing`;
+      : `; of the ${String(Math.round(prompt))} prompt tokens a call, ${String(Math.round(system))} were ` +
+        `system, ${String(Math.round(conversation))} conversation, ${String(Math.round(tools))} tool ` +
+        `schemas and ${String(Math.round(residual))} framing`;
 
   if (coverage > PREFIX_UNDERCOUNTED) {
     return {
@@ -193,9 +204,10 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       sentence:
         `the provider credited ${percent}% of the ${String(prefix)}-token prefix this census counts as ` +
         `seen, which is more than it was shown: the share is above 1 because the denominator stops two ` +
-        `messages short, not because the provider credited more than it held${split}; the ` +
+        `messages short, not because the provider credited more than it held${split}${composition}; the ` +
         `${String(uncached)} uncached tokens a call cannot be attributed from this reading: the ` +
-        `attribution R134's arms were read with is a guess until the split below is reported`,
+        `attribution R134's arms were read with is a guess until the split is read beside the prompt's ` +
+        `own composition`,
     };
   }
   if (coverage >= PREFIX_HONOURED) {
@@ -207,8 +219,8 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       repair: 'the-turn',
       sentence:
         `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen, and the ` +
-        `newest message was ${String(tail)} tokens${split}: the ${String(uncached)} uncached tokens a ` +
-        `call are the turn's own material${attribution}`,
+        `newest message was ${String(tail)} tokens${split}${composition}: the ${String(uncached)} ` +
+        `uncached tokens a call are the turn's own material`,
     };
   }
   if (coverage < PREFIX_BROKEN) {
@@ -220,8 +232,8 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       repair: 'the-prefix',
       sentence:
         `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen, against ` +
-        `a ${String(tail)}-token newest message${split}: the lane is re-billing a prefix it believes is ` +
-        `cached${attribution}`,
+        `a ${String(tail)}-token newest message${split}${composition}: the lane is re-billing a prefix it ` +
+        `believes is cached`,
     };
   }
   return {
@@ -231,9 +243,9 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
     tailPerCall,
     repair: 'the-prefix',
     sentence:
-      `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen${split}: part ` +
-      `of the prefix is re-billed on some calls, which is a boundary that moves rather than a size` +
-      `${attribution}`,
+      `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen${split}` +
+      `${composition}: part of the prefix is re-billed on some calls, which is a boundary that moves ` +
+      `rather than a size`,
   };
 }
 

@@ -79,36 +79,42 @@ describe('a share above 1 is the denominator, not the provider', () => {
 });
 
 describe('the split, once the census reports one', () => {
-  it('names the system share, the conversation share, and the residual', () => {
-    // R135. R134's arms differed by 642 tokens of prefix and the artefact had no field saying whether
-    // that was the pack or the conversation, because the Python half computed both and then summed them
-    // into a counter nothing read.
+  it('states the four columns the prompt is made of, which is a composition not an attribution', () => {
+    // R135. The memory arm's own numbers: 5,376 prompt tokens a call, and the four columns that add up to
+    // it. R134's artefact had two of them under one name (`prefix_tokens` was system plus history) and the
+    // premium was attributed to a column nobody had isolated.
     const verdict = cacheCensusVerdict(
       measured({
         prefix_coverage: 0.72,
-        prefix_tokens: 2_522,
-        last_tokens: 155,
-        tail2_tokens: 2_683,
-        system_tokens_per_call: 2_522,
-        conversation_tokens_per_call: 2_838,
-        residual_tokens_per_call: 1_485,
+        prompt_tokens_per_call: 5_376,
+        system_tokens_per_call: 1_613,
+        conversation_tokens_per_call: 988,
+        tools_tokens_per_call: 1_569,
+        residual_tokens_per_call: 1_206,
       }),
     );
-    expect(verdict.sentence).toContain('5360 message tokens a call');
-    expect(verdict.sentence).toContain('2522 were system');
-    expect(verdict.sentence).toContain('2838 were conversation');
-    // 1,485 tokens a call are neither the newest message nor the one before it, so the sentence says
-    // where they can be rather than calling them the turn's.
-    expect(verdict.sentence).toContain('1485 of them sit outside every message this census saw');
-    expect(verdict.sentence).toContain("the tools block and the chat template's framing");
+    expect(verdict.sentence).toContain('5376 prompt tokens a call');
+    expect(verdict.sentence).toContain('1613 were system');
+    expect(verdict.sentence).toContain('988 conversation');
+    expect(verdict.sentence).toContain('1569 tool schemas');
+    expect(verdict.sentence).toContain('1206 framing');
+    // The five columns are the whole prompt: a composition that did not add up would be the
+    // residual-of-a-residual defect one layer out.
+    expect(1_613 + 988 + 1_569 + 1_206).toBe(5_376);
   });
 
-  it('says the two newest messages account for the bill when they do', () => {
+  it('omits the composition when one column is missing, because half a sum is not a sum', () => {
+    // An arm that reports the split but not the tools cannot be composed, and printing the three it has
+    // would leave a remainder looking like framing. Absence, not zero.
     const verdict = cacheCensusVerdict(
-      measured({ prefix_coverage: 0.9, last_tokens: 100, tail2_tokens: 400, residual_tokens_per_call: 3 }),
+      measured({
+        prefix_coverage: 0.9,
+        prompt_tokens_per_call: 4_000,
+        system_tokens_per_call: 1_000,
+        conversation_tokens_per_call: 900,
+      }),
     );
-    expect(verdict.sentence).toContain('account for all of them');
-    expect(verdict.sentence).not.toContain('sit outside every message');
+    expect(verdict.sentence).not.toContain('prompt tokens a call');
   });
 
   it('leaves the split out rather than inventing a zero for an arm that predates it', () => {
@@ -116,7 +122,7 @@ describe('the split, once the census reports one', () => {
     // measurement -- the defect this module's own docstring is about.
     const verdict = cacheCensusVerdict(measured());
     expect(verdict.sentence).not.toContain('were system');
-    expect(verdict.sentence).not.toContain('account for all of them');
+    expect(verdict.sentence).not.toContain('prompt tokens a call');
   });
 });
 

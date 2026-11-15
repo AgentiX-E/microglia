@@ -472,10 +472,13 @@ def the_bill_is_split_into_system_conversation_and_a_named_residual(checks):
     # task on the first: (400 + 400 + 100) / 3 / 4.
     checks.equal(census["last_tokens"], 75.0, "the turn's newest message, averaged")
     checks.equal(census["tail2_tokens"], 10.0, "and the assistant call it followed: 120 characters over three calls")
-    # 118.3 uncached a call minus 75.0 and 10.0 is material no message carries, which is what the
-    # residual is for: this fixture sends no tools, so the residual is the census's own gap and is
-    # reported rather than attributed to the turn.
-    checks.equal(census["residual_tokens_per_call"], 33.3, "uncached less the two newest messages")
+    # 201.7 prompt tokens a call, which the messages account for in full: this fixture sends no tools and
+    # the provider's count is exactly the text. A framing residual of zero here is a measurement, and it is
+    # why the field is defined against the prompt column rather than against the uncached one -- against
+    # `uncached` it would have read 201.7 - 75 - 10 = 116.7 of "material no message carries" on a fixture
+    # whose every token is a message.
+    checks.equal(census["prompt_tokens_per_call"], 201.7, "the provider's prompt, averaged")
+    checks.equal(census["residual_tokens_per_call"], 0.0, "prompt less messages and tools is nothing here")
 
 
 @case
@@ -527,6 +530,7 @@ def every_counter_the_census_keeps_is_a_field_the_verdict_reports(checks):
         "conversation_tokens_per_call",
         "tail2_tokens",
         "residual_tokens_per_call",
+        "prompt_tokens_per_call",
         "tools_tokens_per_call",
         "last_tokens",
         "prefix_tokens",

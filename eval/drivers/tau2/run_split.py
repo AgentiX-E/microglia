@@ -421,10 +421,15 @@ def cache_census() -> dict:
     mean_conversation_tokens = (_cache["conversation_chars"] / seen) / ratio
     mean_cached = cached / calls
     mean_uncached = max(0, prompt - cached) / calls
-    # What the two newest messages cannot account for. Named a residual rather than attributed: the
-    # tools block is the largest thing it can be, and a census that has not counted the tools cannot say
-    # so -- which is why `tools_tokens_per_call` is reported beside it.
+    mean_prompt = prompt / calls
     mean_tools_tokens = (_cache["tools_chars"] / seen) / ratio
+    # The framing the prompt carries beyond the messages and the tool schemas: the chat template, the
+    # generation prompt, whatever the provider adds. Measured against the *prompt* column, not against
+    # the uncached one -- R135 defined it as `uncached - last - tail2`, which makes it inherit the whole
+    # premium by construction whenever the two arms cache differently (memory 1409.7 against the
+    # reference's 179.5, which is 99.7% of a premium that is 45% a longer prompt and 45% a worse cache).
+    # A residual of a residual is not an attribution, and this one was read as if it were.
+    mean_framing_tokens = mean_prompt - mean_system_tokens - mean_conversation_tokens - mean_tools_tokens
     return {
         "measured": True,
         "calls_with_messages": seen,
@@ -437,9 +442,8 @@ def cache_census() -> dict:
         "system_tokens_per_call": round(mean_system_tokens, 1),
         "conversation_tokens_per_call": round(mean_conversation_tokens, 1),
         "tools_tokens_per_call": round(mean_tools_tokens, 1),
-        "residual_tokens_per_call": round(
-            max(0.0, mean_uncached - mean_last_tokens - mean_tail2_tokens), 1
-        ),
+        "prompt_tokens_per_call": round(mean_prompt, 1),
+        "residual_tokens_per_call": round(max(0.0, mean_framing_tokens), 1),
         "cached_tokens_per_call": round(mean_cached, 1),
         "uncached_tokens_per_call": round(mean_uncached, 1),
         "prefix_coverage": round(mean_cached / mean_seen_tokens, 4)
