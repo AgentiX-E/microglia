@@ -148,6 +148,7 @@ describe('foldCensus', () => {
     groups: Array.from({ length: foldedItems }, () => ({})),
     refused: 0,
     unnamed: 0,
+    unnamedIds: [],
     suppressed: 0,
     support,
     items: [],
@@ -164,6 +165,7 @@ describe('foldCensus', () => {
       groups: 3,
       refused: 0,
       unnamed: 0,
+      unnamedItems: 0,
       suppressed: 0,
       units: 3,
       atLeastTwo: 3,
@@ -238,7 +240,7 @@ describe('foldCensus', () => {
         ids: ['a'],
         truncated: 0,
         rendered: 'x',
-        fold: { items: [], folded: 0, groups: [], refused: 0, unnamed: 0, support: { max: 1, atLeastTwo: 0, atLeastThree: 0 } },
+        fold: { items: [], folded: 0, groups: [], refused: 0, unnamed: 0, unnamedIds: [], support: { max: 1, atLeastTwo: 0, atLeastThree: 0 } },
       },
     ]);
     expect(older?.suppressed).toBe(0);
@@ -257,8 +259,12 @@ describe('foldCensus', () => {
       ],
       { budget: 2400, capacity: null },
     );
+    // R126. An artefact that predates the ids keeps the old wording and says so: `unnamedItems` is `null`
+    // and not `0`, because a zero there would claim a store whose records all carry a shape on evidence
+    // that only ever counted serves.
     expect(packLineOf(blind)).toContain('0 refused for want of a second task, 3 unnamed');
     expect(blind.fold?.unnamed).toBe(3);
+    expect(blind.fold?.unnamedItems).toBeNull();
     // And it is not printed when it is zero, so a store the fold could read keeps the old line byte for
     // byte: an artefact written before this count existed must still compare.
     const readable = packCensus(
@@ -312,4 +318,31 @@ describe('the pack ledger', () => {
     expect(ledgerLineOf(undefined)).toContain('no ledger');
     expect(ledgerLineOf(ledgerDiff([['a']], [['a']]))).toContain('1 of 1 request(s) identical');
   });
+  // R126. R124 printed `52 unnamed of 697 units` from three records and the reader had no way to see it:
+  // `unnamed` sums a per-pack unit count, so it counts serves. Two denominators, printed together, is
+  // the whole fix — and the case is written from the run that produced it rather than from a fixture.
+  it('reports the items behind a summed render count, which is the number a store is about', () => {
+    const keyless = (renders: number) =>
+      Array.from({ length: renders }, () => ({
+        ids: ['k_1'],
+        truncated: 0,
+        rendered: 'x',
+        fold: {
+          items: [],
+          folded: 0,
+          groups: [],
+          refused: 0,
+          unnamed: 1,
+          unnamedIds: ['k_1'],
+          suppressed: 0,
+          support: { max: 1, atLeastTwo: 0, atLeastThree: 0 },
+        },
+      }));
+    const census = foldCensus([...keyless(8), ...keyless(17)]);
+    expect(census?.unnamed).toBe(25);
+    expect(census?.unnamedItems).toBe(1);
+    const pack = packCensus(keyless(8), { budget: 2400, capacity: null });
+    expect(packLineOf(pack)).toContain('1 item(s) / 8 render(s) unnamed');
+  });
+
 });

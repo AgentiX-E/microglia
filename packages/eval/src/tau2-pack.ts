@@ -115,6 +115,15 @@ export type FoldCensus = {
    */
   readonly unnamed: number;
   /**
+   * The distinct items behind `unnamed`, or `null` for an artefact written before R126.
+   *
+   * `null` and `0` are different readings and the type says so: every pack before R126 reported a render
+   * count and no ids, so a zero here would claim a store whose records all carry a shape on evidence that
+   * only ever counted serves. R124 is the run that made this necessary — `52 unnamed of 697 units` beside
+   * R120's `0 of 650`, from three records served fifty-two times in a store that never changed.
+   */
+  readonly unnamedItems: number | null;
+  /**
    * Groups that met the fold's floor and that this arm's unit did not fold.
    *
    * The count that keeps `groups: 0` from reading as a fact about the store: on the `per-failure` arm
@@ -145,6 +154,8 @@ export function foldCensus(readings: readonly PackReading[]): FoldCensus | null 
   let groups = 0;
   let refused = 0;
   let unnamed = 0;
+  const unnamedIds = new Set<string>();
+  let unnamedIdsRecorded = true;
   let suppressed = 0;
   let units = 0;
   let atLeastTwo = 0;
@@ -156,6 +167,8 @@ export function foldCensus(readings: readonly PackReading[]): FoldCensus | null 
       readonly groups: readonly unknown[];
       readonly refused: number;
       readonly unnamed: number;
+      /** Absent on artefacts written before R126, which is a different reading from a measured zero. */
+      readonly unnamedIds?: readonly string[];
       /** Absent on artefacts written before R120, which is a different reading from a measured zero. */
       readonly suppressed?: number;
       readonly support: FoldSupport;
@@ -164,6 +177,8 @@ export function foldCensus(readings: readonly PackReading[]): FoldCensus | null 
     groups += fold.groups.length;
     refused += fold.refused;
     unnamed += fold.unnamed;
+    if (fold.unnamedIds === undefined) unnamedIdsRecorded = false;
+    else for (const id of fold.unnamedIds) unnamedIds.add(id);
     suppressed += fold.suppressed ?? 0;
     units += pack.ids.length;
     atLeastTwo += fold.support.atLeastTwo;
@@ -176,6 +191,7 @@ export function foldCensus(readings: readonly PackReading[]): FoldCensus | null 
     groups,
     refused,
     unnamed,
+    unnamedItems: unnamedIdsRecorded ? unnamedIds.size : null,
     suppressed,
     units,
     atLeastTwo,
@@ -302,7 +318,12 @@ export function packLineOf(census: PackCensus): string {
         `${String(fold.refused)} refused for want of a second task` +
         // Printed only when it is non-zero, because it is the one number that turns a zero into a
         // finding: a run whose fold had no key said `folded 0, groups 0, refused 0` for three rounds.
-        `${fold.unnamed === 0 ? '' : `, ${String(fold.unnamed)} unnamed`}), ` +
+        //
+        // R126. Both denominators, because they are different populations: R124 printed `52 unnamed of 697
+        // units` from **three** keyless records, and the reader who has only the render count cannot tell
+        // a store that lost its keys from a store whose three weakest records started being served. An
+        // artefact that predates the ids keeps the old wording rather than claiming the item count.
+        `${fold.unnamed === 0 ? '' : fold.unnamedItems === null ? `, ${String(fold.unnamed)} unnamed` : `, ${String(fold.unnamedItems)} item(s) / ${String(fold.unnamed)} render(s) unnamed`}), ` +
         `support ≥2 ${String(fold.atLeastTwo)}, ≥3 ${String(fold.atLeastThree)}, max ${String(fold.max)}`;
   return (
     `${head}; served ${String(census.filled)} of ${String(census.requests)} ` +

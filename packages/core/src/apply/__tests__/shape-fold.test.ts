@@ -322,6 +322,7 @@ describe('what the pack reports', () => {
       groups: [],
       refused: 0,
       unnamed: 0,
+      unnamedIds: [],
       suppressed: 0,
       support: { max: 0, atLeastTwo: 0, atLeastThree: 0 },
     });
@@ -410,4 +411,18 @@ describe('the pack the fold is applied to', () => {
     expect(pack.ids).toHaveLength(1);
     await memory.close();
   });
+  // R126. `unnamed` is a count of units in one pack, so a census that sums it over packs counts serves.
+  // The ids are what let a reader recover the population, and they are the reason a store that did not
+  // change stopped reporting `unnamed 0` the moment three keyless records entered a pack.
+  it('names the items it could not key, so a summed census can report both denominators', () => {
+    const blind = [ONE, TWO].map((item, index) => ({ ...item, id: `k_${String(index)}` }));
+    const fold = foldByShape(blind, { mode: 'collapse', shapeOf: () => undefined });
+    expect(fold.unnamed).toBe(2);
+    expect(fold.unnamedIds).toEqual(['k_0', 'k_1']);
+    // A keyed pack reports no ids at all, and the empty array is the measured zero: the difference
+    // between "nothing was unnamed" and "this host cannot say" lives in the census, not here.
+    const named = foldByShape(blind, { mode: 'collapse', shapeOf: () => EXCHANGE.join(' > ') });
+    expect(named.unnamedIds).toEqual([]);
+  });
+
 });

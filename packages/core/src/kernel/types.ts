@@ -568,6 +568,17 @@ export type ShapeFold = {
    */
   readonly unnamed: number;
   /**
+   * Which items those are, by id — the denominator `unnamed` cannot carry.
+   *
+   * R126. `unnamed` counts a pack's units, so a census that sums it over packs counts **renders**: a store
+   * with three keyless records served fifty-two times reports fifty-two, and the next reader has no way to
+   * tell a store that lost its keys from a store whose three weakest records entered a pack. R124 produced
+   * exactly that reading — `52 unnamed of 697 units` beside R120's `0 of 650`, from a store whose own shape
+   * census was 62 of 64 in both runs. The ids are what make the two denominators distinguishable, and they
+   * cost one array per pack.
+   */
+  readonly unnamedIds: readonly string[];
+  /**
    * Groups that met the floor and that this arm's unit did not fold.
    *
    * R120. `groups` is a count of groups that *folded*, so on the `per-failure` arm it is zero by
