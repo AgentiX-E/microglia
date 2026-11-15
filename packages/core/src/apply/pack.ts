@@ -8,8 +8,9 @@
 import { defaultPolicy, mmrSelect, queryCoverage, recallText } from '../kernel/index.js';
 import type { KnowledgeItem, KnowledgePack, RecallQuery } from '../kernel/index.js';
 import type { MemoryPort } from '../memory/index.js';
-import { makePack, type NoteMode } from './render.js';
+import { emptyPack, makePack, type NoteMode } from './render.js';
 import { foldByShape, type ShapeFold, type ShapeMode } from './shape-fold.js';
+import { decideSpeak, suppressionOf } from './speak.js';
 
 export type BuildPackOptions = {
   readonly memory: MemoryPort;
@@ -83,6 +84,25 @@ export type BuildPackOptions = {
    * packs byte-identical.
    */
   readonly shapeOf?: (item: KnowledgeItem) => string | undefined;
+  /**
+   * How far ahead of its runner-up the best candidate must be for the pack to speak at all.
+   *
+   * Zero — the default — speaks on every non-empty pack, which is the behaviour every committed
+   * artefact measured. A positive value withholds the pack when the store's top two candidates are
+   * closer together than this, because a store that holds several answers and prefers none of them
+   * has not decided what to teach. See `decideSpeak` for why a relevance floor cannot express this
+   * question: on the same 650 pairs the retention curve falls off a cliff at 0.15, serving 75 of 162
+   * requests, so a floor withholds half the traffic or none of it and never the contested half.
+   */
+  readonly speakMargin?: number;
+  /**
+   * Whether the pack records the decision it made, in `pack.decision`.
+   *
+   * An observer: the rendered bytes, the ids and the fingerprint are identical with this on and off,
+   * which `__tests__/speak.test.ts` pins. Absent means the pack carries no census, so every pack
+   * written before this option existed is unchanged.
+   */
+  readonly decision?: boolean;
 };
 
 export async function buildPack(
@@ -120,6 +140,27 @@ export async function buildPack(
     1 - Math.min(1, Math.max(0, options.diversity ?? 0.25)),
   );
 
+  // Whether to speak is asked before what to say, and over the candidates rather than over the pack:
+  // `limit` is the host's room, so a small budget must not be able to manufacture a leader. The census
+  // is computed on both settings of `text` — the reduction is pure and cheap — and recorded only when
+  // the host asked to see it.
+  const decision = decideSpeak({
+    candidates: hits.length,
+    afterCoverage: byRelevance.length,
+    afterEvidence: eligible.length,
+    selected: selected.length,
+    scores: eligible.map((hit) => hit.score),
+    speakMargin: Math.max(0, options.speakMargin ?? 0),
+  });
+  if (!decision.spoke) {
+    const suppression = suppressionOf(decision.silentBecause);
+    return {
+      ...emptyPack(budget),
+      ...(suppression === undefined ? {} : { suppressed: suppression }),
+      ...(options.decision === true ? { decision } : {}),
+    };
+  }
+
   // An abstention is not a rule: it may only speak when nothing confident can. A
   // pack that carries both tells the model "here is the convention" and "there is
   // no answer" at once, and the model resolves that contradiction by answering.
@@ -135,7 +176,7 @@ export async function buildPack(
   // The fold is the last thing that happens to the selection: one line per routine instead of one per
   // failure, with every other decision — which rules, what order, how much room — already made.
   const fold = foldOf(chosen, options, query);
-  return makePack(
+  const pack = makePack(
     fold?.items ?? chosen,
     {
       budget,
@@ -145,6 +186,7 @@ export async function buildPack(
     },
     fold,
   );
+  return options.decision === true ? { ...pack, decision } : pack;
 }
 
 /**

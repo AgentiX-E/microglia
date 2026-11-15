@@ -75,6 +75,19 @@ export type MicrogliaOptions = {
    * byte-identical and is the honest reading of one that never asked.
    */
   readonly shapeOf?: (item: KnowledgeItem) => string | undefined;
+  /**
+   * How far ahead of its runner-up the best candidate must be for `recall` to speak at all.
+   *
+   * Off (0) by default, which is the world every committed artefact measured: the pack is served on
+   * every request whose store returned anything. A positive value withholds the pack when the store's
+   * top two candidates tie, because a store that holds several answers and prefers none of them has
+   * not decided what to teach — the read-time failure arXiv 2611.07554 prices at 35-81% unsafe actions
+   * against ≈0 without memory.
+   *
+   * A host that declares one also gets `pack.decision`, since the only useful reason to name a margin
+   * is to read back what it withheld.
+   */
+  readonly speakMargin?: number;
   /** Apply feedback to the knowledge that was in the run's prompt. Default true. */
   readonly credit?: boolean;
   /**

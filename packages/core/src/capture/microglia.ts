@@ -76,6 +76,11 @@ export class Microglia implements RunHost {
   private readonly budgetBasis: 'note-included' | 'note-excluded' | undefined;
   /** See `MicrogliaOptions.shapeOf`; `undefined` means this host cannot name a shape at all. */
   private readonly shapeOf: ((item: KnowledgeItem) => string | undefined) | undefined;
+  /**
+   * See `MicrogliaOptions.speakMargin`. `undefined` is the historical behaviour — speak on every pack
+   * the store could answer — and is kept distinct from 0 so no host changes on an upgrade.
+   */
+  private readonly speakMargin: number | undefined;
   private readonly creditEnabled: boolean;
   private readonly corroborationFloor: number | undefined;
   /**
@@ -119,6 +124,7 @@ export class Microglia implements RunHost {
     this.note = options.note;
     this.budgetBasis = options.budgetBasis;
     this.shapeOf = options.shapeOf;
+    this.speakMargin = options.speakMargin;
     this.creditEnabled = options.credit ?? true;
     this.editSemantics = options.editSemantics;
     this.corroborationFloor = options.corroborationFloor;
@@ -189,6 +195,12 @@ export class Microglia implements RunHost {
         // on a host that cannot name a shape folds nothing, which is why the two travel separately.
         ...(query.shape === undefined ? {} : { shape: query.shape }),
         ...(this.shapeOf === undefined ? {} : { shapeOf: this.shapeOf }),
+        // Both travel together: a host that named a margin is a host that wants to read back what the
+        // margin withheld, and a census nobody asked for is a field every other host would have to
+        // ignore. The census never moves the rendered bytes — `__tests__/speak.test.ts` pins that.
+        ...(this.speakMargin === undefined
+          ? {}
+          : { speakMargin: this.speakMargin, decision: true }),
       },
     );
     // An empty pack for a reason is not the same as an empty pack for no reason, and a

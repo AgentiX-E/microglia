@@ -28,6 +28,8 @@ export type {
   KnowledgePack,
   KnowledgePolarity,
   KnowledgeScope,
+  SpeakDecision,
+  SpeakSilence,
   KnowledgeStatus,
   Policy,
   RatingValue,
@@ -63,6 +65,8 @@ export {
 export { TIER_RANK } from './types.js';
 /** Value, not a type: the two names a `shape` knob may carry, in the order a table lists them. */
 export { SHAPE_MODES } from './types.js';
+/** Value, not a type: the five states a pack's silence can be in, so a zero is never read as a cause. */
+export { SPEAK_SILENCES } from './types.js';
 export { tierFor } from './provenance.js';
 /** Value, not a type: the side an event's signal sits on, derived from the signal rather than the kind. */
 export { polarityFor } from './provenance.js';

@@ -25,6 +25,12 @@ export {
 export { buildPack, type BuildPackOptions } from './pack.js';
 
 export {
+  decideSpeak,
+  suppressionOf,
+  type SpeakInput,
+} from './speak.js';
+
+export {
   DEFAULT_FOLD_SUPPORT,
   foldByShape,
   type ShapeFoldOptions,

@@ -420,8 +420,15 @@ export type KnowledgePack = {
    * cannot corroborate its own rules, so the pack was silenced deliberately. A host
    * that cannot tell that from "nothing matched" will read a deliberate silence as a
    * retrieval failure and lower thresholds until the noise returns.
+   *
+   * `'no-leader'` means the ranking was contested: the top two candidates were closer
+   * together than the margin the host required, so the store held several answers and
+   * preferred none of them. It is a decision about the *shape* of the ranking rather
+   * than about any single item — see `decideSpeak` for why a relevance floor cannot
+   * express it, and why the margin is measured over the candidates rather than over the
+   * lines the budget happened to carry.
    */
-  readonly suppressed?: 'uncorroborated-store';
+  readonly suppressed?: 'uncorroborated-store' | 'no-leader';
   /**
    * What the pack's units carry, when the host can name a shape.
    *
@@ -431,6 +438,67 @@ export type KnowledgePack = {
    * changes.
    */
   readonly fold?: ShapeFold;
+  /**
+   * What the pack decided about speaking, when the host asked it to record that.
+   *
+   * The pack is the only place that saw the whole population — the candidates the store returned and
+   * every gate that removed one — so it is the only place the decision can be recorded without
+   * re-running the retrieval. A pack that came back empty without this field is indistinguishable
+   * from a pack whose store was empty, which is what `served 162 of 162` could not tell either.
+   *
+   * Absent unless the host declares `decision`, so every pack written before this field existed is
+   * byte-identical to the one it wrote.
+   */
+  readonly decision?: SpeakDecision;
+};
+
+/** The five ways a pack comes back empty. */
+export const SPEAK_SILENCES = [
+  /** The store returned no candidate at all. */
+  'nothing-matched',
+  /** Every candidate covered too little of the question to be shown. */
+  'nothing-covered',
+  /** Every candidate had been observed fewer times than the corroboration floor requires. */
+  'nothing-corroborated',
+  /** The host asked for no room (`limit` 0), so nothing could be carried. */
+  'nothing-selected',
+  /** The ranking had two top answers and no reason to prefer either. */
+  'no-leader',
+] as const;
+
+export type SpeakSilence = (typeof SPEAK_SILENCES)[number];
+
+/**
+ * What the pack decided, over the population it decided about.
+ *
+ * Every count is a partition of `candidates`, so a readback recomputes all five: the arithmetic is
+ * `candidates = carried + belowCoverage + belowEvidence + overLimit`. That is the property R121's
+ * merge census lacked — it reported `merged: 0` while being unable to say how many pairs it had ever
+ * tested.
+ */
+export type SpeakDecision = {
+  /** Candidates the store returned, before any gate. */
+  readonly candidates: number;
+  /** Candidates that survived the coverage floor. */
+  readonly afterCoverage: number;
+  /** Candidates that survived the corroboration floor. */
+  readonly afterEvidence: number;
+  /** `candidates - afterCoverage` — removed for covering too little of the question. */
+  readonly belowCoverage: number;
+  /** `afterCoverage - afterEvidence` — removed for being observed too few times. */
+  readonly belowEvidence: number;
+  /** `afterEvidence` minus what the host's room carried — removed by `limit`, not by relevance. */
+  readonly overLimit: number;
+  /** Highest relevance among the candidates that cleared every floor, or null. */
+  readonly topScore: number | null;
+  /** Second-highest, or null when the store held a single candidate: nothing contested it. */
+  readonly runnerUpScore: number | null;
+  /** `topScore - runnerUpScore`, or null when there is no rival. Never negative. */
+  readonly margin: number | null;
+  /** Whether the pack carried anything. */
+  readonly spoke: boolean;
+  /** Why it did not, when it did not. */
+  readonly silentBecause: SpeakSilence | null;
 };
 
 /**

@@ -94,10 +94,24 @@ import { build } from 'esbuild';
  *   successes. Measured 50,886 raw at this commit, so the raise is 114 bytes of headroom — the same
  *   shape as the guard correction above, and for the same reason: a field is not a mechanism, and
  *   anything larger would have to be argued as one.
+ *
+ * Raised once on 2026-11-15, 51,000 -> 52,500 raw and 17,400 -> 17,900 gzip, for one mechanism:
+ *
+ *   `apply/speak.ts` — the decision whether the pack speaks at all: `decideSpeak` reduces the
+ *   population the store returned to the five states a silence can be in (`nothing-matched`,
+ *   `nothing-covered`, `nothing-corroborated`, `nothing-selected`, `no-leader`), the margin between the
+ *   top two candidates that separates a store with an answer from a store with several, and
+ *   `suppressionOf`, which decides which of those a host is allowed to read as deliberate. It ships
+ *   because `served 162 of 162` was a default rather than a coverage — at floor 0 no request could be
+ *   refused — and because the retention curve on the same 650 pairs is a cliff (0.10 serves 154, 0.15
+ *   serves 75), so a relevance floor can withhold half the traffic or none of it and never the
+ *   contested half. The rest is `KnowledgePack.decision`, the second value of `suppressed`, the hook in
+ *   `buildPack` and one host-level pass-through. It is a mechanism rather than a correction by this
+ *   file's own rule, and it is argued as one.
  */
 const BUDGETS = [
   { name: 'browser', entry: 'packages/browser/dist/index.js', raw: 3200, gzip: 1600 },
-  { name: 'core', entry: 'packages/core/dist/index.js', raw: 51000, gzip: 17400 },
+  { name: 'core', entry: 'packages/core/dist/index.js', raw: 52500, gzip: 17900 },
 ];
 
 const probe = process.argv.includes('--probe');
