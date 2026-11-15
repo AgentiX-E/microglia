@@ -801,6 +801,13 @@ export {
 } from './trace-claims.js';
 
 export { speakLineOf, type RecallTraffic } from './tau2-speak.js';
+export {
+  itemTransfer,
+  itemTransferLine,
+  pairedEpisodes,
+  type EpisodeOutcome,
+  type ItemTransfer,
+} from './tau2-attribution.js';
 
 export {
   TRACE_CALL_CAP,

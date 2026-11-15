@@ -89,6 +89,14 @@ _margins: list = []
 # store made by a run that never asked it. The counter is what lets `rivaled` be `None` (no census) rather
 # than `0` (a census that found no rival), and the two are different sentences in the run's log.
 _census = 0
+# The index of the request that opened each episode, so a served pack can be joined to the trial it was
+# served into. R123a measured the need: `pack.ledger` carries the ids served per request and `per_trial`
+# carries each trial's reward, and the two cannot meet because nothing says where one episode's requests
+# stop -- `recall` fires once per episode, and 164 requests covered 160 episodes, so a positional join
+# drifts at the four episodes that recalled twice. The index is the request count at the moment a new
+# episode was recognised, which is the boundary a join needs and the only one this side of the socket
+# can observe: the agent is never told which task or trial it is in.
+_episode_starts: list = []
 
 # Sentinel rather than `None`, because "" is a real answer: a facade that was asked
 # and had nothing to say must not be asked again on the next turn.
@@ -286,6 +294,11 @@ class MicrogliaAgent(LLMAgent):
         turn = len(state.messages)
         held = self.__dict__.get("_pack", _UNSET)
         if held is _UNSET or turn <= self.__dict__.get("_turn", -1):
+            # R128. The boundary is recorded before the request, because the request is what it names:
+            # `_recalls` is already the count of requests that succeeded, so it is the index this one will
+            # take. A recall that returns without a request leaves the index unchanged and the next episode
+            # records it again -- a repeated index is harmless to a join, a missing one is not.
+            _episode_starts.append(_recalls)
             held = recall(text)
         self._pack = held
         self._turn = turn
@@ -323,6 +336,9 @@ def memory_stats() -> dict:
         # `None` rather than `0` when no decision arrived: R123a read the absence as a zero and the run
         # printed a store result it had not measured. `census` is the denominator that tells them apart.
         "census": _census,
+        # R128: where each episode's requests begin. `len(episodeStarts)` is the episode count, and the
+        # difference between two consecutive entries is the requests one episode spent.
+        "episodeStarts": list(_episode_starts),
         "rivaled": len(_margins) if _census else None,
         "margin_p10": quantile_of(_margins, 0.10),
         "margin_p50": quantile_of(_margins, 0.50),

@@ -324,6 +324,7 @@ def memory_stats_exposes_the_recall_count(checks):
         sorted(stats),
         [
             "census",
+            "episodeStarts",
             "margin_ladder",
             "margin_p10",
             "margin_p50",
@@ -486,6 +487,44 @@ def the_census_denominator_separates_an_absent_measurement_from_a_zero(checks):
     finally:
         subject._census = saved_census  # noqa: SLF001
         subject._margins[:] = saved_margins  # noqa: SLF001
+
+
+@case
+def an_episode_boundary_is_recorded_where_a_join_can_use_it(checks):
+    """R128, from the gap R123a's transfer ledger exposed.
+
+    `pack.ledger` says which ids each request served and `per_trial` says how each trial scored, and the two
+    could not be joined: nothing marked where one episode's requests end. `recall` fires once per episode, so
+    the counts are nearly equal -- **164 requests over 160 episodes** -- and "nearly" is what makes a
+    positional join wrong at exactly the four episodes that recalled twice. The boundary is recorded on the
+    episode, not on the request, because the request does not know which trial it belongs to and the episode
+    is the only thing this side can see.
+    """
+    agent, _, original = fresh()
+    saved = list(subject._episode_starts)  # noqa: SLF001
+    try:
+        subject._episode_starts.clear()  # noqa: SLF001
+        state = LLMAgentState()
+        episode_step(agent, state, "first turn")
+        checks.equal(len(subject._episode_starts), 1, "one episode, one boundary")  # noqa: SLF001
+        episode_step(agent, state, "second turn")
+        checks.equal(
+            len(subject._episode_starts),
+            1,
+            "a second turn of the same episode is not a new boundary, which is the whole difference "
+            "between a request count and an episode count",
+        )
+        # A fresh state is what a new episode looks like to an agent that is never told it is new.
+        episode_step(agent, LLMAgentState(), "next episode")
+        checks.equal(len(subject._episode_starts), 2, "a new state opens a new episode")  # noqa: SLF001
+        checks.equal(
+            sorted(subject.memory_stats()["episodeStarts"]),
+            subject.memory_stats()["episodeStarts"],
+            "the boundaries are a list the artefact can carry, not an opaque counter",
+        )
+    finally:
+        subject._episode_starts[:] = saved  # noqa: SLF001
+        subject.recall = original
 
 
 def dump_stats() -> int:

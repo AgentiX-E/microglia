@@ -125,6 +125,7 @@ describe('the reader and the writer agree on the field names', () => {
     expect(Object.keys(stats).sort()).toEqual(
       [
         'census',
+        'episodeStarts',
         'margin_ladder',
         'margin_p10',
         'margin_p50',

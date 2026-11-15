@@ -33,6 +33,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { inGateOrder, mergeGates, type ValidityGate } from '@agentix-e/microglia-protocol';
 import { degradationLineOf, degradationOfPair } from '../tau2-degradation.js';
+import { itemTransfer, itemTransferLine, pairedEpisodes } from '../tau2-attribution.js';
 import {
   ceilingOf,
   compareArms,
@@ -95,7 +96,19 @@ type Artefact = {
      */
     readonly plant?: { readonly arm: string };
     /** The pack the arm served; `summary.meanChars` is what the premium is priced against. */
-    readonly pack?: { readonly summary: { readonly meanChars: number } | null };
+    readonly pack?: {
+      readonly summary: { readonly meanChars: number } | null;
+      /** R128: the ids served at each request, in request order — the left side of the attribution join. */
+      readonly ledger?: readonly (readonly string[])[];
+    };
+    /**
+     * R128: the request index that opened each episode.
+     *
+     * Absent on every artefact written before the instrument existed, and the attribution reads absence as
+     * "cannot join" rather than as "one request per episode", because the second is the assumption that
+     * makes the join wrong exactly at the episodes that recalled twice (164 requests, 160 episodes).
+     */
+    readonly memory?: { readonly episodeStarts?: readonly number[] };
   };
   readonly per_task?: readonly TaskRow[];
   /** One row per evaluated episode; absent on artefacts written before R29 stage 2. */
@@ -315,6 +328,36 @@ const degradation =
     : degradationOfPair(first.per_trial, second.per_trial, second.tau2?.scenario?.learn ?? DOMAIN);
 process.stdout.write(`${degradationLineOf(degradation)}\n`);
 
+/**
+ * R128: which claim was present when the memory lost.
+ *
+ * The transfer ledger says how many trials the treatment broke; this says which of the four lines served
+ * into them was there. It is a **screening** reading and not a cause: a trial is a ten-turn trajectory and
+ * the store served four lines into it, so a negative net means "present whenever the memory failed". The
+ * verdict is the ablation that withholds exactly that claim, which is why the line prints ids and a count
+ * rather than a verdict.
+ *
+ * Undefined rather than empty when the join cannot be made: an artefact from before the instrument carries
+ * no `episodeStarts`, and a zero there would read as "no claim was ever served into a measured trial" —
+ * which is the class of defect this round spent its whole dispatch learning to refuse.
+ */
+function attributionOf(reference: Artefact, memory: Artefact) {
+  const ledger = memory.tau2?.pack?.ledger;
+  const starts = memory.tau2?.memory?.episodeStarts;
+  const rows = memory.per_trial;
+  if (ledger === undefined || starts === undefined || rows === undefined) return undefined;
+  const episodes = pairedEpisodes({
+    referenceTrials: reference.per_trial ?? [],
+    memoryTrials: rows,
+    episodeStarts: starts,
+  });
+  if (episodes === undefined) return undefined;
+  return itemTransfer({ episodes, ledger });
+}
+
+const attribution = attributionOf(first, second);
+if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribution)}\n`);
+
 const retain = (artefact: Artefact) =>
   artefact.per_trial === undefined ? undefined : holdRateOfTrials(artefact.per_trial);
 const firstHeld = retain(first);
@@ -347,6 +390,17 @@ await writeJson('poc-l4-pair', {
           measured: degradation.measured,
           breakRate: degradation.breakRate,
           netPp: degradation.netPp,
+        },
+      }),
+  // R128: the per-item transfer table, when the join could be made at all. Absent rather than empty on an
+  // artefact whose memory arm carries no episode boundaries, because an empty table reads as "no claim was
+  // served into a measured trial" and the truth would be "this run could not say".
+  ...(attribution === undefined
+    ? {}
+    : {
+        attribution: {
+          items: attribution.items,
+          unmatchedRequests: attribution.unmatchedRequests,
         },
       }),
   // R57: the distractor this pair is about, when the memory arm planted one. Without it a reader sees
