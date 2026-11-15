@@ -3118,3 +3118,60 @@ misreading §20.4's third row exists to prevent.
 
 Each prints its own sentence, because a `0 net` would collapse all three into "the store changed nothing" —
 which is the one claim none of them supports.
+
+## 22. One arm, several dispatches
+
+Every number in this lane is a draw. R131 read `pass^4` **0.625** on the arm that read **0.775** in R123a and
+**0.750** in R124 — same store shape, same split, same headers, same gate — and for two rounds the record quoted
+the largest of the three as that arm's score. Three numbers of one arm are an *estimate with an interval*, and
+this reader prints the interval.
+
+```bash
+L4_DISPATCHES="R123a=eval/results/history/a.json,R124=eval/results/history/b.json,R131=/tmp/c.json" \
+  pnpm eval:dispatch-pool
+```
+
+```
+[dispatch-pool]   R123a: pass^4 77.50% over 40 task(s)
+[dispatch-pool]   R124: pass^4 75.00% over 40 task(s)
+[dispatch-pool]   R131: pass^4 62.50% over 40 task(s)
+[dispatch-pool] dispatch pool: 3 dispatch(es) at k=4 over 40 task(s): pass^4 72.30% [53.13, 91.47]
+(±19.17pp at t(2)=4.303, random-effects) — 16.45% of the spread is between-dispatch, so this is a summary of
+disagreeing runs; an interval this wide does not order two arms
+```
+
+The input documents are the per-arm `poc-l4.json` files the lane already writes.
+
+### 22.1 The two variances, and why both are printed
+
+A pool splits the spread between **dispatches** and **within** them:
+
+| quantity | meaning |
+|---|---|
+| `tau2` | between-dispatch variance (DerSimonian–Laird, truncated at zero) |
+| `iSquared` | the share of the total spread that is between dispatches |
+| `label` | `random-effects` when `tau2 > 0`, else `fixed-effect` |
+
+And the interval's quantile follows the variance the estimate is actually made of: `t(dispatches−1)` when the
+dispatches disagree (4.303 at three, against 1.96 — a factor of 2.2), and the normal quantile when they do not,
+because the uncertainty is then the episodes' own.
+
+### 22.2 What the three pools say
+
+| quantity | dispatches | pooled | 95% | I² | reading |
+|---|---|---|---|---|---|
+| `pass^4` | 0.775 / 0.750 / 0.625 | **72.30%** | [53.13, 91.47] | **16%** | the movement is mostly sampling: the arm's estimate is 0.72 with a ±19pp interval |
+| harm share | 29.6% / 31.2% / 55.2% | **38.35%** | [3.85, 72.86] | **60%** | the movement is **not** sampling: these dispatches genuinely disagree |
+| episode rate (one dispatch, two arms) | 83.75% / 85.62% | 84.73% | [80.77, 88.69] | **0%** | reproducible to ±4.0pp — the only quantity here that is |
+
+That table is the reason the record's competitive board was rebuilt (§COMPETITIVE AU). `pass^4` at forty tasks
+cannot rank; the harm share is not one number; the episode rate is, and it is what a claim should be made on.
+
+### 22.3 The refusals
+
+| input | what happens |
+|---|---|
+| one dispatch | `undefined` and a sentence — one draw is not a pool |
+| two `k` values | `RangeError` naming both: a `pass^2` is not a `pass^4` |
+| a rate outside [0, 1], or a task count under 1 | `RangeError` — nothing is dropped, because a pool over the readable subset of a record's runs is a selection |
+| an artefact with no `metrics.k` | the reader exits 2 and names the field: `pass4` predates `k`, and R132 published `pass4: 0.825` at `k: 2` |

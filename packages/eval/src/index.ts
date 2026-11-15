@@ -817,6 +817,13 @@ export {
   type TurnMeasure,
 } from './tau2-turn.js';
 export {
+  dispatchRowOf,
+  poolDispatches,
+  dispatchPoolLine,
+  type DispatchPool,
+  type DispatchRow,
+} from './dispatch-pool.js';
+export {
   rehearsalLine,
   rehearsalOf,
   rehearsalRecordOf,

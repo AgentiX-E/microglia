@@ -1,0 +1,50 @@
+{
+  "id": "poc-dispatch-pool",
+  "title": "One arm across several dispatches: the estimate and the interval nobody printed",
+  "notes": [
+    "The pool is random-effects (DerSimonian-Laird) when the dispatches disagree by more than their own sampling",
+    "error, and fixed-effect otherwise; the interval uses t(dispatches-1) in the first case and the normal",
+    "quantile in the second, because the uncertainty then comes from the episodes rather than from the spread",
+    "between dispatches.",
+    "A pass^k whose k differs between dispatches is refused: averaging a pass^2 with a pass^4 under one name is",
+    "the defect this record has already paid for in a field name."
+  ],
+  "rows": [
+    {
+      "dispatch": "first",
+      "k": 4,
+      "tasks": 68,
+      "passAtK": 0.5294117647058824
+    },
+    {
+      "dispatch": "c2",
+      "k": 4,
+      "tasks": 68,
+      "passAtK": 0.5882352941176471
+    },
+    {
+      "dispatch": "s67",
+      "k": 4,
+      "tasks": 68,
+      "passAtK": 0.5294117647058824
+    }
+  ],
+  "reading": {
+    "dispatches": 3,
+    "pooled": 0.5493786898835648,
+    "low": 0.4811946826015641,
+    "high": 0.6175626971655654,
+    "halfWidthPp": 6.818400728200063,
+    "tau2": 0,
+    "iSquared": 0,
+    "df": 201,
+    "quantile": 1.96,
+    "label": "fixed-effect",
+    "k": 4,
+    "tasks": [
+      68,
+      68,
+      68
+    ]
+  }
+}

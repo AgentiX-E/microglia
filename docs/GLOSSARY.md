@@ -1511,3 +1511,13 @@ store did anything. Against the control, `repaired` and `broke` are discordant p
 differ only in the store, so their difference (`net`) is the store's own-case effect with the draw held fixed.
 The control carries no `requests` and no `served`: it has no facade, and `0 of 0 served` would read as a store
 that found nothing.
+
+**Dispatch pool** — One arm's readings from several dispatches, pooled into an estimate with an interval. Every
+number in this lane is a draw: R131 read `pass^4` 0.625 on the arm that read 0.775 in R123a and 0.750 in R124, and
+quoting the largest of the three as a score is what made the competitive board wrong. The pool splits the spread
+into **between-dispatch** variance (`tau2`, DerSimonian–Laird, truncated at zero) and **within** variance, and
+`iSquared` is the share that is between: above ~50% the pooled value is a summary of disagreeing runs rather than
+an estimate of one quantity. The quantile follows the variance the estimate is made of — `t(dispatches−1)` when
+the dispatches disagree, the normal quantile when they do not. Two differences from the domain pool: a dispatch
+pool *requires* the same tasks to appear again, and two dispatches at different `k` are refused rather than
+averaged.
