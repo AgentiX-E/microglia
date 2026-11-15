@@ -102,6 +102,10 @@ function main(): void {
       `consolidate=${declaredConsolidate === undefined ? '' : String(declaredConsolidate)}\n` +
       `consolidateKey=${reading.prereg.consolidateKey ?? ''}\n` +
       `rehearsal=${declaredRehearsal === undefined ? '' : String(declaredRehearsal)}\n` +
+      // R133: the control replay. Printed the way the header wrote it, the same wire `rehearsal` rides.
+      `rehearsalControl=${
+        reading.prereg.rehearsalControl === undefined ? '' : String(reading.prereg.rehearsalControl)
+      }\n` +
       // R123: the gate on whether a pack is served. Header-only, like the two above, and absent leaves
       // the variable unset so the lane serves every non-empty pack exactly as every committed artefact did.
       `speakMargin=${reading.prereg.speakMargin === undefined ? '' : String(reading.prereg.speakMargin)}\n` +

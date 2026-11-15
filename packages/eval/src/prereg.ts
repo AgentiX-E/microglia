@@ -236,6 +236,13 @@ export type Prereg = {
    */
   readonly rehearsal?: boolean;
   /**
+   * R133: whether the replay is compared with a fresh no-memory draw of the same tasks.
+   *
+   * A second paid phase, so it is a header and not a repository variable, and it is refused without
+   * `rehearsal`: a comparison needs both sides.
+   */
+  readonly rehearsalControl?: boolean;
+  /**
    * Which key the recurrence pass compares items by: their scope (the default) or the routine behind them.
    *
    * R124. R121 measured the default's cost — `scope.intent` is a phrase the distiller writes per episode, so
@@ -476,6 +483,7 @@ const HEADER_KEYS = [
   'distillScope',
   'learnOnly',
   'rehearsal',
+  'rehearsalControl',
   'consolidate',
   'consolidateKey',
   'speakMargin',
@@ -1039,9 +1047,11 @@ export function readPrereg(markdown: string, file: string): PreregReading {
   }
 
   // R132: the replay of the learn half's own cases. A second paid phase, so the header states it and the
-  // dispatch inherits it -- and a `learnOnly` arm refuses it, because that arm stops before the evaluation
-  // whose favours the replay is paired against: a rehearsal with no learn-half rewards to pair with would
-  // cost an hour and produce `nothing paired`.
+  // dispatch inherits it -- and a `learnOnly` arm refuses it. The first version of this refusal said the arm
+  // "would have nothing to pair against", which is false: the replay pairs against the **learn** half's
+  // rewards, and a learn-only arm runs that half. What is actually wrong with the combination is what the arm
+  // would publish -- a store graded on the cases it was written from, as its only result -- and a refusal that
+  // names the wrong reason is worse than none, because it prices a fix (change the pairing) that is not needed.
   const rehearsalText = values.get('rehearsal');
   let rehearsal: boolean | undefined;
   if (rehearsalText !== undefined) {
@@ -1057,7 +1067,31 @@ export function readPrereg(markdown: string, file: string): PreregReading {
   if (rehearsal === true && learnOnly === true) {
     collected.push({
       where: `header 'rehearsal'`,
-      problem: 'a learnOnly arm stops before the evaluation, so a replay would have nothing to pair against',
+      problem:
+        'a learnOnly arm publishes no held-out reading, so a replay would be its only result -- a store ' +
+        'graded on the cases it was written from',
+    });
+  }
+
+  // R133: the control is the denominator the replay's four cells do not have. It is refused without the
+  // rehearsal, because a second no-memory baseline that nothing is compared against is a phase whose only
+  // product is a bill.
+  const rehearsalControlText = values.get('rehearsalControl');
+  let rehearsalControl: boolean | undefined;
+  if (rehearsalControlText !== undefined) {
+    if (!HEADER_BOOLEANS.has(rehearsalControlText)) {
+      collected.push({
+        where: `header 'rehearsalControl'`,
+        problem: `'${rehearsalControlText}' is not one of ${[...HEADER_BOOLEANS].join(', ')}`,
+      });
+    } else {
+      rehearsalControl = rehearsalControlText === 'true';
+    }
+  }
+  if (rehearsalControl === true && rehearsal !== true) {
+    collected.push({
+      where: `header 'rehearsalControl'`,
+      problem: 'a control is a comparison, and this registration buys no rehearsal for it to be compared with',
     });
   }
 
@@ -1127,14 +1161,18 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     const testTasks = Number(values.get('testTasks') ?? 40);
     const trainTasks = Number(values.get('trainTasks') ?? 40);
     const armTrials = trials ?? 4;
+    // The third pass is the control replay, which runs the learn half a third time with the store off.
+    const passes = rehearsalControl === true ? 3 : 2;
+    const learnTasks = Number.isFinite(trainTasks) && trainTasks > 0 ? trainTasks : 40;
     const episodes = armTrials * (Number.isFinite(testTasks) && testTasks > 0 ? testTasks : 40) +
-      2 * (Number.isFinite(trainTasks) && trainTasks > 0 ? trainTasks : 40);
+      passes * learnTasks;
     if (episodes > DISPATCH_EPISODE_CEILING) {
       collected.push({
         where: `header 'rehearsal'`,
         problem:
           `a replay adds the learn half a second time, so this arm carries ${String(episodes)} episode(s) ` +
-          `(${String(armTrials)} x ${String(testTasks)} evaluated + 2 x ${String(trainTasks)} learned), above ` +
+          `(${String(armTrials)} x ${String(testTasks)} evaluated + ${String(passes)} x ${String(trainTasks)} ` +
+          'learned), above ' +
           `the ${String(DISPATCH_EPISODE_CEILING)} one 240-minute job carries at the measured 0.75 minutes an ` +
           'episode; lower the trial count or split the arm',
       });
@@ -1486,6 +1524,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(distillScope === undefined ? {} : { distillScope }),
       ...(learnOnly === undefined ? {} : { learnOnly }),
       ...(rehearsal === undefined ? {} : { rehearsal }),
+      ...(rehearsalControl === undefined ? {} : { rehearsalControl }),
       ...(consolidate === undefined ? {} : { consolidate }),
       ...(consolidateKey === undefined ? {} : { consolidateKey }),
       ...(speakMargin === undefined ? {} : { speakMargin }),

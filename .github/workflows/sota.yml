@@ -1341,6 +1341,9 @@ jobs:
           # above are: it is a second paid phase, and a repository variable that bought it would buy it on
           # every queued dispatch -- including the reference arm, whose store does not exist.
           REHEARSAL=$(sed -n 's/^rehearsal=//p' "$RUNNER_TEMP/distill.env")
+          # R133: the third pass, which replays the same tasks with the store off. Header-only for the reason
+          # above: it is a paid phase, and the arm that buys it is the one whose registration asks.
+          REHEARSAL_CONTROL=$(sed -n 's/^rehearsalControl=//p' "$RUNNER_TEMP/distill.env")
           # R123: the gate on whether a pack is served. Header-only, for the reason the two above are: a
           # repository variable would apply to every queued dispatch, and the lane has served a pack on
           # every request for twelve rounds precisely because nothing ever set one.
@@ -1389,6 +1392,7 @@ jobs:
           echo "consolidate=$CONSOLIDATE" >> "$GITHUB_OUTPUT"
           echo "consolidate_key=$CONSOLIDATE_KEY" >> "$GITHUB_OUTPUT"
           echo "rehearsal=$REHEARSAL" >> "$GITHUB_OUTPUT"
+          echo "rehearsal_control=$REHEARSAL_CONTROL" >> "$GITHUB_OUTPUT"
           echo "speak_margin=$SPEAK_MARGIN" >> "$GITHUB_OUTPUT"
           echo "speak_census=$SPEAK_CENSUS" >> "$GITHUB_OUTPUT"
           # R125: the arm's resolution, from the registration's header. A repository variable would apply
@@ -1532,6 +1536,8 @@ jobs:
           # misapplied item can be separated from a wrong one. The registration's header decides, and an
           # absent header renders empty, which is what every arm before this one ran.
           TAU_REHEARSAL: ${{ steps.recall_floor.outputs.rehearsal }}
+          # R133: the control replay. Absent header renders empty, which is what every arm before R133 ran.
+          TAU_REHEARSAL_CONTROL: ${{ steps.recall_floor.outputs.rehearsal_control }}
           # R60: how many claims one trace may teach. Unset means three, which is what every
           # committed trace artefact ran at; a run at six is a different treatment and the ceiling
           # travels into the artefact so a readback can tell the two apart.

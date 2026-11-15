@@ -1502,3 +1502,12 @@ served 74 and changed nothing produce the same four cells, and only `served` sep
 a distillation one. Inside the block, `reading` is the field that may be absent — the phase ran and nothing
 paired — which is a different sentence from the block itself being absent, meaning the registration never
 bought the phase.
+
+**Control replay** — The same tasks, the same one trial, the same reduction, and **no store**: the agent the
+learn half ran, with no facade. It is the denominator a rehearsal does not otherwise have, because a rehearsal's
+four cells are counted against the draw that *selected* the cases — the learn half failed a task and the store was
+written from that failure — and a task that fails two thirds of the time lands in `inert` whether or not the
+store did anything. Against the control, `repaired` and `broke` are discordant pairs between two phases that
+differ only in the store, so their difference (`net`) is the store's own-case effect with the draw held fixed.
+The control carries no `requests` and no `served`: it has no facade, and `0 of 0 served` would read as a store
+that found nothing.

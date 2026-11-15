@@ -128,7 +128,46 @@ export function rehearsalLine(record: RehearsalRecord): string {
     `${String(rehearsal.repaired)} repaired / ${String(rehearsal.inert)} inert of the ${String(failed)} that ` +
     `failed without memory (${share(rehearsal.repairRate)}); ` +
     `${String(rehearsal.broke)} broken and ${String(rehearsal.kept)} kept of the rest` +
-    (rehearsal.harmShare === null ? '' : `; harm share ${share(rehearsal.harmShare)}`)
+    (rehearsal.harmShare === null ? '' : `; harm share ${share(rehearsal.harmShare)}`) +
+    controlClause(record.control)
+  );
+}
+
+/**
+ * The clause the control replay adds, and the four absences it can have.
+ *
+ * The main clause divides by the population the store was *selected* on: its `inert` cell is "failed without
+ * memory, then failed again", which is also what a task that simply fails two thirds of the time produces. The
+ * control replaces the without-side with a fresh draw of the same population, so `repaired` and `broke` become
+ * discordant pairs and their difference is the store's effect on its own cases with the draw held fixed.
+ *
+ * Absence is printed rather than omitted, for the reason every reading in this lane prints it: a clause that is
+ * simply missing reads as "no effect", and "the store was never compared" is not that.
+ */
+function controlClause(control: RehearsalControl | undefined): string {
+  if (control === undefined) {
+    return '; against a no-memory replay: not measured (the registration bought no control phase)';
+  }
+  if (control.refused !== undefined) {
+    return (
+      '; against a no-memory replay: not measured (the control phase refused at the rate window, so the store ' +
+      'was never compared with a fresh draw of its own population)'
+    );
+  }
+  const reading = control.reading;
+  if (reading === undefined) {
+    return (
+      '; against a no-memory replay: not measured (no task carried a reward on both sides, so the control ran ' +
+      'and paired nothing)'
+    );
+  }
+  const net = reading.repaired - reading.broke;
+  const signed = `${net > 0 ? '+' : ''}${String(net)}`;
+  const share = reading.harmShare === null ? 'none' : `${(reading.harmShare * 100).toFixed(2)}%`;
+  return (
+    `; against a no-memory replay: ${String(reading.repaired)} repaired / ${String(reading.broke)} broken = ` +
+    `${signed} net of ${String(reading.paired)} task(s) (${((net / reading.paired) * 100).toFixed(2)}%)` +
+    (reading.repaired + reading.broke === 0 ? '' : `, harm share ${share}`)
   );
 }
 
@@ -156,6 +195,15 @@ export type RehearsalRecord = {
   readonly served: number;
   readonly reading: Rehearsal | undefined;
   /**
+   * R133's second replay: the same tasks with the store **off**.
+   *
+   * Absent when the registration did not buy it. Present-and-empty when it was bought and paired nothing. The
+   * distinction is the whole point of the block: `reading.inert` counts tasks that failed without memory and
+   * failed again with it, and a task that fails 65% of the time produces that cell whether or not the store
+   * did anything. Only a second draw of the same population can say which.
+   */
+  readonly control?: RehearsalControl;
+  /**
    * Why the phase never ran, when it was bought and then refused.
    *
    * One value, because there is one refusal that can arrive here: `run_split.py` declines to open a phase in a
@@ -166,6 +214,29 @@ export type RehearsalRecord = {
    */
   readonly refused?: 'peak-window';
   readonly usage?: Tau2PhaseUsage;
+};
+
+/**
+ * The control replay's reading.
+ *
+ * It carries no `requests` and no `served`, and the omission is a statement: the control runs with the store
+ * off, so there is no facade to count. `0 of 0 served` would read as a store that found nothing — the exact
+ * misreading AUDIT 34.162 forbids — so the fields are absent rather than zero.
+ */
+export type RehearsalControl = {
+  /** The four cells with the control as the *without* side. `undefined` when nothing paired. */
+  readonly reading: Rehearsal | undefined;
+  readonly refused?: 'peak-window';
+  readonly usage?: Tau2PhaseUsage;
+};
+
+/** What one replay phase hands back before it is paired: counts, rewards, bill, and a possible refusal. */
+export type RehearsalHalf = {
+  readonly requests: number;
+  readonly served: number;
+  readonly rewards: readonly { readonly task: string; readonly reward: number | null }[];
+  readonly usage?: Tau2PhaseUsage;
+  readonly refused?: 'peak-window';
 };
 
 /** The record of a phase that was bought and refused before its first call. */
@@ -197,6 +268,16 @@ export function rehearsalRecordOf(input: {
   readonly learnRewards: ReadonlyMap<string, number> | Readonly<Record<string, number>>;
   readonly rehearsalRewards: readonly { readonly task: string; readonly reward: number | null }[];
   readonly usage?: Tau2PhaseUsage;
+  /**
+   * The second replay's rewards, when one was bought. Pairing happens here rather than at the call site for the
+   * reason the main pairing does: a caller that handed in four numbers could hand in four different ones than
+   * the ones its own line printed.
+   */
+  readonly control?: {
+    readonly rewards: readonly { readonly task: string; readonly reward: number | null }[];
+    readonly usage?: Tau2PhaseUsage;
+    readonly refused?: 'peak-window';
+  };
 }): RehearsalRecord {
   return {
     tasks: input.tasks,
@@ -206,6 +287,22 @@ export function rehearsalRecordOf(input: {
       learnRewards: input.learnRewards,
       rehearsalRewards: input.rehearsalRewards,
     }),
+    ...(input.control === undefined
+      ? {}
+      : {
+          control: {
+            reading: rehearsalOf({
+              learnRewards: new Map(
+                input.control.rewards
+                  .filter((row): row is { readonly task: string; readonly reward: number } => row.reward !== null)
+                  .map((row) => [row.task, row.reward]),
+              ),
+              rehearsalRewards: input.rehearsalRewards,
+            }),
+            ...(input.control.refused === undefined ? {} : { refused: input.control.refused }),
+            ...(input.control.usage === undefined ? {} : { usage: input.control.usage }),
+          },
+        }),
     ...(input.usage === undefined ? {} : { usage: input.usage }),
   };
 }
@@ -236,5 +333,36 @@ export function resolveRehearsal(raw = process.env['TAU_REHEARSAL']): boolean {
   if (value === '1' || value === 'true') return true;
   throw new RangeError(
     `TAU_REHEARSAL must be unset, '0'/'false' or '1'/'true'; received '${String(raw)}'`,
+  );
+}
+
+/**
+ * Whether this dispatch buys the control replay as well.
+ *
+ * Same four spellings and the same refusal as the phase's switch, plus one that only the pair can have: a
+ * control with no replay is refused at load. It would run a second no-memory baseline over the learn half's
+ * tasks, cost a phase, and compare it against nothing — the shape of a switch whose second end was never built,
+ * which is the defect R132's first dispatch paid thirty seconds to teach.
+ */
+export function resolveRehearsalControl(
+  raw = process.env['TAU_REHEARSAL_CONTROL'],
+  phaseRaw = process.env['TAU_REHEARSAL'],
+): boolean {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (value === '' || value === '0' || value === 'false') return false;
+  if (value === '1' || value === 'true') {
+    // Read from the same wire the phase reads, so the two switches cannot disagree about what this dispatch
+    // bought. Garbage in the phase's variable throws from `resolveRehearsal` with its own message, which is the
+    // refusal that should be attributed to the variable that holds it.
+    if (!resolveRehearsal(phaseRaw)) {
+      throw new RangeError(
+        'TAU_REHEARSAL_CONTROL buys a comparison against the rehearsal, and this dispatch did not buy the ' +
+          'rehearsal; a control with nothing to compare against is a phase that cannot be read',
+      );
+    }
+    return true;
+  }
+  throw new RangeError(
+    `TAU_REHEARSAL_CONTROL must be unset, '0'/'false' or '1'/'true'; received '${String(raw)}'`,
   );
 }

@@ -5,6 +5,7 @@ import {
   rehearsalRecordOf,
   rehearsalRefused,
   resolveRehearsal,
+  resolveRehearsalControl,
 } from '../tau2-rehearsal.js';
 
 const rows = (...pairs: readonly (readonly [string, number | null])[]) =>
@@ -171,5 +172,121 @@ describe('the store on the cases it was built from', () => {
     expect(resolveRehearsal('TRUE')).toBe(true);
     expect(() => resolveRehearsal('yes')).toThrow(/TAU_REHEARSAL/);
     expect(() => resolveRehearsal('on')).toThrow(/must be unset, '0'\/'false' or '1'\/'true'/);
+  });
+});
+
+describe('the control the replay was missing', () => {
+  /**
+   * A little 4-task split where the two questions give different answers.
+   *
+   * The learn draw failed `t1..t3` and passed `t4`. A second no-memory draw (the control) fails only `t1` — so two
+   * of the three "failures the store was written from" were the draw's luck, not the task's difficulty. The
+   * treatment passes `t1` and `t4` and fails `t2` and `t3`.
+   */
+  const fixture = () =>
+    rehearsalRecordOf({
+      tasks: 4,
+      requests: 4,
+      served: 4,
+      learnRewards: { 'retail/t1': 0, 'retail/t2': 0, 'retail/t3': 0, 'retail/t4': 1 },
+      rehearsalRewards: rows(['retail/t1', 1], ['retail/t2', 0], ['retail/t3', 0], ['retail/t4', 1]),
+      control: {
+        rewards: rows(['retail/t1', 0], ['retail/t2', 1], ['retail/t3', 1], ['retail/t4', 1]),
+      },
+    });
+
+  it('pairs the control against the treatment, not against the draw that selected the cases', () => {
+    // Against the learn draw the store looks neutral: one repair, two inert. Against a fresh no-memory draw the
+    // same three trials are one repair and **two breaks** — the store took two cases a second draw passes and
+    // failed them. Two readings, one treatment, and only the second one has a denominator that is not the
+    // selector.
+    const record = fixture();
+    expect(record.reading).toMatchObject({ paired: 4, repaired: 1, inert: 2, broke: 0, kept: 1 });
+    expect(record.control?.reading).toMatchObject({ paired: 4, repaired: 1, broke: 2, inert: 0, kept: 1 });
+  });
+
+  it('states the net the control supports, because the four cells alone cannot', () => {
+    // `repaired` and `broke` against a control are discordant pairs, so their difference is the store's own-case
+    // effect with the draw held fixed. It is signed: a zero here says the store changed nothing net, which is a
+    // different claim from "it changed nothing".
+    const line = rehearsalLine(fixture());
+    expect(line).toContain('against a no-memory replay: 1 repaired / 2 broken = -1 net of 4 task(s)');
+  });
+
+  it('says the control was not bought rather than leaving the clause out', () => {
+    // The main clause is a reading about the store's own cases; without a control it cannot say whether the
+    // inert cell is the store or the task. Printing nothing would let a raw reading be quoted as an effect.
+    const reading = rehearsalOf({
+      learnRewards: { 'retail/t1': 0 },
+      rehearsalRewards: rows(['retail/t1', 0]),
+    });
+    const line = rehearsalLine(record(reading));
+    expect(line).toContain('against a no-memory replay: not measured');
+    expect(line).toContain('the registration bought no control phase');
+  });
+
+  it('distinguishes a control that refused at the window from one that never ran anything', () => {
+    // Three absences for the control, as for the phase: not bought, bought and refused, bought and paired nothing.
+    // A `0 net` would collapse the last two into the first, and only one of them is about the store.
+    const withRefusal = rehearsalRecordOf({
+      tasks: 4,
+      requests: 4,
+      served: 4,
+      learnRewards: { 'retail/t1': 0 },
+      rehearsalRewards: rows(['retail/t1', 1]),
+      control: { rewards: [], refused: 'peak-window' },
+    });
+    const refused = rehearsalLine(withRefusal);
+    expect(refused).toContain('not measured');
+    expect(refused).toContain('refused at the rate window');
+
+    const unpaired = rehearsalLine(
+      rehearsalRecordOf({
+        tasks: 4,
+        requests: 4,
+        served: 4,
+        learnRewards: { 'retail/t1': 0 },
+        rehearsalRewards: rows(['retail/t1', 1]),
+        control: { rewards: rows(['retail/t9', 1]) },
+      }),
+    );
+    expect(unpaired).toContain('not measured');
+    expect(unpaired).toContain('no task carried a reward on both sides');
+  });
+
+  it('carries the control phase\'s own bill, because it is a third paid phase', () => {
+    const usage = {
+      calls: 74,
+      prompt_tokens: 1,
+      completion_tokens: 1,
+      cached_tokens: 0,
+      uncached_tokens: 1,
+      cache_hit_rate: 0,
+      cost: { usd: 0.21, band: 'off_peak', rates: { miss: 0.15, hit: 0.003, out: 0.6 }, usd_in_other_band: 0.42 },
+    } as const;
+    const record = rehearsalRecordOf({
+      tasks: 1,
+      requests: 1,
+      served: 1,
+      learnRewards: { 'retail/t1': 0 },
+      rehearsalRewards: rows(['retail/t1', 1]),
+      control: { rewards: rows(['retail/t1', 1]), usage },
+    });
+    expect(record.control?.usage?.cost.usd).toBe(0.21);
+  });
+
+  it('reads the control\'s switch the way it reads the phase\'s, and refuses a control with no phase', () => {
+    // Both switches are read from their own wire, and the control reads the phase's wire too: two variables that
+    // can disagree about what this dispatch bought are two premises for one run.
+    expect(resolveRehearsalControl(String(true), String(true))).toBe(true);
+    expect(resolveRehearsalControl(String(false), String(true))).toBe(false);
+    expect(resolveRehearsalControl('', '1')).toBe(false);
+    expect(resolveRehearsalControl('1', '1')).toBe(true);
+    expect(() => resolveRehearsalControl('yes', '1')).toThrow(/TAU_REHEARSAL_CONTROL/);
+    // A control is a comparison, so it has nothing to compare against without the replay. Refused at load
+    // rather than run as a second no-memory baseline nobody asked for.
+    expect(() => resolveRehearsalControl('true', '')).toThrow(/did not buy the rehearsal/);
+    expect(() => resolveRehearsalControl('true', String(false))).toThrow(/rehearsal/);
+    expect(resolveRehearsalControl('true', 'true')).toBe(true);
   });
 });

@@ -1523,12 +1523,37 @@ describe('the distilling scope', () => {
     expect(readPrereg(withHeader('rehearsal: 1'), 'R87-distill-scope.md').problems).toEqual([
       { where: "header 'rehearsal'", problem: "'1' is not one of true, false" },
     ]);
-    // A learn-only arm stops before the evaluation whose rewards the replay is paired against, so buying one
-    // would spend an hour to report `nothing paired` — a plan defect wearing a store result's clothes.
+    // A learn-only arm would publish the store's own cases as its only result — which is a fact about the
+    // cases, not about the lane. The refusal is this one because the first one written here was false: the
+    // replay pairs against the learn half's rewards, and a learn-only arm runs that half.
     expect(readPrereg(withHeader('rehearsal: true\nlearnOnly: true'), 'R87-distill-scope.md').problems).toEqual([
       {
         where: "header 'rehearsal'",
-        problem: 'a learnOnly arm stops before the evaluation, so a replay would have nothing to pair against',
+        problem:
+          'a learnOnly arm publishes no held-out reading, so a replay would be its only result -- a store ' +
+          'graded on the cases it was written from',
+      },
+    ]);
+  });
+
+  it('reads the control the replay is compared with, and refuses one with nothing to compare against', () => {
+    // R133: the replay's four cells divide by the population the store was selected on, so `inert` cannot say
+    // whether the store did nothing or the task fails on its own. The control is a second paid phase, hence a
+    // header; a control without a replay is refused at read time, before the first model call.
+    const control = readPrereg(withHeader('rehearsal: true\nrehearsalControl: true'), 'R87-distill-scope.md');
+    expect(control.prereg?.rehearsalControl).toBe(true);
+    expect(control.problems).toEqual([]);
+    expect(readPrereg(withHeader('rehearsal: true\nrehearsalControl: false'), 'R87-distill-scope.md')
+      .prereg?.rehearsalControl).toBe(false);
+    expect(readPrereg(withHeader('rehearsal: true'), 'R87-distill-scope.md').prereg?.rehearsalControl)
+      .toBeUndefined();
+    expect(readPrereg(withHeader('rehearsalControl: yes'), 'R87-distill-scope.md').problems).toEqual([
+      { where: "header 'rehearsalControl'", problem: "'yes' is not one of true, false" },
+    ]);
+    expect(readPrereg(withHeader('rehearsalControl: true'), 'R87-distill-scope.md').problems).toEqual([
+      {
+        where: "header 'rehearsalControl'",
+        problem: 'a control is a comparison, and this registration buys no rehearsal for it to be compared with',
       },
     ]);
   });

@@ -155,9 +155,10 @@ import {
   judgeOf,
   rehearsalLine,
   rehearsalRecordOf,
-  rehearsalRefused,
   resolveRehearsal,
+  type RehearsalHalf,
   type RehearsalRecord,
+  resolveRehearsalControl,
   type RecallInput,
 } from "@agentix-e/microglia-eval";
 import {
@@ -248,6 +249,8 @@ const DECLARED_EMPTY = declaresEmptyStore(ARM);
  * paired" — would spend an hour to say that the arm it was not meant for ran.
  */
 const REHEARSAL = resolveRehearsal();
+/** R133: whether this dispatch also bought the no-memory control the replay is compared with. */
+const REHEARSAL_CONTROL = resolveRehearsalControl();
 if (REHEARSAL && !MEMORY) {
   throw new RangeError(
     `a rehearsal replays a store and this arm is '${ARM}': there is nothing to replay, and the phase would ` +
@@ -2299,7 +2302,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
   const rehearsalHalf = async (
     treatment: FacadeTreatment,
     out: string,
-  ): Promise<RehearsalRecord> => {
+  ): Promise<RehearsalHalf> => {
     let requests = 0;
     let served = 0;
     const facade = await startRecallFacade(async ({ text, query }) => {
@@ -2338,22 +2341,58 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       // its first call is recorded as a reading. Every other failure is thrown, because a rehearsal that crashed
       // mid-phase did spend money and its loss is not a scheduling fact.
       if (!(error as Error).message.includes("tau2-peak-window")) throw error;
-      return rehearsalRefused({ tasks: train.length, reason: "peak-window" });
+      return { requests: 0, served: 0, rewards: [], refused: "peak-window" as const };
     } finally {
       await facade.close();
     }
     const usage = diagnosticsOf(stdout)?.usage;
-    return rehearsalRecordOf({
-      tasks: train.length,
+    return {
       requests,
       served,
       ...(usage === undefined || usage === null ? {} : { usage }),
-      learnRewards: rewards,
-      rehearsalRewards: [...bestRewards(readFileSync(out, "utf8"))].map(([task, reward]) => ({
-        task,
-        reward,
-      })),
-    });
+      rewards: [...bestRewards(readFileSync(out, "utf8"))].map(([task, reward]) => ({ task, reward })),
+    };
+  };
+
+  /**
+   * R133: the same replay with the store off.
+   *
+   * R132's four cells divide by the population the store was selected on, and its `inert` cell is "failed
+   * without memory, then failed again". A task that fails two thirds of the time produces that cell whether or
+   * not the store did anything — so the raw reading cannot tell a store that is inert on its own cases from a
+   * population that is simply hard. This phase is the denominator that fixes it: the same tasks, the same one
+   * trial, the same reduction, and no facade at all.
+   *
+   * No facade is the point. A facade started and never asked would still be a facade, and the agent would be
+   * `microglia_agent` reaching a store the run means to hold out. `llm_agent` is what the learn half ran, so the
+   * control differs from the learn half in one respect only: it is a second draw.
+   */
+  const rehearsalControlHalf = async (out: string): Promise<RehearsalHalf> => {
+    let stdout = "";
+    try {
+      stdout = await phase(
+        driverArgs({
+          script: SCRIPT,
+          domain: LEARN_DOMAIN,
+          phase: "eval",
+          agent: "llm_agent",
+          taskIds: train,
+          trials: 1,
+          out,
+          requireOffPeak: REQUIRE_OFF_PEAK,
+        }),
+      );
+    } catch (error) {
+      if (!(error as Error).message.includes("tau2-peak-window")) throw error;
+      return { requests: 0, served: 0, rewards: [], refused: "peak-window" as const };
+    }
+    const usage = diagnosticsOf(stdout)?.usage;
+    return {
+      requests: 0,
+      served: 0,
+      ...(usage === undefined || usage === null ? {} : { usage }),
+      rewards: [...bestRewards(readFileSync(out, "utf8"))].map(([task, reward]) => ({ task, reward })),
+    };
   };
 
   // Attest the single store before either facade recalls. A second learning
@@ -2539,7 +2578,31 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // this is a phase, not an instrument every run carries, and a line saying "not measured" on every arm
     // that never asked would be the noise that makes a missing reading hard to see.
     if (REHEARSAL) {
-      rehearsalReading = await rehearsalHalf(primary.treatment, join(workdir, "rehearsal.json"));
+      const replay = await rehearsalHalf(primary.treatment, join(workdir, "rehearsal.json"));
+      // R133: the control runs after the replay and before the close, so the two phases share one workdir, one
+      // window and one task list. A refusal here is a field rather than a throw, for the reason the replay's is:
+      // the arm is paid for, and a comparison that did not happen must not take the measurement with it.
+      const control = REHEARSAL_CONTROL
+        ? await rehearsalControlHalf(join(workdir, "rehearsal-control.json"))
+        : undefined;
+      rehearsalReading = rehearsalRecordOf({
+        tasks: train.length,
+        requests: replay.requests,
+        served: replay.served,
+        learnRewards: rewards,
+        rehearsalRewards: replay.rewards,
+        ...(replay.usage === undefined ? {} : { usage: replay.usage }),
+        ...(control === undefined
+          ? {}
+          : {
+              control: {
+                rewards: control.rewards,
+                ...(control.refused === undefined ? {} : { refused: control.refused }),
+                ...(control.usage === undefined ? {} : { usage: control.usage }),
+              },
+            }),
+        ...(replay.refused === undefined ? {} : { refused: replay.refused }),
+      });
       process.stdout.write(`[tau2] ${rehearsalLine(rehearsalReading)}\n`);
     }
   } finally {

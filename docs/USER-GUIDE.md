@@ -3060,3 +3060,61 @@ counts, and only one of them is about what the store says. The fourth row is why
 than a crash: the graded facade has already been paid for by the time the replay opens, and a second phase must
 never take the primary measurement with it. `run_split.py` declines to open a phase in a peak-rate window; the
 driver records that one refusal and throws every other failure.
+
+## 21. The denominator a replay does not have
+
+§20's four cells are computed against the draw that **selected** them. The learn half failed a task, the store
+was written from that failure, and the replay asks whether the same task now passes. `inert` therefore means
+"failed without memory, then failed again with it" — and a task that fails two thirds of the time produces that
+cell whether or not the store did anything at all.
+
+R132 measured 14 failures and read 5 repaired / 9 inert. Without a second draw there is no way to tell a store
+that is inert on its own cases from fourteen tasks that are simply hard, and the two point at opposite fixes.
+
+### 21.1 Buying the control
+
+A control replay is the same task list, the same one trial, the same reduction, and **no store** — the agent the
+learn half ran, with no facade and no recall. It is a second paid phase, so it is a header:
+
+```yaml
+rehearsal: true
+rehearsalControl: true
+trials: 1          # 74 learned + 40 evaluated + 74 replayed + 74 controlled = 262 episodes
+```
+
+`pnpm eval:prereg` refuses a control without a rehearsal (a comparison needs both sides), and counts the third
+pass in its sizing arithmetic: the episodes an arm carries are `trials x testTasks + 3 x trainTasks`, and the
+message names the sum.
+
+### 21.2 What it prints
+
+```bash
+[tau2] rehearsal: 74 of 74 task(s) replayed, 74 of 74 request(s) served, 5 repaired / 9 inert of the 14 that
+failed without memory (35.71%); 3 broken and 57 kept of the rest; harm share 37.50%; against a no-memory
+replay: 4 repaired / 5 broken = -1 net of 74 task(s) (-1.35%), harm share 55.56%
+```
+
+The clause after the semicolon is the store's effect with the draw held fixed: `repaired` and `broke` there are
+**discordant pairs** between two phases that differ only in whether the store was on, so `net = repaired −
+broke` is not diluted by task difficulty and its sign is the reading.
+
+| clause | what it says |
+|---|---|
+| `net ≥ +2` | the store changes its own cases for the better: it is right, and misapplied on held-out tasks |
+| `−2 < net < +2` | the store changes nothing net on its own cases: inert, not wrong |
+| `net ≤ −2` | the store costs its own cases: the items themselves are the problem |
+
+`served` is **not** in the control's half of the clause, and its absence is deliberate: the control runs with no
+facade, so there is no request to count. `0 of 0 served` would read as a store that found nothing — the
+misreading §20.4's third row exists to prevent.
+
+### 21.3 The control's own three absences
+
+| what you see | what it means |
+|---|---|
+| no `control` key | the registration did not buy the comparison — every arm before R133 |
+| `control.reading` absent | the control ran and paired nothing: every reward was `null` or no task id matched |
+| `control.refused: peak-window` | the window closed before the control opened; no call was made |
+
+Each prints its own sentence, because a `0 net` would collapse all three into "the store changed nothing" —
+which is the one claim none of them supports.
