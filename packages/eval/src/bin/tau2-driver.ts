@@ -103,6 +103,7 @@ import {
   resolveConsolidation,
   resolveConsolidationKey,
   resolveConsolidationLinkage,
+  resolveServeSupport,
   resolveSpeakCensus,
   resolveSpeakMargin,
   resolveDistillUnit,
@@ -182,6 +183,7 @@ import {
 } from "../plant.js";
 import { consolidateKnowledge } from "@agentix-e/microglia-core/distill";
 import { consolidationLineOf, sweepConsolidation, sweepSummary } from "../consolidation-sweep.js";
+import { retireBelowSupport, supportFloorLine, type SupportFloorResult } from "../tau2-support-floor.js";
 import { speakLineOf } from "../tau2-speak.js";
 import { turnCensusLine, turnCensusOf, type TurnCensus } from "../tau2-turn.js";
 import type { Tau2PhaseUsage } from "../tau2-instrument.js";
@@ -685,6 +687,14 @@ const CONSOLIDATE_KEY = resolveConsolidationKey();
  * both so the pair of them is one measurement of one store.
  */
 const CONSOLIDATE_LINKAGE = resolveConsolidationLinkage();
+
+/**
+ * How many distinct tasks must stand behind an item before it may be served, R141's one variable.
+ *
+ * Read here for the reason every resolver in this file is: a misspelt value must refuse the run before the
+ * first model call rather than fall back to the control under the treatment's name.
+ */
+const SERVE_SUPPORT = resolveServeSupport();
 
 /** Where the pass runs: the unit it has always run on, plus any unit a registration asked for. */
 const CONSOLIDATION_RUNS = CONSOLIDATE || DISTILL_UNIT === "trace";
@@ -1822,6 +1832,20 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     process.stdout.write(`[tau2] consolidation: ${consolidationLineOf(consolidation.report)}\n`);
     for (const item of consolidation.items) await store.putKnowledge(item);
   }
+  // R141: the support floor, applied after the recurrence pass and before anything is served. It runs here
+  // rather than in the recall path because the recall path is a different process and a filter there would be
+  // a second implementation of a rule the store's own vocabulary already states (`statusReason`).
+  let supportFloor: SupportFloorResult | undefined;
+  if (SERVE_SUPPORT > 1) {
+    // A second read, because the pass above wrote its survivors back: the floor has to price the store the
+    // recall path will open, not the one the distiller wrote.
+    const stored = await store.listKnowledge({});
+    supportFloor = retireBelowSupport(stored, SERVE_SUPPORT, Date.now());
+    for (const item of supportFloor.items) {
+      if (item.statusReason === "support-floor") await store.putKnowledge(item);
+    }
+    process.stdout.write(`[tau2] ${supportFloorLine(supportFloor)}\n`);
+  }
   const faults = distiller.faults();
   // The reasons, not only the count: eleven of fifteen events answered by the fallback is a fact,
   // and *which* error they threw is the fact that names the fix. Counted here because `faults()`
@@ -1877,6 +1901,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // costs nothing, because it is arithmetic over statements the run already paid for.
     redundancy: redundancyOfSample(storeItems),
     yield: yieldCensus(claimsPerCorrection(captured, knowledge)),
+    // R141: the floor the recall path was left with, when this dispatch applied one. A refusal that says
+    // `0 servable` over a store of seventy items is unexplained without it, and the two causes it separates
+    // — a floor that retired everything, and a distiller that wrote nothing — have different fixes.
+    ...(supportFloor === undefined ? {} : { supportFloor }),
     distill: {
       scope: DISTILL_SCOPE,
       unit: DISTILL_UNIT,
@@ -2881,6 +2909,8 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // produced. Cheap and free of model calls; it prices the merge arm before one is bought.
     merge: mergeCensusOf(corrections),
     ...(consolidationSweep === undefined ? {} : { consolidationSweep }),
+    // R141: the floor and what it removed, beside the pass whose support it reads. Absent is floor 1.
+    ...(supportFloor === undefined ? {} : { supportFloor }),
     // The treatment, recorded beside its result: an artefact cannot otherwise tell an arm
     // that switched write admission on from one that never asked, and the counters are the
     // only place the mechanism's own population appears.

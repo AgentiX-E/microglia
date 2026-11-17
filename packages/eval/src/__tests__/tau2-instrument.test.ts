@@ -729,6 +729,9 @@ describe('the projection has a decision for every field, and keeps it', () => {
           },
         ],
       },
+      // R141: the floor the recall path served at. Carried because the pack census cannot say whether a
+      // short serve was the floor working or the store having nothing to serve.
+      supportFloor: { total: 2, retired: 1, retained: 1, floor: 2, items: [] },
       // R60: the ceiling the dispatch ran under, carried beside the yield it explains.
       traceClaims: { ceiling: 3, declared: true },
       // R62: the population switch and the store split by it. Both are carried rather than reduced,

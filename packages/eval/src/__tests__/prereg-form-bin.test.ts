@@ -63,3 +63,22 @@ describe('prereg-form prints the linkage the registration fixed', () => {
     expect(reading.out).toContain('consolidateLinkage=\n');
   });
 });
+
+describe('prereg-form prints the support floor the registration fixed', () => {
+  // R141. Same wire, new line: a header that named a floor and a form that stopped printing it would
+  // dispatch the control and read the zero it measured as the floor's failure.
+  it('prints the floor when the header names one', () => {
+    const reading = run(registration(['serveSupport: 2']));
+    expect(reading.code).toBe(0);
+    expect(reading.out).toContain('serveSupport=2');
+    // The two switches above ride the same wire and must not be disturbed by the new line.
+    expect(reading.out).toContain('consolidate=true');
+    expect(reading.out).toContain('consolidateKey=routine');
+  });
+
+  it('prints an empty line when the header names none, which leaves the run at 1', () => {
+    const reading = run(registration([]));
+    expect(reading.code).toBe(0);
+    expect(reading.out).toContain('serveSupport=\n');
+  });
+});

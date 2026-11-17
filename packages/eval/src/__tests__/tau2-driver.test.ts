@@ -551,6 +551,98 @@ process.exit(9);
     expect(typeof control?.skippedKey).toBe('number');
   }, 60_000);
 
+  it('retires what no second task corroborated, before the funnel gate reads the store', async () => {
+    // R141's wire, driven as a wire. The floor is a serve-time decision: `funnelVerdict` reads the store
+    // the recall path will open, so a floor applied *after* the gate would be measured as a store that
+    // carried something and served nothing. This stub distils one claim per correction and this benchmark
+    // gives every claim one task, so a floor of two empties the store — which is the mechanism working,
+    // and the assertion is that it happened at the gate rather than in the pack.
+    //
+    // The floor's own record travels in the refusal's diagnostics, because that is the artefact class a
+    // store emptied by a switch produces: "0 servable" without it is indistinguishable from a distiller
+    // that wrote nothing, and those are two different fixes.
+    const run = async (load: () => Promise<typeof import('../bin/tau2-driver.js')>, floor: string | undefined) => {
+      const { dir, executable } = stubRunner();
+      process.env['TAU_PYTHON'] = executable;
+      process.env['TAU_MEMORY'] = 'true';
+      process.env['TAU_TRIALS'] = '2';
+      process.env['TAU_TRAIN_SHARE'] = '0.75';
+      process.env['TAU_DISTILL_UNIT'] = 'correction';
+      process.env['TAU_CONSOLIDATE'] = 'true';
+      process.env['TAU_WORKDIR'] = dir;
+      process.env['DEEPSEEK_API_KEY'] = 'test-key';
+      process.env['TAU_DISTILL_MODEL'] = 'deepseek/deepseek-chat';
+      if (floor === undefined) delete process.env['TAU_SERVE_SUPPORT'];
+      else process.env['TAU_SERVE_SUPPORT'] = floor;
+      vi.stubGlobal(
+        'fetch',
+        async () =>
+          new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify([
+                      { kind: 'procedure', statement: 'Confirm the customer identity before changing an order' },
+                    ]),
+                  },
+                },
+              ],
+              usage: { prompt_tokens: 3, completion_tokens: 3 },
+            }),
+            { status: 200 },
+          ),
+      );
+      try {
+        const driver = await load();
+        await driver.run();
+        return { record: driver.instrument(), error: undefined };
+      } catch (error) {
+        return { record: undefined, error };
+      } finally {
+        vi.unstubAllGlobals();
+        for (const name of [
+          'TAU_PYTHON',
+          'TAU_MEMORY',
+          'TAU_TRIALS',
+          'TAU_TRAIN_SHARE',
+          'TAU_DISTILL_UNIT',
+          'TAU_CONSOLIDATE',
+          'TAU_WORKDIR',
+          'DEEPSEEK_API_KEY',
+          'TAU_DISTILL_MODEL',
+          'TAU_SERVE_SUPPORT',
+        ]) {
+          delete process.env[name];
+        }
+      }
+    };
+
+    // Two literal specifiers, for the reason the linkage case gives: the driver reads the floor at module
+    // load, so each case needs its own instance and a query built at run time is not resolvable.
+    const arm = await run(() => import('../bin/tau2-driver.js?case=floor-two'), '2');
+    const refusal = arm.error as { marker?: { diagnostics?: Record<string, unknown> } } | undefined;
+    const floor = refusal?.marker?.diagnostics?.['supportFloor'] as
+      | { total: number; retired: number; retained: number; floor: number }
+      | undefined;
+    expect(floor?.floor).toBe(2);
+    // Every claim this stub wrote has one task behind it, so the floor retires all of them and says so.
+    expect(floor?.retired).toBe(floor?.total);
+    expect(floor?.retained).toBe(0);
+    // The store the census describes is the one the floor left, not the one the distiller wrote.
+    const store = refusal?.marker?.diagnostics?.['store'] as { servable?: number; reasons?: Record<string, number> };
+    expect(store?.servable).toBe(0);
+    expect(store?.reasons?.['support-floor']).toBe(floor?.retired);
+
+    // Unset is floor 1: the store keeps its items, the floor reports nothing, and the arm evaluates. Absence
+    // rather than a zero, because a `0 retired` written everywhere would be a measured statement about
+    // arms that never had the switch.
+    const control = await run(() => import('../bin/tau2-driver.js?case=floor-off'), undefined);
+    expect(control.error).toBeUndefined();
+    expect(control.record?.supportFloor).toBeUndefined();
+    expect(control.record?.store?.servable).toBeGreaterThan(0);
+  }, 60_000);
+
   it('teaches from the tasks that passed when the scope asks for every trajectory', async () => {
     // R62's treatment, driven end to end: three tasks teach instead of one, and every claim can be
     // traced to the population that produced it. The stub passes t1 every trial and fails t2 every

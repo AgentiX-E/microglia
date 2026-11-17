@@ -51,6 +51,7 @@ import type { YieldCensus } from "./tau2-yield.js";
 import type { PlantCensus } from "./plant.js";
 import type { PackCensus } from "./tau2-pack.js";
 import type { ConsolidationSweep } from "./consolidation-sweep.js";
+import type { SupportFloorResult } from "./tau2-support-floor.js";
 import type { ProvenanceCensus } from "./tau2-provenance.js";
 import type { QueryCensus } from "./tau2-queries.js";
 import type { MergeCensus } from "./tau2-merge.js";
@@ -677,6 +678,15 @@ export type Tau2Raw = {
    * population that does not corroborate.
    */
   readonly consolidationSweep?: ConsolidationSweep;
+  /**
+   * R141: the floor the recall path served at, and how much of the store it removed.
+   *
+   * Absent is a store served with no floor, which is every artefact before this field. Present, it is the
+   * only place a readback can learn that an arm served 44 items out of 70 because 26 had one task behind
+   * them — a transfer that fell with this field present and a transfer that fell without it are the floor
+   * working and the floor missing, and nothing in the pack census tells them apart.
+   */
+  readonly supportFloor?: SupportFloorResult;
   readonly injectionNote?: InjectionNoteRecord;
   /**
    * How far the pipeline from a correction to a servable rule got.
@@ -945,6 +955,7 @@ export const PROJECTION: {
   yieldCensus: "carried",
   merge: "carried",
   consolidationSweep: "carried",
+  supportFloor: "carried",
   plant: "carried",
   injectionNote: "carried",
   funnel: "carried",
@@ -1154,6 +1165,7 @@ export function armRecordFromDriver(
     ...(raw.consolidationSweep === undefined
       ? {}
       : { consolidationSweep: raw.consolidationSweep }),
+    ...(raw.supportFloor === undefined ? {} : { supportFloor: raw.supportFloor }),
     ...(raw.plant === undefined ? {} : { plant: raw.plant }),
     ...(raw.injectionNote === undefined
       ? {}

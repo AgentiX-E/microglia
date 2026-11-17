@@ -21,6 +21,7 @@ import {
   resolveConsolidation,
   resolveConsolidationKey,
   resolveConsolidationLinkage,
+  resolveServeSupport,
   resolveDistillUnit,
   resolveSpeakCensus,
   resolveSpeakMargin,
@@ -452,6 +453,29 @@ describe('resolveConsolidationLinkage', () => {
     // A misspelt switch that fell back to `key` would run R139's control and publish it as its arm.
     for (const bad of ['scope', 'routine', 'everything', '1']) {
       expect(() => resolveConsolidationLinkage(bad)).toThrow(/TAU_CONSOLIDATE_LINKAGE must be/);
+    }
+  });
+});
+
+describe('resolveServeSupport', () => {
+  it('defaults to one task, which serves every item', () => {
+    expect(resolveServeSupport(undefined)).toBe(1);
+    expect(resolveServeSupport('')).toBe(1);
+    expect(resolveServeSupport(' 1 ')).toBe(1);
+    // Zero is not the default and is not refused: it is a floor above every item, i.e. an empty pack, which a
+    // registration may ask for and a readback must be able to see.
+    expect(resolveServeSupport('0')).toBe(0);
+  });
+
+  it('reads the floor a registration asked for', () => {
+    expect(resolveServeSupport('2')).toBe(2);
+    expect(resolveServeSupport(' 2 ')).toBe(2);
+    expect(resolveServeSupport('3')).toBe(3);
+  });
+
+  it('refuses a value that is not a count, before any model call', () => {
+    for (const bad of ['two', '1.5', '-1', '+2', '2.0']) {
+      expect(() => resolveServeSupport(bad)).toThrow(/TAU_SERVE_SUPPORT must be/);
     }
   });
 });

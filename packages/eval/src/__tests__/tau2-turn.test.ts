@@ -359,6 +359,20 @@ describe('the branches a malformed payload can reach', () => {
     expect(turnCensusOfBlock('nope')).toBeUndefined();
   });
 
+  it('counts only the rows it could read, whatever the block claims it measured', () => {
+    // The block's own `measurable` is not trusted: a list holding one unreadable row would otherwise make
+    // the pair join on a row that has no episode key, and the count would exceed the table it describes.
+    const block = turnCensusOfBlock({
+      episodes: 3,
+      measurable: 3,
+      rows: [{}, 'not a row', { task: '5', assistant: 1, user: 1, toolCalls: 1 }],
+    });
+    expect(block?.episodes).toBe(3);
+    expect(block?.measurable).toBe(1);
+    // A block that states no episode count at all is zero rather than `undefined` in an arithmetic field.
+    expect(turnCensusOfBlock({ rows: [] })?.episodes).toBe(0);
+  });
+
   it('prints a verdict for a reading that could not be graded, and one with no pairs', () => {
     const line = pairedTurnLine([
       {
@@ -377,9 +391,39 @@ describe('the branches a malformed payload can reach', () => {
     expect(line).toContain('(unmeasured on one side)');
   });
 
+  it('leaves the interval absent on the side that measured nothing', () => {
+    // An interval over zero episodes is not a wide interval, it is no interval, and a reading that filled it
+    // with `[0, 0]` would separate against every arm it was compared with.
+    const blind = turnCensusOf({ turnCensus: { episodes: 4, measurable: 0, rows: [] } });
+    const measured = censusOf([row('5', 0), row('5', 1)]);
+    const memoryBlind = pairedTurnCount('toolErrors', blind, measured);
+    expect(memoryBlind?.memoryInterval).toBeNull();
+    expect(memoryBlind?.controlInterval).not.toBeNull();
+    expect(memoryBlind?.separated).toBeNull();
+    // And the other side, because an interval that only ever goes missing on one arm would be a bug a
+    // single-direction case cannot see.
+    const controlBlind = pairedTurnCount('toolErrors', measured, blind);
+    expect(controlBlind?.memoryInterval).not.toBeNull();
+    expect(controlBlind?.controlInterval).toBeNull();
+    expect(controlBlind?.separated).toBeNull();
+  });
+
   it('prints a negative delta without a plus sign, so a direction is legible at a glance', () => {
     const memory = censusOf([row('5', 0, { repeatCalls: 0 }), row('5', 1, { repeatCalls: 0 })]);
     const control = censusOf([row('5', 0, { repeatCalls: 4 }), row('5', 1, { repeatCalls: 4 })]);
     expect(pairedTurnLine(pairedTurns(memory, control))).toContain('-4.000 per episode');
+  });
+
+  it('says which side of the verdict a separated reading is on', () => {
+    // A difference the intervals do not overlap is a different sentence from one they do, and this line is
+    // the only place the artefact carries the difference: 40 pairs at 0 against 40 at 8 is the smallest
+    // arrangement that separates, so the word appears exactly where the arithmetic earns it.
+    const episodes = 40;
+    const rows = Array.from({ length: episodes }, (_, index) => index);
+    const memory = censusOf(rows.map((index) => row('5', index, { repeatCalls: 0 })));
+    const control = censusOf(rows.map((index) => row('5', index, { repeatCalls: 8 })));
+    const line = pairedTurnLine(pairedTurns(memory, control));
+    expect(line).toContain('-8.000 per episode');
+    expect(line).toContain('(separated)');
   });
 });

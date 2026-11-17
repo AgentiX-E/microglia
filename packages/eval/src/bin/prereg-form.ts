@@ -104,6 +104,8 @@ function main(): void {
       // R139: whether that key filters or describes. Printed the way the header wrote it, so a
       // dispatch that named `all` cannot arrive at the driver as the control.
       `consolidateLinkage=${reading.prereg.consolidateLinkage ?? ''}\n` +
+      // R141: the support floor at serve time. Empty leaves the run at 1, which serves every item.
+      `serveSupport=${reading.prereg.serveSupport === undefined ? '' : String(reading.prereg.serveSupport)}\n` +
       `rehearsal=${declaredRehearsal === undefined ? '' : String(declaredRehearsal)}\n` +
       // R133: the control replay. Printed the way the header wrote it, the same wire `rehearsal` rides.
       `rehearsalControl=${

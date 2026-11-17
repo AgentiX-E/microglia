@@ -264,6 +264,15 @@ export type Prereg = {
    */
   readonly consolidateLinkage?: 'key' | 'all';
   /**
+   * How many distinct tasks must stand behind an item before the recall path may serve it.
+   *
+   * R141. Absent means 1, which serves every item and is what every artefact before this header measured.
+   * The floor is applied after the recurrence pass, so the items it removes are the ones no second task
+   * agreed with — R139 measured that every negative-net item in its arm was one of those. A floor above 1
+   * therefore needs `consolidate: true`, since the support it reads is the pass's output.
+   */
+  readonly serveSupport?: number;
+  /**
    * How far ahead of its runner-up the best candidate must be for the pack to be served at all.
    *
    * R123. The lane has served a pack on every request for twelve rounds and `served 162 of 162` was read as
@@ -514,6 +523,7 @@ const HEADER_KEYS = [
   'consolidate',
   'consolidateKey',
   'consolidateLinkage',
+  'serveSupport',
   'speakMargin',
   'trials',
   'effectClaimPp',
@@ -1065,10 +1075,34 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       consolidateLinkage = consolidateLinkageText;
     }
   }
+  // R141: the support floor. Read here so a misspelt value refuses the registration rather than resolving to
+  // the control inside a dispatch — and so the round that names it has to say what it expects to be removed.
+  const serveSupportText = values.get('serveSupport');
+  let serveSupport: number | undefined;
+  if (serveSupportText !== undefined) {
+    if (!/^[0-9]+$/.test(serveSupportText)) {
+      collected.push({
+        where: `header 'serveSupport'`,
+        problem: `'${serveSupportText}' is not a non-negative integer`,
+      });
+    } else {
+      serveSupport = Number(serveSupportText);
+    }
+  }
   if (consolidateLinkage !== undefined && consolidate !== true) {
     collected.push({
       where: `header 'consolidateLinkage'`,
       problem: 'the linkage decides whether the recurrence pass filters pairs, so it needs consolidate: true',
+    });
+  }
+  // R141's floor and the pass it reads. Without the recurrence pass every item is written from one
+  // correction, so its support is 1 by construction and a floor above 1 retires the whole store: the arm
+  // would serve no memory at all under the treatment's name. Refused here rather than measured there,
+  // because a transfer that fell to zero for this reason reads exactly like a floor that did not work.
+  if (serveSupport !== undefined && serveSupport > 1 && consolidate !== true) {
+    collected.push({
+      where: `header 'serveSupport'`,
+      problem: 'the floor reads the support the recurrence pass computes, so a floor above 1 needs consolidate: true',
     });
   }
   // R121's switch and the unit it cannot apply to. `raw` writes one verbatim event per episode and the
@@ -1596,6 +1630,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(consolidate === undefined ? {} : { consolidate }),
       ...(consolidateKey === undefined ? {} : { consolidateKey }),
       ...(consolidateLinkage === undefined ? {} : { consolidateLinkage }),
+      ...(serveSupport === undefined ? {} : { serveSupport }),
       ...(speakMargin === undefined ? {} : { speakMargin }),
       ...(trials === undefined ? {} : { trials }),
       ...(effectClaimPp === undefined ? {} : { effectClaimPp }),

@@ -1621,6 +1621,33 @@ describe('the distilling scope', () => {
     ]);
   });
 
+  it('reads the support floor, and refuses a floor the recurrence pass has to compute', () => {
+    // R141. The floor retires items no second task agreed with, and the count it reads is the pass's
+    // output: without the pass every item is written from one correction, so `2` would retire the whole
+    // store and the arm would serve nothing under the treatment's name. Absent stays absent, so an
+    // artefact written before this header still reads as floor 1 rather than as a run that chose it.
+    expect(
+      readPrereg(withHeader('consolidate: true\nserveSupport: 2'), 'R87-distill-scope.md').prereg?.serveSupport,
+    ).toBe(2);
+    expect(
+      readPrereg(withHeader('consolidate: true\nserveSupport: 0'), 'R87-distill-scope.md').prereg?.serveSupport,
+    ).toBe(0);
+    expect(readPrereg(withHeader('consolidate: true'), 'R87-distill-scope.md').prereg?.serveSupport)
+      .toBeUndefined();
+    expect(
+      readPrereg(withHeader('consolidate: true\nserveSupport: 1.5'), 'R87-distill-scope.md').problems,
+    ).toEqual([{ where: "header 'serveSupport'", problem: "'1.5' is not a non-negative integer" }]);
+    expect(readPrereg(withHeader('serveSupport: 2'), 'R87-distill-scope.md').problems).toEqual([
+      {
+        where: "header 'serveSupport'",
+        problem:
+          'the floor reads the support the recurrence pass computes, so a floor above 1 needs consolidate: true',
+      },
+    ]);
+    // `1` is the control spelled out, so it is not refused beside a store with no pass.
+    expect(readPrereg(withHeader('serveSupport: 1'), 'R87-distill-scope.md').problems).toEqual([]);
+  });
+
   it('reads the margin below which a contested pack is withheld, and refuses what it cannot use', () => {
     // R123. Zero is the default and it is not "off" -- it is "serve every non-empty pack" -- so a value
     // that fell back to zero would publish the control under the treatment's name.

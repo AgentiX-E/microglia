@@ -869,6 +869,7 @@ export {
   resolveConsolidation,
   resolveConsolidationKey,
   resolveConsolidationLinkage,
+  resolveServeSupport,
   resolveDistillUnit,
   resolveSpeakCensus,
   resolveSpeakMargin,
