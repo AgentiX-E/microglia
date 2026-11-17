@@ -235,7 +235,7 @@ describe('what the gate did to the trials it withheld from', () => {
       memoryTrials: [row('a', 0, 1), row('b', 0, 0), row('c', 0, 1), row('d', 0, 1)],
     });
     expect(reading).toEqual({
-      measured: { served: { episodes: 3, passed: 3 }, withheld: { episodes: 1, passed: 0 } },
+      measured: { served: { episodes: 3, passed: 3 }, withheld: { episodes: 1, passed: 0 }, droppedRequests: 0 },
     });
   });
 
@@ -251,7 +251,7 @@ describe('what the gate did to the trials it withheld from', () => {
     // request would call it withheld and understate the gate's reach by half; it is served, and it passed.
     // Episode `b` owns request 2, which was served, and it failed.
     expect(reading).toEqual({
-      measured: { served: { episodes: 2, passed: 1 }, withheld: { episodes: 0, passed: 0 } },
+      measured: { served: { episodes: 2, passed: 1 }, withheld: { episodes: 0, passed: 0 }, droppedRequests: 0 },
     });
   });
 
@@ -296,18 +296,18 @@ describe('what the gate did to the trials it withheld from', () => {
       episodeStarts: [0, 1],
       memoryTrials: [row('a', 0, null), row('b', 0, 1)],
     });
-    expect(reading).toEqual({ measured: { served: { episodes: 0, passed: 0 }, withheld: { episodes: 1, passed: 1 } } });
+    expect(reading).toEqual({ measured: { served: { episodes: 0, passed: 0 }, withheld: { episodes: 1, passed: 1 }, droppedRequests: 0 } });
   });
 
   it('prints both rates with their intervals, and prints the absence instead of printing nothing', () => {
     const line = serveSplitLine({
-      measured: { served: { episodes: 100, passed: 90 }, withheld: { episodes: 40, passed: 30 } },
+      measured: { served: { episodes: 100, passed: 90 }, withheld: { episodes: 40, passed: 30 }, droppedRequests: 0 },
     });
     expect(line).toContain('served 90 of 100 = 90.00%');
     expect(line).toContain('withheld 30 of 40 = 75.00%');
     // Wilson, not Wald: 40 episodes is small enough that the two disagree at the edge.
     expect(line).toMatch(/\[\d+\.\d, \d+\.\d\]/);
-    const empty = serveSplitLine({ measured: { served: { episodes: 0, passed: 0 }, withheld: { episodes: 0, passed: 0 } } });
+    const empty = serveSplitLine({ measured: { served: { episodes: 0, passed: 0 }, withheld: { episodes: 0, passed: 0 }, droppedRequests: 0 } });
     expect(empty).toContain('served none measured');
     // The sentence R123 needed and did not get: a run whose registered mechanism check could not be computed.
     const absent = serveSplitLine({ absent: 'no-boundary', detail: '162 request(s) with no episode boundary' });
@@ -480,7 +480,7 @@ describe('joining a boundary to the task it opened for', () => {
       memoryTrials: [row('retail/a', 0, 0), row('retail/b', 0, 1)],
     });
     expect(split).toEqual({
-      measured: { served: { episodes: 1, passed: 0 }, withheld: { episodes: 1, passed: 1 } },
+      measured: { served: { episodes: 1, passed: 0 }, withheld: { episodes: 1, passed: 1 }, droppedRequests: 0 },
     });
   });
 
@@ -657,7 +657,7 @@ describe('a joined trial the harness declined to score', () => {
       memoryTrials: [row('a', 0, null), row('b', 0, 0)],
     });
     expect(split).toEqual({
-      measured: { served: { episodes: 0, passed: 0 }, withheld: { episodes: 1, passed: 0 } },
+      measured: { served: { episodes: 0, passed: 0 }, withheld: { episodes: 1, passed: 0 }, droppedRequests: 0 },
     });
   });
 });
@@ -755,5 +755,102 @@ describe('the named ledger', () => {
   it('refuses a named boundary that resolves to a task this arm never scored', () => {
     const reading = namedLedgerOf({ ledger, boundaryTasks: ['a/y', null, 'a/z'], tasks });
     expect('absent' in reading && reading.absent).toBe('unknown-task');
+  });
+});
+
+/**
+ * R140 — the abandoned attempt, which is a drop rather than a refusal.
+ *
+ * R138's arm took **42 requests for 40 trials**: τ² re-ran two simulations whose first attempt died, and
+ * each abandoned attempt opened a boundary no trial owns (`boundaryTasks` carried two `null`s). The identity
+ * join refused, so the run lost its mechanism reading while its treatment was sound — the second time in
+ * three rounds that a conservative join cost a reading it did not have to cost.
+ *
+ * The distinction that makes the repair safe: a boundary whose name is **absent** is a harness that dropped
+ * an attempt, and a boundary whose name is **wrong** is a mislabelled artefact. The first may be excluded
+ * with its requests; the second may not be excluded quietly.
+ */
+describe('the abandoned attempt', () => {
+  const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
+
+  it('drops a null-named boundary with its requests and still splits the arm', () => {
+    // Five requests, three boundaries; the middle one was abandoned. `a` is served throughout its own range,
+    // `b` is refused, and the abandoned attempt's single request is in neither rate.
+    // Four requests, three boundaries: `a` served and failed, one abandoned, `b` refused twice and passed.
+    const split = serveSplit({
+      ledger: [['k'], [], [], []],
+      episodeStarts: [0, 1, 2],
+      boundaryTasks: ['a', null, 'b'],
+      memoryTrials: [row('a', 0, 0), row('b', 0, 1)],
+    });
+    expect(split).toMatchObject({
+      measured: {
+        served: { episodes: 1, passed: 0 },
+        withheld: { episodes: 1, passed: 1 },
+        droppedRequests: 1,
+      },
+    });
+  });
+
+  it('says how many requests it excluded, because the exclusion is otherwise invisible', () => {
+    const split = serveSplit({
+      ledger: [['k'], [], ['k'], ['k']],
+      episodeStarts: [0, 1, 2],
+      boundaryTasks: ['a', null, 'b'],
+      memoryTrials: [row('a', 0, 0), row('b', 0, 1)],
+    });
+    expect(serveSplitLine(split)).toContain('1 request(s) belonged to abandoned attempt(s)');
+  });
+
+  it('refuses when a scored trial has no surviving boundary, because the drop would invent a refusal', () => {
+    // `b`'s only boundary was abandoned, so `b` has no requests in this phase. Dropping the abandoned range
+    // and counting `b` as withheld would report a gate refusing an episode it never saw.
+    const split = serveSplit({
+      ledger: [['k'], []],
+      episodeStarts: [0, 1],
+      boundaryTasks: ['a', null],
+      memoryTrials: [row('a', 0, 1), row('b', 0, 1)],
+    });
+    expect(split).toMatchObject({ absent: 'trial-uncovered' });
+    if ('absent' in split) expect(split.detail).toContain('1 of 2 scored trial(s) are opened by no surviving');
+  });
+
+  it('still refuses a boundary that names a task the arm never scored', () => {
+    // The half of the distinction that may not be dropped: a name that is wrong is a broken artefact, and
+    // excluding its requests would hide the break.
+    const split = serveSplit({
+      ledger: [['k'], ['k'], ['k']],
+      episodeStarts: [0, 1, 2],
+      boundaryTasks: ['a', 'b', 'c'],
+      memoryTrials: [row('a', 0, 1), row('b', 0, 1)],
+    });
+    expect(split).toMatchObject({ absent: 'tasks-unresolved' });
+    if ('absent' in split) expect(split.detail).toContain('mislabelled artefact');
+  });
+
+  it('refuses when every boundary was abandoned, because then nothing is measured at all', () => {
+    // An arm whose every attempt died has no request belonging to a trial: the split is absent rather than
+    // an arm of zeros, which is the difference between "nothing was served" and "nothing was joined".
+    const split = serveSplit({
+      ledger: [['k'], []],
+      episodeStarts: [0, 1],
+      boundaryTasks: [null, null],
+      memoryTrials: [row('a', 0, 1)],
+    });
+    expect(split).toMatchObject({ absent: 'tasks-unresolved' });
+    if ('absent' in split) expect(split.detail).toContain('name no task at all');
+  });
+
+  it('reports no drop on an arm that abandoned nothing', () => {
+    // The control: the field is present on every split, so a reader never has to distinguish "nothing was
+    // dropped" from "the instrument did not ask".
+    const split = serveSplit({
+      ledger: [['k'], []],
+      episodeStarts: [0, 1],
+      boundaryTasks: ['a', 'b'],
+      memoryTrials: [row('a', 0, 1), row('b', 0, 0)],
+    });
+    expect(split).toMatchObject({ measured: { droppedRequests: 0 } });
+    expect(serveSplitLine(split)).not.toContain('abandoned');
   });
 });

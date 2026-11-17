@@ -277,6 +277,15 @@ export type ServeSplit = {
   readonly served: { readonly episodes: number; readonly passed: number };
   /** Episodes where every request in range was refused. */
   readonly withheld: { readonly episodes: number; readonly passed: number };
+  /**
+   * Requests excluded because the boundary that opened them belonged to no trial.
+   *
+   * R140. A harness that re-runs a simulation which died opens a boundary no trial owns, and its requests
+   * are real: they were sent, they were packed, and they belong to an attempt that was abandoned. Excluding
+   * them is right; excluding them *silently* is not, because the number is the only evidence that the arm
+   * ran more episodes than it scored — and it is the number the ledger's row count exceeds the trial count by.
+   */
+  readonly droppedRequests: number;
 };
 
 /**
@@ -342,6 +351,8 @@ export type BoundaryJoinReading =
       readonly retried: readonly BoundaryGroup[];
       /** Boundaries no task could be resolved for. Their requests belong to no trial and are excluded. */
       readonly unresolved: number;
+      /** Of those, the ones whose name is absent rather than wrong: the abandoned attempts. */
+      readonly abandoned: number;
     }
   | { readonly absent: BoundaryAbsence; readonly detail: string };
 
@@ -391,9 +402,15 @@ export function boundaryJoin(input: {
   });
   const groups = new Map<string, { boundaries: number[]; trial: number }>();
   let unresolved = 0;
+  // R140: the two reasons a boundary resolves to no trial are different findings and are counted apart. A
+  // null name is a harness that could not resolve the attempt — τ² re-ran a simulation whose first attempt
+  // died, and the abandoned attempt opened a boundary no trial owns. A name the arm never scored is a
+  // mislabelled artefact. The first may be dropped with its requests; the second may not be dropped quietly.
+  let abandoned = 0;
   boundaryTasks.forEach((task, index) => {
     if (task === null) {
       unresolved += 1;
+      abandoned += 1;
       return;
     }
     const key = taskKey(task);
@@ -421,7 +438,12 @@ export function boundaryJoin(input: {
     boundaries: group.boundaries,
     trial: group.trial,
   }));
-  return { measured, retried: measured.filter((group) => group.boundaries.length > 1), unresolved };
+  return {
+    measured,
+    retried: measured.filter((group) => group.boundaries.length > 1),
+    unresolved,
+    abandoned,
+  };
 }
 
 /**
@@ -459,7 +481,15 @@ export type ServeSplitAbsence =
   /** The boundary exists but its length disagrees with the trials it would be joined to. */
   | 'boundary-disagrees'
   /** R136: the arm names its boundaries and some of them name no task, so identity cannot decide. */
-  | 'tasks-unresolved';
+  | 'tasks-unresolved'
+  /**
+   * R140: a scored trial no boundary opened for.
+   *
+   * The abandoned attempts may be dropped only when every scored trial is still named by one of the
+   * survivors — a trial whose only boundary was abandoned has no requests at all this phase recorded, and
+   * counting it as `withheld` would report a refusal that never happened.
+   */
+  | 'trial-uncovered';
 
 export type ServeSplitReading =
   | { readonly measured: ServeSplit }
@@ -521,14 +551,42 @@ export function serveSplit(input: {
     if (!('measured' in join)) {
       return { absent: 'boundary-disagrees', detail: join.detail };
     }
-    if (join.unresolved > 0 || join.measured.length === 0) {
+    // R140: a boundary whose name is *absent* is an attempt the harness abandoned, and its requests belong to
+    // no trial rather than to a neighbouring one. Dropping them is what the identity join already does with
+    // the ranges; refusing the whole reading is what R138 lost — its arm had 42 boundaries for 40 trials, two
+    // of them null-named, and the split reported nothing at all while the treatment was sound.
+    const mislabelled = join.unresolved - join.abandoned;
+    if (mislabelled > 0) {
       return {
         absent: 'tasks-unresolved',
         detail:
-          `${String(join.unresolved)} of ${String(episodeStarts.length)} boundar(ies) name no task this ` +
-          'arm scored, so the requests they opened belong to no trial',
+          `${String(mislabelled)} of ${String(episodeStarts.length)} boundar(ies) name a task this arm ` +
+          'never scored, which is a mislabelled artefact rather than an abandoned attempt',
       };
     }
+    if (join.measured.length === 0) {
+      return {
+        absent: 'tasks-unresolved',
+        detail: `${String(join.unresolved)} boundar(ies) name no task at all, so no request belongs to a trial`,
+      };
+    }
+    // The coverage the drop requires: every trial the arm scored must still be opened by a surviving
+    // boundary. A trial whose only boundary was abandoned has no requests in this phase, and counting it as
+    // `withheld` would report a refusal that never happened.
+    const named = new Set(join.measured.map((group) => taskKey(group.task)));
+    const uncovered = memoryTrials.filter((entry) => !named.has(taskKey(entry.id)));
+    if (uncovered.length > 0) {
+      return {
+        absent: 'trial-uncovered',
+        detail:
+          `${String(uncovered.length)} of ${String(memoryTrials.length)} scored trial(s) are opened by no ` +
+          // No `?? '—'`: the branch is only reachable when the list is non-empty, and a fallback that no
+          // artefact can reach is a line that claims to be tested.
+          `surviving boundar(y) (first: ${String((uncovered[0] as TauTrialRow).id)}), so the abandoned attempts cannot be ` +
+          'dropped without attributing their requests to someone else',
+      };
+    }
+    const droppedRequests = join.abandoned === 0 ? 0 : abandonedRequestsOf(episodeStarts, join, ledger.length);
     const served = { episodes: 0, passed: 0 };
     const withheld = { episodes: 0, passed: 0 };
     for (const group of join.measured) {
@@ -549,7 +607,7 @@ export function serveSplit(input: {
       bucket.episodes += 1;
       if (row.reward === 1) bucket.passed += 1;
     }
-    return { measured: { served, withheld } };
+    return { measured: { served, withheld, droppedRequests } };
   }
   if (episodeStarts.length !== memoryTrials.length) {
     return {
@@ -578,7 +636,33 @@ export function serveSplit(input: {
     bucket.episodes += 1;
     if (row.reward === 1) bucket.passed += 1;
   }
-  return { measured: { served, withheld } };
+  // The positional path only runs when the boundary count equals the trial count, so no boundary was
+  // abandoned and nothing was dropped.
+  return { measured: { served, withheld, droppedRequests: 0 } };
+}
+
+/**
+ * The requests the abandoned boundaries opened.
+ *
+ * Counted from the spans rather than from the difference between the ledger and the scored trials: a retried
+ * task also makes the ledger longer, and the number this reading carries is specifically the requests that
+ * belong to *no* trial — the ones a reader has to know were sent and were packed before deciding what the
+ * split's two rates describe.
+ */
+function abandonedRequestsOf(
+  episodeStarts: readonly number[],
+  join: { readonly measured: readonly BoundaryGroup[] },
+  ledgerLength: number,
+): number {
+  const owned = new Set<number>();
+  for (const group of join.measured) for (const index of group.boundaries) owned.add(index);
+  let requests = 0;
+  for (let index = 0; index < episodeStarts.length; index += 1) {
+    if (owned.has(index)) continue;
+    const [from, to] = boundarySpan(episodeStarts, index, ledgerLength);
+    requests += to - from;
+  }
+  return requests;
 }
 
 /** The half-open request range one boundary owns: from its own index to the next boundary's. */
@@ -637,7 +721,15 @@ export function serveSplitLine(reading: ServeSplitReading): string {
       `[${(low * 100).toFixed(1)}, ${(high * 100).toFixed(1)}]`
     );
   };
-  return `serve split: served ${render(reading.measured.served)}; withheld ${render(reading.measured.withheld)}`;
+  const dropped =
+    reading.measured.droppedRequests === 0
+      ? ''
+      : `; ${String(reading.measured.droppedRequests)} request(s) belonged to abandoned attempt(s) and are ` +
+        'in neither rate';
+  return (
+    `serve split: served ${render(reading.measured.served)}; ` +
+    `withheld ${render(reading.measured.withheld)}${dropped}`
+  );
 }
 
 /**
