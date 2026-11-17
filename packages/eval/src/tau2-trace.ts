@@ -274,6 +274,33 @@ export function resolveConsolidationKey(raw = process.env['TAU_CONSOLIDATE_KEY']
 }
 
 /**
+ * Whether the key the pass was given filters pairs or only describes them.
+ *
+ * R139. `consolidateKey: routine` was read as a statement that two items of different routines are
+ * different claims, which the pass cannot know before it compares their text. The store R137 wrote
+ * says what that costs: 1,953 live pairs, 35 above the 0.60 floor, **all 35 cross-key** — so a pass
+ * whose only reachable pairs share a key could not have found them, and `sup2` stayed at 2 of 66
+ * while the store held six paraphrases of one sentence.
+ *
+ * `all` is the treatment and `key` is the control. Unset means `key`, which is what every artefact
+ * committed before this resolver ran, so no past reading is reinterpreted. An unrecognised value is
+ * refused before the first model call, for `resolveConsolidationKey`'s reason: a misspelt switch that
+ * fell back to the default would publish the control under the treatment's name.
+ */
+export type ConsolidationLinkage = 'key' | 'all';
+
+export function resolveConsolidationLinkage(
+  raw = process.env['TAU_CONSOLIDATE_LINKAGE'],
+): ConsolidationLinkage {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (value === '') return 'key';
+  if (value === 'key' || value === 'all') return value;
+  throw new RangeError(
+    `TAU_CONSOLIDATE_LINKAGE must be unset, 'key' or 'all'; received '${String(raw)}'`,
+  );
+}
+
+/**
  * How far ahead of its runner-up the best candidate must be for the pack to speak at all.
  *
  * The lane has served a pack on **every** request for twelve rounds, and `served 162 of 162` was read as a

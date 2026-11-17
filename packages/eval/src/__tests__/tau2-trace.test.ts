@@ -20,6 +20,7 @@ import {
   parseTraceCalls,
   resolveConsolidation,
   resolveConsolidationKey,
+  resolveConsolidationLinkage,
   resolveDistillUnit,
   resolveSpeakCensus,
   resolveSpeakMargin,
@@ -432,6 +433,28 @@ describe('resolveConsolidationKey', () => {
       expect(() => resolveConsolidationKey(bad)).toThrow(/TAU_CONSOLIDATE_KEY must be/);
     }
   });
+
+describe('resolveConsolidationLinkage', () => {
+  it('defaults to the key, which is what every artefact before R139 ran', () => {
+    // The key was a filter in every round from R121 to R138. Defaulting to `all` would re-read those
+    // artefacts as runs that searched a population they never searched.
+    expect(resolveConsolidationLinkage(undefined)).toBe('key');
+    expect(resolveConsolidationLinkage('')).toBe('key');
+    expect(resolveConsolidationLinkage('  KEY ')).toBe('key');
+  });
+
+  it('reads the arm that stops the key removing pairs', () => {
+    expect(resolveConsolidationLinkage('all')).toBe('all');
+    expect(resolveConsolidationLinkage(' ALL ')).toBe('all');
+  });
+
+  it('refuses a value it does not know, before any model call', () => {
+    // A misspelt switch that fell back to `key` would run R139's control and publish it as its arm.
+    for (const bad of ['scope', 'routine', 'everything', '1']) {
+      expect(() => resolveConsolidationLinkage(bad)).toThrow(/TAU_CONSOLIDATE_LINKAGE must be/);
+    }
+  });
+});
 
 describe('resolveSpeakMargin', () => {
   it('defaults to zero, which serves every non-empty pack', () => {

@@ -272,10 +272,14 @@ describe('the operating-line for the recurrence pass', () => {
       pairs: 3081,
       skippedKind: 12,
       skippedScope: 2900,
+      // R121's store, read again under R139's counter: the pairs that passed every other test and were
+      // removed by the key alone. Zero here is a fact about *that* store as the pass saw it.
+      skippedKey: 0,
       skippedOverlap: 169,
+      linkage: 'scope',
     });
     expect(line).toContain('79 considered, 3081 pair(s)');
-    expect(line).toContain('12 kind, 2900 scope, 169 overlap');
+    expect(line).toContain('12 kind, 2900 scope, 0 hidden by the key, 169 overlap');
     expect(line).toContain('0 groups, 0 merged, 79 retained');
     expect(line).toContain('cross-task 0');
     expect(line).toContain('support ≥2 0→0');
@@ -294,6 +298,21 @@ describe('the operating-line for the recurrence pass', () => {
       'every pair reached the similarity test',
     );
   });
+
+  it('leads with the duplicates the key hid, which is a different failure from a filter that emptied the population', () => {
+    // R139. `skippedScope` alone could not tell "the store is 64 unrelated claims" from "the store holds
+    // six paraphrases and the key filed them apart": both report a large scope count and zero groups.
+    // The count that separates them is the subset that passed every other test.
+    const hidden = consolidationLineOf(report({ pairs: 1953, skippedScope: 34, skippedKey: 34, skippedOverlap: 0 }));
+    expect(hidden).toContain('34 hidden by the key');
+    expect(hidden).toContain('the key removed 34 pair(s) that every other test admitted');
+    // And the arm that stops the key removing them says so, rather than reporting a clean sweep it did
+    // not perform: the guards still ran, the key was simply not consulted.
+    const arm = consolidationLineOf(
+      report({ pairs: 1953, skippedScope: 0, skippedKey: 0, skippedOverlap: 1, linkage: 'all' }),
+    );
+    expect(arm).toContain('every pair reached the guards: the key was not consulted');
+  });
 });
 
 /** A census with the fields these cases vary, defaulted to R121's shape otherwise. */
@@ -301,6 +320,9 @@ function report(overrides: {
   readonly pairs: number;
   readonly skippedScope: number;
   readonly skippedOverlap: number;
+  /** R139: the pairs the key removed after every other test admitted them. Default 0, the world before it. */
+  readonly skippedKey?: number;
+  readonly linkage?: 'scope' | 'host' | 'all';
 }) {
   return {
     considered: 64,
@@ -322,6 +344,8 @@ function report(overrides: {
     largestGroup: 1,
     crossTaskGroups: 0,
     skippedKind: 0,
+    skippedKey: 0,
+    linkage: 'scope' as const,
     ...overrides,
   };
 }

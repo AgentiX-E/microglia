@@ -868,6 +868,7 @@ export {
   parseTraceCalls,
   resolveConsolidation,
   resolveConsolidationKey,
+  resolveConsolidationLinkage,
   resolveDistillUnit,
   resolveSpeakCensus,
   resolveSpeakMargin,

@@ -19,7 +19,7 @@ import { redundancyLine, storeRedundancy } from '../store-redundancy.js';
 type Artefact = {
   readonly tau2?: {
     readonly storeItems?: {
-      readonly items?: readonly { readonly statement?: string }[];
+      readonly items?: readonly { readonly statement?: string; readonly shape?: string }[];
       readonly omitted?: number;
       readonly truncated?: number;
     };
@@ -53,6 +53,10 @@ if (items.length === 0) {
 const statements = items.map((item) => ({
   statement: item.statement ?? '',
   clipped: (sample?.truncated ?? 0) > 0,
+  // R139: the routine the item was filed under, which is the key the recurrence pass compares by when a
+  // registration asks for `consolidateKey: routine`. Carried so the census can say which of its joined
+  // pairs a keyed pass could have reached — R137's store answers 0 of 35, and that is the whole round.
+  ...(item.shape === undefined ? {} : { key: item.shape }),
 }));
 const census = storeRedundancy(statements);
 const omitted = sample?.omitted ?? 0;

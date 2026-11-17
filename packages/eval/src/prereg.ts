@@ -251,6 +251,19 @@ export type Prereg = {
    */
   readonly consolidateKey?: 'scope' | 'routine';
   /**
+   * Whether that key removes pairs or only describes them.
+   *
+   * R139. R121 and R124 both treated a key mismatch as a finding — two items filed differently are
+   * not one claim — which the pass cannot know before it reads them. The store R137 wrote makes the
+   * cost exact: **1,953** live pairs, **35** at or above the 0.60 floor, and **all 35 cross-key**, so
+   * the pass could reach none of them and `sup2` stayed at 2 of 66 while the store held six
+   * paraphrases of one sentence. `all` stops the key removing pairs; the claim guards still decide.
+   *
+   * Absent means `key`, which is what every artefact before this header measured. A registration
+   * that names it without `consolidate: true` is refused for `consolidateKey`'s reason.
+   */
+  readonly consolidateLinkage?: 'key' | 'all';
+  /**
    * How far ahead of its runner-up the best candidate must be for the pack to be served at all.
    *
    * R123. The lane has served a pack on every request for twelve rounds and `served 162 of 162` was read as
@@ -500,6 +513,7 @@ const HEADER_KEYS = [
   'rehearsalControl',
   'consolidate',
   'consolidateKey',
+  'consolidateLinkage',
   'speakMargin',
   'trials',
   'effectClaimPp',
@@ -1037,6 +1051,26 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       problem: 'the key decides how the recurrence pass compares items, so it needs consolidate: true',
     });
   }
+  // R139: the key is a prior or it is a verdict, and that is a second decision. Read here so a misspelt
+  // value refuses the registration rather than being resolved to the control inside a dispatch.
+  const consolidateLinkageText = values.get('consolidateLinkage');
+  let consolidateLinkage: 'key' | 'all' | undefined;
+  if (consolidateLinkageText !== undefined) {
+    if (consolidateLinkageText !== 'key' && consolidateLinkageText !== 'all') {
+      collected.push({
+        where: `header 'consolidateLinkage'`,
+        problem: `'${consolidateLinkageText}' is not one of key, all`,
+      });
+    } else {
+      consolidateLinkage = consolidateLinkageText;
+    }
+  }
+  if (consolidateLinkage !== undefined && consolidate !== true) {
+    collected.push({
+      where: `header 'consolidateLinkage'`,
+      problem: 'the linkage decides whether the recurrence pass filters pairs, so it needs consolidate: true',
+    });
+  }
   // R121's switch and the unit it cannot apply to. `raw` writes one verbatim event per episode and the
   // pass merges claims; asking for both is not an arm, and a dispatch that ran it would score a store the
   // registration does not describe.
@@ -1561,6 +1595,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(rehearsalControl === undefined ? {} : { rehearsalControl }),
       ...(consolidate === undefined ? {} : { consolidate }),
       ...(consolidateKey === undefined ? {} : { consolidateKey }),
+      ...(consolidateLinkage === undefined ? {} : { consolidateLinkage }),
       ...(speakMargin === undefined ? {} : { speakMargin }),
       ...(trials === undefined ? {} : { trials }),
       ...(effectClaimPp === undefined ? {} : { effectClaimPp }),

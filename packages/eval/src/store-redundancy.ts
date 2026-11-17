@@ -51,10 +51,34 @@ export type RedundancyCensus = {
   readonly floor: number;
   /** Inputs the caller clipped before handing them over. Non-zero makes the reading an upper bound. */
   readonly truncated: number;
+  /**
+   * Joined pairs whose two rows are filed under the same key, and whose are not.
+   *
+   * R139. A pass that compares only within one key can reach the first number and never the second,
+   * and until this field existed an artefact could report `groups: 43` beside a pass's `merged: 1`
+   * without the reader being able to tell that the difference was the key rather than the guards.
+   * Both are zero when no row carried a key, which is the census every earlier round took; a pair with
+   * a key on one side only is counted by neither, because half a key is not a filing decision.
+   */
+  readonly joinedWithinKey: number;
+  readonly joinedAcrossKey: number;
 };
 
-/** A statement and whether the caller had to clip it to get here. */
-export type RedundancyInput = { readonly statement: string; readonly clipped?: boolean };
+/**
+ * A statement, whether the caller had to clip it, and the key it is filed under.
+ *
+ * R139. The census has always been keyless, which is right for the question it was written to answer
+ * — *how many distinct claims does this store hold* — and wrong for the one the recurrence pass acts
+ * on, because that pass only ever compares two items filed under the same key. Carrying the key here
+ * lets one artefact answer both: `groups` is what the store knows, and the split of `joined` into
+ * within-key and across-key is what the pass could have reached.
+ */
+export type RedundancyInput = {
+  readonly statement: string;
+  readonly clipped?: boolean;
+  /** The key the item is filed under. Absent on a sample whose rows carry none. */
+  readonly key?: string;
+};
 
 /**
  * The distinct claims in a set of statements, by the consolidator's key.
@@ -85,11 +109,26 @@ export function storeRedundancy(
 
   let pairs = 0;
   let joined = 0;
+  let joinedWithinKey = 0;
+  let joinedAcrossKey = 0;
   for (let left = 0; left < rows.length; left += 1) {
     for (let right = left + 1; right < rows.length; right += 1) {
       pairs += 1;
       if (claimContainment(terms[left] as ReadonlySet<string>, terms[right] as ReadonlySet<string>) < floor) continue;
       joined += 1;
+      // Two rows both without a key are not "the same key": one silence is not evidence of agreement,
+      // which is the rule `distill` states everywhere it compares an absent field with an absent one —
+      // and a pair with no key on either side is skipped by both counters rather than counted as a join
+      // a keyed pass could not reach.
+      const leftKey = rows[left]?.key;
+      const rightKey = rows[right]?.key;
+      // A pair with half a key is counted by neither counter and still merged: the split is a reading of
+      // the filing, not a gate on the claim, and letting it skip the union is how a census reports a
+      // store of unrelated claims while its own pair count says otherwise.
+      if (leftKey !== undefined && rightKey !== undefined) {
+        if (leftKey === rightKey) joinedWithinKey += 1;
+        else joinedAcrossKey += 1;
+      }
       const a = find(left);
       const b = find(right);
       if (a !== b) parent[a] = b;
@@ -111,6 +150,8 @@ export function storeRedundancy(
     largest: sizes.size === 0 ? 0 : Math.max(...sizes.values()),
     floor,
     truncated: rows.filter((row) => row.clipped === true).length,
+    joinedWithinKey,
+    joinedAcrossKey,
   };
 }
 
@@ -125,9 +166,19 @@ export function redundancyLine(census: RedundancyCensus): string {
     `redundancy: ${String(census.statements)} statement(s), ${String(census.groups)} distinct claim(s) ` +
     `(${(census.redundancy * 100).toFixed(1)}% restated), largest ${String(census.largest)}, ` +
     `${String(census.joined)} of ${String(census.pairs)} pair(s) at or above ${census.floor.toFixed(2)}`;
-  return census.truncated === 0
-    ? head
-    : `${head}; ${String(census.truncated)} input(s) were clipped, so this is an upper bound`;
+  // R139: what a keyed pass could reach, printed beside what the store holds. Omitted when no row
+  // carried a key, because a zero there would be a reading of a census that did not ask.
+  const keyedPairs = census.joinedWithinKey + census.joinedAcrossKey;
+  const keyed =
+    keyedPairs === 0
+      ? ''
+      : `; ${String(census.joinedAcrossKey)} of the ${String(keyedPairs)} joined pair(s) that carry a key ` +
+        `on both sides are filed under different keys, which a keyed pass cannot reach`;
+  const caveat =
+    census.truncated === 0
+      ? ''
+      : `; ${String(census.truncated)} input(s) were clipped, so this is an upper bound`;
+  return `${head}${keyed}${caveat}`;
 }
 
 /**
@@ -138,11 +189,19 @@ export function redundancyLine(census: RedundancyCensus): string {
  * upper bound, and the caller is expected to print the sample's size beside the answer — the module cannot
  * know how many items it was not shown, so it does not guess.
  */
-export function redundancyOfSample(sample: {
-  readonly items: readonly { readonly statement: string }[];
-  readonly truncated: number;
-}): RedundancyCensus {
+export function redundancyOfSample(
+  sample: {
+    readonly items: readonly { readonly statement: string; readonly key?: string }[];
+    readonly truncated: number;
+  },
+  options: { readonly floor?: number } = {},
+): RedundancyCensus {
   return storeRedundancy(
-    sample.items.map((item) => ({ statement: item.statement, clipped: sample.truncated > 0 })),
+    sample.items.map((item) => ({
+      statement: item.statement,
+      clipped: sample.truncated > 0,
+      ...(item.key === undefined ? {} : { key: item.key }),
+    })),
+    options,
   );
 }

@@ -960,6 +960,27 @@ its one pair of repeats reads 0.700 and the closest pair that is not a repeat re
 | `supportBefore` / `supportAfter` | the distribution of `supportTasks` on both sides, which is the reading a corroboration gate asks for |
 | `threshold`, `conditionMinShared` | the two floors this pass used, so two stores consolidated under different settings are not compared by accident |
 | `refusedCondition` / `refusedPayload` / `refusedDuplicateEvidence` | why pairs that overlapped were not merged |
+| `skippedKey` | duplicates the linkage key removed after every other test had admitted them — the pairs a keyed pass can never merge |
+
+### The linkage key, and why it defaults to filtering
+
+The pass is quadratic, so it groups items by a *key* before comparing them: `scopeKey(item.scope)` by
+default, or whatever a host supplies through `keyOf` (a hook that knows the routine behind an item, say).
+The key was introduced to make the test affordable and it is easy to read as a finding — *two items filed
+differently are two claims* — which the pass cannot know before it reads them. On a real store of 64
+statements that cost everything: the store held **43** distinct claims, the pass merged **one**, and
+**34 of the 35** joins sat under different keys, so the pass was comparing the one pair its key admitted
+while 34 duplicates went unexamined.
+
+```ts
+consolidateKnowledge(items, { now, policy, linkage: 'all' });   // the key still names, it no longer removes
+```
+
+`linkage: 'all'` stops the key removing pairs and leaves **every** claim test in force: kind, containment
+at `threshold`, the condition floor, payload equality, duplicate-evidence refusal, and complete linkage.
+It is *look everywhere*, not *merge everything*. `skippedKey` is the field to read on either setting: on
+`'key'` it counts the candidates the key deleted, and on `'all'` it must be `0` — if it is not, the option
+did not reach the pass and the run is not the arm it claims to be.
 
 Two things it does not do. It does not delete: a retired member is kept with `statusReason:
 consolidated:<id>`, so an erasure request and an audit both still see it. And it does not decide what
@@ -2728,9 +2749,11 @@ Three habits that follow:
 2. **Compare `top1` against the number of records, not against the pack size.** R120 served four items a
    request from 73 records and one record took 54% of the requests; the pack size was healthy and the
    supply was not.
-3. **When `groups` is 0, read `pairs` and `skippedScope` before concluding anything about the store.** A
-   merge keyed on the model's own scope spelling will report zero groups on a store full of paraphrases —
-   the pass tested 4 of 2,016 pairs, which is a statement about the key.
+3. **When `groups` is 0, read `pairs`, `skippedScope` and `skippedKey` before concluding anything about the
+   store.** A merge keyed on the model's own scope spelling will report zero groups on a store full of
+   paraphrases — the pass tested 4 of 2,016 pairs, which is a statement about the key. `skippedKey` is the
+   sharper reading of the two: it counts the pairs that passed every other test and were removed by the key
+   alone, so a store with `skippedKey > 0` has duplicates the pass was in a position to merge and did not.
 
 ### 13.26 Why a merge census and a merge are not the same number
 
@@ -2742,9 +2765,12 @@ A store can report two very different counts of "things taught twice", and both 
 | `consolidation.merged` | the **claim** an item states, compared by wording + scope | **0** of 79 items, with 4 candidate pairs |
 
 Twelve routines taught twice and zero claims written twice are both true of that store: 79 items, every one
-with `supportTasks: 1`. **A merge raises `supportTasks`; a recurrence census does not.** If you want the second
-number to move, the pass has to key on the object the census keyed on — which is what R124 changes, and what
-`skippedScope` will show it doing.
+with `supportTasks: 1`. **A merge raises `supportTasks`; a recurrence census does not.** R124 answered by
+keying the pass on the routine the census keys on, and that answer was incomplete in a way this table can
+now state: keying on the routine only lets the pass compare items *inside one routine*, and R137's store
+filed **34 of its 35** joins across routines — so the pass still merged one item out of a store whose
+wording repeats a third of itself. What moves the second number is not a better key but `linkage: 'all'`,
+which leaves the key informational and the claim test decisive.
 
 ### 13.27 Choosing a margin rung without buying a wrong one
 

@@ -1595,6 +1595,32 @@ describe('the distilling scope', () => {
     ]);
   });
 
+  it('reads whether the key filters pairs or only describes them, and only beside the pass', () => {
+    // R139. The key was a filter in every round from R121 to R138, so `key` is the control and `all` is
+    // the arm. A linkage without the pass is the same defect the key without the pass is: the dispatch
+    // would measure the control under the treatment's name.
+    expect(
+      readPrereg(withHeader('consolidate: true\nconsolidateLinkage: all'), 'R87-distill-scope.md').prereg
+        ?.consolidateLinkage,
+    ).toBe('all');
+    expect(
+      readPrereg(withHeader('consolidate: true\nconsolidateLinkage: key'), 'R87-distill-scope.md').prereg
+        ?.consolidateLinkage,
+    ).toBe('key');
+    expect(readPrereg(withHeader('consolidate: true'), 'R87-distill-scope.md').prereg?.consolidateLinkage)
+      .toBeUndefined();
+    expect(
+      readPrereg(withHeader('consolidate: true\nconsolidateLinkage: both'), 'R87-distill-scope.md').problems,
+    ).toEqual([{ where: "header 'consolidateLinkage'", problem: "'both' is not one of key, all" }]);
+    expect(readPrereg(withHeader('consolidateLinkage: all'), 'R87-distill-scope.md').problems).toEqual([
+      {
+        where: "header 'consolidateLinkage'",
+        problem:
+          'the linkage decides whether the recurrence pass filters pairs, so it needs consolidate: true',
+      },
+    ]);
+  });
+
   it('reads the margin below which a contested pack is withheld, and refuses what it cannot use', () => {
     // R123. Zero is the default and it is not "off" -- it is "serve every non-empty pack" -- so a value
     // that fell back to zero would publish the control under the treatment's name.

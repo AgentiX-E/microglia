@@ -172,6 +172,7 @@ export function consolidationLineOf(census: ConsolidationCensus): string {
   const head =
     `${String(census.considered)} considered, ${String(census.pairs)} pair(s) ` +
     `(${String(census.skippedKind)} kind, ${String(census.skippedScope)} scope, ` +
+    `${String(census.skippedKey)} hidden by the key, ` +
     `${String(census.skippedOverlap)} overlap removed)`;
   const survived =
     `${String(census.groups)} groups, ${String(census.merged)} merged, ` +
@@ -184,13 +185,22 @@ export function consolidationLineOf(census: ConsolidationCensus): string {
   // The sentence a reader needs most, and the one no counter states: which filter took the population.
   const scope = census.skippedScope;
   const overlap = census.skippedOverlap;
+  // R139: the filter that removes the *answer* rather than the population. A pair the key hid passed
+  // every test that decides whether two items state one claim and was removed for being filed
+  // elsewhere — the sentence R124's readback needed and could not write, because the count did not exist.
+  const hidden = census.skippedKey;
   const verdict =
-    census.pairs === 0
-      ? 'no pair to test: the store holds fewer than two items of one kind'
-      : scope >= overlap && scope > 0
-        ? `the scope key removed ${String(scope)} of ${String(census.pairs)} pair(s) — a merge keyed on the model's own scope spelling`
-        : overlap > 0
-          ? `the claim overlap removed ${String(overlap)} of ${String(census.pairs)} pair(s) — the store holds distinct claims`
-          : 'every pair reached the similarity test';
+    hidden > 0
+      ? `the key removed ${String(hidden)} pair(s) that every other test admitted — the store holds ` +
+        `${String(hidden)} duplicate(s) filed under a different key`
+      : census.linkage === 'all'
+        ? 'every pair reached the guards: the key was not consulted'
+        : census.pairs === 0
+          ? 'no pair to test: the store holds fewer than two items of one kind'
+          : scope >= overlap && scope > 0
+            ? `the scope key removed ${String(scope)} of ${String(census.pairs)} pair(s) — a merge keyed on the model's own scope spelling`
+            : overlap > 0
+              ? `the claim overlap removed ${String(overlap)} of ${String(census.pairs)} pair(s) — the store holds distinct claims`
+              : 'every pair reached the similarity test';
   return `${head}: ${survived}. ${verdict}`;
 }

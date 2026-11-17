@@ -125,6 +125,21 @@ export type ConsolidationOptions = {
    * depend on how much of the trace a run happened to have.
    */
   readonly keyOf?: (item: KnowledgeItem) => string | undefined;
+  /**
+   * Whether the key **filters** pairs or only **orders** them. Default `key`.
+   *
+   * R139. The key arrived in R121 as a way to make the quadratic test affordable, and it was never
+   * re-read as a claim: a pair whose keys differ was removed before the similarity test, so the pass
+   * could only ever find a duplicate filed under the same bucket. R139 read the store that
+   * arrangement produces — 64 items, 1,953 live pairs, **35 above the 0.60 floor and every one of
+   * them cross-key** — so the key was not narrowing the search, it was deleting the answer. With
+   * `all`, every pair reaches the guards and the key is not consulted; the cost is the full
+   * `C(n,2)`, which for a store of tens is a few thousand set intersections.
+   *
+   * `all` is a treatment and `key` is the control, which is why it is an option rather than a
+   * correction: a pass that stopped filtering would silently change every arm that ever ran.
+   */
+  readonly linkage?: "key" | "all";
 };
 
 /** One group of items the pass folded into one, and the two readings that say how strong it is. */
@@ -202,8 +217,18 @@ export type ConsolidationCensus = {
   readonly skippedKind: number;
   /** Pairs removed because the two scopes do not spell the same key — the filter R121 died on. */
   readonly skippedScope: number;
-  /** Which key admitted a pair: the item's scope (the default) or one the host supplied. */
-  readonly linkage: 'scope' | 'host';
+  /**
+   * Of `skippedScope`, the pairs that passed **every other test** and were removed by the key alone.
+   *
+   * R139. These are the duplicates the pass was in a position to merge and refused because the two
+   * items were filed under different keys — the number that separates "the store has nothing to
+   * merge" from "the key is deleting the answer". It is the count a registration reads before it
+   * spends a dispatch on `linkage: "all"`, and it is measured in both modes so an arm and its
+   * control describe the same candidate population.
+   */
+  readonly skippedKey: number;
+  /** Which key admitted a pair: the item's scope (the default), one the host supplied, or none. */
+  readonly linkage: 'scope' | 'host' | 'all';
   /** Pairs removed because their claim overlap fell short of `threshold`. */
   readonly skippedOverlap: number;
 };
@@ -437,6 +462,9 @@ export function consolidateKnowledge(
   // compared inline so the fallback is in one place: a host key that answers for some items and not
   // others must not read as two different keys for the same item.
   const keyFor = (entry: KnowledgeItem): string => options.keyOf?.(entry) ?? scopeKey(entry.scope);
+  // R139: whether the key removes a pair or merely describes it. `all` skips the removal; it does not
+  // skip the measurement, because the control's `skippedKey` is what makes the two arms comparable.
+  const keyFilters = options.linkage !== "all";
 
   let refusedCondition = 0;
   let refusedPayload = 0;
@@ -446,6 +474,7 @@ export function consolidateKnowledge(
   // reports only refusals cannot tell "nothing to merge" from "nothing survived the key".
   let skippedKind = 0;
   let skippedScope = 0;
+  let skippedKey = 0;
   let skippedOverlap = 0;
 
   for (let left = 0; left < consideredIndexes.length; left += 1) {
@@ -458,20 +487,25 @@ export function consolidateKnowledge(
         skippedKind += 1;
         continue;
       }
-      if (keyFor(leftItem) !== keyFor(rightItem)) {
-        skippedScope += 1;
-        continue;
-      }
+      // The key is *measured* for every pair and *applied* to the ones that reach it. R139 moved the
+      // content tests above the removal so the census can say what the key cost — before it, a
+      // key-mismatched pair was counted and discarded without its similarity ever being computed, and
+      // 35 duplicates in a 64-item store were invisible for eighteen rounds.
+      const keyAgrees = keyFor(leftItem) === keyFor(rightItem);
+      if (!keyAgrees && keyFilters) skippedScope += 1;
       const overlap = overlapOf(leftIndex, rightIndex);
+      // Every counter below is gated on `keyAgrees`, because each one used to be reachable only for a
+      // pair the key admitted: counting a key-mismatched pair's refusal here would change what every
+      // earlier artefact's number means.
       if (overlap < threshold) {
-        skippedOverlap += 1;
+        if (keyAgrees) skippedOverlap += 1;
         continue;
       }
       if (
         conditionMinShared > 0 &&
         conditionSharedOf(leftIndex, rightIndex) < conditionMinShared
       ) {
-        refusedCondition += 1;
+        if (keyAgrees) refusedCondition += 1;
         continue;
       }
       if (
@@ -479,11 +513,16 @@ export function consolidateKnowledge(
         rightItem.payload !== undefined &&
         !jsonEqual(leftItem.payload, rightItem.payload)
       ) {
-        refusedPayload += 1;
+        if (keyAgrees) refusedPayload += 1;
         continue;
       }
       if (sameEvidence(leftItem, rightItem)) {
-        refusedDuplicateEvidence += 1;
+        if (keyAgrees) refusedDuplicateEvidence += 1;
+        continue;
+      }
+      // Every content test admitted this pair. What happens next is the whole of R139.
+      if (!keyAgrees && keyFilters) {
+        skippedKey += 1;
         continue;
       }
       // Complete linkage: the pair joins only if every member of one group matches every member of
@@ -673,8 +712,10 @@ export function consolidateKnowledge(
           : (consideredIndexes.length * (consideredIndexes.length - 1)) / 2,
       skippedKind,
       skippedScope,
+      skippedKey,
       skippedOverlap,
-      linkage: options.keyOf === undefined ? 'scope' : 'host',
+      linkage:
+        options.linkage === "all" ? 'all' : options.keyOf === undefined ? 'scope' : 'host',
     },
   };
 }

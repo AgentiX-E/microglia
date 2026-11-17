@@ -1389,11 +1389,20 @@ instruction about a rare situation. **When a census reports a mean over renders,
 over records looks like before believing anything about the store.**
 
 **Pair population** — The number of unordered pairs of items a consolidation pass could test, `C(n,2)`, and
-the three filters that remove them before any refusal is counted: `skippedKind`, `skippedScope`,
-`skippedOverlap`. R121 reported `groups 0, merged 0` with every refusal counter at zero, which is consistent
-with "nothing to merge" and with "the key removed everything". It was the second: the linkage key includes the
-distiller's free-text `intent`, 64 items fell into **60** buckets, and **4 of 2,016** pairs were ever tested.
-A census that counts refusals but not the population they were drawn from cannot tell those two apart.
+the four filters that remove them before any refusal is counted: `skippedKind`, `skippedScope`,
+`skippedKey`, `skippedOverlap`. R121 reported `groups 0, merged 0` with every refusal counter at zero, which
+is consistent with "nothing to merge" and with "the key removed everything". It was the second: the linkage
+key includes the distiller's free-text `intent`, 64 items fell into **60** buckets, and **4 of 2,016** pairs
+were ever tested. A census that counts refusals but not the population they were drawn from cannot tell
+those two apart.
+
+**Hidden candidate** — A pair the linkage key removed *after* every test that decides whether two items state
+one claim had admitted it. It is `skippedKey`, and it is the only number that separates the two ways a store
+can report zero groups: *the store holds distinct claims* (no admissible pair exists) from *the key is
+deleting the answer* (admissible pairs exist and were never compared). On the store R137 wrote, 64 statements
+held **43** distinct claims, the pass merged **one**, and **34 of the 35** joins were filed under different
+keys — so `sup2 2 of 66` was arithmetic of a filter, not a property of the corpus. `linkage: "all"` stops the
+key removing pairs and leaves every claim test in force.
 
 **Two denominators** — `pass^4` is the fraction of *tasks* whose k trials all passed; `episode_rate` is the
 fraction of *episodes* that passed. The first is `p^k` averaged over tasks and is a nonlinear function of the

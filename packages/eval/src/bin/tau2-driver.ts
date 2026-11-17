@@ -102,6 +102,7 @@ import {
   resolveDistillScope,
   resolveConsolidation,
   resolveConsolidationKey,
+  resolveConsolidationLinkage,
   resolveSpeakCensus,
   resolveSpeakMargin,
   resolveDistillUnit,
@@ -674,6 +675,16 @@ const CONSOLIDATE = resolveConsolidation() && DISTILL_UNIT !== "raw";
  * `scope` is the default and reproduces R121 exactly; `routine` is the arm.
  */
 const CONSOLIDATE_KEY = resolveConsolidationKey();
+
+/**
+ * Whether that key filters pairs or only describes them, R139's one variable.
+ *
+ * Read here for the same reason as the key: an unrecognised value must refuse the run before the first
+ * model call rather than fall back to the control under the treatment's name. `key` is what every
+ * committed artefact measured; `all` is the arm, and the census carries the hidden-candidate count in
+ * both so the pair of them is one measurement of one store.
+ */
+const CONSOLIDATE_LINKAGE = resolveConsolidationLinkage();
 
 /** Where the pass runs: the unit it has always run on, plus any unit a registration asked for. */
 const CONSOLIDATION_RUNS = CONSOLIDATE || DISTILL_UNIT === "trace";
@@ -1776,6 +1787,10 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     ...(CONSOLIDATE_KEY === "routine"
       ? { keyOf: (entry: Parameters<typeof shapeOf>[0]) => shapeOf(entry) }
       : {}),
+    // R139: the key the block above chooses is a prior, not a verdict. `all` stops it removing pairs;
+    // the guards below still decide whether two items state one claim, so the arm is "look everywhere"
+    // rather than "merge everything".
+    ...(CONSOLIDATE_LINKAGE === "all" ? { linkage: "all" as const } : {}),
   } as const;
   // Not for the raw unit, and the reason is the arm rather than the pass: a record is one event, and
   // merging two records by statement similarity produces a third record neither episode wrote --

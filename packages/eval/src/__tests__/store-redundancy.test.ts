@@ -120,3 +120,70 @@ describe('the line a readback prints', () => {
     expect(redundancyLine(storeRedundancy([RETURN_CARRIES, RETURN_CARRIES_SHORT]))).not.toContain('clipped');
   });
 });
+
+/**
+ * R139 — the split between the joins a keyed pass can reach and the ones it cannot.
+ *
+ * R137's store is the case: 43 distinct claims over 64 statements, and the recurrence pass merged one
+ * of them. Neither number was wrong. The pass compares only within a key, and 34 of the 35 joins are
+ * filed under different keys, so the census could report the store's redundancy and the pass's
+ * inactivity in one artefact without either being legible as a defect.
+ */
+describe('the joins a keyed pass could reach', () => {
+  it('counts a join inside one key and a join across two', () => {
+    const census = storeRedundancy([
+      { statement: RETURN_CARRIES, key: 'return_delivered_order_items' },
+      { statement: RETURN_CARRIES_SHORT, key: 'return_delivered_order_items' },
+      { statement: RETURN_CARRIES_SHORT, key: 'cancel_pending_order' },
+    ]);
+    // Two statements of one claim, then a third that repeats the shorter one under another routine.
+    expect(census.joined).toBe(3);
+    expect(census.joinedWithinKey).toBe(1);
+    expect(census.joinedAcrossKey).toBe(2);
+    expect(census.groups).toBe(1);
+  });
+
+  it('counts a half-keyed pair by neither counter and still merges it', () => {
+    // The regression this case exists for: an early version skipped the union for a pair with a key on
+    // one side only, and the census reported three distinct claims over three statements while its own
+    // `joined` said 1 — the two numbers would have travelled together and contradicted each other.
+    const census = storeRedundancy([
+      { statement: RETURN_CARRIES, key: 'return_delivered_order_items' },
+      { statement: RETURN_CARRIES_SHORT },
+    ]);
+    expect(census.joined).toBe(1);
+    expect(census.joinedWithinKey).toBe(0);
+    expect(census.joinedAcrossKey).toBe(0);
+    expect(census.groups).toBe(1);
+  });
+
+  it('says nothing about keys when no join carried two of them', () => {
+    // Silence rather than "0 of 0": a census over rows that carry no key has not asked the question,
+    // and a sentence saying every join is within its key would be an answer it did not have.
+    const line = redundancyLine(storeRedundancy([RETURN_CARRIES, RETURN_CARRIES_SHORT]));
+    expect(line).not.toContain('filed under different keys');
+  });
+
+  it('states the cross-key share on the line when it can, because that is the number a dispatch buys', () => {
+    const line = redundancyLine(
+      storeRedundancy([
+        { statement: RETURN_CARRIES, key: 'a' },
+        { statement: RETURN_CARRIES_SHORT, key: 'b' },
+      ]),
+    );
+    expect(line).toContain('1 of the 1 joined pair(s) that carry a key on both sides');
+    expect(line).toContain('which a keyed pass cannot reach');
+  });
+
+  it('carries the keys through a sample, which is the shape the projection has', () => {
+    const census = redundancyOfSample({
+      items: [
+        { statement: RETURN_CARRIES, key: 'a' },
+        { statement: RETURN_CARRIES_SHORT, key: 'b' },
+      ],
+      truncated: 0,
+    });
+    expect(census.joinedAcrossKey).toBe(1);
+    expect(census.joinedWithinKey).toBe(0);
+  });
+});

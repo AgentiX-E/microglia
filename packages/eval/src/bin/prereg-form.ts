@@ -101,6 +101,9 @@ function main(): void {
       `learnOnly=${declaredLearnOnly === undefined ? '' : String(declaredLearnOnly)}\n` +
       `consolidate=${declaredConsolidate === undefined ? '' : String(declaredConsolidate)}\n` +
       `consolidateKey=${reading.prereg.consolidateKey ?? ''}\n` +
+      // R139: whether that key filters or describes. Printed the way the header wrote it, so a
+      // dispatch that named `all` cannot arrive at the driver as the control.
+      `consolidateLinkage=${reading.prereg.consolidateLinkage ?? ''}\n` +
       `rehearsal=${declaredRehearsal === undefined ? '' : String(declaredRehearsal)}\n` +
       // R133: the control replay. Printed the way the header wrote it, the same wire `rehearsal` rides.
       `rehearsalControl=${

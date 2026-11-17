@@ -1229,3 +1229,124 @@ describe("the linkage key a host may supply", () => {
     expect(report).toMatchObject({ pairs: 1, skippedScope: 0, skippedOverlap: 1, groups: 0, merged: 0 });
   });
 });
+
+/**
+ * R139 — the key was a filter when it had to be a prior.
+ *
+ * R121 introduced the key to make the quadratic test affordable, and R124 moved it from the item's
+ * free-text scope to the routine behind it. Both rounds treated a key mismatch as a statement that
+ * two items are not one claim — which the pass cannot know before it reads them. R139 read the store
+ * that arrangement produces: of **1,953** live pairs in a 64-item store, **35** reach the 0.60 floor
+ * and **every one of them is cross-key**, so the pass tested nothing and the census reported `sup2`
+ * two of sixty-six while the store held six paraphrases of one sentence.
+ *
+ * These cases pin the two halves of the repair: the key still counts what it removes, and in `all`
+ * mode it removes nothing.
+ */
+describe("R139 — the key that hid every duplicate the store held", () => {
+  const twoSpellings = (): readonly [KnowledgeItem, KnowledgeItem] => {
+    const base = candidate("A return carries the item ids being returned.", { id: "a", taskId: "task-1" });
+    // Two tasks, because the question this pair answers is whether one claim reached support 2 — a
+    // fixture in which both items cite one task would merge and still report support 1, and the case
+    // would pass while proving nothing about corroboration.
+    const other = candidate("A return carries the item ids being returned.", { id: "b", taskId: "task-2" });
+    return [
+      item({ ...base, scope: { task: "retail", intent: "return_items" } }, "k1"),
+      item({ ...other, scope: { task: "retail", intent: "items to return" } }, "k2"),
+    ] as const;
+  };
+
+  it("counts the pairs that failed only the key, which the old census could not name", () => {
+    const [left, right] = twoSpellings();
+    const { report } = consolidateKnowledge([left, right], { now: AT, policy: defaultPolicy });
+    // One claim, two spellings: the key removed it and nothing else would have.
+    expect(report).toMatchObject({ pairs: 1, skippedScope: 1, skippedKey: 1, merged: 0, linkage: "scope" });
+  });
+
+  it("does not count a pair the key removed and the claims also refused", () => {
+    // The two halves have to stay apart: `skippedKey` is a candidate the key deleted, not every pair
+    // whose keys differ. A store of unrelated claims filed under unrelated scopes hides nothing.
+    const left = item(
+      {
+        ...candidate("A cancellation includes the order id and a reason.", { id: "a" }),
+        scope: { task: "retail", intent: "cancel" },
+      },
+      "k1",
+    );
+    const right = item(
+      {
+        ...candidate("An exchange needs the payment method of the original order.", { id: "b" }),
+        scope: { task: "retail", intent: "exchange" },
+      },
+      "k2",
+    );
+    const { report } = consolidateKnowledge([left, right], { now: AT, policy: defaultPolicy });
+    expect(report).toMatchObject({ skippedScope: 1, skippedKey: 0, skippedOverlap: 0, merged: 0 });
+  });
+
+  it("merges the pair the key was hiding once the key is a prior rather than a filter", () => {
+    const [left, right] = twoSpellings();
+    const { items, report } = consolidateKnowledge([left, right], {
+      now: AT,
+      policy: defaultPolicy,
+      linkage: "all",
+    });
+    expect(report).toMatchObject({
+      pairs: 1,
+      // Nothing was removed by the key because the key was not consulted for removal — and the
+      // candidate it used to hide is now the group it merges.
+      skippedScope: 0,
+      skippedKey: 0,
+      groups: 1,
+      merged: 1,
+      retained: 1,
+      linkage: "all",
+      crossTaskGroups: 1,
+      largestGroup: 2,
+    });
+    // Support is a union of evidence, not a copy of one member's: two tasks now stand behind one claim.
+    expect(items.filter((entry) => entry.status !== "retired")).toHaveLength(1);
+    expect(report.supportAfter).toEqual({ 2: 1 });
+    expect(report.maxSupportAfter).toBe(2);
+  });
+
+  it("keeps the guards in force when the key is not: a different claim still stays two items", () => {
+    // The point of `all` is that the *key* stops deciding. Every test that decides whether two items
+    // state one claim is still applied, and this case is the one that would fail if `all` had become
+    // "merge everything in the store".
+    const left = item(candidate("A cancellation includes the order id and a reason.", { id: "a" }), "k1");
+    const right = item(
+      candidate("An exchange needs the payment method of the original order.", { id: "b" }),
+      "k2",
+    );
+    const { report } = consolidateKnowledge([left, right], {
+      now: AT,
+      policy: defaultPolicy,
+      linkage: "all",
+    });
+    expect(report).toMatchObject({ skippedScope: 0, skippedOverlap: 1, groups: 0, merged: 0 });
+  });
+
+  it("reports the same candidate population in both modes, so an arm and its control are comparable", () => {
+    // The control has to describe the population the treatment searched. If `all` changed what
+    // `pairs` counted, an arm's groups could not be read against its control's hidden count.
+    const [left, right] = twoSpellings();
+    const control = consolidateKnowledge([left, right], { now: AT, policy: defaultPolicy }).report;
+    const arm = consolidateKnowledge([left, right], { now: AT, policy: defaultPolicy, linkage: "all" }).report;
+    expect(arm.pairs).toBe(control.pairs);
+    expect(arm.skippedKey).toBe(0);
+    expect(control.skippedKey).toBe(1);
+  });
+
+  it("treats an unknown linkage value as the key, because an arm may not become a treatment by typo", () => {
+    const [left, right] = twoSpellings();
+    // The header is validated where it is parsed; the pass is the second line of defence and the one
+    // that runs inside a dispatch nobody re-reads.
+    const { report } = consolidateKnowledge([left, right], {
+      now: AT,
+      policy: defaultPolicy,
+      linkage: "everything" as unknown as "all",
+    });
+    expect(report).toMatchObject({ skippedScope: 1, skippedKey: 1, merged: 0, linkage: "scope" });
+  });
+});
