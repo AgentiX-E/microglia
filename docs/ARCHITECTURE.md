@@ -116,7 +116,15 @@ it gets the bytes it always got.
 
 | It merges | It refuses, and counts |
 |---|---|
-| same kind, same scope, statements whose terms are contained past a floor, compatible conditions | different payloads (one item cannot carry both), identical evidence (no support bought), conditions that share less than three content terms (the first would win by arrival order) |
+| same kind, statements whose terms are contained past a floor, compatible conditions | different payloads (one item cannot carry both), identical evidence (no support bought), conditions that share less than three content terms (the first would win by arrival order) |
+
+**The key narrows the search; it does not decide the claim.** The pass is quadratic, so it groups items
+by a key before comparing them — the scope by default, or a routine a host supplies — and for a long
+time a pair whose keys differed was removed rather than compared. That is a filter doing a measurement's
+job: on a real store of 64 statements it hid **34 of the 35** duplicate pairs, so the pass merged one
+item out of a store that repeated a third of itself. `linkage: 'all'` keeps every claim test and stops
+the key removing pairs, and the census reports `skippedKey` — the pairs the key removed after every
+other test admitted them — so the two readings can never again be confused. See §13 of the user guide.
 
 The survivor is the best-attested live member — not quarantined first, then the most distinct tasks,
 then the most evidence rows, then the smallest id — so the result is a function of the store rather
