@@ -2860,6 +2860,20 @@ The first line is the pass: `support ≥2 0→11` says eleven items are now taug
 none were before. The second is the floor: 44 of those 55 items are singletons, so they leave, and the pack
 serves from the eleven that remain.
 
+The pair report prints the join those two lines are about — what the pack served, bucketed by the support
+behind it, and either the counterfactual or the grade:
+
+```
+# No floor in force: how many of the served items a floor of two would have retired.
+serve support: 21 of 55 servable item(s) served; support 1: 19 item(s), 5 broke, 5 kept, net +0;
+support ≥2: 2 item(s), 0 broke, 1 kept, net +1; floor absent, so a floor of 2 would have retired 19 of the 21
+
+# A floor in force: how many served items sit below it, which must be zero. The bucket counts are the
+# run's own; the shape is what to read, and `no singleton was served` is the sentence a working floor prints.
+serve support: 11 of 11 servable item(s) served; no singleton was served; support ≥2: 11 item(s), ...;
+floor 2 in force, and no served item carries support below it
+```
+
 Four things to know before you use it:
 
 1. **It is a serve-time decision, not a write-side filter.** The retired items are still in the store with
