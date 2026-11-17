@@ -193,10 +193,10 @@ export function consolidationLineOf(census: ConsolidationCensus): string {
     hidden > 0
       ? `the key removed ${String(hidden)} pair(s) that every other test admitted — the store holds ` +
         `${String(hidden)} duplicate(s) filed under a different key`
-      : census.linkage === 'all'
-        ? 'every pair reached the guards: the key was not consulted'
-        : census.pairs === 0
-          ? 'no pair to test: the store holds fewer than two items of one kind'
+      : census.pairs === 0
+        ? 'no pair to test: the store holds fewer than two items of one kind'
+        : census.linkage === 'all'
+          ? 'every pair reached the guards: the key was not consulted'
           : scope >= overlap && scope > 0
             ? `the scope key removed ${String(scope)} of ${String(census.pairs)} pair(s) — a merge keyed on the model's own scope spelling`
             : overlap > 0

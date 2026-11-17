@@ -470,6 +470,87 @@ process.exit(9);
     }
   }, 60_000);
 
+  it('carries the linkage the dispatch named into the pass, end to end', async () => {
+    // R139's wire, driven as a wire. The header is parsed in one process (`prereg-form`), read as an
+    // environment variable in another, and turned into an option before the pass runs — three chances for a
+    // switch to arrive as the control while the registration says `all`. The driver's constant is read at
+    // module load, so each case imports its own copy.
+    //
+    // The stub distils one claim per correction, which cannot produce a merge: what this asserts is the
+    // option's arrival, not a grouping. The grouping is asserted where the store is constructed.
+    const run = async (load: () => Promise<typeof import('../bin/tau2-driver.js')>, linkage: string | undefined) => {
+      const { dir, executable } = stubRunner();
+      process.env['TAU_PYTHON'] = executable;
+      process.env['TAU_MEMORY'] = 'true';
+      process.env['TAU_TRIALS'] = '2';
+      process.env['TAU_TRAIN_SHARE'] = '0.75';
+      process.env['TAU_DISTILL_UNIT'] = 'correction';
+      // The pass has its own switch, and a registration that names a linkage without it is refused; here the
+      // switch is what makes the run an arm at all rather than a control with an unused option.
+      process.env['TAU_CONSOLIDATE'] = 'true';
+      process.env['TAU_WORKDIR'] = dir;
+      process.env['DEEPSEEK_API_KEY'] = 'test-key';
+      process.env['TAU_DISTILL_MODEL'] = 'deepseek/deepseek-chat';
+      if (linkage === undefined) delete process.env['TAU_CONSOLIDATE_LINKAGE'];
+      else process.env['TAU_CONSOLIDATE_LINKAGE'] = linkage;
+      vi.stubGlobal(
+        'fetch',
+        async () =>
+          new Response(
+            JSON.stringify({
+              choices: [
+                {
+                  message: {
+                    content: JSON.stringify([
+                      { kind: 'procedure', statement: 'Confirm the customer identity before changing an order' },
+                    ]),
+                  },
+                },
+              ],
+              usage: { prompt_tokens: 3, completion_tokens: 3 },
+            }),
+            { status: 200 },
+          ),
+      );
+      try {
+        const driver = await load();
+        await driver.run();
+        return driver.instrument()?.distillUnit?.consolidation;
+      } finally {
+        vi.unstubAllGlobals();
+        for (const name of [
+          'TAU_PYTHON',
+          'TAU_MEMORY',
+          'TAU_TRIALS',
+          'TAU_TRAIN_SHARE',
+          'TAU_DISTILL_UNIT',
+          'TAU_CONSOLIDATE',
+          'TAU_WORKDIR',
+          'DEEPSEEK_API_KEY',
+          'TAU_DISTILL_MODEL',
+          'TAU_CONSOLIDATE_LINKAGE',
+        ]) {
+          delete process.env[name];
+        }
+      }
+    };
+
+    // Two literal specifiers rather than a template: the bundler analyses static imports, and a query built
+    // at run time is a module vite cannot resolve — which would fail as a harness error rather than as a
+    // finding about the switch.
+    const arm = await run(() => import('../bin/tau2-driver.js?case=linkage-all'), 'all');
+    expect(arm?.linkage).toBe('all');
+    // The instrument's own criterion: a phase that still reports hidden candidates has not stopped
+    // filtering, whatever its registration said.
+    expect(arm?.skippedKey).toBe(0);
+
+    const control = await run(() => import('../bin/tau2-driver.js?case=linkage-key'), undefined);
+    // Unset is `key`, and on this stub the items carry one scope each, so the key removes nothing and the
+    // count is a reading rather than an absence.
+    expect(control?.linkage === 'scope' || control?.linkage === 'host').toBe(true);
+    expect(typeof control?.skippedKey).toBe('number');
+  }, 60_000);
+
   it('teaches from the tasks that passed when the scope asks for every trajectory', async () => {
     // R62's treatment, driven end to end: three tasks teach instead of one, and every claim can be
     // traced to the population that produced it. The stub passes t1 every trial and fails t2 every
