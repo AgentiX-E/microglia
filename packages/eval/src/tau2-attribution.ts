@@ -709,3 +709,74 @@ export function copyLedgerLine(reading: CopyLedgerReading): string {
 function finiteOrNull(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
+
+/**
+ * The ledger rows that name a scored trial, and the ones an abandoned attempt opened.
+ *
+ * R138. τ² re-runs a simulation whose first attempt died, so the facade serves a pack to an episode the runner
+ * never scores: R137 took 42 requests for 40 trials and `item-ledger` refused, which suppressed the per-item
+ * census on the one arm that had a clean carriage. The rows are not unknown — each boundary owns exactly one
+ * ledger row, in order — so the two that name no task can be removed rather than guessed at, and what is
+ * removed is reported.
+ *
+ * The repair is conservative and says why: a row is dropped only when its own boundary names no scored task,
+ * **and** only when the survivors cover every scored trial exactly once. A task that was simulated twice fails
+ * the second test (its rows outnumber the trials), because that case needs the spans `boundaryJoin` groups and
+ * a positional join would silently merge two ranges.
+ */
+export type NamedLedgerInput = {
+  readonly ledger?: readonly (readonly string[])[] | null;
+  readonly boundaryTasks?: readonly (string | null)[] | null;
+  readonly tasks: readonly string[];
+};
+
+export type NamedLedgerReading =
+  | { readonly ledger: readonly (readonly string[])[]; readonly dropped: number }
+  | { readonly absent: 'no-ledger' | 'no-tasks' | 'length-disagrees' | 'tasks-unresolved' | 'unknown-task'; readonly detail: string };
+
+export function namedLedgerOf(input: NamedLedgerInput): NamedLedgerReading {
+  const ledger = input.ledger;
+  if (!Array.isArray(ledger) || ledger.length === 0) {
+    return { absent: 'no-ledger', detail: 'the artefact carries no pack ledger, so no request can be priced' };
+  }
+  const names = input.boundaryTasks;
+  if (!Array.isArray(names) || names.length === 0) {
+    return {
+      absent: 'no-tasks',
+      detail: 'the arm recorded no boundary names, so a ledger row cannot be told from an abandoned attempt',
+    };
+  }
+  if (ledger.length !== names.length) {
+    return {
+      absent: 'length-disagrees',
+      detail: `${String(ledger.length)} ledger row(s) against ${String(names.length)} boundary name(s)`,
+    };
+  }
+  // One row per boundary, in order: a recall succeeds once per boundary, and the ledger records the requests
+  // that succeeded. So a row is paired with the name at its own index, and the pair survives only if the name
+  // is one.
+  const kept: (readonly string[])[] = [];
+  const named: string[] = [];
+  ledger.forEach((row, index) => {
+    const name = names[index];
+    if (name === null || name === undefined) return;
+    kept.push(row);
+    named.push(name);
+  });
+  if (kept.length !== input.tasks.length) {
+    return {
+      absent: 'tasks-unresolved',
+      detail:
+        `${String(kept.length)} row(s) name a scored task against ${String(input.tasks.length)} trial(s): a task ` +
+        'simulated twice, or a boundary that names nothing, and neither can be joined by position',
+    };
+  }
+  const scored = new Set(input.tasks.map((id) => taskKey(id)));
+  if (named.some((name) => !scored.has(taskKey(name)))) {
+    return {
+      absent: 'unknown-task',
+      detail: 'a named boundary resolves to a task this arm never scored, so its rows belong to no trial',
+    };
+  }
+  return { ledger: kept, dropped: ledger.length - kept.length };
+}

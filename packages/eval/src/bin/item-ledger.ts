@@ -17,6 +17,7 @@ import {
   boundaryLine,
   boundaryTasksOf,
   episodeStartsOf,
+  namedLedgerOf,
 } from '../tau2-attribution.js';
 import { itemLedgerLine, itemLedgerOf } from '../item-ledger.js';
 
@@ -63,7 +64,7 @@ function main(): void {
   const path = args[0];
   if (path === undefined || path.startsWith('--')) refuse('usage: eval:item-ledger <poc-l4.json> [--baseline <file>]');
   const arm = read(path);
-  const packs = arm.tau2?.pack?.ledger ?? [];
+  const ledger = arm.tau2?.pack?.ledger ?? [];
   const tasks = (arm.per_task ?? []).map((row) => row.id);
   // R136: the boundary is printed before the count is checked, because the count is what fails on a retried
   // task — and a refusal that cannot say *which* task repeated is the refusal R135 spent a course on. The
@@ -74,10 +75,22 @@ function main(): void {
     memoryTrials: arm.per_trial,
   });
   process.stdout.write(`[item-ledger] ${boundaryLine(boundary)}\n`);
-  if (packs.length !== tasks.length) {
-    refuse(
-      `the pack ledger carries ${String(packs.length)} request(s) and the arm ${String(tasks.length)} episode(s); ` +
-        'a ledger joined to the wrong episode reports a number rather than a defect',
+  // R138. τ² re-runs a simulation whose first attempt died, so the ledger can carry a request the runner never
+  // scored. That row is droppable *by its own boundary's name* rather than by position, and what is dropped is
+  // reported — a count of requests that belong to no trial is a fact about the harness, not a loss.
+  const joined = namedLedgerOf({
+    ledger,
+    boundaryTasks: boundaryTasksOf(arm.tau2?.memory),
+    tasks,
+  });
+  if ('absent' in joined) {
+    refuse(`${joined.absent}: ${joined.detail}`);
+  }
+  const packs = joined.ledger;
+  if (joined.dropped > 0) {
+    process.stdout.write(
+      `[item-ledger] ${String(joined.dropped)} request(s) belong to an attempt no trial names, and are dropped ` +
+        'before the join rather than paired with a neighbour\n',
     );
   }
   // The third array, checked against the second: `turnCensus.rows[i].task` is the episode the driver believes

@@ -17,6 +17,7 @@ import {
   copyLedgerLine,
   copyLedgerOf,
   episodeStartsOf,
+  namedLedgerOf,
   itemTransfer,
   itemTransferLine,
   pairAttribution,
@@ -705,5 +706,54 @@ describe('the copy ledger', () => {
     const reading = copyLedgerOf({ dropped: Number.NaN, injected: 410, boundaries: 41 });
     expect(reading.state).toBe('absent');
     expect(reading.dropped).toBeNull();
+  });
+});
+
+/**
+ * R138. The ledger rows an abandoned attempt opened, dropped by name rather than by position.
+ *
+ * τ² re-runs a simulation whose first attempt died, so the facade serves a pack to an episode the runner never
+ * scores — R137 took 42 requests for 40 trials — and the per-item census refused for a reason that had nothing
+ * to do with the store. Each boundary owns exactly one ledger row in order, so a row whose own boundary names
+ * no task can be removed, and what is removed is reported.
+ */
+describe('the named ledger', () => {
+  const tasks = ['a/x', 'a/y'];
+  const ledger = [['k1'], ['k2'], ['k3']];
+
+  it('drops the row an abandoned attempt opened and keeps the rest in order', () => {
+    const reading = namedLedgerOf({ ledger, boundaryTasks: ['a/y', null, 'a/x'], tasks });
+    expect('absent' in reading).toBe(false);
+    if ('absent' in reading) return;
+    expect(reading.dropped).toBe(1);
+    expect(reading.ledger).toEqual([['k1'], ['k3']]);
+  });
+
+  it('refuses a ledger the artefact never carried', () => {
+    const reading = namedLedgerOf({ ledger: undefined, boundaryTasks: ['a/x'], tasks });
+    expect('absent' in reading && reading.absent).toBe('no-ledger');
+  });
+
+  it('refuses to guess when the arm recorded no boundary names', () => {
+    // Every artefact before R136. Dropping by position is the misattribution the identity join exists to
+    // prevent, so the absence is a refusal rather than a fallback.
+    const reading = namedLedgerOf({ ledger, boundaryTasks: [], tasks });
+    expect('absent' in reading && reading.absent).toBe('no-tasks');
+  });
+
+  it('refuses two arrays that disagree about how many boundaries there were', () => {
+    const reading = namedLedgerOf({ ledger, boundaryTasks: ['a/y', null], tasks });
+    expect('absent' in reading && reading.absent).toBe('length-disagrees');
+    expect('absent' in reading && reading.detail).toContain('3 ledger row(s) against 2 boundary name(s)');
+  });
+
+  it('refuses a task simulated twice, because that case needs the spans and not a positional join', () => {
+    const reading = namedLedgerOf({ ledger, boundaryTasks: ['a/y', 'a/y', 'a/x'], tasks });
+    expect('absent' in reading && reading.absent).toBe('tasks-unresolved');
+  });
+
+  it('refuses a named boundary that resolves to a task this arm never scored', () => {
+    const reading = namedLedgerOf({ ledger, boundaryTasks: ['a/y', null, 'a/z'], tasks });
+    expect('absent' in reading && reading.absent).toBe('unknown-task');
   });
 });

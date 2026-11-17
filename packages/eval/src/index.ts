@@ -845,6 +845,7 @@ export {
   boundaryLine,
   copyLedgerLine,
   copyLedgerOf,
+  namedLedgerOf,
   boundarySpan,
   boundaryDefect,
   taskKey,
