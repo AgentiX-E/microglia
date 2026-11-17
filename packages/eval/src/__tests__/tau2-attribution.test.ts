@@ -14,6 +14,8 @@ import {
   boundaryLine,
   boundarySpan,
   boundaryTasksOf,
+  copyLedgerLine,
+  copyLedgerOf,
   episodeStartsOf,
   itemTransfer,
   itemTransferLine,
@@ -656,5 +658,52 @@ describe('a joined trial the harness declined to score', () => {
     expect(split).toEqual({
       measured: { served: { episodes: 0, passed: 0 }, withheld: { episodes: 1, passed: 0 } },
     });
+  });
+});
+
+/**
+ * R137. The identity that fails when the wrapper starts appending to a state the benchmark threads back.
+ *
+ * `dropped == injected − boundaries` is exact: every injected call after the first of its episode is handed a
+ * state that already carries the block, so a sound wrapper removes one copy per such call. With the defect
+ * the left side is zero and the right side is 369; with a benchmark that stops threading the state the right
+ * side is zero and the left side is not, which is a fact about the harness this lane cannot see otherwise.
+ */
+describe('the copy ledger', () => {
+  it('reconciles an arm whose removals match its injections', () => {
+    const reading = copyLedgerOf({ dropped: 369, injected: 410, boundaries: 41 });
+    expect(reading.state).toBe('reconciled');
+    expect(reading.expected).toBe(369);
+    expect(copyLedgerLine(reading)).toContain('369 copy(ies) removed, as the identity requires');
+  });
+
+  it('names the defect when the removals are zero and the injections are not', () => {
+    const reading = copyLedgerOf({ dropped: 0, injected: 410, boundaries: 41 });
+    expect(reading.state).toBe('unreconciled');
+    expect(reading.detail).toContain('369 injection(s) were handed a state that already carried the block');
+  });
+
+  it('names the opposite failure, which is the benchmark and not the wrapper', () => {
+    // A caller that hands a fresh state every turn: nothing to remove, and a wrapper that removes something
+    // is a wrapper that dropped a block it had not written.
+    const reading = copyLedgerOf({ dropped: 7, injected: 41, boundaries: 41 });
+    expect(reading.state).toBe('unreconciled');
+    expect(reading.detail).toContain('a bench that does not thread the state back');
+  });
+
+  it('is absent rather than reconciled when the arm predates the counter', () => {
+    const reading = copyLedgerOf({ injected: 410, boundaries: 41 });
+    expect(reading.state).toBe('absent');
+    expect(reading.dropped).toBeNull();
+    expect(reading.expected).toBeNull();
+    // And the line still names the three numbers it was missing, because a silent line is how a check
+    // disappears between a green gate and an artefact.
+    expect(copyLedgerLine(reading)).toContain('nothing to reconcile');
+  });
+
+  it('refuses a non-finite counter rather than reconciling against NaN', () => {
+    const reading = copyLedgerOf({ dropped: Number.NaN, injected: 410, boundaries: 41 });
+    expect(reading.state).toBe('absent');
+    expect(reading.dropped).toBeNull();
   });
 });

@@ -37,6 +37,8 @@ import {
   boundaryJoin,
   boundaryLine,
   boundaryTasksOf,
+  copyLedgerLine,
+  copyLedgerOf,
   episodeStartsOf,
   itemTransferLine,
   pairAttribution,
@@ -403,6 +405,15 @@ process.stdout.write(`${boundaryLine(boundary)}\n`);
 // Printed whether or not it could be measured. R123's split returned `undefined`, the caller printed nothing,
 // and the arm's registered mechanism check disappeared between a green gate and an artefact with no field.
 process.stdout.write(`${serveSplitLine(split)}\n`);
+// R137: whether the agent's own copy count reconciles with the injections it made. Free, and the only check
+// on this record that fails when the wrapper starts appending to a state the benchmark threads back — the
+// defect that lived from R92 to R136 because the fixture asserted the opposite contract.
+const copies = copyLedgerOf({
+  dropped: (second.tau2?.memory as { packCopiesDropped?: number } | undefined)?.packCopiesDropped,
+  injected: (second.tau2?.memory as { injectedMessages?: number } | undefined)?.injectedMessages,
+  boundaries: episodeStartsOf(second.tau2?.memory)?.length ?? null,
+});
+process.stdout.write(`${copyLedgerLine(copies)}\n`);
 
 // R125: the per-turn census, paired across the two arms. Printed here rather than per arm because the
 // question it answers is a *difference*: either arm alone reports 1,800 turns of activity, and only the

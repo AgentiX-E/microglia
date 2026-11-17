@@ -843,6 +843,8 @@ export {
   boundaryTasksOf,
   boundaryJoin,
   boundaryLine,
+  copyLedgerLine,
+  copyLedgerOf,
   boundarySpan,
   boundaryDefect,
   taskKey,

@@ -639,3 +639,73 @@ export function serveSplitLine(reading: ServeSplitReading): string {
   };
   return `serve split: served ${render(reading.measured.served)}; withheld ${render(reading.measured.withheld)}`;
 }
+
+/**
+ * Whether the agent's own copy count reconciles with the injections it made.
+ *
+ * R137. The wrapper appended the recalled block to a state tau2 threads back, so an episode of ten turns
+ * carried ten copies of it — and the only test that could have caught it asserted a caller the benchmark
+ * does not have. The repair removes every copy the agent wrote before appending one, which makes an identity
+ * hold that no run can fake:
+ *
+ *   packCopiesDropped == injectedMessages − boundaries
+ *
+ * because every injected call after the first of its episode is handed a state that already carries the
+ * block, and drops it. With the defect the left side is zero and the right side is not; with a benchmark
+ * that stops threading the state the right side is zero and the left side is not, which is the *other*
+ * reason to print it — a fact about the harness rather than about the wrapper, and one this lane has no
+ * other way to observe.
+ *
+ * `absent` rather than a pass when the arm predates the counter: an arm that never recorded the field did
+ * not reconcile anything, and a green gate on a missing measurement is the defect R123a paid for.
+ */
+export type CopyLedgerInput = {
+  readonly dropped?: number | null;
+  readonly injected?: number | null;
+  readonly boundaries?: number | null;
+};
+
+export type CopyLedgerReading = {
+  /** `expected` is `injected − boundaries`: the copies a sound wrapper must have removed. */
+  readonly state: 'reconciled' | 'unreconciled' | 'absent';
+  readonly dropped: number | null;
+  readonly expected: number | null;
+  readonly detail: string;
+};
+
+export function copyLedgerOf(input: CopyLedgerInput): CopyLedgerReading {
+  const dropped = finiteOrNull(input.dropped);
+  const injected = finiteOrNull(input.injected);
+  const boundaries = finiteOrNull(input.boundaries);
+  if (dropped === null || injected === null || boundaries === null) {
+    return {
+      state: 'absent',
+      dropped,
+      expected: null,
+      detail:
+        'the arm did not report the copies it removed, the messages it injected and the boundaries it opened, so there is nothing to reconcile',
+    };
+  }
+  const expected = injected - boundaries;
+  if (dropped === expected) {
+    return { state: 'reconciled', dropped, expected, detail: `${String(dropped)} copy(ies) removed, as the identity requires` };
+  }
+  return {
+    state: 'unreconciled',
+    dropped,
+    expected,
+    detail:
+      expected === 0
+        ? `the agent removed ${String(dropped)} copies where the identity requires none, which is a bench that does not thread the state back`
+        : `the agent removed ${String(dropped)} copies where ${String(expected)} injection(s) were handed a state that already carried the block`,
+  };
+}
+
+export function copyLedgerLine(reading: CopyLedgerReading): string {
+  return `copies: ${reading.state} — ${reading.detail}`;
+}
+
+/** A finite number, or `null`. Three counters arrive from a JSON artefact and any of them may be absent. */
+function finiteOrNull(value: number | null | undefined): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
