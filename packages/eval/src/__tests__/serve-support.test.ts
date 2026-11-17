@@ -120,6 +120,20 @@ describe('the line a readback quotes', () => {
     expect(line).toContain('a floor of 2 would have retired 0 of the 2');
   });
 
+  it('omits the denominator rather than printing one over an absent census', () => {
+    // An artefact from before the store census carries no servable count, and `21 of 0` is a rate above one:
+    // the reader would take it for a miscounted denominator rather than for a field the run never wrote.
+    const line = serveSupportLine(
+      serveSupportCensus({
+        items: [item('a', 1, 0)],
+        support: support({ a: 1 }),
+        floor: 1,
+      }),
+    );
+    expect(line).toContain('serve support: 1 item(s) served;');
+    expect(line).not.toContain('of 0');
+  });
+
   it('names the buckets, the harm and the counterfactual on one line', () => {
     const line = serveSupportLine(
       serveSupportCensus({

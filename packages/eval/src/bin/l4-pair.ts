@@ -410,7 +410,8 @@ process.stdout.write(
       : serveSupportCensus({
           items: attribution?.items ?? [],
           support: supportBehindServed,
-          servable: second.tau2?.store?.servable ?? 0,
+          // Absent when the arm wrote no store census, which is a missing denominator rather than a zero one.
+          ...(second.tau2?.store?.servable === undefined ? {} : { servable: second.tau2.store.servable }),
           floor: second.tau2?.supportFloor?.floor ?? 1,
         }),
   )}\n`,

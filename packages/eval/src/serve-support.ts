@@ -38,8 +38,14 @@ export type ServeSupportCensus = {
   readonly served: number;
   /** Ascending by support; the last bucket is the floor's own population, whatever its size. */
   readonly buckets: readonly ServeSupportBucket[];
-  /** Items the store said were servable when the pack was read, so the served share has a denominator. */
-  readonly servable: number;
+  /**
+   * Items the store said were servable when the pack was read, so the served share has a denominator.
+   *
+   * Optional because an artefact from before the store census carries none, and a zero written there would
+   * print `21 of 0 servable item(s) served` — a rate above one, which is the shape of a miscounted
+   * denominator rather than of a missing one.
+   */
+  readonly servable?: number;
   /** The floor the arm ran at. 1 is the control: every item servable. */
   readonly floor: number;
   /**
@@ -78,7 +84,7 @@ function supportOf(id: string, support: ReadonlyMap<string, number>): number {
 export function serveSupportCensus(input: {
   readonly items: readonly ItemTransfer[];
   readonly support: ReadonlyMap<string, number>;
-  readonly servable: number;
+  readonly servable?: number;
   readonly floor: number;
 }): ServeSupportCensus {
   const counted = new Map<number, ServeSupportBucket>();
@@ -135,10 +141,11 @@ export function serveSupportLine(census: ServeSupportCensus | undefined): string
         : `floor ${String(census.floor)} in force, and ${String(census.belowFloor)} of the ${String(census.served)} served item(s) carry support below it`
       : // The counterfactual a control arm is priced on: the singletons, read from the bucket that counted them.
         `floor absent, so a floor of 2 would have retired ${String(one === undefined ? 0 : one.items)} of the ${String(census.served)}`;
-  return (
-    `serve support: ${String(census.served)} of ${String(census.servable)} servable item(s) served; ` +
-    `${single}; ${corroborated}; ${verdict}`
-  );
+  const served =
+    census.servable === undefined
+      ? `${String(census.served)} item(s) served`
+      : `${String(census.served)} of ${String(census.servable)} servable item(s) served`;
+  return `serve support: ${served}; ${single}; ${corroborated}; ${verdict}`;
 }
 
 function signed(value: number): string {
