@@ -27,6 +27,10 @@ function arm(input: {
   readonly pass4: number;
   readonly meanPackIds?: number;
   readonly scenarioTasks?: { readonly learn: number; readonly test: number };
+  /** R141: the servable population and the sample the support is read from. */
+  readonly store?: { readonly stored: number; readonly active: number; readonly servable: number };
+  readonly storeItems?: { readonly items: readonly { readonly id: string; readonly supportTasks?: number }[] };
+  readonly floor?: number;
 }): unknown {
   const byTask = new Map<string, boolean[]>();
   for (const row of input.rows) {
@@ -47,6 +51,11 @@ function arm(input: {
             scenario: { learn: 'retail', test: 'airline', recall: 'retail' },
             split: { train: ['retail/1', 'retail/2'], test: [...byTask.keys()] },
             ...(input.scenarioTasks === undefined ? {} : { scenarioTasks: input.scenarioTasks }),
+            ...(input.store === undefined ? {} : { store: input.store }),
+            ...(input.storeItems === undefined ? {} : { storeItems: input.storeItems }),
+            ...(input.floor === undefined
+              ? {}
+              : { supportFloor: { total: 4, retired: 2, retained: 2, floor: input.floor } }),
           },
         }
       : {}),
@@ -229,5 +238,56 @@ describe('the pairing step on a cross-domain pair', () => {
     expect(published.ceiling?.halfWidthPp).toBeCloseTo(12.98, 1);
     expect(published.ceiling?.mde80Pp).toBeCloseTo(18.56, 1);
     expect(published.ceiling?.resolvesFivePp).toBe(false);
+  }, 60_000);
+
+  it('prints the support behind what the pack served, and grades the floor when one ran', () => {
+    // R141. The join the floor's criterion is written in spans two artefacts — the attribution table and
+    // the store sample — and the *wiring* between them is invisible to both: a field the pair's own
+    // projection does not carry produces no line at all, which reads as a lane that never asked. So this
+    // case runs the bin the workflow runs and asserts the sentence it prints.
+    const dir = mkdtempSync(join(tmpdir(), 'l4-pair-support-'));
+    const referenceRows: Row[] = [
+      { id: 'airline/1', trial: 0, reward: 1 },
+      { id: 'airline/1', trial: 1, reward: 1 },
+      { id: 'airline/2', trial: 0, reward: 0 },
+      { id: 'airline/2', trial: 1, reward: 0 },
+    ];
+    const memoryRows = referenceRows.map((row) => (row.id === 'airline/2' ? { ...row, reward: 1 } : row));
+    writeFileSync(
+      join(dir, 'reference.json'),
+      JSON.stringify(arm({ arm: 'reference', rows: referenceRows, pass4: 0.5 })),
+    );
+    writeFileSync(
+      join(dir, 'memory.json'),
+      JSON.stringify(
+        arm({
+          arm: 'memory',
+          rows: memoryRows,
+          pass4: 0.5,
+          store: { stored: 4, active: 2, servable: 2 },
+          storeItems: { items: [{ id: 'airline/1', supportTasks: 2 }, { id: 'airline/2', supportTasks: 3 }] },
+          floor: 2,
+        }),
+      ),
+    );
+    let printed = '';
+    try {
+      printed = execFileSync(TSX, [PAIR], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          POC_RESULT_DIR: dir,
+          L4_FIRST: join(dir, 'reference.json'),
+          L4_SECOND: join(dir, 'memory.json'),
+        },
+      });
+    } catch (error) {
+      // A failed finding gate still prints every reading; the sentence is what this reads.
+      printed = String((error as { stdout?: string }).stdout ?? '');
+    }
+    // This fixture carries no episode ledger, so nothing was served into a measured episode — which is a
+    // reading and not an absence, and the line says which of the two it is.
+    expect(printed).toContain('serve support: no item was served');
   }, 60_000);
 });

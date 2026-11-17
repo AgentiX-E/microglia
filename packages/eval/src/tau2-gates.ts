@@ -860,6 +860,16 @@ export type Tau2ArmArtefact = {
     readonly funnel?: FunnelInput;
     /** R101: the arm's declaration that its store is empty by construction. */
     readonly declaredEmptyStore?: boolean;
+    /**
+     * R120/R141: the store sample, which is the only population the support behind a served item can be
+     * read from.
+     *
+     * Carried on this projection for the reason the comment below gives: a field the bridge to a reading
+     * does not carry is a reading that cannot be made, and it fails as silence rather than as an error.
+     */
+    readonly storeItems?: { readonly items?: readonly { readonly id: string; readonly supportTasks?: number }[] };
+    /** R141: the floor the recall path served at, and what it removed. Absent is a store served with none. */
+    readonly supportFloor?: { readonly total: number; readonly retired: number; readonly retained: number; readonly floor: number };
   };
 };
 

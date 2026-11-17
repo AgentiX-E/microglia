@@ -62,6 +62,7 @@ import {
 } from '@agentix-e/microglia-eval';
 import { writeJson } from './lib.js';
 import { pairedVerdict } from '../paired-verdict.js';
+import { serveSupportCensus, serveSupportLine, supportMapOf } from '../serve-support.js';
 import { pairGates, plantedBarNote } from '../pair-gates.js';
 import { cacheCensusVerdict, premiumSplitOf } from '../cache-census.js';
 
@@ -100,6 +101,17 @@ type Artefact = {
     readonly scenarioTasks?: { readonly learn: number; readonly test: number };
     /** The store's census and the recall tally, when the arm recorded them (R43 onward). */
     readonly store?: Tau2ArmRecord['store'];
+    /**
+     * R120/R141: the store sample, which is the only population the support behind a served item can be read
+     * from, and the floor the arm served at. Absent on every artefact written before the two fields.
+     */
+    readonly storeItems?: { readonly items?: readonly { readonly id: string; readonly supportTasks?: number }[] };
+    readonly supportFloor?: {
+      readonly total: number;
+      readonly retired: number;
+      readonly retained: number;
+      readonly floor: number;
+    };
     readonly recall?: Tau2ArmRecord['recall'];
     /**
      * R57: the distractor this arm planted. Read from the artefact rather than from the dispatch's
@@ -384,6 +396,25 @@ function attributionOf(reference: Artefact, memory: Artefact) {
 
 const attribution = attributionOf(first, second);
 if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribution)}\n`);
+
+// R141: the join the floor's own criterion is written in. The attribution table says which item was served
+// and what it did; the store sample says how many tasks stand behind it. Neither alone can say whether the
+// items that hurt were the singletons — which is the entire premise of a serve-time floor — and the arm's
+// `supportFloor` says whether a floor was in force at all or only predicted. Three readings in one line: the
+// buckets, the harm inside each, and either the counterfactual (no floor) or the grade (a floor ran).
+const supportBehindServed = supportMapOf(second.tau2?.storeItems);
+process.stdout.write(
+  `${serveSupportLine(
+    supportBehindServed === undefined
+      ? undefined
+      : serveSupportCensus({
+          items: attribution?.items ?? [],
+          support: supportBehindServed,
+          servable: second.tau2?.store?.servable ?? 0,
+          floor: second.tau2?.supportFloor?.floor ?? 1,
+        }),
+  )}\n`,
+);
 
 // R123's mechanism check: the arm's own episodes, split by whether the gate let their pack through. This is
 // the only within-arm comparison the lane has, and it is free — an empty ledger entry already records a
