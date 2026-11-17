@@ -3,38 +3,288 @@
   "title": "L4 — memory arm against the reference arm on one split, paired per task",
   "domain": "retail",
   "first": {
-    "path": "eval/results/history/l4-arm-reference-67.json",
-    "pass4": 0.5147058823529411
+    "path": "/tmp/r139/arms/reference/poc-l4.json",
+    "pass4": 0.8
   },
   "second": {
-    "path": "eval/results/history/l4-arm-memory-67.json",
-    "pass4": 0.5294117647058824
+    "path": "/tmp/r139/arms/memory/poc-l4.json",
+    "pass4": 0.825
   },
   "comparison": {
-    "paired": 68,
+    "paired": 40,
     "onlyFirst": 0,
     "onlySecond": 0,
-    "deltaPp": 1.4705882352941175,
-    "ciLowPp": -13.23529411764706,
-    "ciHighPp": 16.176470588235293,
-    "p": 0.9999999999999899,
-    "lost": 13,
-    "gained": 14
+    "deltaPp": 2.5,
+    "ciLowPp": -15,
+    "ciHighPp": 17.5,
+    "p": 0.9999999999999978,
+    "lost": 5,
+    "gained": 6
+  },
+  "retention": {
+    "reference": {
+      "ordered": 40,
+      "withoutOrder": 0,
+      "pairs": 0,
+      "held": 0
+    },
+    "memory": {
+      "ordered": 40,
+      "withoutOrder": 0,
+      "pairs": 0,
+      "held": 0
+    }
+  },
+  "degradation": {
+    "broke": 5,
+    "repaired": 6,
+    "blankRight": 32,
+    "measured": 40,
+    "breakRate": 0.15625,
+    "netPp": 2.5
+  },
+  "attribution": {
+    "items": [
+      {
+        "id": "k_01hf7uaq8j_12gc0",
+        "episodes": 2,
+        "kept": 0,
+        "broke": 1,
+        "net": -1
+      },
+      {
+        "id": "k_01hf7uaq8l_et6m7",
+        "episodes": 3,
+        "kept": 0,
+        "broke": 1,
+        "net": -1
+      },
+      {
+        "id": "k_01hf7uaq8s_8knmy",
+        "episodes": 1,
+        "kept": 0,
+        "broke": 1,
+        "net": -1
+      },
+      {
+        "id": "k_01hf7uaq70_bbwnd",
+        "episodes": 1,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq74_6k0xd",
+        "episodes": 1,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq7f_5pqmn",
+        "episodes": 2,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq7i_5s1b2",
+        "episodes": 1,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq7n_8t867",
+        "episodes": 1,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq7r_4p4nx",
+        "episodes": 1,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq7s_e4pjf",
+        "episodes": 9,
+        "kept": 1,
+        "broke": 1,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq82_b56mw",
+        "episodes": 3,
+        "kept": 1,
+        "broke": 1,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq89_9r5gs",
+        "episodes": 1,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq8a_dp95f",
+        "episodes": 1,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq8b_64gf9",
+        "episodes": 2,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq8i_44xx4",
+        "episodes": 1,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq8m_chg3w",
+        "episodes": 1,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq8v_c55gm",
+        "episodes": 5,
+        "kept": 0,
+        "broke": 0,
+        "net": 0
+      },
+      {
+        "id": "k_01hf7uaq6r_7zfhc",
+        "episodes": 1,
+        "kept": 1,
+        "broke": 0,
+        "net": 1
+      },
+      {
+        "id": "k_01hf7uaq7k_d93qx",
+        "episodes": 1,
+        "kept": 1,
+        "broke": 0,
+        "net": 1
+      },
+      {
+        "id": "k_01hf7uaq86_2k4gb",
+        "episodes": 1,
+        "kept": 1,
+        "broke": 0,
+        "net": 1
+      },
+      {
+        "id": "k_01hf7uaq8h_52gjg",
+        "episodes": 1,
+        "kept": 1,
+        "broke": 0,
+        "net": 1
+      }
+    ],
+    "unmatchedRequests": 0
+  },
+  "turnCensus": [
+    {
+      "measure": "toolErrors",
+      "episodes": 40,
+      "memory": 8,
+      "control": 8,
+      "memoryInterval": [
+        2.456384658873958,
+        13.543615341126042
+      ],
+      "controlInterval": [
+        2.456384658873958,
+        13.543615341126042
+      ],
+      "separated": false,
+      "meanDelta": 0,
+      "deltaInterval": [
+        -0.07017796864909115,
+        0.07017796864909115
+      ]
+    },
+    {
+      "measure": "repeatCalls",
+      "episodes": 40,
+      "memory": 3,
+      "control": 0,
+      "memoryInterval": [
+        0,
+        6.394757229005927
+      ],
+      "controlInterval": [
+        0,
+        3.6888794541139363
+      ],
+      "separated": false,
+      "meanDelta": 0.075,
+      "deltaInterval": [
+        -0.0334357489016624,
+        0.1834357489016624
+      ]
+    }
+  ],
+  "serveSplit": {
+    "served": {
+      "episodes": 40,
+      "passed": 33
+    },
+    "withheld": {
+      "episodes": 0,
+      "passed": 0
+    },
+    "droppedRequests": 0
+  },
+  "verdict": {
+    "state": "UNRESOLVED",
+    "claim": null,
+    "reason": "2.50pp at p=1.0000 with n=40 pairs does not clear the 23.23pp the sample can resolve; no effect larger than 23.23pp in either direction was shown",
+    "excludedAbovePp": 23.23295665643958,
+    "servedPacks": 40
   },
   "resolution": {
-    "standardErrorPp": 7.6414006216274,
-    "halfWidthPp": 14.977145218389705,
-    "tasksForFivePp": 611,
-    "tasksForThreePp": 1695,
+    "standardErrorPp": 8.291561975888499,
+    "halfWidthPp": 16.251461472741457,
+    "tasksForFivePp": 423,
+    "tasksForThreePp": 1174,
     "detectableAtFivePp": false
   },
+  "ceiling": {
+    "tasks": 114,
+    "halfWidthPp": 9.62653496532353,
+    "mde80Pp": 13.76201580246762,
+    "resolvesFivePp": false
+  },
   "protocol": {
-    "detectablePp": 21.411204541799975,
+    "detectablePp": 23.23295665643958,
     "evaluable": [
+      "V0-instrument-ready",
+      "V1-pack-not-empty",
+      "V2-fold-partition",
       "V3-parse-rate",
       "V5-resolution",
       "V6-controls-inject",
-      "V7-channel"
+      "V7-channel",
+      "V8-call-reliability",
+      "V32-fold-learning-intact",
+      "V15-transfer-reconciles",
+      "V16-transfer-resolvable",
+      "V33-transfer-ledger",
+      "V17-transfer-net-reported",
+      "V44-domain-accounted"
     ],
     "vacuous": [
       "V6-controls-inject",
@@ -42,24 +292,8 @@
     ],
     "absent": [
       {
-        "id": "V1-pack-not-empty",
-        "needs": "the lane's own record, which this run did not carry: the mean number of recalled items per prompt"
-      },
-      {
-        "id": "V2-fold-partition",
-        "needs": "the lane's own record, which this run did not carry: the split, so leaking and duplication can be counted"
-      },
-      {
         "id": "V4-gold-executable",
         "needs": "an oracle arm replaying each reference trajectory to reward 1, which no τ² agent provides"
-      },
-      {
-        "id": "V8-call-reliability",
-        "needs": "the lane's own record, which this run did not carry: the agent call tally, which a separate process owns"
-      },
-      {
-        "id": "V32-fold-learning-intact",
-        "needs": "the lane's own record, which this run did not carry: the correction bookkeeping: rows, unanswered, edited, failed to distil"
       },
       {
         "id": "V12-shape-present",
@@ -88,22 +322,6 @@
       {
         "id": "V38-repair-probe-applied",
         "needs": "the same probe, reporting how many packs it changed"
-      },
-      {
-        "id": "V15-transfer-reconciles",
-        "needs": "a transfer measurement: the store answering questions from a domain it never learned"
-      },
-      {
-        "id": "V16-transfer-resolvable",
-        "needs": "the same measurement, reaching a hundred informative trials"
-      },
-      {
-        "id": "V33-transfer-ledger",
-        "needs": "the same measurement, carrying one row per trial"
-      },
-      {
-        "id": "V17-transfer-net-reported",
-        "needs": "the same measurement, carrying its repair and break counts"
       },
       {
         "id": "V39-repair-transfer-reconciles",
@@ -154,10 +372,6 @@
         "needs": "a statement executor with a deadline, which τ² delegates to its own environment"
       },
       {
-        "id": "V44-domain-accounted",
-        "needs": "the lane's own record, which this run did not carry: the provenance of each stored item's scope domain"
-      },
-      {
         "id": "V45-clearance-dose-matched",
         "needs": "a clearance arm paired with a dose-matched control that drops as many items"
       },
@@ -182,10 +396,31 @@
         "needs": "a channel arm that rewrites the prompt, and its share floor"
       }
     ],
-    "supplyable": 9,
-    "armIndexed": 30
+    "supplyable": 14,
+    "armIndexed": 26
   },
   "gates": [
+    {
+      "id": "V0-instrument-ready",
+      "criterion": "every stage from a correction to a servable rule carried something, and the stages reconcile",
+      "actual": "73 correction(s) -> 73 asked -> 143 candidate(s) -> 70 admitted -> 70 stored -> 55 servable (73 refused, 0 failed)",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V1-pack-not-empty",
+      "criterion": "the memory arm injected at least one rule per question on average",
+      "actual": "1.00 rules/question: 40 of 40 request(s) carried an item, from a store of 70 (55 active, 55 in scope)",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V2-fold-partition",
+      "criterion": "every question is evaluated exactly once, by a memory that never learned from it",
+      "actual": "40/40 questions, 0 duplicates, 0 leaks",
+      "pass": true,
+      "blocking": true
+    },
     {
       "id": "V3-parse-rate",
       "criterion": "at least 90% of replies contain a statement",
@@ -195,9 +430,9 @@
     },
     {
       "id": "V5-resolution",
-      "criterion": "the sample can resolve a 6pp effect at 80% power",
-      "actual": "minimum detectable 21.41pp",
-      "pass": false,
+      "criterion": "the run claims no effect finer than its sample can resolve: a resolvable 6pp, or no direction claimed",
+      "actual": "minimum detectable 23.23pp against a 6.00pp target; the run claims no direction",
+      "pass": true,
       "blocking": true
     },
     {
@@ -215,11 +450,67 @@
       "blocking": true
     },
     {
-      "id": "l4-paired",
-      "criterion": "the memory does not cost accuracy: delta >= 0 at p < 0.05",
-      "actual": "1.47pp (p=1.0000, n=68)",
-      "pass": false,
+      "id": "V8-call-reliability",
+      "criterion": "at most 2% of calls failed after retries, so the outcome is about knowledge",
+      "actual": "0.00% (0/467 turns)",
+      "pass": true,
       "blocking": true
+    },
+    {
+      "id": "V32-fold-learning-intact",
+      "criterion": "at most 10% of the learning questions went unanswered and at most 10% of the corrections failed to distil, so the store is the one the fold paid for",
+      "actual": "0/74 unanswered question(s) (0.0%), 14 correction(s), 0 distillation failure(s) (0.0%)",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V15-transfer-reconciles",
+      "criterion": "every transfer trial is measured, informative, or a target that needed nothing",
+      "actual": "40/40 trial(s): 8 informative, 32 already repaired by the retry, 0 unmeasured (0 with no control call)",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V16-transfer-resolvable",
+      "criterion": "at least 100 informative trials, or the transfer rate is a direction rather than a rate",
+      "actual": "8 informative trial(s), 6 repair(s)",
+      "pass": false,
+      "blocking": false
+    },
+    {
+      "id": "V33-transfer-ledger",
+      "criterion": "the artefact carries one row per trial, so the pairs behind the rate survive the run",
+      "actual": "40/40 pair(s) carried",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V17-transfer-net-reported",
+      "criterion": "the transfer summary states its net marginal effect, and the repair and break counts reconcile with it",
+      "actual": "2.50pp net over 40 measured trial(s): 6 repaired, 5 broken, verdict `unmeasured`",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V44-domain-accounted",
+      "criterion": "the store holds at least one item, and every item with no domain either arrived without one or lost it to a recorded widening",
+      "actual": "0 of 70 item(s) with no domain, 0 arrived unscoped, 0 widened",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "l4-paired",
+      "criterion": "the memory does not cost accuracy: neither R45 revert branch fires",
+      "actual": "2.50pp (p=1.0000, n=40, 40 served pack(s)): UNRESOLVED",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "l4-effect-resolved",
+      "criterion": "the pair resolves the effect it reports: |delta| >= minimum detectable difference, or no direction is claimed",
+      "actual": "UNRESOLVED: |2.50pp| against 23.23pp minimum detectable difference",
+      "pass": false,
+      "blocking": false
     },
     {
       "id": "l4-same-split",
@@ -227,13 +518,283 @@
       "actual": "0 only in first, 0 only in second",
       "pass": true,
       "blocking": true
+    },
+    {
+      "id": "l4-projection-complete",
+      "criterion": "every field either arm emitted reached its artefact",
+      "actual": "both arms carried every field the driver emitted",
+      "pass": true,
+      "blocking": true
     }
   ],
+  "scenario": {
+    "learn": "retail",
+    "test": "retail",
+    "recall": "retail"
+  },
+  "transfer": {
+    "store": "retail",
+    "storeItems": 70,
+    "paired": 40,
+    "orphanMemory": 0,
+    "informative": 8,
+    "repaired": 6,
+    "broke": 5,
+    "blankRight": 32,
+    "unmeasured": 0,
+    "measured": 40,
+    "netPp": 2.5,
+    "verdict": "unmeasured",
+    "ledger": [
+      {
+        "task": "retail/5",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/9",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/12",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/17",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/18",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/26",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/27",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/32",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/33",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/36",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/38",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/39",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/40",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/42",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/45",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/49",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/51",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/53",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/55",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/56",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/60",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/61",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/62",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/64",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/65",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/68",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/70",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/71",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/74",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/77",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/79",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/86",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/90",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/94",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/97",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/100",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/101",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/102",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/108",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/111",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      }
+    ]
+  },
   "notes": [
     "`deltaPp` is second - first, so a negative number means the second arm (memory) did worse.",
     "pass^4 per task is the k=4 reading: a task counts only when all four trials passed.",
     "The pair is defined on the intersection of task ids; tasks scored by one arm only are counted, not dropped silently.",
     "Published reference for scale: ALTK-Evolve pass^4 = 0.575 on tau2-retail.",
-    "The protocol gates are the shared thirty-nine, not a τ² copy of them; `absent` names the arm each of the rest would need."
+    "The protocol gates are the shared forty, not a τ² copy of them; `absent` names the arm each of the rest would need.",
+    "Call reliability is graded over the population the arm recorded: `turns.scope` is `distillation` when the episodes’ tally came from a process that does not report one, and `turns` holds agent turns rather than model calls — the provider’s own count is `usage.calls`.",
+    "`transfer` pairs the two arms episode by episode, so a repair is one episode the control failed and the treatment passed. The treatment is the whole pack: `repaired` says the pack fixed an episode, not which item in it did."
   ]
 }

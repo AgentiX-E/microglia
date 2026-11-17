@@ -1404,6 +1404,16 @@ held **43** distinct claims, the pass merged **one**, and **34 of the 35** joins
 keys — so `sup2 2 of 66` was arithmetic of a filter, not a property of the corpus. `linkage: "all"` stops the
 key removing pairs and leaves every claim test in force.
 
+**Support floor** — The number of distinct tasks that must stand behind an item before the recall path may
+serve it. It is a *serve-time* rule rather than a write-side one: the recurrence pass labels an item with the
+tasks that taught it, and the floor decides whether that label is enough to hand the item to a model.
+`retireBelowSupport` implements it as a status (`statusReason: "support-floor"`), so a retired item is kept,
+counted under `store.reasons`, and reversible — and it is applied after the pass and before the gate that
+reads the store, because a floor applied later would be measured as a store that carried something and served
+nothing. **Support is a safety statistic, not a quality one:** an item two tasks agreed on can be wrong, and
+an item one task taught can be the only useful rule in the store, so a floor is graded on the harm share and
+on the per-item `broke` column rather than on the mean.
+
 **Two denominators** — `pass^4` is the fraction of *tasks* whose k trials all passed; `episode_rate` is the
 fraction of *episodes* that passed. The first is `p^k` averaged over tasks and is a nonlinear function of the
 second, so at forty tasks it is roughly three times as coarse. Every `poc-l4` line now carries `episode_rate`,

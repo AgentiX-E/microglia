@@ -146,6 +146,16 @@ paraphrase shares four content terms and a conflict shares two. Both floors trav
 (`threshold`, `conditionMinShared`), so a store consolidated under one setting is never read as a
 store consolidated under another.
 
+**A merge is a label until something acts on it.** With `linkage: 'all'` the pass reached
+`supportAfter {1: 44, 2: 8, 3: 2, 4: 1}` on a store where every item had one task before it, and the
+lane went on serving those 55 items as though the census did not exist. The act is deliberately not in
+the pass: retiring an item is the *store's* vocabulary (`statusReason`), and a rule inside the recall
+path would be a second implementation of it in another process. `retireBelowSupport` runs once, after
+the pass and before the gate that reads the store, so the population the eval phase prices is the
+population the floor left — and the floor's own record (`total`, `retired`, `retained`, `floor`)
+travels in the learning block, because a store that serves 11 of 55 items and a store that had 11 items
+are the same sentence in every census that came before it.
+
 ### 2.4 `apply` owns the injection boundary
 
 The renderer is the only place that decides what a model sees. It is therefore the only place that

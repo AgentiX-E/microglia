@@ -987,6 +987,15 @@ consolidated:<id>`, so an erasure request and an audit both still see it. And it
 a claim *means* — a merge of two claims that should have stayed apart will be visible in the census as
 a group, which is why the threshold travels with the report rather than living in a constant.
 
+### What the pass buys, and what still has to be done with it
+
+A keyless pass is what makes `supportTasks` move: on a store where `supportBefore` was `{1: 69}` a pass with
+`linkage: 'all'` reached `supportAfter {1: 44, 2: 8, 3: 2, 4: 1}` — **11 items that two or more tasks taught
+independently**, max 4. The pass only *labels* that consensus; it does not act on it. An item with one task
+behind it is still served, and on a store that is larger than the request population most requests are
+answered with one. The mechanism that acts on it is a serve-time floor — `retireBelowSupport` in the
+library, `serveSupport` in a registration — documented in §13.28.
+
 ## 9. Exporting a dataset
 
 ```ts
@@ -2822,6 +2831,53 @@ What to check on the treatment run:
 A rung that withholds more than two requests in five has replaced the store rather than filtered it. If the
 **lowest** rung already does that, do not buy a rung at all: that store's top two candidates are always
 within a point of each other, and the honest report is the ladder itself.
+
+### 13.28 Serving only what a second task agreed with
+
+A store written one item per correction holds mostly items with **one** task behind them. On a benchmark
+where a pack serves one item per request, those items are what the model actually sees, and they are also
+what it cannot check: the same store can hold a corroborated claim (two tasks taught it independently) and
+fourteen singletons, and the pack will hand out whichever ranks highest for the question.
+
+`serveSupport` retires, at serve time, every item fewer than *n* distinct tasks stand behind:
+
+```yaml
+# Needs the recurrence pass: the support it reads is the pass's own count.
+consolidate: true
+consolidateKey: routine
+consolidateLinkage: all   # without this the pass only compares items filed under one key
+serveSupport: 2           # absent or 1 = every item is servable, which is the control
+```
+
+```text
+[tau2] consolidation: 69 considered, 2,346 pair(s) (0 kind, 0 scope, 0 hidden by the key, 26 overlap
+removed): 11 groups, 15 merged, 55 retained; cross-task 11, support ≥2 2→8, max 4; ...
+[tau2] support floor 2: 44 of 55 item(s) retired for want of corroboration, 11 servable
+```
+
+Four things to know before you use it:
+
+1. **It is a serve-time decision, not a write-side filter.** The retired items are still in the store with
+   `statusReason: support-floor`, are counted under `store.reasons`, and can be re-activated. Nothing is
+   deleted, so a readback can always price what the floor removed.
+2. **It needs the pass.** Without `consolidate: true` every item is written from one correction, so its
+   support is 1 by construction and a floor of 2 retires the entire store — the run then serves no memory at
+   all and looks exactly like a floor that did not work. A registration that names `serveSupport` above 1
+   without `consolidate: true` is refused before dispatch.
+3. **It changes the denominator, not only the numerator.** If the store holds 55 items and the floor leaves
+   11, then at most 11 distinct items can be served however many requests there are. `recall.served` falling
+   is the floor working; `recall.served` at zero with `retained` above zero is a wiring defect.
+4. **Support is not quality.** An item two tasks agreed on can still be wrong, and an item one task taught can
+   be the only useful rule in the store. The floor is a safety instrument: grade it on the **harm share** (the
+   share of trials the control passed and the memory arm broke) and on the per-item `broke` column, not on the
+   point estimate at n = 40.
+
+| reading | what it means |
+|---|---|
+| `supportFloor.retired` in band with the pass's `supportAfter[1]` | the floor acted on the population the census described |
+| `store.reasons['support-floor']` equals `supportFloor.retired` | the write-back reached the store the recall path opens |
+| a served item with support 1 | the floor did not reach the pack — a carriage defect, not a finding |
+| `retained` at or above the store's own length | the floor was not applied at all |
 
 ## 17. When the memory makes things worse, which rule did it
 
