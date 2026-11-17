@@ -374,27 +374,31 @@ class MicrogliaAgent(LLMAgent):
         _calls += 1
         text = getattr(message, "content", None)
         pack = self.pack_for(state, text if isinstance(text, str) else "")
-        if pack:
+        # R137. The invariant is not "inject a block" but "the prompt carries at most one block, and it is
+        # this episode's". A state that already carries one is a state this method wrote — tau2 threads the
+        # state the agent returns — so the earlier copy is removed whether or not this turn has one of its
+        # own: a retry whose recall came back empty must not keep serving the attempt before it.
+        carried = any(is_pack_message(m) for m in state.system_messages)
+        if pack or carried:
             # A copy, not a mutation: appending to the shared state would make the
             # pack accumulate once per turn, and a ten-turn episode would carry ten
             # copies of it.
             state = state.model_copy(deep=True)
-            injected = injected_message(pack)
-            # R137. The copy above does not prevent that accumulation on its own, and this is the line
-            # that was wrong for forty-five rounds: tau2 threads the state the agent *returns*, so the
-            # copy is what the next turn is handed, and appending to it put one more copy of the same
-            # block in the prompt every turn. The block is constant for the whole episode (`pack_for`
-            # holds it), so the correct prompt has exactly one — the one built now. Any earlier copy is
-            # this method's own output read back, and it is removed rather than kept beside its
-            # successor.
+            # The copy above does not prevent that accumulation on its own, and this is the line that was
+            # wrong for forty-five rounds: the copy is what the next turn is handed, so appending to it put
+            # one more copy of the same block in the prompt every turn. The block is constant for the whole
+            # episode (`pack_for` holds it), so any earlier copy is this method's own output read back.
             kept = [m for m in state.system_messages if not is_pack_message(m)]
             _pack_copies_dropped += len(state.system_messages) - len(kept)
-            # R136: the length is taken from the message object rather than from the pack, because the
-            # question is what the prompt *carried* — the element `injected_message` adds is part of the
-            # bill, and a census that only knows the pack's length cannot see it.
-            _injected_chars += len(injected.content)
-            _injected_lengths.append(len(injected.content))
-            state.system_messages = kept + [injected]
+            if pack:
+                injected = injected_message(pack)
+                # R136: the length is taken from the message object rather than from the pack, because the
+                # question is what the prompt *carried* — the element `injected_message` adds is part of the
+                # bill, and a census that only knows the pack's length cannot see it.
+                _injected_chars += len(injected.content)
+                _injected_lengths.append(len(injected.content))
+                kept = kept + [injected]
+            state.system_messages = kept
         return super().generate_next_message(message, state)
 
 

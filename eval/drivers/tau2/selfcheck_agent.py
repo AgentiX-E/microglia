@@ -882,6 +882,25 @@ def parse_turns() -> int:
     return 0
 
 
+@case
+def an_empty_answer_clears_a_block_from_the_attempt_before_it(checks):
+    """The invariant is not "inject a block" but "at most one block, and it is this episode's".
+
+    A retry can be handed a state that carries the previous attempt's block and recall nothing of its own.
+    Leaving that block in the prompt would serve a memory into an episode that asked for none, which is the
+    one thing an empty answer must never do.
+    """
+    agent, _, original = fresh(pack="")
+    try:
+        stale = SystemMessage(role="system", content="<microglia-knowledge>\nOLD\n</microglia-knowledge>")
+        state = LLMAgentState(system_messages=[stale])
+        state = episode_step(agent, state, "retry")
+    finally:
+        subject.recall = original
+    checks.equal(len(agent.seen.system_messages), 0, "the attempt before it left nothing behind")
+    checks.equal(subject._pack_copies_dropped, 1, "and the removal is counted")  # noqa: SLF001
+
+
 def main(argv: list[str]) -> int:
     if "--dump-stats" in argv:
         return dump_stats()
