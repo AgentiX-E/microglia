@@ -38,9 +38,9 @@ function item(id: string, tasks: readonly string[], status: 'active' | 'retired'
 /**
  * R141 — the store's consensus, served instead of its instances.
  *
- * R139 read two facts off one artefact: every negative-net item had **one** task of support, and **43 of 64**
- * items were never served because the store is 1.75× the request population with one item a request. This
- * pass acts on both at once, and these cases pin what it may and may not touch.
+ * R139 read two facts off one artefact: every negative-net item had **one** task of support, and **34 of the
+ * 55** servable items were never served because the store is 1.4× the request population with one item a
+ * request. This pass acts on both at once, and these cases pin what it may and may not touch.
  */
 describe('the support floor at serve time', () => {
   it('retires what one task said and keeps what two agreed on', () => {

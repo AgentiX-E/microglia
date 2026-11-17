@@ -4,13 +4,13 @@
  * ## What the store's own numbers said
  *
  * R139 measured a store of 70 items whose recurrence pass was finally allowed to compare every pair: 11
- * groups, **8 items corroborated by two or more tasks**, max support 4, and a bill that is now the control's
+ * groups, **11 items corroborated by two or more tasks**, max support 4, and a bill that is now the control's
  * ($0.0958 against $0.0962). It also measured two things that decide this round:
  *
  *  - of the 21 items served over 40 requests, **every one of the three negative-net items had one task of
  *    support**, and neither of the two corroborated items that were served did;
- *  - **43 of 64 items were never served at all**, because the store is 1.75× the request population and the
- *    pack serves one item a request. An item cannot accumulate outcomes it is never handed.
+ *  - **34 of the 55 servable items were never served at all**, because the store is 1.4× the request
+ *    population and the pack serves one item a request. An item cannot accumulate outcomes it is never handed.
  *
  * So the store holds a consensus it never uses, and the items that hurt are the ones nothing corroborates.
  * A floor on `supportTasks` is the smallest mechanism that acts on both facts at once: it is the gate ALTK's

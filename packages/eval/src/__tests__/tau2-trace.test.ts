@@ -14,6 +14,7 @@
  * shape is a reader that will meet the real one and return nothing.
  */
 import { describe, expect, it } from 'vitest';
+import { retireBelowSupport } from '../tau2-support-floor.js';
 import { buildDistillPrompt } from '@agentix-e/microglia-core/distill';
 import type { FeedbackEvent, RunRecord } from '@agentix-e/microglia-core';
 import {
@@ -462,9 +463,11 @@ describe('resolveServeSupport', () => {
     expect(resolveServeSupport(undefined)).toBe(1);
     expect(resolveServeSupport('')).toBe(1);
     expect(resolveServeSupport(' 1 ')).toBe(1);
-    // Zero is not the default and is not refused: it is a floor above every item, i.e. an empty pack, which a
-    // registration may ask for and a readback must be able to see.
+    // Zero is not the default and is not refused: nothing can be below it, so it is the control spelled out.
+    // The resolver reads and refuses rather than reinterpreting, and the floor treats anything at or below one
+    // as no floor, so the two agree about what the value means.
     expect(resolveServeSupport('0')).toBe(0);
+    expect(retireBelowSupport([], 0, 0).retired).toBe(0);
   });
 
   it('reads the floor a registration asked for', () => {

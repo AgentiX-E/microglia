@@ -290,13 +290,15 @@ export function resolveConsolidationKey(raw = process.env['TAU_CONSOLIDATE_KEY']
 /**
  * How many distinct tasks must stand behind an item before the recall path may serve it.
  *
- * R141. R139's store held **8 items corroborated by two or more tasks** and served 21 items over 40
- * requests: every negative-net item had **one** task of support, and **43 of 64** items were never served at
- * all. A floor on `supportTasks` is the smallest mechanism that acts on both facts — it is the gate ALTK's
- * `sup2`/`sup3` cells implement, applied where the memory is served rather than where it is written.
+ * R141. R139's store held **11 items corroborated by two or more tasks** and served 21 of its 55 servable
+ * items over 40 requests: every negative-net item had **one** task of support, and **34 of the 55** were never
+ * served at all. A floor on `supportTasks` is the smallest mechanism that acts on both facts — it is the gate
+ * ALTK's `sup2`/`sup3` cells implement, applied where the memory is served rather than where it is written.
  *
  * Unset and `1` are the same fact: every item is servable, which is what every artefact before this resolver
- * measured. A value that is not a non-negative integer is refused before the first model call, for
+ * measured — and so is `0`, because nothing can be below it. The resolver reads and refuses; it does not
+ * reinterpret, which is why zero is passed through as zero and the floor itself treats anything at or below one
+ * as the control. A value that is not a non-negative integer is refused before the first model call, for
  * `resolveConsolidationKey`'s reason: a misread switch that fell back to the control would publish the control
  * under the treatment's name.
  */
