@@ -989,7 +989,7 @@ a group, which is why the threshold travels with the report rather than living i
 
 ### What the pass buys, and what still has to be done with it
 
-A keyless pass is what makes `supportTasks` move: on a store where `supportBefore` was `{1: 69}` a pass with
+A keyless pass is what makes `supportTasks` move: on a store where `supportBefore` was `{1: 70}` a pass with
 `linkage: 'all'` reached `supportAfter {1: 44, 2: 8, 3: 2, 4: 1}` — **11 items that two or more tasks taught
 independently**, max 4. The pass only *labels* that consensus; it does not act on it. An item with one task
 behind it is still served, and on a store that is larger than the request population most requests are
@@ -2850,10 +2850,15 @@ serveSupport: 2           # absent or 1 = every item is servable, which is the c
 ```
 
 ```text
-[tau2] consolidation: 69 considered, 2,346 pair(s) (0 kind, 0 scope, 0 hidden by the key, 26 overlap
-removed): 11 groups, 15 merged, 55 retained; cross-task 11, support ≥2 2→8, max 4; ...
+# The two lines a run prints, from the store R139 measured and the floor this header would apply to it.
+[tau2] consolidation: 70 considered, 2,415 pair(s): 11 groups, 15 merged, 55 retained; cross-task 11,
+       support ≥2 0→11, max 1→4; refused 0 condition / 1 payload / 0 evidence / 20 linkage
 [tau2] support floor 2: 44 of 55 item(s) retired for want of corroboration, 11 servable
 ```
+
+The first line is the pass: `support ≥2 0→11` says eleven items are now taught by two or more tasks and
+none were before. The second is the floor: 44 of those 55 items are singletons, so they leave, and the pack
+serves from the eleven that remain.
 
 Four things to know before you use it:
 
