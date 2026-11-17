@@ -317,6 +317,16 @@ def _census_of(messages) -> "dict[str, int] | None":
         "packed_calls": packed,
         "system_chars_packed": system if packed else 0,
         "system_chars_unpacked": 0 if packed else system,
+        # R137. How many copies of the block a packed call carried. The prompt is the policy plus whatever
+        # the agent put in `state.system_messages`, and the only thing this lane ever puts there is the
+        # pack — so the first system message is the policy and every one after it is a copy. Counting the
+        # copies rather than the column is what makes the R136 remainder readable: a carriage of 10,400
+        # characters against a 705-character message is not a preamble, it is the same block read back
+        # five more times, and no mean over characters can say that.
+        "pack_copies": systems - 1 if packed else 0,
+        # And the calls that carried one twice or more, because a mean of 2.0 can be produced by a phase
+        # where half the calls carried one copy and half carried three. A count cannot.
+        "packed_with_copies": 1 if systems > 2 else 0,
     }
 
 
@@ -495,6 +505,11 @@ def cache_census(memory: "dict | None" = None) -> dict:
         per_packed = _cache["system_chars_packed"] / packed
         block["packed_calls"] = packed
         block["system_chars_per_packed_call"] = round(per_packed, 1)
+        # R137. The copies, reported beside the column they inflate. `1.0` is the sound reading — one
+        # block a call — and the defect this round repaired measured 5.4. Absent rather than zeroed when
+        # the phase carried no pack, because "no pack" and "one pack" are different phases.
+        block["pack_copies_per_packed_call"] = round(_cache["pack_copies"] / packed, 2)
+        block["packed_calls_with_copies"] = _cache["packed_with_copies"]
         if unpacked:
             block["system_chars_per_unpacked_call"] = round(
                 _cache["system_chars_unpacked"] / unpacked, 1

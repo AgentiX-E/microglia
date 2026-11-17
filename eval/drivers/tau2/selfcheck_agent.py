@@ -122,15 +122,31 @@ def fresh(pack: str = "RULE", *, fail: bool = False):
 
     original = subject.recall
     subject.recall = fake_recall
+    # R137: the copy counter is the claim in two cases below, so it starts each one at zero. The other
+    # counters are read as differences or as facts about a phase this file builds, and resetting them
+    # here would be a fixture deciding what the code under test had done before it was called.
+    subject._pack_copies_dropped = 0  # noqa: SLF001
     return subject.MicrogliaAgent(), calls, original
 
 
 def episode_step(agent, state, text: str):
-    """One turn: the agent answers, and the conversation grows by two messages."""
+    """One turn, under the contract tau2 actually honours: **the returned state is the next one.**
+
+    This used to hand the same object back on every turn, which made the wrapper look idempotent for
+    a reason that had nothing to do with the wrapper: the agent copies the state it is given, so a
+    copy of a state that never grew carries one injected message however many turns pass. tau2
+    threads the state the agent *returns* — that is the only reason the copy is visible to the next
+    turn at all — so a fixture that drops the return value asserts a contract the benchmark does not
+    have, and the two ways of getting the loop wrong (a pack per turn, a recall per turn) become
+    invisible to the only test that was written to catch them.
+
+    R137. The defect this fixture hid was measured before it was believed: 11,105.9 characters of
+    system a packed call against a 705-character message leaves room for 5.4 copies of the block.
+    """
     state.messages.append(("user", text))
-    result = agent.generate_next_message(Turn(text), state)
-    state.messages.append(("assistant", "ok"))
-    return result
+    _, out = agent.generate_next_message(Turn(text), state)
+    out.messages.append(("assistant", "ok"))
+    return out
 
 
 # -------------------------------------------------------------------------- tests
@@ -150,7 +166,7 @@ def recalls_once_for_a_whole_episode(checks):
     try:
         state = LLMAgentState()
         for index in range(6):
-            episode_step(agent, state, f"turn {index}")
+            state = episode_step(agent, state, f"turn {index}")
     finally:
         subject.recall = original
     checks.equal(len(calls), 1, "six turns cost one recall")
@@ -163,10 +179,10 @@ def a_second_episode_recalls_again(checks):
     try:
         first = LLMAgentState()
         for index in range(4):
-            episode_step(agent, first, f"a{index}")
+            first = episode_step(agent, first, f"a{index}")
         second = LLMAgentState()
         for index in range(3):
-            episode_step(agent, second, f"b{index}")
+            second = episode_step(agent, second, f"b{index}")
     finally:
         subject.recall = original
     checks.equal(len(calls), 2, "one recall per episode, not per agent")
@@ -180,7 +196,7 @@ def the_same_pack_is_served_every_turn(checks):
         state = LLMAgentState()
         contents = []
         for index in range(3):
-            episode_step(agent, state, f"t{index}")
+            state = episode_step(agent, state, f"t{index}")
             contents.append(agent.seen.system_messages[-1].content)
     finally:
         subject.recall = original
@@ -195,11 +211,66 @@ def the_pack_does_not_accumulate(checks):
         state = LLMAgentState()
         lengths = []
         for index in range(5):
-            episode_step(agent, state, f"t{index}")
+            state = episode_step(agent, state, f"t{index}")
             lengths.append(len(agent.seen.system_messages))
     finally:
         subject.recall = original
     checks.equal(lengths, [1, 1, 1, 1, 1], "one injected message, not one per turn")
+    # R137: the identity of that one message, not only its count. A wrapper that dropped the block and
+    # appended nothing would pass the lengths above and serve no memory at all.
+    checks.equal(
+        agent.seen.system_messages[0].content.count("<microglia-knowledge"),
+        1,
+        "and the message in the prompt is the block itself, once",
+    )
+    checks.equal(
+        subject._pack_copies_dropped,  # noqa: SLF001 - the counter is the claim
+        4,
+        "four of the five turns were handed a state that already carried the pack",
+    )
+
+
+@case
+def a_policy_prompt_survives_the_replacement(checks):
+    """The block is removed by identity, and every other system message is left exactly where it was.
+
+    A wrapper that reset `system_messages` to `[injected]` would satisfy the count above and delete the
+    benchmark's own policy prompt, which is the failure mode a length-only assertion cannot see.
+    """
+    agent, _, original = fresh(pack="PACK")
+    try:
+        policy = SystemMessage(role="system", content="You are a retail agent.")
+        state = LLMAgentState(system_messages=[policy])
+        for index in range(3):
+            state = episode_step(agent, state, f"t{index}")
+    finally:
+        subject.recall = original
+    contents = [m.content for m in agent.seen.system_messages]
+    checks.equal(len(contents), 2, "the policy and one block")
+    checks.equal(contents[0], "You are a retail agent.", "the policy is first and untouched")
+    checks.substring(contents[1], "PACK", "the block follows it")
+
+
+@case
+def a_block_from_another_episode_is_replaced_rather_than_stacked(checks):
+    """A retry hands the agent a state that already carried a *different* pack.
+
+    The held pack is a property of the episode, and an episode that reopens has a pack of its own; keeping
+    the stale one beside the new one would serve two memories that disagree and call it a treatment.
+    """
+    agent, _, original = fresh(pack="NEW")
+    try:
+        stale = SystemMessage(role="system", content="<microglia-knowledge>\nOLD\n</microglia-knowledge>")
+        state = LLMAgentState(system_messages=[stale])
+        state = episode_step(agent, state, "retry")
+    finally:
+        subject.recall = original
+    contents = [m.content for m in agent.seen.system_messages]
+    checks.equal(len(contents), 1, "one block, not two")
+    checks.substring(contents[0], "NEW", "the one in the prompt is the one this episode recalled")
+    checks.equal(
+        contents[0].count("<microglia-knowledge"), 1, "and the stale one left no element behind"
+    )
 
 
 @case
@@ -207,9 +278,9 @@ def an_empty_pack_is_not_injected(checks):
     agent, calls, original = fresh(pack="")
     try:
         state = LLMAgentState()
-        episode_step(agent, state, "t0")
+        state = episode_step(agent, state, "t0")
         first = len(agent.seen.system_messages)
-        episode_step(agent, state, "t1")
+        state = episode_step(agent, state, "t1")
     finally:
         subject.recall = original
     checks.equal(first, 0, "nothing is added when there is nothing to add")
@@ -220,12 +291,13 @@ def an_empty_pack_is_not_injected(checks):
 def the_state_is_copied_rather_than_mutated(checks):
     agent, _, original = fresh()
     try:
-        state = LLMAgentState(messages=["seed"])
-        episode_step(agent, state, "t0")
+        given = LLMAgentState(messages=["seed"])
+        state = episode_step(agent, given, "t0")
     finally:
         subject.recall = original
-    checks.equal(len(state.system_messages), 0, "the caller's state is untouched")
-    checks.equal(len(agent.seen.system_messages), 1, "the copy carries the pack")
+    checks.equal(len(given.system_messages), 0, "the caller's state is untouched")
+    checks.equal(len(state.system_messages), 1, "the copy carries the pack")
+    checks.equal(len(agent.seen.system_messages), 1, "and the agent answered from the copy")
 
 
 @case
@@ -246,7 +318,7 @@ def the_block_is_wrapped_once(checks):
     agent, _, original = fresh(pack=block)
     try:
         state = LLMAgentState()
-        episode_step(agent, state, "t0")
+        state = episode_step(agent, state, "t0")
     finally:
         subject.recall = original
     content = agent.seen.system_messages[-1].content
@@ -261,7 +333,7 @@ def a_bare_body_is_wrapped_rather_than_sent_untagged(checks):
     agent, _, original = fresh(pack='{"id":"k_1"}')
     try:
         state = LLMAgentState()
-        episode_step(agent, state, "t0")
+        state = episode_step(agent, state, "t0")
     finally:
         subject.recall = original
     content = agent.seen.system_messages[-1].content
@@ -276,7 +348,7 @@ def a_reused_agent_resets_on_a_shorter_conversation(checks):
     try:
         state = LLMAgentState()
         for index in range(9):
-            episode_step(agent, state, f"long{index}")
+            state = episode_step(agent, state, f"long{index}")
         # tau2 hands the same instance a fresh state; only the length says so.
         fresh_state = LLMAgentState(messages=["only"])
         agent.generate_next_message(Turn("fresh"), fresh_state)
@@ -320,7 +392,7 @@ def memory_stats_exposes_the_recall_count(checks):
     try:
         state = LLMAgentState()
         for index in range(3):
-            episode_step(agent, state, f"t{index}")
+            state = episode_step(agent, state, f"t{index}")
     finally:
         subject.recall = original
     stats = subject.memory_stats()
@@ -340,6 +412,7 @@ def memory_stats_exposes_the_recall_count(checks):
             "margin_p50",
             "margin_p90",
             "packChars",
+            "packCopiesDropped",
             "recallRepeats",
             "recall_empty",
             "recall_failures",
@@ -418,7 +491,7 @@ def the_boundary_records_the_task_it_opened_for(checks):
     try:
         before = subject.memory_stats()
         state = LLMAgentState()
-        episode_step(agent, state, "where is my order 1234")
+        state = episode_step(agent, state, "where is my order 1234")
         after = subject.memory_stats()
     finally:
         subject.recall = original
@@ -440,7 +513,7 @@ def a_boundary_text_is_recorded_at_the_length_the_recall_used(checks):
     try:
         before = subject.memory_stats()
         state = LLMAgentState()
-        episode_step(agent, state, long_text)
+        state = episode_step(agent, state, long_text)
         after = subject.memory_stats()
     finally:
         subject.recall = original
@@ -462,8 +535,8 @@ def the_injected_message_is_measured_where_it_is_injected(checks):
     try:
         before = subject.memory_stats()
         state = LLMAgentState()
-        episode_step(agent, state, "t1")
-        episode_step(agent, state, "t2")
+        state = episode_step(agent, state, "t1")
+        state = episode_step(agent, state, "t2")
         after = subject.memory_stats()
     finally:
         subject.recall = original
@@ -485,7 +558,7 @@ def an_episode_with_no_pack_injects_nothing_and_says_so(checks):
     try:
         before = subject.memory_stats()
         state = LLMAgentState()
-        episode_step(agent, state, "t1")
+        state = episode_step(agent, state, "t1")
         after = subject.memory_stats()
     finally:
         subject.recall = original
@@ -606,9 +679,9 @@ def an_episode_boundary_is_recorded_where_a_join_can_use_it(checks):
     try:
         subject._episode_starts.clear()  # noqa: SLF001
         state = LLMAgentState()
-        episode_step(agent, state, "first turn")
+        state = episode_step(agent, state, "first turn")
         checks.equal(len(subject._episode_starts), 1, "one episode, one boundary")  # noqa: SLF001
-        episode_step(agent, state, "second turn")
+        state = episode_step(agent, state, "second turn")
         checks.equal(
             len(subject._episode_starts),
             1,

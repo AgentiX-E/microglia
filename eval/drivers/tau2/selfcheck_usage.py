@@ -516,7 +516,9 @@ def every_counter_the_census_keeps_is_a_field_the_verdict_reports(checks):
             "conversation_chars",
             "last_chars",
             "messages",
+            "pack_copies",
             "packed_calls",
+            "packed_with_copies",
             "prefix_chars",
             "seen_calls",
             "seen_chars",
@@ -703,6 +705,59 @@ def a_phase_with_no_packed_call_reports_no_per_packed_column(checks):
     census = subject.cache_census({"injectedCharsTotal": 100})
     checks.equal("packed_calls" in census, False, "no call carried a pack, so nothing is divided by zero")
     checks.equal("carriage_chars_per_packed_call" in census, False, "and no carriage is invented")
+
+
+@case
+def a_block_carried_twice_is_counted_as_two_copies(checks):
+    """R137. The reading that turns a carriage into a defect, measured on a population known by construction.
+
+    R136 could say a packed call carried 10,400 characters the injected message did not account for and
+    could not say what they were: a longer preamble and five copies of the same block produce the same
+    mean. The count separates them — the policy is one system message and everything after it is this
+    lane's own block, so three system messages is two copies.
+    """
+    subject.reset_usage()
+    twice = [
+        {"role": "system", "content": "p" * 400},
+        {"role": "system", "content": "i" * 100},
+        {"role": "system", "content": "i" * 100},
+        {"role": "user", "content": TASK},
+    ]
+    once = [
+        {"role": "system", "content": "p" * 400},
+        {"role": "system", "content": "i" * 100},
+        {"role": "user", "content": TASK},
+    ]
+    _call(list(twice), 200, 0)
+    _call(list(once), 200, 0)
+    census = subject.cache_census({"injectedCharsTotal": 300})
+    checks.equal(census["packed_calls"], 2, "both calls carried a block")
+    checks.equal(census["pack_copies_per_packed_call"], 1.5, "three copies over two calls")
+    checks.equal(
+        census["packed_calls_with_copies"],
+        1,
+        "and exactly one of them carried the block more than once — a count a mean cannot fake",
+    )
+    checks.equal(census["system_chars_per_packed_call"], 550.0, "600 and 500 characters, over two calls")
+
+
+@case
+def a_phase_that_carried_one_block_a_call_reports_one_copy(checks):
+    """The sound reading, so the defect has something to be measured against."""
+    subject.reset_usage()
+    for _ in range(3):
+        _call(
+            [
+                {"role": "system", "content": "p" * 400},
+                {"role": "system", "content": "i" * 100},
+                {"role": "user", "content": TASK},
+            ],
+            200,
+            0,
+        )
+    census = subject.cache_census({"injectedCharsTotal": 300})
+    checks.equal(census["pack_copies_per_packed_call"], 1.0, "one block a call")
+    checks.equal(census["packed_calls_with_copies"], 0, "and no call carried it twice")
 
 
 def main(argv: list[str]) -> int:

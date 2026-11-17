@@ -123,7 +123,9 @@ describe('the reader and the writer agree on the field names', () => {
   // R130 added `recallRepeats`: the count a boundary list is short by, so `len(episodeStarts) + repeats ==
   // recalls` is an identity rather than a hope. R136 added the six fields of the two instruments it buys —
   // the boundary's own text and the three lengths the system column is made of — which is the same list
-  // failing in the same direction: a writer that grew fields the reader had not been told about.
+  // failing in the same direction: a writer that grew fields the reader had not been told about. R137 adds
+  // `packCopiesDropped`, the agent-side corroboration of the census's copy count: `calls - boundaries` when
+  // the block is injected once, and it is what a reader checks the census's mean against.
   it.skipIf(!available)('carries every field the speak line reads', () => {
     const stats = JSON.parse(dumped.stdout) as Record<string, unknown>;
     expect(Object.keys(stats).sort()).toEqual(
@@ -141,6 +143,7 @@ describe('the reader and the writer agree on the field names', () => {
         'margin_p50',
         'margin_p90',
         'packChars',
+        'packCopiesDropped',
         'recallRepeats',
         'recall_empty',
         'recall_failures',

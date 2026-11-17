@@ -116,6 +116,18 @@ export type PhaseCacheCensus = {
    */
   readonly carriage_chars_per_packed_call?: number;
   readonly carriage_tokens_per_call?: number;
+  /**
+   * How many copies of the block a packed call carried, and how many calls carried more than one.
+   *
+   * R137. R136's carriage was the right subtraction and the wrong instrument: 10,400 characters a call
+   * beyond a 705-character message is either a long preamble or the same block sent again, and a mean over
+   * characters cannot tell them apart. The policy is one system message and the block is the only thing
+   * this lane ever puts beside it, so `system_messages - 1` counts the copies directly — and the count of
+   * *calls* over one copy is what a mean cannot fake, since 2.0 can be half the calls at one and half at
+   * three. A sound phase reports `1` and `0`; the arm this field was built for reported 5.4 and 369.
+   */
+  readonly pack_copies_per_packed_call?: number;
+  readonly packed_calls_with_copies?: number;
   /** Why there is no census, when the phase says why. */
   readonly reason?: string;
   readonly first_call?: {
@@ -168,7 +180,7 @@ export type CacheCensusVerdict = {
   /** Mean tokens of newest message a call — the candidate explanation for `uncachedPerCall`. */
   readonly tailPerCall: number | null;
   /** What the reading points a repair at. `unmeasured` when the census cannot attribute the bill. */
-  readonly repair: 'the-turn' | 'the-prefix' | 'the-framing' | 'unmeasured';
+  readonly repair: 'the-turn' | 'the-prefix' | 'the-framing' | 'the-pack' | 'unmeasured';
   /**
    * The injected message's share of the system column it rides in, when both were measured.
    *
@@ -177,6 +189,9 @@ export type CacheCensusVerdict = {
    * dollars, and only a share says which one this is.
    */
   readonly carriageShare: number | null;
+  /** Mean copies of the block a packed call carried, and the calls that carried more than one. */
+  readonly packCopies: number | null;
+  readonly repeatedCalls: number | null;
   readonly sentence: string;
 };
 
@@ -246,6 +261,28 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
         `${String(Math.round(pair.carriage))} more` +
         (pair.tokens === null ? '' : ` (about ${String(Math.round(pair.tokens))} tokens)`);
 
+  // R137. The copies, and the clause that prices them. A packed call carries the policy and the block; a
+  // carriage the block's own message cannot explain is either a longer preamble or more copies of the same
+  // block, and only the count says which. `repeated` is the count of *calls*, so a phase where half the
+  // calls carried one copy and half carried three reads as a duplication rather than as an average of two.
+  const copies = finiteOrNull(census.pack_copies_per_packed_call);
+  const repeated = finiteOrNull(census.packed_calls_with_copies);
+  const packedCalls = Math.round(finiteOrNull(census.packed_calls) ?? 0);
+  const packClause =
+    copies === null || repeated === null
+      ? ''
+      : repeated > 0
+        ? `; ${String(repeated)} of the ${String(packedCalls)} packed call(s) carried the block more than ` +
+          `once, ${copies.toFixed(2)} copies a call — the same text re-sent, which is a defect and not a ` +
+          `longer preamble`
+        : `; every packed call carried the block exactly once`;
+  // A block re-sent is not the turn's material and not the prefix's boundary: it is the injection, and the
+  // repair is to make it idempotent. Only a duplication overrides, because a sound phase has nothing here
+  // to repair and its own reading is the better one. The gate is the clause's own: a repair drawn from half
+  // a pair would point a reader at an injection the sentence never mentioned.
+  const packRepair = packClause === '' ? null : repeated !== null && repeated > 0 ? ('the-pack' as const) : null;
+  const copiesFields = { packCopies: copies, repeatedCalls: repeated };
+
   if (coverage > PREFIX_UNDERCOUNTED) {
     return {
       state: 'prefix-undercounted',
@@ -254,11 +291,12 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       tailPerCall,
       repair: 'unmeasured',
       carriageShare,
+      ...copiesFields,
       sentence:
         `the provider credited ${percent}% of the ${String(prefix)}-token prefix this census counts as ` +
         `seen, which is more than it was shown: the share is above 1 because the denominator stops two ` +
         `messages short, not because the provider credited more than it held${split}${composition}` +
-        `${carriage}; the ` +
+        `${carriage}${packClause}; the ` +
         `${String(uncached)} uncached tokens a call cannot be attributed from this reading: the ` +
         `attribution R134's arms were read with is a guess until the split is read beside the prompt's ` +
         `own composition`,
@@ -270,12 +308,13 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       coverage,
       uncachedPerCall,
       tailPerCall,
-      repair: 'the-turn',
+      repair: packRepair ?? 'the-turn',
       carriageShare,
+      ...copiesFields,
       sentence:
         `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen, and the ` +
-        `newest message was ${String(tail)} tokens${split}${composition}${carriage}: the ${String(uncached)} ` +
-        `uncached tokens a call are the turn's own material`,
+        `newest message was ${String(tail)} tokens${split}${composition}${carriage}${packClause}: the ` +
+        `${String(uncached)} uncached tokens a call are the turn's own material`,
     };
   }
   if (coverage < PREFIX_BROKEN) {
@@ -284,12 +323,13 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
       coverage,
       uncachedPerCall,
       tailPerCall,
-      repair: 'the-prefix',
+      repair: packRepair ?? 'the-prefix',
       carriageShare,
+      ...copiesFields,
       sentence:
         `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen, against ` +
-        `a ${String(tail)}-token newest message${split}${composition}${carriage}: the lane is re-billing a ` +
-        `prefix it believes is cached`,
+        `a ${String(tail)}-token newest message${split}${composition}${carriage}${packClause}: the lane is ` +
+        `re-billing a prefix it believes is cached`,
     };
   }
   return {
@@ -297,12 +337,13 @@ export function cacheCensusVerdict(census: PhaseCacheCensus | undefined | null):
     coverage,
     uncachedPerCall,
     tailPerCall,
-    repair: 'the-prefix',
+    repair: packRepair ?? 'the-prefix',
     carriageShare,
+    ...copiesFields,
     sentence:
       `the provider credited ${percent}% of the ${String(prefix)}-token prefix it had seen${split}` +
-      `${composition}${carriage}: part of the prefix is re-billed on some calls, which is a boundary that ` +
-      `moves rather than a size`,
+      `${composition}${carriage}${packClause}: part of the prefix is re-billed on some calls, which is a ` +
+      `boundary that moves rather than a size`,
   };
 }
 
@@ -342,6 +383,8 @@ function unmeasured(sentence: string): CacheCensusVerdict {
     tailPerCall: null,
     repair: 'unmeasured',
     carriageShare: null,
+    packCopies: null,
+    repeatedCalls: null,
     sentence,
   };
 }

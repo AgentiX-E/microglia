@@ -1571,12 +1571,26 @@ was the name. The two lists are positional against each other (`boundaryTexts` a
 is why an unresolved entry is kept in place rather than filtered out.
 
 **Carriage** — `carriage_chars_per_packed_call`: what the system column carries beyond the message the
-agent injected, per call that carried a pack. It is the adapter's preamble and the renderer's wrapper, and
-until R136 it had no name: the census counted every system message together, so a 559-token growth against
-a 725-character pack was reported as one number and read as if it were the memory's text. Measured against
-`system_chars_per_packed_call` rather than against the mean over all calls, because the callback sees the
-user simulator's calls and those carry neither the pack nor the agent's policy. A reading exists only when
-the injection, the column and the call count all travelled: half a pair is not a carriage.
+agent injected, per call that carried a pack. Until R136 it had no name: the census counted every system
+message together, so a 559-token growth against a 725-character pack was reported as one number and read as
+if it were the memory's text. Measured against `system_chars_per_packed_call` rather than against the mean
+over all calls, because the callback sees the user simulator's calls and those carry neither the pack nor
+the agent's policy. A reading exists only when the injection, the column and the call count all travelled:
+half a pair is not a carriage.
+
+> The subtraction names a remainder, not its contents. R136 called the remainder "the adapter's preamble"
+> and the arm it dispatched reported **10,400 characters a call against a 705-character message** — the block
+> re-sent five times, not a preamble. Read **Copy** before reading a carriage.
+
+**Copy** — One instance of the recalled block in a prompt, when the block was injected more than once.
+`pack_copies_per_packed_call` is `system_messages − 1` per packed call, because the policy is one system
+message and the block is the only thing the agent puts beside it; `packed_calls_with_copies` counts the calls
+that carried two or more, which a mean cannot fake. `memory.packCopiesDropped` is the agent's own count of
+copies it removed from the state it was handed, and on a sound phase it reads `calls − boundaries`. The
+defect they were built for: an agent that appends its block to the state the benchmark threads back puts one
+more copy in the prompt every turn, so a ten-turn episode carries ten — the cost grows with the square of the
+episode, the model is told ten times which data to act on, and the cached prefix ends at the insertion point
+because the block sits at the front of the prompt. Every memory arm from R92 to R136 carried it.
 
 **Packed call** — A model call whose messages carry **two or more system messages**, i.e. one that the pack
 rode on. Structural rather than nominal: it is visible from the roles alone, so a release that renames the

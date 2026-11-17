@@ -406,3 +406,65 @@ describe('the carriage the system column carries beyond the message', () => {
     }
   });
 });
+
+/**
+ * R137. The count that turned R136's carriage from a remainder into a defect.
+ *
+ * R136 measured 10,400 characters of system a packed call over a 705-character injected message and could
+ * not say whether they were a long preamble or the same block sent repeatedly. The census now counts the
+ * copies — the policy is one system message and the block is the only thing this lane puts beside it — and
+ * the count of *calls* carrying more than one, which a mean cannot fake: half the calls at one copy and
+ * half at three average 2.0 and are not the same phase as every call at two.
+ */
+describe('the copies of the block a packed call carried', () => {
+  const withCopies = (over: Partial<PhaseCacheCensus> = {}): PhaseCacheCensus =>
+    measured({
+      packed_calls: 410,
+      system_chars_per_packed_call: 11_105.9,
+      injected_chars_per_packed_call: 705.1,
+      carriage_chars_per_packed_call: 10_400.8,
+      carriage_tokens_per_call: 2_132.2,
+      pack_copies_per_packed_call: 5.4,
+      packed_calls_with_copies: 369,
+      ...over,
+    });
+
+  it('names the duplication and points the repair at the injection', () => {
+    const verdict = cacheCensusVerdict(withCopies());
+    expect(verdict.packCopies).toBe(5.4);
+    expect(verdict.repeatedCalls).toBe(369);
+    expect(verdict.repair).toBe('the-pack');
+    expect(verdict.sentence).toContain('369 of the 410 packed call(s) carried the block more than once');
+    expect(verdict.sentence).toContain('5.40 copies a call');
+    expect(verdict.sentence).toContain('a defect and not a longer preamble');
+  });
+
+  it('leaves a sound phase alone, because one copy a call has nothing to repair', () => {
+    const verdict = cacheCensusVerdict(withCopies({ pack_copies_per_packed_call: 1, packed_calls_with_copies: 0 }));
+    expect(verdict.repair).toBe('the-turn');
+    expect(verdict.repeatedCalls).toBe(0);
+    expect(verdict.sentence).toContain('every packed call carried the block exactly once');
+  });
+
+  it('overrides the prefix repair too, because a block that grows is what breaks the prefix', () => {
+    const verdict = cacheCensusVerdict(withCopies({ prefix_coverage: 0.42 }));
+    expect(verdict.state).toBe('prefix-partial');
+    expect(verdict.repair).toBe('the-pack');
+  });
+
+  it('says nothing when the phase counted no copies', () => {
+    // Every artefact before R137, and every arm without a pack. An absent count is not a count of zero.
+    const verdict = cacheCensusVerdict(withCopies({ pack_copies_per_packed_call: undefined }));
+    expect(verdict.packCopies).toBeNull();
+    expect(verdict.repeatedCalls).toBe(369);
+    expect(verdict.sentence).not.toContain('copies a call');
+    expect(verdict.repair).toBe('the-turn');
+  });
+
+  it('carries the nulls on an unmeasured census rather than a shape that forgets them', () => {
+    const verdict = cacheCensusVerdict(null);
+    expect(verdict.packCopies).toBeNull();
+    expect(verdict.repeatedCalls).toBeNull();
+    expect(verdict.sentence).not.toContain('copies a call');
+  });
+});

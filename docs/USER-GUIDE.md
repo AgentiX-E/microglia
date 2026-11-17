@@ -3362,12 +3362,48 @@ The census splits the column by structure rather than by name: a call that carri
 provider's callback sees the user simulator's calls too, and a mean over both is a mixture whose
 composition moves with how many turns each side took.
 
-`carriage_chars_per_packed_call` is `system_chars_per_packed_call` minus the injected message: the
-adapter's preamble, which no field on the record had ever named. Measured on R135's arm, 559 tokens of
-system growth against a 725-character pack meant about 409 tokens sat in a column that was reported as one
-number — and this is the subtraction that says so.
+`carriage_chars_per_packed_call` is `system_chars_per_packed_call` minus the injected message: everything
+in the system column the pack's own text does not account for. Measured on R135's arm, 559 tokens of system
+growth against a 725-character pack meant about 409 tokens sat in a column that was reported as one number,
+and this is the subtraction that says so.
+
+> **The carriage is not automatically a preamble, and R136 assumed it was.** The subtraction names a
+> remainder; it does not name its contents. On the arm R136 dispatched the remainder was **10,400
+> characters a call against a 705-character message** — four times the block itself — and the cause was not
+> a long preamble but the same block in the prompt more than once. §24.6 is the field that separates the
+> two, and it is the field to read first.
 
 ```text
 [tau2] the provider credited 96.0% of the 4120-token prefix it had seen … ; on the 16 call(s) that carried
 a pack the injected message was 726 characters and the system column carried 1986 more (about 505 tokens)
 ```
+
+### 24.6 How many times the model read the memory
+
+A recalled block is injected as a system message. If the agent writes it into the state the benchmark hands
+back, and the agent appends rather than replaces, then every turn adds another copy: a ten-turn episode puts
+the block in the prompt ten times, the block's cost grows with the square of the episode, and the model is
+told ten times that this is the reference data to act on.
+
+Two fields count it, from opposite sides of the socket:
+
+| field | side | sound reading |
+| --- | --- | --- |
+| `memory.packCopiesDropped` | the agent | `calls − boundaries`, because every turn after the first is handed a state that already carries the block |
+| `usage.cache.pack_copies_per_packed_call` | the census | `1.00`, because the policy is one system message and the block is the only thing the agent puts beside it |
+| `usage.cache.packed_calls_with_copies` | the census | `0`, because a mean of 2.0 can be half the calls at one copy and half at three, and a count cannot |
+
+```text
+; 369 of the 410 packed call(s) carried the block more than once, 5.40 copies a call — the same text
+re-sent, which is a defect and not a longer preamble
+```
+
+The same duplication is what breaks the cache. The block sits at the front of the prompt, so inserting a
+copy there shifts every message after it and the provider's cached prefix ends at the insertion point: an
+arm that reads `prefix-broken` while serving a small pack usually has this defect rather than a cadence
+problem, and `uncached_tokens_per_call` is where it shows.
+
+> **If you inject a block into an agent you did not write, make the injection idempotent.** Replace any
+> earlier copy — identify it by the element your renderer emits — instead of appending to the state you were
+> handed. A wrapper that only appends is correct under a benchmark that passes a fresh state each turn and
+> wrong under one that threads the state back, and the two are indistinguishable from inside the wrapper.

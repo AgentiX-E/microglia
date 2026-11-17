@@ -126,6 +126,12 @@ _injected_lengths: list = []
 # simulator's, and the pack rides only this agent's. A per-call figure divided by the wrong one of those
 # two is the arithmetic that would make a 750-character message look like 300.
 _calls = 0
+# R137. Copies of the block this agent removed from the state it was handed, because a state that already
+# carried the pack is a state this method wrote. Counted rather than merely removed: the number is the
+# evidence that the state is threaded at all, and it is the one figure a fixture without tau2 cannot
+# invent. On a phase with B boundaries and C calls it reads `C - B` when the fix is in and `0` when the
+# defect is, which is why it travels beside `injectedMessages` rather than instead of it.
+_pack_copies_dropped = 0
 
 # Sentinel rather than `None`, because "" is a real answer: a facade that was asked
 # and had nothing to say must not be asked again on the next turn.
@@ -282,6 +288,19 @@ def empty_bucket(payload: dict) -> str:
     return reason if isinstance(reason, str) and reason != "" else "unattributed"
 
 
+def is_pack_message(message) -> bool:
+    """Whether a system message is one of this agent's own blocks.
+
+    The tag is the identity, and it is the *only* identity available: the state tau2 hands back carries
+    messages, not provenance, so a block re-read from the state and a block built this turn are the same
+    object shape. `injected_message` guarantees every block starts with the element, either because the
+    facade emitted it or because the wrapper added it, so a prefix test is exact for the messages this
+    module writes and cannot match a policy prompt that never mentions the tag.
+    """
+    content = getattr(message, "content", None)
+    return isinstance(content, str) and content.lstrip().startswith(f"<{PACK_TAG}")
+
+
 def injected_message(pack: str) -> SystemMessage:
     """The recalled block as one system message, given an element only if it arrives without one.
 
@@ -351,7 +370,7 @@ class MicrogliaAgent(LLMAgent):
     def generate_next_message(
         self, message: ValidAgentInputMessage, state: LLMAgentState
     ) -> tuple:
-        global _injected_chars, _calls
+        global _injected_chars, _calls, _pack_copies_dropped
         _calls += 1
         text = getattr(message, "content", None)
         pack = self.pack_for(state, text if isinstance(text, str) else "")
@@ -361,12 +380,21 @@ class MicrogliaAgent(LLMAgent):
             # copies of it.
             state = state.model_copy(deep=True)
             injected = injected_message(pack)
+            # R137. The copy above does not prevent that accumulation on its own, and this is the line
+            # that was wrong for forty-five rounds: tau2 threads the state the agent *returns*, so the
+            # copy is what the next turn is handed, and appending to it put one more copy of the same
+            # block in the prompt every turn. The block is constant for the whole episode (`pack_for`
+            # holds it), so the correct prompt has exactly one — the one built now. Any earlier copy is
+            # this method's own output read back, and it is removed rather than kept beside its
+            # successor.
+            kept = [m for m in state.system_messages if not is_pack_message(m)]
+            _pack_copies_dropped += len(state.system_messages) - len(kept)
             # R136: the length is taken from the message object rather than from the pack, because the
             # question is what the prompt *carried* — the element `injected_message` adds is part of the
             # bill, and a census that only knows the pack's length cannot see it.
             _injected_chars += len(injected.content)
             _injected_lengths.append(len(injected.content))
-            state.system_messages = list(state.system_messages) + [injected]
+            state.system_messages = kept + [injected]
         return super().generate_next_message(message, state)
 
 
@@ -412,6 +440,11 @@ def memory_stats() -> dict:
         "injectedCharsTotal": _injected_chars,
         "injectedCharsPerCall": round(_injected_chars / _calls, 1) if _calls else None,
         "calls": _calls,
+        # R137: the copies removed from the state the agent was handed. `calls - boundaries` when the
+        # state is threaded and the block is injected once, which is the shape a reader checks this
+        # against; a zero on a phase with more calls than boundaries is the defect this round fixed,
+        # because it means the prompt never carried the block twice.
+        "packCopiesDropped": _pack_copies_dropped,
         "rivaled": len(_margins) if _census else None,
         "margin_p10": quantile_of(_margins, 0.10),
         "margin_p50": quantile_of(_margins, 0.50),
