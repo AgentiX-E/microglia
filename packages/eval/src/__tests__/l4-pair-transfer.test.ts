@@ -291,3 +291,158 @@ describe('the pairing step on a cross-domain pair', () => {
     expect(printed).toContain('serve support: no item was served');
   }, 60_000);
 });
+
+describe('the rung the pair prices from the artefacts it was given', () => {
+  /**
+   * A pair whose memory arm carries the three arrays a sweep needs: the ids served per request, the gate's
+   * margin per request, and the episode boundary that ties a request to the trial it belonged to.
+   *
+   * The fixture is four trials wide on purpose. One repairable trial carries a high margin, one broken trial
+   * carries a low one, and two trials are inert — which is the shape R142 measured (four repairs, six breaks,
+   * forty-seven inert) reduced to something a reader can check by hand.
+   */
+  function armWithLedger(input: {
+    readonly rows: readonly Row[];
+    readonly pass4: number;
+    readonly ledger?: readonly (readonly string[])[];
+    readonly margins?: readonly (number | null)[];
+    readonly starts?: readonly number[];
+    readonly tasks?: readonly string[];
+  }): unknown {
+    const base = arm({ arm: 'memory', rows: input.rows, pass4: input.pass4 }) as Record<string, unknown>;
+    const tau2 = base['tau2'] as Record<string, unknown>;
+    return {
+      ...base,
+      tau2: {
+        ...tau2,
+        ...(input.ledger === undefined
+          ? {}
+          : {
+              pack: {
+                summary: { meanIds: 1, meanChars: 10 },
+                ledger: input.ledger,
+                ...(input.margins === undefined ? {} : { margins: { perRequest: input.margins } }),
+              },
+            }),
+        ...(input.starts === undefined
+          ? {}
+          : {
+              memory: {
+                episodeStarts: input.starts,
+                ...(input.tasks === undefined ? {} : { boundaryTasks: input.tasks }),
+              },
+            }),
+      },
+    };
+  }
+
+  it('prices every rung against the two arms\u2019 outcomes and publishes the first clean one', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'l4-pair-sweep-'));
+    const ids = ['airline/1', 'airline/2', 'airline/3', 'airline/4'];
+    const reference: Row[] = [
+      { id: 'airline/1', trial: 0, reward: 1 },
+      { id: 'airline/2', trial: 0, reward: 0 },
+      { id: 'airline/3', trial: 0, reward: 1 },
+      { id: 'airline/4', trial: 0, reward: 0 },
+    ];
+    // 2 is repaired, 3 is broken, 1 and 4 are inert.
+    const memory: Row[] = [
+      { id: 'airline/1', trial: 0, reward: 1 },
+      { id: 'airline/2', trial: 0, reward: 1 },
+      { id: 'airline/3', trial: 0, reward: 0 },
+      { id: 'airline/4', trial: 0, reward: 0 },
+    ];
+    writeFileSync(join(dir, 'reference.json'), JSON.stringify(arm({ arm: 'reference', rows: reference, pass4: 0.5 })));
+    writeFileSync(
+      join(dir, 'memory.json'),
+      JSON.stringify(
+        armWithLedger({
+          rows: memory,
+          pass4: 0.5,
+          ledger: ids.map((_, index) => [`k_${String(index)}`]),
+          // The repair carries 0.30 and the break 0.05, so 0.10 is the cheapest rung that keeps one and
+          // withholds the other. The two inert trials sit above it so the served count is three of four.
+          margins: [0.5, 0.3, 0.05, 0.5],
+          starts: [0, 1, 2, 3],
+          tasks: ids,
+        }),
+      ),
+    );
+
+    let printed = '';
+    try {
+      printed = execFileSync(TSX, [PAIR], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          POC_RESULT_DIR: dir,
+          L4_FIRST: join(dir, 'reference.json'),
+          L4_SECOND: join(dir, 'memory.json'),
+        },
+      });
+    } catch (error) {
+      printed = String((error as { stdout?: string }).stdout ?? '');
+    }
+
+    expect(printed).toContain('serve sweep (estimated, withholding is priced as the control outcome)');
+    expect(printed).toContain('the first rung that withholds every break is 0.08');
+    expect(printed).toContain('keeps 1 repair(s) and serves 3 of 4 trial(s)');
+
+    const published = JSON.parse(readFileSync(join(dir, 'poc-l4-pair.json'), 'utf8')) as {
+      serveSweep?: {
+        trials: number;
+        unpriced: number;
+        firstClean: { rung: number; served: number; kept: number; broke: number } | null;
+        rows: readonly { rung: number; served: number; net: number }[];
+      };
+    };
+    expect(published.serveSweep?.trials).toBe(4);
+    expect(published.serveSweep?.unpriced).toBe(0);
+    expect(published.serveSweep?.firstClean).toMatchObject({ rung: 0.08, served: 3, kept: 1, broke: 0 });
+    expect(published.serveSweep?.rows).toHaveLength(10);
+    // At rung zero everything is served, so the estimated net is the measured one: one repair and one break.
+    expect(published.serveSweep?.rows[0]).toMatchObject({ rung: 0, served: 4, net: 0 });
+  }, 60_000);
+
+  it('says nothing at all when the memory arm carried no margin census', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'l4-pair-nosweep-'));
+    const rows: Row[] = [
+      { id: 'airline/1', trial: 0, reward: 1 },
+      { id: 'airline/2', trial: 0, reward: 0 },
+    ];
+    writeFileSync(join(dir, 'reference.json'), JSON.stringify(arm({ arm: 'reference', rows, pass4: 0.5 })));
+    writeFileSync(
+      join(dir, 'memory.json'),
+      JSON.stringify(
+        armWithLedger({
+          rows,
+          pass4: 0.5,
+          ledger: [['k_1'], ['k_2']],
+          starts: [0, 1],
+          tasks: ['airline/1', 'airline/2'],
+        }),
+      ),
+    );
+
+    let published: { serveSweep?: unknown } = {};
+    try {
+      execFileSync(TSX, [PAIR], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          POC_RESULT_DIR: dir,
+          L4_FIRST: join(dir, 'reference.json'),
+          L4_SECOND: join(dir, 'memory.json'),
+        },
+      });
+    } catch {
+      // A failed finding gate still publishes its record.
+    }
+    published = JSON.parse(readFileSync(join(dir, 'poc-l4-pair.json'), 'utf8')) as { serveSweep?: unknown };
+    // Absent rather than a table of zeroes: an arm that asked no census cannot be read as a store whose packs
+    // were never contested, and the sweep says so by carrying nothing.
+    expect(published.serveSweep).toBeUndefined();
+  }, 60_000);
+});

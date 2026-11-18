@@ -66,6 +66,7 @@ import { serveSupportCensus, serveSupportLine, supportMapOf } from '../serve-sup
 import { foldSplitOf, treatmentOf } from '../cross-fit.js';
 import { serveYieldCensus, serveYieldLine } from '../serve-yield.js';
 import { serveTaskCensus, serveTaskLine } from '../serve-tasks.js';
+import { marginSweep, serveSweepLine } from '../serve-sweep.js';
 import { pairGates, plantedBarNote } from '../pair-gates.js';
 import { cacheCensusVerdict, premiumSplitOf } from '../cache-census.js';
 
@@ -153,6 +154,14 @@ type Artefact = {
       readonly summary: { readonly meanChars: number } | null;
       /** R128: the ids served at each request, in request order — the left side of the attribution join. */
       readonly ledger?: readonly (readonly string[])[];
+      /**
+       * R151: the gate's margin per request, aligned with `ledger`.
+       *
+       * Read here rather than from `memory.margin_ladder`, which is the same quantity summarised: a ladder
+       * prices a rung in advance and the sweep needs the row, because the question is which requests the
+       * rung would have withheld and whether those were the ones that did damage.
+       */
+      readonly margins?: { readonly perRequest?: readonly (number | null)[] };
       /** R150: the recall knobs the arm's requests carried, verbatim; absent on every artefact before the field. */
       readonly knobs?: string;
     };
@@ -414,6 +423,7 @@ process.stdout.write(`${degradationLineOf(degradation)}\n`);
  * which is the class of defect this round spent its whole dispatch learning to refuse.
  */
 function attributionOf(reference: Artefact, memory: Artefact) {
+  const margins = memory.tau2?.pack?.margins?.perRequest;
   return pairAttribution({
     ledger: memory.tau2?.pack?.ledger,
     episodeStarts: episodeStartsOf(memory.tau2?.memory),
@@ -422,6 +432,8 @@ function attributionOf(reference: Artefact, memory: Artefact) {
     boundaryTasks: boundaryTasksOf(memory.tau2?.memory),
     memoryTrials: memory.per_trial,
     referenceTrials: reference.per_trial,
+    // R151: the gate's own decision, so the sweep can price a rung without a second dispatch.
+    ...(margins === undefined ? {} : { margins }),
   });
 }
 
@@ -439,6 +451,15 @@ if (yields !== undefined) process.stdout.write(`${serveYieldLine(yields)}\n`);
 // key of an attribution, and the yield census above is asserted invariant to the id's presence.
 const taskYields = attribution === undefined ? undefined : serveTaskCensus(attribution.renders);
 if (taskYields !== undefined) process.stdout.write(`${serveTaskLine(taskYields)}\n`);
+// R151: the rung, priced against the outcomes the run already bought. `margins.ladder` said how many requests
+// each rung would withhold and could not say whether it would withhold the ones that did damage; this joins the
+// gate's own decision to the pair's ledger and answers it. Zero model calls, and the answer is the one a rung
+// has to be chosen by — the alternative is buying a dispatch per candidate rung.
+const sweep =
+  attribution === undefined || second.tau2?.pack?.margins?.perRequest === undefined
+    ? undefined
+    : marginSweep(attribution.renders);
+if (sweep !== undefined) process.stdout.write(`${serveSweepLine(sweep)}\n`);
 
 // R141: the join the floor's own criterion is written in. The attribution table says which item was served
 // and what it did; the store sample says how many tasks stand behind it. Neither alone can say whether the
@@ -607,6 +628,19 @@ await writeJson('poc-l4-pair', {
         },
       }),
   ...(retention === undefined ? {} : { retention }),
+  // R151: what a margin gate would have done, priced at readback rather than at dispatch. The three arrays
+  // this needs were already in the two artefacts, so the only cost of the block is the join — and a rung
+  // chosen by a dispatch that has not read the sweep is a rung chosen without the number it exists for.
+  ...(sweep === undefined
+    ? {}
+    : {
+        serveSweep: {
+          trials: sweep.trials,
+          unpriced: sweep.unpriced,
+          firstClean: sweep.firstClean,
+          rows: sweep.rows,
+        },
+      }),
   // The degradation reading, unconditionally: it is the only number in this artefact that says how
   // many trials the treatment broke rather than how many tasks it changed.
   ...(degradation === undefined

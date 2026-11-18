@@ -1783,3 +1783,37 @@ A rule checked by four process launches is a rule checked intermittently.
 
 **And the record.** `tau2.pack.knobs` carries the string verbatim. It is the only trace of the filter once the
 request is made, and it is what makes "which serving did this artefact measure" answerable without reading a log.
+
+### 8.23 A threshold is priced from the ledger, not from a second dispatch
+
+`pack.margins.ladder` counts how many requests a given margin would withhold. It cannot say *which* ones, and
+the only question a threshold is chosen by is whether the withheld requests are the ones that did damage. The
+three arrays that answer it are already in the artefact — the ids served per request, the gate's margin per
+request, the trial each request belonged to — so the answer is a join, and the join is `serve-sweep.ts`:
+
+```
+renders (one per record per trial, each carrying its margin)  ->  marginSweep(renders, rungs)
+                                                              ->  { trials, unpriced, firstClean, rows }
+```
+
+**The margin travels on the render, not beside it.** `itemTransfer` is the only place that knows which request
+served which record, so it is where the field is filled: the **highest** margin among the requests of an episode
+that served that record. The aggregation is a maximum because a gate acts per request while an outcome is
+measured per trial — a record that cleared the rung at one request of a trial and not at another was still served
+into the trial.
+
+| state | meaning | the sweep |
+| --- | --- | --- |
+| the key is absent | the arm carried no census | nothing is published at all |
+| the value is `null` | the census ran, the request served one candidate | served at every rung, counted in `unpriced` |
+| a number | a contested request | served iff `margin >= rung` (strict, matching `buildPack`) |
+
+**One statistic, deliberately not a maximum.** `firstClean` is the first ascending rung with `broke === 0` and
+`kept > 0`. The argmax of the net would be a parameter fitted to the sample it is read from, and the record has
+refused that shape everywhere else. The `kept > 0` clause lives in the predicate rather than in a reader's eye,
+because a rung that withholds every request is trivially clean and worthless.
+
+**The premise is printed with the number.** A withheld trial is estimated at its control outcome, which is what
+the reference arm measured on the same task — and a model shown a procedure and then not shown it is not the
+model that never saw it. The line therefore opens `serve sweep (estimated, …)`, and a rung is *measured* only by
+the dispatch that runs it. What the estimate removes is the first dispatch of a two-dispatch loop.

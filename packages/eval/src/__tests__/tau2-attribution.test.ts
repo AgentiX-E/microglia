@@ -179,6 +179,61 @@ describe('the task a render was served into', () => {
   });
 });
 
+describe('the margin a render carried', () => {
+  it('is left off when the arm carried no margin census at all', () => {
+    // Absent is not `null`: an artefact written before the census existed says nothing was asked, while a
+    // census of nulls says every pack served one candidate. The sweep treats both as unpriced and the
+    // artefact keeps them apart, which is the only way a readback can tell a quiet store from an old one.
+    const reading = itemTransfer({
+      episodes: [{ startsAt: 0, memory: true, control: false, task: 'a' }],
+      ledger: [['k_1']],
+    });
+    expect(reading.renders[0]).not.toHaveProperty('margin');
+  });
+
+  it('is the highest margin among the requests that served the record', () => {
+    // The gate withholds per request; a trial is what an outcome is measured on. A record that cleared the
+    // rung at one request and not at another was still served into the trial, so the maximum is the only
+    // aggregation that answers "would this trial have been served".
+    const reading = itemTransfer({
+      episodes: [{ startsAt: 0, spans: [[0, 2]], memory: true, control: false, task: 'a' }],
+      ledger: [['k_1'], ['k_1']],
+      margins: [0.05, 0.3],
+    });
+    expect(reading.renders[0]?.margin).toBe(0.3);
+  });
+
+  it('is null when the record was served at requests the census could not price', () => {
+    const reading = itemTransfer({
+      episodes: [{ startsAt: 0, memory: true, control: false, task: 'a' }],
+      ledger: [['k_1']],
+      margins: [null],
+    });
+    expect(reading.renders[0]).toMatchObject({ margin: null });
+  });
+
+  it('ignores a margin carrying a non-finite number, which is a parse failure rather than a low score', () => {
+    const reading = itemTransfer({
+      episodes: [{ startsAt: 0, memory: true, control: false, task: 'a' }],
+      ledger: [['k_1']],
+      margins: [Number.NaN],
+    });
+    expect(reading.renders[0]).toMatchObject({ margin: null });
+  });
+
+  it('takes the margin from the request that served the record, not from the episode\'s first one', () => {
+    const reading = itemTransfer({
+      episodes: [{ startsAt: 0, spans: [[0, 2]], memory: true, control: false, task: 'a' }],
+      ledger: [['k_other'], ['k_1']],
+      margins: [0.9, 0.1],
+    });
+    expect(reading.renders).toEqual([
+      { itemId: 'k_other', controlPassed: false, memoryPassed: true, task: 'a', margin: 0.9 },
+      { itemId: 'k_1', controlPassed: false, memoryPassed: true, task: 'a', margin: 0.1 },
+    ]);
+  });
+});
+
 describe('pairing two arms into episodes', () => {
   const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
 

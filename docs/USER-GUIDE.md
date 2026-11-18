@@ -3854,3 +3854,61 @@ performed:
 
 An artefact written before the field existed reads as `none`, so it still pools with a newer fold that carried no
 knobs — the two produced the same request, and only an *absent* filter and a *named* one are different facts.
+
+## 30. What a threshold would have done, priced before you spend on it
+
+Every serving knob in §29 has a threshold inside it — a margin below which a pack is withheld — and until now the
+only way to choose one was to run the arm at each candidate value. A dispatch costs about a quarter of a dollar
+and an hour of off-peak wall clock, so the loop "run, read, run again" was the expensive part of tuning, not the
+model calls.
+
+The readback step now prices every candidate threshold against the outcomes the run has already paid for.
+
+### 30.1 Where the number comes from
+
+Three arrays in a memory arm's artefact, one row per recall request, in the order the requests arrived:
+
+| array | what it holds |
+| --- | --- |
+| `tau2.pack.ledger` | the ids of the records served at that request (`[]` when the gate withheld) |
+| `tau2.pack.margins.perRequest` | the ranking margin the gate saw, or `null` when only one candidate competed |
+| `per_trial` + `tau2.memory.episodeStarts` | which trial the request belonged to, and whether each arm passed it |
+
+`pnpm eval:l4-pair` joins them and prints:
+
+```
+serve sweep (estimated, withholding is priced as the control outcome): the first rung that withholds every
+break is 0.30, which keeps 2 repair(s) and serves 7 of 57 trial(s); net by rung 0.00 -3.51 / 0.05 -3.51 /
+0.08 -1.75 / 0.10 -1.75 / 0.15 +0.00 / 0.20 -1.75 / 0.25 +0.00 / 0.30 +3.51
+```
+
+### 30.2 How to read the sentence
+
+- **`the first rung that withholds every break`** is the cheapest threshold at which no trial that the control
+  passed is broken by the memory, *while at least one repair survives*. Ascending order, so it is the smallest
+  such value. If no rung qualifies the line says so, and a rung that withholds everything never qualifies —
+  silence is not safety.
+- **`keeps N repair(s)`** is what that threshold costs: repairs the gate also throws away.
+- **`serves S of T trial(s)`** is the traffic left. A rung that keeps two repairs by serving seven of fifty-seven
+  trials is a **fitted** value, not a lever — it wins because the breaks happened to sit low, and the next run is
+  free to disagree.
+- **`net by rung`** is `kept − broke` over every trial, in percentage points, so a rung's number is comparable
+  with the paired delta on the line above it.
+
+### 30.3 What "estimated" means, and why it is in the sentence
+
+A trial the gate withholds is priced at **its control outcome** — the bare agent that produced the reference half
+of the pair. That is an estimator, not a measurement: a model that was shown a procedure and then not shown it is
+not the same model as one that never saw it, and the join cannot see the difference. So a rung is *priced* here
+and *measured* by a dispatch, and the line says which one it is doing.
+
+### 30.4 The two absences it keeps apart
+
+| state | meaning | what the sweep does |
+| --- | --- | --- |
+| the key is missing | the arm carried no margin census: nothing was asked | the whole sweep is not published |
+| the value is `null` | the census ran and this request served one candidate: nothing was contested | served at every rung, and counted in `unpriced` |
+
+Both are served at every rung, because a gate with no measurement cannot have withheld anything — but a store that
+serves one candidate per request is a store no threshold can act on, and a reader should see that rather than
+infer it.

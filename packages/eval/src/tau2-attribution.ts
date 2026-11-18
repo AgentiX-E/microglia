@@ -33,7 +33,7 @@
  */
 
 import type { TauTrialRow } from './tau2-transfer.js';
-import type { ServeRender } from './serve-yield.js';
+import type { PricedRender } from './serve-sweep.js';
 import { wilsonInterval } from './reproduction.js';
 
 /** One episode, as the analysis needs it: the requests it spent and how the two arms scored it. */
@@ -89,6 +89,15 @@ export type ItemTransfer = {
 export function itemTransfer(input: {
   readonly episodes: readonly EpisodeOutcome[];
   readonly ledger: readonly (readonly string[])[];
+  /**
+   * The gate's own margin, one row per request in the same order as `ledger`.
+   *
+   * R151. Absent when the arm carried no margin census, which is a different reading from a census of
+   * `null`s: the first says nothing was measured, the second says the packs served one candidate each and
+   * no rung could have acted. `serveSweep` prices rungs from this array, and it can only do so if the field
+   * travels with the render rather than being re-read from an artefact two modules away.
+   */
+  readonly margins?: readonly (number | null)[];
   /** Requests with no episode behind them — a recall that fired outside any trial. Excluded, and counted. */
 }): {
   readonly items: readonly ItemTransfer[];
@@ -102,7 +111,7 @@ export function itemTransfer(input: {
    * unit that carries that distinction, and it is produced here rather than re-derived because this loop is
    * where the episode's outcome is still in hand.
    */
-  readonly renders: readonly ServeRender[];
+  readonly renders: readonly PricedRender[];
 } {
   // A row that is not a list of ids is a malformed ledger, not a request that served nothing. Thrown rather
   // than tolerated: a hole read as an empty pack would make the request count the table's denominator while
@@ -114,7 +123,7 @@ export function itemTransfer(input: {
   }
   const ordered = [...input.episodes].sort((left, right) => left.startsAt - right.startsAt);
   const tallies = new Map<string, { episodes: number; kept: number; broke: number }>();
-  const renders: ServeRender[] = [];
+  const renders: PricedRender[] = [];
   const covered = new Array<boolean>(input.ledger.length).fill(false);
   let unmatchedRequests = 0;
 
@@ -133,6 +142,14 @@ export function itemTransfer(input: {
         [Math.min(from, input.ledger.length), Math.min(to, input.ledger.length)] as const,
     );
     const served = new Set<string>();
+    // The margin each served record carried in this episode: the highest among the requests that served it.
+    //
+    // R151. The gate withholds per request (`margin < rung` serves nothing), so a record that cleared the rung
+    // at one request of the episode and not at another was still served into the trial — the trial is the unit
+    // an outcome is measured on, and the maximum is the only aggregation that answers "would this trial have
+    // been served". Filled here rather than in `serve-sweep.ts` because this is the only place that knows which
+    // request served which record.
+    const marginById = new Map<string, number>();
     // Coverage is the spans and nothing else. Marking the episode's positional range as well would defeat the
     // count: `end` is the next episode's start or the ledger's length, which is the assumption the spans exist
     // to replace, and on a single-episode ledger it would mark the dropped boundary's requests as covered.
@@ -143,7 +160,14 @@ export function itemTransfer(input: {
         // `ledger` is one entry per request by construction, every `to` is clamped to its length and every
         // row was checked to be a list above, so the element exists: a `?? []` here was a branch no artefact
         // could reach, which is the shape this record deletes rather than exempts.
-        for (const id of input.ledger[request] as readonly string[]) served.add(id);
+        const ids = input.ledger[request] as readonly string[];
+        const margin = input.margins?.[request];
+        for (const id of ids) {
+          served.add(id);
+          if (typeof margin !== 'number' || !Number.isFinite(margin)) continue;
+          const best = marginById.get(id);
+          if (best === undefined || margin > best) marginById.set(id, margin);
+        }
       }
     }
     if (spans.every(([from, to]) => to <= from)) continue;
@@ -158,11 +182,19 @@ export function itemTransfer(input: {
       // change its outcome.
       // The task travels with the render and nothing counts by it: `serveYieldCensus` is asserted invariant to
       // its presence, and `serveTaskCensus` is the only reader, where it is a group key rather than a divisor.
-      renders.push(
-        episode.task === undefined
-          ? { itemId: id, controlPassed: episode.control, memoryPassed: episode.memory }
-          : { itemId: id, controlPassed: episode.control, memoryPassed: episode.memory, task: episode.task },
-      );
+      //
+      // The margin travels the same way and for a sharper reason: `serveSweep` is the only reader, and it can
+      // price a rung only against the record's own gate decision. A record served with no measured margin gets
+      // `null` — measured, and not contested — while an arm that carried no census at all leaves the key out,
+      // because "nothing was asked" and "nothing was contested" are different facts about the same absence.
+      const margin = marginById.get(id);
+      renders.push({
+        itemId: id,
+        controlPassed: episode.control,
+        memoryPassed: episode.memory,
+        ...(episode.task === undefined ? {} : { task: episode.task }),
+        ...(input.margins === undefined ? {} : { margin: margin ?? null }),
+      });
     }
   }
 
@@ -295,12 +327,14 @@ export function pairAttribution(input: {
   readonly boundaryTasks?: readonly (string | null)[];
   readonly memoryTrials?: readonly TauTrialRow[];
   readonly referenceTrials?: readonly TauTrialRow[];
+  /** R151: the gate's margin per request, aligned with `ledger`, for the sweep that prices a rung. */
+  readonly margins?: readonly (number | null)[];
 }): {
   readonly items: readonly ItemTransfer[];
   readonly unmatchedRequests: number;
-  readonly renders: readonly ServeRender[];
+  readonly renders: readonly PricedRender[];
 } | undefined {
-  const { ledger, episodeStarts, memoryTrials, referenceTrials, boundaryTasks } = input;
+  const { ledger, episodeStarts, memoryTrials, referenceTrials, boundaryTasks, margins } = input;
   if (ledger === undefined || episodeStarts === undefined || memoryTrials === undefined) return undefined;
   const episodes = pairedEpisodes({
     referenceTrials: referenceTrials ?? [],
@@ -310,7 +344,7 @@ export function pairAttribution(input: {
     ...(boundaryTasks === undefined ? {} : { boundaryTasks }),
   });
   if (episodes === undefined) return undefined;
-  return itemTransfer({ episodes, ledger });
+  return itemTransfer({ episodes, ledger, ...(margins === undefined ? {} : { margins }) });
 }
 
 /**

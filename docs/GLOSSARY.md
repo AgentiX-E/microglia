@@ -1708,3 +1708,29 @@ it would be a second reader of a vocabulary that lives in one module.
 | "Task id is a dimension" | *attribution key* | A dimension invites a division; this id may only group, and the invariant case enforces it |
 | "Anchor setting" | *serve anchor* | A mode names where a pack comes from; an anchor filters what may appear inside it |
 | "Config" | *knobs* | The knob string is an identity, not a description: two different strings are two treatments |
+
+### Sweep, rung, and the first clean one
+
+A **sweep** prices every candidate threshold of a serving knob against outcomes already measured, instead of
+spending a dispatch per candidate. A **rung** is one candidate value on that grid. The **first clean rung**
+(`firstClean`) is the smallest rung at which no trial the control passed is broken by the memory *and* at least
+one repaired trial survives — reported instead of the best net, because a maximum over rungs is a parameter
+fitted to the sample it is read from.
+
+A render's **margin** is the gate's own ranking margin for the request that served it, and the value carried on a
+render is the **highest** margin among the requests of its trial: a gate acts per request, an outcome is measured
+per trial. A trial with no measurable margin is **unpriced** — served at every rung, because a gate with no
+measurement cannot have withheld anything — and the sweep reports how many trials that was, so a store whose
+packs never competed is visible rather than inferred.
+
+The sweep's number is an **estimate**: a withheld trial is priced at its control outcome, and a model shown a
+procedure and then not shown it is not the model that never saw it. Rungs are *priced* at readback and
+*measured* by a dispatch.
+
+| Term | In this project | Why the distinction matters |
+| --- | --- | --- |
+| "Threshold tuning" | *sweep* | A sweep costs nothing and answers "which requests would this withhold"; a dispatch answers "what happens if it does" |
+| "Best threshold" | *first clean rung* | A maximum is fitted; the first clean rung is a claim the next run can refute |
+| "Score" | *margin* | A margin is the ranking's own gap, not a confidence and not a probability |
+| "Zero margin" | *unpriced* | Nothing was contested, so no rung can act: a different fact from a measured zero |
+| "Population" | *provenance* (`edited` / `passed`) | A store of repairs and a store of descriptions of successes are different objects, whatever their size |

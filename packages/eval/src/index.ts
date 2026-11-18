@@ -1213,6 +1213,14 @@ export {
   type TaskYieldCensus,
 } from './serve-tasks.js';
 export {
+  SWEEP_RUNGS,
+  marginSweep,
+  serveSweepLine,
+  type PricedRender,
+  type SweepReading,
+  type SweepRung,
+} from './serve-sweep.js';
+export {
   pairKey,
   transferReadingOf,
   holdRateOfTrials,
