@@ -88,6 +88,16 @@ export type CrossFitFold = {
   readonly form: string | undefined;
   readonly scope: string | undefined;
   readonly model: string | undefined;
+  /**
+   * The recall knobs the arm's request carried, verbatim — `anchoring=lexical&minCoverage=0`, or empty.
+   *
+   * R150. It is the only record of *what filter ran*, and it is an identity rather than a detail: two folds of
+   * one store served through two different filters are two experiments, and a pool that averaged them would
+   * report a treatment that neither fold ran. Absent on every artefact written before the field, and absent is
+   * normalised to `none` rather than to the empty string, because "this run named no knob" and "this artefact
+   * could not say" are the same reading for the purpose of comparing two folds and different facts about them.
+   */
+  readonly knobs?: string;
 };
 
 export type CrossFitFoldReading = {
@@ -170,9 +180,9 @@ function foldReadingOf(fold: CrossFitFold): CrossFitFoldReading {
  * A record rather than a list of pairs: the comparison walks a fixed set of names, so every field is compared
  * on every fold and none can be skipped by a list that happened to be shorter.
  */
-type FoldIdentity = Readonly<Record<'unit' | 'form' | 'scope' | 'model', string>>;
+type FoldIdentity = Readonly<Record<'unit' | 'form' | 'scope' | 'model' | 'knobs', string>>;
 
-const IDENTITY_FIELDS = ['unit', 'form', 'scope', 'model'] as const;
+const IDENTITY_FIELDS = ['unit', 'form', 'scope', 'model', 'knobs'] as const;
 
 function identityOf(fold: CrossFitFold): FoldIdentity {
   return {
@@ -180,6 +190,9 @@ function identityOf(fold: CrossFitFold): FoldIdentity {
     form: fold.form ?? 'unrecorded',
     scope: fold.scope ?? 'unrecorded',
     model: fold.model ?? 'unrecorded',
+    // `none` rather than `unrecorded`: a run that carried no knob and an artefact that could not say produced
+    // the same request, and a pool that refused them would refuse every fold written before the field existed.
+    knobs: fold.knobs === undefined || fold.knobs === '' ? 'none' : fold.knobs,
   };
 }
 
@@ -460,6 +473,7 @@ export type TreatmentArm = {
   readonly scope: string | undefined;
   readonly model: string | undefined;
   readonly traceClaims: number | undefined;
+  readonly knobs: string | undefined;
 };
 
 export type Treatment = {
@@ -468,6 +482,7 @@ export type Treatment = {
   readonly scope?: string;
   readonly model?: string;
   readonly traceClaims?: number;
+  readonly knobs?: string;
 };
 
 export type TreatmentOutcome =
@@ -519,6 +534,7 @@ export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {
     scope: arm.scope,
     model: arm.model,
     traceClaims: arm.traceClaims,
+    knobs: arm.knobs,
   }));
   const unit = agreement('unit', { label: head.label, value: head.unit }, others.map((arm) => ({ label: arm.label, value: arm.unit })));
   if (!unit.ok) return unit;
@@ -534,6 +550,12 @@ export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {
     others.map((arm) => ({ label: arm.label, value: arm.traceClaims })),
   );
   if (!ceiling.ok) return ceiling;
+  const knobs = agreement(
+    'knobs',
+    { label: head.label, value: head.knobs },
+    others.map((arm) => ({ label: arm.label, value: arm.knobs })),
+  );
+  if (!knobs.ok) return knobs;
   return {
     ok: true,
     treatment: {
@@ -542,6 +564,7 @@ export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {
       ...(scope.value === undefined ? {} : { scope: scope.value }),
       ...(model.value === undefined ? {} : { model: model.value }),
       ...(ceiling.value === undefined ? {} : { traceClaims: ceiling.value }),
+      ...(knobs.value === undefined ? {} : { knobs: knobs.value }),
     },
   };
 }

@@ -153,6 +153,8 @@ type Artefact = {
       readonly summary: { readonly meanChars: number } | null;
       /** R128: the ids served at each request, in request order — the left side of the attribution join. */
       readonly ledger?: readonly (readonly string[])[];
+      /** R150: the recall knobs the arm's requests carried, verbatim; absent on every artefact before the field. */
+      readonly knobs?: string;
     };
     /**
      * R128: the request index that opened each episode.
@@ -543,6 +545,9 @@ const treatment = treatmentOf([
     scope: first.tau2?.distillScope,
     model: first.model,
     traceClaims: first.tau2?.traceClaims?.ceiling,
+    // R150: the filter the request carried, verbatim. Two folds served through two filters are two experiments,
+    // and the pool refuses them by this string rather than by re-deriving an anchor from a knob nobody printed.
+    knobs: first.tau2?.pack?.knobs,
   },
   {
     label: 'memory',
@@ -551,6 +556,7 @@ const treatment = treatmentOf([
     scope: second.tau2?.distillScope,
     model: second.model,
     traceClaims: second.tau2?.traceClaims?.ceiling,
+    knobs: second.tau2?.pack?.knobs,
   },
 ]);
 

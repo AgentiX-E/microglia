@@ -48,6 +48,20 @@ describe('packCensus', () => {
     expect(census.droppedForSize).toBe(3);
   });
 
+  it('records the knobs the requests carried, because they are the only trace of what filter ran', () => {
+    // R150. By the time the request is made, `anchoring`, `minCoverage`, `limit` and `budget` are one string. An
+    // artefact that did not carry it could not say which serving it measured, and the cross-fit's identity would
+    // have to re-derive an anchor from a knob nobody printed.
+    const carried = packCensus([pack(['a'])], {
+      budget: 1200,
+      capacity: 810,
+      knobs: 'anchoring=lexical',
+    });
+    expect(carried.knobs).toBe('anchoring=lexical');
+    // Empty rather than absent: a run that carried no knob still ran, and the field says so in one word.
+    expect(packCensus([pack(['a'])], { budget: 1200, capacity: 810 }).knobs).toBe('');
+  });
+
   it('counts an item dropped beside a served one, not only a dropped pack', () => {
     // R88's case: twelve records, one served, some refused. A census that counted only emptied packs
     // would report zero loss on the run where the loss is largest.

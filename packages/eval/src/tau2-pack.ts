@@ -61,6 +61,14 @@ export type PackCensus = {
    * stop one level up.
    */
   readonly capacity: number | null;
+  /**
+   * The recall knobs every request of this arm carried, verbatim, empty when it carried none.
+   *
+   * R150. `anchoring=lexical` is a different filter from the default, and by the time the request is made it is
+   * one string among four. An artefact that did not carry it could not say which serving it measured, and the
+   * cross-fit's identity would have to re-derive an anchor from a knob nobody printed.
+   */
+  readonly knobs: string;
   readonly requests: number;
   readonly filled: number;
   readonly empty: number;
@@ -246,7 +254,7 @@ export function foldCensus(readings: readonly PackReading[]): FoldCensus | null 
 
 export function packCensus(
   readings: readonly PackReading[],
-  options: { readonly budget: number; readonly capacity: number | null },
+  options: { readonly budget: number; readonly capacity: number | null; readonly knobs?: string },
 ): PackCensus {
   const requests = readings.length;
   const empty = readings.filter((pack) => pack.ids.length === 0).length;
@@ -255,6 +263,10 @@ export function packCensus(
   return {
     budget: options.budget,
     capacity: options.capacity,
+    // R150: the recall knobs this arm's requests carried, verbatim and empty when it carried none. It is the
+    // only record of what filter ran — `anchoring`, `minCoverage`, `limit`, `budget` are all one string by the
+    // time the request is made — and without it an artefact cannot say which serving it measured.
+    knobs: options.knobs ?? '',
     requests,
     filled: requests - empty,
     empty,

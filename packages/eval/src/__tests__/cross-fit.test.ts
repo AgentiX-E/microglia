@@ -72,6 +72,33 @@ describe('crossFitPool', () => {
     expect(reading.lost).toBe(1);
   });
 
+  it('refuses two folds served through two filters, and pools two that carried none', () => {
+    // R150. `anchoring=lexical` and the default differ in one parameter and in what may appear inside a pack, so
+    // the two folds would be one corpus and two experiments. The knob string is compared rather than an anchor
+    // re-derived from it: a pool that parsed the string would have a second reader of the vocabulary.
+    const [a, b] = tiling();
+    const different = crossFitPool(
+      [
+        { ...(a as CrossFitFold), knobs: 'anchoring=lexical' },
+        { ...(b as CrossFitFold), knobs: '' },
+      ],
+      CROSS_FIT_SEED,
+      200,
+    );
+    expect(different.ok).toBe(false);
+    if (different.ok) return;
+    expect(different.refusals.join(' ')).toContain("knobs is 'anchoring=lexical' on A and 'none' on B");
+
+    // Absent and empty are the same reading — this run sent no knob — so a fold written before the field pools
+    // with one written after it that declared nothing.
+    const same = crossFitPool(
+      [{ ...(a as CrossFitFold), knobs: '' }, { ...(b as CrossFitFold) }],
+      CROSS_FIT_SEED,
+      200,
+    );
+    expect(same.ok).toBe(true);
+  });
+
   it('reports the folds it pooled, because a pooled number with no per-fold row hides two findings', () => {
     const outcome = crossFitPool(tiling(), CROSS_FIT_SEED, 500);
     if (!outcome.ok) throw new Error('expected a reading');
@@ -404,7 +431,14 @@ describe('foldSplitOf', () => {
 
 const arm = (
   label: string,
-  over: Partial<{ unit: string; form: string; scope: string; model: string; traceClaims: number }> = {},
+  over: Partial<{
+    unit: string;
+    form: string;
+    scope: string;
+    model: string;
+    traceClaims: number;
+    knobs: string;
+  }> = {},
 ): Parameters<typeof treatmentOf>[0][number] => ({
   label,
   unit: 'raw',
@@ -412,6 +446,8 @@ const arm = (
   scope: 'edited',
   model: 'deepseek-chat',
   traceClaims: 400,
+  // R150: absent unless a case states one, which is every artefact written before the field.
+  knobs: undefined,
   ...over,
 });
 
@@ -420,6 +456,31 @@ describe('treatmentOf', () => {
     expect(treatmentOf([arm('reference'), arm('memory')])).toEqual({
       ok: true,
       treatment: { unit: 'raw', form: 'record', scope: 'edited', model: 'deepseek-chat', traceClaims: 400 },
+    });
+  });
+
+  it('carries the filter the request ran, and refuses two arms that ran different ones', () => {
+    // R150. The knob string is the only record of *what filter ran*: `anchoring=lexical` and the default differ
+    // in one parameter and in what may appear in a pack. Two folds of one store served through two filters are
+    // two experiments, and a pool that averaged them would report a treatment neither of them ran.
+    expect(treatmentOf([arm('reference', { knobs: 'anchoring=lexical' }), arm('memory', { knobs: 'anchoring=lexical' })]))
+      .toEqual({
+        ok: true,
+        treatment: {
+          unit: 'raw',
+          form: 'record',
+          scope: 'edited',
+          model: 'deepseek-chat',
+          traceClaims: 400,
+          knobs: 'anchoring=lexical',
+        },
+      });
+    expect(
+      treatmentOf([arm('reference', { knobs: '' }), arm('memory', { knobs: 'anchoring=lexical' })]),
+    ).toEqual({
+      ok: false,
+      reason:
+        "the arms are two runs, not one treatment: knobs is '' on reference and 'anchoring=lexical' on memory",
     });
   });
 

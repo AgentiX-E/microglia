@@ -2966,6 +2966,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     pack: packCensus(primary.packReadings, {
       budget: PACK_BUDGET,
       capacity: RECORD_CAPACITY,
+      // R150: the filter the request carried. The workflow sets it for the Python agent, and this is the same
+      // string: one variable, read where the request is made and recorded where the arm is written.
+      knobs: process.env['MICROGLIA_PACK_KNOBS'] ?? '',
     }),
     // R123a's readback had to download a 103 KB job log to find the ladder, because the driver read
     // `diagnostics.memory` to print one line and dropped the block: `margin_ladder`, `census` and
