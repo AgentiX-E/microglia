@@ -1,0 +1,579 @@
+{
+  "id": "poc-l4-pair-swapped",
+  "source": "poc-l4-pair @ undated",
+  "treatment": {
+    "unit": "correction",
+    "form": "lesson",
+    "scope": "all",
+    "model": "deepseek/deepseek-flash",
+    "traceClaims": 6,
+    "knobs": ""
+  },
+  "foldSplit": {
+    "learned": [
+      "retail/100",
+      "retail/101",
+      "retail/102",
+      "retail/108",
+      "retail/111",
+      "retail/12",
+      "retail/17",
+      "retail/18",
+      "retail/26",
+      "retail/27",
+      "retail/32",
+      "retail/33",
+      "retail/36",
+      "retail/38",
+      "retail/39",
+      "retail/40",
+      "retail/42",
+      "retail/45",
+      "retail/49",
+      "retail/5",
+      "retail/51",
+      "retail/53",
+      "retail/55",
+      "retail/56",
+      "retail/60",
+      "retail/61",
+      "retail/62",
+      "retail/64",
+      "retail/65",
+      "retail/68",
+      "retail/70",
+      "retail/71",
+      "retail/74",
+      "retail/77",
+      "retail/79",
+      "retail/86",
+      "retail/9",
+      "retail/90",
+      "retail/94",
+      "retail/97"
+    ],
+    "evaluated": [
+      "retail/0",
+      "retail/1",
+      "retail/10",
+      "retail/103",
+      "retail/104",
+      "retail/105",
+      "retail/106",
+      "retail/107",
+      "retail/109",
+      "retail/11",
+      "retail/110",
+      "retail/112",
+      "retail/113",
+      "retail/13",
+      "retail/14",
+      "retail/15",
+      "retail/16",
+      "retail/19",
+      "retail/2",
+      "retail/20",
+      "retail/21",
+      "retail/22",
+      "retail/23",
+      "retail/24",
+      "retail/25",
+      "retail/28",
+      "retail/29",
+      "retail/3",
+      "retail/30",
+      "retail/31",
+      "retail/34",
+      "retail/35",
+      "retail/37",
+      "retail/4",
+      "retail/41",
+      "retail/43",
+      "retail/44",
+      "retail/46",
+      "retail/47",
+      "retail/48",
+      "retail/50",
+      "retail/52",
+      "retail/54",
+      "retail/57",
+      "retail/58",
+      "retail/59",
+      "retail/6",
+      "retail/63",
+      "retail/66",
+      "retail/67",
+      "retail/69",
+      "retail/7",
+      "retail/72",
+      "retail/73",
+      "retail/75",
+      "retail/76",
+      "retail/78",
+      "retail/8",
+      "retail/80",
+      "retail/81",
+      "retail/82",
+      "retail/83",
+      "retail/84",
+      "retail/85",
+      "retail/87",
+      "retail/88",
+      "retail/89",
+      "retail/91",
+      "retail/92",
+      "retail/93",
+      "retail/95",
+      "retail/96",
+      "retail/98",
+      "retail/99"
+    ]
+  },
+  "ledger": [
+    {
+      "task": "retail/0",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/1",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/2",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/3",
+      "trial": 0,
+      "blankCorrect": false,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/4",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/6",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/7",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/8",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/10",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/11",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/13",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/14",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/15",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/16",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/19",
+      "trial": 0,
+      "blankCorrect": false,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/20",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/21",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/22",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/23",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/24",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/25",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/28",
+      "trial": 0,
+      "blankCorrect": false,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/29",
+      "trial": 0,
+      "blankCorrect": false,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/30",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/31",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/34",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/35",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/37",
+      "trial": 0,
+      "blankCorrect": false,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/41",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/43",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/44",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/46",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/47",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/48",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/50",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/52",
+      "trial": 0,
+      "blankCorrect": false,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/54",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/57",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/58",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/59",
+      "trial": 0,
+      "blankCorrect": false,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/63",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/66",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/67",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/69",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/72",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/73",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/75",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/76",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/78",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/80",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/81",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/82",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/83",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/84",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/85",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/87",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/88",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/89",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/91",
+      "trial": 0,
+      "blankCorrect": false,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/92",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/93",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/95",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/96",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/98",
+      "trial": 0,
+      "blankCorrect": false,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/99",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/103",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/104",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/105",
+      "trial": 0,
+      "blankCorrect": false,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/106",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    },
+    {
+      "task": "retail/107",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/109",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/110",
+      "trial": 0,
+      "blankCorrect": false,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/112",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": false
+    },
+    {
+      "task": "retail/113",
+      "trial": 0,
+      "blankCorrect": true,
+      "withMemoryCorrect": true
+    }
+  ],
+  "derivation": []
+}

@@ -1,0 +1,49 @@
+{
+  "id": "poc-cross-fit",
+  "title": "L4 — two folds of one corpus, paired over every task once",
+  "sources": [
+    "eval/results/folds/poc-l4-pair-official.json",
+    "eval/results/folds/poc-l4-pair-swapped.json"
+  ],
+  "folds": [
+    {
+      "label": "poc-l4-pair-official",
+      "tasks": 40,
+      "memoryPass4": 0.925,
+      "controlPass4": 0.9,
+      "deltaPp": 2.5,
+      "lost": 3,
+      "gained": 4
+    },
+    {
+      "label": "poc-l4-pair-swapped",
+      "tasks": 74,
+      "memoryPass4": 0.7432432432432432,
+      "controlPass4": 0.8513513513513513,
+      "deltaPp": -10.81081081081081,
+      "lost": 15,
+      "gained": 7
+    }
+  ],
+  "reading": {
+    "tasks": 114,
+    "memoryPass4": 0.8070175438596491,
+    "controlPass4": 0.868421052631579,
+    "deltaPp": -6.140350877192982,
+    "ciLowPp": -14.912280701754385,
+    "ciHighPp": 2.631578947368421,
+    "p": 0.26493089646100737,
+    "lost": 18,
+    "gained": 11,
+    "discordance": 0.2543859649122807,
+    "mde80Pp": 13.236168236483229
+  },
+  "census": {
+    "evaluated": 114,
+    "learned": 114,
+    "tiles": true,
+    "neverLearned": [],
+    "neverScored": [],
+    "agreeInSign": false
+  }
+}

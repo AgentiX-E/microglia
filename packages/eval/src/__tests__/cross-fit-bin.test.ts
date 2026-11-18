@@ -102,6 +102,41 @@ describe('cross-fit', () => {
     expect(artefact.census.tiles).toBe(true);
   });
 
+  it('pools two fold records, which is the shape the composition writes', () => {
+    // `eval:fold-records` states the ledger at the top level beside the two id sets; a run's pair artefact nests
+    // it under `transfer`. Both are inputs to this command, and a reader who pools what the composition wrote
+    // must not be told the fold has no paired trials.
+    const dir = workdir();
+    const record = (name: string, learned: readonly string[], rows: readonly Row[]): string => {
+      const path = join(dir, `${name}.json`);
+      writeFileSync(
+        path,
+        JSON.stringify({
+          id: name,
+          source: 'poc-l4-pair @ 2026-11-18T13:55:00Z',
+          foldSplit: { learned, evaluated: rows.map((row) => row.task) },
+          treatment: { unit: 'correction', form: 'lesson', scope: 'all', model: 'deepseek/deepseek-chat', knobs: '' },
+          ledger: rows,
+          derivation: [],
+        }),
+        'utf8',
+      );
+      return path;
+    };
+    const a = record('official', ['retail/3', 'retail/4'], [
+      { task: 'retail/1', blankCorrect: false, withMemoryCorrect: true },
+      { task: 'retail/2', blankCorrect: true, withMemoryCorrect: true },
+    ]);
+    const b = record('swapped', ['retail/1', 'retail/2'], [
+      { task: 'retail/3', blankCorrect: false, withMemoryCorrect: true },
+      { task: 'retail/4', blankCorrect: true, withMemoryCorrect: false },
+    ]);
+    const result = run([a, b], dir);
+    expect(result.code).toBe(0);
+    expect(result.out).toContain('[cross-fit] pooled n=4 memory=0.7500 control=0.5000 delta=+25.00pp');
+    expect(result.out).toContain('[cross-fit] tiles 4 of 4 task(s)');
+  });
+
   it('refuses one path, because one fold has no other half to have trained it', () => {
     const dir = workdir();
     const result = run([pair(dir, 'fold-a', { learned: [], rows: [{ task: 'retail/1', blankCorrect: true, withMemoryCorrect: true }] })], dir);

@@ -1,0 +1,1881 @@
+{
+  "id": "poc-l4-pair",
+  "title": "L4 — memory arm against the reference arm on one split, paired per task",
+  "domain": "retail",
+  "first": {
+    "path": "/home/runner/work/microglia/microglia/eval/results/arms/reference/poc-l4.json",
+    "pass4": 0.8513513513513513
+  },
+  "second": {
+    "path": "/home/runner/work/microglia/microglia/eval/results/arms/memory/poc-l4.json",
+    "pass4": 0.7432432432432432
+  },
+  "comparison": {
+    "paired": 74,
+    "onlyFirst": 0,
+    "onlySecond": 0,
+    "deltaPp": -10.81081081081081,
+    "ciLowPp": -22.972972972972975,
+    "ciHighPp": 1.3513513513513513,
+    "p": 0.13380050659179593,
+    "lost": 15,
+    "gained": 7
+  },
+  "foldSplit": {
+    "learned": [
+      "retail/100",
+      "retail/101",
+      "retail/102",
+      "retail/108",
+      "retail/111",
+      "retail/12",
+      "retail/17",
+      "retail/18",
+      "retail/26",
+      "retail/27",
+      "retail/32",
+      "retail/33",
+      "retail/36",
+      "retail/38",
+      "retail/39",
+      "retail/40",
+      "retail/42",
+      "retail/45",
+      "retail/49",
+      "retail/5",
+      "retail/51",
+      "retail/53",
+      "retail/55",
+      "retail/56",
+      "retail/60",
+      "retail/61",
+      "retail/62",
+      "retail/64",
+      "retail/65",
+      "retail/68",
+      "retail/70",
+      "retail/71",
+      "retail/74",
+      "retail/77",
+      "retail/79",
+      "retail/86",
+      "retail/9",
+      "retail/90",
+      "retail/94",
+      "retail/97"
+    ],
+    "evaluated": [
+      "retail/0",
+      "retail/1",
+      "retail/10",
+      "retail/103",
+      "retail/104",
+      "retail/105",
+      "retail/106",
+      "retail/107",
+      "retail/109",
+      "retail/11",
+      "retail/110",
+      "retail/112",
+      "retail/113",
+      "retail/13",
+      "retail/14",
+      "retail/15",
+      "retail/16",
+      "retail/19",
+      "retail/2",
+      "retail/20",
+      "retail/21",
+      "retail/22",
+      "retail/23",
+      "retail/24",
+      "retail/25",
+      "retail/28",
+      "retail/29",
+      "retail/3",
+      "retail/30",
+      "retail/31",
+      "retail/34",
+      "retail/35",
+      "retail/37",
+      "retail/4",
+      "retail/41",
+      "retail/43",
+      "retail/44",
+      "retail/46",
+      "retail/47",
+      "retail/48",
+      "retail/50",
+      "retail/52",
+      "retail/54",
+      "retail/57",
+      "retail/58",
+      "retail/59",
+      "retail/6",
+      "retail/63",
+      "retail/66",
+      "retail/67",
+      "retail/69",
+      "retail/7",
+      "retail/72",
+      "retail/73",
+      "retail/75",
+      "retail/76",
+      "retail/78",
+      "retail/8",
+      "retail/80",
+      "retail/81",
+      "retail/82",
+      "retail/83",
+      "retail/84",
+      "retail/85",
+      "retail/87",
+      "retail/88",
+      "retail/89",
+      "retail/91",
+      "retail/92",
+      "retail/93",
+      "retail/95",
+      "retail/96",
+      "retail/98",
+      "retail/99"
+    ]
+  },
+  "treatment": {
+    "unit": "correction",
+    "form": "lesson",
+    "scope": "all",
+    "model": "deepseek/deepseek-flash",
+    "traceClaims": 6,
+    "knobs": ""
+  },
+  "serveYield": {
+    "renders": 74,
+    "opportunity": 11,
+    "repairs": 7,
+    "breaks": 15,
+    "inert": 52,
+    "repairRate": 0.6363636363636364,
+    "opportunitiesForEvidence": 3,
+    "candidates": []
+  },
+  "serveTasks": {
+    "rendered": 74,
+    "unattributed": 0,
+    "harmed": 15,
+    "helped": 7,
+    "neutral": 52,
+    "contested": [],
+    "tasks": [
+      {
+        "taskId": "retail/104",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/107",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/109",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/112",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/14",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/20",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/31",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/34",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/35",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/4",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/41",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/6",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/72",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/8",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/99",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 1,
+        "inert": 0,
+        "net": -1
+      },
+      {
+        "taskId": "retail/0",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/1",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/10",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/103",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/105",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 1,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/106",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/11",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/110",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 1,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/113",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/13",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/15",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/16",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/2",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/21",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/22",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/23",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/24",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/25",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/30",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/37",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 1,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/43",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/44",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/46",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/47",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/48",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/50",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/54",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/57",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/58",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/59",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 1,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/63",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/66",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/67",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/69",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/7",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/73",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/75",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/76",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/78",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/80",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/81",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/82",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/83",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/84",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/85",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/87",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/88",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/89",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/92",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/93",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/95",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/96",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 0,
+        "repairs": 0,
+        "breaks": 0,
+        "inert": 1,
+        "net": 0
+      },
+      {
+        "taskId": "retail/19",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 1,
+        "repairs": 1,
+        "breaks": 0,
+        "inert": 0,
+        "net": 1
+      },
+      {
+        "taskId": "retail/28",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 1,
+        "repairs": 1,
+        "breaks": 0,
+        "inert": 0,
+        "net": 1
+      },
+      {
+        "taskId": "retail/29",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 1,
+        "repairs": 1,
+        "breaks": 0,
+        "inert": 0,
+        "net": 1
+      },
+      {
+        "taskId": "retail/3",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 1,
+        "repairs": 1,
+        "breaks": 0,
+        "inert": 0,
+        "net": 1
+      },
+      {
+        "taskId": "retail/52",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 1,
+        "repairs": 1,
+        "breaks": 0,
+        "inert": 0,
+        "net": 1
+      },
+      {
+        "taskId": "retail/91",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 1,
+        "repairs": 1,
+        "breaks": 0,
+        "inert": 0,
+        "net": 1
+      },
+      {
+        "taskId": "retail/98",
+        "renders": 1,
+        "items": 1,
+        "opportunity": 1,
+        "repairs": 1,
+        "breaks": 0,
+        "inert": 0,
+        "net": 1
+      }
+    ]
+  },
+  "retention": {
+    "reference": {
+      "ordered": 74,
+      "withoutOrder": 0,
+      "pairs": 0,
+      "held": 0
+    },
+    "memory": {
+      "ordered": 74,
+      "withoutOrder": 0,
+      "pairs": 0,
+      "held": 0
+    }
+  },
+  "serveSweep": {
+    "trials": 74,
+    "unpriced": 0,
+    "firstClean": null,
+    "rows": [
+      {
+        "rung": 0,
+        "served": 74,
+        "withheld": 0,
+        "partial": 0,
+        "kept": 7,
+        "broke": 15,
+        "net": -8,
+        "netPp": -10.81081081081081
+      },
+      {
+        "rung": 0.01,
+        "served": 60,
+        "withheld": 14,
+        "partial": 0,
+        "kept": 5,
+        "broke": 12,
+        "net": -7,
+        "netPp": -9.45945945945946
+      },
+      {
+        "rung": 0.02,
+        "served": 57,
+        "withheld": 17,
+        "partial": 0,
+        "kept": 5,
+        "broke": 12,
+        "net": -7,
+        "netPp": -9.45945945945946
+      },
+      {
+        "rung": 0.05,
+        "served": 45,
+        "withheld": 29,
+        "partial": 0,
+        "kept": 4,
+        "broke": 10,
+        "net": -6,
+        "netPp": -8.108108108108109
+      },
+      {
+        "rung": 0.08,
+        "served": 40,
+        "withheld": 34,
+        "partial": 0,
+        "kept": 4,
+        "broke": 8,
+        "net": -4,
+        "netPp": -5.405405405405405
+      },
+      {
+        "rung": 0.1,
+        "served": 40,
+        "withheld": 34,
+        "partial": 0,
+        "kept": 4,
+        "broke": 8,
+        "net": -4,
+        "netPp": -5.405405405405405
+      },
+      {
+        "rung": 0.15,
+        "served": 35,
+        "withheld": 39,
+        "partial": 0,
+        "kept": 4,
+        "broke": 7,
+        "net": -3,
+        "netPp": -4.054054054054054
+      },
+      {
+        "rung": 0.2,
+        "served": 34,
+        "withheld": 40,
+        "partial": 0,
+        "kept": 4,
+        "broke": 6,
+        "net": -2,
+        "netPp": -2.7027027027027026
+      },
+      {
+        "rung": 0.25,
+        "served": 31,
+        "withheld": 43,
+        "partial": 0,
+        "kept": 4,
+        "broke": 5,
+        "net": -1,
+        "netPp": -1.3513513513513513
+      },
+      {
+        "rung": 0.3,
+        "served": 28,
+        "withheld": 46,
+        "partial": 0,
+        "kept": 4,
+        "broke": 5,
+        "net": -1,
+        "netPp": -1.3513513513513513
+      }
+    ],
+    "ranking": {
+      "kept": 7,
+      "broke": 15,
+      "auc": 0.49523809523809526,
+      "p": null,
+      "labellings": 170544,
+      "enumerable": false
+    }
+  },
+  "degradation": {
+    "broke": 15,
+    "repaired": 7,
+    "blankRight": 63,
+    "measured": 74,
+    "breakRate": 0.23809523809523808,
+    "netPp": -10.81081081081081
+  },
+  "attribution": {
+    "items": [
+      {
+        "id": "k_01hf7uaq3o_bjtew",
+        "episodes": 23,
+        "kept": 0,
+        "broke": 5,
+        "net": -5
+      },
+      {
+        "id": "k_01hf7uaq4k_276dn",
+        "episodes": 4,
+        "kept": 0,
+        "broke": 2,
+        "net": -2
+      },
+      {
+        "id": "k_01hf7uaq4p_6ats7",
+        "episodes": 47,
+        "kept": 7,
+        "broke": 8,
+        "net": -1
+      }
+    ],
+    "unmatchedRequests": 1
+  },
+  "turnCensus": [
+    {
+      "measure": "toolErrors",
+      "episodes": 74,
+      "memory": 8,
+      "control": 7,
+      "memoryInterval": [
+        2.456384658873958,
+        13.543615341126042
+      ],
+      "controlInterval": [
+        1.8144226773606,
+        12.1855773226394
+      ],
+      "separated": false,
+      "meanDelta": 0.013513513513513514,
+      "deltaInterval": [
+        -0.032570583424911294,
+        0.05959761045193832
+      ]
+    },
+    {
+      "measure": "repeatCalls",
+      "episodes": 74,
+      "memory": 12,
+      "control": 5,
+      "memoryInterval": [
+        5.210485541988146,
+        18.789514458011855
+      ],
+      "controlInterval": [
+        0.6173872625476022,
+        9.382612737452398
+      ],
+      "separated": false,
+      "meanDelta": 0.0945945945945946,
+      "deltaInterval": [
+        -0.03144046510630072,
+        0.22062965429548992
+      ]
+    }
+  ],
+  "serveSplit": {
+    "served": {
+      "episodes": 74,
+      "passed": 55
+    },
+    "withheld": {
+      "episodes": 0,
+      "passed": 0
+    },
+    "droppedRequests": 1
+  },
+  "verdict": {
+    "state": "HARM",
+    "claim": "the memory costs accuracy: -10.81pp",
+    "reason": "l4-paired -10.81pp is below the -5pp bar with 75 served packs; significance is not required on this branch; revert on the reading",
+    "excludedAbovePp": 17.76019589057466,
+    "servedPacks": 75
+  },
+  "resolution": {
+    "standardErrorPp": 6.338399675437067,
+    "halfWidthPp": 12.423263363856652,
+    "tasksForFivePp": 457,
+    "tasksForThreePp": 1269,
+    "detectableAtFivePp": false
+  },
+  "ceiling": {
+    "tasks": 114,
+    "halfWidthPp": 10.009194445465194,
+    "mde80Pp": 14.309062671527284,
+    "resolvesFivePp": false
+  },
+  "protocol": {
+    "detectablePp": 17.76019589057466,
+    "evaluable": [
+      "V0-instrument-ready",
+      "V1-pack-not-empty",
+      "V2-fold-partition",
+      "V3-parse-rate",
+      "V5-resolution",
+      "V6-controls-inject",
+      "V7-channel",
+      "V8-call-reliability",
+      "V32-fold-learning-intact",
+      "V15-transfer-reconciles",
+      "V16-transfer-resolvable",
+      "V33-transfer-ledger",
+      "V17-transfer-net-reported",
+      "V44-domain-accounted"
+    ],
+    "vacuous": [
+      "V6-controls-inject",
+      "V7-channel"
+    ],
+    "absent": [
+      {
+        "id": "V4-gold-executable",
+        "needs": "an oracle arm replaying each reference trajectory to reward 1, which no τ² agent provides"
+      },
+      {
+        "id": "V12-shape-present",
+        "needs": "a distiller that can say when a rule applies, and a plain twin to compare it against"
+      },
+      {
+        "id": "V9-subset-size",
+        "needs": "a qualifying subset whose floor is fixed before the result is read"
+      },
+      {
+        "id": "V11-channel-ceiling",
+        "needs": "an oracle control that states the accepted answer, to separate format from knowledge"
+      },
+      {
+        "id": "V13-probe-reconciles",
+        "needs": "a reproducibility probe over the stored action plans, with its four buckets"
+      },
+      {
+        "id": "V14-probe-applied",
+        "needs": "the same probe, reporting how many held-out packs it changed"
+      },
+      {
+        "id": "V37-repair-probe-reconciles",
+        "needs": "a reproducibility probe over the second substrate, with its four buckets"
+      },
+      {
+        "id": "V38-repair-probe-applied",
+        "needs": "the same probe, reporting how many packs it changed"
+      },
+      {
+        "id": "V39-repair-transfer-reconciles",
+        "needs": "a transfer measurement over the second substrate"
+      },
+      {
+        "id": "V40-repair-transfer-resolvable",
+        "needs": "the same measurement, reaching a hundred trials"
+      },
+      {
+        "id": "V41-repair-transfer-ledger",
+        "needs": "the same measurement, carrying one row per trial"
+      },
+      {
+        "id": "V42-repair-transfer-net-reported",
+        "needs": "the same measurement, with its net marginal effect"
+      },
+      {
+        "id": "V34-substrate-paired",
+        "needs": "two stores built over one corpus, so the cells can be paired"
+      },
+      {
+        "id": "V35-substrate-resolvable",
+        "needs": "the same comparison, reaching a hundred paired tasks"
+      },
+      {
+        "id": "V36-substrate-coverage",
+        "needs": "the same comparison, reporting its exclusive sets"
+      },
+      {
+        "id": "V18-pool-complete",
+        "needs": "a sampling arm that records more than one candidate per task"
+      },
+      {
+        "id": "V19-pool-reconciles",
+        "needs": "the same arm, signing or explicitly refusing each candidate"
+      },
+      {
+        "id": "V10-convention-executable",
+        "needs": "a house convention the gold answer can be rewritten to and re-executed under"
+      },
+      {
+        "id": "V43-framing-delivered",
+        "needs": "a framing arm that declares a sentence per arm, and its ablation"
+      },
+      {
+        "id": "V48-statements-answered",
+        "needs": "a statement executor with a deadline, which τ² delegates to its own environment"
+      },
+      {
+        "id": "V45-clearance-dose-matched",
+        "needs": "a clearance arm paired with a dose-matched control that drops as many items"
+      },
+      {
+        "id": "V46-raw-is-verbatim",
+        "needs": "a raw arm injecting the correction events unchanged"
+      },
+      {
+        "id": "V47-evidence-ablated",
+        "needs": "an arm that removes the evidence block, and its twin"
+      },
+      {
+        "id": "V49-dose-truncated",
+        "needs": "a one-slot arm whose every pack carries at most one item"
+      },
+      {
+        "id": "V50-admission-engaged",
+        "needs": "a per-question admission arm with a floor fitted per fold"
+      },
+      {
+        "id": "V51-channel-applied",
+        "needs": "a channel arm that rewrites the prompt, and its share floor"
+      }
+    ],
+    "supplyable": 14,
+    "armIndexed": 26
+  },
+  "gates": [
+    {
+      "id": "V0-instrument-ready",
+      "criterion": "every stage from a correction to a servable rule carried something, and the stages reconcile",
+      "actual": "40 correction(s) -> 40 asked -> 80 candidate(s) -> 40 admitted -> 40 stored -> 3 servable (40 refused, 0 failed)",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V1-pack-not-empty",
+      "criterion": "the memory arm injected at least one rule per question on average",
+      "actual": "1.00 rules/question: 75 of 75 request(s) carried an item, from a store of 40 (3 active, 3 in scope)",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V2-fold-partition",
+      "criterion": "every question is evaluated exactly once, by a memory that never learned from it",
+      "actual": "74/74 questions, 0 duplicates, 0 leaks",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V3-parse-rate",
+      "criterion": "at least 90% of replies contain a statement",
+      "actual": "100.00%",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V5-resolution",
+      "criterion": "the run claims no effect finer than its sample can resolve: a resolvable 6pp, or no direction claimed",
+      "actual": "minimum detectable 17.76pp against a 6.00pp target; claims -10.81pp, which is finer than the sample can resolve",
+      "pass": false,
+      "blocking": true
+    },
+    {
+      "id": "V6-controls-inject",
+      "criterion": "every pack-based control arm injected at least one rule on average",
+      "actual": "no pack-based controls configured",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V7-channel",
+      "criterion": "a stated control moves accuracy by at least 10pp",
+      "actual": "no channel control was run",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V8-call-reliability",
+      "criterion": "at most 2% of calls failed after retries, so the outcome is about knowledge",
+      "actual": "0.00% (0/839 turns)",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V32-fold-learning-intact",
+      "criterion": "at most 10% of the learning questions went unanswered and at most 10% of the corrections failed to distil, so the store is the one the fold paid for",
+      "actual": "0/40 unanswered question(s) (0.0%), 8 correction(s), 0 distillation failure(s) (0.0%)",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V15-transfer-reconciles",
+      "criterion": "every transfer trial is measured, informative, or a target that needed nothing",
+      "actual": "74/74 trial(s): 11 informative, 63 already repaired by the retry, 0 unmeasured (0 with no control call)",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V16-transfer-resolvable",
+      "criterion": "at least 100 informative trials, or the transfer rate is a direction rather than a rate",
+      "actual": "11 informative trial(s), 7 repair(s)",
+      "pass": false,
+      "blocking": false
+    },
+    {
+      "id": "V33-transfer-ledger",
+      "criterion": "the artefact carries one row per trial, so the pairs behind the rate survive the run",
+      "actual": "74/74 pair(s) carried",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V17-transfer-net-reported",
+      "criterion": "the transfer summary states its net marginal effect, and the repair and break counts reconcile with it",
+      "actual": "-10.81pp net over 74 measured trial(s): 7 repaired, 15 broken, verdict `unmeasured`",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "V44-domain-accounted",
+      "criterion": "the store holds at least one item, and every item with no domain either arrived without one or lost it to a recorded widening",
+      "actual": "0 of 40 item(s) with no domain, 0 arrived unscoped, 0 widened",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "l4-paired",
+      "criterion": "the memory does not cost accuracy: neither R45 revert branch fires",
+      "actual": "-10.81pp (p=0.1338, n=74, 75 served pack(s)): HARM",
+      "pass": false,
+      "blocking": true
+    },
+    {
+      "id": "l4-effect-resolved",
+      "criterion": "the pair resolves the effect it reports: |delta| >= minimum detectable difference, or no direction is claimed",
+      "actual": "the memory costs accuracy: -10.81pp",
+      "pass": true,
+      "blocking": false
+    },
+    {
+      "id": "l4-same-split",
+      "criterion": "both arms scored exactly the same tasks",
+      "actual": "0 only in first, 0 only in second",
+      "pass": true,
+      "blocking": true
+    },
+    {
+      "id": "l4-projection-complete",
+      "criterion": "every field either arm emitted reached its artefact",
+      "actual": "both arms carried every field the driver emitted",
+      "pass": true,
+      "blocking": true
+    }
+  ],
+  "scenario": {
+    "learn": "retail",
+    "test": "retail",
+    "recall": "retail"
+  },
+  "transfer": {
+    "store": "retail",
+    "storeItems": 40,
+    "paired": 74,
+    "orphanMemory": 0,
+    "informative": 11,
+    "repaired": 7,
+    "broke": 15,
+    "blankRight": 63,
+    "unmeasured": 0,
+    "measured": 74,
+    "netPp": -10.81081081081081,
+    "verdict": "unmeasured",
+    "ledger": [
+      {
+        "task": "retail/0",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/1",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/2",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/3",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/4",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/6",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/7",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/8",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/10",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/11",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/13",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/14",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/15",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/16",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/19",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/20",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/21",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/22",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/23",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/24",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/25",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/28",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/29",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/30",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/31",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/34",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/35",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/37",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/41",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/43",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/44",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/46",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/47",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/48",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/50",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/52",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/54",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/57",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/58",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/59",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/63",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/66",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/67",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/69",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/72",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/73",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/75",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/76",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/78",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/80",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/81",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/82",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/83",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/84",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/85",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/87",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/88",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/89",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/91",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/92",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/93",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/95",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/96",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/98",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/99",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/103",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/104",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/105",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/106",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      },
+      {
+        "task": "retail/107",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/109",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/110",
+        "trial": 0,
+        "blankCorrect": false,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/112",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": false
+      },
+      {
+        "task": "retail/113",
+        "trial": 0,
+        "blankCorrect": true,
+        "withMemoryCorrect": true
+      }
+    ]
+  },
+  "notes": [
+    "`deltaPp` is second - first, so a negative number means the second arm (memory) did worse.",
+    "pass^4 per task is the k=4 reading: a task counts only when all four trials passed.",
+    "The pair is defined on the intersection of task ids; tasks scored by one arm only are counted, not dropped silently.",
+    "Published reference for scale: ALTK-Evolve pass^4 = 0.575 on tau2-retail.",
+    "The protocol gates are the shared forty, not a τ² copy of them; `absent` names the arm each of the rest would need.",
+    "Call reliability is graded over the population the arm recorded: `turns.scope` is `distillation` when the episodes’ tally came from a process that does not report one, and `turns` holds agent turns rather than model calls — the provider’s own count is `usage.calls`.",
+    "`transfer` pairs the two arms episode by episode, so a repair is one episode the control failed and the treatment passed. The treatment is the whole pack: `repaired` says the pack fixed an episode, not which item in it did."
+  ]
+}

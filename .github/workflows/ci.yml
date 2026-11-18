@@ -194,6 +194,60 @@ jobs:
               a.significant95 + ' above the 95% half-width');
           "
 
+      # R152: the two folds recomposed from the two pair artefacts, and the pooled reading recomputed
+      # from the records.
+      #
+      # A cross-fit is two deterministic steps — compose, then pool — and every claim it makes is a
+      # property of the files it reads: no fold evaluates a task its store learned from, the two folds
+      # tile the corpus once, and the pooled delta is its own discordant counts. Each of those is
+      # asserted beside the byte comparison, because a diff nobody reads is not a check.
+      - name: Fold records (recomposed from the two pairs, and the tiling asserted)
+        run: |
+          set -euo pipefail
+          pnpm eval:fold-records eval/results/poc-l4-pair-official.json eval/results/poc-l4-pair-swapped.json --out-dir "${RUNNER_TEMP}/folds"
+          diff -u eval/results/folds/poc-l4-pair-official.json "${RUNNER_TEMP}/folds/poc-l4-pair-official.json"
+          diff -u eval/results/folds/poc-l4-pair-swapped.json "${RUNNER_TEMP}/folds/poc-l4-pair-swapped.json"
+          node -e "
+            const a = require('./eval/results/folds/poc-l4-pair-official.json');
+            const b = require('./eval/results/folds/poc-l4-pair-swapped.json');
+            const bad = [];
+            for (const [name, r] of [['official', a], ['swapped', b]]) {
+              const scored = new Set(r.foldSplit.evaluated);
+              const leak = r.foldSplit.learned.filter((id) => scored.has(id));
+              if (leak.length > 0) bad.push(name + ': evaluates ' + leak.length + ' task(s) it learned from');
+              if (r.ledger.length !== scored.size) bad.push(name + ': ledger rows disagree with the evaluation half');
+              if (r.foldSplit.learned.length + r.foldSplit.evaluated.length !== 114) bad.push(name + ': the two halves are not the corpus');
+            }
+            const union = new Set([...a.foldSplit.evaluated, ...b.foldSplit.evaluated]);
+            if (union.size !== 114) bad.push('the folds answer ' + union.size + ' distinct task(s), not 114');
+            if (bad.length > 0) { console.error('fold records failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('fold records: ' + a.foldSplit.evaluated.length + ' + ' + b.foldSplit.evaluated.length +
+              ' task(s), no leak, tiling the corpus once');
+          "
+
+      - name: Cross-fit (recomputed, and the pooled reading asserted)
+        run: |
+          set -euo pipefail
+          POC_RESULT_DIR="${RUNNER_TEMP}/crossfit" pnpm eval:cross-fit eval/results/folds/poc-l4-pair-official.json eval/results/folds/poc-l4-pair-swapped.json
+          diff -u eval/results/poc-cross-fit.json "${RUNNER_TEMP}/crossfit/poc-cross-fit.json"
+          node -e "
+            const a = require('${RUNNER_TEMP}/crossfit/poc-cross-fit.json');
+            const bad = [];
+            const n = a.reading.tasks;
+            const folds = a.folds.reduce((sum, f) => sum + f.tasks, 0);
+            const se = (Math.sqrt(a.reading.discordance * n) / n) * 100;
+            if (folds !== n) bad.push('pooled n disagrees with the folds it pooled');
+            if (Math.abs(a.reading.deltaPp - ((a.reading.gained - a.reading.lost) / n) * 100) > 1e-9) bad.push('delta');
+            if (Math.abs(a.reading.mde80Pp - 2.802 * se) > 1e-9) bad.push('mde80');
+            if (!a.census.tiles) bad.push('the folds do not tile');
+            if (a.census.agreeInSign !== (a.folds.every((f) => f.deltaPp >= 0) || a.folds.every((f) => f.deltaPp <= 0))) {
+              bad.push('the sign flag disagrees with the per-fold rows');
+            }
+            if (bad.length > 0) { console.error('cross-fit failed: ' + bad.join(', ')); process.exit(1); }
+            console.log('cross-fit: ' + n + ' pairs, delta ' + a.reading.deltaPp.toFixed(2) + 'pp, mde80 ' +
+              a.reading.mde80Pp.toFixed(2) + 'pp, folds ' + (a.census.agreeInSign ? 'agree' : 'disagree') + ' in sign');
+          "
+
       # R28: the harm stratification, recomputed from the committed run rather than trusted.
       #
       # The artefact is a pure function of one committed file, so the check is a byte comparison —

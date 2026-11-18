@@ -28,6 +28,20 @@ import { writeJson } from './lib.js';
 type PairArtefact = {
   readonly id?: string;
   readonly domain?: string;
+  /**
+   * The two shapes this command reads.
+   *
+   * A **fold record** (`pnpm eval:fold-records`) states its ledger at the top level, beside the two id sets and
+   * the treatment. A **pair artefact** — what a run writes — nests the same ledger under `transfer`. Both are
+   * accepted because both are real inputs: the record exists so a fold whose artefact is silent about its halves
+   * can still be pooled, and the artefact is what a run produces without any composition at all.
+   */
+  readonly ledger?: readonly {
+    readonly task: string;
+    readonly blankCorrect: boolean;
+    readonly withMemoryCorrect: boolean;
+  }[];
+  readonly source?: string;
   /** R143: the two halves the arms ran, which is what makes a fold checkable against a leak. */
   readonly foldSplit?: { readonly learned: readonly string[]; readonly evaluated: readonly string[] };
   readonly foldSplitAbsent?: { readonly reason: string };
@@ -65,7 +79,10 @@ function fail(reason: string): never {
 function load(path: string): CrossFitFold {
   if (!existsSync(path)) fail(`missing fold artefact: ${path}`);
   const doc = JSON.parse(readFileSync(path, 'utf8')) as PairArtefact;
-  const rows = doc.transfer?.ledger;
+  // The two shapes this command is given, in the order they are met: a fold record states its ledger at the top
+  // level, a pair artefact nests it under `transfer`. Read here rather than sniffed twice, because a file that
+  // carries both is a composition mistake and the top-level one is the later statement.
+  const rows = doc.ledger ?? doc.transfer?.ledger;
   if (rows === undefined || rows.length === 0) {
     // The ledger is the population a fold is made of. An artefact without one is a run that never joined its
     // trials to its tasks, and pooling "no rows" would report a sample that does not exist.
@@ -73,8 +90,7 @@ function load(path: string): CrossFitFold {
   }
   const tasks = foldTasksOf(rows);
   if (!tasks.ok) fail(`${path}: ${tasks.reason}`);
-  const label = basename(path).replace(/\.json$/, '');
-  // Read once so the narrowing below is on a value rather than on an optional chain re-evaluated after the
+  const label = basename(path).replace(/\.json$/, '');  // Read once so the narrowing below is on a value rather than on an optional chain re-evaluated after the
   // check: `exactOptionalPropertyTypes` refuses a present `undefined`, and "the artefact did not state it" is
   // an absent field rather than one holding nothing.
   const knobs = doc.treatment?.knobs;

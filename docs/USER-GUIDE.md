@@ -3560,21 +3560,30 @@ treatments disagree: the composition removes the assumption, not the check.
 
 ### 25.2 What it prints
 
+The reading from this project's own two folds of τ² retail, 2026-11-18:
+
 ```
-[cross-fit] pooled n=114 memory=0.9211 control=0.8333 delta=+8.77pp [1.75, 15.79] p=0.0213 lost=3 gained=13 mde80=6.94pp
-[cross-fit] folds: official +10.00pp (n=40), official-swapped +7.50pp (n=74)
-[cross-fit] tiles 114 of 114 task(s); folds agree in sign
+[cross-fit] pooled n=114 memory=0.8070 control=0.8684 delta=-6.14pp [-14.91, 2.63] p=0.2649 lost=18 gained=11 mde80=13.24pp
+[cross-fit] folds: poc-l4-pair-official +2.50pp (n=40), poc-l4-pair-swapped -10.81pp (n=74)
+[cross-fit] tiles 114 of 114 task(s); folds disagree in sign
 ```
 
 Read it in this order:
 
 1. **`pooled n`** — must equal the corpus. If it is smaller, look at the third line.
-2. **`delta` and its interval** — the pair's own reading, over every task once.
+2. **`delta` and its interval** — the pair's own reading, over every task once. Here the memory costs 6.14pp and
+   the interval still contains zero.
 3. **`mde80`** — the smallest difference this many pairs could detect at 80% power. An interval that contains
    zero and an `mde80` larger than the delta is an unresolved reading, whatever the point estimate says.
-4. **`folds:`** — the per-fold deltas. A pooled +8.77pp can be +20pp in one fold and −2pp in the other, and that
-   is two findings averaged rather than one finding.
+4. **`folds:`** — the per-fold deltas, and the reason a pooled number is never the whole story: +2.50pp on one
+   half and −10.81pp on the other is not a six-point loss, it is two findings whose average happens to be
+   negative.
 5. **`tiles` / `agree in sign`** — see below.
+
+**When the folds disagree in sign, the pooled number is an average and nothing else.** Do not report it as the
+effect: report the two folds and what differs between them. In this record the difference was the store's
+density — 11 servable items over 40 renders against 3 over 74 — which is the finding the pool was bought to
+expose, not a nuisance beside it.
 
 ### 25.3 The four refusals, and the defect each one stops
 

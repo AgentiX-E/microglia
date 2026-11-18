@@ -1758,3 +1758,18 @@ asymptotic approximation on four against six would be a number about a distribut
 | "AUC" | *AUC with an exact p* | A perfect ordering on two against two is 1/6 by chance: the area alone is not evidence |
 | "Significance" | *permutation p* | The null here is which label went with which margin, not a normal distribution |
 | "Correlation" | *ranking* | The rung acts on an order, so the order is what has to carry information |
+
+**Tiling (cross-fit)** — the property two folds must have to be pooled: every task in the corpus was learned from
+by exactly one fold and answered by exactly the other. It is printed as a count (`tiles 114 of 114 task(s)`), not
+enforced as a refusal, because a pool over a smaller population is still a valid reading — it is just a reading
+about a smaller population, and the two counts beside the sentence say which tasks fell outside.
+
+**Sign disagreement** — the case where the two folds of a cross-fit point in opposite directions. The pooled delta
+is then an average of two findings rather than one, so the flag (`folds disagree in sign`) matters more than the
+point estimate. On this project's τ² folds it fired: +2.50pp on the half whose store kept 11 servable items,
+−10.81pp on the half that kept 3.
+
+**Renders per servable item** — how many times an average servable record was served into a request. The quantity
+that explained both cross-fit folds: 3.6 renders per item with an 8.33% harm share against 25.0 with 23.81%, on
+one treatment. It is a property of the *recall path's density*, not of the store's size: a store that keeps fewer
+items applies each of them everywhere, so the harm follows the renders rather than the count.
