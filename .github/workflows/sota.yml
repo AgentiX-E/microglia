@@ -1466,9 +1466,15 @@ jobs:
       # card says are off-peak. `windowFit` is that function, `eval:window-fit` is this step, and the estimate
       # is R141's measured 26 seconds an episode rather than a guess.
       - name: Refuse a dispatch that would cross into the peak window
+        id: window
         if: github.event_name == 'workflow_dispatch'
         env:
           NOT_BEFORE: ${{ github.event.inputs.not_before }}
+          # R146: the instant the wait step woke on, not this step's own reading of `not_before`. The guard
+          # runs minutes after the wait ends, and `planBandWait` reads an hour that has passed as the next
+          # day's — which is how a dispatch that slept to 04:00 was refused at 04:00:27 for naming a window
+          # 1440 minutes away, with the reference arm buying its half regardless.
+          TAU_START_AT: ${{ steps.wait.outputs.start_at }}
           TAU_TRAIN_TASKS: ${{ steps.recall_floor.outputs.trainTasks }}
           TAU_TEST_TASKS: ${{ steps.recall_floor.outputs.testTasks }}
           TAU_TRIALS: ${{ steps.recall_floor.outputs.trials || vars.TAU_TRIALS || '4' }}
@@ -1480,7 +1486,11 @@ jobs:
         run: pnpm --silent eval:window-fit
 
       - name: L4 arm — memory
-        if: github.event.inputs.l4_arms != 'reference'
+        # R146: the window guard's answer, consulted by both arms rather than inherited from the implicit
+        # `success()` that only one of their conditions gets. Empty on a push run, where no guard runs.
+        if: >-
+          github.event.inputs.l4_arms != 'reference' &&
+          steps.window.outputs.fits != 'false'
         # Two facades of ONE run: one learn, one store, two evaluations.
         timeout-minutes: 240
         env:
@@ -1696,9 +1706,17 @@ jobs:
       - name: L4 arm — reference
         # A failed registration check must not buy an hour of reference calls:
         # that is a configuration error, not an arm that failed to measure.
+        #
+        # R146 and the reason this arm carries the window guard explicitly. `!cancelled()` is a status
+        # function, so GitHub adds no implicit `success()` to this condition — and the memory arm's condition
+        # names none, so it does get one. R142's second dispatch was refused by the window guard at 04:00:27
+        # (the guard re-read `not_before` and found the hour it had just slept to a day away), the memory arm
+        # was skipped, and this arm bought its half of a run whose guard had already said no. A guard two arms
+        # consult cannot be half-honoured, and `fits` is empty on a push run, where no guard runs.
         if: >-
           !cancelled() && github.event.inputs.l4_arms != 'memory' &&
-          steps.recall_floor.outcome != 'failure'
+          steps.recall_floor.outcome != 'failure' &&
+          steps.window.outputs.fits != 'false'
         timeout-minutes: 120
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}

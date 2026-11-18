@@ -1,4 +1,8 @@
 import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { SECONDS_PER_EPISODE, SETUP_MINUTES, windowFit, windowFitLine } from '../window-fit.js';
 
@@ -131,5 +135,86 @@ describe('eval:window-fit, the command a workflow step calls', () => {
     const result = run({ TAU_ALLOW_PEAK: '1', TAU_TRAIN_TASKS: '', TAU_TEST_TASKS: '' });
     expect(result.code).toBe(0);
     expect(result.out).toContain('bills this dispatch at peak rate');
+  });
+
+  it('refuses a cap that is not a count, rather than estimating from a fraction', () => {
+    const result = run({ TAU_TRAIN_TASKS: '12.5', TAU_TEST_TASKS: '57' });
+    expect(result.code).not.toBe(0);
+    expect(result.err).toContain('not a count of tasks');
+  });
+
+  it('estimates from one trial and two arms when the dispatch names neither', () => {
+    // Both are multipliers on the episode count, and a missing one silently halves or quarters the estimate —
+    // which is how a run that would cross into peak is told it fits.
+    const result = run({
+      TAU_TRAIN_TASKS: '57',
+      TAU_TEST_TASKS: '57',
+      TAU_TRIALS: '',
+      TAU_WINDOW_ARMS: '',
+      TAU_START_AT: '2026-11-18T04:00:00Z',
+    });
+    expect(result.out).toContain('arms=2 trials=1');
+  });
+
+  /**
+   * R146. The guard was refused by its own clock.
+   *
+   * A dispatch naming `not_before: 04:00` slept until 04:00:00 and then ran this step at 04:00:27, where
+   * `planBandWait` read `04:00` as the *next* 04:00 — 1440 minutes away — and refused the run it had just
+   * waited for. The 2-hour wait was spent, the memory arm was skipped by the implicit `success()`, and the
+   * reference arm bought its half anyway. The fix is that the wait step publishes the instant it woke and
+   * the guard consumes that instant rather than parsing the request a second time.
+   */
+  it('takes the start from the clock the wait step woke on, not from a second read of not_before', () => {
+    const result = run({
+      TAU_TRAIN_TASKS: '57',
+      TAU_TEST_TASKS: '57',
+      NOT_BEFORE: '04:00',
+      TAU_START_AT: '2026-11-18T04:00:00Z',
+    });
+    // The claim is that nothing was refused. `npx` writes its own warnings to stderr, so emptiness is not
+    // the assertion: the marker the workflow fails on is.
+    expect(result.err).not.toContain('::error::');
+    expect(result.code).toBe(0);
+    expect(result.out).toContain('it fits');
+  });
+
+  it('refuses a start it cannot read rather than falling back to now', () => {
+    // Falling back to "now" is exactly the defect above: the wall clock at the moment of the check is not
+    // the instant the run started, and at a window boundary it is on the other side of one.
+    const result = run({ TAU_TRAIN_TASKS: '57', TAU_TEST_TASKS: '57', TAU_START_AT: 'half past four' });
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('TAU_START_AT');
+  });
+
+  it('refuses a start the wait step woke on inside the peak window', () => {
+    const result = run({ TAU_TRAIN_TASKS: '57', TAU_TEST_TASKS: '57', TAU_START_AT: '2026-11-18T05:30:00Z' });
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('Dispatch with not_before: 06:00');
+  });
+
+  /**
+   * The arms read `fits` rather than relying on the implicit `success()`.
+   *
+   * One arm's condition already named a status function (`!cancelled()`), and GitHub only adds the implicit
+   * `success()` when the expression names none — so the refused guard skipped one arm and bought the other.
+   * A guard two arms consult explicitly cannot be half-honoured.
+   */
+  it('publishes fits for the arms to consult, on both answers', () => {
+    const fits = join(tmpdir(), `window-fit-${randomUUID()}.txt`);
+    writeFileSync(fits, '');
+    expect(
+      run({ TAU_TRAIN_TASKS: '57', TAU_TEST_TASKS: '57', TAU_START_AT: '2026-11-18T04:00:00Z', GITHUB_OUTPUT: fits })
+        .code,
+    ).toBe(0);
+    expect(readFileSync(fits, 'utf8')).toContain('fits=true');
+
+    const refused = join(tmpdir(), `window-fit-${randomUUID()}.txt`);
+    writeFileSync(refused, '');
+    expect(
+      run({ TAU_TRAIN_TASKS: '57', TAU_TEST_TASKS: '57', TAU_START_AT: '2026-11-18T05:30:00Z', GITHUB_OUTPUT: refused })
+        .code,
+    ).toBe(1);
+    expect(readFileSync(refused, 'utf8')).toContain('fits=false');
   });
 });

@@ -458,3 +458,44 @@ describe('the distiller is sized by the same function as the answer', () => {
     expect(text).toContain("distill_repair_max_tokens: distillBudget('repair', THINKING),");
   });
 });
+
+describe('the window guard gates both arms, and neither of them relies on an implicit success()', () => {
+  const WORKFLOW = new URL('../../../../.github/workflows/sota.yml', import.meta.url);
+  const lines = readFileSync(WORKFLOW, 'utf8').split('\n');
+
+  /** The `if:` block of a named step, with its folded continuation lines. */
+  function conditionOf(step: string): string {
+    const index = lines.findIndex((line) => line.trimEnd() === `      - name: ${step}`);
+    expect(index, `no step named ${step}`).toBeGreaterThan(-1);
+    const condition = lines.findIndex((line, at) => at > index && line.trimStart().startsWith('if:'));
+    expect(condition, `${step} has no condition`).toBeGreaterThan(index);
+    const rest = lines.slice(condition, condition + 8);
+    const stop = rest.findIndex((line, at) => at > 0 && !/^\s{8,}\S/.test(line) && line.trim() !== '');
+    return (stop === -1 ? rest : rest.slice(0, stop)).join('\n');
+  }
+
+  it('publishes the guard answer as a step output', () => {
+    // R146. Without an output there is nothing for the arms to read, and the guard's exit code alone is
+    // not enough: one arm's condition already named `!cancelled()`, and GitHub adds the implicit
+    // `success()` only to expressions that name no status function — so the refused guard skipped one arm
+    // and bought the other.
+    expect(lines.some((line) => line.trimEnd() === '        id: window')).toBe(true);
+    expect(conditionOf('Refuse a dispatch that would cross into the peak window')).toContain(
+      "github.event_name == 'workflow_dispatch'",
+    );
+  });
+
+  it('has both arms consult it', () => {
+    // The memory arm's condition names no status function, so a refused guard skips it by the implicit
+    // `success()`; the reference arm's names `!cancelled()`, so it ran and bought a half. Two arms of one
+    // dispatch cannot disagree about whether the run was refused.
+    expect(conditionOf('L4 arm — memory')).toContain("steps.window.outputs.fits != 'false'");
+    expect(conditionOf('L4 arm — reference')).toContain("steps.window.outputs.fits != 'false'");
+  });
+
+  it('gives the guard the clock the wait step woke on', () => {
+    const index = lines.findIndex((line) => line.trimEnd() === '      - name: Refuse a dispatch that would cross into the peak window');
+    const block = lines.slice(index, index + 30).join('\n');
+    expect(block).toContain('TAU_START_AT: ${{ steps.wait.outputs.start_at }}');
+  });
+});

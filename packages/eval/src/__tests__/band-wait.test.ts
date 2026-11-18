@@ -1,3 +1,8 @@
+import { spawnSync } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MAX_BAND_WAIT_MINUTES, planBandWait } from '../band-wait.js';
 
@@ -62,5 +67,34 @@ describe('planBandWait', () => {
     const plan = planBandWait(at('2026-11-12T03:59:30Z'), '04:00');
     expect(plan.ok).toBe(true);
     expect(plan.ok && plan.minutes).toBe(1);
+  });
+});
+
+/**
+ * `eval:wait-band`, the step that does the sleeping.
+ *
+ * R146. The guard that decides whether a run fits the window used to re-parse `not_before` on its own clock,
+ * four minutes after the wait had ended, and read the hour it had just slept to as the next day's — refusing
+ * the dispatch it had waited for. The wait step therefore publishes the instant it woke, and the guard
+ * consumes that instead of parsing the request twice: one parse, one clock, one answer.
+ */
+describe('eval:wait-band, the command a workflow step calls', () => {
+  it('publishes the instant it woke, for the guard that runs after it', () => {
+    const out = join(tmpdir(), `wait-band-${randomUUID()}.txt`);
+    writeFileSync(out, '');
+    const child = spawnSync('npx', ['tsx', 'packages/eval/src/bin/wait-band.ts'], {
+      encoding: 'utf8',
+      env: { ...process.env, NOT_BEFORE: '', GITHUB_OUTPUT: out },
+    });
+    expect(child.status, child.stderr).toBe(0);
+    const published = readFileSync(out, 'utf8');
+    expect(published).toContain('wait_min=0');
+    // An ISO instant rather than an hour: the card's windows are bounded by minutes as well as by hours, so
+    // an `HH:MM` would have to be re-read against a date the guard does not have.
+    const start = /start_at=(\S+)/.exec(published)?.[1];
+    expect(start, published).toBeDefined();
+    expect(Number.isNaN(new Date(start ?? '').getTime())).toBe(false);
+    // A dispatch with no window runs now, so the instant it publishes is the instant it started.
+    expect(Math.abs(new Date(start ?? '').getTime() - Date.now())).toBeLessThan(120_000);
   });
 });

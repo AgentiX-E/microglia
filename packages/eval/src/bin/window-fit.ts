@@ -6,7 +6,13 @@
  * that started at 01:19 was refused. The arithmetic that would have caught it is `windowFit`; this is the
  * command a workflow step calls, and it takes its inputs from the same registration caps the arm runs under.
  *
- *     NOT_BEFORE=04:00 TAU_TRAIN_TASKS=57 TAU_TEST_TASKS=57 pnpm --silent eval:window-fit
+ *     TAU_START_AT=2026-11-18T04:00:00Z TAU_TRAIN_TASKS=57 TAU_TEST_TASKS=57 pnpm --silent eval:window-fit
+ *
+ * **The start is a moment, and the wait step is the only thing that reads `not_before`.** R146: this command
+ * used to parse `not_before` itself, and the guard ran four minutes after the wait had ended, so `planBandWait`
+ * read `04:00` as the *next* 04:00 — 1440 minutes away — and refused the dispatch it had just slept through.
+ * Two hours of waiting, one arm skipped, and the other arm bought anyway. `TAU_START_AT` is the instant
+ * `eval:wait-band` publishes; when no window was named the start is now, because that is when the run starts.
  *
  * Three states, and the third is why it exits non-zero rather than printing a warning:
  *
@@ -16,7 +22,12 @@
  * - **peak was authorised** — `TAU_ALLOW_PEAK=1` is the repository variable the lane already reads, and a
  *   dispatch under it is billed at double price deliberately. This command says so and proceeds; it does not
  *   silently disagree with a decision somebody made.
+ *
+ * Every path publishes `fits`, because the arms consult it: one of them already names `!cancelled()`, and
+ * GitHub adds the implicit `success()` only to a condition that names no status function, so a refused guard
+ * skipped one arm and bought the other.
  */
+import { appendFileSync } from 'node:fs';
 import { planBandWait } from '../band-wait.js';
 import { windowFit, windowFitLine } from '../window-fit.js';
 
@@ -30,17 +41,39 @@ function count(name: string): number {
   return value;
 }
 
+function publish(fits: boolean): void {
+  const out = process.env['GITHUB_OUTPUT'];
+  if (out !== undefined) appendFileSync(out, `fits=${fits ? 'true' : 'false'}\n`);
+}
+
+/** The instant the run starts: what the wait step woke on, or now when the dispatch named no window. */
+function startOf(): Date | string {
+  const published = (process.env['TAU_START_AT'] ?? '').trim();
+  if (published !== '') {
+    const moment = new Date(published);
+    // Falling back to the wall clock is the defect this variable exists to remove: the clock at the moment
+    // of the check is not the instant the run started, and at a window boundary it is on the other side of
+    // one. An unreadable instant is a refusal with the variable's name in it.
+    if (Number.isNaN(moment.getTime())) return `TAU_START_AT is '${published}', which is not an instant`;
+    return moment;
+  }
+  const plan = planBandWait(new Date(), (process.env['NOT_BEFORE'] ?? '').trim());
+  if (!plan.ok) return plan.reason;
+  return plan.target;
+}
+
 const allowPeak = (process.env['TAU_ALLOW_PEAK'] ?? '').trim() === '1';
 if (allowPeak) {
+  // Authorised at peak, so the window is not a constraint and there is nothing to gate on.
+  publish(true);
   process.stdout.write('off-peak window: not checked — TAU_ALLOW_PEAK=1 bills this dispatch at peak rate\n');
 } else {
-  const now = new Date();
-  const wait = planBandWait(now, (process.env['NOT_BEFORE'] ?? '').trim());
-  if (!wait.ok) {
-    process.stderr.write(`::error::${wait.reason}\n`);
+  const start = startOf();
+  if (typeof start === 'string') {
+    publish(false);
+    process.stderr.write(`::error::${start}\n`);
     process.exit(1);
   }
-  const start = wait.target;
   const trainTasks = count('TAU_TRAIN_TASKS');
   const testTasks = count('TAU_TEST_TASKS');
   // One trial per task per arm unless the registration says otherwise, and one arm per side of the pair.
@@ -50,6 +83,7 @@ if (allowPeak) {
   if (episodes === 0) {
     // A dispatch that names no caps has no estimate, and an estimate of zero would fit every window. Refusing
     // is the only reading that does not turn "the caps are missing" into "the run is free".
+    publish(false);
     process.stderr.write(
       '::error::TAU_TRAIN_TASKS and TAU_TEST_TASKS are both zero, so this dispatch has no episode count to estimate from; the registration must pin both caps\n',
     );
@@ -58,6 +92,7 @@ if (allowPeak) {
   const fit = windowFit({ now: start, episodes });
   process.stdout.write(`${windowFitLine(fit)}\n`);
   process.stdout.write(`episodes=${String(episodes)} arms=${String(arms)} trials=${String(trials)}\n`);
+  publish(fit.fits);
   if (!fit.fits) {
     process.stderr.write(`::error::${windowFitLine(fit)}\n`);
     process.exit(1);
