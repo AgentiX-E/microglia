@@ -1959,3 +1959,11 @@ its evidence with "the store had nothing to say", so the ledger can only bound i
 point. A ledger can prove a count wrong; it can never prove a policy right — which is why a fold whose block went
 missing cannot be repaired from its own files at any price, and why the reconciliation is a gate rather than a
 repair tool.
+
+**Instrument and policy are two decisions, and this round separated them.** The serving cap is a correct instrument
+— it moves allocation, its ledger reconciles with its own report, and `maxRenders` equals the cap in every bounded
+draw. It is not an established policy: at renders-per-item of 2.9 and 3.2 the harm share reads 5.88% and 20.59%, so
+the quantity the cap controls does not determine the outcome, and one draw falls below R45's revert bar. The code
+stays and its recommendation is withdrawn — a distinction worth stating in a section about allocation, because the
+alternative (removing a working instrument because its policy failed) would delete the only quantity in this lane an
+experimenter can set.

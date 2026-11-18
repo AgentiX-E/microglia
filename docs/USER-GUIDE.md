@@ -4127,3 +4127,32 @@ Two consequences worth knowing when you read an artefact:
   this section. The pair refuses it (`l4-rotation-reconciles` compares the block with the ids the same file's
   `pack.ledger` carries, and blocks on a disagreement), and the fold is not poolable: read the cap from
   `pack.summary` and the renders from the run log, and do not re-derive the policy — no file holds one.
+
+### 32.6 The policy is withdrawn; the instrument stays
+
+The two folds in §32.1 moved **both** quantities at once — renders per servable item and how many items survived the
+floor — so the line drawn through them was a line through two confounded points. Three draws at the same dose
+separate them:
+
+| draw | servable items | renders per item | harm share | delta |
+| --- | --- | --- | --- | --- |
+| R152, cap 3 | 14 | 2.86 | **5.88%** | +2.50pp |
+| R152b, cap 4 | 13 | 3.08 | not measured | — |
+| R152c, cap 4 | 13 | 3.15 | **20.59%** | **−7.50pp** |
+
+At 2.9 and 3.2 renders per item the harm share differs by fifteen points, so **renders per servable item does not
+determine the harm** at these store sizes, and the one drawn below the revert bar withdrew the policy: a
+`serveRotation: fair-share` registration is no longer the recommended default, and nothing in the template sets it.
+
+What remains true, and is why the switch is still in the kernel:
+
+- the cap acts on exactly what its reading says — `maxRenders` equalled the cap in all three bounded draws, the
+  leader's renders fell from 12 to 3–4, every servable item was served and no phase was starved;
+- the ledger, the report and `l4-rotation-reconciles` make allocation an **observable** quantity, which nothing else
+  in this lane had before;
+- an instrument whose numbers are checkable against its own artefact is worth keeping even when the policy it was
+  built for does not earn its default.
+
+If you use it, use it as an experiment: state the mode, read `maxRenders` against `cap`, and do not expect the
+score to move — on four draws of one treatment the arm's own `pass^4` ranged 0.775 to 0.925, which is wider than
+anything a 40-task fold can resolve.
