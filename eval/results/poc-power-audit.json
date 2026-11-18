@@ -5,12 +5,12 @@
   "rows": [
     {
       "artefact": "poc-l4-pair.json",
-      "n": 40,
-      "helped": 6,
-      "harmed": 5,
-      "deltaPp": 2.5,
-      "halfWidthPp": 16.251461472741457,
-      "minDetectablePp": 23.23295665643958,
+      "n": 57,
+      "helped": 4,
+      "harmed": 6,
+      "deltaPp": -3.508771929824561,
+      "halfWidthPp": 10.873796866543902,
+      "minDetectablePp": 15.545091234722456,
       "resolvable": false,
       "significant95": false
     },
@@ -274,12 +274,12 @@
   },
   "coarsest": {
     "artefact": "poc-l4-pair.json",
-    "n": 40,
-    "helped": 6,
-    "harmed": 5,
-    "deltaPp": 2.5,
-    "halfWidthPp": 16.251461472741457,
-    "minDetectablePp": 23.23295665643958,
+    "n": 57,
+    "helped": 4,
+    "harmed": 6,
+    "deltaPp": -3.508771929824561,
+    "halfWidthPp": 10.873796866543902,
+    "minDetectablePp": 15.545091234722456,
     "resolvable": false,
     "significant95": false
   },
