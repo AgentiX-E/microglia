@@ -4054,8 +4054,14 @@ exclude = { ids whose renders ≥ cap }  # sent as RecallQuery.exclude
 | you wrote | the request carries | the artefact records |
 | --- | --- | --- |
 | nothing | no `exclude` parameter (byte-identical to every earlier run) | no `serveRotation` block |
-| `serveRotation: off` | no `exclude` parameter | `serveRotation.cap: 0` — the declared control |
-| `serveRotation: fair-share` | `exclude=k_a,k_b` once items reach the cap | `cap`, `maxRenders`, `renders`, `distinct`, `exhausted`, `starved` |
+| `serveRotation: off` | no `exclude` parameter | `serveRotation.mode: 'off'` — the declared control |
+| `serveRotation: fair-share` | `exclude=k_a,k_b` once items reach the cap | `mode`, `cap`, `maxRenders`, `renders`, `distinct`, `exhausted`, `starved` |
+
+The middle row there is the analogue of §29.2's: declaring the identity sends nothing across the socket and still
+makes the artefact say which policy it was, because the report carries its own `mode`. The pool compares that
+string, so an arm that bounded travel and an arm that never mentioned the switch are refused as one experiment
+rather than averaged — and the composition refuses to carry the field across a silent fold, since here the absence
+*is* the control.
 
 The cap is computed rather than written down because a constant in a header is a guess about a store that does not
 exist yet. When the store is bigger than the phase the cap is 1, which is still a spread; when the phase is bigger

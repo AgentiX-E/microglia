@@ -1913,6 +1913,14 @@ something else:
 | the rendered block carries the substitute rule | a caller that re-rendered elsewhere would show a hole |
 | an unknown id in the list is ignored, not fatal | the caller's list is state, and an item can retire between building it and sending it |
 
+**The policy is part of the treatment, and its absence is the control.** The artefact carries the declared mode
+beside the reading, the pair states it for both arms, and the pool compares it like `knobs`: two folds of one store,
+one of which bounded how far each item travelled, are two experiments. The composition goes one step further than
+the carry rule allows for other fields — it *refuses* a fold that states a policy beside one that is silent, because
+everywhere else silence means "this artefact predates the field", and here silence means "this arm did not bound
+anything". Carrying it would convert an unbounded fold into a bounded one on the strength of a header it never
+carried, which is the mistake `AUDIT 34.191` records one layer up.
+
 The cap itself is deliberately **not** part of the contract. `serveRotation: fair-share` names a policy and the
 driver resolves `ceil(requests / servable)` from the store the run actually built, because a constant in a header
 is a guess about a store that does not exist yet — and a guess that does not bind produces an arm that ran as its
