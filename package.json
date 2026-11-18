@@ -117,6 +117,7 @@
     "eval:wait-band": "tsx packages/eval/src/bin/wait-band.ts",
     "eval:window-fit": "tsx packages/eval/src/bin/window-fit.ts",
     "eval:cross-fit": "tsx packages/eval/src/bin/cross-fit.ts",
+    "eval:fold-records": "tsx packages/eval/src/bin/fold-records.ts",
     "eval:width-share": "tsx packages/eval/src/bin/width-share.ts",
     "eval:writer-probe": "tsx packages/eval/src/bin/writer-probe.ts",
     "review:serve": "tsx packages/eval/src/bin/review.ts",

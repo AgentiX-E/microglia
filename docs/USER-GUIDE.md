@@ -3530,17 +3530,33 @@ Each task is answered **exactly once, by a memory that never saw it**, and the t
 ### 25.1 Run it
 
 ```bash
+# 1. compose the two runs into the two fold records
+pnpm eval:fold-records eval/results/pairs/official.json eval/results/pairs/swapped.json --out-dir eval/results/folds
+
+# 2. pool them
 pnpm eval:cross-fit eval/results/folds/official.json eval/results/folds/swapped.json
 ```
 
-Each argument is a **pair artefact** — the file `l4-pair` writes — and it must carry two fields that this
-release added:
+The pool needs three things from each fold: its per-task outcomes, the half its store **learned from** (so the
+leak check has something to check) and the **treatment identity** (so two folds of two experiments cannot be
+averaged). A pair artefact written by a run older than this release states the first and refuses the other two,
+because the guards that read them demanded a symmetry the two arms do not have — the reference arm learns
+nothing, so it states `train: []` and no store fields at all.
 
-- `foldSplit: { learned, evaluated }` — the two id sets the arms ran, read from the arms themselves;
-- `treatment: { unit, form, scope, model }` — what the pair ran, as `poolArms` compares it.
+`eval:fold-records` is that composition, and it is where the convenience is made safe:
 
-Artefacts written before this release carry neither. They are not silently accepted: the command refuses them
-with the reason, because the check below is the whole claim.
+- a fold that states its own halves keeps them; a fold that does not takes its learning half from the
+  **sibling's evaluation half**, which is only legitimate if the two folds are one corpus read twice;
+- so the tiling is checked before anything is written — each fold learned exactly what the other answered, and
+  no fold evaluates a task it learned from;
+- every value a record did not read from its own file is **named inside the record**, in `derivation`, so a
+  reader can see which field was carried from where without re-running the tool.
+
+The records are small — a ledger of 40 or 74 rows — and they are committed, because a pair artefact is a
+deterministic join of two arm files and can be rebuilt from a run's evidence.
+
+The pool itself still refuses a fold that cannot state its learning half, and refuses two folds whose
+treatments disagree: the composition removes the assumption, not the check.
 
 ### 25.2 What it prints
 
@@ -3930,10 +3946,12 @@ know that, a small delta is not a finding.
 | question | answered by | what it assumes |
 | --- | --- | --- |
 | "given these two runs, how surprising is this split?" | the McNemar interval on discordant pairs | nothing — it is exact |
-| "would the treatment move the outcome again?" | `minDetectablePp` **plus the arms' own variance** | that both draws are sampled, not just one |
+| "would the treatment move the outcome again?" | `minDetectablePp` — the paired SE, which already carries both arms' noise | that a new dispatch does not carry a variance the pairing cancels |
 
-Every `minDetectablePp` in `eval/results` is the first kind: it treats the control as a fixed quantity. The
-control is a run of a stochastic agent on a stochastic model, and it moves.
+Every `minDetectablePp` in `eval/results` is the second kind: it is formed from the discordant pairs of one run,
+which is the variance of the *paired difference* and therefore contains the control arm's own noise. What it
+does not contain is the variance of drawing a whole new pair of arms, and that is a different question with a
+different (larger) answer — `sqrt((p1*(1-p1)+p2*(1-p2))/n)` — which §31.3 keeps separate for that reason.
 
 ### 31.2 How far it moves, measured once
 
@@ -3949,20 +3967,38 @@ The arm did not change. It moved **7.02pp** and flipped **17.5%** of its tasks.
 
 ### 31.3 The arithmetic to redo whenever you quote an MDE
 
+Two questions, two variances, and they are not interchangeable:
+
 ```
-per-arm SD      = sqrt(f * (1 - f) / n)        f = flip share, n = trials
-delta SD        = sqrt(2) * per-arm SD         two independent dispatches
-MDE80           = 2.802 * delta SD             the constant the protocol uses
+unpaired SD   = sqrt((p1*(1-p1) + p2*(1-p2)) / n)   two independent draws of one arm
+paired SE     = sqrt(b + c) / n                     b, c = discordant pairs, one run
+MDE80         = 2.802 * SE                          the constant the protocol uses
 ```
 
-On the numbers above: `sqrt(0.175*0.825/57) = 5.0pp`, so the delta carries `7.1pp` and the 80% MDE is
-**19.9pp** — against the **15.55pp** the pair artefact prints from within-run discordance alone. The published
-figure is the MDE of a conditional question; the unconditional one is 28% wider.
+On the numbers above, the two control rates are `p1 = 0.8246` and `p2 = 0.8947`:
+
+| quantity | value |
+| --- | --- |
+| disagreement two **independent** draws would produce | `p1*(1-p2) + (1-p1)*p2` = **0.2438** |
+| disagreement observed | **0.1754** |
+| unpaired SD of the difference | **6.47pp** |
+| paired SE the artefact prints | **5.36pp** |
+| MDE80 at 40 tasks / 57 tasks / 114 tasks | **18.53 / 15.55 / 10.98pp** |
+
+The observed disagreement is **below** what independence predicts, which is the direction of a positive
+task-level correlation: the two estimators differ by `1 - (5.36/6.47)^2 = 0.31`, and the flip share implies
+`1 - 0.1754/0.2438 = 0.28`. Pairing buys that much and no more.
+
+**The mistake to avoid, because this guide made it.** Do not build a per-arm SD out of the *flip share*
+(`sqrt(f*(1-f)/n)`) and multiply it by `sqrt(2)`: `f` is a disagreement rate between two draws, not an outcome
+proportion, so the result double-counts and then compares an unpaired SD against a paired SE. That arithmetic
+produced a 19.9pp figure which has been retracted; the paired MDE the artefact prints is the one that belongs to
+the design that produced the delta.
 
 ### 31.4 What to do about it
 
-- **Quote the pair's interval as what it is**: exact given these two runs. Do not call a 4pp delta a finding on
-  40–60 tasks without a test–retest.
+- **Quote the pair's interval as what it is**: exact given these two runs, and the resolution that belongs to a
+  paired design — 15.55pp at 57 tasks, 10.98pp at 114. Do not quote a 4pp delta as a finding at those sizes.
 - **Prefer tasks to trials.** `n` and `k` both shrink the noise, but trials within a task are correlated, so
   `k` shrinks less than `sqrt(k)` and the pass^k metric exists precisely because of that. 114 independent pairs
   resolve 10.98pp; 228 correlated trial pairs on 57 tasks claim 7.8pp and deliver less.

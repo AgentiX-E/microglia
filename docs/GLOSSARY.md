@@ -53,6 +53,18 @@ mutation: the items the store holds are untouched, so one dispatch can serve the
 the folded one from the same recall. Requires two distinct tasks behind a group; folding two records of
 one task would report a task as having been taught twice.
 
+> **Not to be confused with a fold of a cross-fit**, which is one *half* of a corpus read in one direction —
+> `official` learns from the 74 published train tasks and answers the 40 published test tasks, and
+> `official-swapped` does the reverse. The two meanings share a word because both are about putting two things
+> together; one folds items, the other folds a corpus. Where a sentence could be read either way, this record
+> says "fold (render)" or "fold (cross-fit)".
+
+**Fold record** — the file a cross-fit is actually run on: one fold's ledger, its two id sets and its treatment
+identity, composed from the run's pair artefact by `pnpm eval:fold-records`. It exists because a pair artefact
+can be silent about its learning half and its treatment — the reference arm has neither to state — and a pool
+that guessed would be checking nothing. Every value a record did not read from its own artefact is named in its
+`derivation` field, so the composition is auditable without re-running it.
+
 **Routine (shape)** — the ordered list of tool names a record states, without their arguments:
 `get_order_details > exchange_delivered_order_items`. The arguments are the instance, the sequence is
 the routine. This is the unit ExpeL's `UPVOTE` merges and the unit a workflow-shaped memory is organised

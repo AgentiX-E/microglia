@@ -1199,6 +1199,14 @@ export {
   type TreatmentOutcome,
 } from './cross-fit.js';
 export {
+  foldRecordsLine,
+  foldRecordsOf,
+  type FoldInput,
+  type FoldLedgerRow,
+  type FoldRecord,
+  type FoldRecordsOutcome,
+} from './fold-records.js';
+export {
   opportunitiesForEvidence,
   serveYieldCensus,
   serveYieldLine,

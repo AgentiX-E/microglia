@@ -1825,23 +1825,58 @@ the reference arm measured on the same task — and a model shown a procedure an
 model that never saw it. The line therefore opens `serve sweep (estimated, …)`, and a rung is *measured* only by
 the dispatch that runs it. What the estimate removes is the first dispatch of a two-dispatch loop.
 
-### 8.24 Two draws, not one: the variance the paired interval leaves out
+### 8.24 Two draws, not one: what a test–retest does and does not license
 
-`l4-pair`'s interval is McNemar's, computed on the discordant pairs of one dispatch. It is exact **conditional
-on the two runs**, and its `minDetectablePp` inherits that: it asks what a 5pp effect would need *if the control
-did not move*. The control moves — 17.5% of its tasks flipped between two dispatches of the same reference
-configuration — so the artefact now sits beside a reading that says so.
+`l4-pair`'s interval is McNemar's, computed on the discordant pairs of one dispatch. It is the variance of the
+**paired difference**: both arms' noise is inside it, and what it excludes is exactly the part the pairing
+cancels — the task-level difficulty the two arms share. A second dispatch of the same reference arm therefore
+measures something else: how stable one task's outcome is from one run to the next. On this lane, 17.5% of 57
+tasks flipped.
 
 | quantity | where it comes from | what it licenses |
 | --- | --- | --- |
 | `degradation.breakRate` | one dispatch | a description of the arm that ran |
-| `resolution.standardErrorPp` | within-run discordance | the conditional question |
-| the flip share of one arm across two dispatches | two artefacts, joined by task id | the unconditional one |
+| `resolution.standardErrorPp` | within-run discordance | the resolution of the paired delta — 15.55pp at 57, 10.98pp at 114 |
+| the flip share of one arm across two dispatches | two artefacts joined by task id | a check on whether the binomial model is adequate |
 
-The join is the same one `serveSplit` uses — `per_trial` keyed by `(id, trial)` — and it is free: two mechanism
-rounds leave two reference arms behind, and nobody had joined them. The rule this leaves is that **a lane which
-has never run one treatment twice has never measured the variance its intervals depend on**; the second
-reference dispatch is a $0.13 instrument that every later reading is priced against.
+The check comes out in favour of the model. Two *independent* draws at the rates the two control arms actually
+ran (0.8246, 0.8947) would disagree on `p₁(1−p₂) + (1−p₁)p₂ = 24.4%` of tasks; they disagreed on **17.5%**. The
+task outcomes are more stable across dispatches than independence predicts, which is the positive within-task
+correlation pairing exists to exploit (`1 − (5.36/6.47)² = 0.31` from the two standard errors, `1 −
+0.1754/0.2438 = 0.28` from the flip share).
+
+**The rule.** A variance is estimated from the design that produced the number it is quoted beside. Quoting the
+unpaired SD of two independent arm means (6.47pp) against the paired SE of one dispatch (5.36pp) compares two
+designs and reads the difference as a defect; this record made that comparison once and retracted it
+(`AUDIT 34.192`, and the user guide's §31.3 carries the arithmetic). What the second dispatch is worth is the
+check, and the check is cheap: $0.13 of off-peak inference against an interval every later reading is priced
+with.
 
 The two are not interchangeable levers: `n` shrinks both terms by `√n`, while `k` shrinks the per-arm term by
 `√k` only to the extent trials are independent — which is the question `pass^k` exists to raise, not to answer.
+
+### 8.25 A pool is run on fold records, and the composition is where the assumption lives
+
+`crossFitPool` asks each fold for three things: its per-task outcomes, the half its store learned from, and the
+treatment identity. Two of the three cannot exist on a reference arm — it learns nothing (`train: []`) and it
+serves nothing (no unit, form, scope or knobs) — so a guard that demanded them twice refused every pair artefact
+this lane had written (`AUDIT 34.191`). The pool is still right to refuse a fold that cannot state its learning
+half; what changed is that the statement now comes from a **composition step** rather than from a guard's
+assumption.
+
+| step | reads | writes | refuses when |
+| --- | --- | --- | --- |
+| `pnpm eval:fold-records` | two pair artefacts | two fold records under `eval/results/folds/` | the folds do not tile, a fold evaluates a task it learned from, the two folds state different treatments, a ledger counts two rows for one task |
+| `pnpm eval:cross-fit` | two fold records | `poc-cross-fit.json` | a fold states no learning half, two folds are two experiments, an id is evaluated twice |
+
+The composition's central move is that **one fold's learning half is the other's evaluation half** — true only
+because the two folds are one corpus read in opposite directions — so the tiling is verified before a record is
+written: each fold learned exactly what the other answered, and no fold answered a task it learned from. The
+half that was derived rather than read is named in the record's `derivation`, together with every treatment
+field carried from the sibling, because a value that reaches a pool without its source is a value nobody can
+audit.
+
+The two-step shape is not ceremony. A pool that read pair artefacts directly would have to decide, per field,
+whether silence meant "this arm has nothing to state" or "this artefact predates the field" — and both answers
+produce a number. A separate composition step puts that decision in one file, prints what it decided, and lets
+the pool keep refusing anything that arrives without it.
