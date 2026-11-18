@@ -61,7 +61,7 @@ describe('prereg-caps', () => {
   it('prints both caps, one per line, for the two variables the workflow reads', () => {
     const result = run(file(['trainTasks: 57', 'testTasks: 1']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=\nlimit=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=\nlimit=\npin=\ntaskSplit=\ntrainShare=\nqueryPin=\nrelease=\n');
   });
 
   it('prints the record ceiling beside the caps, which is the switch R85 lacked', () => {
@@ -70,13 +70,13 @@ describe('prereg-caps', () => {
     // by the last dispatch; R85's own 700 is what that costs -- twelve of twelve records clipped.
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'rawCeiling: 2000']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\nlimit=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\nlimit=\npin=\ntaskSplit=\ntrainShare=\nqueryPin=\nrelease=\n');
   });
 
   it('prints one empty line per variable when the registration pins nothing, so the variables stand', () => {
     const result = run(file([]));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=\ntest=\nceiling=\nbudget=\nlimit=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
+    expect(result.out).toBe('train=\ntest=\nceiling=\nbudget=\nlimit=\npin=\ntaskSplit=\ntrainShare=\nqueryPin=\nrelease=\n');
   });
 
   it('prints the capacity the inherited budget implies, so the pair is visible in the dispatch log', () => {
@@ -85,7 +85,7 @@ describe('prereg-caps', () => {
     // read by whoever looks at a run that served one record out of twelve.
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'rawCeiling: 2000', 'distillUnit: raw']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\nlimit=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=\nlimit=\npin=\ntaskSplit=\ntrainShare=\nqueryPin=\nrelease=\n');
     expect(result.err).toContain('ceiling 2000 is above budget 1200');
     expect(result.err).toContain('capacity is 810 chars/record');
   });
@@ -101,7 +101,7 @@ describe('prereg-caps', () => {
       ]),
     );
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=2400\nlimit=\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=2000\nbudget=2400\nlimit=\npin=\ntaskSplit=\ntrainShare=\nqueryPin=\nrelease=\n');
     expect(result.err).toContain('ceiling 2000 fits budget 2400 (capacity 2010 chars/record)');
   });
 
@@ -112,7 +112,7 @@ describe('prereg-caps', () => {
     // usually set together.
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'packBudget: 700', 'packLimit: 1']));
     expect(result.code).toBe(0);
-    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=700\nlimit=1\npin=\ntaskSplit=\nqueryPin=\nrelease=\n');
+    expect(result.out).toBe('train=57\ntest=1\nceiling=\nbudget=700\nlimit=1\npin=\ntaskSplit=\ntrainShare=\nqueryPin=\nrelease=\n');
   });
 
   it('prints the store pin when the registration freezes its learn half', () => {
@@ -121,7 +121,7 @@ describe('prereg-caps', () => {
     const result = run(file(['trainTasks: 57', 'testTasks: 1', 'storePin: eval/pins/r90-retail.json']));
     expect(result.code).toBe(0);
     expect(result.out).toBe(
-      'train=57\ntest=1\nceiling=\nbudget=\nlimit=\npin=eval/pins/r90-retail.json\ntaskSplit=\nqueryPin=\nrelease=\n',
+      'train=57\ntest=1\nceiling=\nbudget=\nlimit=\npin=eval/pins/r90-retail.json\ntaskSplit=\ntrainShare=\nqueryPin=\nrelease=\n',
     );
   });
 
@@ -141,7 +141,7 @@ describe('prereg-caps', () => {
     const result = run(file(['trainTasks: 74', 'testTasks: 40', 'taskSplit: official']));
     expect(result.code).toBe(0);
     expect(result.out).toBe(
-      'train=74\ntest=40\nceiling=\nbudget=\nlimit=\npin=\ntaskSplit=official\nqueryPin=\nrelease=\n',
+      'train=74\ntest=40\nceiling=\nbudget=\nlimit=\npin=\ntaskSplit=official\ntrainShare=\nqueryPin=\nrelease=\n',
     );
   });
 
@@ -175,7 +175,7 @@ describe('prereg-caps', () => {
     );
     expect(result.code).toBe(0);
     expect(result.out).toBe(
-      'train=57\ntest=1\nceiling=\nbudget=\nlimit=\npin=eval/pins/r90-retail.json\ntaskSplit=\nqueryPin=eval/pins/r92-retail-queries.json\nrelease=\n',
+      'train=57\ntest=1\nceiling=\nbudget=\nlimit=\npin=eval/pins/r90-retail.json\ntaskSplit=\ntrainShare=\nqueryPin=eval/pins/r92-retail-queries.json\nrelease=\n',
     );
   });
 
@@ -191,6 +191,36 @@ describe('prereg-caps', () => {
     expect(result.code).toBe(1);
     expect(result.err).toContain("header 'taskSplit'");
     expect(result.err).toContain('is not one of official');
+  });
+
+  it('prints the share this lane cuts its own boundary at, where a registration states one', () => {
+    // R142: the boundary between the half a store learns from and the half it is scored on. It has been a
+    // repository variable since the lane was written, which is the defect class the store pin and the serve
+    // floor were moved out of: a cut that moved between dispatches makes two numbers incomparable without
+    // anything in either artefact saying why.
+    const result = run(file(['trainTasks: 57', 'testTasks: 57', 'trainShare: 0.5']));
+    expect(result.code).toBe(0);
+    expect(result.out).toContain('trainShare=0.5\n');
+  });
+
+  it('refuses a share spelled as a word, a percentage or a number outside the open interval', () => {
+    // Four spellings and two endpoints. `half` and `50%` are the same number written in a way no later
+    // comparison can hold a run to, and zero and one are the two shares that make the halves one half.
+    for (const spelling of ['half', '50%', '1', '0', '1.5']) {
+      const result = run(file(['trainTasks: 57', 'testTasks: 57', `trainShare: ${spelling}`]));
+      expect(result.code, spelling).toBe(1);
+      expect(result.err).toContain('strictly between zero and one');
+    }
+  });
+
+  it('refuses a registration that names both the split and its share', () => {
+    // One line would read the share and the other would ignore it: the benchmark's halves are not cut by a
+    // number, so a registration naming both has stated a boundary it cannot have.
+    const result = run(
+      file(['trainTasks: 74', 'testTasks: 40', 'taskSplit: official', 'trainShare: 0.5']),
+    );
+    expect(result.code).toBe(1);
+    expect(result.err).toContain('names the split or its share, never both');
   });
 
   it('refuses half a pin instead of letting a variable decide the other half', () => {

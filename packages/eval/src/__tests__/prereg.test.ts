@@ -2034,6 +2034,56 @@ describe('taskSplit, whose halves an arm runs on', () => {
   });
 });
 
+describe('trainShare, where this lane cuts its own boundary', () => {
+  const HEADER = [
+    '---',
+    'id: R142-the-other-cut',
+    'step: R142',
+    'opened: 2026-11-18',
+    'arms: memory',
+    'sample: 114',
+    'gates: V1',
+    '---',
+    '',
+  ].join('\n');
+  const BODY =
+    '## Prediction\n\n- the held-out half is the complement of the learn half\n\n' +
+    '## Refutation\n\n- a learner that saw the held-out tasks proves the share was not read\n';
+
+  function withHeader(extra: string): string {
+    return `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${BODY}`;
+  }
+
+  it('reads the share as a number, because a later dispatch compares it to a variable', () => {
+    const reading = readPrereg(withHeader('trainShare: 0.5'), 'R142-the-other-cut.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.trainShare).toBe(0.5);
+  });
+
+  it('refuses a share spelled as a word or a percentage, and both endpoints of the interval', () => {
+    // Five spellings of two facts: `half` and `50%` are the same number written so that nothing can hold a
+    // run to it, and zero and one are the shares that make the two halves one half.
+    for (const bad of ['half', '50%', '0', '1', '1.5']) {
+      expect(problemsOf(withHeader(`trainShare: ${bad}`), 'R142-the-other-cut.md')).toEqual([
+        `header 'trainShare': '${bad}' is not a share strictly between zero and one`,
+      ]);
+    }
+  });
+
+  it('refuses a registration that names both the split and its share', () => {
+    // One header would be read and the other ignored: the benchmark's halves are not cut by a number.
+    expect(
+      problemsOf(withHeader('taskSplit: official\ntrainShare: 0.5'), 'R142-the-other-cut.md'),
+    ).toEqual(["headers 'taskSplit' and 'trainShare': a registration names the split or its share, never both"]);
+  });
+
+  it('leaves the field absent when the arm runs the lane default, which every earlier arm did', () => {
+    const reading = readPrereg(withHeader('rawCeiling: 2000'), 'R142-the-other-cut.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.trainShare).toBeUndefined();
+  });
+});
+
 describe('storePin, the learn half as a file', () => {
   const HEADER = [
     '---',

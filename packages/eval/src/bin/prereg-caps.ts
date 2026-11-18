@@ -66,8 +66,18 @@ function main(): void {
     for (const problem of reading.problems) refuse(`at ${problem.where}: ${problem.problem}`);
     return;
   }
-  const { trainTasks, testTasks, rawCeiling, packBudget, packLimit, storePin, taskSplit, queryPin, release } =
-    reading.prereg;
+  const {
+    trainTasks,
+    testTasks,
+    rawCeiling,
+    packBudget,
+    packLimit,
+    storePin,
+    taskSplit,
+    trainShare,
+    queryPin,
+    release,
+  } = reading.prereg;
   // A ceiling the declared pack cannot carry is refused here rather than priced: the arm would write
   // records the renderer drops, every one of which reads as a request with nothing relevant, and the
   // dispatch costs more than the check does. Only a registration that states both is refused -- see
@@ -102,6 +112,10 @@ function main(): void {
   process.stdout.write(`taskSplit=${taskSplit === undefined ? '' : taskSplit}\n`);
   // R92: the question, when the arm holds it. Empty means the queries were the ones the simulator drew,
   // which is what every arm before R92 did and what an arm quoting an absolute number must keep doing.
+  // R142: the boundary this lane cuts itself, when the registration states one. Empty means the lane's own
+  // 0.5, which is what every arm before this header ran with — printed only when stated, for the reason the
+  // store pin is: a default that no registration authored must not appear in the record as if one had.
+  process.stdout.write(`trainShare=${trainShare === undefined ? '' : String(trainShare)}\n`);
   process.stdout.write(`queryPin=${queryPin === undefined ? '' : queryPin}\n`);
   // R92: the release this number is a number *of*. Empty means the registration makes no claim, which is
   // true of every arm before R92; a value is compared against the release the workflow pinned, so the

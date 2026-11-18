@@ -1638,7 +1638,10 @@ jobs:
           # word is `empty-pack` rather than `true` because the arm's claim is that the emptiness was
           # declared before the first episode rather than discovered after it.
           TAU_SCAFFOLD: ${{ github.event.inputs.l4_arms == 'scaffold' && 'empty-pack' || '' }}
-          TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
+          # R142: the registration first, the menu second, the repository variable last. A share is the
+          # boundary between the half a store learns from and the half it is scored on, so a dispatch whose
+          # cut came from whichever variable was last edited would produce a number with no predecessor.
+          TAU_TRAIN_SHARE: ${{ steps.recall_floor.outputs.trainShare || github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
           # One task at a time, because the two numbers are in different units.
           #
           # `max_concurrency` is tau2's TASK count; the provider's limit is a REQUEST count, and one
@@ -1748,7 +1751,10 @@ jobs:
           MICROGLIA_PACK_KNOBS: ${{ steps.recall_floor.outputs.knobs }}
           TAU_SEED: ${{ vars.TAU_SEED }}
           TAU_MAX_CALLS: ${{ vars.TAU_MAX_CALLS }}
-          TAU_TRAIN_SHARE: ${{ github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
+          # R142: the registration first, the menu second, the repository variable last. A share is the
+          # boundary between the half a store learns from and the half it is scored on, so a dispatch whose
+          # cut came from whichever variable was last edited would produce a number with no predecessor.
+          TAU_TRAIN_SHARE: ${{ steps.recall_floor.outputs.trainShare || github.event.inputs.l4_train_share || vars.TAU_TRAIN_SHARE || '0.5' }}
           # One task at a time, for the reason spelled out on the memory arm above: `max_concurrency`
           # counts tasks and the provider limits requests, and an episode holds three at once.
           TAU_CONCURRENCY: ${{ vars.TAU_CONCURRENCY || '1' }}

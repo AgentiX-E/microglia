@@ -397,6 +397,20 @@ export type Prereg = {
    */
   readonly taskSplit?: string;
   /**
+   * The share of the pool the learning half takes, on a split this lane cuts itself.
+   *
+   * R142. `TAU_TRAIN_SHARE` has existed since the lane was written and no registration has ever stated
+   * it, so the boundary between learning and evaluation has been a repository variable — the same defect
+   * class the store pin and the serve floor were moved out of for: a dispatch that changes the held-out
+   * population without saying so produces a number nobody can compare to its predecessor.
+   *
+   * Stated as a share rather than as counts, because the pool is the corpus's: `0.5` over retail's 114
+   * tasks is 57/57 and stays 57/57 when the corpus is re-listed, which two counts would not. Refused
+   * together with `taskSplit`, because the benchmark's own halves are not cut by a share and a header
+   * that named both would be read by one line and ignored by the other.
+   */
+  readonly trainShare?: number;
+  /**
    * The benchmark release this registration's number is about.
    *
    * R92. The port to v1.0.1 was forced by a dispatch that died on a file v0.2.0 does not ship, and by the
@@ -535,6 +549,7 @@ const HEADER_KEYS = [
   'packLimit',
   'storePin',
   'taskSplit',
+  'trainShare',
   'queryPin',
   'release',
   'packMode',
@@ -1422,6 +1437,37 @@ export function readPrereg(markdown: string, file: string): PreregReading {
   }
 
   /**
+   * The share this lane cuts its own boundary at, when the arm states one.
+   *
+   * A share is a decimal and nothing else: `half`, `50%` and `0.5` are three spellings of one number and
+   * only one of them is a number, which is the rule `taskSplit` follows for the same reason — a header a
+   * later dispatch compares against a variable must not be interpretable in two ways. Zero and one are
+   * refused by value rather than by range: a share of one holds nothing out, and a share of zero learns
+   * from nothing, and both would produce a run whose two halves are one half.
+   */
+  const trainShareText = values.get('trainShare');
+  let trainShare: number | undefined;
+  if (trainShareText !== undefined) {
+    const parsed = /^0?\.[0-9]+$/.test(trainShareText) ? Number(trainShareText) : Number.NaN;
+    if (!Number.isFinite(parsed) || parsed <= 0 || parsed >= 1) {
+      collected.push({
+        where: `header 'trainShare'`,
+        problem: `'${trainShareText}' is not a share strictly between zero and one`,
+      });
+    } else {
+      trainShare = parsed;
+    }
+  }
+  // Both would be read by one line and ignored by the other: the benchmark's halves are not cut by a
+  // share, and a registration that names both has stated a boundary it cannot have.
+  if (trainShare !== undefined && taskSplit !== undefined) {
+    collected.push({
+      where: `headers 'taskSplit' and 'trainShare'`,
+      problem: 'a registration names the split or its share, never both',
+    });
+  }
+
+  /**
    * The query pin, held to the same rule as the store pin.
    *
    * Same directory, same restriction, same reason: a header read by a paid dispatch must not be able to
@@ -1642,6 +1688,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(packLimit === undefined ? {} : { packLimit }),
       ...(storePin === undefined ? {} : { storePin }),
       ...(taskSplit === undefined ? {} : { taskSplit }),
+      ...(trainShare === undefined ? {} : { trainShare }),
       ...(queryPin === undefined ? {} : { queryPin }),
       ...(release === undefined ? {} : { release }),
       ...(packMode === undefined ? {} : { packMode }),
