@@ -3073,12 +3073,17 @@ The four reasons, and what each one means for your run:
 | `boundary-disagrees` | the boundary exists but is not a partition — it repeats, decreases, starts past the ledger, or does not match the trial count | the numbers in the sentence; the first and last are usually enough |
 | (absent field) | `serveSplitAbsent` in the pair artefact carries the same sentence in machine-readable form | the artefact, not the log |
 
-### 19.2 The two checks that make it trustworthy
+### 19.2 The three checks that make it trustworthy
 
-- **A field either arm emitted is in its artefact.** The projection table is typed so that a plain field cannot
-  be forgotten; a field added through a spread is exempt, which is how two blocks were dropped. A record that
+- **A field either arm emitted is in its artefact.** The projection table is typed so that a *declared* field
+  cannot be forgotten; a field added through a spread is exempt, which is how three blocks were dropped and why
+  the rule is that a field is declared on the record's type in the same edit that emits it. A record that
   carries an undecided key reports it, and the pair's `l4-projection-complete` gate fails the arm. If you see
   that gate red, the arms are fine and the projection needs a decision for the named keys.
+- **A reading the artefact declares is a reading its own ledger accounts for.** `l4-rotation-reconciles` compares
+  a serving policy's numbers with the ids the same file's `pack.ledger` carries, and blocks on a disagreement. It
+  also prints the fields it cannot reach — `mode` is a policy and no ledger holds one — so a green row says what
+  it checked, not that everything was checked. See §32.5.
 - **The split reproduces the arm rate when nothing is withheld.** On an arm with no gate, every episode lands in
   the served bucket, so `serve split: served` must equal the arm's own episode rate. If it does not, the join has
   mis-assigned requests and every gated split in the record is unreadable.
