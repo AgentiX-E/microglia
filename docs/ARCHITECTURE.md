@@ -1928,3 +1928,18 @@ own control. That failure is made visible rather than prevented: `maxRenders` be
 whether the bound was ever reached, and `starved` separates a rotation that spent the store from a store that had
 nothing to say. A policy whose own reading cannot say whether it acted is the defect this record has repaired four
 times at other layers.
+
+**Two guards, and the one this round got past.** A field reaches an arm record through a spread, which TypeScript
+exempts from the excess-property check: `Tau2Raw` is the type `PROJECTION` is exhaustive over, so a field the type
+does not declare is a field no table has to decide about, and the compile-time guard never fires. The runtime guard
+(`armRecordFromDriver` names every key without a decision, and the pair refuses such an arm) is the backstop that
+caught it — one paid dispatch late. The rule that follows is not "be careful": it is that **a field emitted through
+a spread has to be declared on `Tau2Raw` in the same edit**, because that declaration is what makes the table's
+exhaustiveness mean anything.
+
+The reading has its own version of the same trap, and it is the more dangerous one. The report is built from
+`rotation.reading()`, a snapshot; taken beside the ledger it is taken before the loop, and the counter reads zero.
+The block then describes a phase that served forty packs as one that served none, next to a log line that says
+otherwise — and the artefact is the file that survives, so the disagreement resolves against the truth. The rule is
+that a reading is read once, after the phase, and the same object feeds both the log line and the artefact. Two
+reads of one ledger are two chances to disagree; one read cannot.

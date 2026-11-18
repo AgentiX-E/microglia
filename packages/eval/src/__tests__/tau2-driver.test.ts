@@ -50,6 +50,19 @@ if (phase === 'selftest') {
 } else {
   const tasks = (read('--tasks') || '').split(',').filter(Boolean);
   const trials = Number(read('--trials') || 1);
+  const memoryUrl = read('--memory-url');
+  // R152: the one thing this stand-in never did was ask the memory. The facade is a real HTTP server in the
+  // driver's process, so an episode-shaped GET is all it takes to exercise the serving path -- and without it
+  // the whole reading that a served pack produces (the pack census, the served sizes, the travel budget's
+  // ledger) is measured at zero by every case in this file while every case still passes. Opt-in per case:
+  // turning it on for all of them would change what twenty-three existing assertions are asserting.
+  const ask = async () => {
+    if (memoryUrl === undefined || !process.env.TAU_STUB_RECALL) return;
+    for (let index = 0; index < tasks.length * trials; index += 1) {
+      const task = tasks[index % tasks.length];
+      await fetch(memoryUrl + '/v1/recall?task=tau2.act&text=' + encodeURIComponent('task ' + task));
+    }
+  };
   const simulations = [];
   for (const taskId of tasks) {
     for (let trial = 0; trial < trials; trial += 1) {
@@ -58,6 +71,7 @@ if (phase === 'selftest') {
       simulations.push({ task_id: taskId, trial, reward_info: { reward } });
     }
   }
+  ask().then(() => {
   // Every task states the tool call it expects, which is what a correction is learned from: a task
   // without criteria teaches nothing and would make the learning half look empty for a reason that
   // has nothing to do with the provider.
@@ -83,6 +97,7 @@ if (phase === 'selftest') {
       },
     }) + '\\n',
   );
+  });
 }
 `;
 
@@ -203,6 +218,73 @@ describe('the L4 driver', () => {
       delete process.env['TAU_WORKDIR'];
       delete process.env['DEEPSEEK_API_KEY'];
       delete process.env['TAU_DISTILL_MODEL'];
+    }
+  }, 60_000);
+
+  it('declares the travel budget before the phase and carries what it did afterwards', async () => {
+    // R152's defect, at the layer that could have caught it for free. The field entered the record through a
+    // spread, `Tau2Raw` did not declare it, and `PROJECTION` — exhaustive over a type that no longer described
+    // the record — stayed silent, so a paid dispatch was the first reader. The guard above (`unprojected`) was
+    // already here and could not fire, because it only sees keys the record actually emits and the switch was
+    // unset in every case. That is the general shape of the miss: a *conditional* field whose branch is off in
+    // the whole suite is invisible to both guards, so the switch has to be on somewhere.
+    const { dir, executable } = stubRunner();
+    process.env['TAU_PYTHON'] = executable;
+    process.env['TAU_MEMORY'] = 'true';
+    process.env['TAU_TRIALS'] = '4';
+    process.env['TAU_TRAIN_SHARE'] = '0.5';
+    process.env['TAU_DISTILL_UNIT'] = 'raw';
+    process.env['TAU_WORKDIR'] = dir;
+    process.env['DEEPSEEK_API_KEY'] = 'test-key';
+    process.env['TAU_DISTILL_MODEL'] = 'deepseek/deepseek-chat';
+    process.env['TAU_SERVE_ROTATION'] = 'fair-share';
+    // The stand-in asks the memory once per episode, which is what makes the ledger non-empty. Without it the
+    // reading below is `requests: 0` and every assertion about the bound would be vacuous.
+    process.env['TAU_STUB_RECALL'] = '1';
+    vi.stubGlobal('fetch', async () => {
+      throw new Error('a raw arm must not call a model');
+    });
+    const said: string[] = [];
+    const write = vi
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: string | Uint8Array): boolean => {
+        said.push(String(chunk));
+        return true;
+      });
+    try {
+      const driver = await import('../bin/tau2-driver.js?case=rotation');
+      await driver.run();
+      const record = driver.instrument();
+      // Two held-out tasks at four trials each is eight requests, and the cap is arithmetic over them and the
+      // store this arm built — neither is asserted as a constant, because the second is the run's own number.
+      expect(record?.serveRotation?.mode).toBe('fair-share');
+      expect(record?.serveRotation?.requests).toBe(8);
+      expect(typeof record?.serveRotation?.cap).toBe('number');
+      // The identity that ties the artefact to the phase: one `next()` per recall, so a reading taken at the
+      // wrong moment disagrees with the tally the same facade counted. This is the assertion that separates
+      // "the rotation is wired" from "the rotation's numbers describe the run" — the report used to be built
+      // beside the ledger, before the loop, and shipped `requests: 0` beside a log line saying forty.
+      expect(record?.serveRotation?.requests).toBe(record?.recall?.requests);
+      expect(record?.serveRotation?.renders).toBeGreaterThan(0);
+      // The identity is stated before the first episode and the reading after the last: a policy announced
+      // afterwards would describe a run that had already happened without it.
+      expect(said.join('')).toContain('[tau2] serve rotation: fair share declared, cap ');
+      expect(said.join('')).toContain('[tau2] serve rotation: cap ');
+      // The field that reached a dispatch with no decision, which is the reason this case exists.
+      expect(record?.unprojected).toBeUndefined();
+    } finally {
+      write.mockRestore();
+      vi.unstubAllGlobals();
+      delete process.env['TAU_PYTHON'];
+      delete process.env['TAU_MEMORY'];
+      delete process.env['TAU_TRIALS'];
+      delete process.env['TAU_TRAIN_SHARE'];
+      delete process.env['TAU_DISTILL_UNIT'];
+      delete process.env['TAU_WORKDIR'];
+      delete process.env['DEEPSEEK_API_KEY'];
+      delete process.env['TAU_DISTILL_MODEL'];
+      delete process.env['TAU_SERVE_ROTATION'];
+      delete process.env['TAU_STUB_RECALL'];
     }
   }, 60_000);
 

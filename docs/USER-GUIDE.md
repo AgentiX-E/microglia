@@ -4097,3 +4097,27 @@ serve rotation: absent (no request was made; fair share over 11 item(s) is unmea
 
 `max` beside `cap` is the number that keeps an inert arm honest: `max 3` under `cap 4` says the ranking never
 reached the bound, so the dispatch ran as its own control.
+
+### 32.5 When the numbers are written
+
+The block is filled **after** the phase, from one reading:
+
+```ts
+const rotationReading = rotation?.reading();          // after the loop, not beside the ledger
+if (rotationReading !== undefined) write(rotationLine(rotationReading));
+const report = { mode, ...(rotationReading ?? {}) };  // the same object the line printed
+```
+
+One read, used twice, because the two consumers are read by different people at different times and a disagreeing
+pair is worse than either alone. The first version built the report beside the ledger — before the loop — which is
+the natural place for `mode` and the wrong place for the reading: it shipped `requests: 0` and `maxRenders: 0`
+beside a log line saying forty renders over fourteen items. The log is what a readback greps; the artefact is what
+survives.
+
+Two consequences worth knowing when you read an artefact:
+
+- `serveRotation` is absent on an arm that declared no policy, and `{ mode: 'off' }` on an arm that declared the
+  identity. An arm whose block is missing entirely is not "the default"; it is a run that never heard of the switch.
+- If the block is present but `requests` is `0` while the phase served packs, the file is from a build older than
+  this section. Read the cap from `pack.summary` and the renders from the run log, and treat the fold as
+  un-poolable rather than re-deriving its policy.

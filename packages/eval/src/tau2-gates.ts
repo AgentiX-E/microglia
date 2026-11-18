@@ -62,6 +62,7 @@ import type {
 import type { StoreItemSample } from './store-items.js';
 import type { QueryCensus } from './tau2-queries.js';
 import type { RehearsalRecord } from './tau2-rehearsal.js';
+import type { ServeRotationReport } from './serve-rotation.js';
 
 /**
  * One arm's records, as far as the protocol is concerned.
@@ -301,6 +302,18 @@ export type Tau2ArmRecord = {
     readonly margin_ladder?: Readonly<Record<string, number>>;
   };
   readonly injectionNote?: InjectionNoteRecord;
+  /**
+   * R152: the travel budget the arm declared, and what the bound did to the phase.
+   *
+   * Two fields in one block because a readback asks them in order: *which policy was this* (the identity a
+   * fold pools on, where an undeclared arm is `none` and a declared identity is `off`, two different
+   * experiments) and *did the bound bite* (`cap`, `max`, `exhausted`, `starved`). A `cap` alone cannot
+   * distinguish "nothing was withheld" from "the store could serve nothing".
+   *
+   * Absent on every artefact written before the switch: absence is the identity, and a `mode: 'off'`
+   * written everywhere would be a measured statement about arms that never declared a policy.
+   */
+  readonly serveRotation?: ServeRotationReport;
   /**
    * How far the pipeline from a correction to a servable rule got, when the driver counted it.
    *

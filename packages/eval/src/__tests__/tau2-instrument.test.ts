@@ -574,6 +574,20 @@ describe('the projection has a decision for every field, and keeps it', () => {
         },
       },
       recall: { requests: 200, served: 200, empty: 0 },
+      // R152's travel budget: the field that reached a paid dispatch without a decision, because it
+      // entered the record through a spread and `Tau2Raw` never declared it. The fixture states it so
+      // the `carried` decision is exercised rather than merely written down.
+      serveRotation: {
+        mode: 'fair-share',
+        cap: 3,
+        requests: 40,
+        servable: 14,
+        distinct: 13,
+        renders: 40,
+        exhausted: ['retail/12', 'retail/29'],
+        starved: 0,
+        maxRenders: 3,
+      },
       // R93: the rows behind `unscored`. The fixture holds one for the same reason it holds every
       // other carried field — a decision is only checked against the fields the fixture defines, so
       // a fixture without it would let the projection drop it silently.
@@ -916,6 +930,38 @@ describe('the projection has a decision for every field, and keeps it', () => {
     // passed through its argument is overwritten by the fixture's copy — the same trap that once made
     // three tests assert the fixture's value instead of the case's.
     expect(armRecordFromDriver({ ...full(), pack }).pack).toEqual(pack);
+  });
+
+  it('carries the travel budget, which reached a paid dispatch with no decision at all', () => {
+    // R152 emitted `serveRotation` through a spread, `Tau2Raw` did not declare it, and `PROJECTION` — exhaustive
+    // over a type that no longer described the record — stayed silent. The pair refused the arm after the run
+    // (`FAIL l4-projection-complete: memory: serveRotation`), which is the guard working one dispatch too late.
+    // The test holds both halves: the field the fixture states reaches the artefact, and the two fields of the
+    // block survive together, because a `cap` without a `mode` cannot say which policy produced it.
+    const serveRotation = {
+      mode: 'fair-share' as const,
+      cap: 4,
+      requests: 40,
+      servable: 11,
+      distinct: 11,
+      renders: 40,
+      exhausted: ['retail/3'],
+      starved: 0,
+      maxRenders: 4,
+    };
+    const record = armRecordFromDriver({ ...full(), serveRotation });
+    expect(record.serveRotation).toEqual(serveRotation);
+    expect(record.serveRotation?.mode).toBe('fair-share');
+    expect(record.serveRotation?.maxRenders).toBe(4);
+  });
+
+  it('writes no travel budget on an arm that declared none, because absence is the identity', () => {
+    // The switch's default is "the driver excludes nothing", and every committed artefact before R152 ran with
+    // it unset. A `mode: 'off'` written on every arm would be a measured statement about runs that never
+    // declared a policy, and it would also be indistinguishable from a rotation arm that bound nothing -- the
+    // distinction `rotationModeOf` exists to keep (`none` against `off`).
+    const { serveRotation: _dropped, ...rest } = full();
+    expect(armRecordFromDriver(rest as Tau2Raw)).not.toHaveProperty('serveRotation');
   });
 
   it('carries every field it says it carries', () => {

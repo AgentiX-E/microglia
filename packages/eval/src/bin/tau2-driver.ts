@@ -2234,11 +2234,6 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         ? rotationCapOf({ requests: test.length * TRIALS, servable: census.servable })
         : undefined;
     const rotation = rotationCap === undefined ? undefined : new ServeRotationLedger(rotationCap);
-    // The report and the ledger are two objects on purpose: the mode is what the dispatch declared and belongs in
-    // the artefact whether or not a ledger ran, while the reading only exists for a policy that acted. `off`
-    // therefore ships `{ mode: 'off' }` and is distinguishable from an arm that never mentioned the switch.
-    const rotationReport: ServeRotationReport | undefined =
-      ROTATION.mode === undefined ? undefined : { mode: ROTATION.mode, ...(rotation?.reading() ?? {}) };
     if (rotationCap !== undefined) {
       process.stdout.write(
         `[tau2] serve rotation: fair share declared, cap ${String(rotationCap.cap)} per item ` +
@@ -2376,9 +2371,23 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // Printed after the phase, so the line reports what the rotation did rather than what it intended: the
     // reading carries the renders each item actually took, and a cap the ranking never reached is visible as
     // `max 3` under `cap 4` — the check that the arm bound anything at all.
-    if (rotation !== undefined) {
-      process.stdout.write(`[tau2] ${rotationLine(rotation.reading())}\n`);
+    //
+    // One read, used twice. The report was first built beside the ledger — before the loop — which is the
+    // natural place for the mode and the wrong place for the reading: it shipped `requests: 0`, `renders: 0`,
+    // `exhausted: []` and `maxRenders: 0` beside a log line that said forty renders over fourteen items. The
+    // artefact would have been the only file in the lane that disagreed with its own run, and the test that
+    // caught it asserted the request count against the requests the phase made.
+    const rotationReading = rotation?.reading();
+    if (rotationReading !== undefined) {
+      process.stdout.write(`[tau2] ${rotationLine(rotationReading)}\n`);
     }
+    // The report and the ledger are two objects on purpose: the mode is what the dispatch declared and belongs in
+    // the artefact whether or not a ledger ran, while the reading only exists for a policy that acted. `off`
+    // therefore ships `{ mode: 'off' }` and is distinguishable from an arm that never mentioned the switch.
+    const rotationReport: ServeRotationReport | undefined =
+      ROTATION.mode === undefined
+        ? undefined
+        : { mode: ROTATION.mode, ...(rotationReading ?? {}) };
     return {
       // The three arguments this facade was asked for, so a second phase can serve the same memory without
       // restating them. Recorded from the parameters rather than from the branch that called them.

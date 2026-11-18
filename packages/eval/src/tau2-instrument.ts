@@ -39,6 +39,7 @@
 import type { PhaseCacheCensus } from "./cache-census.js";
 import type { FaithfulnessCensus } from "./tau2-faithfulness.js";
 import type { RehearsalRecord } from "./tau2-rehearsal.js";
+import type { ServeRotationReport } from "./serve-rotation.js";
 import type { RawLogCensus } from "./tau2-rawlog.js";
 import { defaultPolicy } from "@agentix-e/microglia-core/kernel";
 import type { FunnelInput } from "@agentix-e/microglia-protocol";
@@ -324,6 +325,22 @@ export type Tau2Raw = {
   readonly store?: StoreCensus;
   /** What the facade was asked for, and how often it had an answer. */
   readonly recall?: RecallTally;
+  /**
+   * What the travel budget did, beside the recall it acted on.
+   *
+   * Declared here rather than left to the record's spread, and that is the whole point of the entry.
+   * R152 emitted this field from a `...(primary.rotation === undefined ? {} : …)` spread, which
+   * TypeScript exempts from the excess-property check, so `keyof Tau2Raw` did not grow, `PROJECTION`
+   * stayed exhaustive over a type that no longer described the record, and the omission went out to a
+   * dispatch. The runtime guard caught it — the pair refused the arm with
+   * `FAIL l4-projection-complete: memory: serveRotation` — but a guard that fires after the run is a
+   * guard that costs the run. Naming the field here moves the same refusal to `tsc`, which is where
+   * the table's own comment always claimed it happened.
+   *
+   * Absent on every arm that declared no policy, which is every arm before R152: the identity is
+   * absence, not `mode: 'off'`, so a comparison against an older artefact stays byte-identical.
+   */
+  readonly serveRotation?: ServeRotationReport;
   /**
    * What the pack served and what it refused, which `recall.empty` cannot separate.
    *
@@ -923,6 +940,9 @@ export const PROJECTION: {
   // cases, and a block the record dropped would leave a phase that cost an hour with nowhere to land.
   rehearsal: "carried",
   recall: "carried",
+  // Carried verbatim: the policy is the fold's identity and the reading is the only record of what the bound
+  // did. Reduced or dropped, a rotation arm would be indistinguishable from the arm it is compared against.
+  serveRotation: "carried",
   useObservations: "reduced",
   coverageObservations: "reduced",
   inaction: "carried",
@@ -1175,6 +1195,9 @@ export function armRecordFromDriver(
       ? {}
       : { declaredEmptyStore: raw.declaredEmptyStore }),
     ...(raw.recall === undefined ? {} : { recall: raw.recall }),
+    // R152: carried beside the recall for the same reason. Absent rather than `{ mode: 'off' }` on an arm that
+    // declared nothing, so every artefact written before the switch keeps the shape it had.
+    ...(raw.serveRotation === undefined ? {} : { serveRotation: raw.serveRotation }),
     ...(raw.pack === undefined ? {} : { pack: raw.pack }),
     ...(raw.memory === undefined ? {} : { memory: raw.memory }),
     ...(raw.turnCensus === undefined ? {} : { turnCensus: raw.turnCensus }),
