@@ -1756,3 +1756,30 @@ share from the population end.
 | `unattributed` is a counted field | dropping unlabelled renders: the census would then report a population it did not read |
 | `contested` cross-cuts the net buckets | a fourth bucket: a task at net zero after one of each is not the same reading as a task with no movement, and a bucket would force a choice between two true statements |
 | three line forms, one per state | one form with zeros: `0 task(s) reached` is the collapse of absent into zero that cost this lane two dispatches |
+
+### 8.22 A treatment has three axes, and the pool compares all of them
+
+`packMode` (where a pack is served from), `packShape` (the unit it is written in) and `serveAnchor` (what may
+appear inside it) are resolved by three modules and joined by one pure function:
+
+```
+knobFragment({mode, shape, anchor}) -> "anchoring=lexical&shape=collapse&..."   (or "")
+```
+
+Empty is a fact the lane preserves byte for byte: the retrieved arm's request must stay identical to the one every
+committed artefact was written with, or the history stops being comparable to the future.
+
+**The join is a function, not a bin.** It was code inside `eval:pack-knobs` for one hour, which meant the rule it
+enforces — a prefix arm cannot carry a lexical anchor, because `anchoring=scope` and `anchoring=lexical` would
+collide in one query string and the last key would win in silence — could only be checked by spawning a process.
+A rule checked by four process launches is a rule checked intermittently.
+
+| decision | the alternative, and why not |
+| --- | --- |
+| the anchor is its own axis | a third `PackMode`: that type's contract says its names are places, and a filter on what appears inside a place is a different question |
+| `declared` distinguishes "the default" from "unsaid" | inferring it from an empty knob string: two different facts about a run, one representation |
+| the knob string is an identity field | re-deriving `anchor` from `anchoring=…`: a second reader of a vocabulary that lives in one module |
+| absent and `''` both normalise to `none` | treating them as different: every artefact before the field would be refused by every pool |
+
+**And the record.** `tau2.pack.knobs` carries the string verbatim. It is the only trace of the filter once the
+request is made, and it is what makes "which serving did this artefact measure" answerable without reading a log.

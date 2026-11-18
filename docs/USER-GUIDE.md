@@ -3792,3 +3792,65 @@ project has paid for that confusion twice.
 carries `supportTasks` as a *count*, not as a list of ids, so a record's provenance is not in the artefact. The
 join grain `(record, task)` now exists; the provenance is the next instrument, and until it lands, a claim's
 text can be read against the task it was served into but not against the tasks it came from.
+
+---
+
+## 29. The three axes of a serve, and the fourth thing a registration fixes
+
+A memory pack is a function of three things: the store, the query, and the options the dispatch fixed. The options
+are separate switches, and a registration may name any of them.
+
+| axis | question | values | default |
+| --- | --- | --- | --- |
+| `packMode` | **where** is the pack served from | `retrieved` (by relevance, under a budget) / `prefix` (every admitted entry, into the system prompt) | retrieved |
+| `packShape` | **what unit** is it written in | `per-failure` (one line per failure) / `collapse` (one per routine) | whatever the distiller wrote |
+| `serveAnchor` | **what may appear inside it** | `lexical` (a rule must share a word with the request) / `scope` (structure alone may justify it) | scope |
+
+### 29.1 Why the third axis exists
+
+`scope` lets a rule appear because its scope matched, even when it shares no word with the request. `lexical`
+requires one word in common. The difference is not stylistic: it is the guard against the failure mode the 2026
+literature attributes most memory harm to — a *valid* rule applied outside the situation it was learned in.
+WikiTrace (arXiv 2611.14320) traces 52% of degradation events to a followed memory entry, and of those, 80% to a
+valid insight misapplied rather than an outright wrong one.
+
+### 29.2 How to ask for it
+
+```yaml
+serveAnchor: lexical
+```
+
+One header line. It becomes `anchoring=lexical` on the recall request, the arm's artefact records the whole knob
+string under `tau2.pack.knobs`, and the cross-fit pool treats it as part of the treatment's identity.
+
+| you wrote | the request carries | the artefact records |
+| --- | --- | --- |
+| nothing | no `anchoring` parameter (byte-identical to every earlier run) | `knobs: ''` |
+| `serveAnchor: scope` | no `anchoring` parameter | `knobs: ''`, and the registration says the default was chosen |
+| `serveAnchor: lexical` | `anchoring=lexical` | `knobs: 'anchoring=lexical'` |
+
+The middle row is the interesting one: naming the default changes nothing on the wire and everything in the
+record. That is deliberate — a run that *relies* on a default should be able to say so.
+
+### 29.3 The combination that is refused
+
+```
+a prefix arm renders every admitted entry, so a lexical anchor has nothing to filter:
+TAU_PACK_MODE=prefix and TAU_SERVE_ANCHOR=lexical cannot both be honoured
+```
+
+Both knobs would land in one query string (`anchoring=scope` from the mode, `anchoring=lexical` from the anchor) and
+the last key would win in silence. The refusal happens where the three plans are joined, before a model call.
+
+### 29.4 What the pool does with it
+
+A fold's treatment is its identity: unit, form, scope, model, trace ceiling — and now the knob string. Two folds
+served through two filters are two experiments, and pooling them would report a mean about a serving neither fold
+performed:
+
+```
+[cross-fit] REFUSED: the folds are two experiments, not one corpus: knobs is 'anchoring=lexical' on A and 'none' on B
+```
+
+An artefact written before the field existed reads as `none`, so it still pools with a newer fold that carried no
+knobs — the two produced the same request, and only an *absent* filter and a *named* one are different facts.

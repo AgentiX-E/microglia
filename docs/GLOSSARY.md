@@ -1681,6 +1681,17 @@ Counted and printed rather than dropped, because a census that reports a populat
 defect this lane keeps deleting; `0 task(s) reached` is the wrong sentence for that state, and the line says so
 in words.
 
+**Serve anchor** — Whether a scope-matched rule must share a word with the request before it may be served.
+`'scope'` (the published default) lets structure alone justify a rule; `'lexical'` requires a lexical anchor. Named
+in a registration as `serveAnchor:` and sent as `anchoring=…` on the recall request. It is the guard against the
+class the 2026 literature puts at 80% of memory-degradation events: a valid rule applied outside the situation it
+was learned in.
+
+**Knobs** — The recall parameters a dispatch fixed, joined into one string (`anchoring=lexical&minCoverage=0`).
+Recorded verbatim as `tau2.pack.knobs` and compared as part of a fold's **treatment identity**, because two folds
+served through two filters are two experiments. The string is compared and never parsed: an anchor re-derived from
+it would be a second reader of a vocabulary that lives in one module.
+
 | Term | In this project | Why the distinction matters |
 | --- | --- | --- |
 | "Cross-validation" | *cross-fit* | A cross-fit is two folds of one corpus read as one paired sample, not k models averaged: each task is answered once, and the reading is a paired difference |
@@ -1695,3 +1706,5 @@ in words.
 | "Guard failed" | *`fits=false`* | A red step is a report; an output is a gate. Only the second is obeyed by a step whose `if:` names a status function |
 | "Harm rate" | *net per task* | With one render per task a rate is ±100%: the census prints `-1 over 1 render(s)`, not `-100%` |
 | "Task id is a dimension" | *attribution key* | A dimension invites a division; this id may only group, and the invariant case enforces it |
+| "Anchor setting" | *serve anchor* | A mode names where a pack comes from; an anchor filters what may appear inside it |
+| "Config" | *knobs* | The knob string is an identity, not a description: two different strings are two treatments |
