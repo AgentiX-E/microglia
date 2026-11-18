@@ -1880,3 +1880,43 @@ The two-step shape is not ceremony. A pool that read pair artefacts directly wou
 whether silence meant "this arm has nothing to state" or "this artefact predates the field" — and both answers
 produce a number. A separate composition step puts that decision in one file, prints what it decided, and lets
 the pool keep refusing anything that arrives without it.
+
+### 8.26 Allocation is a serving decision, and it belongs where the candidates are
+
+A pack is a function of a store, a query and the options a dispatch fixed. §8.22 states that a treatment has three
+axes — where a pack is served from, what unit it is written in, what may appear inside it — and every one of them
+decides *whether* and *what*, never *how often*. R143's two folds added the missing quantity: renders per servable
+item, 3.6 on a store that kept eleven items and 25.0 on a store that kept three, with the harm share following it
+from 8.33% to 23.81%. A store that holds fewer items does not become conservative; the same one line per request
+is simply the same record every time.
+
+The mechanism that acts on it is a cap on renders per item, and its implementation is a statement about where the
+decision belongs:
+
+```
+RecallQuery.exclude  →  EmbeddedMemory.search  →  skip before scoring  →  rank  →  pack
+```
+
+**Not** a filter over the returned pack. The difference is measurable in one request: with `limit: 2` and the
+leader withheld, a post-filter returns one item and the search returns two, and only the second is the experiment
+the cap is for — identical dose, different allocation. A post-filter is a dose change, and dose is an axis this
+record has already priced (§8.11: the item count is not a knob, and a pack is not additive). The store also owns the normalisation: BM25 scores are divided by the pack's own
+maximum, so a maximum left over an excluded item would deflate every remaining score and hand a margin gate a
+contest the exclusion invented.
+
+Three properties are asserted rather than assumed, because each is a way the mechanism could quietly become
+something else:
+
+| property | why it can go wrong |
+| --- | --- |
+| the pack keeps its size | a substitution that loses a slot is a dose change |
+| the rendered block carries the substitute rule | a caller that re-rendered elsewhere would show a hole |
+| an unknown id in the list is ignored, not fatal | the caller's list is state, and an item can retire between building it and sending it |
+
+The cap itself is deliberately **not** part of the contract. `serveRotation: fair-share` names a policy and the
+driver resolves `ceil(requests / servable)` from the store the run actually built, because a constant in a header
+is a guess about a store that does not exist yet — and a guess that does not bind produces an arm that ran as its
+own control. That failure is made visible rather than prevented: `maxRenders` beside `cap` in the artefact says
+whether the bound was ever reached, and `starved` separates a rotation that spent the store from a store that had
+nothing to say. A policy whose own reading cannot say whether it acted is the defect this record has repaired four
+times at other layers.

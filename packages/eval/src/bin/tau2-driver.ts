@@ -185,6 +185,14 @@ import {
 import { consolidateKnowledge } from "@agentix-e/microglia-core/distill";
 import { consolidationLineOf, sweepConsolidation, sweepSummary } from "../consolidation-sweep.js";
 import { retireBelowSupport, supportFloorLine, type SupportFloorResult } from "../tau2-support-floor.js";
+import {
+  resolveServeRotationPlan,
+  rotationCapOf,
+  rotationLine,
+  rotationsOf,
+  ServeRotationLedger,
+  type RotationReading,
+} from "../serve-rotation.js";
 import { speakLineOf } from "../tau2-speak.js";
 import { turnCensusLine, turnCensusOf, type TurnCensus } from "../tau2-turn.js";
 import type { Tau2PhaseUsage } from "../tau2-instrument.js";
@@ -276,6 +284,16 @@ const MIN_COVERAGE = resolveRecallFloor(process.env);
  * workflow reads from the dispatch's own pre-registration.
  */
 const PAIR_PLAN = resolveFacadePairPlan(process.env);
+/**
+ * R152's serving policy: how far one item may travel inside a phase.
+ *
+ * Resolved at module load like every other switch, and undeclared means the driver excludes nothing — the
+ * request is byte-identical to every committed artefact's, which is what keeps a rotation arm comparable to
+ * the arms it is measured against. The cap is *not* in the header: it is `ceil(requests / servable)`, computed
+ * from the store this run actually built, because a constant would be a guess about a store the distiller has
+ * not written yet, and a guess that does not bind is an arm that silently runs the identity.
+ */
+const ROTATION = resolveServeRotationPlan(process.env);
 /**
  * The seed both facades must share. `run_split.py --seed` defaults to 300; in a
  * paired dispatch we pass it explicitly so common random numbers are an
@@ -2165,6 +2183,14 @@ export async function run(): Promise<readonly PassAtKInput[]> {
      * dispatch was the control rather than an arm whose census came back empty.
      */
     readonly plant?: PlantCensus;
+    /**
+     * R152: what the travel budget did, when this dispatch declared one.
+     *
+     * Absent on every arm before the switch, and on a fair-share arm whose store could serve nothing — the
+     * `servable` field of a present reading is what tells those two absences apart, which is the same split
+     * `declaredEmptyStore` makes one level up.
+     */
+    readonly rotation?: RotationReading;
   };
 
   const evaluateFacade = async (
@@ -2197,6 +2223,23 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     // because the facade is never told which task an episode belongs to -- the agent sends
     // `task=tau2.act` on all 228 requests -- so an episode IS its position here.
     const recallInputs: RecallInput[] = [];
+    // R152: the travel budget for THIS phase, computed from the store this run built rather than written in a
+    // header. A fair share of the requests the phase will make over the items the floor left servable — forty
+    // requests and eleven servable items is a cap of four, which still covers the phase, so the arm differs
+    // from its control in *allocation* and not in how often the memory speaks. Where the arithmetic cannot
+    // cover the phase (three items against seventy-five requests) the ledger is the identity, and the reading
+    // prints that rather than the registration's intention.
+    const rotationCap =
+      ROTATION.mode === "fair-share"
+        ? rotationCapOf({ requests: test.length * TRIALS, servable: census.servable })
+        : undefined;
+    const rotation = rotationCap === undefined ? undefined : new ServeRotationLedger(rotationCap);
+    if (rotationCap !== undefined) {
+      process.stdout.write(
+        `[tau2] serve rotation: fair share declared, cap ${String(rotationCap.cap)} per item ` +
+          `(${String(rotationCap.requests)} request(s), ${String(rotationCap.servable)} servable item(s))\n`,
+      );
+    }
     const facade = await startRecallFacade(async ({ text, query }) => {
       const index = recallInputs.length;
       // The pin replaces the *retrieval* query and not the user's message: the episode still reads the
@@ -2206,6 +2249,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       // The request's knobs first, then the two this file owns: the task label the store is scoped to,
       // and the scope itself. The registration's floor is the fallback and not the value, so an arm that
       // asks for `minCoverage=0` is served the pack it declared instead of the one the header rescued.
+      //
+      // R152: the ids this request may not be served, from the ledger and from the request itself. The two
+      // are concatenated rather than one winning, because they answer different questions — the wire's list
+      // is the caller's, the ledger's is this phase's — and a rule that let one override the other would be
+      // a policy about precedence that no registration asked for.
+      const rotated = rotation?.next();
+      const withheld = [...(query.exclude ?? []), ...(rotated?.exclude ?? [])];
       const pack = await host.recall({
         ...query,
         task: TASK,
@@ -2222,7 +2272,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         // R109a: the unit, for the same reason and with the same default. The host declares how to
         // recognise a routine (`shapeOf`, below); the request says which unit this arm wants.
         ...(shape === undefined ? {} : { shape }),
+        ...(withheld.length === 0 ? {} : { exclude: withheld }),
       });
+      // Charged before the pack is used and after it is built: what the ledger counts is the store's answer,
+      // so an empty pack charges nothing and a folded pack charges the items behind its one line.
+      rotation?.record(rotationsOf(pack));
       const planted =
         PLANTED === undefined
           ? undefined
@@ -2314,6 +2368,12 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       await facade.close();
     }
     const diagnostics = diagnosticsOf(evalStdout);
+    // Printed after the phase, so the line reports what the rotation did rather than what it intended: the
+    // reading carries the renders each item actually took, and a cap the ranking never reached is visible as
+    // `max 3` under `cap 4` — the check that the arm bound anything at all.
+    if (rotation !== undefined) {
+      process.stdout.write(`[tau2] ${rotationLine(rotation.reading())}\n`);
+    }
     return {
       // The three arguments this facade was asked for, so a second phase can serve the same memory without
       // restating them. Recorded from the parameters rather than from the branch that called them.
@@ -2348,6 +2408,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
               plantCreatedBlock,
             ),
           }),
+      ...(rotation === undefined ? {} : { rotation: rotation.reading() }),
     };
   };
 
@@ -2956,6 +3017,9 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       served: primary.recallServed,
       empty: primary.recallRequests - primary.recallServed,
     },
+    // R152: what the travel budget did, beside the recall it acted on. Absent on every arm that declared no
+    // rotation, so an artefact cannot mistake the identity for a policy that bound nothing.
+    ...(primary.rotation === undefined ? {} : { serveRotation: primary.rotation }),
     // R92: the questions the packs were ranked on. Recorded beside the store because the two are the
     // function's arguments: R91 replayed one exactly and the other moved by 13 characters a pack, and
     // nothing in the artefact could say so.

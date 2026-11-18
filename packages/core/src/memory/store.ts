@@ -145,6 +145,21 @@ export class EmbeddedMemory implements MemoryPort {
       queryTokens.length === 0
         ? new Set(this.knowledge.keys())
         : this.index.candidates(queryTokens);
+    /**
+     * The ids this request may not be served, skipped before scoring rather than after selection.
+     *
+     * R152. A caller that bounds how far one item may travel has to be able to ask for the *next*
+     * candidate, and a filter applied to the finished pack cannot: the withheld item has already
+     * taken the slot, so the request would be served one rule fewer instead of another rule. Skipping
+     * here keeps `limit` a promise about the pack — and it also keeps the BM25 normalisation honest,
+     * because a maximum taken over items the caller will never see would deflate every score in the
+     * pack by the excluded item's own relevance.
+     *
+     * Built once per request: the list is short by construction (a caller passes the exhausted ids of
+     * one store, not the store) and a `Set` per request is cheaper than a linear scan per candidate.
+     */
+    const excluded =
+      query.exclude === undefined || query.exclude.length === 0 ? undefined : new Set(query.exclude);
 
     /**
      * Scope is an index, not merely a filter.
@@ -170,6 +185,10 @@ export class EmbeddedMemory implements MemoryPort {
     const scored: { item: KnowledgeItem; lexical: number }[] = [];
     let maxLexical = 0;
     for (const id of candidateIds) {
+      // R152's skip comes first, before the `present` assertion: an id the caller forbade is not a
+      // retrieval defect, and a crash path reached by a legitimate request would make the exclusion
+      // unusable. Placed before scoring so the normalisation below never sees the excluded item.
+      if (excluded !== undefined && excluded.has(id)) continue;
       // Every candidate id came from `this.knowledge` or from the inverted index, and the two are
       // written together (`indexKnowledge` posts only after the map holds the item) and erased
       // together (both `forget` branches remove from both). An id here that the map does not hold

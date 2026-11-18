@@ -2495,3 +2495,29 @@ describe('the serve anchor header', () => {
     expect(readPrereg(VALID, FILE).prereg?.serveAnchor).toBeUndefined();
   });
 });
+
+describe('the serve rotation header', () => {
+  const withHeader = (extra: string): string => `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${PREDICTION}${REFUTATION}`;
+  // The file name and the header's `id` must agree, so this block borrows the fixture's own pair rather
+  // than renaming one of them: a mismatch makes `readPrereg` refuse the document and every assertion below
+  // would then be about a refusal rather than about the key.
+  const FILE = 'R8.3-xiyan-cell.md';
+
+  it('carries a serving policy it can run, including the identity', () => {
+    // R152. `off` is accepted on purpose: the arm that declares the control is a different document from the
+    // arm that omits the key, and a readback that could not see the difference would grade a dispatch on which
+    // line its header happened to leave out.
+    expect(readPrereg(withHeader('serveRotation: fair-share'), FILE).prereg?.serveRotation).toBe('fair-share');
+    expect(readPrereg(withHeader('serveRotation: off'), FILE).prereg?.serveRotation).toBe('off');
+  });
+
+  it('refuses a policy the driver does not implement, before the money is committed', () => {
+    const problems = problemsOf(withHeader('serveRotation: round-robin'), FILE);
+    expect(problems.some((entry) => entry.includes("header 'serveRotation'"))).toBe(true);
+    expect(problems.some((entry) => entry.includes("'round-robin' is not one of off, fair-share"))).toBe(true);
+  });
+
+  it('leaves it absent when the header says nothing, which is every arm before this one', () => {
+    expect(readPrereg(VALID, FILE).prereg?.serveRotation).toBeUndefined();
+  });
+});

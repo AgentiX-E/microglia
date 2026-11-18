@@ -1329,6 +1329,10 @@ jobs:
           # apply it to every queued dispatch — including the ones whose registration says the lane serves
           # exactly as it always has. Empty keeps the recall request free of the parameter altogether.
           ANCHOR=$(sed -n 's/^anchor=//p' "$RUNNER_TEMP/distill.env")
+          # R152: how far one item may travel. Header-only, for the reason every switch above is: a repository
+          # variable that bought a rotation would buy it on every queued dispatch, and the cap it resolves to is
+          # arithmetic over a store that does not exist yet.
+          ROTATION=$(sed -n 's/^rotation=//p' "$RUNNER_TEMP/distill.env")
           # R118: the stop after the learning half, when the registration's claim is a census. Header
           # only — there is no variable to reconcile it against, because a global that could turn it
           # off would let a dispatch pay for an evaluation the registration never asked for.
@@ -1401,6 +1405,9 @@ jobs:
           # than only as an argument. Both are the same value; the variable exists because the repository's own
           # audit refuses an environment read no workflow can set, and that rule has caught three dead knobs.
           echo "anchor=$ANCHOR" >> "$GITHUB_OUTPUT"
+          # R152: the serving policy, published so the driver reads it as an environment variable. Both the
+          # argument above and this output carry one value.
+          echo "serve_rotation=$ROTATION" >> "$GITHUB_OUTPUT"
           # R118: whether the arm stops after the learning half. Header-only, because the stop is the
           # registration's own statement about what it will read.
           echo "learn_only=$LEARN_ONLY" >> "$GITHUB_OUTPUT"
@@ -1585,6 +1592,9 @@ jobs:
           TAU_CONSOLIDATE_KEY: ${{ steps.recall_floor.outputs.consolidate_key }}
           TAU_CONSOLIDATE_LINKAGE: ${{ steps.recall_floor.outputs.consolidate_linkage }}
           TAU_SERVE_SUPPORT: ${{ steps.recall_floor.outputs.serve_support }}
+          # R152: the travel budget. Empty for every registration that does not name one, which leaves the
+          # driver excluding nothing and the request byte-identical to every committed artefact's.
+          TAU_SERVE_ROTATION: ${{ steps.recall_floor.outputs.serve_rotation }}
           # R123: the margin below which a contested ranking is withheld. Empty means 0, which serves every
           # non-empty pack — the behaviour every artefact committed before this switch measured.
           TAU_SPEAK_MARGIN: ${{ steps.recall_floor.outputs.speak_margin }}

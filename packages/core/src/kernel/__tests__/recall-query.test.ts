@@ -101,4 +101,54 @@ describe('recallQueryOf', () => {
     const scope = { domain: 'retail', reasonCode: 'R1' };
     expect(recallQueryOf(read({}), { ...FIXED, scope })).toEqual({ query: { ...FIXED, scope } });
   });
+
+  describe('the ids a serving policy has exhausted', () => {
+    it('carries a comma-separated list, trimmed, so a caller can bound one item of travel', () => {
+      expect(recallQueryOf(read({ exclude: 'k_1, k_2' }), FIXED)).toEqual({
+        query: { ...FIXED, exclude: ['k_1', 'k_2'] },
+      });
+    });
+
+    it('leaves an absent list absent rather than reading it as "nothing excluded"', () => {
+      // The absence is what keeps every request written before R152 byte-identical: a `[]` here would be a
+      // field the store has to test on every candidate to learn what its absence already told it.
+      expect(recallQueryOf(read({}), FIXED)).toEqual({ query: { ...FIXED } });
+    });
+
+    it('refuses a present but empty list, which is a caller whose list came out empty', () => {
+      // A request that excludes nothing omits the parameter. An empty value is the state a caller reaches
+      // when the thing it meant to exclude was not there, and honouring it would serve the item it meant
+      // to hold — the one reading this parser exists to refuse.
+      expect(recallQueryOf(read({ exclude: '' }), FIXED)).toEqual({
+        error: "exclude carries '', which is not an item id",
+      });
+      expect(recallQueryOf(read({ exclude: 'k_1,' }), FIXED)).toEqual({
+        error: "exclude carries '', which is not an item id",
+      });
+    });
+
+    it('refuses an id outside the alphabet the store mints', () => {
+      expect(recallQueryOf(read({ exclude: 'k 1' }), FIXED)).toEqual({
+        error: "exclude carries 'k 1', which is not an item id",
+      });
+      expect(recallQueryOf(read({ exclude: '!' }), FIXED)).toEqual({
+        error: "exclude carries '!', which is not an item id",
+      });
+      // 65 characters: one more than any id this kernel mints, so the pattern is a bound as well as a shape.
+      expect(recallQueryOf(read({ exclude: `k${'a'.repeat(64)}` }), FIXED)).toEqual({
+        error: `exclude carries 'k${'a'.repeat(64)}', which is not an item id`,
+      });
+    });
+
+    it('refuses a list longer than a store, because the caller is the one that built it', () => {
+      const ids = Array.from({ length: 257 }, (_, index) => `k_${String(index)}`).join(',');
+      expect(recallQueryOf(read({ exclude: ids }), FIXED)).toEqual({
+        error: 'exclude names 257 ids, more than the 256 a request may carry',
+      });
+      // Exactly at the bound is a legal request: a store of 256 items is one this lane has already served.
+      const legal = Array.from({ length: 256 }, (_, index) => `k_${String(index)}`).join(',');
+      const parsed = recallQueryOf(read({ exclude: legal }), FIXED);
+      expect('query' in parsed && parsed.query.exclude?.length).toBe(256);
+    });
+  });
 });

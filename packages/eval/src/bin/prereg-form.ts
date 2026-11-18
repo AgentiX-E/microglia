@@ -111,6 +111,10 @@ function main(): void {
       // R150: the serve anchor. Empty leaves the recall request with no `anchoring` parameter at all, which is
       // byte-identical to every artefact written before the switch existed.
       `anchor=${declaredAnchor ?? ''}\n` +
+      // R152: the serving policy. Empty leaves the driver excluding nothing, which is byte-identical to every
+      // artefact written before the switch existed — and `off` travels as `off` rather than as empty, so an arm
+      // that declared the default is distinguishable from one that never named it.
+      `rotation=${reading.prereg.serveRotation ?? ''}\n` +
       // R141: the support floor at serve time. Empty leaves the run at 1, which serves every item.
       `serveSupport=${reading.prereg.serveSupport === undefined ? '' : String(reading.prereg.serveSupport)}\n` +
       `rehearsal=${declaredRehearsal === undefined ? '' : String(declaredRehearsal)}\n` +

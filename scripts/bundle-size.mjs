@@ -108,10 +108,24 @@ import { build } from 'esbuild';
  *   contested half. The rest is `KnowledgePack.decision`, the second value of `suppressed`, the hook in
  *   `buildPack` and one host-level pass-through. It is a mechanism rather than a correction by this
  *   file's own rule, and it is argued as one.
+ *
+ * Raised once on 2026-11-18, 52,500 -> 53,000 raw and 17,900 -> 18,300 gzip, for one mechanism:
+ *
+ *   the exclusion path — `RecallQuery.exclude` on the type, its validation in `kernel/recall-query.ts`
+ *   (one shape test and one count bound, so a caller's own list cannot arrive longer than the corpus it
+ *   addresses), and the skip inside `EmbeddedMemory.search` that keeps a withheld item out of the
+ *   candidate set *before* ranking. It ships because R143's two folds priced the quantity it acts on:
+ *   renders per servable item was 3.6 on the fold whose store kept eleven items and 25.0 on the fold
+ *   that kept three, with the harm share following it from 8.33% to 23.81%, and the item that took
+ *   twelve renders on the rich fold repaired nothing while the three that did were served five, six and
+ *   one time. A post-filter over the finished pack would have changed the dose instead of the
+ *   allocation, which is a different experiment and one this record has already priced. Measured 52,781
+ *   raw and 18,006 gzip at this commit, so the raise is 219 raw and 294 gzip of headroom: a mechanism
+ *   rather than a correction by this file's own rule, argued as one.
  */
 const BUDGETS = [
   { name: 'browser', entry: 'packages/browser/dist/index.js', raw: 3200, gzip: 1600 },
-  { name: 'core', entry: 'packages/core/dist/index.js', raw: 52500, gzip: 17900 },
+  { name: 'core', entry: 'packages/core/dist/index.js', raw: 53000, gzip: 18300 },
 ];
 
 const probe = process.argv.includes('--probe');

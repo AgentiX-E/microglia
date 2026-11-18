@@ -1773,3 +1773,30 @@ point estimate. On this project's τ² folds it fired: +2.50pp on the half whose
 that explained both cross-fit folds: 3.6 renders per item with an 8.33% harm share against 25.0 with 23.81%, on
 one treatment. It is a property of the *recall path's density*, not of the store's size: a store that keeps fewer
 items applies each of them everywhere, so the harm follows the renders rather than the count.
+
+**Travel budget** — a cap on how many times one knowledge item may be put in front of an episode during a phase.
+It is a *serving* policy, not a write-time filter and not a quality gate: it never asks whether a record is right,
+only how often it has already spoken. The reading it answers is **renders per servable item**, which is the
+quantity that separated this project's two cross-fit folds.
+
+| Term | In this project | Why the distinction matters |
+| --- | --- | --- |
+| "Budget" | *travel budget* | The pack budget (`packBudget`, in characters) bounds one pack; this bounds one item across a phase |
+| "Fair share" | *`ceil(requests / servable)`* | A share of the phase, computed from the store the run built — not a constant in a header |
+| "Rotation" | *allocation at constant dose* | Same number of served requests, different distribution of them |
+| "Excluded" | *withheld for this request only* | The item is still active and still ranked; it simply may not fill this pack |
+
+**Exclusion set** — the ids one recall request may not be served, carried as `RecallQuery.exclude` and honoured by
+the store *before* ranking, so the pack serves the next candidate instead of one item fewer. The distinction is the
+whole mechanism: a filter over the finished pack changes the dose, an exclusion inside the search changes the
+allocation, and only the second is the experiment.
+
+**Starved request** — a request issued while every servable item had already taken its share, so the only pack the
+store could return is empty. It is kept apart from a store with nothing to say, because the two have different
+fixes: one is a cap set too tight against the store, the other is a store that does not cover the question. The
+artefact counts them (`serveRotation.starved`) rather than leaving a silent phase to be explained later.
+
+**Inert arm** — a dispatch that declared a treatment the data never let it apply: a cap the ranking never reached
+(`maxRenders < cap`), a floor that retired nothing, a rung that withheld nothing. This record's rule is that an arm
+whose own reading cannot say whether it acted has produced no finding, and the reading is designed to say so in one
+number rather than in a paragraph of caveats.

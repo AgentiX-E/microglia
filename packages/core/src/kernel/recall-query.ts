@@ -35,6 +35,21 @@ export type RecallParsed =
 const ANCHORINGS: readonly string[] = ['lexical', 'scope'];
 
 /**
+ * What an excluded id must look like, and how many a request may name.
+ *
+ * The pattern is the store's own id alphabet (`k_01hf7uaq8e_axxtd`) widened to every id this kernel has
+ * ever minted — a letter or digit, then letters, digits, `.`, `_`, `:`, `-`, at most 64 characters. It is
+ * a shape check and not a lookup: whether an id exists is the store's answer, and a parser that decided
+ * it would refuse a request for an item that a concurrent write had already retired.
+ *
+ * The count bound exists because this list comes from a caller's own state. A caller that names more than
+ * a store has is a caller with a bug, and the alternative — accepting it — is a request whose parameter
+ * is longer than the corpus it addresses.
+ */
+const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,63}$/;
+const MAX_EXCLUDED = 256;
+
+/**
  * The route's query, or every reason it cannot be built.
  *
  * `get` is the request's own accessor, so this is testable without an HTTP server and the route keeps
@@ -68,6 +83,27 @@ export function recallQueryOf(get: (name: string) => string | undefined, fixed: 
   // than read as "no watermark", because it would silently match every item and present as a store
   // that taught nothing.
   const before = whole('before', (value) => value >= 1, 'not an attempt number');
+
+  // The ids a serving policy has exhausted. R152. A comma-separated list rather than one parameter per
+  // id, because the caller's list grows with the store and a request with eighty `exclude=` pairs is a
+  // request no proxy will carry. An empty value is refused rather than read as "nothing excluded": the
+  // way to exclude nothing is to omit the parameter, so a present-but-empty one is a caller that built
+  // its list from something that came out empty, and honouring it would serve the item it meant to hold.
+  let exclude: readonly string[] | undefined;
+  const rawExclude = get('exclude');
+  if (rawExclude !== undefined) {
+    const ids = rawExclude.split(',').map((id) => id.trim());
+    const bad = ids.find((id) => !ID_PATTERN.test(id));
+    if (bad !== undefined || ids.length > MAX_EXCLUDED) {
+      problems.push(
+        bad === undefined
+          ? `exclude names ${String(ids.length)} ids, more than the ${String(MAX_EXCLUDED)} a request may carry`
+          : `exclude carries '${bad}', which is not an item id`,
+      );
+    } else {
+      exclude = ids;
+    }
+  }
 
   const rawCoverage = get('minCoverage');
   let minCoverage: number | undefined;
@@ -104,6 +140,7 @@ export function recallQueryOf(get: (name: string) => string | undefined, fixed: 
       ...(minCoverage === undefined ? {} : { minCoverage }),
       ...(rawAnchoring === undefined ? {} : { anchoring: rawAnchoring as 'lexical' | 'scope' }),
       ...(before === undefined ? {} : { before }),
+      ...(exclude === undefined ? {} : { exclude }),
       ...(rawShape === undefined ? {} : { shape: rawShape as ShapeMode }),
     },
   };

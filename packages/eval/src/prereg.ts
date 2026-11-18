@@ -20,6 +20,7 @@ import type { RunGate } from './artifact-schema.js';
 import { splitProvider } from './model-id.js';
 import { detectableDelta } from './detectable.js';
 import { SERVE_ANCHORS } from './serve-anchor.js';
+import { SERVE_ROTATIONS } from './serve-rotation.js';
 
 export type Prereg = {
   readonly id: string;
@@ -459,6 +460,16 @@ export type Prereg = {
    */
   readonly serveAnchor?: string;
   /**
+   * Whether a registration bounds how far one item may travel inside the phase.
+   *
+   * R152's switch, and the first serving policy this lane has registered that acts on *allocation* rather
+   * than on selection: every other gate here decides whether a pack is served, and this one decides which
+   * item fills it. The cap is not in the header because it is arithmetic over the store the run will build
+   * (`ceil(requests / servable)`); the header names the policy, and the artefact records the number it
+   * resolved to, so a registration can be graded on a share it could not have known in advance.
+   */
+  readonly serveRotation?: string;
+  /**
    * The unit this registration's packs are written in: one line per failure, or one per routine.
    *
    * R109's switch, registered the same way the pack mode is and for the same reason: the arm is one
@@ -566,6 +577,7 @@ const HEADER_KEYS = [
   'packMode',
   'packShape',
   'serveAnchor',
+  'serveRotation',
   'claimRuler',
   'thinking',
 ] as const;
@@ -644,6 +656,14 @@ export const HEADER_PACK_SHAPES: ReadonlySet<string> = new Set(['per-failure', '
  * the run cannot apply, and the readback would grade the arm the header described rather than the one that ran.
  */
 const HEADER_SERVE_ANCHORS: ReadonlySet<string> = new Set(SERVE_ANCHORS);
+
+/**
+ * The serving policies a header may name.
+ *
+ * R152. Spelled once, for the reason the anchor set above is: a header that accepted a mode the driver
+ * refuses would be a registration naming a policy no run can apply.
+ */
+const HEADER_SERVE_ROTATIONS: ReadonlySet<string> = new Set(SERVE_ROTATIONS);
 
 /**
  * The largest number of episodes one dispatch carries.
@@ -1576,6 +1596,23 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  // R152: the serving policy. Refused on an unknown spelling like the anchor above, because a mode the
+  // driver does not know would run the identity and the registration would be graded on a treatment it
+  // never declared. `off` is accepted and means the same request as an absent key — a registration is
+  // allowed to state that it relies on the default, which is what makes a rotation arm's control explicit.
+  const serveRotationText = values.get('serveRotation');
+  let serveRotation: string | undefined;
+  if (serveRotationText !== undefined) {
+    if (!HEADER_SERVE_ROTATIONS.has(serveRotationText)) {
+      collected.push({
+        where: `header 'serveRotation'`,
+        problem: `'${serveRotationText}' is not one of ${[...HEADER_SERVE_ROTATIONS].join(', ')}`,
+      });
+    } else {
+      serveRotation = serveRotationText;
+    }
+  }
+
   const claimRulerText = values.get('claimRuler');
   let claimRuler: 'point' | 'interval' | undefined;
   if (claimRulerText !== undefined) {
@@ -1743,6 +1780,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(claimRuler === undefined ? {} : { claimRuler }),
       ...(packShape === undefined ? {} : { packShape }),
       ...(serveAnchor === undefined ? {} : { serveAnchor }),
+      ...(serveRotation === undefined ? {} : { serveRotation }),
       ...(facadeShapes === undefined ? {} : { facadeShapes }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,

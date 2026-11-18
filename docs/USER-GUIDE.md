@@ -4016,3 +4016,78 @@ the design that produced the delta.
   the number its intervals depend on.
 - **Read `eval:power` as a floor, not a verdict.** It recomputes every published delta against its own MDE; the
   coarsest design on the record is the one to quote when someone asks what the project can see.
+
+## 32. Bounding how far one item travels
+
+§29 lists the axes that decide **what a pack may contain**. This one decides **how the phase's renders are shared
+out**, which is a different question: every pack §29 allows can still be served on every request while one record
+does all the work.
+
+### 32.1 The reading it answers
+
+Two folds of one treatment, same day, same split size in total:
+
+| reading | fold with 11 servable items | fold with 3 servable items |
+| --- | --- | --- |
+| renders | 40 over 10 items | 75 over 3 items |
+| renders per servable item | 3.6 | 25.0 |
+| harm share | 8.33% | 23.81% |
+| delta | +2.50pp | −10.81pp |
+
+The store that kept fewer items did not become careful. It served each of them **everywhere**, because the recall
+path had nothing else to offer, and the item that took twelve renders on the rich fold was the one that repaired
+nothing while the three items that did repair something were served five, six and one time.
+
+### 32.2 How to ask for it
+
+```yaml
+serveRotation: fair-share
+```
+
+One header line, and the cap is not in it — it is arithmetic over the store the run builds:
+
+```
+cap = ceil(requests / servable)        # 40 requests over 11 servable items → 4
+exclude = { ids whose renders ≥ cap }  # sent as RecallQuery.exclude
+```
+
+| you wrote | the request carries | the artefact records |
+| --- | --- | --- |
+| nothing | no `exclude` parameter (byte-identical to every earlier run) | no `serveRotation` block |
+| `serveRotation: off` | no `exclude` parameter | `serveRotation.cap: 0` — the declared control |
+| `serveRotation: fair-share` | `exclude=k_a,k_b` once items reach the cap | `cap`, `maxRenders`, `renders`, `distinct`, `exhausted`, `starved` |
+
+The cap is computed rather than written down because a constant in a header is a guess about a store that does not
+exist yet. When the store is bigger than the phase the cap is 1, which is still a spread; when the phase is bigger
+than the arithmetic can cover — three items against seventy-five requests — the policy is the identity, and the
+artefact says so instead of claiming a treatment it did not apply.
+
+### 32.3 Why the exclusion is not a filter on the finished pack
+
+It is honoured inside the store's search, before ranking, so the pack serves the **next** rule:
+
+```
+same request, limit 2, excluding the leader
+  without exclusion: [leader, runner]     ← 2 items
+  filter after the pack: [runner]         ← 1 item: a dose change wearing an allocation change's name
+  excluded in the search: [runner, tail]  ← 2 items: the allocation change this is
+```
+
+Three things follow, and all three are asserted in the suite rather than described here: the pack's size is
+unchanged, the rendered block carries the substitute rule instead of a hole, and the relevance normalisation is
+taken over the items the request may serve — a maximum left over an excluded item would deflate every remaining
+score and make a margin gate read a contest the exclusion created.
+
+### 32.4 What a phase can be starved of
+
+A request is **starved** when every servable item has already taken its share, so the only pack the store can
+return is empty. That is a different finding from a store with nothing to say, and the reading separates them:
+
+```
+serve rotation: cap 4 per item from 40 request(s) over 11 servable item(s); max 4, 40 render(s) over 10 item(s), 2 exhausted
+serve rotation: absent (the store can serve nothing, so no share exists)
+serve rotation: absent (no request was made; fair share over 11 item(s) is unmeasured)
+```
+
+`max` beside `cap` is the number that keeps an inert arm honest: `max 3` under `cap 4` says the ranking never
+reached the bound, so the dispatch ran as its own control.

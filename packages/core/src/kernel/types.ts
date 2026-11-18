@@ -724,6 +724,20 @@ export type RecallQuery = {
    */
   readonly before?: number;
   /**
+   * The ids this request may not be served, whatever their rank.
+   *
+   * A serving policy that bounds how far one item may travel needs to ask for the *next* candidate, and
+   * that question can only be answered where the candidates are: filtering the finished pack would spend
+   * the slot on the withheld item and hand the caller one rule fewer, which is a different treatment
+   * (fewer items) than the one such a policy is meant to be (other items).
+   *
+   * Absent means "no exclusion", which is every caller before R152 and keeps their packs identical. The
+   * list is an id set, not a filter expression, so the store can honour it with one membership test per
+   * candidate and no policy of its own: which items are exhausted is the caller's state, and a store that
+   * guessed it would be a second implementation of a rule that lives above it.
+   */
+  readonly exclude?: readonly string[];
+  /**
    * The unit this request wants: one line per failure, or one line per routine.
    *
    * Absent means `per-failure`, the shape every committed artefact measured. `collapse` folds items
