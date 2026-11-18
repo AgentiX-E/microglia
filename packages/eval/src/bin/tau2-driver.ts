@@ -86,6 +86,7 @@ import {
   resolveWriteAdmissionPlan,
   resolveRecallFloor,
   stampDomain,
+  directedSplit,
   splitFromOfficial,
   stoppedRun,
   storeCensus,
@@ -430,8 +431,18 @@ function pinCorpusPath(domain: string): string {
  * another name would be the same defect the key exists to remove.
  */
 const TASK_SPLIT = (process.env["TAU_TASK_SPLIT"] ?? "").trim();
-if (TASK_SPLIT !== "" && TASK_SPLIT !== "official") {
-  throw new Error(`TAU_TASK_SPLIT is '${TASK_SPLIT}'; the only split a document states is 'official'`);
+/**
+ * R143: and the other direction of it.
+ *
+ * `official-swapped` runs the same document with the halves exchanged — the store learns from the 40 tasks
+ * the benchmark holds out and answers the 74 it publishes as training. Alone that arm is a curiosity; beside
+ * an `official` arm it is the second fold of a cross-fit over all 114 tasks, and the reason it is a value of
+ * this key rather than a new header is that the boundary is still the benchmark's: no number decides it.
+ */
+if (TASK_SPLIT !== "" && TASK_SPLIT !== "official" && TASK_SPLIT !== "official-swapped") {
+  throw new Error(
+    `TAU_TASK_SPLIT is '${TASK_SPLIT}'; a document states 'official', and 'official-swapped' runs it backwards`,
+  );
 }
 
 /**
@@ -1313,13 +1324,16 @@ export async function run(): Promise<readonly PassAtKInput[]> {
       : await listTasks(LEARN_DOMAIN, join(workdir, "learn-tasks.json"));
 
   const official =
-    TASK_SPLIT === "official"
-      ? splitFromOfficial(
-          JSON.parse(
-            readFileSync(splitPathOf(TEST_DOMAIN), "utf8"),
-          ) as unknown,
-        )
-      : undefined;
+    TASK_SPLIT === ""
+      ? undefined
+      : directedSplit(
+          splitFromOfficial(
+            JSON.parse(
+              readFileSync(splitPathOf(TEST_DOMAIN), "utf8"),
+            ) as unknown,
+          ),
+          TASK_SPLIT === "official-swapped",
+        );
   const plan = heldOutPlan({
     learnIds: learnable,
     evalIds: drawn,
@@ -1331,8 +1345,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
     ...(official === undefined ? {} : { official }),
   });
   if (official !== undefined) {
+    // R143: which direction, because a swapped arm and a published-direction arm have the same file and
+    // opposite halves, and a log that named only the file would make the two runs indistinguishable.
+    const direction = TASK_SPLIT === "official-swapped" ? " (halves exchanged)" : "";
     process.stdout.write(
-      `[tau2] split: the benchmark's own — ${String(plan.train.length)} learn / ` +
+      `[tau2] split: the benchmark's own${direction} — ${String(plan.train.length)} learn / ` +
         `${String(plan.test.length)} held out\n`,
     );
   }

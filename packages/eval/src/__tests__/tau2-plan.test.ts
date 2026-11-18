@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { heldOutPlan, qualifiedId, splitFromOfficial } from '../tau2-plan.js';
+import { directedSplit, heldOutPlan, qualifiedId, splitFromOfficial } from '../tau2-plan.js';
 
 /**
  * The plan a cross-domain arm runs on.
@@ -239,5 +239,42 @@ describe('splitFromOfficial', () => {
     // A leak in the published file would be published as a leak in the run; the plan cannot fix it and
     // must not absorb it.
     expect(() => splitFromOfficial({ train: ['0', '1'], test: ['1', '2'] })).toThrow(/in both halves: 1/);
+  });
+});
+
+describe('directedSplit, the two directions of one document', () => {
+  it('returns the published direction untouched when the registration is not swapped', () => {
+    const split = { train: ['0', '1', '2'], test: ['3', '4'] };
+    expect(directedSplit(split, false)).toEqual(split);
+    expect(directedSplit(split, false)).toBe(split);
+  });
+
+  it('exchanges the halves and nothing else when the registration is swapped', () => {
+    // R143's fold B. The assertion is on the whole object rather than on a length: a swap that also sorted,
+    // deduped or capped would still pass a length check and would be a leak in the fold that runs backwards.
+    const split = { train: ['0', '1', '2'], test: ['3', '4'] };
+    expect(directedSplit(split, true)).toEqual({ train: ['3', '4'], test: ['0', '1', '2'] });
+    expect(split.train).toEqual(['0', '1', '2']);
+  });
+
+  it('tiles the corpus when the two directions are taken together', () => {
+    // The property the cross-fit rests on: the corpus each task appears in is one, and the two arms answer
+    // every task exactly once. A swap that dropped or duplicated a task would show here and not in a run,
+    // where it would read as an arm that scored fewer tasks than its registration named.
+    const corpus = ['0', '1', '2', '3', '4', '5'];
+    const published = { train: corpus.slice(0, 4), test: corpus.slice(4) };
+    const swapped = directedSplit(published, true);
+    const evaluated = [...published.test, ...swapped.test];
+    expect(new Set(evaluated).size).toBe(corpus.length);
+    expect([...evaluated].sort()).toEqual([...corpus].sort());
+    const learned = [...published.train, ...swapped.train];
+    expect(new Set(learned).size).toBe(corpus.length);
+  });
+
+  it('refuses a split with an empty half, which has no direction to swap into', () => {
+    // Unreachable from `splitFromOfficial`, which refuses both empty halves; the guard exists for a caller
+    // that built a `TaskSplit` itself, and a refusal nobody can call is a refusal nobody has tested.
+    expect(() => directedSplit({ train: [], test: ['1'] }, true)).toThrow(/no direction to swap into/);
+    expect(() => directedSplit({ train: ['1'], test: [] }, true)).toThrow(/no direction to swap into/);
   });
 });

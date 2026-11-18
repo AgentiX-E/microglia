@@ -85,6 +85,28 @@ export function splitFromOfficial(document: unknown): TaskSplit {
   return { train, test };
 }
 
+/**
+ * The benchmark's halves in the direction a registration names.
+ *
+ * R143. A cross-fit over retail's 114 tasks needs both directions of the published boundary: the store
+ * learns from the 74 and answers the 40, then the store learns from the 40 and answers the 74. Each task is
+ * then evaluated exactly once by a memory that never saw it, and the two arms pool to 114 pairs — which is
+ * the only way this lane reaches a population that can resolve a ten-point effect (40 resolves 17.16pp).
+ *
+ * The swap is a *function* rather than two lines in the driver because the arithmetic it can get wrong is
+ * invisible in a run: a swapped arm that still learns from its own evaluation set produces a number, not an
+ * error, and the leak gate would report every task as leaked only if the plan were rebuilt from the halves
+ * rather than from the ids the driver passes. Keeping it here makes "the halves are exchanged and nothing
+ * else" an assertion with a test.
+ */
+export function directedSplit(split: TaskSplit, swapped: boolean): TaskSplit {
+  if (!swapped) return split;
+  if (split.train.length === 0 || split.test.length === 0) {
+    throw new RangeError('a split with an empty half has no direction to swap into');
+  }
+  return { train: split.test, test: split.train };
+}
+
 export type HeldOutPlanInput = {
   /** Task ids the learning half may draw from, as the scenario states them. */
   readonly learnIds: readonly string[];
