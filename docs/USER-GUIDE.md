@@ -3726,3 +3726,69 @@ consumes that instant; `not_before` is parsed once, by the step that sleeps on i
 4. `pnpm eval:band` says off-peak **now**, if the run is not waiting.
 5. The workflow file parses — an expression error is a 422 at dispatch, not a red step at the line, and it
    costs the round a dispatch window rather than a dollar.
+
+---
+
+## 28. Where the harm landed
+
+§26 reads a record's outcome. This reads the same renders from the other end: **which task did the store reach,
+and did it help there or hurt there**. The two questions have different fixes, which is why they are two
+readings rather than two views of one.
+
+A store that breaks one trial of a hundred and a store that breaks one *task* of a hundred produce the same
+`breaks` count.
+
+| the shape | what it usually is | what fixes it |
+| --- | --- | --- |
+| one task, many renders, net negative | **reach**: the retrieval found something plausible for a task family the store has nothing to say about | a retrieval gate, or a content axis that can tell the families apart |
+| many tasks, one render each, net ±1 | **interference or luck**: the store changed one episode per task | a floor, or more trials — not a gate |
+
+### 28.1 The line
+
+```
+serve tasks: 40 task(s) reached by 40 render(s); 1 harmed, 4 helped, 35 neutral, 0 contested; worst t21 -1 over 1 render(s)
+```
+
+1. **`task(s) reached by render(s)`** — the population. Two numbers, because they answer different questions: a
+   store that reached 4 tasks 40 times is a store concentrated on a few families; one that reached 40 tasks 40
+   times is a store spread across the corpus.
+2. **`harmed / helped / neutral`** — the net per task. `neutral` being the largest bucket is the normal reading
+   on this corpus, and it is the same fact as §26's 85% inert seen from the other side: the store was served and
+   changed nothing.
+3. **`contested`** — tasks where the store both repaired one trial and broke another. This is not a fourth
+   bucket; it cross-cuts. A task at net zero can be contested, and that is a very different reading from a task
+   the store reached and did nothing on: one says the record is wrong *for this task*, the other says it is
+   irrelevant to it.
+4. **`worst t21 -1 over 1 render(s)`** — the lowest net, with the renders it took. One render is not a verdict,
+   and the line prints the count beside the net precisely so the reader does not turn `-1` into a rate.
+
+### 28.2 Reading it against §26
+
+| if | then |
+| --- | --- |
+| `breaks` are spread over many tasks at one render each | the floor is the right lever: the store is being served where it could not have been right, and `supportTasks` is the only signal available |
+| `breaks` concentrate on a few tasks with many renders | the floor cannot help: those records *pass* the floor, and the problem is that the content says something true about the wrong family |
+| `contested` is non-empty | at least one task is evidence about a record's applicability rather than about the corpus, and that task is the first place to read the claim text |
+
+### 28.3 What the field is, and is not
+
+The render names its task for **attribution**. Nothing divides by a task: there is no per-task rate, and the
+suite asserts that the record census (`serve yield`) produces an identical table with and without the id. If you
+are writing a statistic that divides by `tasks`, it belongs in a new census with its own denominator argument —
+not here.
+
+An artefact written before this field existed prints:
+
+```
+serve tasks: no render named a task, so the population axis is unread on this artefact (40 render(s))
+```
+
+That is an absence, not a clean population. `0 task(s) reached` would be the wrong sentence for it, and this
+project has paid for that confusion twice.
+
+### 28.4 What it still cannot answer
+
+**Was the claim right for the tasks that taught it?** The store sample is capped (64 of 83 rows on R141) and
+carries `supportTasks` as a *count*, not as a list of ids, so a record's provenance is not in the artefact. The
+join grain `(record, task)` now exists; the provenance is the next instrument, and until it lands, a claim's
+text can be read against the task it was served into but not against the tasks it came from.

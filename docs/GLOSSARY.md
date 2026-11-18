@@ -1664,6 +1664,23 @@ step that publishes an output makes a **decision** other steps can obey. Both ar
 an implicit `success()` to an `if:` that names no status function, so the arm whose condition was a plain input
 comparison was skipped and the arm whose condition named `!cancelled()` bought its half of a refused run.
 
+**Task yield** — The same renders `serve yield` counts, grouped by the task they were served into:
+`renders`, distinct `items`, `opportunity`, `repairs`, `breaks`, `inert`, `net`. It answers a question the record
+census cannot: one break over forty renders is a number without an address, and reach (a store used on a task
+family it has nothing to say about) and interference (a store used on the episode it was taught) are fixed by
+different mechanisms. Nothing divides by a task — the id is attribution, and a case asserts the record census is
+identical with and without it.
+
+**Contested task** — A task where the store both repaired one trial and broke another, whatever its net. It
+cross-cuts `harmed` / `helped` / `neutral` on purpose: a task at net zero after one of each is evidence that a
+record is *wrong for that task*, while a neutral task that is not contested is a task the store reached and
+changed nothing about. Only the first is evidence about applicability.
+
+**Unattributed render** — A render that named no task, which is every artefact written before the field existed.
+Counted and printed rather than dropped, because a census that reports a population it did not read is the
+defect this lane keeps deleting; `0 task(s) reached` is the wrong sentence for that state, and the line says so
+in words.
+
 | Term | In this project | Why the distinction matters |
 | --- | --- | --- |
 | "Cross-validation" | *cross-fit* | A cross-fit is two folds of one corpus read as one paired sample, not k models averaged: each task is answered once, and the reading is a paired difference |
@@ -1676,3 +1693,5 @@ comparison was skipped and the arm whose condition named `!cancelled()` bought i
 | "Dropped data" | *unmatched requests* | A hole that is counted is published beside the reading; a condition that returns `undefined` costs the whole table |
 | "Sleep until" | *`not_before` + `start_at`* | The request is an hour; the run has an instant. Two readers of one hour disagree at the boundary |
 | "Guard failed" | *`fits=false`* | A red step is a report; an output is a gate. Only the second is obeyed by a step whose `if:` names a status function |
+| "Harm rate" | *net per task* | With one render per task a rate is ±100%: the census prints `-1 over 1 render(s)`, not `-100%` |
+| "Task id is a dimension" | *attribution key* | A dimension invites a division; this id may only group, and the invariant case enforces it |

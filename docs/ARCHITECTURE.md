@@ -1720,3 +1720,39 @@ boundary the two sit on opposite sides.
 **What a guard is, stated as a rule.** A step that fails makes a job red; a step that **publishes its answer**
 makes a decision. Only the second can be obeyed by a step whose own condition has a status function in it, and
 the number of such steps is not visible from the guard.
+
+### 8.21 A field may be attribution without being a grain, and the invariant is a test
+
+`ServeRender` was written without a task id, on the argument that a second identity invites a second
+de-duplication (`itemTransfer` de-duplicates at the episode, where the identity is known). The argument is
+right; the conclusion was a silent restriction. On R141 the census could say *one break over forty renders* and
+not *which task*, and the remaining question in the lane — reach versus interference — is exactly the question
+the missing id would have answered.
+
+| reader | groups by | divides by |
+| --- | --- | --- |
+| `serveYieldCensus` | record | opportunities |
+| `serveTaskCensus` | task | nothing |
+| `itemTransfer` | record × episode | nothing |
+
+Three grains in one structure, and only one of them divides. The guarantee is a case rather than a comment:
+`serveYieldCensus` must be deep-equal on the same renders with and without `task`, so the round that adds a
+division by task fails at the point it is written rather than at the point its number is quoted.
+
+**The id travels from where it is known.** `EpisodeOutcome.task` is set by both join paths in `pairedEpisodes`
+from the trial row's own `id` — the identity join and the positional fallback — and `itemTransfer` copies it
+onto each render. Absent stays absent: `exactOptionalPropertyTypes` distinguishes no key from `undefined`, and a
+render whose episode named no task is counted as `unattributed` rather than attached to a task that did not
+serve it.
+
+**Net zero is two readings, so the census does not fold them.** `harmed` / `helped` / `neutral` classify the
+net; `contested` is an independent flag for the tasks where both a repair and a break occurred. A task at net
+zero that is not contested was reached and changed nothing, which is the same fact as the yield census's inert
+share from the population end.
+
+| decision | the alternative, and why not |
+| --- | --- |
+| the id is attribution only, asserted by an invariant case | withholding it: a missing field is silent, and nothing can fail for a question the structure cannot ask |
+| `unattributed` is a counted field | dropping unlabelled renders: the census would then report a population it did not read |
+| `contested` cross-cuts the net buckets | a fourth bucket: a task at net zero after one of each is not the same reading as a task with no movement, and a bucket would force a choice between two true statements |
+| three line forms, one per state | one form with zeros: `0 task(s) reached` is the collapse of absent into zero that cost this lane two dispatches |
