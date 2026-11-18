@@ -23,12 +23,17 @@
  * `l4-same-split` stays for every arm, because it is a property of the two files on disk rather than a
  * hypothesis about either of them: an arm that dropped tasks leaves the pair incomparable whoever it is.
  *
+ * R152 added a fourth that is neither: `l4-rotation-reconciles` compares the serving policy's declared reading
+ * with the ids the same artefact's pack ledger carries. It grades no hypothesis and no arm, only whether the file
+ * agrees with itself — which is the one thing a reader could not check, because the ledger was there and unread.
+ *
  * Extracted out of `bin/l4-pair.ts` for the reason `sample-gates.ts` was extracted out of `bin/l4.ts`:
  * a `bin/` file is excluded from coverage, and these three gates have never had a test.
  */
 
 import type { ValidityGate } from '@agentix-e/microglia-protocol';
 import type { PairedVerdictState } from './paired-verdict.js';
+import type { RotationReconciliation } from './serve-rotation.js';
 
 export type PairGateInput = {
   /** What the pair established, from `pairedVerdict`. */
@@ -74,6 +79,16 @@ export type PairGateInput = {
    * made a round later by a reader comparing a log line with a JSON file.
    */
   readonly unprojected?: readonly { readonly arm: string; readonly keys: readonly string[] }[];
+  /**
+   * The serving policy's declared reading, reconciled against the arm's own pack ledger.
+   *
+   * Absent on every pair whose memory arm declared no policy, and on every arm that kept no id list — the two
+   * cases where there is nothing to reconcile. R152 shipped a block built from a snapshot taken before the phase
+   * (`requests: 0` beside a log line saying forty), and the artefact was the only file that could have said so:
+   * the ledger was in the same file, unread. This is that reader, and it blocks, because an artefact that
+   * contradicts its own evidence is a defect rather than a reading.
+   */
+  readonly rotationReconciled?: RotationReconciliation | undefined;
 };
 
 /** Whether an arm planted a distractor. `none` is the control arm's own name for planting nothing. */
@@ -150,6 +165,21 @@ export function pairGates(input: PairGateInput): readonly ValidityGate[] {
               .map((entry) => `${entry.arm}: ${entry.keys.join(', ')}`)
               .join('; '),
       pass: input.unprojected === undefined || input.unprojected.length === 0,
+      blocking: true,
+    },
+    {
+      id: 'l4-rotation-reconciles',
+      criterion:
+        'the serving policy\'s declared reading is the reading the arm\'s own pack ledger accounts for',
+      actual:
+        input.rotationReconciled === undefined
+          ? 'no policy declared, or no id list kept, so there is no reading to reconcile'
+          : input.rotationReconciled.problems.length === 0
+            ? `${input.rotationReconciled.checked.join(', ')} agree; ` +
+              `${input.rotationReconciled.unchecked.join(', ')} cannot be reached from the ledger`
+            : input.rotationReconciled.problems.join('; '),
+      pass:
+        input.rotationReconciled === undefined || input.rotationReconciled.problems.length === 0,
       blocking: true,
     },
   ];

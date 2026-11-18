@@ -4119,5 +4119,6 @@ Two consequences worth knowing when you read an artefact:
 - `serveRotation` is absent on an arm that declared no policy, and `{ mode: 'off' }` on an arm that declared the
   identity. An arm whose block is missing entirely is not "the default"; it is a run that never heard of the switch.
 - If the block is present but `requests` is `0` while the phase served packs, the file is from a build older than
-  this section. Read the cap from `pack.summary` and the renders from the run log, and treat the fold as
-  un-poolable rather than re-deriving its policy.
+  this section. The pair refuses it (`l4-rotation-reconciles` compares the block with the ids the same file's
+  `pack.ledger` carries, and blocks on a disagreement), and the fold is not poolable: read the cap from
+  `pack.summary` and the renders from the run log, and do not re-derive the policy — no file holds one.

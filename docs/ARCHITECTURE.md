@@ -1943,3 +1943,19 @@ The block then describes a phase that served forty packs as one that served none
 otherwise — and the artefact is the file that survives, so the disagreement resolves against the truth. The rule is
 that a reading is read once, after the phase, and the same object feeds both the log line and the artefact. Two
 reads of one ledger are two chances to disagree; one read cannot.
+
+**And a third guard, inside the artefact.** The two above are about *writing* the field; neither can tell whether
+what was written is true. So the pair now reconciles the declared reading against the pack ledger, which is the
+same list the counter charged and is filed beside the block:
+
+```
+readRotationLedger(pack.ledger) → { requests, renders, distinct, maxRenders, emptyRequests }
+reconcileServeRotation(block, pack.ledger) → { checked, unchecked, problems }
+```
+
+`l4-rotation-reconciles` blocks on any problem, and it names the fields it *cannot* reach instead of counting them
+as agreement: `mode` is a policy no ledger holds, `cap` and `servable` come from the store, and `starved` shares
+its evidence with "the store had nothing to say", so the ledger can only bound it from above. That asymmetry is the
+point. A ledger can prove a count wrong; it can never prove a policy right — which is why a fold whose block went
+missing cannot be repaired from its own files at any price, and why the reconciliation is a gate rather than a
+repair tool.

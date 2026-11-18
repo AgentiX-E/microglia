@@ -28,6 +28,11 @@
  *
  * `l4-resolution` is gone rather than renamed: the protocol's `V5-resolution` is the same condition
  * computed from the same discordance with the same constant, and it is now blocking.
+ *
+ * R152 added a third to `pair-gates.ts`: `l4-rotation-reconciles` compares the serving policy's declared reading
+ * with the ids this pair's own pack ledger carries. It is computed here because the ledger is a file the pair
+ * reads and the gate is a table, and it is recorded in the artefact beside the treatment so a readback can see
+ * which fields the ledger could reach — `mode` is a policy, and no ledger holds one.
  */
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -65,7 +70,7 @@ import { pairedVerdict } from '../paired-verdict.js';
 import { serveSupportCensus, serveSupportLine, supportMapOf } from '../serve-support.js';
 import { foldSplitOf, treatmentOf } from '../cross-fit.js';
 import { serveYieldCensus, serveYieldLine } from '../serve-yield.js';
-import { rotationModeOf } from '../serve-rotation.js';
+import { reconcileServeRotation, rotationModeOf } from '../serve-rotation.js';
 import { serveTaskCensus, serveTaskLine } from '../serve-tasks.js';
 import { marginSweep, serveSweepLine } from '../serve-sweep.js';
 import { pairGates, plantedBarNote } from '../pair-gates.js';
@@ -377,6 +382,14 @@ const unprojectedArms = [first, second]
   }))
   .filter((entry) => entry.keys.length > 0);
 
+// R152: the memory arm's serving policy, reconciled against the ids its own pack ledger carries. Absent when the
+// arm declared no policy or kept no id list, because there is nothing to reconcile in either case — and absence
+// is reported as absence rather than as agreement (the gate says which fields it could not reach).
+const rotationReconciled =
+  second.tau2?.serveRotation === undefined || second.tau2?.pack?.ledger === undefined
+    ? undefined
+    : reconcileServeRotation(second.tau2.serveRotation, second.tau2.pack.ledger);
+
 const scenarioGates: readonly ValidityGate[] = pairGates({
   state: verdict.state,
   claim: verdict.claim ?? null,
@@ -391,6 +404,7 @@ const scenarioGates: readonly ValidityGate[] = pairGates({
   ...(plantedArm === undefined ? {} : { plantedArm }),
   ...(registeredBand === undefined ? {} : { registeredBand }),
   ...(unprojectedArms.length === 0 ? {} : { unprojected: unprojectedArms }),
+  ...(rotationReconciled === undefined ? {} : { rotationReconciled }),
 });
 
 const gates = mergeGates(audit.gates, scenarioGates, inGateOrder);
@@ -636,6 +650,9 @@ await writeJson('poc-l4-pair', {
     ? { foldSplit: { learned: foldSplit.learned, evaluated: foldSplit.evaluated } }
     : { foldSplitAbsent: { reason: foldSplit.reason } }),
   ...(treatment.ok ? { treatment: treatment.treatment } : { treatmentAbsent: { reason: treatment.reason } }),
+  // R152: what the declared reading was checked against. Recorded rather than only graded, so a reader can see
+  // which fields the ledger could reach and which it could not — `mode` is a policy and no ledger holds one.
+  ...(rotationReconciled === undefined ? {} : { rotationReconciled }),
   // R144: the render census beside the item table. The table says which records were served and what they did;
   // this says how many of those renders could have changed anything, which is the number that decides whether
   // an outcome counter can act on the table at all.

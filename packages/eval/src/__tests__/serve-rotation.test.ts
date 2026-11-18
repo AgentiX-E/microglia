@@ -9,6 +9,8 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  reconcileServeRotation,
+  readRotationLedger,
   resolveServeRotationPlan,
   rotationCapOf,
   rotationLine,
@@ -226,5 +228,79 @@ describe('rotationLine', () => {
     expect(rotationLine(reading({ cap: 0, requests: 0, servable: 11 }))).toBe(
       'serve rotation: absent (no request was made; fair share over 11 item(s) is unmeasured)',
     );
+  });
+});
+
+describe('the block against the ledger it kept', () => {
+  // R152 shipped a block built from a snapshot taken before the loop: `requests: 0`, `renders: 0`, `maxRenders: 0`
+  // beside a log line saying forty renders over fourteen items. The ledger was in the same file, unread. These
+  // cases pin the reader that compares them, and the reason each field is or is not reachable from it.
+  const ledger = [['k_a'], ['k_a'], ['k_a'], ['k_b'], [], []];
+
+  it('reads the four counts a ledger can account for', () => {
+    expect(readRotationLedger(ledger)).toEqual({
+      requests: 6,
+      renders: 4,
+      distinct: 2,
+      maxRenders: 3,
+      emptyRequests: 2,
+    });
+  });
+
+  it('agrees with a block the same arithmetic produced', () => {
+    const reconciled = reconcileServeRotation(
+      { mode: 'fair-share', cap: 3, requests: 6, renders: 4, distinct: 2, maxRenders: 3, exhausted: ['k_a'], starved: 0 },
+      ledger,
+    );
+    expect(reconciled.problems).toEqual([]);
+    expect(reconciled.checked).toContain('exhausted');
+  });
+
+  it('names the field that disagrees, with both numbers', () => {
+    // The exact shape of the defect: a snapshot taken before the phase reports nothing served.
+    const reconciled = reconcileServeRotation({ mode: 'fair-share', cap: 3, requests: 0, renders: 0, maxRenders: 0 }, ledger);
+    expect(reconciled.problems).toEqual([
+      'requests: the block says 0, the ledger accounts for 6',
+      'renders: the block says 0, the ledger accounts for 4',
+      'maxRenders: the block says 0, the ledger accounts for 3',
+    ]);
+  });
+
+  it('checks `exhausted` only when the block states the cap it is a function of', () => {
+    // Without a cap there is no rung to derive the list at, and a comparison against a guess would invent the
+    // defect it reports rather than find one.
+    const withoutCap = reconcileServeRotation({ exhausted: ['k_b'] }, ledger);
+    expect(withoutCap.problems).toEqual([]);
+    expect(withoutCap.unchecked).toContain('exhausted');
+    const withCap = reconcileServeRotation({ cap: 3, exhausted: ['k_b'] }, ledger);
+    expect(withCap.problems).toEqual([
+      "exhausted: the block names 1 item(s), the ledger's cap of 3 exhausts 1",
+    ]);
+    const zeroCap = reconcileServeRotation({ cap: 0, exhausted: [] }, ledger);
+    expect(zeroCap.problems).toEqual([]);
+  });
+
+  it('bounds `starved` from above rather than deriving it, because an empty pack has two causes', () => {
+    // A request whose pack was empty is either a spent rotation or a store with nothing to say, and the ledger
+    // holds the same empty list for both — so the strongest claim it can support is a ceiling.
+    expect(reconcileServeRotation({ starved: 2 }, ledger).problems).toEqual([]);
+    expect(reconcileServeRotation({ starved: 3 }, ledger).problems).toEqual([
+      'starved: the block says 3, the ledger holds 2 empty request(s)',
+    ]);
+    expect(reconcileServeRotation({ starved: 0 }, ledger).checked).toContain('starved (bounded above)');
+  });
+
+  it('says which fields it cannot reach, and never that they agree', () => {
+    const reconciled = reconcileServeRotation({ mode: 'off', cap: 3 }, ledger);
+    // The policy is the one field no ledger holds: this is why R152's fold could not be repaired at $0.
+    expect(reconciled.unchecked).toEqual(['mode', 'cap', 'servable']);
+    expect(reconciled.checked).toEqual(['requests', 'renders', 'distinct', 'maxRenders']);
+    expect(reconciled.problems).toEqual([]);
+  });
+
+  it('compares nothing against nothing, rather than passing an absent field off as agreement', () => {
+    const reconciled = reconcileServeRotation({}, []);
+    expect(reconciled.problems).toEqual([]);
+    expect(reconciled.checked).toEqual(['requests', 'renders', 'distinct', 'maxRenders']);
   });
 });

@@ -236,3 +236,117 @@ export function rotationLine(reading: RotationReading): string {
     `${String(reading.exhausted.length)} exhausted${starved}`
   );
 }
+
+/**
+ * What the pack ledger says the phase did, re-derived from the ids each request carried.
+ *
+ * The ledger is the arm's own record of which records its packs put in front of an episode, one entry per
+ * request in request order, and it is the same list `rotationsOf` charges to the counter — so it is the one
+ * place the reading can be checked against instead of believed. R152 shipped a block built from a snapshot
+ * taken before the loop (`requests: 0` beside a log line saying forty) and nothing in the record compared the
+ * two; this is the comparison.
+ */
+export type RotationLedgerRead = {
+  /** Requests the ledger holds an entry for, which is what the counter's `requests` counts. */
+  readonly requests: number;
+  readonly renders: number;
+  readonly distinct: number;
+  readonly maxRenders: number;
+  /** Requests whose pack carried no id: starved, or a store with nothing to say. The ledger cannot separate them. */
+  readonly emptyRequests: number;
+};
+
+export function readRotationLedger(ledger: readonly (readonly string[])[]): RotationLedgerRead {
+  const counts = new Map<string, number>();
+  let renders = 0;
+  let empty = 0;
+  for (const ids of ledger) {
+    if (ids.length === 0) empty += 1;
+    for (const id of ids) {
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+      renders += 1;
+    }
+  }
+  let maxRenders = 0;
+  for (const count of counts.values()) if (count > maxRenders) maxRenders = count;
+  return {
+    requests: ledger.length,
+    renders,
+    distinct: counts.size,
+    maxRenders,
+    emptyRequests: empty,
+  };
+}
+
+/**
+ * The block an artefact declares, against the ledger it kept.
+ *
+ * Two lists rather than a boolean, because the interesting answer is not "no" but "which field": `checked` names
+ * what the ledger could account for and `problems` names every disagreement with both numbers in it. The fields
+ * it cannot check are stated with their reasons instead of being silently passed over — `mode` is a policy
+ * nobody can re-derive, `cap` and `servable` come from the store rather than from the ledger, and `starved` shares
+ * its evidence with "the store had nothing to say", so the ledger can only bound it from above.
+ */
+export type RotationReconciliation = {
+  readonly checked: readonly string[];
+  readonly unchecked: readonly string[];
+  readonly problems: readonly string[];
+};
+
+export function reconcileServeRotation(
+  block: {
+    readonly mode?: unknown;
+    readonly cap?: number;
+    readonly requests?: number;
+    readonly renders?: number;
+    readonly distinct?: number;
+    readonly maxRenders?: number;
+    readonly exhausted?: readonly string[];
+    readonly starved?: number;
+  },
+  ledger: readonly (readonly string[])[],
+): RotationReconciliation {
+  const read = readRotationLedger(ledger);
+  const problems: string[] = [];
+  const compare = (field: string, declared: number | undefined, derived: number): void => {
+    if (declared === undefined) return;
+    if (declared === derived) return;
+    problems.push(`${field}: the block says ${String(declared)}, the ledger accounts for ${String(derived)}`);
+  };
+  compare('requests', block.requests, read.requests);
+  compare('renders', block.renders, read.renders);
+  compare('distinct', block.distinct, read.distinct);
+  compare('maxRenders', block.maxRenders, read.maxRenders);
+  // `exhausted` is a function of the cap, so it is only checkable when the block states one: an artefact whose
+  // cap is absent cannot be told from one whose cap is zero, and comparing against a guess would invent the
+  // defect it reports.
+  if (block.exhausted !== undefined && block.cap !== undefined && block.cap > 0) {
+    const cap = block.cap;
+    const counts = new Map<string, number>();
+    for (const ids of ledger) for (const id of ids) counts.set(id, (counts.get(id) ?? 0) + 1);
+    const exhausted = [...counts.entries()]
+      .filter(([, count]) => count >= cap)
+      .map(([id]) => id)
+      .sort();
+    const declared = [...block.exhausted].sort();
+    if (declared.join(',') !== exhausted.join(',')) {
+      problems.push(
+        `exhausted: the block names ${String(declared.length)} item(s), the ledger's cap of ` +
+          `${String(block.cap)} exhausts ${String(exhausted.length)}`,
+      );
+    }
+  }
+  if (block.starved !== undefined && block.starved > read.emptyRequests) {
+    problems.push(
+      `starved: the block says ${String(block.starved)}, the ledger holds ${String(read.emptyRequests)} ` +
+        'empty request(s)',
+    );
+  }
+  const checked = ['requests', 'renders', 'distinct', 'maxRenders'];
+  if (block.exhausted !== undefined && block.cap !== undefined && block.cap > 0) checked.push('exhausted');
+  if (block.starved !== undefined) checked.push('starved (bounded above)');
+  const unchecked = ['mode', 'cap', 'servable'].concat(
+    block.cap === undefined || block.cap === 0 ? ['exhausted'] : [],
+  );
+  return { checked, unchecked, problems };
+}

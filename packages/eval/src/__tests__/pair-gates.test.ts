@@ -32,7 +32,13 @@ function ids(gates: readonly { id: string }[]): string[] {
 describe('a treatment pair', () => {
   it('carries the finding gate and the resolution report', () => {
     const gates = pairGates(treatment);
-    expect(ids(gates)).toEqual(['l4-paired', 'l4-effect-resolved', 'l4-same-split', 'l4-projection-complete']);
+    expect(ids(gates)).toEqual([
+      'l4-paired',
+      'l4-effect-resolved',
+      'l4-same-split',
+      'l4-projection-complete',
+      'l4-rotation-reconciles',
+    ]);
     expect(gates.every((gate) => gate.pass)).toBe(true);
   });
 
@@ -93,6 +99,46 @@ describe('a treatment pair', () => {
     // And absent, not empty, when both arms carried everything: a pair with nothing to report must not carry
     // a sentence that reads as a defect.
     expect(pairGates(treatment).find((entry) => entry.id === 'l4-projection-complete')?.pass).toBe(true);
+  });
+
+  it('refuses an artefact that contradicts the ledger filed beside it', () => {
+    // R152's block was built from a snapshot taken before the phase, so it reported `requests: 0`, `renders: 0`
+    // and `maxRenders: 0` while the same file's pack ledger held forty requests and forty renders. Nothing
+    // compared the two, and the artefact is the file that survives — this is the comparison, and it blocks.
+    const gates = pairGates({
+      ...treatment,
+      rotationReconciled: {
+        checked: ['requests', 'renders', 'distinct', 'maxRenders'],
+        unchecked: ['mode', 'cap', 'servable'],
+        problems: ['requests: the block says 0, the ledger accounts for 40'],
+      },
+    });
+    const gate = gates.find((entry) => entry.id === 'l4-rotation-reconciles');
+    expect(gate?.pass).toBe(false);
+    expect(gate?.blocking).toBe(true);
+    expect(gate?.actual).toBe('requests: the block says 0, the ledger accounts for 40');
+  });
+
+  it('says which fields the ledger could not reach rather than calling them agreement', () => {
+    const gates = pairGates({
+      ...treatment,
+      rotationReconciled: {
+        checked: ['requests', 'renders'],
+        unchecked: ['mode', 'cap', 'servable'],
+        problems: [],
+      },
+    });
+    const gate = gates.find((entry) => entry.id === 'l4-rotation-reconciles');
+    expect(gate?.pass).toBe(true);
+    // The policy is unreachable from any ledger, and the sentence says so: a gate that printed "all agree"
+    // would be claiming the one field it cannot see.
+    expect(gate?.actual).toBe(
+      'requests, renders agree; mode, cap, servable cannot be reached from the ledger',
+    );
+    // And absent on a pair whose arm declared no policy, where there is nothing to reconcile.
+    expect(
+      pairGates(treatment).find((entry) => entry.id === 'l4-rotation-reconciles')?.actual,
+    ).toBe('no policy declared, or no id list kept, so there is no reading to reconcile');
   });
 
   it('always grades the split, because a pair on two splits is not a pair', () => {
@@ -169,7 +215,11 @@ describe('a planted distractor pair', () => {
     // `near` predicts it breaks more episodes than it repairs. A pair verdict of `HARM` is that
     // prediction confirmed, and the gate that reads it as a defect would turn the arm being right into
     // a red job — the seventh instance of one defect class (AUDIT 34.86).
-    expect(ids(pairGates(planted))).toEqual(['l4-same-split', 'l4-projection-complete']);
+    expect(ids(pairGates(planted))).toEqual([
+      'l4-same-split',
+      'l4-projection-complete',
+      'l4-rotation-reconciles',
+    ]);
   });
 
   it('keeps the split gate, which is about the two files rather than about either arm', () => {
