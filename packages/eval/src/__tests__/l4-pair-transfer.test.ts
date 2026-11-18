@@ -494,3 +494,118 @@ describe('the rung the pair prices from the artefacts it was given', () => {
     expect(published.serveSweep).toBeUndefined();
   }, 60_000);
 });
+
+/**
+ * The two identities a cross-fit reads off the pair, over the shape the arms actually write.
+ *
+ * The reference arm is not a memory arm with an empty store in the artefact: it carries a `tau2` block since
+ * R130 — usage, cost, turns, a scenario — and its `split.train` is the empty list `controlRaw` records because
+ * the arm learned nothing, while `split.test` is the same held-out half the memory arm answered. That
+ * asymmetry is the pair's design, and a guard that read it as "two arms that recorded different splits"
+ * refused every artefact this lane has written: the committed pair carries `foldSplitAbsent` and
+ * `treatmentAbsent` down to today, which is why no cross-fit has ever been poolable.
+ */
+describe('the fold a cross-fit reads off the pair', () => {
+  /** One arm as the driver writes it: the four metrics, the episodes, and the `tau2` block both arms carry. */
+  function armWithSplit(input: {
+    readonly arm: 'memory' | 'reference';
+    readonly rows: readonly Row[];
+    readonly train: readonly string[] | undefined;
+    readonly test: readonly string[] | undefined;
+    readonly treatment?: {
+      readonly unit?: string;
+      readonly form?: string;
+      readonly scope?: string;
+      readonly knobs?: string;
+    };
+  }): unknown {
+    const base = arm({ arm: input.arm, rows: input.rows, pass4: 0.5 }) as Record<string, unknown>;
+    return {
+      ...base,
+      model: 'deepseek/deepseek-chat',
+      tau2: {
+        ...((base['tau2'] as Record<string, unknown> | undefined) ?? {}),
+        scenario: { learn: 'retail', test: 'airline', recall: 'retail' },
+        ...(input.train === undefined || input.test === undefined
+          ? // `undefined` rather than nothing: the base fixture is a memory arm and carries a split, and this
+            // case is the arm that predates the field. `JSON.stringify` drops the key, which is absence.
+            { split: undefined }
+          : { split: { train: input.train, test: input.test } }),
+        servedPackSizes: [],
+        learning: { rows: input.train?.length ?? 0, unanswered: 0, edited: 0, distilled: 0, distillFailed: 0 },
+        ...(input.treatment === undefined
+          ? {}
+          : {
+              ...(input.treatment.unit === undefined ? {} : { distillUnit: { unit: input.treatment.unit } }),
+              ...(input.treatment.form === undefined ? {} : { distillForm: { form: input.treatment.form } }),
+              ...(input.treatment.scope === undefined ? {} : { distillScope: input.treatment.scope }),
+              ...(input.treatment.knobs === undefined ? {} : { pack: { summary: null, knobs: input.treatment.knobs } }),
+            }),
+      },
+    };
+  }
+
+  const ROWS: Row[] = [
+    { id: 'airline/1', trial: 0, reward: 1 },
+    { id: 'airline/2', trial: 0, reward: 0 },
+  ];
+
+  function publish(reference: unknown, memory: unknown): Record<string, unknown> {
+    const dir = mkdtempSync(join(tmpdir(), 'l4-pair-fold-'));
+    writeFileSync(join(dir, 'reference.json'), JSON.stringify(reference));
+    writeFileSync(join(dir, 'memory.json'), JSON.stringify(memory));
+    try {
+      execFileSync(TSX, [PAIR], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          POC_RESULT_DIR: dir,
+          L4_FIRST: join(dir, 'reference.json'),
+          L4_SECOND: join(dir, 'memory.json'),
+        },
+      });
+    } catch {
+      // A failed finding gate still publishes its record.
+    }
+    return JSON.parse(readFileSync(join(dir, 'poc-l4-pair.json'), 'utf8')) as Record<string, unknown>;
+  }
+
+  it('states the split of the arm that learned and the treatment of the arm that served', () => {
+    // The reference arm learned nothing and served nothing: `train: []` is its record, not its omission.
+    const reference = armWithSplit({ arm: 'reference', rows: ROWS, train: [], test: ['airline/1', 'airline/2'] });
+    const memory = armWithSplit({
+      arm: 'memory',
+      rows: ROWS,
+      train: ['retail/1', 'retail/2', 'retail/3'],
+      test: ['airline/1', 'airline/2'],
+      treatment: { unit: 'correction', form: 'lesson', scope: 'edited', knobs: '' },
+    });
+    const published = publish(reference, memory);
+
+    expect(published['foldSplitAbsent']).toBeUndefined();
+    expect(published['foldSplit']).toEqual({
+      learned: ['retail/1', 'retail/2', 'retail/3'],
+      evaluated: ['airline/1', 'airline/2'],
+    });
+    expect(published['treatmentAbsent']).toBeUndefined();
+    expect(published['treatment']).toEqual({
+      unit: 'correction',
+      form: 'lesson',
+      scope: 'edited',
+      model: 'deepseek/deepseek-chat',
+      knobs: '',
+    });
+  }, 60_000);
+
+  it('says which arm could not state its split, because an artefact from before the field is not a leak', () => {
+    const reference = armWithSplit({ arm: 'reference', rows: ROWS, train: [], test: ['airline/1', 'airline/2'] });
+    // A memory arm from before R143: no `tau2.split` at all. The pair cannot state the half its store learned,
+    // and it says which arm left the hole rather than inventing a boundary that would pass the leak check.
+    const memory = armWithSplit({ arm: 'memory', rows: ROWS, train: undefined, test: undefined });
+    const published = publish(reference, memory);
+    expect(published['foldSplit']).toBeUndefined();
+    expect((published['foldSplitAbsent'] as { reason: string }).reason).toBe('arm(s) record no evaluation half: memory');
+  }, 60_000);
+});
+

@@ -371,6 +371,30 @@ describe('crossFitLine', () => {
 });
 
 describe('foldSplitOf', () => {
+  it('reads the split from the arm that learned, because the control arm states an empty learning half', () => {
+    // The shape every pair artefact in this lane actually has. `controlRaw` records `train: []` on purpose —
+    // "this arm learned nothing" — while the memory arm records the half its store was built from. A guard
+    // that demanded two identical learning halves therefore refused every artefact this lane has ever
+    // written: the committed pair carries `foldSplitAbsent` down to today. The halves are the pair's: one
+    // evaluation half both arms answered, and the learning half the arm with a store was built from.
+    const outcome = foldSplitOf([
+      { label: 'reference', train: [], test: ['t3', 't4'] },
+      { label: 'memory', train: ['t2', 't1'], test: ['t4', 't3'] },
+    ]);
+    expect(outcome).toEqual({ ok: true, learned: ['t1', 't2'], evaluated: ['t3', 't4'] });
+  });
+
+  it('refuses a pair in which neither arm learned anything, because a fold with no store is not a half', () => {
+    const outcome = foldSplitOf([
+      { label: 'reference', train: [], test: ['t3'] },
+      { label: 'memory', train: [], test: ['t3'] },
+    ]);
+    expect(outcome).toEqual({
+      ok: false,
+      reason: 'no arm states a learning half: a fold whose store learned nothing cannot be half of a corpus',
+    });
+  });
+
   it('reads the two halves from the arms when they agree, sorted so the record is stable', () => {
     const outcome = foldSplitOf([
       { label: 'reference', train: ['t2', 't1'], test: ['t4', 't3'] },
@@ -379,24 +403,45 @@ describe('foldSplitOf', () => {
     expect(outcome).toEqual({ ok: true, learned: ['t1', 't2'], evaluated: ['t3', 't4'] });
   });
 
-  it('refuses when an arm records no split, because half the pair cannot state the boundary alone', () => {
+  it('reads a split from an arm that states an evaluation half and no learning half at all', () => {
+    // An arm whose `tau2` block predates the key still answers a half; only the memory arm has to state what
+    // it learned, because only the memory arm has a store.
+    const outcome = foldSplitOf([
+      { label: 'reference', train: undefined, test: ['t3'] },
+      { label: 'memory', train: ['t1'], test: ['t3'] },
+    ]);
+    expect(outcome).toEqual({ ok: true, learned: ['t1'], evaluated: ['t3'] });
+  });
+
+  it('refuses a third arm that learned a different half, so a pool is never built from two stores', () => {
+    const outcome = foldSplitOf([
+      { label: 'reference', train: [], test: ['t3'] },
+      { label: 'memory', train: ['t1', 't2'], test: ['t3'] },
+      { label: 'memory-b', train: ['t1'], test: ['t3'] },
+    ]);
+    expect(outcome).toEqual({ ok: false, reason: "the arms learned different halves: 'memory-b' learned 1 against 2" });
+  });
+
+  it('refuses when an arm records no split at all, because the pair cannot state a boundary alone', () => {
     const outcome = foldSplitOf([
       { label: 'reference', train: undefined, test: undefined },
       { label: 'memory', train: ['t1'], test: ['t2'] },
     ]);
-    expect(outcome).toEqual({ ok: false, reason: 'arm(s) record no split: reference' });
+    expect(outcome).toEqual({ ok: false, reason: 'arm(s) record no evaluation half: reference' });
   });
 
   it('refuses a caller with no arms at all, rather than reading a split over nothing', () => {
     expect(foldSplitOf([])).toEqual({ ok: false, reason: 'no arm to read a split from' });
   });
 
-  it('names every arm that records no split, so one edit fixes both', () => {
+  it('names every arm that records no evaluation half, so one edit fixes both', () => {
+    // `train` absent is not a defect — an arm with no store states no learning half — but `test` absent is:
+    // an arm that does not say what it answered cannot be paired on anything.
     const outcome = foldSplitOf([
       { label: 'reference', train: undefined, test: ['t2'] },
       { label: 'memory', train: ['t1'], test: undefined },
     ]);
-    expect(outcome).toEqual({ ok: false, reason: 'arm(s) record no split: reference, memory' });
+    expect(outcome).toEqual({ ok: false, reason: 'arm(s) record no evaluation half: memory' });
   });
 
   it('refuses a split whose halves overlap, which is a leak stated in the artefact itself', () => {
@@ -404,27 +449,27 @@ describe('foldSplitOf', () => {
     expect(outcome).toEqual({ ok: false, reason: '1 task(s) are in both halves of the split: t2' });
   });
 
-  it('refuses two arms that ran different splits, which is two runs rather than a pair', () => {
+  it('refuses two arms that learned different halves, which is two runs rather than a pair', () => {
     const outcome = foldSplitOf([
       { label: 'reference', train: ['t1'], test: ['t2'] },
       { label: 'memory', train: ['t1', 't9'], test: ['t2'] },
     ]);
     expect(outcome).toEqual({
       ok: false,
-      reason: "the arms scored different splits: 'memory' learned 2 and answered 1, against 1 and 1",
+      reason: "the arms learned different halves: 'memory' learned 2 against 1",
     });
   });
 
-  it('refuses two arms whose learning halves match but whose evaluation halves do not', () => {
-    // The comparison is on both halves: an arm that learned the same half and answered a different one is
-    // the same defect as the reverse, and checking only the train half would pass it.
+  it('refuses two arms that answered different halves, whatever they learned', () => {
+    // The evaluation half is the pair's, not one arm's: two arms that scored different task sets have no
+    // shared denominator, so no delta between them is a treatment effect.
     const outcome = foldSplitOf([
       { label: 'reference', train: ['t1'], test: ['t2'] },
       { label: 'memory', train: ['t1'], test: ['t3'] },
     ]);
     expect(outcome).toEqual({
       ok: false,
-      reason: "the arms scored different splits: 'memory' learned 1 and answered 1, against 1 and 1",
+      reason: "the arms answered different halves: 'memory' answered 1 against 1, and the lists differ",
     });
   });
 });
@@ -497,10 +542,20 @@ describe('treatmentOf', () => {
     });
   });
 
-  it('refuses a pair where one arm states a field and the other does not', () => {
-    expect(treatmentOf([arm('reference'), arm('memory', { unit: undefined })])).toEqual({
-      ok: false,
-      reason: 'the arms do not both state unit: memory record none, so nothing can compare it',
+  it('reads a field from the arm that states it, because a control arm has no store to describe', () => {
+    // The committed pair artefact carries `treatmentAbsent: "the arms do not both state unit: reference
+    // record none"` on every run of this lane, because the reference arm serves no pack and distils nothing:
+    // unit, form, scope and knobs cannot exist on it. Demanding they be stated twice made the pair unable to
+    // say what treatment it ran, which is the identity a cross-fit pools on. The treatment is the serving
+    // arm's, and a disagreement between arms that both state it still refuses.
+    expect(
+      treatmentOf([
+        arm('reference', { unit: undefined, form: undefined, scope: undefined, traceClaims: undefined }),
+        arm('memory'),
+      ]),
+    ).toEqual({
+      ok: true,
+      treatment: { unit: 'raw', form: 'record', scope: 'edited', model: 'deepseek-chat', traceClaims: 400 },
     });
   });
 

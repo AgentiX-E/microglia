@@ -398,54 +398,83 @@ export type FoldSplitOutcome =
   | { readonly ok: false; readonly reason: string };
 
 /**
- * The arms that state both halves, or nothing when one of them does not.
+ * The arms that state what they answered, or nothing when one of them does not.
  *
  * Returned as a list of narrower objects rather than read through an optional twice: the guard's conclusion
- * is a fact the compiler should be told, and `train?.x ?? []` after the guard would be a branch no input can
+ * is a fact the compiler should be told, and `test?.x ?? []` after the guard would be a branch no input can
  * reach — the kind of dead protection that reads as care and is never exercised.
+ *
+ * Only `test` is required. `train` is not, because the two arms of this lane are not symmetric: the reference
+ * arm serves no pack and distils nothing, so `controlRaw` records an empty learning half on purpose, and an
+ * arm whose store is empty is a control rather than a fold that forgot to state its split.
  */
 function statedHalvesOf(
   arms: readonly FoldSplitArm[],
-): readonly { readonly label: string; readonly train: readonly string[]; readonly test: readonly string[] }[] | undefined {
-  const stated: { label: string; train: readonly string[]; test: readonly string[] }[] = [];
+): readonly { readonly label: string; readonly train: readonly string[] | undefined; readonly test: readonly string[] }[] | undefined {
+  const stated: { label: string; train: readonly string[] | undefined; test: readonly string[] }[] = [];
   for (const arm of arms) {
-    if (arm.train === undefined || arm.test === undefined) return undefined;
+    if (arm.test === undefined) return undefined;
     stated.push({ label: arm.label, train: arm.train, test: arm.test });
   }
   return stated;
 }
 
 export function foldSplitOf(arms: readonly FoldSplitArm[]): FoldSplitOutcome {
-  const stated = statedHalvesOf(arms);
-  if (stated === undefined) {
-    const silent = arms.filter((arm) => arm.train === undefined || arm.test === undefined).map((arm) => arm.label);
-    return { ok: false, reason: `arm(s) record no split: ${silent.join(', ')}` };
-  }
-  const [first, ...rest] = stated;
-  if (first === undefined) {
+  if (arms.length === 0) {
     // No arms at all: a caller that read an empty directory. Refused rather than answered with two empty
     // halves, which would read as a split over nothing.
     return { ok: false, reason: 'no arm to read a split from' };
   }
-  const learned = [...first.train].sort();
+  const stated = statedHalvesOf(arms);
+  if (stated === undefined) {
+    const silent = arms.filter((arm) => arm.test === undefined).map((arm) => arm.label);
+    return { ok: false, reason: `arm(s) record no evaluation half: ${silent.join(', ')}` };
+  }
+  const first = stated[0]!;
   const evaluated = [...first.test].sort();
+  for (const arm of stated.slice(1)) {
+    const theirs = [...arm.test].sort();
+    if (theirs.join(',') !== evaluated.join(',')) {
+      return {
+        ok: false,
+        reason: `the arms answered different halves: '${arm.label}' answered ${String(theirs.length)} against ` +
+          `${String(evaluated.length)}, and the lists differ`,
+      };
+    }
+  }
+
+  // The learning half is the pair's too, and it is the union of every half an arm actually learned from: a
+  // control arm's empty list adds nothing, and two arms that state two different non-empty halves are two
+  // stores rather than one treatment. Narrowed here rather than filtered and re-read with `?? []` below,
+  // because a fallback after the filter would be a branch no input can reach.
+  const learnedBy: { readonly label: string; readonly train: readonly string[] }[] = [];
+  for (const arm of stated) {
+    const mine = arm.train;
+    if (mine !== undefined && mine.length > 0) learnedBy.push({ label: arm.label, train: mine });
+  }
+  const [learner, ...others] = learnedBy;
+  if (learner === undefined) {
+    // No store anywhere: the leak check would compare nothing and the pool would report a fold whose memory
+    // never existed. Refused rather than pooled as a control, which is not a half of a corpus.
+    return { ok: false, reason: 'no arm states a learning half: a fold whose store learned nothing cannot be half of a corpus' };
+  }
+  const base = [...learner.train].sort();
+  for (const arm of others) {
+    const mine = [...arm.train].sort();
+    if (mine.join(',') !== base.join(',')) {
+      return {
+        ok: false,
+        reason: `the arms learned different halves: '${arm.label}' learned ${String(mine.length)} against ${String(base.length)}`,
+      };
+    }
+  }
+  const learned = [...new Set(learnedBy.flatMap((arm) => [...arm.train]))].sort();
   const overlap = learned.filter((id) => evaluated.includes(id));
   if (overlap.length > 0) {
     return {
       ok: false,
       reason: `${String(overlap.length)} task(s) are in both halves of the split: ${overlap.slice(0, 5).join(', ')}`,
     };
-  }
-  for (const arm of rest) {
-    const mine = [...arm.train].sort();
-    const theirs = [...arm.test].sort();
-    if (mine.join(',') !== learned.join(',') || theirs.join(',') !== evaluated.join(',')) {
-      return {
-        ok: false,
-        reason: `the arms scored different splits: '${arm.label}' learned ${String(mine.length)} and answered ` +
-          `${String(theirs.length)}, against ${String(learned.length)} and ${String(evaluated.length)}`,
-      };
-    }
   }
   return { ok: true, learned, evaluated };
 }
@@ -496,6 +525,13 @@ type Stated<T> = { readonly label: string; readonly value: T | undefined };
  *
  * A generic rather than five copies of the same four lines: the rule is identical for all five fields, and a
  * field that skipped the comparison because it was copied by hand is exactly the defect this guards.
+ *
+ * The comparison is over the arms that state the field. A control arm states none of the store's shape — it
+ * serves no pack, distils nothing, and has no unit, form, scope or knobs to report — so requiring every field
+ * twice made this function refuse the only pair shape this lane produces: the committed artefact still reads
+ * `treatmentAbsent: "the arms do not both state unit: reference record none"`. What is still refused, and is
+ * what the guard exists for, is two arms that both state a field and disagree — that is two runs, and the
+ * delta between them is not a treatment effect.
  */
 function agreement<T extends string | number>(
   field: string,
@@ -503,25 +539,22 @@ function agreement<T extends string | number>(
   rest: readonly Stated<T>[],
 ): { readonly ok: true; readonly value: T | undefined } | { readonly ok: false; readonly reason: string } {
   if (rest.length === 0) return { ok: false, reason: 'a treatment needs two arms: one arm is not a pair' };
-  const stated = rest.filter((arm) => arm.value !== undefined);
-  if (first.value === undefined && stated.length === 0) return { ok: true, value: undefined };
-  if (first.value === undefined || stated.length !== rest.length) {
-    const silent = [first, ...rest].filter((arm) => arm.value === undefined).map((arm) => arm.label);
-    return {
-      ok: false,
-      reason: `the arms do not both state ${field}: ${silent.join(', ')} record none, so nothing can compare it`,
-    };
+  const stated: { readonly label: string; readonly value: T }[] = [];
+  for (const arm of [first, ...rest]) {
+    if (arm.value !== undefined) stated.push({ label: arm.label, value: arm.value });
   }
-  const differing = rest.find((arm) => arm.value !== first.value);
+  const [head, ...tail] = stated;
+  if (head === undefined) return { ok: true, value: undefined };
+  const differing = tail.find((arm) => arm.value !== head.value);
   if (differing !== undefined) {
     return {
       ok: false,
       reason:
-        `the arms are two runs, not one treatment: ${field} is '${String(first.value)}' on ${first.label} and ` +
+        `the arms are two runs, not one treatment: ${field} is '${String(head.value)}' on ${head.label} and ` +
         `'${String(differing.value)}' on ${differing.label}`,
     };
   }
-  return { ok: true, value: first.value };
+  return { ok: true, value: head.value };
 }
 
 export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {

@@ -38,6 +38,14 @@ type PairArtefact = {
     readonly scope?: string;
     readonly model?: string;
     readonly traceClaims?: number;
+    /**
+     * R150: the recall filter the arms' requests carried, verbatim.
+     *
+     * Carried rather than ignored: two folds of one store read through two anchors are two experiments, and
+     * the pool can only refuse them if the field reaches it. It was omitted here while the pool compared it,
+     * which made every cross-fit look like it ran one filter.
+     */
+    readonly knobs?: string;
   };
   readonly treatmentAbsent?: { readonly reason: string };
   readonly transfer?: {
@@ -66,6 +74,10 @@ function load(path: string): CrossFitFold {
   const tasks = foldTasksOf(rows);
   if (!tasks.ok) fail(`${path}: ${tasks.reason}`);
   const label = basename(path).replace(/\.json$/, '');
+  // Read once so the narrowing below is on a value rather than on an optional chain re-evaluated after the
+  // check: `exactOptionalPropertyTypes` refuses a present `undefined`, and "the artefact did not state it" is
+  // an absent field rather than one holding nothing.
+  const knobs = doc.treatment?.knobs;
   return {
     label,
     // Absent rather than invented: a fold that does not state what it learned from cannot be checked for the
@@ -76,6 +88,9 @@ function load(path: string): CrossFitFold {
     form: doc.treatment?.form,
     scope: doc.treatment?.scope,
     model: doc.treatment?.model,
+    // Forwarded as the artefact states it, including the empty string: `load` cannot tell "no knob" from
+    // "this reader dropped it", so the normalisation to `none` belongs to `identityOf`, which sees both folds.
+    ...(knobs === undefined ? {} : { knobs }),
   };
 }
 

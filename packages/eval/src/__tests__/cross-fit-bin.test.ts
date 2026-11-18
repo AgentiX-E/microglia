@@ -152,6 +152,32 @@ describe('cross-fit', () => {
     expect(result.err).toContain('fold(s) that do not say what they learned from: fold-a');
   });
 
+  it('refuses two folds served through two recall filters, which the artefact states and the loader must carry', () => {
+    // R150's knob string is the only record of *what filter ran*. The pool has compared it since the field
+    // existed, but the command that feeds the pool omitted it from the fold it builds — so two folds of one
+    // store read through two anchors reached `identityOf` as 'none' and 'none' and pooled. The test is on the
+    // command rather than on the pool because the defect was in the wiring, and a pool test cannot see it.
+    const dir = workdir();
+    const treatment = { unit: 'correction', form: 'lesson', scope: 'all', model: 'deepseek/deepseek-flash', knobs: 'anchoring=lexical' };
+    const a = pair(dir, 'fold-a', { learned: ['retail/2'], rows: [{ task: 'retail/1', blankCorrect: true, withMemoryCorrect: true }], treatment });
+    const b = pair(dir, 'fold-b', { learned: ['retail/1'], rows: [{ task: 'retail/2', blankCorrect: true, withMemoryCorrect: true }], treatment: { ...treatment, knobs: '' } });
+    const result = run([a, b], dir);
+    expect(result.code).toBe(1);
+    expect(result.err).toContain("knobs is 'anchoring=lexical' on fold-a and 'none' on fold-b");
+  });
+
+  it('pools two folds that name the same filter, because one filter served both halves', () => {
+    // The counterpart: the refusal above must not fire on a fold pair that ran one filter, or the knob would
+    // have made every cross-fit unpoolable — a guard that refuses everything is not a guard.
+    const dir = workdir();
+    const treatment = { unit: 'correction', form: 'lesson', scope: 'all', model: 'deepseek/deepseek-flash', knobs: 'anchoring=lexical' };
+    const a = pair(dir, 'fold-a', { learned: ['retail/2'], rows: [{ task: 'retail/1', blankCorrect: false, withMemoryCorrect: true }], treatment });
+    const b = pair(dir, 'fold-b', { learned: ['retail/1'], rows: [{ task: 'retail/2', blankCorrect: true, withMemoryCorrect: true }], treatment });
+    const result = run([a, b], dir);
+    expect(result.code).toBe(0);
+    expect(result.out).toContain('[cross-fit] tiles 2 of 2 task(s)');
+  });
+
   it('refuses two folds of two models, whatever the delta between them is', () => {
     const dir = workdir();
     const treatment = { unit: 'correction', form: 'lesson', scope: 'all', model: 'deepseek/deepseek-flash' };
