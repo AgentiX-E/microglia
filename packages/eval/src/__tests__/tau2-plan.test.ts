@@ -271,6 +271,38 @@ describe('directedSplit, the two directions of one document', () => {
     expect(new Set(learned).size).toBe(corpus.length);
   });
 
+  it('keeps both folds whole at the caps R143 registers', () => {
+    // The registered caps are the published halves in the direction that fold runs: 74/40 forwards, 40/74
+    // backwards. A cap that is right for one direction truncates the other, and a truncated fold is not a
+    // dispatch that fails — it is a dispatch that scores fewer tasks than its registration says, which the
+    // pool then reports as `neverScored` after the money is spent.
+    const train = Array.from({ length: 74 }, (_, index) => `t${String(index)}`);
+    const test = Array.from({ length: 40 }, (_, index) => `h${String(index)}`);
+    const published = { train, test };
+    const shared = { learnIds: [...train, ...test], evalIds: [...train, ...test], learnScenario: 'retail', testScenario: 'retail' };
+
+    const forward = heldOutPlan({ ...shared, trainCap: 74, evalCap: 40, official: published });
+    expect([forward.train.length, forward.test.length]).toEqual([74, 40]);
+
+    const backward = heldOutPlan({
+      ...shared,
+      trainCap: 40,
+      evalCap: 74,
+      official: directedSplit(published, true),
+    });
+    expect([backward.train.length, backward.test.length]).toEqual([40, 74]);
+
+    // And the two folds answer every task exactly once, which is the claim the pool will re-check.
+    const evaluated = [...forward.test, ...backward.test];
+    expect(new Set(evaluated).size).toBe(114);
+    // The leak the pool refuses is *within* a fold; across folds the design is the opposite, and a task the
+    // forward fold learned from is precisely a task the backward fold answers. Asserting the wrong invariant
+    // here was this case's first version, and it failed: the equality below is the design stated exactly.
+    expect(forward.train.some((id) => forward.test.includes(id))).toBe(false);
+    expect(backward.train.some((id) => backward.test.includes(id))).toBe(false);
+    expect(backward.test).toEqual(forward.train);
+  });
+
   it('refuses a split with an empty half, which has no direction to swap into', () => {
     // Unreachable from `splitFromOfficial`, which refuses both empty halves; the guard exists for a caller
     // that built a `TaskSplit` itself, and a refusal nobody can call is a refusal nobody has tested.
