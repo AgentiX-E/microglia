@@ -64,7 +64,7 @@ import { writeJson } from './lib.js';
 import { pairedVerdict } from '../paired-verdict.js';
 import { serveSupportCensus, serveSupportLine, supportMapOf } from '../serve-support.js';
 import { foldSplitOf, treatmentOf } from '../cross-fit.js';
-import { yieldCensus, yieldLine } from '../serve-yield.js';
+import { serveYieldCensus, serveYieldLine } from '../serve-yield.js';
 import { pairGates, plantedBarNote } from '../pair-gates.js';
 import { cacheCensusVerdict, premiumSplitOf } from '../cache-census.js';
 
@@ -428,8 +428,8 @@ if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribut
 // and can only break one it passed, so a record rendered nine times inside a corpus whose control passes 82.5%
 // of its trials has almost no opportunity — and counting repairs per render measures the corpus's difficulty
 // rather than the record. Printed from the same join, at no extra cost.
-const yields = attribution === undefined ? undefined : yieldCensus(attribution.renders);
-if (yields !== undefined) process.stdout.write(`${yieldLine(yields)}\n`);
+const yields = attribution === undefined ? undefined : serveYieldCensus(attribution.renders);
+if (yields !== undefined) process.stdout.write(`${serveYieldLine(yields)}\n`);
 
 // R141: the join the floor's own criterion is written in. The attribution table says which item was served
 // and what it did; the store sample says how many tasks stand behind it. Neither alone can say whether the

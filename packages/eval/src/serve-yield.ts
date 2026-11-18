@@ -45,7 +45,7 @@ export type ServeRender = {
   readonly memoryPassed: boolean;
 };
 
-export type ItemYield = {
+export type ServeYieldItem = {
   readonly itemId: string;
   readonly renders: number;
   /** Renders on a trial the reference arm failed: the only population a repair can come from. */
@@ -62,7 +62,7 @@ export type ItemYield = {
   readonly inertP: number;
 };
 
-export type YieldCensus = {
+export type ServeYieldCensus = {
   readonly renders: number;
   readonly opportunity: number;
   readonly repairs: number;
@@ -70,7 +70,7 @@ export type YieldCensus = {
   readonly inert: number;
   /** Repairs per opportunity, which is the rate the tails are taken against. */
   readonly repairRate: number;
-  readonly items: readonly ItemYield[];
+  readonly items: readonly ServeYieldItem[];
   /** Records whose repair count is below that rate at `alpha`; empty when the sample cannot separate one. */
   readonly candidates: readonly string[];
   /** Opportunities a record needs before zero repairs is evidence at this rate and this alpha. */
@@ -112,7 +112,7 @@ export function opportunitiesForEvidence(rate: number, alpha = 0.05): number {
   return Math.ceil(Math.log(alpha) / Math.log(1 - rate));
 }
 
-export function yieldCensus(renders: readonly ServeRender[], alpha = 0.05): YieldCensus {
+export function serveYieldCensus(renders: readonly ServeRender[], alpha = 0.05): ServeYieldCensus {
   const perItem = new Map<string, { renders: number; opportunity: number; repairs: number; breaks: number; inert: number }>();
   let opportunities = 0;
   let repairs = 0;
@@ -170,7 +170,7 @@ export function yieldCensus(renders: readonly ServeRender[], alpha = 0.05): Yiel
  * The inert share is the number this exists for: it is the fraction of the money's renders that could not have
  * changed the answer, and it is what makes a per-render repair rate a statement about the corpus.
  */
-export function yieldLine(census: YieldCensus): string {
+export function serveYieldLine(census: ServeYieldCensus): string {
   if (census.renders === 0) return 'serve yield: no render was made, so no yield can be read';
   const share = (value: number): string => `${(value * 100).toFixed(2)}%`;
   // A store that repaired every opportunity it was offered has no evidence threshold at all: (1 − 1)^n is zero

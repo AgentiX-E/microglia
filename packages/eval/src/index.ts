@@ -1199,6 +1199,14 @@ export {
   type TreatmentOutcome,
 } from './cross-fit.js';
 export {
+  opportunitiesForEvidence,
+  serveYieldCensus,
+  serveYieldLine,
+  type ServeYieldItem,
+  type ServeRender,
+  type ServeYieldCensus,
+} from './serve-yield.js';
+export {
   pairKey,
   transferReadingOf,
   holdRateOfTrials,

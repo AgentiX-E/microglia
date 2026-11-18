@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { opportunitiesForEvidence, yieldCensus, yieldLine, type ServeRender } from '../serve-yield.js';
+import { opportunitiesForEvidence, serveYieldCensus, serveYieldLine, type ServeRender } from '../serve-yield.js';
 
 /**
  * What a served record could have done, before asking what it did.
@@ -14,11 +14,11 @@ const render = (itemId: string, controlPassed: boolean, memoryPassed: boolean): 
   memoryPassed,
 });
 
-describe('yieldCensus', () => {
+describe('serveYieldCensus', () => {
   it('separates the renders a claim could have repaired from the ones it could only lose', () => {
     // Three renders on trials the control failed (two repaired, one not) and two it passed (one broken, one
     // kept). The opportunity is the three, and the repair rate is over them rather than over all five.
-    const census = yieldCensus([
+    const census = serveYieldCensus([
       render('a', false, true),
       render('a', false, false),
       render('a', false, true),
@@ -47,7 +47,7 @@ describe('yieldCensus', () => {
   it('gives a record with no opportunity a tail of one, because it failed at nothing it could do', () => {
     // R141's breaking record: one render, on a trial the bare agent passed, and it broke it. A rule that
     // counted "zero repairs" would read this as the worst record in the store.
-    const census = yieldCensus([render('breaker', true, false)]);
+    const census = serveYieldCensus([render('breaker', true, false)]);
     expect(census.items[0]?.opportunity).toBe(0);
     expect(census.items[0]?.breaks).toBe(1);
     expect(census.items[0]?.inertP).toBe(1);
@@ -62,7 +62,7 @@ describe('yieldCensus', () => {
       ...Array.from({ length: 8 }, () => render('quiet', true, true)),
       render('quiet', false, false),
     ];
-    const census = yieldCensus(rows);
+    const census = serveYieldCensus(rows);
     expect(census.items[0]?.renders).toBe(9);
     expect(census.items[0]?.opportunity).toBe(1);
     expect(census.items[0]?.inertP).toBeCloseTo(1, 10);
@@ -82,7 +82,7 @@ describe('yieldCensus', () => {
       render('good', false, true),
       render('good', false, true),
     ];
-    const census = yieldCensus(rows, 0.1);
+    const census = serveYieldCensus(rows, 0.1);
     expect(census.repairRate).toBeCloseTo(0.5, 10);
     expect(census.items.find((item) => item.itemId === 'lazy')?.inertP).toBeCloseTo(0.0625, 10);
     expect(census.candidates).toEqual(['lazy']);
@@ -98,20 +98,20 @@ describe('yieldCensus', () => {
   });
 
   it('orders the records by id so two runs of one artefact print the same table', () => {
-    const census = yieldCensus([render('b', false, true), render('a', true, true)]);
+    const census = serveYieldCensus([render('b', false, true), render('a', true, true)]);
     expect(census.items.map((item) => item.itemId)).toEqual(['a', 'b']);
   });
 });
 
-describe('yieldLine', () => {
+describe('serveYieldLine', () => {
   it('prints the opportunity share and the inert share, which are the two numbers a reader needs', () => {
-    const census = yieldCensus([
+    const census = serveYieldCensus([
       render('a', false, true),
       render('a', false, false),
       render('a', true, true),
       render('a', true, true),
     ]);
-    const line = yieldLine(census);
+    const line = serveYieldLine(census);
     expect(line).toContain('4 render(s) over 1 record(s)');
     expect(line).toContain('2 landed where a repair was possible (50.00%)');
     expect(line).toContain('1 repaired, 0 broke, 3 inert (75.00%)');
@@ -122,7 +122,7 @@ describe('yieldLine', () => {
   it('says a store that repaired every opportunity has no threshold, instead of printing infinity', () => {
     // (1 − 1)^n = 0 for every n, so no sample can separate a record at this rate. On a one-opportunity arm that
     // is the honest sentence, and `Infinity` is the number a reader would take for a very large requirement.
-    const line = yieldLine(yieldCensus([render('a', false, true), render('a', true, true)]));
+    const line = serveYieldLine(serveYieldCensus([render('a', false, true), render('a', true, true)]));
     expect(line).toContain('no number of opportunities separates a record at this rate');
     expect(line).not.toContain('Infinity');
   });
@@ -138,10 +138,10 @@ describe('yieldLine', () => {
       render('good', false, true),
       render('good', false, true),
     ];
-    expect(yieldLine(yieldCensus(rows, 0.1))).toContain('1 record(s) below their own rate at 5%: lazy');
+    expect(serveYieldLine(serveYieldCensus(rows, 0.1))).toContain('1 record(s) below their own rate at 5%: lazy');
   });
 
   it('says a run that rendered nothing rendered nothing, rather than dividing by zero', () => {
-    expect(yieldLine(yieldCensus([]))).toBe('serve yield: no render was made, so no yield can be read');
+    expect(serveYieldLine(serveYieldCensus([]))).toBe('serve yield: no render was made, so no yield can be read');
   });
 });
