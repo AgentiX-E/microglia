@@ -33,16 +33,24 @@ import { logBinomialPmf } from '@agentix-e/microglia-core';
 /**
  * One render: a record put in front of an episode, and what that episode did with and without it.
  *
- * There is no task id here, and that is a decision: the census counts renders, and a task served twice by the
- * same record is two renders in two episodes — which is what the transfer table already de-duplicates at the
- * episode, where the identity is known. Carrying the id would invite a second de-duplication at a different
- * grain, and two grains of one count is two answers.
+ * `task` is **attribution and never a count**. This field was withheld for two rounds on the argument that an
+ * id invites a second de-duplication at a different grain, and two grains of one count are two answers. The
+ * argument is sound and the withholding was still wrong: without the id the census cannot say whether the
+ * harm landed on one task of a hundred or one trial of a hundred, which are different diseases
+ * (`serveTaskCensus` in `serve-tasks.ts`). So the field exists, the counting census ignores it, and the suite
+ * asserts that `serveYieldCensus` produces an identical table with and without it — the guard the comment
+ * could not be.
+ *
+ * Absent on an artefact written before the id was carried. A census that reads such an artefact reports the
+ * renders it could not attribute rather than leaving them out of its own total.
  */
 export type ServeRender = {
   readonly itemId: string;
   /** Whether the reference arm — the same task without a memory — passed. */
   readonly controlPassed: boolean;
   readonly memoryPassed: boolean;
+  /** The task this render was served into, for attribution only: no rate in this module divides by it. */
+  readonly task?: string;
 };
 
 export type ServeYieldItem = {

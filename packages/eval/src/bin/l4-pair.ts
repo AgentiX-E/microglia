@@ -65,6 +65,7 @@ import { pairedVerdict } from '../paired-verdict.js';
 import { serveSupportCensus, serveSupportLine, supportMapOf } from '../serve-support.js';
 import { foldSplitOf, treatmentOf } from '../cross-fit.js';
 import { serveYieldCensus, serveYieldLine } from '../serve-yield.js';
+import { serveTaskCensus, serveTaskLine } from '../serve-tasks.js';
 import { pairGates, plantedBarNote } from '../pair-gates.js';
 import { cacheCensusVerdict, premiumSplitOf } from '../cache-census.js';
 
@@ -430,6 +431,12 @@ if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribut
 // rather than the record. Printed from the same join, at no extra cost.
 const yields = attribution === undefined ? undefined : serveYieldCensus(attribution.renders);
 if (yields !== undefined) process.stdout.write(`${serveYieldLine(yields)}\n`);
+// R148: the same renders, grouped by the task they were served into. One hundred breaks on one task and one
+// hundred breaks across a hundred tasks are the same `breaks` count and different illnesses — reach versus
+// interference — and only the second is what a content axis addresses. Nothing counts by this: it is the group
+// key of an attribution, and the yield census above is asserted invariant to the id's presence.
+const taskYields = attribution === undefined ? undefined : serveTaskCensus(attribution.renders);
+if (taskYields !== undefined) process.stdout.write(`${serveTaskLine(taskYields)}\n`);
 
 // R141: the join the floor's own criterion is written in. The attribution table says which item was served
 // and what it did; the store sample says how many tasks stand behind it. Neither alone can say whether the
@@ -575,6 +582,22 @@ await writeJson('poc-l4-pair', {
           repairRate: yields.repairRate,
           opportunitiesForEvidence: yields.opportunitiesForEvidence,
           candidates: yields.candidates,
+        },
+      }),
+  // R148: which tasks the store reached, and how the harm was distributed across them. The rows are the join
+  // grain a content axis needs — `(record, task)` — written here because the arm's artefacts carry the record
+  // text and the trials carry the outcomes, but neither carries the pair.
+  ...(taskYields === undefined
+    ? {}
+    : {
+        serveTasks: {
+          rendered: taskYields.rendered,
+          unattributed: taskYields.unattributed,
+          harmed: taskYields.harmed,
+          helped: taskYields.helped,
+          neutral: taskYields.neutral,
+          contested: taskYields.contested,
+          tasks: taskYields.tasks,
         },
       }),
   ...(retention === undefined ? {} : { retention }),

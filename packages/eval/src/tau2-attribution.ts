@@ -53,6 +53,18 @@ export type EpisodeOutcome = {
   /** Whether the memory arm passed, and whether the control did. */
   readonly memory: boolean;
   readonly control: boolean;
+  /**
+   * The task this episode simulated, when the arm named it.
+   *
+   * R148. The id was in hand at every join — it is the trial row's own `id` — and it was dropped when the
+   * episode was built, which is why two rounds of readings could say a store broke one trial and not whether
+   * it broke one task. It travels as attribution: the counting censuses do not group by it, and
+   * `serveYieldCensus` is asserted to be invariant to its presence.
+   *
+   * Absent on an episode joined by position from an artefact whose trials carry no id, and absent is a
+   * different state from the empty string.
+   */
+  readonly task?: string;
 };
 
 /** One item's record across the trials it was served into. */
@@ -144,7 +156,13 @@ export function itemTransfer(input: {
       // One render per record per episode: an episode that recalled twice and was served the same record at
       // both boundaries was served it once, in the sense that matters to a yield — one trial, one chance to
       // change its outcome.
-      renders.push({ itemId: id, controlPassed: episode.control, memoryPassed: episode.memory });
+      // The task travels with the render and nothing counts by it: `serveYieldCensus` is asserted invariant to
+      // its presence, and `serveTaskCensus` is the only reader, where it is a group key rather than a divisor.
+      renders.push(
+        episode.task === undefined
+          ? { itemId: id, controlPassed: episode.control, memoryPassed: episode.memory }
+          : { itemId: id, controlPassed: episode.control, memoryPassed: episode.memory, task: episode.task },
+      );
     }
   }
 
@@ -241,7 +259,7 @@ export function pairedEpisodes(input: {
       if (other === null || other === undefined || row.reward === null) continue;
       const spans = group.boundaries.map((index) => boundarySpan(input.episodeStarts, index, ledgerLength));
       const startsAt = Math.min(...spans.map(([from]) => from));
-      episodes.push({ startsAt, spans, memory: row.reward === 1, control: other === 1 });
+      episodes.push({ startsAt, spans, memory: row.reward === 1, control: other === 1, task: row.id });
     }
     return episodes;
   }
@@ -258,6 +276,7 @@ export function pairedEpisodes(input: {
       startsAt: input.episodeStarts[index] as number,
       memory: row.reward === 1,
       control: other === 1,
+      task: row.id,
     });
   });
   return episodes;

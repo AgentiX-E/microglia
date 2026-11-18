@@ -142,6 +142,43 @@ describe('the line a run prints about it', () => {
   });
 });
 
+describe('the task a render was served into', () => {
+  const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
+
+  it('travels from the trial row to the render, on both join paths', () => {
+    // R148. The id was in hand at every join and was dropped when the episode was built, which is why two
+    // rounds of readings could report that a store broke one trial and not whether it broke one task. The two
+    // paths below are the identity join and the positional fallback; both must carry it, because a reading
+    // that only worked on the path a named arm takes would be absent exactly when the arm is ambiguous.
+    const named = pairedEpisodes({
+      referenceTrials: [row('a', 0, 1)],
+      memoryTrials: [row('a', 0, 0)],
+      episodeStarts: [0],
+      boundaryTasks: ['a'],
+      ledgerLength: 1,
+    });
+    expect(named?.map((episode) => episode.task)).toEqual(['a']);
+
+    const positional = pairedEpisodes({
+      referenceTrials: [row('b', 0, 1)],
+      memoryTrials: [row('b', 0, 0)],
+      episodeStarts: [0],
+    });
+    expect(positional?.map((episode) => episode.task)).toEqual(['b']);
+  });
+
+  it('leaves the field off a render whose episode named no task', () => {
+    // The absent state is not the empty string: an artefact can predate the field, and a caller can hold an
+    // episode list itself. `exactOptionalPropertyTypes` makes the distinction load-bearing, and the task
+    // census reports these renders instead of attaching them to a task that did not serve them.
+    const reading = itemTransfer({
+      episodes: [{ startsAt: 0, memory: false, control: true }],
+      ledger: [['k_1']],
+    });
+    expect(reading.renders).toEqual([{ itemId: 'k_1', controlPassed: true, memoryPassed: false }]);
+  });
+});
+
 describe('pairing two arms into episodes', () => {
   const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
 
@@ -154,8 +191,8 @@ describe('pairing two arms into episodes', () => {
     // The memory arm's first row is task `a`'s second trial, and it is paired with the reference's second
     // trial. A positional join would compare it against trial 0 and invert both readings.
     expect(episodes).toEqual([
-      { startsAt: 0, memory: true, control: false },
-      { startsAt: 1, memory: false, control: true },
+      { startsAt: 0, memory: true, control: false, task: 'a' },
+      { startsAt: 1, memory: false, control: true, task: 'a' },
     ]);
   });
 
@@ -175,7 +212,7 @@ describe('pairing two arms into episodes', () => {
       memoryTrials: [row('a', 0, 1), row('a', 1, null), row('b', 0, 1)],
       episodeStarts: [0, 1, 2],
     });
-    expect(episodes).toEqual([{ startsAt: 2, memory: true, control: false }]);
+    expect(episodes).toEqual([{ startsAt: 2, memory: true, control: false, task: 'b' }]);
   });
 
   it('drops a trial the other arm never ran', () => {
@@ -184,7 +221,7 @@ describe('pairing two arms into episodes', () => {
       memoryTrials: [row('a', 0, 1), row('z', 0, 0)],
       episodeStarts: [0, 1],
     });
-    expect(episodes).toEqual([{ startsAt: 0, memory: true, control: true }]);
+    expect(episodes).toEqual([{ startsAt: 0, memory: true, control: true, task: 'a' }]);
   });
 });
 
@@ -212,7 +249,7 @@ describe('reading the three fields off an artefact', () => {
       unmatchedRequests: 0,
       // R144: the same join also yields the render, because the yield census needs the episode's control outcome
       // and this loop is the last place it is in hand.
-      renders: [{ itemId: 'k_1', controlPassed: true, memoryPassed: false }],
+      renders: [{ itemId: 'k_1', controlPassed: true, memoryPassed: false, task: 'a' }],
     });
   });
 
@@ -559,8 +596,8 @@ describe('pairing a repeated task into one episode with two ranges', () => {
       ledgerLength: 5,
     });
     expect(episodes).toEqual([
-      { startsAt: 0, spans: [[0, 2], [4, 5]], memory: false, control: true },
-      { startsAt: 2, spans: [[2, 4]], memory: true, control: false },
+      { startsAt: 0, spans: [[0, 2], [4, 5]], memory: false, control: true, task: 'a' },
+      { startsAt: 2, spans: [[2, 4]], memory: true, control: false, task: 'b' },
     ]);
   });
 
@@ -592,7 +629,7 @@ describe('pairing a repeated task into one episode with two ranges', () => {
         boundaryTasks: ['a', 'zzz'],
         ledgerLength: 3,
       }),
-    ).toEqual([{ startsAt: 0, spans: [[0, 2]], memory: true, control: true }]);
+    ).toEqual([{ startsAt: 0, spans: [[0, 2]], memory: true, control: true, task: 'a' }]);
   });
 
   it('declines the pair when the join names nothing at all, because then there is no episode to read', () => {
@@ -680,7 +717,7 @@ describe('the joins tolerance and its refusals', () => {
       boundaryTasks: ['a', 'z'],
       ledgerLength: 4,
     });
-    expect(episodes).toEqual([{ startsAt: 0, spans: [[0, 2]], memory: true, control: true }]);
+    expect(episodes).toEqual([{ startsAt: 0, spans: [[0, 2]], memory: true, control: true, task: 'a' }]);
   });
 });
 

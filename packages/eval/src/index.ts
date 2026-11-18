@@ -1207,6 +1207,12 @@ export {
   type ServeYieldCensus,
 } from './serve-yield.js';
 export {
+  serveTaskCensus,
+  serveTaskLine,
+  type TaskYield,
+  type TaskYieldCensus,
+} from './serve-tasks.js';
+export {
   pairKey,
   transferReadingOf,
   holdRateOfTrials,
