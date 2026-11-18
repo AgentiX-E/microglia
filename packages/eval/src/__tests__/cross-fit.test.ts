@@ -72,6 +72,30 @@ describe('crossFitPool', () => {
     expect(reading.lost).toBe(1);
   });
 
+  it('refuses a rotation fold and an unbounded fold, and pools two that declared the same policy', () => {
+    // R152. This is the pair the lane is about to produce: R143's folds carried no policy and are already on the
+    // record, so a pool that ignored the field would quietly average a bounded arm into two unbounded ones.
+    const [a, b] = tiling();
+    const different = crossFitPool(
+      [
+        { ...(a as CrossFitFold), rotation: 'fair-share' },
+        { ...(b as CrossFitFold), rotation: undefined },
+      ],
+      CROSS_FIT_SEED,
+      200,
+    );
+    expect(different.ok).toBe(false);
+    if (different.ok) return;
+    expect(different.refusals.join(' ')).toContain("rotation is 'fair-share' on A and 'none' on B");
+
+    const same = crossFitPool(
+      [{ ...(a as CrossFitFold), rotation: 'fair-share' }, { ...(b as CrossFitFold), rotation: 'fair-share' }],
+      CROSS_FIT_SEED,
+      200,
+    );
+    expect(same.ok).toBe(true);
+  });
+
   it('refuses two folds served through two filters, and pools two that carried none', () => {
     // R150. `anchoring=lexical` and the default differ in one parameter and in what may appear inside a pack, so
     // the two folds would be one corpus and two experiments. The knob string is compared rather than an anchor
@@ -483,6 +507,7 @@ const arm = (
     model: string;
     traceClaims: number;
     knobs: string;
+    rotation: string;
   }> = {},
 ): Parameters<typeof treatmentOf>[0][number] => ({
   label,
@@ -493,6 +518,8 @@ const arm = (
   traceClaims: 400,
   // R150: absent unless a case states one, which is every artefact written before the field.
   knobs: undefined,
+  // R152: absent unless a case states one. The control arm states none of the serving policy: it serves no pack.
+  rotation: undefined,
   ...over,
 });
 
@@ -526,6 +553,28 @@ describe('treatmentOf', () => {
       ok: false,
       reason:
         "the arms are two runs, not one treatment: knobs is '' on reference and 'anchoring=lexical' on memory",
+    });
+  });
+
+  it('carries the serving policy, and refuses a pair whose arms declared two of them', () => {
+    // R152. A rotation is an identity and not a detail: the arm that bounded how far each item could travel
+    // resolved a cap from the store its run built, and that arm's delta is not a number the unbounded arm's pool
+    // may average in. The control states nothing here, which is silence rather than a disagreement — it serves no
+    // pack and therefore has no policy to declare.
+    expect(treatmentOf([arm('reference'), arm('memory', { rotation: 'fair-share' })])).toEqual({
+      ok: true,
+      treatment: {
+        unit: 'raw',
+        form: 'record',
+        scope: 'edited',
+        model: 'deepseek-chat',
+        traceClaims: 400,
+        rotation: 'fair-share',
+      },
+    });
+    expect(treatmentOf([arm('reference', { rotation: 'off' }), arm('memory', { rotation: 'fair-share' })])).toEqual({
+      ok: false,
+      reason: "the arms are two runs, not one treatment: rotation is 'off' on reference and 'fair-share' on memory",
     });
   });
 

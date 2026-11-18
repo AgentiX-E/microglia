@@ -49,6 +49,8 @@ export type FoldInput = {
     readonly model?: string;
     readonly traceClaims?: number | undefined;
     readonly knobs?: string;
+    /** R152: the serving policy the pair declared, absent on every artefact written before the switch. */
+    readonly rotation?: string;
   };
   /** The run the artefact came from, carried into the record so the fold can be traced back to its dispatch. */
   readonly source?: string;
@@ -68,7 +70,19 @@ export type FoldRecordsOutcome =
   | { readonly ok: true; readonly records: readonly FoldRecord[] }
   | { readonly ok: false; readonly refusals: readonly string[] };
 
-const TREATMENT_FIELDS = ['unit', 'form', 'scope', 'model', 'traceClaims', 'knobs'] as const;
+const TREATMENT_FIELDS = ['unit', 'form', 'scope', 'model', 'traceClaims', 'knobs', 'rotation'] as const;
+
+/**
+ * The fields that may not be carried from one fold to the other, because their absence *is* the control.
+ *
+ * R152. The carry rule exists for fields whose silence means "this artefact is older than the field" — the two
+ * folds then ran the same thing and only one can say so. A serving policy is not that: an arm that bounded how
+ * far each item travels and an arm that did not are two experiments, and carrying the policy across would
+ * convert the unbounded fold into a bounded one on the strength of a header the fold never carried. Composing
+ * R152's pair with a pair written before the switch is exactly the mistake this refuses, and it is the one the
+ * record has already made once at another layer (AUDIT 34.191: a guard that assumed two arms are symmetric).
+ */
+const STRICT_FIELDS: ReadonlySet<string> = new Set(['rotation']);
 
 function sorted(ids: readonly string[]): readonly string[] {
   return [...new Set(ids)].sort();
@@ -110,6 +124,14 @@ function treatmentOf(
       );
       continue;
     }
+    if (stated.length !== inputs.length && STRICT_FIELDS.has(field)) {
+      const silent = inputs.filter((input) => input.treatment?.[field] === undefined).map((input) => input.label);
+      refusals.push(
+        `the folds are two experiments, not one corpus: ${field} is '${String(head!.value)}' on ${head!.label} ` +
+          `and unstated on ${silent.join(', ')} — a field whose absence is the control may not be carried`,
+      );
+      continue;
+    }
     carried[field] = head!.value;
     if (stated.length !== inputs.length) {
       const silent = inputs.filter((input) => input.treatment?.[field] === undefined).map((input) => input.label);
@@ -129,7 +151,7 @@ function treatmentOf(
       ],
     };
   }
-  const text = (field: 'unit' | 'form' | 'scope' | 'model' | 'knobs'): string | undefined => {
+  const text = (field: 'unit' | 'form' | 'scope' | 'model' | 'knobs' | 'rotation'): string | undefined => {
     const value = carried[field];
     return typeof value === 'string' ? value : undefined;
   };
@@ -143,6 +165,7 @@ function treatmentOf(
       ...(text('model') === undefined ? {} : { model: text('model')! }),
       ...(typeof ceiling === 'number' ? { traceClaims: ceiling } : {}),
       ...(text('knobs') === undefined ? {} : { knobs: text('knobs')! }),
+      ...(text('rotation') === undefined ? {} : { rotation: text('rotation')! }),
     },
     notes,
   };

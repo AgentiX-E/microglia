@@ -180,6 +180,31 @@ export class ServeRotationLedger {
 }
 
 /**
+ * What a declared policy writes into the artefact: the mode it asked for, and the reading when a ledger ran.
+ *
+ * Two fields in one block rather than two fields at the top level, because they answer the two questions a
+ * readback asks in order — *which policy was this* (the identity the pool compares) and *what did it do* (the
+ * cap, the maximum, the starved count). A `cap` on its own cannot say whether a zero means "nothing was
+ * withheld" or "the store could serve nothing", and a mode on its own cannot say whether the bound ever bit.
+ */
+export type ServeRotationReport = { readonly mode: ServeRotation } & Partial<RotationReading>;
+
+/**
+ * The policy an artefact's block states, or `none` when it states no block at all.
+ *
+ * `none` and `off` are deliberately different: a fold that never declared a policy and a fold that declared the
+ * identity produced the same request and are different experiments — the first cannot be pooled as the second's
+ * control without claiming a treatment nobody ran. A block with no `mode` is the first rotation arm's artefact
+ * (R152 wrote the reading before the report carried the policy); the only policy that writes a block is the one
+ * that acts, so it reads as `fair-share` rather than as unrecorded.
+ */
+export function rotationModeOf(block: { readonly mode?: unknown } | undefined): ServeRotation | 'none' {
+  if (block === undefined) return 'none';
+  const mode = block.mode;
+  return mode === 'off' || mode === 'fair-share' ? mode : 'fair-share';
+}
+
+/**
  * The ids one pack carried, as the rotation charges them.
  *
  * The pack's `ids` and never its `rendered` text: a folded pack renders one line for several items, and the

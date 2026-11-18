@@ -98,6 +98,14 @@ export type CrossFitFold = {
    * could not say" are the same reading for the purpose of comparing two folds and different facts about them.
    */
   readonly knobs?: string;
+  /**
+   * The serving policy the fold declared: `off`, `fair-share`, or absent on every artefact before R152.
+   *
+   * It is an identity and not a detail, for the reason `knobs` is: two folds of one store, one of which bounded
+   * how far each item could travel, are two experiments — and the second one's arithmetic (a cap resolved from
+   * the store the run built) is not a number the first one's pool may average in.
+   */
+  readonly rotation?: string;
 };
 
 export type CrossFitFoldReading = {
@@ -180,9 +188,9 @@ function foldReadingOf(fold: CrossFitFold): CrossFitFoldReading {
  * A record rather than a list of pairs: the comparison walks a fixed set of names, so every field is compared
  * on every fold and none can be skipped by a list that happened to be shorter.
  */
-type FoldIdentity = Readonly<Record<'unit' | 'form' | 'scope' | 'model' | 'knobs', string>>;
+type FoldIdentity = Readonly<Record<'unit' | 'form' | 'scope' | 'model' | 'knobs' | 'rotation', string>>;
 
-const IDENTITY_FIELDS = ['unit', 'form', 'scope', 'model', 'knobs'] as const;
+const IDENTITY_FIELDS = ['unit', 'form', 'scope', 'model', 'knobs', 'rotation'] as const;
 
 function identityOf(fold: CrossFitFold): FoldIdentity {
   return {
@@ -193,6 +201,10 @@ function identityOf(fold: CrossFitFold): FoldIdentity {
     // `none` rather than `unrecorded`: a run that carried no knob and an artefact that could not say produced
     // the same request, and a pool that refused them would refuse every fold written before the field existed.
     knobs: fold.knobs === undefined || fold.knobs === '' ? 'none' : fold.knobs,
+    // `none` for the same reason `knobs` uses it: an artefact written before the field and a run that declared no
+    // policy produced the same request. A declared `off` is not `none` — it is the identity, chosen and recorded,
+    // and a pool that merged it with an undeclared run would be averaging a control into a treatment.
+    rotation: fold.rotation === undefined || fold.rotation === '' ? 'none' : fold.rotation,
   };
 }
 
@@ -503,6 +515,7 @@ export type TreatmentArm = {
   readonly model: string | undefined;
   readonly traceClaims: number | undefined;
   readonly knobs: string | undefined;
+  readonly rotation: string | undefined;
 };
 
 export type Treatment = {
@@ -512,6 +525,8 @@ export type Treatment = {
   readonly model?: string;
   readonly traceClaims?: number;
   readonly knobs?: string;
+  /** R152: the serving policy the folds declared, `none` when neither stated one. */
+  readonly rotation?: string;
 };
 
 export type TreatmentOutcome =
@@ -568,6 +583,7 @@ export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {
     model: arm.model,
     traceClaims: arm.traceClaims,
     knobs: arm.knobs,
+    rotation: arm.rotation,
   }));
   const unit = agreement('unit', { label: head.label, value: head.unit }, others.map((arm) => ({ label: arm.label, value: arm.unit })));
   if (!unit.ok) return unit;
@@ -589,6 +605,14 @@ export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {
     others.map((arm) => ({ label: arm.label, value: arm.knobs })),
   );
   if (!knobs.ok) return knobs;
+  // R152: the serving policy. Compared like every other field, and stated only by an arm that declared one — the
+  // control arm serves no pack and therefore has no policy to state, which is silence rather than a disagreement.
+  const rotation = agreement(
+    'rotation',
+    { label: head.label, value: head.rotation },
+    others.map((arm) => ({ label: arm.label, value: arm.rotation })),
+  );
+  if (!rotation.ok) return rotation;
   return {
     ok: true,
     treatment: {
@@ -598,6 +622,7 @@ export function treatmentOf(arms: readonly TreatmentArm[]): TreatmentOutcome {
       ...(model.value === undefined ? {} : { model: model.value }),
       ...(ceiling.value === undefined ? {} : { traceClaims: ceiling.value }),
       ...(knobs.value === undefined ? {} : { knobs: knobs.value }),
+      ...(rotation.value === undefined ? {} : { rotation: rotation.value }),
     },
   };
 }

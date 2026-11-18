@@ -71,6 +71,45 @@ describe('foldRecordsOf', () => {
     });
   });
 
+  it('refuses a rotation fold and an unbounded fold as two treatments', () => {
+    // R152. The composition is where two pair artefacts become one claim, so the policy that bounds how far an
+    // item travels has to be compared here and not only in the pool: a fold record that dropped it would hand the
+    // pool two folds that look identical.
+    const official = stating({
+      label: 'official',
+      train: ['t3'],
+      test: ['t1'],
+      treatment: { ...TREATMENT, rotation: 'fair-share' },
+    });
+    const swapped = stating({ label: 'swapped', train: ['t1'], test: ['t3'], treatment: TREATMENT });
+    expect(foldRecordsOf([official, swapped])).toEqual({
+      ok: false,
+      refusals: [
+        "the folds are two experiments, not one corpus: rotation is 'fair-share' on official and unstated on " +
+          'swapped — a field whose absence is the control may not be carried',
+      ],
+    });
+  });
+
+  it('carries the serving policy into the record when both folds declared one', () => {
+    const official = stating({
+      label: 'official',
+      train: ['t3'],
+      test: ['t1'],
+      treatment: { ...TREATMENT, rotation: 'fair-share' },
+    });
+    const swapped = stating({
+      label: 'swapped',
+      train: ['t1'],
+      test: ['t3'],
+      treatment: { ...TREATMENT, rotation: 'fair-share' },
+    });
+    const outcome = foldRecordsOf([official, swapped]);
+    if (!outcome.ok) throw new Error(outcome.refusals.join('; '));
+    expect(outcome.records[0]?.treatment.rotation).toBe('fair-share');
+    expect(outcome.records[1]?.treatment.rotation).toBe('fair-share');
+  });
+
   it('refuses when neither artefact states a treatment, rather than pooling two unrecorded runs', () => {
     const outcome = foldRecordsOf([
       stating({ label: 'official', train: ['t3'], test: ['t1'] }),

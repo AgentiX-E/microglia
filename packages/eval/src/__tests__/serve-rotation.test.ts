@@ -12,6 +12,7 @@ import {
   resolveServeRotationPlan,
   rotationCapOf,
   rotationLine,
+  rotationModeOf,
   rotationsOf,
   SERVE_ROTATIONS,
   ServeRotationLedger,
@@ -159,6 +160,27 @@ describe('ServeRotationLedger', () => {
     expect(reading.maxRenders).toBe(2);
     expect(reading.exhausted).toEqual([]);
     expect(reading.requests).toBe(0);
+  });
+});
+
+describe('rotationModeOf', () => {
+  it('reads a stated mode as itself, including the identity', () => {
+    // The pool compares this string, so `off` and `fair-share` must stay two values: an arm that declared the
+    // control is not an arm that never heard of the switch.
+    expect(rotationModeOf({ mode: 'off' })).toBe('off');
+    expect(rotationModeOf({ mode: 'fair-share' })).toBe('fair-share');
+  });
+
+  it('reads an absent block as no policy at all, which is every artefact before the switch', () => {
+    expect(rotationModeOf(undefined)).toBe('none');
+  });
+
+  it('reads a block without a mode as the policy that writes one', () => {
+    // R152's own artefact: the reading was written before the report carried the policy, and the only policy
+    // that writes a block is the one that acted. A reader that called this `none` would pool the first
+    // rotation fold with a run that never bounded anything.
+    expect(rotationModeOf({ cap: 4, servable: 11 })).toBe('fair-share');
+    expect(rotationModeOf({ mode: 'round-robin' })).toBe('fair-share');
   });
 });
 

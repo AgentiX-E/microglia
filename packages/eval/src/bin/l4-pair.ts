@@ -65,6 +65,7 @@ import { pairedVerdict } from '../paired-verdict.js';
 import { serveSupportCensus, serveSupportLine, supportMapOf } from '../serve-support.js';
 import { foldSplitOf, treatmentOf } from '../cross-fit.js';
 import { serveYieldCensus, serveYieldLine } from '../serve-yield.js';
+import { rotationModeOf } from '../serve-rotation.js';
 import { serveTaskCensus, serveTaskLine } from '../serve-tasks.js';
 import { marginSweep, serveSweepLine } from '../serve-sweep.js';
 import { pairGates, plantedBarNote } from '../pair-gates.js';
@@ -165,6 +166,13 @@ type Artefact = {
       /** R150: the recall knobs the arm's requests carried, verbatim; absent on every artefact before the field. */
       readonly knobs?: string;
     };
+    /**
+     * R152: the travel budget this arm declared, and what it did.
+     *
+     * Read at the phase level rather than under `pack` because the policy is the driver's decision and the cap
+     * is arithmetic over the whole phase (`ceil(requests / servable)`), which no single pack knows.
+     */
+    readonly serveRotation?: { readonly mode?: string; readonly cap?: number; readonly servable?: number };
     /**
      * R128: the request index that opened each episode.
      *
@@ -598,6 +606,9 @@ const treatment = treatmentOf([
     // R150: the filter the request carried, verbatim. Two folds served through two filters are two experiments,
     // and the pool refuses them by this string rather than by re-deriving an anchor from a knob nobody printed.
     knobs: first.tau2?.pack?.knobs,
+    // Stated only when the artefact carries a block: the control arm serves no pack and has no policy to
+    // declare, and `treatmentOf` reads silence as "this arm cannot say" rather than as a disagreement.
+    rotation: first.tau2?.serveRotation === undefined ? undefined : rotationModeOf(first.tau2.serveRotation),
   },
   {
     label: 'memory',
@@ -607,6 +618,8 @@ const treatment = treatmentOf([
     model: second.model,
     traceClaims: second.tau2?.traceClaims?.ceiling,
     knobs: second.tau2?.pack?.knobs,
+    rotation:
+      second.tau2?.serveRotation === undefined ? undefined : rotationModeOf(second.tau2.serveRotation),
   },
 ]);
 

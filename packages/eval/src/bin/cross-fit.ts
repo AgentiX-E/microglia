@@ -60,6 +60,8 @@ type PairArtefact = {
      * which made every cross-fit look like it ran one filter.
      */
     readonly knobs?: string;
+    /** R152: the serving policy the arms declared, absent on every pair written before the switch. */
+    readonly rotation?: string;
   };
   readonly treatmentAbsent?: { readonly reason: string };
   readonly transfer?: {
@@ -94,6 +96,9 @@ function load(path: string): CrossFitFold {
   // check: `exactOptionalPropertyTypes` refuses a present `undefined`, and "the artefact did not state it" is
   // an absent field rather than one holding nothing.
   const knobs = doc.treatment?.knobs;
+  // Forwarded like `knobs`: `load` cannot tell a declared identity from an absent field, so the normalisation
+  // belongs to `identityOf`, which sees both folds.
+  const rotation = doc.treatment?.rotation;
   return {
     label,
     // Absent rather than invented: a fold that does not state what it learned from cannot be checked for the
@@ -107,6 +112,7 @@ function load(path: string): CrossFitFold {
     // Forwarded as the artefact states it, including the empty string: `load` cannot tell "no knob" from
     // "this reader dropped it", so the normalisation to `none` belongs to `identityOf`, which sees both folds.
     ...(knobs === undefined ? {} : { knobs }),
+    ...(rotation === undefined ? {} : { rotation }),
   };
 }
 

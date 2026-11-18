@@ -39,6 +39,8 @@ type PairArtefact = {
     readonly model?: string;
     readonly traceClaims?: number;
     readonly knobs?: string;
+    /** R152: the serving policy, forwarded so the composition can refuse two policies as one treatment. */
+    readonly rotation?: string;
   };
   readonly treatmentAbsent?: { readonly reason: string };
   readonly transfer?: { readonly ledger?: readonly FoldLedgerRow[] };

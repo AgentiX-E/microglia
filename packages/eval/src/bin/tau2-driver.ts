@@ -191,7 +191,7 @@ import {
   rotationLine,
   rotationsOf,
   ServeRotationLedger,
-  type RotationReading,
+  type ServeRotationReport,
 } from "../serve-rotation.js";
 import { speakLineOf } from "../tau2-speak.js";
 import { turnCensusLine, turnCensusOf, type TurnCensus } from "../tau2-turn.js";
@@ -2184,13 +2184,13 @@ export async function run(): Promise<readonly PassAtKInput[]> {
      */
     readonly plant?: PlantCensus;
     /**
-     * R152: what the travel budget did, when this dispatch declared one.
+     * R152: the serving policy this arm declared, and what it did.
      *
-     * Absent on every arm before the switch, and on a fair-share arm whose store could serve nothing — the
-     * `servable` field of a present reading is what tells those two absences apart, which is the same split
-     * `declaredEmptyStore` makes one level up.
+     * Absent on every arm before the switch. A declared identity (`off`) carries the mode and no reading, so an
+     * artefact can tell "this dispatch named the control" from "this dispatch never heard of the switch" — the
+     * distinction the pool needs to refuse pooling the two as one experiment.
      */
-    readonly rotation?: RotationReading;
+    readonly rotation?: ServeRotationReport;
   };
 
   const evaluateFacade = async (
@@ -2234,6 +2234,11 @@ export async function run(): Promise<readonly PassAtKInput[]> {
         ? rotationCapOf({ requests: test.length * TRIALS, servable: census.servable })
         : undefined;
     const rotation = rotationCap === undefined ? undefined : new ServeRotationLedger(rotationCap);
+    // The report and the ledger are two objects on purpose: the mode is what the dispatch declared and belongs in
+    // the artefact whether or not a ledger ran, while the reading only exists for a policy that acted. `off`
+    // therefore ships `{ mode: 'off' }` and is distinguishable from an arm that never mentioned the switch.
+    const rotationReport: ServeRotationReport | undefined =
+      ROTATION.mode === undefined ? undefined : { mode: ROTATION.mode, ...(rotation?.reading() ?? {}) };
     if (rotationCap !== undefined) {
       process.stdout.write(
         `[tau2] serve rotation: fair share declared, cap ${String(rotationCap.cap)} per item ` +
@@ -2408,7 +2413,7 @@ export async function run(): Promise<readonly PassAtKInput[]> {
               plantCreatedBlock,
             ),
           }),
-      ...(rotation === undefined ? {} : { rotation: rotation.reading() }),
+      ...(rotationReport === undefined ? {} : { rotation: rotationReport }),
     };
   };
 
