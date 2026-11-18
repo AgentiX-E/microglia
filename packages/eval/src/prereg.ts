@@ -392,7 +392,7 @@ export type Prereg = {
    * A number produced on a different split cannot be ranked against one produced on this one, whatever
    * the metric agrees on.
    *
-   * One value, `official`, because that is the only split a document states. Absent means the lane
+   * `official` is the document's own direction and `official-swapped` the reverse; absent means the lane
    * cuts the pool as every arm before R92 did, which keeps their readings as published.
    */
   readonly taskSplit?: string;
@@ -566,6 +566,16 @@ const HEADER_KEYS = [
  * registration naming a split the lane cannot serve would otherwise be discovered by the first model
  * call of a paid dispatch, which is the class of check this file exists to move earlier.
  */
+/**
+ * The task splits a registration may name, and the two directions of the published one.
+ *
+ * R143. One document (`split_tasks.json`) states the boundary and two directions read it: the store learns
+ * from its train half and answers its test half, or the reverse. The pair is a cross-fit — every task is
+ * answered by a memory that never saw it, and the two arms pool to the whole corpus — which is the only
+ * population on this lane that can resolve a ten-point effect. A share, a percentage or a count would be a
+ * boundary this repository chose; these two are the boundary the benchmark chose, read either way round.
+ */
+const TASK_SPLITS: ReadonlySet<string> = new Set(['official', 'official-swapped']);
 const HEADER_SPLITS: ReadonlySet<string> = new Set(['minidev', 'dev', 'train']);
 
 /**
@@ -1418,18 +1428,23 @@ export function readPrereg(markdown: string, file: string): PreregReading {
   }
 
   /**
-   * The published split, and the one value that names it.
+   * The published split, and the values that name it.
    *
    * A header that could say `half` or `0.65` would be a share by another spelling, and the whole point of
    * this key is that the boundary is read from the corpus's own file rather than chosen by a number.
+   *
+   * R143 adds the second value: `official-swapped` runs the same document with the halves exchanged, so two
+   * arms — one each way — are a cross-fit over the whole corpus in which every task is answered by a memory
+   * that never saw it. The direction is still the benchmark's, which is why it is a value of this key rather
+   * than a header of its own.
    */
   const taskSplitText = values.get('taskSplit');
   let taskSplit: string | undefined;
   if (taskSplitText !== undefined) {
-    if (taskSplitText !== 'official') {
+    if (!TASK_SPLITS.has(taskSplitText)) {
       collected.push({
         where: `header 'taskSplit'`,
-        problem: `'${taskSplitText}' is not one of official`,
+        problem: `'${taskSplitText}' is not one of ${[...TASK_SPLITS].join(', ')}`,
       });
     } else {
       taskSplit = taskSplitText;

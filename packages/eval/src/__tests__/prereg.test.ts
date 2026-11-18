@@ -2020,11 +2020,20 @@ describe('taskSplit, whose halves an arm runs on', () => {
 
   it('refuses a split stated as a share, because a number here would move the boundary', () => {
     expect(problemsOf(withHeader('taskSplit: 0.6491'), 'R92-official-split.md')).toEqual([
-      "header 'taskSplit': '0.6491' is not one of official",
+      "header 'taskSplit': '0.6491' is not one of official, official-swapped",
     ]);
     for (const bad of ['half', 'Official', 'train']) {
       expect(problemsOf(withHeader(`taskSplit: ${bad}`), 'R92-official-split.md')).toHaveLength(1);
     }
+  });
+
+  it('reads the second direction of the same document, which is the other fold of a cross-fit', () => {
+    // R143: `official-swapped` runs the boundary backwards. Two arms, one each way, are a cross-fit over the
+    // whole corpus — every task answered by a memory that never saw it — and the direction is still the
+    // benchmark's, which is why it is a value of this key and not a boundary this repository chose.
+    const reading = readPrereg(withHeader('taskSplit: official-swapped'), 'R92-official-split.md');
+    expect(reading.problems).toEqual([]);
+    expect(reading.prereg?.taskSplit).toBe('official-swapped');
   });
 
   it('leaves the field absent when the arm cuts the pool itself', () => {
