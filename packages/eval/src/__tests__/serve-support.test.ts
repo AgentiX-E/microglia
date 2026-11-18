@@ -123,15 +123,17 @@ describe('the line a readback quotes', () => {
   it('omits the denominator rather than printing one over an absent census', () => {
     // An artefact from before the store census carries no servable count, and `21 of 0` is a rate above one:
     // the reader would take it for a miscounted denominator rather than for a field the run never wrote.
-    const line = serveSupportLine(
-      serveSupportCensus({
-        items: [item('a', 1, 0)],
-        support: support({ a: 1 }),
-        floor: 1,
-      }),
-    );
+    const census = serveSupportCensus({
+      items: [item('a', 1, 0)],
+      support: support({ a: 1 }),
+      floor: 1,
+    });
+    const line = serveSupportLine(census);
     expect(line).toContain('serve support: 1 item(s) served;');
     expect(line).not.toContain('of 0');
+    // The key is absent and not merely `undefined`: `exactOptionalPropertyTypes` is on, and an artefact
+    // that writes the key with no number is an artefact that answered the question badly.
+    expect('servable' in census).toBe(false);
   });
 
   it('names the buckets, the harm and the counterfactual on one line', () => {

@@ -107,7 +107,10 @@ export function serveSupportCensus(input: {
   return {
     served: input.items.length,
     buckets,
-    servable: input.servable,
+    // Absent, not `undefined`: the type says the field may be missing, and `exactOptionalPropertyTypes`
+    // makes that literalism fair — a present key holding `undefined` is a census that answered "no
+    // denominator" with a value the reader would print.
+    ...(input.servable === undefined ? {} : { servable: input.servable }),
     floor: input.floor,
     belowFloor,
     corroborated,
