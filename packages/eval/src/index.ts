@@ -1167,6 +1167,7 @@ export {
   type LabelCensusTask,
 } from './label-census.js';
 export {
+  directedSplit,
   heldOutPlan,
   qualifiedId,
   splitFromOfficial,
