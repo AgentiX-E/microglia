@@ -405,6 +405,54 @@ describe('the rung the pair prices from the artefacts it was given', () => {
     expect(published.serveSweep?.rows[0]).toMatchObject({ rung: 0, served: 4, net: 0 });
   }, 60_000);
 
+  it('refuses to price a rung when one task was simulated twice, because a render cannot tell the trials apart', () => {
+    // `trials: 4` is a legal arm and this lane has run it. The sweep's unit is the trial, the render's grain is
+    // (record, task), and pooling two trials of one task would price a population the artefacts cannot
+    // separate — so the line names the refusal instead of printing a table about the wrong unit.
+    const dir = mkdtempSync(join(tmpdir(), 'l4-pair-repeat-'));
+    const reference: Row[] = [
+      { id: 'airline/1', trial: 0, reward: 1 },
+      { id: 'airline/1', trial: 1, reward: 1 },
+    ];
+    const memory: Row[] = [
+      { id: 'airline/1', trial: 0, reward: 0 },
+      { id: 'airline/1', trial: 1, reward: 0 },
+    ];
+    writeFileSync(join(dir, 'reference.json'), JSON.stringify(arm({ arm: 'reference', rows: reference, pass4: 0 })));
+    writeFileSync(
+      join(dir, 'memory.json'),
+      JSON.stringify(
+        armWithLedger({
+          rows: memory,
+          pass4: 0,
+          ledger: [['k_1'], ['k_1']],
+          margins: [0.5, 0.4],
+          starts: [0, 1],
+          tasks: ['airline/1', 'airline/1'],
+        }),
+      ),
+    );
+
+    let printed = '';
+    try {
+      printed = execFileSync(TSX, [PAIR], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          POC_RESULT_DIR: dir,
+          L4_FIRST: join(dir, 'reference.json'),
+          L4_SECOND: join(dir, 'memory.json'),
+        },
+      });
+    } catch (error) {
+      printed = String((error as { stdout?: string }).stdout ?? '');
+    }
+    expect(printed).toContain('serve sweep: not priced, 1 task(s) were simulated more than once');
+    const published = JSON.parse(readFileSync(join(dir, 'poc-l4-pair.json'), 'utf8')) as { serveSweep?: unknown };
+    expect(published.serveSweep).toBeUndefined();
+  }, 60_000);
+
   it('says nothing at all when the memory arm carried no margin census', () => {
     const dir = mkdtempSync(join(tmpdir(), 'l4-pair-nosweep-'));
     const rows: Row[] = [

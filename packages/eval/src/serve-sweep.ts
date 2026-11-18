@@ -253,6 +253,13 @@ function trialsOf(renders: readonly PricedRender[]): readonly TrialGroup[] {
  * makes (`margin < rung` serves nothing). A trial is served while any of its renders survives, so the
  * counts are trials and not renders — the same population `serveYieldCensus` divides by, and the reason
  * `netPp` is comparable with the pair's own delta.
+ *
+ * ## The assumption this makes, and who is expected to check it
+ *
+ * A render carries the task it was served into and not the trial number, so a task simulated twice is one
+ * group here and two trials in fact. `l4-pair` refuses to price a rung on such an arm and says so; the
+ * assumption lives in the reader rather than in this function because the artefact is where the repetition
+ * is visible (`per_trial` has the rows) and this module never sees them.
  */
 export function marginSweep(
   renders: readonly PricedRender[],

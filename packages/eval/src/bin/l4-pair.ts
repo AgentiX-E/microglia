@@ -437,6 +437,21 @@ function attributionOf(reference: Artefact, memory: Artefact) {
   });
 }
 
+/**
+ * How many tasks the arm simulated more than once, or `undefined` when every task was simulated once.
+ *
+ * The sweep's unit is the trial and the render's grain is (record, task), so a repeated task is the one case
+ * where the two differ. Counting it here rather than in the sweep keeps `serve-sweep.ts` free of a caller's
+ * assumption: it is the artefact reader's job to know that `per_trial` may carry two rows for one id.
+ */
+function repeatedTask(rows: readonly TauTrialRow[] | undefined): number | undefined {
+  if (rows === undefined) return undefined;
+  const seen = new Map<string, number>();
+  for (const row of rows) seen.set(row.id, (seen.get(row.id) ?? 0) + 1);
+  const repeated = [...seen.values()].filter((count) => count > 1).length;
+  return repeated === 0 ? undefined : repeated;
+}
+
 const attribution = attributionOf(first, second);
 if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribution)}\n`);
 // R144: the denominator the outcome counter never had. A memory can only repair a trial the bare agent failed
@@ -455,10 +470,24 @@ if (taskYields !== undefined) process.stdout.write(`${serveTaskLine(taskYields)}
 // each rung would withhold and could not say whether it would withhold the ones that did damage; this joins the
 // gate's own decision to the pair's ledger and answers it. Zero model calls, and the answer is the one a rung
 // has to be chosen by — the alternative is buying a dispatch per candidate rung.
+//
+// R151: a sweep prices *trials*, and a render carries the task it was served into rather than the trial
+// number, so an arm that simulated one task twice would have its two trials pooled into one. That is the
+// positional assumption the episode join exists to remove, and the cheap guard is to price nothing rather
+// than to price a population the artefacts cannot separate. Named rather than silent: an arm at `trials: 4`
+// is a legal arm, and a readback that printed no sweep would read as an arm with no margin census.
+const repeated = repeatedTask(second.per_trial);
 const sweep =
   attribution === undefined || second.tau2?.pack?.margins?.perRequest === undefined
     ? undefined
-    : marginSweep(attribution.renders);
+    : repeated === undefined
+      ? marginSweep(attribution.renders)
+      : undefined;
+if (repeated !== undefined) {
+  process.stdout.write(
+    `serve sweep: not priced, ${String(repeated)} task(s) were simulated more than once and a render does not say which trial it served\n`,
+  );
+}
 if (sweep !== undefined) process.stdout.write(`${serveSweepLine(sweep)}\n`);
 
 // R141: the join the floor's own criterion is written in. The attribution table says which item was served
