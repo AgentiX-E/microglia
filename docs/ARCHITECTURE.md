@@ -1610,3 +1610,36 @@ it is not evidence about memory: it is a statement that two numbers are not the 
 library's own claim — that a distilled store raises the share of tasks solved in all trials — is a paired
 claim, and the paired claim survives a release boundary exactly as well as it survives a split boundary:
 by being made twice inside one of them.
+
+### 8.18 A fold states what it learned, and the pool refuses what it cannot check
+
+The lane has measured one direction of the benchmark's boundary since R92, and the reason is not the split: it
+is that a paired reading needs a *pair*, and one arm has one. Two arms — the published direction and the reverse
+— give 114 pairs where one gives 40, and the arithmetic is the same function the rest of the record uses.
+
+The design has one claim, and it is not "the memory helps": it is that **no task is scored by a store that saw
+it**. Everything else in the cross-fit follows from how that claim is made checkable.
+
+| decision | the alternative, and why not |
+| --- | --- |
+| the pair artefact records the two id sets (`foldSplit`) | deriving them at read time from the dispatch's environment: the environment is gone by the time anyone reads the file, and a boundary nobody recorded cannot be checked |
+| the pool **refuses** a fold that does not state its learning half | defaulting to "it learned from the other half", which is the assumption that makes the check disappear precisely on the artefacts that need it |
+| a duplicate task is a refusal, not a de-duplication | de-duplication silently changes the sample; a duplicate means one of the two files is not the split it claims to be |
+| the pooled interval comes from `comparePaired` | a second implementation of one statistic: two formulas for one quantity is two answers to a question the record already answers, and the disagreement surfaces as a gate that passes what the power audit rejects |
+
+**Why the identity travels with the pair.** `poolArms` has refused to pool two experiments since R85, and it
+compares the unit, form, scope and model that a *dispatch* declared. A cross-fit pools two *files*, so the same
+four fields have to be in the file. `treatmentOf` reads them from the two arms and refuses when one states a
+field the other omits — absence is not agreement, and a pool that treated it as agreement would average a store
+that distilled corrections with one that distilled something else.
+
+**What the reading carries that a delta cannot.** Two things, and both exist because a pooled mean is a lossy
+summary of two folds:
+
+- **per-fold deltas**, because +25pp and −5pp average to +10pp, and only the columns say whether the mechanism
+  is uniform or the corpus is doing the work;
+- **the tiling census** (`neverLearned`, `neverScored`), because on a corpus where one fold dropped two tasks the
+  pooled `n` is not the corpus's `n`, and the difference is the kind of thing a footnote hides.
+
+Neither is a refusal. A refusal would make the instrument unusable for exactly the diagnosis it exists to
+support — a fold that dropped tasks is a fact to report, not a run to discard.

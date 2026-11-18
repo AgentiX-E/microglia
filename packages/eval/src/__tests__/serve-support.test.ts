@@ -30,10 +30,10 @@ describe('the served population by the support behind it', () => {
     ]);
   });
 
-  it('reads an item the sample does not carry as one task, which is what the store would write', () => {
-    // A sample is capped. An id outside it is not an unknown item — the store writes one task per correction,
-    // so the conservative reading is the one the floor would act on, and a bucket named `unknown` would make
-    // the census look like it measured something it refused to.
+  it('reads an item a complete sample does not carry as one task, which is what the store would write', () => {
+    // Complete sample, so absence is a fact about the store: the store writes one task per correction, and the
+    // conservative reading is the one the floor would act on. A truncated sample is the other case, and it is
+    // the one R141 landed in.
     const census = serveSupportCensus({
       items: [item('a', 1, 0), item('sampled-out', 0, 1)],
       support: support({ a: 2 }),
@@ -42,6 +42,65 @@ describe('the served population by the support behind it', () => {
     });
     expect(census.buckets.find((bucket) => bucket.support === 1)?.items).toBe(1);
     expect(census.served).toBe(2);
+  });
+
+  it('reads a merged member through its group, because the group is where its support lives', () => {
+    // R141's shape: the sample holds 64 of 83 records, six of the fourteen served ids are outside it, and every
+    // one of the six is a member of a group whose support is two or three. Joining on the id alone loses
+    // exactly the records that were corroborated enough to merge — the population a floor of two exists to keep.
+    const map = supportMapOf(
+      { items: [{ id: 'kept', supportTasks: 1 }], omitted: 19 },
+      [{ ids: ['merged-a', 'merged-b'], supportTasks: 2 }, { ids: ['merged-c'], supportTasks: 3 }],
+    );
+    expect(map?.get('kept')).toBe(1);
+    expect(map?.get('merged-b')).toBe(2);
+    expect(map?.get('merged-c')).toBe(3);
+  });
+
+  it('grades a merged member at the support its group carries, instead of failing the floor it satisfied', () => {
+    const map = supportMapOf(
+      { items: [{ id: 'a', supportTasks: 1 }], omitted: 19 },
+      [{ ids: ['a', 'b'], supportTasks: 2 }],
+    );
+    const census = serveSupportCensus({
+      items: [item('a', 2, 0), item('b', 0, 1)],
+      support: map ?? new Map(),
+      servable: 14,
+      floor: 2,
+      truncated: true,
+    });
+    expect(census.belowFloor).toBe(0);
+    expect(census.corroborated).toBe(2);
+    expect(census.unresolved).toBe(0);
+    expect(serveSupportLine(census)).toContain('no served item carries support below it');
+  });
+
+  it('refuses to grade an id a truncated sample does not carry and no group names', () => {
+    // The census cannot say what support it carried, and the one thing it may not do is say one: R141's sample
+    // was 64 of 83, and reading absence as a singleton turned a satisfied criterion into a failed one.
+    const census = serveSupportCensus({
+      items: [item('a', 2, 0), item('outside', 0, 1)],
+      support: support({ a: 2 }),
+      servable: 3,
+      floor: 2,
+      truncated: true,
+    });
+    expect(census.unresolved).toBe(1);
+    expect(census.belowFloor).toBe(0);
+    expect(census.buckets).toEqual([{ support: 2, items: 1, kept: 2, broke: 0, net: 2 }]);
+    expect(serveSupportLine(census)).toContain(
+      '1 served item(s) fall outside the sample and no group names them',
+    );
+  });
+
+  it('says nothing about ungraded items on a census that resolved every one of them', () => {
+    const census = serveSupportCensus({
+      items: [item('a', 1, 0)],
+      support: support({ a: 1 }),
+      floor: 1,
+    });
+    expect(census.unresolved).toBe(0);
+    expect(serveSupportLine(census)).not.toContain('fall outside the sample');
   });
 
   it('leaves the counterfactual to the singleton bucket, and counts nothing below a floor of one', () => {

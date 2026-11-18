@@ -63,6 +63,7 @@ import {
 import { writeJson } from './lib.js';
 import { pairedVerdict } from '../paired-verdict.js';
 import { serveSupportCensus, serveSupportLine, supportMapOf } from '../serve-support.js';
+import { foldSplitOf, treatmentOf } from '../cross-fit.js';
 import { pairGates, plantedBarNote } from '../pair-gates.js';
 import { cacheCensusVerdict, premiumSplitOf } from '../cache-census.js';
 
@@ -71,7 +72,29 @@ type TaskRow = { readonly id: string; readonly passed_all: boolean };
 type Artefact = {
   readonly n?: number;
   readonly metrics?: { readonly pass4?: number; readonly k?: number; readonly tasks?: number };
+  /** The model that answered, which a cross-fit compares because two models are two experiments. */
+  readonly model?: string;
   readonly tau2?: {
+    /**
+     * R85's three-level identity of the treatment, carried so a cross-fit can state what it pooled
+     * instead of reading it from the dispatch that sent the arm.
+     */
+    readonly distillUnit?: {
+      readonly unit?: string;
+      /**
+       * The move pass's groups, each naming every member id and the support the merged record carries.
+       *
+       * R143: the support join needs these because a served id can be a member the store no longer holds under
+       * its own name — 6 of R141's 14 served records were — and the group is the only place that says what
+       * their support is.
+       */
+      readonly consolidation?: {
+        readonly groupDetail?: readonly { readonly ids: readonly string[]; readonly supportTasks: number }[];
+      };
+    };
+    readonly distillForm?: { readonly form?: string };
+    readonly distillScope?: string;
+    readonly traceClaims?: { readonly ceiling?: number };
     /**
      * Which arm wrote the file — `memory`, `reference`, or a declared-empty one under either name.
      *
@@ -105,7 +128,11 @@ type Artefact = {
      * R120/R141: the store sample, which is the only population the support behind a served item can be read
      * from, and the floor the arm served at. Absent on every artefact written before the two fields.
      */
-    readonly storeItems?: { readonly items?: readonly { readonly id: string; readonly supportTasks?: number }[] };
+    readonly storeItems?: {
+      readonly items?: readonly { readonly id: string; readonly supportTasks?: number }[];
+      /** Items the store held beyond the sample's cap, which is what makes absence uninformative. */
+      readonly omitted?: number;
+    };
     readonly supportFloor?: {
       readonly total: number;
       readonly retired: number;
@@ -402,7 +429,10 @@ if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribut
 // items that hurt were the singletons — which is the entire premise of a serve-time floor — and the arm's
 // `supportFloor` says whether a floor was in force at all or only predicted. Three readings in one line: the
 // buckets, the harm inside each, and either the counterfactual (no floor) or the grade (a floor ran).
-const supportBehindServed = supportMapOf(second.tau2?.storeItems);
+const supportBehindServed = supportMapOf(
+  second.tau2?.storeItems,
+  second.tau2?.distillUnit?.consolidation?.groupDetail,
+);
 process.stdout.write(
   `${serveSupportLine(
     supportBehindServed === undefined
@@ -413,6 +443,10 @@ process.stdout.write(
           // Absent when the arm wrote no store census, which is a missing denominator rather than a zero one.
           ...(second.tau2?.store?.servable === undefined ? {} : { servable: second.tau2.store.servable }),
           floor: second.tau2?.supportFloor?.floor ?? 1,
+          // R143: a capped sample is a prefix of the store, so an id it does not carry is not evidence of a
+          // singleton. R141 was 64 of 83, and six of its fourteen served records were in the nineteen it left
+          // out — every one of them with two or three tasks behind it.
+          truncated: (second.tau2?.storeItems?.omitted ?? 0) > 0,
         }),
   )}\n`,
 );
@@ -476,6 +510,36 @@ const retention =
     : // `second` is the memory arm by construction, the same order the comparison uses.
       { reference: firstHeld, memory: secondHeld };
 
+// R143: the two identities a cross-fit cannot do without, read from the arms rather than from the dispatch.
+//
+// The pair has always said which two files it compared and what the difference between them was. It has never
+// said what the stores learned from or what treatment they ran, so the one property a cross-fit rests on — that
+// no fold answered a task its own store had learned — could not be checked from the artefact at all, and a
+// reader who wanted to check it had to read the workflow. Both are refusals-with-a-reason rather than blanks:
+// an arm from before the field existed cannot state its split, and saying so is different from saying nothing.
+const foldSplit = foldSplitOf([
+  { label: 'reference', train: first.tau2?.split?.train, test: first.tau2?.split?.test },
+  { label: 'memory', train: second.tau2?.split?.train, test: second.tau2?.split?.test },
+]);
+const treatment = treatmentOf([
+  {
+    label: 'reference',
+    unit: first.tau2?.distillUnit?.unit,
+    form: first.tau2?.distillForm?.form,
+    scope: first.tau2?.distillScope,
+    model: first.model,
+    traceClaims: first.tau2?.traceClaims?.ceiling,
+  },
+  {
+    label: 'memory',
+    unit: second.tau2?.distillUnit?.unit,
+    form: second.tau2?.distillForm?.form,
+    scope: second.tau2?.distillScope,
+    model: second.model,
+    traceClaims: second.tau2?.traceClaims?.ceiling,
+  },
+]);
+
 await writeJson('poc-l4-pair', {
   id: 'poc-l4-pair',
   title: 'L4 — memory arm against the reference arm on one split, paired per task',
@@ -485,6 +549,10 @@ await writeJson('poc-l4-pair', {
   first: { path: FIRST, ranAt: first.ranAt ?? null, pass4: first.metrics?.pass4 ?? null },
   second: { path: SECOND, ranAt: second.ranAt ?? null, pass4: second.metrics?.pass4 ?? null },
   comparison,
+  ...(foldSplit.ok
+    ? { foldSplit: { learned: foldSplit.learned, evaluated: foldSplit.evaluated } }
+    : { foldSplitAbsent: { reason: foldSplit.reason } }),
+  ...(treatment.ok ? { treatment: treatment.treatment } : { treatmentAbsent: { reason: treatment.reason } }),
   ...(retention === undefined ? {} : { retention }),
   // The degradation reading, unconditionally: it is the only number in this artefact that says how
   // many trials the treatment broke rather than how many tasks it changed.

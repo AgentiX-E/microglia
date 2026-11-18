@@ -58,6 +58,13 @@ export type ServeSupportCensus = {
   readonly belowFloor: number;
   /** Served items with two or more tasks behind them — the population a floor of two leaves. */
   readonly corroborated: number;
+  /**
+   * Served items a truncated sample does not carry and no group names.
+   *
+   * Neither graded nor bucketed: the census cannot say what support they carried, and the one thing it may not
+   * do is say one. Zero on every arm whose sample is the whole store.
+   */
+  readonly unresolved: number;
 };
 
 /**
@@ -69,16 +76,19 @@ export type ServeSupportCensus = {
  */
 export function supportMapOf(
   sample: { readonly items?: readonly { readonly id: string; readonly supportTasks?: number }[] } | undefined,
+  groups?: readonly { readonly ids: readonly string[]; readonly supportTasks: number }[],
 ): ReadonlyMap<string, number> | undefined {
   if (sample?.items === undefined) return undefined;
   const map = new Map<string, number>();
   for (const row of sample.items) map.set(row.id, row.supportTasks ?? 1);
+  // R143: the move pass merges records and keeps one row per group, so a served id can be a member the store
+  // no longer holds under its own name. The group table names every member and carries the group's support,
+  // which is the number the floor acted on — and joining on the id alone loses exactly the records that were
+  // corroborated enough to merge, which is the population a floor of two exists to keep.
+  for (const group of groups ?? []) {
+    for (const id of group.ids) map.set(id, group.supportTasks);
+  }
   return map;
-}
-
-/** The support a served item carries, with the store's own default for an id the sample omits. */
-function supportOf(id: string, support: ReadonlyMap<string, number>): number {
-  return support.get(id) ?? 1;
 }
 
 export function serveSupportCensus(input: {
@@ -86,12 +96,31 @@ export function serveSupportCensus(input: {
   readonly support: ReadonlyMap<string, number>;
   readonly servable?: number;
   readonly floor: number;
+  /**
+   * Whether the sample is the whole store or a prefix of it.
+   *
+   * R143, and this is the defect the field closes: `storeItemSample` caps at 64 rows and records what it left
+   * out, but the census read every unlisted id as one task. On R141 — 83 items, 64 sampled, 19 omitted — six of
+   * the fourteen served records were in the omitted nineteen, and all six had two or three tasks behind them.
+   * The census would have reported `6 of 14 served items below the floor`, which is the round's own criterion
+   * failing on a run that satisfied it, and the failure would have been the sample's size rather than the store.
+   *
+   * A truncated sample makes absence uninformative. Absence from a *complete* sample is still a fact — the
+   * store writes one task per correction — so the default of one survives exactly where it is justified.
+   */
+  readonly truncated?: boolean;
 }): ServeSupportCensus {
   const counted = new Map<number, ServeSupportBucket>();
   let belowFloor = 0;
   let corroborated = 0;
+  let unresolved = 0;
   for (const item of input.items) {
-    const support = supportOf(item.id, input.support);
+    const resolved = input.support.get(item.id);
+    if (resolved === undefined && input.truncated === true) {
+      unresolved += 1;
+      continue;
+    }
+    const support = resolved ?? 1;
     const current = counted.get(support) ?? { support, items: 0, kept: 0, broke: 0, net: 0 };
     counted.set(support, {
       support,
@@ -114,6 +143,7 @@ export function serveSupportCensus(input: {
     floor: input.floor,
     belowFloor,
     corroborated,
+    unresolved,
   };
 }
 
@@ -148,7 +178,12 @@ export function serveSupportLine(census: ServeSupportCensus | undefined): string
     census.servable === undefined
       ? `${String(census.served)} item(s) served`
       : `${String(census.served)} of ${String(census.servable)} servable item(s) served`;
-  return `serve support: ${served}; ${single}; ${corroborated}; ${verdict}`;
+  const ungraded =
+    census.unresolved === 0
+      ? ''
+      : `; ${String(census.unresolved)} served item(s) fall outside the sample and no group names them, so ` +
+        'neither the bucket nor the floor is graded for them';
+  return `serve support: ${served}; ${single}; ${corroborated}; ${verdict}${ungraded}`;
 }
 
 function signed(value: number): string {

@@ -3508,3 +3508,84 @@ problem, and `uncached_tokens_per_call` is where it shows.
 > earlier copy — identify it by the element your renderer emits — instead of appending to the state you were
 > handed. A wrapper that only appends is correct under a benchmark that passes a fresh state each turn and
 > wrong under one that threads the state back, and the two are indistinguishable from inside the wrapper.
+
+## 25. Two folds, one corpus: reading a cross-fit
+
+Every paired number this project publishes on τ² retail sits on **40 tasks**, and at n = 40 a paired design
+resolves about **17 percentage points**. A memory worth ten points therefore reads as `UNRESOLVED` forever —
+not because it is small, but because the sample cannot see it. The corpus is 114 tasks and the lane has been
+scoring 40 of them.
+
+A **cross-fit** spends the whole corpus without leaking it. The benchmark states a boundary — 74 train, 40 test —
+and two arms read it in opposite directions:
+
+| fold | the store learns from | the store answers |
+| --- | --- | --- |
+| `official` | the benchmark's train half (74) | the benchmark's test half (40) |
+| `official-swapped` | the benchmark's test half (40) | the benchmark's train half (74) |
+
+Each task is answered **exactly once, by a memory that never saw it**, and the two folds pool to 114 pairs. At
+114 the same design resolves about 10pp.
+
+### 25.1 Run it
+
+```bash
+pnpm eval:cross-fit eval/results/folds/official.json eval/results/folds/swapped.json
+```
+
+Each argument is a **pair artefact** — the file `l4-pair` writes — and it must carry two fields that this
+release added:
+
+- `foldSplit: { learned, evaluated }` — the two id sets the arms ran, read from the arms themselves;
+- `treatment: { unit, form, scope, model }` — what the pair ran, as `poolArms` compares it.
+
+Artefacts written before this release carry neither. They are not silently accepted: the command refuses them
+with the reason, because the check below is the whole claim.
+
+### 25.2 What it prints
+
+```
+[cross-fit] pooled n=114 memory=0.9211 control=0.8333 delta=+8.77pp [1.75, 15.79] p=0.0213 lost=3 gained=13 mde80=6.94pp
+[cross-fit] folds: official +10.00pp (n=40), official-swapped +7.50pp (n=74)
+[cross-fit] tiles 114 of 114 task(s); folds agree in sign
+```
+
+Read it in this order:
+
+1. **`pooled n`** — must equal the corpus. If it is smaller, look at the third line.
+2. **`delta` and its interval** — the pair's own reading, over every task once.
+3. **`mde80`** — the smallest difference this many pairs could detect at 80% power. An interval that contains
+   zero and an `mde80` larger than the delta is an unresolved reading, whatever the point estimate says.
+4. **`folds:`** — the per-fold deltas. A pooled +8.77pp can be +20pp in one fold and −2pp in the other, and that
+   is two findings averaged rather than one finding.
+5. **`tiles` / `agree in sign`** — see below.
+
+### 25.3 The four refusals, and the defect each one stops
+
+| refusal | what it would have produced |
+| --- | --- |
+| one fold supplied | the fold itself, described as a corpus |
+| the same task evaluated in both folds | a task counted twice: n inflated, interval narrowed in the direction that flatters the result |
+| a fold that evaluated a task **its own store learned from** | a leak, and the number comes out **better** than the truth instead of failing |
+| a fold that does not state what it learned from | the leak check cannot run, and a missing check is never reported as missing by an average |
+| two folds whose `treatment` differs | a larger sample of two experiments, averaged |
+
+The third is the one to watch. It is invisible in a run: an arm that trains on its own evaluation set prints a
+score, not an error.
+
+### 25.4 `tiles`, and why it is a count rather than a refusal
+
+`tiles 114 of 114 task(s)` means the two folds learned from and evaluated exactly the same set — the corpus is
+covered once. When it reads `does not tile`, two counts follow:
+
+- **evaluated and learned by neither fold** — a task no memory had seen at all;
+- **learned and evaluated by neither** — the corpus's leftover, which the pooled `n` does not cover.
+
+Neither is a failure. Both change what the pooled number is a number *about*, so the line states them beside it
+rather than in a footnote.
+
+### 25.5 What it does not do
+
+It does not make a small effect resolved. On τ² retail with the observed discordance, 114 pairs resolve about
+7–10pp; a real 4pp effect would still read `UNRESOLVED`, and the `mde80` on the line is how you know before you
+spend the money.

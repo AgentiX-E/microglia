@@ -1616,3 +1616,11 @@ rode on. Structural rather than nominal: it is visible from the roles alone, so 
 pack's element cannot move the split. `system_chars_per_unpacked_call` is the same column on the calls the
 pack did not ride, which is the mixture R135's mean hid — the user simulator's prompt is neither the
 agent's policy nor the pack, and its weight in the mean moves with how many turns each side took.
+
+| Term | In this project | Why the distinction matters |
+| --- | --- | --- |
+| "Cross-validation" | *cross-fit* | A cross-fit is two folds of one corpus read as one paired sample, not k models averaged: each task is answered once, and the reading is a paired difference |
+| "Split" | *fold* | A fold is (what a store learned from, what it answered). The split is the boundary; the fold is one direction of it |
+| "Fold identity" | *`foldSplit`* | The two id sets an arm ran, recorded in the pair artefact, because the leak check is the cross-fit's whole claim |
+| "Model config" | *treatment identity* (`unit`, `form`, `scope`, `model`, `traceCeiling`) | Two folds of two treatments are two experiments; the pool refuses to average them |
+| "Missing data" | *truncated sample* | A capped sample is a prefix of the store, so an id it does not carry is not evidence of a singleton |
