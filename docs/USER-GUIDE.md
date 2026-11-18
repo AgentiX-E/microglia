@@ -3673,3 +3673,56 @@ and the floor looked broken when it was not.
 It does not tell you whether to keep a record. It tells you how many opportunities the arm gave the records, how
 many it took, and how much data a per-record verdict would need. On a corpus where 85% of renders are inert,
 the answer to "is this record good?" is usually "you have not asked it enough times".
+
+---
+
+## 27. Waiting for the cheap window, and who is allowed to spend
+
+The lane has two prices, and one of them is roughly double. The rate card declares its peak windows in UTC —
+**01:00–04:00 and 06:00–10:00 on weekdays** — and a run that straddles the boundary is billed at both.
+
+### 27.1 Three levers, and the one that bites
+
+| lever | what it does | where it can go wrong |
+| --- | --- | --- |
+| `not_before: HH:MM` | the job sleeps until that UTC hour before its first paid step | a wait longer than **240 minutes** is refused, and a dispatch must still leave room for the run: send it no earlier than `target − (315 − deadline_min)` |
+| the window guard | estimates the run from the registration's own caps and refuses if it would cross into peak | an estimate is only as good as the caps: a registration that pins no `trainTasks`/`testTasks` is refused, because an estimate of zero fits every window |
+| `--require-off-peak` | the runner refuses a **phase** that starts inside peak | it is checked per phase, so it fires after the first phase has been paid for — which is why the guard exists in front of it |
+
+The estimate is `(learn tasks + evaluated tasks) × trials × arms × 26 s + 10 min`: 114 tasks, one trial, two
+arms is 109 minutes. That number is printed on every dispatch, pass or fail, so the next one can be sized
+deliberately.
+
+### 27.2 What a refusal looks like, and what it means
+
+```
+off-peak window: 30 minute(s) left against an estimate of 109 — the run would cross into the window that
+opens at 06:00, and `--require-off-peak` is checked per phase, so the half it paid for would be lost.
+Dispatch with not_before: 06:00
+```
+
+Read the last sentence first: a refusal always names the hour that would work. If it names an hour less than
+240 minutes away, re-dispatch with it. If it names one further out, the run does not fit this window at all and
+either the caps come down or the dispatch waits.
+
+### 27.3 A guard two arms must both obey
+
+The guard publishes its answer (`fits`) and **both** arms consult it, because the alternative was measured:
+one arm's `if:` expression inherited GitHub's implicit `success()` and the other's did not, so a refused
+dispatch skipped one arm and bought the other. That is $0.10 of control arm against a run already refused —
+and it is invisible in the job summary, which shows one skipped step and one green one.
+
+The related defect is worth knowing because it is silent and slow: an hour that has already passed is read as
+**tomorrow's**. A dispatch that slept to 04:00 and then asked the guard for permission was told its window was
+1440 minutes away, after the wait was spent. The waiter therefore publishes the instant it woke and the guard
+consumes that instant; `not_before` is parsed once, by the step that sleeps on it.
+
+### 27.4 The checklist before a paid dispatch
+
+1. The registration pins `trainTasks` and `testTasks` — otherwise there is no estimate.
+2. `not_before` names an hour at least `estimate` minutes before the next peak window opens.
+3. The dispatch is sent no earlier than 240 minutes before that hour, and leaves `deadline_min + 25` minutes
+   inside the 340-minute job limit.
+4. `pnpm eval:band` says off-peak **now**, if the run is not waiting.
+5. The workflow file parses — an expression error is a 422 at dispatch, not a red step at the line, and it
+   costs the round a dispatch window rather than a dollar.

@@ -1688,3 +1688,35 @@ The refusal is kept for the one case where there is nothing to publish — no ep
 | the coefficient is the store's own rate, not a prior | a fixed 0.5: the number of opportunities a record needs depends on how good the store is, and a prior would make a good store look under-sampled |
 | a dropped boundary is counted, not fatal | refusing the arm: it costs the reading and reports nothing, and the arm that needed the diagnosis most is exactly the one that dropped a boundary |
 | `unmatchedRequests` is coverage-derived | testing `ordered.length`: a property of the join's input instead of its output, which is how the count read 0 on the arm that had dropped requests |
+
+### 8.20 One parse, one clock, and a guard that is a value
+
+`not_before` is a request for a later moment, and three steps need to agree about that moment: the waiter (how
+long to sleep), the deadline check (how much of the job limit the sleep has consumed) and the window guard
+(whether the run that starts then will finish before the expensive hour). The first version had the waiter parse
+the request and the guard parse it again, minutes later:
+
+| reader | when it read | answer |
+| --- | --- | --- |
+| `eval:wait-band` | 01:54 | sleep 126 minutes, wake at 04:00 |
+| `eval:window-fit` | 04:00:27 | `04:00` is 1440 minutes away |
+
+`planBandWait` reads a passed hour as the next day's, which is right for a dispatch sent at 05:00 naming 04:00
+and wrong for a guard grading the wait it just performed. The dispatch slept two hours and was refused.
+
+**The repair is a single derivation, published.** The waiter writes both quantities downstream needs —
+`wait_min`, a duration, and `start_at`, an instant — and the guard takes its `now` from `start_at` rather than
+from a second parse. `TAU_START_AT` being unreadable is a refusal that names the variable; the fallback to the
+wall clock is precisely the defect, because the clock at the check is not the instant of the start and at a
+boundary the two sit on opposite sides.
+
+| decision | the alternative, and why not |
+| --- | --- |
+| the waiter publishes an **instant**, not the hour it was given | re-parsing `HH:MM` downstream: any reader that arrives after the hour must decide whether it passed, and the two readers decided differently |
+| the guard's answer travels as an output (`fits`) | its exit code: GitHub adds an implicit `success()` only to `if:` expressions that name no status function, so one arm inherited the gate and the other — the one whose condition names `!cancelled()` — did not |
+| an unreadable `TAU_START_AT` refuses | a fallback to now: at a boundary the fallback lands on the other side of the window, which is the same 1440-minute error with a shorter explanation |
+| the arms' conditions spell the gate out | relying on ordering: a step order is a fact about the file, and a gate is a fact about the run |
+
+**What a guard is, stated as a rule.** A step that fails makes a job red; a step that **publishes its answer**
+makes a decision. Only the second can be obeyed by a step whose own condition has a status function in it, and
+the number of such steps is not visible from the guard.

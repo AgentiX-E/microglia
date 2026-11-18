@@ -1646,6 +1646,24 @@ the join's input (`ordered.length`), which is how the field read `0` on the very
 An arm that resolves **some** boundaries publishes the table and reports the hole; one that resolves none is
 refused, because there is nothing to publish.
 
+**Off-peak window** — The hours the rate card prices at the lower band: everything outside **01:00–04:00 and
+06:00–10:00 UTC on weekdays** for `deepseek-flash`. A dispatch that crosses a boundary is billed at both rates,
+and the runner's `--require-off-peak` is evaluated **per phase**, so the expensive half is refused after the
+cheap half has been paid for. Two commands exist for that: `eval:wait-band` sleeps to the hour a dispatch named
+(`not_before: HH:MM`, capped at 240 minutes), and `eval:window-fit` refuses the run if its own estimate — caps ×
+trials × arms × 26 s + 10 min — would not finish before the window closes.
+
+**`start_at`** — The instant the wait step woke, published as an ISO moment beside `wait_min`. It exists because
+the window guard needs a **moment** and used to re-parse `not_before` on its own clock minutes after the wait
+ended, where a passed hour reads as tomorrow's: a dispatch that slept to 04:00 was refused at 04:00:27 with
+"1440 minutes away". One parse, one clock: `not_before` is read only by the step that sleeps on it.
+
+**`fits`** — The window guard's answer, published for the arms to read. A step that fails makes the job red; a
+step that publishes an output makes a **decision** other steps can obey. Both arms consult
+`steps.window.outputs.fits != 'false'`, because relying on the failure alone gated only one of them: GitHub adds
+an implicit `success()` to an `if:` that names no status function, so the arm whose condition was a plain input
+comparison was skipped and the arm whose condition named `!cancelled()` bought its half of a refused run.
+
 | Term | In this project | Why the distinction matters |
 | --- | --- | --- |
 | "Cross-validation" | *cross-fit* | A cross-fit is two folds of one corpus read as one paired sample, not k models averaged: each task is answered once, and the reading is a paired difference |
@@ -1656,3 +1674,5 @@ refused, because there is nothing to publish.
 | "Improvement rate" | *repair rate* (`repairs / opportunities`) | Dividing by renders measures how often the corpus offers a failure to fix; dividing by opportunities measures the store |
 | "Turn" | *render* | A render is one record on one turn, not one trial: the counts differ per record and per arm |
 | "Dropped data" | *unmatched requests* | A hole that is counted is published beside the reading; a condition that returns `undefined` costs the whole table |
+| "Sleep until" | *`not_before` + `start_at`* | The request is an hour; the run has an instant. Two readers of one hour disagree at the boundary |
+| "Guard failed" | *`fits=false`* | A red step is a report; an output is a gate. Only the second is obeyed by a step whose `if:` names a status function |
