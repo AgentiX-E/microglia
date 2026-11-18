@@ -493,6 +493,18 @@ describe('the window guard gates both arms, and neither of them relies on an imp
     expect(conditionOf('L4 arm — reference')).toContain("steps.window.outputs.fits != 'false'");
   });
 
+  it('ships the pair artefact on its own, because a cross-fit reads a file and not a bundle', () => {
+    // R147: the evidence bundle is 20.6 MB and the two files a pool needs are inside it. A fold is fetched by
+    // the operator channel at roughly 32 KB/s, so the pair travels separately and the pool names what is
+    // missing rather than an upload failing quietly.
+    const index = lines.findIndex((line) => line.trimEnd() ===
+      '      - name: Upload the pair artefact, which is what a cross-fit reads');
+    expect(index).toBeGreaterThan(-1);
+    const block = lines.slice(index, index + 8).join('\n');
+    expect(block).toContain('path: eval/results/poc-l4-pair*.json');
+    expect(block).toContain('pair-artefact-');
+  });
+
   it('gives the guard the clock the wait step woke on', () => {
     const index = lines.findIndex((line) => line.trimEnd() === '      - name: Refuse a dispatch that would cross into the peak window');
     const block = lines.slice(index, index + 30).join('\n');

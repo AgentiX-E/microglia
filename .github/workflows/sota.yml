@@ -1881,3 +1881,18 @@ jobs:
         with:
           name: l4-evidence-${{ matrix.arm || 'none' }}
           path: eval/results
+
+      # R147. The cross-fit consumes two files — one per fold — and both live inside that 20.6 MB bundle,
+      # which is everything the lane wrote. Downloading a bundle to read two JSON files was 10 minutes a fold
+      # at the rate this repository's operator channel manages, so the pair artefact travels on its own.
+      #
+      # `warn` rather than `error` on a missing file, and the reason is not convenience: a single-arm dispatch
+      # legitimately writes no pair, and making that red would train a reader to ignore a red upload. What
+      # refuses a missing fold is the pool's own check, one command later.
+      - name: Upload the pair artefact, which is what a cross-fit reads
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pair-artefact-${{ steps.recall_floor.outputs.taskSplit || 'lane' }}
+          path: eval/results/poc-l4-pair*.json
+          if-no-files-found: warn
