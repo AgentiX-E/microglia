@@ -1813,6 +1813,13 @@ into the trial.
 refused that shape everywhere else. The `kept > 0` clause lives in the predicate rather than in a reader's eye,
 because a rung that withholds every request is trivially clean and worthless.
 
+**The ranking underneath the rungs.** `marginRanking` walks every labelling of the pooled margins and reports
+AUC with the exact one-sided permutation probability, because "the cleanest rung is 0.30" invites a question the
+rung cannot answer: whether the margin orders a repair above a break at all. The walk is enumerated, not
+resampled — the margins and the outcomes are fixed and only the labels are in doubt — and above twenty thousand
+labellings it reports `enumerable: false` with the count it would have needed, rather than a normal
+approximation nobody believes.
+
 **The premise is printed with the number.** A withheld trial is estimated at its control outcome, which is what
 the reference arm measured on the same task — and a model shown a procedure and then not shown it is not the
 model that never saw it. The line therefore opens `serve sweep (estimated, …)`, and a rung is *measured* only by

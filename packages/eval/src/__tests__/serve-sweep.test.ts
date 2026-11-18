@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { SWEEP_RUNGS, marginSweep, serveSweepLine, type PricedRender } from '../serve-sweep.js';
+import {
+  SWEEP_RUNGS,
+  marginRanking,
+  marginSweep,
+  rankingLine,
+  serveSweepLine,
+  type PricedRender,
+} from '../serve-sweep.js';
 
 /**
  * The rung, priced against outcomes.
@@ -142,5 +149,68 @@ describe('the line a readback quotes', () => {
     expect(withUnpriced).toContain('1 trial(s) carried no margin and are served at every rung');
     const fullyPriced = serveSweepLine(marginSweep([kept('a', 0.5), broke('b', 0.5)], [0]));
     expect(fullyPriced).not.toContain('carried no margin');
+  });
+});
+
+describe('whether the margin orders a repair above a break', () => {
+  it('is 1 when every repair outranks every break, and the exact null says how surprising that is', () => {
+    const ranking = marginRanking([kept('a', 0.4), kept('b', 0.3), broke('c', 0.2), broke('d', 0.1)]);
+    expect(ranking).toMatchObject({ kept: 2, broke: 2, auc: 1, labellings: 6, enumerable: true });
+    // Exactly one of the six ways of splitting four margins into two groups of two separates perfectly, and
+    // it is the one observed: 1/6 is the smallest p an exact test can report on two against two, which is the
+    // arithmetic behind "a single clean pair is not evidence".
+    expect(ranking.p).toBeCloseTo(1 / 6, 10);
+  });
+
+  it('is 0 when every repair sits below every break, and then no labelling is better than chance', () => {
+    const ranking = marginRanking([kept('a', 0.1), broke('b', 0.2)]);
+    expect(ranking.auc).toBe(0);
+    expect(ranking.p).toBe(1);
+  });
+
+  it('counts a tie as half a win, so an all-tied population is exactly chance', () => {
+    const ranking = marginRanking([kept('a', 0.2), broke('b', 0.2)]);
+    expect(ranking.auc).toBe(0.5);
+    expect(ranking.p).toBe(1);
+  });
+
+  it('excludes a trial whose margin was never measured, because it cannot be ranked', () => {
+    const ranking = marginRanking([kept('a'), kept('b', 0.3), broke('c', 0.1)]);
+    expect(ranking).toMatchObject({ kept: 1, broke: 1, auc: 1, labellings: 2 });
+  });
+
+  it('ranks the trial once, by its highest margin, not once per record served into it', () => {
+    const ranking = marginRanking([
+      { ...kept('a', 0.9), itemId: 'k1' },
+      { ...kept('a', 0.1), itemId: 'k2' },
+      broke('b', 0.5),
+    ]);
+    expect(ranking).toMatchObject({ kept: 1, broke: 1, auc: 1 });
+  });
+
+  it('refuses an exact null it cannot walk, and says how many labellings it would have taken', () => {
+    const renders = [
+      ...Array.from({ length: 9 }, (_, index) => kept(`k${String(index)}`, 0.5 + index / 100)),
+      ...Array.from({ length: 9 }, (_, index) => broke(`b${String(index)}`, 0.1 + index / 100)),
+    ];
+    const ranking = marginRanking(renders);
+    expect(ranking.enumerable).toBe(false);
+    expect(ranking.auc).toBe(1);
+    expect(ranking.p).toBeNull();
+    expect(ranking.labellings).toBe(48620);
+    expect(rankingLine(ranking)).toContain('the exact null was not walked (48620 labellings)');
+  });
+
+  it('names which side is empty rather than reporting a ranking of nothing', () => {
+    const noRepair = rankingLine(marginRanking([broke('a', 0.2)]));
+    const noBreak = rankingLine(marginRanking([kept('a', 0.2)]));
+    expect(noRepair).toBe('no repaired trial carries a margin, so the ranking has nothing to order');
+    expect(noBreak).toBe('no broken trial carries a margin, so the ranking has nothing to order');
+  });
+
+  it('is carried by the sweep, so a reader of the line cannot see the rungs without the ranking', () => {
+    const reading = marginSweep([kept('a', 0.4), broke('b', 0.1)], [0]);
+    expect(reading.ranking).toMatchObject({ kept: 1, broke: 1, auc: 1, labellings: 2 });
+    expect(serveSweepLine(reading)).toContain('exact p 0.500 over 2 labelling(s)');
   });
 });

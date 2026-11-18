@@ -71,6 +71,129 @@ export type SweepRung = {
   readonly netPp: number;
 };
 
+/**
+ * Whether the margin ranks a repair above a break, and how surprising that ranking is.
+ *
+ * The sweep answers "what would a rung withhold"; this answers the question underneath it — whether the
+ * ranking carries any information about the outcome at all. `auc` is the probability that a randomly chosen
+ * repaired trial carried a higher margin than a randomly chosen broken one, ties counted a half; `p` is the
+ * exact one-sided permutation probability of a ranking at least that good when the outcome labels are
+ * shuffled across the same margins.
+ *
+ * Exact rather than asymptotic, and bounded rather than approximated: the null is enumerated over every
+ * labelling when the count of them is small enough to enumerate, and `p` is `null` with `enumerable: false`
+ * when it is not. An asymptotic approximation on six breaks and four repairs would be a number about a
+ * normal distribution that nobody believes, and the record's rule is that an absent reading is named rather
+ * than replaced by one from another distribution.
+ */
+export type MarginRanking = {
+  /** Priced trials that repaired, and priced trials that broke. Trials that did neither are not ranked. */
+  readonly kept: number;
+  readonly broke: number;
+  /** `null` when one side is empty: a ranking needs two populations to compare. */
+  readonly auc: number | null;
+  /** Exact one-sided permutation probability, or `null` when the labellings were too many to enumerate. */
+  readonly p: number | null;
+  /** How many labellings the null has: always exact, whether or not they were walked. */
+  readonly labellings: number;
+  readonly enumerable: boolean;
+};
+
+/** The point estimate, from the two margin lists, with ties counted a half. */
+function aucOf(kept: readonly number[], broke: readonly number[]): number | null {
+  if (kept.length === 0 || broke.length === 0) return null;
+  let credit = 0;
+  for (const high of kept) {
+    for (const low of broke) {
+      if (high > low) credit += 1;
+      else if (high === low) credit += 0.5;
+    }
+  }
+  return credit / (kept.length * broke.length);
+}
+
+/** `n choose k`, in floating point: it is only ever compared against a cap. */
+function choose(n: number, k: number): number {
+  const smaller = Math.min(k, n - k);
+  let value = 1;
+  for (let step = 0; step < smaller; step += 1) value = (value * (n - step)) / (step + 1);
+  return value;
+}
+
+/** The most labellings this will walk. Above it the exact null is not available and the reading says so. */
+const ENUMERATION_CAP = 20000;
+
+/**
+ * The ranking, from the priced trials in a render list.
+ *
+ * Trials carrying no measured margin are **excluded** rather than pooled at zero: a trial whose margin was
+ * never measured cannot be ranked against one that was, and the sweep already reports how many those were.
+ * The unit is the trial and the margin is the trial's highest — the same aggregation the sweep prices rungs
+ * with, so the two readings describe the same quantity.
+ */
+export function marginRanking(renders: readonly PricedRender[]): MarginRanking {
+  return rankingOf(trialsOf(renders));
+}
+
+/** The ranking over trials already grouped, which is where the sweep reads it. */
+function rankingOf(trials: readonly TrialGroup[]): MarginRanking {
+  const kept: number[] = [];
+  const broke: number[] = [];
+  for (const trial of trials) {
+    const margins = trial.margins.filter((margin): margin is number => typeof margin === 'number');
+    // A trial served only at uncontested requests has no margin to rank: it is not evidence about whether
+    // the ranking works, it is evidence that nothing competed.
+    if (margins.length === 0) continue;
+    const margin = Math.max(...margins);
+    if (trial.kept) kept.push(margin);
+    if (trial.broke) broke.push(margin);
+  }
+  const auc = aucOf(kept, broke);
+  const labellings = choose(kept.length + broke.length, kept.length);
+  const enumerable = auc !== null && labellings <= ENUMERATION_CAP;
+  if (!enumerable) {
+    return { kept: kept.length, broke: broke.length, auc, p: null, labellings, enumerable: false };
+  }
+  // The null: every way of choosing which of the pooled margins belonged to the repaired trials. Walking
+  // the combinations rather than resampling, because there is no randomness in this question — the
+  // margins and the outcomes are fixed, and the only thing in doubt is which label went where.
+  const pool = [...kept, ...broke];
+  const observed = auc as number;
+  const size = kept.length;
+  let atLeast = 0;
+  let walked = 0;
+  const pick = new Array<number>(size).fill(0);
+  const walk = (depth: number, from: number): void => {
+    if (depth === size) {
+      const chosen: number[] = [];
+      const rest: number[] = [];
+      for (let index = 0; index < pool.length; index += 1) {
+        if (pick.includes(index)) chosen.push(pool[index] as number);
+        else rest.push(pool[index] as number);
+      }
+      const value = aucOf(chosen, rest) as number;
+      walked += 1;
+      if (value >= observed - 1e-12) atLeast += 1;
+      return;
+    }
+    for (let index = from; index <= pool.length - (size - depth); index += 1) {
+      pick[depth] = index;
+      walk(depth + 1, index + 1);
+    }
+  };
+  walk(0, 0);
+  return {
+    kept: kept.length,
+    broke: broke.length,
+    auc,
+    // `walked` is the number of labellings, which is at least one whenever both populations are non-empty —
+    // and a null `auc` above took the other branch — so there is no empty-walk case to report.
+    p: atLeast / walked,
+    labellings,
+    enumerable: true,
+  };
+}
+
 export type SweepReading = {
   /** Trials the sweep is over: one per task the renders were attributed to. */
   readonly trials: number;
@@ -79,6 +202,8 @@ export type SweepReading = {
   /** The smallest rung that withholds every break and keeps at least one repair, or `null`. */
   readonly firstClean: SweepRung | null;
   readonly rows: readonly SweepRung[];
+  /** Whether the margin orders a repair above a break, and how surprising that order is. */
+  readonly ranking: MarginRanking;
 };
 
 /**
@@ -172,6 +297,7 @@ export function marginSweep(
     unpriced: trials.filter((trial) => trial.margins.every((margin) => margin === null)).length,
     firstClean,
     rows,
+    ranking: rankingOf(trials),
   };
 }
 
@@ -202,6 +328,30 @@ export function serveSweepLine(reading: SweepReading): string {
       : `; ${String(reading.unpriced)} trial(s) carried no margin and are served at every rung`;
   return (
     `serve sweep (estimated, withholding is priced as the control outcome): ${clean}${unpriced}; ` +
-    `net by rung ${table}`
+    `${rankingLine(reading.ranking)}; net by rung ${table}`
   );
+}
+
+/**
+ * Whether the ranking carries information, in one clause.
+ *
+ * The three states are kept apart for the reason every other census here keeps them apart: a ranking that
+ * is indistinguishable from a shuffle, a ranking the exact null was too large to test, and a population with
+ * no repairs or no breaks to rank at all are three different facts about a rung, and the difference decides
+ * whether the sweep's clean rung means anything.
+ */
+export function rankingLine(ranking: MarginRanking): string {
+  if (ranking.auc === null) {
+    return ranking.kept === 0
+      ? 'no repaired trial carries a margin, so the ranking has nothing to order'
+      : 'no broken trial carries a margin, so the ranking has nothing to order';
+  }
+  const counts = `${String(ranking.kept)} repaired against ${String(ranking.broke)} broken`;
+  const auc = `the margin orders a repair above a break at AUC ${ranking.auc.toFixed(3)}`;
+  // `p === null` is exactly the state the walk did not reach: a null `auc` above took the other branch, so
+  // the only way here with no p is a null too large to enumerate.
+  if (ranking.p === null) {
+    return `${auc} over ${counts}, and the exact null was not walked (${String(ranking.labellings)} labellings)`;
+  }
+  return `${auc} over ${counts}, exact p ${ranking.p.toFixed(3)} over ${String(ranking.labellings)} labelling(s)`;
 }

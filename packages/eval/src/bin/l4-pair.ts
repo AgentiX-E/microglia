@@ -639,6 +639,7 @@ await writeJson('poc-l4-pair', {
           unpriced: sweep.unpriced,
           firstClean: sweep.firstClean,
           rows: sweep.rows,
+          ranking: sweep.ranking,
         },
       }),
   // The degradation reading, unconditionally: it is the only number in this artefact that says how

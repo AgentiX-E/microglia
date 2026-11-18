@@ -1734,3 +1734,15 @@ procedure and then not shown it is not the model that never saw it. Rungs are *p
 | "Score" | *margin* | A margin is the ranking's own gap, not a confidence and not a probability |
 | "Zero margin" | *unpriced* | Nothing was contested, so no rung can act: a different fact from a measured zero |
 | "Population" | *provenance* (`edited` / `passed`) | A store of repairs and a store of descriptions of successes are different objects, whatever their size |
+
+A **ranking** is the margin read as an ordering of repaired trials against broken ones: AUC is the probability
+that a repaired trial carried a higher margin than a broken one, and its **exact p** is the share of labellings
+of the same margins, under a shuffled outcome label, that order at least as well. The p is enumerated when the
+labellings are few enough to walk and reported as *not walked* with their count when they are not — an
+asymptotic approximation on four against six would be a number about a distribution nobody has evidence for.
+
+| Term | In this project | Why the distinction matters |
+| --- | --- | --- |
+| "AUC" | *AUC with an exact p* | A perfect ordering on two against two is 1/6 by chance: the area alone is not evidence |
+| "Significance" | *permutation p* | The null here is which label went with which margin, not a normal distribution |
+| "Correlation" | *ranking* | The rung acts on an order, so the order is what has to carry information |

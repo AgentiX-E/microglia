@@ -3894,6 +3894,12 @@ break is 0.30, which keeps 2 repair(s) and serves 7 of 57 trial(s); net by rung 
   free to disagree.
 - **`net by rung`** is `kept − broke` over every trial, in percentage points, so a rung's number is comparable
   with the paired delta on the line above it.
+- **`the margin orders a repair above a break at AUC … exact p …`** is the question underneath the rungs:
+  whether the ranking carries any information about the outcome at all. `AUC` is the chance that a repaired
+  trial outranks a broken one, ties counted a half; `p` is the **exact** one-sided probability of a ranking at
+  least that good when the two labels are shuffled across the same margins. `exact p 0.305 over 210
+  labelling(s)` means the observed order is unremarkable — four against six cannot be told from a shuffle —
+  and the clean rung below it is a fitted value.
 
 ### 30.3 What "estimated" means, and why it is in the sentence
 

@@ -1214,8 +1214,11 @@ export {
 } from './serve-tasks.js';
 export {
   SWEEP_RUNGS,
+  marginRanking,
   marginSweep,
+  rankingLine,
   serveSweepLine,
+  type MarginRanking,
   type PricedRender,
   type SweepReading,
   type SweepRung,
