@@ -1617,6 +1617,35 @@ pack's element cannot move the split. `system_chars_per_unpacked_call` is the sa
 pack did not ride, which is the mixture R135's mean hid — the user simulator's prompt is neither the
 agent's policy nor the pack, and its weight in the mean moves with how many turns each side took.
 
+**Render** — One served record on one turn, as `ServeRender`: which record, which trial, and whether the
+trial got better. Not a trial and not a task: one trial can carry several renders and one record renders on
+many trials, so a per-render average weights a record served nine times the same as one served once. R141
+rendered 40 times over 14 records.
+
+**Opportunity** — A render on a trial the **control failed**. It is the only kind of render on which a repair
+is possible; on a trial the control passed, the same record can only break it. The census therefore reports
+`opportunity`, `repairs`, `breaks` and `inert` separately, because the share of renders that are opportunities
+is a property of the **corpus** — how often a failure coincides with a retrieval hit — and only the ratio
+inside that share is a property of the **store**. On R141: 7 of 40 renders were opportunities (17.5%), 5 of
+those repaired (71.4%), 1 of the other 33 broke (3.03%), and 34 renders (85%) changed nothing.
+
+**Inert render** — A render where the arm and the control agree, one way or the other. It is the residual of
+the yield census rather than an omission, because an inert render is tokens paid with no mechanism attached
+and on R141 that was 85% of the traffic. A `repairs / renders` rate divides by them, which is why it read
+12.5% while the store was repairing 71.4% of what it was given.
+
+**Opportunities for evidence** — `ceil(log α / log(1 − p))`, where `p` is the store's own repair rate: how many
+opportunities a record needs before observing **zero** repairs is unlikely at level α. At R141's `p = 5/7` it
+is 3, and the most-served record was rendered nine times with one opportunity, so "this record never repaired
+anything" was not a finding. The number is a statement about how much data a verdict would need, never a
+verdict.
+
+**Unmatched requests** — Ledger requests that no episode boundary's span covered, e.g. when a boundary resolved
+to no trial because the run abandoned that attempt. Counted by coverage of the spans rather than tested from
+the join's input (`ordered.length`), which is how the field read `0` on the very arm that had dropped requests.
+An arm that resolves **some** boundaries publishes the table and reports the hole; one that resolves none is
+refused, because there is nothing to publish.
+
 | Term | In this project | Why the distinction matters |
 | --- | --- | --- |
 | "Cross-validation" | *cross-fit* | A cross-fit is two folds of one corpus read as one paired sample, not k models averaged: each task is answered once, and the reading is a paired difference |
@@ -1624,3 +1653,6 @@ agent's policy nor the pack, and its weight in the mean moves with how many turn
 | "Fold identity" | *`foldSplit`* | The two id sets an arm ran, recorded in the pair artefact, because the leak check is the cross-fit's whole claim |
 | "Model config" | *treatment identity* (`unit`, `form`, `scope`, `model`, `traceCeiling`) | Two folds of two treatments are two experiments; the pool refuses to average them |
 | "Missing data" | *truncated sample* | A capped sample is a prefix of the store, so an id it does not carry is not evidence of a singleton |
+| "Improvement rate" | *repair rate* (`repairs / opportunities`) | Dividing by renders measures how often the corpus offers a failure to fix; dividing by opportunities measures the store |
+| "Turn" | *render* | A render is one record on one turn, not one trial: the counts differ per record and per arm |
+| "Dropped data" | *unmatched requests* | A hole that is counted is published beside the reading; a condition that returns `undefined` costs the whole table |

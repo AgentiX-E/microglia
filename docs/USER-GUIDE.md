@@ -3589,3 +3589,87 @@ rather than in a footnote.
 It does not make a small effect resolved. On τ² retail with the observed discordance, 114 pairs resolve about
 7–10pp; a real 4pp effect would still read `UNRESOLVED`, and the `mde80` on the line is how you know before you
 spend the money.
+
+---
+
+## 26. The opportunity a render needs
+
+A stored record is served on a turn, and the turn either gets better or it does not. The obvious score is
+`repairs / renders` — and it is wrong, because **most turns have nothing to repair**. A record can only fix a
+trial its control got wrong; on a trial the control already passed, the same record can only break it.
+
+So every render is one of three things:
+
+| outcome | what happened | counted as |
+| --- | --- | --- |
+| repair | the control failed this trial, and the arm passed it | an opportunity, taken |
+| break | the control passed this trial, and the arm failed it | an opportunity, absent — only harm was possible |
+| inert | the arm and the control agree, one way or the other | nothing |
+
+### 26.1 What R141's census reads
+
+```
+serve yield: 40 render(s) over 14 record(s); 7 landed where a repair was possible (17.50%);
+5 repaired, 1 broke, 34 inert (85.00%); no record is below its own rate at 5%
+```
+
+1. **40 renders over 14 records** — the store was served, and it was served repeatedly. A per-render average
+   weights the nine-render record the same as the one-render record.
+2. **7 of 40 (17.5%) landed on a repairable trial.** That is a property of the **corpus**, not of the store: it
+   is how often the control fails and the retriever still finds a relevant record.
+3. **5 repaired / 7 opportunities = 71.4%.** This is the record set's quality, and it is the only rate on the
+   line that is about the store.
+4. **33 renders could only do harm, and 1 did (3.03%).** This is the number the floor argument turns on: 82.5%
+   of the store's exposure was pure downside risk, and the store converted 1 of 33.
+5. **34 of 40 (85%) changed nothing at all.** A memory that is served and ignored is a token cost, not a
+   mechanism — and a `repairs / renders` rate would have divided its 5 repairs by all 40.
+
+The two rates are not interchangeable. `repairs / renders` on this arm is 12.5%; `repairs / opportunities` is
+71.4%. One describes a corpus that rarely has anything to fix; the other describes a store that usually fixes
+what it is given.
+
+### 26.2 Why "no record is below its own rate" is the interesting half
+
+A single record with zero repairs is not evidence of a bad record — most records have few chances. The test is
+binomial: at the store's own repair rate `p`, how many opportunities does a record need before observing zero
+repairs is unlikely at 5%?
+
+```
+opportunities = ceil(log(0.05) / log(1 - p))
+```
+
+At `p = 5/7 = 0.714` that is **3**. So a record that was served nine times but had one opportunity has told you
+nothing, and a retention rule that dropped it would be reacting to a render count. The line prints "a record
+needs 3 opportunities before zero repairs is evidence" for exactly this reason: it is a statement about how much
+data would be required, not a verdict about the records in hand.
+
+When no record is below its own rate, the honest reading is **the store has not been caught being wrong yet**,
+not that every record is good.
+
+### 26.3 The support census beside it
+
+```
+serve support: 14 of 14 servable item(s) served; no singleton was served;
+support ≥2: 14 item(s), 1 broke, 5 kept, net +4; floor 2 in force
+```
+
+A **support floor** retires an item whose evidence covers fewer than `supportTasks` tasks, at serve time, with no
+model call. Its claim is "an item that one task taught is not knowledge". The census is what tests that claim,
+and it reads three things:
+
+- **servable / served** — items the floor left standing, and items actually rendered;
+- **singletons** — anything served with support 1, which would be the floor failing to apply;
+- **the `support ≥2` bucket** — its `broke` / `kept` / `net` is the floor's ledger. A floor that retires half the
+  store and changes no outcomes has cost tokens and bought nothing.
+
+A caution that cost this project a reading: if the artefact's item sample is **capped** (the store writes at most
+64 rows and reports the rest as omitted), an id missing from the sample is not a singleton. `supportMapOf` reads
+the omission count and the consolidation groups before it grades anything, and the census reports the ids it
+could not resolve instead of guessing — before that fix, six of fourteen served items were graded at support 1
+and the floor looked broken when it was not.
+
+### 26.4 What it does not do
+
+It does not tell you whether to keep a record. It tells you how many opportunities the arm gave the records, how
+many it took, and how much data a per-record verdict would need. On a corpus where 85% of renders are inert,
+the answer to "is this record good?" is usually "you have not asked it enough times".

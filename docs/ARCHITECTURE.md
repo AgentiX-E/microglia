@@ -1643,3 +1643,48 @@ summary of two folds:
 
 Neither is a refusal. A refusal would make the instrument unusable for exactly the diagnosis it exists to
 support — a fold that dropped tasks is a fact to report, not a run to discard.
+
+### 8.19 A render is judged where a repair was possible, and a dropped boundary is a count
+
+Two defects, both found by the same run, both of a kind that reports a number instead of an error.
+
+**The denominator.** `itemTransfer` counted `repairs` and `breaks` over renders since R138, and every reading
+taken from it divided by the wrong thing. A record served on a trial the control already passed cannot repair
+anything; it can only break. On R141 the split is:
+
+| over 40 renders | count | share |
+| --- | --- | --- |
+| repairable (control failed) | 7 | 17.5% |
+| of those, repaired | 5 | 71.4% of 7 |
+| only-breakable (control passed) | 33 | 82.5% |
+| of those, broken | 1 | 3.03% of 33 |
+| arm and control agree | 34 | 85.0% |
+
+So `repairs / renders` = 12.5% described the **corpus** — how often a failure coincides with a retrieval hit —
+while `repairs / opportunities` = 71.4% describes the **store**. The two differ by a factor of six on the same
+run, and only the second is a property of the thing under test. `serveYieldCensus` therefore carries
+`opportunity` as a first-class count, and `inert` as the residual rather than an omission: an inert render is
+paid tokens with no mechanism attached, and on this arm it is 85% of the traffic.
+
+**The per-record test.** With opportunities as the denominator, "this record never repaired anything" becomes a
+question with an answer: at the store's own rate `p`, `ceil(log α / log(1 − p))` opportunities are needed before
+zero repairs is evidence at `α`. On R141 (`p = 5/7`) that is 3, and the most-served record was rendered nine
+times with **one** opportunity. Any retention rule keyed on renders would have retired it on a coin flip.
+
+**The dropped boundary.** `pairedEpisodes` joins episode boundaries to trials by task id and falls back to
+position. A boundary that resolves to no trial — an abandoned attempt — leaves a range of ledger requests that
+no episode owns. The join already reported that as `unresolved`, and the caller treated it as
+`return undefined`: forty of forty-one boundaries is a table, and R141's attribution was absent from the
+artefact because of one attempt the run gave up on.
+
+The record's own rule, stated in 8.9 and again in 8.18, is that a **partial reading is a reading with an
+announced hole**. So the join proceeds over the groups it could name, and `unmatchedRequests` stops being an
+assumption (`ordered.length === 0 ? ledger.length : 0`) and becomes a measurement: the requests no span covered.
+The refusal is kept for the one case where there is nothing to publish — no episode resolved at all.
+
+| decision | the alternative, and why not |
+| --- | --- |
+| opportunity is a count on the census | a caller computing `renders − breaks` at the call site: two definitions of one quantity, and the one that is wrong is the one that reads plausibly |
+| the coefficient is the store's own rate, not a prior | a fixed 0.5: the number of opportunities a record needs depends on how good the store is, and a prior would make a good store look under-sampled |
+| a dropped boundary is counted, not fatal | refusing the arm: it costs the reading and reports nothing, and the arm that needed the diagnosis most is exactly the one that dropped a boundary |
+| `unmatchedRequests` is coverage-derived | testing `ordered.length`: a property of the join's input instead of its output, which is how the count read 0 on the arm that had dropped requests |
