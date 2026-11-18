@@ -1324,6 +1324,11 @@ jobs:
           # R109: the unit the pack is written in, from the registration's header. Empty means the
           # variable stands, which is what every artefact committed before this switch ran.
           SHAPE=$(sed -n 's/^shape=//p' "$RUNNER_TEMP/distill.env")
+          # R150: whether a scope-matched rule needs a word in common with the request. Header-only, for
+          # R118's reason: it is a filter on what may appear inside a pack, and a repository variable would
+          # apply it to every queued dispatch — including the ones whose registration says the lane serves
+          # exactly as it always has. Empty keeps the recall request free of the parameter altogether.
+          ANCHOR=$(sed -n 's/^anchor=//p' "$RUNNER_TEMP/distill.env")
           # R118: the stop after the learning half, when the registration's claim is a census. Header
           # only — there is no variable to reconcile it against, because a global that could turn it
           # off would let a dispatch pay for an evaluation the registration never asked for.
@@ -1374,7 +1379,7 @@ jobs:
             echo "::error::a two-unit registration renders both units, and TAU_PACK_SHAPE names one"
             exit 1
           fi
-          KNOBS=$(pnpm --silent eval:pack-knobs "${MODE:-}" "${SHAPE:-}")
+          KNOBS=$(TAU_SERVE_ANCHOR="${ANCHOR:-}" pnpm --silent eval:pack-knobs "${MODE:-}" "${SHAPE:-}")
           pnpm --silent eval:prereg-scenario "$FILE" > "$RUNNER_TEMP/scenario.env"
           TRAIN=$(sed -n 's/^train=//p' "$RUNNER_TEMP/scenario.env")
           TEST=$(sed -n 's/^test=//p' "$RUNNER_TEMP/scenario.env")
@@ -1392,6 +1397,10 @@ jobs:
           echo "claims=$CLAIMS" >> "$GITHUB_OUTPUT"
           echo "mode=$MODE" >> "$GITHUB_OUTPUT"
           echo "shape=$SHAPE" >> "$GITHUB_OUTPUT"
+          # R150: the serve anchor, published so the knobs step can name it as an environment variable rather
+          # than only as an argument. Both are the same value; the variable exists because the repository's own
+          # audit refuses an environment read no workflow can set, and that rule has caught three dead knobs.
+          echo "anchor=$ANCHOR" >> "$GITHUB_OUTPUT"
           # R118: whether the arm stops after the learning half. Header-only, because the stop is the
           # registration's own statement about what it will read.
           echo "learn_only=$LEARN_ONLY" >> "$GITHUB_OUTPUT"

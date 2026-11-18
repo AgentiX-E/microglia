@@ -2471,3 +2471,27 @@ describe('effectClaimPp in a registration header', () => {
     expect(reading.problems[0]?.problem).toMatch(/not a number/);
   });
 });
+
+describe('the serve anchor header', () => {
+  const withHeader = (extra: string): string => `${HEADER.replace(/^---\n/, `---\n${extra}\n`)}${PREDICTION}${REFUTATION}`;
+  const FILE = 'R8.3-xiyan-cell.md';
+
+  it('carries a serve anchor it recognises', () => {
+    // R150. The vocabulary is imported from the module that resolves the switch rather than spelled a second
+    // time here: a header that accepted a spelling `eval:pack-knobs` refuses would be a dispatch refused after
+    // the money was committed, or worse, an arm published under a filter it did not apply.
+    expect(readPrereg(withHeader('serveAnchor: lexical'), FILE).prereg?.serveAnchor).toBe('lexical');
+    expect(readPrereg(withHeader('serveAnchor: scope'), FILE).prereg?.serveAnchor).toBe('scope');
+  });
+
+  it('refuses a spelling the wire would reject, naming both that it can honour', () => {
+    const problems = problemsOf(withHeader('serveAnchor: lexcial'), FILE);
+    expect(problems.some((entry) => entry.includes("header 'serveAnchor'"))).toBe(true);
+    expect(problems.some((entry) => entry.includes("'lexcial' is not one of lexical, scope"))).toBe(true);
+  });
+
+  it('leaves it absent when the header says nothing, which is every arm before this one', () => {
+    expect(readPrereg(VALID, FILE).prereg).toBeDefined();
+    expect(readPrereg(VALID, FILE).prereg?.serveAnchor).toBeUndefined();
+  });
+});

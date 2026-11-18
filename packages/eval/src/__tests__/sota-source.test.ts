@@ -511,3 +511,18 @@ describe('the window guard gates both arms, and neither of them relies on an imp
     expect(block).toContain('TAU_START_AT: ${{ steps.wait.outputs.start_at }}');
   });
 });
+
+describe('the serve anchor travels from the header to the request', () => {
+  const WORKFLOW = readFileSync(new URL('../../../../.github/workflows/sota.yml', import.meta.url), 'utf8');
+
+  it('reads the anchor the registration declares and hands it to the resolver', () => {
+    // R150. The chain has four links — header, `eval:prereg-form`'s `anchor=` line, this shell variable, and
+    // `eval:pack-knobs`'s fourth argument — and a break in any one of them is silent: the run would execute
+    // the lane's default filter while its registration described another. The assertion is on the two links
+    // that live in YAML, because the other two are unit-tested where they are written.
+    expect(WORKFLOW).toContain("ANCHOR=$(sed -n 's/^anchor=//p' \"$RUNNER_TEMP/distill.env\")");
+    // The anchor is set as an environment variable on the resolver's own process rather than passed as a
+    // fourth argument, because the repository's audit refuses an environment read no workflow can set.
+    expect(WORKFLOW).toContain('TAU_SERVE_ANCHOR="${ANCHOR:-}" pnpm --silent eval:pack-knobs');
+  });
+});

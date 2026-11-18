@@ -93,6 +93,10 @@ function main(): void {
   // same reason: it is a second paid phase, and a global that could turn it on would buy it on every
   // dispatch the repository has queued.
   const declaredRehearsal = reading.prereg.rehearsal;
+  // R150: whether a scope-matched rule needs a word in common with the request. Header-only, for R118's reason
+  // and one of its own: it is a filter on what may appear inside a pack, and a repository variable would apply
+  // it to every queued dispatch — including the ones whose registration says the lane serves as it always has.
+  const declaredAnchor = reading.prereg.serveAnchor;
   process.stdout.write(
     `unit=${declaredUnit ?? ''}\nform=${declared ?? ''}\nscope=${declaredScope ?? ''}\n` +
       `claims=${declaredClaims === undefined ? '' : String(declaredClaims)}\n` +
@@ -104,6 +108,9 @@ function main(): void {
       // R139: whether that key filters or describes. Printed the way the header wrote it, so a
       // dispatch that named `all` cannot arrive at the driver as the control.
       `consolidateLinkage=${reading.prereg.consolidateLinkage ?? ''}\n` +
+      // R150: the serve anchor. Empty leaves the recall request with no `anchoring` parameter at all, which is
+      // byte-identical to every artefact written before the switch existed.
+      `anchor=${declaredAnchor ?? ''}\n` +
       // R141: the support floor at serve time. Empty leaves the run at 1, which serves every item.
       `serveSupport=${reading.prereg.serveSupport === undefined ? '' : String(reading.prereg.serveSupport)}\n` +
       `rehearsal=${declaredRehearsal === undefined ? '' : String(declaredRehearsal)}\n` +

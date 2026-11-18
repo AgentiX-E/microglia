@@ -19,6 +19,7 @@ import { TRACE_CLAIM_RANGE } from './trace-claims.js';
 import type { RunGate } from './artifact-schema.js';
 import { splitProvider } from './model-id.js';
 import { detectableDelta } from './detectable.js';
+import { SERVE_ANCHORS } from './serve-anchor.js';
 
 export type Prereg = {
   readonly id: string;
@@ -448,6 +449,16 @@ export type Prereg = {
    */
   readonly packMode?: string;
   /**
+   * Whether a scope-matched rule must share a word with the request before it may be served.
+   *
+   * R150's switch, and the third axis of a serve. `RecallQuery.anchoring` has always been a published
+   * contract — `'scope'` lets structure alone justify a rule, `'lexical'` requires a word in common — and
+   * the τ² lane has only ever run the first, because no registration could name the second. It is not a
+   * `packMode`: that names where a pack is served from, and a filter on what may appear inside it is a
+   * different question with a different default.
+   */
+  readonly serveAnchor?: string;
+  /**
    * The unit this registration's packs are written in: one line per failure, or one per routine.
    *
    * R109's switch, registered the same way the pack mode is and for the same reason: the arm is one
@@ -554,6 +565,7 @@ const HEADER_KEYS = [
   'release',
   'packMode',
   'packShape',
+  'serveAnchor',
   'claimRuler',
   'thinking',
 ] as const;
@@ -624,6 +636,14 @@ const HEADER_CLAIM_RULERS: ReadonlySet<string> = new Set(['point', 'interval']);
  * than by a comment asking future editors to be careful.
  */
 export const HEADER_PACK_SHAPES: ReadonlySet<string> = new Set(['per-failure', 'collapse']);
+
+/**
+ * The two anchors a registration may name, taken from the module that resolves them.
+ *
+ * R150. Spelled once: a header that accepted a value the wire refuses would be a registration naming a filter
+ * the run cannot apply, and the readback would grade the arm the header described rather than the one that ran.
+ */
+const HEADER_SERVE_ANCHORS: ReadonlySet<string> = new Set(SERVE_ANCHORS);
 
 /**
  * The largest number of episodes one dispatch carries.
@@ -1543,6 +1563,19 @@ export function readPrereg(markdown: string, file: string): PreregReading {
     }
   }
 
+  const serveAnchorText = values.get('serveAnchor');
+  let serveAnchor: string | undefined;
+  if (serveAnchorText !== undefined) {
+    if (!HEADER_SERVE_ANCHORS.has(serveAnchorText)) {
+      collected.push({
+        where: `header 'serveAnchor'`,
+        problem: `'${serveAnchorText}' is not one of ${[...HEADER_SERVE_ANCHORS].join(', ')}`,
+      });
+    } else {
+      serveAnchor = serveAnchorText;
+    }
+  }
+
   const claimRulerText = values.get('claimRuler');
   let claimRuler: 'point' | 'interval' | undefined;
   if (claimRulerText !== undefined) {
@@ -1709,6 +1742,7 @@ export function readPrereg(markdown: string, file: string): PreregReading {
       ...(packMode === undefined ? {} : { packMode }),
       ...(claimRuler === undefined ? {} : { claimRuler }),
       ...(packShape === undefined ? {} : { packShape }),
+      ...(serveAnchor === undefined ? {} : { serveAnchor }),
       ...(facadeShapes === undefined ? {} : { facadeShapes }),
       ...(thinking === undefined ? {} : { thinking }),
       prediction,
