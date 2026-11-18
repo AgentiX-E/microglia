@@ -64,6 +64,7 @@ import { writeJson } from './lib.js';
 import { pairedVerdict } from '../paired-verdict.js';
 import { serveSupportCensus, serveSupportLine, supportMapOf } from '../serve-support.js';
 import { foldSplitOf, treatmentOf } from '../cross-fit.js';
+import { yieldCensus, yieldLine } from '../serve-yield.js';
 import { pairGates, plantedBarNote } from '../pair-gates.js';
 import { cacheCensusVerdict, premiumSplitOf } from '../cache-census.js';
 
@@ -423,6 +424,12 @@ function attributionOf(reference: Artefact, memory: Artefact) {
 
 const attribution = attributionOf(first, second);
 if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribution)}\n`);
+// R144: the denominator the outcome counter never had. A memory can only repair a trial the bare agent failed
+// and can only break one it passed, so a record rendered nine times inside a corpus whose control passes 82.5%
+// of its trials has almost no opportunity — and counting repairs per render measures the corpus's difficulty
+// rather than the record. Printed from the same join, at no extra cost.
+const yields = attribution === undefined ? undefined : yieldCensus(attribution.renders);
+if (yields !== undefined) process.stdout.write(`${yieldLine(yields)}\n`);
 
 // R141: the join the floor's own criterion is written in. The attribution table says which item was served
 // and what it did; the store sample says how many tasks stand behind it. Neither alone can say whether the
@@ -553,6 +560,23 @@ await writeJson('poc-l4-pair', {
     ? { foldSplit: { learned: foldSplit.learned, evaluated: foldSplit.evaluated } }
     : { foldSplitAbsent: { reason: foldSplit.reason } }),
   ...(treatment.ok ? { treatment: treatment.treatment } : { treatmentAbsent: { reason: treatment.reason } }),
+  // R144: the render census beside the item table. The table says which records were served and what they did;
+  // this says how many of those renders could have changed anything, which is the number that decides whether
+  // an outcome counter can act on the table at all.
+  ...(yields === undefined
+    ? {}
+    : {
+        serveYield: {
+          renders: yields.renders,
+          opportunity: yields.opportunity,
+          repairs: yields.repairs,
+          breaks: yields.breaks,
+          inert: yields.inert,
+          repairRate: yields.repairRate,
+          opportunitiesForEvidence: yields.opportunitiesForEvidence,
+          candidates: yields.candidates,
+        },
+      }),
   ...(retention === undefined ? {} : { retention }),
   // The degradation reading, unconditionally: it is the only number in this artefact that says how
   // many trials the treatment broke rather than how many tasks it changed.

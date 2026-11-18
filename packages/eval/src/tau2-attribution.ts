@@ -33,6 +33,7 @@
  */
 
 import type { TauTrialRow } from './tau2-transfer.js';
+import type { ServeRender } from './serve-yield.js';
 import { wilsonInterval } from './reproduction.js';
 
 /** One episode, as the analysis needs it: the requests it spent and how the two arms scored it. */
@@ -77,7 +78,20 @@ export function itemTransfer(input: {
   readonly episodes: readonly EpisodeOutcome[];
   readonly ledger: readonly (readonly string[])[];
   /** Requests with no episode behind them — a recall that fired outside any trial. Excluded, and counted. */
-}): { readonly items: readonly ItemTransfer[]; readonly unmatchedRequests: number } {
+}): {
+  readonly items: readonly ItemTransfer[];
+  readonly unmatchedRequests: number;
+  /**
+   * One row per render, which is the population `yieldCensus` reads.
+   *
+   * R144. The table above counts episodes per item and cannot say how many of them the memory could have
+   * repaired: on R141 one record was rendered nine times and 33 of the 40 trials were passed by the bare agent
+   * anyway, so eight of its nine renders landed where no claim could have changed anything. A render row is the
+   * unit that carries that distinction, and it is produced here rather than re-derived because this loop is
+   * where the episode's outcome is still in hand.
+   */
+  readonly renders: readonly ServeRender[];
+} {
   // A row that is not a list of ids is a malformed ledger, not a request that served nothing. Thrown rather
   // than tolerated: a hole read as an empty pack would make the request count the table's denominator while
   // contributing no observation, and every rate derived from it would be a rate over the wrong population.
@@ -88,6 +102,7 @@ export function itemTransfer(input: {
   }
   const ordered = [...input.episodes].sort((left, right) => left.startsAt - right.startsAt);
   const tallies = new Map<string, { episodes: number; kept: number; broke: number }>();
+  const renders: ServeRender[] = [];
   let unmatchedRequests = 0;
 
   for (let index = 0; index < ordered.length; index += 1) {
@@ -121,6 +136,10 @@ export function itemTransfer(input: {
       if (episode.memory && !episode.control) tally.kept += 1;
       if (!episode.memory && episode.control) tally.broke += 1;
       tallies.set(id, tally);
+      // One render per record per episode: an episode that recalled twice and was served the same record at
+      // both boundaries was served it once, in the sense that matters to a yield — one trial, one chance to
+      // change its outcome.
+      renders.push({ itemId: id, controlPassed: episode.control, memoryPassed: episode.memory });
     }
   }
 
@@ -133,7 +152,7 @@ export function itemTransfer(input: {
   const items = [...tallies.entries()]
     .map(([id, tally]) => ({ id, ...tally, net: tally.kept - tally.broke }))
     .sort((left, right) => (left.net === right.net ? left.id.localeCompare(right.id) : left.net - right.net));
-  return { items, unmatchedRequests };
+  return { items, unmatchedRequests, renders };
 }
 
 /**
@@ -246,7 +265,11 @@ export function pairAttribution(input: {
   readonly boundaryTasks?: readonly (string | null)[];
   readonly memoryTrials?: readonly TauTrialRow[];
   readonly referenceTrials?: readonly TauTrialRow[];
-}): { readonly items: readonly ItemTransfer[]; readonly unmatchedRequests: number } | undefined {
+}): {
+  readonly items: readonly ItemTransfer[];
+  readonly unmatchedRequests: number;
+  readonly renders: readonly ServeRender[];
+} | undefined {
   const { ledger, episodeStarts, memoryTrials, referenceTrials, boundaryTasks } = input;
   if (ledger === undefined || episodeStarts === undefined || memoryTrials === undefined) return undefined;
   const episodes = pairedEpisodes({

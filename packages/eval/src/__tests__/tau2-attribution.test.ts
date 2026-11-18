@@ -207,7 +207,13 @@ describe('reading the three fields off an artefact', () => {
       memoryTrials: [row('a', 0, 0)],
       referenceTrials: [row('a', 0, 1)],
     });
-    expect(reading).toEqual({ items: [{ id: 'k_1', episodes: 1, kept: 0, broke: 1, net: -1 }], unmatchedRequests: 0 });
+    expect(reading).toEqual({
+      items: [{ id: 'k_1', episodes: 1, kept: 0, broke: 1, net: -1 }],
+      unmatchedRequests: 0,
+      // R144: the same join also yields the render, because the yield census needs the episode's control outcome
+      // and this loop is the last place it is in hand.
+      renders: [{ itemId: 'k_1', controlPassed: true, memoryPassed: false }],
+    });
   });
 
   it('treats a memory arm with no reference rows as unpaired rather than as all losses', () => {
@@ -218,7 +224,7 @@ describe('reading the three fields off an artefact', () => {
     });
     // The request is counted as unattributed rather than attributed to a loss: with no control row there is
     // no outcome to pair, and the one served request belongs to an episode that was never measured.
-    expect(reading).toEqual({ items: [], unmatchedRequests: 1 });
+    expect(reading).toEqual({ items: [], unmatchedRequests: 1, renders: [] });
   });
 });
 
