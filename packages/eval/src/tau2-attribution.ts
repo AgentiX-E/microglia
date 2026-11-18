@@ -103,6 +103,7 @@ export function itemTransfer(input: {
   const ordered = [...input.episodes].sort((left, right) => left.startsAt - right.startsAt);
   const tallies = new Map<string, { episodes: number; kept: number; broke: number }>();
   const renders: ServeRender[] = [];
+  const covered = new Array<boolean>(input.ledger.length).fill(false);
   let unmatchedRequests = 0;
 
   for (let index = 0; index < ordered.length; index += 1) {
@@ -120,9 +121,13 @@ export function itemTransfer(input: {
         [Math.min(from, input.ledger.length), Math.min(to, input.ledger.length)] as const,
     );
     const served = new Set<string>();
+    // Coverage is the spans and nothing else. Marking the episode's positional range as well would defeat the
+    // count: `end` is the next episode's start or the ledger's length, which is the assumption the spans exist
+    // to replace, and on a single-episode ledger it would mark the dropped boundary's requests as covered.
     for (const [from, to] of spans) {
       if (to <= from) continue;
       for (let request = from; request < to; request += 1) {
+        covered[request] = true;
         // `ledger` is one entry per request by construction, every `to` is clamped to its length and every
         // row was checked to be a list above, so the element exists: a `?? []` here was a branch no artefact
         // could reach, which is the shape this record deletes rather than exempts.
@@ -143,11 +148,11 @@ export function itemTransfer(input: {
     }
   }
 
-  // Every request belongs to an episode by construction: `recall` opens one before it asks, and the last
-  // boundary therefore covers the tail of the ledger. The only way a request is unattributed is a ledger
-  // with no episodes at all — an arm that served packs outside the runner, which is a wiring finding rather
-  // than an analysis one, so it is counted instead of dropped.
-  unmatchedRequests = ordered.length === 0 ? input.ledger.length : 0;
+  // Every request belongs to an episode by construction, with one exception this field now measures rather
+  // than assumes: a boundary that resolved to no trial — an abandoned attempt — opens a range no episode owns.
+  // Counting coverage rather than testing `ordered.length` is the difference between reporting the requests a
+  // join dropped and reporting none, and R141 is the arm that made the difference visible.
+  unmatchedRequests = covered.filter((seen) => !seen).length;
 
   const items = [...tallies.entries()]
     .map(([id, tally]) => ({ id, ...tally, net: tally.kept - tally.broke }))
@@ -218,9 +223,15 @@ export function pairedEpisodes(input: {
           memoryTrials: input.memoryTrials,
         });
   if (join !== undefined) {
-    // A named boundary that resolves to nothing is not a case for the positional path: the arm said which
-    // task it opened and the reader could not honour it, which is an instrument finding.
-    if (!('measured' in join) || join.unresolved > 0 || join.measured.length === 0) return undefined;
+    // A named boundary that resolves to nothing is not a case for the positional path: the arm said which task
+    // it opened and the reader could not honour it.
+    //
+    // R145: and it is not a reason to refuse the arm either. R138 taught `serveSplit` to proceed over the groups
+    // it could name and report the requests it dropped, and this function kept the reflex it was taught to drop:
+    // R141 opened 41 boundaries for 40 scored trials — one abandoned attempt — and the whole attribution came
+    // back `undefined`. Forty of forty-one is a table; refusing it costs the reading and reports nothing, while
+    // proceeding costs the dropped boundary's requests and reports them as `unmatchedRequests`.
+    if (!('measured' in join) || join.measured.length === 0) return undefined;
     const episodes: EpisodeOutcome[] = [];
     for (const group of join.measured) {
       // The trial index came from this array, so the row exists: a `=== undefined` guard here was a branch

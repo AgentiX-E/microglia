@@ -228,6 +228,25 @@ describe('reading the three fields off an artefact', () => {
   });
 });
 
+describe('the requests a join dropped', () => {
+  it('counts the requests no episode covers, which is what an abandoned attempt leaves behind', () => {
+    // A ledger of four requests, one episode covering the first two. The other two belong to a boundary that
+    // resolved to nothing, and the count is what tells a reader the table is over two requests rather than four.
+    const reading = itemTransfer({
+      episodes: [{ startsAt: 0, spans: [[0, 2]], memory: true, control: true }],
+      ledger: [['k_1'], ['k_1'], ['k_2'], ['k_2']],
+    });
+    expect(reading.unmatchedRequests).toBe(2);
+    expect(reading.items).toEqual([{ id: 'k_1', episodes: 1, kept: 0, broke: 0, net: 0 }]);
+  });
+
+  it('counts every request when the arm has no episode at all', () => {
+    const reading = itemTransfer({ episodes: [], ledger: [['k_1'], ['k_1']] });
+    expect(reading.unmatchedRequests).toBe(2);
+    expect(reading.items).toEqual([]);
+  });
+});
+
 describe('what the gate did to the trials it withheld from', () => {
   const row = (id: string, trial: number, reward: number | null) => ({ id, trial, reward });
 
@@ -561,13 +580,28 @@ describe('pairing a repeated task into one episode with two ranges', () => {
     ]);
   });
 
-  it('declines the pair when a named boundary resolves to nothing', () => {
+  it('keeps the episodes a named join could resolve, and drops only the boundary it could not', () => {
+    // R145. This used to return `undefined`, which cost R141 the whole attribution for one abandoned attempt:
+    // 41 boundaries for 40 scored trials. A boundary that resolves to nothing drops its own requests — the
+    // second boundary here owns request 2 — and the resolved one still pairs.
     expect(
       pairedEpisodes({
         referenceTrials: [row('a', 0, 1)],
         memoryTrials: [row('a', 0, 1)],
         episodeStarts: [0, 2],
         boundaryTasks: ['a', 'zzz'],
+        ledgerLength: 3,
+      }),
+    ).toEqual([{ startsAt: 0, spans: [[0, 2]], memory: true, control: true }]);
+  });
+
+  it('declines the pair when the join names nothing at all, because then there is no episode to read', () => {
+    expect(
+      pairedEpisodes({
+        referenceTrials: [row('a', 0, 1)],
+        memoryTrials: [row('a', 0, 1)],
+        episodeStarts: [0, 2],
+        boundaryTasks: ['zzz', 'yyy'],
         ledgerLength: 3,
       }),
     ).toBeUndefined();
