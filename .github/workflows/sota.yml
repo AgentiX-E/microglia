@@ -1473,7 +1473,9 @@ jobs:
           TAU_TEST_TASKS: ${{ steps.recall_floor.outputs.testTasks }}
           TAU_TRIALS: ${{ steps.recall_floor.outputs.trials || vars.TAU_TRIALS || '4' }}
           # One arm per side of the pair, which is what the job pays for: a memory-only dispatch is half.
-          TAU_WINDOW_ARMS: "${{ github.event.inputs.l4_arms == 'memory' || github.event.inputs.l4_arms == 'reference' ? '1' : '2' }}"
+          # `&&`/`||` rather than `? :`: GitHub's expression language has no ternary, and a workflow that fails
+          # to parse is refused at dispatch with a 422 rather than at the line (R142's second attempt did exactly that).
+          TAU_WINDOW_ARMS: "${{ (github.event.inputs.l4_arms == 'memory' || github.event.inputs.l4_arms == 'reference') && '1' || '2' }}"
           TAU_ALLOW_PEAK: ${{ vars.TAU_ALLOW_PEAK }}
         run: pnpm --silent eval:window-fit
 
