@@ -3918,3 +3918,56 @@ and *measured* by a dispatch, and the line says which one it is doing.
 Both are served at every rung, because a gate with no measurement cannot have withheld anything — but a store that
 serves one candidate per request is a store no threshold can act on, and a reader should see that rather than
 infer it.
+
+## 31. What your numbers can resolve, and why re-running one arm is not optional
+
+A paired read gives you a delta and an interval, and the interval is exact for the two runs in front of you. It
+does not tell you whether **another dispatch of the same treatment** would land in the same place, and until you
+know that, a small delta is not a finding.
+
+### 31.1 The two questions, and which one the artefact answers
+
+| question | answered by | what it assumes |
+| --- | --- | --- |
+| "given these two runs, how surprising is this split?" | the McNemar interval on discordant pairs | nothing — it is exact |
+| "would the treatment move the outcome again?" | `minDetectablePp` **plus the arms' own variance** | that both draws are sampled, not just one |
+
+Every `minDetectablePp` in `eval/results` is the first kind: it treats the control as a fixed quantity. The
+control is a run of a stochastic agent on a stochastic model, and it moves.
+
+### 31.2 How far it moves, measured once
+
+Two dispatches of the *same* reference arm, same 57 tasks, same model, forty minutes apart:
+
+```
+R142 reference  47 / 57        R151 reference  51 / 57
+agree 47        (both pass 44, both fail 3)      disagree 10   (3 down, 7 up)
+flip share 0.175              McNemar exact p 0.344
+```
+
+The arm did not change. It moved **7.02pp** and flipped **17.5%** of its tasks.
+
+### 31.3 The arithmetic to redo whenever you quote an MDE
+
+```
+per-arm SD      = sqrt(f * (1 - f) / n)        f = flip share, n = trials
+delta SD        = sqrt(2) * per-arm SD         two independent dispatches
+MDE80           = 2.802 * delta SD             the constant the protocol uses
+```
+
+On the numbers above: `sqrt(0.175*0.825/57) = 5.0pp`, so the delta carries `7.1pp` and the 80% MDE is
+**19.9pp** — against the **15.55pp** the pair artefact prints from within-run discordance alone. The published
+figure is the MDE of a conditional question; the unconditional one is 28% wider.
+
+### 31.4 What to do about it
+
+- **Quote the pair's interval as what it is**: exact given these two runs. Do not call a 4pp delta a finding on
+  40–60 tasks without a test–retest.
+- **Prefer tasks to trials.** `n` and `k` both shrink the noise, but trials within a task are correlated, so
+  `k` shrinks less than `sqrt(k)` and the pass^k metric exists precisely because of that. 114 independent pairs
+  resolve 10.98pp; 228 correlated trial pairs on 57 tasks claim 7.8pp and deliver less.
+- **Re-run one arm before believing a mechanism.** One reference dispatch is $0.13–0.15 off-peak and it is the
+  only way to know your own noise floor. A lane that has never run the same treatment twice has never measured
+  the number its intervals depend on.
+- **Read `eval:power` as a floor, not a verdict.** It recomputes every published delta against its own MDE; the
+  coarsest design on the record is the one to quote when someone asks what the project can see.

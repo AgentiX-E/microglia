@@ -1824,3 +1824,24 @@ approximation nobody believes.
 the reference arm measured on the same task — and a model shown a procedure and then not shown it is not the
 model that never saw it. The line therefore opens `serve sweep (estimated, …)`, and a rung is *measured* only by
 the dispatch that runs it. What the estimate removes is the first dispatch of a two-dispatch loop.
+
+### 8.24 Two draws, not one: the variance the paired interval leaves out
+
+`l4-pair`'s interval is McNemar's, computed on the discordant pairs of one dispatch. It is exact **conditional
+on the two runs**, and its `minDetectablePp` inherits that: it asks what a 5pp effect would need *if the control
+did not move*. The control moves — 17.5% of its tasks flipped between two dispatches of the same reference
+configuration — so the artefact now sits beside a reading that says so.
+
+| quantity | where it comes from | what it licenses |
+| --- | --- | --- |
+| `degradation.breakRate` | one dispatch | a description of the arm that ran |
+| `resolution.standardErrorPp` | within-run discordance | the conditional question |
+| the flip share of one arm across two dispatches | two artefacts, joined by task id | the unconditional one |
+
+The join is the same one `serveSplit` uses — `per_trial` keyed by `(id, trial)` — and it is free: two mechanism
+rounds leave two reference arms behind, and nobody had joined them. The rule this leaves is that **a lane which
+has never run one treatment twice has never measured the variance its intervals depend on**; the second
+reference dispatch is a $0.13 instrument that every later reading is priced against.
+
+The two are not interchangeable levers: `n` shrinks both terms by `√n`, while `k` shrinks the per-arm term by
+`√k` only to the extent trials are independent — which is the question `pass^k` exists to raise, not to answer.
