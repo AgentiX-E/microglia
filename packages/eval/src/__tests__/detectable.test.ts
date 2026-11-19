@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { POWER_Z, detectableDelta } from '../detectable.js';
+import { POWER_Z, detectableDelta, tasksForDelta } from '../detectable.js';
 import { pairedWidths } from '../power.js';
 
 describe('detectableDelta', () => {
@@ -42,5 +42,35 @@ describe('detectableDelta', () => {
     // than 33.98pp, and 40 cannot guarantee 44.30pp.
     expect(detectableDelta(68, 1) * 100).toBeCloseTo(33.98, 2);
     expect(detectableDelta(40, 1) * 100).toBeCloseTo(44.30, 2);
+  });
+});
+
+describe('tasksForDelta', () => {
+  it('prices this lane\'s own revert bar: −5pp needs 864 paired trials at the discordance it observes', () => {
+    // 2.802² · 0.275 / 0.05² = 863.7, so 864. The largest fold this record has run is 194 pairs, and the
+    // rule fires on the sign of a delta the sample cannot resolve until it is four times that size.
+    expect(tasksForDelta(0.05, 0.275)).toBe(864);
+    expect(tasksForDelta(0.03, 0.275)).toBe(2399);
+    expect(tasksForDelta(0.1, 0.275)).toBe(216);
+    expect(tasksForDelta(0.15, 0.275)).toBe(96);
+  });
+
+  it('is the exact inverse of detectableDelta, which is the only reason two files may hold it', () => {
+    for (const [n, d] of [
+      [40, 0.275],
+      [114, 0.4],
+      [164, 0.25],
+    ] as const) {
+      const effect = detectableDelta(n, d);
+      // The inverse rounds up, so the sample it returns resolves *that* effect or better and never worse.
+      expect(detectableDelta(tasksForDelta(effect, d), d)).toBeLessThanOrEqual(effect + 1e-12);
+    }
+  });
+
+  it('answers the non-questions the way the forward direction does', () => {
+    expect(tasksForDelta(0, 0.3)).toBe(Number.POSITIVE_INFINITY);
+    expect(tasksForDelta(-0.02, 0.3)).toBe(Number.POSITIVE_INFINITY);
+    expect(tasksForDelta(0.05, 0)).toBe(Number.POSITIVE_INFINITY);
+    expect(tasksForDelta(0.05, 1)).toBe(tasksForDelta(0.05, 3));
   });
 });

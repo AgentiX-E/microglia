@@ -71,6 +71,7 @@ import { foldHeadroom, headroomLine } from '../headroom.js';
 import { serveSupportCensus, serveSupportLine, supportMapOf } from '../serve-support.js';
 import { foldSplitOf, treatmentOf } from '../cross-fit.js';
 import { serveYieldCensus, serveYieldLine } from '../serve-yield.js';
+import { conditionalLine, conditionalReading } from '../conditional.js';
 import { reconcileServeRotation, rotationModeOf } from '../serve-rotation.js';
 import { serveTaskCensus, serveTaskLine } from '../serve-tasks.js';
 import { marginSweep, serveSweepLine } from '../serve-sweep.js';
@@ -499,6 +500,20 @@ if (attribution !== undefined) process.stdout.write(`${itemTransferLine(attribut
 // rather than the record. Printed from the same join, at no extra cost.
 const yields = attribution === undefined ? undefined : serveYieldCensus(attribution.renders);
 if (yields !== undefined) process.stdout.write(`${serveYieldLine(yields)}\n`);
+// R155: the same counts divided by the populations they came from. `yields` says four repairs and seven breaks
+// on forty trials; this says four of six failed trials repaired against seven of thirty-four passed ones
+// broken, which is the reading the delta dilutes — 86% of a retail fold is population where a memory can only
+// lose. Its break-even is the number a content axis is measured against, and it is a property of the corpus.
+const conditional =
+  yields === undefined
+    ? undefined
+    : conditionalReading({
+        trials: yields.renders,
+        failedControl: yields.opportunity,
+        repairs: yields.repairs,
+        breaks: yields.breaks,
+      });
+if (conditional !== undefined) process.stdout.write(`${conditionalLine(conditional)}\n`);
 // R148: the same renders, grouped by the task they were served into. One hundred breaks on one task and one
 // hundred breaks across a hundred tasks are the same `breaks` count and different illnesses — reach versus
 // interference — and only the second is what a content axis addresses. Nothing counts by this: it is the group
@@ -687,6 +702,10 @@ await writeJson('poc-l4-pair', {
           candidates: yields.candidates,
         },
       }),
+  // R155: the same counts divided by the population each came from, with the break rate at which they cancel.
+  // Beside `serveYield` rather than inside it because it answers a different question on the same numbers: not
+  // what a record did per render, but how far a store is from paying for itself on this corpus.
+  ...(conditional === undefined ? {} : { conditional }),
   // R148: which tasks the store reached, and how the harm was distributed across them. The rows are the join
   // grain a content axis needs — `(record, task)` — written here because the arm's artefacts carry the record
   // text and the trials carry the outcomes, but neither carries the pair.

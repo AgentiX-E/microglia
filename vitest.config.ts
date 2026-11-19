@@ -29,6 +29,13 @@ export default defineConfig({
     include: ['packages/*/src/**/*.test.ts'],
     environment: 'node',
     testTimeout: 20_000,
+    // A cap, not a tuning knob. Vitest defaults to one worker per core, and on a many-core machine (32 here) the
+    // suite now runs enough workers that the pool's own `onTaskUpdate` RPC times out — 5,830 tests pass and the
+    // run still exits 1 with "Unhandled Errors". A gate that fails for a scheduling reason is a gate people
+    // re-run until it passes, which is a gate nobody reads, so the count is capped at a number that keeps the
+    // workers fed without starving the RPC. It costs nothing on CI: those runners have four cores, and a cap
+    // above the core count is never reached.
+    maxWorkers: 8,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json-summary'],

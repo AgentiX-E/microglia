@@ -1023,6 +1023,14 @@ export {
   type FoldHeadroomInput,
 } from './headroom.js';
 export {
+  conditionalLine,
+  conditionalReading,
+  proportionRate,
+  type ConditionalInput,
+  type ConditionalReading,
+  type Rate,
+} from './conditional.js';
+export {
   FACADE_NOTES_ENV,
   NOTE_LEVELS,
   PRIMARY_NOTE,

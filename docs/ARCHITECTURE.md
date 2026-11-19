@@ -2036,3 +2036,54 @@ owes before it is bought.
 in one direction give `p = 0.0156`, so an oracle store would be significant, and its 95% interval on forty tasks
 would be roughly [3, 27] — a sentence that establishes something happened on six tasks and nothing about its size.
 A record that reported only the `p` value would have called that a success four times.
+
+### 8.29 A delta over a corpus is a weighted average of two rates, and the weights are the corpus's
+
+§8.28 established that a fold has a ceiling. This section is about the quantity taken on that fold — and the
+argument is that the delta, as this record has been publishing it, is a **mixture** whose mixing weights nobody
+wrote down.
+
+A repair can only come from a trial the control failed; a break can only come from one it passed. So for a
+failure share `f`, a repair rate `r` and a break rate `b`:
+
+```
+delta = f·r − (1−f)·b
+```
+
+That identity is exact, and it is the whole design problem. On τ² retail `f ≈ 0.14`, so the delta is 14% a large
+positive number and 86% a smaller negative one. **The store repairs two thirds of the failures and breaks one in
+six of the passes, and the delta is negative because passes outnumber failures five to one.** Four rounds of
+reading that delta as a fact about a mechanism were reading a ratio of corpus composition.
+
+| draw | trials | failed | repaired | passed | broken | repair rate | break rate | break-even | net |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `official` | 40 | 4 | 4 | 36 | 3 | 100.0% | 8.3% | 11.1% | +2.50pp |
+| `swapped` | 74 | 11 | 7 | 63 | 15 | 63.6% | 23.8% | 11.1% | −10.81pp |
+| R152 | 40 | 6 | 3 | 34 | 2 | 50.0% | 5.9% | 8.8% | +2.50pp |
+| R152c | 40 | 6 | 4 | 34 | 7 | 66.7% | 20.6% | 11.8% | −7.50pp |
+| pooled | 194 | 27 | 18 | 167 | 27 | **66.7%** | **16.2%** | **10.8%** | −4.64pp |
+
+**The break-even is the number the harm side never had.** Setting the identity to zero gives `b* = r·f/(1−f)`, so
+at this corpus's failure share the store has to keep its break rate under **10.8%** to pay for itself, and it is
+at 16.2%. That is a target a content axis can be graded against, and unlike "the delta must be positive" it
+separates the store's precision from the corpus's difficulty: the same store on a corpus with a 30% failure share
+breaks even at 28%.
+
+**Two populations, two denominators, and that is why the intervals differ.** The repair rate is estimated from 27
+failures and the break rate from 167 passes, so their intervals are 34 and 11 points wide respectively — a rate
+is only as precise as the population it is about, and averaging them into one delta destroys exactly the
+information a reader needs to decide what to fix. Wilson intervals throughout (`reproduction.ts`'s, not a second
+copy): at 4 of 6 the textbook interval reaches 104%, and a rate above 100% is a wrong number rather than a wide
+one.
+
+**The gate reconciles; it does not grade.** `serveYield`'s four counts must reconstruct the published delta to
+0.005pp, because two blocks that disagree about one comparison mean one of them is lying and neither says which.
+The gate deliberately does *not* fail on a store that is over its break-even: that is a measurement, and a build
+that goes red on a negative measurement teaches its readers to skip the line — the same reason the resolution row
+is advisory (§8.27) while the cost row blocks.
+
+**And the inverse formula, which is what a bar owes before it fires.** `tasksForDelta` solves
+`detectableDelta` for the sample instead of the effect: `n = z²·d/effect²`. At this lane's own discordance
+(0.232) the `−5pp` revert rule needs **729 paired trials** to be resolvable, and the largest fold in the record
+is 74. A bar priced in points and never in pairs is a rule that fires on readings the design cannot certify — and
+the direction of that error is the expensive one, because it reverts on noise.

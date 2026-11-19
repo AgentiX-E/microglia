@@ -4247,3 +4247,64 @@ Two consequences you can use:
 The smallest fold in this record whose ceiling clears its resolution is the pooled 114-pair one (14.0pp against
 13.24pp, and only by 0.8pp). That is why the next reading is pooled or on a harder corpus rather than a fifth
 40-task draw: on forty tasks with a 0.85 baseline, the design cannot see what the mechanism is asked to do.
+
+### 32.9 Two rates instead of one delta, and the break-even between them
+
+Every delta this record has published is a weighted average of two rates it never printed. A repair can only
+come from a trial the control failed and a break only from one it passed, so on a corpus the bare agent already
+solves 86% of, the delta spends 86% of its weight on the population where the memory can only lose:
+
+```
+delta = f·r − (1−f)·b        f = failure share, r = repair rate, b = break rate
+```
+
+`pnpm eval:conditional <pair-artefact.json ...>` divides the same counts by the populations they came from:
+
+```console
+$ pnpm eval:conditional eval/results/poc-l4-pair-official.json eval/results/poc-l4-pair-swapped.json \
+      .cache/r152-pair/poc-l4-pair.json .cache/r152c-pair/poc-l4-pair.json
+| fold | trials | failed | repaired | passed | broken | repair rate | break rate | break-even | net |
+| poc-l4-pair-official | 40 | 4 | 4 | 36 | 3 | 100.00% [51.01, 100.00] | 8.33% [2.87, 21.83] | 11.11% | 2.50pp |
+| poc-l4-pair-swapped  | 74 | 11 | 7 | 63 | 15 | 63.64% [35.38, 84.83] | 23.81% [14.99, 35.64] | 11.11% | -10.81pp |
+| r152-pair            | 40 | 6 | 3 | 34 | 2 | 50.00% [18.76, 81.24] | 5.88% [1.63, 19.09] | 8.82% | 2.50pp |
+| r152c-pair           | 40 | 6 | 4 | 34 | 7 | 66.67% [30.00, 90.32] | 20.59% [10.35, 36.80] | 11.76% | -7.50pp |
+| **pooled (4 folds)** | 194 | 27 | 18 | 167 | 27 | 66.67% [47.82, 81.36] | 16.17% [11.36, 22.50] | 10.78% | -4.64pp |
+```
+
+Three things to read out of it:
+
+- **The memory repairs two thirds of the trials the bare agent fails.** 18 of 27, interval `[47.8%, 81.4%]`. That
+  is a large, consistent effect and it is invisible in the delta, because failures are 14% of the sample.
+- **It breaks one in six of the trials the bare agent already passes.** 27 of 167, `[11.4%, 22.5%]`. This is the
+  harm the last four rounds have been arguing about, and it is also the larger of the two counts.
+- **The break-even is 10.78%.** Setting the identity to zero gives `b* = r·f/(1−f)`; at this corpus's failure
+  share the store's break rate has to fall below **10.8%** to pay for itself, and it is at 16.2% — over its own
+  bar by 5.4pp.
+
+**This is the first numeric target the harm side has had.** "The memory costs points" is not actionable; "the
+break rate must come down by a third on this corpus" is, and a content axis can be graded against it. Note that
+the bar is a property of the corpus as much as of the store: at a 30% failure share the same store would break
+even at 28% breaks.
+
+**Why the interval is wide, and honestly so.** A rate over 27 failures is estimated from 27 trials, not from 194,
+which is why the repair interval spans 34 points. Wilson rather than the normal approximation throughout: at 4 of
+6 the textbook interval runs to 104%, and a rate above 100% is a wrong number rather than a wide one.
+
+**What the same command says about the bars.** Beside the table it prices the effect sizes this lane argues about
+at its own observed discordance (0.232 pooled):
+
+| bar | paired trials needed | largest fold this record has run |
+| --- | --- | --- |
+| 3pp | 2,024 | 74 |
+| 5pp | 729 | 74 |
+| 10pp | 183 | 74 |
+| 15pp | 81 | 74 |
+
+The rule this lane reverts on is `−5pp with a served pack`, and at its own discordance that rule needs **729
+paired trials to be resolvable**. A bar whose price is never computed is a rule that fires on readings the design
+cannot certify, and the direction of that error is the expensive one: it reverts on noise.
+
+**Reconciliation is a gate in `pnpm check`.** `serveYield`'s four counts must reconstruct the delta the pair
+published, to 0.005pp; two blocks that disagree about one comparison mean one of them is wrong and neither says
+which. The gate does not grade whether a store pays for itself — that is a measurement, and a build that fails on
+a negative measurement teaches its readers to skip the line.

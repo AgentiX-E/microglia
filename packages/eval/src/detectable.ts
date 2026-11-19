@@ -32,3 +32,34 @@ export function detectableDelta(n: number, discordance: number, z = POWER_Z): nu
   const d = Math.min(1, discordance);
   return Math.sqrt((z * z * d) / n);
 }
+
+/**
+ * The inverse: the paired sample a stated effect needs before it can be resolved.
+ *
+ * `effect` is a share of pairs, not percentage points — the same unit `detectableDelta` returns and the same
+ * unit the protocol carries, so `tasksForDelta(0.05, 0.275)` is the price of the 5pp bar (§`bin/conditional`).
+ *
+ * `detectableDelta` answers "what is the smallest effect this sample could see". This answers the question a
+ * design should be asked *before* it is bought — "how many pairs does the effect I am hunting need" — and it is
+ * the same formula solved for `n` instead of for the effect:
+ *
+ * ```
+ * n = z²·d / effect²
+ * ```
+ *
+ * It exists because a bar can be stated in points and never priced in pairs. This lane's revert rule is
+ * `−5pp with a served pack`; at retail's observed discordance (0.275) `tasksForDelta(0.05, 0.275)` is
+ * **864 paired trials**, and the largest fold it has ever run is 194. A bar whose price is never computed
+ * is a rule that fires on readings the design cannot certify, and the direction of the miscalculation is the
+ * expensive one: it reverts on noise.
+ *
+ * Rounded **up** to a whole pair, because a design is sized in tasks and a fractional task is a sample nobody
+ * can draw. `Infinity` for a non-positive effect or no discordance, which are the same non-answers
+ * `detectableDelta` returns: no sample resolves zero, and a sample whose arms never disagree resolves nothing.
+ */
+export function tasksForDelta(effect: number, discordance: number, z = POWER_Z): number {
+  if (!(effect > 0)) return Number.POSITIVE_INFINITY;
+  if (!(discordance > 0)) return Number.POSITIVE_INFINITY;
+  const d = Math.min(1, discordance);
+  return Math.ceil((z * z * d) / (effect * effect));
+}
