@@ -84,6 +84,10 @@ export const DEFERRALS: Readonly<Record<string, string>> = {
   'content-signal':
     'compares the question\'s own words against a candidate\'s column names and literals; it reads ' +
     'strings and executes nothing',
+  'pack-copy':
+    'reads the statements a pack delivered and the gold query beside them; it asks two questions of ' +
+    'those strings -- whether a denial names a construct the statement of record uses, and how far a ' +
+    'sentence travelled -- and executes nothing',
   assertion:
     'scores a candidate against the assertions a model wrote for one question; the query it reads is ' +
     'a string the pool already recorded, and the arithmetic never opens a database',

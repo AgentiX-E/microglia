@@ -954,6 +954,13 @@ jobs:
         # its own writer, a new field invented in the shape of the old ones.
         run: pnpm eval:claim-check
 
+      - name: The pack-copy census has not drifted
+        # R158. The census reads four committed artefacts and two hundred statements, so it is exactly
+        # the kind of evidence that moves when an artefact is re-committed and nobody re-reads it. The
+        # check recomputes the whole file and fails on a byte: a number that moved is a change in the
+        # evidence, and a rule that moved is a change in the reader, and neither may pass as the other.
+        run: pnpm eval:pack-copy --check
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

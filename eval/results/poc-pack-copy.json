@@ -1,0 +1,409 @@
+{
+  "id": "poc-pack-copy",
+  "registered": "ROADMAP.md §R158",
+  "resamples": 2000,
+  "seed": 12345,
+  "rule": "denial: a statement that negates a construct it binds within one phrase, where the gold query uses that construct; circulation: a statement delivered to cases in at least two databases, scored per case as the share of its statements that circulate",
+  "sources": [
+    {
+      "source": "bird-train",
+      "n": 7000,
+      "clusters": 58,
+      "statements": 210,
+      "circulating": 39,
+      "withDenial": 3108,
+      "denials": 3963,
+      "warnings": 902,
+      "withHit": 127,
+      "withStrict": 98,
+      "deniedDelta": 1.574803149606299,
+      "deniedInterval": {
+        "low": -2.7586206896551726,
+        "high": 6.382978723404255,
+        "point": 1.574803149606299,
+        "dropped": 0
+      },
+      "cleanDelta": -0.7565837334497308,
+      "cleanInterval": {
+        "low": -1.3316423589093214,
+        "high": -0.16763181956720513,
+        "point": -0.7565837334497308,
+        "dropped": 0
+      },
+      "denialGap": {
+        "low": -1.948280344389901,
+        "high": 7.202716735427015,
+        "point": 2.33138688305603,
+        "dropped": 0
+      },
+      "strictGap": {
+        "low": -3.2667546070247284,
+        "high": 5.409668007254949,
+        "point": 0.7244277021153289,
+        "dropped": 0
+      },
+      "circulation": [
+        {
+          "stratum": "none",
+          "n": 948,
+          "delta": -0.10548523206751054,
+          "interval": {
+            "low": -2.7799227799227797,
+            "high": 2.6567481402763016,
+            "point": -0.10548523206751054,
+            "dropped": 0
+          }
+        },
+        {
+          "stratum": "mixed",
+          "n": 1811,
+          "delta": -0.4969630038652678,
+          "interval": {
+            "low": -1.57251019219569,
+            "high": 0.5228136882129277,
+            "point": -0.4969630038652678,
+            "dropped": 0
+          }
+        },
+        {
+          "stratum": "all",
+          "n": 4241,
+          "delta": -0.9431737797689225,
+          "interval": {
+            "low": -1.4992860542598763,
+            "high": -0.4049676025917927,
+            "point": -0.9431737797689225,
+            "dropped": 0
+          }
+        }
+      ],
+      "circulationGap": {
+        "low": -3.644358800363068,
+        "high": 1.7841897698458904,
+        "point": -0.837688547701412,
+        "dropped": 0
+      },
+      "contradicted": [
+        {
+          "construct": "select-alias",
+          "cases": 57
+        },
+        {
+          "construct": "join",
+          "cases": 24
+        },
+        {
+          "construct": "count-star",
+          "cases": 22
+        },
+        {
+          "construct": "distinct",
+          "cases": 11
+        },
+        {
+          "construct": "order-by",
+          "cases": 11
+        },
+        {
+          "construct": "like",
+          "cases": 3
+        }
+      ],
+      "statement": "bird-train: 127 of 7000 cases carry a denial the gold contradicts, at +1.57pp [-2.76pp, +6.38pp] against -0.76pp [-1.33pp, -0.17pp]; the all-boilerplate stratum sits -0.84pp from the singleton stratum [-3.64pp, +1.78pp].",
+      "path": "eval/results/poc-sota-bird-train.json"
+    },
+    {
+      "source": "bird-dev",
+      "n": 1534,
+      "clusters": 11,
+      "statements": 215,
+      "circulating": 31,
+      "withDenial": 257,
+      "denials": 286,
+      "warnings": 28,
+      "withHit": 62,
+      "withStrict": 31,
+      "deniedDelta": 0,
+      "deniedInterval": {
+        "low": -7.4074074074074066,
+        "high": 10.638297872340425,
+        "point": 0,
+        "dropped": 0
+      },
+      "cleanDelta": 0.33967391304347827,
+      "cleanInterval": {
+        "low": -0.6105006105006106,
+        "high": 1.4792899408284024,
+        "point": 0.33967391304347827,
+        "dropped": 0
+      },
+      "denialGap": {
+        "low": -8.194189468776408,
+        "high": 9.827271938199809,
+        "point": -0.33967391304347827,
+        "dropped": 0
+      },
+      "strictGap": {
+        "low": -1.4423076923076923,
+        "high": 0.6076975016880486,
+        "point": -0.332667997338656,
+        "dropped": 13
+      },
+      "circulation": [
+        {
+          "stratum": "none",
+          "n": 943,
+          "delta": 0.4241781548250266,
+          "interval": {
+            "low": -0.5512679162072767,
+            "high": 1.3215859030837005,
+            "point": 0.4241781548250266,
+            "dropped": 0
+          }
+        },
+        {
+          "stratum": "mixed",
+          "n": 422,
+          "delta": 0.9478672985781991,
+          "interval": {
+            "low": -1.6260162601626018,
+            "high": 3.8147138964577656,
+            "point": 0.9478672985781991,
+            "dropped": 0
+          }
+        },
+        {
+          "stratum": "all",
+          "n": 169,
+          "delta": -1.7751479289940828,
+          "interval": {
+            "low": -5.555555555555555,
+            "high": 3.816793893129771,
+            "point": -1.7751479289940828,
+            "dropped": 0
+          }
+        }
+      ],
+      "circulationGap": {
+        "low": -5.95002311827586,
+        "high": 3.333040833040833,
+        "point": -2.1993260838191095,
+        "dropped": 0
+      },
+      "contradicted": [
+        {
+          "construct": "join",
+          "cases": 34
+        },
+        {
+          "construct": "distinct",
+          "cases": 16
+        },
+        {
+          "construct": "order-by",
+          "cases": 7
+        },
+        {
+          "construct": "cast",
+          "cases": 5
+        }
+      ],
+      "statement": "bird-dev: 62 of 1534 cases carry a denial the gold contradicts, at +0.00pp [-7.41pp, +10.64pp] against +0.34pp [-0.61pp, +1.48pp]; the all-boilerplate stratum sits -2.20pp from the singleton stratum [-5.95pp, +3.33pp].",
+      "path": "eval/results/poc-sota-bird-dev-R26-channels.json"
+    },
+    {
+      "source": "bird-dev-lexicon",
+      "n": 1534,
+      "clusters": 11,
+      "statements": 212,
+      "circulating": 31,
+      "withDenial": 215,
+      "denials": 239,
+      "warnings": 32,
+      "withHit": 47,
+      "withStrict": 18,
+      "deniedDelta": 6.382978723404255,
+      "deniedInterval": {
+        "low": 0,
+        "high": 21.21212121212121,
+        "point": 6.382978723404255,
+        "dropped": 0
+      },
+      "cleanDelta": 0.5379959650302623,
+      "cleanInterval": {
+        "low": -0.8922443376801648,
+        "high": 2.2338049143708116,
+        "point": 0.5379959650302623,
+        "dropped": 0
+      },
+      "denialGap": {
+        "low": -1.085383502170767,
+        "high": 21.124162337173402,
+        "point": 5.844982758373993,
+        "dropped": 0
+      },
+      "strictGap": {
+        "low": -2.396644697423607,
+        "high": 0.7482993197278911,
+        "point": -0.7255936675461742,
+        "dropped": 199
+      },
+      "circulation": [
+        {
+          "stratum": "none",
+          "n": 914,
+          "delta": 0.87527352297593,
+          "interval": {
+            "low": -0.851581508515815,
+            "high": 2.197802197802198,
+            "point": 0.87527352297593,
+            "dropped": 0
+          }
+        },
+        {
+          "stratum": "mixed",
+          "n": 459,
+          "delta": 0,
+          "interval": {
+            "low": -2.823529411764706,
+            "high": 3.076923076923077,
+            "point": 0,
+            "dropped": 0
+          }
+        },
+        {
+          "stratum": "all",
+          "n": 161,
+          "delta": 1.8633540372670807,
+          "interval": {
+            "low": -1.6853932584269662,
+            "high": 8.870967741935484,
+            "point": 1.8633540372670807,
+            "dropped": 0
+          }
+        }
+      ],
+      "circulationGap": {
+        "low": -2.934638057998055,
+        "high": 7.8679587148542405,
+        "point": 0.9880805142911507,
+        "dropped": 0
+      },
+      "contradicted": [
+        {
+          "construct": "join",
+          "cases": 18
+        },
+        {
+          "construct": "distinct",
+          "cases": 15
+        },
+        {
+          "construct": "order-by",
+          "cases": 10
+        },
+        {
+          "construct": "cast",
+          "cases": 4
+        }
+      ],
+      "statement": "bird-dev-lexicon: 47 of 1534 cases carry a denial the gold contradicts, at +6.38pp [+0.00pp, +21.21pp] against +0.54pp [-0.89pp, +2.23pp]; the all-boilerplate stratum sits +0.99pp from the singleton stratum [-2.93pp, +7.87pp].",
+      "path": "eval/results/poc-sota-bird-dev-R37-lexicon-grain.json"
+    },
+    {
+      "source": "bird-mini",
+      "n": 350,
+      "clusters": 11,
+      "statements": 192,
+      "circulating": 24,
+      "withDenial": 33,
+      "denials": 35,
+      "warnings": 0,
+      "withHit": 14,
+      "withStrict": 6,
+      "deniedDelta": 7.142857142857142,
+      "deniedInterval": {
+        "low": 0,
+        "high": 15,
+        "point": 7.142857142857142,
+        "dropped": 0
+      },
+      "cleanDelta": 0.2976190476190476,
+      "cleanInterval": {
+        "low": -4.166666666666666,
+        "high": 4.934210526315789,
+        "point": 0.2976190476190476,
+        "dropped": 0
+      },
+      "denialGap": {
+        "low": -4.092071611253197,
+        "high": 15.709290709290709,
+        "point": 6.845238095238095,
+        "dropped": 12
+      },
+      "strictGap": {
+        "low": -5.151515151515151,
+        "high": 3.571428571428571,
+        "point": -0.5813953488372093,
+        "dropped": 54
+      },
+      "circulation": [
+        {
+          "stratum": "none",
+          "n": 252,
+          "delta": 1.984126984126984,
+          "interval": {
+            "low": -2.8000000000000003,
+            "high": 6.405693950177936,
+            "point": 1.984126984126984,
+            "dropped": 0
+          }
+        },
+        {
+          "stratum": "mixed",
+          "n": 92,
+          "delta": -3.260869565217391,
+          "interval": {
+            "low": -7.4074074074074066,
+            "high": 3.508771929824561,
+            "point": -3.260869565217391,
+            "dropped": 0
+          }
+        },
+        {
+          "stratum": "all",
+          "n": 6,
+          "delta": 0,
+          "interval": {
+            "low": 0,
+            "high": 0,
+            "point": 0,
+            "dropped": 0
+          }
+        }
+      ],
+      "circulationGap": {
+        "low": -6.741573033707865,
+        "high": 2.8455284552845526,
+        "point": -1.984126984126984,
+        "dropped": 3
+      },
+      "contradicted": [
+        {
+          "construct": "join",
+          "cases": 9
+        },
+        {
+          "construct": "distinct",
+          "cases": 3
+        },
+        {
+          "construct": "cast",
+          "cases": 2
+        }
+      ],
+      "statement": "bird-mini: 14 of 350 cases carry a denial the gold contradicts, at +7.14pp [+0.00pp, +15.00pp] against +0.30pp [-4.17pp, +4.93pp]; the all-boilerplate stratum sits -1.98pp from the singleton stratum [-6.74pp, +2.85pp].",
+      "path": "eval/results/poc-sota-bird-R63-recall-order.json"
+    }
+  ]
+}

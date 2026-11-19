@@ -2206,3 +2206,44 @@ draws with a denominator; the count is what makes that bias visible instead of s
 **The gate.** `eval/results/poc-exchange-census.json` is committed, and `pnpm eval:exchange --check` fails when
 the recomputation differs from it by a byte. The census is a pure function of five committed artefacts, so a
 drift is a change in the evidence and is not allowed to pass as a change in the arithmetic.
+
+### 8.33 Why the content axis is two functions and not one classifier
+
+`pack-copy.ts` answers "is the pack about this case" with two mechanical readers, because the honest version of
+that question splits into two that can each be computed from a committed artefact.
+
+**Denial.** The unit is a construct, not a sentence. Prose mentions constructs in many roles — `a join between
+two tables`, `the joined result`, `nothing was joined` — and only a negation *bound to* the construct states a
+polarity. So `DENIAL_RULES` is a table of eleven patterns, each of which admits only connectives (`using`, `be`,
+`wrapped in`, an article) between the cue and the construct. The construct is then looked for in
+`constructsOf(goldSql)`, which reads `sqlShapeOf` and the shared tokeniser rather than the query's text, so a
+construct named inside a string literal is not counted.
+
+Two properties of that design are load-bearing:
+
+- **The asymmetry is deliberate.** "The pack prescribes X and the gold does not do X" is not measurable this
+  way, because a bare mention is not a prescription. The module computes the one direction English states
+  unambiguously and says so, instead of inventing a second classifier for the other direction and reporting its
+  error rate as a finding.
+- **Warnings are a separate count, not a filter.** A sentence carrying a failure predicate ("does not measure",
+  "inflates", "drops rows") tells the executor what *not to try*, and read as a prescription it inverts: the
+  gold does the very thing the sentence warns against. `warn` therefore has its own column. On `bird-train` it is
+  902 of 3,963 denials — 23% — which is a property of the store worth knowing on its own.
+
+**Circulation.** `spreadOf` counts, for every delivered statement, how many *databases* received it, and a case's
+boilerplate share is the fraction of its statements whose spread is at least two. The database is the unit
+because cases in one database share a schema: a statement delivered twice inside `california_schools` is about a
+schema those cases have, while the same statement in `hockey` and `student_loan` is about neither. The share is
+`null` for a pack of no statements, and `circulationStratumOf` puts that `null` in `none` rather than in a fourth
+stratum, because an empty pack has no composition to report and must not be scored as clean by default.
+
+**The statistics reuse one loop.** Both readings stratify the same paired rows, so `carve` reports a stratum's
+delta with `clusterBootstrapStatistic` over databases, and `carveGap` bootstraps the *corpus* — clusters drawn,
+both strata recomputed in the draw, a draw losing either stratum dropped and counted. Resampling inside a
+stratum would answer a different question, because the draws would be conditioned on a label derived from the
+same rows.
+
+**What it costs, and what it buys.** A lexical denial reader is roughly five-in-eight precise on a hand-audited
+sample of eight: enough to reject a large effect, not enough to establish a small one. The census publishes the
+denial count beside the hit count for that reason, and the round's conclusion is a rejection — the pack's
+contradictions are 1.8% of cases and do not predict harm — rather than a positive finding.

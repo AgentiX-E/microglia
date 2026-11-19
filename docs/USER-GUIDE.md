@@ -4477,3 +4477,88 @@ absorbed.
 $ pnpm eval:exchange --write   # regenerate after reading why the evidence moved
 $ pnpm eval:exchange --check   # what CI runs
 ```
+
+### 32.13 Two ways a pack can be wrong, and the one that is measurable
+
+Two axes came before this one and both were null: `AM.15` read how much of the question the pack's text covers,
+and `R31` read whether the pack names the identifier the query imports. Neither asks whether the pack says
+something the answer **denies**, which is where the 2026 literature puts the harm — a memory that scores badly
+on relevance is noise, but a memory that makes a *competing* claim is a different failure, worth 55 points of
+accuracy in FactConsolidation's controlled setting.
+
+`pnpm eval:pack-copy` asks it two ways on artefacts this repository already commits, with no model call.
+
+```console
+$ pnpm eval:pack-copy
+source                              n  clus  stmts   xdb  denial   warn   hit  strict
+bird-train                       7000    58    210    39    3108    902   127      98
+bird-dev                         1534    11    215    31     257     28    62      31
+bird-dev-lexicon                 1534    11    212    31     215     32    47      18
+bird-mini                         350    11    192    24      33      0    14       6
+
+source                         stratum           n     delta       low      high
+bird-train                     contradicted    127   +1.57pp   -2.76pp   +6.38pp
+bird-train                     else           6873   -0.76pp   -1.33pp   -0.17pp
+bird-train                     denial-gap        —   +2.33pp   -1.95pp   +7.20pp
+bird-train                     strict-gap        —   +0.72pp   -3.27pp   +5.41pp
+bird-train                     none            948   -0.11pp   -2.78pp   +2.66pp
+bird-train                     mixed          1811   -0.50pp   -1.57pp   +0.52pp
+bird-train                     all            4241   -0.94pp   -1.50pp   -0.40pp
+bird-train                     circ-gap          —   -0.84pp   -3.64pp   +1.78pp
+```
+
+**Reading one: denial.** A rule binds a negation cue to a construct inside one phrase — `without DISTINCT`,
+`rather than COUNT(*)`, `left unaliased` — and the construct is then looked for in the gold query's shape.
+Eleven rules, one per construct, each narrow enough that a word changing the phrase stops the match. A
+window-based reader was tried first and bound `a join problem`, `the joined result` and `nothing was joined` to
+`join`; it called 1,092 of 1,534 dev cases contradicted, which is a description of English rather than of the
+pack.
+
+The corpus then says something the hypothesis does not predict: **3,963 denial sentences, and only 127 cases
+carry a denial the gold contradicts** — 1.8%. Of the rest, 902 are *warnings*: "counting rows without joining
+and grouping by case does not measure how many officers were involved" is not advice to avoid joining, it is
+advice that a shortcut fails, and the gold joins. Read as a prescription it inverts. That is why the census
+carries `warn` and excludes those sentences from `hit`: without it, a third of the store's negative advice
+would have been scored as contradicting the very query it supports.
+
+**Reading two: circulation.** The store distilled 210 statements for 7,000 questions. Thirty-nine of them reach
+cases in two or more databases — *"a customer name filter must match the stored `customerName` value exactly,
+including any suffix such as 'Distributors Ltd.'"* arrived in 53 databases — and those thirty-nine compose
+**60.6% of packs entirely**. A case's *boilerplate share* is the fraction of its statements that crossed a
+database boundary, and the three strata are the shares 0, in between, and 1.
+
+**What the two readings establish.**
+
+| reading | what it establishes |
+| --- | --- |
+| contradiction, train | 127 cases at **+1.57pp [−2.76, +6.38]** against −0.76pp elsewhere: denials do not carry the harm |
+| contradiction, dev-lexicon | **+6.38pp [+0.00, +21.21]** on 47 cases: the same sign, and it is the opposite of the prediction |
+| circulation, train, all-boilerplate | **−0.94pp [−1.50, −0.40]**, the only stratum interval in the table that excludes zero |
+| circulation, train, none | −0.11pp [−2.78, +2.66] |
+| circulation gap, train / dev / mini / lexicon | −0.84 [−3.64, +1.78], −2.20 [−5.95, +3.33], −1.98 [−6.74, +2.85], **+0.99 [−2.93, +7.87]** |
+
+Note the second row of that table: the `else` stratum — every case whose pack carries no contradiction — is
+**−0.76pp [−1.33, −0.17]**, and it is the only interval in the whole census that resolves. The loss is in what
+the pack says when it is not contradicting anything.
+
+So the literature's mechanism is **not visible in this store**, and the reason is structural rather than
+statistical: the pack almost never makes a claim specific enough to compete. What it does is generalise — a
+lesson distilled in `hockey` arrives in `student_loan` with no schema in common — and the harm, where it shows,
+sits in the generalised end. That is the Memory Tax shape (11.4–22.6% of facts lost at construction) with a
+different loss: not facts dropped, but facts abstracted until nothing case-specific remains.
+
+**What the reader cannot do, published with the numbers.** Eight hits were hand-audited: five are genuine
+contradictions (`COUNT(col)` against a gold `COUNT(*)`, `rather than ORDER BY` against a gold that orders), one
+bound to a longer object (`rather than joining the Answer table to itself` against a gold that joins one
+table), one conflated a select-list `DISTINCT` with a `COUNT(DISTINCT)`, one fired on a conditional. A lexical
+reader is about five-in-eight precise, which is enough to falsify a large effect and not enough to establish a
+small one. The census states both counts rather than reporting the favourable ratio.
+
+**The gate.** `--check` recomputes all four arms and compares the file byte for byte with
+`eval/results/poc-pack-copy.json`; CI runs it, so an artefact re-committed without re-reading the census fails
+the build.
+
+```console
+$ pnpm eval:pack-copy --write   # regenerate after reading why the evidence moved
+$ pnpm eval:pack-copy --check   # what CI runs
+```
