@@ -1800,3 +1800,14 @@ artefact counts them (`serveRotation.starved`) rather than leaving a silent phas
 (`maxRenders < cap`), a floor that retired nothing, a rung that withheld nothing. This record's rule is that an arm
 whose own reading cannot say whether it acted has produced no finding, and the reading is designed to say so in one
 number rather than in a paragraph of caveats.
+
+**Reuse** — the share of a nearby case's answer that applies to the case at hand, measured as the Jaccard overlap of
+the two gold queries' column sets, divided by the union so a fragment is not counted as a whole answer. It is a
+property of the **corpus**, not of the store: a lesson can only transfer where the two answers already share a
+column, so reuse is a ceiling on every content axis at once. `pnpm eval:reuse` reports it per band, for two corpora,
+with a cluster bootstrap.
+
+**Contradicted** — a verdict about a reading rather than about a corpus. `null` says the top band failed to clear
+zero and can still be blamed on the sample; **`contradicted`** says the top band's sign flipped between two corpora,
+which no increase in sample size repairs. The distinction matters because a null invites buying more questions and a
+flip forbids it.

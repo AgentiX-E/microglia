@@ -2301,3 +2301,46 @@ comparison wearing the vocabulary of a content effect. `circulationContrasts` re
 inside a database and gets −1.34pp [−3.58, +0.71]: the sign holds and the resolution does not. That is the second
 time this record has had to withdraw one of its own intervals, and the module carries the withdrawal beside the
 first estimate rather than instead of it.
+
+### 8.35 Why twelve null axes are one hypothesis, and what a replication adds to a bin
+
+`reuse-ceiling.ts` (R160) exists because of a pattern in the record rather than a gap in it. Twelve content axes
+came back null on BIRD — coverage, imported identifiers, denial, form, grounding, size-matched control, anchoring,
+conditional execution, deletion, recall order, and two more — and each null was explained afterwards by saying that
+axis does not carry the effect. Twelve explanations of that shape are not twelve facts. They are one claim about
+the corpus: **a lesson can transfer only to a question whose answer already shares something with the case the
+lesson came from**, so a corpus of questions each written against a fresh column set has a ceiling on memory that
+no distillation can lift.
+
+**The quantity is reuse, and it is measured from the answers, not from the questions.** For every case the nearest
+other case *inside its own database* is found from the question text — the only input a deployed system has — and
+reuse is the Jaccard overlap of the two gold queries' column sets. The denominator is the union, so a query wholly
+contained in a longer one scores 0.5: reuse is meant to say the whole answer transfers, and a fragment is not the
+whole answer. The cluster is the database, because two questions in one database share a schema and are not
+independent draws of anything.
+
+**The extractor was the first defect, and it produced a clean false finding.** The obvious way to read a column is
+everything between backticks. That sees a column in **8%** of this corpus's gold queries, because BIRD writes
+`SELECT player_api_id` unquoted, and it reported a median reuse of exactly **0.000** — a sentence that would have
+been published as "BIRD admits no reuse at all". `sqlShapeOf` returns `columns` with keywords, tables, aliases,
+output labels, CTEs and function names excluded, and the same corpus reads a median of **0.500**. The first number
+was a fact about a regular expression; the second is a fact about the corpus.
+
+**The unit of evidence is a replication, not a band.** Any single corpus's top band is allowed to be anything, and
+dev's happens to be the most encouraging number this record has seen from a content axis: **+2.69pp** at reuse
+≥ 0.75. The reading that decides is whether that band keeps its sign on a corpus sharing no database with dev, and
+on train it does not: **−1.04pp [−2.20, +0.18]** across 1,630 pairs, with a design that resolves 0.92pp. The
+verdict is therefore `contradicted` and not `null` — a flip is stronger evidence than an absence, because an
+absence can be blamed on power and a flip cannot.
+
+**The bands share one set of replicates, and the sufficient statistics are per cluster.** Sums and counts are
+accumulated into (database × band) cells, and each bootstrap draw reweights cells rather than rows, so a replicate
+is a pass over at most a few dozen cells; one draw supplies all four bands, which is what makes them comparable as
+one shape rather than four independent experiments. Empty bands are published with zero width and `pairs: 0`
+instead of being dropped, because a missing row reads as "not measured" when the truth is "nothing landed here".
+
+**What the verdict authorises, and what it forbids.** It forbids the thirteenth content axis: if every band on the
+corpus that can resolve 0.92pp is negative or within noise of it, the next feature is measuring the same ceiling
+from another side. It authorises exactly one direction — a task family in which the same defect recurs, which is
+the property the synthetic corpus has and a one-shot benchmark does not — and it says that as a scope claim rather
+than as another arm, because the corpus a claim is about is not something an arm can change.

@@ -968,6 +968,13 @@ jobs:
         # round's defect, and the gate cannot tell them apart because it is not supposed to.
         run: pnpm eval:pack-attribution --check
 
+      - name: The reuse ceiling has not drifted
+        # R160. Twelve content axes came back null on this corpus, and this lane tests the reason
+        # they all did: the share of a neighbour's answer that applies to the next question. It reads
+        # dev and train with one set of band edges and one seed, so the only thing that differs
+        # between the two rows is the corpus, and a verdict that flips is this round's defect.
+        run: pnpm eval:reuse --check
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

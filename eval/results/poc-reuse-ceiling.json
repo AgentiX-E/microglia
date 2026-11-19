@@ -1,0 +1,90 @@
+{
+  "id": "reuse",
+  "floor": 5,
+  "corpora": [
+    {
+      "corpus": "dev",
+      "cases": 1534,
+      "databases": 11,
+      "paired": 1534,
+      "unpaired": 0,
+      "gainPp": 2.6865671641791042,
+      "interval": {
+        "low": 0,
+        "high": 5.660377358490567,
+        "point": 2.6865671641791042,
+        "dropped": 0
+      },
+      "bands": [
+        {
+          "low": 0,
+          "high": 0.25,
+          "pairs": 309,
+          "gainPp": -0.9708737864077669
+        },
+        {
+          "low": 0.25,
+          "high": 0.5,
+          "pairs": 446,
+          "gainPp": 0.4484304932735426
+        },
+        {
+          "low": 0.5,
+          "high": 0.75,
+          "pairs": 444,
+          "gainPp": -0.6756756756756757
+        },
+        {
+          "low": 0.75,
+          "high": 1,
+          "pairs": 335,
+          "gainPp": 2.6865671641791042
+        }
+      ]
+    },
+    {
+      "corpus": "train",
+      "cases": 7000,
+      "databases": 58,
+      "paired": 7000,
+      "unpaired": 0,
+      "gainPp": -1.0429447852760736,
+      "interval": {
+        "low": -2.204836415362731,
+        "high": 0.17595307917888564,
+        "point": -1.0429447852760736,
+        "dropped": 0
+      },
+      "bands": [
+        {
+          "low": 0,
+          "high": 0.25,
+          "pairs": 1351,
+          "gainPp": -1.7024426350851223
+        },
+        {
+          "low": 0.25,
+          "high": 0.5,
+          "pairs": 1849,
+          "gainPp": -0.32449972958355866
+        },
+        {
+          "low": 0.5,
+          "high": 0.75,
+          "pairs": 2170,
+          "gainPp": -0.18433179723502305
+        },
+        {
+          "low": 0.75,
+          "high": 1,
+          "pairs": 1630,
+          "gainPp": -1.0429447852760736
+        }
+      ]
+    }
+  ],
+  "verdict": {
+    "label": "contradicted",
+    "reason": "the top band is positive on one corpus and negative on another, so the ordering is a property of the corpus"
+  }
+}

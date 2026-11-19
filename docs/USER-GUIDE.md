@@ -4677,3 +4677,43 @@ change what a statement is allowed to say.
 $ pnpm eval:pack-attribution --write   # regenerate after reading why the evidence moved
 $ pnpm eval:pack-attribution --check   # what CI runs
 ```
+
+### 32.15 Whether the corpus can carry a lesson at all
+
+Sections 32.10 to 32.14 tried twelve content axes and each came back null. Twelve nulls are not twelve facts; they
+are one claim about the corpus: **a lesson can only transfer to a question whose answer already shares something
+with the case it came from**, and if that share is low no axis built on answers will move. `pnpm eval:reuse`
+measures the share, on two committed artefacts, with no model call.
+
+Reuse is the column overlap between a case and the nearest case **inside its own database**, found from question
+text alone — the only input a deployed system has — and read from the two gold queries with the SQL tokenizer.
+
+```console
+$ pnpm eval:reuse
+the top band, per corpus — the only row a replication compares
+corpus     cases  db   paired top band   interval             up/down
+dev        1534   11   1534   +2.69pp    [0.00, 5.66]         2/2
+train      7000   58   7000   −1.04pp    [-2.20, 0.18]        0/4
+verdict: contradicted — the top band is positive on one corpus and negative on another, so the
+ordering is a property of the corpus
+
+dev        0.00–0.25  309   −0.97pp
+dev        0.25–0.50  446   +0.45pp
+dev        0.50–0.75  444   −0.68pp
+dev        0.75–1.00  335   +2.69pp
+train      0.00–0.25  1351  −1.70pp
+train      0.25–0.50  1849  −0.32pp
+train      0.50–0.75  2170  −0.18pp
+train      0.75–1.00  1630  −1.04pp
+```
+
+**How to read the verdict.** `replicates` needs the same sign and an interval clear of zero on both corpora.
+`null` means the top band fails to clear zero anywhere, which can still be blamed on sample size. `contradicted`
+means the sign flips, and a flip cannot be blamed on sample size: on the corpus that resolves 0.92pp, every band
+is negative or indistinguishable from it. So the corpus admits reuse — median overlap 0.500 — but reuse does not
+predict where the pack pays, and a thirteenth content axis would be measuring the same ceiling from another side.
+
+```console
+$ pnpm eval:reuse --write   # regenerate after reading why the evidence moved
+$ pnpm eval:reuse --check   # what CI runs
+```

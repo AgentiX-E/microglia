@@ -516,6 +516,39 @@ effect while describing a control comparison, which is why every row now carries
 first version of the replication table called a single decided run a replication, because with one decided
 row "the decided runs agree" is vacuously true; `decidedAgree` is now `null` below two.
 
+### Why every content axis was null: this corpus carries no reusable answer
+
+Twelve content axes have come back null on BIRD — coverage, imported identifiers, denial, procedural vs
+declarative form, grounding, size-matched controls, anchoring, conditional execution, deletion, recall
+order, and the two this round added. Each was explained afterwards by saying that axis does not carry the
+effect, and twelve explanations of that shape are a hypothesis about the corpus rather than twelve facts
+about twelve axes. `pnpm eval:reuse` tests the hypothesis. A lesson can transfer only to a question whose
+answer shares a column with the case the lesson came from, so the ceiling on any memory is the **reuse the
+corpus admits**, and that is a property of the questions rather than of the sentences distilled from them.
+
+The measurement pairs every case with its nearest neighbour **inside its own database**, found from the
+question text alone, and scores reuse as the Jaccard overlap of the two gold queries' column sets. Columns
+come from the SQL tokenizer, not from backticks: the extractor written first saw a column in **8%** of this
+corpus's gold queries, because BIRD writes `SELECT player_api_id` without quoting, and reported a median
+overlap of exactly **0.000**. That was a fact about the extractor. With the tokenizer the median is
+**0.500**, and half the corpus shares at least half its columns with its nearest neighbour.
+
+| corpus | cases | databases | top band (reuse ≥ 0.75) | 95% | bands above / below zero |
+|---|---|---|---|---|---|
+| dev | 1,534 | 11 | **+2.69pp** | [0.00, +5.66] | 2 / 2 |
+| train | 7,000 | 58 | **−1.04pp** | [−2.20, +0.18] | 0 / 4 |
+
+The verdict is **contradicted**, and it is not a question of power: the band that reads best on dev reads
+worst on train, and train resolves 0.92pp at this sample while the band moves −1.04pp. On the corpus that
+can see, **every band is negative or within noise of it**. There is no subset of BIRD in which the pack
+pays for itself, and the reason is structural rather than a defect in distillation: a lesson about `County`
+cannot help a query that needs `Free Meal Count`.
+
+That closes the search this record has run for twelve rounds. The next axis cannot be a thirteenth content
+feature, because this corpus is not the object a content feature operates on. What the mechanism needs is a
+task family in which the same defect recurs — which is what the synthetic corpus is and what a one-shot
+benchmark is not — and the honest statement of that is a scope claim, not another arm.
+
 ### Where the scenario actually is: 1,766 lines, seven modules, and a gate for the rest
 
 The library claims it is scenario-agnostic. That claim has been made in a paragraph since its first
