@@ -71,21 +71,35 @@ def main() -> int:
     print(f"observation:\n{observation[0]}")
     admissible = info.get("admissible_commands", [[]])[0]
     print(f"admissible: {len(admissible)} commands, first three {admissible[:3]}")
+    print(f"info keys: {sorted(info.keys())}")
 
-    # The walkthrough is per trial and the environment hands back one game at a time,
-    # so the plan is read from the file the environment just opened rather than from
-    # index 0 of the split.
-    game = json.loads(games[0].read_text(encoding="utf-8"))
-    plan = game.get("walkthrough") or []
+    # The plan has to come from the episode the environment opened, not from the first
+    # file in the split: the environment shuffles and filters the games it serves, so
+    # `games[0]` is an unrelated trial whose step names do not exist here. The first
+    # run of this check asserted against `games[0]` and reported "the gold plan did not
+    # end the game" -- a true statement about a plan belonging to another game.
+    plan = None
+    for key in ("extra.walkthrough", "walkthrough"):
+        candidate = info.get(key)
+        if candidate:
+            candidate = candidate[0] if isinstance(candidate[0], (list, tuple)) else candidate
+            plan = list(candidate)
+            print(f"plan source: info[{key!r}]")
+            break
+    if plan is None:
+        game = json.loads(games[0].read_text(encoding="utf-8"))
+        plan = game.get("walkthrough") or []
+        print("plan source: games[0] (the environment did not publish one)")
     if not plan:
-        fail("the game carries no walkthrough, so there is nothing to assert against")
+        fail("the episode carries no walkthrough, so there is nothing to assert against")
     print(f"plan: {len(plan)} steps")
 
     done = False
     for step, action in enumerate(plan):
         observation, _scores, dones, info = env.step([action])
         done = bool(dones[0])
-        print(f"  {step + 1}. {action} -> done={done}")
+        line = str(observation[0]).replace("\n", " ")[:110]
+        print(f"  {step + 1}. {action} -> done={done} :: {line}")
         if done:
             break
 
