@@ -1,0 +1,70 @@
+name: alfworld
+
+# The recurring-defect lane, and only its pre-flight.
+#
+# Every board this project is measured on is one-shot: a system is scored on tasks it
+# has never seen, while the mechanism under study is learning across repeats. ALFWorld
+# is the procedure the experience-reuse literature uses for that question, so the lane
+# has to exist before the question can be asked on somebody else's corpus.
+#
+# This workflow runs the part that must not cost anything: install the environment,
+# drive one held-out game with the file's own gold plan, and stop. A model is not
+# called. That keeps the first green build a statement about the driver rather than
+# about a budget, and it is why `calls` is printed as zero at the end rather than left
+# implicit.
+#
+# Why CI and not the development sandbox: `textworld` builds a 22 MB Inform7 compiler
+# from emshort.com at build time, which the sandbox fetches at 3 KB/s and then aborts.
+# A runner fetches it in seconds. The dependency is not optional and it is not a
+# property of the lane, so the lane lives where the dependency resolves.
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'eval/drivers/alfworld/**'
+      - '.github/workflows/alfworld.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  selfcheck:
+    name: the environment drives and the gold plan reaches the goal
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install the environment
+        # `alfworld` declares `torch` and `ai2thor` for its embodied twin, which the
+        # text lane never constructs; installing them would add about a gigabyte to a
+        # job that opens a .tw-pddl file. --no-deps plus the four modules the text
+        # path actually imports keeps the job about the text lane.
+        run: |
+          python -m pip install --upgrade pip
+          pip install 'textworld[pddl]==1.6.1'
+          pip install 'alfworld==0.3.5' --no-deps
+          pip install pandas pyyaml 'werkzeug==2.0.3' tqdm
+
+      - name: Fetch the games
+        # 36.5 MB, fetched once per job. The download is the same artefact the release
+        # publishes, so a lane that cannot fetch it cannot claim to be running the
+        # published corpus.
+        run: |
+          export ALFWORLD_DATA="$HOME/.cache/alfworld"
+          alfworld-download
+          find "$ALFWORLD_DATA" -name 'game.tw-pddl' | wc -l
+
+      - name: Drive one held-out game with its own gold plan
+        env:
+          ALFWORLD_DATA: /home/runner/.cache/alfworld
+        run: python eval/drivers/alfworld/selfcheck.py
+
+      - name: Report the bill
+        if: always()
+        run: echo 'model calls made by this job = 0'
