@@ -32,6 +32,7 @@ from pathlib import Path
 os.environ.setdefault("ALFWORLD_DATA", str(Path.home() / ".cache" / "alfworld"))
 
 DATA_ROOT = Path(os.environ["ALFWORLD_DATA"])
+HERE = Path(__file__).resolve().parent
 
 
 def fail(message: str) -> "None":
@@ -51,22 +52,17 @@ def main() -> int:
 
     import yaml
 
-    # `alfworld.agents.environment` also exports the embodied environment, and importing
-    # the package therefore requires `ai2thor` -- a visual simulator that the text lane
-    # never constructs. The text class is reachable on its own, which is one dependency
-    # fewer on a job that reads a .tw-pddl file.
+    # The config lives in this repository rather than in the installed package: version
+    # 0.4.2 ships it at `configs/base_config.yaml`, which is not a package and is
+    # therefore not installed by `find_packages`. A lane that read whatever the wheel
+    # happened to carry would record a different environment for the same commit.
+    raw = (HERE / "config.yaml").read_text(encoding="utf-8").replace("$ALFWORLD_DATA", str(DATA_ROOT))
+    config = yaml.safe_load(raw)
+
+    # Imported after the environment variable is set: `alfworld.info` reads it at import
+    # time, and a module-level import here would freeze the default before this file can
+    # override it.
     from alfworld.agents.environment.alfred_tw_env import AlfredTWEnv
-
-    config_path = Path(__file__).resolve().parents[0] / "config.yaml"
-    if not config_path.exists():
-        # The package ships one; copy it beside this script so a run records which
-        # config it used rather than which config the installed version happened to
-        # carry.
-        import alfworld
-
-        shipped = Path(alfworld.__file__).parent / "agents" / "config" / "base_config.yaml"
-        config_path.write_text(shipped.read_text(), encoding="utf-8")
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
     env = AlfredTWEnv(config, train_eval="eval_out_of_distribution")
     env = env.init_env(batch_size=1)

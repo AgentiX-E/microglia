@@ -41,30 +41,26 @@ jobs:
           python-version: '3.10'
 
       - name: Install the environment
-        # The text lane touches four modules and inherits an import chain that reaches
-        # two simulators' worth of dependencies. Rather than discover them one run at a
-        # time -- tatsu, then opencv, then ai2thor, then torch -- the list below is the
-        # package's own `install_requires`, minus nothing: `alfworld` declares torch and
-        # torchvision for a Mask R-CNN detector the text path never constructs, but the
-        # detector is imported at module scope, so the import cannot avoid the weights.
-        # The CPU index keeps that under 200 MB instead of the CUDA build's gigabyte.
+        # Version 0.4.2 is installed from the tag rather than from PyPI, because PyPI
+        # stops at 0.3.5 and 0.3.5 reads the z-machine release while the data published
+        # for this lane is the PDDL one. The mismatch would have surfaced after the
+        # install as a game file the environment could not open.
+        #
+        # 0.4.2 declares exactly one dependency, `textworld[pddl]`, so the chain that
+        # cost six runs on 0.3.5 -- torch, torchvision, ai2thor, opencv, all of them for
+        # a visual simulator and a detector the text path never constructs -- is not in
+        # this lane at all.
         run: |
           python -m pip install --upgrade pip
-          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install 'textworld[pddl]==1.6.1'
-          # textworld 1.6.1 imports `ParserConfig` from `tatsu.infos`. A fresh resolve
-          # takes whatever the resolver prefers, and the first two runs died on that
-          # line rather than at install time. 5.8.3 is verified to carry the name:
-          # `from tatsu.infos import ParserConfig` succeeds on 5.8.3, 5.13.1 and 6.0.1
-          # locally, so the pin is to a version checked here rather than to a range
-          # whose members were never run.
+          # textworld 1.6.1 imports `ParserConfig` from `tatsu.infos`, and a fresh
+          # resolve takes whatever the resolver prefers. 5.8.3 is verified to carry the
+          # name here (`from tatsu.infos import ParserConfig` succeeds on 5.8.3, 5.13.1
+          # and 6.0.1), so the pin is a version that was run rather than a range.
           pip install 'tatsu==5.8.3'
-          pip install 'alfworld==0.3.5' --no-deps
-          pip install pandas pyyaml 'werkzeug==2.0.3' tqdm opencv-python-headless 'ai2thor==2.1.0'
-          # Printed because the first two runs reported the same import failure after a
-          # pin that was supposed to prevent it, and a version nobody printed cannot be
-          # argued with.
-          pip show tatsu textworld ai2thor torch | grep -E '^(Name|Version)'
+          pip install 'git+https://github.com/alfworld/alfworld@0.4.2' --no-deps
+          pip install pandas pyyaml tqdm requests
+          pip show tatsu textworld | grep -E '^(Name|Version)'
 
       - name: Fetch the games
         # 36.5 MB, fetched once per job. The download is the same artefact the release
