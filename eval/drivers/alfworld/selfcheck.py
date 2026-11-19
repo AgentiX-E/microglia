@@ -73,25 +73,24 @@ def main() -> int:
     print(f"admissible: {len(admissible)} commands, first three {admissible[:3]}")
     print(f"info keys: {sorted(info.keys())}")
 
-    # The plan has to come from the episode the environment opened, not from the first
-    # file in the split: the environment shuffles and filters the games it serves, so
-    # `games[0]` is an unrelated trial whose step names do not exist here. The first
-    # run of this check asserted against `games[0]` and reported "the gold plan did not
-    # end the game" -- a true statement about a plan belonging to another game.
+    # The plan has to come from the episode the environment opened. `extra.gamefile` is
+    # the path it opened, which is the only reliable way to reach that trial's own plan:
+    # the split also carries files whose walkthroughs are written in first-release
+    # symbolic coordinates (`desk_bar__minus_00_dot_57...`), and replaying one of those
+    # against a textworld episode produces "Nothing happens" on every step -- a report
+    # that reads like a broken driver and is really a plan from another release.
+    #
+    # This cost two runs: the first asserted against `games[0]` and the second against
+    # the same file without saying so in the log.
     plan = None
-    for key in ("extra.walkthrough", "walkthrough"):
-        candidate = info.get(key)
-        if candidate:
-            candidate = candidate[0] if isinstance(candidate[0], (list, tuple)) else candidate
-            plan = list(candidate)
-            print(f"plan source: info[{key!r}]")
-            break
-    if plan is None:
-        game = json.loads(games[0].read_text(encoding="utf-8"))
-        plan = game.get("walkthrough") or []
-        print("plan source: games[0] (the environment did not publish one)")
+    gamefile = info.get("extra.gamefile")
+    if isinstance(gamefile, (list, tuple)):
+        gamefile = gamefile[0] if gamefile else None
+    if gamefile:
+        plan = json.loads(Path(str(gamefile)).read_text(encoding="utf-8")).get("walkthrough") or []
+        print(f"plan source: {gamefile}")
     if not plan:
-        fail("the episode carries no walkthrough, so there is nothing to assert against")
+        fail("the episode published no game file, so there is no plan to assert against")
     print(f"plan: {len(plan)} steps")
 
     done = False
