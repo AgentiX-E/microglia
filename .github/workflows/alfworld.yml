@@ -56,7 +56,10 @@ jobs:
           # whose members were never run.
           pip install 'tatsu==5.8.3'
           pip install 'alfworld==0.3.5' --no-deps
-          pip install pandas pyyaml 'werkzeug==2.0.3' tqdm
+          # `--no-deps` skipped opencv along with torch. The text path imports it for a
+          # frame buffer the text environment never fills, so the headless build is the
+          # one that resolves without X.
+          pip install pandas pyyaml 'werkzeug==2.0.3' tqdm opencv-python-headless
           # Printed because the first two runs reported the same import failure after a
           # pin that was supposed to prevent it, and a version nobody printed cannot be
           # argued with.
