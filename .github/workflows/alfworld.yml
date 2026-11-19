@@ -41,12 +41,16 @@ jobs:
           python-version: '3.10'
 
       - name: Install the environment
-        # `alfworld` declares `torch` and `ai2thor` for its embodied twin, which the
-        # text lane never constructs; installing them would add about a gigabyte to a
-        # job that opens a .tw-pddl file. --no-deps plus the four modules the text
-        # path actually imports keeps the job about the text lane.
+        # The text lane touches four modules and inherits an import chain that reaches
+        # two simulators' worth of dependencies. Rather than discover them one run at a
+        # time -- tatsu, then opencv, then ai2thor, then torch -- the list below is the
+        # package's own `install_requires`, minus nothing: `alfworld` declares torch and
+        # torchvision for a Mask R-CNN detector the text path never constructs, but the
+        # detector is imported at module scope, so the import cannot avoid the weights.
+        # The CPU index keeps that under 200 MB instead of the CUDA build's gigabyte.
         run: |
           python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install 'textworld[pddl]==1.6.1'
           # textworld 1.6.1 imports `ParserConfig` from `tatsu.infos`. A fresh resolve
           # takes whatever the resolver prefers, and the first two runs died on that
@@ -56,20 +60,11 @@ jobs:
           # whose members were never run.
           pip install 'tatsu==5.8.3'
           pip install 'alfworld==0.3.5' --no-deps
-          # `--no-deps` skipped opencv along with torch. The text path imports it for a
-          # frame buffer the text environment never fills, so the headless build is the
-          # one that resolves without X.
-          #
-          # ai2thor is here because the import cannot avoid it: `import
-          # alfworld.agents.environment.alfred_tw_env` runs the package `__init__` first,
-          # and that file imports the embodied environment, which imports the simulator.
-          # The wheel is pure Python and version 2.1.0 is the one alfworld 0.3.5 declares;
-          # nothing constructs a Controller, so no scene is ever fetched.
           pip install pandas pyyaml 'werkzeug==2.0.3' tqdm opencv-python-headless 'ai2thor==2.1.0'
           # Printed because the first two runs reported the same import failure after a
           # pin that was supposed to prevent it, and a version nobody printed cannot be
           # argued with.
-          pip show tatsu textworld | grep -E '^(Name|Version)'
+          pip show tatsu textworld ai2thor torch | grep -E '^(Name|Version)'
 
       - name: Fetch the games
         # 36.5 MB, fetched once per job. The download is the same artefact the release
