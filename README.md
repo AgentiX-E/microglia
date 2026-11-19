@@ -549,6 +549,24 @@ feature, because this corpus is not the object a content feature operates on. Wh
 task family in which the same defect recurs — which is what the synthetic corpus is and what a one-shot
 benchmark is not — and the honest statement of that is a scope claim, not another arm.
 
+### The one lane that can enter that direction: ALFWorld, and a pre-flight that costs nothing
+
+ALFWorld is the procedure the experience-reuse literature uses for recurrence, so it is the only public corpus
+where "does a lesson survive a second attempt" can be asked against somebody else's data. `alfworld.yml` builds
+that lane up to the point where a model would be called, and stops.
+
+| fact | reading | why it matters |
+|---|---|---|
+| the corpus | **36.5 MB**, 4,027 files, MIT, **134 held-out games** | fetchable in two minutes through a mirror; 134 is the number ExpeL reports, not a subset we chose |
+| the environment | `textworld` builds an **Inform7 compiler** it fetches from `emshort.com` at build time | 3 KB/s and then abort from this sandbox; seconds from a runner, so the lane lives in CI |
+| the release | PyPI stops at **0.3.5** (z-machine); the PDDL data needs the **0.4.2** tag | 0.3.5 also demands `torch`, `ai2thor` and `opencv` for a simulator the text path never constructs |
+| the plan in the file | `walkthrough` is written in **first-release symbolic coordinates** | the text environment answers `Nothing happens.` to every step, so "verify against the gold plan" is wrong here |
+
+The gate asserts the contract instead, and prints its own bill: a reset states a task and publishes admissible
+commands, an admissible command changes the observation, an inadmissible one is refused in the environment's
+words, and a twelve-step walk keeps the episode alive. A green run ends with `model calls made by this job = 0`,
+because a build that is silent about its cost reads as a result about memory.
+
 ### Where the scenario actually is: 1,766 lines, seven modules, and a gate for the rest
 
 The library claims it is scenario-agnostic. That claim has been made in a paragraph since its first

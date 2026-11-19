@@ -4717,3 +4717,40 @@ predict where the pack pays, and a thirteenth content axis would be measuring th
 $ pnpm eval:reuse --write   # regenerate after reading why the evidence moved
 $ pnpm eval:reuse --check   # what CI runs
 ```
+
+### 32.16 Running the ALFWorld lane's pre-flight
+
+The recurring-defect lane asks whether a stored lesson survives a second attempt, on ALFWorld — the procedure
+the experience-reuse literature uses. Before any model is called, the lane has to prove it can drive the
+environment, and that check is a workflow rather than a command you run locally.
+
+**Why not locally.** `textworld` builds an Inform7 compiler at install time and fetches it from `emshort.com`.
+That host delivers about 3 KB/s from a development sandbox and then aborts, so the package cannot be installed
+outside CI. The data does not have this problem: it is 36.5 MB, MIT-licensed, and a mirror serves it in minutes.
+
+```console
+$ gh workflow run alfworld.yml              # or: Actions -> alfworld -> Run workflow
+$ gh run watch                              # 2 minutes, no provider secrets needed
+```
+
+**What it asserts, and what it deliberately does not.** Four statements, each about the driver rather than about
+a model:
+
+1. a reset returns an observation that states a task and publishes a non-empty admissible list;
+2. an admissible command changes what the agent sees;
+3. a command outside that list is refused with `Nothing happens.`;
+4. a twelve-step walk keeps the episode alive and still rendering.
+
+A passing run prints the observation, the number of admissible commands, and one line per step, and ends with
+`model calls made by this job = 0`. That line is the point: a green build here is a statement about the
+environment, and reading it as a result about memory is the mistake the line exists to prevent.
+
+**The plan in the file is not a plan you can replay.** Each `.tw-pddl` file carries a `walkthrough`, and it is
+written in the first-release symbolic coordinates the embodied agent used (`toilet_bar__minus_00_dot_54...`).
+The text environment answers `Nothing happens.` to every step. If you want a trajectory through a game, ask the
+environment for `admissible_commands` and build one; the file's own plan is not executable here.
+
+**Pinned versions, and why each is pinned.** `textworld==1.6.1` reads `ParserConfig` from `tatsu.infos`, so
+`tatsu==5.8.3` goes in the same `pip install` command — pinning it afterwards leaves the build resolved against
+a version that lacks the name. `alfworld` is installed from the `0.4.2` tag rather than PyPI, because PyPI stops
+at `0.3.5`, which reads the z-machine release instead of the PDDL one this lane downloads.

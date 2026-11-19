@@ -2344,3 +2344,45 @@ corpus that can resolve 0.92pp is negative or within noise of it, the next featu
 from another side. It authorises exactly one direction — a task family in which the same defect recurs, which is
 the property the synthetic corpus has and a one-shot benchmark does not — and it says that as a scope claim rather
 than as another arm, because the corpus a claim is about is not something an arm can change.
+
+### 8.36 Why the recurring-defect lane runs in CI, and why its gate is a contract
+
+R160 left one direction authorised and no way to enter it: the mechanism's only positive reading is a corpus
+that repeats its defects (100.00% against 31.79%), and no public board repeats anything. ALFWorld is the
+procedure the experience-reuse literature uses for that question, so `eval/drivers/alfworld/` exists to ask it
+on somebody else's corpus — but the round's own first task was to find out whether the corpus can be opened at
+all, and that answer decided where the lane lives.
+
+**The corpus is small and free; the environment is not.** The release carries 36.5 MB in 4,027 files under the
+MIT licence, fetchable through a mirror in two minutes. What costs is `textworld`, which builds an Inform7
+compiler it fetches from `emshort.com` at build time: from this sandbox that host delivers 3 KB/s and then
+aborts, so the package cannot be installed here at all. A runner fetches the same 22 MB in seconds. The
+dependency is a property of the environment rather than of the lane, so the lane lives where the dependency
+resolves, and the sandbox holds only the data and the parser.
+
+**Two versions, and only one of them reads the data we have.** PyPI stops at `alfworld 0.3.5`, which reads the
+z-machine release; the PDDL release is served by the 0.4.2 tag. 0.3.5 also declares `torch`, `torchvision`,
+`ai2thor` and `opencv` — a Mask R-CNN detector and a visual simulator, both imported at module scope for
+machinery the text path never constructs. Installing 0.3.5 therefore fails one import at a time (`tatsu`, then
+`cv2`, then `ai2thor`, then `torch`), and each failure is invisible until the previous one clears. 0.4.2
+declares `textworld[pddl]` and nothing else. Six runs were spent learning that a manifest read costs less than
+a manifest discovered.
+
+**A pin is only a pin if it is in the same resolve.** `textworld 1.6.1` imports `ParserConfig` from
+`tatsu.infos`. Installing `tatsu==5.8.3` *after* installing textworld leaves the build resolved against
+whatever the resolver preferred — 5.15.1, which does not carry the name — and then imports it, so two runs
+reported the same traceback with a correct-looking pin in the file. Both constraints now go in one command.
+
+**The gold plan is not replayable, and that is the finding.** The `walkthrough` field in a `.tw-pddl` file is
+written in first-release symbolic coordinates (`toilet_bar__minus_00_dot_54...`), the names the embodied release
+uses. The text environment answers "Nothing happens" to every one of them, so a check that replays the file's
+own plan cannot reach the goal in this lane — three runs established it, and the third printed all nine rejected
+steps. That is worth recording because "verify against the gold plan" is the obvious first move and it is wrong
+here for a reason that no amount of retrying fixes.
+
+**What the gate asserts instead.** The contract the driver actually depends on, without a model: a reset returns
+an observation that states a task and a non-empty admissible list; an admissible command changes the
+observation; a command outside the list is refused in the environment's own words ("Nothing happens"); and a
+twelve-step walk keeps the episode alive and rendering. A gate on those four is a statement about the driver. A
+gate on the score would be a statement about a model this job deliberately does not call, and a job that says
+nothing about its own bill is a job whose green build reads as a result.

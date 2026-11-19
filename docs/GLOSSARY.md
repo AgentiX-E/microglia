@@ -1811,3 +1811,17 @@ with a cluster bootstrap.
 zero and can still be blamed on the sample; **`contradicted`** says the top band's sign flipped between two corpora,
 which no increase in sample size repairs. The distinction matters because a null invites buying more questions and a
 flip forbids it.
+
+**Contract pre-flight** — The gate an environment lane passes before a model is called: a reset states a task
+and publishes admissible commands, an admissible command changes the observation, an inadmissible one is refused
+in the environment's own words, and a walk of many steps keeps the episode alive. It is a statement about the
+driver, not about a score, and the run prints its own model-call count beside the verdict so a green build cannot
+be read as a result about memory. ALFWorld's pre-flight (R161) exists because its `walkthrough` field is written
+in first-release symbolic coordinates: the text environment answers `Nothing happens.` to every step, so the
+obvious gate — replay the gold plan — is unavailable for a reason that retrying does not fix.
+
+**In-force pin** — A version constraint that is resolved in the same `pip install` command as the package it
+constrains. A pin installed afterwards has never been in force for the build that ran, and it leaves a file that
+looks correct beside a traceback that contradicts it: `textworld 1.6.1` reads `ParserConfig` from `tatsu.infos`,
+the resolver prefers 5.15.1, and the pin to 5.8.3 was a separate command that executed after the import that
+failed.
