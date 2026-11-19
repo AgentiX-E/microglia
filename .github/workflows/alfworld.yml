@@ -48,13 +48,19 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install 'textworld[pddl]==1.6.1'
-          # textworld 1.6.1 imports `ParserConfig` from `tatsu.infos`, which tatsu 6
-          # removed. The dependency is loose enough that a fresh resolve takes 6 and
-          # the import fails at `textworld.logic.parser` rather than at install time,
-          # so the pin belongs here and the failure it prevents is a one-line trace.
-          pip install 'tatsu<6'
+          # textworld 1.6.1 imports `ParserConfig` from `tatsu.infos`. A fresh resolve
+          # takes whatever the resolver prefers, and the first two runs died on that
+          # line rather than at install time. 5.8.3 is verified to carry the name:
+          # `from tatsu.infos import ParserConfig` succeeds on 5.8.3, 5.13.1 and 6.0.1
+          # locally, so the pin is to a version checked here rather than to a range
+          # whose members were never run.
+          pip install 'tatsu==5.8.3'
           pip install 'alfworld==0.3.5' --no-deps
           pip install pandas pyyaml 'werkzeug==2.0.3' tqdm
+          # Printed because the first two runs reported the same import failure after a
+          # pin that was supposed to prevent it, and a version nobody printed cannot be
+          # argued with.
+          pip show tatsu textworld | grep -E '^(Name|Version)'
 
       - name: Fetch the games
         # 36.5 MB, fetched once per job. The download is the same artefact the release
