@@ -2001,3 +2001,38 @@ edit to `pair-gates.ts` that moves a row fails the build until the evidence is r
 `l4-projection-complete` one level up: that gate says an arm's fields reached its artefact, and this one says the
 artefact's rows are graded by the rule that ships. Two ways for a committed file to be true about itself, and the
 cheaper of the two to check is the one nobody had.
+
+### 8.28 A fold is a design, and its headroom is checkable before it is dispatched
+
+The four sections above are about readings: what a field should carry, how a policy is reconciled against its own
+ledger, how a claim is graded. This one is about the object all of them are taken on. A paired fold has two
+numbers that bound what it can ever say, and only one of them was in the record:
+
+- **resolution** — the smallest delta the fold can distinguish, `z·sqrt(d/n)` from the discordance `d` and the
+  paired count `n`. Every artefact has carried this since R42.
+- **headroom** — the largest delta the fold could produce at all, which is `1 − controlPass⁴` because a memory can
+  only repair a trial the control already failed.
+
+Headroom and resolution answer different questions and neither implies the other. A fold whose headroom is below
+its resolution cannot certify an effect **at any store quality**: an oracle memory would produce a delta the design
+is forbidden from reading, and `V5-resolution` would block it for claiming a resolution the sample cannot reach. On
+the two committed folds that is exactly the situation — ceilings of 10.00pp and 14.86pp against resolutions of
+18.53pp and 17.76pp — and on the two dispatches after them, 15.00pp against 15.66pp and 23.23pp.
+
+**Why it was invisible.** The control's pass rate was recorded on every artefact as the treatment's comparison,
+never as the design's ceiling. Reading it as a ceiling is a one-line subtraction, and the subtraction is the reason
+four rounds of `UNRESOLVED` were attributed to the mechanism, the floor, the margin and the allocation before
+anyone asked whether the fold could have shown an effect if it had one. The instrument is in `headroom.ts`, printed
+by every pair, carried as `headroom` in the artefact, and re-runnable over any archived pair with
+`pnpm eval:headroom`.
+
+**What it selects.** With retail's observed discordance (0.275) and a control at 0.85, the fold size that clears
+the 15pp ceiling is 164 pairs — which is retail's 114 plus airline's 50, and is why the next reading is pooled
+across domains rather than a fifth draw of the same forty tasks. The arithmetic is available before the dispatch
+for the price of the control's pass rate from any earlier fold of the same split, and that is the check a design
+owes before it is bought.
+
+**The trap it closes.** Significance and resolution part company at exactly this boundary. Six discordant pairs all
+in one direction give `p = 0.0156`, so an oracle store would be significant, and its 95% interval on forty tasks
+would be roughly [3, 27] — a sentence that establishes something happened on six tasks and nothing about its size.
+A record that reported only the `p` value would have called that a success four times.

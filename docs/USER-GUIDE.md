@@ -4212,3 +4212,38 @@ and, on the swapped fold only, the row that had certified `−10.81pp` as a reso
 Because the check runs in `pnpm check`, the same command is a gate: if a future edit to `pair-gates.ts` moves a
 row of either committed artefact, the build fails until the evidence is re-graded — which is the same rule as
 `l4-projection-complete` one level up, applied to the table rather than to the fields.
+
+### 32.8 Headroom: the most a fold could have shown
+
+A memory can only repair a trial the bare agent failed, so a fold where the control passes 34 of 40 tasks
+cannot produce a delta above **+15.00pp** — and that is a perfect store, one that repairs every failure and
+breaks nothing. Compare that ceiling with the smallest effect the same fold can resolve and the four red rows
+in this record explain themselves:
+
+```console
+$ pnpm eval:headroom eval/results/poc-l4-pair-official.json eval/results/poc-l4-pair-swapped.json
+| fold | n | control pass^4 | ceiling | minimum detectable | verdict |
+| --- | --- | --- | --- | --- | --- |
+| `poc-l4-pair-official` | 40 | 0.9000 | **10.00pp** | 18.53pp | silent |
+| `poc-l4-pair-swapped` | 74 | 0.8514 | **14.86pp** | 17.76pp | silent |
+```
+
+**Every fold in this record has a ceiling below its own resolution.** R152 and R152c read 15.00pp against 15.66pp
+and 23.23pp; the two committed folds read 10.00 and 14.86 against 18.53 and 17.76. So no store, however good,
+could have been certified on any of them, and the `UNRESOLVED` rows were statements about the design from the
+first dispatch.
+
+Two consequences you can use:
+
+- **Read the headroom before paying for the fold.** `pnpm eval:headroom` runs on any pair artefact and prints
+  the table above; the line also prints during every pair, and the block is carried in the artefact as
+  `headroom`, so a reader never has to recompute it.
+- **Significance and resolution are different questions, and this is where they part.** Six discordant pairs
+  all in one direction give `p = 0.0156`, so a perfect store *would* be significant — and would still be
+  reported as unresolved, because the resolution predicate is about the size of the point estimate. Both are
+  true of the same reading, which is why the advisory gate asks about `|delta|` rather than about the verdict
+  state (§32.7).
+
+The smallest fold in this record whose ceiling clears its resolution is the pooled 114-pair one (14.0pp against
+13.24pp, and only by 0.8pp). That is why the next reading is pooled or on a harder corpus rather than a fifth
+40-task draw: on forty tasks with a 0.85 baseline, the design cannot see what the mechanism is asked to do.

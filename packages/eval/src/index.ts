@@ -1017,6 +1017,12 @@ export {
   type RegradedRow,
 } from './pair-regrade.js';
 export {
+  foldHeadroom,
+  headroomLine,
+  type FoldHeadroom,
+  type FoldHeadroomInput,
+} from './headroom.js';
+export {
   FACADE_NOTES_ENV,
   NOTE_LEVELS,
   PRIMARY_NOTE,

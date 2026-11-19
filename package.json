@@ -125,7 +125,8 @@
     "test:unit": "vitest run",
     "typecheck": "tsc -b packages/core packages/protocol packages/sql packages/eval packages/node packages/browser && tsc --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck packages/eval/src/bin/*.ts",
     "typecheck:lanes": "tsc --noEmit --strict --target es2022 --module nodenext --moduleResolution nodenext --skipLibCheck packages/eval/src/bin/*.ts",
-    "eval:l4-regrade": "tsx packages/eval/src/bin/l4-regrade.ts"
+    "eval:l4-regrade": "tsx packages/eval/src/bin/l4-regrade.ts",
+    "eval:headroom": "tsx packages/eval/src/bin/headroom.ts"
   },
   "devDependencies": {
     "@agentix-e/microglia-browser": "workspace:*",

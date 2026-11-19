@@ -67,6 +67,7 @@ import {
 } from '@agentix-e/microglia-eval';
 import { writeJson } from './lib.js';
 import { pairedVerdict } from '../paired-verdict.js';
+import { foldHeadroom, headroomLine } from '../headroom.js';
 import { serveSupportCensus, serveSupportLine, supportMapOf } from '../serve-support.js';
 import { foldSplitOf, treatmentOf } from '../cross-fit.js';
 import { serveYieldCensus, serveYieldLine } from '../serve-yield.js';
@@ -352,6 +353,22 @@ const verdict = pairedVerdict({
   servedPacks: served,
   detectablePp: detectablePp ?? Number.POSITIVE_INFINITY,
 });
+
+/**
+ * R154: what the fold could have shown, beside what the pair did show.
+ *
+ * A memory can only repair a task the control failed, so the difference between the control's pass rate and
+ * one is a hard ceiling on any delta this fold can express. Comparing it with the pair's own resolution is
+ * the check a design owes before it is dispatched, and printing it after the fact is the cheapest way to
+ * stop the next fold of the same shape being bought — four reads of this lane came back `UNRESOLVED` and
+ * every one of them was a fold whose ceiling was below its own resolution.
+ */
+const controlPass4 = first.metrics?.pass4;
+const headroom =
+  typeof controlPass4 !== 'number'
+    ? undefined
+    : foldHeadroom({ paired: comparison.paired, controlPass4, detectablePp });
+if (headroom !== undefined) process.stdout.write(`${headroomLine(headroom)}\n`);
 
 const evidence: Tau2Evidence = {
   domain: scenario?.test ?? DOMAIN,
@@ -751,6 +768,10 @@ await writeJson('poc-l4-pair', {
     servedPacks: served,
   },
   resolution,
+  // R154: the largest delta this fold could have produced, beside the finest one it can see. Computed from
+  // the control's own pass rate, so it is a statement about the design rather than about the store, and a
+  // fold whose ceiling is below its resolution cannot certify an effect however good the memory is.
+  ...(headroom === undefined ? {} : { headroom }),
   // What the scenario itself could decide, when the arms listed it. `tasksForFivePp` is a
   // requirement; this is the supply, and on τ² the two do not meet: retail carries 115 tasks and a
   // 5pp half-width at the observed discordance takes several hundred, so no split of it reaches the
