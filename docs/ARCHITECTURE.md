@@ -2247,3 +2247,57 @@ same rows.
 sample of eight: enough to reject a large effect, not enough to establish a small one. The census publishes the
 denial count beside the hit count for that reason, and the round's conclusion is a rejection — the pack's
 contradictions are 1.8% of cases and do not predict harm — rather than a positive finding.
+
+### 8.34 Why attribution needs a fixed effect and a screen, not a correlation
+
+`pack-attribution.ts` (R159) asks where a corpus-level loss lives. The naive answer — regress the outcome on
+whether a statement was delivered — is wrong three times over, and each wrongness has a specific fix.
+
+**Wrong once: the comparison crosses schemas.** The store delivers a statement where it looks relevant, and
+relevance is mostly schema resemblance, so "received" and "did not receive" are two different populations of
+database. The fix is a **fixed effect at the database**: `contrastOf` compares exposed against rest *inside* each
+database and weights databases by exposed cases, so the estimate is the average effect on the treated and every
+database is its own control. A database that cannot form both sides contributes nothing and is counted, because
+"no comparison here" is not "no effect here".
+
+**Wrong twice: accuracy carries difficulty.** The outcome is the **paired gain** — `correct` minus
+`withoutMemoryCorrect` — so a statement delivered to hard questions is not blamed for them. This is what makes the
+reading different from a stratum of accuracy, and it is why the artefact can compare a stratum at 41% accuracy
+with one at 39% and say which is worse.
+
+**Wrong three times: 210 hypotheses are 210 chances.** The screen is a table, and a table of 210 intervals at 95%
+has about ten that exclude zero by construction. So `ledgerOf` publishes `resolved`, `expected` at
+`screened × 0.05`, and `massAtRiskPp` — the sum over the resolved-negative statements of `|point| × cases /
+corpus`, which is a **bound** on what dropping them could recover and not a prediction, because a case can carry
+several at once.
+
+**The estimator is one ratio of sums, so it gets one bootstrap.** For a database *d* with exposed count *n*,
+exposed gain total *S*, and rest totals *N*, *T*, the weighted difference is `S − (n/(N−n))·T` over `n`, and the
+arm's estimate is the sum of numerators over the sum of denominators. That is exactly the shape
+`clusterBootstrapRatio` resamples: per-cluster totals, multiplicities drawn per cluster, the ratio recomputed from
+the reweighted sums. The draws consume the same `mulberry32` stream in the same order as
+`clusterBootstrapStatistic`, so the two produce the same bounds — asserted in a test that runs both — and the
+screen of 210 statements costs 210 × 58 multiply-adds per resample instead of 210 × 7,000 row copies.
+
+**The dose is a second estimator of the same thing, and it is deliberately reparameterised.** Fitting paired gain
+on `(statements, unsupported, gold-constructs)` inside the same fixed effects gives the cost of one more statement
+of any kind and the *extra* cost of one that names an unused construct. The alternative — `(unsupported,
+supported)` — carries the same information in a basis where the contrast between the two coefficients is not a
+coefficient, and a reader would have to difference two intervals to see the finding. `gold-constructs` is the
+confound control: a simple gold is more likely to be contradicted, and without the control the reading would be
+"the pack hurts easy questions" wearing the costume of "the pack prescribes machinery".
+
+**The normal equations are accumulated per cluster.** Demeaning a cluster that a resample draws twice is the same
+as demeaning it once, and both cross-products scale by the multiplicity, so a draw's coefficient is a two- or
+three-dimensional solve over cluster totals rather than a pass over 7,000 rows. The equality with a naive refit is
+asserted against a hand-written solver in the tests, not assumed.
+
+**What the module refuses to compute.** A predictor that is constant inside every cluster has no slope and returns
+`null`, not zero. A statement compared in fewer than five databases gets its point estimate — arithmetic is not an
+inference — and no interval. `resamples: 0` returns the point and `null` intervals rather than a zero-width claim.
+
+**The correction it publishes.** R158's all-boilerplate stratum (−0.94pp [−1.50, −0.40]) was a between-database
+comparison wearing the vocabulary of a content effect. `circulationContrasts` re-estimates the same three strata
+inside a database and gets −1.34pp [−3.58, +0.71]: the sign holds and the resolution does not. That is the second
+time this record has had to withdraw one of its own intervals, and the module carries the withdrawal beside the
+first estimate rather than instead of it.

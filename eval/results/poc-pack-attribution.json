@@ -1,0 +1,1965 @@
+{
+  "id": "poc-pack-attribution",
+  "registered": "ROADMAP.md §R159",
+  "resamples": 2000,
+  "seed": 12345,
+  "rule": "gain: correct minus without-memory correct, per case; contrast: within a database, exposed cases against the rest, weighted by exposed cases, interval by resampling databases; screen: a statement is screened when at least five databases can form both sides; unsupported: a delivered statement names a construct the case gold does not use",
+  "sources": [
+    {
+      "source": "bird-train",
+      "path": "eval/results/poc-sota-bird-train.json",
+      "n": 7000,
+      "clusters": 58,
+      "statements": 210,
+      "unscreened": 171,
+      "ledger": {
+        "statements": 210,
+        "screened": 39,
+        "resolved": 4,
+        "expected": 1.95,
+        "negative": 2,
+        "positive": 2,
+        "massAtRiskPp": 0.363558878591285
+      },
+      "screen": [
+        {
+          "statement": "Aliasing an aggregate expression with a column alias produces an output column name that differs from the expression text the grader expects. The expected output column is the unaliased aggregate expression rather than a named alias.",
+          "cases": 168,
+          "databases": 45,
+          "comparable": 45,
+          "att": 168,
+          "contrast": {
+            "low": -8.797834399511178,
+            "high": -1.5043541390629729,
+            "point": -4.877527103187035,
+            "dropped": 0
+          },
+          "resolved": true
+        },
+        {
+          "statement": "String comparisons against categorical values use case-insensitive matching (LIKE) when the stored casing is not guaranteed to match the question's casing. The filter compares a text column to a literal whose casing differs from the stored values.",
+          "cases": 51,
+          "databases": 12,
+          "comparable": 12,
+          "att": 51,
+          "contrast": {
+            "low": -9.486490059256576,
+            "high": 4.776187963789381,
+            "point": -3.6641544292071995,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Columns referenced in a query must exist in the tables named in that query's FROM or JOIN clauses. A query references a column that is not present in any table it selects from or joins.",
+          "cases": 52,
+          "databases": 25,
+          "comparable": 25,
+          "att": 52,
+          "contrast": {
+            "low": -11.187091709426635,
+            "high": 5.296300653208571,
+            "point": -3.1876652337320794,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Aggregate expressions in the SELECT list are left unaliased unless the question explicitly requests a named output column. The question asks for a count or other aggregate per group without naming the resulting column.",
+          "cases": 641,
+          "databases": 55,
+          "comparable": 55,
+          "att": 641,
+          "contrast": {
+            "low": -4.850551076290232,
+            "high": -0.7812491563220527,
+            "point": -2.6918683257466034,
+            "dropped": 0
+          },
+          "resolved": true
+        },
+        {
+          "statement": "Counting rows for a question about a specific attribute uses COUNT on that attribute's column rather than COUNT(*). The question asks how many records have a given value for a named attribute.",
+          "cases": 28,
+          "databases": 12,
+          "comparable": 12,
+          "att": 28,
+          "contrast": {
+            "low": -8.69580130285097,
+            "high": 1.5398043949743057,
+            "point": -2.633025255011092,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Counting rows that satisfy a filter uses COUNT on a key column or COUNT(*), not a filter on a name column. The question asks how many entities satisfy a categorical attribute condition.",
+          "cases": 32,
+          "databases": 18,
+          "comparable": 18,
+          "att": 32,
+          "contrast": {
+            "low": -14.041084198356662,
+            "high": 8.060787917150675,
+            "point": -2.556144000272139,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A percentage aggregate is expressed as a single expression without a column alias when the reference answer uses an unaliased expression. The question asks for a percentage and the expected output column name is not specified.",
+          "cases": 245,
+          "databases": 54,
+          "comparable": 54,
+          "att": 245,
+          "contrast": {
+            "low": -6.437658898418699,
+            "high": 1.6705948817657796,
+            "point": -2.4848816394772313,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A query that returns zero rows when the expected answer is non-empty indicates a wrong filter or join condition rather than a correct empty result. The question implies a non-empty answer and the generated SQL returns no rows.",
+          "cases": 38,
+          "databases": 22,
+          "comparable": 22,
+          "att": 38,
+          "contrast": {
+            "low": -8.651682313108564,
+            "high": 1.0084590838514218,
+            "point": -2.2283530006560888,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for an aggregate value and a separate attribute, the aggregate column is listed before the attribute column in the SELECT clause. The question requests both an aggregate (such as MIN or MAX) and a non-aggregated attribute.",
+          "cases": 32,
+          "databases": 17,
+          "comparable": 17,
+          "att": 32,
+          "contrast": {
+            "low": -6.621218828925303,
+            "high": 1.967860572237557,
+            "point": -2.1684525935384893,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A column name containing a space must be quoted with the identifier-quoting style the schema uses, not with double quotes when the engine treats double quotes as string literals. The query references a column whose name contains a space or other non-identifier character.",
+          "cases": 79,
+          "databases": 37,
+          "comparable": 37,
+          "att": 79,
+          "contrast": {
+            "low": -6.539319021087634,
+            "high": 3.481307361962111,
+            "point": -1.6856199453130167,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for a percentage of a total, the denominator counts rows matching the total's condition rather than all rows in the table. The question's phrasing names a total population (e.g. 'all tied games') that is narrower than the whole table.",
+          "cases": 575,
+          "databases": 55,
+          "comparable": 55,
+          "att": 575,
+          "contrast": {
+            "low": -4.174900450911389,
+            "high": 1.0994237920290835,
+            "point": -1.549491423524259,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A filter on a numeric column is expressed as a comparison against a literal threshold rather than as a CAST expression inside the WHERE clause. The question describes a qualitative threshold (such as 'dislikes pretty much') that maps to a numeric cutoff on a text-typed column.",
+          "cases": 65,
+          "databases": 26,
+          "comparable": 26,
+          "att": 65,
+          "contrast": {
+            "low": -7.4457096251442145,
+            "high": 6.4287112932278,
+            "point": -1.2240786828889465,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for a per-group average, the result must contain one row per group, matching the number of distinct group keys. The question contains a per-group phrasing such as 'for each' or 'per' and the answer is an average or other aggregate.",
+          "cases": 804,
+          "databases": 55,
+          "comparable": 55,
+          "att": 804,
+          "contrast": {
+            "low": -2.913556926054641,
+            "high": 0.5281337084385521,
+            "point": -1.0823192223365456,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "COUNT is applied to a specific column rather than * when counting rows of a table that has a designated key column. The question asks how many records exist for each group in a table with an identifying column.",
+          "cases": 244,
+          "databases": 37,
+          "comparable": 37,
+          "att": 244,
+          "contrast": {
+            "low": -3.797376123354742,
+            "high": 1.1918768280646426,
+            "point": -1.0178300588250466,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A percentage of a subset relative to a larger set requires the subset condition in the numerator and the larger-set condition in the denominator, not the subset condition in the WHERE clause. The question asks what percentage of a broader population satisfies a narrower condition.",
+          "cases": 55,
+          "databases": 29,
+          "comparable": 29,
+          "att": 55,
+          "contrast": {
+            "low": -9.192473030728433,
+            "high": 7.390810830040587,
+            "point": -0.9591432655227522,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Ranking vendors by order volume uses COUNT of quantityOrdered in the ORDER BY clause while the selected columns remain the vendor and the per-unit earnings expression. The question asks for the vendor with the most orders and the answer must also report an earnings figure.",
+          "cases": 64,
+          "databases": 22,
+          "comparable": 22,
+          "att": 64,
+          "contrast": {
+            "low": -6.898012649125919,
+            "high": 3.9929475060843904,
+            "point": -0.8038782677465116,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks which entity satisfies a comparison, the SELECT list contains only the entity identifier column and excludes the column being compared. The question's answer is a single entity chosen by comparing a numeric column across candidates.",
+          "cases": 59,
+          "databases": 27,
+          "comparable": 27,
+          "att": 59,
+          "contrast": {
+            "low": -6.8186408282529145,
+            "high": 5.494049818460336,
+            "point": -0.7805303888158458,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for a named attribute of an entity, the SELECT list must project that attribute rather than the entity's identifier. The question names a descriptive column (such as a name) as part of the requested output.",
+          "cases": 72,
+          "databases": 19,
+          "comparable": 19,
+          "att": 72,
+          "contrast": {
+            "low": -11.917572730811118,
+            "high": 10.203894132907248,
+            "point": -0.7148141541715818,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "City values in the offices table are stored as short forms such as 'NYC' rather than full names such as 'New York'. The question refers to New York city and the query filters on offices.city.",
+          "cases": 393,
+          "databases": 47,
+          "comparable": 47,
+          "att": 393,
+          "contrast": {
+            "low": -3.448977336582108,
+            "high": 2.2643528540908293,
+            "point": -0.5934385646252585,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A question asking for a total price of products requires an aggregate SUM over the per-line price-times-quantity expression, not a bare row-level product. The question asks for a total or aggregate amount over products or order lines.",
+          "cases": 495,
+          "databases": 51,
+          "comparable": 51,
+          "att": 495,
+          "contrast": {
+            "low": -2.7874191959917844,
+            "high": 1.5990537882957976,
+            "point": -0.48979329223521395,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A join between a product table and its cost history table produces multiple rows per product when a product has more than one history record. The query joins a product table to a cost history table on product identifier and the question asks for product-level output.",
+          "cases": 773,
+          "databases": 54,
+          "comparable": 54,
+          "att": 773,
+          "contrast": {
+            "low": -1.8535923394544889,
+            "high": 1.173372508506176,
+            "point": -0.2756170686682655,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "ORDER BY references the aggregate expression itself rather than a SELECT-list alias when no alias is defined. The query orders by an aggregate that has no alias in the SELECT list.",
+          "cases": 798,
+          "databases": 55,
+          "comparable": 55,
+          "att": 798,
+          "contrast": {
+            "low": -2.1423907565750278,
+            "high": 1.8908631453267404,
+            "point": -0.13246827544189432,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A generated SQL answer must contain a non-empty query. The task requires producing SQL for a question.",
+          "cases": 284,
+          "databases": 49,
+          "comparable": 49,
+          "att": 284,
+          "contrast": {
+            "low": -1.7310148088890622,
+            "high": 2.941788185728243,
+            "point": 0.49524989718660006,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Aggregate expressions in the SELECT list are left unaliased when the question does not name an output column label. The question asks for an aggregate value without specifying a column name for the result.",
+          "cases": 850,
+          "databases": 52,
+          "comparable": 52,
+          "att": 850,
+          "contrast": {
+            "low": -0.7940523260246342,
+            "high": 2.191485282180867,
+            "point": 0.6416793177483925,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A customer name filter must match the stored customerName value exactly, including any suffix such as 'Distributors Ltd.' that appears in the schema data. The question names a customer whose name may include a corporate suffix.",
+          "cases": 650,
+          "databases": 53,
+          "comparable": 53,
+          "att": 650,
+          "contrast": {
+            "low": -1.1593936727941578,
+            "high": 2.4144116920354106,
+            "point": 0.6690330316590662,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Comparing a team's wins in one year against its wins in the prior year is expressed by joining the teams table to itself on team identifier with each side filtered to its respective year, then comparing the win columns. The question asks for teams whose wins in a given year exceed their wins in the immediately preceding year.",
+          "cases": 541,
+          "databases": 47,
+          "comparable": 47,
+          "att": 541,
+          "contrast": {
+            "low": -1.4820488829891092,
+            "high": 2.8658818330720077,
+            "point": 0.8236023968819756,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "The SELECT list of a query should contain only columns the question asks to see, excluding columns used solely for ordering or filtering. The question names entities and asks which one ranks highest on some attribute without requesting the attribute itself.",
+          "cases": 42,
+          "databases": 20,
+          "comparable": 20,
+          "att": 42,
+          "contrast": {
+            "low": -9.51544910863535,
+            "high": 10.906394427982171,
+            "point": 0.891989160220754,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "The ORDER BY column used to rank candidates does not need to appear in the SELECT list. The question asks for a single winner among named candidates based on an ordering attribute.",
+          "cases": 264,
+          "databases": 48,
+          "comparable": 48,
+          "att": 264,
+          "contrast": {
+            "low": -2.286486688909959,
+            "high": 4.274616168125464,
+            "point": 0.9583975742562426,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Negating a 'without X' condition by using an inequality on the X column selects the rows that have X rather than the rows that lack it. The question contains a negative qualifier such as 'without', 'no', or 'excluding' applied to a column value.",
+          "cases": 434,
+          "databases": 53,
+          "comparable": 53,
+          "att": 434,
+          "contrast": {
+            "low": -0.3565803572779287,
+            "high": 3.4974952556789,
+            "point": 1.3097668456438616,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A query that lists city values from a location table must exclude rows where the city column is NULL. The question asks for a list of cities and the city column is nullable in the schema.",
+          "cases": 449,
+          "databases": 53,
+          "comparable": 53,
+          "att": 449,
+          "contrast": {
+            "low": -1.086045851968568,
+            "high": 4.208495504366502,
+            "point": 1.3944426249556177,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Result column names must match the expression or column name as written in the query, without introducing aliases that rename them. The question asks for an aggregate alongside a descriptive column and the expected output column names are the raw expression and column name.",
+          "cases": 277,
+          "databases": 47,
+          "comparable": 47,
+          "att": 277,
+          "contrast": {
+            "low": -0.22394141245367086,
+            "high": 4.0011528489359325,
+            "point": 1.8914767071636005,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for a list of products by name, the result set contains one row per product name rather than one row per matching history record. The question asks for products identified by name and the query joins a product table to a history table that can have multiple rows per product.",
+          "cases": 112,
+          "databases": 30,
+          "comparable": 30,
+          "att": 112,
+          "contrast": {
+            "low": -2.5811407587793234,
+            "high": 5.699521408431129,
+            "point": 2.031955305933501,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for a vendor and a per-unit earnings figure, the result set contains the vendor and the difference between MSRP and buyPrice, not an aggregate of quantity ordered. The question asks which vendor has the most orders and also asks to calculate estimated earnings.",
+          "cases": 114,
+          "databases": 34,
+          "comparable": 34,
+          "att": 114,
+          "contrast": {
+            "low": -0.5682131606439935,
+            "high": 5.9040164484160575,
+            "point": 2.2843674130126015,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Using DISTINCT on a nullable city column does not remove the NULL row from the result set. The selected column is nullable and the query uses DISTINCT to deduplicate values.",
+          "cases": 191,
+          "databases": 31,
+          "comparable": 31,
+          "att": 191,
+          "contrast": {
+            "low": -1.2796999854249274,
+            "high": 6.073839939038252,
+            "point": 2.4565024432461136,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A question asking for one review per app alongside an app count is answered by selecting the reviews filtered by app membership in the qualifying app set, rather than by a correlated subquery in the count projection. The question asks for both an aggregate over apps and one representative row per app.",
+          "cases": 54,
+          "databases": 9,
+          "comparable": 9,
+          "att": 54,
+          "contrast": {
+            "low": -7.302133295492172,
+            "high": 8.887505137142131,
+            "point": 3.3397450628547016,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A query that returns fewer rows than the corrected answer has over-restricted the result set, typically through an extra predicate on a categorical column. The generated SQL returns a row count substantially below the expected count for the same question.",
+          "cases": 29,
+          "databases": 16,
+          "comparable": 16,
+          "att": 29,
+          "contrast": {
+            "low": -0.23305489956241782,
+            "high": 12.018432713822772,
+            "point": 3.751309238183094,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Counting rows for an entity identified by name uses COUNT on the entity's primary key column rather than COUNT(*). The question asks how many records are associated with a named entity and the answer is produced by joining that entity's table to a related table.",
+          "cases": 27,
+          "databases": 15,
+          "comparable": 15,
+          "att": 27,
+          "contrast": {
+            "low": 0.5938085158775837,
+            "high": 13.916055172422132,
+            "point": 4.860886026837511,
+            "dropped": 0
+          },
+          "resolved": true
+        },
+        {
+          "statement": "A DISTINCT modifier is unnecessary when the selected column is already unique per matching row or when the query returns a single column with no join duplication. The projection lists one column from a single table with no join and no aggregation.",
+          "cases": 23,
+          "databases": 14,
+          "comparable": 14,
+          "att": 23,
+          "contrast": {
+            "low": -11.1620623098766,
+            "high": 28.934944985314097,
+            "point": 5.714183110398842,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A comparison question asking which of two named entities has a higher attribute value is answered by returning only the identifying column of the winner, not the compared attribute. The question asks which of two named rows has a higher value of some column and does not ask for that value.",
+          "cases": 20,
+          "databases": 9,
+          "comparable": 9,
+          "att": 20,
+          "contrast": {
+            "low": 0.32511778870244795,
+            "high": 25.890366444309088,
+            "point": 10.790220182350163,
+            "dropped": 0
+          },
+          "resolved": true
+        }
+      ],
+      "unsupported": {
+        "any": {
+          "exposed": 4894,
+          "comparable": 58,
+          "att": 4894,
+          "contrast": {
+            "low": -3.1349823412759195,
+            "high": -0.5093283414743942,
+            "point": -1.8287742716614805,
+            "dropped": 0
+          }
+        },
+        "all": {
+          "exposed": 1154,
+          "comparable": 56,
+          "att": 1154,
+          "contrast": {
+            "low": -0.6095757528351744,
+            "high": 2.2304177132716347,
+            "point": 0.867239362259777,
+            "dropped": 0
+          }
+        },
+        "none": {
+          "exposed": 2106,
+          "comparable": 58,
+          "att": 2106,
+          "contrast": {
+            "low": 0.2591443186809443,
+            "high": 3.7157472923566455,
+            "point": 2.0413682434495435,
+            "dropped": 0
+          }
+        },
+        "casesAny": 4894,
+        "casesAll": 1154,
+        "meanPerCase": 0.8478571428571429,
+        "byConstruct": [
+          {
+            "construct": "select-alias",
+            "cases": 2953
+          },
+          {
+            "construct": "distinct",
+            "cases": 1314
+          },
+          {
+            "construct": "order-by",
+            "cases": 956
+          },
+          {
+            "construct": "join",
+            "cases": 605
+          },
+          {
+            "construct": "count-star",
+            "cases": 273
+          },
+          {
+            "construct": "subquery",
+            "cases": 156
+          },
+          {
+            "construct": "like",
+            "cases": 125
+          },
+          {
+            "construct": "cast",
+            "cases": 92
+          },
+          {
+            "construct": "limit",
+            "cases": 39
+          },
+          {
+            "construct": "union",
+            "cases": 17
+          }
+        ]
+      },
+      "circulation": [
+        {
+          "stratum": "none",
+          "result": {
+            "exposed": 948,
+            "comparable": 37,
+            "att": 948,
+            "contrast": {
+              "low": -1.4665991778810128,
+              "high": 4.324657684982584,
+              "point": 1.3795914631643995,
+              "dropped": 0
+            }
+          }
+        },
+        {
+          "stratum": "mixed",
+          "result": {
+            "exposed": 1811,
+            "comparable": 44,
+            "att": 1811,
+            "contrast": {
+              "low": -1.9550692572472907,
+              "high": 1.587716701944733,
+              "point": -0.09035556356701144,
+              "dropped": 0
+            }
+          }
+        },
+        {
+          "stratum": "all",
+          "result": {
+            "exposed": 4241,
+            "comparable": 43,
+            "att": 2617,
+            "contrast": {
+              "low": -3.5830705668548775,
+              "high": 0.7086630157298461,
+              "point": -1.3361153443092448,
+              "dropped": 0
+            }
+          }
+        }
+      ],
+      "dose": {
+        "predictors": [
+          "statements",
+          "unsupported",
+          "gold-constructs"
+        ],
+        "cases": 7000,
+        "clusters": 58,
+        "coefficients": [
+          -2.95712387693032,
+          -0.7596458647964369,
+          -0.3132228955677961
+        ],
+        "intervals": [
+          {
+            "low": -5.854906946390435,
+            "high": 0.3053368621029359,
+            "point": -2.95712387693032,
+            "dropped": 0
+          },
+          {
+            "low": -1.5523947068964075,
+            "high": 0.07978752464128817,
+            "point": -0.7596458647964369,
+            "dropped": 0
+          },
+          {
+            "low": -1.004812462488478,
+            "high": 0.409607797873939,
+            "point": -0.3132228955677961,
+            "dropped": 0
+          }
+        ]
+      },
+      "filter": {
+        "share": 0.05,
+        "deliveredBefore": 13578,
+        "deliveredAfter": 10968,
+        "casesEmptied": 65,
+        "profiles": 58
+      }
+    },
+    {
+      "source": "bird-dev",
+      "path": "eval/results/poc-sota-bird-dev-R26-channels.json",
+      "n": 1534,
+      "clusters": 11,
+      "statements": 215,
+      "unscreened": 192,
+      "ledger": {
+        "statements": 215,
+        "screened": 23,
+        "resolved": 2,
+        "expected": 1.15,
+        "negative": 1,
+        "positive": 1,
+        "massAtRiskPp": 0.26108265203378733
+      },
+      "screen": [
+        {
+          "statement": "A GROUP BY query whose ORDER BY uses an aggregate must order by that aggregate expression rather than by a select-list alias when the alias is not projected. The select list omits the aggregate that the ordering depends on.",
+          "cases": 32,
+          "databases": 9,
+          "comparable": 9,
+          "att": 32,
+          "contrast": {
+            "low": -24.86977789178208,
+            "high": -3.7016726352274527,
+            "point": -12.51564963186968,
+            "dropped": 0
+          },
+          "resolved": true
+        },
+        {
+          "statement": "Returning one row per candidate value with ORDER BY and LIMIT 1 answers a ranking question, not a which-is-higher question. the question asks which of two values is higher and the answer must name one of them",
+          "cases": 11,
+          "databases": 5,
+          "comparable": 5,
+          "att": 11,
+          "contrast": {
+            "low": -32.05128205128205,
+            "high": 0.26246719160104987,
+            "point": -9.175295395767836,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for a ratio of A to B, the numerator must count A and the denominator must count B in the order named by the question. The question asks for a ratio of one named group to another named group.",
+          "cases": 15,
+          "databases": 9,
+          "comparable": 9,
+          "att": 15,
+          "contrast": {
+            "low": -26.303459354874022,
+            "high": 1.1092861629608122,
+            "point": -6.496502441037391,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A question asking for a single derived ratio or percentage is answered by a query that returns only that computed value, not the component counts alongside it. The question asks for a deviation, ratio, or percentage rather than for the underlying counts.",
+          "cases": 22,
+          "databases": 8,
+          "comparable": 8,
+          "att": 22,
+          "contrast": {
+            "low": -10.87630524046709,
+            "high": 1.2990745446885799,
+            "point": -4.053099268986465,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A question that asks to rank rows requires a rank or row-number column in the result, not just an ORDER BY clause. The question contains a ranking verb such as rank or top-N over an ordering criterion.",
+          "cases": 25,
+          "databases": 10,
+          "comparable": 10,
+          "att": 25,
+          "contrast": {
+            "low": -11.009488843548395,
+            "high": 0.3799498835940153,
+            "point": -3.938238200520925,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A query whose question asks which entity ranks highest returns exactly one row when a LIMIT 1 is applied. The question asks for the single top-ranked entity and the query uses ORDER BY with LIMIT 1.",
+          "cases": 34,
+          "databases": 10,
+          "comparable": 10,
+          "att": 34,
+          "contrast": {
+            "low": -7.973869978141355,
+            "high": 0.25624413279883357,
+            "point": -3.707708827922107,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Counting rows that satisfy a filter uses COUNT on the key column without DISTINCT when the join is many-to-one from the counted table to the joined table. The question asks how many entities of one table meet conditions, and the join to the other table is on that table's foreign key.",
+          "cases": 50,
+          "databases": 8,
+          "comparable": 8,
+          "att": 50,
+          "contrast": {
+            "low": -7.5574744741740405,
+            "high": 1.6317586941821949,
+            "point": -3.276550491386239,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A LIKE pattern built from a user-supplied lap time must match the stored textual format of the time column, including whether minutes are zero-padded. A query filters a time column using a LIKE pattern derived from a time value stated in the question.",
+          "cases": 47,
+          "databases": 6,
+          "comparable": 6,
+          "att": 47,
+          "contrast": {
+            "low": -19.795701370662,
+            "high": 0.20846560846560844,
+            "point": -2.3284578242119554,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A query that asks only for a list of named entities returns just the requested identifying column, not all columns of the source table. The question names a single attribute to list (such as player names) rather than asking for full records.",
+          "cases": 36,
+          "databases": 10,
+          "comparable": 10,
+          "att": 36,
+          "contrast": {
+            "low": -8.323089482771563,
+            "high": 0.9836040828800034,
+            "point": -2.322844210523311,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Integer division in SQL is avoided by casting a numerator or denominator to a real type before dividing. The query computes a ratio or percentage from integer count columns.",
+          "cases": 42,
+          "databases": 6,
+          "comparable": 6,
+          "att": 42,
+          "contrast": {
+            "low": -4.819058650328,
+            "high": 1.6635357202443932,
+            "point": -2.0081161185683056,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A year-range filter on a date column is expressed as two comparisons on the extracted year, one lower bound and one upper bound. The question specifies an inclusive range of years over a date or timestamp column.",
+          "cases": 17,
+          "databases": 6,
+          "comparable": 6,
+          "att": 17,
+          "contrast": {
+            "low": -1.8640167126491591,
+            "high": 1.3995276269692407,
+            "point": -0.30933292998103934,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A ratio expression must not be wrapped in a CAST to REAL when the numerator already uses a decimal literal such as 1.0 to force floating-point division. The SQL computes a ratio using SUM(CASE ...) over two groups.",
+          "cases": 53,
+          "databases": 8,
+          "comparable": 8,
+          "att": 53,
+          "contrast": {
+            "low": -3.725292403515589,
+            "high": 6.3003712854012255,
+            "point": 0.17572346973899347,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A column used only in ORDER BY to rank rows is not included in the SELECT list unless the question explicitly asks for it. The question asks for an entity identified by name and the ranking is performed on a separate attribute.",
+          "cases": 40,
+          "databases": 9,
+          "comparable": 9,
+          "att": 40,
+          "contrast": {
+            "low": -7.639068771800554,
+            "high": 19.03760902897779,
+            "point": 0.31567154814144416,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks which entity has the maximum value and ties are possible, the query must return all entities tied at the maximum rather than a single row via ORDER BY ... LIMIT 1. The question asks which entity has the highest value on an attribute.",
+          "cases": 30,
+          "databases": 7,
+          "comparable": 7,
+          "att": 30,
+          "contrast": {
+            "low": -0.6822659612271489,
+            "high": 1.4601010130166652,
+            "point": 0.6736202959510592,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A query that groups by a table's name column groups by that name column alone rather than by both the name and the table's id. The question asks for results grouped by an entity's name and the entity table has both a name column and an id column.",
+          "cases": 71,
+          "databases": 10,
+          "comparable": 10,
+          "att": 71,
+          "contrast": {
+            "low": -8.015085943739793,
+            "high": 11.072236139060967,
+            "point": 1.6696473761025534,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Percentage increase between a base period and a later period is computed as (later - base) * 100 / base, dividing by the base-period value. The question asks for a percentage increase in a measure between two periods.",
+          "cases": 42,
+          "databases": 10,
+          "comparable": 10,
+          "att": 42,
+          "contrast": {
+            "low": -7.083361906882539,
+            "high": 16.352079015058962,
+            "point": 2.6666250731140733,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "An average over a column is computed as the sum of that column divided by the count of rows in the filtered set, not by averaging a differently filtered subset. The question asks for a comparison against an average over the same filtered population.",
+          "cases": 30,
+          "databases": 7,
+          "comparable": 7,
+          "att": 30,
+          "contrast": {
+            "low": -16.705612556673707,
+            "high": 16.05581720842221,
+            "point": 3.2724312535834654,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for the customer with the least or most total consumption over a period, consumption must be aggregated per customer before ordering. The question asks for a customer ranked by least or most consumption over a time period, and the consumption table has multiple rows per customer.",
+          "cases": 19,
+          "databases": 6,
+          "comparable": 6,
+          "att": 19,
+          "contrast": {
+            "low": -24.48934837092732,
+            "high": 24.94178006220825,
+            "point": 5.102662991108459,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A query answering a who-is question returns only the columns naming the person, excluding columns that merely support filtering or ordering. The question asks 'who' and the supporting column is not itself requested.",
+          "cases": 22,
+          "databases": 6,
+          "comparable": 6,
+          "att": 22,
+          "contrast": {
+            "low": 0.4206576504256188,
+            "high": 13.252484135694695,
+            "point": 5.459548832981839,
+            "dropped": 0
+          },
+          "resolved": true
+        },
+        {
+          "statement": "Selecting the row with the highest value in a column is expressed by ordering on that column descending and limiting to one row. The question asks for the record associated with the maximum value of a column.",
+          "cases": 14,
+          "databases": 5,
+          "comparable": 5,
+          "att": 14,
+          "contrast": {
+            "low": -28.02547770700637,
+            "high": 21.048770356498334,
+            "point": 7.185732932992386,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Questions asking which of two values is higher require a single comparison result rather than a row per candidate value. the question asks which of two aggregates is higher",
+          "cases": 25,
+          "databases": 8,
+          "comparable": 8,
+          "att": 25,
+          "contrast": {
+            "low": -1.0215442407580162,
+            "high": 23.541202920024894,
+            "point": 8.107396069775957,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for a peak month, the result must be the month component extracted from the date column, not the full date value. The question asks for a peak or maximum month within a year.",
+          "cases": 21,
+          "databases": 7,
+          "comparable": 7,
+          "att": 21,
+          "contrast": {
+            "low": -0.19036172515959135,
+            "high": 22.215808388475423,
+            "point": 10.31727542915957,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Date-part filters on a stored date string can be expressed as a single prefix comparison against the concatenated year and month. The birthday column stores dates as text in YYYY-MM-DD form and the question constrains both year and month.",
+          "cases": 6,
+          "databases": 5,
+          "comparable": 5,
+          "att": 6,
+          "contrast": {
+            "low": -0.5082457178401832,
+            "high": 61.14649681528663,
+            "point": 17.33843921731719,
+            "dropped": 0
+          },
+          "resolved": false
+        }
+      ],
+      "unsupported": {
+        "any": {
+          "exposed": 809,
+          "comparable": 11,
+          "att": 809,
+          "contrast": {
+            "low": -6.959376634401654,
+            "high": 1.5694219903068531,
+            "point": -2.8048801513222683,
+            "dropped": 0
+          }
+        },
+        "all": {
+          "exposed": 319,
+          "comparable": 11,
+          "att": 319,
+          "contrast": {
+            "low": -3.319111981812975,
+            "high": 4.193404678911919,
+            "point": 0.2435099464814609,
+            "dropped": 0
+          }
+        },
+        "none": {
+          "exposed": 725,
+          "comparable": 11,
+          "att": 725,
+          "contrast": {
+            "low": -4.169342072863312,
+            "high": 5.106751788194111,
+            "point": 0.578912968810278,
+            "dropped": 0
+          }
+        },
+        "casesAny": 809,
+        "casesAll": 319,
+        "meanPerCase": 0.6447196870925684,
+        "byConstruct": [
+          {
+            "construct": "distinct",
+            "cases": 285
+          },
+          {
+            "construct": "join",
+            "cases": 222
+          },
+          {
+            "construct": "order-by",
+            "cases": 199
+          },
+          {
+            "construct": "like",
+            "cases": 112
+          },
+          {
+            "construct": "limit",
+            "cases": 79
+          },
+          {
+            "construct": "count-star",
+            "cases": 70
+          },
+          {
+            "construct": "subquery",
+            "cases": 69
+          },
+          {
+            "construct": "select-alias",
+            "cases": 64
+          },
+          {
+            "construct": "cast",
+            "cases": 55
+          }
+        ]
+      },
+      "circulation": [
+        {
+          "stratum": "none",
+          "result": {
+            "exposed": 943,
+            "comparable": 11,
+            "att": 943,
+            "contrast": {
+              "low": -4.482500598996353,
+              "high": 2.6156449954518997,
+              "point": -0.7993315161225419,
+              "dropped": 0
+            }
+          }
+        },
+        {
+          "stratum": "mixed",
+          "result": {
+            "exposed": 422,
+            "comparable": 11,
+            "att": 422,
+            "contrast": {
+              "low": -2.9928381022134842,
+              "high": 4.953533338770355,
+              "point": 1.1668538445189263,
+              "dropped": 0
+            }
+          }
+        },
+        {
+          "stratum": "all",
+          "result": {
+            "exposed": 169,
+            "comparable": 10,
+            "att": 169,
+            "contrast": {
+              "low": -5.824622763179918,
+              "high": 3.2637997879979648,
+              "point": -2.1492204281164726,
+              "dropped": 0
+            }
+          }
+        }
+      ],
+      "dose": {
+        "predictors": [
+          "statements",
+          "unsupported",
+          "gold-constructs"
+        ],
+        "cases": 1534,
+        "clusters": 11,
+        "coefficients": [
+          -0.0022727504323123413,
+          -1.1361061369242702,
+          1.2236104347122294
+        ],
+        "intervals": [
+          {
+            "low": -2.780163974827511,
+            "high": 3.5849168775093294,
+            "point": -0.0022727504323123413,
+            "dropped": 0
+          },
+          {
+            "low": -3.421275399827819,
+            "high": 1.7653613911968242,
+            "point": -1.1361061369242702,
+            "dropped": 0
+          },
+          {
+            "low": 0.15005673754262056,
+            "high": 2.198217380931984,
+            "point": 1.2236104347122294,
+            "dropped": 0
+          }
+        ]
+      },
+      "filter": {
+        "share": 0.05,
+        "deliveredBefore": 2688,
+        "deliveredAfter": 2566,
+        "casesEmptied": 1,
+        "profiles": 11
+      }
+    },
+    {
+      "source": "bird-dev-lexicon",
+      "path": "eval/results/poc-sota-bird-dev-R37-lexicon-grain.json",
+      "n": 1534,
+      "clusters": 11,
+      "statements": 212,
+      "unscreened": 190,
+      "ledger": {
+        "statements": 212,
+        "screened": 22,
+        "resolved": 1,
+        "expected": 1.1,
+        "negative": 1,
+        "positive": 0,
+        "massAtRiskPp": 0.16978165668343898
+      },
+      "screen": [
+        {
+          "statement": "A LIKE pattern built from a user-supplied lap time must match the stored textual format of the time column, including whether minutes are zero-padded. A query filters a time column using a LIKE pattern derived from a time value stated in the question.",
+          "cases": 41,
+          "databases": 5,
+          "comparable": 5,
+          "att": 41,
+          "contrast": {
+            "low": -40.10030864197531,
+            "high": -1.5265704012142758,
+            "point": -6.3523185695706195,
+            "dropped": 0
+          },
+          "resolved": true
+        },
+        {
+          "statement": "Ordering by a nullable date column without filtering out NULLs can place NULL rows first and yield an empty or wrong result. The ORDER BY column can contain NULL values and the query uses LIMIT to pick the earliest row.",
+          "cases": 16,
+          "databases": 7,
+          "comparable": 7,
+          "att": 16,
+          "contrast": {
+            "low": -16.841088454316818,
+            "high": 0.6649125127385996,
+            "point": -5.922272810715874,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A query whose question asks which entity ranks highest returns exactly one row when a LIMIT 1 is applied. The question asks for the single top-ranked entity and the query uses ORDER BY with LIMIT 1.",
+          "cases": 27,
+          "databases": 10,
+          "comparable": 10,
+          "att": 27,
+          "contrast": {
+            "low": -13.477579340666976,
+            "high": 1.1277882671206059,
+            "point": -4.655816230917669,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks which entity has the maximum value and ties are possible, the query must return all entities tied at the maximum rather than a single row via ORDER BY ... LIMIT 1. The question asks which entity has the highest value on an attribute.",
+          "cases": 26,
+          "databases": 7,
+          "comparable": 7,
+          "att": 26,
+          "contrast": {
+            "low": -5.647906390224614,
+            "high": 0.5700634958298754,
+            "point": -4.11292836731931,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Counting rows that satisfy a filter uses COUNT on the key column without DISTINCT when the join is many-to-one from the counted table to the joined table. The question asks how many entities of one table meet conditions, and the join to the other table is on that table's foreign key.",
+          "cases": 49,
+          "databases": 8,
+          "comparable": 8,
+          "att": 49,
+          "contrast": {
+            "low": -6.947178228149889,
+            "high": 7.022586253089878,
+            "point": -0.9881087879736933,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Filtering a date stored as a text column by year and month is expressed as a single prefix comparison on the first seven characters in YYYY-MM form. The question constrains both the year and the month of a date column stored as text.",
+          "cases": 7,
+          "databases": 5,
+          "comparable": 5,
+          "att": 7,
+          "contrast": {
+            "low": -2.4941911317310614,
+            "high": 0.3580043859649122,
+            "point": -0.9767023316273065,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A date range that names a month covers the first day through the last day of that month, inclusive. The question specifies a month and year for a date filter.",
+          "cases": 105,
+          "databases": 9,
+          "comparable": 9,
+          "att": 105,
+          "contrast": {
+            "low": -4.768925518157476,
+            "high": 8.732361834811174,
+            "point": -0.9286744186348913,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A threshold stated as 'greater than or equal to N' is expressed with >= N, not > N. The question specifies an inclusive lower bound on a numeric column.",
+          "cases": 45,
+          "databases": 6,
+          "comparable": 6,
+          "att": 45,
+          "contrast": {
+            "low": -15.77114450109124,
+            "high": 6.962234632343237,
+            "point": -0.75756969686706,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "An age computed as a fixed reference year minus a birth year is expressed as a numeric subtraction, not a string subtraction. The question asks for an average age as of a stated year derived from a birthday column.",
+          "cases": 22,
+          "databases": 9,
+          "comparable": 9,
+          "att": 22,
+          "contrast": {
+            "low": -11.332681380317682,
+            "high": 14.93557061144813,
+            "point": -0.5351364995040812,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "The SELECT list contains exactly the columns the question names as output, and aggregate expressions used only for ordering or filtering are not projected. The question names a single output attribute while the query computes an aggregate for ranking.",
+          "cases": 28,
+          "databases": 8,
+          "comparable": 8,
+          "att": 28,
+          "contrast": {
+            "low": -3.048798899697919,
+            "high": 1.2214102031437495,
+            "point": -0.18661085310147704,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Returning one row per candidate value with ORDER BY and LIMIT 1 answers a ranking question, not a which-is-higher question. the question asks which of two values is higher and the answer must name one of them",
+          "cases": 13,
+          "databases": 5,
+          "comparable": 5,
+          "att": 13,
+          "contrast": {
+            "low": -25.898634698634698,
+            "high": 17.09401709401709,
+            "point": 0.10040046769301664,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A query that asks to list a named attribute returns only that attribute, not all columns of the source table. The question names specific attributes to list rather than asking for full records.",
+          "cases": 67,
+          "databases": 10,
+          "comparable": 10,
+          "att": 67,
+          "contrast": {
+            "low": -3.3259396585645153,
+            "high": 5.891232947002497,
+            "point": 0.5860821838306053,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A question asking for a single derived ratio or percentage is answered by a query that returns only that computed value, not the component counts alongside it. The question asks for a deviation, ratio, or percentage rather than for the underlying counts.",
+          "cases": 30,
+          "databases": 7,
+          "comparable": 7,
+          "att": 30,
+          "contrast": {
+            "low": -7.12894360723061,
+            "high": 14.499255619892484,
+            "point": 0.7675629371046342,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for a single entity type (such as atom IDs), the SELECT list contains only the columns representing that entity, excluding paired or related columns. The question names one entity whose values are requested and the table stores that entity alongside a related counterpart column.",
+          "cases": 8,
+          "databases": 5,
+          "comparable": 5,
+          "att": 8,
+          "contrast": {
+            "low": -1.766061666366291,
+            "high": 3.5554686551640313,
+            "point": 0.9760164006736981,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A query answering a who-is question returns only the columns naming the person, excluding columns that merely support filtering or ordering. The question asks 'who' and the supporting column is not itself requested.",
+          "cases": 19,
+          "databases": 5,
+          "comparable": 5,
+          "att": 19,
+          "contrast": {
+            "low": -0.24432684806050042,
+            "high": 2.560133365086926,
+            "point": 1.0060173768260725,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A query that groups by a table's name column groups by that name column alone rather than by both the name and the table's id. The question asks for results grouped by an entity's name and the entity table has both a name column and an id column.",
+          "cases": 67,
+          "databases": 10,
+          "comparable": 10,
+          "att": 67,
+          "contrast": {
+            "low": -10.444449786386473,
+            "high": 10.151098389331164,
+            "point": 1.5575308838193573,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A ratio expression must not be wrapped in a CAST to REAL when the numerator already uses a decimal literal such as 1.0 to force floating-point division. The SQL computes a ratio using SUM(CASE ...) over two groups.",
+          "cases": 41,
+          "databases": 8,
+          "comparable": 8,
+          "att": 41,
+          "contrast": {
+            "low": -8.856344982924549,
+            "high": 22.518666609895917,
+            "point": 4.666497523130236,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Selecting the row with the highest value in a column is expressed by ordering on that column descending and limiting to one row. The question asks for the record associated with the maximum value of a column.",
+          "cases": 14,
+          "databases": 6,
+          "comparable": 6,
+          "att": 14,
+          "contrast": {
+            "low": -3.217151523322554,
+            "high": 24.236874236874232,
+            "point": 6.378787350022341,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for the customer with the least or most total consumption over a period, consumption must be aggregated per customer before ordering. The question asks for a customer ranked by least or most consumption over a time period, and the consumption table has multiple rows per customer.",
+          "cases": 15,
+          "databases": 5,
+          "comparable": 5,
+          "att": 15,
+          "contrast": {
+            "low": -0.9034397016162454,
+            "high": 17.38623687664042,
+            "point": 6.547307323176185,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "An average over a column is computed as the sum of that column divided by the count of rows in the filtered set, not by averaging a differently filtered subset. The question asks for a comparison against an average over the same filtered population.",
+          "cases": 25,
+          "databases": 7,
+          "comparable": 7,
+          "att": 25,
+          "contrast": {
+            "low": -1.1004231849745922,
+            "high": 15.915212238741649,
+            "point": 6.628857874738717,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for a ratio of A to B, the numerator must count A and the denominator must count B in the order named by the question. The question asks for a ratio of one named group to another named group.",
+          "cases": 12,
+          "databases": 6,
+          "comparable": 6,
+          "att": 12,
+          "contrast": {
+            "low": -1.6220580827602027,
+            "high": 30.128969116916522,
+            "point": 9.031986872693043,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Questions asking which of two values is higher require a single comparison result rather than a row per candidate value. the question asks which of two aggregates is higher",
+          "cases": 21,
+          "databases": 8,
+          "comparable": 8,
+          "att": 21,
+          "contrast": {
+            "low": -0.5916183734648269,
+            "high": 38.39159884984829,
+            "point": 14.348873557893699,
+            "dropped": 0
+          },
+          "resolved": false
+        }
+      ],
+      "unsupported": {
+        "any": {
+          "exposed": 705,
+          "comparable": 11,
+          "att": 705,
+          "contrast": {
+            "low": -7.818180039085087,
+            "high": 0.31066317122537224,
+            "point": -3.5735230679669834,
+            "dropped": 0
+          }
+        },
+        "all": {
+          "exposed": 266,
+          "comparable": 11,
+          "att": 266,
+          "contrast": {
+            "low": -7.239164182386665,
+            "high": 3.1790244821519016,
+            "point": -2.380047635694543,
+            "dropped": 0
+          }
+        },
+        "none": {
+          "exposed": 829,
+          "comparable": 11,
+          "att": 829,
+          "contrast": {
+            "low": -2.3659089511435614,
+            "high": 6.126286552664925,
+            "point": 1.754591508230135,
+            "dropped": 0
+          }
+        },
+        "casesAny": 705,
+        "casesAll": 266,
+        "meanPerCase": 0.5475880052151239,
+        "byConstruct": [
+          {
+            "construct": "distinct",
+            "cases": 264
+          },
+          {
+            "construct": "join",
+            "cases": 218
+          },
+          {
+            "construct": "order-by",
+            "cases": 141
+          },
+          {
+            "construct": "like",
+            "cases": 94
+          },
+          {
+            "construct": "limit",
+            "cases": 80
+          },
+          {
+            "construct": "subquery",
+            "cases": 72
+          },
+          {
+            "construct": "count-star",
+            "cases": 50
+          },
+          {
+            "construct": "cast",
+            "cases": 37
+          },
+          {
+            "construct": "select-alias",
+            "cases": 28
+          }
+        ]
+      },
+      "circulation": [
+        {
+          "stratum": "none",
+          "result": {
+            "exposed": 914,
+            "comparable": 11,
+            "att": 914,
+            "contrast": {
+              "low": -4.387675625656395,
+              "high": 2.494619225168424,
+              "point": -0.4899433570645612,
+              "dropped": 0
+            }
+          }
+        },
+        {
+          "stratum": "mixed",
+          "result": {
+            "exposed": 459,
+            "comparable": 11,
+            "att": 459,
+            "contrast": {
+              "low": -3.274383035854575,
+              "high": 2.877602190758313,
+              "point": -0.3567836136507462,
+              "dropped": 0
+            }
+          }
+        },
+        {
+          "stratum": "all",
+          "result": {
+            "exposed": 161,
+            "comparable": 10,
+            "att": 161,
+            "contrast": {
+              "low": -1.2804025839000528,
+              "high": 10.002047237961719,
+              "point": 2.4754014873872956,
+              "dropped": 0
+            }
+          }
+        }
+      ],
+      "dose": {
+        "predictors": [
+          "statements",
+          "unsupported",
+          "gold-constructs"
+        ],
+        "cases": 1534,
+        "clusters": 11,
+        "coefficients": [
+          -2.6944750880247184,
+          -1.815598637101694,
+          0.7416940397587221
+        ],
+        "intervals": [
+          {
+            "low": -6.1227437509632745,
+            "high": 2.2455587266478187,
+            "point": -2.6944750880247184,
+            "dropped": 0
+          },
+          {
+            "low": -3.943346795900874,
+            "high": 1.2029208277928396,
+            "point": -1.815598637101694,
+            "dropped": 0
+          },
+          {
+            "low": -0.19590339748060898,
+            "high": 1.6693590448362545,
+            "point": 0.7416940397587221,
+            "dropped": 0
+          }
+        ]
+      },
+      "filter": {
+        "share": 0.05,
+        "deliveredBefore": 2691,
+        "deliveredAfter": 2608,
+        "casesEmptied": 1,
+        "profiles": 11
+      }
+    },
+    {
+      "source": "bird-mini",
+      "path": "eval/results/poc-sota-bird-R63-recall-order.json",
+      "n": 350,
+      "clusters": 11,
+      "statements": 192,
+      "unscreened": 188,
+      "ledger": {
+        "statements": 192,
+        "screened": 4,
+        "resolved": 1,
+        "expected": 0.2,
+        "negative": 0,
+        "positive": 1,
+        "massAtRiskPp": 0
+      },
+      "screen": [
+        {
+          "statement": "A filter phrased as 'greater than or equal to N' is expressed with >= N, not > N. The question states a numeric bound with 'greater than or equal to' or 'at least'.",
+          "cases": 6,
+          "databases": 5,
+          "comparable": 5,
+          "att": 6,
+          "contrast": {
+            "low": -61.98412698412699,
+            "high": 1.9830418653948068,
+            "point": -32.0518838165897,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "Counting patients who satisfy a condition requires counting patient identifiers without DISTINCT when each patient appears at most once per joined row set. The question asks how many patients meet a condition and the joins do not multiply patient rows.",
+          "cases": 15,
+          "databases": 5,
+          "comparable": 5,
+          "att": 15,
+          "contrast": {
+            "low": -33.50658350658351,
+            "high": 1.307076307076307,
+            "point": -7.9579806050394275,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "A ratio expression must not be wrapped in a CAST to REAL when the numerator already uses a decimal literal such as 1.0 to force floating-point division. The ratio is computed as SUM(CASE ... THEN 1.0 ELSE 0 END) divided by SUM(CASE ... THEN 1 ELSE 0 END).",
+          "cases": 6,
+          "databases": 5,
+          "comparable": 5,
+          "att": 6,
+          "contrast": {
+            "low": -10.807840807840808,
+            "high": 1.6737891737891735,
+            "point": -3.434890934890935,
+            "dropped": 0
+          },
+          "resolved": false
+        },
+        {
+          "statement": "When a question asks for the biggest and lowest values across a fixed set of categories, the result is one row with one column per category value rather than a ranked top-1/bottom-1 selection. the question names a small fixed set of category values and asks for both the maximum and minimum among them",
+          "cases": 5,
+          "databases": 5,
+          "comparable": 5,
+          "att": 5,
+          "contrast": {
+            "low": 0.29492650545282134,
+            "high": 6.318318318318318,
+            "point": 3.384595121437227,
+            "dropped": 0
+          },
+          "resolved": true
+        }
+      ],
+      "unsupported": {
+        "any": {
+          "exposed": 111,
+          "comparable": 11,
+          "att": 111,
+          "contrast": {
+            "low": -5.10204081632653,
+            "high": 4.071246819338422,
+            "point": -0.21014138661197487,
+            "dropped": 0
+          }
+        },
+        "all": {
+          "exposed": 36,
+          "comparable": 9,
+          "att": 36,
+          "contrast": {
+            "low": -5.97181974032303,
+            "high": 15.05370826491516,
+            "point": 0.6973048393004531,
+            "dropped": 0
+          }
+        },
+        "none": {
+          "exposed": 239,
+          "comparable": 11,
+          "att": 239,
+          "contrast": {
+            "low": -6.071428571428571,
+            "high": 5.095598845598846,
+            "point": -0.35108255296539786,
+            "dropped": 0
+          }
+        },
+        "casesAny": 111,
+        "casesAll": 36,
+        "meanPerCase": 0.3657142857142857,
+        "byConstruct": [
+          {
+            "construct": "distinct",
+            "cases": 43
+          },
+          {
+            "construct": "join",
+            "cases": 19
+          },
+          {
+            "construct": "order-by",
+            "cases": 18
+          },
+          {
+            "construct": "select-alias",
+            "cases": 13
+          },
+          {
+            "construct": "limit",
+            "cases": 11
+          },
+          {
+            "construct": "subquery",
+            "cases": 11
+          },
+          {
+            "construct": "like",
+            "cases": 8
+          },
+          {
+            "construct": "cast",
+            "cases": 4
+          },
+          {
+            "construct": "count-star",
+            "cases": 2
+          }
+        ]
+      },
+      "circulation": [
+        {
+          "stratum": "none",
+          "result": {
+            "exposed": 252,
+            "comparable": 11,
+            "att": 252,
+            "contrast": {
+              "low": -3.9718467373334634,
+              "high": 7.426365456105232,
+              "point": 2.0018969126111976,
+              "dropped": 0
+            }
+          }
+        },
+        {
+          "stratum": "mixed",
+          "result": {
+            "exposed": 92,
+            "comparable": 11,
+            "att": 92,
+            "contrast": {
+              "low": -6.065850522864098,
+              "high": 3.7989752113863293,
+              "point": -1.874729064626763,
+              "dropped": 0
+            }
+          }
+        },
+        {
+          "stratum": "all",
+          "result": {
+            "exposed": 6,
+            "comparable": 5,
+            "att": 6,
+            "contrast": {
+              "low": 0.3099415204678363,
+              "high": 7.031746031746031,
+              "point": 3.6487050960735172,
+              "dropped": 0
+            }
+          }
+        }
+      ],
+      "dose": {
+        "predictors": [
+          "statements",
+          "unsupported",
+          "gold-constructs"
+        ],
+        "cases": 350,
+        "clusters": 11,
+        "coefficients": [
+          -5.661310780035354,
+          -0.4497825384533103,
+          1.1156256897890588
+        ],
+        "intervals": [
+          {
+            "low": -13.705914205271865,
+            "high": 3.2747621316427287,
+            "point": -5.661310780035354,
+            "dropped": 0
+          },
+          {
+            "low": -4.025527781476187,
+            "high": 4.070004742301061,
+            "point": -0.4497825384533103,
+            "dropped": 0
+          },
+          {
+            "low": -2.0282605247587946,
+            "high": 3.8424310887764648,
+            "point": 1.1156256897890588,
+            "dropped": 0
+          }
+        ]
+      },
+      "filter": {
+        "share": 0.05,
+        "deliveredBefore": 625,
+        "deliveredAfter": 609,
+        "casesEmptied": 1,
+        "profiles": 11
+      }
+    }
+  ]
+}

@@ -4562,3 +4562,118 @@ the build.
 $ pnpm eval:pack-copy --write   # regenerate after reading why the evidence moved
 $ pnpm eval:pack-copy --check   # what CI runs
 ```
+
+### 32.14 Which statement is the harm in
+
+Section 32.13 asked whether the pack contradicts the answer and found that it almost never does. This section asks
+the question that has to come next, because a corpus cannot lose 0.7pp to a store and lose it nowhere: **is the
+loss in particular statements, in the sentence's polarity, or in the pack as a whole?**
+
+`pnpm eval:pack-attribution` answers all three on the same four committed arms, with no model call.
+
+```console
+$ pnpm eval:pack-attribution
+ledger — statements screened, resolved, and the share of the corpus loss they can explain
+source                      n  clus  stmts    keep  resolv  expect neg/pos       mass
+bird-train               7000    58    210      39       4     1.9     2/2    −0.36pp
+
+the converse reading and the circulation strata, re-estimated inside a database
+source                           stratum      n  clus      delta        low       high
+bird-train               unsupported-any   4894    58    −1.83pp    −3.13pp    −0.51pp
+bird-train               unsupported-all   1154    56    +0.87pp    −0.61pp    +2.23pp
+bird-train              unsupported-none   2106    58    +2.04pp    +0.26pp    +3.72pp
+bird-train                     circ-none    948    37    +1.38pp    −1.47pp    +4.32pp
+bird-train                    circ-mixed   1811    44    −0.09pp    −1.96pp    +1.59pp
+bird-train                      circ-all   2617    43    −1.34pp    −3.58pp    +0.71pp
+
+dose — paired gain per additional delivered statement, with database fixed effects
+source                        predictor   per stmt        low       high  sig
+bird-train                   statements    −2.96pp    −5.85pp    +0.31pp
+bird-train                  unsupported    −0.76pp    −1.55pp    +0.08pp
+bird-train              gold-constructs    −0.31pp    −1.00pp    +0.41pp
+```
+
+**Why the contrast is inside a database.** A statement's harm cannot be read from "the cases that received it"
+against "the cases that did not", because the store delivers a statement exactly where it looks relevant: the two
+groups differ by construction, and almost all of that difference is the schema. So every number in this section
+compares, *within one database*, the cases whose pack carried a statement against the cases whose pack did not,
+and only databases that can form both sides contribute. A statement is screened only when at least five databases
+can compare it; on `bird-train` that is **39 of 210**, and the other 171 are local notes, delivered inside one
+database and compared there alone.
+
+**Why the polarity is the reverse of 32.13.** 32.13 counted *denials* — "without `DISTINCT`", "rather than
+`COUNT(*)`" — and found 1.8% of cases carrying one. But this store does not mostly deny. It **prescribes**:
+*"aggregate expressions in the `SELECT` list are left unaliased unless the question asks for a name"*. Read as a
+mention rather than as a denial, the question becomes: does the pack name machinery the answer does not use? And
+that is the axis that moves.
+
+| reading | what it counts | `bird-train` | `bird-dev` | `dev-lexicon` | `mini-dev` |
+| --- | --- | --- | --- | --- | --- |
+| unsupported, any | pack names a construct its gold does not use | 4,894 cases, **−1.83pp [−3.13, −0.51]** | 809, −2.80pp [−6.96, +1.57] | 705, −3.57pp [−7.82, +0.31] | 111, −0.21pp [−5.10, +4.07] |
+| unsupported, none | pack names only what the gold uses | 2,106 cases, **+2.04pp [+0.26, +3.72]** | 725, +0.58pp | 829, +1.75pp | 239, −0.35pp |
+| unsupported, all | every statement in the pack is unsupported | 1,154 cases, +0.87pp [−0.61, +2.23] | 319, +0.24pp | 266, −2.38pp | 36, +0.70pp |
+
+The sign is the same in all four arms and the interval resolves in the one arm large enough to resolve it. That is
+the first content axis in this record to do either — coverage (32.10), imported identifiers (32.11) and denial
+(32.13) were null in every arm.
+
+**The dose agrees with the stratum.** Fitting paired gain on how many statements a pack carried, how many of them
+were unsupported, and how many constructs the gold itself uses — all inside database fixed effects — gives
+**−2.96pp per additional statement [−5.85, +0.31]** and **−0.76pp extra for each unsupported one [−1.55, +0.08]**.
+At 0.85 unsupported statements per case that is −0.65pp, and the categorical version says −1.83pp; the two
+estimators do not have to agree exactly, because one asks "did any arrive" and the other "how many arrived", but
+they have to agree in sign and order of magnitude, and they do.
+
+`gold-constructs` is in the fit as a control, not as a finding: a pack is more likely to name an unused construct
+when the gold is simple, and a reading that ignored that would be reporting "the pack hurts easy questions" as
+"the pack hurts". The unsupported coefficient survives the control. On `bird-dev` the control is the one
+coefficient that resolves (**+1.22pp per gold construct**): memory helps more where the answer is more complex,
+which is what a memory system is for.
+
+**No single statement is to blame.** The screen ranks all 39 statements with their own intervals:
+
+| statement | cases | dbs | delta | 95% |
+| --- | --- | --- | --- | --- |
+| `Aliasing an aggregate expression with a column alias …` | 168 | 45 | **−4.88pp** | [−8.80, −1.50] |
+| `Aggregate expressions in the SELECT list are left unaliased …` | 641 | 55 | **−2.69pp** | [−4.85, −0.78] |
+| `Columns referenced in a query must exist in the tables …` | 52 | 25 | −3.19pp | [−11.19, +5.30] |
+| `Counting rows for an entity identified by name uses COUNT on the key` | 27 | 15 | **+4.86pp** | [+0.59, +13.92] |
+| `A comparison question asking which of two named entities …` | 20 | 9 | **+10.79pp** | [+0.33, +25.89] |
+
+Four of 39 resolve, at 1.95 expected under a global null, and two of the four are *positive*. Both negatives are
+widely delivered — 55 databases and 641 cases, and 45 databases and 168 cases, in a store where 171 of the 210
+statements cannot be compared in five databases — and their combined mass is **0.36pp of the corpus's −0.71pp**: half the
+loss, in two sentences out of 210. That is a bound on the mass at
+risk and not a prediction: a case can carry several of them at once, and the residual is what the interaction
+costs.
+
+**R158's circulation finding does not survive the same control.** 32.13 reported the all-boilerplate stratum at
+**−0.94pp [−1.50, −0.40]** and called it the only resolved interval in that census. That estimate compared cases
+in different databases. Re-estimated inside a database it is **−1.34pp [−3.58, +0.71]** — the same sign, and no
+longer resolved, because 15 of the 58 databases cannot form both sides and the comparison loses a third of the
+corpus. The earlier interval was too narrow for the estimator it used, and this section is where the correction is
+published rather than in a footnote.
+
+**What a serve-time version would cost, and why it is not the next step.** The reading needs the case's gold,
+which does not exist at serving time. The deployable analogue is a **database profile**: the constructs a
+database's questions actually use, built offline and shipped with the store, with a statement dropped when every
+construct it names is absent from the profile.
+
+| arm | delivered before | after | kept | cases left empty |
+| --- | --- | --- | --- | --- |
+| `bird-train` | 13,578 | 10,968 | 80.8% | 65 |
+| `bird-dev` | 2,688 | 2,566 | 95.5% | 1 |
+| `dev-lexicon` | 2,691 | 2,608 | 96.9% | 1 |
+| `mini-dev` | 625 | 609 | 97.4% | 1 |
+
+On `bird-dev` the oracle reading would drop **37%** of delivered statements — 0.64 unsupported per case against
+1.75 delivered — and the profile drops **4.5%**, because a profile is the union over hundreds of questions and one
+gold is one question. So the oracle's −1.83pp is an **upper bound on a filter**, and the deployable filter is a
+small fraction of it. That is the honest reason this round does not end
+with a filter: filtering cannot pay for itself at this store's composition, and the next intervention has to
+change what a statement is allowed to say.
+
+```console
+$ pnpm eval:pack-attribution --write   # regenerate after reading why the evidence moved
+$ pnpm eval:pack-attribution --check   # what CI runs
+```

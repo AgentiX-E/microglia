@@ -179,3 +179,88 @@ export function clusterBootstrapStatistic<T>(
     dropped,
   };
 }
+
+/**
+ * One cluster's contribution to a ratio of two sums.
+ *
+ * `numerator / denominator` is not a mean of anything the row carries — it is a ratio of two totals,
+ * and a bootstrap over it has to resample the clusters that own the totals rather than the rows that
+ * compose them. That is what this type exists to say.
+ */
+export type RatioUnit = {
+  readonly cluster: string;
+  readonly numerator: number;
+  readonly denominator: number;
+};
+
+/**
+ * The cluster bootstrap for a ratio of sums, computed from per-cluster totals.
+ *
+ * Structurally identical to `clusterBootstrapStatistic` with one row per cluster and a statistic that
+ * adds the rows up: the draws consume the same `mulberry32` stream in the same order, so the
+ * multiplicities — and therefore every bound — are the same numbers. The difference is cost. A screen
+ * that intervals two hundred hypotheses would otherwise materialise 7,000 rows per resample two
+ * hundred times over, and the loop would be measuring the allocator rather than the data.
+ *
+ * A draw whose denominator is zero is dropped and counted, as in the generic loop: a sample with no
+ * denominator does not have a ratio of zero, it does not have a ratio.
+ */
+export function clusterBootstrapRatio(
+  units: readonly RatioUnit[],
+  resamples = 10_000,
+  seed = 12345,
+): ResampledInterval | null {
+  if (units.length === 0) return null;
+  const byCluster = new Map<string, { numerator: number; denominator: number }>();
+  for (const unit of units) {
+    const bucket = byCluster.get(unit.cluster) ?? { numerator: 0, denominator: 0 };
+    bucket.numerator += unit.numerator;
+    bucket.denominator += unit.denominator;
+    byCluster.set(unit.cluster, bucket);
+  }
+  const groups = [...byCluster.values()];
+  let numerator = 0;
+  let denominator = 0;
+  for (const group of groups) {
+    numerator += group.numerator;
+    denominator += group.denominator;
+  }
+  if (denominator === 0) return null;
+  const point = numerator / denominator;
+  if (groups.length === 1) return { low: point, high: point, point, dropped: 0 };
+  const random = mulberry32(seed);
+  const multiplicity = new Int32Array(groups.length);
+  const samples: number[] = [];
+  let dropped = 0;
+  for (let i = 0; i < resamples; i += 1) {
+    multiplicity.fill(0);
+    for (let draw = 0; draw < groups.length; draw += 1) {
+      // Exactly one `random()` per draw, as the generic loop takes: the streams have to match for the
+      // two implementations to be the same experiment rather than two similar ones.
+      const at = Math.floor(random() * groups.length);
+      multiplicity[at] = (multiplicity[at] as number) + 1;
+    }
+    let drawnNumerator = 0;
+    let drawnDenominator = 0;
+    for (let group = 0; group < groups.length; group += 1) {
+      const count = multiplicity[group] as number;
+      if (count === 0) continue;
+      const entry = groups[group] as { numerator: number; denominator: number };
+      drawnNumerator += count * entry.numerator;
+      drawnDenominator += count * entry.denominator;
+    }
+    if (drawnDenominator === 0) {
+      dropped += 1;
+      continue;
+    }
+    samples.push(drawnNumerator / drawnDenominator);
+  }
+  if (samples.length === 0) return null;
+  samples.sort((left, right) => left - right);
+  return {
+    low: samples[Math.floor(0.025 * (samples.length - 1))] as number,
+    high: samples[Math.ceil(0.975 * (samples.length - 1))] as number,
+    point,
+    dropped,
+  };
+}

@@ -961,6 +961,13 @@ jobs:
         # evidence, and a rule that moved is a change in the reader, and neither may pass as the other.
         run: pnpm eval:pack-copy --check
 
+      - name: The pack-attribution census has not drifted
+        # R159. Two hundred statements, four arms and a screen whose every number is a function of
+        # rows another repository's dispatch wrote. The check recomputes the file and fails on a
+        # byte: an artefact that moved is a change in the evidence, a reading that moved is this
+        # round's defect, and the gate cannot tell them apart because it is not supposed to.
+        run: pnpm eval:pack-attribution --check
+
       - name: CPU scale and latency
         run: pnpm eval:scale
 

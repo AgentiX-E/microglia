@@ -248,11 +248,14 @@ describe('the census over several arms', () => {
 
 describe('the table the census prints', () => {
   it('aligns a row under its own header, column for column', () => {
-    const census = exchangeCensusOf('bird-train', [
-      ...spread(187, true, false, 'r-'),
-      ...spread(237, false, true, 'b-'),
-      ...spread(6576, true, true, 'p-'),
-    ]);
+    // 400 resamples rather than the census default: this test asserts the shape of a printed row and
+    // reads none of its bounds, and ten thousand draws over seven thousand rows is a minute of
+    // instrumented arithmetic spent on a substring.
+    const census = exchangeCensusOf(
+      'bird-train',
+      [...spread(187, true, false, 'r-'), ...spread(237, false, true, 'b-'), ...spread(6576, true, true, 'p-')],
+      400,
+    );
     const line = censusLine(census);
     expect(line.indexOf('loses')).toBe(CENSUS_HEADER.indexOf('verdict'));
     expect(line.startsWith('bird-train')).toBe(true);
