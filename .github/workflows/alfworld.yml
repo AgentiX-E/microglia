@@ -68,16 +68,21 @@ jobs:
           # build is deterministic and the failure was a connection refused, so the
           # third attempt either produces the same wheel or the job fails loudly.
           for attempt in 1 2 3; do
-            if pip install 'textworld[pddl]==1.6.1'; then break; fi
+            # Both constraints in one command. Installing textworld first and pinning
+            # tatsu afterwards is what the eleventh run did, and it resolved tatsu 5.15.1
+            # during the first install and then checked the import before the pin could
+            # apply -- so the pin existed and had never been in force. 5.15.1 does not
+            # carry `ParserConfig`; 5.8.3 does.
+            if pip install 'textworld[pddl]==1.6.1' 'tatsu==5.8.3'; then break; fi
             echo "textworld build attempt $attempt failed; retrying"
             sleep $((attempt * 20))
           done
-          python -c "import textworld; print('textworld', textworld.__version__)"
+          python -c "import textworld, tatsu; print('textworld', textworld.__version__, 'tatsu', tatsu.__version__)"
           # textworld 1.6.1 imports `ParserConfig` from `tatsu.infos`, and a fresh
-          # resolve takes whatever the resolver prefers. 5.8.3 is verified to carry the
-          # name here (`from tatsu.infos import ParserConfig` succeeds on 5.8.3, 5.13.1
-          # and 6.0.1), so the pin is a version that was run rather than a range.
-          pip install 'tatsu==5.8.3'
+          # resolve takes whatever the resolver prefers: the eleventh run took 5.15.1,
+          # which does not carry the name. 5.8.3 is pinned above, in the same command as
+          # textworld, so the constraint is in force during the resolve rather than
+          # applied to a tree that was already built against another version.
           pip install 'git+https://github.com/alfworld/alfworld@0.4.2' --no-deps
           pip install pandas pyyaml tqdm requests
           pip show tatsu textworld | grep -E '^(Name|Version)'
