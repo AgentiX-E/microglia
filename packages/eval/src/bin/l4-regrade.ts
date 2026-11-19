@@ -48,6 +48,12 @@ for (const path of paths) {
         ' the day could not have written them\n',
     );
   }
+  // R156: the rows this tool cannot see the evidence for, left exactly as the run wrote them. Printed
+  // rather than silent, because "unchanged" and "not checked" are different states and only one of them
+  // is a reason to trust the row.
+  for (const entry of regrade.preserved) {
+    process.stdout.write(`[l4-regrade] ${name}: ${entry.id} kept as written — ${entry.reason}\n`);
+  }
   if (write && text !== before) writeFileSync(absolute, text, 'utf8');
 }
 

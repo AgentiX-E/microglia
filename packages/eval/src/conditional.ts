@@ -191,6 +191,78 @@ function pct(share: number): string {
 }
 
 /**
+ * One draw's four counts, as a census file carries them.
+ *
+ * `k` is the trial count the draw was scored at, and it is part of the row rather than a column a
+ * reader infers: R152c's arm wrote `metrics.k = 1` beside a field named `pass4`, and a break rate
+ * pooled without it is a rate over a population the row cannot name.
+ */
+export type DrawCount = {
+  readonly label: string;
+  /** Trials per task, or null when the draw never stated one. */
+  readonly k: number | null;
+  readonly trials: number;
+  readonly failedControl: number;
+  readonly repairs: number;
+  readonly breaks: number;
+};
+
+/** One metric's worth of the pool. */
+export type KStratum = {
+  readonly k: number | null;
+  readonly reading: ConditionalReading;
+  readonly draws: readonly string[];
+};
+
+/**
+ * The same pool, split by the `k` each draw was scored at.
+ *
+ * ## Why a break rate may not be pooled across `k`
+ *
+ * The denominator of a break rate is the trials the control **passed**, and what "passed" means is the
+ * metric. At `k = 4` a counted task passed four of four trials; at `k = 1` it passed the one it ran, and
+ * a task that would fail three times in four is in the second population and not the first. So the two
+ * rates are estimated over two populations of different reliability, and a pool that mixes them reports
+ * one number for both.
+ *
+ * ## Why it is still worth printing both
+ *
+ * Because the two can be compared. If the break-even is stable across the strata, the target survives the
+ * metric split even though the point estimate does not — and that is a statement a reader can act on,
+ * where "the pool is 16.2%" was a mixture whose weights nobody had written down. If they disagree, the
+ * disagreement is the finding, and it says which population the store fails on.
+ *
+ * Strata are ordered by `k` with the unstated draws last, so two runs of the same census print the same
+ * table.
+ */
+export function stratifyByK(draws: readonly DrawCount[]): readonly KStratum[] {
+  const groups = new Map<number | null, DrawCount[]>();
+  for (const draw of draws) {
+    if (draw.k !== null && (!Number.isInteger(draw.k) || draw.k < 1)) {
+      throw new Error(`${draw.label} states k = ${String(draw.k)}, which is not a trial count`);
+    }
+    const list = groups.get(draw.k) ?? [];
+    list.push(draw);
+    groups.set(draw.k, list);
+  }
+  // Unstated levels sort last, by a key rather than by a comparator with two null arms: the Map has one
+  // key per level, so a comparator can only ever be asked about a pair of them once, and half its
+  // branches would be unreachable.
+  const order = (k: number | null): number => (k === null ? Number.POSITIVE_INFINITY : k);
+  const keys = [...groups.keys()].sort((a, b) => order(a) - order(b));
+  return keys.map((k) => {
+    const rows = groups.get(k) as DrawCount[];
+    const reading = conditionalReading({
+      trials: rows.reduce((sum, row) => sum + row.trials, 0),
+      failedControl: rows.reduce((sum, row) => sum + row.failedControl, 0),
+      repairs: rows.reduce((sum, row) => sum + row.repairs, 0),
+      breaks: rows.reduce((sum, row) => sum + row.breaks, 0),
+    });
+    return { k, reading, draws: rows.map((row) => row.label) };
+  });
+}
+
+/**
  * The reading as one line.
  *
  * Three sentences for the two rates and the target, because the useful comparison is the last one: a break

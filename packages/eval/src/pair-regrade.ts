@@ -42,6 +42,24 @@ export type RegradedRow = {
   readonly actual: string;
 };
 
+/**
+ * The rows a pair artefact can be re-graded on, because their every input is a field of that artefact.
+ *
+ * R156 is the round that found the rest could not. `l4-projection-complete` grades whether the driver's
+ * emitted fields reached the artefact — and a pair artefact records *neither* the emitted fields nor the
+ * projection's verdict on them, so a re-grader that recomputes it always finds "every field arrived",
+ * because it can only see the fields that did. The first run of the regrade over the two recovered draws
+ * did exactly that: R152's artefact carried `l4-projection-complete: false` from the run that wrote it,
+ * and the re-grade turned it **true**, silently repairing a defect the file had recorded. That is the
+ * worst possible direction for a re-grader to be wrong in, and it is why this list is an allow-list
+ * rather than a block-list: a row added to `pairGates` later is preserved by default, and somebody has to
+ * argue for it here.
+ *
+ * `l4-rotation-reconciles` fails the same test for the same reason: it reconciles the arm's serving
+ * policy against the arm's pack ledger, and both live in the arm artefact rather than in the pair.
+ */
+const REGRADABLE = new Set(['l4-paired', 'l4-effect-resolved', 'l4-same-split']);
+
 export type PairRegrade = {
   /** The gate table as it should read now, in the file's own order. */
   readonly gates: readonly ValidityGate[];
@@ -49,6 +67,8 @@ export type PairRegrade = {
   readonly changed: readonly RegradedRow[];
   /** Rows this rule computes that the file predates, left out of `gates` and named here instead. */
   readonly ungraded: readonly string[];
+  /** Rows kept exactly as the file wrote them, with the reason this tool cannot see their evidence. */
+  readonly preserved: readonly { readonly id: string; readonly reason: string }[];
 };
 
 /** The artefact fields this reads, named so an error says which one is missing. */
@@ -90,6 +110,13 @@ function inputOf(artefact: Record<string, unknown>): PairGateInput {
   }
   const onlyFirst = number(comparison, 'onlyFirst', 'comparison');
   const onlySecond = number(comparison, 'onlySecond', 'comparison');
+  // R57's distractor arm, when the pair recorded one. Without it the recomputation treats a planted arm as a
+  // treatment and rewrites its `l4-paired` sentence into a claim the arm never made — the row is omitted for
+  // a distractor, and the omitted row is then preserved exactly as the run wrote it.
+  const plantedArm = artefact['planted_arm'];
+  if (plantedArm !== undefined && typeof plantedArm !== 'string') {
+    throw new Error('planted_arm must be a string when present');
+  }
   return {
     state: state as PairedVerdictState,
     claim,
@@ -101,6 +128,7 @@ function inputOf(artefact: Record<string, unknown>): PairGateInput {
     splitMatches: onlyFirst === 0 && onlySecond === 0,
     onlyFirst,
     onlySecond,
+    ...(plantedArm === undefined ? {} : { plantedArm }),
   };
 }
 
@@ -129,7 +157,18 @@ export function regradePair(artefact: unknown): PairRegrade {
   const byId = new Map(computed.map((gate) => [gate.id, gate]));
   const ids = new Set(existing.map((gate) => gate.id));
 
-  const gates = existing.map((gate) => byId.get(gate.id) ?? gate);
+  const preserved: { id: string; reason: string }[] = [];
+  const gates = existing.map((gate) => {
+    const reason = preserveReason(gate);
+    // Only a row this rule *could* have recomputed is worth reporting: the protocol's own rows are not
+    // this tool's subject, and printing "kept as written" beside eighteen of them would bury the two
+    // that matter.
+    if (reason !== null && byId.has(gate.id)) {
+      preserved.push({ id: gate.id, reason });
+      return gate;
+    }
+    return reason !== null ? gate : (byId.get(gate.id) ?? gate);
+  });
   const changed: RegradedRow[] = [];
   gates.forEach((gate, index) => {
     const before = existing[index] as ValidityGate;
@@ -139,7 +178,36 @@ export function regradePair(artefact: unknown): PairRegrade {
     changed.push({ id: gate.id, from: before.pass, to: gate.pass, actual: gate.actual });
   });
 
-  return { gates, changed, ungraded: computed.filter((gate) => !ids.has(gate.id)).map((gate) => gate.id) };
+  return {
+    gates,
+    changed,
+    ungraded: computed
+      .filter((gate) => !ids.has(gate.id) && REGRADABLE.has(gate.id))
+      .map((gate) => gate.id),
+    preserved,
+  };
+}
+
+/**
+ * Why this row may not be recomputed from the artefact, or null when it may.
+ *
+ * Two reasons, and both are about evidence that lives somewhere other than the file being re-graded: the
+ * driver's field census, the arm's serving policy, and — the subtler one — the band an arm was held to,
+ * which arrives through `TAU_BAND` and not through the artefact. A row graded under a band says so in its
+ * own sentence, and re-computing it without one would replace "landed inside the interval it registered"
+ * with a resolution question the pair never asked (AUDIT 34.128). The sentence is the only record of the
+ * band, so it is read rather than assumed absent.
+ */
+function preserveReason(gate: ValidityGate): string | null {
+  if (!REGRADABLE.has(gate.id)) {
+    return gate.id === 'l4-projection-complete'
+      ? "the driver's emitted fields are not in the pair artefact, so a recomputation can only confirm the fields that arrived"
+      : 'the evidence for this row lives in the arm artefacts, not in the pair';
+  }
+  if (gate.id === 'l4-effect-resolved' && /registered band/.test(gate.actual)) {
+    return 'this row was graded under a band that arrived through the dispatch environment, and the artefact carries it only in this sentence';
+  }
+  return null;
 }
 
 /**

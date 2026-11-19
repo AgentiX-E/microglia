@@ -53,7 +53,13 @@ import type {
   TauTrialRow,
 } from '@agentix-e/microglia-eval';
 import { writeJson, writeResult } from './lib.js';
-import { COMPETITOR_PASS4, minTasksOf, scenarioBarOf, sotaLineOf } from '@agentix-e/microglia-eval';
+import {
+  COMPETITOR_PASS4,
+  PUBLISHED_K,
+  minTasksOf,
+  scenarioBarOf,
+  sotaLineOf,
+} from '@agentix-e/microglia-eval';
 
 const BAR = 0.05;
 /**
@@ -69,8 +75,6 @@ function trialsOf(value: string | undefined): number {
   return Number.isInteger(parsed) && parsed >= 1 ? parsed : 4;
 }
 const K = trialsOf(process.env['TAU_TRIALS']);
-/** The trial count the published rows were measured at, and the only one their bar applies to. */
-const PUBLISHED_K = 4;
 /**
  * The scenario this arm answered, and whether a published number is a bar for it.
  *
@@ -640,6 +644,11 @@ await writeResult({
     // backbone differs would be unfalsifiable on the lane's only published reference. It says the
     // delta is a model difference as well as a prompt difference, which is what a ranking needs.
     bar_backbone_matches: scenarioBar.sameBackbone ? 1 : 0,
+    // Whether the bar and this arm were scored by the same statistic. `0` is why `published_bar_applies`
+    // is `0` and it is the only place that reason is written: a readback that saw the flag alone could
+    // not tell a `k = 1` dispatch from an airline dispatch from a scaffold arm, and R152c is a run whose
+    // `metrics.k` was `1` beside a field named `pass4` with nothing anywhere joining the two.
+    bar_k_matches: K === PUBLISHED_K ? 1 : 0,
     // Which of the two bars this file was graded by, as a flag rather than a name: `metrics` is a
     // record of numbers, and the name is already in the artefact where it belongs — `tau2.plant.arm`,
     // written by the driver that planted the rules. `1` here means "the published bar was not this
@@ -674,7 +683,20 @@ await writeResult({
             episodeFields.episode_trials,
           )} episode(s), whose half-width is ${episodeFields.episode_half_width_pp.toFixed(2)}pp against the headline's. \`rate_to_the_k\` is what the rate alone implies; a pass^4 above it is a *finding* — the misses clustered into fewer tasks — and not an improvement.`,
         ]),
-    `pass^4 is the unbiased C(c,4)/C(n,4) mean over ${measured.tasks.length} tasks, with success defined as \`reward == 1.0\` exactly, as upstream scores it.`,
+    // `pass^${K}` rather than a literal: this sentence said `pass^4` on every arm, including the
+    // `k = 1` dispatch R152c, where the name and the statistic disagreed in the only place a reader
+    // looks first. The field `metrics.k` was right and the sentence beside it was not.
+    `pass^${String(K)} is the unbiased C(c,${String(K)})/C(n,${String(K)}) mean over ${measured.tasks.length} tasks, with success defined as \`reward == 1.0\` exactly, as upstream scores it.`,
+    // R156: why the bar was withheld, when it was withheld for the metric. `bar_backbone_matches` has said
+    // this about the model since R92; the statistic had no such field, and a reader of `published_bar_applies:
+    // 0` could not tell the three reasons apart.
+    ...(K === PUBLISHED_K
+      ? []
+      : [
+          `Metric: this arm was scored at k = ${String(K)} and both published bars are pass^${String(
+            PUBLISHED_K,
+          )}. \`published_bar_applies\` is 0 for that reason and the delta is withheld rather than annotated, because pass^1 and pass^4 are two statistics and a delta across them is not a memory effect.`,
+        ]),
     coversSplit
       ? `The split covers the minimum: ${measured.tasks.length} scored tasks against a floor of ${MIN_TASKS}.`
       : `The split is short: ${measured.tasks.length} scored tasks against a minimum of ${MIN_TASKS}. Short splits and missed bars fail separately.`,

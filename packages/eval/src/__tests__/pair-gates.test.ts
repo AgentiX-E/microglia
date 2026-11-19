@@ -302,3 +302,22 @@ describe('a planted distractor pair', () => {
     expect(pairGates(planted).some((gate) => gate.id === 'l4-paired')).toBe(false);
   });
 });
+
+describe('the metric row', () => {
+  it('carries the gate it is given, and nothing when it is given nothing', () => {
+    // The gate itself is `metric-parity.ts`'s to build; this only has to publish it in the table, and to
+    // stay silent when there is no level to grade — an absent row is not a green one.
+    const baseline = ids(pairGates(treatment));
+    expect(baseline).not.toContain('l4-same-k');
+    const gate = {
+      id: 'l4-same-k',
+      criterion: 'both arms were scored by one statistic',
+      actual: 'first at k = 1, second at k = 4',
+      pass: false,
+      blocking: true,
+    };
+    const withMetric = pairGates({ ...treatment, metricParity: gate });
+    expect(ids(withMetric)).toContain('l4-same-k');
+    expect(withMetric.find((row) => row.id === 'l4-same-k')).toEqual(gate);
+  });
+});

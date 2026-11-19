@@ -2087,3 +2087,67 @@ is advisory (§8.27) while the cost row blocks.
 (0.232) the `−5pp` revert rule needs **729 paired trials** to be resolvable, and the largest fold in the record
 is 74. A bar priced in points and never in pairs is a rule that fires on readings the design cannot certify — and
 the direction of that error is the expensive one, because it reverts on noise.
+
+### 8.30 `pass^k` is a parameter of the comparison, so the artefact has to carry it
+
+**The failure mode, precisely.** Two arms scored at `k = 1` and `k = 4` produce two deltas that are numbers of
+the same name and different statistics. For a per-trial rate `p`, `pass^1 = p` and `pass^4 = p⁴`; nothing in a
+pair's `deltaPp`, its interval or its task count distinguishes them. A record that compares a `k = 1` reading to
+a `pass^4` bar is reporting a metric difference as a capability difference, and it is unfalsifiable from the
+artefact — which is the definition of the defect class this architecture keeps naming.
+
+**Why the field was missing.** The arm wrote `metrics.k`; the pair did not copy it; the pairing step handed the
+protocol `trialCount: first.metrics?.k ?? 4`, and `trialCount` is read by no gate. Three files, one fact, and no
+edge between them. The default of four is the worst part: it is a claim about a run nobody asked, and it made
+the projection look complete while the level went unrecorded.
+
+**The design that replaces it.**
+
+| layer | what it states | what it refuses |
+| --- | --- | --- |
+| arm (`metrics.k`) | the level this arm was scored at | invents nothing: `trialsOf` reads `TAU_TRIALS`, the same variable the driver reads |
+| arm bar block (`bar_k_matches`) | whether the bar and the arm share a statistic | does not withdraw the bar: `0` says *why* it was withheld, which `published_bar_applies: 0` could not |
+| pair projection (`first.k`, `second.k`) | each arm's own statement | `null` for an artefact written before the field, never a default |
+| pair protocol (`k`, `kAbsent`, `barK`, `barKMismatch`) | the level the pair shares and whether it is the bar's | `kAbsent` names the silent arm instead of leaving a hole |
+| gate `l4-same-k` | both arms were scored by one statistic | is **absent** when an arm stated none — an omitted row, not a green one |
+| `restatedAtBarK` | each headline at the bar's level | carries its independence assumption in the same block |
+
+**The re-grader learned the same lesson one layer up.** `pair-regrade.ts` recomputes rows from the artefact it
+is given, and two of the rows it used to recompute have evidence that is *not in that file*: the driver's field
+census (`l4-projection-complete`) and the arm's serving policy against its pack ledger
+(`l4-rotation-reconciles`). The first run over the two recovered draws turned R152's recorded
+`l4-projection-complete: false` into `true`, because a pair artefact carries only the fields that arrived and a
+recomputation can only confirm them. The repair is an **allow-list** of three rows whose every input is a field
+of the file, a `preserved` list that names what was not re-graded and why, and a fourth rule: a row graded under a
+`TAU_BAND` is preserved too, because the band came through the environment and survives only in the row's own
+sentence (AUDIT 34.128). A block-list would have been wrong in the other direction — every row added later would
+be recomputed by default.
+
+**What the correction buys, in one line.** On the published fold the memory arm's `pass^1` of 0.925 is a
+`pass^4` of 0.7321 under independence, against a bar of 0.575: +15.7pp rather than +35pp, and still positive. The
+control's 0.85 restates to 0.522, which is *below* the bar — so the bare agent does not clear it and the memory
+does. That is the first version of this comparison the record can defend, and it is a weaker claim than the one
+it made for four rounds.
+
+### 8.31 A rate has two prices, and the cheaper one is not the one a target needs
+
+`b* = 10.78%` arrived as a level, and a level is certified by an interval rather than by a delta. That makes it a
+different quantity from the `−5pp` bar the revert rule uses, and the difference is a factor of five in pairs:
+
+| question | statistic | price on this corpus |
+| --- | --- | --- |
+| did the break rate **move** 16.17% → 10.78%? | McNemar on the delta, `tasksForDelta` | 170 pairs if the new breaks are nested in the old; 847 at the corpus's own discordance |
+| is the break rate **below** 10.78%? | Wilson upper end on the control's passes | 592 passes ≈ 592 tasks at a true 8.08%; 149 at 5.39% |
+
+**The property that makes the second price the binding one.** The upper end of a Wilson interval always sits
+above the estimate, so a rate equal to its own bar is never certified below it, at any sample size. `certify.ts`
+returns `null` there rather than a large number, and that `null` is the finding: **the target cannot be reached by
+measuring the store again; it has to move.** `passesToCertify` is a bisection on `n` over the repository's one
+Wilson interval rather than a closed form, because a second derivation of the same interval is a second answer to
+one question — and it asserts nothing at runtime about monotonicity, since a branch no input reaches is dead code;
+the suite checks the property over a 50 × 600 grid instead.
+
+**Why the fold on the roadmap fails both tests.** The 164-pair composition (retail 114 + airline 50) is below the
+*nested* price of 170, so the best case cannot buy the claim and the honest case is 847. The same arithmetic that
+priced the `−5pp` bar at 729 pairs was available before that fold was budgeted; what was missing was applying it
+to the target rather than to the bar.

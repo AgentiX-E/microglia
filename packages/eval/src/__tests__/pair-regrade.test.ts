@@ -90,8 +90,76 @@ describe('re-grading a pair artefact', () => {  it('flips the row whose predicat
     // `poc-l4-pair-official.json` was written before `l4-rotation-reconciles` existed. Appending it would
     // date the artefact to a driver run it never came from.
     const { ungraded, gates } = regradePair(artefact());
-    expect(ungraded).toEqual(['l4-projection-complete', 'l4-rotation-reconciles']);
+    // R156: only a row this tool could actually recompute is listed as ungraded. The two rows whose
+    // evidence lives in the arm artefacts are preserved instead, and named with their reason.
+    expect(ungraded).toEqual([]);
     expect(gates.map((gate) => gate.id)).not.toContain('l4-rotation-reconciles');
+    // Nothing is preserved *here* because this fixture does not carry the two rows in question — the two
+    // tests below add them, and each asserts that its row survives the re-grade untouched.
+    expect(regradePair(artefact()).preserved).toEqual([]);
+  });
+
+  it('keeps a projection failure the file recorded, because the evidence for it is not in the file', () => {
+    // R152's artefact carries `l4-projection-complete: false` from the run that wrote it. The first
+    // version of this tool recomputed that row from the pair artefact, which records only the fields that
+    // *did* arrive — so the recomputation always passes, and the re-grade turned a recorded defect green.
+    const failed = artefact({
+      gates: [
+        V5,
+        {
+          id: 'l4-projection-complete',
+          criterion: 'every field either arm emitted reached its artefact',
+          actual: 'memory: sidecarCensus, recallQueries',
+          pass: false,
+          blocking: true,
+        },
+      ],
+    });
+    const { gates, changed, preserved } = regradePair(failed);
+    const row = gates.find((gate) => gate.id === 'l4-projection-complete');
+    expect(row?.pass).toBe(false);
+    expect(row?.actual).toBe('memory: sidecarCensus, recallQueries');
+    expect(changed.map((entry) => entry.id)).not.toContain('l4-projection-complete');
+    expect(preserved[0]?.reason).toContain('emitted fields');
+  });
+
+  it('keeps a rotation row the pair cannot re-derive', () => {
+    // The policy and the pack ledger live in the memory arm. A recomputation here would report "no policy
+    // declared" — a sentence about this tool rather than about the run.
+    const withRotation = artefact({
+      gates: [
+        {
+          id: 'l4-rotation-reconciles',
+          criterion: 'the declared reading is the one the ledger accounts for',
+          actual: 'requests, renders, maxRenders agree; mode, cap, servable cannot be reached',
+          pass: true,
+          blocking: true,
+        },
+      ],
+    });
+    const { gates, preserved } = regradePair(withRotation);
+    expect(gates[0]?.actual).toContain('maxRenders agree');
+    expect(preserved.map((row) => row.id)).toEqual(['l4-rotation-reconciles']);
+  });
+
+  it('keeps a row graded under a band the artefact only remembers in its sentence', () => {
+    // `TAU_BAND` arrives through the environment. Recomputing such a row without it asks a resolution
+    // question the pair never posed — AUDIT 34.128 — and the sentence is the only trace of the band.
+    const banded = artefact({
+      gates: [
+        {
+          id: 'l4-effect-resolved',
+          criterion: 'the pair landed inside the interval it registered',
+          actual: '−5.00pp against the registered band [−7.50, 2.50]pp',
+          pass: true,
+          blocking: false,
+        },
+      ],
+    });
+    const { gates, changed, preserved } = regradePair(banded);
+    expect(changed).toEqual([]);
+    expect(gates[0]?.actual).toContain('registered band');
+    expect(preserved[0]?.reason).toContain('dispatch environment');
   });
 
   it('leaves a file that already reads correctly alone', () => {
@@ -175,5 +243,37 @@ describe('the text transform', () => {
     expect(() => regradePair([])).toThrow(/artefact must be an object/);
     expect(() => regradePair(artefact({ verdict: [] }))).toThrow(/verdict must be an object/);
     expect(() => regradePairText('null\n')).toThrow(/artefact must be an object/);
+  });
+});
+
+describe('a row whose rule no longer computes it', () => {
+  it('keeps a treatment row the corrected rule omits for a distractor arm', () => {
+    // `pairGates` omits `l4-paired` on a planted arm, because a HARM verdict there is the arm agreeing with
+    // its registration. An artefact written before that rule still carries the row, and the re-grade has
+    // nothing to replace it with — so it stays, rather than disappearing from a table a reader compares.
+    const planted = artefact({
+      planted_arm: 'near',
+      gates: [
+        {
+          id: 'l4-paired',
+          criterion: 'the memory does not cost accuracy: neither R45 revert branch fires',
+          actual: '-7.02pp (p=0.40, n=57, 57 served pack(s)): HARM, planted near',
+          pass: false,
+          blocking: true,
+        },
+      ],
+    });
+    const { gates, changed } = regradePair(planted);
+    expect(gates.map((gate) => gate.id)).toEqual(['l4-paired']);
+    expect(gates[0]?.pass).toBe(false);
+    expect(changed).toEqual([]);
+  });
+});
+
+describe('a field this tool cannot read', () => {
+  it('refuses a planted arm that is not a name', () => {
+    // `planted_arm` decides whether the treatment's two rows apply at all, so a value that is not a string
+    // is a file whose gates cannot be graded — and defaulting it would grade a distractor as a treatment.
+    expect(() => regradePair(artefact({ planted_arm: 3 }))).toThrow(/planted_arm must be a string/);
   });
 });

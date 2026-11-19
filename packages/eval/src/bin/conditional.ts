@@ -14,8 +14,9 @@
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { conditionalReading, type ConditionalReading } from '../conditional.js';
+import { conditionalReading, stratifyByK, type ConditionalReading } from '../conditional.js';
 import { tasksForDelta } from '../detectable.js';
+import { certificationLine, certificationOf, changePriceOf, passesToCertify } from '../certify.js';
 
 type Rate = { readonly rate: number; readonly lo: number; readonly hi: number };
 
@@ -39,9 +40,13 @@ type PairShape = {
 /** How far a decomposition may sit from the published delta: both are computed from the same integers. */
 const RECONCILE_PP = 0.005;
 
-const paths = process.argv.slice(2);
+const arguments_ = process.argv.slice(2);
+const drawsPath = arguments_
+  .find((argument) => argument.startsWith('--draws='))
+  ?.slice('--draws='.length);
+const paths = arguments_.filter((argument) => !argument.startsWith('--'));
 if (paths.length === 0) {
-  process.stderr.write('usage: conditional <pair-artefact.json ...>\n');
+  process.stderr.write('usage: conditional <pair-artefact.json ...> [--draws=<census.json>]\n');
   process.exit(2);
 }
 
@@ -96,8 +101,10 @@ for (const path of paths) {
         'the census and the comparison are two readings of one sample and they disagree\n',
     );
   }
-  readings.push({ name: path, paired, reading, deltaPp });
+  // The label every later block looks the row up by, so the census can be checked against the artefact it
+  // claims to describe rather than against a second copy of the numbers.
   const name = path.replace(`${process.cwd()}/`, '').replace('eval/results/', '').replace('.json', '');
+  readings.push({ name, paired, reading, deltaPp });
   process.stdout.write(
     `| \`${name}\` | ${String(reading.trials)} | ${String(reading.failedControl)} | ${String(reading.repairs)} | ` +
       `${String(reading.passedControl)} | ${String(reading.breaks)} | ${interval(reading.repairRate)} | ` +
@@ -148,5 +155,110 @@ process.stdout.write(
     `${String(tasksForDelta(0.05, discordance))} paired trials, and the largest fold above is ` +
     `${String(largest)}.\n`,
 );
+
+// R156: what the target itself costs. The break-even is a level, and a level is certified by an interval
+// rather than by a delta — so it has a price in *passes* that no earlier table computed. The reading is on
+// the pooled population, because that is where `b*` was computed.
+const target = pooled.breakEvenRate;
+if (Number.isFinite(target) && target > 0 && target < 1 && pooled.breakRate !== null) {
+  const observed = pooled.breakRate.rate;
+  const reading = certificationOf({ target, planned: observed, passes: pooled.passedControl });
+  process.stdout.write(`\n${certificationLine(reading)}\n`);
+  process.stdout.write(
+    '\n| planned break rate | passes to certify it below the break-even | the same, if every pass were a task |\n',
+  );
+  process.stdout.write('| --- | --- | --- |\n');
+  // Four points below the bar, because the interesting question is not "can we certify the rate we have"
+  // — we cannot, at any sample — but "how far below it must the content axis get before this instrument
+  // can say so", and that distance is the fold's own half width.
+  for (const planned of [target * 0.25, target * 0.5, target * 0.75, target]) {
+    const passes = passesToCertify(target, planned);
+    const tasks = passes === null ? null : Math.ceil(passes / (pooled.passedControl / pooled.trials));
+    process.stdout.write(
+      `| ${pct(planned)} | ${passes === null ? 'never' : String(passes)} | ` +
+        `${tasks === null ? 'never' : String(tasks)} |\n`,
+    );
+  }
+  // The two prices of *moving* the rate. The nested end is exact algebra, the unrelated end is the
+  // corpus's own discordance; the fold on the table is quoted against both so the next dispatch is
+  // bought knowing which end of the range it can reach.
+  const price = changePriceOf({ from: observed, to: target, passShare: 1 - pooled.failureShare, discordance });
+  process.stdout.write(
+    `\nMoving the break rate from ${pct(observed)} to the ${pct(target)} bar costs between ` +
+      `${String(price.nested)} paired tasks (if every remaining break was already one) and ` +
+      `${String(price.independent)} (at this corpus's ${pct(price.discordance)} discordance), against the ` +
+      `${String(largest)}-pair fold on the table.\n`,
+  );
+}
+
+/**
+ * The same pool split by the metric each draw was scored at, when a census says which one that was.
+ *
+ * A pair artefact written before R156 carries no `k` — the field did not exist — so the census is the only
+ * place the level can live, and every row it marks with an `artefact` is checked against that file before
+ * it is printed. A census that disagreed with the artefact would be a second copy of the numbers, which is
+ * the defect `poc-l4-pool` would have had if it had ever been written as prose.
+ */
+if (drawsPath !== undefined) {
+  const census = JSON.parse(readFileSync(drawsPath, 'utf8')) as {
+    readonly draws?: readonly {
+      readonly label: string;
+      readonly k: number | null;
+      readonly trials: number;
+      readonly failedControl: number;
+      readonly repairs: number;
+      readonly breaks: number;
+      readonly artefact?: string;
+    }[];
+  };
+  const draws = census.draws ?? [];
+  if (draws.length === 0) {
+    process.stderr.write(`conditional: ${drawsPath} carries no draws\n`);
+    process.exit(2);
+  }
+  let disagrees = 0;
+  for (const draw of draws) {
+    if (draw.artefact === undefined) continue;
+    const read = readings.find((row) => row.name === draw.label);
+    if (read === undefined) {
+      process.stderr.write(`conditional: ${draw.label} is in the census but not on the command line\n`);
+      disagrees += 1;
+      continue;
+    }
+    const same =
+      read.reading.trials === draw.trials &&
+      read.reading.failedControl === draw.failedControl &&
+      read.reading.repairs === draw.repairs &&
+      read.reading.breaks === draw.breaks;
+    if (!same) {
+      process.stderr.write(
+        `conditional: ${draw.label} census reads ${String(draw.trials)}/${String(draw.failedControl)}/` +
+          `${String(draw.repairs)}/${String(draw.breaks)} and the artefact reads ` +
+          `${String(read.reading.trials)}/${String(read.reading.failedControl)}/` +
+          `${String(read.reading.repairs)}/${String(read.reading.breaks)}\n`,
+      );
+      disagrees += 1;
+    }
+  }
+  process.stdout.write('\n| metric | draws | trials | failed | repaired | passed | broken | repair rate | break rate | break-even | net |\n');
+  process.stdout.write('| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |\n');
+  for (const stratum of stratifyByK(draws)) {
+    const label = stratum.k === null ? 'unstated' : `pass^${String(stratum.k)}`;
+    process.stdout.write(
+      `| ${label} | ${stratum.draws.join(', ')} | ${String(stratum.reading.trials)} | ` +
+        `${String(stratum.reading.failedControl)} | ${String(stratum.reading.repairs)} | ` +
+        `${String(stratum.reading.passedControl)} | ${String(stratum.reading.breaks)} | ` +
+        `${interval(stratum.reading.repairRate)} | ${interval(stratum.reading.breakRate)} | ` +
+        `${pct(stratum.reading.breakEvenRate)} | ${stratum.reading.netPp.toFixed(2)}pp |\n`,
+    );
+  }
+  process.stdout.write(
+    '\nThe strata answer one question: whether the target survives the metric split. A break rate is over ' +
+      'the trials the control passed, and a `pass^4` pass is a different event from a `pass^1` pass — so a ' +
+      'pooled rate is a mixture, and a break-even that stays put across the strata is a target that does ' +
+      'not depend on the mixture.\n',
+  );
+  if (disagrees > 0) process.exit(1);
+}
 
 if (unreconciled > 0) process.exit(1);

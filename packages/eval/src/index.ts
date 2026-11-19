@@ -1031,6 +1031,24 @@ export {
   type Rate,
 } from './conditional.js';
 export {
+  certificationLine,
+  certificationOf,
+  changePriceOf,
+  passesToCertify,
+  upperBoundOf,
+  type Certification,
+  type CertificationInput,
+  type ChangePrice,
+  type ChangePriceInput,
+} from './certify.js';
+export {
+  metricParityLine,
+  metricParityOf,
+  restateAtLevel,
+  type MetricParity,
+  type MetricParityInput,
+} from './metric-parity.js';
+export {
   FACADE_NOTES_ENV,
   NOTE_LEVELS,
   PRIMARY_NOTE,
@@ -1172,6 +1190,7 @@ export {
   COMPETITOR_PASS4,
   COMPETITOR_TASKS,
   DEFAULT_MIN_TASKS,
+  PUBLISHED_K,
   PUBLISHED_PASS4,
   PUBLISHED_SCENARIO,
   minTasksOf,

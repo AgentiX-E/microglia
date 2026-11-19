@@ -97,6 +97,15 @@ export type PairGateInput = {
    * contradicts its own evidence is a defect rather than a reading.
    */
   readonly rotationReconciled?: RotationReconciliation | undefined;
+  /**
+   * Whether the two arms were scored by one statistic, from `metric-parity.ts`.
+   *
+   * A whole gate rather than the two `k` values, because the module that decides what "the same metric"
+   * means also decides when the question cannot be asked at all — an arm written before R120 states no
+   * `k`, and the absence has to be recorded as an absence. Absent here means exactly that, and the pair
+   * artefact's `protocol.kAbsent` carries the sentence.
+   */
+  readonly metricParity?: ValidityGate | undefined;
 };
 
 /** Whether an arm planted a distractor. `none` is the control arm's own name for planting nothing. */
@@ -202,6 +211,10 @@ export function pairGates(input: PairGateInput): readonly ValidityGate[] {
         input.rotationReconciled === undefined || input.rotationReconciled.problems.length === 0,
       blocking: true,
     },
+    // R156: the metric the pair was scored at. Absent only when an arm could not state one, and the
+    // sentence that says so lives in the artefact's protocol block rather than here — a gate that
+    // printed its own absence would be a green row about a question nobody asked.
+    ...(input.metricParity === undefined ? [] : [input.metricParity]),
   ];
 }
 

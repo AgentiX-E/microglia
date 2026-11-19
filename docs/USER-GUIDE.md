@@ -4262,12 +4262,12 @@ delta = f·r − (1−f)·b        f = failure share, r = repair rate, b = break
 
 ```console
 $ pnpm eval:conditional eval/results/poc-l4-pair-official.json eval/results/poc-l4-pair-swapped.json \
-      .cache/r152-pair/poc-l4-pair.json .cache/r152c-pair/poc-l4-pair.json
+      eval/results/poc-l4-pair-r152.json eval/results/poc-l4-pair-r152c.json
 | fold | trials | failed | repaired | passed | broken | repair rate | break rate | break-even | net |
 | poc-l4-pair-official | 40 | 4 | 4 | 36 | 3 | 100.00% [51.01, 100.00] | 8.33% [2.87, 21.83] | 11.11% | 2.50pp |
 | poc-l4-pair-swapped  | 74 | 11 | 7 | 63 | 15 | 63.64% [35.38, 84.83] | 23.81% [14.99, 35.64] | 11.11% | -10.81pp |
-| r152-pair            | 40 | 6 | 3 | 34 | 2 | 50.00% [18.76, 81.24] | 5.88% [1.63, 19.09] | 8.82% | 2.50pp |
-| r152c-pair           | 40 | 6 | 4 | 34 | 7 | 66.67% [30.00, 90.32] | 20.59% [10.35, 36.80] | 11.76% | -7.50pp |
+| poc-l4-pair-r152     | 40 | 6 | 3 | 34 | 2 | 50.00% [18.76, 81.24] | 5.88% [1.63, 19.09] | 8.82% | 2.50pp |
+| poc-l4-pair-r152c    | 40 | 6 | 4 | 34 | 7 | 66.67% [30.00, 90.32] | 20.59% [10.35, 36.80] | 11.76% | -7.50pp |
 | **pooled (4 folds)** | 194 | 27 | 18 | 167 | 27 | 66.67% [47.82, 81.36] | 16.17% [11.36, 22.50] | 10.78% | -4.64pp |
 ```
 
@@ -4308,3 +4308,115 @@ cannot certify, and the direction of that error is the expensive one: it reverts
 published, to 0.005pp; two blocks that disagree about one comparison mean one of them is wrong and neither says
 which. The gate does not grade whether a store pays for itself — that is a measurement, and a build that fails on
 a negative measurement teaches its readers to skip the line.
+
+### 32.10 The metric is part of the comparison, and four rounds had the label wrong
+
+`pass^k` at two different `k` are two statistics. For a per-trial rate `p`, `pass^1` is `p` and `pass^4` is
+`p⁴`; at `p = 0.95` the first reads 95% and the second 81%. Nothing in a delta, an interval or a count of
+tasks can tell you which one you are looking at, which is why it has to be a field.
+
+**What was found, at zero cost.** Every one of the four registrations behind the pooled fold declares
+`trials: 1`:
+
+| draw | registration | header | what the artefact calls it |
+| --- | --- | --- | --- |
+| `poc-l4-pair-official` | `prereg/R143-fold-official.md` | `trials: 1` | `pass4` |
+| `poc-l4-pair-swapped` | `prereg/R143-fold-swapped.md` | `trials: 1` | `pass4` |
+| `poc-l4-pair-r152` | `prereg/R152-the-travel-budget.md` | `trials: 1` | `pass4` |
+| `poc-l4-pair-r152c` | `prereg/R152c-the-paired-fold.md` | `trials: 1` | `pass4` |
+
+Four rounds of headlines — 0.925, 0.851, 0.875, 0.775 — are **per-task pass rates over one trial**, and both
+published bars (`0.575` and `0.6754`) are `pass^4`. The rank claim was made in one metric against a bar in
+another, and until now no file said so: the pair artefact did not copy `k`, and the arm's `metrics.k` was read
+by nothing.
+
+**What the artefacts now carry.** Three fields and one gate:
+
+```console
+$ pnpm eval:l4-pair          # first line of the run, and protocol.* in the artefact
+[l4-pair] metric: k = 1; the bar is k = 4, so a delta against it is cross-metric as well as cross-sample
+```
+
+| field | meaning |
+| --- | --- |
+| `first.k`, `second.k` | each arm's own `metrics.k`, or `null` when the artefact predates the field |
+| `protocol.k` | the level both arms share, or `null` when they stated different ones |
+| `protocol.kAbsent` | which arm stayed silent, when the pair cannot say |
+| `protocol.barKMismatch` | whether the shared level is the bar's — the same statement `bar_backbone_matches` makes about the model |
+| `protocol.restatedAtBarK` | each arm's headline raised to the bar's `k`, with its independence assumption printed beside it |
+| `l4-same-k` | a blocking gate: two arms scored at different levels are not a pair |
+
+On the published fold the restatement reads `0.925 → 0.7321` for the memory arm and `0.85 → 0.522` for its
+control. The memory still clears `0.575`, by 15.7pp rather than by 35pp, and it clears the competitor's
+submitted `0.6754` by 5.7pp — cross-sample and cross-backbone, as the artefact's own notes say. **The
+restatement is an estimate**: it treats the four trials of a task as independent, which flatters a store whose
+misses cluster, and the assumption travels in the field rather than in a footnote.
+
+**And the same field closes a reproducibility gap.** Two of the four draws had never been committed, so
+`b* = 10.78%` could not be recomputed from the repository. Both are now in `eval/results/`, recovered byte for
+byte from the runs that wrote them (`44363599721`, `44395483632`), and `eval/results/poc-l4-draws.json` records
+each draw's `k` with the evidence it came from. `pnpm eval:conditional ... --draws=eval/results/poc-l4-draws.json`
+prints the pool split by metric and **refuses** when a census row disagrees with the artefact it describes.
+
+```console
+$ pnpm eval:conditional eval/results/poc-l4-pair-*.json --draws=eval/results/poc-l4-draws.json
+| metric | draws | trials | failed | repaired | passed | broken | repair rate | break rate | break-even | net |
+| pass^1 | official, swapped, r152, r152c | 194 | 27 | 18 | 167 | 27 | 66.67% [47.82, 81.36] | 16.17% [11.36, 22.50] | 10.78% | -4.64pp |
+```
+
+One stratum, and that is the answer to a question the split was built to ask: the pool is **homogeneous**, so
+the break-even of 10.78% is not an artefact of mixing two metrics. What it is, is a target measured on a metric
+the bar does not use.
+
+**Re-grading is now narrower than it was.** The tool that repairs a gate by re-grading the evidence it already
+has (`pnpm eval:l4-regrade`) used to recompute every `l4-*` row from the pair artefact. Two of those rows have
+evidence that is not in that file — whether the driver's emitted fields reached the artefact, and whether the
+arm's serving policy reconciles with its pack ledger. Recomputing them can only ever confirm the fields that
+arrived, and the first run over the two recovered draws did exactly that: R152's artefact recorded
+`l4-projection-complete: false` and the re-grade turned it **true**. The allow-list in `pair-regrade.ts` is the
+fix, and the rows it will not touch are printed with their reason.
+
+### 32.11 What the target costs, and why more of the same data cannot certify it
+
+Two different questions sit under "get the break rate under 10.78%", and they have different prices.
+
+**Detecting the change.** Moving `b` from 16.17% to 10.78% moves the headline delta by `(16.17 − 10.78) × 86.08%
+= 4.64pp`, and the pairs that takes depend on something unknowable before the run: whether the new break set is
+nested in the old one. At one end every remaining break was already a break, so the discordance *is* the effect
+and the price collapses to `z²/effect`; at the other the break sets are as unrelated as the corpus's own draws.
+
+```console
+$ pnpm eval:conditional eval/results/poc-l4-pair-*.json
+Moving the break rate from 16.17% to the 10.78% bar costs between 170 paired tasks (if every remaining break was
+already one) and 847 (at this corpus's 23.20% discordance), against the 74-pair fold on the table.
+```
+
+**Certifying the level.** "The break rate is under 10.78%" is an absolute claim, and it needs an interval whose
+upper end is under the bar — Wilson on the control's passes, not McNemar on the delta. This is the one that
+decides whether a fold of a given size can make the claim *at all*:
+
+```console
+$ pnpm eval:conditional eval/results/poc-l4-pair-*.json
+certify: at 167 pass(es) a 16.17% break rate is certified only below 22.50%, which does not reach the 10.78% bar;
+no sample certifies a rate at or above its own bar, so 10.78% cannot be certified by measuring it again
+
+| planned break rate | passes to certify it below the break-even | the same, if every pass were a task |
+| 2.69% | 57 | 67 |
+| 5.39% | 128 | 149 |
+| 8.08% | 509 | 592 |
+| 10.78% | never | never |
+```
+
+**The property that matters is the last row.** A rate sitting on its own bar can never be certified below it,
+because the interval always has positive width. So the target is not something a bigger sample settles: it has to
+be *reached*, and the distance below it that a fold can certify is the fold's own half-width.
+
+Three consequences, each of which changes what the next dollar buys:
+
+- **The 164-pair fold on the roadmap cannot grade the target.** Its cheapest price is 170 pairs and its central
+  one is 847, so even the best case is 6 pairs short and the honest case is five times short.
+- **A fold of 592 tasks certifies an 8% break rate under the 10.78% bar**; 149 tasks certify 5.39%. Those are
+  the two sizes the next dispatch should choose between, and the choice is a claim about how far the content
+  axis is expected to move the rate, not about how much money is available.
+- **The current fold certifies almost nothing about the harm side.** 167 passes at a 16.17% rate certify only
+  "below 22.50%", which is the same sentence the pooled interval printed before any of this arithmetic existed.

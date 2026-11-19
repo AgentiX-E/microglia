@@ -52,6 +52,8 @@ import {
 } from '../tau2-attribution.js';
 import { pairedTurnLine, pairedTurns, turnCensusLine, turnCensusOfBlock } from '../tau2-turn.js';
 import {
+  PUBLISHED_K,
+  PUBLISHED_SCENARIO,
   ceilingOf,
   compareArms,
   resolutionOf,
@@ -72,6 +74,7 @@ import { serveSupportCensus, serveSupportLine, supportMapOf } from '../serve-sup
 import { foldSplitOf, treatmentOf } from '../cross-fit.js';
 import { serveYieldCensus, serveYieldLine } from '../serve-yield.js';
 import { conditionalLine, conditionalReading } from '../conditional.js';
+import { metricParityLine, metricParityOf, restateAtLevel } from '../metric-parity.js';
 import { reconcileServeRotation, rotationModeOf } from '../serve-rotation.js';
 import { serveTaskCensus, serveTaskLine } from '../serve-tasks.js';
 import { marginSweep, serveSweepLine } from '../serve-sweep.js';
@@ -290,6 +293,27 @@ const ceiling = scenarioTasks === undefined ? undefined : ceilingOf(comparison, 
 const scenario = second.tau2?.scenario ?? first.tau2?.scenario;
 
 /**
+ * Whether the two arms were scored by one statistic, and whether that statistic is the bar's.
+ *
+ * R152c is the read that made this a gate rather than a field: its arm carried `metrics.k = 1` beside a
+ * metric named `pass4`, the pairing step handed the protocol `trialCount: first.metrics?.k ?? 4` — a
+ * default invented for a field no gate reads — and the run's delta was compared to a bar registered at
+ * `pass^4`. Nothing in the three files could see the mismatch, because the two arm artefacts were the
+ * only places the level was ever written and neither the pair projection nor the protocol copied it.
+ *
+ * The bar's `k` is passed only on the scenario the bar belongs to, for the reason `l4-scenario.ts`
+ * withholds the bar itself elsewhere: a `k` from another scenario's leaderboard grades nothing here.
+ */
+const metricParity = metricParityOf({
+  kFirst: first.metrics?.k ?? null,
+  kSecond: second.metrics?.k ?? null,
+  barK: (scenario?.test ?? DOMAIN) === PUBLISHED_SCENARIO ? PUBLISHED_K : null,
+  firstArm: 'the reference arm',
+  secondArm: 'the memory arm',
+});
+process.stdout.write(`[l4-pair] ${metricParityLine(metricParity)}\n`);
+
+/**
  * The transfer reading, when both artefacts carry their episodes.
  *
  * Absent on a within-scenario pair, and that absence is a statement rather than a gap: a store
@@ -373,7 +397,7 @@ if (headroom !== undefined) process.stdout.write(`${headroomLine(headroom)}\n`);
 
 const evidence: Tau2Evidence = {
   domain: scenario?.test ?? DOMAIN,
-  trialCount: first.metrics?.k ?? 4,
+  trialCount: first.metrics?.k ?? null,
   reference: tau2ArmRecordOf('reference', first),
   memory: tau2ArmRecordOf('memory', second),
   comparison: comparisonRecord,
@@ -423,6 +447,11 @@ const scenarioGates: readonly ValidityGate[] = pairGates({
   ...(registeredBand === undefined ? {} : { registeredBand }),
   ...(unprojectedArms.length === 0 ? {} : { unprojected: unprojectedArms }),
   ...(rotationReconciled === undefined ? {} : { rotationReconciled }),
+  // R156: the fourth condition about the two files rather than about the instrument. Absent when an arm
+  // never stated its `k`, which is every pair of artefacts written before R120 — and absence is reported
+  // in `protocol.kAbsent` rather than as a green row, because "the metric was never stated" and "the
+  // metrics matched" are different facts and only one of them is a measurement.
+  ...(metricParity.gate === null ? {} : { metricParity: metricParity.gate }),
 });
 
 const gates = mergeGates(audit.gates, scenarioGates, inGateOrder);
@@ -675,8 +704,20 @@ await writeJson('poc-l4-pair', {
   ranAt: new Date().toISOString(),
   // The scenario the arms answered, which is the only domain this pair can be about.
   domain: scenario?.test ?? DOMAIN,
-  first: { path: FIRST, ranAt: first.ranAt ?? null, pass4: first.metrics?.pass4 ?? null },
-  second: { path: SECOND, ranAt: second.ranAt ?? null, pass4: second.metrics?.pass4 ?? null },
+  // R156: each arm's own `k`, beside its `pass4`, so the pair states the level rather than inheriting
+  // one. `null` is an artefact that never wrote the field, which is every arm before R120.
+  first: {
+    path: FIRST,
+    ranAt: first.ranAt ?? null,
+    pass4: first.metrics?.pass4 ?? null,
+    k: first.metrics?.k ?? null,
+  },
+  second: {
+    path: SECOND,
+    ranAt: second.ranAt ?? null,
+    pass4: second.metrics?.pass4 ?? null,
+    k: second.metrics?.k ?? null,
+  },
   comparison,
   ...(foldSplit.ok
     ? { foldSplit: { learned: foldSplit.learned, evaluated: foldSplit.evaluated } }
@@ -801,6 +842,35 @@ await writeJson('poc-l4-pair', {
   // half-width became a 21pp minimum detectable difference without anybody noticing.
   protocol: {
     detectablePp: detectablePp ?? null,
+    // R156: the statistic this pair was scored by, and the one the bar was scored by. Two `null`s and a
+    // `null` for `kAbsent` is the state every pair written before this round is in, and it is a fact a
+    // reader has to be able to see: R152c published a `k = 1` delta under a field named `pass4` and
+    // nothing in the artefact could have told them.
+    k: metricParity.k,
+    kFirst: metricParity.kFirst,
+    kSecond: metricParity.kSecond,
+    barK: metricParity.barK,
+    barKMismatch: metricParity.barKMismatch,
+    ...(metricParity.absent === null ? {} : { kAbsent: metricParity.absent }),
+    // R156: what each arm's headline would read at the bar's level, when the pair and the bar disagree on
+    // the statistic. An estimate with its assumption named — trials within a task are treated as
+    // independent, which flatters a store whose misses cluster — and printed rather than withheld, because
+    // the alternative is a rank claim in one metric and a bar in another.
+    ...(() => {
+      const { k, barK } = metricParity;
+      if (k === null || barK === null || k === barK) return {};
+      const firstPass = first.metrics?.pass4;
+      const secondPass = second.metrics?.pass4;
+      if (typeof firstPass !== 'number' || typeof secondPass !== 'number') return {};
+      return {
+        restatedAtBarK: {
+          k: barK,
+          first: restateAtLevel(firstPass, k, barK),
+          second: restateAtLevel(secondPass, k, barK),
+          assumption: 'trials within a task are independent, so pass^k = rate^k; a store whose misses cluster reads lower than this',
+        },
+      };
+    })(),
     evaluable: audit.evaluable,
     vacuous: audit.vacuous,
     absent: audit.absent,
@@ -847,6 +917,7 @@ await writeJson('poc-l4-pair', {
   notes: [
     '`deltaPp` is second - first, so a negative number means the second arm (memory) did worse.',
     'pass^4 per task is the k=4 reading: a task counts only when all four trials passed.',
+    'The level this pair was actually scored at is `protocol.k`, with each arm\'s own statement beside it. When an arm stated none, `protocol.kAbsent` says which one and the gate `l4-same-k` is absent rather than green — a default of four would be a claim about a run nobody asked.',
     'The pair is defined on the intersection of task ids; tasks scored by one arm only are counted, not dropped silently.',
     'Published reference for scale: ALTK-Evolve pass^4 = 0.575 on tau2-retail.',
     'The protocol gates are the shared forty, not a τ² copy of them; `absent` names the arm each of the rest would need.',

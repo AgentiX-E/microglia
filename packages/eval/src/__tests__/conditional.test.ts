@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { conditionalLine, conditionalReading, proportionRate } from '../conditional.js';
+import { conditionalLine, conditionalReading, proportionRate, stratifyByK } from '../conditional.js';
 
 /**
  * The conditional rates are the only readings in this lane whose denominator is the population the rate is
@@ -136,5 +136,64 @@ describe('the two conditional rates of a draw', () => {
     expect(line).toContain('4 of 6 failed trial(s) repaired');
     expect(line).toContain('7 of 34 passed trial(s) broken');
     expect(line).toContain('break-even at a 15.00% failure share');
+  });
+});
+
+describe('the pool split by the metric each draw was scored at', () => {
+  const DRAWS = [
+    { label: 'official', k: 4, trials: 40, failedControl: 4, repairs: 4, breaks: 3 },
+    { label: 'swapped', k: 4, trials: 74, failedControl: 11, repairs: 7, breaks: 15 },
+    { label: 'R152', k: null, trials: 40, failedControl: 6, repairs: 3, breaks: 2 },
+    { label: 'R152c', k: null, trials: 40, failedControl: 6, repairs: 4, breaks: 7 },
+  ];
+
+  it('gives each metric its own counts and its own target', () => {
+    // The four draws that produced `b* = 10.78%` in R155 are two pairs of artefacts written under two
+    // different metric states: `poc-l4-pair-official`/`-swapped` state `k = 4`, and the two recovered
+    // draws state nothing at all. Splitting them is what makes the target auditable per population.
+    const strata = stratifyByK(DRAWS);
+    expect(strata.map((stratum) => stratum.k)).toEqual([4, null]);
+    const four = strata[0]?.reading;
+    expect(four?.trials).toBe(114);
+    expect(four?.passedControl).toBe(99);
+    expect(four?.breakRate?.rate).toBeCloseTo(18 / 99, 9);
+    // `b* = r·f/(1−f)`; at 11 repairs over 15 failures and 114 trials that is 11/99 = 11.11%.
+    expect(four?.breakEvenRate).toBeCloseTo(11 / 99, 9);
+    const unstated = strata[1]?.reading;
+    expect(unstated?.trials).toBe(80);
+    expect(unstated?.breakRate?.rate).toBeCloseTo(9 / 68, 9);
+    expect(strata[0]?.draws).toEqual(['official', 'swapped']);
+    expect(strata[1]?.draws).toEqual(['R152', 'R152c']);
+  });
+
+  it('reconstructs the pooled delta of the whole set when the strata are added back', () => {
+    const strata = stratifyByK(DRAWS);
+    const total = strata.reduce(
+      (sum, stratum) => ({
+        trials: sum.trials + stratum.reading.trials,
+        failedControl: sum.failedControl + stratum.reading.failedControl,
+        repairs: sum.repairs + stratum.reading.repairs,
+        breaks: sum.breaks + stratum.reading.breaks,
+      }),
+      { trials: 0, failedControl: 0, repairs: 0, breaks: 0 },
+    );
+    const pooled = conditionalReading(total);
+    expect(pooled.trials).toBe(194);
+    expect(pooled.netPp).toBeCloseTo(-4.6392, 3);
+    expect(pooled.breakEvenRate).toBeCloseTo(0.1078, 4);
+  });
+
+  it('orders the strata so two runs of one census print one table', () => {
+    const shuffled = [DRAWS[3], DRAWS[0], DRAWS[2], DRAWS[1]];
+    expect(stratifyByK(shuffled).map((stratum) => stratum.k)).toEqual([4, null]);
+  });
+
+  it('refuses a level that is not a trial count', () => {
+    expect(() => stratifyByK([{ label: 'x', k: 0, trials: 4, failedControl: 1, repairs: 1, breaks: 0 }])).toThrow(
+      /states k = 0, which is not a trial count/,
+    );
+    expect(() => stratifyByK([{ label: 'x', k: 1.5, trials: 4, failedControl: 1, repairs: 1, breaks: 0 }])).toThrow(
+      /not a trial count/,
+    );
   });
 });

@@ -48,6 +48,16 @@ export const PUBLISHED_PASS4 = 0.575;
  * a cross-sample number would fail arms for the dispatch's task count rather than for their memory.
  */
 export const COMPETITOR_PASS4 = 0.6754;
+/**
+ * The trial count the two published numbers above were measured at.
+ *
+ * It lives here since R156 rather than as a private constant in `bin/l4.ts`, because three files now
+ * need it and two of them were written by hand: the arm artefact grades its bar against it, the pair
+ * artefact states whether its own metric is the bar's, and a `k = 1` dispatch read against `57.5%
+ * pass^4` is a comparison of two statistics. R152c recorded exactly that pair of facts in one file —
+ * `metrics.k = 1` beside a field named `pass4` — and nothing in the record could see it.
+ */
+export const PUBLISHED_K = 4;
 /** The number of tasks the submission above covers, so a delta can say whether it is cross-sample. */
 export const COMPETITOR_TASKS = 114;
 /**

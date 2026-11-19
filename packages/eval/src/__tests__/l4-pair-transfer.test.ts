@@ -31,6 +31,8 @@ function arm(input: {
   readonly store?: { readonly stored: number; readonly active: number; readonly servable: number };
   readonly storeItems?: { readonly items: readonly { readonly id: string; readonly supportTasks?: number }[] };
   readonly floor?: number;
+  /** R156: the level the arm was scored at, so a pair can be graded on metric parity. */
+  readonly k?: number;
 }): unknown {
   const byTask = new Map<string, boolean[]>();
   for (const row of input.rows) {
@@ -41,7 +43,7 @@ function arm(input: {
   return {
     id: 'poc-l4',
     n: byTask.size,
-    metrics: { pass4: input.pass4, k: 2, tasks: byTask.size, unscored_tasks: 0 },
+    metrics: { pass4: input.pass4, k: input.k ?? 2, tasks: byTask.size, unscored_tasks: 0 },
     per_task: [...byTask].map(([id, passes]) => ({ id, passed_all: passes.every(Boolean) })),
     per_trial: input.rows,
     ...(input.arm === 'memory'
@@ -609,3 +611,104 @@ describe('the fold a cross-fit reads off the pair', () => {
   }, 60_000);
 });
 
+
+/**
+ * The level the pair was scored at, end to end.
+ *
+ * R152c published a `k = 1` delta under a field named `pass4` and compared it to a `pass^4` bar, and no
+ * file in the three it wrote could be read to see it. These tests are that shape, run through the step:
+ * the pair states each arm's level, its own, and whether the bar's agrees.
+ */
+describe('the metric a pair was scored at', () => {
+  const ROWS: Row[] = [
+    { id: 'airline/1', trial: 0, reward: 1 },
+    { id: 'airline/2', trial: 0, reward: 0 },
+    { id: 'airline/3', trial: 0, reward: 0 },
+    { id: 'airline/4', trial: 0, reward: 0 },
+  ];
+
+  function publish(input: {
+    readonly kReference?: number;
+    readonly kMemory?: number;
+    readonly test?: string;
+  }): { readonly published: Record<string, unknown>; readonly status: number } {
+    const dir = mkdtempSync(join(tmpdir(), 'l4-pair-metric-'));
+    const build = (armKind: 'memory' | 'reference', k: number): unknown => {
+      const base = arm({ arm: armKind, rows: ROWS, pass4: 0.25, k }) as Record<string, unknown>;
+      return {
+        ...base,
+        tau2: {
+          ...((base['tau2'] as Record<string, unknown> | undefined) ?? {}),
+          scenario: { learn: 'retail', test: input.test ?? 'airline', recall: 'retail' },
+        },
+      };
+    };
+    writeFileSync(join(dir, 'reference.json'), JSON.stringify(build('reference', input.kReference ?? 2)));
+    writeFileSync(join(dir, 'memory.json'), JSON.stringify(build('memory', input.kMemory ?? 2)));
+    let status = 0;
+    try {
+      execFileSync(TSX, [PAIR], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          POC_RESULT_DIR: dir,
+          L4_FIRST: join(dir, 'reference.json'),
+          L4_SECOND: join(dir, 'memory.json'),
+        },
+      });
+    } catch (error) {
+      status = (error as { status?: number }).status ?? 1;
+    }
+    return {
+      published: JSON.parse(readFileSync(join(dir, 'poc-l4-pair.json'), 'utf8')) as Record<string, unknown>,
+      status,
+    };
+  }
+
+  it('states each arm\u2019s level and passes the gate when they agree', () => {
+    const { published } = publish({ kReference: 2, kMemory: 2 });
+    const protocol = published['protocol'] as Record<string, unknown>;
+    expect(protocol['k']).toBe(2);
+    expect(protocol['kFirst']).toBe(2);
+    expect(protocol['kSecond']).toBe(2);
+    // An airline pair has no published bar, so there is no level of the bar's to compare with.
+    expect(protocol['barK']).toBeNull();
+    expect(protocol['barKMismatch']).toBeNull();
+    expect(protocol['kAbsent']).toBeUndefined();
+    const gates = published['gates'] as readonly { id: string; pass: boolean; blocking: boolean }[];
+    const gate = gates.find((row) => row.id === 'l4-same-k');
+    expect(gate).toMatchObject({ pass: true, blocking: true });
+    expect((published['first'] as Record<string, unknown>)['k']).toBe(2);
+    expect((published['second'] as Record<string, unknown>)['k']).toBe(2);
+  });
+
+  it('fails and blocks when the arms were scored at different levels', () => {
+    const { published } = publish({ kReference: 2, kMemory: 4 });
+    const protocol = published['protocol'] as Record<string, unknown>;
+    expect(protocol['k']).toBeNull();
+    expect(protocol['kFirst']).toBe(2);
+    expect(protocol['kSecond']).toBe(4);
+    const gates = published['gates'] as readonly { id: string; pass: boolean; blocking: boolean }[];
+    expect(gates.find((row) => row.id === 'l4-same-k')).toMatchObject({ pass: false, blocking: true });
+  });
+
+  it('says the bar is on another statistic when the pair agrees at a level the bar does not use', () => {
+    // The R152c shape: a `k = 1` fold on the published scenario. The pair is internally consistent and may
+    // be read; the delta against `0.575` is a comparison of two statistics, and the artefact now says so.
+    const { published } = publish({ kReference: 1, kMemory: 1, test: 'retail' });
+    const protocol = published['protocol'] as Record<string, unknown>;
+    expect(protocol['k']).toBe(1);
+    expect(protocol['barK']).toBe(4);
+    expect(protocol['barKMismatch']).toBe(true);
+    const gates = published['gates'] as readonly { id: string; pass: boolean }[];
+    expect(gates.find((row) => row.id === 'l4-same-k')?.pass).toBe(true);
+    // And what each arm's headline would read at the bar's level: the fixture's arms both scored 0.25, so
+    // the restatement is 0.25⁴, and the assumption is carried beside it rather than in a footnote.
+    const restated = protocol['restatedAtBarK'] as Record<string, unknown>;
+    expect(restated['k']).toBe(4);
+    expect(restated['first']).toBeCloseTo(0.25 ** 4, 12);
+    expect(restated['second']).toBeCloseTo(0.25 ** 4, 12);
+    expect(String(restated['assumption'])).toContain('independent');
+  });
+});

@@ -443,8 +443,15 @@ export type Tau2ComparisonRecord = {
 /** Everything a τ² run can tell the protocol. */
 export type Tau2Evidence = {
   readonly domain: string;
-  /** Trials per task the run used; the `k` the grid was scored at. */
-  readonly trialCount: number;
+  /**
+   * Trials per task the run used; the `k` the grid was scored at.
+   *
+   * `null` since R156 when the arm stated none. It used to be `first.metrics?.k ?? 4` at the one call
+   * site, which invented a level for a field no gate in this table reads — so the value could be wrong
+   * with nothing downstream to notice. An unstated level is a statement, and the pair records it as
+   * one (`metricParityOf`); a default of 4 is a claim about a run nobody asked.
+   */
+  readonly trialCount: number | null;
   readonly memory?: Tau2ArmRecord;
   readonly reference?: Tau2ArmRecord;
   readonly comparison?: Tau2ComparisonRecord;

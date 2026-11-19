@@ -1,0 +1,51 @@
+{
+  "id": "poc-l4-draws",
+  "title": "Every draw of the L4 retail fold, with the metric each one was actually scored at",
+  "note": "The four draws behind §AUDIT 34.201's pooled 194 trials. Two of them were never committed as pair artefacts, which is why the pooled rates could not be re-run from the repository; both have since been recovered from the runs that wrote them (run 44363599721 and run 44395483632, artefact `pair-artefact-official`) and committed verbatim under `eval/results/`. The `k` column is the level each draw was scored at and it does not come from the pair artefact — none of these four was written with one — but from the registration header that fed `TAU_TRIALS` (`trials: 1` in all four) and, for the two recovered draws, from the arm artefact's own `metrics.k` read out of the run's evidence bundle.",
+  "draws": [
+    {
+      "label": "poc-l4-pair-official",
+      "artefact": "eval/results/poc-l4-pair-official.json",
+      "run": "44318618847",
+      "k": 1,
+      "kEvidence": "prereg/R143-fold-official.md header `trials: 1`, which the recall-floor step copies to TAU_TRIALS",
+      "trials": 40,
+      "failedControl": 4,
+      "repairs": 4,
+      "breaks": 3
+    },
+    {
+      "label": "poc-l4-pair-swapped",
+      "artefact": "eval/results/poc-l4-pair-swapped.json",
+      "run": "44332852585",
+      "k": 1,
+      "kEvidence": "prereg/R143-fold-swapped.md header `trials: 1`",
+      "trials": 74,
+      "failedControl": 11,
+      "repairs": 7,
+      "breaks": 15
+    },
+    {
+      "label": "poc-l4-pair-r152",
+      "artefact": "eval/results/poc-l4-pair-r152.json",
+      "run": "44363599721",
+      "k": 1,
+      "kEvidence": "arms/memory/poc-l4.json and arms/reference/poc-l4.json in run 44363599721's evidence artefact both carry `metrics.k = 1` and `episode_trials = 40`; prereg/R152-the-travel-budget.md header `trials: 1`",
+      "trials": 40,
+      "failedControl": 6,
+      "repairs": 3,
+      "breaks": 2
+    },
+    {
+      "label": "poc-l4-pair-r152c",
+      "artefact": "eval/results/poc-l4-pair-r152c.json",
+      "run": "44395483632",
+      "k": 1,
+      "kEvidence": "prereg/R152c-the-paired-fold.md header `trials: 1`; §PROGRESS 181 records the arm's `metrics.k = 1` and `episode_trials = 40`",
+      "trials": 40,
+      "failedControl": 6,
+      "repairs": 4,
+      "breaks": 7
+    }
+  ]
+}
