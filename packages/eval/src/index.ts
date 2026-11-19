@@ -1042,6 +1042,23 @@ export {
   type ChangePriceInput,
 } from './certify.js';
 export {
+  CENSUS_HEADER,
+  CENSUS_RULE,
+  CENSUS_SOURCES,
+  censusLine,
+  deltaPpOf,
+  exchangeCensus,
+  exchangeCensusOf,
+  pairRows,
+  perCaseRows,
+  type CensusEntry,
+  type CensusSource,
+  type ExchangeCensus,
+  type ExchangeCensusSet,
+  type ExchangeRow,
+  type ExchangeVerdict,
+} from './exchange.js';
+export {
   metricParityLine,
   metricParityOf,
   restateAtLevel,

@@ -2151,3 +2151,58 @@ the suite checks the property over a 50 × 600 grid instead.
 *nested* price of 170, so the best case cannot buy the claim and the honest case is 847. The same arithmetic that
 priced the `−5pp` bar at 729 pairs was available before that fold was budgeted; what was missing was applying it
 to the target rather than to the bar.
+
+### 8.32 Why the pay test lives one level above the ratio, and what a clustered interval costs
+
+`exchange.ts` exists because `admission.ts`'s `clearance` answered a question nobody asked with a number
+everybody quoted. This section is the design that replaces it, and the arithmetic that makes the replacement
+forced rather than tasteful.
+
+**The identity.** Net accuracy change is `repaired − broken`, so:
+
+```
+pays  ⇔  repaired ≥ broken  ⇔  helpPerHarm ≥ 1
+      ⇔  repairRate·repairable ≥ breakRate·breakable
+      ⇔  repairRate ≥ breakRate · (breakable / repairable)
+      ⇔  repairRate ≥ breakRate · hurdle.
+```
+
+The last line is `requiredRepairRatePp`, which `admission.ts` has always computed correctly. So the hurdle is
+already the bar in the rate form; `clearance = helpPerHarm / hurdle` divides by it a second time and lands on a
+quantity that is neither the count ratio nor the rate ratio. There is no ambiguity about which of the two fields
+is wrong: `requiredRepairRatePp` is derived from `breakRatePp` and `hurdle`, and `pays` is derived from the
+counts, and on BIRD dev's lexicon arm they agree with each other and disagree with `clearance`.
+
+**Why the verdict is computed from the delta and not from the ratio.** `l4-effect-resolved` gates on `|delta|`
+against the fold's resolution, `V5-resolution` gates on the delta's interval, and the break-even target `b*` is
+written in the delta's language. A second null test on `netOdds` would be a second rule for one question, and
+the two would eventually disagree on a boundary. The ratio is still published, with its own interval, because
+`b*` is quoted in exchange language and a reader checking `b < b*` needs the ratio to hand.
+
+**The clustering is the finding, not a refinement.** These corpora are not collections of independent questions:
+
+| corpus | questions | clusters | what the cluster is |
+| --- | --- | --- | --- |
+| BIRD train | 7,000 | 58 | one database: same schema, same values, same rules |
+| BIRD dev | 1,534 | 11 | one database |
+| BIRD mini-dev | 350 | 11 | one database |
+| τ² retail, pooled | 194 | 114 | one task, re-run across the four draws |
+
+An interval that resamples questions shrinks by roughly the square root of the cluster size — on BIRD dev that
+is a factor of three — and turns `+0.72pp [−0.78, +2.39]` into a reading that looks like a win. The census
+therefore resamples clusters, and the effective sample it reports (`clusters`) is the number a reader has to
+believe, not `n`.
+
+**One resampling loop.** `clusterBootstrapStatistic` takes rows, a cluster function and a statistic, and
+`clusterBootstrapCI` is now that function with `mean` as its statistic — same draw order, same RNG, same
+percentiles, so every interval already in this repository is unchanged to the last digit. The alternative was a
+second loop for ratios, which would have been a second definition of the 2.5 / 97.5 convention in a repository
+whose whole argument is that two copies of one quantity eventually disagree.
+
+A ratio can be undefined on a resample — a draw with no breaks has no exchange rate — and those draws are
+**dropped and counted** (`dropped`) rather than treated as zero. Dropping biases the interval toward the
+draws with a denominator; the count is what makes that bias visible instead of silent.
+
+**The gate.** `eval/results/poc-exchange-census.json` is committed, and `pnpm eval:exchange --check` fails when
+the recomputation differs from it by a byte. The census is a pure function of five committed artefacts, so a
+drift is a change in the evidence and is not allowed to pass as a change in the arithmetic.

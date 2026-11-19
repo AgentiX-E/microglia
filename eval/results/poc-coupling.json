@@ -2,13 +2,13 @@
   "id": "poc-coupling",
   "title": "The scenario's size, recomputed from the tree on every push",
   "source": "worktree",
-  "scanned": 252,
+  "scanned": 253,
   "totals": {
-    "modules": 252,
-    "lines": 70662,
+    "modules": 253,
+    "lines": 71146,
     "adapterLines": 1956,
     "deferredLines": 9043,
-    "coupledShare": 0.1539
+    "coupledShare": 0.1528
   },
   "layers": [
     {
@@ -37,8 +37,8 @@
     },
     {
       "layer": "eval",
-      "modules": 187,
-      "lines": 54625,
+      "modules": 188,
+      "lines": 55109,
       "adapterLines": 0,
       "deferredLines": 9043,
       "coupled": 24
@@ -435,6 +435,13 @@
     },
     {
       "pkg": "eval",
+      "module": "admission",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
       "module": "band-wait",
       "words": [
         "bird"
@@ -493,6 +500,13 @@
     {
       "pkg": "eval",
       "module": "empty-result",
+      "words": [
+        "bird"
+      ]
+    },
+    {
+      "pkg": "eval",
+      "module": "exchange",
       "words": [
         "bird"
       ]
@@ -707,7 +721,7 @@
       "id": "V72-every-coupled-module-has-a-verdict",
       "pass": true,
       "blocking": true,
-      "detail": "252 modules, 24 deferred with a reason"
+      "detail": "253 modules, 24 deferred with a reason"
     },
     {
       "id": "V73-no-package-imports-upward",
@@ -722,5 +736,5 @@
       "detail": "47 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 70662 production lines across 252 modules: 7 adapter modules in `sql`, 24 deferred with a reason, and `core` at 0 coupled modules of 47; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 71146 production lines across 253 modules: 7 adapter modules in `sql`, 24 deferred with a reason, and `core` at 0 coupled modules of 47; 5 package edges, 0 of them upward."
 }

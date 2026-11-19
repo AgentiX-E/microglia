@@ -59,11 +59,19 @@ export type ExchangeCase = {
 };
 
 /**
- * The exchange rate and the bar it has to clear.
+ * The exchange rate, the corpus's odds, and the one bit a reader needs.
  *
- * `hurdle` is the quantity §147 did not have: the ratio of questions that could only be broken to
- * questions that could only be repaired, which is what an exchange rate of 1.0 was being compared to
- * by mistake. `clearance` is the two divided, and a clearance below one is a memory that loses.
+ * `hurdle` is the corpus's own odds of being right, `breakable / repairable`: questions that could only
+ * be broken over questions that could only be repaired. It is the break-even for the **rate** ratio, and
+ * it is what `requiredRepairRatePp` — `breakRatePp × hurdle` — encodes.
+ *
+ * `clearance` is `helpPerHarm / hurdle`, and it is **not** a pay test. The count ratio `helpPerHarm`
+ * already pays at 1, because net accuracy is `repaired − broken`; dividing it by the hurdle as well
+ * applies the corpus's odds a second time. On BIRD dev (`hurdle` 1.33) the record has arms with a
+ * positive net that `clearance` calls losses: the lexicon grain repairs 78 and breaks 67 for +11
+ * questions, and `clearance` reads 0.877. `pays` is the field that answers the question `clearance`
+ * was documented as answering — see `exchange.ts` for the algebra, the counterexamples and the
+ * clustered intervals.
  */
 export type ExchangeReading = {
   readonly n: number;
@@ -80,7 +88,15 @@ export type ExchangeReading = {
   readonly netPp: number | null;
   readonly helpPerHarm: number | null;
   readonly hurdle: number | null;
+  /** `helpPerHarm / hurdle`: distance above a memory that repairs and breaks at the same *rate*. */
   readonly clearance: number | null;
+  /**
+   * Whether the memory pays: `repaired ≥ broken`, which is `helpPerHarm ≥ 1`.
+   *
+   * `null` only when nothing moved in either direction, because an arm that neither repaired nor broke
+   * anything has not paid and has not lost — it has not acted.
+   */
+  readonly pays: boolean | null;
   /** The repair rate that would break even at the measured break rate, and the mirror. */
   readonly requiredRepairRatePp: number | null;
   readonly requiredBreakRatePp: number | null;
@@ -117,6 +133,7 @@ export function exchangeOf(cases: readonly ExchangeCase[]): ExchangeReading {
     netPp: perHundred(repaired - broken, n),
     helpPerHarm,
     hurdle,
+    pays: repaired === 0 && broken === 0 ? null : repaired >= broken,
     clearance: helpPerHarm === null || hurdle === null || hurdle === 0 ? null : helpPerHarm / hurdle,
     requiredRepairRatePp: breakRatePp === null || hurdle === null ? null : breakRatePp * hurdle,
     requiredBreakRatePp: repairRatePp === null || hurdle === null || hurdle === 0 ? null : repairRatePp / hurdle,

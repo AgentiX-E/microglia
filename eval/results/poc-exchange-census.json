@@ -1,0 +1,162 @@
+{
+  "id": "poc-exchange-census",
+  "registered": "ROADMAP.md §R157",
+  "resamples": 2000,
+  "seed": 12345,
+  "rule": "pays when the clustered 95% interval of the net change excludes zero; the decision statistic is repaired against broken, which pays at 1, not the clearance ratio, which divides by the corpus odds a second time",
+  "sources": [
+    {
+      "source": "bird-train",
+      "n": 7000,
+      "clusters": 58,
+      "repairable": 2925,
+      "breakable": 4075,
+      "repaired": 187,
+      "broken": 237,
+      "netPp": -0.7142857142857143,
+      "netOdds": 0.7890295358649789,
+      "netOddsInterval": {
+        "low": 0.6571428571428571,
+        "high": 0.9417989417989417,
+        "point": 0.7890295358649789,
+        "dropped": 0
+      },
+      "parity": 1.393162393162393,
+      "deltaPp": -0.7142857142857143,
+      "deltaInterval": {
+        "low": -1.262232307474117,
+        "high": -0.1758312020460358,
+        "point": -0.7142857142857143,
+        "dropped": 0
+      },
+      "verdict": "loses",
+      "statement": "bird-train: the memory loses — 187 repaired against 237 broken is a delta of -0.71pp over [-1.26pp, -0.18pp], whose interval excludes zero, on an exchange rate of 0.789 over [0.657, 0.942].",
+      "paths": [
+        "eval/results/poc-sota-bird-train.json"
+      ]
+    },
+    {
+      "source": "bird-dev-rule",
+      "n": 1534,
+      "clusters": 11,
+      "repairable": 653,
+      "breakable": 881,
+      "repaired": 67,
+      "broken": 62,
+      "netPp": 0.3259452411994785,
+      "netOdds": 1.0806451612903225,
+      "netOddsInterval": {
+        "low": 0.8571428571428571,
+        "high": 1.3818181818181818,
+        "point": 1.0806451612903225,
+        "dropped": 0
+      },
+      "parity": 1.349157733537519,
+      "deltaPp": 0.3259452411994785,
+      "deltaInterval": {
+        "low": -0.6076975016880486,
+        "high": 1.4011799410029497,
+        "point": 0.3259452411994785,
+        "dropped": 0
+      },
+      "verdict": "unresolved",
+      "statement": "bird-dev-rule: unresolved — 67 repaired against 62 broken is a delta of +0.33pp over [-0.61pp, +1.40pp], whose interval contains zero, on an exchange rate of 1.081 over [0.857, 1.382].",
+      "paths": [
+        "eval/results/poc-sota-bird-dev-R26-channels.json"
+      ]
+    },
+    {
+      "source": "bird-dev-lexicon",
+      "n": 1534,
+      "clusters": 11,
+      "repairable": 659,
+      "breakable": 875,
+      "repaired": 78,
+      "broken": 67,
+      "netPp": 0.7170795306388527,
+      "netOdds": 1.164179104477612,
+      "netOddsInterval": {
+        "low": 0.8414634146341463,
+        "high": 1.65,
+        "point": 1.164179104477612,
+        "dropped": 0
+      },
+      "parity": 1.3277693474962065,
+      "deltaPp": 0.7170795306388527,
+      "deltaInterval": {
+        "low": -0.7797270955165692,
+        "high": 2.3880597014925375,
+        "point": 0.7170795306388527,
+        "dropped": 0
+      },
+      "verdict": "unresolved",
+      "statement": "bird-dev-lexicon: unresolved — 78 repaired against 67 broken is a delta of +0.72pp over [-0.78pp, +2.39pp], whose interval contains zero, on an exchange rate of 1.164 over [0.841, 1.650].",
+      "paths": [
+        "eval/results/poc-sota-bird-dev-R37-lexicon-grain.json"
+      ]
+    },
+    {
+      "source": "bird-mini-recall-order",
+      "n": 350,
+      "clusters": 11,
+      "repairable": 170,
+      "breakable": 180,
+      "repaired": 19,
+      "broken": 17,
+      "netPp": 0.5714285714285714,
+      "netOdds": 1.1176470588235294,
+      "netOddsInterval": {
+        "low": 0.5,
+        "high": 3.25,
+        "point": 1.1176470588235294,
+        "dropped": 0
+      },
+      "parity": 1.0588235294117647,
+      "deltaPp": 0.5714285714285714,
+      "deltaInterval": {
+        "low": -3.4759358288770055,
+        "high": 5.016722408026756,
+        "point": 0.5714285714285714,
+        "dropped": 0
+      },
+      "verdict": "unresolved",
+      "statement": "bird-mini-recall-order: unresolved — 19 repaired against 17 broken is a delta of +0.57pp over [-3.48pp, +5.02pp], whose interval contains zero, on an exchange rate of 1.118 over [0.500, 3.250].",
+      "paths": [
+        "eval/results/poc-sota-bird-R63-recall-order.json"
+      ]
+    },
+    {
+      "source": "tau2-retail-pooled",
+      "n": 194,
+      "clusters": 114,
+      "repairable": 27,
+      "breakable": 167,
+      "repaired": 18,
+      "broken": 27,
+      "netPp": -4.639175257731959,
+      "netOdds": 0.6666666666666666,
+      "netOddsInterval": {
+        "low": 0.3448275862068966,
+        "high": 1.1666666666666667,
+        "point": 0.6666666666666666,
+        "dropped": 0
+      },
+      "parity": 6.185185185185185,
+      "deltaPp": -4.639175257731959,
+      "deltaInterval": {
+        "low": -11.44578313253012,
+        "high": 1.5957446808510638,
+        "point": -4.639175257731959,
+        "dropped": 0
+      },
+      "verdict": "unresolved",
+      "statement": "tau2-retail-pooled: unresolved — 18 repaired against 27 broken is a delta of -4.64pp over [-11.45pp, +1.60pp], whose interval contains zero, on an exchange rate of 0.667 over [0.345, 1.167].",
+      "paths": [
+        "eval/results/poc-l4-pair-official.json",
+        "eval/results/poc-l4-pair-swapped.json",
+        "eval/results/poc-l4-pair-r152.json",
+        "eval/results/poc-l4-pair-r152c.json"
+      ]
+    }
+  ]
+}

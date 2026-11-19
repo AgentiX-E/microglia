@@ -84,8 +84,44 @@ describe('exchangeOf', () => {
     // The hurdle is the bare odds: 2 right against 4 wrong, so 0.5. Parity would be 1.
     expect(reading.hurdle).toBeCloseTo(0.5, 10);
     // 2.0 of exchange against a hurdle of 0.5 clears by four times, which is why this corpus is a
-    // fixture rather than a finding.
+    // fixture rather than a finding. Note that two repairs against one break already pays (2 ≥ 1), so
+    // `clearance` and `pays` agree here — that agreement is what hid the defect on corpora whose
+    // hurdle is below 1, and the next test is the case where they do not.
     expect(reading.clearance).toBeCloseTo(4, 10);
+    expect(reading.pays).toBe(true);
+  });
+
+  it('says an arm pays when it repairs more than it breaks, whatever the clearance reads', () => {
+    // The BIRD dev lexicon arm's shape, cell for cell: 78 repaired, 67 broken, on 659 repairable and
+    // 875 breakable. Net is +11 questions, so it pays; `clearance` is 0.877 because it divides by the
+    // corpus's own odds a second time, and the doc comment used to call that "a memory that loses".
+    const rows: AdmissionCase[] = [];
+    for (let i = 0; i < 78; i += 1) rows.push(entry(`r${String(i)}`, 'db', false, true));
+    for (let i = 0; i < 67; i += 1) rows.push(entry(`b${String(i)}`, 'db', true, false));
+    for (let i = 0; i < 581; i += 1) rows.push(entry(`w${String(i)}`, 'db', false, false));
+    for (let i = 0; i < 808; i += 1) rows.push(entry(`p${String(i)}`, 'db', true, true));
+    const reading = exchangeOf(rows);
+    expect(reading.repaired).toBe(78);
+    expect(reading.broken).toBe(67);
+    expect(reading.net).toBe(11);
+    expect(reading.helpPerHarm).toBeCloseTo(78 / 67, 10);
+    expect(reading.hurdle).toBeCloseTo(875 / 659, 10);
+    expect(reading.clearance).toBeCloseTo((78 / 67) / (875 / 659), 10);
+    expect(reading.clearance).toBeLessThan(1);
+    expect(reading.pays).toBe(true);
+    // And the rate form of the same bar agrees with `pays`, which is how the defect is proved rather
+    // than argued: `requiredRepairRatePp` is the break-even repair rate, and the observed one is above it.
+    expect(reading.repairRatePp).toBeGreaterThan(reading.requiredRepairRatePp as number);
+  });
+
+  it('reports an arm that neither repaired nor broke anything as having no verdict', () => {
+    const quiet = [entry('a', 'db', false, false), entry('b', 'db', true, true)];
+    expect(exchangeOf(quiet).pays).toBeNull();
+    expect(exchangeOf([entry('a', 'db', true, true)]).pays).toBeNull();
+    // Breaks without repairs is a loss, and repairs without breaks is a win — the two ends of the
+    // predicate, which `helpPerHarm` cannot express because one of its denominators is zero.
+    expect(exchangeOf([entry('a', 'db', true, false)]).pays).toBe(false);
+    expect(exchangeOf([entry('a', 'db', false, true)]).pays).toBe(true);
   });
 
   it('derives the repair rate that would break even at the measured break rate', () => {

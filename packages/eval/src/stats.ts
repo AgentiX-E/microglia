@@ -96,34 +96,86 @@ export function clusterBootstrapCI(
   if (values.length !== clusters.length) {
     throw new Error('A clustered interval needs one cluster label per value');
   }
-  if (values.length === 0) return { low: 0, high: 0, point: 0 };
-  const byCluster = new Map<string, number[]>();
-  for (const [at, label] of clusters.entries()) {
+  const interval = clusterBootstrapStatistic(
+    values.map((value, at) => ({ value, cluster: clusters[at] as string })),
+    (row) => row.cluster,
+    (drawn) => drawn.reduce((sum, row) => sum + row.value, 0) / drawn.length,
+    resamples,
+    seed,
+  );
+  if (interval === null) return { low: 0, high: 0, point: 0 };
+  return { low: interval.low, high: interval.high, point: interval.point };
+}
+
+/** An interval over a resampled statistic, and the resamples that had no answer to give. */
+export type ResampledInterval = Interval & {
+  /**
+   * Resamples the statistic refused to evaluate — a ratio whose denominator was zero in that draw.
+   *
+   * They are dropped rather than counted as zero: a draw with no breaks is not a draw in which the
+   * exchange rate is 0, it is a draw in which the exchange rate does not exist. Dropping them
+   * conditions the interval on "the denominator was positive", which is a bias, and the count is
+   * published beside the interval so that a ratio resting on three events cannot be read as if it
+   * rested on three hundred. A caller that sees this number large should read `null`, not the bounds.
+   */
+  readonly dropped: number;
+};
+
+/**
+ * The same cluster resampling, for a statistic that is not a mean.
+ *
+ * `clusterBootstrapCI` can only interval a mean, because a mean is what it accumulates. Every
+ * interval this record needs that is *not* a mean — the exchange rate `repaired / broken`, a ratio of
+ * two rates — was therefore either left without an interval or given a second resampling loop of its
+ * own, and a second loop is a second definition of the 2.5 / 97.5 percentile convention. This function
+ * is that loop, once: it takes whole rows, resamples the clusters that carry them, and hands each
+ * resample to the caller's statistic.
+ *
+ * `null` means the statistic has no value on the observed sample at all (an empty denominator), and
+ * never "the interval is empty". A single cluster returns its own statistic as both bounds, as
+ * `clusterBootstrapCI` does and for the same reason.
+ */
+export function clusterBootstrapStatistic<T>(
+  rows: readonly T[],
+  clusterOf: (row: T) => string,
+  statistic: (drawn: readonly T[]) => number | null,
+  resamples = 10_000,
+  seed = 12345,
+): ResampledInterval | null {
+  if (rows.length === 0) return null;
+  const byCluster = new Map<string, T[]>();
+  for (const row of rows) {
+    const label = clusterOf(row);
     const bucket = byCluster.get(label) ?? [];
-    bucket.push(values[at] as number);
+    bucket.push(row);
     byCluster.set(label, bucket);
   }
   const groups = [...byCluster.values()];
-  const point = values.reduce((sum, value) => sum + value, 0) / values.length;
-  if (groups.length === 1) return { low: point, high: point, point };
+  const point = statistic(rows);
+  if (point === null) return null;
+  if (groups.length === 1) return { low: point, high: point, point, dropped: 0 };
   const random = mulberry32(seed);
   const samples: number[] = [];
+  let dropped = 0;
   for (let i = 0; i < resamples; i += 1) {
-    let total = 0;
-    let count = 0;
+    const drawn: T[] = [];
     for (let draw = 0; draw < groups.length; draw += 1) {
-      const bucket = groups[Math.floor(random() * groups.length)] as number[];
-      for (const value of bucket) {
-        total += value;
-        count += 1;
-      }
+      const bucket = groups[Math.floor(random() * groups.length)] as T[];
+      for (const row of bucket) drawn.push(row);
     }
-    samples.push(total / count);
+    const value = statistic(drawn);
+    if (value === null || !Number.isFinite(value)) {
+      dropped += 1;
+      continue;
+    }
+    samples.push(value);
   }
+  if (samples.length === 0) return null;
   samples.sort((left, right) => left - right);
   return {
     low: samples[Math.floor(0.025 * (samples.length - 1))] as number,
     high: samples[Math.ceil(0.975 * (samples.length - 1))] as number,
     point,
+    dropped,
   };
 }

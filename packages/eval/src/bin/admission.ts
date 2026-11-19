@@ -204,6 +204,7 @@ const exchangeSummary = (value: ExchangeReading): Record<string, unknown> => ({
   helpPerHarm: value.helpPerHarm,
   hurdle: value.hurdle,
   clearance: value.clearance,
+  pays: value.pays,
   requiredRepairRatePp: value.requiredRepairRatePp,
   requiredBreakRatePp: value.requiredBreakRatePp,
 });
@@ -321,8 +322,9 @@ function statementOf(): string {
   return (
     `Memory repairs ${pp(exchange.repairRatePp)} of the ${exchange.repairable} questions the bare model got wrong and ` +
     `breaks ${pp(exchange.breakRatePp)} of the ${exchange.breakable} it got right: an exchange of ` +
-    `${(exchange.helpPerHarm ?? 0).toFixed(3)} against a hurdle of ${(exchange.hurdle ?? 0).toFixed(3)}, so it is ` +
-    `${(100 * (1 - (exchange.clearance ?? 0))).toFixed(0)}% short of paying rather than close to a wash. ` +
+    `${(exchange.helpPerHarm ?? 0).toFixed(3)} repairs per break — ` +
+    `${(100 * (1 - (exchange.helpPerHarm ?? 0))).toFixed(0)}% short of the 1.000 at which the memory pays, and ` +
+    `${pct(exchange.clearance ?? 0)} of the rate parity a ${(exchange.hurdle ?? 0).toFixed(3)} hurdle demands. ` +
     `Admitting only to the questions a self-knowledge gate selects covers ${pct(confirmationRead.share)} of the ` +
     `confirmation half at ${pct(confirmationRead.precision)} precision and returns ${pp(confirmationRead.netPp)} on ` +
     `[${pp(confirmationRead.lowPp)}, ${pp(confirmationRead.highPp)}]. Tightening the gate does not close the gap: ` +

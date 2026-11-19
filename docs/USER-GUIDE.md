@@ -4420,3 +4420,60 @@ Three consequences, each of which changes what the next dollar buys:
   axis is expected to move the rate, not about how much money is available.
 - **The current fold certifies almost nothing about the harm side.** 167 passes at a 16.17% rate certify only
   "below 22.50%", which is the same sentence the pooled interval printed before any of this arithmetic existed.
+
+### 32.12 The statistic that said "loses" about memories that helped
+
+`pnpm eval:exchange` prints one table. It is short, it needs no dispatch, and it changed three verdicts this
+record had already published.
+
+```console
+$ pnpm eval:exchange
+source                               n clus   rep   brk    netPp     low    high   netOdds   low  high verdict
+bird-train                        7000   58   187   237    -0.71    -1.26   -0.18     0.789 0.657 0.942 loses
+bird-dev-rule                     1534   11    67    62     0.33    -0.61    1.40     1.081 0.857 1.382 unresolved
+bird-dev-lexicon                  1534   11    78    67     0.72    -0.78    2.39     1.164 0.841 1.650 unresolved
+bird-mini-recall-order             350   11    19    17     0.57    -3.48    5.02     1.118 0.500 3.250 unresolved
+tau2-retail-pooled                 194  114    18    27    -4.64   -11.45    1.60     0.667 0.345 1.167 unresolved
+```
+
+**What was wrong.** `admission.ts` published `clearance = helpPerHarm / hurdle` and documented it as "a clearance
+below one is a memory that loses". The net change is `repaired − broken`, so the memory pays exactly when
+`repaired ≥ broken` — the bar on `helpPerHarm` is **1**. The hurdle is `breakable / repairable`, which is the
+break-even for the **rate** ratio, and the module already said so one field over: `requiredRepairRatePp =
+breakRatePp × hurdle` is the same condition written in rate units. Dividing the count ratio by the hurdle as
+well applies the corpus's odds twice.
+
+The three rows above with a positive net are the proof, not an argument: the lexicon arm repairs 78 and breaks
+67 for +11 questions, and the old statistic reads `0.877`, i.e. "loses". Its own `requiredRepairRatePp` says the
+arm clears the bar by 1.7 points of repair rate. Two fields in one struct disagreeing about one row is a defect
+that needs no external reference.
+
+`clearance` also cannot compare corpora, because it moves with the corpus. On τ² retail it reads 0.108 against
+BIRD train's 0.566; the decision statistic reads 0.667 against 0.789, the opposite ordering.
+
+**What the table says now, and what it costs to say it.** Every reading here is clustered — BIRD by database,
+τ² by task across the four draws — because a question in one database shares its schema, its values and its
+rules with every other question in that database. That is not a formality: BIRD dev is 1,534 questions over 11
+databases, so its effective sample is eleven.
+
+| reading | what it establishes |
+| --- | --- |
+| BIRD train, 7,000 questions over 58 databases | **the memory loses 0.71pp [0.18, 1.26]**, and this is the only interval in the family that excludes break-even |
+| BIRD dev, rule grain | +0.33pp [−0.61, +1.40]: pays by point estimate, **unresolved** |
+| BIRD dev, lexicon grain | +0.72pp [−0.78, +2.39]: pays by point estimate, **unresolved** |
+| BIRD mini-dev, recall order | +0.57pp [−3.48, +5.02]: **unresolved** |
+| τ² retail, four draws pooled | −4.64pp [−11.45, +1.60]: **unresolved** |
+
+So the honest sentence about τ² retail is not "memory costs 4.64pp". It is: *the largest fold this lane has is
+too small to tell a 4.6pp cost from a 1.6pp gain*, and the only resolved reading in the whole record — the one on
+7,000 paired questions — is a loss.
+
+**How the gate works.** `--check` recomputes the census and compares it byte for byte against
+`eval/results/poc-exchange-census.json`; any drift fails `pnpm check`. That is deliberate: the numbers are a
+function of the committed artefacts, so a change in them is a change in the evidence and has to be read, not
+absorbed.
+
+```console
+$ pnpm eval:exchange --write   # regenerate after reading why the evidence moved
+$ pnpm eval:exchange --check   # what CI runs
+```

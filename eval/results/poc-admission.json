@@ -104,6 +104,7 @@
       "helpPerHarm": 0.7890295358649789,
       "hurdle": 1.393162393162393,
       "clearance": 0.5663586239030831,
+      "pays": false,
       "requiredRepairRatePp": 8.102564102564102,
       "requiredBreakRatePp": 4.588957055214724
     },
@@ -120,6 +121,7 @@
       "helpPerHarm": 0.7478991596638656,
       "hurdle": 1.2924059616749468,
       "clearance": 0.5786874881748416,
+      "pays": false,
       "requiredRepairRatePp": 8.445706174591908,
       "requiredBreakRatePp": 4.887424492037342
     },
@@ -136,6 +138,7 @@
       "helpPerHarm": 0.8305084745762712,
       "hurdle": 1.4868073878627968,
       "clearance": 0.5585851142225498,
+      "pays": false,
       "requiredRepairRatePp": 7.783641160949868,
       "requiredBreakRatePp": 4.3478260869565215
     }
@@ -289,6 +292,7 @@
               "helpPerHarm": 0.7457627118644068,
               "hurdle": 1.259126700071582,
               "clearance": 0.5922856784960638,
+              "pays": false,
               "requiredRepairRatePp": 8.446671438797424,
               "requiredBreakRatePp": 5.002842524161455
             },
@@ -305,6 +309,7 @@
               "helpPerHarm": 0.8245614035087719,
               "hurdle": 1.3931451612903225,
               "clearance": 0.5918704140960216,
+              "pays": false,
               "requiredRepairRatePp": 7.661290322580644,
               "requiredBreakRatePp": 4.534491075735649
             }
@@ -359,6 +364,7 @@
               "helpPerHarm": 0.8148148148148148,
               "hurdle": 1.197172619047619,
               "clearance": 0.6806159795594227,
+              "pays": false,
               "requiredRepairRatePp": 8.035714285714285,
               "requiredBreakRatePp": 5.469235550031076
             },
@@ -375,6 +381,7 @@
               "helpPerHarm": 0.8640776699029126,
               "hurdle": 1.2183908045977012,
               "clearance": 0.709195823410881,
+              "pays": false,
               "requiredRepairRatePp": 7.399425287356323,
               "requiredBreakRatePp": 5.247641509433962
             }
@@ -429,6 +436,7 @@
               "helpPerHarm": 0.83,
               "hurdle": 1.0935720097640358,
               "clearance": 0.7589806547619047,
+              "pays": false,
               "requiredRepairRatePp": 8.136696501220504,
               "requiredBreakRatePp": 6.175595238095237
             },
@@ -445,6 +453,7 @@
               "helpPerHarm": 0.9390243902439024,
               "hurdle": 0.9700404858299595,
               "clearance": 0.9680259782564437,
+              "pays": false,
               "requiredRepairRatePp": 6.639676113360324,
               "requiredBreakRatePp": 6.42737896494157
             }
@@ -499,6 +508,7 @@
               "helpPerHarm": 0.7682926829268293,
               "hurdle": 0.9762140733399405,
               "clearance": 0.787012504642813,
+              "pays": false,
               "requiredRepairRatePp": 8.126858275520316,
               "requiredBreakRatePp": 6.395939086294416
             },
@@ -515,6 +525,7 @@
               "helpPerHarm": 0.9682539682539683,
               "hurdle": 0.7790585975024016,
               "clearance": 1.2428512712113204,
+              "pays": false,
               "requiredRepairRatePp": 6.051873198847263,
               "requiredBreakRatePp": 7.52157829839704
             }
@@ -569,6 +580,7 @@
               "helpPerHarm": 0.7682926829268293,
               "hurdle": 0.9762140733399405,
               "clearance": 0.787012504642813,
+              "pays": false,
               "requiredRepairRatePp": 8.126858275520316,
               "requiredBreakRatePp": 6.395939086294416
             },
@@ -585,6 +597,7 @@
               "helpPerHarm": 0.9682539682539683,
               "hurdle": 0.7790585975024016,
               "clearance": 1.2428512712113204,
+              "pays": false,
               "requiredRepairRatePp": 6.051873198847263,
               "requiredBreakRatePp": 7.52157829839704
             }
@@ -639,6 +652,7 @@
               "helpPerHarm": 0.8888888888888888,
               "hurdle": 0.8459495351925631,
               "clearance": 1.0507587650444792,
+              "pays": false,
               "requiredRepairRatePp": 7.171314741035856,
               "requiredBreakRatePp": 7.535321821036106
             },
@@ -655,6 +669,7 @@
               "helpPerHarm": 0.9591836734693877,
               "hurdle": 0.60381861575179,
               "clearance": 1.5885294829394208,
+              "pays": false,
               "requiredRepairRatePp": 5.8472553699284004,
               "requiredBreakRatePp": 9.288537549407113
             }
@@ -714,6 +729,7 @@
               "helpPerHarm": 0.7478991596638656,
               "hurdle": 1.2924059616749468,
               "clearance": 0.5786874881748416,
+              "pays": false,
               "requiredRepairRatePp": 8.445706174591908,
               "requiredBreakRatePp": 4.887424492037342
             },
@@ -730,6 +746,7 @@
               "helpPerHarm": 0.8305084745762712,
               "hurdle": 1.4868073878627968,
               "clearance": 0.5585851142225498,
+              "pays": false,
               "requiredRepairRatePp": 7.783641160949868,
               "requiredBreakRatePp": 4.3478260869565215
             }
@@ -784,6 +801,7 @@
               "helpPerHarm": 0.7291666666666666,
               "hurdle": 1.1883289124668435,
               "clearance": 0.6136067708333334,
+              "pays": false,
               "requiredRepairRatePp": 8.488063660477453,
               "requiredBreakRatePp": 5.208333333333334
             },
@@ -800,6 +818,7 @@
               "helpPerHarm": 0.8494623655913979,
               "hurdle": 1.2983023443815682,
               "clearance": 0.6542870150912573,
+              "pays": false,
               "requiredRepairRatePp": 7.518189167340339,
               "requiredBreakRatePp": 4.919053549190536
             }
@@ -854,6 +873,7 @@
               "helpPerHarm": 0.6951219512195121,
               "hurdle": 1.2326111744583808,
               "clearance": 0.5639426005730918,
+              "pays": false,
               "requiredRepairRatePp": 9.350057012542758,
               "requiredBreakRatePp": 5.272895467160037
             },
@@ -870,6 +890,7 @@
               "helpPerHarm": 0.8717948717948718,
               "hurdle": 1.3326653306613228,
               "clearance": 0.6541738962791593,
+              "pays": false,
               "requiredRepairRatePp": 7.815631262525051,
               "requiredBreakRatePp": 5.112781954887217
             }
@@ -924,6 +945,7 @@
               "helpPerHarm": 0.7123287671232876,
               "hurdle": 1.2480211081794195,
               "clearance": 0.5707666019867358,
+              "pays": false,
               "requiredRepairRatePp": 9.630606860158311,
               "requiredBreakRatePp": 5.496828752642706
             },
@@ -940,6 +962,7 @@
               "helpPerHarm": 0.8615384615384616,
               "hurdle": 1.3101123595505617,
               "clearance": 0.6576065443989974,
+              "pays": false,
               "requiredRepairRatePp": 7.303370786516853,
               "requiredBreakRatePp": 4.802744425385935
             }
@@ -994,6 +1017,7 @@
               "helpPerHarm": 0.6470588235294118,
               "hurdle": 1.2456140350877194,
               "clearance": 0.5194697597348799,
+              "pays": false,
               "requiredRepairRatePp": 10.845295055821373,
               "requiredBreakRatePp": 5.633802816901408
             },
@@ -1010,6 +1034,7 @@
               "helpPerHarm": 0.8771929824561403,
               "hurdle": 1.3055181695827724,
               "clearance": 0.671911738108157,
+              "pays": false,
               "requiredRepairRatePp": 7.671601615074023,
               "requiredBreakRatePp": 5.154639175257732
             }
@@ -1064,6 +1089,7 @@
               "helpPerHarm": 0.8,
               "hurdle": 1.122077922077922,
               "clearance": 0.712962962962963,
+              "pays": false,
               "requiredRepairRatePp": 10.38961038961039,
               "requiredBreakRatePp": 7.407407407407407
             },
@@ -1080,6 +1106,7 @@
               "helpPerHarm": 0.8823529411764706,
               "hurdle": 1.228110599078341,
               "clearance": 0.7184637457234301,
+              "pays": false,
               "requiredRepairRatePp": 7.834101382488479,
               "requiredBreakRatePp": 5.6285178236397755
             }
@@ -1139,6 +1166,7 @@
               "helpPerHarm": 0.7727272727272727,
               "hurdle": 1.82,
               "clearance": 0.4245754245754246,
+              "pays": false,
               "requiredRepairRatePp": 8.8,
               "requiredBreakRatePp": 3.7362637362637363
             },
@@ -1155,6 +1183,7 @@
               "helpPerHarm": 0.7083333333333334,
               "hurdle": 2.5384615384615383,
               "clearance": 0.2790404040404041,
+              "pays": false,
               "requiredRepairRatePp": 9.7165991902834,
               "requiredBreakRatePp": 2.711323763955343
             }
@@ -1209,6 +1238,7 @@
               "helpPerHarm": 0.7916666666666666,
               "hurdle": 1.6745762711864407,
               "clearance": 0.47275641025641024,
+              "pays": false,
               "requiredRepairRatePp": 8.135593220338983,
               "requiredBreakRatePp": 3.846153846153846
             },
@@ -1225,6 +1255,7 @@
               "helpPerHarm": 0.7407407407407407,
               "hurdle": 2.254180602006689,
               "clearance": 0.3286075392900319,
+              "pays": false,
               "requiredRepairRatePp": 9.03010033444816,
               "requiredBreakRatePp": 2.967359050445104
             }
@@ -1279,6 +1310,7 @@
               "helpPerHarm": 0.8043478260869565,
               "hurdle": 1.342064714946071,
               "clearance": 0.5993360954425199,
+              "pays": false,
               "requiredRepairRatePp": 7.087827426810478,
               "requiredBreakRatePp": 4.247990815154994
             },
@@ -1295,6 +1327,7 @@
               "helpPerHarm": 0.7924528301886793,
               "hurdle": 1.7572815533980584,
               "clearance": 0.4509538204941103,
+              "pays": false,
               "requiredRepairRatePp": 8.576051779935275,
               "requiredBreakRatePp": 3.8674033149171265
             }
@@ -1349,6 +1382,7 @@
               "helpPerHarm": 0.88,
               "hurdle": 1.3402328589909445,
               "clearance": 0.6566023166023166,
+              "pays": false,
               "requiredRepairRatePp": 6.468305304010349,
               "requiredBreakRatePp": 4.2471042471042475
             },
@@ -1365,6 +1399,7 @@
               "helpPerHarm": 0.7704918032786885,
               "hurdle": 1.674113009198423,
               "clearance": 0.4602388244074427,
+              "pays": false,
               "requiredRepairRatePp": 8.015768725361367,
               "requiredBreakRatePp": 3.6891679748822606
             }
@@ -1419,6 +1454,7 @@
               "helpPerHarm": 0.8032786885245902,
               "hurdle": 1.3581920903954803,
               "clearance": 0.5914323122664411,
+              "pays": false,
               "requiredRepairRatePp": 6.892655367231638,
               "requiredBreakRatePp": 4.076539101497504
             },
@@ -1435,6 +1471,7 @@
               "helpPerHarm": 0.7323943661971831,
               "hurdle": 1.6244493392070485,
               "clearance": 0.4508570064454524,
+              "pays": false,
               "requiredRepairRatePp": 7.819383259911894,
               "requiredBreakRatePp": 3.5254237288135593
             }
@@ -1489,6 +1526,7 @@
               "helpPerHarm": 0.7023809523809523,
               "hurdle": 1.3144186046511628,
               "clearance": 0.5343662588885518,
+              "pays": false,
               "requiredRepairRatePp": 7.813953488372094,
               "requiredBreakRatePp": 4.175513092710545
             },
@@ -1505,6 +1543,7 @@
               "helpPerHarm": 0.7840909090909091,
               "hurdle": 1.5789946140035906,
               "clearance": 0.4965760504418833,
+              "pays": false,
               "requiredRepairRatePp": 7.899461400359067,
               "requiredBreakRatePp": 3.922683342808414
             }
@@ -1564,6 +1603,7 @@
               "helpPerHarm": 0.672566371681416,
               "hurdle": 1.3038548752834467,
               "clearance": 0.515829165063486,
+              "pays": false,
               "requiredRepairRatePp": 8.54119425547997,
               "requiredBreakRatePp": 4.405797101449275
             },
@@ -1580,6 +1620,7 @@
               "helpPerHarm": 0.7678571428571429,
               "hurdle": 1.5171184022824535,
               "clearance": 0.5061286856068239,
+              "pays": false,
               "requiredRepairRatePp": 7.9885877318116965,
               "requiredBreakRatePp": 4.0432534085566525
             }
@@ -1634,6 +1675,7 @@
               "helpPerHarm": 0.672566371681416,
               "hurdle": 1.3038548752834467,
               "clearance": 0.515829165063486,
+              "pays": false,
               "requiredRepairRatePp": 8.54119425547997,
               "requiredBreakRatePp": 4.405797101449275
             },
@@ -1650,6 +1692,7 @@
               "helpPerHarm": 0.7678571428571429,
               "hurdle": 1.5171184022824535,
               "clearance": 0.5061286856068239,
+              "pays": false,
               "requiredRepairRatePp": 7.9885877318116965,
               "requiredBreakRatePp": 4.0432534085566525
             }
@@ -1704,6 +1747,7 @@
               "helpPerHarm": 0.672566371681416,
               "hurdle": 1.3038548752834467,
               "clearance": 0.515829165063486,
+              "pays": false,
               "requiredRepairRatePp": 8.54119425547997,
               "requiredBreakRatePp": 4.405797101449275
             },
@@ -1720,6 +1764,7 @@
               "helpPerHarm": 0.7678571428571429,
               "hurdle": 1.5171184022824535,
               "clearance": 0.5061286856068239,
+              "pays": false,
               "requiredRepairRatePp": 7.9885877318116965,
               "requiredBreakRatePp": 4.0432534085566525
             }
@@ -1774,6 +1819,7 @@
               "helpPerHarm": 0.672566371681416,
               "hurdle": 1.3038548752834467,
               "clearance": 0.515829165063486,
+              "pays": false,
               "requiredRepairRatePp": 8.54119425547997,
               "requiredBreakRatePp": 4.405797101449275
             },
@@ -1790,6 +1836,7 @@
               "helpPerHarm": 0.7678571428571429,
               "hurdle": 1.5171184022824535,
               "clearance": 0.5061286856068239,
+              "pays": false,
               "requiredRepairRatePp": 7.9885877318116965,
               "requiredBreakRatePp": 4.0432534085566525
             }
@@ -1844,6 +1891,7 @@
               "helpPerHarm": 0.672566371681416,
               "hurdle": 1.3038548752834467,
               "clearance": 0.515829165063486,
+              "pays": false,
               "requiredRepairRatePp": 8.54119425547997,
               "requiredBreakRatePp": 4.405797101449275
             },
@@ -1860,6 +1908,7 @@
               "helpPerHarm": 0.7678571428571429,
               "hurdle": 1.5171184022824535,
               "clearance": 0.5061286856068239,
+              "pays": false,
               "requiredRepairRatePp": 7.9885877318116965,
               "requiredBreakRatePp": 4.0432534085566525
             }
@@ -1914,6 +1963,7 @@
               "helpPerHarm": 0.672566371681416,
               "hurdle": 1.3038548752834467,
               "clearance": 0.515829165063486,
+              "pays": false,
               "requiredRepairRatePp": 8.54119425547997,
               "requiredBreakRatePp": 4.405797101449275
             },
@@ -1930,6 +1980,7 @@
               "helpPerHarm": 0.7678571428571429,
               "hurdle": 1.5171184022824535,
               "clearance": 0.5061286856068239,
+              "pays": false,
               "requiredRepairRatePp": 7.9885877318116965,
               "requiredBreakRatePp": 4.0432534085566525
             }
@@ -1989,6 +2040,7 @@
               "helpPerHarm": 0.775,
               "hurdle": 1.1018276762402088,
               "clearance": 0.7033767772511849,
+              "pays": false,
               "requiredRepairRatePp": 10.443864229765012,
               "requiredBreakRatePp": 7.345971563981044
             },
@@ -2005,6 +2057,7 @@
               "helpPerHarm": 0.9090909090909091,
               "hurdle": 1.1348837209302325,
               "clearance": 0.801043219076006,
+              "pays": false,
               "requiredRepairRatePp": 7.674418604651162,
               "requiredBreakRatePp": 6.147540983606557
             }
@@ -2059,6 +2112,7 @@
               "helpPerHarm": 0.8378378378378378,
               "hurdle": 1.0485175202156334,
               "clearance": 0.7990689918710484,
+              "pays": false,
               "requiredRepairRatePp": 9.973045822102424,
               "requiredBreakRatePp": 7.969151670951157
             },
@@ -2075,6 +2129,7 @@
               "helpPerHarm": 1.0714285714285714,
               "hurdle": 1.027027027027027,
               "clearance": 1.0432330827067668,
+              "pays": true,
               "requiredRepairRatePp": 6.87960687960688,
               "requiredBreakRatePp": 7.177033492822967
             }
@@ -2129,6 +2184,7 @@
               "helpPerHarm": 0.8484848484848485,
               "hurdle": 0.9794721407624634,
               "clearance": 0.8662674650698603,
+              "pays": false,
               "requiredRepairRatePp": 9.67741935483871,
               "requiredBreakRatePp": 8.383233532934131
             },
@@ -2145,6 +2201,7 @@
               "helpPerHarm": 1.1363636363636365,
               "hurdle": 0.8506666666666667,
               "clearance": 1.3358506697064692,
+              "pays": true,
               "requiredRepairRatePp": 5.866666666666666,
               "requiredBreakRatePp": 7.836990595611286
             }
@@ -2199,6 +2256,7 @@
               "helpPerHarm": 0.88,
               "hurdle": 0.92,
               "clearance": 0.9565217391304347,
+              "pays": false,
               "requiredRepairRatePp": 9.090909090909092,
               "requiredBreakRatePp": 8.695652173913043
             },
@@ -2215,6 +2273,7 @@
               "helpPerHarm": 1.2352941176470589,
               "hurdle": 0.7085889570552147,
               "clearance": 1.7433155080213905,
+              "pays": true,
               "requiredRepairRatePp": 5.214723926380369,
               "requiredBreakRatePp": 9.090909090909092
             }
@@ -2269,6 +2328,7 @@
               "helpPerHarm": 0.88,
               "hurdle": 0.92,
               "clearance": 0.9565217391304347,
+              "pays": false,
               "requiredRepairRatePp": 9.090909090909092,
               "requiredBreakRatePp": 8.695652173913043
             },
@@ -2285,6 +2345,7 @@
               "helpPerHarm": 1.2352941176470589,
               "hurdle": 0.7085889570552147,
               "clearance": 1.7433155080213905,
+              "pays": true,
               "requiredRepairRatePp": 5.214723926380369,
               "requiredBreakRatePp": 9.090909090909092
             }
@@ -2339,6 +2400,7 @@
               "helpPerHarm": 0.8,
               "hurdle": 0.8484848484848485,
               "clearance": 0.9428571428571428,
+              "pays": false,
               "requiredRepairRatePp": 10.1010101010101,
               "requiredBreakRatePp": 9.523809523809524
             },
@@ -2355,6 +2417,7 @@
               "helpPerHarm": 1.0714285714285714,
               "hurdle": 0.5265017667844523,
               "clearance": 2.034995206136146,
+              "pays": true,
               "requiredRepairRatePp": 4.946996466431095,
               "requiredBreakRatePp": 10.067114093959733
             }
@@ -2418,6 +2481,7 @@
           "helpPerHarm": 0.88,
           "hurdle": 0.92,
           "clearance": 0.9565217391304347,
+          "pays": false,
           "requiredRepairRatePp": 9.090909090909092,
           "requiredBreakRatePp": 8.695652173913043
         },
@@ -2434,6 +2498,7 @@
           "helpPerHarm": 1.2352941176470589,
           "hurdle": 0.7085889570552147,
           "clearance": 1.7433155080213905,
+          "pays": true,
           "requiredRepairRatePp": 5.214723926380369,
           "requiredBreakRatePp": 9.090909090909092
         }
@@ -2490,6 +2555,7 @@
           "helpPerHarm": 0.8888888888888888,
           "hurdle": 0.8459495351925631,
           "clearance": 1.0507587650444792,
+          "pays": false,
           "requiredRepairRatePp": 7.171314741035856,
           "requiredBreakRatePp": 7.535321821036106
         },
@@ -2506,6 +2572,7 @@
           "helpPerHarm": 0.9591836734693877,
           "hurdle": 0.60381861575179,
           "clearance": 1.5885294829394208,
+          "pays": false,
           "requiredRepairRatePp": 5.8472553699284004,
           "requiredBreakRatePp": 9.288537549407113
         }
@@ -2560,6 +2627,7 @@
           "helpPerHarm": 0.8,
           "hurdle": 1.122077922077922,
           "clearance": 0.712962962962963,
+          "pays": false,
           "requiredRepairRatePp": 10.38961038961039,
           "requiredBreakRatePp": 7.407407407407407
         },
@@ -2576,6 +2644,7 @@
           "helpPerHarm": 0.8823529411764706,
           "hurdle": 1.228110599078341,
           "clearance": 0.7184637457234301,
+          "pays": false,
           "requiredRepairRatePp": 7.834101382488479,
           "requiredBreakRatePp": 5.6285178236397755
         }
@@ -2630,6 +2699,7 @@
           "helpPerHarm": 0.7727272727272727,
           "hurdle": 1.82,
           "clearance": 0.4245754245754246,
+          "pays": false,
           "requiredRepairRatePp": 8.8,
           "requiredBreakRatePp": 3.7362637362637363
         },
@@ -2646,6 +2716,7 @@
           "helpPerHarm": 0.7083333333333334,
           "hurdle": 2.5384615384615383,
           "clearance": 0.2790404040404041,
+          "pays": false,
           "requiredRepairRatePp": 9.7165991902834,
           "requiredBreakRatePp": 2.711323763955343
         }
@@ -2700,6 +2771,7 @@
           "helpPerHarm": 0.672566371681416,
           "hurdle": 1.3038548752834467,
           "clearance": 0.515829165063486,
+          "pays": false,
           "requiredRepairRatePp": 8.54119425547997,
           "requiredBreakRatePp": 4.405797101449275
         },
@@ -2716,6 +2788,7 @@
           "helpPerHarm": 0.7678571428571429,
           "hurdle": 1.5171184022824535,
           "clearance": 0.5061286856068239,
+          "pays": false,
           "requiredRepairRatePp": 7.9885877318116965,
           "requiredBreakRatePp": 4.0432534085566525
         }
@@ -2770,6 +2843,7 @@
           "helpPerHarm": 0.8484848484848485,
           "hurdle": 0.9794721407624634,
           "clearance": 0.8662674650698603,
+          "pays": false,
           "requiredRepairRatePp": 9.67741935483871,
           "requiredBreakRatePp": 8.383233532934131
         },
@@ -2786,13 +2860,14 @@
           "helpPerHarm": 1.1363636363636365,
           "hurdle": 0.8506666666666667,
           "clearance": 1.3358506697064692,
+          "pays": true,
           "requiredRepairRatePp": 5.866666666666666,
           "requiredBreakRatePp": 7.836990595611286
         }
       }
     }
   },
-  "statement": "Memory repairs 6.39pp of the 2925 questions the bare model got wrong and breaks 5.82pp of the 4075 it got right: an exchange of 0.789 against a hurdle of 1.393, so it is 43% short of paying rather than close to a wash. Admitting only to the questions a self-knowledge gate selects covers 35.6% of the confirmation half at 62.4% precision and returns -0.05pp on [-0.50pp, 0.45pp]. Tightening the gate does not close the gap: across its six thresholds precision climbs from 41.8% to 62.4% while the precision the admitted set itself needs climbs from 46.5% to 63.3%, because the break rate inside the set goes from 5.50pp to 9.68pp while the repair rate stays inside 5.61pp–6.32pp. The best point any registered curve reached out of sample is 0.11pp at 14.8% coverage on [-0.19pp, 0.44pp], against a ceiling admission puts at 2.67pp — 4% of it.",
+  "statement": "Memory repairs 6.39pp of the 2925 questions the bare model got wrong and breaks 5.82pp of the 4075 it got right: an exchange of 0.789 repairs per break — 21% short of the 1.000 at which the memory pays, and 56.6% of the rate parity a 1.393 hurdle demands. Admitting only to the questions a self-knowledge gate selects covers 35.6% of the confirmation half at 62.4% precision and returns -0.05pp on [-0.50pp, 0.45pp]. Tightening the gate does not close the gap: across its six thresholds precision climbs from 41.8% to 62.4% while the precision the admitted set itself needs climbs from 46.5% to 63.3%, because the break rate inside the set goes from 5.50pp to 9.68pp while the repair rate stays inside 5.61pp–6.32pp. The best point any registered curve reached out of sample is 0.11pp at 14.8% coverage on [-0.19pp, 0.44pp], against a ceiling admission puts at 2.67pp — 4% of it.",
   "notes": [
     "The hurdle is not parity. A repair can only happen on a question the bare model got wrong and a break only on one it got right, so the exchange rate that breaks even is the bare odds of being right — 4,075 / 2,925 = 1.393 out of sample. §147 compared 0.79 against 1.0 and read a near miss where the arithmetic shows a 43% shortfall.",
     "Admission is selective classification (Chow 1957; El-Yaniv et al. 2010; Geifman & El-Yaniv 2017) applied to a paired treatment, which makes the perfect-ordering bound sharper than it is for accuracy: admitting the repairable questions first makes the gain 100pp on that sliver and +2.67pp on the corpus. The removal ceiling §147 published is the same bound read from the other side, at 3.39pp.",
