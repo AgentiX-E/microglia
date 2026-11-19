@@ -50,7 +50,12 @@ def main() -> int:
     print(f"games: {len(games)} held-out")
 
     import yaml
-    from alfworld.agents.environment import get_environment
+
+    # `alfworld.agents.environment` also exports the embodied environment, and importing
+    # the package therefore requires `ai2thor` -- a visual simulator that the text lane
+    # never constructs. The text class is reachable on its own, which is one dependency
+    # fewer on a job that reads a .tw-pddl file.
+    from alfworld.agents.environment.alfred_tw_env import AlfredTWEnv
 
     config_path = Path(__file__).resolve().parents[0] / "config.yaml"
     if not config_path.exists():
@@ -63,7 +68,7 @@ def main() -> int:
         config_path.write_text(shipped.read_text(), encoding="utf-8")
     config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 
-    env = get_environment("AlfredTWEnv")(config, train_eval="eval_out_of_distribution")
+    env = AlfredTWEnv(config, train_eval="eval_out_of_distribution")
     env = env.init_env(batch_size=1)
 
     observation, info = env.reset()
