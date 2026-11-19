@@ -1011,6 +1011,12 @@ export {
   type PairGateInput,
 } from './pair-gates.js';
 export {
+  regradePair,
+  regradePairText,
+  type PairRegrade,
+  type RegradedRow,
+} from './pair-regrade.js';
+export {
   FACADE_NOTES_ENV,
   NOTE_LEVELS,
   PRIMARY_NOTE,

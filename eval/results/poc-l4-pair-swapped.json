@@ -1384,9 +1384,9 @@
     },
     {
       "id": "l4-effect-resolved",
-      "criterion": "the pair resolves the effect it reports: |delta| >= minimum detectable difference, or no direction is claimed",
-      "actual": "the memory costs accuracy: -10.81pp",
-      "pass": true,
+      "criterion": "the pair may be quoted as a finding: it publishes a direction, and |delta| >= its own minimum detectable difference",
+      "actual": "-10.81pp against 17.76pp minimum detectable difference — the memory costs accuracy: -10.81pp, which is a direction this pair cannot claim",
+      "pass": false,
       "blocking": false
     },
     {

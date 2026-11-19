@@ -1093,7 +1093,7 @@
     },
     {
       "id": "l4-effect-resolved",
-      "criterion": "the pair resolves the effect it reports: |delta| >= minimum detectable difference, or no direction is claimed",
+      "criterion": "the pair may be quoted as a finding: it publishes a direction, and |delta| >= its own minimum detectable difference",
       "actual": "UNRESOLVED: |2.50pp| against 18.53pp minimum detectable difference",
       "pass": false,
       "blocking": false

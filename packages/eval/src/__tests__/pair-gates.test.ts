@@ -200,11 +200,70 @@ describe('a control pair grades the band it registered, not a significance it ne
 
   it('leaves every pair that registered no band exactly as it read before', () => {
     expect(pairGates(treatment).find((gate) => gate.id === 'l4-effect-resolved')?.criterion).toContain(
-      'the pair resolves the effect it reports',
+      'may be quoted as a finding',
     );
     expect(pairGates({ ...control, registeredBand: undefined }).find((gate) => gate.id === 'l4-effect-resolved')?.pass).toBe(
       false,
     );
+  });
+});
+
+describe('the resolution row grades the sentence it prints', () => {
+  // AUDIT 34.197: the predicate was `state !== 'UNRESOLVED'` and `state` is the R45 **cost bar**, so a
+  // harm of any size above the bar passed a gate whose own criterion asked for `|delta| >= resolution`.
+  // R152c's artefact is the instance: `l4-effect-resolved True` at −7.50pp against 23.23pp, one line
+  // under a red `V5-resolution` that said the same number could not be resolved.
+  it('refuses to certify a cost the pair cannot resolve, which is the branch it used to hide', () => {
+    const gates = pairGates({
+      ...treatment,
+      claim: 'the memory costs accuracy: -7.50pp',
+      state: 'HARM',
+      deltaPp: -7.5,
+      p: 0.5488,
+      detectablePp: 23.23,
+    });
+    const resolved = gates.find((gate) => gate.id === 'l4-effect-resolved');
+    expect(resolved?.pass).toBe(false);
+    // Non-blocking still: R45's revert rule is the gate that blocks a pair for costing accuracy, and a
+    // second red line for the same reading teaches readers to ignore red (AUDIT 34.86's class).
+    expect(resolved?.blocking).toBe(false);
+    expect(resolved?.actual).toBe(
+      '-7.50pp against 23.23pp minimum detectable difference — ' +
+        'the memory costs accuracy: -7.50pp, which is a direction this pair cannot claim',
+    );
+    expect(resolved?.actual).not.toContain('True');
+  });
+
+  it('certifies a benefit that clears its own resolution, which is the branch it already had', () => {
+    const resolved = pairGates(treatment).find((gate) => gate.id === 'l4-effect-resolved');
+    expect(resolved?.pass).toBe(true);
+    expect(resolved?.actual).toBe(treatment.claim);
+  });
+
+  it('refuses a pair that could not estimate a resolution at all', () => {
+    // `undefined` is "no discordant task, so no variance to estimate", not "any effect would have shown".
+    // AUDIT 34.197's draft predicate treated it as resolving; a pair that measured nothing cannot certify
+    // a direction, so the disjunct is dropped and this case pins the drop.
+    const gates = pairGates({ ...treatment, state: 'HARM', deltaPp: -6, detectablePp: undefined });
+    const resolved = gates.find((gate) => gate.id === 'l4-effect-resolved');
+    expect(resolved?.pass).toBe(false);
+    expect(resolved?.actual).toContain('an unestimable minimum detectable difference');
+  });
+
+  it('keeps the band reading whole when a band is registered, resolution irrelevant', () => {
+    // A control pair claims a band rather than an effect, so `|delta| < resolution` is not a defect there
+    // and the resolution half of the predicate must not reach it.
+    const gates = pairGates({
+      ...treatment,
+      state: 'UNRESOLVED',
+      claim: null,
+      deltaPp: -5,
+      detectablePp: 24.27,
+      registeredBand: { loPp: -7.5, hiPp: 2.5 },
+    });
+    const resolved = gates.find((gate) => gate.id === 'l4-effect-resolved');
+    expect(resolved?.pass).toBe(true);
+    expect(resolved?.actual).toBe('-5.00pp against the registered band [-7.50, 2.50]pp');
   });
 });
 

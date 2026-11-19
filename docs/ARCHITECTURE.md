@@ -1967,3 +1967,37 @@ the quantity the cap controls does not determine the outcome, and one draw falls
 stays and its recommendation is withdrawn — a distinction worth stating in a section about allocation, because the
 alternative (removing a working instrument because its policy failed) would delete the only quantity in this lane an
 experimenter can set.
+
+### 8.27 A gate is derived, so a wrong gate is repaired by re-grading rather than by re-measuring
+
+Everything in §8.26 is about a field that has to be *written* correctly. A gate is a different kind of object: it
+is a pure function of fields that are already in the artefact, so when its predicate is wrong the artefact is not
+wrong — the row that grades it is. R152c's pair made that concrete in the worst direction, a false green:
+
+```
+V5-resolution          False (blocking)  minimum detectable 23.23pp …; claims -7.50pp …
+l4-effect-resolved     True  (advisory)  the memory costs accuracy: -7.50pp
+```
+
+`l4-effect-resolved`'s criterion asked for `|delta| >= minimum detectable difference`; its predicate asked only
+whether the verdict was not `UNRESOLVED`, and `HARM` is the **R45 cost bar** rather than a resolution test. `HARM`
+fires on "significantly negative, or below −5pp with a served pack", which is satisfied by effects far smaller than
+the sample can resolve. So the gate passed the one case its own sentence forbids, and it did so silently, because
+an advisory row that is green is the row nobody reads.
+
+The repair is one conjunction — the predicate became the criterion — plus the sentence for the case the old
+predicate hid, and the second half is the structural one:
+
+**The correction is applied to the evidence, not re-measured.** Re-running the pair would cost two dispatches and
+answer a different question: a new draw of 40 tasks is not the same 40 tasks, so the numbers would move for reasons
+that have nothing to do with the fix. `pair-regrade.ts` reads `verdict`, `comparison` and `protocol` out of the
+committed file and recomputes only the `l4-*` rows, and it is written to refuse three things a rewriting tool must
+never do — reformat the file it edits, default an input it could not read, and append a row the file's driver
+could not have written. A re-grade that changes four lines of a 43 kB artefact is a diff a reader can check; one
+that reindents it is a diff that hides the change inside itself.
+
+**And the re-grade is a gate, not a chore.** `pnpm check` runs it over both committed pair artefacts, so the next
+edit to `pair-gates.ts` that moves a row fails the build until the evidence is re-graded. That is
+`l4-projection-complete` one level up: that gate says an arm's fields reached its artefact, and this one says the
+artefact's rows are graded by the rule that ships. Two ways for a committed file to be true about itself, and the
+cheaper of the two to check is the one nobody had.

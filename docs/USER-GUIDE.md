@@ -3087,6 +3087,13 @@ The four reasons, and what each one means for your run:
 - **The split reproduces the arm rate when nothing is withheld.** On an arm with no gate, every episode lands in
   the served bucket, so `serve split: served` must equal the arm's own episode rate. If it does not, the join has
   mis-assigned requests and every gated split in the record is unreadable.
+- **A row certifies what its own criterion asks.** `l4-effect-resolved` answers one question: may this pair be
+  quoted as a finding? That needs a published direction *and* a `|delta|` at least as large as the pair's minimum
+  detectable difference, so `−7.50pp` against `23.23pp` reads as a cost the revert rule acts on **and** a
+  direction the pair cannot claim. The row is advisory — `l4-paired` is what blocks a pair for costing accuracy —
+  and it is re-graded, not re-measured: `pnpm eval:l4-regrade eval/results/poc-l4-pair-*.json` recomputes the
+  `l4-*` rows of the committed artefacts from the numbers they already carry, and `pnpm check` runs it, so a
+  change to the gate that moves a row fails the build until the evidence is re-graded. See §32.7.
 
 ### 19.3 What the control arm carries
 
@@ -4156,3 +4163,52 @@ What remains true, and is why the switch is still in the kernel:
 If you use it, use it as an experiment: state the mode, read `maxRenders` against `cap`, and do not expect the
 score to move — on four draws of one treatment the arm's own `pass^4` ranged 0.775 to 0.925, which is wider than
 anything a 40-task fold can resolve.
+
+### 32.7 Re-grading a pair instead of re-running it
+
+A gate is a function of numbers the artefact already contains, so when the gate is wrong the cure is not another
+dispatch. `pnpm eval:l4-regrade eval/results/poc-l4-pair-official.json eval/results/poc-l4-pair-swapped.json`
+recomputes the `l4-*` rows of a committed pair from its own `verdict`, `comparison` and `protocol` blocks, and
+writes them back only with `--write`:
+
+```console
+$ pnpm eval:l4-regrade eval/results/poc-l4-pair-*.json
+[l4-regrade] eval/results/poc-l4-pair-official.json: l4-effect-resolved pass stays fail
+[l4-regrade]   UNRESOLVED: |2.50pp| against 18.53pp minimum detectable difference
+[l4-regrade] eval/results/poc-l4-pair-swapped.json: l4-effect-resolved pass -> fail
+[l4-regrade]   -10.81pp against 17.76pp minimum detectable difference — the memory costs accuracy: -10.81pp, which is a direction this pair cannot claim
+[l4-regrade] 2 row(s) moved across 2 artefact(s) — dry run, pass --write to apply
+```
+
+Three properties make this safe to run against evidence rather than merely convenient:
+
+- **It refuses a file it would reformat.** The parse is round-tripped through the writer's own
+  `JSON.stringify(value, null, 2)` and compared byte for byte with the input. A re-grade of two rows that
+  reindented a 43 kB file would hide the re-grade inside a rewrite, and no diff would show it.
+- **It refuses a file it cannot read in full.** Every input is read through an accessor that throws instead of
+  defaulting. A defaulted `protocol.detectablePp` would become `undefined`, which the predicate treats as "no
+  resolution", which would silently turn every regraded row false — a reading that looks like a finding.
+- **It refuses to add rows.** `poc-l4-pair-official.json` predates `l4-rotation-reconciles`; the row it cannot
+  have written is printed (`predates … — not added`) rather than appended, because an artefact dated to a driver
+  that did not have the gate is a fabricated record.
+
+The diff is the reviewable thing. Two commits of `pair-gates.ts` later, these are the only lines the re-grade
+moved in either file:
+
+```diff
+-      "criterion": "the pair resolves the effect it reports: |delta| >= minimum detectable difference, or no direction is claimed",
++      "criterion": "the pair may be quoted as a finding: it publishes a direction, and |delta| >= its own minimum detectable difference",
+```
+
+and, on the swapped fold only, the row that had certified `−10.81pp` as a resolved harm:
+
+```diff
+-      "actual": "the memory costs accuracy: -10.81pp",
+-      "pass": true,
++      "actual": "-10.81pp against 17.76pp minimum detectable difference — the memory costs accuracy: -10.81pp, which is a direction this pair cannot claim",
++      "pass": false,
+```
+
+Because the check runs in `pnpm check`, the same command is a gate: if a future edit to `pair-gates.ts` moves a
+row of either committed artefact, the build fails until the evidence is re-graded — which is the same rule as
+`l4-projection-complete` one level up, applied to the table rather than to the fields.

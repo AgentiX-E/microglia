@@ -7,6 +7,14 @@
  * sentence it prints, and does not block, because an unresolvable effect is a fact about the sample.
  * `l4-same-split` blocks: two arms scored on different tasks are not a pair.
  *
+ * R153: until it, `l4-effect-resolved`'s predicate was `state !== 'UNRESOLVED'` while its criterion asked
+ * for `|delta| >= minimum detectable difference`, and `state` is the R45 *cost bar* rather than a
+ * resolution test — so a harm of any size above the bar passed a gate whose own sentence forbids it
+ * (AUDIT 34.197). The predicate is now the criterion: a pair may be quoted as a finding when it publishes
+ * a direction **and** that direction is at least as large as the pair's resolution. A cost the revert rule
+ * acts on is still a cost, and a row that says "resolved" about one is a row certifying what it never
+ * checked.
+ *
  * R57 added a third kind of arm and the first two conditions are not that arm's. A planted distractor
  * puts one authored rule in every pack *because* its registered hypothesis is that the rule costs
  * something: `near` predicts it breaks more episodes than it repairs, `adversarial` predicts it more
@@ -102,6 +110,33 @@ export function pairGates(input: PairGateInput): readonly ValidityGate[] {
     `${input.deltaPp.toFixed(2)}pp (p=${input.p.toFixed(4)}, n=${input.paired}, ` +
     `${String(input.served)} served pack(s)): ${input.state}` +
     (distractor ? `, planted ${String(input.plantedArm)}` : '');
+  // The resolution question, asked once for the row that reports it. A pair that could not estimate a
+  // resolution has not resolved anything: `undefined` means "no discordant task, so no variance to estimate",
+  // not "any effect would have shown". AUDIT 34.197's draft wrote this as `detectablePp === undefined || …`,
+  // and that disjunct is the one thing in the draft that would have let a pair certify a direction it never
+  // measured — so it is dropped here, and the deviation is recorded in the same entry that asked for the fix.
+  const resolves = input.detectablePp !== undefined && Math.abs(input.deltaPp) >= input.detectablePp;
+  const resolution = input.detectablePp === undefined ? 'an unestimable' : `${input.detectablePp.toFixed(2)}pp`;
+  const inBand =
+    input.registeredBand !== undefined &&
+    input.deltaPp >= input.registeredBand.loPp &&
+    input.deltaPp <= input.registeredBand.hiPp;
+  const effectActual =
+    input.registeredBand !== undefined
+      ? `${input.deltaPp.toFixed(2)}pp against the registered band ` +
+        `[${input.registeredBand.loPp.toFixed(2)}, ${input.registeredBand.hiPp.toFixed(2)}]pp` +
+        (inBand
+          ? ''
+          : ' — outside it, which is a finding about the arm rather than a defect in it')
+      : input.state === 'UNRESOLVED'
+        ? `UNRESOLVED: |${input.deltaPp.toFixed(2)}pp| against ${resolution} minimum detectable difference`
+        : input.claim === null
+          ? input.state
+          : resolves
+            ? input.claim
+            : `${input.deltaPp.toFixed(2)}pp against ${resolution} minimum detectable difference — ` +
+              `${input.claim}, which is a direction this pair cannot claim`;
+  const effectPass = input.registeredBand === undefined ? input.state !== 'UNRESOLVED' && resolves : inBand;
 
   return [
     // The treatment's finding. Omitted for a distractor arm, whose `HARM` verdict is its registered
@@ -118,33 +153,18 @@ export function pairGates(input: PairGateInput): readonly ValidityGate[] {
           },
           {
             id: 'l4-effect-resolved',
+            // The predicate, in words. The earlier text offered a disjunct — "or no direction is claimed" —
+            // that the code has never implemented in either version, and a sentence a gate does not act on
+            // is how the gate stopped saying one thing (AUDIT 34.197). This one says only what is computed.
             criterion:
               input.registeredBand === undefined
-                ? 'the pair resolves the effect it reports: |delta| >= minimum detectable difference, or no direction is claimed'
+                ? 'the pair may be quoted as a finding: it publishes a direction, and |delta| >= its own minimum detectable difference'
                 : 'the pair landed inside the interval it registered before the dispatch, which is the only claim a control pair makes',
-            actual:
-              input.registeredBand !== undefined
-                ? `${input.deltaPp.toFixed(2)}pp against the registered band ` +
-                  `[${input.registeredBand.loPp.toFixed(2)}, ${input.registeredBand.hiPp.toFixed(2)}]pp` +
-                  (input.deltaPp >= input.registeredBand.loPp &&
-                  input.deltaPp <= input.registeredBand.hiPp
-                    ? ''
-                    : ' — outside it, which is a finding about the arm rather than a defect in it')
-                : input.state === 'UNRESOLVED'
-                  ? `UNRESOLVED: |${input.deltaPp.toFixed(2)}pp| against ${
-                      input.detectablePp === undefined
-                        ? 'an unestimable'
-                        : `${input.detectablePp.toFixed(2)}pp`
-                    } minimum detectable difference`
-                  : (input.claim ?? input.state),
+            actual: effectActual,
             // Non-blocking in both readings, and for the same reason: an effect the sample could not
             // resolve and a delta outside its registered band are facts about the arm, and R45's
             // revert rule is the gate that blocks a pair for costing accuracy.
-            pass:
-              input.registeredBand === undefined
-                ? input.state !== 'UNRESOLVED'
-                : input.deltaPp >= input.registeredBand.loPp &&
-                  input.deltaPp <= input.registeredBand.hiPp,
+            pass: effectPass,
             blocking: false,
           },
         ]),
