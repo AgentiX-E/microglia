@@ -417,3 +417,19 @@ have.
 **The contrast is read in one direction.** `harm_share(sham vs none)` against `harm_share(always-in vs none)`. If the
 sham's help share is within the interval of the bank's, the finding is that the mechanism this lane has spent four
 rounds building is formatting, and the next row is not a better bank — it is a different layer.
+
+### R165, amendment 2 — the k=1 direction, registered before either arm runs
+
+AMD (Appendix AY of `COMPETITIVE.md`) measured retrieval `k=1` as the **global optimum** on AppWorld, with k=3 and
+k=5 degrading monotonically (49.40% → 33.34% at k=5 on a 4B agent). Both arms of the contrast this lane now supports
+(`arms: ["retrieved"]` with `top_k: 3` and `top_k: 1`, ≈ ¥1.9 each) are dispatched against the same bank, so the
+contrast is paired on all 134 games.
+
+**The prediction: `retrieved(k=1) − retrieved(k=3) > 0`.** Stated with its refutation: a k=3 arm that beats k=1 says
+this corpus's packs need more than one entry to be actionable, which would be a difference from AppWorld rather than
+a defect in either arm. Both outcomes are informative, which is why the contrast is worth ¥3.8 rather than the
+bank's own delta being read twice.
+
+**What would make it uninterpretable.** If the divergence rate of the two arms is near zero — the same games, the
+same digests — then the third entry never mattered, and the contrast is measuring the prefix's length rather than
+its content. `aggregate.py` reports `divergence_rate` for exactly this reason, and it is read before the delta.
