@@ -64,8 +64,38 @@ class Draw:
         return self.u64() % bound
 
 
-def load_slices(paths: "list[Path]") -> "dict[str, list[dict]]":
-    """Every episode of every slice, grouped by the arm that drove it."""
+def load_slices(paths: "list[Path]", relabel_specs: "list[str] | tuple[str, ...]" = ()) -> "dict[str, list[dict]]":
+    """Every episode of every slice, grouped by the arm that drove it.
+
+    A spec may name an **arm** or a **path**. The path form is what makes two dispatches of the *same* arm joinable:
+    they carry the same `arm_label`, so they would land in one group and `tile` would refuse the duplicate games —
+    which is the right refusal, and it left the lane's most common comparison (two blocks, one arm name, two runs)
+    with no command at all. A rename has to keep the family, so `run.json=always-in@placement` is accepted and
+    `run.json=placement` is not: the family is what `aggregate` validates against, and a label without one is an
+    arm nobody can check.
+    """
+    path_specs: "dict[str, str]" = {}
+    arm_specs: "list[str]" = []
+    # Four shards of one arm carry four names and two dispatches carry the same four again, so a basename can
+    # name more than one input. Renaming the first and leaving the rest is the exact failure this file exists to
+    # prevent — one run's episodes under a name the other run also owns — so an ambiguous name is refused here
+    # rather than resolved by iteration order.
+    basenames: "dict[str, int]" = {}
+    for path in paths:
+        basenames[path.name] = basenames.get(path.name, 0) + 1
+    for spec in relabel_specs:
+        old, new = parse_spec(spec)
+        if old in basenames:
+            if basenames[old] > 1:
+                fail(
+                    f"--relabel {spec!r}: {old!r} names {basenames[old]} inputs in this join, so renaming it "
+                    f"would leave {basenames[old] - 1} of them under their old label; name the directory too"
+                )
+            path_specs[old] = new
+        elif any(old == str(path) for path in paths):
+            path_specs[old] = new
+        else:
+            arm_specs.append(spec)
     grouped: "dict[str, list[dict]]" = {}
     for path in paths:
         payload = json.loads(path.read_text(encoding="utf-8"))
@@ -81,12 +111,36 @@ def load_slices(paths: "list[Path]") -> "dict[str, list[dict]]":
             fail(f"{path}: summary.arm is {arm!r}, which is not one of {ARMS}")
         if label != arm and not str(label).startswith(f"{arm}@"):
             fail(f"{path}: summary.arm_label is {label!r}, which is neither {arm!r} nor a configuration of it")
+        for key in (str(path), path.name):
+            if key in path_specs:
+                renamed = path_specs.pop(key)
+                if renamed != arm and not renamed.startswith(f"{arm}@"):
+                    fail(
+                        f"--relabel {key}={renamed}: {renamed!r} is neither {arm!r} nor a configuration of it; "
+                        f"a rename keeps the family, as in {key}={arm}@{renamed}"
+                    )
+                label = renamed
+                break
         if not isinstance(episodes, list) or not episodes:
             fail(f"{path}: no episodes, so this slice contributes nothing and its cost is unexplained")
         if policy == "seed" or policy == "first":
             fail(f"{path}: a model-free slice cannot be paired with a billed one; policy is {policy!r}")
         grouped.setdefault(label, []).extend(episodes)
-    return grouped
+    return relabel(grouped, arm_specs)
+
+
+def parse_spec(spec: str) -> "tuple[str, str]":
+    """`old=new`, with the three ways it can be malformed refused in one place.
+
+    One parser rather than two: the spec is read when the rename may be keyed on a path and again when it is keyed
+    on an arm, and a second copy of these four conditions is a second place for them to disagree. `=` may not appear
+    in the new name because the first `partition` would then have produced a name the caller did not mean.
+    """
+    old, separator, new = spec.partition("=")
+    old, new = old.strip(), new.strip()
+    if not separator or not old or not new or "=" in new:
+        fail(f"--relabel {spec!r} is not 'old=new'")
+    return old, new
 
 
 def relabel(groups: "dict[str, list[dict]]", specs: "list[str]") -> "dict[str, list[dict]]":
@@ -107,10 +161,7 @@ def relabel(groups: "dict[str, list[dict]]", specs: "list[str]") -> "dict[str, l
     """
     renamed = dict(groups)
     for spec in specs:
-        old, separator, new = spec.partition("=")
-        old, new = old.strip(), new.strip()
-        if not separator or not old or not new or "=" in new:
-            fail(f"--relabel {spec!r} is not 'old=new'")
+        old, new = parse_spec(spec)
         if old not in renamed:
             fail(f"--relabel {spec!r}: no slice carries {old!r}; the file(s) hold {sorted(renamed)}")
         if new != old and new in renamed:
@@ -402,14 +453,11 @@ def main() -> int:
     arguments = parser.parse_args()
 
     paths = [Path(item) for item in arguments.input]
-    grouped = load_slices(paths)
-    if arguments.relabel:
-        before = sorted(grouped)
-        grouped = relabel(grouped, arguments.relabel)
-        # Printed rather than implied: a reading that crosses dispatches is the one kind of reading whose
-        # provenance a reader cannot recover from the arms' names in the report.
-        for spec in arguments.relabel:
-            print(f"  relabelled      {spec}  (arms before {before})")
+    grouped = load_slices(paths, arguments.relabel)
+    # Printed rather than implied: a reading that crosses dispatches is the one kind of reading whose
+    # provenance a reader cannot recover from the arms' names in the report.
+    for spec in arguments.relabel:
+        print(f"  relabelled      {spec}")
     # Parsed before anything is tiled, and a malformed pair is refused here rather than at unpacking time:
     # `--compare always-in` would otherwise raise a ValueError from a tuple unpacking three frames down,
     # which reads as a crash rather than as a dispatch that named one arm where a pair was wanted.

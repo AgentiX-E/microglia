@@ -658,6 +658,73 @@ class RelabelTest(unittest.TestCase):
             )
         self.assertIn("relabelled      always-in@a=x", printed.getvalue())
 
+    def test_two_dispatches_of_one_arm_are_joinable_by_naming_the_slice(self):
+        # The case the arm form cannot reach: both runs carry `arm_label: always-in`, so they land in one group
+        # and tile refuses the duplicate games. Naming the file is the only way to say which run is which.
+        left = self.write("p-a.json", {"summary": summary("always-in"), "episodes": [episode("g1", True), episode("g2", True)]})
+        right = self.write("p-b.json", {"summary": summary("always-in"), "episodes": [episode("g1", True), episode("g2", False)]})
+        out = HERE / "by-path.json"
+        self.paths.append(out)
+        self.assertEqual(
+            self.run_main(
+                [
+                    "--input", str(left), "--input", str(right),
+                    "--compare", "always-in@placement,always-in@search",
+                    "--relabel", f"{left.name}=always-in@placement",
+                    "--relabel", f"{right.name}=always-in@search",
+                    "--expect", "2", "--out", str(out), "--rounds", "50",
+                ]
+            ),
+            0,
+        )
+        reading = json.loads(out.read_text(encoding="utf-8"))["readings"][0]
+        self.assertEqual(reading["wins"], {"always-in@placement": 2, "always-in@search": 1})
+
+    def test_a_path_rename_that_drops_the_family_is_refused(self):
+        # The family is what `aggregate` validates a label against; a label without one is an arm nobody can check.
+        left = self.write("pq-a.json", {"summary": summary("always-in"), "episodes": [episode("g1", True)]})
+        with self.assertRaises(SystemExit):
+            self.run_main(["--input", str(left), "--compare", "placement,none", "--relabel", f"{left.name}=placement"])
+
+    def test_a_path_that_no_input_carries_is_refused(self):
+        left = self.write("pr-a.json", {"summary": summary("always-in"), "episodes": [episode("g1", True)]})
+        control = self.write("pr-b.json", {"summary": summary("none"), "episodes": [episode("g1", False)]})
+        with self.assertRaises(SystemExit):
+            self.run_main(
+                [
+                    "--input", str(left), "--input", str(control), "--compare", "always-in,none",
+                    "--relabel", "arm-always-in-9.json=always-in@x",
+                ]
+            )
+
+    def test_a_basename_that_names_two_inputs_is_refused_rather_than_half_renamed(self):
+        # Two runs, the same four shard names: renaming by basename would move one run's shard and leave the
+        # other's under the old label, which is a join whose two sides are one run and three quarters of another.
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+            left = Path(first) / "arm-always-in-0.json"
+            right = Path(second) / "arm-always-in-0.json"
+            left.write_text(json.dumps({"summary": summary("always-in"), "episodes": [episode("g1", True)]}), encoding="utf-8")
+            right.write_text(json.dumps({"summary": summary("always-in"), "episodes": [episode("g1", False)]}), encoding="utf-8")
+            with self.assertRaises(SystemExit):
+                self.run_main(
+                    ["--input", str(left), "--input", str(right), "--compare", "always-in@a,always-in@b",
+                     "--relabel", "arm-always-in-0.json=always-in@a"]
+                )
+
+    def test_the_full_path_disambiguates_what_the_basename_could_not(self):
+        with tempfile.TemporaryDirectory() as first, tempfile.TemporaryDirectory() as second:
+            left = Path(first) / "arm-always-in-0.json"
+            right = Path(second) / "arm-always-in-0.json"
+            left.write_text(json.dumps({"summary": summary("always-in"), "episodes": [episode("g1", True)]}), encoding="utf-8")
+            right.write_text(json.dumps({"summary": summary("always-in"), "episodes": [episode("g1", False)]}), encoding="utf-8")
+            self.assertEqual(
+                self.run_main(
+                    ["--input", str(left), "--input", str(right), "--compare", "always-in@a,always-in@b",
+                     "--relabel", f"{left}=always-in@a", "--relabel", f"{right}=always-in@b", "--rounds", "50"]
+                ),
+                0,
+            )
+
     def test_a_source_that_no_slice_carries_is_refused(self):
         left = self.write("rs-a.json", {"summary": summary("always-in"), "episodes": [episode("g1", True)]})
         with self.assertRaises(SystemExit):
