@@ -55,6 +55,10 @@ on:
         description: 'true runs all three arms over four slices of the held-out split in one dispatch'
         required: false
         default: ''
+      not_before:
+        description: 'UTC HH:MM to hold the paid step until; empty starts immediately'
+        required: false
+        default: ''
   push:
     branches: [master]
     paths:
@@ -95,6 +99,7 @@ jobs:
           python eval/drivers/alfworld/test_agent.py
           python eval/drivers/alfworld/test_aggregate.py
           python eval/drivers/alfworld/test_distill.py
+          python eval/drivers/alfworld/test_wait.py
 
       - name: Report the bill
         if: always()
@@ -378,6 +383,13 @@ jobs:
           alfworld-download
           find "$ALFWORLD_DATA" -name 'game.tw-pddl' | wc -l
 
+      - name: Wait for the off-peak window
+        # The window arithmetic lives in one script rather than in three copies of it, and that script says
+        # why waiting is cheaper than starting: `eval/drivers/alfworld/wait-for-window.sh`.
+        env:
+          NOT_BEFORE: ${{ inputs.not_before }}
+        run: bash eval/drivers/alfworld/wait-for-window.sh "${NOT_BEFORE}"
+
       - name: Drive the arm
         env:
           ALFWORLD_DATA: /home/runner/.cache/alfworld
@@ -429,7 +441,7 @@ jobs:
     name: the training pass a rule bank is extracted from
     if: github.event_name == 'workflow_dispatch' && inputs.train != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 300
     strategy:
       fail-fast: false
       matrix:
@@ -464,6 +476,13 @@ jobs:
           export ALFWORLD_DATA="$HOME/.cache/alfworld"
           alfworld-download
           find "$ALFWORLD_DATA" -name 'game.tw-pddl' | wc -l
+
+      - name: Wait for the off-peak window
+        # The window arithmetic lives in one script rather than in three copies of it, and that script says
+        # why waiting is cheaper than starting: `eval/drivers/alfworld/wait-for-window.sh`.
+        env:
+          NOT_BEFORE: ${{ inputs.not_before }}
+        run: bash eval/drivers/alfworld/wait-for-window.sh "${NOT_BEFORE}"
 
       - name: Drive the training slice with transcripts
         env:
@@ -559,7 +578,7 @@ jobs:
     name: one arm over one slice
     if: github.event_name == 'workflow_dispatch' && inputs.sweep != ''
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 330
     strategy:
       fail-fast: false
       matrix:
@@ -595,6 +614,13 @@ jobs:
           export ALFWORLD_DATA="$HOME/.cache/alfworld"
           alfworld-download
           find "$ALFWORLD_DATA" -name 'game.tw-pddl' | wc -l
+
+      - name: Wait for the off-peak window
+        # The window arithmetic lives in one script rather than in three copies of it, and that script says
+        # why waiting is cheaper than starting: `eval/drivers/alfworld/wait-for-window.sh`.
+        env:
+          NOT_BEFORE: ${{ inputs.not_before }}
+        run: bash eval/drivers/alfworld/wait-for-window.sh "${NOT_BEFORE}"
 
       - name: Drive the arm
         env:
