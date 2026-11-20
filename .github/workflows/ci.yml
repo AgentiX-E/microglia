@@ -72,6 +72,11 @@ jobs:
             echo "== $suite"
             python3 "eval/drivers/alfworld/$suite.py"
           done
+          # The dispatcher's guards are the only code in the tree whose failure costs money, and three of them
+          # exist to stop a payment. It sits in `scripts/` rather than beside the operator so that this step can
+          # import it: a guard exercised only by paying is a guard nobody has tested.
+          echo "== test_alf_dispatch"
+          python3 scripts/test_alf_dispatch.py
           python3 scripts/check-workflows.py --self-test
 
       - name: Repository audit (source rules, manifests, published dependencies)
