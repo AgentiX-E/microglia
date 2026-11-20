@@ -63,6 +63,9 @@ jobs:
       - name: The lane's python drivers, on the interpreter the lane runs
         run: |
           set -euo pipefail
+          # One package, named because its absence is silent: without PyYAML the workflow checker answers "clean"
+          # for every structural rule it has, and its self-test used to pass in that mode.
+          python3 -m pip install --disable-pip-version-check --quiet pyyaml
           python3 scripts/check-python-floor.py --self-test
           python3 scripts/check-python-floor.py
           for suite in test_agent test_aggregate test_distill test_wait; do

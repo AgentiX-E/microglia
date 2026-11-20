@@ -400,6 +400,8 @@ def self_test() -> int:
     """
     import tempfile
 
+    global HAS_YAML
+
     def workflow(
         inputs: int,
         job_runner: bool = True,
@@ -593,6 +595,13 @@ jobs:
         ),
     ]
     failures = 0
+    # The structural rules need a YAML parser, and the count-only fallback silently answers "clean" for every one of
+    # them. A self-test that passed in that mode would be the exact defect this file exists to catch, so the mode is
+    # named and it fails: half a checker proved is not proved. Found by the first CI step that ever ran this
+    # self-test — it had been in `eval:verifiers` since it was written and no workflow ran that script.
+    if not HAS_YAML:
+        failures += 1
+        print("  FAIL the structural rules were not exercised: PyYAML is not installed, so only the input count runs")
     with tempfile.TemporaryDirectory() as directory:
         for label, text, clean, fragment in cases:
             path = Path(directory) / "case.yml"
@@ -604,7 +613,6 @@ jobs:
             print(f"  {'ok  ' if ok else 'FAIL'} {label} -> {found or 'clean'}")
         # The degraded path is the one that runs on an image without PyYAML, and it has to keep the
         # cap: that count is the whole incident.
-        global HAS_YAML
         stored = HAS_YAML
         HAS_YAML = False
         try:
