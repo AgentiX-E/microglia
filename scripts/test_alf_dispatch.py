@@ -12,7 +12,10 @@ Run: python3 scripts/test_alf_dispatch.py
 import contextlib
 import io
 import json
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 
 import alf_dispatch as lane
 
@@ -229,6 +232,55 @@ class GreenTreeTest(unittest.TestCase):
         with self.assertRaises(lane.Refused) as caught:
             lane.green_tree("token", call=call)
         self.assertIn("in_progress", str(caught.exception))
+
+
+class RulesPathTest(unittest.TestCase):
+    """`--rules` is resolved against the checkout, because the workflow runs from its root.
+
+    Run `44779423772` bought eight jobs and every one of them exited at the "no bank at ${RULES}" guard before a
+    single call: the bank was named the way the lane's own directory reads (`banks/...`), while the jobs run from
+    the repository root (`eval/drivers/alfworld/banks/...`). A guard that refused correctly and a path that was
+    wrong cost two arms of wall-clock; the check below costs nothing and names the intended path.
+    """
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp()).resolve()
+        self.addCleanup(shutil.rmtree, self.root, True)
+        self.banks = self.root / "eval" / "drivers" / "alfworld" / "banks"
+        self.banks.mkdir(parents=True)
+        (self.banks / "bank-x.json").write_text("{}", encoding="utf-8")
+
+    def refuse(self, tree, *argv):
+        with self.assertRaises(lane.Refused) as caught:
+            lane.check(arguments(*argv), tree=tree)
+        return str(caught.exception)
+
+    def test_a_bank_path_that_does_not_resolve_is_refused_with_the_path_that_would(self):
+        message = self.refuse(
+            self.root, "--sweep", "true", "--arms", '["none","always-in"]', "--rules", "banks/bank-x.json"
+        )
+        self.assertIn("repository root", message)
+        self.assertIn("eval/drivers/alfworld/banks/bank-x.json", message)
+
+    def test_the_lane_relative_path_is_accepted(self):
+        named = lane.check(
+            arguments("--sweep", "true", "--arms", '["none","always-in"]', "--rules", "eval/drivers/alfworld/banks/bank-x.json"),
+            tree=self.root,
+        )
+        self.assertEqual(named, ["none", "always-in"])
+
+    def test_an_absolute_path_is_the_runner_temporary_directory_and_is_not_resolved_here(self):
+        named = lane.check(
+            arguments("--sweep", "true", "--arms", '["none","always-in"]', "--rules", "/tmp/runner/bank.json"),
+            tree=self.root,
+        )
+        self.assertEqual(named, ["none", "always-in"])
+
+    def test_without_a_tree_the_path_is_not_checked_at_all(self):
+        # The default: `check()` is a pure function of the command line unless a checkout is named, which is what
+        # keeps the other forty cases in this file readable.
+        named = lane.check(arguments("--sweep", "true", "--arms", '["none","always-in"]', "--rules", "b.json"))
+        self.assertEqual(named, ["none", "always-in"])
 
 
 class MainTest(unittest.TestCase):

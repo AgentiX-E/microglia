@@ -31,6 +31,7 @@ import os
 import sys
 import time
 import urllib.request
+from pathlib import Path
 
 API = "https://api.github.com"
 REPO = "AgentiX-E/microglia"
@@ -91,12 +92,17 @@ def sweep_arms(text):
     return named
 
 
-def check(arguments):
+def check(arguments, tree=None):
     """Every reason this dispatch must not be bought.
 
     Order matters: the checks that reject the cheapest mistake come first, so a command line with three
     things wrong is repaired one round trip at a time rather than three. Returns the sweep's arm list,
     which the payload then serialises back, so that the validation is the only place the list is parsed.
+
+    `tree` is the root of the checkout the dispatch would buy. When it is given, a relative `--rules` is
+    resolved against it, because the workflow runs from that root while the banks live beside the driver.
+    Run `44779423772` spent eight jobs on the difference: the path was written the way a reader of this
+    repository sees it, and every job exited at the "no bank at ..." guard before making a single call.
     """
     if arguments.games and not arguments.arm:
         raise Refused("a dispatch with games but no arm is a calibration of nothing")
@@ -135,6 +141,16 @@ def check(arguments):
         unknown = sorted(set(named) - set(TASK_KINDS))
         if unknown:
             raise Refused(f"--distill-kinds names {unknown}; the split publishes {list(TASK_KINDS)}")
+    if arguments.rules and tree is not None and not os.path.isabs(arguments.rules):
+        root = Path(tree)
+        candidate = root / arguments.rules
+        if not candidate.is_file():
+            beside_the_driver = root / "eval" / "drivers" / "alfworld" / arguments.rules
+            hint = f"; the same path inside the lane is eval/drivers/alfworld/{arguments.rules}" if beside_the_driver.is_file() else ""
+            raise Refused(
+                f"--rules {arguments.rules} is not a file in this tree (it resolves to {candidate}), and the "
+                f"workflow runs from the repository root rather than from the lane's own directory{hint}"
+            )
     if arguments.chain and not arguments.train:
         raise Refused("--chain needs --train: the chain starts with the training pass")
     if arguments.sweep and (arguments.games or arguments.train):
@@ -223,7 +239,7 @@ def main(argv=None, token=None, call=call, sleep=time.sleep):
     arguments = parser().parse_args(argv)
     token = token or os.environ.get("GH_TOKEN", "")
     try:
-        check(arguments)
+        check(arguments, tree=Path(__file__).resolve().parent.parent)
     except Refused as refusal:
         sys.stderr.write(f"{refusal}\n")
         return 2

@@ -762,10 +762,9 @@ jobs:
           if [ -z "${RULES}" ]; then
             RULES="$RUNNER_TEMP/bank/bank.json"
           fi
-          if [ ! -f "${RULES}" ]; then
-            echo "::error::no bank at ${RULES}; a treatment arm cannot be run without one"
-            exit 1
-          fi
+          # The `none` arm carries no bank, so a bank path it cannot find is not its problem: checked inside the
+          # treatment branch below. Run 44779423772 lost eight jobs to this line, both arms, because a `--rules`
+          # path was given relative to the lane's own directory and the jobs run from the repository root.
           args=(--arm "${ARM}" --policy model --games "${GAMES}" --shard "${SHARD}/4" --max-steps "${MAX_STEPS}")
           # The retrieval budget is an input because AMD measured k=1 as the global optimum and this lane's
           # default is 3; a contrast that has to be edited into a file is a contrast nobody runs twice.
@@ -777,6 +776,10 @@ jobs:
           if [ "${ARM}" != "none" ]; then
             if [ -z "${RULES}" ]; then
               echo "::error::arm ${ARM} needs a rule bank; there is nothing for it to carry"
+              exit 1
+            fi
+            if [ ! -f "${RULES}" ]; then
+              echo "::error::no bank at ${RULES}; a treatment arm cannot be run without one"
               exit 1
             fi
             args+=(--rules "${RULES}")
