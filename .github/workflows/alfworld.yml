@@ -605,9 +605,25 @@ jobs:
               fi
             done
           done
+          # The directory exists whether or not this dispatch drove a slice. Under `bank_only` no earlier step
+          # has created it, and `cp` into a missing directory fails once per artefact with a message that reads
+          # as the copy rather than as the cause: run `44752386299` died here, at ¥0 spent and nothing distilled.
+          mkdir -p "$RUNNER_TEMP/slices"
+          # The directory is created here rather than assumed: under `bank_only` the step that normally unpacks this
+          # run's own slices is skipped, and the first dispatch of this mode failed on `cp: ... Not a directory`
+          # after two runs had contributed all four slices.
+          mkdir -p "$RUNNER_TEMP/slices"
           # Only the artefacts move across: the logs of the other run describe another pass and would be read
           # beside this one's.
           find "$RUNNER_TEMP/prior" -name 'train-*.json' -exec cp {} "$RUNNER_TEMP/slices/" \;
+          # A run id that contributes nothing is the mistake this step is most likely to have made, so it is
+          # reported as itself rather than left to `distill.py`, whose own refusal would name a union of zero
+          # against a slice of 140 and send the reader looking at the driver.
+          carried=$(find "$RUNNER_TEMP/slices" -name 'train-*.json' | wc -l)
+          if [ "${carried}" -eq 0 ]; then
+            echo "::error::no training slice came from this dispatch or from runs ${PRIOR_RUNS}"
+            exit 1
+          fi
           ls "$RUNNER_TEMP/slices"
 
       - name: Distil the bank
