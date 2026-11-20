@@ -1,0 +1,690 @@
+{
+  "note": "The shared contract for ExpeL's rule arithmetic. Read by eval/drivers/alfworld/test_distill.py (Python) and packages/eval/src/__tests__/rule-bank-vectors.test.ts (TypeScript). Any case that one side passes and the other fails is a drift between distill.py and rule-bank.ts, which is the failure mode two ports of one algorithm have.",
+  "source": "agent/expel.py@LeapLabTHU/ExpeL:e41ec9a2 (parse_rules, update_rules); ported to packages/eval/src/rule-bank.ts",
+  "cases": [
+    {
+      "name": "an add starts at two votes",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [],
+      "reply": "ADD 1: Open the cabinet before taking anything out of it.",
+      "parsed": [
+        {
+          "kind": "ADD",
+          "number": 1,
+          "text": "Open the cabinet before taking anything out of it."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Open the cabinet before taking anything out of it.",
+            "votes": 2
+          }
+        ],
+        "applied": 1,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 1
+      }
+    },
+    {
+      "name": "agree and edit each add one vote, remove takes one away",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "Open the cabinet before taking anything out of it.",
+          "votes": 2
+        },
+        {
+          "text": "Look inside every receptacle you pass.",
+          "votes": 2
+        },
+        {
+          "text": "Put the object on the countertop.",
+          "votes": 1
+        }
+      ],
+      "reply": "AGREE 1: Open the cabinet before taking anything out of it.\nEDIT 2: Look inside every receptacle you open.\nREMOVE 3: Put the object on the countertop.",
+      "parsed": [
+        {
+          "kind": "AGREE",
+          "number": 1,
+          "text": "Open the cabinet before taking anything out of it."
+        },
+        {
+          "kind": "EDIT",
+          "number": 2,
+          "text": "Look inside every receptacle you open."
+        },
+        {
+          "kind": "REMOVE",
+          "number": 3,
+          "text": "Put the object on the countertop."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Open the cabinet before taking anything out of it.",
+            "votes": 3
+          },
+          {
+            "text": "Look inside every receptacle you open.",
+            "votes": 3
+          }
+        ],
+        "applied": 3,
+        "rejected": 0,
+        "culled": 1,
+        "peak": 3
+      }
+    },
+    {
+      "name": "a removal costs three once the list is past the cap's margin",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "Rule zero.",
+          "votes": 2
+        },
+        {
+          "text": "Rule one.",
+          "votes": 2
+        },
+        {
+          "text": "Rule two.",
+          "votes": 2
+        },
+        {
+          "text": "Rule three.",
+          "votes": 2
+        },
+        {
+          "text": "Rule four.",
+          "votes": 2
+        },
+        {
+          "text": "Rule five.",
+          "votes": 2
+        },
+        {
+          "text": "Rule six.",
+          "votes": 2
+        },
+        {
+          "text": "Rule seven.",
+          "votes": 2
+        },
+        {
+          "text": "Rule eight.",
+          "votes": 2
+        },
+        {
+          "text": "Rule nine.",
+          "votes": 2
+        },
+        {
+          "text": "Rule ten.",
+          "votes": 2
+        },
+        {
+          "text": "Rule eleven.",
+          "votes": 2
+        },
+        {
+          "text": "Rule twelve.",
+          "votes": 2
+        },
+        {
+          "text": "Rule thirteen.",
+          "votes": 2
+        },
+        {
+          "text": "Rule fourteen.",
+          "votes": 2
+        },
+        {
+          "text": "Rule fifteen.",
+          "votes": 2
+        },
+        {
+          "text": "Rule sixteen.",
+          "votes": 2
+        },
+        {
+          "text": "Rule seventeen.",
+          "votes": 2
+        },
+        {
+          "text": "Rule eighteen.",
+          "votes": 2
+        },
+        {
+          "text": "Rule nineteen.",
+          "votes": 2
+        },
+        {
+          "text": "Rule twenty.",
+          "votes": 4
+        },
+        {
+          "text": "Rule twenty one.",
+          "votes": 3
+        },
+        {
+          "text": "Rule twenty two.",
+          "votes": 3
+        },
+        {
+          "text": "Rule twenty three.",
+          "votes": 3
+        },
+        {
+          "text": "Rule twenty four.",
+          "votes": 3
+        }
+      ],
+      "reply": "REMOVE 21: Rule twenty.",
+      "parsed": [
+        {
+          "kind": "REMOVE",
+          "number": 21,
+          "text": "Rule twenty."
+        }
+      ],
+      "expect": {
+        "bank_entry_text": "Rule twenty.",
+        "bank_entry_votes": 1,
+        "applied": 1,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 25
+      }
+    },
+    {
+      "name": "a removal that empties the list culls the rule",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "Put the object on the countertop.",
+          "votes": 1
+        }
+      ],
+      "reply": "REMOVE 1: Put the object on the countertop.",
+      "parsed": [
+        {
+          "kind": "REMOVE",
+          "number": 1,
+          "text": "Put the object on the countertop."
+        }
+      ],
+      "expect": {
+        "bank": [],
+        "applied": 1,
+        "rejected": 0,
+        "culled": 1,
+        "peak": 1
+      }
+    },
+    {
+      "name": "the identity test looks for the existing rule inside the incoming one",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "Always check the lamp.",
+          "votes": 2
+        }
+      ],
+      "reply": "ADD 2: Always check the lamp. Leave the room afterwards.",
+      "parsed": [
+        {
+          "kind": "ADD",
+          "number": 2,
+          "text": "Always check the lamp. Leave the room afterwards."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Always check the lamp.",
+            "votes": 2
+          }
+        ],
+        "applied": 0,
+        "rejected": 1,
+        "culled": 0,
+        "peak": 1
+      }
+    },
+    {
+      "name": "the same test does not see a shortening as the same rule",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "Always check the lamp. Leave the room afterwards.",
+          "votes": 2
+        }
+      ],
+      "reply": "ADD 2: Always check the lamp.",
+      "parsed": [
+        {
+          "kind": "ADD",
+          "number": 2,
+          "text": "Always check the lamp."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Always check the lamp. Leave the room afterwards.",
+            "votes": 2
+          },
+          {
+            "text": "Always check the lamp.",
+            "votes": 2
+          }
+        ],
+        "applied": 1,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 2
+      }
+    },
+    {
+      "name": "an identity of exact sees the shortening as a new rule too",
+      "identity": "exact",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "Always check the lamp.",
+          "votes": 2
+        }
+      ],
+      "reply": "ADD 2: Always check the lamp. Leave the room afterwards.",
+      "parsed": [
+        {
+          "kind": "ADD",
+          "number": 2,
+          "text": "Always check the lamp. Leave the room afterwards."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Always check the lamp.",
+            "votes": 2
+          },
+          {
+            "text": "Always check the lamp. Leave the room afterwards.",
+            "votes": 2
+          }
+        ],
+        "applied": 1,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 2
+      }
+    },
+    {
+      "name": "an identity of tokens ignores order and case",
+      "identity": "tokens",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "Check the lamp first.",
+          "votes": 2
+        }
+      ],
+      "reply": "ADD 2: first, CHECK the lamp, check the lamp.",
+      "parsed": [
+        {
+          "kind": "ADD",
+          "number": 2,
+          "text": "first, CHECK the lamp, check the lamp."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Check the lamp first.",
+            "votes": 2
+          }
+        ],
+        "applied": 0,
+        "rejected": 1,
+        "culled": 0,
+        "peak": 1
+      }
+    },
+    {
+      "name": "an edit whose text already exists is an agreement",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "Take the apple from the countertop.",
+          "votes": 2
+        }
+      ],
+      "reply": "EDIT 1: Take the apple from the countertop.",
+      "parsed": [
+        {
+          "kind": "EDIT",
+          "number": 1,
+          "text": "Take the apple from the countertop."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Take the apple from the countertop.",
+            "votes": 3
+          }
+        ],
+        "applied": 1,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 1
+      }
+    },
+    {
+      "name": "an edit of a rule that is not there is rejected rather than added",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "Take the apple from the countertop.",
+          "votes": 2
+        }
+      ],
+      "reply": "EDIT 7: Open the fridge before looking for the lettuce.",
+      "parsed": [
+        {
+          "kind": "EDIT",
+          "number": 7,
+          "text": "Open the fridge before looking for the lettuce."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Take the apple from the countertop.",
+            "votes": 2
+          }
+        ],
+        "applied": 0,
+        "rejected": 1,
+        "culled": 0,
+        "peak": 1
+      }
+    },
+    {
+      "name": "an edit numbered zero is rejected instead of indexing from the end",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "Take the apple from the countertop.",
+          "votes": 2
+        },
+        {
+          "text": "Open the fridge before looking for the lettuce.",
+          "votes": 2
+        }
+      ],
+      "reply": "EDIT 0: Walk to the sink basin before filling the mug.",
+      "parsed": [
+        {
+          "kind": "EDIT",
+          "number": 0,
+          "text": "Walk to the sink basin before filling the mug."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Take the apple from the countertop.",
+            "votes": 2
+          },
+          {
+            "text": "Open the fridge before looking for the lettuce.",
+            "votes": 2
+          }
+        ],
+        "applied": 0,
+        "rejected": 1,
+        "culled": 0,
+        "peak": 2
+      }
+    },
+    {
+      "name": "two identical adds in one reply both land",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [],
+      "reply": "ADD 1: Inspect the microwave before heating anything.\nADD 2: Inspect the microwave before heating anything.",
+      "parsed": [
+        {
+          "kind": "ADD",
+          "number": 1,
+          "text": "Inspect the microwave before heating anything."
+        },
+        {
+          "kind": "ADD",
+          "number": 2,
+          "text": "Inspect the microwave before heating anything."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Inspect the microwave before heating anything.",
+            "votes": 2
+          },
+          {
+            "text": "Inspect the microwave before heating anything.",
+            "votes": 2
+          }
+        ],
+        "applied": 2,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 2
+      }
+    },
+    {
+      "name": "a rule containing a banned word as a substring is discarded",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [],
+      "reply": "ADD 1: ADDITIONAL care is needed when opening the cabinet.",
+      "parsed": [],
+      "expect": {
+        "bank": [],
+        "applied": 0,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 0
+      }
+    },
+    {
+      "name": "a rule without a closing period is discarded as truncated",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [],
+      "reply": "ADD 1: Open the fridge before looking for the lettuce",
+      "parsed": [],
+      "expect": {
+        "bank": [],
+        "applied": 0,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 0
+      }
+    },
+    {
+      "name": "a label prefix is stripped and the rule keeps its own colon clause",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [],
+      "reply": "ADD 1: Goal: reach the fridge.",
+      "parsed": [
+        {
+          "kind": "ADD",
+          "number": 1,
+          "text": "reach the fridge."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "reach the fridge.",
+            "votes": 2
+          }
+        ],
+        "applied": 1,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 1
+      }
+    },
+    {
+      "name": "equal votes keep the order the rules entered in",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "First rule.",
+          "votes": 2
+        },
+        {
+          "text": "Second rule.",
+          "votes": 2
+        },
+        {
+          "text": "Third rule.",
+          "votes": 2
+        }
+      ],
+      "reply": "AGREE 3: Third rule.",
+      "parsed": [
+        {
+          "kind": "AGREE",
+          "number": 3,
+          "text": "Third rule."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Third rule.",
+            "votes": 3
+          },
+          {
+            "text": "First rule.",
+            "votes": 2
+          },
+          {
+            "text": "Second rule.",
+            "votes": 2
+          }
+        ],
+        "applied": 1,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 3
+      }
+    },
+    {
+      "name": "a removal named by number still resolves by text",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "First rule.",
+          "votes": 2
+        },
+        {
+          "text": "Second rule.",
+          "votes": 2
+        }
+      ],
+      "reply": "REMOVE 1: Second rule.",
+      "parsed": [
+        {
+          "kind": "REMOVE",
+          "number": 1,
+          "text": "Second rule."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "First rule.",
+            "votes": 2
+          },
+          {
+            "text": "Second rule.",
+            "votes": 1
+          }
+        ],
+        "applied": 1,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 2
+      }
+    },
+    {
+      "name": "an operation with an empty body is skipped",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [],
+      "reply": "ADD 1: ",
+      "parsed": [],
+      "expect": {
+        "bank": [],
+        "applied": 0,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 0
+      }
+    },
+    {
+      "name": "an agreement with a rule the bank does not hold is rejected",
+      "identity": "substring",
+      "cap": 20,
+      "bank": [
+        {
+          "text": "Rule one.",
+          "votes": 2
+        }
+      ],
+      "reply": "AGREE 9: Rule nine.",
+      "parsed": [
+        {
+          "kind": "AGREE",
+          "number": 9,
+          "text": "Rule nine."
+        }
+      ],
+      "expect": {
+        "bank": [
+          {
+            "text": "Rule one.",
+            "votes": 2
+          }
+        ],
+        "applied": 0,
+        "rejected": 1,
+        "culled": 0,
+        "peak": 1
+      }
+    }
+  ]
+}

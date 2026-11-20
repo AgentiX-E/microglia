@@ -13,6 +13,8 @@ dispatch nobody cancels.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import os
 import socket
@@ -134,32 +136,44 @@ class PackTest(unittest.TestCase):
         self.assertEqual(agent.render_pack([]), "")
 
     def test_numbers_the_entries_and_closes_with_a_blank_line(self):
-        self.assertEqual(agent.render_pack(["a rule", "another"]), "Rules from earlier attempts:\n1. a rule\n2. another\n\n")
+        self.assertEqual(
+            agent.render_pack(["a rule", "another"]),
+            agent.PACK_HEADER + "\n1. a rule\n2. another\n\n",
+        )
 
-    def test_the_opening_puts_the_pack_above_the_examples(self):
+    def test_the_header_is_the_competitors_rule_template_verbatim(self):
+        # `RULE_TEMPLATE['alfworld']` in `prompts/templates/human.py@LeapLabTHU/ExpeL`, at the blob this
+        # lane's examples come from (`2b2093ef`). Pinned as a string rather than described, because the
+        # arm is offered as the competitor's mechanism and a paraphrase would make the always-in arm
+        # this repository's prompt wearing the paper's name. The competitor's grammar is kept too.
+        self.assertEqual(
+            agent.PACK_HEADER,
+            "The following are some experience you gather on a similar task of completing a household task "
+            "by interacting in a household environment. Use these as references to help you perform this task:",
+        )
+
+    def test_the_opening_carries_no_pack_and_starts_with_the_instruction(self):
+        # The pack is prepended to the first observation instead (see the loop tests), which is where the
+        # competitor puts it and is what keeps the control's prompt byte-identical to the one the 20-game
+        # calibration measured.
         examples = agent.load_examples()
-        opening = agent.build_opening(examples, "put", "Your task is to: x\n", 50, agent.render_pack(["r"]))
+        opening = agent.build_opening(examples, "put", "Your task is to: x\n", 50)
         self.assertEqual(opening[0], {"role": "system", "content": agent.SYSTEM_INSTRUCTION})
-        self.assertTrue(opening[1]["content"].startswith("Rules from earlier attempts:"))
+        self.assertTrue(opening[1]["content"].startswith("Your task is to: x\n"))
         self.assertIn("You may take maximum of 50 steps.", opening[1]["content"])
         self.assertIn("Here are two examples:", opening[1]["content"])
         expected_turns = sum(len(agent.split_transcript(t)) for t in examples["examples"]["put"])
         self.assertEqual(len(opening) - 2, expected_turns)
+        for message in opening:
+            self.assertNotIn(agent.PACK_HEADER, message["content"])
 
-    def test_without_a_pack_the_opening_starts_with_the_instruction(self):
+    def test_the_opening_is_a_function_of_the_episode_and_nothing_else(self):
+        # Two calls with the same arguments produce the same prompt, so the arms cannot differ in the
+        # opening by accident and a recorded prefix means something.
         examples = agent.load_examples()
-        opening = agent.build_opening(examples, "put", "Your task is to: x\n", 50, "")
-        self.assertTrue(opening[1]["content"].startswith("Your task is to: x\n"))
-
-    def test_the_two_arms_differ_in_exactly_one_block(self):
-        # The registration's claim is that the arms differ in what sits above the transcript and in
-        # nothing else. This is that claim as an assertion.
-        examples = agent.load_examples()
-        bare = agent.build_opening(examples, "put", "Your task is to: x\n", 50, "")
-        packed = agent.build_opening(examples, "put", "Your task is to: x\n", 50, agent.render_pack(["r"]))
-        self.assertEqual(len(bare), len(packed))
-        differing = [index for index in range(len(bare)) if bare[index] != packed[index]]
-        self.assertEqual(differing, [1])
+        first = agent.build_opening(examples, "put", "Your task is to: x\n", 50)
+        second = agent.build_opening(examples, "put", "Your task is to: x\n", 50)
+        self.assertEqual(first, second)
 
 
 class ParseTest(unittest.TestCase):
@@ -542,6 +556,92 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(episode["steps"], 3)
 
 
+class TrajectoryTest(unittest.TestCase):
+    """What a rule bank is distilled from: the episode as the competitor's critique prompt reads it.
+
+    Assertions are made on the flat text rather than on lines, because an observation is two lines long
+    in this world (`room description`, then `Your task is to: …`) and a line-indexed test would be a test
+    about the fixture's line count.
+    """
+
+    def setUp(self):
+        self.examples = agent.load_examples()
+        self.world = FakeWorld()
+
+    def drive(self, **overrides):
+        arguments = {
+            "arm": "none",
+            "policy": "first",
+            "examples": self.examples,
+            "rules": [],
+            "draw": agent.Draw(7),
+            "max_steps": 50,
+            "top_k": 3,
+            "model": "deepseek-flash",
+            "api_key": "",
+            "timeout": 1.0,
+            "record_transcripts": True,
+        }
+        arguments.update(overrides)
+        return agent.run_episode(self.world, **arguments)
+
+    def test_the_trajectory_is_the_episode_in_the_competitors_rendering(self):
+        opening = self.world.observation()
+        episode = self.drive()
+        text = episode["trajectory"]
+        self.assertTrue(episode["won"])
+        self.assertTrue(text.startswith(opening))
+        self.assertIn("\n> take apple 1 from countertop 1\n", text)
+        self.assertIn("\n> put apple 1 in/on cabinet 1\n", text)
+        self.assertEqual(text.count("\n> "), 2)
+        self.assertTrue(text.endswith("You put the apple 1 in/on the cabinet 1."))
+
+    def test_a_thought_is_answered_with_ok_exactly_as_the_examples_are(self):
+        original = agent.chat
+        replies = ["> think: I need an apple", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        agent.chat = lambda messages, model, api_key, timeout: (
+            replies.pop(0),
+            {"prompt_tokens": 10, "completion_tokens": 1, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 10},
+        )
+        try:
+            episode = self.drive(policy="model")
+        finally:
+            agent.chat = original
+        self.assertIn("\n> think: I need an apple\nOK.\n> take apple 1 from countertop 1\n", episode["trajectory"])
+
+    def test_free_text_is_recorded_as_the_thought_the_parser_read_it_as(self):
+        original = agent.chat
+        replies = ["I cannot find the apple.", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        agent.chat = lambda messages, model, api_key, timeout: (
+            replies.pop(0),
+            {"prompt_tokens": 10, "completion_tokens": 1, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 10},
+        )
+        try:
+            episode = self.drive(policy="model")
+        finally:
+            agent.chat = original
+        self.assertIn("\n> think: I cannot find the apple.\nOK.\n", episode["trajectory"])
+
+    def test_a_trajectory_is_absent_unless_it_was_asked_for(self):
+        # 134 transcripts are about 700 KB of artefact that a scored run has no use for.
+        episode = self.drive(record_transcripts=False)
+        self.assertNotIn("trajectory", episode)
+
+    def test_a_lost_game_still_records_its_trajectory(self):
+        # The bank is distilled from successes, but a trajectory that only existed for wins would make the
+        # artefact unable to answer why the other half failed.
+        self.world.step = lambda actions: (
+            ["nothing happens"],
+            [0.0],
+            [False],
+            {"won": [False], "admissible_commands": [self.world.admissible()]},
+        )
+        episode = self.drive(max_steps=4)
+        self.assertFalse(episode["won"])
+        self.assertEqual(episode["trajectory"].count("\n> "), 4)
+        self.assertTrue(episode["trajectory"].endswith("nothing happens"))
+
+
 class ModelPolicyTest(unittest.TestCase):
     def setUp(self):
         self.examples = agent.load_examples()
@@ -614,6 +714,62 @@ class ModelPolicyTest(unittest.TestCase):
         self.assertEqual(episode["invalid_actions"], 1)
         self.assertEqual(episode["off_space_actions"], 0)
 
+    def test_the_pack_is_prepended_to_the_first_observation_and_absent_from_the_instruction(self):
+        # The placement is the competitor's: `insert_before_task_prompt` puts the rule block after the
+        # few-shot block and before the task. Here the task line is hoisted to the top of the first human
+        # turn, so the block sits immediately before the room description instead.
+        seen = []
+        original = agent.chat
+
+        def chat(messages, model, api_key, timeout):
+            seen.append([message["content"] for message in messages])
+            return "> take apple 1 from countertop 1", {
+                "prompt_tokens": 10,
+                "completion_tokens": 1,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 10,
+            }
+
+        agent.chat = chat
+        try:
+            agent.run_episode(
+                self.world, "always-in", "model", self.examples,
+                ["always open the cabinet before taking anything."],
+                agent.Draw(1), 1, 3, "deepseek-flash", "k", 1.0,
+            )
+        finally:
+            agent.chat = original
+        first = seen[0]
+        for message in first[:-1]:
+            self.assertNotIn(agent.PACK_HEADER, message)
+        self.assertTrue(first[-1].startswith(agent.PACK_HEADER))
+        self.assertIn("1. always open the cabinet before taking anything.", first[-1])
+        self.assertIn("You are in the middle of a room.", first[-1])
+
+    def test_the_control_arm_carries_no_pack_whatsoever(self):
+        # `none` is the corpus's own difficulty, so its first observation is the environment's string and
+        # nothing else. A prefix byte here would make every arm's absolute score incomparable to a
+        # published ReAct row without saying so.
+        seen = []
+        original = agent.chat
+
+        def chat(messages, model, api_key, timeout):
+            seen.append(messages[-1]["content"])
+            return "> take apple 1 from countertop 1", {
+                "prompt_tokens": 10,
+                "completion_tokens": 1,
+                "prompt_cache_hit_tokens": 0,
+                "prompt_cache_miss_tokens": 10,
+            }
+
+        opening = self.world.observation()
+        agent.chat = chat
+        try:
+            agent.run_episode(self.world, "none", "model", self.examples, [], agent.Draw(1), 1, 3, "deepseek-flash", "k", 1.0)
+        finally:
+            agent.chat = original
+        self.assertEqual(seen[0], opening)
+
     def test_a_reply_that_is_not_a_command_at_all_is_counted_as_off_space(self):
         self.script(["I would rather not.", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"])
         # Free text parses as a thought, so the loop retries; the count that matters is the thought.
@@ -630,7 +786,7 @@ class MainTest(unittest.TestCase):
         self.original_build = agent.build_env
         self.original_chat = agent.chat
         self.world = FakeWorld()
-        agent.build_env = lambda batch_size=1: (self.world, 1)
+        agent.build_env = lambda batch_size=1, train_eval="eval_out_of_distribution": (self.world, 1)
         self.out = HERE / "agent-under-test.json"
         self.floor = HERE / "floor-under-test.json"
 
@@ -730,6 +886,101 @@ class MainTest(unittest.TestCase):
                 os.environ.pop("DEEPSEEK_API_KEY", None)
             else:
                 os.environ["DEEPSEEK_API_KEY"] = original
+
+    def test_trace_prints_the_first_replies_of_the_arm(self):
+        # The first reading of a calibration is not the score: it is the first few replies, because a rate
+        # computed over a format the model ignored is a rate about the format.
+        original = os.environ.get("DEEPSEEK_API_KEY")
+        os.environ["DEEPSEEK_API_KEY"] = "test-key"
+        replies = ["> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        agent.chat = lambda messages, model, api_key, timeout: (
+            replies.pop(0),
+            {"prompt_tokens": 10, "completion_tokens": 1, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 10},
+        )
+        printed = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(printed):
+                self.assertEqual(
+                    self.run_main(["--policy", "model", "--games", "1", "--trace", "2", "--out", str(self.out)]), 0
+                )
+        finally:
+            if original is None:
+                os.environ.pop("DEEPSEEK_API_KEY", None)
+            else:
+                os.environ["DEEPSEEK_API_KEY"] = original
+        self.assertIn("turn 1 action: '> take apple 1 from countertop 1'", printed.getvalue())
+        self.assertIn("turn 2 action: '> put apple 1 in/on cabinet 1'", printed.getvalue())
+
+    def test_a_model_pass_that_never_acted_fails_rather_than_reporting_zero(self):
+        # A pass where every reply parsed as a thought is not a low score; it is a prompt the model did not
+        # read as a prompt, and a rate over it would be a rate about the skeleton's syntax.
+        original = os.environ.get("DEEPSEEK_API_KEY")
+        os.environ["DEEPSEEK_API_KEY"] = "test-key"
+        agent.chat = lambda messages, model, api_key, timeout: (
+            "I would rather not.",
+            {"prompt_tokens": 10, "completion_tokens": 1, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 10},
+        )
+        printed = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(printed):
+                with self.assertRaises(SystemExit) as caught:
+                    self.run_main(["--policy", "model", "--games", "1", "--max-steps", "2", "--out", str(self.out)])
+        finally:
+            if original is None:
+                os.environ.pop("DEEPSEEK_API_KEY", None)
+            else:
+                os.environ["DEEPSEEK_API_KEY"] = original
+        self.assertEqual(caught.exception.code, 1)
+        self.assertIn("no episode produced an action", printed.getvalue())
+
+    def test_the_split_reaches_the_environment_builder(self):
+        # `valid_seen` is training data for the rule bank and `valid_unseen` is the measurement. A dispatch
+        # that named one and drove the other would distil rules from the held-out games and then report a
+        # score on them, which is a leak that looks like a result.
+        seen = {}
+
+        def build(batch_size=1, train_eval="eval_out_of_distribution"):
+            seen["train_eval"] = train_eval
+            return self.world, 1
+
+        agent.build_env = build
+        try:
+            self.assertEqual(
+                self.run_main(["--split", "eval_in_distribution", "--policy", "first", "--games", "1", "--out", str(self.out)]),
+                0,
+            )
+        finally:
+            agent.build_env = lambda batch_size=1, train_eval="eval_out_of_distribution": (self.world, 1)
+        self.assertEqual(seen["train_eval"], "eval_in_distribution")
+        self.assertEqual(json.loads(self.out.read_text(encoding="utf-8"))["summary"]["split"], "eval_in_distribution")
+
+    def test_the_default_split_is_the_held_out_one(self):
+        seen = {}
+
+        def build(batch_size=1, train_eval="unset"):
+            seen["train_eval"] = train_eval
+            return self.world, 1
+
+        agent.build_env = build
+        try:
+            self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
+        finally:
+            agent.build_env = lambda batch_size=1, train_eval="eval_out_of_distribution": (self.world, 1)
+        self.assertEqual(seen["train_eval"], "eval_out_of_distribution")
+
+    def test_recorded_transcripts_reach_the_artefact(self):
+        self.assertEqual(
+            self.run_main(["--policy", "first", "--games", "1", "--record-transcripts", "--out", str(self.out)]), 0
+        )
+        payload = json.loads(self.out.read_text(encoding="utf-8"))
+        self.assertTrue(payload["summary"]["transcripts"])
+        self.assertIn("> take apple 1 from countertop 1", payload["episodes"][0]["trajectory"])
+
+    def test_transcripts_are_off_by_default(self):
+        self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
+        payload = json.loads(self.out.read_text(encoding="utf-8"))
+        self.assertFalse(payload["summary"]["transcripts"])
+        self.assertNotIn("trajectory", payload["episodes"][0])
 
     def test_a_model_pass_bills_what_it_used(self):
         original = os.environ.get("DEEPSEEK_API_KEY")
@@ -885,13 +1136,13 @@ class RefusalTest(unittest.TestCase):
             sys.argv = original
 
     def test_a_game_driven_twice_fails_the_pass(self):
-        agent.build_env = lambda batch_size=1: (FakeWorld(), 2)
+        agent.build_env = lambda batch_size=1, train_eval="": (FakeWorld(), 2)
         with self.assertRaises(SystemExit) as caught:
             self.run_main(["--policy", "first", "--games", "2", "--out", str(self.out)])
         self.assertEqual(caught.exception.code, 1)
 
     def test_a_pass_that_spends_its_budget_is_a_result_rather_than_a_failure(self):
-        agent.build_env = lambda batch_size=1: (FakeWorld(never_ends=True), 1)
+        agent.build_env = lambda batch_size=1, train_eval="": (FakeWorld(never_ends=True), 1)
         self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--max-steps", "3", "--out", str(self.out)]), 0)
         summary = json.loads(self.out.read_text(encoding="utf-8"))["summary"]
         self.assertEqual(summary["budget_exhausted"], 1)
@@ -902,7 +1153,7 @@ class RefusalTest(unittest.TestCase):
         # budget ending: it is the pass losing the game, and it must not be written up as a rate.
         world = FakeWorld()
         world.admissible = lambda: []
-        agent.build_env = lambda batch_size=1: (world, 1)
+        agent.build_env = lambda batch_size=1, train_eval="": (world, 1)
         with self.assertRaises(SystemExit) as caught:
             self.run_main(["--policy", "first", "--games", "1", "--max-steps", "50", "--out", str(self.out)])
         self.assertEqual(caught.exception.code, 1)
@@ -919,14 +1170,14 @@ class RefusalTest(unittest.TestCase):
                 self.gamefile = self.gamefile.split("/trial_")[0] + f"/trial_{RotatingWorld.turn}/game.tw-pddl"
                 return super().reset()
 
-        agent.build_env = lambda batch_size=1: (RotatingWorld(), 2)
+        agent.build_env = lambda batch_size=1, train_eval="": (RotatingWorld(), 2)
         self.assertEqual(self.run_main(["--policy", "first", "--games", "2", "--out", str(self.out)]), 0)
         self.assertEqual(json.loads(self.out.read_text(encoding="utf-8"))["summary"]["wins"], 2)
 
     def test_a_bank_without_a_cap_is_read_whole(self):
         bank = HERE / "bank-no-cap.json"
         bank.write_text(json.dumps({"entries": ["one", "two"]}), encoding="utf-8")
-        agent.build_env = lambda batch_size=1: (FakeWorld(), 1)
+        agent.build_env = lambda batch_size=1, train_eval="": (FakeWorld(), 1)
         try:
             self.assertEqual(
                 self.run_main(
@@ -947,7 +1198,7 @@ class RefusalTest(unittest.TestCase):
             replies.pop(0),
             {"prompt_tokens": 1, "completion_tokens": 1, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 1},
         )
-        agent.build_env = lambda batch_size=1: (FakeWorld(), 1)
+        agent.build_env = lambda batch_size=1, train_eval="": (FakeWorld(), 1)
         try:
             self.assertEqual(self.run_main(["--policy", "model", "--games", "1", "--out", str(self.out)]), 0)
             summary = json.loads(self.out.read_text(encoding="utf-8"))["summary"]

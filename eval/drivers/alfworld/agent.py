@@ -17,12 +17,20 @@ bank's cap of rules rendered whole on every episode; `retrieved` carries the ent
 admits. The three differ in one block of text and in nothing else — same model, same decoding, same step
 cap, same examples, same parser.
 
-**Why the pack is fixed per episode and placed above the examples.** DeepSeek caches on a token-block
-prefix, so a block that changes every turn makes every turn after it a miss; the τ² lane paid for that
-lesson already (R57's Amendment 4). The pack is therefore rendered once, at the top of the first human
-turn, and the whole prefix — system, pack, instruction, examples — is stable for the episode. A
-`retrieved` arm that re-anchored per turn would be a different and much more expensive experiment, and
-it is not this one.
+**Why the pack is fixed per episode, and where it sits.** DeepSeek caches on a token-block prefix, so a
+block that changes every turn makes every turn after it a miss; the τ² lane paid for that lesson already
+(R57's Amendment 4). The pack is therefore rendered once per episode, and it is prepended to the first
+observation — after the examples, immediately before the game's own text — because that is where the
+competitor puts it (`insert_before_task_prompt` appends the rule block after the few-shot block and
+before the task line in `agent/react.py@LeapLabTHU/ExpeL`). Everything before the first observation is
+fixed for the episode, so the prefix is stable either way; the position is fidelity, not caching.
+
+**What this skeleton does not reproduce, stated once.** The competitor sends its two example transcripts
+inside one human message and carries the task at the end (`Now it's your turn!\n<task>`); this file
+splits each transcript into alternating turns and carries the task line at the top of the first human
+turn. Both are renderings of the same prompt, they are identical across arms, so the paired delta this
+lane reports is unaffected by them — but a comparison against a published absolute number is a
+comparison of two different renderings, and that limit is registered rather than argued away.
 
 **Two policies that never call a model.** `--policy seed` chooses uniformly among the commands the
 environment publishes, using `floor.Draw`; `--policy first` takes the first. `seed` exists to be
@@ -61,6 +69,11 @@ sys.path.insert(0, str(HERE))
 from floor import DATA_ROOT, SPLIT, Draw, build_env, digest_of, game_key, wilson  # noqa: E402
 
 ARMS = ("none", "always-in", "retrieved")
+# The three splits the installed environment publishes, in its own names. `eval_in_distribution` is
+# `valid_seen` (140 games) and it is *training* data for the rule bank: ExpeL extracts its rules there
+# and reports on `valid_unseen`, and a bank distilled from the held-out split would be a leak dressed
+# as a memory.
+SPLITS = ("eval_out_of_distribution", "eval_in_distribution", "train")
 POLICIES = ("model", "seed", "first")
 
 # The six task types the split publishes, keyed by the prefix the competitor keys its examples by. The
@@ -78,7 +91,21 @@ TASK_KIND_PREFIXES = (
 
 SYSTEM_INSTRUCTION = "Follow the syntax of the examples closely when taking actions."
 HUMAN_TEMPLATE = "{instruction}You may take maximum of {max_steps} steps.\nHere are two examples:"
-PACK_HEADER = "Rules from earlier attempts:"
+
+# The rules block, in the competitor's own words. `prompts/templates/human.py@LeapLabTHU/ExpeL` carries
+# it as `RULE_TEMPLATE['alfworld']` and its grammar is left alone deliberately — *"experience you
+# gather"*, not *"experiences you gathered"* — because an arm that is offered as the competitor's
+# mechanism is a rendering of the competitor's prompt, and a silently corrected sentence is a
+# difference between two arms that nobody registered.
+#
+# This replaced a header written by this project ("Rules from earlier attempts:"). The replacement is
+# not cosmetic: the `always-in` arm is the control for a published 19pp, and a control rendered in this
+# repository's voice rather than the paper's is a measurement of this repository's prompt with the
+# paper's name on it.
+PACK_HEADER = (
+    "The following are some experience you gather on a similar task of completing a household task by "
+    "interacting in a household environment. Use these as references to help you perform this task:"
+)
 
 # The competitor's parser, transliterated. Order matters: a reply that opens with `> think` is a
 # thought even if the rest of it looks like an action, and a reply with no prefix at all is wrapped as
@@ -242,6 +269,11 @@ def render_pack(entries: "list[str]") -> str:
     An empty arm renders an empty string rather than a sentence saying so: a block that announces its
     own emptiness is information the `none` arm does not receive, and the two arms would then differ in
     two places instead of one.
+
+    The trailing blank line is this file's separator between the block and the room description that
+    follows it. The competitor separates the same two things with a task line (`Now it's your turn!`),
+    which this skeleton carries at the top of the first human turn instead; see the module docstring on
+    what that costs and what it does not.
     """
     if not entries:
         return ""
@@ -251,12 +283,17 @@ def render_pack(entries: "list[str]") -> str:
     return "\n".join(lines) + "\n\n"
 
 
-def build_opening(
-    examples: dict, kind: str, instruction: str, max_steps: int, pack: str
-) -> "list[dict[str, str]]":
-    """The messages every arm shares, with the pack (when there is one) above the examples."""
+def build_opening(examples: dict, kind: str, instruction: str, max_steps: int) -> "list[dict[str, str]]":
+    """The messages every arm shares: the system line, the instruction, and the two examples.
+
+    The pack is not here. It is prepended to the first observation instead, which is where the
+    competitor puts it — after the examples, immediately before the game's own text, with only the task
+    line in between. Two consequences, both wanted: the `none` arm's prompt is *byte-identical* to the
+    one the 20-game calibration measured (nothing is inserted), and the arms still differ in exactly
+    one block.
+    """
     opening: "list[dict[str, str]]" = [{"role": "system", "content": SYSTEM_INSTRUCTION}]
-    opening.append({"role": "user", "content": pack + HUMAN_TEMPLATE.format(instruction=instruction, max_steps=max_steps)})
+    opening.append({"role": "user", "content": HUMAN_TEMPLATE.format(instruction=instruction, max_steps=max_steps)})
     for transcript in examples["examples"][kind]:
         for role, content in split_transcript(transcript):
             opening.append({"role": role, "content": content})
@@ -387,8 +424,16 @@ def run_episode(
     api_key: str,
     timeout: float,
     trace: int = 0,
+    record_transcripts: bool = False,
 ) -> dict:
-    """One game, driven by one arm. Returns the episode record; never a partly-filled one."""
+    """One game, driven by one arm. Returns the episode record; never a partly-filled one.
+
+    `record_transcripts` adds the trajectory in the shape the competitor's critique prompt reads it —
+    the first observation, then every reply as `> …` prefixed and every answer to it as its own line —
+    which is what a rule bank has to be distilled from. It is off by default because 134 transcripts
+    are about 700 KB of artefact that a scored run has no use for, and an artefact nobody reads is a
+    field that quietly stops being true.
+    """
     observation, info = env.reset()
     raw_gamefile = info["extra.gamefile"]
     gamefile = game_key(raw_gamefile[0] if isinstance(raw_gamefile, (list, tuple)) else raw_gamefile)
@@ -411,6 +456,11 @@ def run_episode(
     done = False
     won = False
     last = str(observation[0])
+    # The trajectory, in the competitor's rendering: the game's own text first, then `> reply` and its
+    # answer on alternating lines. Built only when asked for, but built the same way either way — a
+    # second function that reconstructed it from `messages` afterwards would be a second answer to
+    # "what did this episode look like".
+    trajectory: "list[str]" = [last.strip()]
 
     # `steps` counts model turns, not environment steps: a thought spends one and moves nothing, which is
     # how a turn budget bounds the bill while leaving the world's own 50-step cap to decide the game.
@@ -433,10 +483,11 @@ def run_episode(
             elif arm == "retrieved":
                 selected = anchor(last, rules, top_k)
             pack_entries = len(selected)
-            opening = build_opening(examples, kind, instruction, max_steps, render_pack(selected))
-            prefix_chars = sum(len(message["content"]) for message in opening)
+            pack = render_pack(selected)
+            opening = build_opening(examples, kind, instruction, max_steps)
+            prefix_chars = sum(len(message["content"]) for message in opening) + len(pack)
             messages = list(opening)
-            messages.append({"role": "user", "content": last})
+            messages.append({"role": "user", "content": pack + last})
 
         consecutive_thoughts = 0
         action: "str | None" = None
@@ -459,7 +510,9 @@ def run_episode(
             replies.append(reply)
             if trace and len(replies) <= trace:
                 print(f"  [{gamefile.split('/')[-3]}] turn {len(replies)} {kind_of_reply}: {reply[:160]!r}")
-            messages.append({"role": "assistant", "content": reply if reply.startswith(">") else f"> think: {reply}"})
+            spoken = reply if reply.startswith(">") else f"> think: {reply}"
+            messages.append({"role": "assistant", "content": spoken})
+            trajectory.append(spoken)
             if kind_of_reply == "action" and payload:
                 action = payload
                 break
@@ -471,6 +524,7 @@ def run_episode(
             if consecutive_thoughts == STALL_THOUGHTS:
                 stalls += 1
             messages.append({"role": "user", "content": "OK."})
+            trajectory.append("OK.")
             if steps >= max_steps:
                 # The budget ran out on a thought, so the episode ends without another environment step.
                 break
@@ -491,8 +545,9 @@ def run_episode(
         observe_chars.append(len(last))
         won = bool(info.get("won", [False])[0])
         messages.append({"role": "user", "content": last})
+        trajectory.append(last.strip())
 
-    return {
+    record = {
         "gamefile": gamefile,
         "task_kind": kind,
         "won": won,
@@ -518,6 +573,9 @@ def run_episode(
         "usage": dict(usage_total),
         "last_line": last.strip().splitlines()[-1][:120] if last.strip() else "",
     }
+    if record_transcripts:
+        record["trajectory"] = "\n".join(trajectory)
+    return record
 
 
 # --------------------------------------------------------------------------------------------------
@@ -566,6 +624,17 @@ def main() -> int:
     parser.add_argument("--rules", default="", help="a rendered rule bank; required by always-in and retrieved")
     parser.add_argument("--top-k", type=int, default=3, help="entries the retrieved arm may carry")
     parser.add_argument("--games", type=int, default=0, help="0 drives the whole split")
+    parser.add_argument(
+        "--split",
+        choices=SPLITS,
+        default="eval_out_of_distribution",
+        help="which split to drive; the held-out 134 by default, valid_seen's 140 for distillation",
+    )
+    parser.add_argument(
+        "--record-transcripts",
+        action="store_true",
+        help="carry each episode's trajectory in the artefact, which is what a rule bank is distilled from",
+    )
     parser.add_argument("--shard", default="0/1", help="i/n; the pass is sliced and each slice is a job")
     parser.add_argument("--max-steps", type=int, default=50, help="the environment's own cap")
     parser.add_argument("--seed", type=int, default=20261120)
@@ -601,13 +670,13 @@ def main() -> int:
     examples = load_examples()
     card = load_rate_card()
 
-    env, num_games = build_env()
+    env, num_games = build_env(train_eval=arguments.split)
     total = num_games if arguments.games <= 0 else min(arguments.games, num_games)
     start, stop = shard_bounds(arguments.shard, total)
     draw = Draw(arguments.seed)
 
     print(
-        f"arm={arguments.arm} policy={arguments.policy} games={start}..{stop - 1} of {total} "
+        f"arm={arguments.arm} policy={arguments.policy} split={arguments.split} games={start}..{stop - 1} of {total} "
         f"max_steps={arguments.max_steps} rules={len(rules)} model={arguments.model if arguments.policy == 'model' else '-'}"
     )
     episodes: "list[dict]" = []
@@ -629,6 +698,7 @@ def main() -> int:
             api_key,
             arguments.timeout,
             arguments.trace,
+            arguments.record_transcripts,
         )
         episodes.append(episode)
         if len(episodes) % 10 == 0 or index + 1 == stop:
@@ -669,6 +739,8 @@ def main() -> int:
     summary = {
         "arm": arguments.arm,
         "policy": arguments.policy,
+        "split": arguments.split,
+        "transcripts": bool(arguments.record_transcripts),
         "model": arguments.model if arguments.policy == "model" else None,
         "seed": arguments.seed,
         "shard": arguments.shard,

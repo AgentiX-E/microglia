@@ -47,6 +47,10 @@ on:
         description: 'print the first N replies; a calibration reads three before it reads its score'
         required: false
         default: '0'
+      train:
+        description: 'games to drive on valid_seen for distillation; empty skips the rule-bank jobs'
+        required: false
+        default: ''
   push:
     branches: [master]
     paths:
@@ -83,7 +87,10 @@ jobs:
           python-version: '3.10'
 
       - name: Run the decisions
-        run: python eval/drivers/alfworld/test_agent.py
+        run: |
+          python eval/drivers/alfworld/test_agent.py
+          python eval/drivers/alfworld/test_aggregate.py
+          python eval/drivers/alfworld/test_distill.py
 
       - name: Report the bill
         if: always()
@@ -403,4 +410,136 @@ jobs:
           path: |
             ${{ runner.temp }}/arm.json
             ${{ runner.temp }}/arm.log
+          if-no-files-found: warn
+
+  distill-train:
+    # The pass a rule bank has to be distilled from, and the one thing about it that must not be got wrong:
+    # the split. ExpeL extracts its rules on `valid_seen` and reports on `valid_unseen`; a bank extracted
+    # from the held-out games would be a memory that had already seen the answers, and the arm carrying it
+    # would score well for a reason no reader of the number could recover. `--split` is therefore named
+    # here rather than defaulted.
+    #
+    # It is the control arm that is driven (`--arm none`), because that is what the competitor distils from:
+    # its own rollouts before any memory exists. A bank extracted from an arm that already carried a bank is
+    # a bank about the bank.
+    name: the training pass a rule bank is extracted from
+    if: github.event_name == 'workflow_dispatch' && inputs.train != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Cache the wheels textworld builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-textworld-1.6.1-tatsu-5.8.3-v1
+
+      - name: Install the environment
+        run: |
+          python -m pip install --upgrade pip
+          for attempt in 1 2 3; do
+            if pip install 'textworld[pddl]==1.6.1' 'tatsu==5.8.3'; then break; fi
+            echo "textworld build attempt $attempt failed; retrying"
+            sleep $((attempt * 20))
+          done
+          python -c "import textworld, tatsu; print('textworld', textworld.__version__, 'tatsu', tatsu.__version__)"
+          pip install 'git+https://github.com/alfworld/alfworld@0.4.2' --no-deps
+          pip install pandas pyyaml tqdm requests
+
+      - name: Fetch the games
+        run: |
+          export ALFWORLD_DATA="$HOME/.cache/alfworld"
+          alfworld-download
+          find "$ALFWORLD_DATA" -name 'game.tw-pddl' | wc -l
+
+      - name: Drive the training slice with transcripts
+        env:
+          ALFWORLD_DATA: /home/runner/.cache/alfworld
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          TRAIN: ${{ inputs.train }}
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEEPSEEK_API_KEY}" ]; then
+            echo "::error::a training pass needs DEEPSEEK_API_KEY"
+            exit 1
+          fi
+          # Four fixed slices, matching the matrix below. An input would be a number a dispatch could set
+          # to two while the matrix still ran four, and two of the four would drive overlapping games.
+          python eval/drivers/alfworld/agent.py \
+            --arm none --policy model --split eval_in_distribution \
+            --games "${TRAIN}" --shard "${SHARD}/4" \
+            --record-transcripts --out "$RUNNER_TEMP/train-${SHARD}.json" \
+            | tee "$RUNNER_TEMP/train-${SHARD}.log"
+
+      - name: Upload the slice
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alfworld-train-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/train-${{ matrix.shard }}.json
+            ${{ runner.temp }}/train-${{ matrix.shard }}.log
+          if-no-files-found: warn
+
+  distill-bank:
+    # Ten critique calls, and the bank they produce. The chunk size and the cap are the competitor's own
+    # (`success_critique_num: 8`, `max_num_rules: 20` in `configs/agent/expel.yaml`), passed explicitly
+    # rather than defaulted so that the artefact records what it was built with.
+    #
+    # What it cannot reproduce: ExpeL's first critique pass compares a successful trial against failed
+    # attempts at the *same* task, which needs repeated trials and the split gives one. Only the success
+    # path is available, so this bank is the competitor's extraction minus its contrast — a limit that is
+    # reported beside the score rather than in a footnote.
+    name: the bank, distilled from the slices
+    if: github.event_name == 'workflow_dispatch' && inputs.train != ''
+    needs: distill-train
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Fetch the slices
+        uses: actions/download-artifact@v4
+        with:
+          pattern: alfworld-train-*
+          path: ${{ runner.temp }}/slices
+          merge-multiple: true
+
+      - name: Distil the bank
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEEPSEEK_API_KEY}" ]; then
+            echo "::error::distillation needs DEEPSEEK_API_KEY"
+            exit 1
+          fi
+          ls "$RUNNER_TEMP/slices"
+          python eval/drivers/alfworld/distill.py \
+            --episodes "$RUNNER_TEMP"/slices/train-*.json \
+            --cap 20 --critique-num 8 \
+            --out "$RUNNER_TEMP/bank.json" | tee "$RUNNER_TEMP/bank.log"
+
+      - name: Upload the bank
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alfworld-bank
+          path: |
+            ${{ runner.temp }}/bank.json
+            ${{ runner.temp }}/bank.log
           if-no-files-found: warn

@@ -279,3 +279,83 @@ list is a different mechanism and would make `none` no longer the corpus's own d
   exactly this reason.
 - A `none` arm landing so close to the floor that 13.3pp of headroom does not exist. That is not a defect
   in the design; it is the design telling the truth about which model this question needs.
+
+## R164 — the arm is rendered in the competitor's voice, and the bank is built by a ported extractor
+
+**Registered 2026-11-20, before the rule bank exists and before any arm has carried one.** Two changes and no
+measurement: the `always-in` arm's block was rendered in this repository's words rather than the paper's, and the
+bank it carries now has a producer.
+
+### The block was ours, and the arm is offered as theirs
+
+The pack's header was `Rules from earlier attempts:` — a sentence this project wrote. The competitor's is
+`RULE_TEMPLATE['alfworld']` in `prompts/templates/human.py@LeapLabTHU/ExpeL`:
+
+> The following are some experience you gather on a similar task of completing a household task by interacting in a
+> household environment. Use these as references to help you perform this task:
+
+Two differences followed from that, and both are now the competitor's:
+
+| what | before | now |
+| --- | --- | --- |
+| the header | this project's sentence | the competitor's, verbatim, grammar included |
+| the position | above the instruction and the examples | prepended to the first observation — after the examples, immediately before the game's text |
+
+The position is where `insert_before_task_prompt` puts it: the rule message is appended **after** the few-shot block
+and **before** the task line. This skeleton carries the task line at the top of the first human turn, so the block
+lands between the examples and the room description, which is the same relative place.
+
+**It cost nothing and it invalidated nothing.** `none` carries no pack, so its prompt is byte-identical to the one the
+20-game calibration measured, and a test now asserts exactly that (`test_the_control_arm_carries_no_pack_whatsoever`):
+the first observation the control sends is the environment's string and nothing else. The two treatment arms have
+never been run, so moving their block cannot invalidate a reading that does not exist.
+
+### What is still not the competitor's, and why it stays
+
+| difference | effect on this lane | effect on a published comparison |
+| --- | --- | --- |
+| the two example transcripts are split into alternating turns; the competitor sends them as one human block | none: identical in all three arms | the prompt is a different rendering of the same examples |
+| the task line sits at the top of the first human turn; the competitor writes `Now it's your turn!` after the rules | none: identical in all three arms | same |
+| `max_steps` counts model turns here, environment steps there (at 20) | 50 turns at the measured 35.3% thought rate is about 32 actions, against the competitor's 20 | the caps are of comparable size but not the same size |
+
+Every row in that table is a reason a **paired** delta remains the claim and an **absolute** number against a
+published row does not. They are repaired by rebuilding the skeleton, not by a paragraph, and rebuilding it after
+the control was measured would mean re-measuring the control to say anything — so the limitation is registered
+rather than quietly closed.
+
+### The bank: who writes it, and with what
+
+`distill.py` builds it, in the competitor's chain: chunk the won trajectories by `success_critique_num` (8), call the
+`all_success_existing_rules` critique once per chunk, feed the list back in so later chunks can agree with or edit
+earlier rules, and apply the vote arithmetic. The arithmetic is `rule-bank.ts`'s, in Python, because this lane runs
+where `textworld` is installed and `node` is not guaranteed. **The two ports are checked against one file**,
+`rule-op-vectors.json`, read by `test_distill.py` and by `rule-bank-vectors.test.ts`: a drift is a red build on both
+sides rather than a bank that differs from what the TypeScript package says it would build.
+
+**The path the competitor uses that this lane cannot.** ExpeL's first criticism compares a successful trial against
+*failed trials of the same task*. That needs repeated attempts per task and both splits give one (AM.24), so this
+bank is the competitor's extraction **minus its contrast** — the `compare_existing_rules` half is absent, and the
+report says so where the score is reported.
+
+### What this round registers as a prediction, if the bank arrives
+
+Unchanged from R162: `always-in − none` is the registered contrast. What is added is the arithmetic of the bank
+itself, which is reported before the score is read:
+
+| reading | why it is read first |
+| --- | --- |
+| rules in the bank, and rules rendered within the cap | a bank of 4 rules and a bank of 20 are different treatments with the same name |
+| operations applied / rejected / culled | a bank built almost entirely from `ADD`s is a list nobody edited, which is a weaker treatment than the competitor's |
+| peak size, and whether it passed `cap + 5` | the cap is soft in the competitor; a bank that drifted is a fourth arm |
+
+**Cost, before it is spent.** The training pass is 140 `valid_seen` games at the measured ¥0.014 each = **¥1.96**;
+the critique calls are ten at ~12k input tokens each, about **¥0.10**; so the bank is **≈ ¥2.1**. The three arms over
+134 held-out games are **¥5.71** measured. **Total ≈ ¥7.8.**
+
+### What would make this registration void
+
+- A bank distilled from the held-out split. `--split eval_in_distribution` is named in the workflow rather than
+  defaulted, because a leak here would look exactly like a result.
+- A bank that the arm cannot read, or reads truncated without saying so: the arm reports `pack_entries` and
+  `rules_in_bank` separately for that reason.
+- A training pass whose transcripts are missing: `distill.py` refuses rather than distilling from whatever is left.

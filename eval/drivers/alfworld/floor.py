@@ -129,7 +129,16 @@ def on_disk() -> "set[str]":
     return {game_key(str(path)) for path in DATA_ROOT.glob(f"json_2.1.1/{SPLIT}/*/*/game.tw-pddl")}
 
 
-def build_env(batch_size: int = 1):
+def build_env(batch_size: int = 1, train_eval: str = "eval_out_of_distribution"):
+    """The environment for one split. `eval_out_of_distribution` is the held-out 134.
+
+    `train_eval` is the package's own name for the split selector, and the three values it accepts
+    are `train` (3,553 generated games), `eval_in_distribution` (`valid_seen`, 140) and
+    `eval_out_of_distribution` (`valid_unseen`, 134). The default is the held-out split, so every
+    caller that predates this parameter drives exactly what it drove before — the distillation job is
+    the only caller that names another one, and it names `eval_in_distribution` because the rule bank
+    has to be extracted from the split ExpeL trains on and measured on the split it does not.
+    """
     import yaml
 
     # The config lives in this repository rather than in the installed package: 0.4.2
@@ -148,7 +157,7 @@ def build_env(batch_size: int = 1):
     # environment; only the latter has reset and step. The first version of this file
     # called reset on the shell and failed with an AttributeError forty-two seconds into
     # the job, which is the reason the smoke pass exists.
-    shell = AlfredTWEnv(config, train_eval="eval_out_of_distribution")
+    shell = AlfredTWEnv(config, train_eval=train_eval)
     return shell.init_env(batch_size=batch_size), shell.num_games
 
 
