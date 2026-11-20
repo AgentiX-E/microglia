@@ -129,6 +129,19 @@ def on_disk() -> "set[str]":
     return {game_key(str(path)) for path in DATA_ROOT.glob(f"json_2.1.1/{SPLIT}/*/*/game.tw-pddl")}
 
 
+def read_config() -> "dict":
+    """The environment's own config, read from this repository rather than from the installed wheel.
+
+    0.4.2 ships it at `configs/base_config.yaml`, which is not a package and is therefore not installed by
+    `find_packages`; a lane that read whatever the wheel carried would record a different environment for the
+    same commit. Split out of `build_env` so the substitution it performs is a test rather than a comment.
+    """
+    import yaml
+
+    raw = (HERE / "config.yaml").read_text(encoding="utf-8").replace("$ALFWORLD_DATA", str(DATA_ROOT))
+    return yaml.safe_load(raw)
+
+
 def build_env(batch_size: int = 1, train_eval: str = "eval_out_of_distribution", shell_factory=None):
     """The environment for one split. `eval_out_of_distribution` is the held-out 134.
 
@@ -140,14 +153,7 @@ def build_env(batch_size: int = 1, train_eval: str = "eval_out_of_distribution",
     has to be extracted from the split ExpeL trains on and measured on the split it does not.
     """
     if shell_factory is None:
-        import yaml
-
-        # The config lives in this repository rather than in the installed package: 0.4.2
-        # ships it at `configs/base_config.yaml`, which is not a package and is therefore not
-        # installed by `find_packages`. A lane that read whatever the wheel carried would
-        # record a different environment for the same commit.
-        raw = (HERE / "config.yaml").read_text(encoding="utf-8").replace("$ALFWORLD_DATA", str(DATA_ROOT))
-        config = yaml.safe_load(raw)
+        config = read_config()
 
         # Imported after the environment variable is set: `alfworld.info` reads it at import
         # time, and a module-level import would freeze the default before this file can
@@ -224,8 +230,11 @@ def drive(env, draw: Draw, max_steps: int) -> "dict":
     }
 
 
-def pass_over(seed: int, limit: int, max_steps: int, label: str) -> "list[dict]":
-    env, num_games = build_env()
+def pass_over(seed: int, limit: int, max_steps: int, label: str, shell_factory=None) -> "list[dict]":
+    """One pass over the split. `shell_factory` is how a test supplies an environment without the package:
+    the alternative was patching this module's `build_env`, which is patching the thing under test.
+    """
+    env, num_games = build_env(shell_factory=shell_factory)
     total = num_games if limit <= 0 else min(limit, num_games)
     print(f"{label}: driving {total} games with seed {seed}, at most {max_steps} steps each")
     draw = Draw(seed)
@@ -261,15 +270,64 @@ def compare(first: "list[dict]", second: "list[dict]") -> "dict":
     }
 
 
-def main() -> int:
+def summarise(episodes: "list[dict]", expected: "set[str]", seed: int) -> "dict":
+    """One pass, as the numbers the registration quotes. A pure function so that a pass over zero games is a
+    case a test can construct rather than a branch inside `main` that no run can reach.
+
+    `expected` is the split's inventory rather than `len(episodes)`: a rate whose denominator is whatever the
+    pass happened to drive is a rate for an unknown population, and the coverage assertion in `main` is the only
+    thing that makes the two the same number.
+    """
+    total = len(episodes)
+    wins = sum(1 for episode in episodes if episode["won"])
+    steps_total = sum(episode["steps"] for episode in episodes)
+    low, high = wilson(wins, total)
+    # The prompt a turn-based agent would send is the transcript so far, so the transcript's own length is the
+    # cost model's input. A mean over episodes hides the tail, and the tail is what a per-episode price is wrong
+    # about, so the median and p90 sit beside it. The p90 is nearest-rank -- the value at ceil(0.9n) -- because
+    # `int(0.9 * (n - 1))` collapses to the minimum on a short pass (n=2 gives index 0, so the quoted tail was the
+    # cheapest episode), and a tail that is too small is a price that is too small.
+    contexts = sorted(sum(episode["observe_chars"]) for episode in episodes)
+    context_mean = sum(contexts) / total if total else 0.0
+    turns_per_episode = steps_total / total if total else 0.0
+    return {
+        "seed": seed,
+        "split": SPLIT,
+        "games_on_disk": len(expected),
+        "episodes": total,
+        "wins": wins,
+        "rate": wins / total if total else 0.0,
+        "wilson_low": round(low, 4),
+        "wilson_high": round(high, 4),
+        "steps_total": steps_total,
+        "steps_mean": round(steps_total / total, 2) if total else 0.0,
+        "admitted_mean": round(sum(e["admitted_at_reset"] for e in episodes) / total, 2) if total else 0.0,
+        "empty_admissible": sum(1 for episode in episodes if episode["admitted_at_reset"] == 0),
+        "context_chars": {
+            "mean": round(context_mean, 1),
+            "median": contexts[len(contexts) // 2] if contexts else 0,
+            "p90": contexts[math.ceil(0.9 * len(contexts)) - 1] if contexts else 0,
+            "max": contexts[-1] if contexts else 0,
+            "per_turn_mean": round(context_mean / turns_per_episode, 1) if turns_per_episode else 0.0,
+        },
+    }
+
+
+def main(argv=None, shell_factory=None) -> int:
+    """The command line, then `run`. Split so that the measurement below is callable with an environment
+    a test wrote: the alternative was patching this module from the test, which tests the patch.
+    """
     parser = argparse.ArgumentParser()
     parser.add_argument("--seed", type=int, default=20261120)
     parser.add_argument("--games", type=int, default=0, help="0 drives the whole split")
     parser.add_argument("--shadow-games", type=int, default=0, help="0 shadows every game driven")
     parser.add_argument("--max-steps", type=int, default=50, help="the environment's own cap")
     parser.add_argument("--out", default=str(HERE / "floor.json"))
-    arguments = parser.parse_args()
+    arguments = parser.parse_args(argv)
+    return run(arguments, shell_factory=shell_factory)
 
+
+def run(arguments, shell_factory=None) -> int:
     if not DATA_ROOT.exists():
         fail(f"no data at {DATA_ROOT}; run `alfworld-download` first")
 
@@ -278,7 +336,7 @@ def main() -> int:
         fail(f"no held-out games under {DATA_ROOT}/json_2.1.1/{SPLIT}")
     print(f"split: {len(expected)} games on disk")
 
-    first = pass_over(arguments.seed, arguments.games, arguments.max_steps, "pass 1")
+    first = pass_over(arguments.seed, arguments.games, arguments.max_steps, "pass 1", shell_factory=shell_factory)
 
     # (1) Every game driven is a game the split publishes, and every published game is
     # driven. A lane that silently replayed one game 134 times would report a floor and a
@@ -304,46 +362,15 @@ def main() -> int:
     # (3) The same seed replays. This is the assumption the whole power calculation rests
     # on, and it is cheap enough to test rather than assert.
     shadow_limit = arguments.games if arguments.shadow_games <= 0 else arguments.shadow_games
-    second = pass_over(arguments.seed, shadow_limit, arguments.max_steps, "pass 2")
+    second = pass_over(arguments.seed, shadow_limit, arguments.max_steps, "pass 2", shell_factory=shell_factory)
     determinism = compare(first, second)
     if determinism["mismatches"]:
         detail = determinism["first_mismatch"]
         fail(f"the same seed did not replay: episode {detail['episode']} {detail['field']}")
 
     wins = sum(1 for episode in first if episode["won"])
-    steps_total = sum(episode["steps"] for episode in first)
-    low, high = wilson(wins, len(first))
 
-    # The prompt a turn-based agent would send is the transcript so far, so the transcript's
-    # own length is the cost model's input, and it is measured here rather than assumed.
-    # `context_chars` is the sum of every observation an episode produced, which is what a
-    # ReAct prompt carries by its final turn. A mean over episodes hides the tail, and the
-    # tail is what a per-episode price is wrong about, so the median and p90 sit beside it.
-    contexts = sorted(sum(episode["observe_chars"]) for episode in first)
-    context_mean = sum(contexts) / len(contexts) if contexts else 0
-    turns_per_episode = steps_total / len(first) if first else 0
-
-    summary = {
-        "seed": arguments.seed,
-        "split": SPLIT,
-        "games_on_disk": len(expected),
-        "episodes": len(first),
-        "wins": wins,
-        "rate": wins / len(first) if first else 0.0,
-        "wilson_low": round(low, 4),
-        "wilson_high": round(high, 4),
-        "steps_total": steps_total,
-        "steps_mean": round(steps_total / len(first), 2) if first else 0.0,
-        "admitted_mean": round(sum(e["admitted_at_reset"] for e in first) / len(first), 2) if first else 0.0,
-        "empty_admissible": sum(1 for episode in first if episode["admitted_at_reset"] == 0),
-        "context_chars": {
-            "mean": round(context_mean, 1),
-            "median": contexts[len(contexts) // 2] if contexts else 0,
-            "p90": contexts[int(0.9 * (len(contexts) - 1))] if contexts else 0,
-            "max": contexts[-1] if contexts else 0,
-            "per_turn_mean": round(context_mean / turns_per_episode, 1) if turns_per_episode else 0.0,
-        },
-    }
+    summary = summarise(first, expected, arguments.seed)
 
     payload = {
         "summary": summary,

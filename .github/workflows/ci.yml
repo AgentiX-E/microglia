@@ -68,7 +68,7 @@ jobs:
           python3 -m pip install --disable-pip-version-check --quiet pyyaml
           python3 scripts/check-python-floor.py --self-test
           python3 scripts/check-python-floor.py
-          for suite in test_agent test_aggregate test_distill test_wait; do
+          for suite in test_agent test_aggregate test_distill test_floor test_wait; do
             echo "== $suite"
             python3 "eval/drivers/alfworld/$suite.py"
           done
