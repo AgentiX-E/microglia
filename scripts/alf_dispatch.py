@@ -109,6 +109,16 @@ def check(arguments):
             raise Refused(f"{named} has treatments but no control; pair it with {CONTROL!r} or name --control-run")
         if CONTROL in named and arguments.control_run:
             raise Refused("this dispatch buys its own control; --control-run would name a second one")
+    if arguments.bank_only:
+        # The mode exists for the failure that costs the most: the slices are bought and the bank dies. It reads
+        # from `train_run_ids`, so a dispatch that names none would distil from nothing while looking like a
+        # recovery, and `train` is still needed because it is the slice size the tiling check holds to.
+        if not arguments.train:
+            raise Refused("--bank-only still needs --train: it is the size of the slice the union must cover")
+        if not arguments.train_run_ids:
+            raise Refused("--bank-only reads its slices from --train-run-ids, and none were named")
+        if arguments.train_shards:
+            raise Refused("--bank-only drives no slice, so --train-shards would name games nobody drives")
     if arguments.chain and not arguments.train:
         raise Refused("--chain needs --train: the chain starts with the training pass")
     if arguments.sweep and (arguments.games or arguments.train):

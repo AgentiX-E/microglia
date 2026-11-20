@@ -86,11 +86,36 @@ class RefusalTest(unittest.TestCase):
     def test_a_gate_share_of_one_would_require_accounting_for_every_word(self):
         self.assertIn("share of the observation", self.refused("--sweep", "true", "--rules", "b.json", "--gate-share", "1"))
 
+    def test_a_bank_rebuild_without_a_run_to_read_from_is_refused(self):
+        # The mode exists for the failure where the slices are already bought; a dispatch that names no run
+        # would distil from nothing while reading like a recovery.
+        self.assertIn("train-run-ids", self.refused("--bank-only", "true", "--train", "140"))
+
+    def test_a_bank_rebuild_that_also_names_slices_is_refused(self):
+        # Naming shards would buy games the dispatch says it is not buying: a recovery that spends money is not
+        # a recovery.
+        self.assertIn(
+            "train-shards",
+            self.refused("--bank-only", "true", "--train", "140", "--train-run-ids", "1", "--train-shards", '["0"]'),
+        )
+
+    def test_a_bank_rebuild_without_a_slice_size_is_refused(self):
+        self.assertIn("size of the slice", self.refused("--bank-only", "true", "--train-run-ids", "1"))
+
     def test_a_gate_share_that_is_not_a_number_is_refused(self):
         self.assertIn("not a number", self.refused("--sweep", "true", "--rules", "b.json", "--gate-share", "half"))
 
 
 class PayloadTest(unittest.TestCase):
+    def test_a_bank_rebuild_carries_the_runs_it_reads_and_not_the_slices_it_does_not_drive(self):
+        inputs = lane.payload(arguments("--bank-only", "true", "--train", "140", "--train-run-ids", "1,2"))
+        self.assertEqual(inputs["bank_only"], "true")
+        self.assertEqual(inputs["train_run_ids"], "1,2")
+        self.assertEqual(inputs["train"], "140")
+        # The legal form is asserted here so the three refusals above are not the only thing the guard does:
+        # a guard that rejects everything is a guard nobody can use.
+        self.assertNotIn("train_shards", inputs)
+
     def test_an_unnamed_input_is_left_out_so_the_workflow_keeps_its_own_default(self):
         inputs = lane.payload(arguments("--arm", "none", "--games", "134", "--shard", "0/4"))
         self.assertNotIn("arms", inputs)
