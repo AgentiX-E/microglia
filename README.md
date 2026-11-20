@@ -567,6 +567,58 @@ commands, an admissible command changes the observation, an inadmissible one is 
 words, and a twelve-step walk keeps the episode alive. A green run ends with `model calls made by this job = 0`,
 because a build that is silent about its cost reads as a result about memory.
 
+#### The floor, measured: 134 games, zero by accident, and a price that is now arithmetic
+
+A driver that can open one game says nothing about the split. `eval/drivers/alfworld/floor.py` drives all 134
+held-out games with a walker that chooses uniformly among the environment's own `admissible_commands` — no
+model, no prompt, no cost — twice, with the same seed.
+
+| reading | value |
+| --- | --- |
+| games covered | **134 of 134**, no duplicate, matched against what the split publishes |
+| episodes terminated | **134 of 134** at the environment's own 50-step cap |
+| floor | **0 wins**, Wilson 95% **[0.0%, 2.8%]** |
+| replay | **134 of 134 identical**: 0 mismatches on game identity, win, steps, action digest, observation fingerprint |
+| commands at reset | **25.05** on average — a closed, small action space |
+| transcript | mean **5,367** chars, median 5,217, p90 6,846, max 8,405 |
+| environment time | **852 s** for the first pass, **884 s** for the second, 6.4 s per game |
+
+Zero is the most useful row. A walker that scored five percent would mean part of the task family is reachable
+without understanding it, and the headroom any memory arm is measured against would be smaller than it looks.
+The replay row is the second most useful: every minimum detectable effect on this record is the paired formula,
+and the pairing only exists if an arm is a function of its seed.
+
+**The transcript length turns the price into arithmetic.** A turn-based agent resends the conversation on every
+turn, so the bill is a function of how long that conversation gets — and it got measured over the real games
+rather than assumed:
+
+| prompt layout | input tokens per episode | bill per episode | 134 games × 3 arms |
+| --- | --- | --- | --- |
+| no prompt cache | 138,042 in / 750 out | $0.02116 = **¥0.150** | ¥60.4 |
+| prefix held by the cache | 3,492 miss + 134,550 hit | $0.00138 = **¥0.0098** | **¥3.93** |
+
+The fifteen-fold gap is a property of the arm, not of the provider. A transcript that is *appended to* keeps a
+stable prefix and hits; a pack re-injected on every turn moves the prefix and misses. On τ² the memory arm was
+billed **3.7× the control's uncached tokens on the same sixteen calls** for exactly this reason, and it is the
+first thing to check about any memory design that looks cheap on paper.
+
+#### Three arms, registered before they ran, and the one of them 134 games cannot see
+
+`eval/drivers/alfworld/REGISTRATION.md` registers the first arm on this corpus: `none`, `always-in` (up to 20
+rules rendered whole on every turn — ExpeL's mechanism, via the ported arithmetic in `rule-bank.ts`) and
+`retrieved` (a lexical anchor per turn — this record's mechanism, on somebody else's corpus).
+
+| prediction | resolved by 134 games? |
+| --- | --- |
+| `always-in` beats `none` | **yes**, if the effect is the 19 points the literature reports — 134 games resolve 13.3pp |
+| `always-in` beats `retrieved` | **no.** A 5-point form difference needs **942 episodes**; a 3-point one needs **2,617** |
+| `retrieved` is not worse than `none` by more than the dev band | yes, if the harm is as large as R159 measured |
+
+Registering a prediction the design cannot resolve is the point of writing it down: 134 games is the split, the
+split has 134 games, and no amount of careful analysis makes a 5-point difference visible through 13.3 points of
+noise. The two honest ways to buy power — repeat passes with a cluster bootstrap over games, or pool a split
+ExpeL trains on — are written into the registration with what each costs in validity.
+
 ### Where the scenario actually is: 1,766 lines, seven modules, and a gate for the rest
 
 The library claims it is scenario-agnostic. That claim has been made in a paragraph since its first

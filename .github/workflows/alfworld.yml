@@ -22,7 +22,11 @@ on:
   push:
     branches: [master]
     paths:
-      - 'eval/drivers/alfworld/**'
+      # The drivers and the environment config, not the directory. A registration or a note beside them
+      # changes no behaviour, and a job that spends thirty minutes of runner time to prove a paragraph is
+      # a job people learn to skip.
+      - 'eval/drivers/alfworld/*.py'
+      - 'eval/drivers/alfworld/config.yaml'
       - '.github/workflows/alfworld.yml'
 
 permissions:
