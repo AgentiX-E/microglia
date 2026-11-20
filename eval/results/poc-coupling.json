@@ -5,14 +5,15 @@
   "scanned": 257,
   "totals": {
     "modules": 257,
-    "lines": 73635,
+    "lines": 73669,
     "adapterLines": 1956,
-    "deferredLines": 9884,
-    "coupledShare": 0.1591
+    "deferredLines": 9918,
+    "coupledShare": 0.1595
   },
   "layers": [
     {
       "layer": "core",
+      "productionModules": 47,
       "modules": 47,
       "lines": 10588,
       "adapterLines": 0,
@@ -21,6 +22,7 @@
     },
     {
       "layer": "protocol",
+      "productionModules": 3,
       "modules": 3,
       "lines": 1922,
       "adapterLines": 0,
@@ -29,6 +31,7 @@
     },
     {
       "layer": "sql",
+      "productionModules": 7,
       "modules": 7,
       "lines": 1956,
       "adapterLines": 1956,
@@ -37,14 +40,16 @@
     },
     {
       "layer": "eval",
+      "productionModules": 192,
       "modules": 192,
-      "lines": 57598,
+      "lines": 57632,
       "adapterLines": 0,
-      "deferredLines": 9884,
+      "deferredLines": 9918,
       "coupled": 25
     },
     {
       "layer": "browser",
+      "productionModules": 2,
       "modules": 2,
       "lines": 280,
       "adapterLines": 0,
@@ -53,6 +58,7 @@
     },
     {
       "layer": "node",
+      "productionModules": 6,
       "modules": 6,
       "lines": 1291,
       "adapterLines": 0,
@@ -176,7 +182,7 @@
       "pkg": "eval",
       "module": "coupling",
       "path": "packages/eval/src/coupling.ts",
-      "lines": 483,
+      "lines": 517,
       "words": [
         "sql",
         "sqlite",
@@ -754,5 +760,5 @@
       "detail": "47 core modules, zero scenario words in code"
     }
   ],
-  "statement": "the scenario is 1956 of 73635 production lines across 257 modules: 7 adapter modules in `sql`, 25 deferred with a reason, and `core` at 0 coupled modules of 47; 5 package edges, 0 of them upward."
+  "statement": "the scenario is 1956 of 73669 production lines across 257 modules: 7 adapter modules in `sql`, 25 deferred with a reason, and `core` at 0 coupled modules of 47; 5 package edges, 0 of them upward."
 }

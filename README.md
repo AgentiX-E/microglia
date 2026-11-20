@@ -591,14 +591,22 @@ and the pairing only exists if an arm is a function of its seed.
 
 **The transcript length turns the price into arithmetic.** A turn-based agent resends the conversation on every
 turn, so the bill is a function of how long that conversation gets — and every factor in it was measured, not
-assumed: 5,367 characters of transcript from the floor pass, and a fixed prefix of **3,574** characters, which is
-the mean of the two ReAct examples per task type that ship in `prompts/alfworld.py@LeapLabTHU/ExpeL` (1,839 to
-4,286 across the six types).
+assumed: 5,367 characters of transcript from the floor pass, and a fixed prefix of **3,965** characters, which is
+the mean of the two ReAct examples per task type, now committed as
+`eval/drivers/alfworld/prompts/alfworld-examples.json` from `prompts/alfworld.py@LeapLabTHU/ExpeL` at blob
+`2b2093ef` (3,199 to 4,403 across the six types). **Four of those six counts were wrong before this file was
+committed** — the mean was quoted 11% low — which is the second number on this page that a pushed artefact
+corrected and a paragraph had kept rendering.
 
 | prompt layout | input tokens per episode | bill per episode | 134 games × 3 arms |
 | --- | --- | --- | --- |
 | no prompt cache | 82,717 in / 750 out | $0.01286 = **¥0.091** | ¥36.7 |
 | prefix held by the cache | 2,385 miss + 80,331 hit | $0.00105 = **¥0.0074** | **¥2.99** |
+
+Both rows were computed at 3,574 characters and are therefore about 11% low in the prefix's share. They are left
+as computed rather than rescaled, because rescaling multiplies a guess about `chars/token` by a correction factor:
+`agent.py` reports the provider's own `usage` and the measured `prefix_chars` per episode, so the 20-game
+calibration replaces both rows with measurements instead of a third estimate.
 
 The twelve-fold gap is a property of the arm, not of the provider. A transcript that is *appended to* keeps a
 stable prefix and hits; a pack re-injected on every turn moves the prefix and misses. On τ² the memory arm was
@@ -617,32 +625,43 @@ rules rendered whole on every turn — ExpeL's mechanism, via the ported arithme
 | `always-in` beats `retrieved` | **no.** A 5-point form difference needs **942 episodes**; a 3-point one needs **2,617** |
 | `retrieved` is not worse than `none` by more than the dev band | yes, if the harm is as large as R159 measured |
 
+The loop behind those arms is `eval/drivers/alfworld/agent.py`, and it is asserted before it is paid for. Its
+skeleton is the competitor's own, transliterated: the system line, the two-examples template, the transcripts
+split into alternating turns, and the parser's four branches — so an arm changes what sits *above* the transcript
+and nothing else. Three zero-cost readings hold it in place: `--policy seed` reproduces `floor.py` game for game
+(same wins, steps, action digests, observation fingerprints) and the `agreement` job fails on a single field;
+81 unit tests with 99% statement coverage cover the parser, the split, the shard arithmetic, the bill and the loop
+itself; and a test asserts that `none` and `always-in` differ at exactly one message index. A model reply that
+never produces an action fails the run rather than scoring zero — a zero would be a number about the prompt's
+syntax wearing the costume of a number about memory.
+
 Registering a prediction the design cannot resolve is the point of writing it down: 134 games is the split, the
 split has 134 games, and no amount of careful analysis makes a 5-point difference visible through 13.3 points of
 noise. The two honest ways to buy power — repeat passes with a cluster bootstrap over games, or pool a split
 ExpeL trains on — are written into the registration with what each costs in validity.
 
-### Where the scenario actually is: 1,766 lines, seven modules, and a gate for the rest
+### Where the scenario actually is: 1,956 lines, 7 modules, and a gate for the rest
 
 The library claims it is scenario-agnostic. That claim has been made in a paragraph since its first
 iteration, measured once by hand, and never recomputed — which is the shape of every number that quietly
-stops being true. `pnpm eval:coupling` recomputes it from the source tree on every push:
+stops being true. `pnpm eval:coupling` recomputes it from the source tree on every push, and
+`readme-layers.test.ts` fails the build when this table and that command disagree:
 
 | layer | production modules | lines | modules that name a scenario |
 |---|---|---|---|
-| `core` | 37 | 6,821 | **0** |
-| `protocol` | 2 | 1,215 | **0** |
-| `sql` (the adapter) | 7 | **1,766** | 5 |
-| `eval` | 76 | 24,799 | 12, each with a written reason |
+| `core` | 47 | 10,588 | **0** |
+| `protocol` | 3 | 1,922 | **0** |
+| `sql` (the adapter) | 7 | **1,956** | 5 |
+| `eval` | 192 | 57,632 | 25, each with a written reason |
 | `browser` | 2 | 280 | 0 |
-| `node` | 6 | 1,282 | 0 |
+| `node` | 6 | 1,291 | 0 |
 
-**The scenario is a fifth of the production tree and none of it is in the library.** `core` names no
+**The scenario is 2.7% of the production tree and none of it is in the library.** `core` names no
 database in code — every occurrence of `sql` in it is inside a test, where a scope string is free text —
-and the text-to-SQL surface is **1,766 lines in seven modules** that execute, guard, differ, link and
-render SQL. The twelve modules that keep a scenario word outside the adapter each carry a reason in the
-source, from *the dataset loader* to *the lane that has not been split yet*, and the gate fails if a
-thirteenth arrives without one.
+and the text-to-SQL surface is **1,956 lines in 7 modules** that execute, guard, differ, link and
+render SQL. The 25 modules that keep a scenario word outside the adapter each carry a reason in the
+source, from *the dataset loader* to *the lane that has not been split yet*, and the gate fails if
+a 26th arrives without one.
 
 Three things make this a measurement rather than a claim:
 
@@ -889,9 +908,9 @@ Read the [user guide](docs/USER-GUIDE.md) for the integration contract, the
 ## Repository layout
 
 ```
-packages/core     the library, five modules behind subpath exports
+packages/core     the library, behind five subpath exports
 packages/protocol the validity gates, paired statistics, artefact schema and lane contract
-packages/sql      the text-to-SQL adapter: execution, guards, schema linking, diffs — 1,766 lines
+packages/sql      the text-to-SQL adapter: execution, guards, schema linking, diffs — 1,956 lines
 packages/node     Hono routes, vendor providers, server bootstrap
 packages/browser  fetch client and offline outbox
 packages/eval     the benchmark instrument (private, not published); lanes in src/bin/

@@ -196,7 +196,24 @@ describe('layerTotals', () => {
   it('sums lines and modules per layer', () => {
     const totals = layerTotals(rows);
     expect(totals.map((total) => total.layer)).toEqual(['core', 'sql', 'eval']);
-    expect(totals[1]).toEqual({ layer: 'sql', modules: 2, lines: 400, adapterLines: 400, deferredLines: 0, coupled: 1 });
+    expect(totals[1]).toEqual({
+      layer: 'sql',
+      productionModules: 2,
+      modules: 2,
+      lines: 400,
+      adapterLines: 400,
+      deferredLines: 0,
+      coupled: 1,
+    });
+  });
+
+  it('spells the published column as productionModules, with the same value as modules', () => {
+    // Two names for one number is a smell, and it is the cheaper of the two available smells: the
+    // README column is literally "production modules", and renaming `modules` would have moved every
+    // caller in this package. Pinned here so the alias cannot drift into two different counts.
+    for (const total of layerTotals(rows)) {
+      expect(total.productionModules).toBe(total.modules);
+    }
   });
 
   it('drops a layer with no modules rather than publishing a zero row', () => {

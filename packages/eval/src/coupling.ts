@@ -135,6 +135,30 @@ export type ModuleSource = {
   readonly source: string;
 };
 
+/**
+ * Directories whose contents are not production code, by the repository's own definition.
+ *
+ * `__tests__` is the test suite, `bin` is the command layer and `bench` is the measurement harness;
+ * none of the three is a module the library ships, so none of them belongs in the denominator of a
+ * line count. This lives here rather than in the command because the README table is checked against
+ * the same definition (`readme-layers.test.ts`), and two copies of a skip list is the drift this
+ * file exists to catch.
+ */
+export const NON_PRODUCTION_DIRS: ReadonlySet<string> = new Set(['__tests__', 'bin', 'bench']);
+
+/**
+ * Whether a path is a production module.
+ *
+ * `index.ts` is a re-export surface and `.d.ts` is a declaration; neither contains a decision, so
+ * counting their lines would make the table's denominator depend on how many subpaths a package
+ * chose to expose.
+ */
+export function isProductionModulePath(path: string): boolean {
+  if (!path.endsWith('.ts') || path.endsWith('.d.ts')) return false;
+  const name = path.slice(path.lastIndexOf('/') + 1);
+  return name !== 'index.ts';
+}
+
 /** What `general`, `adapter` and `deferred` mean is in the module comment; here they are a value. */
 export type Verdict = 'adapter' | 'deferred' | 'general';
 
@@ -322,6 +346,15 @@ export function moduleRow(module: ModuleSource): ModuleRow {
 /** Total lines, modules and adapter lines for one layer. */
 export type LayerTotal = {
   readonly layer: Layer;
+  /**
+   * Modules in the layer, tests and re-export surfaces excluded by `productionModules()`.
+   *
+   * The name is spelled out here rather than left as `modules` because the README table's column is
+   * literally *production modules*, and an alias that reads as "modules" invites the reading that
+   * `__tests__` is in the denominator. Both fields carry the same number: `modules` is kept for every
+   * existing caller, and this one is what the published table is checked against (`readme-layers.test.ts`).
+   */
+  readonly productionModules: number;
   readonly modules: number;
   readonly lines: number;
   readonly adapterLines: number;
@@ -335,6 +368,7 @@ export function layerTotals(rows: readonly ModuleRow[]): readonly LayerTotal[] {
     const mine = rows.filter((row) => row.pkg === layer);
     return {
       layer,
+      productionModules: mine.length,
       modules: mine.length,
       lines: mine.reduce((total, row) => total + row.lines, 0),
       adapterLines: mine.filter((row) => row.verdict === 'adapter').reduce((total, row) => total + row.lines, 0),

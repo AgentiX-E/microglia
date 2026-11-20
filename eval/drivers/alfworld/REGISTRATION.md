@@ -47,6 +47,35 @@ banned-word filter, a cap nothing enforces, and a reply that is not deduplicated
 All three run the same 134 held-out games, the same prompt skeleton, the same model, the same step cap,
 and the same decoding. The only difference between arms is what the prompt carries above the transcript.
 
+### The arm exists, and it is asserted before it is paid for
+
+`eval/drivers/alfworld/agent.py` is that loop. Its skeleton is the competitor's, transliterated from the same
+file the examples come from: the system line, `{instruction}You may take maximum of {max_steps} steps.` followed
+by `Here are two examples:`, the two transcripts split into alternating turns, and the parser's four branches. A
+pack — when the arm has one — is rendered once and placed **above** the examples, so that the whole prefix is
+stable for the episode and the provider's cache can hold it. That placement is a decision, not a layout: a pack
+re-anchored per turn moves the prefix and makes every turn a miss, which is the 3.7× the τ² lane already paid.
+
+Three readings are asserted at zero cost before any call is dispatched.
+
+1. **The loop reproduces the floor.** `--policy seed` picks uniformly among the commands the environment
+   publishes, using `floor.Draw`; `--policy first` takes the first. Both drive the environment through
+   `run_episode`, the function the model arms use, so agreement is a statement about the loop rather than about
+   a policy: same games, same wins, same step counts, same action digests, same observation fingerprints. The
+   `agreement` job in `alfworld.yml` runs `floor.py` over eight games and then `agent.py --policy seed` over the
+   same eight with `--assert-floor`, and fails on a single field. Eight, not 134: a loop does not become more
+   correct with ninety more games, and `floor.py` already drives the whole split in its own job.
+2. **The decisions are covered.** `test_agent.py` carries 81 cases over the transcript split, the parser, the
+   shard arithmetic, the bill, and the loop itself against a fake world that has state. Statement coverage of
+   `agent.py` is 99%, and the one uncovered line is the `sys.exit(main())` every script ends with.
+3. **The arms differ in one block.** A test asserts that the opening of `none` and of `always-in` is identical
+   except at index 1, where the pack sits. Without it, "the only difference is the memory" is a sentence.
+
+What none of that certifies: whether the model follows the format at all. A reply with no action parses as a
+thought, three thoughts in a row fail the run rather than scoring zero, and `invalid_actions` counts what the
+environment refused. Those three counters are the first thing to read in the calibration's output, because a
+high invalid rate means the arm measured the prompt's syntax rather than its content.
+
 ## Three predictions, and what refutes each
 
 1. **`always-in` beats `none`.** Refuted if the paired interval for `always-in − none` contains zero. A
@@ -118,20 +147,39 @@ ReAct trajectories per task type, selected by task type:
 | task type | the two examples, in characters |
 | --- | --- |
 | `pick_and_place` | 3,199 |
-| `look_at_object` | 3,096 |
-| `pick_clean_then_place` | 3,348 |
-| `pick_heat_then_place` | 3,732 |
-| `pick_cool_then_place` | 3,782 |
+| `look_at_object` (the `examine` prefix) | 3,738 |
+| `pick_clean_then_place` | 4,328 |
+| `pick_heat_then_place` | 3,837 |
+| `pick_cool_then_place` | 4,403 |
 | `pick_two_obj_and_place` | 4,286 |
-| **mean over the six** | **3,574** |
+| **mean over the six** | **3,965** |
 
-With that prefix and DeepSeek's published rate card (`eval/manifests/model-rates.json`, off-peak, USD per million
-tokens), one episode costs:
+**Four of the six rows above were wrong, and the file they are counted from is now in this repository.** The
+first version of this table counted the wrong pair of keys for four task types: the competitor's file carries
+three transcripts per type (`react_<kind>_0..2`) and its own template says *"Here are two examples"*, so the
+pair is `_0` and `_1` — that much was right — but the counts had drifted from the strings they claim to
+describe. Only `pick_and_place` and `pick_two_obj_and_place` matched. The corrected mean is **3,965**, which is
+**11% above** the 3,574 this file quoted, and the two arm prices below move with it by about the same factor.
+
+The transcripts are now committed as `eval/drivers/alfworld/prompts/alfworld-examples.json` with the blob they
+came from (`2b2093ef`) beside them, and `test_agent.py` pins all six counts. A prompt read at `main` is a prompt
+that changes under a quote; a count typed by hand is a count that has already drifted once.
+
+With a prefix and DeepSeek's published rate card (`eval/manifests/model-rates.json`, off-peak, USD per million
+tokens), one episode costs about:
 
 | layout | input tokens | bill per episode | 134 games × 3 arms |
 | --- | --- | --- | --- |
 | no prompt cache | 82,717 in, 750 out | $0.01286 = **¥0.091** | ¥36.7 |
 | prefix held by the cache | 2,385 miss + 80,331 hit | $0.00105 = **¥0.0074** | **¥2.99** |
+
+**Those two rows were computed at 3,574 characters and are therefore about 11% low in the prefix's share.** They
+are left as they were computed rather than quietly rescaled: the same 11% applied to a `chars/token` ratio nobody
+measured is a third guess stacked on the two that produced these numbers. What replaces them is not a better
+estimate but a measurement — `agent.py` reports `usage` and `prefix_chars` per episode from the provider's own
+response, so the 20-game calibration below settles both rows and the per-arm cache-hit rate with it. Until then
+the honest reading is: the uncached layout is a few tens of yuan, the cached one is a few, and the ratio between
+them is the thing a design decision should be made on.
 
 The twelve-fold difference is not an optimisation detail; it is the difference between a ¥37 experiment and
 a ¥3 one, and it is decided by a property of the arm rather than of the provider: a turn-based transcript

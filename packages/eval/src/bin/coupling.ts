@@ -22,9 +22,11 @@ import {
   coupledShare,
   coreGate,
   importEdges,
+  isProductionModulePath,
   layerGate,
   layerTotals,
   moduleRow,
+  NON_PRODUCTION_DIRS,
   totalityGate,
   type Layer,
   type ModuleSource,
@@ -33,31 +35,15 @@ import { writeJson } from './lib.js';
 
 const ROOT = process.cwd();
 
-/** Directories whose contents are not production code, by the repository's own definition. */
-const SKIP_DIRS: ReadonlySet<string> = new Set(['__tests__', 'bin', 'bench']);
-
-/**
- * Whether a file is a production module of its package.
- *
- * `index.ts` is a re-export surface and `.d.ts` is a declaration; neither contains a decision, so
- * counting their lines would make the table's denominator depend on how many subpaths a package
- * chose to expose.
- */
-function isProductionModule(path: string): boolean {
-  if (!path.endsWith('.ts') || path.endsWith('.d.ts')) return false;
-  const name = path.slice(path.lastIndexOf('/') + 1);
-  return name !== 'index.ts';
-}
-
 function collect(dir: string, pkg: Layer, into: ModuleSource[]): void {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
     if (entry.isDirectory()) {
-      if (SKIP_DIRS.has(entry.name)) continue;
+      if (NON_PRODUCTION_DIRS.has(entry.name)) continue;
       collect(path, pkg, into);
       continue;
     }
-    if (!isProductionModule(path)) continue;
+    if (!isProductionModulePath(path)) continue;
     into.push({ path: path.slice(ROOT.length + 1), pkg, source: readFileSync(path, 'utf8') });
   }
 }

@@ -27,12 +27,37 @@ on:
       # a job people learn to skip.
       - 'eval/drivers/alfworld/*.py'
       - 'eval/drivers/alfworld/config.yaml'
+      # The few-shot transcripts are part of the prompt, so a change to them changes what every arm
+      # sends. Leaving them out of the trigger would make the one file that moves the score the one file
+      # whose edit runs nothing.
+      - 'eval/drivers/alfworld/prompts/*.json'
       - '.github/workflows/alfworld.yml'
 
 permissions:
   contents: read
 
 jobs:
+  unit:
+    # The half of `agent.py` that decides something, with no model, no environment and no network:
+    # the transcript split, the parser's four branches, the shard arithmetic and the bill. It runs in
+    # seconds because none of it needs textworld, which is what makes it the job that runs first.
+    name: the prompt, the parser, the shard and the bill
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Run the decisions
+        run: python eval/drivers/alfworld/test_agent.py
+
+      - name: Report the bill
+        if: always()
+        run: echo 'model calls made by this job = 0'
+
   selfcheck:
     name: the environment resets, moves, refuses, and survives a walk
     runs-on: ubuntu-latest
@@ -173,6 +198,85 @@ jobs:
             ${{ runner.temp }}/floor.json
             ${{ runner.temp }}/floor-smoke.json
             ${{ runner.temp }}/floor.log
+          if-no-files-found: warn
+
+      - name: Report the bill
+        if: always()
+        run: echo 'model calls made by this job = 0'
+
+  agreement:
+    # The one assertion that makes a three-arm comparison possible: the model-free policy inside
+    # `agent.py` must reproduce `floor.py` game for game — same games, same wins, same step counts, same
+    # action digests, same observation fingerprints.
+    #
+    # Why this is not the same job as the floor: it drives two *different* code paths to the same place.
+    # `floor.py` walks a game with its own loop; `agent.py` walks it through `run_episode`, which is the
+    # function the model arms use. If those two disagree, then every arm's number is a number about the
+    # driver, and no amount of model budget would have found it — the arms would agree with each other
+    # because they share the defect.
+    #
+    # Eight games, not 134: this is a test of the loop, and the loop does not become more or less
+    # correct with the ninety games after it. `floor.py` runs the whole split in its own job.
+    name: the model-free policy reproduces the floor
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Cache the wheels textworld builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-textworld-1.6.1-tatsu-5.8.3-v1
+
+      - name: Install the environment
+        run: |
+          python -m pip install --upgrade pip
+          for attempt in 1 2 3; do
+            if pip install 'textworld[pddl]==1.6.1' 'tatsu==5.8.3'; then break; fi
+            echo "textworld build attempt $attempt failed; retrying"
+            sleep $((attempt * 20))
+          done
+          python -c "import textworld, tatsu; print('textworld', textworld.__version__, 'tatsu', tatsu.__version__)"
+          pip install 'git+https://github.com/alfworld/alfworld@0.4.2' --no-deps
+          pip install pandas pyyaml tqdm requests
+
+      - name: Fetch the games
+        run: |
+          export ALFWORLD_DATA="$HOME/.cache/alfworld"
+          alfworld-download
+          find "$ALFWORLD_DATA" -name 'game.tw-pddl' | wc -l
+
+      - name: Drive eight games with the floor's own walker
+        env:
+          ALFWORLD_DATA: /home/runner/.cache/alfworld
+        run: |
+          python eval/drivers/alfworld/floor.py \
+            --games 8 --shadow-games 0 --out "$RUNNER_TEMP/floor-8.json" | tee "$RUNNER_TEMP/floor-8.log"
+
+      - name: Drive the same eight games through the arm's loop, and require agreement
+        env:
+          ALFWORLD_DATA: /home/runner/.cache/alfworld
+        run: |
+          python eval/drivers/alfworld/agent.py \
+            --arm none --policy seed --games 8 \
+            --assert-floor "$RUNNER_TEMP/floor-8.json" \
+            --out "$RUNNER_TEMP/agent-seed-8.json" | tee "$RUNNER_TEMP/agent-seed-8.log"
+
+      - name: Upload both readings
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alfworld-agreement
+          path: |
+            ${{ runner.temp }}/floor-8.json
+            ${{ runner.temp }}/floor-8.log
+            ${{ runner.temp }}/agent-seed-8.json
+            ${{ runner.temp }}/agent-seed-8.log
           if-no-files-found: warn
 
       - name: Report the bill
