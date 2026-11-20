@@ -110,14 +110,28 @@ The floor being **exactly zero** is the important row and it is the one that can
 literature. A random walker that scored even five percent would have meant part of the split is reachable
 without understanding it, which would have compressed the headroom the treatment is measured against.
 
-**2. The price is measured, not modelled.** With 5,367 characters of transcript for a 50-turn episode, a
-fixed prompt prefix of roughly 8,000 characters and DeepSeek's published rate card
-(`eval/manifests/model-rates.json`, off-peak, USD per million tokens), one episode costs:
+**2. The price is measured, not modelled, and the last assumption in it was checked too.** The transcript is
+5,367 characters for a 50-turn episode (measured, above). The fixed prefix was the one remaining guess, so it was
+read out of the competitor's own prompt file — `prompts/alfworld.py@LeapLabTHU/ExpeL`, which carries two complete
+ReAct trajectories per task type, selected by task type:
+
+| task type | the two examples, in characters |
+| --- | --- |
+| `pick_and_place` | 3,199 |
+| `look_at_object` | 3,096 |
+| `pick_clean_then_place` | 3,348 |
+| `pick_heat_then_place` | 3,732 |
+| `pick_cool_then_place` | 3,782 |
+| `pick_two_obj_and_place` | 4,286 |
+| **mean over the six** | **3,574** |
+
+With that prefix and DeepSeek's published rate card (`eval/manifests/model-rates.json`, off-peak, USD per million
+tokens), one episode costs:
 
 | layout | input tokens | bill per episode | 134 games × 3 arms |
 | --- | --- | --- | --- |
-| no prompt cache | 138,042 in, 750 out | $0.02116 = **¥0.150** | ¥60.4 |
-| prefix held by the cache | 3,492 miss + 134,550 hit | $0.00138 = **¥0.0098** | **¥3.93** |
+| no prompt cache | 82,717 in, 750 out | $0.01286 = **¥0.091** | ¥36.7 |
+| prefix held by the cache | 2,385 miss + 80,331 hit | $0.00105 = **¥0.0074** | **¥2.99** |
 
 The fifteen-fold difference is not an optimisation detail; it is the difference between a ¥60 experiment and
 a ¥4 one, and it is decided by a property of the arm rather than of the provider: a turn-based transcript
@@ -125,7 +139,7 @@ that is *appended to* keeps a stable prefix and hits, while a pack re-injected p
 misses. This record has paid for that lesson once already on τ², where the memory arm was billed 3.7× the
 control's uncached tokens on the same sixteen calls.
 
-**So the calibration dispatch is 20 games, one arm, ≈ ¥0.20**, and its purpose is not the unit price — that
+**So the calibration dispatch is 20 games, one arm, ≈ ¥0.15**, and its purpose is not the unit price — that
 is now arithmetic over a measured distribution. Its purpose is the **headroom**: 134 games resolve 13.3pp, so
 an `always-in` effect is measurable only if the `none` arm lands far enough above the floor to leave 13.3pp
 of room. ExpeL reports its control at 40.0 with a different model; this project has never run any arm on this

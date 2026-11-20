@@ -589,13 +589,15 @@ The replay row is the second most useful: every minimum detectable effect on thi
 and the pairing only exists if an arm is a function of its seed.
 
 **The transcript length turns the price into arithmetic.** A turn-based agent resends the conversation on every
-turn, so the bill is a function of how long that conversation gets — and it got measured over the real games
-rather than assumed:
+turn, so the bill is a function of how long that conversation gets — and every factor in it was measured, not
+assumed: 5,367 characters of transcript from the floor pass, and a fixed prefix of **3,574** characters, which is
+the mean of the two ReAct examples per task type that ship in `prompts/alfworld.py@LeapLabTHU/ExpeL` (1,839 to
+4,286 across the six types).
 
 | prompt layout | input tokens per episode | bill per episode | 134 games × 3 arms |
 | --- | --- | --- | --- |
-| no prompt cache | 138,042 in / 750 out | $0.02116 = **¥0.150** | ¥60.4 |
-| prefix held by the cache | 3,492 miss + 134,550 hit | $0.00138 = **¥0.0098** | **¥3.93** |
+| no prompt cache | 82,717 in / 750 out | $0.01286 = **¥0.091** | ¥36.7 |
+| prefix held by the cache | 2,385 miss + 80,331 hit | $0.00105 = **¥0.0074** | **¥2.99** |
 
 The fifteen-fold gap is a property of the arm, not of the provider. A transcript that is *appended to* keeps a
 stable prefix and hits; a pack re-injected on every turn moves the prefix and misses. On τ² the memory arm was
