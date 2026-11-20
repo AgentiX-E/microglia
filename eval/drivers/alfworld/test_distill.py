@@ -209,6 +209,37 @@ class ChunkTest(unittest.TestCase):
         )
 
 
+class KindCensusTest(unittest.TestCase):
+    """Which operation did the work, because R164 registered a prediction about the ratio.
+
+    A rule ends with a full stop, so the substring identity test almost only fires on a verbatim restatement. That
+    makes the bank nearly add-only, and `applied` -- one number over four operations -- cannot show it.
+    """
+
+    def bank(self):
+        return [{"text": "close the fridge.", "votes": 3}, {"text": "open the drawer.", "votes": 2}]
+
+    def test_each_applied_operation_is_counted_under_its_own_kind(self):
+        report = distill.merge_operations(
+            self.bank(),
+            [
+                {"kind": "ADD", "text": "check the sink first.", "number": None},
+                {"kind": "AGREE", "text": "close the fridge.", "number": None},
+                {"kind": "REMOVE", "text": "open the drawer.", "number": None},
+            ],
+            cap=None,
+        )
+        self.assertEqual(report["by_kind"], {"ADD": 1, "EDIT": 0, "AGREE": 1, "REMOVE": 1})
+        self.assertEqual(report["applied"], 3)
+
+    def test_a_rejected_operation_is_not_counted_as_a_kind(self):
+        report = distill.merge_operations(
+            self.bank(), [{"kind": "AGREE", "text": "a rule nobody wrote.", "number": None}], cap=None
+        )
+        self.assertEqual(report["by_kind"], {"ADD": 0, "EDIT": 0, "AGREE": 0, "REMOVE": 0})
+        self.assertEqual(report["rejected"], 1)
+
+
 class TilingTest(unittest.TestCase):
     """A bank is a function of the games it was distilled from, so a partial slice is a different treatment."""
 

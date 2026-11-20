@@ -145,6 +145,10 @@ def merge_operations(
     peak = len(working)
     applied = 0
     rejected = 0
+    # Counted by kind because R164 registered a prediction about the ratio: a rule ends with a full stop, so a
+    # substring identity test almost only fires on a verbatim restatement, and `EDIT` should therefore be nearly
+    # unreachable. `applied` alone cannot confirm or refute that -- it is one number over four operations.
+    by_kind = {"ADD": 0, "EDIT": 0, "AGREE": 0, "REMOVE": 0}
     resolved: "list[tuple[dict, int]]" = []
 
     for operation in operations:
@@ -181,6 +185,7 @@ def merge_operations(
         for operation, index in resolved:
             if operation["kind"] != kind:
                 continue
+            by_kind[kind] += 1
             if kind == "ADD":
                 working.append({"text": operation["text"], "votes": ADD_VOTES})
                 applied += 1
@@ -202,7 +207,14 @@ def merge_operations(
     # Descending by votes, stable: two rules with equal support keep the order they entered in, which is
     # the order a reader compares two runs by.
     surviving.sort(key=lambda entry: entry["votes"], reverse=True)
-    return {"bank": surviving, "rejected": rejected, "culled": culled, "peak": peak, "applied": applied}
+    return {
+        "bank": surviving,
+        "rejected": rejected,
+        "culled": culled,
+        "peak": peak,
+        "applied": applied,
+        "by_kind": by_kind,
+    }
 
 
 def renderable(bank: "list[dict]", cap: "int | None") -> "list[dict]":
@@ -357,7 +369,15 @@ def build_bank(
     """Run one critique per chunk, feeding the list back in, and report what each reply did to it."""
     caller = chat_fn or driver.chat
     bank: "list[dict]" = []
-    stats = {"applied": 0, "rejected": 0, "culled": 0, "peak": 0, "empty_replies": 0, "operations": 0}
+    stats = {
+        "applied": 0,
+        "rejected": 0,
+        "culled": 0,
+        "peak": 0,
+        "empty_replies": 0,
+        "operations": 0,
+        "by_kind": {"ADD": 0, "EDIT": 0, "AGREE": 0, "REMOVE": 0},
+    }
     usage = {"prompt_tokens": 0, "completion_tokens": 0, "cache_hit_tokens": 0, "cache_miss_tokens": 0}
     calls = 0
     for index, chunk in enumerate(chunk_list, 1):
@@ -378,6 +398,8 @@ def build_bank(
         stats["operations"] += len(operations)
         for key in ("applied", "rejected", "culled"):
             stats[key] += report[key]
+        for kind, count in report["by_kind"].items():
+            stats["by_kind"][kind] += count
         stats["peak"] = max(stats["peak"], report["peak"])
     return {"bank": bank, "stats": stats, "usage": usage, "calls": calls}
 
