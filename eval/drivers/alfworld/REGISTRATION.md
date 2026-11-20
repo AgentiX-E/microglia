@@ -560,3 +560,64 @@ because the games would not tile under one label.
 **The prediction this bank already refuted, kept beside it.** R164 registered that the bank should be nearly add-only;
 the census says otherwise (28 agreements to 4 additions). The measurement is in the file's own `stats`, so the next
 reader sees the refutation in the artefact rather than having to find this paragraph.
+
+## R171 — A bank distilled from two task kinds and scored on all six, registered before it is distilled
+
+The placebo answered "does a block help" with **+17.91 pp** on a block whose words had been permuted (105 of 134
+games, run `44763220821`), which is *higher* than the intact bank's +14.18 pp. That reading retires the attribution
+the programme had been carrying, and it leaves one question that no arm in the lane can answer:
+
+> **Does any of the 15–18 points depend on what the block says?**
+
+`sham` keeps every word and destroys the order, so it tests order. It does not test vocabulary. The one control that
+changes the words while holding everything else is a bank distilled from a subset of the six task kinds: `cool` and
+`heat` are 28 of the 82 won training episodes (`cool` 18, `heat` 10), and the rules they yield are about cooling and
+heating an object before placing it — sentences that are true of the world and inapplicable to the 62 `put`, `clean`
+and `puttwo` games that make up most of the held-out split.
+
+**What this dispatch holds fixed.** The distillation prompt (`all_success_existing_rules@LeapLabTHU/ExpeL:e41ec9a2`),
+the model, the critique budget, the cap (20), the identity substring, the injection site, the arm, the 134 held-out
+games. `--kinds "cool,heat"` is the only input that differs from the registration that produced the bank this lane
+already has. The slices are the ones already paid for (`44744658304` shards 0–2 and `44738148591` shard 3), read
+through `--bank-only`, so the dispatch buys no games.
+
+**What is not held fixed, and the bound it puts on the claim.** A filter over 28 episodes can yield fewer rules than
+a filter over 82, and a shorter block is a weaker treatment if the mechanism is length rather than content. The
+registration therefore binds the *name* of the reading to the artefact that arrives:
+
+| measured on the bank that arrives | what the reading may be called |
+| --- | --- |
+| ≥ 4 entries **and** ≥ 80% of the registered bank's rendered tokens | a **content** control: same shape, different words |
+| 3 entries, or 60–80% of the tokens | a content control **at a shorter length**; the delta is bounded by both differences and may not be attributed to one of them |
+| ≤ 2 entries, or < 60% of the tokens | **not a content control**: it is a shorter block, and the only question it can answer is whether *any* short block moves the score |
+
+**The four readings, and the dispatch each licenses.** Every delta is paired on the same 134 games against a `none`
+arm bought in the same run, because the control moved 6.0 pp between two dispatches of identical code (AUDIT 34.232)
+and a cross-run comparison would be measuring that.
+
+| the reading | what it means | the next dispatch it licenses |
+| --- | --- | --- |
+| delta within ±mde of +14…+18 pp | the **existence and shape** of the block is the mechanism and its vocabulary is not. This is the placebo's conclusion confirmed a third time, and by the arm that removes the words rather than their order | nothing in the memory queue: the lane is measuring preamble engineering, and the honest product is the preamble. The `floor.py` coverage row becomes the only work left (¥0), and the object-location *facts* pack (R170 row 4) becomes the only remaining test of whether content can matter at all |
+| delta positive but **below** the placebo's interval | content contributes part of the effect and shape the rest; the decomposition is not resolvable in one dispatch | a length-matched *neutral* block (R170 rows 1–2, ≈ ¥1.5 each), which separates shape from grammar within the same length |
+| delta within ±mde of zero | the effect **needs** rules that apply where they are scored, and the placebo's +17.9 is then a property of a block that is *about* the right things with its words shuffled — which would make R165 amendment 1's result uninterpretable rather than refuted | a re-read of the sham's bank: if its permuted rules still name the objects and receptacles of the scored games, the sham was never a content-free control, and the placebo reading has to be withdrawn before anything else is dispatched |
+| delta significantly **negative** | inapplicable instructions cost more than no instructions | the read-time gate (R168 amendment 1, ≈ ¥1.9), now as the mechanism that keeps a bank from firing where it does not apply |
+
+**The sub-split is where this reading can be stronger than the placebo.** The 134 held-out games publish their kinds
+(the same six prefixes `agent.py` classifies), so the delta is reported three ways: over all games, over the 28-episode
+*kinds the bank came from* (`cool`, `heat`), and over the games where its rules do not apply (`put`, `clean`,
+`puttwo`). A block that moves `put` games while its sentences are about `heat` is a block whose words are inert, and
+that is a sharper statement than "+17.9 from a shuffle".
+
+**What would make this reading void, stated before it exists.**
+
+  * A bank of ≤ 2 entries or < 60% of the registered token count — the first table governs, and the reading is renamed.
+  * Rules in the arriving bank that are *general* rather than kind-specific: the ExpeL prompt asks for rules over the
+    whole trajectory, and a distilled "search systematically before manipulating" would apply to every kind. The bank's
+    own text is read and quoted in the report before the delta is interpreted, so that a vocabulary-specific control is
+    not claimed for a bank that turned out to be generic.
+  * A `none` arm whose rate moves more than `mde` away from the 81/134 this lane has measured twice — that is a
+    different control or a different corpus, and the pairing, not the delta, is what would be at fault.
+
+**Price, before it is paid.** Distillation over 28 episodes at 10 critique calls ≈ **¥0.03** (the 76-episode bank cost
+$0.0134); the sweep is 134 games × 2 arms ≈ **¥2.0** (the 536-game four-arm sweep cost $0.596). Total **≈ ¥2.03**, and
+the first half of it can fail at ¥0.03 without buying any games.
