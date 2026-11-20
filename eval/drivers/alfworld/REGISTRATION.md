@@ -71,6 +71,22 @@ Three readings are asserted at zero cost before any call is dispatched.
 3. **The arms differ in one block.** A test asserts that the opening of `none` and of `always-in` is identical
    except at index 1, where the pack sits. Without it, "the only difference is the memory" is a sentence.
 
+**Run `44670148442`, job `136068894878`, 03:48:07 to 03:51:14 UTC — eight games, both readings, zero calls.**
+
+| reading | value |
+| --- | --- |
+| games | 8 of 8, five sites each |
+| floor agreement | **8 games, 0 mismatches** on win, steps, action digest and observation fingerprint |
+| floor wins in those eight | 0, same as the walker |
+| opening size | **4,108.5 characters**, measured per episode |
+| model calls | **0**, by construction |
+
+That 4,108.5 is a different quantity from the 3,965 above and the difference is worth stating once: 3,965 counts
+the two example transcripts, and 4,108.5 counts the whole opening — system line, instructional paragraph, the
+`You may take maximum of 50 steps.` clause and `Here are two examples:` — which is what the model actually
+receives before the first observation. Two numbers for one prefix is how a price gets computed twice and disagrees
+with itself; when the calibration reports `prefix_chars` per episode, that field is this larger quantity.
+
 What none of that certifies: whether the model follows the format at all. A reply with no action parses as a
 thought, three thoughts in a row fail the run rather than scoring zero, and `invalid_actions` counts what the
 environment refused. Those three counters are the first thing to read in the calibration's output, because a

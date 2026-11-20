@@ -18,7 +18,31 @@ name: alfworld
 # A runner fetches it in seconds. The dependency is not optional and it is not a
 # property of the lane, so the lane lives where the dependency resolves.
 on:
+  # A dispatch with `games` set runs the calibration and nothing else; a dispatch without it runs the
+  # pre-flight, which is what a dispatch used to do. The split exists because the pre-flight is thirty
+  # minutes of runner time and the calibration is the thing an operator usually wants.
   workflow_dispatch:
+    inputs:
+      arm:
+        description: 'arm to calibrate: none, always-in or retrieved'
+        required: false
+        default: ''
+      games:
+        description: 'games to drive; empty runs only the pre-flight jobs'
+        required: false
+        default: ''
+      shard:
+        description: 'contiguous slice, i/n'
+        required: false
+        default: '0/1'
+      max_steps:
+        description: 'the environment step cap'
+        required: false
+        default: '50'
+      rules:
+        description: 'path to a rendered rule bank, relative to the repository root'
+        required: false
+        default: ''
   push:
     branches: [master]
     paths:
@@ -42,6 +66,9 @@ jobs:
     # the transcript split, the parser's four branches, the shard arithmetic and the bill. It runs in
     # seconds because none of it needs textworld, which is what makes it the job that runs first.
     name: the prompt, the parser, the shard and the bill
+    # Skipped when a dispatch names games: that dispatch is buying a number, not re-running
+    # the pre-flight it already has.
+    if: github.event_name == 'push' || inputs.games == ''
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -60,6 +87,9 @@ jobs:
 
   selfcheck:
     name: the environment resets, moves, refuses, and survives a walk
+    # Skipped when a dispatch names games: that dispatch is buying a number, not re-running
+    # the pre-flight it already has.
+    if: github.event_name == 'push' || inputs.games == ''
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -140,6 +170,9 @@ jobs:
     # exactly, and how much of the task is reachable by accident. All three are properties
     # of the corpus and the driver, so this job costs nothing and is allowed to be slow.
     name: the split is covered, terminates, and replays
+    # Skipped when a dispatch names games: that dispatch is buying a number, not re-running
+    # the pre-flight it already has.
+    if: github.event_name == 'push' || inputs.games == ''
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -218,6 +251,9 @@ jobs:
     # Eight games, not 134: this is a test of the loop, and the loop does not become more or less
     # correct with the ninety games after it. `floor.py` runs the whole split in its own job.
     name: the model-free policy reproduces the floor
+    # Skipped when a dispatch names games: that dispatch is buying a number, not re-running
+    # the pre-flight it already has.
+    if: github.event_name == 'push' || inputs.games == ''
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -282,3 +318,83 @@ jobs:
       - name: Report the bill
         if: always()
         run: echo 'model calls made by this job = 0'
+
+  calibrate:
+    # The first arm that costs money, and it is deliberately the smallest one: twenty games, one arm, and
+    # the question it answers is not "what is the unit price" (that is arithmetic over a measured
+    # transcript) but "does `none` land far enough above the floor to leave 13.3pp of room". If it does
+    # not, the answer is a stronger backbone rather than a bigger sample, and this job is the whole bill.
+    #
+    # What to read first is not the score. It is `invalid_actions`, `off_space_actions` and `thoughts`:
+    # a high invalid rate means the model did not follow the format, and the score that follows is a
+    # score about the prompt's syntax wearing the costume of a score about memory.
+    name: the headroom answer, one arm
+    if: github.event_name == 'workflow_dispatch' && inputs.games != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Cache the wheels textworld builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-textworld-1.6.1-tatsu-5.8.3-v1
+
+      - name: Install the environment
+        run: |
+          python -m pip install --upgrade pip
+          for attempt in 1 2 3; do
+            if pip install 'textworld[pddl]==1.6.1' 'tatsu==5.8.3'; then break; fi
+            echo "textworld build attempt $attempt failed; retrying"
+            sleep $((attempt * 20))
+          done
+          python -c "import textworld, tatsu; print('textworld', textworld.__version__, 'tatsu', tatsu.__version__)"
+          pip install 'git+https://github.com/alfworld/alfworld@0.4.2' --no-deps
+          pip install pandas pyyaml tqdm requests
+
+      - name: Fetch the games
+        run: |
+          export ALFWORLD_DATA="$HOME/.cache/alfworld"
+          alfworld-download
+          find "$ALFWORLD_DATA" -name 'game.tw-pddl' | wc -l
+
+      - name: Drive the arm
+        env:
+          ALFWORLD_DATA: /home/runner/.cache/alfworld
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ARM: ${{ inputs.arm }}
+          GAMES: ${{ inputs.games }}
+          SHARD: ${{ inputs.shard }}
+          MAX_STEPS: ${{ inputs.max_steps }}
+          RULES: ${{ inputs.rules }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEEPSEEK_API_KEY}" ]; then
+            echo "::error::a calibration needs DEEPSEEK_API_KEY"
+            exit 1
+          fi
+          # An empty `arm` input is not an arm: it is a dispatch that forgot one, and defaulting it to
+          # `none` would produce a control somebody believes is a treatment.
+          if [ -z "${ARM}" ]; then
+            echo "::error::a calibration needs \`arm\`; there is no default arm"
+            exit 1
+          fi
+          args=(--arm "${ARM}" --policy model --games "${GAMES}" --shard "${SHARD}" --max-steps "${MAX_STEPS}")
+          if [ -n "${RULES}" ]; then args+=(--rules "${RULES}"); fi
+          python eval/drivers/alfworld/agent.py "${args[@]}" \
+            --out "$RUNNER_TEMP/arm.json" | tee "$RUNNER_TEMP/arm.log"
+
+      - name: Upload the arm
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alfworld-arm
+          path: |
+            ${{ runner.temp }}/arm.json
+            ${{ runner.temp }}/arm.log
+          if-no-files-found: warn
