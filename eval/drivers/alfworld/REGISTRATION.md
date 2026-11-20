@@ -512,3 +512,29 @@ numerals, and every ALFWorld object is numbered, so a rule mentioning `counterto
 free — 2/6 rather than 1/6 in the test's own observation. Removing numerals from the anchor's vocabulary is a
 separate change to the *treatment*, not to the gate, and it is not made here because it would move the arm this
 gate is measured against.
+
+### R168, amendment 2 — what each outcome of the sweep will mean, written before the number exists
+
+The sweep in flight (`44743739868`) produces three readings per pair: the paired delta, the share of games the pack
+changed, and the harm share among those. Twelve outcomes are arithmetically possible and four are worth naming, so
+the decision is registered now rather than chosen afterwards from whatever the interval happens to contain.
+
+| the reading | what it means | the next dispatch it licenses |
+| --- | --- | --- |
+| `\|delta\| ≤ mde` and `divergence > 0.5` | the pack reached most games and moved the score by less than the split can see. **This is not "memory does not work"** — it is "at 134 games this pack's effect is smaller than the instrument's resolution" | the sample, not the mechanism: R165's placeholder "duplicate split" row, ≈ ¥5.71 for a second 134 games at a different seed, which halves the interval |
+| `\|delta\| ≤ mde` and `divergence < 0.1` | the pack reached almost nothing: the rules were admitted rarely or the model ignored them | the *door*, not the rule: a change to where the block sits or how it is addressed, and `engagement` is the metric, not the delta |
+| `delta > mde` | the pack helped by more than the split can resolve | the placebo (R165 amendment 1) at ≈ ¥1.9, because a positive delta and a positive delta from formatting are the same reading until the sham separates them |
+| `delta < −mde` | the pack hurt | the gate (R168 amendment 1) at ≈ ¥1.9, and `harm_share` against the published 52% is the number that says whether this lane is worse than the field at the same failure |
+
+**Why the first row is the one that will be misread.** A null at 134 games is the most likely outcome in this
+literature — MemScope reports DynamicCheatsheet at 50.75 against ALMA's re-run baseline at 67.16 on the same corpus,
+and the ALMA paper reports 87.1 for a method the other harness puts at 67.16. A lane that reports "memory does not
+help" from one null is quoting a 40-point spread's worth of harness uncertainty as a fact about memory. The
+`divergence` column exists to keep that from happening: a null over 5% of games and a null over 60% of games are
+different statements, and only one of them is about memory.
+
+**The number this row cannot produce, stated so it is not claimed later.** 134 games at a 55% base rate resolves
+about 17 points at 80% power. Nothing in this sweep can detect a 3-point effect, and if the literature's effects are
+3 points, this lane will report a null and be right about what it measured and wrong about what it concluded. The
+only honest output of the first row is a *bounds* statement: "the pack's effect lies within ±mde" is a result; "the
+pack does not work" is not.
