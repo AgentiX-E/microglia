@@ -175,6 +175,34 @@ class EngagementTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             aggregate.engagement(left, right)
 
+    def test_the_harm_share_is_the_same_quantity_the_tau2_lane_already_reports(self):
+        # `COMPETITIVE.md` Appendix AS: harm share = the share of *informative* uses that made the outcome
+        # worse. At the episode level an informative use is a game the pack changed, so the denominator is
+        # `diverged` and not the split. Naming it the same way is what makes the two lanes comparable at all.
+        left = {
+            "g1": episode("g1", True),
+            "g2": episode("g2", False),
+            "g3": episode("g3", True),
+            "g4": episode("g4", False),
+        }
+        right = {
+            "g1": episode("g1", False),
+            "g2": episode("g2", True),
+            "g3": episode("g3", True),
+            "g4": episode("g4", False),
+        }
+        report = aggregate.engagement(left, right)
+        self.assertEqual(report["diverged"], 2)
+        self.assertEqual(report["help_share"], 0.5)
+        self.assertEqual(report["harm_share"], 0.5)
+
+    def test_a_pack_that_never_reached_a_game_has_no_harm_share(self):
+        left = {"g1": episode("g1", True, digest="same")}
+        right = {"g1": episode("g1", True, digest="same")}
+        report = aggregate.engagement(left, right)
+        self.assertIsNone(report["harm_share"])
+        self.assertIsNone(report["help_share"])
+
 
 class KindTest(unittest.TestCase):
     """The six task types are not one population, so the delta is reported for each of them.
@@ -225,6 +253,54 @@ class RefusalTest(unittest.TestCase):
     def test_a_slice_with_no_calls_has_no_rate_rather_than_zero(self):
         report = aggregate.refusals(left=[episode("g1", True, calls=0)], right=[episode("g1", True)])
         self.assertIsNone(report["left"]["invalid_per_call"])
+
+
+class StrataTest(unittest.TestCase):
+    """The same delta, split by what the control did on its own.
+
+    `arXiv:2604.27003` ("When Continual Learning Moves to Memory") reports that negative transfer from
+    reused experience concentrates on the cases the agent cannot solve unaided, and that cases it can
+    already solve are comparatively robust. That is a prediction about *this* lane's 134 games, and it is
+    worth nothing unless it is computed before the reading arrives: a pooled delta cannot distinguish
+    "the pack helped the hard games and hurt the easy ones" from "the pack did nothing".
+    """
+
+    def test_the_hard_stratum_is_the_games_the_control_lost(self):
+        left = {
+            "h1": episode("h1", True),
+            "h2": episode("h2", True),
+            "h3": episode("h3", False),
+            "h4": episode("h4", False),
+            "e1": episode("e1", True),
+            "e2": episode("e2", True),
+        }
+        right = {
+            "h1": episode("h1", False),
+            "h2": episode("h2", False),
+            "h3": episode("h3", False),
+            "h4": episode("h4", False),
+            "e1": episode("e1", True),
+            "e2": episode("e2", True),
+        }
+        report = aggregate.strata(left, right)
+        self.assertEqual(report["hard"]["games"], 4)
+        self.assertEqual(report["hard"]["delta"], 0.5)
+        self.assertEqual(report["easy"]["games"], 2)
+        self.assertEqual(report["easy"]["delta"], 0.0)
+
+    def test_a_pack_that_hurts_only_the_easy_cases_says_so(self):
+        left = {"h1": episode("h1", True), "e1": episode("e1", False), "e2": episode("e2", False)}
+        right = {"h1": episode("h1", False), "e1": episode("e1", True), "e2": episode("e2", True)}
+        report = aggregate.strata(left, right)
+        self.assertEqual(report["easy"]["delta"], -1.0)
+        self.assertEqual(report["hard"]["delta"], 1.0)
+
+    def test_an_empty_stratum_is_reported_as_empty_rather_than_as_zero(self):
+        left = {"e1": episode("e1", True)}
+        right = {"e1": episode("e1", True)}
+        report = aggregate.strata(left, right)
+        self.assertEqual(report["hard"]["games"], 0)
+        self.assertIsNone(report["hard"]["delta"])
 
 
 class ReadingTest(unittest.TestCase):

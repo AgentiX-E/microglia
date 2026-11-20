@@ -359,3 +359,35 @@ the critique calls are ten at ~12k input tokens each, about **¥0.10**; so the b
 - A bank that the arm cannot read, or reads truncated without saying so: the arm reports `pack_entries` and
   `rules_in_bank` separately for that reason.
 - A training pass whose transcripts are missing: `distill.py` refuses rather than distilling from whatever is left.
+
+## R165 — Two predictions from the 2026 literature, registered before the first delta exists
+
+The three-arm chain (run `44685314225`) will produce `always-in − none` and `retrieved − none` at 134 games. Before
+that number exists, two published results make predictions about *where* the delta should and should not appear,
+and both are computed by `aggregate.py` from the same artefacts at no extra cost. Registering them now is the only
+way they can be checks rather than narratives: after a delta arrives, every stratification is a story that fits.
+
+| source | the claim | the prediction registered here | what refutes it |
+| --- | --- | --- | --- |
+| **`arXiv:2604.27003`**, *When Continual Learning Moves to Memory* (2026-05) | negative transfer from reused experience concentrates on **the cases the agent cannot solve unaided**; cases it already handles are comparatively robust | `strata.hard.delta > strata.easy.delta`, and any harm shows up in `hard` first. The hard stratum is defined by the **control's** verdict, because "hard" has to mean hard for this skeleton | a harm share concentrated in `easy` (games `none` won and the bank lost), or `hard.delta ≤ easy.delta` |
+| **`arXiv:2610.07311`**, *Understanding and Mitigating Inference-Time Overreliance* (2026-10) | harm is largest at **intermediate** query-memory overlap: memory helps when the experience transfers and hurts when only part of it does | `retrieved − none` is expected to be *larger* than `always-in − none` if the lexical anchor is selecting on partial overlap well, and *smaller* if the anchor is admitting near-misses. The test is `divergence_rate`: a `retrieved` arm that diverges on few games is selecting what `none` would have done anyway | a `retrieved` arm with the same divergence as `always-in` and the same delta — then the anchor is not selecting, and the arm is `always-in` with extra steps (the defect 34.219 already found once) |
+
+**The quantity both are read against is `harm_share`**, defined exactly as `COMPETITIVE.md` Appendix AS defines it
+for the τ² lane — of the uses that changed anything, the share that made the outcome worse — with the episode as the
+unit here and the served item as the unit there. It is the only column this record has ever been able to compare
+across lanes, and this is the second lane that can report it.
+
+**One further control is registered as a decision, not as a dispatch.** `arXiv:2601.22436` (*Are Not Always Faithful
+Self-Evolvers*, 2026-01) finds that agents respond to the **existence and shape** of a condensed-memory block more
+than to its semantic content: corrupting or replacing a summary often leaves the score where it was, while removing
+a raw trajectory collapses it. If that is what is happening here, `always-in − none` will be positive and a
+**placebo** arm — the same header, the same entry count, each rule's words permuted within itself so that the
+surface form is preserved and the meaning is not — would earn the same delta.
+
+The placebo is therefore **not dispatched this round**: its price is ≈ ¥1.9 and it only answers a question that
+exists once the primary delta is non-zero. The rule, written before the number: dispatch it if
+`|always-in − none| > mde`, because below that there is no effect for a sham to imitate and the money is better
+spent on the sample. If the primary delta clears the MDE and the placebo matches it, the finding is that this
+lane's gain is formatting, and the mechanism needs replacing rather than tuning.
+
+**Cost of this registration.** ¥0. Both predictions are computed from artefacts the chain already pays for.

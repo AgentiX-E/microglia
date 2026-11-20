@@ -17,6 +17,15 @@ tile the split, and a pair of arms whose games do not coincide on every one of t
 a zero: dropping it would silently change the denominator and make two arms' rates incomparable while
 still printing a delta.
 
+**Four readings beside the delta, because a delta is a question and not an answer.** *Engagement* is how
+many games the pack actually changed — with the action digest as the instrument, so a treatment that was
+never read reports a divergence of zero and its null is about delivery rather than about memory. *Harm
+share* is the share of those engagements that made the outcome worse, which is the same quantity
+`COMPETITIVE.md` Appendix AS reports for the τ² lane, at the episode as the unit instead of the item.
+*Strata* splits the delta by what the control did unaided, which is the prediction `arXiv:2604.27003`
+makes (negative transfer concentrates on the hard cases). *Kinds* splits it by task type, which is what
+turns "the bank did nothing" into "the bank helped the procedures and hurt the searches".
+
 Exit codes are the report: 0 the reading is written, 1 the slices cannot produce one.
 """
 
@@ -218,6 +227,8 @@ def engagement(left: "dict[str, dict]", right: "dict[str, dict]") -> dict:
     diverged = [game for game in games if left[game]["digest"] != right[game]["digest"]]
     won = lambda side, game: 1.0 if bool(side[game].get("won")) else 0.0  # noqa: E731
     unconditional = sum(won(left, game) - won(right, game) for game in games) / len(games)
+    helped = sum(1 for game in diverged if bool(left[game].get("won")) and not bool(right[game].get("won")))
+    harmed = sum(1 for game in diverged if bool(right[game].get("won")) and not bool(left[game].get("won")))
     report = {
         "identical": len(identical),
         "diverged": len(diverged),
@@ -229,8 +240,48 @@ def engagement(left: "dict[str, dict]", right: "dict[str, dict]") -> dict:
         "delta_among_diverged": (
             round(sum(won(left, game) - won(right, game) for game in diverged) / len(diverged), 4) if diverged else None
         ),
+        # The same two columns `COMPETITIVE.md` Appendix AS reports for the τ² lane, with the episode as the
+        # unit instead of the served item: of the games the pack changed, the share it repaired and the share
+        # it broke. The denominator is what makes them a share rather than a rate, and at zero engagement
+        # there is no share to report — a pack nobody read did not harm nothing.
+        "help_share": round(helped / len(diverged), 4) if diverged else None,
+        "harm_share": round(harmed / len(diverged), 4) if diverged else None,
+        "helped": helped,
+        "harmed": harmed,
     }
     return report
+
+
+def strata(left: "dict[str, dict]", right: "dict[str, dict]", labels: "tuple[str, str]" = ("treatment", "control")) -> dict:
+    """The paired delta split by what the control did unaided: the easy games and the hard ones.
+
+    `arXiv:2604.27003` studies experience reuse as continual learning and reports two asymmetries: raw
+    trajectories transfer badly, and negative transfer concentrates on **the cases the agent cannot solve
+    on its own**, while cases it already handles are robust. `arXiv:2610.07311` (memory over-reliance)
+    adds the reason: harm is largest when the stored evidence only partly matches the question.
+
+    Both are predictions about this lane's 134 games, and neither is visible in a pooled delta — a pack
+    that wins four hard games and loses four easy ones is a delta of zero that is not a null. The control
+    is the stratifier because "hard" has to mean hard *for this skeleton*, not hard in the abstract.
+    """
+    treatment, control = labels
+    table: "dict[str, dict]" = {
+        "hard": {"games": 0, "wins": {treatment: 0, control: 0}},
+        "easy": {"games": 0, "wins": {treatment: 0, control: 0}},
+    }
+    for game in shared_games(left, right):
+        first = bool(left[game].get("won"))
+        second = bool(right[game].get("won"))
+        # The stratum is named by the control's verdict, which is the arm with no memory in it.
+        key = "easy" if second else "hard"
+        table[key]["games"] += 1
+        table[key]["wins"][treatment] += int(first)
+        table[key]["wins"][control] += int(second)
+    for row in table.values():
+        row["delta"] = (
+            round((row["wins"][treatment] - row["wins"][control]) / row["games"], 4) if row["games"] else None
+        )
+    return table
 
 
 def by_kind(left: "dict[str, dict]", right: "dict[str, dict]", labels: "tuple[str, str]" = ("treatment", "control")) -> dict:
@@ -351,6 +402,7 @@ def main() -> int:
                 "mde": round(mde_of(b + c, len(shared)), 4),
                 "paired": bootstrap_delta(pairs_of_verdicts, arguments.rounds, arguments.seed),
                 "engagement": engagement(left, right),
+                "strata": strata(left, right, (treatment, control)),
                 "kinds": by_kind(left, right, (treatment, control)),
             }
         )
@@ -381,6 +433,14 @@ def main() -> int:
             f"  engagement      {moved['diverged']}/{reading['games']} games changed course "
             f"({100 * moved['divergence_rate']:.1f}%), delta on those {moved['delta_among_diverged']}"
         )
+        print(
+            f"  harm share      {moved['harmed']}/{moved['diverged']} = {moved['harm_share']}  "
+            f"(helped {moved['helped']}/{moved['diverged']} = {moved['help_share']})"
+        )
+        for name, row in reading["strata"].items():
+            # The hard stratum is where 2604.27003 predicts the harm; printing it beside the pooled
+            # delta is what makes that prediction checkable in the report rather than in a footnote.
+            print(f"    {name:<6} {row['wins'][treatment]}/{row['games']} vs {row['wins'][control]}/{row['games']}  delta {row['delta']}")
         for kind, row in reading["kinds"].items():
             print(f"    {kind:<9} {row['wins'][treatment]}/{row['games']} vs {row['wins'][control]}/{row['games']}  delta {row['delta']:+.4f}")
         left_counts = per_arm[treatment]
