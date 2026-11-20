@@ -9,6 +9,8 @@ backwards: the discordance counts games where the arms *disagree*, and the inter
 
 from __future__ import annotations
 
+import contextlib
+import io
 import json
 import sys
 import shutil
@@ -581,6 +583,109 @@ class MainTest(unittest.TestCase):
         )
         with self.assertRaises(SystemExit):
             self.run_main(["--input", str(treatment), "--input", str(control), "--compare", "always-in,none"])
+
+
+class RelabelTest(unittest.TestCase):
+    """Two dispatches' treatments, paired — the reading that does not need a control.
+
+    The control's own rate has moved 80 → 81 → 89 → 90 on the same 134 games, which is a seven-point floor
+    under every delta this lane quotes. Two treatments do not have that problem: they both drove every game
+    through the same model, and the difference between them is the difference between two blocks. The
+    rename is the switch that allows both in one join, and these tests pin what it refuses.
+    """
+
+    def setUp(self):
+        self.paths = []
+
+    def tearDown(self):
+        for path in self.paths:
+            path.unlink(missing_ok=True)
+
+    def write(self, name: str, body: dict) -> Path:
+        path = HERE / name
+        path.write_text(json.dumps(body), encoding="utf-8")
+        self.paths.append(path)
+        return path
+
+    def run_main(self, argv):
+        original = sys.argv
+        sys.argv = ["aggregate.py"] + argv
+        try:
+            return aggregate.main()
+        finally:
+            sys.argv = original
+
+    def test_two_dispatches_of_one_family_are_paired_once_renamed(self):
+        left = self.write(
+            "r-a.json",
+            {"summary": summary("always-in", arm_label="always-in@dose-a"), "episodes": [episode("g1", True), episode("g2", True)]},
+        )
+        right = self.write(
+            "r-b.json",
+            {"summary": summary("always-in", arm_label="always-in@dose-b"), "episodes": [episode("g1", True), episode("g2", False)]},
+        )
+        out = HERE / "crossrun.json"
+        self.paths.append(out)
+        self.assertEqual(
+            self.run_main(
+                [
+                    "--input", str(left), "--input", str(right),
+                    "--compare", "left,right",
+                    "--relabel", "always-in@dose-a=left",
+                    "--relabel", "always-in@dose-b=right",
+                    "--expect", "2", "--out", str(out), "--rounds", "50",
+                ]
+            ),
+            0,
+        )
+        reading = json.loads(out.read_text(encoding="utf-8"))["readings"][0]
+        self.assertEqual(reading["wins"], {"left": 2, "right": 1})
+        self.assertEqual(reading["discordant"], {"treatment_only": 1, "control_only": 0, "total": 1})
+
+    def test_a_rename_names_the_cross_dispatch_pairing_in_the_report(self):
+        # A pairing whose provenance is silent reads as an ordinary within-run reading, and the difference
+        # matters: an open interval here cannot be blamed on the control's afternoon.
+        left = self.write("rn-a.json", {"summary": summary("always-in", arm_label="always-in@a"), "episodes": [episode("g1", True)]})
+        right = self.write("rn-b.json", {"summary": summary("always-in", arm_label="always-in@b"), "episodes": [episode("g1", False)]})
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.run_main(
+                [
+                    "--input", str(left), "--input", str(right),
+                    "--compare", "x,y", "--relabel", "always-in@a=x", "--relabel", "always-in@b=y",
+                    "--rounds", "50",
+                ]
+            )
+        self.assertIn("relabelled      always-in@a=x", printed.getvalue())
+
+    def test_a_source_that_no_slice_carries_is_refused(self):
+        left = self.write("rs-a.json", {"summary": summary("always-in"), "episodes": [episode("g1", True)]})
+        with self.assertRaises(SystemExit):
+            self.run_main(["--input", str(left), "--compare", "always-in,none", "--relabel", "sham=placebo"])
+
+    def test_a_rename_onto_an_arm_already_present_is_refused(self):
+        # Merging is the failure this refuses: two groups under one name tile the split twice, and every
+        # rate downstream is then over a denominator nobody can check.
+        left = self.write("rc-a.json", {"summary": summary("always-in", arm_label="always-in@a"), "episodes": [episode("g1", True)]})
+        right = self.write("rc-b.json", {"summary": summary("always-in", arm_label="always-in@b"), "episodes": [episode("g1", False)]})
+        with self.assertRaises(SystemExit):
+            self.run_main(["--input", str(left), "--input", str(right), "--compare", "always-in@a,always-in@b", "--relabel", "always-in@b=always-in@a"])
+
+    def test_a_spec_that_is_not_old_equals_new_is_refused(self):
+        left = self.write("rd-a.json", {"summary": summary("always-in"), "episodes": [episode("g1", True)]})
+        for spec in ("always-in", "=x", "always-in=", "always-in=x=y"):
+            with self.assertRaises(SystemExit):
+                self.run_main(["--input", str(left), "--compare", "always-in,none", "--relabel", spec])
+
+    def test_a_rename_to_itself_leaves_one_group(self):
+        left = self.write("re-a.json", {"summary": summary("always-in"), "episodes": [episode("g1", True)]})
+        control = self.write("re-b.json", {"summary": summary("none"), "episodes": [episode("g1", False)]})
+        self.assertEqual(
+            self.run_main(
+                ["--input", str(left), "--input", str(control), "--compare", "always-in,none", "--relabel", "always-in=always-in", "--rounds", "50"]
+            ),
+            0,
+        )
 
 
 if __name__ == "__main__":

@@ -793,3 +793,95 @@ quoted three times and missed three times.
   * A dose bank whose rendered length differs from the registered bank by more than 5% — it is 0.5% by construction,
     and the number is checked against the artefact rather than trusted from this paragraph.
   * An `engagement` below 50%, which makes the reading about partial discard rather than about dose.
+
+### R172, amendment 1 — the dose point was scored, the control crossed its own ceiling, and the half that was dropped is the half that names the failing operation
+
+Run `44789662558` drove the two-real-two-filler block over all 134 held-out games with its own control: 8,804
+calls, **$0.4495** (¥3.21), 268 episodes, four shards per arm. Rendered length 1,318 against the registered
+block's 1,312 (100.5%), 218 words against 218, the real rules in the positions they occupy in the registered
+bank.
+
+**The condition this registration wrote for itself fired.** Its control landed at **90/134 (67.16%)**, above the
+verbatim 85/134 threshold, so per that paragraph no pooled number is quoted as the reading. The strata, which
+is what the condition asks for:
+
+| stratum | the dose block | `none` | delta |
+| --- | --- | --- | --- |
+| hard — the games the control lost | 13/44 | 0/44 | **+29.55 pp** |
+| easy — the games the control won | 67/90 | 90/90 | **−25.56 pp** |
+
+Engagement **129/134 (96.3%)** — the block was read, so the counters that void the reading did not fire — harm
+23/129 (17.8%), help 13/129 (10.1%). By kind: `clean` −12.9, `put` −12.5, `heat` −8.7, `examine` −5.6,
+`cool` 0.0, `puttwo` 0.0. For the record and not as a claim, the pooled paired delta was −7.46 pp
+[−15.67, +1.49], p = 0.105, discordance 13 + 23 = 36, mde 12.6 pp.
+
+**Which of the four registered rows this is, and why the row's own interpretation is not yet available.** The
+estimate sits on the filler's value (−7.46 against −6.72), which is row 3, whose text reads "the gain needs the
+specific procedural advice in all four entries". That sentence attributes the reading to *how much* of the block
+was about the task, and the artefact does not licence the attribution: the dose kept entries 1–2 (the desklamp
+note, the search order) and dropped entries 3–4 (verify the object is in the inventory before placing; if `put`
+fails try `move <object> to <receptacle>`). Entries 3–4 are the only entries in the block that name the operation
+this corpus actually fails — and the dose arm's two largest losses are on `clean` (−12.9) and `put` (−12.5), the
+two kinds whose failures are placement failures. "Half the content" and "the half that does not address the
+failing operation" are the same half in this artefact, and one more dose at the other half separates them for the
+price already quoted.
+
+**What the four dispatches say without using any control at all.** Every block was scored on the same 134 games
+by the same model through the same harness, so their absolute win counts are comparable to each other even though
+their controls' are not:
+
+| block | entries about the task | wins / 134 | dispatch |
+| --- | --- | --- | --- |
+| four distilled rules | 4 of 4 | **99** (73.9%) | `44754440122` |
+| the same four, order permuted | 4 of 4 | **105** (78.4%) | `44763220821` |
+| four typewriter entries | 0 of 4 | **80** (59.7%) | `44782732761` |
+| two distilled rules + two typewriter entries | 2 of 4 | **80** (59.7%) | `44789662558` |
+| `none` | — | 80, 81, 89, 90 | four dispatches |
+
+The blocks repeat (80 and 80; 99 and 105) while the control does not (80, 81, 89, 90). Whatever produces the
+seven-point spread lives in the arm that has no block, not in the arms that have one, and a delta quoted against
+a single `none` therefore carries an uncertainty this lane cannot shrink by buying more treatments. Two treatments
+paired against each other do not carry it: both drove every game, and the difference between them is the
+difference between two blocks. `aggregate.py --relabel` now exists so that this pairing is a command, with the
+rename printed in the report because a cross-dispatch reading whose provenance is silent reads like a within-run
+one.
+
+## R173 — The other half, and the padding, registered before either is scored
+
+Two treatments, two dispatches, bought in parallel because neither one's reading depends on the other's.
+
+**R173.1 — the complementary half, at the registered length and in the registered positions.**
+`banks/bank-dose-complement-2of4.json` is four entries: the two filler entries at positions 1–2 (trimmed from 255
+and 245 characters to the registered 254 and 248 so that the per-entry profile matches), then entries 3 and 4 of
+the registered bank at 309 and 292. Rendered **1,312 characters against 1,312 (100.0%)**, 219 words against 218,
+same header, same identity, same cap, same injection site, same model, same 134 games. The only difference from
+the R172 dose point is *which* two entries are about the task.
+
+**R173.2 — the same two rules with nothing around them.** `banks/bank-putpair-2.json` is entries 3 and 4 alone:
+**802 rendered characters (61.1%)**, 135 words. It is not length-matched and it is not meant to be. It answers the
+question the dose point raised and could not settle: the dose was 2 real + 2 filler and scored exactly what 4
+filler scored, which is either "two rules are worth nothing" or "the filler cancels them". A block with no filler
+in it reads those two apart — if it lands near 99 the padding is not inert but harmful, and if it lands near 80
+the count of rules that address the failing operation is what the block is worth.
+
+| the reading, treatment against treatment on the same 134 games | what it means | the dispatch it licenses |
+| --- | --- | --- |
+| complement ≈ 99 and pair ≈ 99 | the **placement rules are the whole effect**, and the padding is inert: 802 characters buy what 1,312 buy. The mechanism is advice that names the failing operation | a block written *for* `put`-family failures alone (the lane's worst kind, 3–4 of 24 unaided), ≈ ¥3; and the distillation line resumes with the target changed from "a rule bank" to "a workaround for the operation that fails" |
+| complement ≈ 99 and pair ≈ 80 | placement rules carry the effect **only when the block is long enough**, so length is a second factor after all, and the placebo's "order is inert" does not extend to "quantity is inert" | a length ladder at 1,312 with 1, 2, 3 and 4 real entries, ≈ ¥12, and no product claim until it is read |
+| complement ≈ 80 and pair ≈ 80 | neither half alone moves the score: the effect needs the block to carry **both** a general search rule and a placement rule, which is a composition claim and the first one this lane has had that a competitor's bank could fail | the 3-of-4 dose (entries 1, 3, 4), ≈ ¥3, to find whether the composition is a pair or the whole set |
+| pair ≈ 80 and complement between the endpoints | the filler is actively cancelling a real effect, which reconciles the R172 dose point with the 4-rule block | a re-score of the registered block with its own entries in the reverse order (the placebo already permuted; this reverses), ≈ ¥3 |
+
+**What would void either reading, stated before they exist.**
+
+ * Engagement below 50% of games diverged — a block that was not read cannot be a block that did not help.
+ * A control above 85/134 in either dispatch: reported by stratum only, and the cross-treatment pairing becomes
+   the only number quoted. The condition is now permanent rather than per-registration, because it has fired once
+   in five dispatches and the ceiling it describes is a property of the split rather than of a run.
+ * A rendered length difference above 5% for R173.1 (it is 0.0% by construction, and the number is checked from
+   the artefact's own `render_pack` rather than trusted from this paragraph).
+ * R173.2's reading may not be attributed to content alone: it differs from the registered block in both content
+   and length, and it is quoted only beside R173.1, which holds length fixed.
+
+**Price, before it is paid.** Two dispatches, each 134 games × 2 arms: **¥3.3 each, ≈ ¥6.6 together**, priced at
+the arm's measured cost for this shape rather than at the ¥2.0 that has now been quoted three times and missed
+three times. Each dispatch buys its own `none` arm, so no control is compared across dispatches.

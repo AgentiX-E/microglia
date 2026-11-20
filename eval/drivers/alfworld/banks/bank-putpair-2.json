@@ -1,0 +1,22 @@
+{
+ "schema": "microglia.alfworld-bank/1",
+ "cap": 20,
+ "identity": "substring",
+ "source": {
+  "kind": "hand-assembled subset",
+  "matches": "entries 3 and 4 of banks/bank-44754440122.json, nothing added",
+  "note": "the half of the registered block the dose point dropped, at its own length rather than padded to the registered block's; R173 row 2",
+  "prompt": "entries 3 and 4 of banks/bank-44754440122.json",
+  "registration": "R173 row 2"
+ },
+ "entries": [
+  {
+   "text": "After taking an object, verify it is actually in your inventory (e.g., via inventory) before attempting to place or use it; if the take action fails silently, retry taking the object from its location, and if a subsequent put/move fails, check whether your hands are full by attempting to take another object.",
+   "votes": 10
+  },
+  {
+   "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\"; if that also fails, try a different valid receptacle of the same type, and if the receptacle is a container, ensure it is open first.",
+   "votes": 10
+  }
+ ]
+}

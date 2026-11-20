@@ -89,6 +89,39 @@ def load_slices(paths: "list[Path]") -> "dict[str, list[dict]]":
     return grouped
 
 
+def relabel(groups: "dict[str, list[dict]]", specs: "list[str]") -> "dict[str, list[dict]]":
+    """Rename a group, so that two dispatches' *treatments* can be paired as two arms.
+
+    A reading inside one dispatch pairs a treatment with the `none` arm bought in the same run, because the
+    control moves about seven points between dispatches and a cross-run delta would be measuring that. Two
+    treatments are a different quantity: both drove every game in the split through the same model and the
+    same harness, so the difference between them is the difference between two blocks and not between two
+    afternoons. Four blocks have now been scored against four controls on the same 134 games — 80, 81, 89
+    and 90 wins for `none` against 99, 105, 80 and 80 for the blocks — and the treatment readings repeat
+    while the control's does not. This switch is what turns that comparison into a command.
+
+    A rename that would land on a group already present is refused rather than merged: two arms' episodes
+    under one name is a doubled denominator wearing one arm's label, which is the failure mode this file's
+    docstring is entirely about. The caller prints the rename, because a pairing whose provenance is silent
+    reads like an ordinary within-run reading.
+    """
+    renamed = dict(groups)
+    for spec in specs:
+        old, separator, new = spec.partition("=")
+        old, new = old.strip(), new.strip()
+        if not separator or not old or not new or "=" in new:
+            fail(f"--relabel {spec!r} is not 'old=new'")
+        if old not in renamed:
+            fail(f"--relabel {spec!r}: no slice carries {old!r}; the file(s) hold {sorted(renamed)}")
+        if new != old and new in renamed:
+            fail(
+                f"--relabel {spec!r}: {new!r} is already an arm in this join, and merging two arms would "
+                f"double a denominator while printing one rate"
+            )
+        renamed[new] = renamed.pop(old)
+    return renamed
+
+
 def tile(episodes: "list[dict]", expected: int, label: str) -> "dict[str, dict]":
     """One entry per game, refusing a duplicate — a game driven twice is two votes for one question."""
     by_game: "dict[str, dict]" = {}
@@ -356,6 +389,12 @@ def main() -> int:
         default="always-in,none",
         help="the two arms, treatment first; several pairs may be given, separated by ';'",
     )
+    parser.add_argument(
+        "--relabel",
+        action="append",
+        default=[],
+        help="rename an arm for cross-dispatch pairing, as old=new; repeatable",
+    )
     parser.add_argument("--expect", type=int, default=0, help="games each arm must tile; 0 skips the check")
     parser.add_argument("--rounds", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=20261120)
@@ -364,6 +403,13 @@ def main() -> int:
 
     paths = [Path(item) for item in arguments.input]
     grouped = load_slices(paths)
+    if arguments.relabel:
+        before = sorted(grouped)
+        grouped = relabel(grouped, arguments.relabel)
+        # Printed rather than implied: a reading that crosses dispatches is the one kind of reading whose
+        # provenance a reader cannot recover from the arms' names in the report.
+        for spec in arguments.relabel:
+            print(f"  relabelled      {spec}  (arms before {before})")
     # Parsed before anything is tiled, and a malformed pair is refused here rather than at unpacking time:
     # `--compare always-in` would otherwise raise a ValueError from a tuple unpacking three frames down,
     # which reads as a crash rather than as a dispatch that named one arm where a pair was wanted.
