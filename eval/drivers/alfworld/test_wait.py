@@ -66,7 +66,7 @@ class WaitTest(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("is not an HH:MM", result.stderr)
 
-    def test_the_script_can_be_run_directly_and_fails_fast(self):
+    def test_the_script_fails_fast_and_cannot_detach_itself(self):
         text = SCRIPT.read_text(encoding="utf-8")
         self.assertTrue(text.startswith("#!/usr/bin/env bash"))
         self.assertIn("set -euo pipefail", text)
@@ -74,7 +74,14 @@ class WaitTest(unittest.TestCase):
         # a runner keeps billing after the run it belongs to has been stopped.
         self.assertNotIn("nohup", text)
         self.assertNotIn("&\n", text)
-        self.assertTrue(SCRIPT.stat().st_mode & 0o111)
+
+    def test_the_executable_bit_is_not_asserted_here(self):
+        # It was, and it was a test about the checkout rather than about the script: this repository's pushes
+        # travel through the Git Data API, which wrote every blob as `100644`, so a locally `chmod +x`ed file
+        # arrived readable and not executable. The workflow calls `bash <script>`, which needs no bit — so the
+        # assertion was deleted rather than the transport repaired, and this test records that decision.
+        self.assertTrue(SCRIPT.is_file())
+        self.assertIn("bash", SCRIPT.read_text(encoding="utf-8").splitlines()[0])
 
 
 if __name__ == "__main__":
