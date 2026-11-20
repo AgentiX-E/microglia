@@ -49,6 +49,7 @@ is strong enough to steer a prompt, and forgets it when it stops being true.
 | Distills claims into scoped, deduplicated, evidenced rules | Run a server, a database, or a queue |
 | Recalls a bounded, diversified prompt block | Require GPU, CUDA, or a fine-tuning loop |
 | Reports why each rule is active, demoted, or retired | Send your data anywhere |
+| Projects knowledge into `@agentix-e/cortex` | Own the memory substrate — decay, bitemporal facts and conformance are `cortex`'s product (**8.39**) |
 
 ## What this is, and what has been measured for it
 

@@ -2455,3 +2455,62 @@ than a preference.
 `rules[-1]` and edits the last rule. That is a legal out-of-bounds access in Python and an error in TypeScript,
 so the port rejects it and counts it. Reproducing an indexing accident would not have made the control more
 faithful; it would have made the port harder to reason about while changing nothing a model does on purpose.
+
+
+### 8.39 The boundary: a pack shape is not a substrate, and the test is the score it moves
+
+`@agentix-e/cortex` is a cognitive memory substrate: `MemoryValue` with confidence, source trust and FSRS
+state, bitemporal `Fact`, `decideWrite`/`decideRetrieval` value gates, `consolidate` over Hebbian and FSRS
+schedules. `microglia` is the maintenance layer for it, not a second brain. That sentence is in the
+whitepaper and, until this section, nothing in this repository said how to apply it — which matters because
+the literature the two projects read from is one undifferentiated pile of things called *memory*, and reading
+it wrongly produces work that belongs in the substrate and gets built here instead.
+
+**The test is not what the mechanism is called. It is the score its authors report.**
+
+| a mechanism belongs here if | it belongs in `cortex` if |
+| --- | --- |
+| it changes what `recall()` returns for **one task**, and its authors report a **task success rate** | it changes what can be **asked of the store independently of any task**, and its authors report **LongMemEval, LoCoMo or a QA F1** |
+| its output is consumed by a prompt and then discarded | its output is a fact that outlives every prompt and is queried directly |
+| the unit is a correction, a rule, a workflow or an exemplar | the unit is a `MemoryValue`, a `Fact`, an entity or an edge |
+| the ablation is "with the block / without the block" | the ablation is "with the decay schedule / without it" |
+
+Applied to the four systems a recent round proposed as candidates, the table above separates them cleanly —
+including one case where the *same name* sits on both sides:
+
+| mechanism | what its authors report | belongs here |
+| --- | --- | --- |
+| **H²R** (arXiv 2509.12810) — high-level planning memory and low-level execution memory decoupled, retrieved separately at test time | ALFWorld and ScienceWorld **task success rate**, against ExpeL | yes — a `pack` with two sections |
+| **AWM** (arXiv 2409.07429) — workflows induced from judged-successful trajectories, with instance values abstracted to `{product}` slots | WebArena **success 23.5 → 35.5**, Mind2Web **step SR 36.2 → 45.1** | yes — already registered as the P2 abstraction row, roughly $0.70 plus code |
+| **FSM / procedural graph** — state-transition structure whose traversal chooses what to inject | ALFWorld **success 80.60 vs 75.37** | yes, but only as a *rendering order*: a persistent graph queried outside a task is the substrate's job |
+| **Synapse** (ICLR 2024) — state abstraction, trajectory-as-exemplar prompting, exemplar memory over embeddings | MiniWoB++ **99.2%** and Mind2Web **step success**, both task scores | yes — and it is close to what the `retrieved` arm already does |
+| **Synapse** (ACL 2026, UGA) — dual-layer associative memory with spreading activation, refuses when evidence is thin | **LoCoMo F1 40.5** and token reduction, a long-conversation QA score | **no — this one is cortex's**, and it is the case that proves the rule needs a rule rather than a vibe |
+
+**Two structural consequences, and they are the reason to write this down.**
+
+First, *a shape is a rendering decision and does not need a new store.* Layered sections, workflow
+placeholders and graph-ordered items are all things `renderPack()` can do to the items it already receives. Adding a
+graph database or an abstraction hierarchy to `memory/` in order to obtain them would be building a second
+brain to change a prompt, and the second brain would then need the decay schedule, the bitemporal facts and
+the conformance suite that the substrate already has.
+
+Second, *the shapes are mostly unmeasurable at this split's size*, and the table says which ones are worth
+buying. On 134 ALFWorld games the paired minimum detectable effect is **13.3pp**; converting each published
+delta into episodes needed at the same discordance:
+
+| the mechanism's own reported delta | episodes needed | × the split |
+| --- | --- | --- |
+| ExpeL's 19.0pp | 65 | 0.5× |
+| AWM's 12.0pp | 164 | 1.2× |
+| FSM's 5.23pp | 861 | 6.4× |
+| H²R's 3.5pp | 1,923 | 14.3× |
+
+So the honest queue is not "adopt four mechanisms". It is: prove the *axis* first — with versus without a
+block, which ExpeL's effect size can resolve on the split that exists — and only then ask *which shape*, at
+six to fourteen times the sample. A mechanism whose published effect is smaller than your resolution is not a
+candidate; it is a hypothesis you cannot afford to test, and writing it into a queue as though it were a
+candidate is how a roadmap stops describing what is measurable.
+
+**What this section does not do.** It does not claim the shapes are worthless, and it does not license
+dropping them. It fixes the order: axis, then shape, then substrate — and it says which of the three is not
+this repository's to build.

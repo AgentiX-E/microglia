@@ -1840,3 +1840,19 @@ request, which is why `mergeOperations` reports `peak` beside `culled` rather th
 one is contained in the *incoming* one. A rule that grows (`check the lamp.` → `Always check the lamp.`) is
 recognised as the same rule; a rule that shrinks is not. This is ExpeL's reading, kept in `rule-bank.ts` as the
 default so that the port is a control rather than an improvement on the thing it is controlling for.
+
+
+**Pack shape** — What a knowledge block looks like once `renderPack()` has arranged it: how many sections, in what
+order, with which instance values replaced by placeholders. A shape is a delivery decision, not a storage one. A
+two-section block (a plan above, a procedure below), a block ordered by a state graph, and a block whose rows are
+collapsed by action shape are all shapes over the same items, and none of them requires a new structure in the store.
+The distinction matters because the alternative — putting the shape in `memory/` — makes this library a second
+memory substrate, owing the decay schedule and bitemporal facts that `@agentix-e/cortex` already publishes.
+
+**Substrate query** — A question asked of a memory store *independently of any task*: "what did this user say about
+their move, three months ago". It is the benchmark family `cortex` reports on (LongMemEval, LoCoMo), and it is not
+what `microglia` measures — a pack can make a task succeed more often, and no change to a pack can move a
+long-conversation F1. The test for where a mechanism belongs is **the score its authors report**: a task success
+rate under a fixed model and prompt skeleton belongs here, a substrate query score does not. Two systems called
+Synapse sit on opposite sides of that line — the ICLR 2024 one reports MiniWoB++ and Mind2Web task scores, the ACL
+2026 one reports LoCoMo F1 — which is why the test is the score rather than the name.
