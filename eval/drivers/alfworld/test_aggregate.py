@@ -20,8 +20,27 @@ sys.path.insert(0, str(HERE))
 import aggregate  # noqa: E402
 
 
-def episode(game: str, won: bool) -> dict:
-    return {"gamefile": game, "won": won, "steps": 7, "usage": {}, "calls": 3}
+def episode(game: str, won: bool, digest: str = "", kind: str = "put", **overrides) -> dict:
+    """One episode record, with the fields the join reads.
+
+    `digest` defaults to a value that depends on the verdict, so that a fixture built without one still
+    says "these two runs took different paths" whenever they disagree — which is the only assumption a
+    test that is not about engagement should have to make.
+    """
+    record = {
+        "gamefile": game,
+        "won": won,
+        "steps": 7,
+        "usage": {},
+        "calls": 3,
+        "digest": digest or f"{game}:{int(won)}",
+        "task_kind": kind,
+        "actions": 3,
+        "invalid_actions": 0,
+        "off_space_actions": 0,
+    }
+    record.update(overrides)
+    return record
 
 
 def summary(arm: str, **overrides) -> dict:
@@ -90,6 +109,122 @@ class TileTest(unittest.TestCase):
     def test_a_complete_tile_is_indexed_by_game(self):
         by_game = aggregate.tile([episode("g1", True), episode("g2", False)], 2, "none")
         self.assertEqual(sorted(by_game), ["g1", "g2"])
+
+
+class EngagementTest(unittest.TestCase):
+    """How much of the split the pack actually moved, and what it was worth where it moved it.
+
+    A paired delta answers "did the arm score differently"; it does not answer "did the memory do
+    anything". Those come apart in both directions: a pack that never changed an action produces a delta
+    of exactly zero for reasons that have nothing to do with the mechanism being wrong, and a pack that
+    changed a fifth of the games can produce a delta of zero by helping and hurting in equal measure. The
+    decomposition is what separates the two, so its arithmetic is pinned here rather than trusted.
+    """
+
+    def test_a_pack_that_changed_no_action_leaves_every_game_identical(self):
+        left = {"g1": episode("g1", True, digest="same"), "g2": episode("g2", False, digest="same")}
+        right = {"g1": episode("g1", True, digest="same"), "g2": episode("g2", False, digest="same")}
+        report = aggregate.engagement(left, right)
+        self.assertEqual(report["identical"], 2)
+        self.assertEqual(report["diverged"], 0)
+        self.assertEqual(report["divergence_rate"], 0.0)
+        self.assertIsNone(report["delta_among_diverged"])
+
+    def test_the_diverged_subset_carries_the_whole_effect(self):
+        # Four games, and the pack only changed two of them: the unconditional delta is 1/4, the delta
+        # among the games it changed is 2/2. Reporting the first as the mechanism's effect understates it
+        # by exactly the share of games the mechanism never reached.
+        left = {
+            "g1": episode("g1", True, digest="a1"),
+            "g2": episode("g2", True, digest="a2"),
+            "g3": episode("g3", False, digest="a3"),
+            "g4": episode("g4", False, digest="a4"),
+        }
+        right = {
+            "g1": episode("g1", False, digest="b1"),
+            "g2": episode("g2", False, digest="b2"),
+            "g3": episode("g3", False, digest="a3"),
+            "g4": episode("g4", False, digest="a4"),
+        }
+        report = aggregate.engagement(left, right)
+        self.assertEqual(report["diverged"], 2)
+        self.assertEqual(report["divergence_rate"], 0.5)
+        self.assertEqual(report["delta_among_diverged"], 1.0)
+        self.assertEqual(report["delta_unconditional"], 0.5)
+
+    def test_a_diverged_game_that_ends_the_same_way_is_diverged_with_no_delta(self):
+        left = {"g1": episode("g1", True, digest="a1")}
+        right = {"g1": episode("g1", True, digest="b1")}
+        report = aggregate.engagement(left, right)
+        self.assertEqual(report["diverged"], 1)
+        self.assertEqual(report["delta_among_diverged"], 0.0)
+
+    def test_the_same_actions_with_different_verdicts_is_refused(self):
+        # The environment is a deterministic simulator: the same action sequence replays to the same
+        # verdict. A contradiction here is a defect in the join -- two different games under one key, or a
+        # slice written twice -- and it would make "identical" mean "the pack reached it and nothing
+        # happened", which is the opposite of what it means.
+        left = {"g1": episode("g1", True, digest="same")}
+        right = {"g1": episode("g1", False, digest="same")}
+        with self.assertRaises(SystemExit):
+            aggregate.engagement(left, right)
+
+    def test_a_slice_without_digests_is_refused(self):
+        left = {"g1": episode("g1", True, digest="x")}
+        right = {"g1": {"gamefile": "g1", "won": True}}
+        with self.assertRaises(SystemExit):
+            aggregate.engagement(left, right)
+
+
+class KindTest(unittest.TestCase):
+    """The six task types are not one population, so the delta is reported for each of them.
+
+    The strongest prediction the registration can make is about *where* a rule bank should help: the task
+    types whose solution is a procedure (heat, cool, clean) against the one that is a search (`puttwo`).
+    A single pooled delta cannot confirm or refute that, and pooling six kinds is how a mechanism that
+    helps three and hurts three reads as a null.
+    """
+
+    def test_deltas_are_reported_per_task_kind(self):
+        left = {
+            "g1": episode("g1", True, kind="put"),
+            "g2": episode("g2", True, kind="puttwo"),
+            "g3": episode("g3", False, kind="puttwo"),
+        }
+        right = {
+            "g1": episode("g1", False, kind="put"),
+            "g2": episode("g2", False, kind="puttwo"),
+            "g3": episode("g3", False, kind="puttwo"),
+        }
+        report = aggregate.by_kind(left, right)
+        self.assertEqual(sorted(report), ["put", "puttwo"])
+        self.assertEqual(report["put"]["games"], 1)
+        self.assertEqual(report["put"]["delta"], 1.0)
+        self.assertEqual(report["puttwo"]["games"], 2)
+        self.assertEqual(report["puttwo"]["delta"], 0.5)
+        self.assertEqual(report["puttwo"]["discordant"], 1)
+
+    def test_a_kind_is_named_even_when_an_older_slice_omits_it(self):
+        left = {"g1": {"gamefile": "g1", "won": True, "digest": "d"}}
+        right = {"g1": {"gamefile": "g1", "won": False, "digest": "e"}}
+        self.assertIn("unknown", aggregate.by_kind(left, right))
+
+
+class RefusalTest(unittest.TestCase):
+    """The counters the arm is expected to move, kept apart from the score it may or may not move."""
+
+    def test_refusal_rates_are_reported_per_arm(self):
+        left = [episode("g1", True, calls=10, actions=5, invalid_actions=2, off_space_actions=1)]
+        right = [episode("g1", True, calls=10, actions=5, invalid_actions=4, off_space_actions=0)]
+        report = aggregate.refusals(left=left, right=right)
+        self.assertEqual(report["left"]["invalid_actions"], 2)
+        self.assertEqual(report["left"]["invalid_per_call"], 0.2)
+        self.assertEqual(report["right"]["invalid_per_call"], 0.4)
+        self.assertEqual(report["right"]["off_space_per_action"], 0.0)
+
+    def test_a_slice_with_no_calls_has_no_rate_rather_than_zero(self):
+        report = aggregate.refusals(left=[episode("g1", True, calls=0)], right=[episode("g1", True)])
+        self.assertIsNone(report["left"]["invalid_per_call"])
 
 
 class ReadingTest(unittest.TestCase):
@@ -204,7 +339,7 @@ class MainTest(unittest.TestCase):
             self.run_main(["--input", str(treatment), "--input", str(control), "--compare", "always-in,none", "--expect", "4", "--out", str(out)]),
             0,
         )
-        reading = json.loads(out.read_text(encoding="utf-8"))["reading"]
+        reading = json.loads(out.read_text(encoding="utf-8"))["readings"][0]
         self.assertEqual(reading["games"], 4)
         self.assertEqual(reading["wins"], {"always-in": 3, "none": 0})
         self.assertEqual(reading["discordant"], {"treatment_only": 3, "control_only": 0, "total": 3})
@@ -226,6 +361,91 @@ class MainTest(unittest.TestCase):
             self.run_main(["--input", str(treatment), "--input", str(control), "--compare", "always-in,none", "--rounds", "50"]),
             0,
         )
+
+    def test_one_invocation_reads_every_pair_a_dispatch_produced(self):
+        # Three arms in one sweep is two questions -- always-in against none, and retrieved against
+        # none -- and reading them in two invocations is two chances to quote one and forget the other.
+        games = ["g1", "g2", "g3", "g4"]
+        none = self.write(
+            "p-none.json",
+            {"summary": summary("none"), "episodes": [episode(g, g in ("g1", "g2")) for g in games]},
+        )
+        always = self.write(
+            "p-always.json",
+            {"summary": summary("always-in"), "episodes": [episode(g, g in ("g1", "g2", "g3"), digest=f"a{g}") for g in games]},
+        )
+        retrieved = self.write(
+            "p-retrieved.json",
+            {"summary": summary("retrieved"), "episodes": [episode(g, False, digest=f"r{g}") for g in games]},
+        )
+        out = HERE / "pairs.json"
+        self.paths.append(out)
+        self.assertEqual(
+            self.run_main(
+                [
+                    "--input", str(none), "--input", str(always), "--input", str(retrieved),
+                    "--compare", "always-in,none;retrieved,none", "--rounds", "50", "--out", str(out),
+                ]
+            ),
+            0,
+        )
+        payload = json.loads(out.read_text(encoding="utf-8"))
+        self.assertEqual([reading["treatment"] for reading in payload["readings"]], ["always-in", "retrieved"])
+        self.assertEqual(payload["readings"][0]["wins"]["always-in"], 3)
+        self.assertEqual(payload["readings"][1]["wins"]["retrieved"], 0)
+
+    def test_the_reading_carries_the_decomposition_it_was_asked_for(self):
+        games = ["g1", "g2", "g3", "g4"]
+        treatment = self.write(
+            "d-a.json",
+            {"summary": summary("always-in"), "episodes": [episode(g, g == "g1", digest=f"a{g}") for g in games]},
+        )
+        control = self.write(
+            "d-b.json",
+            {"summary": summary("none"), "episodes": [episode(g, g == "g2", digest=f"b{g}") for g in games]},
+        )
+        out = HERE / "decomposed.json"
+        self.paths.append(out)
+        self.run_main(
+            ["--input", str(treatment), "--input", str(control), "--compare", "always-in,none", "--rounds", "50", "--out", str(out)]
+        )
+        payload = json.loads(out.read_text(encoding="utf-8"))
+        first = payload["readings"][0]
+        self.assertEqual(first["engagement"]["diverged"], 4)
+        self.assertEqual(first["engagement"]["identical"], 0)
+        self.assertIn("put", first["kinds"])
+        # Refusals belong to the arm, not to the pair, so they sit beside the readings rather than inside
+        # one of them: the same arm's refusal rate does not change with what it is being compared to.
+        self.assertEqual(payload["refusals"]["always-in"]["games"], 4)
+
+    def test_a_pair_naming_an_arm_no_slice_carries_is_refused_even_beside_a_good_one(self):
+        treatment, control = self.slices([True], [False])
+        with self.assertRaises(SystemExit):
+            self.run_main(
+                ["--input", str(treatment), "--input", str(control), "--compare", "always-in,none;placebo,none", "--rounds", "50"]
+            )
+
+    def test_a_malformed_pair_is_refused_rather_than_unpacked(self):
+        # `--compare always-in` names one arm where a pair was wanted. Unpacking it raises a ValueError
+        # from three frames down, which reads as a crash; the refusal has to name the flag.
+        treatment, control = self.slices([True], [False])
+        for spec in ("always-in", "always-in,", ",none"):
+            with self.assertRaises(SystemExit):
+                self.run_main(["--input", str(treatment), "--input", str(control), "--compare", spec, "--rounds", "50"])
+
+    def test_arms_that_overlap_partially_are_refused(self):
+        # Two arms that share one game and disagree elsewhere are the case an innocent-looking join gets
+        # wrong: the shared game produces a delta and the other two are silently dropped from both sides.
+        treatment = self.write(
+            "o-a.json",
+            {"summary": summary("always-in"), "episodes": [episode("g1", True), episode("g2", True)]},
+        )
+        control = self.write(
+            "o-b.json",
+            {"summary": summary("none"), "episodes": [episode("g1", False), episode("g3", False)]},
+        )
+        with self.assertRaises(SystemExit):
+            self.run_main(["--input", str(treatment), "--input", str(control), "--compare", "always-in,none"])
 
 
 if __name__ == "__main__":

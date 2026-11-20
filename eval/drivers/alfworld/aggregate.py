@@ -173,10 +173,132 @@ def bill_of_slices(paths: "list[Path]") -> dict:
     }
 
 
+# --------------------------------------------------------------------------------------------------
+# The decomposition: did the pack reach the game, and what did it do where it reached it
+# --------------------------------------------------------------------------------------------------
+
+
+def shared_games(left: "dict[str, dict]", right: "dict[str, dict]") -> "list[str]":
+    """The games both arms drove, which is the only population a paired quantity is defined on."""
+    games = sorted(set(left) & set(right))
+    if not games:
+        fail("the two arms share no game, so nothing here is paired")
+    return games
+
+
+def engagement(left: "dict[str, dict]", right: "dict[str, dict]") -> dict:
+    """How many games the pack actually changed, and what the change was worth on those.
+
+    The unconditional delta answers *what would change if this arm were shipped*; this answers *what the
+    mechanism does when it engages*. They differ by the share of games in which the treatment's action
+    sequence is identical to the control's, and that share is not a detail: at 134 games a pack can be
+    worth 20pp on the games it reaches and 2pp pooled, and only one of those numbers tells a reader
+    whether the mechanism or the sample is the problem.
+
+    The digest is over the action sequence, and the environment is a deterministic simulator, so equal
+    digests imply equal verdicts. A contradiction is refused rather than reported: it means the join is
+    wrong, not that the memory did something subtle.
+    """
+    games = shared_games(left, right)
+    blank = [game for game in games if not isinstance(left[game].get("digest"), str) or not isinstance(right[game].get("digest"), str)
+             or left[game].get("digest") == "" or right[game].get("digest") == ""]
+    if blank:
+        fail(f"{len(blank)} games carry no action digest (first {blank[0]}), so engagement cannot be read")
+
+    identical = [game for game in games if left[game]["digest"] == right[game]["digest"]]
+    contradictions = [
+        game for game in identical if bool(left[game].get("won")) != bool(right[game].get("won"))
+    ]
+    if contradictions:
+        fail(
+            f"{len(contradictions)} games took the same actions and reached different verdicts "
+            f"(first {contradictions[0]}); the environment replays deterministically, so this is a "
+            "defect in the join rather than an effect of the arm"
+        )
+    diverged = [game for game in games if left[game]["digest"] != right[game]["digest"]]
+    won = lambda side, game: 1.0 if bool(side[game].get("won")) else 0.0  # noqa: E731
+    unconditional = sum(won(left, game) - won(right, game) for game in games) / len(games)
+    report = {
+        "identical": len(identical),
+        "diverged": len(diverged),
+        "divergence_rate": round(len(diverged) / len(games), 4),
+        "delta_unconditional": round(unconditional, 4),
+        # Where the pack changed nothing the change is worth exactly nothing, by the determinism above;
+        # writing 0.0 rather than omitting it keeps a reader from reading an absence as a measurement.
+        "delta_among_identical": 0.0,
+        "delta_among_diverged": (
+            round(sum(won(left, game) - won(right, game) for game in diverged) / len(diverged), 4) if diverged else None
+        ),
+    }
+    return report
+
+
+def by_kind(left: "dict[str, dict]", right: "dict[str, dict]", labels: "tuple[str, str]" = ("treatment", "control")) -> dict:
+    """The paired delta of each of the six task types, on the games both arms drove.
+
+    Pooling the six is how a mechanism that helps three and hurts three reads as a null. The registration
+    predicts *where* a procedural rule should help, and this is the only view that can confirm it.
+    """
+    treatment, control = labels
+    table: "dict[str, dict]" = {}
+    for game in shared_games(left, right):
+        kind = left[game].get("task_kind") or right[game].get("task_kind") or "unknown"
+        row = table.setdefault(kind, {"games": 0, "wins": {treatment: 0, control: 0}, "treatment_only": 0, "control_only": 0})
+        first = bool(left[game].get("won"))
+        second = bool(right[game].get("won"))
+        row["games"] += 1
+        row["wins"][treatment] += int(first)
+        row["wins"][control] += int(second)
+        row["treatment_only"] += int(first and not second)
+        row["control_only"] += int(second and not first)
+    for row in table.values():
+        row["delta"] = round((row["wins"][treatment] - row["wins"][control]) / row["games"], 4)
+        row["discordant"] = row["treatment_only"] + row["control_only"]
+    # Descending by games, then by name: the largest population first, and a stable order for a diff.
+    return dict(sorted(table.items(), key=lambda item: (-item[1]["games"], item[0])))
+
+
+def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tuple[str, str]" = ("left", "right")) -> dict:
+    """The counters the arm is expected to move, per arm and independent of any verdict.
+
+    A memory that raises the score while raising the refusal rate is a memory whose effect came from
+    somewhere other than the knowledge it carries; a memory that lowers the refusal rate without raising
+    the score is a memory that reached the world but not the task. Both are readable here and neither is
+    readable from a win count.
+    """
+
+    def summarise(episodes: "list[dict]") -> dict:
+        calls = sum(int(episode.get("calls") or 0) for episode in episodes)
+        actions = sum(int(episode.get("actions") or 0) for episode in episodes)
+        invalid = sum(int(episode.get("invalid_actions") or 0) for episode in episodes)
+        off_space = sum(int(episode.get("off_space_actions") or 0) for episode in episodes)
+        return {
+            "games": len(episodes),
+            "calls": calls,
+            "actions": actions,
+            "invalid_actions": invalid,
+            "off_space_actions": off_space,
+            # A rate over no calls is not zero, it is undefined: a slice that recorded no call did not
+            # refuse nothing, it did not happen.
+            "invalid_per_call": round(invalid / calls, 4) if calls else None,
+            "invalid_per_action": round(invalid / actions, 4) if actions else None,
+            "off_space_per_action": round(off_space / actions, 4) if actions else None,
+        }
+
+    report = {labels[0]: summarise(left)}
+    if right is not None:
+        report[labels[1]] = summarise(right)
+    return report
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Join sliced arms into one paired reading")
     parser.add_argument("--input", action="append", default=[], required=True, help="an arm.json, one per slice")
-    parser.add_argument("--compare", default="always-in,none", help="the two arms, treatment first")
+    parser.add_argument(
+        "--compare",
+        default="always-in,none",
+        help="the two arms, treatment first; several pairs may be given, separated by ';'",
+    )
     parser.add_argument("--expect", type=int, default=0, help="games each arm must tile; 0 skips the check")
     parser.add_argument("--rounds", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=20261120)
@@ -185,49 +307,88 @@ def main() -> int:
 
     paths = [Path(item) for item in arguments.input]
     grouped = load_slices(paths)
-    treatment, control = (part.strip() for part in arguments.compare.split(","))
-    for arm in (treatment, control):
-        if arm not in grouped:
-            fail(f"no slice carries arm {arm!r}; the file(s) hold {sorted(grouped)}")
+    # Parsed before anything is tiled, and a malformed pair is refused here rather than at unpacking time:
+    # `--compare always-in` would otherwise raise a ValueError from a tuple unpacking three frames down,
+    # which reads as a crash rather than as a dispatch that named one arm where a pair was wanted.
+    pairs = []
+    for spec in arguments.compare.split(";"):
+        parts = [part.strip() for part in spec.split(",")]
+        if len(parts) != 2 or not all(parts):
+            fail(f"--compare {arguments.compare!r} does not name two arms per pair")
+        pairs.append((parts[0], parts[1]))
+    for treatment, control in pairs:
+        for arm in (treatment, control):
+            if arm not in grouped:
+                fail(f"no slice carries arm {arm!r}; the file(s) hold {sorted(grouped)}")
 
-    left = tile(grouped[treatment], arguments.expect, treatment)
-    right = tile(grouped[control], arguments.expect, control)
-    shared = sorted(set(left) & set(right))
-    only_left = sorted(set(left) - set(right))
-    only_right = sorted(set(right) - set(left))
-    if only_left or only_right:
-        fail(
-            f"the arms did not drive the same games: {len(only_left)} only in {treatment} "
-            f"(first {only_left[0] if only_left else '-'}), {len(only_right)} only in {control}"
+    # The counters belong to the arm rather than to a pair, so they are computed once per arm over
+    # everything the dispatch produced and printed beside the readings rather than inside one of them.
+    readings = []
+    for treatment, control in pairs:
+        left = tile(grouped[treatment], arguments.expect, treatment)
+        right = tile(grouped[control], arguments.expect, control)
+        shared = shared_games(left, right)
+        only_left = sorted(set(left) - set(right))
+        only_right = sorted(set(right) - set(left))
+        if only_left or only_right:
+            fail(
+                f"the arms did not drive the same games: {len(only_left)} only in {treatment} "
+                f"(first {only_left[0] if only_left else '-'}), {len(only_right)} only in {control}"
+            )
+
+        pairs_of_verdicts = [(bool(left[game]["won"]), bool(right[game]["won"])) for game in shared]
+        b, c = discordance(pairs_of_verdicts)
+        wins_left = sum(1 for first, _ in pairs_of_verdicts if first)
+        wins_right = sum(1 for _, second in pairs_of_verdicts if second)
+        readings.append(
+            {
+                "treatment": treatment,
+                "control": control,
+                "games": len(shared),
+                "wins": {treatment: wins_left, control: wins_right},
+                "rate": {treatment: round(wins_left / len(shared), 4), control: round(wins_right / len(shared), 4)},
+                "discordant": {"treatment_only": b, "control_only": c, "total": b + c},
+                "mde": round(mde_of(b + c, len(shared)), 4),
+                "paired": bootstrap_delta(pairs_of_verdicts, arguments.rounds, arguments.seed),
+                "engagement": engagement(left, right),
+                "kinds": by_kind(left, right, (treatment, control)),
+            }
         )
 
-    pairs = [(bool(left[game]["won"]), bool(right[game]["won"])) for game in shared]
-    b, c = discordance(pairs)
-    wins_left = sum(1 for first, _ in pairs if first)
-    wins_right = sum(1 for _, second in pairs if second)
-    reading = {
-        "treatment": treatment,
-        "control": control,
-        "games": len(shared),
-        "wins": {treatment: wins_left, control: wins_right},
-        "rate": {treatment: round(wins_left / len(shared), 4), control: round(wins_right / len(shared), 4)},
-        "discordant": {"treatment_only": b, "control_only": c, "total": b + c},
-        "mde": round(mde_of(b + c, len(shared)), 4),
-        "paired": bootstrap_delta(pairs, arguments.rounds, arguments.seed),
+    per_arm = {arm: refusals(grouped[arm])["left"] for arm in sorted(grouped)}
+    payload = {
+        "readings": readings,
+        "refusals": per_arm,
+        "bill": bill_of_slices(paths),
+        "slices": [str(path) for path in paths],
     }
-    payload = {"reading": reading, "bill": bill_of_slices(paths), "slices": [str(path) for path in paths]}
     if arguments.out:
         Path(arguments.out).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    print("")
-    print(f"{treatment} {wins_left}/{len(shared)} vs {control} {wins_right}/{len(shared)}")
-    print(
-        f"  paired delta    {reading['paired']['delta']:+.4f} "
-        f"[{reading['paired']['ci_low']:+.4f}, {reading['paired']['ci_high']:+.4f}]  "
-        f"p={reading['paired']['p_two_sided']}"
-    )
-    print(f"  discordant      {b} + {c} = {b + c} games")
-    print(f"  mde at that     {reading['mde']:.4f}  (this is what the split could see)")
+    for reading in readings:
+        treatment, control = reading["treatment"], reading["control"]
+        print("")
+        print(f"{treatment} {reading['wins'][treatment]}/{reading['games']} vs {control} {reading['wins'][control]}/{reading['games']}")
+        print(
+            f"  paired delta    {reading['paired']['delta']:+.4f} "
+            f"[{reading['paired']['ci_low']:+.4f}, {reading['paired']['ci_high']:+.4f}]  "
+            f"p={reading['paired']['p_two_sided']}"
+        )
+        print(f"  discordant      {reading['discordant']['treatment_only']} + {reading['discordant']['control_only']} = {reading['discordant']['total']} games")
+        print(f"  mde at that     {reading['mde']:.4f}  (this is what the split could see)")
+        moved = reading["engagement"]
+        print(
+            f"  engagement      {moved['diverged']}/{reading['games']} games changed course "
+            f"({100 * moved['divergence_rate']:.1f}%), delta on those {moved['delta_among_diverged']}"
+        )
+        for kind, row in reading["kinds"].items():
+            print(f"    {kind:<9} {row['wins'][treatment]}/{row['games']} vs {row['wins'][control]}/{row['games']}  delta {row['delta']:+.4f}")
+        left_counts = per_arm[treatment]
+        right_counts = per_arm[control]
+        print(
+            f"  refusals        {treatment} {left_counts['invalid_per_call']} "
+            f"vs {control} {right_counts['invalid_per_call']} (per call)"
+        )
     print(f"  bill            ${payload['bill']['usd']} over {payload['bill']['calls']} calls")
     if arguments.out:
         print(f"  written         {arguments.out}")
