@@ -133,8 +133,8 @@ tokens), one episode costs:
 | no prompt cache | 82,717 in, 750 out | $0.01286 = **¥0.091** | ¥36.7 |
 | prefix held by the cache | 2,385 miss + 80,331 hit | $0.00105 = **¥0.0074** | **¥2.99** |
 
-The fifteen-fold difference is not an optimisation detail; it is the difference between a ¥60 experiment and
-a ¥4 one, and it is decided by a property of the arm rather than of the provider: a turn-based transcript
+The twelve-fold difference is not an optimisation detail; it is the difference between a ¥37 experiment and
+a ¥3 one, and it is decided by a property of the arm rather than of the provider: a turn-based transcript
 that is *appended to* keeps a stable prefix and hits, while a pack re-injected per turn moves the prefix and
 misses. This record has paid for that lesson once already on τ², where the memory arm was billed 3.7× the
 control's uncached tokens on the same sixteen calls.

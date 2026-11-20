@@ -599,7 +599,7 @@ the mean of the two ReAct examples per task type that ship in `prompts/alfworld.
 | no prompt cache | 82,717 in / 750 out | $0.01286 = **¥0.091** | ¥36.7 |
 | prefix held by the cache | 2,385 miss + 80,331 hit | $0.00105 = **¥0.0074** | **¥2.99** |
 
-The fifteen-fold gap is a property of the arm, not of the provider. A transcript that is *appended to* keeps a
+The twelve-fold gap is a property of the arm, not of the provider. A transcript that is *appended to* keeps a
 stable prefix and hits; a pack re-injected on every turn moves the prefix and misses. On τ² the memory arm was
 billed **3.7× the control's uncached tokens on the same sixteen calls** for exactly this reason, and it is the
 first thing to check about any memory design that looks cheap on paper.
