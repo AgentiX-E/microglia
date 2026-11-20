@@ -19,6 +19,7 @@ import json
 import os
 import sys
 import unittest
+import urllib.error
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -303,12 +304,17 @@ class BuildTest(unittest.TestCase):
 
         def chat(messages, model, api_key, timeout):
             seen.append(messages)
-            return remaining.pop(0), usage or {
-                "prompt_tokens": 1_000,
-                "completion_tokens": 50,
-                "prompt_cache_hit_tokens": 800,
-                "prompt_cache_miss_tokens": 200,
-            }
+            return (
+                remaining.pop(0),
+                usage
+                or {
+                    "prompt_tokens": 1_000,
+                    "completion_tokens": 50,
+                    "prompt_cache_hit_tokens": 800,
+                    "prompt_cache_miss_tokens": 200,
+                },
+                0,
+            )
 
         return chat, seen
 
@@ -339,6 +345,20 @@ class BuildTest(unittest.TestCase):
         self.assertEqual(result["usage"]["cache_hit_tokens"], 800)
         self.assertEqual(result["stats"]["applied"], 1)
         self.assertEqual(result["stats"]["operations"], 1)
+
+    def test_the_retries_of_every_critique_are_summed_into_the_bank(self):
+        # `driver.chat` returns the retry count beside the reply, and the bank is the only artefact that knows a
+        # distillation survived a provider incident. The first version of this file unpacked two values and died on
+        # the first critique of a paid run at 13:50 -- the unit tests agreed with it because their stubs returned
+        # two as well.
+        replies = ["ADD 1: Open the cabinet first.", "ADD 2: Close the fridge after use."]
+        remaining = list(replies)
+
+        def chat(messages, model, api_key, timeout):
+            return remaining.pop(0), {"prompt_tokens": 10, "completion_tokens": 2, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 10}, 2
+
+        result = distill.build_bank(self.chunks(2), 20, "m", "k", 1.0, "substring", 0, chat)
+        self.assertEqual(result["stats"]["retries"], 4)
 
     def test_a_reply_with_no_operation_is_counted_rather_than_crashing(self):
         chat, _ = self.script(["The rules are complete.", "ADD 1: Open the fridge first."])
@@ -403,6 +423,7 @@ class MainTest(unittest.TestCase):
         driver.chat = lambda messages, model, api_key, timeout: (
             remaining.pop(0),
             {"prompt_tokens": 1_000, "completion_tokens": 50, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 1_000},
+            0,
         )
 
     def test_a_bank_is_written_with_the_source_it_came_from(self):
@@ -472,6 +493,69 @@ class MainTest(unittest.TestCase):
         with self.assertRaises(SystemExit) as caught:
             self.run_main(["--episodes", str(self.episodes_with(1)), "--out", str(self.out)])
         self.assertEqual(caught.exception.code, 1)
+
+
+class CallerContractTest(unittest.TestCase):
+    """The seam between this module and the driver it calls, which is the one thing a scripted caller cannot check.
+
+    Run `44743739868` drove 140 training games, joined two runs to cover them, and then died at
+    `reply, reported = caller(...)` with `ValueError: too many values to unpack (expected 2)`: `agent.chat` had
+    grown a third element when the retry table was added, and this caller was not updated with it. Every test
+    above passes a scripted chat function, so every test above kept answering with the shape of a driver that no
+    longer existed — a scripted caller is a stand-in for a provider, and it cannot stand in for the signature.
+
+    So this class passes the driver itself and replaces only the socket, which is the boundary the driver already
+    treats as data.
+    """
+
+    def chunks(self, count: int, size: int = 1) -> "list[list[dict]]":
+        return distill.chunks_of(
+            [{"gamefile": f"g{index}/game.tw-pddl", "trajectory": f"trial {index}"} for index in range(count)], size
+        )
+
+    def completion(self, text, prompt_tokens=900):
+        return {
+            "choices": [{"message": {"content": text}}],
+            "usage": {
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": 40,
+                "prompt_cache_hit_tokens": prompt_tokens // 2,
+                "prompt_cache_miss_tokens": prompt_tokens // 2,
+            },
+        }
+
+    def with_socket(self, answers):
+        """The driver's own `chat`, with `attempt_once` answering from a list; each answer is a payload or an error."""
+        remaining = list(answers)
+        original = driver.attempt_once
+
+        def attempt_once(body, url, api_key, timeout):
+            answer = remaining.pop(0)
+            if isinstance(answer, BaseException):
+                raise answer
+            return answer
+
+        driver.attempt_once = attempt_once
+        self.addCleanup(setattr, driver, "attempt_once", original)
+        return lambda *args: driver.chat(*args, sleep=lambda _: None)
+
+    def test_the_real_driver_satisfies_the_caller_this_module_calls(self):
+        caller = self.with_socket([self.completion("ADD 1: Open the fridge before taking the lettuce.")])
+        result = distill.build_bank(self.chunks(1), 20, "deepseek-flash", "k", 1.0, chat_fn=caller)
+        self.assertEqual(len(result["bank"]), 1)
+        self.assertEqual(result["bank"][0]["text"], "Open the fridge before taking the lettuce.")
+        self.assertEqual(result["usage"]["prompt_tokens"], 900)
+        self.assertEqual(result["calls"], 1)
+
+    def test_a_answer_that_needed_the_retry_table_is_counted_rather_than_lost(self):
+        refusal = urllib.error.HTTPError("https://api.deepseek.com", 429, "slow down", {}, io.BytesIO(b"{}"))
+        caller = self.with_socket(
+            [refusal, self.completion("ADD 1: Open the fridge before taking the lettuce.")]
+        )
+        result = distill.build_bank(self.chunks(1), 20, "deepseek-flash", "k", 1.0, chat_fn=caller)
+        self.assertEqual(result["stats"]["retries"], 1)
+        self.assertEqual(result["calls"], 1)
+        self.assertEqual(result["usage"]["prompt_tokens"], 900)
 
 
 if __name__ == "__main__":

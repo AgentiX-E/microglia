@@ -376,14 +376,19 @@ def build_bank(
         "peak": 0,
         "empty_replies": 0,
         "operations": 0,
+        "retries": 0,
         "by_kind": {"ADD": 0, "EDIT": 0, "AGREE": 0, "REMOVE": 0},
     }
     usage = {"prompt_tokens": 0, "completion_tokens": 0, "cache_hit_tokens": 0, "cache_miss_tokens": 0}
     calls = 0
     for index, chunk in enumerate(chunk_list, 1):
         messages = critique_messages(bank, trials_text(chunk), cap)
-        reply, reported = caller(messages, model, api_key, timeout)
+        # Three values, because `driver.chat` returns the retry count beside the reply. The count is summed here for
+        # the same reason it is summed in a pass: a bank distilled across a provider incident is a bank whose cost
+        # has a caveat, and this is the only place that knows it happened.
+        reply, reported, retried = caller(messages, model, api_key, timeout)
         calls += 1
+        stats["retries"] += retried
         for key, value in driver.usage_numbers(reported).items():
             usage[key] += value
         operations = parse_operations(reply)
@@ -485,6 +490,7 @@ def main() -> int:
     print(f"  rendered       {len(renderable(result['bank'], arguments.cap))} within the cap")
     print(f"  operations     {result['stats']['operations']} parsed, {result['stats']['applied']} applied, "
           f"{result['stats']['rejected']} rejected, {result['stats']['culled']} culled")
+    print(f"  retried        {result['stats']['retries']} call(s)")
     print(f"  bill           ${bill['usd']} ({bill['band']}); other band ${bill['usd_in_other_band']}")
     print(f"  written        {arguments.out}")
     print("PASS the bank was built from the trajectories it was given")
@@ -493,3 +499,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
