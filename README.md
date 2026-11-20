@@ -598,17 +598,27 @@ the mean of the two ReAct examples per task type, now committed as
 committed** — the mean was quoted 11% low — which is the second number on this page that a pushed artefact
 corrected and a paragraph had kept rendering.
 
-| prompt layout | input tokens per episode | bill per episode | 134 games × 3 arms |
-| --- | --- | --- | --- |
-| no prompt cache | 82,717 in / 750 out | $0.01286 = **¥0.091** | ¥36.7 |
-| prefix held by the cache | 2,385 miss + 80,331 hit | $0.00105 = **¥0.0074** | **¥2.99** |
+Those were estimates. A twenty-game calibration (`44673057091`, job `136078308716`) replaced them with the
+provider's own counters:
 
-Both rows were computed at 3,574 characters and are therefore about 11% low in the prefix's share. They are left
-as computed rather than rescaled, because rescaling multiplies a guess about `chars/token` by a correction factor:
-`agent.py` reports the provider's own `usage` and the measured `prefix_chars` per episode, so the 20-game
-calibration replaces both rows with measurements instead of a third estimate.
+| reading | value | what it settles |
+| --- | --- | --- |
+| wins | **11 of 20 = 55.0%**, Wilson **[34.2%, 74.2%]** | the control is **55pp above the floor**: 13.3pp of headroom exists |
+| turns | 728 calls, **36.4 per game** | 35.3% of them thoughts — a third of the bill is deliberation |
+| refused actions | **149 = 20.5%** of calls | the model names objects that are not in the room |
+| tokens | 1,800,595 in / 15,553 out | **90.43%** of the input was a cache hit |
+| bill | **$0.040063 = ¥0.28** | against **¥1.98** uncached for the same tokens: **7.0×** |
+| clock | 42 s per game | 134 games is 94 minutes on one runner, about 24 across four slices |
 
-The twelve-fold gap is a property of the arm, not of the provider. A transcript that is *appended to* keeps a
+So three arms over the full split is **¥5.71 measured**, where the estimate said ¥2.99: the prefix is 4,062
+characters rather than 3,574, the hit rate is 90% rather than the assumed 96%, and the extrapolation runs from 728
+real calls instead of a token model. The 55.0% matters more than the price, and in a direction no estimate could
+have shown: **ExpeL reports its own control at 40.0 on a different model**, so the literature's 19pp was earned from
+a lower baseline than this one. The registered prediction stays as written — it is a prediction — but the round that
+reads the first arm should expect a smaller delta than the paper's, and that expectation is on the record before
+the money is spent.
+
+The seven-fold gap is a property of the arm, not of the provider. A transcript that is *appended to* keeps a
 stable prefix and hits; a pack re-injected on every turn moves the prefix and misses. On τ² the memory arm was
 billed **3.7× the control's uncached tokens on the same sixteen calls** for exactly this reason, and it is the
 first thing to check about any memory design that looks cheap on paper.

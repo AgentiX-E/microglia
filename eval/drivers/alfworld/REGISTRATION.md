@@ -227,12 +227,46 @@ that is *appended to* keeps a stable prefix and hits, while a pack re-injected p
 misses. This record has paid for that lesson once already on τ², where the memory arm was billed 3.7× the
 control's uncached tokens on the same sixteen calls.
 
-**So the calibration dispatch is 20 games, one arm, ≈ ¥0.15**, and its purpose is not the unit price — that
-is now arithmetic over a measured distribution. Its purpose is the **headroom**: 134 games resolve 13.3pp, so
-an `always-in` effect is measurable only if the `none` arm lands far enough above the floor to leave 13.3pp
-of room. ExpeL reports its control at 40.0 with a different model; this project has never run any arm on this
-corpus with this model. If `none` lands near 8%, prediction 1 is unmeasurable at one pass and the answer is a
-stronger backbone, not a bigger sample.
+**So the calibration dispatch is 20 games, one arm**, and its purpose is not the unit price — that is now
+arithmetic over a measured distribution. Its purpose is the **headroom**: 134 games resolve 13.3pp, so an
+`always-in` effect is measurable only if the `none` arm lands far enough above the floor to leave 13.3pp of room.
+ExpeL reports its control at 40.0 with a different model; this project had never run any arm on this corpus with
+this model. If `none` lands near 8%, prediction 1 is unmeasurable at one pass and the answer is a stronger
+backbone, not a bigger sample.
+
+### The answer: 11 of 20, and the price measured rather than extrapolated
+
+Run `44673057091`, job `136078308716`, 04:26:34 to 04:39:15 UTC. Arm `none`, model `deepseek-flash`, 50-step cap,
+`--trace 3`.
+
+| reading | value | what it settles |
+| --- | --- | --- |
+| wins | **11 of 20 = 55.0%**, Wilson 95% **[34.2%, 74.2%]** | headroom is **55pp above the floor**, so 13.3pp of it exists: prediction 1 is measurable at one pass |
+| calls | 728 over 20 episodes = **36.4 turns per game** | the per-episode call count, measured rather than assumed |
+| thoughts | 257 = 35.3% of turns | a third of the bill is deliberation, not action |
+| invalid actions | **149 = 20.5% of calls** | the model names objects that are not in the room; see `AUDIT` 34.220 |
+| off-space actions | 11 = 1.5% | 138 of the 149 refusals were well-formed commands for the wrong world |
+| cache hit rate | **90.43%** of 1,800,595 prompt tokens | the prefix is held, and the miss is 172,312 tokens |
+| tokens | 1,800,595 in / 15,553 out | measured, per 20 games |
+| bill | **$0.040063 = ¥0.28** at off-peak | against **$0.2794 = ¥1.98** for the same tokens uncached: **7.0×** |
+| wall clock | 846 s = 42 s per game | 134 games on one runner is **94 minutes**; four slices is about 24 |
+| budget exhausted | 9 of 20 | half the split reaches the 50-turn cap, which is what makes 50 the right cap |
+
+**Three things follow, and the first one changes the design's premise.** The `none` arm at 55.0% is **15 points
+above the 40.0 ExpeL reports for its own control**, on a different model. The literature's 19pp was measured from a
+lower baseline, so the same intervention here has less room above it; the registered prediction stays as written —
+it is a prediction, and this is the reading it will be judged against — but the round that reads the first arm
+should expect a smaller delta than the paper's, and that expectation is now on the record before the money is spent.
+
+Second, **the price is ¥5.71 for three arms over 134 games**, not the ¥2.99 this file estimated: the prefix is
+4,062 characters rather than 3,574, the cache hit rate is 90% rather than the assumed 96%, and the extrapolation is
+from 728 measured calls rather than from a token model. Both numbers are the same order, and the measured one is the
+number that will be quoted.
+
+Third, **a fifth of the model's actions are refused by the environment.** That is not a defect in the arm — it is
+the arm's measurement, and it is what a memory that carries *where objects live* would be for. It is registered as a
+separate arm (`AUDIT` 34.220) rather than repaired by handing the model the admissible list, because handing it the
+list is a different mechanism and would make `none` no longer the corpus's own difficulty.
 
 ## What would make this registration void
 
