@@ -139,22 +139,28 @@ def build_env(batch_size: int = 1, train_eval: str = "eval_out_of_distribution",
     the only caller that names another one, and it names `eval_in_distribution` because the rule bank
     has to be extracted from the split ExpeL trains on and measured on the split it does not.
     """
-    import yaml
-
-    # The config lives in this repository rather than in the installed package: 0.4.2
-    # ships it at `configs/base_config.yaml`, which is not a package and is therefore not
-    # installed by `find_packages`. A lane that read whatever the wheel carried would
-    # record a different environment for the same commit.
-    raw = (HERE / "config.yaml").read_text(encoding="utf-8").replace("$ALFWORLD_DATA", str(DATA_ROOT))
-    config = yaml.safe_load(raw)
-
-    # Imported after the environment variable is set: `alfworld.info` reads it at import
-    # time, and a module-level import would freeze the default before this file can
-    # override it.
     if shell_factory is None:
+        import yaml
+
+        # The config lives in this repository rather than in the installed package: 0.4.2
+        # ships it at `configs/base_config.yaml`, which is not a package and is therefore not
+        # installed by `find_packages`. A lane that read whatever the wheel carried would
+        # record a different environment for the same commit.
+        raw = (HERE / "config.yaml").read_text(encoding="utf-8").replace("$ALFWORLD_DATA", str(DATA_ROOT))
+        config = yaml.safe_load(raw)
+
+        # Imported after the environment variable is set: `alfworld.info` reads it at import
+        # time, and a module-level import would freeze the default before this file can
+        # override it.
         from alfworld.agents.environment.alfred_tw_env import AlfredTWEnv
 
         shell_factory = AlfredTWEnv
+    else:
+        # A caller that supplies the shell needs neither the config nor the package, which is what makes the
+        # ordering above testable in a job that installs nothing. The first version read the config regardless
+        # and its test passed locally while the workflow's unit job failed on a missing `pyyaml` -- a
+        # local-pass/CI-fail drift in the one file whose job is to describe the environment.
+        config = None
 
     # `AlfredTWEnv` is a shell that reads the split and then hands back a textworld gym
     # environment; only the latter has reset and step. The first version of this file

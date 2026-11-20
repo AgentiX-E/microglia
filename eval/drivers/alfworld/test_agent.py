@@ -1395,6 +1395,22 @@ class PartitionTest(unittest.TestCase):
         self.assertEqual(num_games, 3)
         self.assertIs(env, shell)
 
+    def test_an_injected_shell_needs_neither_the_config_nor_the_yaml_parser(self):
+        # This test exists because its absence was a CI failure: `build_env` read `config.yaml` for every caller,
+        # so a test that only wants the sort needed `pyyaml`, which the workflow's unit job does not install. It
+        # passed here and failed there -- in the file whose job is to describe the environment.
+        shell = self.Shell(None)
+        original = sys.modules.get("yaml", "missing")
+        sys.modules["yaml"] = None
+        try:
+            env, _num_games = floor.build_env(shell_factory=lambda config, train_eval="": shell)
+        finally:
+            if original == "missing":
+                sys.modules.pop("yaml", None)
+            else:
+                sys.modules["yaml"] = original
+        self.assertIs(env, shell)
+
     def test_four_shards_tile_the_split_without_overlapping(self):
         games = [f"/g{index:03d}/game.tw-pddl" for index in range(134)]
         slices = [games[slice(*agent.shard_bounds(f"{index}/4", len(games)))] for index in range(4)]
