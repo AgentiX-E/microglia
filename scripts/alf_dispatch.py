@@ -103,17 +103,21 @@ def check(arguments):
     if arguments.arm not in ("",) + ARMS:
         raise Refused(f"{arguments.arm} is not an arm this lane has; it has {list(ARMS)}")
     named = sweep_arms(arguments.arms) if arguments.arms else []
-    if arguments.control_run and not named:
-        raise Refused("--control-run says where the control comes from, so it needs --arms to say what it is for")
-    if named:
-        # A treatment sweep without its control is the failure `pairs.json` was built to refuse: the run
-        # would produce a rate with nothing on the other side of it. The one legal way to leave the control
-        # out is to name the run that already paid for it — the control arm carries no bank, so an
-        # unchanged tree makes it reusable, and naming the run is what makes that assumption visible.
-        if CONTROL not in named and not arguments.control_run:
-            raise Refused(f"{named} has treatments but no control; pair it with {CONTROL!r} or name --control-run")
-        if CONTROL in named and arguments.control_run:
-            raise Refused("this dispatch buys its own control; --control-run would name a second one")
+    if arguments.control_run:
+        # The flag used to be accepted and sent, and the workflow declared no such input, so it was dropped
+        # between the two and the dispatch bought a treatment with no control while saying it had one. Naming a
+        # previous run cannot be made safe on this path either: nothing here can prove that run drove the same
+        # commit and the same games, and the control arm moved six wins between two dispatches of identical code
+        # (AUDIT 34.232). It is refused rather than ignored.
+        raise Refused(
+            "--control-run names a control an earlier run paid for, and nothing on this path can prove that run "
+            "drove the same commit and the same games; buy the control in this dispatch by naming "
+            f"{CONTROL!r} in --arms"
+        )
+    if named and CONTROL not in named:
+        # A treatment sweep without its control is the failure `pairs.json` was built to refuse: the run would
+        # produce a rate with nothing on the other side of it.
+        raise Refused(f"{named} has treatments but no control; pair it with {CONTROL!r}")
     if arguments.bank_only:
         # The mode exists for the failure that costs the most: the slices are bought and the bank dies. It reads
         # from `train_run_ids`, so a dispatch that names none would distil from nothing while looking like a
@@ -235,8 +239,6 @@ def main(argv=None, token=None, call=call, sleep=time.sleep):
         print(f"[alf] master {master[:8]}  ci {gate['head_sha'][:8]} {gate['status']} {gate['conclusion']}", flush=True)
 
     inputs = payload(arguments)
-    if arguments.control_run:
-        print(f"[alf] the control is the {CONTROL} slices of run {arguments.control_run}, already paid for", flush=True)
     if arguments.dry_run:
         print(f"[alf] dry run inputs={json.dumps(inputs)}")
         return 0

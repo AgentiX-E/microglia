@@ -54,15 +54,24 @@ class RefusalTest(unittest.TestCase):
         message = self.refused("--sweep", "true", "--arms", '["sham"]', "--rules", "b.json")
         self.assertIn("no control", message)
 
-    def test_a_named_control_run_is_what_licenses_leaving_control_out(self):
-        self.assertEqual(lane.check(arguments("--sweep", "true", "--arms", '["sham"]', "--rules", "b.json", "--control-run", "44744658304")), ["sham"])
+    def test_a_control_run_is_refused_even_when_the_arm_list_leaves_the_control_out(self):
+        # The flag was accepted and sent while the workflow declared no such input, so it was dropped between
+        # the two and the dispatch bought a treatment with no control while saying it had one (PROGRESS 200.10).
+        # Reusing an earlier run's control cannot be made safe here either: nothing on this path can prove that
+        # run drove the same commit and the same games, and the control moved six wins between two dispatches of
+        # identical code. Refused, with the sentence that names the alternative.
+        message = self.refused("--sweep", "true", "--arms", '["sham"]', "--rules", "b.json", "--control-run", "44744658304")
+        self.assertIn("nothing on this path can prove", message)
+        self.assertIn("'none' in --arms", message)
 
-    def test_buying_a_control_and_naming_a_second_one_is_refused(self):
+    def test_a_control_run_is_refused_before_the_arm_list_is_read(self):
+        # Cheapest mistake first: a bare `--control-run` is refused for its own reason rather than for the
+        # missing `--arms`, because repairing one flag should not reveal the next refusal.
+        self.assertIn("nothing on this path can prove", self.refused("--control-run", "1"))
+
+    def test_naming_the_control_and_a_control_run_is_no_longer_a_second_refusal(self):
         message = self.refused("--sweep", "true", "--arms", '["none","sham"]', "--rules", "b.json", "--control-run", "1")
-        self.assertIn("second one", message)
-
-    def test_a_control_run_without_an_arm_list_says_what_it_would_be_for(self):
-        self.assertIn("--arms", self.refused("--control-run", "1"))
+        self.assertIn("nothing on this path can prove", message)
 
     def test_a_chain_without_a_training_pass_is_refused(self):
         self.assertIn("--train", self.refused("--chain", "true"))
@@ -263,20 +272,12 @@ class MainTest(unittest.TestCase):
         self.assertIn("refusing to dispatch", err)
         self.assertNotIn("POST", [method for method, _ in seen])
 
-    def test_a_reused_control_is_announced_so_the_readback_knows_where_the_left_side_came_from(self):
-        code, out, _ = self.run_main(
-            "--sweep",
-            "true",
-            "--rules",
-            "b.json",
-            "--arms",
-            '["sham"]',
-            "--control-run",
-            "44744658304",
-            "--dry-run",
-        )
-        self.assertEqual(code, 0)
-        self.assertIn("control is the none slices of run 44744658304", out)
+    def test_a_control_run_stops_before_the_tree_is_asked_about(self):
+        # No network call at all: the refusal is decided from the command line, which is what makes it safe to
+        # run before a payment.
+        code, _, err = self.run_main("--sweep", "true", "--rules", "b.json", "--arms", '["sham"]', "--control-run", "1")
+        self.assertEqual(code, 2)
+        self.assertIn("nothing on this path can prove", err)
 
     def test_a_green_tree_posts_the_payload_and_reports_the_run_it_found(self):
         posted = {}
