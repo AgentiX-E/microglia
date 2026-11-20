@@ -24,7 +24,7 @@ on:
   workflow_dispatch:
     inputs:
       arm:
-        description: 'arm to calibrate: none, always-in or retrieved'
+        description: 'arm to calibrate: none, always-in, retrieved or sham'
         required: false
         default: ''
       games:
@@ -63,6 +63,14 @@ on:
         description: 'true runs train -> bank -> sweep in one dispatch, taking the bank from the artefact'
         required: false
         default: ''
+      arms:
+        description: 'the sweep''s arms, as a JSON list; the placebo is ["sham"]'
+        required: false
+        default: '["none","always-in","retrieved"]'
+      top_k:
+        description: 'entries the retrieved arm may carry; AMD measured k=1 as the optimum'
+        required: false
+        default: '3'
   push:
     branches: [master]
     paths:
@@ -590,7 +598,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arm: [none, always-in, retrieved]
+        # Naming the arms as data rather than as YAML is what lets one job dispatch a placebo
+        # (`["sham"]`) or a k=1 contrast (`["retrieved"]` with `top_k: 1`) without a second copy of this
+        # file that would drift from the first. The default is the three-arm comparison.
+        arm: ${{ fromJSON(inputs.arms || '["none","always-in","retrieved"]') }}
         shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@v4
@@ -648,6 +659,7 @@ jobs:
           GAMES: ${{ inputs.games }}
           MAX_STEPS: ${{ inputs.max_steps }}
           RULES: ${{ inputs.rules }}
+          TOP_K: ${{ inputs.top_k }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -663,6 +675,9 @@ jobs:
             exit 1
           fi
           args=(--arm "${ARM}" --policy model --games "${GAMES}" --shard "${SHARD}/4" --max-steps "${MAX_STEPS}")
+          # The retrieval budget is an input because AMD measured k=1 as the global optimum and this lane's
+          # default is 3; a contrast that has to be edited into a file is a contrast nobody runs twice.
+          args+=(--top-k "${TOP_K:-3}")
           if [ "${ARM}" != "none" ]; then
             if [ -z "${RULES}" ]; then
               echo "::error::arm ${ARM} needs a rule bank; there is nothing for it to carry"

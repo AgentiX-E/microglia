@@ -50,6 +50,7 @@ Exit codes are the report: 0 the arm ran and its accounting closes, 1 the lane c
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -68,7 +69,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 from floor import DATA_ROOT, SPLIT, Draw, build_env, digest_of, game_key, wilson  # noqa: E402
 
-ARMS = ("none", "always-in", "retrieved")
+ARMS = ("none", "always-in", "retrieved", "sham")
 # The three splits the installed environment publishes, in its own names. `eval_in_distribution` is
 # `valid_seen` (140 games) and it is *training* data for the rule bank: ExpeL extracts its rules there
 # and reports on `valid_unseen`, and a bank distilled from the held-out split would be a leak dressed
@@ -321,6 +322,44 @@ def words_of(text: str) -> "set[str]":
     return set(re.findall(r"[a-z0-9]+", text.lower()))
 
 
+def permute_words(text: str, seed: int) -> str:
+    """The same words in an order that means nothing, deterministically.
+
+    Fisher-Yates over the rule's own tokens with the splitmix64 `Draw` the floor uses, so the sham is a
+    function of `(text, seed)` and of nothing else: a bank loaded twice renders the same block, and two
+    runs that happened to list the rules in a different order still produce the same sham for the same rule.
+
+    A one-word rule is returned unchanged rather than reordered — there is nothing to reorder, and the
+    alternative (dropping it) would change the entry count, which is the one surface property the sham has
+    to preserve.
+    """
+    words = text.split()
+    if len(words) < 2:
+        return text
+    draw = Draw(seed)
+    shuffled = list(words)
+    for index in range(len(shuffled) - 1, 0, -1):
+        swap = draw.below(index + 1)
+        shuffled[index], shuffled[swap] = shuffled[swap], shuffled[index]
+    return " ".join(shuffled)
+
+
+def sham_entries(entries: "list[str]") -> "list[str]":
+    """The placebo: every rule permuted inside itself, seeded by the rule's own text.
+
+    `arXiv:2601.22436` finds that agents respond to a condensed block's existence and shape more than to its
+    semantic content — corrupt, irrelevant and filler summaries often leave the score where it was while an
+    emptied raw trajectory collapses it. Word permutation is the tightest surface match available: the entry
+    count, the token count, the punctuation and the header are all exactly the bank's, and only the order
+    carries no information. If this arm earns the bank's delta, the delta is about format.
+
+    The seed is derived from the text rather than from the position, so the sham does not depend on the order
+    the bank happens to be stored in — a permuted bank file must still produce a permuted prompt, not a
+    differently-permuted one.
+    """
+    return [permute_words(str(text), int(hashlib.sha256(str(text).encode("utf-8")).hexdigest()[:12], 16)) for text in entries]
+
+
 def anchor(query: str, entries: "list[str]", top_k: int) -> "list[str]":
     """The entries whose words the observation already contains, best overlap first.
 
@@ -478,7 +517,10 @@ def run_episode(
                 raise LaneError(f"{gamefile}: no task line in the first observation")
             instruction = f"Your task is to: {match.group(1)}\n"
             selected: "list[str]" = []
-            if arm == "always-in":
+            if arm == "always-in" or arm == "sham":
+                # `sham` is permuted once in `main`, before the pass starts, so the block is as fixed as
+                # `always-in`'s and the two arms cost the same prefix. Permuting here would re-permute per
+                # episode and turn a length-matched control into a moving block.
                 selected = list(rules)
             elif arm == "retrieved":
                 selected = anchor(last, rules, top_k)
@@ -666,6 +708,9 @@ def main() -> int:
         cap = payload.get("cap")
         if isinstance(cap, int) and cap > 0:
             rules = rules[:cap]
+    if arguments.arm == "sham":
+        # Permuted after the cap, so the sham has exactly as many entries as `always-in` would render.
+        rules = sham_entries(rules)
 
     examples = load_examples()
     card = load_rate_card()

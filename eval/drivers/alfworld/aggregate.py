@@ -37,7 +37,7 @@ import math
 import sys
 from pathlib import Path
 
-ARMS = ("none", "always-in", "retrieved")
+ARMS = ("none", "always-in", "retrieved", "sham")
 
 
 def fail(message: str) -> "None":

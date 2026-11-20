@@ -176,6 +176,65 @@ class PackTest(unittest.TestCase):
         self.assertEqual(first, second)
 
 
+class ShamTest(unittest.TestCase):
+    """The placebo arm: the bank's own words, in an order that means nothing.
+
+    `arXiv:2601.22436` finds that agents respond to a condensed-memory block's **existence and shape** more than
+    its semantic content — corrupt, irrelevant and filler summaries often leave the score where it was, while
+    emptying a raw trajectory collapses it. If that holds here, the bank's delta is a formatting effect, and the
+    only way to find out is an arm whose surface form is the bank and whose meaning is not.
+
+    Word permutation inside each rule is the construction that matches the surface most tightly: every token,
+    every punctuation mark and the entry count are preserved exactly, and only the order is destroyed. It is
+    deterministic, so the prefix is stable across episodes and the cache behaves as it does for `always-in`.
+    """
+
+    def test_the_words_and_their_number_survive_the_permutation(self):
+        text = "Always check the countertop before opening the cabinet to look for a mug."
+        shuffled = agent.permute_words(text, 3)
+        self.assertEqual(sorted(shuffled.split()), sorted(text.split()))
+        self.assertEqual(len(shuffled.split()), len(text.split()))
+
+    def test_the_same_seed_gives_the_same_sham(self):
+        text = "Always check the countertop before opening the cabinet to look for a mug."
+        self.assertEqual(agent.permute_words(text, 5), agent.permute_words(text, 5))
+
+    def test_two_seeds_usually_disagree_which_is_all_a_permutation_can_promise(self):
+        text = "Always check the countertop before opening the cabinet to look for a mug and a cloth."
+        variants = {agent.permute_words(text, seed) for seed in range(6)}
+        self.assertGreater(len(variants), 1)
+
+    def test_a_one_word_rule_is_returned_unchanged(self):
+        self.assertEqual(agent.permute_words("Search.", 1), "Search.")
+
+    def test_the_seed_is_the_text_so_the_sham_is_a_function_of_the_bank(self):
+        # Not a counter: a bank loaded twice must produce the same sham, and two runs that reordered the
+        # bank file must still produce the same sham for the same rule.
+        rules = ["Check the countertop first.", "The fridge holds cold things."]
+        self.assertEqual(agent.sham_entries(rules), agent.sham_entries(list(rules)))
+        self.assertEqual(agent.sham_entries(rules)[0][:1] != "", True)
+
+    def test_the_sham_keeps_one_output_per_rule(self):
+        rules = ["Check the countertop first.", "The fridge holds cold things.", "Search."]
+        self.assertEqual(len(agent.sham_entries(rules)), 3)
+
+    def test_the_sham_is_not_the_bank(self):
+        # Length-preserving by construction, so character counts cannot tell the two arms apart; the text
+        # can. A sham that rendered identically would be `always-in` wearing a second name.
+        rules = ["Always check the countertop before opening the cabinet to look for a mug."]
+        self.assertNotEqual(agent.render_pack(agent.sham_entries(rules)), agent.render_pack(rules))
+
+    def test_the_sham_carries_the_same_header_and_the_same_entry_count(self):
+        rules = ["Check the countertop first.", "The fridge holds cold things."]
+        sham = agent.render_pack(agent.sham_entries(rules))
+        self.assertTrue(sham.startswith(agent.PACK_HEADER))
+        self.assertIn("\n1. ", sham)
+        self.assertIn("\n2. ", sham)
+
+    def test_the_sham_is_an_arm_so_a_slice_of_it_can_be_joined(self):
+        self.assertIn("sham", agent.ARMS)
+
+
 class ParseTest(unittest.TestCase):
     def test_a_caret_think_is_a_thought(self):
         self.assertEqual(agent.parse_reply("> think: I should open it."), ("thought", "I should open it."))
@@ -520,6 +579,14 @@ class LoopTest(unittest.TestCase):
         retrieved = self.drive(arm="retrieved", rules=["the fridge is cold"], top_k=2)
         self.assertEqual(retrieved["pack_entries"], 0)
 
+    def test_the_sham_arm_carries_every_entry_the_way_always_in_does(self):
+        # Same count, same header, same characters: the two arms differ in the order of the words inside
+        # each rule and in nothing else. That is what makes a sham's delta attributable to meaning.
+        rules = ["the cabinet is closed", "the fridge is cold"]
+        sham = self.drive(arm="sham", rules=rules)
+        self.assertEqual(sham["pack_entries"], 2)
+        self.assertGreater(sham["prefix_chars"], self.drive()["prefix_chars"])
+
     def test_the_seed_policy_is_reproducible(self):
         first = self.drive(policy="seed", draw=agent.Draw(11))
         second = self.drive(policy="seed", draw=agent.Draw(11))
@@ -847,6 +914,34 @@ class MainTest(unittest.TestCase):
         with self.assertRaises(SystemExit) as caught:
             self.run_main(["--arm", "always-in", "--policy", "first", "--games", "1", "--out", str(self.out)])
         self.assertEqual(caught.exception.code, 1)
+
+    def test_the_sham_arm_without_rules_is_refused_too(self):
+        # The sham is a permutation *of a bank*: with no bank there is nothing to permute, and an arm that
+        # silently rendered an empty block would be `none` with a third name.
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main(["--arm", "sham", "--policy", "first", "--games", "1", "--out", str(self.out)])
+        self.assertEqual(caught.exception.code, 1)
+
+    def test_the_sham_arm_records_the_bank_it_permuted(self):
+        bank = HERE / "bank-sham.json"
+        bank.write_text(
+            json.dumps({"entries": [{"text": "Check the countertop first."}, {"text": "Cold things are in the fridge."}]}),
+            encoding="utf-8",
+        )
+        try:
+            self.assertEqual(
+                self.run_main(
+                    ["--arm", "sham", "--rules", str(bank), "--policy", "first", "--games", "1", "--out", str(self.out)]
+                ),
+                0,
+            )
+            summary = json.loads(self.out.read_text(encoding="utf-8"))["summary"]
+            self.assertEqual(summary["arm"], "sham")
+            # The bank is recorded so a reader can see the sham came from twenty rules rather than four,
+            # even though the text in the prefix is not the text of those rules.
+            self.assertEqual(summary["rules_in_bank"], 2)
+        finally:
+            bank.unlink(missing_ok=True)
 
     def test_a_sharded_seed_pass_is_refused(self):
         with self.assertRaises(SystemExit) as caught:

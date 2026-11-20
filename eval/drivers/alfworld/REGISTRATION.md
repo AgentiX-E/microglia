@@ -391,3 +391,29 @@ spent on the sample. If the primary delta clears the MDE and the placebo matches
 lane's gain is formatting, and the mechanism needs replacing rather than tuning.
 
 **Cost of this registration.** ¥0. Both predictions are computed from artefacts the chain already pays for.
+
+### R165, amendment 1 — the placebo is built, and what would make its result uninterpretable
+
+The arm registered above (§ R165, last paragraph) now exists: `--arm sham` permutes each rule's words within itself,
+seeded by the rule's own text, after the cap and before the pass. The construction preserves the entry count, the
+token count, the punctuation and the header exactly, so `sham` and `always-in` carry prefixes of the same length and
+the only difference between them is the order of the words inside each rule. `agent.py`'s eleven tests pin the
+properties that make that true, including the one that would silently destroy the control: the permutation happens
+**once in `main`**, not per episode, because a block that re-permuted every turn would be a moving prefix and the two
+arms would stop sharing a cache behaviour.
+
+**What the sham cannot tell you, stated before it runs.** A permutation destroys meaning *and* it destroys syntax.
+If the sham scores below `always-in`, the difference is "word order carries information" and not "these twenty rules
+are right", because a scrambled rule is also a badly-formed sentence. The arm is therefore one-sided: it can show
+that the bank's content is doing **nothing** (sham ≈ bank), which is the interesting failure; it cannot show that the
+bank's content is doing the *right* thing. The two sided version — the paper's "irrelevant" intervention, twenty real
+rules from an unrelated task type — is a different arm and a different bank, and it is not registered here.
+
+**Dispatch rule (unchanged, restated with the arm in existence).** Run `arms: ["sham"]` with `top_k` at its default
+and the same bank, **iff** `|always-in − none| > mde` from the sweep. Four slices, 134 games, ≈ ¥1.9. The bank must
+be committed first: a standalone sweep that names no bank downloads this run's artefact, which a later run does not
+have.
+
+**The contrast is read in one direction.** `harm_share(sham vs none)` against `harm_share(always-in vs none)`. If the
+sham's help share is within the interval of the bank's, the finding is that the mechanism this lane has spent four
+rounds building is formatting, and the next row is not a better bank — it is a different layer.

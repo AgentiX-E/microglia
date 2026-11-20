@@ -76,6 +76,12 @@ class SliceTest(unittest.TestCase):
         self.assertEqual(sorted(grouped), ["always-in", "none"])
         self.assertEqual(len(grouped["none"]), 1)
 
+    def test_a_slice_of_the_placebo_arm_can_be_joined(self):
+        # `sham` is a treatment with a bank's shape and no bank's content. A join that did not know the
+        # name would refuse the one arm whose whole purpose is to be compared.
+        path = self.write("s-f.json", {"summary": summary("sham"), "episodes": [episode("g1", True)]})
+        self.assertEqual(sorted(aggregate.load_slices([path])), ["sham"])
+
     def test_an_unknown_arm_is_refused(self):
         path = self.write("s-c.json", {"summary": summary("placebo"), "episodes": [episode("g1", True)]})
         with self.assertRaises(SystemExit):
