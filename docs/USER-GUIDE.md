@@ -4824,3 +4824,67 @@ the difference is the answer.
 **One thing the port refuses to copy.** ExpeL checks `rule_num > len(rules)` but not `rule_num < 1`, so `EDIT 0`
 edits the last rule via Python's negative indexing. Here it is rejected and counted, because reproducing an
 out-of-bounds access that happens to be legal in one language buys nothing.
+
+### 32.19 Reading a sweep: one delta, four counters, and the pairing that does not need a control
+
+A dispatch writes one `arm-*.json` per shard per arm. `eval/drivers/alfworld/aggregate.py` turns those slices back
+into the single number a sweep is bought for — a **paired** difference between two arms, where the pair is the game —
+and prints four counters beside it. Nothing is averaged: a game driven twice, an arm whose slices do not tile the
+split, and two arms whose games do not coincide are all refused rather than repaired.
+
+```console
+$ python eval/drivers/alfworld/aggregate.py \
+    --input run/arm-always-in-0.json --input run/arm-always-in-1.json \
+    --input run/arm-none-0.json      --input run/arm-none-1.json \
+    --compare always-in,none --expect 134 --out reading.json
+```
+
+```console
+always-in 99/134 vs none 80/134
+  paired delta    +0.1418 [+0.0448, +0.2388]  p=0.0044
+  discordant      32 + 13 = 45 games
+  mde at that     0.1403  (this is what the split could see)
+  engagement      132/134 games changed course (98.5%), delta on those 0.1439
+  harm share      13/132 = 0.0985  (helped 32/132 = 0.2424)
+    hard   32/54 vs 0/54  delta 0.5926
+    easy   67/80 vs 80/80  delta -0.1625
+    clean     26/31 vs 19/31  delta +0.2258
+    ...
+```
+
+**The delta is the answer and the counters are what makes it a finding.**
+
+| counter | what it is | what it can falsify |
+| --- | --- | --- |
+| `engagement` | how many games the arm's action digest differs from the control's | a null result about *delivery*: a pack nobody read cannot have been a pack that did not help |
+| `harm share` | of the games that changed course, how many got worse | "it helps" statements: an arm can be ahead on the mean and behind on the median game |
+| `strata` | the delta split by what the control did unaided | a pooled number that is two effects and no effect |
+| `kinds` | the delta split by task type | "the pack did nothing" versus "the pack helped the procedures and hurt the searches" |
+| `mde` | `2.802 · sqrt(b + c) / n`, the smallest effect this discordance could see | any claim smaller than it. At the registered discordance on 134 games it is **13.3 pp**, so an interval that excludes zero is the claim, not the point estimate |
+
+**A delta against a control inherits the control's own spread, and that spread is not small.** Four dispatches of
+`none` over the same 134 games read 80, 81, 89 and 90 wins. Two dispatches of a block with nothing about the task in
+it read 80 and 80. So a treatment is a more repeatable measurement than the thing it is usually measured against, and
+the pairing that avoids the problem entirely is **treatment against treatment** — two blocks on the same games:
+
+```console
+$ python eval/drivers/alfworld/aggregate.py \
+    --input runA/arm-always-in-*.json --input runB/arm-always-in-*.json \
+    --compare full,complement --relabel "always-in@full=full" --relabel "always-in@complement=complement" \
+    --expect 134
+```
+
+`--relabel old=new` renames a group so both dispatches can be joined; it prints the rename, because a cross-dispatch
+reading whose provenance is silent reads exactly like a within-run one. It refuses a rename that lands on a group
+already present — that is two arms' episodes under one name, a doubled denominator printing one rate.
+
+**What a reading may be called is decided before it exists.** Each block in this lane is registered in
+`eval/drivers/alfworld/REGISTRATION.md` with the readings it can produce and the dispatch each one licenses, plus the
+conditions that void it: a rendered length that drifts more than 5% of the block it is compared to, an engagement
+below 50%, or a control that lands above 85 of 134 games — in which case the easy stratum is a ceiling and only the
+strata are quoted. A number produced without those conditions is not a smaller finding; it is an unattributed one.
+
+**Price, so a sweep can be quoted before it runs.** A two-arm sweep over 134 games costs $0.45–0.60 (¥3.2–4.3):
+two arms at roughly $0.19–0.24 each, and the arm that confuses the model is the more expensive one, because it
+produces more turns. A per-episode price is not a model of a run; `prefix_chars_mean` and `context_chars` are the two
+measurements that predict the bill, and the second one is in `floor.json` before anything is spent.
