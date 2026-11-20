@@ -49,6 +49,28 @@ jobs:
       - name: Tests with coverage gates
         run: pnpm test
 
+      # Pinned to the lane's own interpreter rather than the runner's default: a suite that passes on 3.12 and fails
+      # on 3.10 is the drift this whole step exists to catch, and running it on the wrong one would reproduce it.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      # The ALFWorld lane's drivers are Python and its tests are not part of `pnpm test`, so until this step existed
+      # a green `ci.yml` said nothing about them — and `ci.yml` is the workflow the lane's dispatcher reads before it
+      # spends money. Three drifts arrived through that gap in one round (a test that needed a package the job does
+      # not install, a 3.11 API on a 3.10 interpreter, and a shard that drove the wrong games). The interpreter is
+      # pinned to the workflow's own floor, and the checker refuses a construct newer than it.
+      - name: The lane's python drivers, on the interpreter the lane runs
+        run: |
+          set -euo pipefail
+          python3 scripts/check-python-floor.py --self-test
+          python3 scripts/check-python-floor.py
+          for suite in test_agent test_aggregate test_distill test_wait; do
+            echo "== $suite"
+            python3 "eval/drivers/alfworld/$suite.py"
+          done
+          python3 scripts/check-workflows.py --self-test
+
       - name: Repository audit (source rules, manifests, published dependencies)
         run: pnpm audit:repo
 

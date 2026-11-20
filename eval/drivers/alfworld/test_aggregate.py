@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import sys
+import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -315,7 +316,13 @@ class LabelTest(unittest.TestCase):
 
     def setUp(self):
         self.paths = []
-        self.directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        # `mkdtemp` and a `tearDown` rather than `enterContext`: that helper arrived in 3.11 and CI runs 3.10, so
+        # the first version of this class passed here and failed there. `scripts/check-python-floor.py` now fails
+        # the gate on the version-specific API rather than on its symptom.
+        self.directory = Path(tempfile.mkdtemp(prefix="aggregate-label-"))
+
+    def tearDown(self):
+        shutil.rmtree(self.directory, ignore_errors=True)
 
     def write(self, name: str, arm: str, label: str, games: "list[str]") -> Path:
         path = self.directory / name
