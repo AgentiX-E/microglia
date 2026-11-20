@@ -744,3 +744,52 @@ effect, which is why the interval, and not the point, is what licenses the state
 placebo's 3,964 for the same 134 games, because it produced more turns. The under-estimate is the same one this lane
 has now made three times — a per-episode price is a model of a run, and a treatment that changes the number of turns
 changes the price.
+
+## R172 — Half a block about the task, registered before it is scored
+
+Amendment 2 left the mechanism as "a block that changes behaviour, pointed by the task's own vocabulary", with three
+layers separated: existence (−6.72 pp), being about the task (+24.63 pp), and the rules being intact (−3.73 pp, not
+resolvable). Both endpoints of the vocabulary axis are now measured on the same 134 games:
+
+| block | entries about the task | delta |
+| --- | --- | --- |
+| `banks/bank-filler-4.json` | 0 of 4 | −6.72 pp |
+| `banks/bank-44754440122.json` | 4 of 4 | +14.18 pp |
+
+**The question this registers is what happens in between**, because the three answers mean three different products.
+
+**The block, and what is held fixed.** `banks/bank-dose-2of4.json` is four entries: the two highest-voting rules of
+the registered bank, then the two typewriter entries of the filler bank. Per-entry lengths are 254/248/306/301
+against the registered bank's 254/248/309/292 — the total renders to **1,318 characters against 1,312 (100.5%)** —
+with the same header, the same identity, the same cap, the same injection site, the same model and the same 134
+held-out games. The real rules stay in the positions they occupy in the registered bank, so position is not a
+difference either.
+
+| the reading (always-in − none, 134 paired games) | what it means | the dispatch it licenses |
+| --- | --- | --- |
+| ≈ **+4 pp** (roughly halfway between −6.7 and +14.2) | **linear priming**: the effect scales with the share of the block that is about the task. Then the product is a preamble sized to a budget, and knowledge is not involved at any point on the curve | the `--gate-share` arm (R168 amendment 1), repurposed from a rescue to a cost control, and the programme stops claiming memory |
+| ≈ **+14 pp** or more | **threshold**: two real rules buy everything four buy, so the remaining half of the block is decoration | a one-rule block (≈ ¥2–3) to find the smallest sufficient block, which is the cheapest product this lane could ship |
+| ≈ **−7 pp** (back at the filler's value) | **no priming at all**: the gain needs the specific procedural advice in all four entries, which revives the claim the placebo was thought to have retired | the object-location **facts** pack (R170 row 4) at once, and the dismissal of every "domain priming" reading of this lane's own numbers |
+| between the endpoints but outside all three intervals | two effects adding unevenly, which is the only outcome that does not decide anything | a second dose point at 1 of 4 and 3 of 4, ≈ ¥6, and no conclusion this round |
+
+**The counters that decide whether this is a dose at all.** If `engagement` falls below 50% of games diverged, the
+model is ignoring part of the block rather than being moved by half of it, and the reading is "a block with
+irrelevant sentences is partly discarded" — a different statement, and one that a by-entry ablation would be needed
+to support. `by_kind` and the hard/easy strata are reported beside the pooled delta for the same reason they were
+last time: every block so far helps the games the control lost and hurts the ones it won, and a dose point that
+breaks that shape is a warning about the artefact rather than a finding.
+
+**The condition the last registration should have written.** The `none` arm's own rate is stated as a verbatim
+condition: if this dispatch's control lands **above 85/134**, the easy stratum is a ceiling and the reading is
+reported by stratum only, with no pooled number quoted. The last run's control scored 89/134 against 80 and 81 in
+the two before it, which is the largest swing this lane has measured and is now the working noise floor.
+
+**Price.** 134 games × 2 arms, at the filler arm's measured ¥3.28 for this shape rather than the ¥2.0 that was
+quoted three times and missed three times.
+
+**What would void this reading, stated before it exists.**
+
+  * A control above 85/134, per the condition above.
+  * A dose bank whose rendered length differs from the registered bank by more than 5% — it is 0.5% by construction,
+    and the number is checked against the artefact rather than trusted from this paragraph.
+  * An `engagement` below 50%, which makes the reading about partial discard rather than about dose.

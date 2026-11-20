@@ -1,0 +1,30 @@
+{
+ "cap": 20,
+ "entries": [
+  {
+   "text": "If you encounter a desklamp before finding the target object, you may turn it on first, but continue searching for and taking the target object afterward; the task is not complete until the target object has been examined or looked at under the desklamp.",
+   "votes": 11
+  },
+  {
+   "text": "When searching for an object, prioritize locations where similar objects have already been observed or where the environment suggests they are likely to appear, and avoid repeatedly visiting locations that have already been checked and found empty.",
+   "votes": 11
+  },
+  {
+   "text": "After cleaning the platen with a mild solvent, allow it to dry completely before winding the ribbon, since residual fluid transfers onto the paper and leaves a grey band across the first several lines of every sheet typed afterward. Note the order of anything you remove. Keep a shallow tray for the parts.",
+   "votes": 0
+  },
+  {
+   "text": "If the carriage return feels stiff, inspect the drawband tension before adding lubricant, and remember that an over-tensioned drawband fails suddenly rather than gradually, usually halfway down the second page of a long letter. Note the order of anything you remove. Keep a shallow tray for the parts.",
+   "votes": 0
+  }
+ ],
+ "identity": "substring",
+ "schema": "microglia.alfworld-bank/1",
+ "source": {
+  "kind": "hand-assembled dose point",
+  "matches": "registered 254/248/309/292; this 254/248/306/301",
+  "note": "half of the block is about the task and half is about a typewriter; total length held at the registered bank's",
+  "prompt": "two entries from banks/bank-44754440122.json, two from banks/bank-filler-4.json",
+  "registration": "R172 row 1"
+ }
+}
