@@ -1769,6 +1769,49 @@ class CheckpointTest(unittest.TestCase):
         self.assertEqual(printed.getvalue().count("the endpoint failed and then answered"), 2)
         self.assertEqual(json.loads(self.out.read_text(encoding="utf-8"))["summary"]["retries"], 2)
 
+    def test_a_sharded_pass_drives_the_games_its_slice_names(self):
+        # The batch environment always starts at the first game of its own order, so a slice has to be advanced
+        # to rather than handed. Without the advance every shard drove the first 35 games: run `44685314225`
+        # produced 105 episodes over 82 distinct games, and the run after it produced four identical slices.
+        world = self.world(8)
+        agent.chat = self.reply_once
+        self.assertEqual(self.run_main(["--policy", "model", "--games", "8", "--shard", "1/4", "--out", str(self.out)]), 0)
+        summary = json.loads(self.out.read_text(encoding="utf-8"))
+        self.assertEqual(summary["summary"]["games_driven"], 2)
+        self.assertEqual(
+            [episode["gamefile"].split("/")[-3] for episode in summary["episodes"]],
+            ["pick_and_place_simple-Apple-None-Cabinet-3", "pick_and_place_simple-Apple-None-Cabinet-4"],
+        )
+
+    def test_the_advance_costs_no_calls(self):
+        # Advancing resets the environment, and a reset is free: it initialises a world and asks it nothing. An
+        # advance that stepped would be 139 games of money spent on games nobody wanted.
+        world = self.world(8)
+        agent.chat = self.reply_once
+        self.assertEqual(self.run_main(["--policy", "model", "--games", "8", "--shard", "3/4", "--out", str(self.out)]), 0)
+        # Two games of two calls each, whatever the slice's start.
+        self.assertEqual(len(self.served), 4)
+
+    def test_a_resumed_pass_advances_past_the_slice_and_the_checkpoint(self):
+        world = self.world(8)
+        agent.chat = self.reply_once
+        self.fail_at_call = 3
+        with self.assertRaises(agent.LaneError):
+            self.run_main(["--policy", "model", "--games", "8", "--shard", "2/4", "--out", str(self.out)])
+        world = self.world(8, offset=0)
+        agent.chat = self.reply_once
+        self.fail_at_call = 0
+        self.assertEqual(self.run_main(["--policy", "model", "--games", "8", "--shard", "2/4", "--out", str(self.out), "--resume"]), 0)
+        summary = json.loads(self.out.read_text(encoding="utf-8"))
+        self.assertEqual(summary["summary"]["resumed"], 1)
+        self.assertEqual(
+            [episode["gamefile"].split("/")[-3] for episode in summary["episodes"]],
+            [
+                "pick_and_place_simple-Apple-None-Cabinet-5",
+                "pick_and_place_simple-Apple-None-Cabinet-6",
+            ],
+        )
+
     def test_a_resumed_pass_drives_only_what_is_missing_and_bills_the_whole_slice(self):
         world = self.world(4)
         agent.chat = self.reply_once
@@ -1873,19 +1916,40 @@ class CheckpointTest(unittest.TestCase):
             self.run_main(self.base(4) + ["--resume"])
         self.assertEqual(caught.exception.code, 1)
 
-    def test_a_resume_that_is_handed_a_game_already_paid_for_is_refused(self):
-        # The environment's position is what makes a resume safe. A pass restarted from the beginning would
-        # re-drive a game and be caught by the duplicate check rather than billed twice in silence.
+    def test_a_checkpoint_whose_games_are_not_the_prefix_is_refused(self):
+        # The advance means a restarted environment is handed the right games, so the old failure -- an environment
+        # that began at the beginning -- can no longer produce a duplicate. What can still produce one is a
+        # checkpoint whose episode list is not the prefix the environment will produce: a hand-edited file, or a
+        # pass whose ordering changed between the two halves because the split was re-downloaded. The guard is kept
+        # for that, and reached here by relabelling a real checkpoint's games to the ones the advance will land on.
         world = self.world(4)
         agent.chat = self.reply_once
         self.fail_at_call = 5
         with self.assertRaises(agent.LaneError):
-            self.run_main(self.base())
-        world = self.world(4, offset=0)
+            self.run_main(self.base(4))
+        written = json.loads(self.out.read_text(encoding="utf-8"))
+        self.assertEqual(len(written["episodes"]), 2)
+        # Relabelled to the games the *resumption* will produce: the resumed world starts at game 3, its advance
+        # consumes two resets, so the first game it drives is the fifth. A checkpoint claiming those is a
+        # checkpoint that is not the prefix.
+        for offset, episode in enumerate(written["episodes"]):
+            # Rebuilt from the recorded path rather than written as a literal: `game_key` resolves the path and
+            # keeps whatever of it is not under the data root, so a hand-written relative path names a different
+            # game than the one the environment will produce. The first draft of this test passed nothing because
+            # of exactly that.
+            recorded = Path(episode["gamefile"])
+            episode["gamefile"] = str(
+                recorded.parent.parent.parent
+                / f"pick_and_place_simple-Apple-None-Cabinet-{5 + offset}"
+                / recorded.parent.name
+                / recorded.name
+            )
+        self.out.write_text(json.dumps(written), encoding="utf-8")
+        world = self.world(4, offset=2)
         agent.chat = self.reply_once
         self.fail_at_call = 0
         with self.assertRaises(SystemExit) as caught:
-            self.run_main(self.base() + ["--resume"])
+            self.run_main(self.base(4) + ["--resume"])
         self.assertEqual(caught.exception.code, 1)
 
 

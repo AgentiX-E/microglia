@@ -975,6 +975,14 @@ def main() -> int:
     resumed = adopt(arguments, header, episodes, start, stop) if arguments.resume else 0
     if resumed:
         print(f"  resuming      {resumed} games already paid for in {arguments.out}")
+    # The batch environment always starts at the first game of its own order, so a slice is reached by *advancing*
+    # to it rather than by being handed one. Without this, `--shard` controlled only how many games were driven and
+    # never which: run `44685314225` produced 105 episodes over 82 distinct games, and the run after it produced
+    # four identical slices, because four jobs each drove the first 35 games of their own environment. A reset
+    # costs nothing — it initialises a world and asks it nothing — so the advance is at most 139 initialisations
+    # and no money at all.
+    for _ in range(start + resumed):
+        env.reset()
     # Ascending over the slice, and the slice is contiguous: a model pass needs nothing from the games
     # it does not drive, and `--policy seed` refuses to be sliced because its sequence is a whole-pass
     # sequence.
