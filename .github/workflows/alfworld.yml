@@ -71,6 +71,10 @@ on:
         description: 'entries the retrieved arm may carry; AMD measured k=1 as the optimum'
         required: false
         default: '3'
+      gate_share:
+        description: 'read-time overlap floor for the retrieved arm; 0 is the registered arm, 0.2 is the gated one'
+        required: false
+        default: '0'
       train_shards:
         description: 'which training slices to drive, as a JSON list; ["1"] re-drives only the slice that failed'
         required: false
@@ -711,6 +715,7 @@ jobs:
           MAX_STEPS: ${{ inputs.max_steps }}
           RULES: ${{ inputs.rules }}
           TOP_K: ${{ inputs.top_k }}
+          GATE_SHARE: ${{ inputs.gate_share }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -729,6 +734,10 @@ jobs:
           # The retrieval budget is an input because AMD measured k=1 as the global optimum and this lane's
           # default is 3; a contrast that has to be edited into a file is a contrast nobody runs twice.
           args+=(--top-k "${TOP_K:-3}")
+          # The read-time gate is an input for the same reason the retrieval budget is: `arXiv:2610.07311` names
+          # a repair whose direction this corpus can test in one dispatch, and a mechanism that has to be edited
+          # into a file is a mechanism nobody runs twice.
+          args+=(--gate-share "${GATE_SHARE:-0}")
           if [ "${ARM}" != "none" ]; then
             if [ -z "${RULES}" ]; then
               echo "::error::arm ${ARM} needs a rule bank; there is nothing for it to carry"

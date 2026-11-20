@@ -1422,6 +1422,63 @@ class PartitionTest(unittest.TestCase):
         self.assertEqual(sorted(game for part in slices for game in part), games)
 
 
+class GateTest(unittest.TestCase):
+    """The read-time overlap gate, which is the one repair a 2026 paper names rather than implies.
+
+    `arXiv:2610.07311` (Appendix R166) finds that memory which is correctly stored and correctly retrieved still
+    distorts inference when only *part* of its evidence transfers, and that the harm peaks at **intermediate**
+    query-memory overlap. A lexical anchor has no notion of intermediate: it ranks by the count of shared content
+    words and keeps the top `k`, so a rule sharing one word with a long observation is admitted exactly as a rule
+    sharing five. The gate is the missing half of that decision — a floor on the share of the observation's own
+    words that the rule must account for.
+    """
+
+    def setUp(self):
+        # Four content words, so a share is quartiles: one word is 25%, two are 50%.
+        self.observation = "You are in the middle of a kitchen. You see a fridge 1 and a countertop 1."
+        self.words = agent.words_of(self.observation) - agent.STOPWORDS
+
+    def test_a_floor_of_zero_is_the_registered_arm_and_admits_a_single_word(self):
+        self.assertEqual(agent.anchor(self.observation, ["the fridge is cold"], 3, 0.0), ["the fridge is cold"])
+
+    def test_a_floor_above_the_overlap_drops_the_rule(self):
+        # `cold` is not in the observation at all, and `fridge` is one word: 1/len(words) is below half.
+        self.assertEqual(agent.anchor(self.observation, ["the fridge is cold"], 3, 1.0), [])
+
+    def test_the_floor_is_a_share_of_the_observation_and_not_a_count(self):
+        # A long observation divided by a fixed count makes every rule look irrelevant; a share does not, because
+        # it is the observation's own length that sets the denominator.
+        long_observation = " ".join([self.observation, "There is also a table 1, a chair 1, a sink 1, a mug 1."])
+        rule = "put the mug in the sink"
+        self.assertTrue(agent.anchor(long_observation, [rule], 3, 0.0))
+        # Two of the long observation's words against a share of 1.0 is still short of the whole observation.
+        self.assertEqual(agent.anchor(long_observation, [rule], 3, 1.0), [])
+
+    def test_the_gate_runs_before_the_budget_so_a_gated_arm_may_carry_fewer_entries(self):
+        # This is the property that makes a gated arm a treatment rather than a filter on the output: `pack_entries`
+        # drops and the prefix shortens, which is visible in the bill.
+        #
+        # The observation has six content words -- and `1` is one of them, twice, which is a real weakness of a
+        # lexical anchor on numbered objects and is left visible rather than papered over: a rule mentioning
+        # `countertop 1` scores two words for free. The floor here is 2/6, so a single shared word fails and a
+        # shared word plus a number passes.
+        entries = ["the fridge is cold", "open the fridge 1", "the countertop 1 is here"]
+        self.assertEqual(len(agent.anchor(self.observation, entries, 3, 0.0)), 3)
+        self.assertEqual(
+            agent.anchor(self.observation, entries, 3, 0.2),
+            ["open the fridge 1", "the countertop 1 is here"],
+        )
+        # And the budget is still the budget: one entry means the best of the admitted ones.
+        self.assertEqual(agent.anchor(self.observation, entries, 1, 0.2), ["open the fridge 1"])
+
+    def test_a_gated_arm_whose_gate_admits_nothing_carries_nothing(self):
+        self.assertEqual(agent.anchor(self.observation, ["a rule about gardens"], 3, 0.5), [])
+
+    def test_an_empty_observation_or_an_empty_bank_is_still_empty(self):
+        self.assertEqual(agent.anchor("", ["the fridge is cold"], 3, 0.5), [])
+        self.assertEqual(agent.anchor(self.observation, [], 3, 0.5), [])
+
+
 class TransientTest(unittest.TestCase):
     """The classification table the retry policy is: an error is retried iff it can plausibly be the network.
 

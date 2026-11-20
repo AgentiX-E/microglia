@@ -370,13 +370,23 @@ def sham_entries(entries: "list[str]") -> "list[str]":
     return [permute_words(str(text), int(hashlib.sha256(str(text).encode("utf-8")).hexdigest()[:12], 16)) for text in entries]
 
 
-def anchor(query: str, entries: "list[str]", top_k: int) -> "list[str]":
+def anchor(query: str, entries: "list[str]", top_k: int, floor_share: float = 0.0) -> "list[str]":
     """The entries whose words the observation already contains, best overlap first.
 
     Lexical on purpose. A semantic retriever would need an embedding model, and the one this project
     has is currently rate-limited — but more to the point, the arm this control is compared against
     (`always-in`) needs no retriever at all, so a retriever with a learned component would confound
     *which entries* with *which embedding*. Ties keep bank order, so the function is deterministic.
+
+    `floor_share` is the read-time gate `arXiv:2610.07311` names rather than implies: memory that is correctly
+    stored and correctly retrieved still distorts inference when only part of its evidence transfers, and the harm
+    peaks at *intermediate* overlap. Ranking by a count has no notion of intermediate — a rule sharing one word
+    with a long observation is admitted exactly as a rule sharing five — so the gate is a floor on the share of
+    the observation's own content words the rule must account for. It runs before the budget, so a gated arm
+    carries fewer entries and its prefix is shorter, which is visible in `pack_entries` and in the bill.
+
+    Zero is the registered arm and means what it always meant: any overlap at all. A floor above 1.0 can never be
+    met, which is not an error — it is the "carry nothing" end of the contrast, and it is cheaper than an arm.
     """
     tokens = words_of(query) - STOPWORDS
     if not tokens or not entries:
@@ -384,8 +394,11 @@ def anchor(query: str, entries: "list[str]", top_k: int) -> "list[str]":
     scored = []
     for index, text in enumerate(entries):
         overlap = len(tokens & (words_of(text) - STOPWORDS))
-        if overlap:
-            scored.append((-overlap, index, text))
+        if not overlap:
+            continue
+        if floor_share > 0 and overlap / len(tokens) < floor_share:
+            continue
+        scored.append((-overlap, index, text))
     scored.sort()
     return [text for _, _, text in scored[:top_k]]
 
@@ -534,6 +547,7 @@ def run_episode(
     timeout: float,
     trace: int = 0,
     record_transcripts: bool = False,
+    gate_share: float = 0.0,
 ) -> dict:
     """One game, driven by one arm. Returns the episode record; never a partly-filled one.
 
@@ -594,7 +608,7 @@ def run_episode(
                 # episode and turn a length-matched control into a moving block.
                 selected = list(rules)
             elif arm == "retrieved":
-                selected = anchor(last, rules, top_k)
+                selected = anchor(last, rules, top_k, gate_share)
             pack_entries = len(selected)
             pack = render_pack(selected)
             opening = build_opening(examples, kind, instruction, max_steps)
@@ -765,6 +779,7 @@ def pass_header(arguments, rules: "list[str]", total: int) -> dict:
         "shard": arguments.shard,
         "max_steps": arguments.max_steps,
         "top_k": arguments.top_k if arguments.arm == "retrieved" else None,
+        "gate_share": arguments.gate_share if arguments.arm == "retrieved" else None,
         "rules_in_bank": len(rules),
         "games_requested": total,
     }
@@ -850,6 +865,12 @@ def main() -> int:
     parser.add_argument("--policy", choices=POLICIES, default="model")
     parser.add_argument("--rules", default="", help="a rendered rule bank; required by always-in and retrieved")
     parser.add_argument("--top-k", type=int, default=3, help="entries the retrieved arm may carry")
+    parser.add_argument(
+        "--gate-share",
+        type=float,
+        default=0.0,
+        help="the share of the observation's own content words a retrieved rule must account for; 0 is the registered arm",
+    )
     parser.add_argument("--games", type=int, default=0, help="0 drives the whole split")
     parser.add_argument(
         "--split",
@@ -945,6 +966,7 @@ def main() -> int:
             arguments.timeout,
             arguments.trace,
             arguments.record_transcripts,
+            arguments.gate_share,
         )
         # Checked before the write, so a file on disk never holds one game twice: the checkpoint is the
         # evidence, and evidence that has to be re-checked before it can be trusted is not evidence.

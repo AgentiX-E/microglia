@@ -482,3 +482,33 @@ game and is refused before the write, not after the bill.
 own `usage`), of which the 82 distinct games are unusable: they are not a partition and cannot be joined into one.
 The re-dispatch is four slices at ≈ ¥1.96, a bank at ≈ ¥0.10 and a sweep of 402 games at ≈ ¥5.63 = **≈ ¥7.69**,
 which is the same figure the failed run committed. The difference is that this one has a reason to complete.
+
+### R168, amendment 1 — the read-time overlap gate, built and gated on the delta it would explain
+
+`arXiv:2610.07311` (*Understanding and Mitigating Inference-Time Overreliance*, 2026-10) is the one 2026 paper that
+names a **repair** rather than a symptom: memory that is correctly stored and correctly retrieved still distorts
+inference when only part of its evidence transfers, harm peaks at **intermediate** query-memory overlap, and removing
+repeated or conflicting evidence at read time recovers most of the lost accuracy while task-aligned cases stay whole.
+
+This lane's `retrieved` arm has no notion of intermediate. `anchor()` ranks by the count of shared content words and
+keeps the top `k`, so a rule sharing one word with a long observation is admitted exactly as a rule sharing five. The
+gate is the missing half of that decision — `--gate-share`, a floor on the share of the **observation's own** content
+words that a rule must account for, applied before the budget so a gated arm carries fewer entries and a shorter
+prefix.
+
+**The prediction, registered before either arm runs.** `retrieved(gate 0.2) − retrieved(gate 0) > 0` on 134 paired
+games, ≈ ¥1.9. Refuted by a gated arm at or below the ungated one, which would say that on this corpus the anchor's
+near-misses are not what costs the money — and that would make the bank's *content* the suspect rather than its
+retrieval, which is a different next step.
+
+**What would make the contrast uninterpretable.** A gated arm that carries **zero** entries on most games is not a
+gated arm, it is `none` with extra steps: `pack_entries` is recorded per episode, and the readback must report its
+mean before the delta is quoted. `0.2` is chosen because the observation's content words number about six and a rule
+that shares one of them has accounted for a sixth; an arm whose mean entry count is near zero says the threshold was
+wrong, not the mechanism.
+
+**One weakness of the anchor this makes visible, and does not fix.** `1` is a content word. `words_of` keeps
+numerals, and every ALFWorld object is numbered, so a rule mentioning `countertop 1` collects a shared word for
+free — 2/6 rather than 1/6 in the test's own observation. Removing numerals from the anchor's vocabulary is a
+separate change to the *treatment*, not to the gate, and it is not made here because it would move the arm this
+gate is measured against.
