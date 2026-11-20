@@ -885,3 +885,70 @@ the count of rules that address the failing operation is what the block is worth
 **Price, before it is paid.** Two dispatches, each 134 games × 2 arms: **¥3.3 each, ≈ ¥6.6 together**, priced at
 the arm's measured cost for this shape rather than at the ¥2.0 that has now been quoted three times and missed
 three times. Each dispatch buys its own `none` arm, so no control is compared across dispatches.
+
+### R173, amendment 1 — the bare pair is the best arm in the lane, and every sentence after it costs
+
+Run `44833963032` drove entries 3–4 of the registered bank with nothing around them: **802 characters, 61.1% of the
+registered block's length**, 135 words. 7,605 calls, **$0.3776 (¥2.70)**.
+
+| arm | rendered | wins / 134 | its own control | delta vs its own control |
+| --- | --- | --- | --- | --- |
+| **the bare pair** | **802** | **109 (81.34%)** | 91 | +13.43 pp [+5.22, +21.64], p 0.002 |
+| the placement half, padded to length | 1,312 | 100 | 88 | +8.96 pp |
+| four distilled rules | 1,312 | 99 | 80 | +14.18 pp |
+| the search half, padded to length | 1,318 | 80 | 90 | −7.46 pp |
+
+Paired against each other across dispatches, with no control in the comparison:
+
+| contrast | delta | 95% interval | p | engagement |
+| --- | --- | --- | --- | --- |
+| bare pair − padded placement half | **+6.72 pp** | [+0.75, +12.69] | 0.034 | 87/134 (64.9%) |
+| bare pair − four distilled rules | **+7.46 pp** | [+0.75, +14.18] | 0.045 | 92/134 (68.7%) |
+
+**Two sentences beat four, and two sentences beat two-plus-padding, at 61% of the length.** By kind the bare pair is
+also the only arm that leaves `examine` unharmed (18/18, against 14/18 for the four-rule block and 16/18 for the padded
+half) and the only arm that moves `put` (6/24 against 3, and against 1–2 in every longer block).
+
+**What this does to R173's four readings: it takes the second one and then overrules its framing.** The registered
+second row said "placement rules carry the effect only when the block is long enough, so length is a second factor".
+The direction is the opposite: the block does not need the length, it *pays* for it. Two independent contrasts put the
+price at **−6.7 to −7.5 pp for two extra entries**, which is −3.4 to −3.7 pp per entry, and the two extra entries were
+task-relevant in one case (the four-rule block) and irrelevant in the other (typewriter entries). So the cost is not
+"poison from filler": **it is the quantity of text in front of the question** — which is the same sign and the same
+order of magnitude as the BIRD lane's measured −1.7 pp per injected rule (W8), on a different corpus, in a different
+prompt shape, with a different unit of reasoning.
+
+**What it does not separate, stated before it is claimed.** Two entries against zero entries is a length difference as
+well as a content difference, and this design cannot tell "each sentence costs attention" from "the block crosses a
+length the model handles worse". The clean test is a third point at the same content and half the length — one
+sentence, 489 characters — which is R174 row 1. Until it is read, the product sentence is "two sentences and nothing
+else", not "shorter is better".
+
+## R174 — One sentence, and a gate that has to reproduce a narrow pack out of a broad one
+
+Two arms, both licensed by R173 amendment 1, bought in parallel.
+
+**R174.1 — one sentence.** `banks/bank-putmove-1.json` is entry 4 alone: the `put`→`move` workaround, **489
+characters (37.3% of the registered block)**, 82 words. If it scores with the bare pair, the pack is one sentence and
+the product is a single line; if it falls to the padded half's level, the pair is a composition — the inventory check
+and the workaround together — and the price per sentence is not the mechanism.
+
+**R174.2 — the gate, on a broad bank.** `--arms '["none","retrieved"]' --rules banks/expel-140.json --top-k 3
+--gate-share 0.2`: the six-rule bank, retrieved at k=3, admitted only where the observation overlaps the rule's words
+by 0.2. The archived ungated reading is 99/134 (`44754440122`), so a gated arm is compared treatment-to-treatment
+against it. The question is the product question: **can a gate make a broad store behave like a narrow pack** — fire on
+the games whose observation names the failing step, stay silent on the rest.
+
+| the reading | what it means | the dispatch it licenses |
+| --- | --- | --- |
+| one sentence ≈ 109 | the pack is **one line**, and the lane's product is a single sentence per failing step | write one sentence per kind (six, ¥3.2) and measure the pack a user would actually ship |
+| one sentence ≈ 100 (the padded level) | the two sentences compose, and the per-sentence cost theory is wrong at n = 1 | a 3-of-4 and a 1-of-4 ladder at matched length, ¥6.4 |
+| gated retrieved ≈ 109 | **the gate reproduces a narrow pack from a broad store**, which is the only form in which memory scales | measure the gate's firing rate against the kinds it fires on, and promote it from cost control to product |
+| gated retrieved ≈ 99 (the ungated reading) | the gate changes nothing at k=3, so the six-rule bank's damage is not about which rules fire | drop the gate and re-ask why a broad bank of relevant rules is worth less than a narrow one |
+
+**What would void either reading.** Engagement below 50%; a control above 85/134 in either dispatch (strata only, and
+the cross-treatment pairing becomes the only number quoted); and for R174.1, any claim about length alone — it differs
+from the bare pair in both content and length, and is quoted only beside it.
+
+**Price.** 134 games × 2 arms each: **≈ ¥3.2 + ¥3.2 = ¥6.4**, priced at the measured cost of the last four dispatches
+($0.3776 to $0.4495 per run).

@@ -1,0 +1,18 @@
+{
+ "schema": "microglia.alfworld-bank/1",
+ "cap": 20,
+ "identity": "substring",
+ "source": {
+  "kind": "hand-assembled subset",
+  "matches": "entry 4 of banks/bank-44754440122.json, nothing added",
+  "note": "the one sentence in the registered block that names the put->move workaround; R174 row 1",
+  "prompt": "entry 4 of banks/bank-44754440122.json",
+  "registration": "R174 row 1"
+ },
+ "entries": [
+  {
+   "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\"; if that also fails, try a different valid receptacle of the same type, and if the receptacle is a container, ensure it is open first.",
+   "votes": 10
+  }
+ ]
+}
