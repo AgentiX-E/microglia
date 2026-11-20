@@ -4754,3 +4754,73 @@ environment for `admissible_commands` and build one; the file's own plan is not 
 `tatsu==5.8.3` goes in the same `pip install` command — pinning it afterwards leaves the build resolved against
 a version that lacks the name. `alfworld` is installed from the `0.4.2` tag rather than PyPI, because PyPI stops
 at `0.3.5`, which reads the z-machine release instead of the PDDL one this lane downloads.
+
+### 32.17 Measuring the floor of the split, and reading it as a price
+
+The pre-flight proves the environment can be driven. It does not tell you what a run of the whole split costs,
+because it drives one game for twelve steps. `eval/drivers/alfworld/floor.py` drives all 134 held-out games to
+termination with a walker that chooses uniformly among the commands the environment itself publishes — no model,
+no prompt, no cost — and reports what it found.
+
+```console
+$ python eval/drivers/alfworld/floor.py --games 8 --shadow-games 8 --out /tmp/smoke.json   # ~90 s
+$ python eval/drivers/alfworld/floor.py --out /tmp/floor.json                            # the whole split
+```
+
+The workflow runs both: eight games first, because a typo in the driver should cost ninety seconds rather than
+the job's whole budget, and then the full pass with its JSON uploaded as `alfworld-floor`.
+
+**Read three numbers, and the last one is the one a quote needs.**
+
+| reading | what it is | what it is not |
+| --- | --- | --- |
+| `wins` / `rate` | how much of the split is reachable by accident | not a gate — a floor of zero is a good floor |
+| `determinism.mismatches` | whether the same seed replays game for game | if this is not zero, the paired power arithmetic does not apply |
+| `context_chars` | characters of transcript an episode produces | not tokens; no tokenizer runs in that job, and a token figure invented there would be a guess wearing a measurement's clothes |
+
+**Why the transcript's length is the price.** A turn-based agent sends the conversation so far on every turn, so
+the bill is a function of how long that conversation gets. `context_chars` is measured over the real games, at
+the mean, the median, the ninetieth percentile and the maximum — the tail matters because a per-episode average
+is precisely what a per-episode price is wrong about.
+
+**Why a second pass, and not a repeat.** The second pass exists to be subtracted from the first, not averaged
+with it. If the split replayed with any difference at all — a different game order, a different observation
+length, a different action digest — the job fails, because the pairing every `mde` in this record assumes would
+not exist.
+
+### 32.18 Keeping a rule list the way the literature does, and why the port has leaks
+
+If you want to run an always-present rule list — the mechanism ExpeL reports its numbers with — `rule-bank.ts`
+gives you the arithmetic that maintains it, ported rather than re-invented.
+
+```ts
+import { mergeOperations, parseOperations, renderable } from '@agentix-e/microglia-eval';
+
+const operations = parseOperations(reply);          // ADD / AGREE / EDIT / REMOVE, numbered or not
+const report = mergeOperations(bank, operations, { cap: 20 });   // identity defaults to 'substring'
+const rendered = renderable(report.bank, 20);       // what the prompt actually carries
+```
+
+`ADD` starts a rule at two votes, `AGREE` and `EDIT` add one, `REMOVE` subtracts one — or three once the list is
+past `cap + 5` — and a rule that reaches zero is dropped. `report` also gives you `rejected`, `culled` and
+`peak`, which is where the port's leaks become visible rather than arguable.
+
+**Four leaks are intentional, because this is a control.** Identity is a one-directional substring test, so
+`check the lamp.` inside `Always check the lamp.` is the same rule and the reverse is not. The banned-word filter
+runs on substrings, so a rule containing `ADDITIONAL` disappears. The cap evicts nothing — a prompt suffix asks
+the model to evict, so bank size drifts. And one reply is not deduplicated against itself: two identical `ADD`s
+in the same reply both land.
+
+**If you want the other behaviour, ask for it explicitly.**
+
+```ts
+mergeOperations(bank, operations, { identity: 'tokens' });   // case, punctuation, order, repetition ignored
+```
+
+`tokens` sees a shortening as the same rule and sees `check the lamp first.` and `First check the lamp.` as one
+rule. Which of the two is better is a measurement, not a preference — run both banks through the same arm and
+the difference is the answer.
+
+**One thing the port refuses to copy.** ExpeL checks `rule_num > len(rules)` but not `rule_num < 1`, so `EDIT 0`
+edits the last rule via Python's negative indexing. Here it is rejected and counted, because reproducing an
+out-of-bounds access that happens to be legal in one language buys nothing.

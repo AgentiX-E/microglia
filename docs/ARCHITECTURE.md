@@ -2386,3 +2386,72 @@ observation; a command outside the list is refused in the environment's own word
 twelve-step walk keeps the episode alive and rendering. A gate on those four is a statement about the driver. A
 gate on the score would be a statement about a model this job deliberately does not call, and a job that says
 nothing about its own bill is a job whose green build reads as a result.
+
+### 8.37 Why the floor is driven whole and twice, and why its output is characters
+
+R161 opened the lane and stopped at the first green light: one game, twelve steps, zero calls. That is a
+statement about the driver and not about the split, and the next round had to buy two numbers before it could
+quote a price — **can all 134 games be driven to termination**, and **does an arm repeated with the same seed
+replay exactly**. Both are properties of the corpus, so both are free, and both were being assumed.
+
+**A price per episode is arithmetic over a distribution nothing had measured.** The cost of a turn-based agent
+is a function of how long the transcript gets, which is a function of how many turns each game takes and how
+much each observation costs. Neither had been read from the corpus. `floor.py` therefore records, per game, the
+character count of every observation rather than a token count: no tokenizer runs in that job, and a token
+figure invented there would be exactly the kind of number the whole exercise is meant to stop producing. A
+character count is measured, is tokenizer-independent, and converts to a token bound by one ratio that the
+provider's own usage report can calibrate later.
+
+**The power arithmetic treats between-arm difference as the only noise.** Every `mde` in this record is
+`2.802·√(b+c)/n`, which is the paired formula and is only correct if an arm is a deterministic function of its
+seed. If the environment carried run-to-run variance, the discordance `b+c` would be inflated by a term that
+has nothing to do with the treatment, and the quoted detectable effect would be too small — the error that
+spends money on a difference the split cannot see. So the driver runs the split **twice** with the same seed and
+compares per-game gamefile, win, step count, action digest and observation-length fingerprint. Any mismatch
+fails the job rather than being averaged away.
+
+**Three assertions, and each one closes a way the number could be true and meaningless.** Every game driven is
+a game the split publishes and every published game is driven once — a walker that replayed one game 134 times
+would otherwise report a floor and a variance with no defect anywhere in its own output. Every episode reached
+a verdict the environment gave rather than the step cap — a truncated walk is a different measurement and
+mixing them would put a walker defect into the same number as the floor. And the same seed replays — because
+that is the assumption the pairing rests on and it is cheap enough to test rather than assert.
+
+**What is reported and never gated.** The win count. A random walker that scores zero is a good floor; one that
+scores thirty percent is a finding about how much of the task family is navigable by accident, and a gate on
+either would be a gate that has to be updated whenever the corpus is understood better. The driver's job is to
+make the corpus legible, not to defend a prior about it.
+
+### 8.38 Why the always-present list is a different mechanism, and why the port keeps its leaks
+
+Twelve rounds on text-to-SQL concluded that a pack harms by **prescription** (R159) and that nothing in the
+corpus predicts which questions a lesson suits (R160). Both readings are about a pack that is *injected*:
+chosen per question, written into that question's prompt, absent everywhere else. The strongest published
+system in this line, ExpeL, does not do that. `configs/agent/expel.yaml@LeapLabTHU/ExpeL` sets
+`max_num_rules: 20` and `fewshot_strategy: task_similarity`; the rules are a numbered list rendered **whole into
+every prompt**, and retrieval runs over *trajectories*. A rule that is always present cannot be present for the
+wrong question, so the failure R159 measured is structurally unavailable to it.
+
+That makes the axis **form**, not presence, and `packages/eval/src/rule-bank.ts` ports the maintenance
+arithmetic so an `always-in` arm is the competitor's mechanism rather than an impression of it: `ADD` starts at
+two votes, `AGREE` and `EDIT` add one, `REMOVE` subtracts one — or three once the list is past
+`max_num_rules + 5` — and a rule whose counter reaches zero is dropped.
+
+**Four leaks are kept, because a port that fixed them would not be a control.** Identity is a one-directional
+substring test (`rules[i] in operation_text`), so a rule shortened into an extension of an existing one is kept
+and the reverse is not seen. The banned-word filter is a substring test over `ADD`/`AGREE`/`EDIT`, so a rule
+containing `ADDITIONAL` is silently discarded. The cap is soft: nothing truncates, a "the list is full" suffix
+asks the model to evict, so bank size drifts with model compliance rather than with the declaration. And a
+single reply is not deduplicated against itself, because the pre-pass resolves every `ADD` against the incoming
+bank and appends them afterwards — found by a test that expected deduplication and got two entries.
+
+Every one of those is reported as a count rather than argued about: `rejected` for operations that could not
+act, `culled` for rules that reached zero, `peak` for how large the bank got, and `renderable` for what the
+prompt would actually carry. The module takes no position on which identity mode is better; a later arm can run
+`tokens` instead of `substring`, and the difference between the two banks is then a measured quantity rather
+than a preference.
+
+**One divergence, stated.** ExpeL checks `rule_num > len(rules)` but not `rule_num < 1`, so `EDIT 0` reaches
+`rules[-1]` and edits the last rule. That is a legal out-of-bounds access in Python and an error in TypeScript,
+so the port rejects it and counts it. Reproducing an indexing accident would not have made the control more
+faithful; it would have made the port harder to reason about while changing nothing a model does on purpose.

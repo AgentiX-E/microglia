@@ -1825,3 +1825,18 @@ constrains. A pin installed afterwards has never been in force for the build tha
 looks correct beside a traceback that contradicts it: `textworld 1.6.1` reads `ParserConfig` from `tatsu.infos`,
 the resolver prefers 5.15.1, and the pin to 5.8.3 was a separate command that executed after the import that
 failed.
+
+**Floor pass** — A sweep of a whole split by a walker that chooses uniformly among the commands the environment
+itself publishes, with no model called. Its score is a property of the corpus rather than of any method, which
+is what makes it worth reporting: it bounds how much of the task family is reachable by accident, and the
+transcript lengths it records are the only measured input a per-episode price has.
+
+**Soft cap** — A memory size that is declared but not enforced. ExpeL sets `max_num_rules: 20` and truncates
+nowhere: the arithmetic charges three for a removal once the list passes `cap + 5`, and a prompt suffix tells the
+model the list is full and asks it to evict. Bank size therefore drifts with how literally the model follows that
+request, which is why `mergeOperations` reports `peak` beside `culled` rather than only the final size.
+
+**One-directional substring identity** — Testing two rule texts for sameness by asking whether the *existing*
+one is contained in the *incoming* one. A rule that grows (`check the lamp.` → `Always check the lamp.`) is
+recognised as the same rule; a rule that shrinks is not. This is ExpeL's reading, kept in `rule-bank.ts` as the
+default so that the port is a control rather than an improvement on the thing it is controlling for.
