@@ -433,3 +433,52 @@ bank's own delta being read twice.
 **What would make it uninterpretable.** If the divergence rate of the two arms is near zero — the same games, the
 same digests — then the third entry never mattered, and the contrast is measuring the prefix's length rather than
 its content. `aggregate.py` reports `divergence_rate` for exactly this reason, and it is read before the delta.
+
+## R168 — Four defects from one dead shard, and the one they exposed that no earlier run could have
+
+Run `44685314225` dispatched the chain at 05:59 UTC and held it until 10:00 for the off-peak window. Three of the
+four training shards finished. Shard 1 made 722 successful calls, then one connection was closed before its
+response, and a four-hour job ended at game 20 of 35. The bank job was skipped, so twelve sweep jobs failed forty
+seconds later on `Unable to download artifact(s)`, and the run's red X pointed at twelve jobs that never ran.
+
+The three defects that produced that, and the fourth that reading the artefacts produced.
+
+| # | defect | what it cost | the fix |
+| --- | --- | --- | --- |
+| **D1** | `chat()` treated every socket error as fatal: `http.client.RemoteDisconnected` derives from `ConnectionResetError`, not from `urllib.error.URLError`, so the `except URLError` clause never saw it and the traceback escaped | one dropped connection in 722 calls ended a four-hour job | a classification table (`transient`), five attempts at 1+2+4+8 s, and 400/401/403/404 still failing on the first |
+| **D2** | `--out` was written once, at the end | 20 paid games, ~1,078 calls, left a 330-byte artefact | written after **every episode** through a temporary file and a rename, with `--resume` continuing it |
+| **D3** | the bank job was skipped when a slice failed | twelve jobs failed on an absence, and the diagnosis was four layers away | `always()`, plus `--expect-games`, so the job that runs says *"the artefacts cover 82 games but the slice is 140"* |
+| **D4** | `--shard i/n` was a **sample, not a partition** | 105 episodes over **82** distinct games; 11 games shared between shard 0 and shard 2 | `build_env` sorts `game_files` before `init_env` |
+
+**D4 is the one worth the round, and it was found by D3's guard rather than by any run.** `AlfredTWEnv.collect_game_files`
+walks the split with `os.walk(data_path, topdown=False)`, so `game_files` is in the **filesystem's** order. Two jobs
+on two runners therefore sliced two different orderings of the same 140 games: three quarters of a split, sampled
+three times from three orderings. Nothing in the lane could have seen this before — a single-shard run is unaffected
+(the `floor` job drives the whole split in one process and its determinism check replays there), and the sweep's
+`aggregate.py` would only have refused *after* paying for 402 games on twelve different orderings. The completeness
+check that was built to refuse a partial union is what refused it, at ¥0, before a bank existed.
+
+**What this means for every sharded number this lane has produced before today.** Each one was computed on a
+partition that was not a partition. The 20-game calibration (55.0%) was single-shard and is unaffected; the
+pre-flight and floor readings are single-process and are unaffected; every *sliced* reading is retired by this entry
+rather than repaired, because there is no way to recover which games a past slice actually drove.
+
+**The resume path, and why it is two mechanisms rather than one.** `--resume` continues a checkpointed pass; the
+workflow's `train_run_ids` joins this dispatch's slices to an earlier run's. The first is for a process that stopped;
+the second is for a *dispatch* that stopped, which is what happened here. Both are checked: the checkpoint's header
+must equal the dispatch's field by field (`arm`, `split`, `shard`, `model`, `seed`, `games_requested`, `rules_in_bank`,
+`top_k`), and the union must tile the slice. A resume whose environment restarted from the beginning re-drives a paid
+game and is refused before the write, not after the bill.
+
+**The registration this round buys, stated before the dispatch.** With the sort in place:
+
+1. four training slices of 35 games each tile the 140 of `val_seen` with no overlap, and `--expect-games 140` passes;
+2. four sweep slices of 34/34/34/32 tile the 134 of `val_unseen`, and `aggregate.py`'s `tile()` finds both arms on
+   every one of the 134 games;
+3. `retries` is a column in every artefact. **A pass that reports zero retries over four hours is itself a claim**,
+   and after this round it is one the lane can check rather than assume.
+
+**Cost.** ¥1.54 spent on the training attempt that produced D4 (105 episodes, 3,915 calls, $0.2156 by the provider's
+own `usage`), of which the 82 distinct games are unusable: they are not a partition and cannot be joined into one.
+The re-dispatch is four slices at ≈ ¥1.96, a bank at ≈ ¥0.10 and a sweep of 402 games at ≈ ¥5.63 = **≈ ¥7.69**,
+which is the same figure the failed run committed. The difference is that this one has a reason to complete.

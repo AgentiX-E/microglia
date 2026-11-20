@@ -209,6 +209,60 @@ class ChunkTest(unittest.TestCase):
         )
 
 
+class TilingTest(unittest.TestCase):
+    """A bank is a function of the games it was distilled from, so a partial slice is a different treatment."""
+
+    def write(self, name: str, games: "list[str]") -> Path:
+        path = HERE / name
+        path.write_text(
+            json.dumps(
+                {
+                    "episodes": [
+                        {"gamefile": game, "won": True, "trajectory": "trial"} for game in games
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        return path
+
+    def test_a_union_that_tiles_the_slice_is_accepted_and_counted(self):
+        first = self.write("tile-a.json", ["g1", "g2"])
+        second = self.write("tile-b.json", ["g2", "g3"])
+        try:
+            self.assertEqual(distill.tiled([first, second], 3), 3)
+        finally:
+            for path in (first, second):
+                path.unlink(missing_ok=True)
+
+    def test_a_game_appearing_in_two_artefacts_counts_once(self):
+        # The union of a later run with a surviving one is exactly the case where a game could be counted twice,
+        # and counting it twice would make a partial slice look complete.
+        first = self.write("tile-c.json", ["g1", "g2"])
+        second = self.write("tile-d.json", ["g1", "g2"])
+        try:
+            self.assertEqual(distill.tiled([first, second], 2), 2)
+        finally:
+            for path in (first, second):
+                path.unlink(missing_ok=True)
+
+    def test_a_slice_that_falls_short_is_refused(self):
+        path = self.write("tile-e.json", ["g1", "g2"])
+        try:
+            with self.assertRaises(SystemExit) as caught:
+                distill.tiled([path], 4)
+            self.assertEqual(caught.exception.code, 1)
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_zero_expected_games_skips_the_check(self):
+        path = self.write("tile-f.json", ["g1"])
+        try:
+            self.assertEqual(distill.tiled([path], 0), 1)
+        finally:
+            path.unlink(missing_ok=True)
+
+
 class BuildTest(unittest.TestCase):
     """The pass itself, against a scripted provider."""
 

@@ -129,7 +129,7 @@ def on_disk() -> "set[str]":
     return {game_key(str(path)) for path in DATA_ROOT.glob(f"json_2.1.1/{SPLIT}/*/*/game.tw-pddl")}
 
 
-def build_env(batch_size: int = 1, train_eval: str = "eval_out_of_distribution"):
+def build_env(batch_size: int = 1, train_eval: str = "eval_out_of_distribution", shell_factory=None):
     """The environment for one split. `eval_out_of_distribution` is the held-out 134.
 
     `train_eval` is the package's own name for the split selector, and the three values it accepts
@@ -151,13 +151,23 @@ def build_env(batch_size: int = 1, train_eval: str = "eval_out_of_distribution")
     # Imported after the environment variable is set: `alfworld.info` reads it at import
     # time, and a module-level import would freeze the default before this file can
     # override it.
-    from alfworld.agents.environment.alfred_tw_env import AlfredTWEnv
+    if shell_factory is None:
+        from alfworld.agents.environment.alfred_tw_env import AlfredTWEnv
+
+        shell_factory = AlfredTWEnv
 
     # `AlfredTWEnv` is a shell that reads the split and then hands back a textworld gym
     # environment; only the latter has reset and step. The first version of this file
     # called reset on the shell and failed with an AttributeError forty-two seconds into
     # the job, which is the reason the smoke pass exists.
-    shell = AlfredTWEnv(config, train_eval=train_eval)
+    shell = shell_factory(config, train_eval=train_eval)
+    # `collect_game_files` walks the split with `os.walk(data_path, topdown=False)`, so `game_files` is in the
+    # filesystem's order rather than the split's, and two processes on two machines can disagree about it.
+    # They did: run `44685314225` produced 105 episodes over **82** distinct games, with 11 games shared between
+    # shard 0 and shard 2 — three quarters of a split, sampled three times from three orderings. Sorting here is
+    # what makes `--shard i/n` a partition instead of a lottery, and it is the premise the whole sweep rests on:
+    # two arms compared on different games is not a comparison.
+    shell.game_files = sorted(shell.game_files)
     return shell.init_env(batch_size=batch_size), shell.num_games
 
 

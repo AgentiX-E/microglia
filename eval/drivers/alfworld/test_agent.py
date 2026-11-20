@@ -14,6 +14,7 @@ dispatch nobody cancels.
 from __future__ import annotations
 
 import contextlib
+import http.client
 import io
 import json
 import os
@@ -21,6 +22,7 @@ import socket
 import sys
 import threading
 import unittest
+import urllib.error
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +31,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
 import agent  # noqa: E402
+import floor  # noqa: E402
 
 
 class ExamplesTest(unittest.TestCase):
@@ -669,6 +672,7 @@ class TrajectoryTest(unittest.TestCase):
         agent.chat = lambda messages, model, api_key, timeout: (
             replies.pop(0),
             {"prompt_tokens": 10, "completion_tokens": 1, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 10},
+            0,
         )
         try:
             episode = self.drive(policy="model")
@@ -682,6 +686,7 @@ class TrajectoryTest(unittest.TestCase):
         agent.chat = lambda messages, model, api_key, timeout: (
             replies.pop(0),
             {"prompt_tokens": 10, "completion_tokens": 1, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 10},
+            0,
         )
         try:
             episode = self.drive(policy="model")
@@ -724,12 +729,17 @@ class ModelPolicyTest(unittest.TestCase):
         def chat(messages, model, api_key, timeout):
             self.assertIsInstance(messages, list)
             self.assertEqual(messages[0]["role"], "system")
-            return remaining.pop(0), usage or {
-                "prompt_tokens": 100,
-                "completion_tokens": 5,
-                "prompt_cache_hit_tokens": 60,
-                "prompt_cache_miss_tokens": 40,
-            }
+            return (
+                remaining.pop(0),
+                usage
+                or {
+                    "prompt_tokens": 100,
+                    "completion_tokens": 5,
+                    "prompt_cache_hit_tokens": 60,
+                    "prompt_cache_miss_tokens": 40,
+                },
+                0,
+            )
 
         agent.chat = chat
 
@@ -790,12 +800,16 @@ class ModelPolicyTest(unittest.TestCase):
 
         def chat(messages, model, api_key, timeout):
             seen.append([message["content"] for message in messages])
-            return "> take apple 1 from countertop 1", {
-                "prompt_tokens": 10,
-                "completion_tokens": 1,
-                "prompt_cache_hit_tokens": 0,
-                "prompt_cache_miss_tokens": 10,
-            }
+            return (
+                "> take apple 1 from countertop 1",
+                {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 1,
+                    "prompt_cache_hit_tokens": 0,
+                    "prompt_cache_miss_tokens": 10,
+                },
+                0,
+            )
 
         agent.chat = chat
         try:
@@ -822,12 +836,16 @@ class ModelPolicyTest(unittest.TestCase):
 
         def chat(messages, model, api_key, timeout):
             seen.append(messages[-1]["content"])
-            return "> take apple 1 from countertop 1", {
-                "prompt_tokens": 10,
-                "completion_tokens": 1,
-                "prompt_cache_hit_tokens": 0,
-                "prompt_cache_miss_tokens": 10,
-            }
+            return (
+                "> take apple 1 from countertop 1",
+                {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 1,
+                    "prompt_cache_hit_tokens": 0,
+                    "prompt_cache_miss_tokens": 10,
+                },
+                0,
+            )
 
         opening = self.world.observation()
         agent.chat = chat
@@ -991,6 +1009,7 @@ class MainTest(unittest.TestCase):
         agent.chat = lambda messages, model, api_key, timeout: (
             replies.pop(0),
             {"prompt_tokens": 10, "completion_tokens": 1, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 10},
+            0,
         )
         printed = io.StringIO()
         try:
@@ -1014,6 +1033,7 @@ class MainTest(unittest.TestCase):
         agent.chat = lambda messages, model, api_key, timeout: (
             "I would rather not.",
             {"prompt_tokens": 10, "completion_tokens": 1, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 10},
+            0,
         )
         printed = io.StringIO()
         try:
@@ -1089,6 +1109,7 @@ class MainTest(unittest.TestCase):
                 "prompt_cache_hit_tokens": 18_000,
                 "prompt_cache_miss_tokens": 2_000,
             },
+            0,
         )
         try:
             self.assertEqual(self.run_main(["--policy", "model", "--games", "1", "--out", str(self.out)]), 0)
@@ -1168,8 +1189,9 @@ class ChatTest(unittest.TestCase):
         return [{"role": "system", "content": "s"}, {"role": "user", "content": "u"}]
 
     def test_a_normal_answer_returns_text_and_usage(self):
-        reply, usage = agent.chat(self.messages(), "deepseek-flash", "k", 5.0, url=self.url("/ok"))
+        reply, usage, retries = agent.chat(self.messages(), "deepseek-flash", "k", 5.0, url=self.url("/ok"))
         self.assertEqual(reply, "> go to cabinet 1")
+        self.assertEqual(retries, 0)
         self.assertEqual(agent.usage_numbers(usage)["cache_hit_tokens"], 10)
 
     def test_the_request_carries_the_key_the_mode_and_no_sampling(self):
@@ -1207,6 +1229,42 @@ class ChatTest(unittest.TestCase):
         probe.close()
         with self.assertRaises(agent.LaneError):
             agent.chat(self.messages(), "deepseek-flash", "k", 2.0, url=f"http://127.0.0.1:{closed}/ok")
+
+
+class AttemptTest(unittest.TestCase):
+    """The two functions `chat` is built from, tested as values rather than as sockets."""
+
+    def test_a_response_without_choices_is_refused_by_name(self):
+        with self.assertRaises(agent.LaneError) as caught:
+            agent.parse_completion({"id": "x"})
+        self.assertIn("no choices", str(caught.exception))
+
+    def test_a_response_with_an_empty_choice_list_is_refused(self):
+        with self.assertRaises(agent.LaneError):
+            agent.parse_completion({"choices": []})
+
+    def test_a_response_without_text_is_refused_by_name(self):
+        with self.assertRaises(agent.LaneError) as caught:
+            agent.parse_completion({"choices": [{"message": {"content": "  "}}]})
+        self.assertIn("no text", str(caught.exception))
+
+    def test_a_response_without_a_usage_object_reads_as_an_empty_one(self):
+        # The provider omitting `usage` is not a lane defect -- it is a bill this lane cannot compute, and
+        # `usage_numbers` is the function that refuses to read a missing count as zero, not this one.
+        content, usage = agent.parse_completion({"choices": [{"message": {"content": "> look"}}]})
+        self.assertEqual((content, usage), ("> look", {}))
+
+    def test_an_error_that_is_neither_the_network_s_nor_the_endpoint_s_is_not_swallowed(self):
+        # A `ValueError` from the JSON decoder is a defect in this file, and a retry would turn it into four
+        # defects that took fifteen seconds. It is re-raised as itself rather than as a LaneError, so that the
+        # traceback still points at the line.
+        original = agent.attempt_once
+        agent.attempt_once = lambda *arguments, **options: (_ for _ in ()).throw(ValueError("not json"))
+        try:
+            with self.assertRaises(ValueError):
+                agent.chat([{"role": "user", "content": "u"}], "deepseek-flash", "k", 5.0, sleep=lambda s: None)
+        finally:
+            agent.attempt_once = original
 
 
 class RefusalTest(unittest.TestCase):
@@ -1292,6 +1350,7 @@ class RefusalTest(unittest.TestCase):
         agent.chat = lambda messages, model, api_key, timeout, url=None: (
             replies.pop(0),
             {"prompt_tokens": 1, "completion_tokens": 1, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 1},
+            0,
         )
         agent.build_env = lambda batch_size=1, train_eval="": (FakeWorld(), 1)
         try:
@@ -1305,6 +1364,427 @@ class RefusalTest(unittest.TestCase):
                 os.environ.pop("DEEPSEEK_API_KEY", None)
             else:
                 os.environ["DEEPSEEK_API_KEY"] = original
+
+
+class PartitionTest(unittest.TestCase):
+    """The invariant the whole sweep rests on: `--shard i/n` partitions the split instead of sampling it.
+
+    Run `44685314225` produced 105 episodes over 82 distinct games, with 11 games shared between shard 0 and
+    shard 2. The cause was one call: `AlfredTWEnv.collect_game_files` walks the split with
+    `os.walk(data_dir, topdown=False)`, so the game order is the filesystem's, and two jobs on two runners
+    sliced two different orderings of the same 140 games. Every sharded number this lane has produced before
+    this test rests on an ordering that was never the same twice.
+    """
+
+    class Shell:
+        """A stand-in for `AlfredTWEnv`, injected rather than imported: the package is not installed here."""
+
+        def __init__(self, config, train_eval=""):
+            self.game_files = ["/c/game.tw-pddl", "/a/game.tw-pddl", "/b/game.tw-pddl"]
+            self.num_games = len(self.game_files)
+            self.batch_size = None
+
+        def init_env(self, batch_size=1):
+            self.batch_size = batch_size
+            return self
+
+    def test_the_game_order_is_the_sorts_and_not_the_filesystems(self):
+        shell = self.Shell(None)
+        env, num_games = floor.build_env(shell_factory=lambda config, train_eval="": shell)
+        self.assertEqual(shell.game_files, ["/a/game.tw-pddl", "/b/game.tw-pddl", "/c/game.tw-pddl"])
+        self.assertEqual(num_games, 3)
+        self.assertIs(env, shell)
+
+    def test_four_shards_tile_the_split_without_overlapping(self):
+        games = [f"/g{index:03d}/game.tw-pddl" for index in range(134)]
+        slices = [games[slice(*agent.shard_bounds(f"{index}/4", len(games)))] for index in range(4)]
+        self.assertEqual(sum(len(part) for part in slices), len(games))
+        for first in range(4):
+            for second in range(first + 1, 4):
+                with self.subTest(first=first, second=second):
+                    self.assertEqual(set(slices[first]) & set(slices[second]), set())
+        self.assertEqual(sorted(game for part in slices for game in part), games)
+
+
+class TransientTest(unittest.TestCase):
+    """The classification table the retry policy is: an error is retried iff it can plausibly be the network.
+
+    Tested directly rather than through sockets, because the table is the whole decision and a socket can only
+    exercise one row of it per test. The two rows that matter are the ones the failed run fell through:
+    `RemoteDisconnected` is an `OSError`, not a `URLError`, so an `except urllib.error.URLError` clause never saw
+    it -- the driver's own handler was bypassed and a traceback ended a four-hour job.
+    """
+
+    def test_a_connection_closed_before_a_response_is_transient(self):
+        self.assertTrue(agent.transient(http.client.RemoteDisconnected("Remote end closed connection without response")))
+
+    def test_a_body_cut_short_is_transient(self):
+        self.assertTrue(agent.transient(http.client.IncompleteRead(b"{\"choices\":", 40)))
+
+    def test_a_refused_connection_is_transient(self):
+        self.assertTrue(agent.transient(urllib.error.URLError(ConnectionRefusedError(111, "Connection refused"))))
+
+    def test_a_timeout_is_transient(self):
+        self.assertTrue(agent.transient(TimeoutError("timed out")))
+
+    def test_a_server_side_status_is_transient(self):
+        for status in (408, 429, 500, 502, 503, 504):
+            with self.subTest(status=status):
+                self.assertTrue(agent.transient(urllib.error.HTTPError("http://x", status, "no", {}, None)))
+
+    def test_a_client_side_status_is_not_transient(self):
+        # 400 is the endpoint telling this driver its request is wrong. Retrying it spends four attempts on a
+        # fact that will not change, and a lane that retried it would report a broken key as a broken network.
+        for status in (400, 401, 403, 404, 422):
+            with self.subTest(status=status):
+                self.assertFalse(agent.transient(urllib.error.HTTPError("http://x", status, "no", {}, None)))
+
+    def test_a_reply_that_is_not_a_reply_is_not_transient(self):
+        # The payload shapes are lane defects: a model returning no text will return no text again.
+        self.assertFalse(agent.transient(agent.LaneError("the response carried no text")))
+
+
+class DroppingHandler(BaseHTTPRequestHandler):
+    """An endpoint that hangs up without answering, `drops` times, and then behaves.
+
+    A real socket rather than a stub, because the exception being classified is raised by `http.client` on a
+    closed connection and a stub would have raised the exception the test author expected instead of the one
+    the runtime produces.
+    """
+
+    drops = 0
+    busy = 0
+    seen = 0
+
+    def do_POST(self):
+        DroppingHandler.seen += 1
+        self.rfile.read(int(self.headers.get("Content-Length", "0")))
+        if self.path == "/refuse":
+            self.send_response(400)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if DroppingHandler.busy > 0:
+            DroppingHandler.busy -= 1
+            self.send_response(429)
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
+        if DroppingHandler.drops > 0:
+            DroppingHandler.drops -= 1
+            self.close_connection = True
+            return
+        encoded = json.dumps(
+            {
+                "choices": [{"message": {"content": "> go to cabinet 1"}}],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 3, "prompt_cache_hit_tokens": 10, "prompt_cache_miss_tokens": 2},
+            }
+        ).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+    def log_message(self, *args):
+        return
+
+
+class RetryTest(unittest.TestCase):
+    """A dropped connection is retried, and the retries are counted rather than swallowed."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.server = ThreadingHTTPServer(("127.0.0.1", 0), DroppingHandler)
+        cls.port = cls.server.server_address[1]
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+
+    def setUp(self):
+        DroppingHandler.drops = 0
+        DroppingHandler.busy = 0
+        DroppingHandler.seen = 0
+        self.slept = []
+
+    def url(self):
+        return f"http://127.0.0.1:{self.port}/ok"
+
+    def messages(self):
+        return [{"role": "user", "content": "u"}]
+
+    def call(self, **overrides):
+        options = {
+            "attempts": 5,
+            "sleep": lambda seconds: self.slept.append(seconds),
+        }
+        options.update(overrides)
+        return agent.chat(self.messages(), "deepseek-flash", "k", 5.0, url=self.url(), **options)
+
+    def test_a_dropped_connection_costs_one_retry_and_the_pass_continues(self):
+        DroppingHandler.drops = 1
+        reply, usage, retries = self.call()
+        self.assertEqual(reply, "> go to cabinet 1")
+        self.assertEqual(retries, 1)
+        self.assertEqual(DroppingHandler.seen, 2)
+        self.assertEqual(self.slept, [agent.RETRY_SECONDS[0]])
+        # The usage is the answering response's, not a sum over attempts: a dropped attempt returned nothing
+        # and a run that counted it would bill a request the provider never served.
+        self.assertEqual(agent.usage_numbers(usage)["prompt_tokens"], 12)
+
+    def test_an_endpoint_that_never_answers_fails_on_the_last_attempt_and_names_the_cause(self):
+        DroppingHandler.drops = 99
+        with self.assertRaises(agent.LaneError) as caught:
+            self.call()
+        self.assertIn("5 attempts", str(caught.exception))
+        self.assertIn("RemoteDisconnected", str(caught.exception))
+        self.assertEqual(DroppingHandler.seen, 5)
+        self.assertEqual(self.slept, list(agent.RETRY_SECONDS[:4]))
+
+    def test_a_rate_limit_is_retried_rather_than_reported_as_a_lane_defect(self):
+        DroppingHandler.busy = 2
+        reply, _usage, retries = self.call()
+        self.assertEqual(reply, "> go to cabinet 1")
+        self.assertEqual(retries, 2)
+
+    def test_a_bad_request_is_not_retried(self):
+        # 400 from the endpoint: one attempt, no sleep, and the status in the message.
+        with self.assertRaises(agent.LaneError) as caught:
+            agent.chat(self.messages(), "deepseek-flash", "k", 5.0, url=f"http://127.0.0.1:{self.port}/refuse", sleep=lambda s: None)
+        self.assertEqual(self.slept, [])
+
+    def test_the_backoff_is_the_documented_one(self):
+        # Written as a test because it is a cost: five attempts at 1+2+4+8 seconds is 15 seconds of a four-hour
+        # job, and a backoff that grew to minutes would have been a different decision, not an implementation
+        # detail.
+        self.assertEqual(agent.RETRY_SECONDS, (1.0, 2.0, 4.0, 8.0))
+
+
+class CheckpointTest(unittest.TestCase):
+    """A game that has been paid for is never lost to a process that stopped mid-pass.
+
+    The failed run `44685314225` proved the cost of not having this: shard 1 died at game 20 of 35 on a single
+    dropped connection, and the twenty games it had already bought -- roughly 1,078 calls -- left no artefact
+    behind, because `--out` was written once, at the end.
+    """
+
+    def setUp(self):
+        self.original_build = agent.build_env
+        self.original_chat = agent.chat
+        self.out = HERE / "checkpoint.json"
+        os.environ["DEEPSEEK_API_KEY"] = "test-key"
+        self.served = []
+        self.fail_at_call = 0
+
+    def tearDown(self):
+        agent.build_env = self.original_build
+        agent.chat = self.original_chat
+        for path in (self.out, HERE / "checkpoint.json.part"):
+            path.unlink(missing_ok=True)
+
+    def world(self, games: int, offset: int = 0):
+        """A world whose games are numbered, so that resuming can be asked for the right ones.
+
+        `offset` is the environment's position, not the driver's: the real environment is asked for its next
+        game and answers with the one after the last it gave, so a resumed pass that skipped indices must
+        still be handed the games those indices name.
+        """
+
+        class Counting(FakeWorld):
+            resets = []
+
+            def reset(inner):
+                Counting.resets.append(inner.gamefile)
+                inner.gamefile = (
+                    f"json_2.1.1/valid_unseen/pick_and_place_simple-Apple-None-Cabinet-{offset + len(Counting.resets)}"
+                    f"/trial_0/game.tw-pddl"
+                )
+                return FakeWorld.reset(inner)
+
+        Counting.resets = []
+        agent.build_env = lambda batch_size=1, train_eval="": (Counting(), games)
+        return Counting
+
+    def reply_once(self, messages, model, api_key, timeout, **options):
+        """Two calls per episode, and a failure scheduled by call number.
+
+        The replies alternate because a stub that always says `take` is an episode that never ends: the fake
+        world keeps accepting the command, refuses it as out of space, and the episode runs to the budget. The
+        first draft of this test made exactly that mistake and measured zero completed episodes against a
+        schedule that assumed two.
+        """
+        self.served.append(1)
+        if self.fail_at_call and len(self.served) == self.fail_at_call:
+            raise agent.LaneError("the model endpoint was unreachable: RemoteDisconnected")
+        reply = "> take apple 1 from countertop 1" if len(self.served) % 2 else "> put apple 1 in/on cabinet 1"
+        return (
+            reply,
+            {"prompt_tokens": 100, "completion_tokens": 5, "prompt_cache_hit_tokens": 80, "prompt_cache_miss_tokens": 20},
+            0,
+        )
+
+    def run_main(self, argv):
+        original = sys.argv
+        sys.argv = ["agent.py"] + argv
+        try:
+            return agent.main()
+        finally:
+            sys.argv = original
+
+    def base(self, games=4):
+        return ["--policy", "model", "--games", str(games), "--out", str(self.out)]
+
+    def test_a_pass_that_dies_leaves_the_games_it_paid_for(self):
+        world = self.world(4)
+        agent.chat = self.reply_once
+        self.fail_at_call = 5
+        with self.assertRaises(agent.LaneError):
+            self.run_main(self.base())
+        written = json.loads(self.out.read_text(encoding="utf-8"))
+        self.assertEqual(len(written["episodes"]), 2)
+        self.assertTrue(written["summary"]["partial"])
+        self.assertEqual(written["summary"]["games_driven"], 2)
+        self.assertFalse((HERE / "checkpoint.json.part").exists())
+
+    def test_a_retry_inside_an_episode_is_printed_and_counted(self):
+        world = self.world(1)
+
+        def flaky(messages, model, api_key, timeout, **options):
+            self.served.append(1)
+            reply = "> take apple 1 from countertop 1" if len(self.served) == 1 else "> put apple 1 in/on cabinet 1"
+            return reply, {"prompt_tokens": 100, "completion_tokens": 5, "prompt_cache_hit_tokens": 0, "prompt_cache_miss_tokens": 100}, 1
+
+        agent.chat = flaky
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed):
+            self.assertEqual(self.run_main(self.base(1)), 0)
+        # One line per call that needed retrying, and the summary carries the total: the log is the narrative,
+        # the artefact is the count.
+        self.assertEqual(printed.getvalue().count("the endpoint failed and then answered"), 2)
+        self.assertEqual(json.loads(self.out.read_text(encoding="utf-8"))["summary"]["retries"], 2)
+
+    def test_a_resumed_pass_drives_only_what_is_missing_and_bills_the_whole_slice(self):
+        world = self.world(4)
+        agent.chat = self.reply_once
+        self.fail_at_call = 5
+        with self.assertRaises(agent.LaneError):
+            self.run_main(self.base())
+        paid_before = len(self.served)
+
+        world = self.world(4, offset=2)
+        agent.chat = self.reply_once
+        self.fail_at_call = 0
+        self.served = []
+        self.assertEqual(self.run_main(self.base() + ["--resume"]), 0)
+
+        written = json.loads(self.out.read_text(encoding="utf-8"))
+        self.assertEqual(written["summary"]["games_driven"], 4)
+        self.assertEqual(written["summary"]["resumed"], 2)
+        # The two games already bought are not bought again: the world was reset four times in total, and the
+        # resumed pass was the one that reset the last two.
+        self.assertEqual(len(written["episodes"]), 4)
+        # The bill is the slice's, not the resumption's: 4 games x 2 calls x 100 prompt tokens, and the two
+        # games paid for before the failure are counted once each.
+        self.assertEqual(written["summary"]["calls"], 8)
+        self.assertEqual(written["summary"]["usage"]["prompt_tokens"], 8 * 100)
+
+    def test_a_resume_against_a_different_arm_is_refused(self):
+        world = self.world(4)
+        agent.chat = self.reply_once
+        self.fail_at_call = 5
+        with self.assertRaises(agent.LaneError):
+            self.run_main(self.base())
+        bank = HERE / "checkpoint-bank.json"
+        bank.write_text(json.dumps({"entries": ["close the fridge"]}), encoding="utf-8")
+        world = self.world(4)
+        try:
+            with self.assertRaises(SystemExit) as caught:
+                self.run_main(self.base() + ["--resume", "--arm", "always-in", "--rules", str(bank)])
+            self.assertEqual(caught.exception.code, 1)
+        finally:
+            bank.unlink(missing_ok=True)
+
+    def test_a_resume_of_a_seed_pass_is_refused(self):
+        # The seed policy draws from one stream for the whole slice; resuming would restart the stream at the
+        # wrong position, and the games it drove would not be the games the seed names.
+        world = self.world(4)
+        agent.build_env = lambda batch_size=1, train_eval="": (world(), 4)
+        self.assertEqual(self.run_main(["--policy", "first", "--games", "2", "--out", str(self.out)]), 0)
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main(["--policy", "first", "--games", "2", "--out", str(self.out), "--resume"])
+        self.assertEqual(caught.exception.code, 1)
+
+    def test_a_resume_against_a_file_with_no_summary_is_refused(self):
+        # A bare list of episodes is not a pass: without a header there is nothing to compare the dispatch
+        # against, and appending to it would be inventing the half of the file that says what it is.
+        self.out.write_text(json.dumps({"episodes": []}), encoding="utf-8")
+        self.world(4)
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main(self.base() + ["--resume"])
+        self.assertEqual(caught.exception.code, 1)
+
+    def test_a_resume_against_a_file_longer_than_the_slice_is_refused(self):
+        # A hand-edited or concatenated file: the header says two games and the body holds four. The header is
+        # what a dispatch is compared against, so this is the check that stops a body from outvoting its own
+        # summary when someone has merged two artefacts by hand.
+        world = self.world(2)
+        agent.chat = self.reply_once
+        self.assertEqual(self.run_main(self.base(2)), 0)
+        written = json.loads(self.out.read_text(encoding="utf-8"))
+        written["episodes"] = written["episodes"] * 2
+        self.out.write_text(json.dumps(written), encoding="utf-8")
+        world = self.world(2, offset=2)
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main(self.base(2) + ["--resume"])
+        self.assertEqual(caught.exception.code, 1)
+
+    def test_a_resume_without_a_file_is_refused(self):
+        self.out.unlink(missing_ok=True)
+        self.world(4)
+        agent.chat = self.reply_once
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main(self.base() + ["--resume"])
+        self.assertEqual(caught.exception.code, 1)
+
+    def test_a_completed_pass_resumes_into_nothing_rather_than_into_a_second_pass(self):
+        world = self.world(2)
+        agent.chat = self.reply_once
+        self.assertEqual(self.run_main(["--policy", "model", "--games", "2", "--out", str(self.out)]), 0)
+        world = self.world(2)
+        self.served = []
+        self.assertEqual(self.run_main(self.base(2) + ["--resume"]), 0)
+        self.assertEqual(self.served, [])
+        self.assertEqual(json.loads(self.out.read_text(encoding="utf-8"))["summary"]["resumed"], 2)
+
+    def test_a_resume_that_asks_for_a_different_slice_is_refused(self):
+        # The header is part of what the file means: appending games the original did not ask for while
+        # reporting its shard is two passes described as one.
+        world = self.world(2)
+        agent.chat = self.reply_once
+        self.assertEqual(self.run_main(["--policy", "model", "--games", "2", "--out", str(self.out)]), 0)
+        world = self.world(4)
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main(self.base(4) + ["--resume"])
+        self.assertEqual(caught.exception.code, 1)
+
+    def test_a_resume_that_is_handed_a_game_already_paid_for_is_refused(self):
+        # The environment's position is what makes a resume safe. A pass restarted from the beginning would
+        # re-drive a game and be caught by the duplicate check rather than billed twice in silence.
+        world = self.world(4)
+        agent.chat = self.reply_once
+        self.fail_at_call = 5
+        with self.assertRaises(agent.LaneError):
+            self.run_main(self.base())
+        world = self.world(4, offset=0)
+        agent.chat = self.reply_once
+        self.fail_at_call = 0
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main(self.base() + ["--resume"])
+        self.assertEqual(caught.exception.code, 1)
 
 
 if __name__ == "__main__":

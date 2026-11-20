@@ -71,6 +71,14 @@ on:
         description: 'entries the retrieved arm may carry; AMD measured k=1 as the optimum'
         required: false
         default: '3'
+      train_shards:
+        description: 'which training slices to drive, as a JSON list; ["1"] re-drives only the slice that failed'
+        required: false
+        default: '["0","1","2","3"]'
+      train_run_ids:
+        description: 'earlier runs whose training slices join this bank, comma separated; a resume of a partial pass'
+        required: false
+        default: ''
   push:
     branches: [master]
     paths:
@@ -457,7 +465,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [0, 1, 2, 3]
+        # The slices are data for the same reason the arms are: run `44685314225` lost shard 1 to a dropped
+        # connection and paid for the other three, and re-driving all four to recover one would spend 105
+        # games' worth of money to learn nothing. A dispatch names the slice it is missing.
+        shard: ${{ fromJSON(inputs.train_shards || '["0","1","2","3"]') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -510,6 +521,9 @@ jobs:
           fi
           # Four fixed slices, matching the matrix below. An input would be a number a dispatch could set
           # to two while the matrix still ran four, and two of the four would drive overlapping games.
+          # The artefact is written after every episode, so a job killed at game 20 of 35 keeps the twenty it
+          # paid for and can be continued with `--resume`; the retry inside `chat()` usually stops it being
+          # killed at all.
           python eval/drivers/alfworld/agent.py \
             --arm none --policy model --split eval_in_distribution \
             --games "${TRAIN}" --shard "${SHARD}/4" \
@@ -536,7 +550,10 @@ jobs:
     # path is available, so this bank is the competitor's extraction minus its contrast — a limit that is
     # reported beside the score rather than in a footnote.
     name: the bank, distilled from the slices
-    if: github.event_name == 'workflow_dispatch' && inputs.train != ''
+    # `always()`: a slice that died must not turn this job grey. Skipped, the bank leaves twelve sweep jobs to
+    # fail on a missing artefact and the red X points at them; run, it says "the artefacts cover 105 games but
+    # the slice is 140" and the X points at the shard that died, which is the whole of the diagnosis.
+    if: always() && github.event_name == 'workflow_dispatch' && inputs.train != ''
     needs: distill-train
     runs-on: ubuntu-latest
     timeout-minutes: 30
@@ -554,9 +571,36 @@ jobs:
           path: ${{ runner.temp }}/slices
           merge-multiple: true
 
+      - name: Fetch the slices an earlier dispatch already paid for
+        # A resume at the level of the data. Run `44685314225` completed shards 0, 2 and 3 and lost shard 1 to a
+        # dropped connection; the honest repair is to drive the missing slice and join it to the surviving three,
+        # not to buy 105 games a second time. The join is checked, not trusted: `--expect-games` refuses a union
+        # that does not cover the slice, and a game appearing twice counts once.
+        if: inputs.train_run_ids != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRIOR_RUNS: ${{ inputs.train_run_ids }}
+        run: |
+          set -euo pipefail
+          for run in $(echo "${PRIOR_RUNS}" | tr ',' ' '); do
+            for shard in 0 1 2 3; do
+              if gh run download "${run}" --repo "${GITHUB_REPOSITORY}" \
+                   --name "alfworld-train-${shard}" --dir "$RUNNER_TEMP/prior/${run}-${shard}"; then
+                echo "run ${run} contributed slice ${shard}"
+              else
+                echo "run ${run} has no slice ${shard}; the tiling check decides whether that matters"
+              fi
+            done
+          done
+          # Only the artefacts move across: the logs of the other run describe another pass and would be read
+          # beside this one's.
+          find "$RUNNER_TEMP/prior" -name 'train-*.json' -exec cp {} "$RUNNER_TEMP/slices/" \;
+          ls "$RUNNER_TEMP/slices"
+
       - name: Distil the bank
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          TRAIN: ${{ inputs.train }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -566,6 +610,7 @@ jobs:
           ls "$RUNNER_TEMP/slices"
           python eval/drivers/alfworld/distill.py \
             --episodes "$RUNNER_TEMP"/slices/train-*.json \
+            --expect-games "${TRAIN}" \
             --cap 20 --critique-num 8 \
             --out "$RUNNER_TEMP/bank.json" | tee "$RUNNER_TEMP/bank.log"
 
@@ -591,7 +636,13 @@ jobs:
     # `needs` with `always()`: a plain sweep names a bank in the repository and must not be blocked by a job that
     # was skipped, while a chained sweep must not start before the bank exists. `always()` allows both, and the
     # bank step below fails loudly when a chained run reaches here without one.
-    if: always() && github.event_name == 'workflow_dispatch' && (inputs.sweep != '' || inputs.chain != '')
+    # `always()` for a standalone sweep, which names a committed bank and must not wait on a job that was
+    # skipped; but not when the bank job *failed*, because then there is no bank and twelve jobs would report
+    # the same absence twelve times, one per arm and slice.
+    if: |
+      always() && github.event_name == 'workflow_dispatch'
+      && (inputs.sweep != '' || inputs.chain != '')
+      && needs.distill-bank.result != 'failure'
     needs: [distill-bank]
     runs-on: ubuntu-latest
     timeout-minutes: 330

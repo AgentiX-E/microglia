@@ -306,6 +306,30 @@ def successes(episode_files: "list[Path]") -> "list[dict]":
     return [seen[game] for game in sorted(seen)]
 
 
+def tiled(episode_files: "list[Path]", expected: int) -> int:
+    """How many distinct games the artefacts cover, refused when that is not the whole slice.
+
+    A bank is a function of the games it was distilled from, and a bank built from three of four shards is a
+    different treatment wearing the same name. Run `44685314225` is exactly that case: one shard died on a
+    dropped connection and the other three completed, so the union of a later run with the surviving artefacts
+    is legitimate *only* if the union is complete. This is the check that makes "complete" a fact rather than
+    an assumption, and it costs nothing because the files are already read.
+    """
+    games = set()
+    for path in episode_files:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        for episode in payload.get("episodes", []):
+            game = episode.get("gamefile")
+            if isinstance(game, str):
+                games.add(game)
+    if expected and len(games) != expected:
+        driver.fail(
+            f"the artefacts cover {len(games)} games but the slice is {expected}: a bank distilled from a partial "
+            "slice is a different treatment, so it is refused rather than reported beside a rate that assumes it"
+        )
+    return len(games)
+
+
 def chunks_of(items: "list[dict]", size: int) -> "list[list[dict]]":
     """Consecutive slices of `size`, which is the competitor's `success_critique_num`."""
     if size < 1:
@@ -368,19 +392,27 @@ def main() -> int:
     parser.add_argument("--model", default=driver.DEFAULT_MODEL)
     parser.add_argument("--timeout", type=float, default=180.0)
     parser.add_argument("--trace", type=int, default=0)
+    parser.add_argument(
+        "--expect-games",
+        type=int,
+        default=0,
+        help="the training slice's size; a union of artefacts that does not tile it is refused (0 skips the check)",
+    )
     arguments = parser.parse_args()
 
     api_key = os.environ.get("DEEPSEEK_API_KEY", "").strip()
     if api_key == "":
         driver.fail("distillation needs DEEPSEEK_API_KEY; there is no offline bank")
 
-    won = successes([Path(path) for path in arguments.episodes])
+    files = [Path(path) for path in arguments.episodes]
+    covered = tiled(files, arguments.expect_games)
+    won = successes(files)
     if not won:
         driver.fail("no won episode carried a trajectory, so there is nothing to distil from")
 
     chunk_list = chunks_of(won, arguments.critique_num)
     print(
-        f"distilling from {len(won)} won episodes in {len(chunk_list)} critique(s) of up to "
+        f"distilling from {len(won)} won episodes of {covered} driven in {len(chunk_list)} critique(s) of up to "
         f"{arguments.critique_num}, cap {arguments.cap}, identity {arguments.identity}"
     )
     began = time.monotonic()

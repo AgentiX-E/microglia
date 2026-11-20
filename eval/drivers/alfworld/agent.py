@@ -51,6 +51,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import os
 import re
@@ -129,6 +130,15 @@ STALL_THOUGHTS = 3
 
 DEFAULT_MODEL = "deepseek-flash"
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
+
+# The retry policy, as numbers rather than as a description. A 134-game sweep is ~5,000 calls and a training
+# slice ~1,300 over four hours; the failed run `44685314225` had made 722 successful calls when one connection
+# was closed before its response, and the whole job ended there. Five attempts at 1+2+4+8 seconds bounds the
+# waiting at 15 seconds out of four hours, which is the trade a run this long wants: the alternative was not
+# "no waiting", it was "no result".
+RETRY_SECONDS = (1.0, 2.0, 4.0, 8.0)
+RETRY_ATTEMPTS = len(RETRY_SECONDS) + 1
+TRANSIENT_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 
 # Words that carry no evidence about which rule applies. Without this list the anchor matched on `the`
 # and `is`, so *any* rule was admitted by *any* observation and the `retrieved` arm was `always-in` with
@@ -385,14 +395,68 @@ def anchor(query: str, entries: "list[str]", top_k: int) -> "list[str]":
 # --------------------------------------------------------------------------------------------------
 
 
-def chat(
-    messages: "list[dict[str, str]]", model: str, api_key: str, timeout: float, url: str = DEEPSEEK_URL
-) -> "tuple[str, dict]":
-    """One completion, with the provider's own usage object returned beside the text.
+def transient(error: BaseException) -> bool:
+    """Whether an error is the network rather than the request.
 
-    `url` is a parameter so that the failure paths can be exercised against a real socket instead of a
-    stubbed function: a refusal, an empty choice list and a response with no text are three different
-    exceptions, and a run that confused them would report a broken key as a broken model.
+    The distinction decides whether a pass spends fifteen more seconds or four more hours, and it is a table
+    rather than a guess: a dropped connection, a body cut short, a refusal, a timeout and the five server-side
+    statuses are all things that were true only for a moment. A 400 is the endpoint saying this request is
+    wrong, and retrying it would report a broken key as a broken network.
+
+    Why the original handler missed the case that killed run `44685314225`: `http.client.RemoteDisconnected`
+    derives from `ConnectionResetError`, not from `urllib.error.URLError`, so the `except URLError` clause never
+    saw it, the traceback escaped, and a four-hour job ended at game 20 of 35. `http.client.HTTPException` is
+    the branch that covers what a socket actually raises.
+    """
+    if isinstance(error, urllib.error.HTTPError):
+        return error.code in TRANSIENT_STATUS
+    return isinstance(error, (urllib.error.URLError, http.client.HTTPException, ConnectionError, TimeoutError))
+
+
+def attempt_once(body: bytes, url: str, api_key: str, timeout: float) -> dict:
+    """One POST, decoded. Everything it can raise is the caller's to classify."""
+    request = urllib.request.Request(url, data=body, method="POST")
+    request.add_header("Authorization", f"Bearer {api_key}")
+    request.add_header("Content-Type", "application/json")
+    with urllib.request.urlopen(request, timeout=timeout) as response:
+        return json.loads(response.read())
+
+
+def parse_completion(payload: dict) -> "tuple[str, dict]":
+    """The text and the usage out of a decoded response, or an error naming which of the three shapes failed.
+
+    A refusal, an empty choice list and a response with no text are three different exceptions, and a run that
+    confused them would report a broken key as a broken model. Split out from the request so that the three
+    shapes are testable as values rather than as sockets.
+    """
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise LaneError(f"the response carried no choices: {json.dumps(payload)[:300]}")
+    message = choices[0].get("message") or {}
+    content = message.get("content")
+    if not isinstance(content, str) or content.strip() == "":
+        raise LaneError(f"the response carried no text: {json.dumps(payload)[:300]}")
+    return content, payload.get("usage") or {}
+
+
+def chat(
+    messages: "list[dict[str, str]]",
+    model: str,
+    api_key: str,
+    timeout: float,
+    url: str = DEEPSEEK_URL,
+    attempts: int = RETRY_ATTEMPTS,
+    sleep=time.sleep,
+) -> "tuple[str, dict, int]":
+    """One completion, retried while the failure is the network's, with the retry count returned beside it.
+
+    `url` and `sleep` are parameters so that the failure paths are exercised against a real socket and the
+    backoff is asserted as numbers: the backoff is a cost (1+2+4+8 seconds out of four hours), and a test that
+    waited for it would be a test nobody runs.
+
+    The retry count is returned rather than swallowed because it is evidence about the provider. A pass that
+    reports `retries: 0` and a pass that reports `retries: 37` produced their scores under different conditions,
+    and a reader deciding whether a number will repeat needs to know which one they have.
     """
     body = json.dumps(
         {
@@ -406,26 +470,32 @@ def chat(
             "thinking": {"type": "disabled"},
         }
     ).encode("utf-8")
-    request = urllib.request.Request(url, data=body, method="POST")
-    request.add_header("Authorization", f"Bearer {api_key}")
-    request.add_header("Content-Type", "application/json")
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.loads(response.read())
-    except urllib.error.HTTPError as error:
-        detail = error.read().decode("utf-8", "replace")[:400]
-        raise LaneError(f"HTTP {error.code} from the model endpoint: {detail}") from error
-    except urllib.error.URLError as error:
-        raise LaneError(f"the model endpoint was unreachable: {error.reason}") from error
-    choices = payload.get("choices")
-    if not isinstance(choices, list) or not choices:
-        raise LaneError(f"the response carried no choices: {json.dumps(payload)[:300]}")
-    message = choices[0].get("message") or {}
-    content = message.get("content")
-    if not isinstance(content, str) or content.strip() == "":
-        raise LaneError(f"the response carried no text: {json.dumps(payload)[:300]}")
-    usage = payload.get("usage") or {}
-    return content, usage
+
+    retries = 0
+    while True:
+        try:
+            payload = attempt_once(body, url, api_key, timeout)
+        except urllib.error.HTTPError as error:
+            detail = error.read().decode("utf-8", "replace")[:400]
+            if error.code not in TRANSIENT_STATUS:
+                # The endpoint saying this request is wrong. Retrying it would spend four attempts on a fact
+                # that will not change, and report a broken key as a broken network.
+                raise LaneError(f"HTTP {error.code} from the model endpoint: {detail}") from error
+            failure: BaseException = LaneError(f"HTTP {error.code} from the model endpoint: {detail}")
+        except Exception as error:  # noqa: BLE001 -- classified by `transient`, which is a table with a test
+            if not transient(error):
+                raise
+            failure = error
+        else:
+            content, usage = parse_completion(payload)
+            return content, usage, retries
+        if retries >= attempts - 1:
+            raise LaneError(
+                f"the model endpoint failed {attempts} attempts in a row; the last cause was "
+                f"{type(failure).__name__}: {failure}"
+            ) from failure
+        sleep(RETRY_SECONDS[min(retries, len(RETRY_SECONDS) - 1)])
+        retries += 1
 
 
 def usage_numbers(usage: dict) -> "dict[str, int]":
@@ -485,6 +555,7 @@ def run_episode(
     thoughts = 0
     stalls = 0
     calls = 0
+    retries = 0
     invalid = 0
     off_space = 0
     pack_entries: "int | None" = None
@@ -538,11 +609,16 @@ def run_episode(
         # take. `True` says what the loop means.
         while True:
             if policy == "model":
-                reply, usage = chat(messages, model, api_key, timeout)
+                reply, usage, retried = chat(messages, model, api_key, timeout)
                 numbers = usage_numbers(usage)
                 for key, value in numbers.items():
                     usage_total[key] += value
                 calls += 1
+                retries += retried
+                if retried:
+                    # Printed because a run that survived a provider incident is a run whose score carries a
+                    # caveat, and the reader of the log is the only one who can decide whether it matters.
+                    print(f"  [{gamefile.split('/')[-3]}] the endpoint failed and then answered ({retried} retries)")
             elif policy == "seed":
                 reply = f"> {admissible[draw.below(len(admissible))]}"
             else:
@@ -604,6 +680,7 @@ def run_episode(
         "observe_chars": observe_chars,
         "observe_fingerprint": digest_of([str(count) for count in observe_chars]),
         "calls": calls,
+        "retries": retries,
         "thoughts": thoughts,
         "stalls": stalls,
         "actions": len(actions),
@@ -659,6 +736,114 @@ def compare_with_floor(episodes: "list[dict]", floor_path: Path) -> dict:
     return {"games_compared": len(episodes), "mismatches": len(mismatches), "first": mismatches[0] if mismatches else None}
 
 
+def write_json(path: Path, payload: dict) -> None:
+    """Write through a temporary file and rename, so a killed job leaves a whole file or none.
+
+    Run `44685314225` paid for twenty games of shard 1 and left a 330-byte artefact, because `--out` was written
+    once at the end of a four-hour job. A half-written JSON would have been worse than none: the next step would
+    have read it, found a truncated list, and reported the truncation as the pass's result.
+    """
+    temporary = path.with_name(path.name + ".part")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def pass_header(arguments, rules: "list[str]", total: int) -> dict:
+    """Everything that has to be equal for two artefacts to be two halves of one pass.
+
+    Written once and compared field by field on resume, because a resumed pass that appended games to a file
+    from a different arm, shard or model would produce one artefact describing two experiments — and the
+    difference would be invisible in the reading, which only ever looks at `episodes`.
+    """
+    return {
+        "arm": arguments.arm,
+        "policy": arguments.policy,
+        "split": arguments.split,
+        "transcripts": bool(arguments.record_transcripts),
+        "model": arguments.model if arguments.policy == "model" else None,
+        "seed": arguments.seed,
+        "shard": arguments.shard,
+        "max_steps": arguments.max_steps,
+        "top_k": arguments.top_k if arguments.arm == "retrieved" else None,
+        "rules_in_bank": len(rules),
+        "games_requested": total,
+    }
+
+
+def pass_summary(
+    header: dict, episodes: "list[dict]", elapsed: float, card: dict, partial: bool = False, resumed: int = 0
+) -> dict:
+    """One artefact's summary, from its episodes: the only place a rate or a bill is computed.
+
+    Called after every episode with `partial=True` and once at the end with `partial=False`, so the two shapes
+    cannot drift. A checkpoint whose summary disagreed with its own episodes would be a file that lies about
+    itself while being the only evidence those games happened.
+    """
+    wins = sum(1 for episode in episodes if episode["won"])
+    usage = {
+        key: sum(episode["usage"][key] for episode in episodes)
+        for key in ("prompt_tokens", "completion_tokens", "cache_hit_tokens", "cache_miss_tokens")
+    }
+    bill = bill_of(card, usage["prompt_tokens"], usage["cache_hit_tokens"], usage["completion_tokens"])
+    low, high = wilson(wins, len(episodes))
+    prefix_chars = [episode["prefix_chars"] for episode in episodes if episode["prefix_chars"]]
+    summary = dict(header)
+    summary.update(
+        {
+            "games_driven": len(episodes),
+            "wins": wins,
+            "rate": round(wins / len(episodes), 4) if episodes else 0.0,
+            "wilson_low": round(low, 4),
+            "wilson_high": round(high, 4),
+            "steps_mean": round(sum(episode["steps"] for episode in episodes) / len(episodes), 2) if episodes else 0.0,
+            "calls": sum(episode["calls"] for episode in episodes),
+            "retries": sum(episode.get("retries", 0) for episode in episodes),
+            "thoughts": sum(episode["thoughts"] for episode in episodes),
+            "stalls": sum(episode["stalls"] for episode in episodes),
+            "episodes_without_any_action": sum(1 for episode in episodes if episode["actions"] == 0),
+            "budget_exhausted": sum(1 for episode in episodes if episode["budget_exhausted"]),
+            "invalid_actions": sum(episode["invalid_actions"] for episode in episodes),
+            "off_space_actions": sum(episode["off_space_actions"] for episode in episodes),
+            "usage": usage,
+            "cache_hit_rate": round(usage["cache_hit_tokens"] / usage["prompt_tokens"], 4) if usage["prompt_tokens"] else None,
+            "prefix_chars_mean": round(sum(prefix_chars) / len(prefix_chars), 1) if prefix_chars else None,
+            "prompt_chars_mean": round(sum(episode["prompt_chars"] for episode in episodes) / len(episodes), 1)
+            if episodes
+            else None,
+            "bill": bill,
+            "partial": bool(partial),
+            "resumed": resumed,
+            "elapsed_s": round(elapsed, 1),
+        }
+    )
+    return summary
+
+
+def adopt(arguments, header: dict, episodes: "list[dict]", start: int, stop: int) -> int:
+    """The episodes a checkpoint already paid for, appended to `episodes`; returns how many.
+
+    The environment's position is the resume's premise and the reason it is safe: a pass asks the world for its
+    next game, so a pass that drives `n - k` games after inheriting `k` is handed exactly the games the indices
+    `k..n` name. When that premise is violated — an environment restarted from the beginning — the games repeat,
+    and the duplicate check in the loop fails the pass instead of billing a game twice in silence.
+    """
+    path = Path(arguments.out)
+    if not path.exists():
+        fail(f"--resume names {path}, which is not there; a resumed pass continues a file and does not start one")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    recorded = payload.get("summary") or {}
+    if not recorded:
+        fail(f"{path} carries no summary, so there is nothing to continue")
+    for field, wanted in header.items():
+        if recorded.get(field) != wanted:
+            fail(f"--resume was given {field}={wanted!r} but {path} was written with {recorded.get(field)!r}")
+    inherited = payload.get("episodes") or []
+    if len(inherited) > stop - start:
+        fail(f"{path} holds {len(inherited)} episodes but this slice is {stop - start} games long")
+    episodes.extend(inherited)
+    return len(inherited)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Drive one ALFWorld arm and bill it")
     parser.add_argument("--arm", choices=ARMS, default="none")
@@ -690,6 +875,11 @@ def main() -> int:
         help="print the first N replies of the pass; a calibration reads three of them before it reads its score",
     )
     parser.add_argument("--out", default=str(HERE / "agent.json"))
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="continue the pass `--out` already holds rather than starting it again; the file is written after every episode",
+    )
     arguments = parser.parse_args()
 
     if arguments.arm != "none" and not arguments.rules:
@@ -724,12 +914,23 @@ def main() -> int:
         f"arm={arguments.arm} policy={arguments.policy} split={arguments.split} games={start}..{stop - 1} of {total} "
         f"max_steps={arguments.max_steps} rules={len(rules)} model={arguments.model if arguments.policy == 'model' else '-'}"
     )
+    header = pass_header(arguments, rules, total)
+    if arguments.resume and arguments.policy != "model":
+        fail(
+            "--resume is a model-pass flag: the seed policy draws from one stream for the whole slice, so the "
+            "position a resumed pass would start from is not the position the seed names"
+        )
     episodes: "list[dict]" = []
     began = time.monotonic()
+    # Inherited before the clock starts, so `elapsed_s` is what this process spent rather than what the pass
+    # spent; `resumed` travels beside it for the same reason.
+    resumed = adopt(arguments, header, episodes, start, stop) if arguments.resume else 0
+    if resumed:
+        print(f"  resuming      {resumed} games already paid for in {arguments.out}")
     # Ascending over the slice, and the slice is contiguous: a model pass needs nothing from the games
     # it does not drive, and `--policy seed` refuses to be sliced because its sequence is a whole-pass
     # sequence.
-    for index in range(start, stop):
+    for index in range(start + resumed, stop):
         episode = run_episode(
             env,
             arguments.arm,
@@ -745,16 +946,29 @@ def main() -> int:
             arguments.trace,
             arguments.record_transcripts,
         )
+        # Checked before the write, so a file on disk never holds one game twice: the checkpoint is the
+        # evidence, and evidence that has to be re-checked before it can be trusted is not evidence.
+        if any(earlier["gamefile"] == episode["gamefile"] for earlier in episodes):
+            fail(
+                f"{episode['gamefile']} was already driven in this pass; a resumed pass whose environment "
+                "restarted from the beginning would bill the same game twice, so it stops here"
+            )
         episodes.append(episode)
+        # Written after every episode rather than at the end. The cost is 35 rewrites of a 200 KB file; the
+        # alternative is what run `44685314225` did, which was to pay for 1,078 calls and keep none of them.
+        write_json(
+            Path(arguments.out),
+            {
+                "summary": pass_summary(header, episodes, time.monotonic() - began, card, partial=True, resumed=resumed),
+                "episodes": episodes,
+            },
+        )
         if len(episodes) % 10 == 0 or index + 1 == stop:
             wins = sum(1 for item in episodes if item["won"])
             elapsed = time.monotonic() - began
             print(f"  {len(episodes)}/{stop - start}  wins={wins}  calls={sum(e['calls'] for e in episodes)}  {elapsed:.0f}s")
 
     elapsed = time.monotonic() - began
-    seen = [episode["gamefile"] for episode in episodes]
-    if len(seen) != len(set(seen)):
-        fail("a game was driven twice, so the slice does not mean what it says")
     truncated = [episode["gamefile"] for episode in episodes if episode["truncated"]]
     if truncated:
         fail(
@@ -762,11 +976,6 @@ def main() -> int:
             f"first {truncated[0]}"
         )
 
-    wins = sum(1 for episode in episodes if episode["won"])
-    usage = {
-        key: sum(episode["usage"][key] for episode in episodes)
-        for key in ("prompt_tokens", "completion_tokens", "cache_hit_tokens", "cache_miss_tokens")
-    }
     calls = sum(episode["calls"] for episode in episodes)
     if arguments.policy == "model" and calls == 0:
         fail("a model pass recorded no calls, so its bill would be zero for the wrong reason")
@@ -778,41 +987,9 @@ def main() -> int:
             f"format. First reply was {episodes[0]['last_line']!r}"
         )
 
-    bill = bill_of(card, usage["prompt_tokens"], usage["cache_hit_tokens"], usage["completion_tokens"])
-    low, high = wilson(wins, len(episodes))
-    prefix_chars = [episode["prefix_chars"] for episode in episodes if episode["prefix_chars"]]
-    summary = {
-        "arm": arguments.arm,
-        "policy": arguments.policy,
-        "split": arguments.split,
-        "transcripts": bool(arguments.record_transcripts),
-        "model": arguments.model if arguments.policy == "model" else None,
-        "seed": arguments.seed,
-        "shard": arguments.shard,
-        "max_steps": arguments.max_steps,
-        "top_k": arguments.top_k if arguments.arm == "retrieved" else None,
-        "rules_in_bank": len(rules),
-        "games_requested": total,
-        "games_driven": len(episodes),
-        "wins": wins,
-        "rate": round(wins / len(episodes), 4) if episodes else 0.0,
-        "wilson_low": round(low, 4),
-        "wilson_high": round(high, 4),
-        "steps_mean": round(sum(episode["steps"] for episode in episodes) / len(episodes), 2) if episodes else 0.0,
-        "calls": calls,
-        "thoughts": sum(episode["thoughts"] for episode in episodes),
-        "stalls": sum(episode["stalls"] for episode in episodes),
-        "episodes_without_any_action": sum(1 for episode in episodes if episode["actions"] == 0),
-        "budget_exhausted": sum(1 for episode in episodes if episode["budget_exhausted"]),
-        "invalid_actions": sum(episode["invalid_actions"] for episode in episodes),
-        "off_space_actions": sum(episode["off_space_actions"] for episode in episodes),
-        "usage": usage,
-        "cache_hit_rate": round(usage["cache_hit_tokens"] / usage["prompt_tokens"], 4) if usage["prompt_tokens"] else None,
-        "prefix_chars_mean": round(sum(prefix_chars) / len(prefix_chars), 1) if prefix_chars else None,
-        "prompt_chars_mean": round(sum(episode["prompt_chars"] for episode in episodes) / len(episodes), 1) if episodes else None,
-        "bill": bill,
-        "elapsed_s": round(elapsed, 1),
-    }
+    summary = pass_summary(header, episodes, elapsed, card, partial=False, resumed=resumed)
+    wins = summary["wins"]
+    bill = summary["bill"]
 
     determinism = None
     if arguments.assert_floor:
@@ -821,9 +998,7 @@ def main() -> int:
             fail(f"the loop does not reproduce the floor: {json.dumps(determinism['first'])}")
         summary["floor_agreement"] = determinism
 
-    Path(arguments.out).write_text(
-        json.dumps({"summary": summary, "episodes": episodes}, indent=2, sort_keys=True) + "\n", encoding="utf-8"
-    )
+    write_json(Path(arguments.out), {"summary": summary, "episodes": episodes})
 
     print("")
     print(f"{arguments.arm} over {len(episodes)} games: {wins} wins = {100 * summary['rate']:.1f}%")
