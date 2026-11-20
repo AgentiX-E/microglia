@@ -1,0 +1,63 @@
+{
+  "bill": {
+    "band": "off_peak",
+    "rates": {
+      "hit": 0.003,
+      "miss": 0.15,
+      "out": 0.6
+    },
+    "usd": 0.013351,
+    "usd_in_other_band": 0.026703
+  },
+  "calls": 10,
+  "cap": 20,
+  "elapsed_s": 17.8,
+  "entries": [
+    {
+      "text": "If you encounter a desklamp before finding the target object, you may turn it on first, but continue searching for and taking the target object afterward; the task is not complete until the target object has been examined or looked at under the desklamp.",
+      "votes": 11
+    },
+    {
+      "text": "When searching for an object, prioritize locations where similar objects have already been observed or where the environment suggests they are likely to appear, and avoid repeatedly visiting locations that have already been checked and found empty.",
+      "votes": 11
+    },
+    {
+      "text": "After taking an object, verify it is actually in your inventory (e.g., via inventory) before attempting to place or use it; if the take action fails silently, retry taking the object from its location, and if a subsequent put/move fails, check whether your hands are full by attempting to take another object.",
+      "votes": 10
+    },
+    {
+      "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\"; if that also fails, try a different valid receptacle of the same type, and if the receptacle is a container, ensure it is open first.",
+      "votes": 10
+    }
+  ],
+  "identity": "substring",
+  "schema": "microglia.alfworld-bank/1",
+  "source": {
+    "chunks": 10,
+    "critique_num": 8,
+    "episodes": 76,
+    "model": "deepseek-flash",
+    "prompt": "all_success_existing_rules@LeapLabTHU/ExpeL:e41ec9a2"
+  },
+  "stats": {
+    "applied": 38,
+    "by_kind": {
+      "ADD": 4,
+      "AGREE": 28,
+      "EDIT": 6,
+      "REMOVE": 0
+    },
+    "culled": 0,
+    "empty_replies": 0,
+    "operations": 40,
+    "peak": 4,
+    "rejected": 2,
+    "retries": 0
+  },
+  "usage": {
+    "cache_hit_tokens": 5888,
+    "cache_miss_tokens": 80900,
+    "completion_tokens": 1998,
+    "prompt_tokens": 86788
+  }
+}

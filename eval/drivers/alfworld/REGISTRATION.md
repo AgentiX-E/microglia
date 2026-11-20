@@ -538,3 +538,25 @@ about 17 points at 80% power. Nothing in this sweep can detect a 3-point effect,
 3 points, this lane will report a null and be right about what it measured and wrong about what it concluded. The
 only honest output of the first row is a *bounds* statement: "the pack's effect lies within ±mde" is a result; "the
 pack does not work" is not.
+
+## R169 — The bank this reading was taken with, committed so the next contrasts cannot silently use another
+
+The reading in PROGRESS 200 has a treatment that is four sentences long, and the four contrasts it licenses all need
+*that* bank. `banks/bank-44754440122.json` is it: 4 entries, cap 20, distilled from 76 won episodes of 140 by
+`all_success_existing_rules@LeapLabTHU/ExpeL:e41ec9a2`, at $0.0134, with the census recorded beside it (ADD 4,
+AGREE 28, EDIT 6, REMOVE 0, rejected 2, peak 4).
+
+**Why it goes in the tree rather than staying an artefact.** A `workflow_dispatch` sweep that names no bank downloads
+the bank of *its own* run, which does not exist when the run is a contrast against a bank built yesterday. A path in
+the repository is the only way to say "this bank" across runs, and an input that accepts a path is an input that can
+name a different one. The file is committed with its provenance in `source` and its bill, so a future contrast that
+names it can be checked against this line rather than trusted.
+
+**What makes two banks the same bank.** Not the entry count: 4 rules can be 4 different rules. The identity of a
+contrast is the file, and the file carries the prompt hash it was distilled with. A re-distillation — even from the
+same 140 games — produces a second file with a second name, and a reading that mixes them refuses in `aggregate.py`
+because the games would not tile under one label.
+
+**The prediction this bank already refuted, kept beside it.** R164 registered that the bank should be nearly add-only;
+the census says otherwise (28 agreements to 4 additions). The measurement is in the file's own `stats`, so the next
+reader sees the refutation in the artefact rather than having to find this paragraph.
