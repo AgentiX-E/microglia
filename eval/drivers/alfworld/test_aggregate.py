@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -307,6 +308,51 @@ class StrataTest(unittest.TestCase):
         report = aggregate.strata(left, right)
         self.assertEqual(report["hard"]["games"], 0)
         self.assertIsNone(report["hard"]["delta"])
+
+
+class LabelTest(unittest.TestCase):
+    """A configuration is part of an arm's identity, or two treatments are read as one."""
+
+    def setUp(self):
+        self.paths = []
+        self.directory = Path(self.enterContext(tempfile.TemporaryDirectory()))
+
+    def write(self, name: str, arm: str, label: str, games: "list[str]") -> Path:
+        path = self.directory / name
+        path.write_text(
+            json.dumps(
+                {
+                    "summary": summary(arm, arm_label=label),
+                    "episodes": [episode(game, True, digest="d") for game in games],
+                }
+            ),
+            encoding="utf-8",
+        )
+        self.paths.append(path)
+        return path
+
+    def test_two_configurations_of_one_family_are_two_groups(self):
+        first = self.write("a.json", "retrieved", "retrieved@k1", ["g1"])
+        second = self.write("b.json", "retrieved", "retrieved", ["g1"])
+        grouped = aggregate.load_slices([first, second])
+        self.assertEqual(sorted(grouped), ["retrieved", "retrieved@k1"])
+        self.assertEqual(len(grouped["retrieved"]), 1)
+
+    def test_the_label_is_what_is_grouped_and_the_family_is_what_is_validated(self):
+        # An artefact written before the field existed groups by its arm, so the reading still works on the
+        # artefacts the failed run produced.
+        path = self.write("c.json", "none", "none", ["g1"])
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["summary"].pop("arm_label")
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        self.assertEqual(sorted(aggregate.load_slices([path])), ["none"])
+
+    def test_a_label_that_does_not_belong_to_its_family_is_refused(self):
+        # A hand-edited or mis-wired label would otherwise make two arms comparable under one name, which is the
+        # defect the label exists to prevent.
+        path = self.write("d.json", "none", "always-in@k1", ["g1"])
+        with self.assertRaises(SystemExit):
+            aggregate.load_slices([path])
 
 
 class ReadingTest(unittest.TestCase):

@@ -71,15 +71,21 @@ def load_slices(paths: "list[Path]") -> "dict[str, list[dict]]":
         payload = json.loads(path.read_text(encoding="utf-8"))
         summary = payload.get("summary") or {}
         arm = summary.get("arm")
+        # What a configuration is called: the family, plus the knobs that were moved off their registered values.
+        # An artefact written before the field existed groups by its arm, so a reading of the failed run's slices
+        # still works, and a label that does not belong to its family is refused rather than trusted.
+        label = summary.get("arm_label") or arm
         episodes = payload.get("episodes")
         policy = summary.get("policy")
         if arm not in ARMS:
             fail(f"{path}: summary.arm is {arm!r}, which is not one of {ARMS}")
+        if label != arm and not str(label).startswith(f"{arm}@"):
+            fail(f"{path}: summary.arm_label is {label!r}, which is neither {arm!r} nor a configuration of it")
         if not isinstance(episodes, list) or not episodes:
             fail(f"{path}: no episodes, so this slice contributes nothing and its cost is unexplained")
         if policy == "seed" or policy == "first":
             fail(f"{path}: a model-free slice cannot be paired with a billed one; policy is {policy!r}")
-        grouped.setdefault(arm, []).extend(episodes)
+        grouped.setdefault(label, []).extend(episodes)
     return grouped
 
 

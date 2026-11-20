@@ -1479,6 +1479,35 @@ class GateTest(unittest.TestCase):
         self.assertEqual(agent.anchor(self.observation, [], 3, 0.5), [])
 
 
+class LabelTest(unittest.TestCase):
+    """Two treatments must not share a name, or the reading cannot pair them.
+
+    `retrieved` at the registered k=3 and `retrieved` at AMD's k=1 are different arms; so are the ungated and the
+    gated one. Their artefacts carry `arm=retrieved` either way, and a sweep that dispatched both would leave
+    `aggregate.py` grouping two treatments into one -- which it refuses as doubled games, after the money is spent.
+    """
+
+    def test_the_registered_arms_keep_the_names_they_have_always_had(self):
+        self.assertEqual(agent.arm_label("none", 3, 0.0), "none")
+        self.assertEqual(agent.arm_label("always-in", 3, 0.0), "always-in")
+        self.assertEqual(agent.arm_label("sham", 3, 0.0), "sham")
+        self.assertEqual(agent.arm_label("retrieved", 3, 0.0), "retrieved")
+
+    def test_a_moved_budget_is_in_the_name(self):
+        self.assertEqual(agent.arm_label("retrieved", 1, 0.0), "retrieved@k1")
+        self.assertEqual(agent.arm_label("retrieved", 5, 0.0), "retrieved@k5")
+
+    def test_a_moved_gate_is_in_the_name(self):
+        self.assertEqual(agent.arm_label("retrieved", 3, 0.2), "retrieved@g0.2")
+
+    def test_both_moved_are_both_in_the_name_in_a_fixed_order(self):
+        self.assertEqual(agent.arm_label("retrieved", 1, 0.2), "retrieved@k1+g0.2")
+
+    def test_the_defaults_are_one_constant_rather_than_three_literals(self):
+        # The label and the argument's default have to agree, or the registered arm stops being registered.
+        self.assertEqual(agent.DEFAULT_TOP_K, 3)
+
+
 class TransientTest(unittest.TestCase):
     """The classification table the retry policy is: an error is retried iff it can plausibly be the network.
 

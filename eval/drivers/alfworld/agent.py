@@ -71,6 +71,9 @@ sys.path.insert(0, str(HERE))
 from floor import DATA_ROOT, SPLIT, Draw, build_env, digest_of, game_key, wilson  # noqa: E402
 
 ARMS = ("none", "always-in", "retrieved", "sham")
+# The registered retrieval budget. Named as a constant because the arm's label is derived from it: the two have to
+# agree, or `retrieved` at its own default would be labelled as if it were a contrast.
+DEFAULT_TOP_K = 3
 # The three splits the installed environment publishes, in its own names. `eval_in_distribution` is
 # `valid_seen` (140 games) and it is *training* data for the rule bank: ExpeL extracts its rules there
 # and reports on `valid_unseen`, and a bank distilled from the held-out split would be a leak dressed
@@ -368,6 +371,27 @@ def sham_entries(entries: "list[str]") -> "list[str]":
     differently-permuted one.
     """
     return [permute_words(str(text), int(hashlib.sha256(str(text).encode("utf-8")).hexdigest()[:12], 16)) for text in entries]
+
+
+def arm_label(arm: str, top_k: int, gate_share: float) -> str:
+    """The arm's identity, including only the knobs that were moved off their registered values.
+
+    `retrieved` at k=3 and `retrieved` at k=1 are two treatments with one name, and so are the ungated and the gated
+    one. Their artefacts carry `arm=retrieved` either way, so a sweep that dispatched both would leave the reading
+    grouping two arms into one — refused as doubled games, after the money is spent. The label is the family plus
+    the moved knobs, in a fixed order, so that `--compare "retrieved@k1,none"` names one arm and not a family.
+
+    The registered arms keep the names they have always had: a label that appeared only when a knob moved means the
+    default reading is unchanged, which is what makes every artefact before this one still comparable.
+    """
+    if arm != "retrieved":
+        return arm
+    moved = []
+    if top_k != DEFAULT_TOP_K:
+        moved.append(f"k{top_k}")
+    if gate_share > 0:
+        moved.append(f"g{gate_share:g}")
+    return f"{arm}@{'+'.join(moved)}" if moved else arm
 
 
 def anchor(query: str, entries: "list[str]", top_k: int, floor_share: float = 0.0) -> "list[str]":
@@ -780,6 +804,9 @@ def pass_header(arguments, rules: "list[str]", total: int) -> dict:
         "max_steps": arguments.max_steps,
         "top_k": arguments.top_k if arguments.arm == "retrieved" else None,
         "gate_share": arguments.gate_share if arguments.arm == "retrieved" else None,
+        # What a reading groups on. `arm` stays the family so that every artefact before this field is still
+        # comparable; the label is what distinguishes two configurations of the same family.
+        "arm_label": arm_label(arguments.arm, arguments.top_k, arguments.gate_share),
         "rules_in_bank": len(rules),
         "games_requested": total,
     }
@@ -864,7 +891,7 @@ def main() -> int:
     parser.add_argument("--arm", choices=ARMS, default="none")
     parser.add_argument("--policy", choices=POLICIES, default="model")
     parser.add_argument("--rules", default="", help="a rendered rule bank; required by always-in and retrieved")
-    parser.add_argument("--top-k", type=int, default=3, help="entries the retrieved arm may carry")
+    parser.add_argument("--top-k", type=int, default=DEFAULT_TOP_K, help="entries the retrieved arm may carry")
     parser.add_argument(
         "--gate-share",
         type=float,
