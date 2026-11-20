@@ -51,6 +51,10 @@ on:
         description: 'games to drive on valid_seen for distillation; empty skips the rule-bank jobs'
         required: false
         default: ''
+      sweep:
+        description: 'true runs all three arms over four slices of the held-out split in one dispatch'
+        required: false
+        default: ''
   push:
     branches: [master]
     paths:
@@ -542,4 +546,89 @@ jobs:
           path: |
             ${{ runner.temp }}/bank.json
             ${{ runner.temp }}/bank.log
+          if-no-files-found: warn
+
+  sweep:
+    # The paired reading, which is the reason the lane exists: three arms over the same 134 games, one job per
+    # arm and slice. `games` is the held-out split's own size and `--split` is left at its default, because the
+    # default is the held-out one and a sweep that named another split would be a leak 402 episodes wide.
+    #
+    # Twelve jobs in one dispatch rather than twelve dispatches: a dispatch is a run, a run is one artefact set,
+    # and `aggregate.py` refuses a pair of arms whose games do not coincide — which is exactly what twelve
+    # separately launched runs can produce when one of them is cancelled.
+    name: one arm over one slice
+    if: github.event_name == 'workflow_dispatch' && inputs.sweep != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        arm: [none, always-in, retrieved]
+        shard: [0, 1, 2, 3]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Cache the wheels textworld builds
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-textworld-1.6.1-tatsu-5.8.3-v1
+
+      - name: Install the environment
+        run: |
+          python -m pip install --upgrade pip
+          for attempt in 1 2 3; do
+            if pip install 'textworld[pddl]==1.6.1' 'tatsu==5.8.3'; then break; fi
+            echo "textworld build attempt $attempt failed; retrying"
+            sleep $((attempt * 20))
+          done
+          python -c "import textworld, tatsu; print('textworld', textworld.__version__, 'tatsu', tatsu.__version__)"
+          pip install 'git+https://github.com/alfworld/alfworld@0.4.2' --no-deps
+          pip install pandas pyyaml tqdm requests
+
+      - name: Fetch the games
+        run: |
+          export ALFWORLD_DATA="$HOME/.cache/alfworld"
+          alfworld-download
+          find "$ALFWORLD_DATA" -name 'game.tw-pddl' | wc -l
+
+      - name: Drive the arm
+        env:
+          ALFWORLD_DATA: /home/runner/.cache/alfworld
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          ARM: ${{ matrix.arm }}
+          SHARD: ${{ matrix.shard }}
+          GAMES: ${{ inputs.games }}
+          MAX_STEPS: ${{ inputs.max_steps }}
+          RULES: ${{ inputs.rules }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DEEPSEEK_API_KEY}" ]; then
+            echo "::error::a sweep needs DEEPSEEK_API_KEY"
+            exit 1
+          fi
+          GAMES="${GAMES:-134}"
+          args=(--arm "${ARM}" --policy model --games "${GAMES}" --shard "${SHARD}/4" --max-steps "${MAX_STEPS}")
+          if [ "${ARM}" != "none" ]; then
+            if [ -z "${RULES}" ]; then
+              echo "::error::arm ${ARM} needs a rule bank; there is nothing for it to carry"
+              exit 1
+            fi
+            args+=(--rules "${RULES}")
+          fi
+          python eval/drivers/alfworld/agent.py "${args[@]}" \
+            --out "$RUNNER_TEMP/arm-${ARM}-${SHARD}.json" | tee "$RUNNER_TEMP/arm-${ARM}-${SHARD}.log"
+
+      - name: Upload the slice
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alfworld-arm-${{ matrix.arm }}-${{ matrix.shard }}
+          path: |
+            ${{ runner.temp }}/arm-${{ matrix.arm }}-${{ matrix.shard }}.json
+            ${{ runner.temp }}/arm-${{ matrix.arm }}-${{ matrix.shard }}.log
           if-no-files-found: warn
