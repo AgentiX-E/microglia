@@ -60,6 +60,7 @@ def parser():
     result.add_argument("--not-before", dest="not_before", default="")
     result.add_argument("--train-shards", dest="train_shards", default="")
     result.add_argument("--train-run-ids", dest="train_run_ids", default="")
+    result.add_argument("--bank-only", dest="bank_only", default="")
     # The sweep's arm list, its retrieval budget and its read-time gate. They are dispatch flags rather
     # than file edits because the three contrasts still owed differ from the registered sweep in exactly
     # these strings, and a contrast that has to be typed into a file is a contrast nobody runs twice.
@@ -150,6 +151,7 @@ def payload(arguments):
     named = (
         ("train_shards", arguments.train_shards),
         ("train_run_ids", arguments.train_run_ids),
+        ("bank_only", arguments.bank_only),
         ("arms", arguments.arms),
         ("top_k", arguments.top_k),
         ("gate_share", arguments.gate_share),
