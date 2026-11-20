@@ -43,6 +43,10 @@ on:
         description: 'path to a rendered rule bank, relative to the repository root'
         required: false
         default: ''
+      trace:
+        description: 'print the first N replies; a calibration reads three before it reads its score'
+        required: false
+        default: '0'
   push:
     branches: [master]
     paths:
@@ -372,6 +376,7 @@ jobs:
           SHARD: ${{ inputs.shard }}
           MAX_STEPS: ${{ inputs.max_steps }}
           RULES: ${{ inputs.rules }}
+          TRACE: ${{ inputs.trace }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -385,6 +390,7 @@ jobs:
             exit 1
           fi
           args=(--arm "${ARM}" --policy model --games "${GAMES}" --shard "${SHARD}" --max-steps "${MAX_STEPS}")
+          args+=(--trace "${TRACE}")
           if [ -n "${RULES}" ]; then args+=(--rules "${RULES}"); fi
           python eval/drivers/alfworld/agent.py "${args[@]}" \
             --out "$RUNNER_TEMP/arm.json" | tee "$RUNNER_TEMP/arm.log"

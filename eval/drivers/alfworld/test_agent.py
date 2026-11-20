@@ -562,24 +562,44 @@ class ModelPolicyTest(unittest.TestCase):
 
         agent.chat = chat
 
-    def test_a_thought_is_answered_with_ok_and_does_not_step_the_world(self):
+    def test_a_thought_does_not_move_the_world_but_does_spend_a_turn(self):
+        # `steps` counts model turns. A thought that were free would let an episode call the model forever
+        # without ever reaching the environment's verdict -- and the first dispatch found out what that
+        # costs when a model gave up and started narrating.
         self.script(["> think: I need an apple", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"])
         episode = agent.run_episode(
             self.world, "none", "model", self.examples, [], agent.Draw(1), 50, 3, "deepseek-flash", "k", 1.0
         )
         self.assertTrue(episode["won"])
-        self.assertEqual(episode["steps"], 2)
+        self.assertEqual(episode["steps"], 3)
+        self.assertEqual(episode["actions"], 2)
         self.assertEqual(episode["thoughts"], 1)
         self.assertEqual(episode["calls"], 3)
         self.assertEqual(episode["usage"]["prompt_tokens"], 300)
         self.assertEqual(episode["usage"]["cache_hit_tokens"], 180)
 
-    def test_three_thoughts_in_a_row_fail_the_run(self):
+    def test_a_run_of_thoughts_spends_the_budget_and_ends_the_episode(self):
         self.script(["> think: one", "> think: two", "> think: three"])
-        with self.assertRaises(agent.LaneError):
-            agent.run_episode(
-                self.world, "none", "model", self.examples, [], agent.Draw(1), 50, 3, "deepseek-flash", "k", 1.0
-            )
+        episode = agent.run_episode(
+            self.world, "none", "model", self.examples, [], agent.Draw(1), 3, 3, "deepseek-flash", "k", 1.0
+        )
+        self.assertFalse(episode["won"])
+        self.assertTrue(episode["truncated"])
+        self.assertEqual(episode["steps"], 3)
+        self.assertEqual(episode["actions"], 0)
+        self.assertEqual(episode["thoughts"], 3)
+        self.assertEqual(episode["stalls"], 1)
+        self.assertEqual(self.world.steps, 0)
+
+    def test_free_text_narration_is_a_thought_and_does_not_raise(self):
+        # The first dispatch died here: a model that has given up narrates instead of acting, and that is a
+        # failure the arm is supposed to record rather than an infrastructure error that hides the run.
+        self.script(["I was unable to complete the task.", "I cannot find the bread.", "I give up."])
+        episode = agent.run_episode(
+            self.world, "none", "model", self.examples, [], agent.Draw(1), 3, 3, "deepseek-flash", "k", 1.0
+        )
+        self.assertEqual(episode["actions"], 0)
+        self.assertEqual(episode["thoughts"], 3)
 
     def test_an_action_outside_the_admissible_set_is_counted_and_still_steps(self):
         self.script(["> take pear 9 from fridge 2", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"])

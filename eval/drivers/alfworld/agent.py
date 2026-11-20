@@ -87,10 +87,17 @@ THINK_PATTERN = r"(?i)(?:>|)\s*think(?::|)"
 CARET_PATTERN = r"(?i)>\s*"
 ACTION_VERB_PATTERN = r"(?i)(?:go to|open|take|put|use|heat|cool|look|clean|inventory)"
 
-# A skeleton that lets the model think forever is a skeleton that spends without stepping. Three in a
-# row is what the competitor's own examples contain at their most deliberate; a fourth means the reply
-# format was not learned and the run is measuring that instead of the arm.
-MAX_THOUGHTS_PER_OBSERVATION = 3
+# Three thoughts in a row is what the competitor's own examples contain at their most deliberate, so a
+# run of three is counted rather than punished. What is punished is spending without stepping: a thought
+# consumes one of the `max_steps` turns exactly as an action does, because the alternative -- thoughts free,
+# actions capped -- is an episode that can call the model forever and never reach the environment's verdict.
+#
+# The first version of this file raised when three thoughts arrived in a row. The first dispatch found out
+# what that costs: on `pick_cool_then_place_in_recep-Bread`, the model reached the end of its patience and
+# began narrating ("I was unable to complete the task..."), which is a *failure the arm is supposed to
+# record*, and the run died two minutes in with zero games driven. A skeleton that cannot represent a
+# model giving up cannot measure an arm whose whole question is how often the model gives up.
+STALL_THOUGHTS = 3
 
 DEFAULT_MODEL = "deepseek-flash"
 DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
@@ -379,6 +386,7 @@ def run_episode(
     model: str,
     api_key: str,
     timeout: float,
+    trace: int = 0,
 ) -> dict:
     """One game, driven by one arm. Returns the episode record; never a partly-filled one."""
     observation, info = env.reset()
@@ -391,6 +399,7 @@ def run_episode(
     actions: "list[str]" = []
     replies: "list[str]" = []
     thoughts = 0
+    stalls = 0
     calls = 0
     invalid = 0
     off_space = 0
@@ -403,6 +412,8 @@ def run_episode(
     won = False
     last = str(observation[0])
 
+    # `steps` counts model turns, not environment steps: a thought spends one and moves nothing, which is
+    # how a turn budget bounds the bill while leaving the world's own 50-step cap to decide the game.
     while not done and steps < max_steps:
         admissible = list(info.get("admissible_commands", [[]])[0])
         if not admissible:
@@ -446,6 +457,8 @@ def run_episode(
 
             kind_of_reply, payload = parse_reply(reply)
             replies.append(reply)
+            if trace and len(replies) <= trace:
+                print(f"  [{gamefile.split('/')[-3]}] turn {len(replies)} {kind_of_reply}: {reply[:160]!r}")
             messages.append({"role": "assistant", "content": reply if reply.startswith(">") else f"> think: {reply}"})
             if kind_of_reply == "action" and payload:
                 action = payload
@@ -453,14 +466,19 @@ def run_episode(
             # A thought does not move the world, and the competitor answers it with `OK.` — the same
             # string its examples carry — rather than with a fresh observation.
             thoughts += 1
+            steps += 1
             consecutive_thoughts += 1
+            if consecutive_thoughts == STALL_THOUGHTS:
+                stalls += 1
             messages.append({"role": "user", "content": "OK."})
-            if consecutive_thoughts >= MAX_THOUGHTS_PER_OBSERVATION:
-                raise LaneError(
-                    f"{gamefile}: {consecutive_thoughts} thoughts in a row without an action; "
-                    f"last reply {reply[:160]!r}"
-                )
+            if steps >= max_steps:
+                # The budget ran out on a thought, so the episode ends without another environment step.
+                break
 
+        if action is None:
+            # Every turn went on a thought. The episode ends where the budget ends, which is a verdict the
+            # arm records rather than an infrastructure failure that hides it.
+            break
         if action not in admissible:
             invalid += 1
             if re.match(ACTION_VERB_PATTERN, action) is None:
@@ -485,6 +503,7 @@ def run_episode(
         "observe_fingerprint": digest_of([str(count) for count in observe_chars]),
         "calls": calls,
         "thoughts": thoughts,
+        "stalls": stalls,
         "actions": len(actions),
         "invalid_actions": invalid,
         "off_space_actions": off_space,
@@ -548,6 +567,12 @@ def main() -> int:
     parser.add_argument("--model", default=os.environ.get("ALFWORLD_MODEL", DEFAULT_MODEL))
     parser.add_argument("--timeout", type=float, default=120.0)
     parser.add_argument("--assert-floor", default="", help="a floor json the seed policy must reproduce")
+    parser.add_argument(
+        "--trace",
+        type=int,
+        default=0,
+        help="print the first N replies of the pass; a calibration reads three of them before it reads its score",
+    )
     parser.add_argument("--out", default=str(HERE / "agent.json"))
     arguments = parser.parse_args()
 
@@ -598,6 +623,7 @@ def main() -> int:
             arguments.model,
             api_key,
             arguments.timeout,
+            arguments.trace,
         )
         episodes.append(episode)
         if len(episodes) % 10 == 0 or index + 1 == stop:
@@ -621,6 +647,13 @@ def main() -> int:
     calls = sum(episode["calls"] for episode in episodes)
     if arguments.policy == "model" and calls == 0:
         fail("a model pass recorded no calls, so its bill would be zero for the wrong reason")
+    # A pass in which no episode produced a single action is not a low score; it is a prompt the model did
+    # not read as a prompt. Reporting a rate here would be reporting the syntax of the skeleton.
+    if arguments.policy == "model" and all(episode["actions"] == 0 for episode in episodes):
+        fail(
+            "no episode produced an action: the skeleton was not followed, so the rate is a rate about the "
+            f"format. First reply was {episodes[0]['last_line']!r}"
+        )
 
     bill = bill_of(card, usage["prompt_tokens"], usage["cache_hit_tokens"], usage["completion_tokens"])
     low, high = wilson(wins, len(episodes))
@@ -643,6 +676,8 @@ def main() -> int:
         "steps_mean": round(sum(episode["steps"] for episode in episodes) / len(episodes), 2) if episodes else 0.0,
         "calls": calls,
         "thoughts": sum(episode["thoughts"] for episode in episodes),
+        "stalls": sum(episode["stalls"] for episode in episodes),
+        "episodes_without_any_action": sum(1 for episode in episodes if episode["actions"] == 0),
         "invalid_actions": sum(episode["invalid_actions"] for episode in episodes),
         "off_space_actions": sum(episode["off_space_actions"] for episode in episodes),
         "usage": usage,
