@@ -73,6 +73,14 @@ class RefusalTest(unittest.TestCase):
     def test_a_training_pass_and_a_calibration_in_one_dispatch_is_refused(self):
         self.assertIn("two runs' worth", self.refused("--train", "140", "--games", "134", "--arm", "none"))
 
+    def test_a_distill_filter_that_names_a_kind_the_split_does_not_publish_is_refused(self):
+        message = self.refused("--train", "140", "--chain", "true", "--distill-kinds", "cool,oracle")
+        self.assertIn("oracle", message)
+        self.assertIn("puttwo", message)
+
+    def test_a_distill_filter_without_a_bank_to_filter_is_refused(self):
+        self.assertIn("--train", self.refused("--sweep", "true", "--rules", "b.json", "--distill-kinds", "cool"))
+
     def test_a_standalone_sweep_without_a_bank_is_refused(self):
         message = self.refused("--sweep", "true", "--arms", '["none","sham"]')
         self.assertIn("--rules", message)
@@ -159,6 +167,15 @@ class PayloadTest(unittest.TestCase):
         )
         self.assertEqual(json.loads(inputs["train_shards"]), ["0", "1", "2"])
         self.assertEqual(inputs["train_run_ids"], "44738148591")
+
+    def test_a_bank_rebuilt_from_paid_for_slices_carries_the_flag_and_the_runs(self):
+        argv = ("--train", "140", "--chain", "true", "--bank-only", "true",
+                "--train-run-ids", "44743739868,44738148591")
+        lane.check(arguments(*argv))
+        inputs = lane.payload(arguments(*argv))
+        self.assertEqual(inputs["bank_only"], "true")
+        self.assertEqual(inputs["train_run_ids"], "44743739868,44738148591")
+        self.assertEqual(inputs["train"], "140")
 
     def test_the_placebo_is_a_two_arm_dispatch_because_a_delta_needs_both_sides(self):
         lane.check(arguments("--sweep", "true", "--rules", "b.json", "--arms", '["none","sham"]'))

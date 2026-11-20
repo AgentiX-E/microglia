@@ -342,6 +342,27 @@ def tiled(episode_files: "list[Path]", expected: int) -> int:
     return len(games)
 
 
+def kept(episodes: "list[dict]", kinds: str) -> "list[dict]":
+    """The episodes whose task kind is named by `kinds`, or all of them when it names none.
+
+    The filter exists for one experiment: a bank distilled from `cool`+`heat` and scored on all six kinds has the
+    same shape, header and length as the registered bank and a different vocabulary. Without it, the only control
+    this lane can build for the *content* of a bank is a permutation of the bank itself, and a permutation keeps the
+    words — which is the confound `44763220821` ran into when its placebo earned the treatment's delta.
+    """
+    if not kinds:
+        return episodes
+    named = [item.strip() for item in kinds.split(",") if item.strip()]
+    published = sorted(kind for _, kind in driver.TASK_KIND_PREFIXES)
+    unknown = sorted(set(named) - set(published))
+    if unknown:
+        driver.fail(f"--kinds names {unknown}; the split publishes {published}")
+    chosen = [episode for episode in episodes if driver.task_kind_of(episode["gamefile"]) in named]
+    if not chosen:
+        driver.fail(f"no won episode belongs to {named}, so the bank would be distilled from nothing")
+    return chosen
+
+
 def chunks_of(items: "list[dict]", size: int) -> "list[list[dict]]":
     """Consecutive slices of `size`, which is the competitor's `success_critique_num`."""
     if size < 1:
@@ -420,6 +441,11 @@ def main() -> int:
     parser.add_argument("--timeout", type=float, default=180.0)
     parser.add_argument("--trace", type=int, default=0)
     parser.add_argument(
+        "--kinds",
+        default="",
+        help="comma separated task kinds to distil from (put, clean, heat, cool, examine, puttwo); empty uses all",
+    )
+    parser.add_argument(
         "--expect-games",
         type=int,
         default=0,
@@ -436,6 +462,7 @@ def main() -> int:
     won = successes(files)
     if not won:
         driver.fail("no won episode carried a trajectory, so there is nothing to distil from")
+    won = kept(won, arguments.kinds)
 
     chunk_list = chunks_of(won, arguments.critique_num)
     print(
@@ -474,6 +501,7 @@ def main() -> int:
             "episodes": len(won),
             "chunks": len(chunk_list),
             "critique_num": arguments.critique_num,
+            "kinds": sorted(item.strip() for item in arguments.kinds.split(",") if item.strip()) or None,
             "model": arguments.model,
             "prompt": "all_success_existing_rules@LeapLabTHU/ExpeL:e41ec9a2",
         },

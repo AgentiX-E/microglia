@@ -39,6 +39,8 @@ WORKFLOW = "alfworld.yml"
 # into other rules, which is what separates "a rule bank helps" from "a longer prompt helps".
 ARMS = ("none", "always-in", "retrieved", "sham")
 CONTROL = "none"
+# The six task kinds the ALFWorld split publishes, which is all `--distill-kinds` may name.
+TASK_KINDS = ("put", "clean", "heat", "cool", "examine", "puttwo")
 
 
 class Refused(Exception):
@@ -61,6 +63,9 @@ def parser():
     result.add_argument("--train-shards", dest="train_shards", default="")
     result.add_argument("--train-run-ids", dest="train_run_ids", default="")
     result.add_argument("--bank-only", dest="bank_only", default="")
+    # The task kinds a bank is distilled from. Empty is the registered bank; naming two is the only control this
+    # lane can build for what a bank *says*, since a permutation keeps every word the bank had.
+    result.add_argument("--distill-kinds", dest="distill_kinds", default="")
     # The sweep's arm list, its retrieval budget and its read-time gate. They are dispatch flags rather
     # than file edits because the three contrasts still owed differ from the registered sweep in exactly
     # these strings, and a contrast that has to be typed into a file is a contrast nobody runs twice.
@@ -119,6 +124,13 @@ def check(arguments):
             raise Refused("--bank-only reads its slices from --train-run-ids, and none were named")
         if arguments.train_shards:
             raise Refused("--bank-only drives no slice, so --train-shards would name games nobody drives")
+    if arguments.distill_kinds:
+        if not arguments.train:
+            raise Refused("--distill-kinds filters the bank, so it needs --train (or --bank-only) to build one")
+        named = [item.strip() for item in arguments.distill_kinds.split(",") if item.strip()]
+        unknown = sorted(set(named) - set(TASK_KINDS))
+        if unknown:
+            raise Refused(f"--distill-kinds names {unknown}; the split publishes {list(TASK_KINDS)}")
     if arguments.chain and not arguments.train:
         raise Refused("--chain needs --train: the chain starts with the training pass")
     if arguments.sweep and (arguments.games or arguments.train):
@@ -162,6 +174,7 @@ def payload(arguments):
         ("train_shards", arguments.train_shards),
         ("train_run_ids", arguments.train_run_ids),
         ("bank_only", arguments.bank_only),
+        ("distill_kinds", arguments.distill_kinds),
         ("arms", arguments.arms),
         ("top_k", arguments.top_k),
         ("gate_share", arguments.gate_share),

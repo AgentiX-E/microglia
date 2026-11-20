@@ -495,6 +495,57 @@ class MainTest(unittest.TestCase):
         self.assertEqual(caught.exception.code, 1)
 
 
+class KindsTest(unittest.TestCase):
+    """The subset filter, which is the only control this lane can build for a bank's *content*.
+
+    A bank distilled from two task kinds and scored on all six carries the same shape as the registered bank and a
+    different vocabulary. That is the experiment `44763220821` says is owed: its placebo was a permutation of the
+    registered bank, which keeps every noun the bank had.
+    """
+
+    def episode(self, kind: str, index: int = 1) -> dict:
+        """A won episode whose path is the shape the split actually publishes."""
+        prefix = {
+            "put": "pick_and_place_simple-Cup-None-Cabinet",
+            "clean": "pick_clean_then_place_in_recep-Cup-None-Sink",
+            "heat": "pick_heat_then_place_in_recep-Cup-None-Microwave",
+            "cool": "pick_cool_then_place_in_recep-Apple-None-Fridge",
+            "examine": "look_at_obj_in_light-Book-None-DeskLamp",
+            "puttwo": "pick_two_obj_and_place-Cup-None-Shelf",
+        }[kind]
+        return {"gamefile": f"json_2.1.1/valid_seen/{prefix}-{index}/trial_T/game.tw-pddl", "trajectory": "t"}
+
+    def test_two_kinds_keep_only_those_two(self):
+        episodes = [self.episode(kind, index) for kind in ("put", "clean", "heat", "cool") for index in (1, 2)]
+        kept = distill.kept(episodes, "cool,heat")
+        self.assertEqual(len(kept), 4)
+        self.assertEqual({distill.driver.task_kind_of(e["gamefile"]) for e in kept}, {"cool", "heat"})
+
+    def test_no_filter_keeps_everything(self):
+        episodes = [self.episode("put", 1), self.episode("cool", 1)]
+        self.assertEqual(distill.kept(episodes, ""), episodes)
+
+    def test_whitespace_is_not_a_kind(self):
+        episodes = [self.episode("put", 1)]
+        self.assertEqual(len(distill.kept(episodes, " put , ")), 1)
+
+    def refused(self, kinds, episodes):
+        """The one sentence a refused filter prints, which is the whole of what an operator sees."""
+        printed = io.StringIO()
+        with self.assertRaises(SystemExit) as caught, contextlib.redirect_stdout(printed):
+            distill.kept(episodes, kinds)
+        self.assertNotEqual(caught.exception.code, 0)
+        return printed.getvalue()
+
+    def test_a_kind_the_split_does_not_publish_is_refused_with_the_list_it_does(self):
+        message = self.refused("put,oracle", [self.episode("put", 1)])
+        self.assertIn("oracle", message)
+        self.assertIn("puttwo", message)
+
+    def test_a_filter_that_keeps_none_is_refused_rather_than_distilling_from_nothing(self):
+        self.assertIn("nothing", self.refused("cool", [self.episode("put", 1)]))
+
+
 class CallerContractTest(unittest.TestCase):
     """The seam between this module and the driver it calls, which is the one thing a scripted caller cannot check.
 

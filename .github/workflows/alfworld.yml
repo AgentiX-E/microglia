@@ -87,6 +87,10 @@ on:
         description: 'true distils the bank from train_run_ids and drives no training slice; train still sets the slice size'
         required: false
         default: ''
+      distill_kinds:
+        description: 'comma separated task kinds the bank is distilled from; empty uses every won episode'
+        required: false
+        default: ''
   push:
     branches: [master]
     paths:
@@ -522,6 +526,7 @@ jobs:
           ALFWORLD_DATA: /home/runner/.cache/alfworld
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           TRAIN: ${{ inputs.train }}
+          KINDS: ${{ inputs.distill_kinds }}
           SHARD: ${{ matrix.shard }}
         run: |
           set -euo pipefail
@@ -630,6 +635,7 @@ jobs:
         env:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           TRAIN: ${{ inputs.train }}
+          KINDS: ${{ inputs.distill_kinds }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -637,10 +643,15 @@ jobs:
             exit 1
           fi
           ls "$RUNNER_TEMP/slices"
+          # `--kinds` is empty for the registered bank and names task kinds for the control the placebo could not
+          # build: the same shape and a different vocabulary. Run `44763220821` earned the bank's delta with the
+          # bank's own words permuted, so a bank about two task kinds is the cheapest way to ask whether any of it
+          # is about what the block says.
           python eval/drivers/alfworld/distill.py \
             --episodes "$RUNNER_TEMP"/slices/train-*.json \
             --expect-games "${TRAIN}" \
             --cap 20 --critique-num 8 \
+            --kinds "${KINDS}" \
             --out "$RUNNER_TEMP/bank.json" | tee "$RUNNER_TEMP/bank.log"
 
       - name: Upload the bank
