@@ -83,6 +83,10 @@ on:
         description: 'earlier runs whose training slices join this bank, comma separated; a resume of a partial pass'
         required: false
         default: ''
+      bank_only:
+        description: 'true distils the bank from train_run_ids and drives no training slice; train still sets the slice size'
+        required: false
+        default: ''
   push:
     branches: [master]
     paths:
@@ -463,7 +467,9 @@ jobs:
     # its own rollouts before any memory exists. A bank extracted from an arm that already carried a bank is
     # a bank about the bank.
     name: the training pass a rule bank is extracted from
-    if: github.event_name == 'workflow_dispatch' && inputs.train != ''
+    # `bank_only` skips the driving and keeps `train` as the slice's size, because the case it exists for is a bank
+    # that failed *after* the slices were paid for: re-driving them to re-read them would buy 140 games twice.
+    if: github.event_name == 'workflow_dispatch' && inputs.train != '' && inputs.bank_only != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 300
     strategy:
@@ -568,7 +574,10 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Fetch the slices
+      - name: Fetch the slices this dispatch drove
+        # Skipped under `bank_only`, where this run drove none: the action fails on a pattern that matches nothing,
+        # and a step excused with `continue-on-error` would hide a real absence too.
+        if: inputs.bank_only != 'true'
         uses: actions/download-artifact@v4
         with:
           pattern: alfworld-train-*
