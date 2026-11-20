@@ -1,0 +1,73 @@
+{
+ "bill": {
+  "band": "off_peak",
+  "rates": {
+   "hit": 0.003,
+   "miss": 0.15,
+   "out": 0.6
+  },
+  "usd": 0.004887,
+  "usd_in_other_band": 0.009773
+ },
+ "calls": 4,
+ "cap": 20,
+ "elapsed_s": 7.0,
+ "entries": [
+  {
+   "text": "When the \"put\" action fails to place an object on a surface or in a receptacle, try the alternative phrasing \"move <object> to <target>\" as it often succeeds.",
+   "votes": 5
+  },
+  {
+   "text": "Before placing an object into a closed receptacle (e.g., microwave, fridge), open it first; if \"put\" still fails after opening, switch to \"move <object> to <receptacle>\".",
+   "votes": 5
+  },
+  {
+   "text": "Systematically search likely locations for the target object (countertops, diningtable, fridge, cabinets, drawers, shelves) one by one, and once found, take it before proceeding to the cooling step.",
+   "votes": 4
+  },
+  {
+   "text": "To cool an object, go to the fridge and use \"cool <object> with fridge 1\" even if the fridge is closed\u2014this action works without needing to open it first.",
+   "votes": 3
+  },
+  {
+   "text": "When a \"put\" action repeatedly fails despite the receptacle being open and the object being in inventory, do not waste turns retrying the same phrasing or re-opening/re-closing the receptacle; immediately switch to \"move <object> to <receptacle>\" to complete the placement.",
+   "votes": 2
+  }
+ ],
+ "identity": "substring",
+ "schema": "microglia.alfworld-bank/1",
+ "source": {
+  "chunks": 4,
+  "critique_num": 8,
+  "dispatch": "run 44774801298, --bank-only --distill-kinds cool,heat",
+  "episodes": 28,
+  "kinds": [
+   "cool",
+   "heat"
+  ],
+  "model": "deepseek-flash",
+  "prompt": "all_success_existing_rules@LeapLabTHU/ExpeL:e41ec9a2",
+  "reading": "void as a content control (R171 amendment 1): four of the five rules are task-general, so the block is about the task even though it was distilled from two task kinds"
+ },
+ "stats": {
+  "applied": 16,
+  "by_kind": {
+   "ADD": 5,
+   "AGREE": 10,
+   "EDIT": 0,
+   "REMOVE": 1
+  },
+  "culled": 0,
+  "empty_replies": 0,
+  "operations": 16,
+  "peak": 5,
+  "rejected": 0,
+  "retries": 0
+ },
+ "usage": {
+  "cache_hit_tokens": 128,
+  "cache_miss_tokens": 29667,
+  "completion_tokens": 727,
+  "prompt_tokens": 29795
+ }
+}

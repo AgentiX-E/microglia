@@ -621,3 +621,68 @@ that is a sharper statement than "+17.9 from a shuffle".
 **Price, before it is paid.** Distillation over 28 episodes at 10 critique calls ≈ **¥0.03** (the 76-episode bank cost
 $0.0134); the sweep is 134 games × 2 arms ≈ **¥2.0** (the 536-game four-arm sweep cost $0.596). Total **≈ ¥2.03**, and
 the first half of it can fail at ¥0.03 without buying any games.
+
+### R171, amendment 1 — the bank arrived, four of its five rules are about the task, and the control is void before it was paid for
+
+Run `44774801298` distilled the filtered bank at **$0.004887** (¥0.035) in four critique calls over 28 won episodes
+of the 140 already paid for: 5 entries, 16 operations (ADD 5, AGREE 10, EDIT 0, REMOVE 1, rejected 0), cap 20. The
+dispatch drove no games. `banks/bank-crosskind-44774801298.json` is the artefact.
+
+**The two conditions this registration named, answered from the artefact rather than from the reading.**
+
+| condition | measured | verdict |
+| --- | --- | --- |
+| ≥ 4 entries and ≥ 80% of the registered bank's tokens | 5 entries; 1,166 rendered characters against 1,312 (88.9%), 188 words against 218 (86.2%) | the **shape** condition passes |
+| rules that are kind-specific rather than general | 4 of the 5 rules are general: two are the `put` → `move <object> to <receptacle>` workaround, one is "open the closed receptacle first", one is "search the likely locations one by one". Only rule 3 is about cooling | the **content** condition fails, and this registration says a failed content condition voids the reading |
+
+The rules, quoted because this is the paragraph a reader will check:
+
+> 1. When the "put" action fails to place an object on a surface or in a receptacle, try the alternative phrasing
+> "move <object> to <target>" as it often succeeds.
+> 2. Before placing an object into a closed receptacle (e.g., microwave, fridge), open it first; if "put" still
+> fails after opening, switch to "move <object> to <receptacle>".
+> 3. Systematically search likely locations for the target object (countertop, diningtable, fridge, cabinets,
+> drawers, shelves) one by one, and once found, take it before proceeding to the cooling step.
+> 4. To cool an object, go to the fridge and use "cool <object> with fridge 1" even if the fridge is closed.
+> 5. When a "put" action repeatedly fails despite the receptacle being open and the object being in inventory,
+> do not waste turns retrying the same phrasing; immediately switch to "move <object> to <receptacle>".
+
+Rule 1 and rule 5 are the same rule at two votes, rule 2 is a special case of it, and rule 3 is the registered
+bank's own rule 2 with the cooling step appended. A bank distilled from `cool` and `heat` trajectories is a bank
+about **placing objects**, because that is the last thing every trajectory does regardless of how the object was
+prepared. The distillation prompt asked for rules over the trajectory, and the trajectories share their ending.
+
+**Why the sweep is not bought, and what the ¥0.035 bought instead.** Scored, this bank would answer: *does a
+five-entry, 88.9%-length bank of general rules move 134 games as much as a four-entry bank of general rules?* That
+is a length-and-count comparison wearing a vocabulary comparison's clothes. Both readings are consistent with the
+placebo's conclusion and neither separates content from form, so the ¥2.0 would buy a number that cannot be
+attributed. The registration exists so that this is decided **before** the money rather than after the number:
+¥0.035 has now bought the fact that the ¥2.0 is not worth spending, and the finding that ExpeL-style distillation
+abstracts a kind-specific trajectory set into general procedures — which is a statement about the prompt, not
+about this lane's mechanism.
+
+**What is dispatched instead, and why it is the same question asked cheaply.** The placebo permuted the words and
+kept the vocabulary; it showed that order is inert (+17.91 pp against the intact bank's +14.18). The remaining
+separation is whether the words themselves matter at all, and it does not need distillation: a block of text with
+the same header, the same length and the same imperative form, and **no word of it about the task**, is written by
+hand at zero model cost. `banks/bank-filler-4.json` is that block — four entries on servicing a mechanical
+typewriter, 1,107 characters against the registered bank's 1,103, 1,316 rendered against 1,312 (100.3%), written to
+the per-entry lengths of the registered bank (255/245/306/301 against 254/248/309/292) so that neither the count nor
+the length nor the grammar differs.
+
+| the reading (always-in − none over 134 paired games) | what it means | the next dispatch it licenses |
+| --- | --- | --- |
+| filler ≥ the placebo's interval (+9…+27 pp) | **form is sufficient**: a preamble that says nothing about the task buys the whole effect. The mechanism is not memory, not vocabulary, and not relevance — it is the presence of a block that reads as instructions | no further memory work in this lane. The product is a preamble, and the remaining engineering is *where and when* it is injected — the read-time gate (R168 amendment 1, ≈ ¥1.9), now as a cost control rather than a rescue |
+| filler within ±mde of zero while `always-in` stays at +14…+18 pp | the block must **read as relevant to the task**; irrelevant instructions do nothing. The placebo's +17.9 then needs a second explanation, because permuted ALFWorld words still read as relevant | the neutral declarative block (R170 row 1, ≈ ¥1.5): is it relevance, or imperative grammar? |
+| filler between zero and the placebo, outside both intervals | two effects add: form contributes and content contributes | a 2×2 of form × relevance, four blocks, ≈ ¥8; and this row is the only one where the memory queue survives |
+| filler significantly negative | irrelevant instructions distract, which is the harm mechanism AUDIT 34.230 measured at 9.85% arriving from the other direction | the gate, then the rule that a bank is injected only where its own words appear in the observation |
+
+**The bound on this reading, stated before it exists.** Character length is not token length: the filler's vocabulary
+is technical prose and the registered bank's is household instruction, and a tokenizer may value them differently.
+Both counts are reported; if the rendered token counts differ by more than 20%, the row is renamed as a
+*shorter-or-longer* block and the delta is bounded by that difference, not by content. The `none` arm is bought in
+the same run, so the control's own 6-win run-to-run swing (AUDIT 34.232) cannot reach the comparison.
+
+**Price.** Filler bank: **¥0** (hand-written, no model call). Sweep: 134 games × 2 arms ≈ **¥2.0**, with its own
+control. The cross-kind bank cost ¥0.035 and is committed beside this text so that the decision not to score it is
+checkable against the artefact rather than trusted from this paragraph.

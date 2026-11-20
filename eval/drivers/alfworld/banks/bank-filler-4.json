@@ -1,0 +1,29 @@
+{
+ "cap": 20,
+ "entries": [
+  {
+   "text": "Before servicing a mechanical typewriter, spread a clean white cloth beneath the machine so that small springs and typebars cannot roll away, and keep the dust cover closed until every ribbon spool has been labelled. Note the order of anything you remove.",
+   "votes": 0
+  },
+  {
+   "text": "Whenever a typebar assembly sticks, elevate it gently with a hooked extraction wire rather than pulling upward, because the segment slots deform easily and a distorted slot misaligns every adjacent key sharing that arc. Work under a bright lamp.",
+   "votes": 0
+  },
+  {
+   "text": "After cleaning the platen with a mild solvent, allow it to dry completely before winding the ribbon, since residual fluid transfers onto the paper and leaves a grey band across the first several lines of every sheet typed afterward. Note the order of anything you remove. Keep a shallow tray for the parts.",
+   "votes": 0
+  },
+  {
+   "text": "If the carriage return feels stiff, inspect the drawband tension before adding lubricant, and remember that an over-tensioned drawband fails suddenly rather than gradually, usually halfway down the second page of a long letter. Note the order of anything you remove. Keep a shallow tray for the parts.",
+   "votes": 0
+  }
+ ],
+ "identity": "substring",
+ "schema": "microglia.alfworld-bank/1",
+ "source": {
+  "kind": "hand-written control",
+  "matches": "banks/bank-44754440122.json entry lengths 254/248/309/292",
+  "note": "same header, same length, same imperative form, no word of it about the task",
+  "prompt": "none: this block was not distilled"
+ }
+}
