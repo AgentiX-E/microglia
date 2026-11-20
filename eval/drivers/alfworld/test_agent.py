@@ -528,13 +528,17 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(episode["steps"], 0)
         self.assertTrue(episode["truncated"])
 
-    def test_a_capped_episode_is_reported_as_truncated(self):
+    def test_a_capped_episode_is_budget_exhausted_rather_than_truncated(self):
+        # The two unfinished endings are different findings: one is the pass's own cap doing its job, the
+        # other is the driver losing a game. The second dispatch failed because this file could not tell
+        # them apart, and reported a 20-turn diagnostic as an infrastructure error.
         world = FakeWorld()
         world.step = lambda actions: (["nothing happens"], [0.0], [False], {"won": [False], "admissible_commands": [world.admissible()]})
         episode = agent.run_episode(
             world, "none", "first", self.examples, [], agent.Draw(1), 3, 3, "deepseek-flash", "", 1.0
         )
-        self.assertTrue(episode["truncated"])
+        self.assertFalse(episode["truncated"])
+        self.assertTrue(episode["budget_exhausted"])
         self.assertEqual(episode["steps"], 3)
 
 
@@ -584,7 +588,8 @@ class ModelPolicyTest(unittest.TestCase):
             self.world, "none", "model", self.examples, [], agent.Draw(1), 3, 3, "deepseek-flash", "k", 1.0
         )
         self.assertFalse(episode["won"])
-        self.assertTrue(episode["truncated"])
+        self.assertTrue(episode["budget_exhausted"])
+        self.assertFalse(episode["truncated"])
         self.assertEqual(episode["steps"], 3)
         self.assertEqual(episode["actions"], 0)
         self.assertEqual(episode["thoughts"], 3)
@@ -885,10 +890,21 @@ class RefusalTest(unittest.TestCase):
             self.run_main(["--policy", "first", "--games", "2", "--out", str(self.out)])
         self.assertEqual(caught.exception.code, 1)
 
-    def test_an_episode_that_never_terminates_fails_the_pass(self):
+    def test_a_pass_that_spends_its_budget_is_a_result_rather_than_a_failure(self):
         agent.build_env = lambda batch_size=1: (FakeWorld(never_ends=True), 1)
+        self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--max-steps", "3", "--out", str(self.out)]), 0)
+        summary = json.loads(self.out.read_text(encoding="utf-8"))["summary"]
+        self.assertEqual(summary["budget_exhausted"], 1)
+        self.assertEqual(summary["wins"], 0)
+
+    def test_an_episode_that_ends_with_turns_to_spare_fails_the_pass(self):
+        # An environment that admits no command while the budget is untouched is neither a win nor a
+        # budget ending: it is the pass losing the game, and it must not be written up as a rate.
+        world = FakeWorld()
+        world.admissible = lambda: []
+        agent.build_env = lambda batch_size=1: (world, 1)
         with self.assertRaises(SystemExit) as caught:
-            self.run_main(["--policy", "first", "--games", "1", "--max-steps", "3", "--out", str(self.out)])
+            self.run_main(["--policy", "first", "--games", "1", "--max-steps", "50", "--out", str(self.out)])
         self.assertEqual(caught.exception.code, 1)
 
     def test_a_two_game_pass_reports_its_progress_once_at_the_end(self):

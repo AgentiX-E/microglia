@@ -88,9 +88,33 @@ receives before the first observation. Two numbers for one prefix is how a price
 with itself; when the calibration reports `prefix_chars` per episode, that field is this larger quantity.
 
 What none of that certifies: whether the model follows the format at all. A reply with no action parses as a
-thought, three thoughts in a row fail the run rather than scoring zero, and `invalid_actions` counts what the
-environment refused. Those three counters are the first thing to read in the calibration's output, because a
-high invalid rate means the arm measured the prompt's syntax rather than its content.
+thought, and `invalid_actions` counts what the environment refused. Those counters are the first thing to read in
+the calibration's output, because a high invalid rate means the arm measured the prompt's syntax rather than its
+content.
+
+### The first dispatch, and what it corrected before it spent anything
+
+Run `44671462382`, 04:00:36 to 04:03:24 UTC. It drove **zero games** and failed on the first one, and the failure
+is worth recording because it was a defect in this design rather than in the code it ran.
+
+On `pick_cool_then_place_in_recep-Bread-None-CounterTop-10` the model reached the end of its patience inside the
+50-step cap and began narrating: *"I was unable to complete the task. I found bread 1 on countertop 3, picked it up,
+and cooled it using the fridge. However, when I attempted to put it on the cou…"*. The parser read that as a
+thought — correctly, it is not a command — and the loop, which had been written to raise when three thoughts
+arrived in a row, raised.
+
+**That rule was wrong in the direction that matters.** A model giving up is a failure this arm exists to record; an
+arm whose question is *how often does the memory help* cannot have a skeleton that refuses to represent the model
+failing. The repair is not a tolerance, it is a change of what a turn is: **a thought now spends one of the
+`max_steps` turns exactly as an action does**, so an episode ends when its budget does rather than when a model
+stops emitting commands. `steps` therefore counts model turns, `actions` and `thoughts` sit beside it, a run of
+three thoughts is a counted `stall` rather than a crash, and a pass in which **no** episode produced an action still
+fails — because that is a skeleton nobody read, not a low score.
+
+Two things follow for the price, and both are corrections in the conservative direction. The worst case per episode
+is now `max_steps` calls rather than `max_steps` actions plus an unbounded number of thoughts, so the quote stops
+having a tail it could not bound. And the first reading of a calibration is no longer the score: it is the three
+replies printed by `--trace`, because a rate computed over a format the model ignored is a rate about the format.
 
 ## Three predictions, and what refutes each
 

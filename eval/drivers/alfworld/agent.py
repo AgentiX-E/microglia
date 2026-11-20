@@ -497,7 +497,12 @@ def run_episode(
         "task_kind": kind,
         "won": won,
         "steps": steps,
-        "truncated": not done,
+        # Two different unfinished endings, and conflating them was a bug the second dispatch found.
+        # `budget_exhausted` is the pass's own cap doing its job -- a model that has not finished by turn
+        # `max_steps` is a result. `truncated` is the environment ending nothing while the pass still had
+        # turns left, which is a driver defect and fails the run.
+        "truncated": not done and steps < max_steps,
+        "budget_exhausted": not done and steps >= max_steps,
         "digest": digest_of(actions),
         "observe_chars": observe_chars,
         "observe_fingerprint": digest_of([str(count) for count in observe_chars]),
@@ -637,7 +642,10 @@ def main() -> int:
         fail("a game was driven twice, so the slice does not mean what it says")
     truncated = [episode["gamefile"] for episode in episodes if episode["truncated"]]
     if truncated:
-        fail(f"{len(truncated)} episodes never terminated, first {truncated[0]}")
+        fail(
+            f"{len(truncated)} episodes ended with the environment undecided and turns to spare, "
+            f"first {truncated[0]}"
+        )
 
     wins = sum(1 for episode in episodes if episode["won"])
     usage = {
@@ -678,6 +686,7 @@ def main() -> int:
         "thoughts": sum(episode["thoughts"] for episode in episodes),
         "stalls": sum(episode["stalls"] for episode in episodes),
         "episodes_without_any_action": sum(1 for episode in episodes if episode["actions"] == 0),
+        "budget_exhausted": sum(1 for episode in episodes if episode["budget_exhausted"]),
         "invalid_actions": sum(episode["invalid_actions"] for episode in episodes),
         "off_space_actions": sum(episode["off_space_actions"] for episode in episodes),
         "usage": usage,
