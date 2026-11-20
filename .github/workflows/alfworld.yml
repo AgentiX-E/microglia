@@ -59,6 +59,10 @@ on:
         description: 'UTC HH:MM to hold the paid step until; empty starts immediately'
         required: false
         default: ''
+      chain:
+        description: 'true runs train -> bank -> sweep in one dispatch, taking the bank from the artefact'
+        required: false
+        default: ''
   push:
     branches: [master]
     paths:
@@ -576,7 +580,11 @@ jobs:
     # and `aggregate.py` refuses a pair of arms whose games do not coincide — which is exactly what twelve
     # separately launched runs can produce when one of them is cancelled.
     name: one arm over one slice
-    if: github.event_name == 'workflow_dispatch' && inputs.sweep != ''
+    # `needs` with `always()`: a plain sweep names a bank in the repository and must not be blocked by a job that
+    # was skipped, while a chained sweep must not start before the bank exists. `always()` allows both, and the
+    # bank step below fails loudly when a chained run reaches here without one.
+    if: always() && github.event_name == 'workflow_dispatch' && (inputs.sweep != '' || inputs.chain != '')
+    needs: [distill-bank]
     runs-on: ubuntu-latest
     timeout-minutes: 330
     strategy:
@@ -622,6 +630,15 @@ jobs:
           NOT_BEFORE: ${{ inputs.not_before }}
         run: bash eval/drivers/alfworld/wait-for-window.sh "${NOT_BEFORE}"
 
+      - name: Take the bank the same run built
+        # A chained dispatch has no bank in the repository yet: the bank is an artefact of this run, so the sweep
+        # reads it from there rather than from a path a human would have had to commit between two dispatches.
+        if: inputs.rules == ''
+        uses: actions/download-artifact@v4
+        with:
+          name: alfworld-bank
+          path: ${{ runner.temp }}/bank
+
       - name: Drive the arm
         env:
           ALFWORLD_DATA: /home/runner/.cache/alfworld
@@ -638,6 +655,13 @@ jobs:
             exit 1
           fi
           GAMES="${GAMES:-134}"
+          if [ -z "${RULES}" ]; then
+            RULES="$RUNNER_TEMP/bank/bank.json"
+          fi
+          if [ ! -f "${RULES}" ]; then
+            echo "::error::no bank at ${RULES}; a treatment arm cannot be run without one"
+            exit 1
+          fi
           args=(--arm "${ARM}" --policy model --games "${GAMES}" --shard "${SHARD}/4" --max-steps "${MAX_STEPS}")
           if [ "${ARM}" != "none" ]; then
             if [ -z "${RULES}" ]; then
