@@ -119,14 +119,17 @@ def game_key(path: str) -> str:
     try:
         return str(resolved.relative_to(DATA_ROOT.resolve()))
     except ValueError:
-        return resolved.name
+        # Outside the data root the whole path is kept. Falling back to the file name would
+        # collapse all 134 games onto the single string `game.tw-pddl`, and the coverage
+        # assertion downstream would then pass on a walker that drove one game 134 times.
+        return str(resolved)
 
 
 def on_disk() -> "set[str]":
     return {game_key(str(path)) for path in DATA_ROOT.glob(f"json_2.1.1/{SPLIT}/*/*/game.tw-pddl")}
 
 
-def build_env():
+def build_env(batch_size: int = 1):
     import yaml
 
     # The config lives in this repository rather than in the installed package: 0.4.2
@@ -141,8 +144,12 @@ def build_env():
     # override it.
     from alfworld.agents.environment.alfred_tw_env import AlfredTWEnv
 
-    env = AlfredTWEnv(config, train_eval="eval_out_of_distribution")
-    return env, config
+    # `AlfredTWEnv` is a shell that reads the split and then hands back a textworld gym
+    # environment; only the latter has reset and step. The first version of this file
+    # called reset on the shell and failed with an AttributeError forty-two seconds into
+    # the job, which is the reason the smoke pass exists.
+    shell = AlfredTWEnv(config, train_eval="eval_out_of_distribution")
+    return shell.init_env(batch_size=batch_size), shell.num_games
 
 
 def drive(env, draw: Draw, max_steps: int) -> "dict":
@@ -156,6 +163,11 @@ def drive(env, draw: Draw, max_steps: int) -> "dict":
     gamefile = game_key(raw_gamefile[0] if isinstance(raw_gamefile, (list, tuple)) else raw_gamefile)
     admitted_at_reset = len(info.get("admissible_commands", [[]])[0])
     actions: "list[str]" = []
+    # Characters, not tokens, because no tokenizer runs in this job and a token count
+    # invented here would be the same kind of number the quote is supposed to stop being.
+    # A character count is measured, is tokenizer-independent, and converts to a token
+    # bound by the one ratio the provider's own usage report can calibrate later.
+    observe_chars: "list[int]" = [len(str(observation[0]))]
     steps = 0
     done = False
     won = False
@@ -172,6 +184,7 @@ def drive(env, draw: Draw, max_steps: int) -> "dict":
         steps += 1
         done = bool(dones[0])
         last = str(observation[0])
+        observe_chars.append(len(last))
         won = bool(info.get("won", [False])[0])
     return {
         "gamefile": gamefile,
@@ -180,13 +193,15 @@ def drive(env, draw: Draw, max_steps: int) -> "dict":
         "admitted_at_reset": admitted_at_reset,
         "truncated": not done,
         "digest": digest_of(actions),
+        "observe_chars": observe_chars,
+        "observe_fingerprint": digest_of([str(count) for count in observe_chars]),
         "last_line": last.strip().splitlines()[-1][:120] if last.strip() else "",
     }
 
 
 def pass_over(seed: int, limit: int, max_steps: int, label: str) -> "list[dict]":
-    env, _config = build_env()
-    total = env.num_games if limit <= 0 else min(limit, env.num_games)
+    env, num_games = build_env()
+    total = num_games if limit <= 0 else min(limit, num_games)
     print(f"{label}: driving {total} games with seed {seed}, at most {max_steps} steps each")
     draw = Draw(seed)
     episodes: "list[dict]" = []
@@ -208,7 +223,7 @@ def compare(first: "list[dict]", second: "list[dict]") -> "dict":
     mismatches = []
     for index in range(min(len(first), len(second))):
         left, right = first[index], second[index]
-        for field in ("gamefile", "won", "steps", "digest"):
+        for field in ("gamefile", "won", "steps", "digest", "observe_fingerprint"):
             if left[field] != right[field]:
                 mismatches.append(
                     {"episode": index, "field": field, "first": left[field], "second": right[field]}
@@ -273,6 +288,16 @@ def main() -> int:
     wins = sum(1 for episode in first if episode["won"])
     steps_total = sum(episode["steps"] for episode in first)
     low, high = wilson(wins, len(first))
+
+    # The prompt a turn-based agent would send is the transcript so far, so the transcript's
+    # own length is the cost model's input, and it is measured here rather than assumed.
+    # `context_chars` is the sum of every observation an episode produced, which is what a
+    # ReAct prompt carries by its final turn. A mean over episodes hides the tail, and the
+    # tail is what a per-episode price is wrong about, so the median and p90 sit beside it.
+    contexts = sorted(sum(episode["observe_chars"]) for episode in first)
+    context_mean = sum(contexts) / len(contexts) if contexts else 0
+    turns_per_episode = steps_total / len(first) if first else 0
+
     summary = {
         "seed": arguments.seed,
         "split": SPLIT,
@@ -286,6 +311,13 @@ def main() -> int:
         "steps_mean": round(steps_total / len(first), 2) if first else 0.0,
         "admitted_mean": round(sum(e["admitted_at_reset"] for e in first) / len(first), 2) if first else 0.0,
         "empty_admissible": sum(1 for episode in first if episode["admitted_at_reset"] == 0),
+        "context_chars": {
+            "mean": round(context_mean, 1),
+            "median": contexts[len(contexts) // 2] if contexts else 0,
+            "p90": contexts[int(0.9 * (len(contexts) - 1))] if contexts else 0,
+            "max": contexts[-1] if contexts else 0,
+            "per_turn_mean": round(context_mean / turns_per_episode, 1) if turns_per_episode else 0.0,
+        },
     }
 
     payload = {
@@ -300,6 +332,12 @@ def main() -> int:
     print(f"  wilson 95%        [{100 * summary['wilson_low']:.1f}, {100 * summary['wilson_high']:.1f}]")
     print(f"  steps per episode {summary['steps_mean']} of {arguments.max_steps} allowed")
     print(f"  commands at reset {summary['admitted_mean']} on average")
+    print(
+        f"  transcript chars  mean {summary['context_chars']['mean']} "
+        f"median {summary['context_chars']['median']} "
+        f"p90 {summary['context_chars']['p90']} "
+        f"max {summary['context_chars']['max']}"
+    )
     print(f"  replays exactly   {determinism['shadow_episodes']} games, {determinism['mismatches']} mismatches")
     print(f"  written           {arguments.out}")
     print("PASS the split is covered, terminates, and replays")
