@@ -686,3 +686,61 @@ the same run, so the control's own 6-win run-to-run swing (AUDIT 34.232) cannot 
 **Price.** Filler bank: **¥0** (hand-written, no model call). Sweep: 134 games × 2 arms ≈ **¥2.0**, with its own
 control. The cross-kind bank cost ¥0.035 and is committed beside this text so that the decision not to score it is
 checkable against the artefact rather than trusted from this paragraph.
+
+### R171, amendment 2 — the filler block was scored, and relevance came back into the mechanism
+
+Run `44782732761` drove the filler block over all 134 held-out games with its own control: 8,974 calls, **$0.4584**
+(¥3.28), 268 episodes. The reading, from `aggregate.py` over the eight slices:
+
+| arm | wins | rate | paired delta | 95% interval | p |
+| --- | --- | --- | --- | --- | --- |
+| `none` (control) | 89/134 | 66.42% | — | — | — |
+| `always-in` (filler block) | 80/134 | 59.70% | **−6.72 pp** | [−14.93, +1.49] | 0.134 |
+
+**Which row of the amendment-1 table this is.** The table named four readings. The point estimate falls in the fourth
+(filler < 0: irrelevant instructions distract), the interval crosses zero, and it excludes the first row's floor
+(+9 pp) by 7.5 points. So the claim this reading supports is narrower than either extreme:
+
+> A block of instruction-shaped text that says nothing about the task does **not** buy the 14–18 points. The gain
+> needs text that is *about the task*.
+
+**And the two blocks that are about the task are still indistinguishable from each other.** Permuted-rule `sham`
+(+17.91 pp) and intact rules (+14.18 pp) differ by 3.7 pp with overlapping intervals, so the ordering and the specific
+content of the rules remain unattributed. What the three blocks together separate is three layers, not two:
+
+| layer | the contrast that isolates it | measured |
+| --- | --- | --- |
+| the existence of a block | filler − none | **−6.72 pp** — no gain, slight and unresolvable harm |
+| the block being *about the task* | sham − filler | **+24.63 pp** [z −3.97, p 0.0001; with the 8-win run swing, p 0.004] |
+| the block's rules being intact and ordered | sham − always-in | **−3.73 pp**, intervals overlap — not resolvable |
+
+**The shape all three share, which the registration did not predict.** Split by what the control did unaided, every
+block helps the games the control lost and hurts the games it won:
+
+| block | hard games (control 0/45…53) | easy games (control 100%) |
+| --- | --- | --- |
+| filler | +24.44 pp (11/45) | −22.47 pp (69/89) |
+| always-in | +59.26 pp (32/45) | −16.25 pp (67/89) |
+| sham | +62.26 pp (33/53) | −11.11 pp (72/81) |
+
+That is the same trade in all three, at different strengths: a block makes the model behave differently on games it
+was losing, and it breaks games it was already winning. The net is positive only when the block names the task.
+
+**The mechanism the numbers now point at, stated as a hypothesis rather than a finding.** A block raises effort — the
+`filler` arm diverged from the control on 88.8% of games and produced **32.7% invalid actions against 28.4%**, with
+off-space actions up from 25 to 41 — and the task's vocabulary supplies direction. Effort without direction is a net
+loss. Read this way, the placebo's +17.91 is not "form is sufficient"; it is "ALFWorld vocabulary is sufficient, in
+any order", which is a weaker and more useful claim.
+
+**What would have made this void, and did not.** The bank met the length condition of the first table (100.3% of the
+rendered characters, per-entry matched to 255/245/306/301 against 254/248/309/292) and the rules were checked to be
+about a different task before dispatch. One condition the registration **should** have named and did not: the control's
+own rate. This run's `none` arm scored 89/134 where the two earlier dispatches scored 80 and 81, and because the easy
+stratum is defined by the control's wins, that difference put **89 of 89** easy games in the stratum — a ceiling the
+treatment can only fall from. The −6.72 point estimate therefore carries the ceiling effect as well as the treatment
+effect, which is why the interval, and not the point, is what licenses the statement above.
+
+**Price against the estimate.** ¥3.28 against the ¥2.0 registered: the filler arm spent 4,492 calls against the
+placebo's 3,964 for the same 134 games, because it produced more turns. The under-estimate is the same one this lane
+has now made three times — a per-episode price is a model of a run, and a treatment that changes the number of turns
+changes the price.
