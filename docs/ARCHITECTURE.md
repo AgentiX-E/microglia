@@ -2514,3 +2514,44 @@ candidate is how a roadmap stops describing what is measurable.
 **What this section does not do.** It does not claim the shapes are worthless, and it does not license
 dropping them. It fixes the order: axis, then shape, then substrate — and it says which of the three is not
 this repository's to build.
+
+### 8.40 Why selection is a layer of its own, and why its signal is the task rather than the text
+
+The pack an arm carries is the product of two decisions that were, until this round, one: **what the store holds**
+and **what one game is shown**. The lane's measurements separated them the hard way. A four-entry bank scores 99, the
+two entries inside it that name the failing operation score 109, and one of those two scores 112 — so the store was
+never the unit that mattered. What mattered was the size of the pack, and the only way to hold a store bigger than a
+pack is a selection layer that can say *not this one*.
+
+**The layer has one interface and three properties.**
+
+```
+applicable(rules, kinds, kind) -> list[str]
+```
+
+* an entry with no tags is carried everywhere, which is what makes every artefact before this round comparable — the
+  knob is inert on an untagged bank;
+* an entry tagged with the game's kind is carried, and one tagged with another kind is not, so a six-sentence store
+  can show one sentence per game;
+* a tag list whose length does not match the rules is refused rather than zipped, because the misalignment a cap
+  produces (`rules[:cap]` beside an uncut `kinds`) carries the sentence the arm believes it dropped.
+
+**Why the signal is the task and not the text.** The first implementation selected on the observation's own words: a
+rule had to account for some share of them. That is the repair `arXiv:2610.07311` names, and on this corpus it
+admitted nothing at all — a first observation is 22 content words of furniture, the rules are about operations, and
+the largest overlap available is one word (`task`, from the prompt's own task line). The floor asked for 4.4. A
+threshold cannot be tuned across a gap that wide, and no smaller threshold would have been a signal either: the room
+does not contain the failing step.
+
+What does contain it is the task, and the harness has it before the first call, for free, from the gamefile's
+directory (`task_kind_of`). It is not a proxy for overlap; it is the operand the overlap was standing in for. The
+generality is stated and bounded: the gate works where tasks are enumerated, and a corpus whose tasks are not named
+in advance needs a different selector — but the design rule survives the bound, which is that **select memory by what
+the agent is doing, not by what it can see.**
+
+**Why the layer must be visible in the artefact.** A gated arm is the pair *(bank, filter)*, and two filters over one
+bank are two treatments. The label carries the gate (`always-in@kind`), the header records `gate_kind`, the episode
+records `pack_entries`, and the join refuses a pack arm whose pack was empty in every game — because the one reading
+this lane got wrong was wrong in exactly that way: 81/134 against a control of 90, 88% engagement, six by-kind rows,
+and not one entry in the prompt. A selection layer that cannot be seen in the artefact is a layer that can silently
+turn a treatment into a control.

@@ -4888,3 +4888,53 @@ strata are quoted. A number produced without those conditions is not a smaller f
 two arms at roughly $0.19–0.24 each, and the arm that confuses the model is the more expensive one, because it
 produces more turns. A per-episode price is not a model of a run; `prefix_chars_mean` and `context_chars` are the two
 measurements that predict the bill, and the second one is in `floor.json` before anything is spent.
+
+### 32.20 Reading a gated arm, and the counter that has to be read before the delta
+
+A **gated** arm carries only some of its bank: the pack is filtered at read time, so the treatment is the pair
+*(bank, filter)* rather than the bank alone. This lane has two filters and they are not interchangeable.
+
+| flag | what it selects on | when it can fire |
+| --- | --- | --- |
+| `--gate-share S` | the share of the **observation's** own content words a rule must account for | only on corpora whose observations name the failing step |
+| `--gate-kind` | the **task the game names**, read from the gamefile before the first call | whenever the bank tags its entries with `kinds` |
+
+**The first one does nothing on ALFWorld, and the reading it produced is the worked example of why the second
+exists.** A first observation carries 22 content words and every one is furniture — `cabinet 4, countertop 1,
+garbagecan 1, sinkbasin 2, toilet 1 …` plus `Your task is to: put some spraybottle on toilet.` The four registered
+rules are about operations (`inventory`, `put`, `move`, `receptacle`, `take`), so the largest overlap available is one
+word, and one of the three matches is `task` from the prompt's own line. A floor of 0.2 needs **4.4 words**. The arm
+that carried it scored 81/134 against a control of 90 while carrying **zero entries in 134 of 134 games** — and it
+still reported 88% engagement, six by-kind rows and a bill, because an empty prompt also changes the trajectory.
+
+**So read the counter first.** `aggregate.py` prints the pack distribution above every delta, and refuses two shapes:
+
+```
+  carried         always-in@kind mean 1.0 entries over 134 games, {1: 134}
+  carried         none mean 0 entries over 134 games, {0: 134}
+```
+
+| what you see | what it means |
+| --- | --- |
+| a pack arm with `{0: 134}` | the filter admitted nothing: the arm is the control with a longer prompt, and its delta is noise |
+| a pack arm with a spread, e.g. `{1: 120, 0: 14}` | the filter fires on the games it should and stays silent elsewhere — that is a gate doing its job |
+| a `none` arm with anything but `{0: n}` | the control was not a control; the join refuses it |
+
+The refusal is a `FAIL` and an exit code, not a warning, because a number produced from an empty pack is quotable
+and indistinguishable from a measurement in every other counter the report prints.
+
+**Carrying the kind gate.** A bank tags an entry with the kinds it was written for; an untagged entry is carried
+everywhere, which is what keeps every earlier artefact comparable:
+
+```json
+{ "text": "To heat something, put it in the microwave and close it before saying heat <object>.",
+  "votes": 0, "kinds": ["heat"] }
+```
+
+`--gate-kind` then carries only the entries whose `kinds` include the game's kind. Three refusals protect it: a bank
+with no tags at all (the gate would carry nothing), `--gate-kind` on the `none` arm (nothing to select from), and a
+`kinds` list whose length does not match the rules (a cap applied to `rules` and not to `kinds` would carry the
+sentence the arm believes it dropped). `alf_dispatch.py` makes the first refusal free, before the dispatch is bought.
+
+**The label.** A gated pack arm is `always-in@kind`, not `always-in`, and the label is what `aggregate.py` groups on:
+two dispatches of the same family under one name are refused as doubled games, after the money is spent.

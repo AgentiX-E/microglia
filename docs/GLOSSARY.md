@@ -1856,3 +1856,40 @@ long-conversation F1. The test for where a mechanism belongs is **the score its 
 rate under a fixed model and prompt skeleton belongs here, a substrate query score does not. Two systems called
 Synapse sit on opposite sides of that line — the ICLR 2024 one reports MiniWoB++ and Mind2Web task scores, the ACL
 2026 one reports LoCoMo F1 — which is why the test is the score rather than the name.
+
+## Selection terms
+
+The words below are new because the failure they describe was new: an arm whose filter admitted nothing, scored a
+control's rate, and reported a treatment's counters.
+
+**Carried** — What an arm actually put in front of the model, per game, read from the artefact's own `pack_entries`.
+The distribution is the first thing a reading prints, because it is the admission test for everything after it:
+`{1: 134}` means every game carried one entry, `{0: 134}` means the arm is the control with a longer prompt, and a
+spread means the filter fires where it should. **The pack is the treatment**, so an empty pack is not a weak
+treatment; it is the absence of one.
+
+**Empty pack** — A pack arm that carried zero entries in every game it drove. Refused by the join rather than
+reported: its score is the control's score, and its label does not describe the prompt. The arm that produced this
+term scored 81/134 against a control of 90 with 88% engagement and six by-kind rows, so every counter the lane had
+was healthy except the one nobody aggregated.
+
+**Engagement** — The share of games whose action digest differs between two arms. It measures that the prompt
+changed, not that the memory was read: an empty prompt diverges too. It is a necessary counter and never a
+sufficient one, which is why the register's voiding conditions now include a manipulation check before engagement.
+
+**Kind gate** (`--gate-kind`) — Selection by the **task the game names**, read from the gamefile's directory before
+the first call. It replaces an overlap floor that cannot fire on this corpus: a room description carries furniture
+nouns and a rule carries operations, so the largest lexical overlap available is one word. An entry tagged
+`"kinds": ["put", "puttwo"]` is carried for those tasks and no others; an untagged entry is carried everywhere, which
+is what keeps every earlier arm comparable.
+
+**Overlap floor** (`--gate-share`) — The read-time repair `arXiv:2610.07311` names, ported as a floor on the share of
+the observation's own content words a rule must account for. Correct as a description of *when* partial evidence
+distorts inference, and inapplicable on a corpus whose observations do not name the failing step: at 0.2 it admitted
+nothing in 134 of 134 games. The term is kept because the mechanism is real and the corpus is the reason it did not
+fire — the next corpus may be the one it was written for.
+
+**Manipulation check** — A condition on what the experiment *did* rather than on what it produced: was the treatment
+in the prompt, was the block the length it was registered at, did the bank hold the rules it claims. The lane had
+three voiding conditions and all three were outcome-shaped (engagement, harm share, control level); the manipulation
+check is the one that caught the arm in 208.2, and it costs one counter.
