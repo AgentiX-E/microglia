@@ -2106,3 +2106,91 @@ the nine `put` games specifically rather than the budget generally.
 without saying what they are: the first explores the test instance itself (~177.9 steps an instance, amortised), the
 second distils a manual from experience. The lane's bank is the second kind. Both belong on the board with the
 distinction stated, and neither belongs in a claim about this round's 274 games.
+
+## R184, amendment 1 — bought, and the cap is pure budget: the sentence cut narration and narration was not the cost
+
+Eight jobs, 274 games an arm, `any-line` channel, `banks/bank-putmove-line-1.json`, `--max-steps 30`, off-peak band,
+runs `44915418516` (134 held out) and `44915531080` (140 seen).
+
+| arm | at cap 50 | **at cap 30** | Wilson | frozen-behaviour prediction | paired delta vs its own cap-50 run | mde |
+| --- | --- | --- | --- | --- | --- | --- |
+| `always-in@anyline` | 257 (93.80%) | **240 (87.59%)** | [83.2, 91.0] | **242** | **−6.20 pp** (9 new, 26 old) | 6.05 pp |
+| `none@anyline` | 197 (71.90%) | **156 (56.93%)** | [51.0, 62.7] | **157** | **−14.96 pp** (25 new, 66 old) | 9.76 pp |
+
+**The predicted artefact arrived to 0.36 pp and the predicted effect did not arrive at all.** The memory effect at cap 30
+reads **+30.66 pp** against the frozen-behaviour value of **+31.02 pp** — the inflation the registration computed from the
+cap's asymmetry (15 games against 40) is what happened, nearly exactly, and it happened *because nothing else did*.
+
+### The registration said "floor" and the word was wrong
+
+§R184 wrote that the counterfactual is *"a floor no behaviour can fall below and a ceiling only behaviour can raise"*.
+Both arms landed **below** it — by 2 games and by 1. The reason is not a defect in the arithmetic but in the word: the
+model is **sampled**, so a game that won at step 22 on the fifty-step pass can be lost outright on the thirty-step pass,
+and the counterfactual is a *prediction under frozen behaviour with sampling noise around it*, not a bound. What it
+still licenses is the reading it was written for, and more sharply than a bound would: **lands within 1–2 games of the
+prediction = the model did the same thing**, and both arms did. The correct sentence, which replaces the registered
+one, is: *the counterfactual is exact as arithmetic and noisy as a prediction; the residual is the effect.*
+
+### Verdicts, one row each
+
+| # | registered | read | verdict |
+| --- | --- | --- | --- |
+| 1 | `always-in` above 242, band 246–262 | **240** | **failed** — refutation clause 1 fires |
+| 2 | `none` above 157, band 162–190 | **156** | **failed**, 1 game under its prediction |
+| 3 | `put`, `always-in`: 48–53 of 59 | **50** | held, exactly at the cap-50 baseline |
+| 4 | `put`, `none`: 26–36 of 59 | **32** | held (baseline 35, prediction 28) |
+| 5 | thoughts per turn on a lost `put` ≤ 0.30 | **0.2667** | **held** — and it is the round's anomaly |
+| 6 | `budget_exhausted` ≥ 32 and ≥ 117, `truncated` 0 | **34, 118, 0** | held |
+| 7 | other kinds within the cap's own price, `\|Δ\|` ≤ 5 pp | `always-in` ±3 games; `none` `heat` +4, `put` +4, **`puttwo` −7** | refuted as written on one kind |
+| 8 | `pack chars` 551, `parser` `any-line`, `max_steps` 30 | 551 in 274, `any-line` in 548, 30 in all eight summaries | held |
+
+**Per kind, against the cap's own price** (`always-in` then `none`, observed against the frozen prediction):
+
+| kind | `always-in` | `none` |
+| --- | --- | --- |
+| `clean` | 57/58 (cf 56) **+1** | 27/58 (cf 26) **+1** |
+| `cool` | 37/46 (cf 40) −3 | 30/46 (cf 32) −2 |
+| `examine` | 26/31 (cf 25) **+1** | 29/31 (cf 30) −1 |
+| `heat` | 35/39 (cf 37) −2 | 26/39 (cf 22) **+4** |
+| `put` | 50/59 (cf 49) **+1** | 32/59 (cf 28) **+4** |
+| `puttwo` | 35/41 (cf 35) 0 | 12/41 (cf 19) **−7** |
+
+Ten of the twelve rows sit within ±3 games of the prediction. The two that do not are both on the control, and both in
+the direction of *noise on a sample of 39–41 games*: `puttwo` at 41 games has an mde of ≈ 30 pp, so a 7-game row is not
+a mechanism, and it is reported as it fell rather than explained.
+
+### The anomaly that decides the next round
+
+Reading 5 held and reading 3 held, and the pair of them is the finding: on the nine `put` games that still lose, the
+model's narration per turn fell from **0.3533 to 0.2667** — a quarter — while `put` stayed at **50 of 59**. So the cap
+*did* what the sentence was bought to do, and the losses did not convert:
+
+| quantity, nine lost `put` games | cap 50 | cap 30 |
+| --- | --- | --- |
+| turns | 50.0 | **30.0** |
+| thoughts per game | 17.67 | **8.00** |
+| **thoughts per turn** | 0.3533 | **0.2667** |
+| recovered commands per game | 15.0 | 3.67 |
+
+**Narration was not what kept those games from finishing.** The budget shape is closed as an explanation, clause 1 fires
+on the level, and the residual floor is neither syntax (R183) nor budget (R184).
+
+### What the nine games are actually made of, which is the design of R185
+
+At cap 30 they split into two clusters, and the split is the first diagnosis this lane has of the floor that survived
+two repairs:
+
+| cluster | games | invalid actions | stalls | last line | what it is |
+| --- | --- | --- | --- | --- | --- |
+| **precondition** | **5** | 3, 5, 6, 7, 11 (mean 6.4) | 1–3 | `Nothing happens.` | a command the world rejects, repeatedly |
+| **budget** | 4 | 0–2 | 0 | mid-progress (`You open the drawer 15…`, `You arrive at cabinet 8…`) | valid actions, thirty turns ran out |
+
+A won `put` has **1.54** invalid actions in 12.8 turns; a lost one has **4.00** in 30. So five of the nine are not
+exploration depth at all — they are **preconditions the model does not hold**: a container must be open before
+something is taken out of it, and a receptacle is not a surface. That is a knowledge entry of a specific shape, and it
+is the shape AutoContext's schema calls `requirements` (addendum 1) rather than the "where is the object" entry the
+roadmap sketched as candidate 2.
+
+**Spend: ¥4.11 against ¥3.80 quoted** ($0.5751, 11,079 calls, off-peak in all eight summaries). Nine per cent over
+quote, and the reason is the same one R183 found in the opposite direction: the control runs 24.07 turns an episode
+against the bank arm's 16.36, so the arm that fails is the arm that bills.

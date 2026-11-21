@@ -662,10 +662,20 @@ neutral clause of the same length, while the length itself is free (−0.36 pp, 
 changed rather than the sentence: on `--parser any-line`, which executes the command the first-line rule refuses, the
 same bank reads **257/274 (93.80%)** against a re-bought control at **197/274 (71.90%)** — **+9.85 pp** for the bank arm
 and **+17.15 pp** for the control, and a memory effect of **+21.90 pp** where the reference channel says **+29.20 pp**.
-Those two levels are this lane's own reader and are **not** board rows; the reference-channel number is the one that sits
-beside a published one. Both readings, the
+Both levels are read on a harness this lane built, and the published rows were measured on the competitor's reader, so
+the held-out figure (**129/134 = 96.27%**) is quoted on the board only with that caveat attached and beside the family it
+belongs to; the reference channel reads **115/134 = 85.82%**. Both readings, the
 per-kind decomposition and the two sections are in `eval/drivers/alfworld/REGISTRATION.md`; the argument for
 reading them is in `WHITEPAPER.md` §3.5 of the [docs repository](https://github.com/AgentiX-E/microglia-docs).
+
+**Then the turn budget was cut from fifty to thirty on both arms, and it was pure budget.** 257 → **240** and
+197 → **156**, against frozen-behaviour predictions of 242 and 157 computed from the arms' own records: both within two
+games, so the cap changed the budget and nothing else, and the memory effect at the short cap (**+30.66 pp**) is
+**+31.02 pp** of arithmetic with nothing left over. The one thing that did move is thoughts per turn on the nine games
+that still lose — **0.3533 → 0.2667** with `put` unmoved at 50 of 59 — which says the cap suppressed narration and
+narration was not the cost. Those nine split into **five** that issue commands the world rejects (3 to 11 invalid
+actions, ending on `Nothing happens.`) and **four** that run out of turns mid-progress, so the floor that survived both
+repairs is a **precondition** the model does not hold.
 
 **Then the lane spent five arms finding nothing, and found a bug instead.** Five renderings of that one sentence —
 itself, plus a neutral clause, a true citation, a false citation, and the sentence with its second operation
