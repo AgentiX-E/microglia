@@ -2002,3 +2002,23 @@ under a thought that the lane executed instead of dropping. Counted in `recovere
 because the two are one event with two possible ends, and the pair is what shows that two channels drove the same model
 behaviour — the reference channel dropped 11.64 and 10.53 per `put` game, so the second channel recovering far fewer
 would mean it met a different model rather than the same one under a different reader.
+
+**Step cap** (`--max-steps`) — The turn budget the environment hands a pass, default 50, and simultaneously a number
+the model reads: the human turn is `"{instruction}You may take maximum of {max_steps} steps.\nHere are two examples:"`.
+It is the one lever in this lane that is **not orthogonal to the arm**, because arms win at different speeds — the bank
+arm's `put` wins in 13.1 steps and the control's in 21.8 — so the same cap takes 15 games from one arm and 40 from the
+other. Both sentences are the treatment: shortening the cap shortens the budget *and* changes the number in the prompt,
+and a fourth cell (short cap, long sentence) is the only way to separate them.
+
+**Pure-budget counterfactual** — The score an arm would read at a shorter step cap **if the model did exactly what it
+did at the longer one**, computed from artefacts already paid for as `|{e : e.won and e.steps <= cap}|`. It is a floor
+no behaviour can fall below and a ceiling only behaviour can raise, because a shorter cap is a strict subset of the
+feasible set — and unlike every other counterfactual in this lane it is **exact rather than sampled**, since it is
+recomputed from the same records instead of estimated from a null. `257 → 242` and `197 → 157` are the R183 numbers at
+a cap of thirty.
+
+**Budget inflation** — The part of a cross-arm delta at a shortened cap that is arithmetic rather than memory: at a cap
+of thirty the same model behaviour reads **+31.02 pp where the fifty-step pass read +21.90 pp**, and **+33.94 where
++29.20**, because the cap costs the slow arm more. It is why a reading at a new cap quotes absolute scores and prints
+the counterfactual beside them, and why a cross-arm delta at a new cap is a derived quantity whose null value is the
+inflation rather than zero.

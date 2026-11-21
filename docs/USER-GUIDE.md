@@ -5119,3 +5119,53 @@ python eval/drivers/alfworld/aggregate.py \
    channel buys the control again.
 5. **The reference channel stays the default forever.** An arm file written before `parser` existed reads as
    `reference`, because that is the only reader that existed — not as unknown.
+
+### 32.25 Shrinking the step cap, and why it is the one knob you must not compare arms across
+
+`--max-steps` is the environment's turn budget and it is also a sentence the model reads: the human turn is
+`"{instruction}You may take maximum of {max_steps} steps.\nHere are two examples:"`. Moving it is therefore two
+treatments at once — fewer turns, and a different number in the prompt — and it has a property no other lever in this
+lane has: **it is not neutral between arms, because different arms win at different speeds.**
+
+You can see the whole problem before spending anything, from an artefact you already have. Every episode records the
+step at which it won:
+
+```
+python - <<'PY'
+import json, glob, sys
+for path in sorted(glob.glob("run-…/arm-*.json")):
+    episodes = json.load(open(path))["episodes"]
+    won = sum(e["won"] for e in episodes)
+    at_30 = sum(1 for e in episodes if e["won"] and e["steps"] <= 30)
+    print(f"{path:44s} 50 steps {won:3d}/{len(episodes)}   30 steps (same behaviour) {at_30:3d}")
+PY
+```
+
+```
+run-…/arm-always-in-0.json   50 steps  31/34   30 steps (same behaviour)  31
+run-…/arm-always-in-1.json   50 steps  33/34   30 steps (same behaviour)  31
+run-…/arm-always-in-3.json   50 steps  32/32   30 steps (same behaviour)  31
+run-…/arm-none-0.json        50 steps  26/34   30 steps (same behaviour)  19
+run-…/arm-none-2.json        50 steps  22/34   30 steps (same behaviour)  19
+run-…/arm-none-3.json        50 steps  23/32   30 steps (same behaviour)  19
+```
+
+Those six lines are the R183 held-out artefacts and they contain the round's whole arithmetic: the treatment loses five
+games of 134 to a twenty-turn cut (129 → 124), the control loses nineteen of 134 (97 → 78). Same cap, two prices.
+
+The recomputation is a **floor**, not an estimate: a shorter cap cannot win a game the longer one did not, so the number
+is what the arm reads if the model does exactly what it did. Anything above it came from the model behaving differently,
+which is the only interesting part of the experiment.
+
+1. **`won` and `steps` are all you need.** `steps <= cap` is the counterfactual; no re-run, no null distribution, no band
+   around it. It is exact because it is a subset of the same records.
+2. **Do not read a cross-arm delta at the new cap as a memory effect.** In the lane's own numbers the cap costs the
+   control 40 games and the treatment 15, so the delta reads **+31.02 pp instead of +21.90 pp with the model frozen**.
+   The inflation is arithmetic, not memory.
+3. **Read each arm against itself.** "257 → X at thirty steps" is a statement about the arm; "A − B at thirty steps" is
+   a statement about the arm *and* about how the cap treats two different speed profiles.
+4. **The prompt sentence and the budget cannot be separated in one pass.** A fourth cell that shortens the cap but tells
+   the model fifty is the cell that separates them, and it is worth buying only after the cheaper pass shows an effect.
+5. **The dispatcher refuses two caps before the money leaves.** A non-integer (`30.0`) and anything below the shortest
+   win the corpus has recorded (three steps, over 6,096 episodes): the first would fail in eight jobs after the
+   environment install, the second would succeed and return zeroes that look like a mechanism that does not work.

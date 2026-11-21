@@ -1976,3 +1976,103 @@ thinking. That is the R184 question, and it is the first one this lane can ask t
 **Spend: ¥4.64 against ¥5.90 quoted** ($0.6490, 13,311 calls, four jobs an arm). The bank arm is the *cheaper* of the
 two — $0.2246 against $0.4244 — because a model that wins in 13 turns bills 13 turns: on this channel being right is
 what makes calls, where on the reference channel being wrong was.
+
+## R184 — The budget sentence, and a cap that is not a neutral knob
+
+The floor after R183 is nine `put` games that spend all fifty turns and end no closer: **17.67 thoughts** and **15.0
+recovered commands** each, at `0.3533` thoughts per turn, while a won `put` is **13.1 turns** and **1.38 thoughts**. The
+syntax no longer swallows the command, so what remains is what the model does with turns it is no longer forced to
+spend on the format. The nine losing games are, in the phrase the roadmap used before the round existed, *narration
+that has already executed*.
+
+The cheapest intervention that could change that is one number already in the prompt. `HUMAN_TEMPLATE` is
+`"{instruction}You may take maximum of {max_steps} steps.\nHere are two examples:"`, `--max-steps` is already a
+dispatch input, and the loop stops at `steps < max_steps`. So a cap of thirty is a one-token change to a sentence the
+model reads and a five-line change to where its turns run out: **no new code, no new bank, no new arm.**
+
+### The cap is the first knob in this lane that is not orthogonal to the arm
+
+Every episode record carries the step at which it won, so the score an arm *would* read at a cap of thirty **if the
+model did exactly what it did at fifty** is a deterministic function of runs already paid for: `won and steps <= 30`.
+It is a floor no behaviour can fall below and a ceiling only behaviour can raise.
+
+| channel | arm | at cap 50 | **same behaviour, cap 30** | the cap's price |
+| --- | --- | --- | --- | --- |
+| `any-line` | `always-in` | 257 (93.80%) | **242 (88.32%)** | −15 games |
+| `any-line` | `none` | 197 (71.90%) | **157 (57.30%)** | −40 games |
+| `reference` | `always-in` | 230 (83.94%) | **209 (76.28%)** | −21 games |
+| `reference` | `none` | 150 (54.74%) | **116 (42.34%)** | −34 games |
+
+The cap costs the control **2.7× more than it costs the bank arm** on the channel under test, because the bank arm wins
+fast — mean 15.6 steps on `clean`, 13.1 on `put`, `examine` 15.9 — and the control wins slow: 28.0, 21.8 and 13.7 on
+the same three kinds. So the memory effect at cap thirty would read **+31.02 pp instead of +21.90 pp with no change in
+behaviour at all**, and **+33.94 instead of +29.20** on the reference channel. A shrunk cap is not a neutral harness
+knob: it is a treatment whose size is *correlated with the arm*, and it flatters memory by 4.7 to 9.1 pp by arithmetic
+alone.
+
+**Consequence for this round, fixed before buying.** The primary readings are the two **absolute** scores, each arm
+against itself at fifty. Every cross-arm row quoted at cap thirty is quoted with the inflation in the same sentence,
+and the within-cap memory delta is **not** registered as a reading: it is a derived quantity whose null value is
++31.02 and whose interpretable part is whatever the absolute scores leave over.
+
+### What the cap costs, per kind, if behaviour does not change
+
+| kind | `always-in` 50 → 30 | `none` 50 → 30 | the shape of the loss |
+| --- | --- | --- | --- |
+| `clean` | 58 → 56 | **39 → 26** | the control's slowest kind loses a third |
+| `cool` | 43 → 40 | 36 → 32 | |
+| `examine` | 28 → 25 | 31 → 30 | the bank arm pays most where it is one game from ceiling |
+| `heat` | 38 → 37 | **31 → 22** | |
+| `put` | **50 → 49** | 35 → 28 | the bank arm loses **one** game of fifty |
+| `puttwo` | 40 → 35 | 25 → 19 | |
+
+`put` is the least sensitive kind on the bank arm: **one game in fifty** is lost to a twenty-turn cut, which is the
+round's whole premise restated as a number — the nine that still lose cannot be rescued by budget, only by acting
+inside it. On the control, `put` loses seven: the same mechanism, opposite sign, because its wins are slow.
+
+### Registered readings
+
+Four jobs an arm, `any-line` channel, `banks/bank-putmove-line-1.json`, 274 games (140 seen, 134 held out),
+`--max-steps 30`, both arms in one dispatch so the pairing is by construction:
+
+1. **`always-in@anyline` above 242**, band **246 to 262** (91.4% of the gap to the nine lost `put` games at the top of
+   the band). The floor is exact rather than sampled, because it is computed from the same episode records rather than
+   estimated from a null: **any excess at all is behaviour, and the round's question is how much.**
+2. `none@anyline` above 157, band **162 to 190**.
+3. `put`, `always-in`: **48 to 53 of 59** (cap-50 baseline 50, budget-only 49). Above 53 means the sentence made the
+   model act on games where the cap alone would not have.
+4. `put`, `none`: **26 to 36 of 59** (baseline 35, budget-only 28). The control's band is the wider one on purpose:
+   its nine-game drop is arithmetic, and the question is whether the sentence recovers any of it.
+5. **Thoughts per turn on a lost `put`, `always-in`: ≤ 0.30** against `0.3533`. Per turn rather than per game, for
+   R183's reason: a cap changes the denominator and the numerator together, and only the rate is the same quantity.
+6. `budget_exhausted` rises on both arms to at least 32 and 117 respectively, and `truncated` stays 0.
+7. The other five kinds stay within the cap's own price — `|Δ| ≤ 5 pp` except where the table above says otherwise,
+   and there the registered shape is the table's number, not a surprise.
+8. `pack chars` exactly 551 and `parser` `any-line` in all 548 episodes; `max_steps` 30 in all eight summaries.
+
+### Refutation
+
+1. **`always-in@anyline` at or below 242.** The sentence does not discipline narration; its only effect was to shorten
+   the budget; the budget shape is closed as an explanation for the nine lost `put` games; the residual floor is a
+   knowledge gap and R185 is the belief entry (roadmap candidate 2), not a smaller cap.
+2. **Inside band 1 but `none` below 157.** The cap traded the control's slow wins for the bank arm's fast ones. The
+   round is then a null with a *measured* inflation, the cross-arm rows are descriptive, and the cap is recorded as a
+   harness setting rather than an intervention.
+3. **`put` above 53 on either arm.** The nine lost games were not exploration depth, and R183's closing sentence — that
+   the floor is depth of search rather than the reader — is retracted in the amendment that reports it.
+
+### Void
+
+Any episode whose `parser` is not `any-line`, any summary whose `max_steps` is not 30, a channel with fewer than 274
+games, or an episode the environment refuses past step 30. The cap has to be the only difference from R183 or the
+comparison it is for does not exist.
+
+### The confound this round cannot remove, priced
+
+The treatment is two things at once: the loop stops at thirty, and the sentence says thirty. A fourth cell — cap thirty,
+sentence fifty — separates them, costs ≈ ¥1.9 (one arm, both sections), and is registered as the follow-up only if
+reading 1 is positive: if the cap does nothing there is nothing to attribute, and if it does, the attribution is worth
+a fifth of what the attribution of the round itself cost. That asymmetry is why the cell is not bought now.
+
+**Price ≈ ¥3.80**, eight jobs, shorter episodes, off-peak band. At the peak band the same pass is ≈ ¥7.6, which is why
+the dispatch holds its paid step until the window opens.

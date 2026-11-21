@@ -52,6 +52,11 @@ HELD_OUT = "eval_out_of_distribution"
 # to refuse a dispatch that would spend money on an argument the driver cannot honour, and it refuses before the API
 # call rather than inside twelve jobs.
 PARSERS = ("reference", "any-line")
+# The shortest win across every episode this lane has recorded — three steps, over the 6,096 episodes on hand when
+# R184 made the step cap a variable. A cap below it is a cap that cannot win any game in the corpus, and the number is
+# recorded rather than chosen so that the guard is an assertion about the corpus instead of a taste.
+SHORTEST_WIN = 3
+RECORDED_EPISODES = 6096
 
 
 class Refused(Exception):
@@ -265,6 +270,19 @@ def check(arguments, tree=None):
         # after the environment install, in twelve jobs, with the money committed. Checked here, where the refusal is
         # still free.
         raise Refused(f"--parser {arguments.parser!r} is not one of {PARSERS}")
+    if not arguments.max_steps.isdigit():
+        # R184 is the first round that moves the cap, so the flag stops being a constant nobody types. The workflow
+        # hands it to `agent.py` as `type=int`, which means `30.0` survives this payload and dies in eight jobs after
+        # the environment install; the refusal is free on this side of the API call.
+        raise Refused(f"--max-steps {arguments.max_steps!r} is not a whole number of steps")
+    if int(arguments.max_steps) < SHORTEST_WIN:
+        # A cap below the shortest win the corpus has ever produced cannot win a game, so the pass would spend eight
+        # jobs to read zeroes that nobody could tell from a broken run. The floor is a recorded number rather than a
+        # preference: see SHORTEST_WIN.
+        raise Refused(
+            f"--max-steps {arguments.max_steps} is below the shortest win this lane has recorded "
+            f"({SHORTEST_WIN} steps in {RECORDED_EPISODES:,} episodes), so a pass at it cannot win a game"
+        )
     if arguments.gate_share:
         try:
             share = float(arguments.gate_share)

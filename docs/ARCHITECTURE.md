@@ -2730,3 +2730,53 @@ the default forever: an artefact written before the field reads as the reference
 reader that existed rather than an unknown. The command leaves by the same door an action leaves by — `env.step` — so
 `steps`, `actions`, `invalid_actions` and `digest` keep their meanings, and a recovered turn is answered with an
 observation rather than with `Nothing happens.`
+
+### 8.46 The step cap is a knob, and it is the first one that is not orthogonal to the arm
+
+Every other lever this lane has pulled — the entry's content, its length, its phrasing, its source, its citation, the
+reader that executes what the first line refused — was applied to both arms through the same harness, so a difference
+between arms could only come from the arm. `--max-steps` is not that kind of lever. It is a one-token change to a
+sentence the model reads (`HUMAN_TEMPLATE` formats `max_steps` into *"You may take maximum of N steps."*) and a
+five-line change to where the loop stops, and its effect is **asymmetric between arms because the arms win at different
+speeds**.
+
+The asymmetry is measurable before it is bought, which is why the design decision is to measure it first. Every episode
+record carries the step at which it won, so the score an arm *would* read at a shorter cap, **if the model did exactly
+what it did at the longer one**, is a deterministic function of artefacts already paid for:
+
+```
+counterfactual(arm, cap) = |{ episode in arm : episode.won and episode.steps <= cap }|
+```
+
+That quantity is a **floor** no behaviour can fall below and a **ceiling** only behaviour can raise: a pass that moves
+the cap cannot win a game the longer cap did not win *unless* the change made the model behave differently, because
+the shorter cap is a strict subset of the feasible set. It is therefore the rare counterfactual in this lane that is
+exact rather than sampled — computed from the same records rather than estimated from a null distribution — which makes
+the round that uses it sharper than a two-arm band and, in one direction, unfalsifiable only by the model's own change
+of behaviour.
+
+| channel | arm | at cap 50 | same behaviour at cap 30 | price |
+| --- | --- | --- | --- | --- |
+| `any-line` | `always-in` | 257/274 | 242/274 | −15 games |
+| `any-line` | `none` | 197/274 | 157/274 | −40 games |
+| `reference` | `always-in` | 230/274 | 209/274 | −21 games |
+| `reference` | `none` | 150/274 | 116/274 | −34 games |
+
+**The consequence is a reporting rule, not a footnote.** A cap costs the control 2.7× what it costs the bank arm on the
+channel under test, so the memory effect computed at a shorter cap is **+31.02 pp where it was +21.90 pp, with no change
+in behaviour at all**. A cap therefore cannot be used to compare arms; it can only be used to compare an arm against
+itself. Two rules follow and both are enforced in how the round is registered rather than in code, because the
+arithmetic is a property of the artefacts and a guard in `aggregate.py` would have to know which cap each artefact ran
+at — which it does, in `max_steps`, and could in principle check; the reason it does not is that a cross-cap comparison
+is sometimes exactly what is wanted and the reader, not the tool, is the one who can say so.
+
+1. **Absolute scores are the reading; cross-arm deltas at the new cap are derived quantities** whose null value is the
+   counterfactual difference, not zero.
+2. **The counterfactual is printed with the reading**, so a reader who sees +31 pp is told in the same table that +31 is
+   what the arithmetic says with the model frozen.
+
+The other half of the design is a guard that stops the money before the cap can be wrong: `scripts/alf_dispatch.py`
+refuses a `--max-steps` that is not a whole number, and refuses one **below the shortest win the corpus has recorded**
+(three steps in 6,096 episodes). Both refusals exist because the driver takes `type=int` after the environment install:
+a `30.0` or a `2` would otherwise be discovered in eight jobs with the money committed, and the second of the two would
+not even fail — it would return eight zeroes that look exactly like a mechanism that does not work.

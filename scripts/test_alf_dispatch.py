@@ -138,6 +138,32 @@ class RefusalTest(unittest.TestCase):
         # jobs, after the environment install, with the money committed. The refusal belongs here, where it is free.
         self.assertIn("not one of", self.refused("--arm", "none", "--parser", "any_line", "--games", "134"))
 
+    def test_a_step_cap_that_is_not_a_whole_number_is_refused(self):
+        # R184 is the first round that moves the cap, so the flag stops being a constant nobody types. `--max-steps 30`
+        # reaches the driver as `type=int`, which means `30.0` would parse in the payload and fail in eight jobs after
+        # the environment install. The refusal is free here and costs a runner there.
+        self.assertIn("whole number", self.refused("--sweep", "true", "--rules", "b.json", "--max-steps", "30.0"))
+
+    def test_a_step_cap_below_the_shortest_recorded_win_is_refused(self):
+        # The shortest win in the 6,096 episodes this lane has recorded is three steps, so a cap of two is a pass that
+        # cannot win a game: it would spend eight jobs to read zeroes that nobody could tell from a broken run.
+        self.assertIn("shortest win", self.refused("--sweep", "true", "--rules", "b.json", "--max-steps", "2"))
+
+    def test_a_step_cap_of_three_is_the_floor_and_is_accepted(self):
+        # The boundary is the recorded minimum, so the guard has to be tested on both sides of it or it is a guard
+        # against one number rather than against a class of command line.
+        self.assertEqual(
+            lane.check(arguments("--sweep", "true", "--rules", "b.json", "--arms", '["always-in","none"]', "--max-steps", "3")),
+            ["always-in", "none"],
+        )
+
+    def test_the_step_cap_travels_with_the_dispatch(self):
+        # The cap is a property of the pass, not of an arm: a payload that dropped it would buy both arms at fifty and
+        # the round would read as a null for a reason that lives in this file.
+        self.assertEqual(
+            lane.payload(arguments("--sweep", "true", "--max-steps", "30"))["max_steps"], "30"
+        )
+
     def test_a_channel_travels_with_the_dispatch(self):
         # Every channel is a channel for both arms, so the input is not conditional on the arm: R183 buys the control
         # and the treatment on the second reader, and a payload that dropped the flag would buy two reference runs.
