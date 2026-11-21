@@ -144,6 +144,24 @@ class PackTest(unittest.TestCase):
             agent.PACK_HEADER + "\n1. a rule\n2. another\n\n",
         )
 
+    def test_a_transcript_entry_keeps_one_number_and_indents_its_own_lines(self):
+        # A bank may hold one verbatim trajectory segment rather than advice, and the block has to read as one item
+        # rather than as a numbered line followed by unnumbered prose — otherwise the numbering counts one thing and
+        # the text says five.
+        segment = "Nothing happens.\n> move toiletpaper 1 to toiletpaperhanger 1\nYou move the toiletpaper 1."
+        self.assertEqual(
+            agent.render_pack([segment]),
+            agent.PACK_HEADER
+            + "\n1. Nothing happens.\n   > move toiletpaper 1 to toiletpaperhanger 1\n   You move the toiletpaper 1.\n\n",
+        )
+
+    def test_a_single_line_entry_renders_exactly_as_it_always_has(self):
+        # The multi-line branch must not change one byte of every arm bought before this round: their rendered
+        # lengths are quoted in the register and their prices were computed from them.
+        for text in ("a rule", "a rule with  double  spaces", "a rule with a trailing period."):
+            with self.subTest(text=text):
+                self.assertEqual(agent.render_pack([text]), agent.PACK_HEADER + f"\n1. {text}\n\n")
+
     def test_the_header_is_the_competitors_rule_template_verbatim(self):
         # `RULE_TEMPLATE['alfworld']` in `prompts/templates/human.py@LeapLabTHU/ExpeL`, at the blob this
         # lane's examples come from (`2b2093ef`). Pinned as a string rather than described, because the

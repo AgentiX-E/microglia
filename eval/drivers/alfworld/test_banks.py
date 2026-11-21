@@ -258,5 +258,46 @@ class DesignTest(unittest.TestCase):
         self.assertGreater(self.rendered("bank-putpair-2.json"), self.rendered("bank-putpair-terse-2.json"))
 
 
+class RawTrajectoryTest(unittest.TestCase):
+    """The bank that is evidence rather than advice, at the length of the advice it is compared to.
+
+    `arXiv:2605.12978` finds that repeated abstraction degrades a useful memory and that raw trajectories stay
+    competitive. This lane has spent five rounds distilling advice and never once offered the model the evidence
+    the advice was distilled from, so the claim has never been testable here. It is testable in one arm: the
+    verbatim segment of a won training game that shows a failed `put`, the model's own reasoning about phrasing,
+    and the `move` that succeeded — 505 rendered characters against the one-sentence arm's 489.
+    """
+
+    def payload(self) -> dict:
+        return payload_of("bank-rawput-1.json")
+
+    def test_the_segment_is_verbatim_evidence_and_names_both_operations(self):
+        text = self.payload()["entries"][0]["text"]
+        for phrase in ("Nothing happens.", "> move toiletpaper 1 to toiletpaperhanger 1", "You move the toiletpaper 1"):
+            with self.subTest(phrase=phrase):
+                self.assertIn(phrase, text)
+        # Multi-line is what makes it evidence rather than a sentence, and the bank has to declare it for the
+        # validator to accept it and for `render_pack` to indent it under one number.
+        self.assertIn("\n", text)
+        self.assertEqual(self.payload()["render"], "transcript")
+
+    def test_it_is_matched_in_length_to_the_one_sentence_arm(self):
+        rendered = len(driver.render_pack([self.payload()["entries"][0]["text"]]))
+        self.assertAlmostEqual(rendered / 489, 1.0, delta=0.05)
+
+    def test_it_carries_the_run_and_the_game_it_came_from(self):
+        # A trajectory without provenance is a story. The register quotes the run id and the gamefile so the
+        # segment can be re-read out of the artefact rather than trusted.
+        source = self.payload()["source"]
+        self.assertIn("44731175801", source["provenance"])
+        self.assertIn("game.tw-pddl", source["provenance"])
+        self.assertIn("verbatim", source["construction"])
+
+    def test_a_multiline_bank_without_the_declaration_is_refused(self):
+        payload = self.payload()
+        payload.pop("render")
+        self.assertIn("entry 1 spans more than one line", distill.validate_bank(payload))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -276,7 +276,10 @@ def validate_bank(payload: dict) -> "list[str]":
             defects.append(f"entry {position} is empty")
         elif text != text.strip():
             defects.append(f"entry {position} is untrimmed")
-        if "\n" in text:
+        if "\n" in text and payload.get("render") != "transcript":
+            # A bank that holds a verbatim transcript says so (`"render": "transcript"`), and `render_pack` then
+            # indents the continuation lines under one number. Without the flag a second line is a line the model
+            # reads as part of the previous rule while the numbering no longer counts what it appears to count.
             defects.append(f"entry {position} spans more than one line")
         if re.match(r"\s*\d+\.\s", text):
             defects.append(f"entry {position} carries its own number")

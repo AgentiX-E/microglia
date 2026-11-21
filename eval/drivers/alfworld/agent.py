@@ -284,6 +284,11 @@ def render_pack(entries: "list[str]") -> str:
     own emptiness is information the `none` arm does not receive, and the two arms would then differ in
     two places instead of one.
 
+    A multi-line entry keeps its number on the first line and is indented under it, so a bank that holds a
+    verbatim transcript renders as one item rather than as a numbered line followed by unnumbered prose. For
+    a single-line entry — every bank before `bank-rawput-1.json` — the two branches produce the same bytes,
+    which is what keeps every earlier arm's rendered length and price unchanged.
+
     The trailing blank line is this file's separator between the block and the room description that
     follows it. The competitor separates the same two things with a task line (`Now it's your turn!`),
     which this skeleton carries at the top of the first human turn instead; see the module docstring on
@@ -293,7 +298,9 @@ def render_pack(entries: "list[str]") -> str:
         return ""
     lines = [PACK_HEADER]
     for index, text in enumerate(entries, start=1):
-        lines.append(f"{index}. {text}")
+        body = str(text).split("\n")
+        lines.append(f"{index}. {body[0]}")
+        lines.extend(f"   {line}" for line in body[1:])
     return "\n".join(lines) + "\n\n"
 
 

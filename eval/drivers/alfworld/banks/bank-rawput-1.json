@@ -1,0 +1,23 @@
+{
+ "schema": "microglia.alfworld-bank/1",
+ "cap": 20,
+ "identity": "substring",
+ "render": "transcript",
+ "source": {
+  "kind": "one verbatim trajectory segment",
+  "matches": "the successful placement in a won training game, from the failed put to its confirmation",
+  "note": "the raw counterpart of banks/bank-putmove-1.json at 493 rendered characters: the same evidence, shown rather than stated; R176 row 1",
+  "registration": "R176 row 1",
+  "provenance": "run 44731175801, json_2.1.1/valid_seen/pick_and_place_simple-ToiletPaper-None-ToiletPaperHanger-406/trial_T20190908_122858_883968/game.tw-pddl",
+  "construction": "lines from the 'Nothing happens.' that follows a failed put to the observation confirming the move, verbatim, no edit"
+ },
+ "entries": [
+  {
+   "text": "Nothing happens.\n> think: The put action isn't working. Maybe the toiletpaperhanger is a receptacle that requires a specific interaction. Let me try \"move toiletpaper 1 to toiletpaperhanger 1\".\nOK.\n> move toiletpaper 1 to toiletpaperhanger 1\nYou move the toiletpaper 1 to the toiletpaperhanger 1.",
+   "votes": 0,
+   "kinds": [
+    "put"
+   ]
+  }
+ ]
+}
