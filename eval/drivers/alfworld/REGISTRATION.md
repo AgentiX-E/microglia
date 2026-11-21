@@ -1680,8 +1680,8 @@ holds. Every void condition holds.
 
 | arm | seen, 140 | held out, 134 | pooled, 274 | bill |
 | --- | --- | --- | --- | --- |
-| `always-in` @ the anchor | 113 | **114** | **227 (82.85%)** | $0.61 (¥4.35) |
-| `none` | 69 | 81 | 150 (54.74%) | $0.54 (¥3.85) |
+| `always-in` @ the anchor | 113 | **114** | **227 (82.85%)** | $0.3139 (¥2.24) |
+| `none` | 69 | 81 | 150 (54.74%) | $0.5061 (¥3.62) |
 
 **Two readings, and they are different questions.**
 
@@ -1719,8 +1719,11 @@ this round readable. It does not say the repair helped: +1.82 pp on the same ban
 treatment. And it does not touch the family's earlier nulls, which were measured on the pre-repair driver with both
 arms paying the same defect.
 
-**Spend: ¥8.20 against ¥4.70 quoted** ($1.1473, 22,769 calls). The estimate assumed four shards an arm at the
-single-arm price; a two-arm sweep runs eight and the floor job beside them.
+**Spend: ¥5.86 against ¥4.70 quoted** ($0.8200, 16,071 calls, two dispatches). The estimate assumed four shards an
+arm at the single-arm price; a two-arm sweep runs eight per section. The join's own `bill` line reads $1.1473 over
+22,769 calls because it includes the pre-repair anchor arm (R178's ¥2.34), which was bought then and is not money
+this round spent — and the control is the dearer arm here ($0.5061 against $0.3139) because a lost game bills every
+one of its fifty turns: being wrong is what makes calls.
 
 ## R182 — The format is the binding constraint, so the dead operation's slot gets the live one
 
