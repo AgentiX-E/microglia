@@ -1771,3 +1771,45 @@ R181's post-repair `none`, and the comparison for the mechanism is R180 1a.
 
 **Cost.** One dispatch, one arm, both sections — **≈ ¥2.35**, and the last round that can be read against a control it
 did not buy.
+
+## R182, amendment 1 — bought, and the format entry pays a little without stopping the format
+
+One dispatch per section, one arm, 274 games; `pack chars` exactly 551 in every game; the entry keeps the first
+operation's 157 characters and differs from R180 1a only in its 197-character tail. Every void condition holds.
+
+| arm | seen, 140 | held out, 134 | pooled, 274 | bill |
+| --- | --- | --- | --- | --- |
+| **1a** operation (1) + the format operation | **115** | **115** | **230 (83.94%)** | $0.3106 (¥2.22) |
+
+| pairing | delta | 95% CI | p | discordant | mde |
+| --- | --- | --- | --- | --- | --- |
+| 1a − R180 1a (the registered comparison) | **+3.65 pp** | [−1.09, +8.39] | 0.146 | 44 | **6.78 pp** |
+| 1a − R181's post-repair `none` (the absolute level) | **+29.20 pp** | [+23.36, +35.04] | < 0.001 | 90 | 9.70 pp |
+| 1a − R181's post-repair anchor (two 551-character entries) | +1.09 pp | [−3.28, +5.47] | 0.668 | 37 | 6.22 pp |
+
+**Predictions: two held, one failed, and the failure is the informative one.**
+
+| registered | read | verdict |
+| --- | --- | --- |
+| `refused_actions` below **5** per `put` game | **9.90** | **failed** — the entry did not stop the format |
+| `put` **21 to 29 of 59** (+6 to +20 pp) | **24/59, +11.86 pp** | held |
+| pooled **+3 to +12 pp** | **+3.65 pp** | held, and inside its own mde |
+| \|Δ\| ≤ 5 pp on the other five kinds | `examine` +12.90 (4 games), `heat` −5.13, rest ≤ 3.45 | refuted as written |
+
+**What the failure means.** The entry cut refusals from 11.64 to **9.90** per `put` game — 15% of them — and put
+gained seven games. But a model that had *understood* the entry would write no thought-and-command replies at all, and
+the count would be near zero. It is not: the format is largely intact, so what moved is the marginal turn rather than
+the shape. That is a smaller mechanism than the one registered, and the honest reading of `put`'s +11.86 pp is
+**unresolved**: 59 games at this discordance have an mde of 19 pp, so +11.86 is a point estimate inside its own floor.
+
+**The level is a new high, and it is inside the noise.** 230/274 (83.94%) and **115/134 = 85.82%** are the best numbers
+this lane has read, three games above R181's 227 on a different entry at the same length. Three games at an mde of 6.22
+is nothing, and it is reported as nothing; what the round establishes is a second 274-game observation of the same
+neighbourhood, which is what the family now has six of.
+
+**Where the headroom still is.** `put` is 59 of 274 games and reads 24 wins — **40.7%** — while every other kind is
+between 88 and 100%. The control's `put` is 4 of 59. So the remaining 15 points of the corpus live almost entirely in
+one kind whose failures are, by the counter's own testimony, a format the few-shot examples teach and a prompt-level
+entry moves by 15%.
+
+**Spend: ¥2.22 against ¥2.35 quoted** ($0.3106, 6,177 calls), two dispatches, one arm each.
