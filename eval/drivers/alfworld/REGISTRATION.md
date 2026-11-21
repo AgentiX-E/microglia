@@ -1259,3 +1259,65 @@ games the minimum detectable effect falls from 12–13 pp to ≈ 9 pp, so this p
 parent named, so the reading prints a delta per section beside the pooled one. That grading is the pre-registered
 question rather than a diagnostic — if the effect is held-out-only, the seen section reads ≈ 0 and the pooled
 number is the average of an effect and a null.
+
+## R177, amendment 2 — the sentence wins on both sections, and the two cannot be told apart
+
+Bought as registered in amendment 1: two arms on `eval_in_distribution`, 140 games, one control in the same
+dispatch. Joined to R174.1's held-out pair for the 274-game estimate the round was registered for.
+
+| arm | section | won | rate | bill | per win |
+| --- | --- | --- | --- | --- | --- |
+| `none` | `eval_in_distribution` | 75/140 | 53.57% | $0.2574 (¥1.84) | $0.0034 |
+| `always-in`, 489 ch | `eval_in_distribution` | **111/140** | 79.29% | $0.1801 (¥1.29) | $0.0016 |
+| `none` | `eval_out_of_distribution` (R174.1) | 88/134 | 65.67% | $0.2201 (¥1.57) | $0.0025 |
+| `always-in`, 489 ch (R174.1) | `eval_out_of_distribution` | **112/134** | 83.58% | $0.1506 (¥1.08) | $0.0013 |
+
+| reading | delta | 95% CI | p | mde |
+| --- | --- | --- | --- | --- |
+| seen section, 140 | **+25.71 pp** | [+17.86, +34.29] | < 0.001 | 13.28 pp |
+| held-out section, 134 | +17.91 pp | [+8.96, +26.87] | < 0.001 | 14.18 pp |
+| **pooled, 274** | **+21.90 pp** | [+15.69, +28.10] | < 0.001 | **9.70 pp** |
+| seen − held-out | +7.80 pp | [−4.63, +20.27] | 0.226 | — |
+
+**1. The registered negative result did not happen, and the registered positive one did.** The row was written
+with three outcomes, the second of which was *"< +5 pp, or a seen-section gain under +8 pp → the effect is a
+property of the held-out section"*. The seen section read **+25.71 pp**, larger than the held-out section's
++17.91. A memory that only paid in the rooms it was not tuned for would have been a split artefact; this one pays
+in both, and the pooled estimate is 21.90 pp against an mde of 9.70.
+
+**2. The two sections are not distinguishable, and that is the honest form of the answer.** The difference is
++7.80 pp with an interval of [−4.63, +20.27] and p = 0.226 — a 274-game design cannot separate a seen-section
+gain of 25.7 from a held-out gain of 17.9. Reporting the pooled number as if it were one population would be
+wrong, and reporting the two as different would be wrong too; `by section` prints both for that reason.
+
+**3. Why the seen section's control is nine points lower, and why it is not a defect.** `none` reads 75/140
+(53.57%) there against 88/134 (65.67%) held out, and the whole difference is composition: `put` is 35 of the 140
+seen games and 24 of the 134 held-out ones, and `put` is the kind no arm wins without the sentence (3/35 and
+2/24). The per-kind rates agree within a point everywhere else. A pooled *rate* over the two sections is
+therefore an average over two mixtures, which is the second reason the reading is graded rather than pooled.
+
+**4. `examine` is negative on both sections, and it is the only entry the sentence does not repair.** Pooled by
+kind:
+
+| kind | sentence | control | delta |
+| --- | --- | --- | --- |
+| `cool` | 43/46 | 29/46 | **+30.4 pp** |
+| `heat` | 38/39 | 27/39 | +28.2 pp |
+| `put` | 24/59 | 8/59 | +27.1 pp |
+| `puttwo` | 38/41 | 28/41 | +24.4 pp |
+| `clean` | 53/58 | 40/58 | +22.4 pp |
+| `examine` | 27/31 | **31/31** | **−12.9 pp** |
+
+The control wins **every one of the 31 `examine` games** across both sections, and the sentence costs four of
+them. That is not a dilution effect and not a variance artefact: it is the same sign in two dispatches on two
+sections, and `examine` is the one kind with no placement step — the sentence names a `put`→`move` repair, which
+on a `look_at_obj_in_light` game can only be noise. **The sentence is negative exactly where it has no referent.**
+
+**5. What this changes in the product.** The lane's headline is now a 274-game estimate rather than a 134-game
+one: **81.39% with a 489-character sentence against 59.49% without, +21.90 pp, $0.0016 per win**. The 134-game
+number stays quotable because it is the number ExpeL reports on, and the 274-game number is the one this
+programme will defend. The conditional-delivery hypothesis (`examine` should receive nothing) is licensed by
+reading 4 and is **not** testable at this design: four games out of 274 is 1.5 pp against an mde of 9.7.
+
+**Price.** ¥3.13 for the two seen-section arms against ¥2.8 quoted; the overrun is the control's, which is the
+expensive arm in every dispatch — a losing arm is billed for the steps it loses (AUDIT 34.248).
