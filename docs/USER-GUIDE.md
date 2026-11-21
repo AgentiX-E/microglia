@@ -5166,6 +5166,11 @@ which is the only interesting part of the experiment.
    a statement about the arm *and* about how the cap treats two different speed profiles.
 4. **The prompt sentence and the budget cannot be separated in one pass.** A fourth cell that shortens the cap but tells
    the model fifty is the cell that separates them, and it is worth buying only after the cheaper pass shows an effect.
-5. **The dispatcher refuses two caps before the money leaves.** A non-integer (`30.0`) and anything below the shortest
+5. **The join refuses a cap span until you name it.** `aggregate.py` reads `max_steps` from every slice, treats a
+   missing field as 50 (the only cap any earlier reading ran at), refuses one label at two caps outright, and refuses a
+   join across caps until `--expect-caps 50,30` says that is what is being compared — then prints `budget
+   always-in 30 vs none 50` above the delta. It is the same rule as the parser channel's, for the sharper reason above:
+   an undeclared cap span is not an average of two populations, it is a difference that is partly arithmetic.
+6. **The dispatcher refuses two caps before the money leaves.** A non-integer (`30.0`) and anything below the shortest
    win the corpus has recorded (three steps, over 6,096 episodes): the first would fail in eight jobs after the
    environment install, the second would succeed and return zeroes that look like a mechanism that does not work.

@@ -1146,5 +1146,137 @@ class RelabelTest(unittest.TestCase):
         )
 
 
+
+class CapTest(unittest.TestCase):
+    """The join refuses to pool two step caps until it says that is what it is comparing.
+
+    R184 makes the turn budget a variable for the first time, and the budget is a *harness* exactly as the reader is:
+    one arm cannot be driven at two caps, and a rate pooled over two caps is a rate about the budget. The strictness is
+    the same as the channel's and for a sharper reason: the cap's price is not symmetric between arms (R184 computes 15
+    games for the bank and 40 for the control), so an undeclared cap span is not an average of two populations but a
+    comparison whose difference is partly arithmetic.
+    """
+
+    def setUp(self):
+        self.paths = []
+
+    def tearDown(self):
+        for path in self.paths:
+            path.unlink(missing_ok=True)
+
+    def write(self, name: str, payload: dict) -> Path:
+        path = HERE / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        self.paths.append(path)
+        return path
+
+    def test_an_artefact_from_before_the_field_is_fifty_steps(self):
+        # Every reading before R184 was driven at the environment's own cap, which is the driver's default. Reading a
+        # missing field as "unknown" would make the cap span unreadable; reading it as anything else would be a guess.
+        old = self.write("cap-old.json", {"summary": summary("none"), "episodes": [episode("g1", True)]})
+        self.assertEqual(aggregate.caps(aggregate.load_slices([old])), {"none": "50"})
+
+    def test_a_join_that_spans_two_caps_is_refused_until_it_names_them(self):
+        left = self.write(
+            "cap-50.json", {"summary": summary("none"), "episodes": [episode("g1", True), episode("g2", False)]}
+        )
+        right = self.write(
+            "cap-30.json",
+            {"summary": summary("always-in", max_steps=30), "episodes": [episode("g3", True), episode("g4", True)]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([left, right])
+        self.assertIn("--expect-caps", printed.getvalue())
+
+    def test_one_arm_cannot_span_two_caps(self):
+        # The same label driven at two budgets is two treatments, and averaging them prints a rate nobody designed.
+        left = self.write("cap-a.json", {"summary": summary("none"), "episodes": [episode("g1", True)]})
+        right = self.write(
+            "cap-b.json", {"summary": summary("none", max_steps=30), "episodes": [episode("g2", True)]}
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([left, right], (), (), (), (50, 30))
+        self.assertIn("two budgets", printed.getvalue())
+
+    def test_a_named_cap_span_is_allowed(self):
+        left = self.write("cap-c.json", {"summary": summary("none"), "episodes": [episode("g1", True)]})
+        right = self.write(
+            "cap-d.json", {"summary": summary("always-in", max_steps=30), "episodes": [episode("g2", True)]}
+        )
+        grouped = aggregate.load_slices([left, right], (), (), (), (50, 30))
+        self.assertEqual(aggregate.caps(grouped), {"none": "50", "always-in": "30"})
+
+    def test_a_declared_span_the_slices_do_not_have_is_refused(self):
+        # A declaration is a claim about the artefacts, so a join that names 30 and drove 20 is refused: the reading's
+        # own arithmetic would be about a budget nobody bought.
+        left = self.write("cap-e.json", {"summary": summary("none"), "episodes": [episode("g1", True)]})
+        right = self.write(
+            "cap-f.json", {"summary": summary("always-in", max_steps=20), "episodes": [episode("g2", True)]}
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([left, right], (), (), (), (50, 30))
+        self.assertIn("--expect-caps", printed.getvalue())
+
+    def test_a_cap_that_is_not_a_number_is_refused(self):
+        # `max_steps` arrives from a JSON artefact, not from this parser, so it is the one field in the header the
+        # join cannot assume was validated on the way in.
+        odd = self.write("cap-g.json", {"summary": summary("none", max_steps="thirty"), "episodes": [episode("g1", True)]})
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([odd])
+        self.assertIn("max_steps", printed.getvalue())
+
+
+    def test_the_pass_prints_the_budget_of_each_arm(self):
+        # R184's whole point is that a cap is not neutral, so a reading whose two arms ran at two caps has to print
+        # both above the delta: the number is then partly a statement about the budget, and nothing else in the
+        # output would say which budget either arm had.
+        original = sys.argv
+        treatment = HERE / "cap-print-a.json"
+        control = HERE / "cap-print-b.json"
+        treatment.write_text(
+            json.dumps({"summary": summary("always-in", max_steps=30), "episodes": [episode("g1", True, max_steps=30)]}),
+            encoding="utf-8",
+        )
+        control.write_text(
+            json.dumps({"summary": summary("none"), "episodes": [episode("g1", False)]}), encoding="utf-8"
+        )
+        sys.argv = [
+            "aggregate.py", "--input", str(treatment), "--input", str(control),
+            "--compare", "always-in,none", "--expect-caps", "50,30",
+        ]
+        buffer = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buffer):
+                aggregate.main()
+        finally:
+            sys.argv = original
+            for path in (treatment, control):
+                path.unlink(missing_ok=True)
+        printed = buffer.getvalue()
+        self.assertIn("budget          always-in 30", printed)
+        self.assertIn("vs none 50", printed)
+
+    def test_a_declared_cap_that_is_not_a_number_is_refused(self):
+        # `--expect-caps 3o` would otherwise raise from `int()` three frames down and read as a crash rather than as
+        # a dispatch that named a budget that does not exist.
+        original = sys.argv
+        slice_path = HERE / "cap-print-c.json"
+        slice_path.write_text(
+            json.dumps({"summary": summary("none"), "episodes": [episode("g1", True)]}), encoding="utf-8"
+        )
+        sys.argv = ["aggregate.py", "--input", str(slice_path), "--compare", "none,none", "--expect-caps", "3o"]
+        buffer = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buffer), self.assertRaises(SystemExit):
+                aggregate.main()
+        finally:
+            sys.argv = original
+            slice_path.unlink(missing_ok=True)
+        self.assertIn("--expect-caps '3o' is not a step count", buffer.getvalue())
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -45,6 +45,13 @@ ARMS = ("none", "always-in", "retrieved", "sham")
 REFERENCE_PARSER = "reference"
 PARSERS = (REFERENCE_PARSER, "any-line")
 
+# The turn budget every reading before R184 was driven at: the environment's own cap and the driver's default. It is
+# the same kind of field as the channel — a property of the harness rather than of the prompt — and it is read the same
+# way: a missing value is the default rather than unknown, because that is the only budget that existed. R184 is the
+# first round that moves it, and the reason the join has to know is arithmetic: a shorter cap costs the slow arm more
+# than the fast one (15 games against 40 at cap 30), so a delta across two caps is partly a statement about the budget.
+REFERENCE_CAP = 50
+
 
 def fail(message: str) -> "None":
     print(f"FAIL {message}")
@@ -75,6 +82,7 @@ def load_slices(
     relabel_specs: "list[str] | tuple[str, ...]" = (),
     expect_splits: "tuple[str, ...]" = (),
     expect_parsers: "tuple[str, ...]" = (),
+    expect_caps: "tuple[int, ...]" = (),
 ) -> "dict[str, list[dict]]":
     """Every episode of every slice, grouped by the arm that drove it.
 
@@ -111,6 +119,8 @@ def load_slices(
     sections: "dict[str, str]" = {}
     channels: "dict[str, str]" = {}
     label_channels: "dict[str, set[str]]" = {}
+    caps: "dict[str, int]" = {}
+    label_caps: "dict[str, set[int]]" = {}
     for path in paths:
         payload = json.loads(path.read_text(encoding="utf-8"))
         summary = payload.get("summary") or {}
@@ -156,6 +166,18 @@ def load_slices(
             fail(f"{path}: summary.parser is {channel!r}, which is not one of {PARSERS}")
         channels[str(path)] = channel
         label_channels.setdefault(label, set()).add(channel)
+        # The turn budget this slice was driven at, read and validated here because it arrives from JSON rather than
+        # from a parser: a string in that field would otherwise be compared against an integer three checks later and
+        # read as a different cap rather than as a malformed artefact (R184, and the test that drove this line).
+        recorded_cap = summary.get("max_steps")
+        if recorded_cap is None:
+            cap = REFERENCE_CAP
+        elif isinstance(recorded_cap, bool) or not isinstance(recorded_cap, int):
+            fail(f"{path}: summary.max_steps is {recorded_cap!r}, which is not a step count")
+        else:
+            cap = recorded_cap
+        caps[str(path)] = cap
+        label_caps.setdefault(label, set()).add(cap)
         if section:
             # Derived at join time rather than stored in the artefact: an episode is "from" the section its
             # parent said it was, and writing it into the artefact too would be two places to disagree.
@@ -165,6 +187,7 @@ def load_slices(
         for episode in episodes:
             if isinstance(episode, dict):
                 episode.setdefault("parser", channel)
+                episode.setdefault("max_steps", cap)
         grouped.setdefault(label, []).extend(episodes)
     # A join across sections is legal and sometimes the point — a second section is the only place this lane can
     # buy resolution — but it is never silent. Two sections in one reading is a different claim from a reading on
@@ -211,6 +234,25 @@ def load_slices(
         )
     if expect_parsers and driven != set(expect_parsers):
         fail(f"--expect-parsers {sorted(expect_parsers)} but the slices drove {sorted(driven)}")
+    # The budget is the harness as well, and it is the stricter case of the two: the cap's price is not symmetric
+    # between arms, so an undeclared span is not an average of two populations but a difference that is partly
+    # arithmetic. One label at two caps is two treatments; a join across caps is legal when it is named.
+    spanned = sorted(label for label, seen in label_caps.items() if len(seen) > 1)
+    if spanned:
+        listed = ", ".join(f"{label}: {sorted(label_caps[label])}" for label in spanned)
+        fail(
+            f"one arm cannot span two budgets ({listed}); a label is one step cap, so re-drive the slice or label it "
+            "after the cap rather than averaging two budgets into one rate"
+        )
+    budgets = set(caps.values())
+    if len(budgets) > 1 and not expect_caps:
+        listed = ", ".join(f"{Path(path).name}: {cap}" for path, cap in sorted(caps.items()))
+        fail(
+            f"this join mixes step caps ({listed}); name them with --expect-caps to compare them, because a shorter "
+            "cap costs the slow arm more than the fast one and the delta is then partly arithmetic (R184)"
+        )
+    if expect_caps and budgets != set(expect_caps):
+        fail(f"--expect-caps {sorted(expect_caps)} but the slices were driven at {sorted(budgets)}")
     return relabel(grouped, arm_specs)
 
 
@@ -520,6 +562,20 @@ def parsers(grouped: "dict[str, list[dict]]") -> "dict[str, str]":
     }
 
 
+def caps(grouped: "dict[str, list[dict]]") -> "dict[str, str]":
+    """Which step cap drove each arm, from the episodes rather than from the labels.
+
+    The counterpart of `parsers`, and it exists for the same reason one round later: the cap is a harness, so a
+    reading whose arms ran at two budgets has to print both above the delta. The value is the default for any episode
+    that predates the field, and a joined span is spelled `30+50` so that a report cannot show one number where two
+    were driven.
+    """
+    return {
+        arm: "+".join(sorted({str(episode.get("max_steps") or REFERENCE_CAP) for episode in episodes}))
+        for arm, episodes in grouped.items()
+    }
+
+
 def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tuple[str, str]" = ("left", "right")) -> dict:
     """The counters the arm is expected to move, per arm and independent of any verdict.
 
@@ -664,6 +720,13 @@ def main() -> int:
         "rule and `any-line` executes the command it refuses. A span is refused until it is named here, because a "
         "rate pooled over two readers is a rate about the harness (AUDIT 34.262)",
     )
+    parser.add_argument(
+        "--expect-caps",
+        default="",
+        help="the step caps this join compares, comma separated; `50` is the environment's own and every reading "
+        "before R184 ran at it. A span is refused until it is named here, because a shorter cap costs the slow arm "
+        "more than the fast one and the delta is then partly arithmetic (R184)",
+    )
     parser.add_argument("--rounds", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=20261120)
     parser.add_argument("--out", default="")
@@ -672,7 +735,18 @@ def main() -> int:
     paths = [Path(item) for item in arguments.input]
     declared = tuple(item.strip() for item in arguments.expect_splits.split(",") if item.strip())
     declared_parsers = tuple(item.strip() for item in arguments.expect_parsers.split(",") if item.strip())
-    grouped = load_slices(paths, arguments.relabel, declared, declared_parsers)
+    declared_caps = []
+    for item in arguments.expect_caps.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        # A cap is read through `int` below, so a malformed one has to be refused here: `--expect-caps 3o` would
+        # otherwise raise from a place that reads as a crash rather than as a declaration with a typo in it.
+        if not item.isdigit():
+            fail(f"--expect-caps {item!r} is not a step count")
+        declared_caps.append(int(item))
+    declared_caps = tuple(declared_caps)
+    grouped = load_slices(paths, arguments.relabel, declared, declared_parsers, declared_caps)
     # Printed rather than implied: a reading that crosses dispatches is the one kind of reading whose
     # provenance a reader cannot recover from the arms' names in the report.
     for spec in arguments.relabel:
@@ -765,6 +839,9 @@ def main() -> int:
         channel_of = parsers(grouped)
         if treatment in channel_of and control in channel_of and len({channel_of[treatment], channel_of[control], REFERENCE_PARSER}) > 1:
             print(f"  channel         {treatment} {channel_of[treatment]} vs {control} {channel_of[control]}")
+        cap_of = caps(grouped)
+        if treatment in cap_of and control in cap_of and len({cap_of[treatment], cap_of[control], str(REFERENCE_CAP)}) > 1:
+            print(f"  budget          {treatment} {cap_of[treatment]} vs {control} {cap_of[control]}")
         print(
             f"  paired delta    {reading['paired']['delta']:+.4f} "
             f"[{reading['paired']['ci_low']:+.4f}, {reading['paired']['ci_high']:+.4f}]  "

@@ -2008,7 +2008,9 @@ the model reads: the human turn is `"{instruction}You may take maximum of {max_s
 It is the one lever in this lane that is **not orthogonal to the arm**, because arms win at different speeds — the bank
 arm's `put` wins in 13.1 steps and the control's in 21.8 — so the same cap takes 15 games from one arm and 40 from the
 other. Both sentences are the treatment: shortening the cap shortens the budget *and* changes the number in the prompt,
-and a fourth cell (short cap, long sentence) is the only way to separate them.
+and a fourth cell (short cap, long sentence) is the only way to separate them. The join treats it as a second
+harness — `max_steps` per slice, one label may not span two caps, and a cross-cap join is refused until `--expect-caps`
+names the span — because the cap's price is asymmetric between arms and the delta would be partly arithmetic.
 
 **Pure-budget counterfactual** — The score an arm would read at a shorter step cap **if the model did exactly what it
 did at the longer one**, computed from artefacts already paid for as `|{e : e.won and e.steps <= cap}|`. It is a floor
