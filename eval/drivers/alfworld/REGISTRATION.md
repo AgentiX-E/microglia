@@ -2194,3 +2194,75 @@ roadmap sketched as candidate 2.
 **Spend: ¥4.11 against ¥3.80 quoted** ($0.5751, 11,079 calls, off-peak in all eight summaries). Nine per cent over
 quote, and the reason is the same one R183 found in the opposite direction: the control runs 24.07 turns an episode
 against the bank arm's 16.36, so the arm that fails is the arm that bills.
+
+## R185 — the tail swap: 197 characters of format instruction out, 197 of precondition in
+
+R184 closed the budget and left a floor with a shape. The nine `put` games that still lose spend fifty turns each and
+make **12.33 invalid actions** against **1.60** in a won game; at the short cap they split into five that keep issuing
+commands the world rejects (ending on `Nothing happens.`) and four that run out of turns mid-progress. The rejections are
+one mechanism, and the episodes name it: `take` from a closed container answers `Nothing happens.`, and every `put`
+afterwards answers the same, because the model never took the object it thinks it holds.
+
+### The design is a single tail, and that is the whole point
+
+`bank-putmove-line-1.json` is 354 characters in one entry, rendered to **551**: its first **157** characters are the
+put-to-move phrasing that R182 measured as the winning sentence's live half, and its last **197** are the format
+instruction. On the `any-line` channel that instruction is inert — R183 moved the reader and the reader executes a
+command on a later line, so telling the model to write one does not change what the world receives (`refused_actions`
+**0** in 274 games, `recovered_actions` **269**). So the tail is the one part of the winning sentence that this channel
+does not use, and it is exactly 197 characters of room.
+
+`banks/bank-putprecond-1.json` holds the same 157 characters and a different 197: open the container before taking
+anything from it, or the take answers `Nothing happens.` and the put that follows fails the same way. Same entry count,
+same rendered length (**551**), same label (`always-in@anyline`), same reader, same cap (**50**), same bank file
+position in the dispatch. **One variable: what the 197 characters say.**
+
+### Registered readings
+
+Bank arm only (`--against none`), `any-line`, `banks/bank-putprecond-1.json`, cap 50, 274 games (140 seen, 134 held
+out), four jobs, against the control R183 bought (`none@anyline`, 197/274):
+
+1. **`put` 53 to 58 of 59** (from **50**). The band's floor is one converted game above noise for a 59-game row; its
+   ceiling leaves room for the four budget-bound games the sentence cannot reach.
+2. **`always-in@anyline` 260 to 270** of 274 (from **257**). Small on purpose: the entry is aimed at one kind and the
+   other five are registered to sit still, so a pool that moves six games has moved more than `put` did.
+3. **Invalid actions per lost `put` at or below 6.0**, against **12.33**; and the number of lost `put` games with more
+   than two invalid actions falls from **8** to **≤ 5**. This is the mechanism reading, and it is the one that can pass
+   while reading 1 fails.
+4. **`recovered_actions` 200 to 340 and `refused_actions` 0.** The tail that left was the format instruction, so if the
+   model's format behaviour were being held in place by it, this is where the loss would appear — and if it appears, the
+   551-character comparison is confounded by format rather than clean.
+5. The other five kinds stay within **|Δ| ≤ 5 pp** of R183's bank arm.
+6. `pack_chars` exactly **551**, `pack_entries` **1**, `parser` `any-line`, `max_steps` **50**, and **one**
+   `bank_digest` across all 274 episodes — the last of which is now an assertion rather than a hope, because the join
+   refuses a label that spans two packs.
+7. **Memory effect against R183's control between +23.0 and +30.0 pp** (from **+21.90**). Not a board claim: the board
+   row is the 134 unseen games, and this is the pooled 274.
+
+### Refutation
+
+1. **`put` at or below 50 with invalid actions still above 8.** The entry does not reach the decision. The precondition
+   is then a fact the model cannot use in a sentence, and the next lever is not a prompt at all — it is instance state
+   with the unobserved parts marked, i.e. AutoContext's document rather than its sentence. R186 becomes that document.
+2. **`put` inside the band with invalid actions unchanged.** The gain did not come from the precondition, and the only
+   other thing that changed is that the format clause left. The round then reports a level and no mechanism, and the
+   tail is recorded as unexplained rather than credited.
+3. **`recovered_actions` below 200.** The dropped instruction was load-bearing for how the model composes a reply even
+   on this channel, and the comparison is a format contrast wearing a knowledge contrast's clothes: the round is void
+   for attribution and is reported as a level only.
+
+### Void
+
+Any episode whose `parser` is not `any-line`, any summary whose `max_steps` is not 50 or whose `pack_chars` is not 551,
+a bank label spanning two `bank_digest` values, a section with fewer than its published size, or a control that had to be
+re-bought — the control is R183's and it is the fixed side of the comparison.
+
+### The confound this round carries, priced
+
+Two things leave together: the format instruction and the put-to-move phrasing's tail position. The second is not a
+change (the prefix is byte-identical), but the first is, and the separation is a third bank: the format clause plus the
+precondition, with the prefix cut to hold 551 — a tail-for-prefix swap that costs ≈ **¥2.40** and is bought only if
+reading 4 fails, because a format clause that is inert on this channel has no effect to separate.
+
+**Price ≈ ¥2.40**, four jobs, one arm, both sections, off-peak band. The control is not re-bought: R183's `none@anyline`
+is the fixed side, which is what `--against none` exists for.

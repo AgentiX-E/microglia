@@ -1,0 +1,27 @@
+{
+  "schema": "microglia.alfworld-bank/1",
+  "cap": 20,
+  "identity": "substring",
+  "source": {
+    "kind": "the R183-winning sentence with its format clause replaced by the precondition the nine lost `put` games show is live",
+    "matches": "banks/bank-putmove-line-1.json character for character through the first 157, then a different 197-character tail",
+    "note": "R185. The first 157 characters are the put-to-move phrasing R182 measured as the winning sentence's live half and are untouched, so the round is a statement about the tail. The 197 characters it replaces were the format instruction, and R183 showed that instruction is inert on the `any-line` channel: the reader executes a command on a later line, so telling the model to write one does not change what the world receives. What the nine lost `put` games show instead is a take from a closed container answering `Nothing happens.`, with every put after it failing the same way -- 12.33 invalid actions per lost game against 1.60 in a won one. 551 rendered characters, one entry.",
+    "registration": "R185",
+    "operations_kept": [
+      "the put-to-move phrasing"
+    ],
+    "operations_written": [
+      "open the container before taking from it"
+    ],
+    "operations_replaced": [
+      "one command per turn, on its own line"
+    ],
+    "provenance": "written after R184 closed the budget as an explanation and split the nine lost `put` games into five that issue commands the world rejects and four that run out of turns mid-progress"
+  },
+  "entries": [
+    {
+      "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\". A closed container hides its contents: open the cabinet, fridge, drawer or safe before taking anything from it, or the take answers \"Nothing happens.\" and the put that follows fails the same way.",
+      "votes": 10
+    }
+  ]
+}

@@ -28,6 +28,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+BANKS = HERE / "banks"
+
+
+def payload_of(name: str) -> dict:
+    return json.loads((BANKS / name).read_text(encoding="utf-8"))
 sys.path.insert(0, str(HERE))
 
 import agent  # noqa: E402
@@ -1199,13 +1204,13 @@ class MainTest(unittest.TestCase):
     def test_the_artefact_records_the_section_and_the_size_it_publishes(self):
         # A join across two sections is refused by `aggregate.py`, and it can only be refused if every slice says
         # which section it drove. `split_size` is the denominator a tiling check holds to.
-        self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
+        self.assertEqual(self.run_main(["--arm", "none", "--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
         summary = json.loads(self.out.read_text(encoding="utf-8"))["summary"]
         self.assertEqual(summary["split"], "eval_out_of_distribution")
         self.assertEqual(summary["split_size"], agent.SPLIT_SIZES["eval_out_of_distribution"])
 
     def test_a_pass_writes_a_summary_whose_accounting_closes(self):
-        self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
+        self.assertEqual(self.run_main(["--arm", "none", "--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
         payload = json.loads(self.out.read_text(encoding="utf-8"))
         summary = payload["summary"]
         self.assertEqual(summary["wins"], 1)
@@ -1215,7 +1220,7 @@ class MainTest(unittest.TestCase):
         self.assertEqual(summary["arm"], "none")
 
     def test_a_seed_pass_reproduces_a_floor_that_agrees(self):
-        self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
+        self.assertEqual(self.run_main(["--arm", "none", "--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
         first = json.loads(self.out.read_text(encoding="utf-8"))
         self.floor.write_text(json.dumps({"episodes": first["episodes"]}), encoding="utf-8")
         self.assertEqual(
@@ -1225,7 +1230,7 @@ class MainTest(unittest.TestCase):
         self.assertEqual(json.loads(self.out.read_text(encoding="utf-8"))["summary"]["floor_agreement"]["mismatches"], 0)
 
     def test_a_floor_that_disagrees_fails_the_pass(self):
-        self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
+        self.assertEqual(self.run_main(["--arm", "none", "--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
         first = json.loads(self.out.read_text(encoding="utf-8"))
         first["episodes"][0]["digest"] = "not-the-same"
         self.floor.write_text(json.dumps({"episodes": first["episodes"]}), encoding="utf-8")
@@ -1463,7 +1468,7 @@ class MainTest(unittest.TestCase):
 
         agent.build_env = build
         try:
-            self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
+            self.assertEqual(self.run_main(["--arm", "none", "--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
         finally:
             agent.build_env = lambda batch_size=1, train_eval="eval_out_of_distribution": (self.world, 1)
         self.assertEqual(seen["train_eval"], "eval_out_of_distribution")
@@ -1477,7 +1482,7 @@ class MainTest(unittest.TestCase):
         self.assertIn("> take apple 1 from countertop 1", payload["episodes"][0]["trajectory"])
 
     def test_transcripts_are_off_by_default(self):
-        self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
+        self.assertEqual(self.run_main(["--arm", "none", "--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
         payload = json.loads(self.out.read_text(encoding="utf-8"))
         self.assertFalse(payload["summary"]["transcripts"])
         self.assertNotIn("trajectory", payload["episodes"][0])
@@ -2531,6 +2536,87 @@ class CheckpointTest(unittest.TestCase):
             self.run_main(self.base(4) + ["--resume"])
         self.assertEqual(caught.exception.code, 1)
 
+
+
+class BankProvenanceTest(unittest.TestCase):
+    """An artefact says which pack it rendered, because its length does not.
+
+    R185 swaps the last 197 characters of a 551-character pack and holds the label still. Nothing in the record
+    distinguished the two banks: `rules_in_bank` is 1 for both, `pack_chars` is 551 for both, `arm_label` is
+    `always-in` for both — so a join of the two runs would have averaged two prompts into one rate and printed it
+    under one name, which is the defect R183 found for the reader and R184 for the budget, one harness further in.
+    The digest is content, not a filename: the same sentence loaded twice is the same bank, and two banks that
+    render to the same length are not.
+    """
+
+    def setUp(self):
+        self.original_build = agent.build_env
+        self.world = FakeWorld()
+        agent.build_env = lambda batch_size=1, train_eval="eval_out_of_distribution": (self.world, 1)
+        self.out = HERE / "bank-provenance.json"
+        self.banks = []
+
+    def tearDown(self):
+        agent.build_env = self.original_build
+        self.out.unlink(missing_ok=True)
+        for path in self.banks:
+            path.unlink(missing_ok=True)
+
+    def bank(self, name: str, text: str) -> Path:
+        path = HERE / name
+        path.write_text(json.dumps({"entries": [{"text": text}]}), encoding="utf-8")
+        self.banks.append(path)
+        return path
+
+    def run_main(self, argv):
+        original = sys.argv
+        sys.argv = ["agent.py"] + argv
+        try:
+            return agent.main()
+        finally:
+            sys.argv = original
+
+    def artefact(self):
+        return json.loads(self.out.read_text(encoding="utf-8"))
+
+    def test_the_pass_records_the_pack_it_rendered(self):
+        text = "Open the fridge before taking anything out of it."
+        bank = self.bank("bank-provenance-a.json", text)
+        self.assertEqual(self.run_main(["--arm", "always-in", "--policy", "first", "--games", "1", "--rules", str(bank), "--out", str(self.out)]), 0)
+        payload = self.artefact()
+        self.assertEqual(payload["summary"]["bank_digest"], agent.digest_of([text]))
+        self.assertEqual(payload["episodes"][0]["bank_digest"], agent.digest_of([text]))
+
+    def test_two_banks_that_render_to_the_same_length_are_two_banks(self):
+        # The exact pair R185 uses: 157 characters held, 197 swapped. Same price, different prompt.
+        source = payload_of("bank-putmove-line-1.json")["entries"][0]["text"]
+        swapped = source[:157] + source[157:].replace("own line", "own rows", 1)
+        self.assertNotEqual(source, swapped)
+        self.assertEqual(len(source), len(swapped))
+        first = self.bank("bank-provenance-b.json", source)
+        second = self.bank("bank-provenance-c.json", swapped)
+        self.assertEqual(self.run_main(["--arm", "always-in", "--policy", "first", "--games", "1", "--rules", str(first), "--out", str(self.out)]), 0)
+        left = self.artefact()["summary"]["bank_digest"]
+        self.assertEqual(self.run_main(["--arm", "always-in", "--policy", "first", "--games", "1", "--rules", str(second), "--out", str(self.out)]), 0)
+        right = self.artefact()["summary"]["bank_digest"]
+        self.assertNotEqual(left, right)
+
+    def test_the_same_sentence_loaded_twice_is_one_bank(self):
+        text = "Open the drawer before taking the pencil."
+        first = self.bank("bank-provenance-d.json", text)
+        second = self.bank("bank-provenance-e.json", text)
+        self.assertEqual(self.run_main(["--arm", "always-in", "--policy", "first", "--games", "1", "--rules", str(first), "--out", str(self.out)]), 0)
+        left = self.artefact()["summary"]["bank_digest"]
+        self.assertEqual(self.run_main(["--arm", "always-in", "--policy", "first", "--games", "1", "--rules", str(second), "--out", str(self.out)]), 0)
+        self.assertEqual(left, self.artefact()["summary"]["bank_digest"])
+
+    def test_the_control_records_no_bank_because_it_renders_none(self):
+        # The empty pack is not a bank, and a control that carried a digest would make every treatment-versus-control
+        # join look like a comparison of two prompts.
+        self.assertEqual(self.run_main(["--arm", "none", "--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
+        payload = self.artefact()
+        self.assertEqual(payload["summary"]["bank_digest"], "")
+        self.assertEqual(payload["episodes"][0]["bank_digest"], "")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

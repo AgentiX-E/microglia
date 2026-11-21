@@ -5174,3 +5174,55 @@ which is the only interesting part of the experiment.
 6. **The dispatcher refuses two caps before the money leaves.** A non-integer (`30.0`) and anything below the shortest
    win the corpus has recorded (three steps, over 6,096 episodes): the first would fail in eight jobs after the
    environment install, the second would succeed and return zeroes that look like a mechanism that does not work.
+
+### 32.26 Swapping a bank without moving the price, and the field that makes the swap auditable
+
+This lane's packs are length-matched on purpose: every arm since R180 pays **551 rendered characters**, because the price
+of a pack is its characters and a longer sentence is a different treatment before it is a better one. R185 uses that
+property to run a clean one-variable experiment — 157 characters kept byte for byte, 197 swapped — which creates a trap
+worth understanding before you copy the pattern: **after the swap, the two artefacts are indistinguishable in every field
+the join reads.**
+
+```
+$ python3 eval/drivers/alfworld/aggregate.py --input … --compare always-in,none
+  bank            always-in 5fb4c464 vs none no pack
+  channel         always-in any-line vs none any-line
+  budget          always-in 50 vs none 50
+```
+
+The `bank` line is the digest of the pack each arm rendered. Three ways to read it:
+
+1. **It is content, not a path.** Copying a bank file, reformatting its JSON, or loading the same sentence from two names
+   gives one digest. Editing one character gives another — including a character that leaves the rendered length at 551.
+2. **`no pack` is not a missing value.** An arm that renders nothing (`none`) records the empty string, and a join of a
+   treatment against the control is never refused for spanning two "banks": the control has none.
+3. **A label may not span two banks.** If you join two dispatches of `always-in` that rendered different banks, the join
+   refuses — because averaging them prints one rate over two prompts. Relabel one of them:
+
+```bash
+python3 eval/drivers/alfworld/aggregate.py \
+  --input run-A/arm-always-in-0.json --input run-A/arm-always-in-1.json \
+  --input run-B/arm-always-in-0.json --input run-B/arm-always-in-1.json \
+  --relabel 'run-A/arm-always-in-0.json=always-in#a' --relabel 'run-A/arm-always-in-1.json=always-in#a' \
+  --relabel 'run-B/arm-always-in-0.json=always-in#b' --relabel 'run-B/arm-always-in-1.json=always-in#b' \
+  --compare 'always-in#a,always-in#b'
+```
+
+4. **An artefact written before the field existed reports the empty value**, and mixing it with a post-R185 slice under
+   one label is refused. That is deliberate: the older file cannot prove which pack it rendered, and "cannot prove" is
+   not "did not".
+
+To check a bank's identity before spending anything, the digest is a pure function of its entries:
+
+```python
+import json, sys
+sys.path.insert(0, "eval/drivers/alfworld")
+import agent
+payload = json.load(open("eval/drivers/alfworld/banks/bank-putprecond-1.json"))
+rules = [entry["text"] for entry in payload["entries"]]
+print(len(agent.render_pack(rules)), agent.digest_of(rules))   # 551 5fb4c46456d4a497
+```
+
+A 551 and a digest: the price and the identity, which are the two things a bank swap has to hold fixed. Run the same
+two lines over `banks/bank-putmove-line-1.json`, the bank R185 replaces, and the pair reads `551
+90c0688f60c5d524`: same price, different pack — which is exactly the state the join could not see before `bank_digest`.

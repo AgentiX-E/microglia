@@ -1278,5 +1278,110 @@ class CapTest(unittest.TestCase):
             slice_path.unlink(missing_ok=True)
         self.assertIn("--expect-caps '3o' is not a step count", buffer.getvalue())
 
+
+class BankTest(unittest.TestCase):
+    """The pack is the harness's payload, and until R185 the artefact did not say which one produced it.
+
+    R185 swaps 197 characters of a 551-character bank and holds the label, the length and the reader still. The two
+    runs therefore agree on every field the join used to read — `arm_label` `always-in`, `pack_chars` 551,
+    `pack_entries` 1 — so a join of them would have averaged two prompts into one rate and printed it under one name.
+    That is the defect R183 found for the reader and R184 for the budget, one harness component further in, and the
+    rule is the same: one label is one pack, and a join across packs says so.
+    """
+
+    def setUp(self):
+        self.paths = []
+
+    def tearDown(self):
+        for path in self.paths:
+            path.unlink(missing_ok=True)
+
+    def write(self, name: str, payload: dict) -> Path:
+        path = HERE / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        self.paths.append(path)
+        return path
+
+    def test_an_artefact_from_before_the_field_has_no_bank(self):
+        # Every reading before R185 predates the digest, and "no bank recorded" is what those files can prove. It is
+        # not treated as the empty pack: an unrecorded bank is unknown, which is why it cannot be silently pooled.
+        old = self.write("bank-old.json", {"summary": summary("always-in"), "episodes": [episode("g1", True)]})
+        self.assertEqual(aggregate.banks(aggregate.load_slices([old])), {"always-in": ""})
+
+    def test_one_arm_cannot_span_two_banks(self):
+        # The R185 case exactly: same label, same length, different prompt. Averaging is not an option the join has.
+        left = self.write(
+            "bank-a.json",
+            {"summary": summary("always-in"), "episodes": [episode("g1", True, bank_digest="aaaa1111")]},
+        )
+        right = self.write(
+            "bank-b.json",
+            {"summary": summary("always-in"), "episodes": [episode("g2", True, bank_digest="bbbb2222")]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([left, right])
+        self.assertIn("cannot span two banks", printed.getvalue())
+
+    def test_a_control_is_not_a_bank_and_joins_freely(self):
+        # The comparison every round makes: a treatment that renders a pack against a control that renders none. The
+        # empty string is not a second bank, or every memory-versus-control delta in the lane would be refused.
+        treatment = self.write(
+            "bank-c.json",
+            {"summary": summary("always-in"), "episodes": [episode("g1", True, bank_digest="aaaa1111")]},
+        )
+        control = self.write("bank-d.json", {"summary": summary("none"), "episodes": [episode("g2", False)]})
+        grouped = aggregate.load_slices([treatment, control])
+        self.assertEqual(aggregate.banks(grouped), {"always-in": "aaaa1111", "none": ""})
+
+    def test_two_slices_of_the_same_bank_are_one_bank(self):
+        # Four shards of one dispatch carry one digest; a guard that refused them would refuse every normal join.
+        left = self.write(
+            "bank-e.json",
+            {"summary": summary("always-in"), "episodes": [episode("g1", True, bank_digest="aaaa1111")]},
+        )
+        right = self.write(
+            "bank-f.json",
+            {"summary": summary("always-in"), "episodes": [episode("g2", True, bank_digest="aaaa1111")]},
+        )
+        self.assertEqual(aggregate.load_slices([left, right])["always-in"][0]["bank_digest"], "aaaa1111")
+
+    def test_a_bank_that_is_not_a_string_is_refused(self):
+        # The digest arrives from JSON and is compared by equality with other strings, so a number would make two
+        # different banks look the same the moment both were written as one. Refused where it is read.
+        odd = self.write(
+            "bank-g.json", {"summary": summary("always-in"), "episodes": [episode("g1", True, bank_digest=7)]}
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([odd])
+        self.assertIn("bank_digest", printed.getvalue())
+
+    def test_the_pass_prints_the_bank_of_each_arm(self):
+        original = sys.argv
+        treatment = HERE / "bank-print-a.json"
+        control = HERE / "bank-print-b.json"
+        treatment.write_text(
+            json.dumps(
+                {
+                    "summary": summary("always-in"),
+                    "episodes": [episode("g1", True, bank_digest="abcd1234efgh5678")],
+                }
+            ),
+            encoding="utf-8",
+        )
+        control.write_text(json.dumps({"summary": summary("none"), "episodes": [episode("g1", False)]}), encoding="utf-8")
+        sys.argv = ["aggregate.py", "--input", str(treatment), "--input", str(control), "--compare", "always-in,none"]
+        buffer = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buffer):
+                aggregate.main()
+        finally:
+            sys.argv = original
+            for path in (treatment, control):
+                path.unlink(missing_ok=True)
+        printed = buffer.getvalue()
+        self.assertIn("bank            always-in abcd1234 vs none no pack", printed)
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -121,6 +121,7 @@ def load_slices(
     label_channels: "dict[str, set[str]]" = {}
     caps: "dict[str, int]" = {}
     label_caps: "dict[str, set[int]]" = {}
+    label_banks: "dict[str, set[str]]" = {}
     for path in paths:
         payload = json.loads(path.read_text(encoding="utf-8"))
         summary = payload.get("summary") or {}
@@ -187,6 +188,13 @@ def load_slices(
         for episode in episodes:
             if isinstance(episode, dict):
                 episode.setdefault("parser", channel)
+                # Which pack this episode rendered, as content. An artefact from before R185 records none, and an
+                # arm that renders nothing (`none`) records the empty string -- so the set of one label answers
+                # "was this arm one prompt or two", which is the only thing the join needs to know.
+                bank = episode.get("bank_digest", "")
+                if not isinstance(bank, str):
+                    fail(f"{path}: bank_digest is {bank!r}, which is not a bank digest")
+                label_banks.setdefault(label, set()).add(bank)
                 episode.setdefault("max_steps", cap)
         grouped.setdefault(label, []).extend(episodes)
     # A join across sections is legal and sometimes the point — a second section is the only place this lane can
@@ -253,6 +261,17 @@ def load_slices(
         )
     if expect_caps and budgets != set(expect_caps):
         fail(f"--expect-caps {sorted(expect_caps)} but the slices were driven at {sorted(budgets)}")
+    # And the pack is the harness too. The rule is the channel's and the cap's with one difference: a treatment and
+    # its control are always two packs (the control renders none), so a join across labels is the normal case and
+    # only *one label* spanning two banks is illegal. R185 is the first round to swap a bank under an unchanged label
+    # at an unchanged 551 characters, which is why no other field in the artefact could have caught the pooling.
+    swapped = sorted(label for label, seen in label_banks.items() if len(seen) > 1)
+    if swapped:
+        listed = ", ".join(f"{label}: {sorted(label_banks[label])}" for label in swapped)
+        fail(
+            f"one arm cannot span two banks ({listed}); a label is one pack, so re-drive the slice or give the new "
+            "bank a label of its own rather than averaging two prompts into one rate"
+        )
     return relabel(grouped, arm_specs)
 
 
@@ -576,6 +595,20 @@ def caps(grouped: "dict[str, list[dict]]") -> "dict[str, str]":
     }
 
 
+def banks(grouped: "dict[str, list[dict]]") -> "dict[str, str]":
+    """Which pack each arm rendered, from the episodes rather than from the labels.
+
+    The third of the three: R183 moved the reader, R184 the budget, and R185 the bank — all three are harness and all
+    three are invisible in a name. The value is a content digest, so the same sentence loaded from two files is one
+    bank and two banks rendering to the same length are two; `""` means the arm rendered no pack (the control) or the
+    artefact predates the field.
+    """
+    return {
+        arm: "+".join(sorted({str(episode.get("bank_digest") or "") for episode in episodes}))
+        for arm, episodes in grouped.items()
+    }
+
+
 def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tuple[str, str]" = ("left", "right")) -> dict:
     """The counters the arm is expected to move, per arm and independent of any verdict.
 
@@ -839,6 +872,10 @@ def main() -> int:
         channel_of = parsers(grouped)
         if treatment in channel_of and control in channel_of and len({channel_of[treatment], channel_of[control], REFERENCE_PARSER}) > 1:
             print(f"  channel         {treatment} {channel_of[treatment]} vs {control} {channel_of[control]}")
+        bank_of = banks(grouped)
+        if treatment in bank_of and bank_of.get(treatment):
+            other = bank_of.get(control) or ""
+            print(f"  bank            {treatment} {bank_of[treatment][:8]} vs {control} {other[:8] if other else 'no pack'}")
         cap_of = caps(grouped)
         if treatment in cap_of and control in cap_of and len({cap_of[treatment], cap_of[control], str(REFERENCE_CAP)}) > 1:
             print(f"  budget          {treatment} {cap_of[treatment]} vs {control} {cap_of[control]}")

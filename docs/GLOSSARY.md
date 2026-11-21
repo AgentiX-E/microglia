@@ -2024,3 +2024,14 @@ of thirty the same model behaviour reads **+31.02 pp where the fifty-step pass r
 +29.20**, because the cap costs the slow arm more. It is why a reading at a new cap quotes absolute scores and prints
 the counterfactual beside them, and why a cross-arm delta at a new cap is a derived quantity whose null value is the
 inflation rather than zero.
+
+**Bank digest** (`bank_digest`) — A 16-hex content hash of the entries an arm actually rendered, recorded in the header
+and in every episode. It is content rather than a path, so the same sentence loaded from two files is one bank and two
+banks edited to the same rendered length are two. `""` means no pack was rendered (the `none` arm) or the artefact
+predates the field (before R185). The join refuses a label that spans two digests — one arm is one pack — and prints the
+digest of each side above a delta, because R185's design makes two banks agree on every other field the join reads.
+
+**Tail swap** — The R185 design: hold the first 157 characters of a 354-character entry and replace the last 197, so the
+rendered pack stays at 551 characters and the label, reader, cap and entry count are unchanged. It is the cleanest
+one-variable experiment this lane can run on a bank, and it is only available because every arm since R180 is
+length-matched — which is also why it needs `bank_digest` to be auditable at all.

@@ -532,5 +532,71 @@ class FormatOperatorTest(unittest.TestCase):
                 self.assertNotIn(phrase, tail)
 
 
+
+class PreconditionBankTest(unittest.TestCase):
+    """R185's bank: the same 551 rendered characters, one tail swapped for the failure the games show.
+
+    The round is a one-variable comparison inside a single sentence. `bank-putmove-line-1.json` spends its first
+    157 characters on the put-to-move phrasing and its last 197 on the format instruction. R183 moved the *reader*
+    and the format instruction became inert there: `any-line` executes a command on a later line, so telling the
+    model to write one does not change what the world receives. The nine `put` games that still lose therefore lose
+    for a reason that is not the format, and their episodes name it — a take from a closed container answers
+    `Nothing happens.`, and every put afterwards fails with it.
+
+    So the tail carries that precondition instead, at the same length, in one entry, with the prefix untouched.
+    Everything below is the guard that makes "one variable" true rather than claimed: if the prefix drifts, the
+    bank measures a different sentence; if the length drifts, it measures a different price; and if the format
+    clause survives anywhere in the text, the swapped tail is not the only change.
+    """
+
+    NAME = "bank-putprecond-1.json"
+    SOURCE = "bank-putmove-line-1.json"
+
+    def text(self) -> str:
+        return payload_of(self.NAME)["entries"][0]["text"]
+
+    def test_it_is_length_matched_to_the_bank_it_replaces(self):
+        # 551 is the rendered length every arm of this lane has paid since R180, and the price of a pack is its
+        # characters, so a bank that is four characters longer is a different treatment before it is a different
+        # sentence.
+        entries = [entry["text"] for entry in payload_of(self.NAME)["entries"]]
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(len(entries[0]), 354)
+        self.assertEqual(len(driver.render_pack(entries)), 551)
+
+    def test_the_prefix_is_the_sentence_it_leaves_alone(self):
+        # The put-to-move phrasing is the operation R182 measured as the winning sentence's live half. R185 does not
+        # touch it, and the equality is what makes the round a statement about the tail.
+        source = payload_of(self.SOURCE)["entries"][0]["text"]
+        self.assertEqual(self.text()[:157], source[:157])
+        self.assertEqual(payload_of(self.SOURCE)["source"]["registration"], "R182 row 1a")
+
+    def test_the_tail_is_the_precondition_the_lost_games_show(self):
+        tail = self.text()[157:].lower()
+        self.assertEqual(len(tail), 197)
+        self.assertTrue(tail.startswith(". a closed container"))  # it continues the sentence, not a list
+        for word in ("closed", "open", "take", "put", "nothing happens"):
+            with self.subTest(word=word):
+                self.assertIn(word, tail)
+        for container in ("cabinet", "fridge", "drawer"):
+            with self.subTest(container=container):
+                self.assertIn(container, tail)
+
+    def test_the_format_clause_is_gone_rather_than_moved(self):
+        # The one way to lose the round's meaning without changing its length: keep "on its own line" somewhere in
+        # the 354 characters and the reading attributes an inert instruction's effect to the precondition.
+        text = self.text().lower()
+        for phrase in ("own line", "shares a line", "read as part of the thought"):
+            with self.subTest(phrase=phrase):
+                self.assertNotIn(phrase, text)
+
+    def test_the_source_block_states_the_relationship_the_test_checks(self):
+        source = payload_of(self.NAME)["source"]
+        self.assertEqual(source["registration"], "R185")
+        self.assertIn("157", source["matches"])
+        self.assertIn("197", source["matches"])
+        self.assertIn("one command per turn, on its own line", source["operations_replaced"])
+        self.assertIn("open the container before taking from it", source["operations_written"])
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

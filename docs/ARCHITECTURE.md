@@ -2780,3 +2780,49 @@ refuses a `--max-steps` that is not a whole number, and refuses one **below the 
 (three steps in 6,096 episodes). Both refusals exist because the driver takes `type=int` after the environment install:
 a `30.0` or a `2` would otherwise be discovered in eight jobs with the money committed, and the second of the two would
 not even fail — it would return eight zeroes that look exactly like a mechanism that does not work.
+
+### 8.47 The pack is the third harness component, and the artefact did not say which one it rendered
+
+R183 made the reader a recorded variable, R184 the step cap, and each got a field in the artefact plus a refusal in the
+join. R185 makes the **bank** a variable for the first time in the same way: it swaps 197 characters of a 551-character
+pack, holds the label (`always-in@anyline`), the length (`pack_chars` 551), the entry count (`pack_entries` 1), the
+reader and the cap. After that swap the two artefacts agree on **every field the join used to read**, which means a join
+of the two runs would have averaged two prompts into one rate and printed it under one name — the same defect as R183's
+reader, one component further in, and one that a length-matched design makes *more* likely rather than less.
+
+The fix is a content digest, not a filename:
+
+```python
+bank_digest = digest_of(selected) if selected else ""      # per episode, from the pack it rendered
+"bank_digest": digest_of(rules) if rules else ""           # in the header, from the bank it was handed
+```
+
+Three consequences follow from that definition rather than from a convention.
+
+1. **The same sentence loaded from two files is one bank**, because the digest is over the text and not over the path.
+2. **Two banks that render to the same length are two banks**, which is exactly the case the length-matched design
+   creates.
+3. **The control has no bank.** An arm that renders no pack records `""`, and the empty string is not a pool of its own:
+   if it were, every memory-versus-control delta in the lane would be a comparison of two prompts and would be refused.
+
+The join enforces the one rule the definition implies — *one label is one pack* — and stops there. It deliberately does
+**not** require a declaration for a join across labels, because a treatment and its control are always two packs (the
+control renders none), and a join of two treatments on two banks is the comparison a bank swap exists to make. What it
+does instead is **print the digest of each arm above the delta**, so a reading whose two sides came off different prompts
+says so on its own first screen:
+
+```
+  bank            always-in abcd1234 vs none no pack
+```
+
+The asymmetry with the reader's rule is worth stating because it is not an oversight. A channel or a cap is a property of
+the *run*, so two of them inside one label is never legal and two across the join is legal only when named. A bank is a
+property of the *arm*: the control's bank is the empty pack, and the treatment's bank is the thing under test. The shared
+half of the rule — one label, one value — is what catches the pooling; the divergent half is what keeps the ordinary
+comparison buyable.
+
+There is a fourth consequence, and it is the reason the field is worth its twelve characters: **an artefact from before
+R185 records no bank, and the join treats that as a value rather than as a default.** A label that mixes a pre-R185
+slice with a post-R185 one spans `""` and a digest, which is refused — because the reader cannot prove the two slices
+rendered the same prompt, and this lane has published one reading from a join it had not checked was homogeneous
+(AUDIT 34.251).
