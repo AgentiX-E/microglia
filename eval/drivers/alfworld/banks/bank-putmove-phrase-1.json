@@ -1,0 +1,25 @@
+{
+ "schema": "microglia.alfworld-bank/1",
+ "cap": 20,
+ "identity": "substring",
+ "source": {
+  "kind": "the winning sentence with its second operation ablated, at the length of the entry it is read against",
+  "matches": "banks/bank-putmove-note-1.json entry, with the 135-character clause from '; if that also fails' to '...is open first.' replaced by a 197-character note",
+  "note": "R180 row 1a: which half of the sentence pays. The first operation ('try the alternative phrasing \"move ...\"') is kept byte for byte; the second (a different receptacle of the same type, the container check) is removed and replaced by neutral text of exactly the same total length, so the arm differs from bank-putmove-note-1.json in one clause and in nothing else. 551 rendered characters.",
+  "registration": "R180 row 1a",
+  "operations_kept": [
+   "the put-to-move phrasing"
+  ],
+  "operations_ablated": [
+   "a different receptacle of the same type",
+   "the container check"
+  ],
+  "provenance": "written after R178 measured the full sentence at 222/274 with a neutral clause appended, before any arm carried one operation only"
+ },
+ "entries": [
+  {
+   "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\" [note: this entry states a single operation only, and this line carries no operation at all; it exists so that the entry keeps the length of the entry it is read against and names no step at all.]",
+   "votes": 10
+  }
+ ]
+}

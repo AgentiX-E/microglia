@@ -1463,3 +1463,73 @@ tell the two apart, so one arm covers both and the second is not bought.
 **only** with 1b and 1c, both of which are already in the record; `by_kind` and `by_section` printed beside the
 pooled delta; and the bank declares in `source.note` that its citation is false by construction, because a bank that
 looks like a mistake in the tree is a bank somebody will eventually "fix".
+
+## R179, amendment 1 — a fabricated citation is worth what a true one is worth
+
+One arm, both sections, 274 games, 551 rendered characters: the same 62-character clause with an eleven-digit run
+id no artefact carries. Read against the two arms R178 already bought.
+
+| arm | the clause | seen, 140 | held out, 134 | pooled | bill |
+| --- | --- | --- | --- | --- | --- |
+| the sentence | *(none)* | 111 | 112 | **223 (81.39%)** | $0.3308 |
+| the neutral clause | `[note: a reference for this task, not an instruction for it.]` | 111 | 111 | **222 (81.02%)** | $0.3273 |
+| **the fabricated citation** | `[source: … run 44800000000]` | 106 | 112 | **218 (79.56%)** | $0.3283 (¥2.35) |
+| the true citation | `[source: … run 44841962248]` | 105 | 107 | **212 (77.37%)** | $0.3391 |
+
+| pairing | delta | 95% CI | p | discordant | mde |
+| --- | --- | --- | --- | --- | --- |
+| **the fabricated citation − the true citation** | **+2.19 pp** | **[−1.82, +6.20]** | 0.363 | 34 | **5.96 pp** |
+| the fabricated citation − the neutral clause | −1.46 pp | [−5.84, +2.92] | 0.566 | 36 | 6.14 pp |
+| the fabricated citation − the sentence | −1.82 pp | [−6.20, +2.55] | 0.458 | 37 | 6.22 pp |
+
+**The registered band is the middle one, and it is the informative one.** `−9 to +9 pp` was written as *citations are
+inert as text: the model neither checks nor acts on them, and WikiTrace's 79.5 → 90.2 must come from the descent.* A
+citation whose referent **does not exist** is worth **+2.19 pp** against one whose referent does — inside the noise,
+with an interval that excludes any effect larger than 6.2 pp in either direction.
+
+**Second reading, which the registration did not ask for and the four arms give for free.** Both citations sit below
+the neutral clause (−1.46 and −3.65) and the two are indistinguishable from each other, so what R178 measured is a
+**form** effect and not a **truth** effect: a bracketed claim about a run costs a little, and whether the run exists
+does not matter to a frozen model. That is the same statement as "inert", read from the other side, and it is why the
+product conclusion is that the evidence link belongs in the artefact the lane reads rather than in the prompt the
+model reads.
+
+**Void conditions honoured.** `carried` 1.0 in all 274 games; `pack chars` exactly 551 in every game; read only
+against the two arms named above; `by_kind` and `by_section` printed (no kind moves beyond its own floor: the largest
+is `put` at −8.47 pp on 19 discordant pairs, and `put`'s own mde is 20.8 pp).
+
+**Spend: ¥2.35 against ¥2.4 quoted.** R178 and R179 together bought **three** arms — the neutral clause, the true
+citation and the fabricated one — for **¥7.12** against ¥7.2 quoted, over 20,134 model calls across four dispatches;
+the sentence arm they are all read against was bought in R174.1 and R177.
+
+## R180 — Which half of the sentence pays: the phrasing swap, or the receptacle and the container check
+
+The one sentence this lane has measured four times is two operations, not one:
+
+> *(1)* try the alternative phrasing `"move <object> to <receptacle>"`; *(2)* if that also fails, try a different
+> valid receptacle of the same type, and if the receptacle is a container, ensure it is open first.
+
+The per-kind rows say operation (2) is the plausible carrier — the kinds the sentence helps most are the ones that
+end in a container (`clean` +22.4, `cool` +30.4, `heat` +28.2 on 274 games), and the kind it cannot help is `examine`,
+which has no placement step at all. That has never been tested as a clause, and it is exactly one arm away: keep (1)
+byte for byte, remove (2), pad to the same 551 characters.
+
+| # | arm | bank | rendered | games | the question | price |
+| --- | --- | --- | --- | --- | --- | --- |
+| **1a** | the sentence with its second operation ablated | `banks/bank-putmove-phrase-1.json` | **551** | 274 (both sections) | is the +21.90 the phrasing swap or the receptacle knowledge | ≈ ¥2.4 |
+| 1b | *(spent)* the full sentence + a neutral clause | `bank-putmove-note-1.json` | 551 | 274 | R178 1b | ¥2.34 |
+
+**Registered readings on 274 games (mde ≈ 6.0 pp).**
+
+| 1a − 1b | what it means |
+| --- | --- |
+| ≤ −9 pp | **the second operation is the mechanism**: the receptacle choice and the container check are what transfers, the phrasing swap is not, and the product statement becomes "store the operation the step is blocked on" |
+| −9 to +9 pp | **the phrasing swap carries it**, operation (2) is decoration, and the −8.96 pp R175 measured for five added sentences becomes the cost of stating more than one thing |
+| ≥ +9 pp | removing instruction makes the entry *better* — Anti-Persistence's reading arriving through an ablation, and the first positive result that paper would predict here |
+
+**Void conditions.** `carried` 1.0 in all 274 games; `pack chars` exactly **551** in every game of both arms; the
+ablated arm keeps the first operation byte for byte and contains neither "different valid receptacle" nor "ensure it
+is open"; the filler carries no digit and names no step; `by_kind` printed beside the pooled delta, because the
+prediction is a *per-kind* one (`clean`/`cool`/`heat` should fall and `examine` should not) and a pooled number that
+lands in the middle band would hide exactly the pattern that matters.
+

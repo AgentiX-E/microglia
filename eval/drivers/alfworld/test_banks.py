@@ -394,5 +394,52 @@ class GhostCitationTest(unittest.TestCase):
         self.assertIn("FALSE BY CONSTRUCTION", source["note"])
 
 
+class PhraseAblationTest(unittest.TestCase):
+    """R180's arm: the sentence with its second operation removed, at the length it is read against.
+
+    The sentence states two operations — swap `put` for `move`, then try another receptacle of the same type
+    and open it if it is a container — and the lane has never known which of them carries the +21.90 pp. The
+    ablation keeps the first byte for byte, drops the second, and pads to the same 551 rendered characters, so
+    the comparison with `bank-putmove-note-1.json` is one clause.
+
+    The guard matters more than usual here: an ablation that also changed the length would be readable as
+    "shorter" rather than as "less instruction", and every arm in this lane has been the wrong length at least
+    once before it was checked.
+    """
+
+    ABLATED = "bank-putmove-phrase-1.json"
+    FULL = "bank-putmove-note-1.json"
+    HEAD = (
+        'If a "put" action repeatedly fails despite being at the correct location and holding the object, '
+        'try the alternative phrasing "move <object> to <receptacle>"'
+    )
+
+    def text(self, name: str) -> str:
+        return payload_of(name)["entries"][0]["text"]
+
+    def test_it_keeps_the_first_operation_byte_for_byte(self):
+        self.assertTrue(self.text(self.ABLATED).startswith(self.HEAD))
+        self.assertTrue(self.text(self.FULL).startswith(self.HEAD))
+
+    def test_the_second_operation_is_gone(self):
+        text = self.text(self.ABLATED).lower()
+        for phrase in ("different valid receptacle", "ensure it is open", "if that also fails"):
+            with self.subTest(phrase=phrase):
+                self.assertNotIn(phrase, text)
+        self.assertIn("different valid receptacle", self.text(self.FULL).lower())
+
+    def test_it_is_the_same_length_as_the_arm_it_is_read_against(self):
+        ablated = len(driver.render_pack([self.text(self.ABLATED)]))
+        full = len(driver.render_pack([self.text(self.FULL)]))
+        self.assertEqual(ablated, full)
+        self.assertEqual(ablated, 551)
+
+    def test_the_filler_carries_no_digit_and_names_no_step(self):
+        filler = self.text(self.ABLATED)[len(self.HEAD):]
+        self.assertNotRegex(filler, r"[0-9]")
+        self.assertNotIn("receptacle", filler.lower())
+        self.assertIn("no operation", filler)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
