@@ -481,6 +481,58 @@ class CarriedTest(unittest.TestCase):
         self.assertIn("arm retrieved@g0.2 carried an empty pack", aggregate.empty_pack_reason("retrieved@g0.2", empty))
         self.assertIsNone(aggregate.empty_pack_reason("bare-pair", empty))
 
+    def test_the_pack_length_is_reported_beside_the_entry_count(self):
+        # R176 is a length match -- a 505-character trajectory against a 489-character sentence -- so the reading
+        # has to be able to say what each arm actually rendered. `prefix_chars` cannot: it contains the few-shot
+        # examples as well, and an arm whose pack was the wrong length would still show a plausible prefix.
+        counts = aggregate.carried([
+            episode("g1", True, pack_entries=1, pack_chars=505),
+            episode("g2", False, pack_entries=1, pack_chars=505),
+            episode("g3", True, pack_entries=0, pack_chars=0),
+        ])
+        self.assertEqual(counts["by_chars"], {0: 1, 505: 2})
+
+    def test_an_artefact_without_pack_chars_reports_no_lengths(self):
+        # Same rule as `pack_entries`: a file written before the field existed cannot answer, and an answer of
+        # zero would be a claim about the prompt that nothing measured.
+        counts = aggregate.carried([episode("g1", True, pack_entries=1), episode("g2", False, pack_entries=1)])
+        self.assertEqual(counts["by_chars"], {})
+
+    def test_the_length_is_printed_under_the_carried_line(self):
+        original = sys.argv
+        treatment = HERE / "length-a.json"
+        control = HERE / "length-b.json"
+        treatment.write_text(
+            json.dumps({
+                "summary": summary("always-in"),
+                "episodes": [episode("g1", True, pack_entries=1, pack_chars=505),
+                             episode("g2", False, pack_entries=1, pack_chars=505)],
+            }),
+            encoding="utf-8",
+        )
+        control.write_text(
+            json.dumps({
+                "summary": summary("none"),
+                "episodes": [episode("g1", False, pack_entries=0, pack_chars=0),
+                             episode("g2", True, pack_entries=0, pack_chars=0)],
+            }),
+            encoding="utf-8",
+        )
+        sys.argv = ["aggregate.py", "--input", str(treatment), "--input", str(control), "--compare", "always-in,none"]
+        buffer = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buffer):
+                aggregate.main()
+        finally:
+            sys.argv = original
+            for path in (treatment, control):
+                path.unlink(missing_ok=True)
+        printed = buffer.getvalue()
+        self.assertIn("pack chars      always-in 505 ch x2", printed)
+        self.assertIn("pack chars      none 0 ch x2", printed)
+        # And the line has to sit under `carried`, above the delta: the admission test comes before the effect.
+        self.assertLess(printed.index("pack chars      always-in"), printed.index("paired delta"))
+
     def test_the_pass_refuses_an_empty_pack_treatment_before_it_prints_a_delta(self):
         original = sys.argv
         treatment = HERE / "carry-a.json"

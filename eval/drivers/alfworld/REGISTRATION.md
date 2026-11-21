@@ -1104,6 +1104,15 @@ the agent to close the microwave before heating; a `heat` game already has a mic
 observation that says so. The `put` entry tells the agent that `put` has a second phrasing — which no observation
 ever says, and which is why it survives being carried into games it was not written for.
 
+**3b. The transfer is the placement, and five of the six kinds end with one.** The one-sentence arm read against
+the **control**, by kind: `put` 10/24 vs 2 (+8), `clean` 28/31 vs 22 (+6), `heat` 22/23 vs 18 (+4), `cool` 20/21 vs
+16 (+4), `puttwo` 16/17 vs 15 (+1), `examine` 16/18 vs 18 (−2). The corpus's own type names say which of these end
+with a placement — `pick_and_place_simple`, `pick_clean_then_place_in_recep`, `pick_heat_then_place_in_recep`,
+`pick_cool_then_place_in_recep`, `pick_two_obj_and_place` — and those five are exactly the five the sentence helps;
+`look_at_obj_in_light` has no placement in it and is the one kind the sentence charges. So the sentence does not
+generalise: **it repairs the step every kind ends on**, which is why it transfers and why a description of the
+middle of a task does not.
+
 **4. A wrong sentence costs more than a long one.** The gated arm carried one sentence per game — a mean pack of
 378 characters against the ungated store's 1,280, and a mean prompt of 4,452 against 5,354, the two differing by
 exactly the pack in each case — and cost $0.2516, **34% more than the six-sentence arm** and 2.7× the per-win price
@@ -1126,3 +1135,85 @@ trajectory it was distilled from at the same length (505 against 489 characters,
 
 **Price.** ¥1.80 (row 1) + ¥2.95 (row 2 with its control) = **¥4.75**, against ¥6.4 quoted for two arms with two
 controls.
+
+## R176 — The same evidence shown instead of stated, at the same length
+
+The one sentence that wins this lane is an **abstraction**: 489 characters distilled from one trajectory. The
+literature's claim (`arXiv:2605.12978`) is that abstraction is where a memory loses its value. On this corpus that
+claim was untestable until now for a duller reason than theory — nobody had bought the trajectory at the same
+length. `banks/bank-rawput-1.json` is that trajectory **verbatim**: the failed `put`, the thought that followed it,
+the `move` that worked and the observation confirming it, rendered at **505 characters** against the sentence's
+**489**. Two arms, one bank each, 16 characters apart.
+
+| # | experiment | the question | price |
+| --- | --- | --- | --- |
+| **1** | `always-in` over the verbatim trajectory (505 ch) | at matched length, is the value in the statement or in the evidence | ¥3.2 quoted |
+| **2** | `none` in the same dispatch | the control the pair is read against | included above |
+
+**Registered readings.** ≥ 106 (within 6 games of the sentence) — **the form does not matter, the information does**;
+below 98 (8 games under the sentence) — **the statement is what transfers**, and shown evidence is not readable at
+equal length; between — both forms carry part of it and the next arm is a mixed pack at the same total length.
+
+**Void conditions.** `carried` must be 1.0 in all 134 games; the arm's mean prefix must exceed the control's by
+**505 ± 2** characters, which is what makes the pair length-matched rather than length-adjacent; engagement above
+50%.
+
+| arm | won | rate | bill | per win | mean prefix |
+| --- | --- | --- | --- | --- | --- |
+| verbatim trajectory, 505 ch | **108**/134 | 80.60% | $0.1576 (¥1.13) | $0.0015 | 4,579.1 |
+| the sentence, 489 ch (R174.1) | **112**/134 | 83.58% | $0.1506 (¥1.08) | $0.0013 | 4,563.1 |
+| `none` (this dispatch) | 93/134 | 69.40% | $0.2162 (¥1.55) | $0.0023 | 4,074.1 |
+
+**Read.** The trajectory is worth **+11.19 pp [+3.73, +18.66], p = 0.0038** against its own control — 22 games
+repaired, 7 broken — and the sentence is worth **+2.99 pp [−3.73, +9.70], p = 0.445** over the trajectory. The
+registered answer is the first: at equal length **the two forms are worth the same**, and whatever the literature's
+compression loses, it does not lose it here. The mean prefix differs by **505.0 characters**, exactly the bank's
+render, so the pair is length-matched to the byte.
+
+**What the aggregate tie hides, by kind.** The sentence minus the trajectory, paired on the same games:
+
+| kind | sentence | trajectory | delta |
+| --- | --- | --- | --- |
+| `put` | 10/24 | 1/24 | **+37.5 pp** |
+| `cool` | 20/21 | 19/21 | +4.8 pp |
+| `heat` | 22/23 | 23/23 | −4.3 pp |
+| `puttwo` | 16/17 | 17/17 | −5.9 pp |
+| `clean` | 28/31 | 30/31 | −6.5 pp |
+| `examine` | 16/18 | 18/18 | −11.1 pp |
+
+Two opposite trades summing to four games. The trajectory is the **best** arm this lane has on `clean` (30/31),
+`heat` (23/23), `examine` (18/18) and `puttwo` (17/17) — and the **worst** on `put` (1/24 against a control of 5).
+The sentence is the opposite. The mechanism is visible in the counters rather than inferred: on `put` games the
+trajectory arm spent **49.5 of its 50 steps** and **33.6 thoughts** per game with **fewer** invalid actions than
+either arm (6.8 against 8.8 and 8.1), so it was not fighting the syntax — it was deliberating about an episode whose
+objects are not in the room. **A verbatim trace transfers the shape of the solution and carries its nouns with it.**
+
+**Price.** $0.3738 = **¥2.67**, against ¥3.2 quoted.
+
+## R177 — Registered, and deliberately not bought: the lane's resolution floor
+
+R175 and R176 have left this lane with hypotheses in the 3–6 pp band and an instrument that can see **12–13 pp** on
+134 paired games. Three rows were written against that arithmetic and none of them is bought:
+
+| # | experiment | predicted effect | why not |
+| --- | --- | --- | --- |
+| 1 | `always-in` over `banks/bank-repair-2.json` (620 ch: the `put` repair verbatim + the `puttwo` repair verbatim) | +1 to +3 games over the 112 arm | under the mde by 5×; whatever it reads, the answer is "indistinguishable" |
+| 2 | the sentence delivered **after the first refusal** instead of before the first call | +7 games at best (the easy stratum's 84/91 against 91/91 is what it would recover) | six games short of the mde |
+| 3 | the best-per-kind pack (the five kinds' best arms sum to 118) | +6 games | cherry-picked across arms, and the composition tax eats most of it |
+
+Row 1's bank is committed anyway — `banks/bank-repair-2.json`, validated by `test_banks.py` — because the sentence it
+needs has already been written and a bank that has to be written between two dispatches is a bank that is written
+twice. It is labelled **built, not bought**, the same way `bank-putpair-terse-2.json` is.
+
+**What is bought instead.** Games. The driver already accepts `--split`, the corpus publishes a second section
+(`valid_seen`, 140 games) and a training section, and the three arms of R174.1/R176 on 140 more games cost ≈ ¥3.6 —
+the price of one arm on 134. A 274-game join has an mde of ≈ 9 pp, and a 402-game training section would take it to
+≈ 6 pp for hand-written banks only (a bank distilled from a training run cannot be evaluated on it, and the guard for
+that is not written yet).
+
+**The instrument work this requires, before any dispatch.** `--split` is not an input of `alfworld.yml`; the sweep
+hardcodes `GAMES=134`, passes no split, and `aggregate.py --expect` tiles 134. A split input without a size is a
+sweep whose jobs drive one section while the join expects another, so the change is one workflow input, one dispatch
+flag, `--expect` read from the split's published size, and a refusal when a sweep names a split without its size.
+That work is registered here rather than done because it is instrument, not hypothesis, and it must be green before
+the ¥3.6 is spent.

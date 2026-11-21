@@ -591,6 +591,17 @@ class LoopTest(unittest.TestCase):
         self.assertEqual(packed["pack_entries"], 1)
         self.assertGreater(packed["prefix_chars"], self.drive()["prefix_chars"])
 
+    def test_the_pack_length_is_recorded_apart_from_the_prefix(self):
+        # The two differ by the few-shot examples, which are the same in every arm: only `pack_chars` answers the
+        # question a length-matched experiment asks -- did this arm render the block it was registered with
+        # (R176's void condition, AUDIT 34.249).
+        rule = "always open the cabinet before taking"
+        packed = self.drive(arm="always-in", rules=[rule])
+        bare = self.drive()
+        self.assertEqual(packed["pack_chars"], len(agent.render_pack([rule])))
+        self.assertEqual(packed["prefix_chars"] - bare["prefix_chars"], packed["pack_chars"])
+        self.assertEqual(bare["pack_chars"], 0)
+
     def test_the_retrieved_arm_carries_only_what_the_observation_admits(self):
         rules = ["the cabinet is closed", "the fridge is cold", "an apple is a fruit"]
         retrieved = self.drive(arm="retrieved", rules=rules, top_k=2)

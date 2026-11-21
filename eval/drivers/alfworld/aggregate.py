@@ -444,16 +444,30 @@ def carried(episodes: "list[dict]") -> dict:
     rules and a bank of twenty are two arms with one label, and an arm whose pack is empty is not that arm.
     """
     by_entries: "dict[int, int]" = {}
+    by_chars: "dict[int, int]" = {}
     for episode in episodes:
         count = episode.get("pack_entries")
         if not isinstance(count, int):
             continue
         by_entries[count] = by_entries.get(count, 0) + 1
+        chars = episode.get("pack_chars")
+        if isinstance(chars, int):
+            by_chars[chars] = by_chars.get(chars, 0) + 1
     games = sum(by_entries.values())
+    if games:
+        mean = round(sum(count * games_with for count, games_with in by_entries.items()) / games, 3)
+    else:
+        mean = None
+    # The pack's own length, which a length-matched experiment has to read before it reads the delta: an arm that
+    # was supposed to carry 505 characters and carried 1,280 is a different experiment, and `prefix_chars` cannot
+    # say so because it also contains the few-shot examples. Absent from artefacts written before the field
+    # existed, and then reported as absent rather than as zero.
+    unlike = {chars: games_with for chars, games_with in by_chars.items()}
     return {
         "games": games,
         "by_entries": dict(sorted(by_entries.items())),
-        "mean": round(sum(count * games_with for count, games_with in by_entries.items()) / games, 3) if games else None,
+        "mean": mean,
+        "by_chars": dict(sorted(unlike.items())),
     }
 
 
@@ -589,6 +603,9 @@ def main() -> int:
         for arm in (treatment, control):
             counts = per_arm_carried[arm]
             print(f"  carried         {arm} mean {counts['mean']} entries over {counts['games']} games, {counts['by_entries']}")
+            if counts["by_chars"]:
+                rendered = ", ".join(f"{chars} ch x{games_with}" for chars, games_with in counts["by_chars"].items())
+                print(f"  pack chars      {arm} {rendered}")
         print(
             f"  paired delta    {reading['paired']['delta']:+.4f} "
             f"[{reading['paired']['ci_low']:+.4f}, {reading['paired']['ci_high']:+.4f}]  "

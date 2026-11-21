@@ -1,0 +1,32 @@
+{
+ "schema": "microglia.alfworld-bank/1",
+ "cap": 20,
+ "identity": "substring",
+ "source": {
+  "kind": "two sentences, both repairs, one per failing step",
+  "matches": "the `put` entry is banks/bank-putmove-1.json unchanged (112/134 alone); the `puttwo` entry is the six-bank's, unchanged",
+  "note": "the composition test R175 licensed: two repairs against the one repair they extend, at ~600 characters",
+  "registration": "R177 row 1",
+  "operations_kept": [
+   "the put-to-move phrasing and the second receptacle",
+   "placing the first object before taking the second, so a full hand cannot block the take"
+  ],
+  "provenance": "written after R175 measured five description sentences at -8.96pp, and before any arm carried two repairs"
+ },
+ "entries": [
+  {
+   "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\"; if that also fails, try a different valid receptacle of the same type, and if the receptacle is a container, ensure it is open first.",
+   "votes": 10,
+   "kinds": [
+    "put"
+   ]
+  },
+  {
+   "text": "When the task asks for two objects, place the first before taking the second, so that a full hand cannot block the second take.",
+   "votes": 0,
+   "kinds": [
+    "puttwo"
+   ]
+  }
+ ]
+}
