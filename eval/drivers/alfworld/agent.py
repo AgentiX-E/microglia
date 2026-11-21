@@ -79,6 +79,16 @@ DEFAULT_TOP_K = 3
 # and reports on `valid_unseen`, and a bank distilled from the held-out split would be a leak dressed
 # as a memory.
 SPLITS = ("eval_out_of_distribution", "eval_in_distribution", "train")
+# How many games each split publishes, counted from the installed corpus rather than quoted:
+# `find <split> -name game.tw-pddl | wc -l` gives 134, 140 and 3,553. Two things need the number. A `--games`
+# larger than the split it names is a typo that would otherwise be bought as a shorter pass with a rate that
+# reads like a full one. And a join across two sections has to know which section's size its tiling check holds
+# to, because a 274-game reading that quietly tiled 134 twice is a doubled denominator (AUDIT 34.251).
+SPLIT_SIZES = {"eval_out_of_distribution": 134, "eval_in_distribution": 140, "train": 3553}
+# The directory each of those names lives in inside the published corpus. The environment renames the
+# sections (`valid_unseen` is `eval_out_of_distribution`), and the two names have to be related somewhere
+# or every count of the corpus is an argument about which directory was meant.
+SPLIT_DIRS = {"eval_out_of_distribution": "valid_unseen", "eval_in_distribution": "valid_seen", "train": "train"}
 POLICIES = ("model", "seed", "first")
 
 # The six task types the split publishes, keyed by the prefix the competitor keys its examples by. The
@@ -869,6 +879,10 @@ def pass_header(arguments, rules: "list[str]", total: int) -> dict:
         "arm": arguments.arm,
         "policy": arguments.policy,
         "split": arguments.split,
+        # The section's own size, which is what a join's tiling check has to hold to. `games_requested` is the
+        # pass's budget and is legitimately smaller for a calibration; this is the denominator the split
+        # publishes, and two sections joined without it are a join nobody can check (AUDIT 34.251).
+        "split_size": SPLIT_SIZES[arguments.split],
         "transcripts": bool(arguments.record_transcripts),
         "model": arguments.model if arguments.policy == "model" else None,
         "seed": arguments.seed,
@@ -1038,7 +1052,17 @@ def main() -> int:
     card = load_rate_card()
 
     env, num_games = build_env(train_eval=arguments.split)
-    total = num_games if arguments.games <= 0 else min(arguments.games, num_games)
+    # `total` used to be `min(games, num_games)`, which answered a `--games 140` on the 134-game split with 134
+    # games and a rate that read like a full pass — the one place in this file where a wrong number was silently
+    # made smaller instead of refused. Both ceilings are now refusals: the split's published size, so a typo
+    # cannot be bought as a shorter pass, and the corpus's own count, so a stale table cannot be bought at all
+    # (`scripts/check-split-sizes.py` holds the table to the installed corpus in CI, AUDIT 34.251).
+    published = SPLIT_SIZES[arguments.split]
+    if arguments.games > published:
+        fail(f"--games {arguments.games} is more than {arguments.split} publishes ({published})")
+    if arguments.games > num_games:
+        fail(f"--games {arguments.games} is more than the installed {arguments.split} corpus holds ({num_games})")
+    total = num_games if arguments.games <= 0 else arguments.games
     start, stop = shard_bounds(arguments.shard, total)
     draw = Draw(arguments.seed)
 

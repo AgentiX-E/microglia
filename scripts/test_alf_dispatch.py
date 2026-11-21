@@ -255,6 +255,98 @@ class PayloadTest(unittest.TestCase):
         self.assertEqual(json.loads(inputs["arms"]), ["none", "sham"])
 
 
+class SplitTest(unittest.TestCase):
+    """The corpus section: which one is bought, how big it is, and what may be scored with it.
+
+    Every published number in this lane comes from `eval_out_of_distribution`. A second section is only a
+    second reading if the dispatch names it, the size travels with it (the join tiles to that number), and the
+    bank it carries was not distilled from it.
+    """
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp()).resolve()
+        self.addCleanup(shutil.rmtree, self.root, True)
+        self.banks = self.root / "eval" / "drivers" / "alfworld" / "banks"
+        self.banks.mkdir(parents=True)
+        # Three provenances, which is the whole distinction the guard turns on: a distilled bank with a recorded
+        # section, a distilled bank without one, and a hand-written bank that is a function of no section.
+        (self.banks / "distilled.json").write_text(json.dumps({"entries": [], "source": {"episodes": 76}}), encoding="utf-8")
+        (self.banks / "seen.json").write_text(
+            json.dumps({"entries": [], "source": {"episodes": 140, "train_split": "eval_in_distribution"}}),
+            encoding="utf-8",
+        )
+        (self.banks / "handwritten.json").write_text(
+            json.dumps({"entries": [], "source": {"kind": "hand-assembled subset"}}), encoding="utf-8"
+        )
+
+    def refuse(self, *argv):
+        with self.assertRaises(lane.Refused) as caught:
+            lane.check(arguments(*argv), tree=self.root)
+        return str(caught.exception)
+
+    def test_the_table_of_sizes_is_the_lane_s_own_table(self):
+        # The copy is what lets this script run without the lane's environment; the test is what keeps the copy
+        # from becoming a second, quieter opinion about how many games a section holds.
+        sys.path.insert(0, str(self.root.parent))
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "eval" / "drivers" / "alfworld"))
+        import agent  # noqa: E402  (imported here: the comparison is the test)
+
+        self.assertEqual(lane.SPLIT_SIZES, agent.SPLIT_SIZES)
+
+    def test_an_unknown_section_is_refused_against_the_list_the_corpus_has(self):
+        message = self.refuse("--arm", "none", "--games", "134", "--split", "valid_seen")
+        self.assertIn("valid_seen", message)
+        self.assertIn("eval_in_distribution", message)
+
+    def test_games_beyond_the_section_are_refused_rather_than_shortened(self):
+        # `agent.py` used to answer this with `min(games, num_games)` and a rate that read like a full pass.
+        self.assertIn("more than", self.refuse("--arm", "none", "--games", "140"))
+
+    def test_a_chain_cannot_score_the_section_it_distilled_from(self):
+        message = self.refuse("--train", "140", "--chain", "true", "--split", "eval_in_distribution")
+        self.assertIn("valid_seen", message)
+        self.assertIn("not built from", message)
+
+    def test_a_distilled_bank_without_provenance_is_refused_on_a_named_section(self):
+        message = self.refuse(
+            "--sweep", "true", "--arms", '["none","always-in"]', "--rules",
+            "eval/drivers/alfworld/banks/distilled.json", "--split", "eval_in_distribution",
+        )
+        self.assertIn("cannot prove", message)
+
+    def test_a_distilled_bank_from_the_scored_section_is_refused(self):
+        message = self.refuse(
+            "--sweep", "true", "--arms", '["none","always-in"]', "--rules",
+            "eval/drivers/alfworld/banks/seen.json", "--split", "eval_in_distribution",
+        )
+        self.assertIn("eval_in_distribution", message)
+        self.assertIn("distilled-on", message)
+
+    def test_a_hand_written_bank_may_be_scored_on_another_section(self):
+        # R177's first purchase is exactly this shape: a sentence and a trajectory, neither of them a rate over
+        # any section, scored on `valid_seen` for the games rather than for the split.
+        named = lane.check(
+            arguments(
+                "--sweep", "true", "--arms", '["none","always-in"]', "--rules",
+                "eval/drivers/alfworld/banks/handwritten.json", "--split", "eval_in_distribution",
+            ),
+            tree=self.root,
+        )
+        self.assertEqual(named, ["none", "always-in"])
+
+    def test_the_payload_names_the_section_and_its_published_size(self):
+        inputs = lane.payload(
+            arguments("--sweep", "true", "--rules", "b.json", "--split", "eval_in_distribution")
+        )
+        self.assertEqual(inputs["split"], "eval_in_distribution")
+        self.assertEqual(inputs["split_games"], "140")
+
+    def test_an_unnamed_section_leaves_the_workflow_its_own_default(self):
+        inputs = lane.payload(arguments("--sweep", "true", "--rules", "b.json"))
+        self.assertNotIn("split", inputs)
+        self.assertNotIn("split_games", inputs)
+
+
 class GreenTreeTest(unittest.TestCase):
     """The gate that decides whether a purchase happens, with the network replaced by a value."""
 

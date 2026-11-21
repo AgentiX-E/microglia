@@ -64,7 +64,11 @@ class Draw:
         return self.u64() % bound
 
 
-def load_slices(paths: "list[Path]", relabel_specs: "list[str] | tuple[str, ...]" = ()) -> "dict[str, list[dict]]":
+def load_slices(
+    paths: "list[Path]",
+    relabel_specs: "list[str] | tuple[str, ...]" = (),
+    expect_splits: "tuple[str, ...]" = (),
+) -> "dict[str, list[dict]]":
     """Every episode of every slice, grouped by the arm that drove it.
 
     A spec may name an **arm** or a **path**. The path form is what makes two dispatches of the *same* arm joinable:
@@ -97,10 +101,19 @@ def load_slices(paths: "list[Path]", relabel_specs: "list[str] | tuple[str, ...]
         else:
             arm_specs.append(spec)
     grouped: "dict[str, list[dict]]" = {}
+    sections: "dict[str, str]" = {}
     for path in paths:
         payload = json.loads(path.read_text(encoding="utf-8"))
         summary = payload.get("summary") or {}
         arm = summary.get("arm")
+        # Which corpus section this slice was driven from. It is recorded per slice because a reading has to be
+        # able to grade itself by section: `eval_out_of_distribution` is 134 games and `eval_in_distribution` is
+        # 140, and a delta that pools them is an average over two populations (see the check after this loop).
+        section = summary.get("split")
+        if section is not None and not isinstance(section, str):
+            fail(f"{path}: summary.split is {section!r}, which is not a split name")
+        if section:
+            sections[str(path)] = section
         # What a configuration is called: the family, plus the knobs that were moved off their registered values.
         # An artefact written before the field existed groups by its arm, so a reading of the failed run's slices
         # still works, and a label that does not belong to its family is refused rather than trusted.
@@ -125,7 +138,37 @@ def load_slices(paths: "list[Path]", relabel_specs: "list[str] | tuple[str, ...]
             fail(f"{path}: no episodes, so this slice contributes nothing and its cost is unexplained")
         if policy == "seed" or policy == "first":
             fail(f"{path}: a model-free slice cannot be paired with a billed one; policy is {policy!r}")
+        if section:
+            # Derived at join time rather than stored in the artefact: an episode is "from" the section its
+            # parent said it was, and writing it into the artefact too would be two places to disagree.
+            for episode in episodes:
+                if isinstance(episode, dict):
+                    episode.setdefault("section", section)
         grouped.setdefault(label, []).extend(episodes)
+    # A join across sections is legal and sometimes the point — a second section is the only place this lane can
+    # buy resolution — but it is never silent. Two sections in one reading is a different claim from a reading on
+    # one section: the arms drove different rooms, so the delta is an average over two populations and has to be
+    # reported per section beside the pooled number. So the declaration is required and the sections are graded
+    # (`by_section`), and an undeclared mixture is refused rather than pooled.
+    present = set(sections.values())
+    if len(present) > 1 and not expect_splits:
+        listed = ", ".join(f"{Path(path).name}: {section}" for path, section in sorted(sections.items()))
+        fail(
+            f"this join mixes corpus sections ({listed}); name them with --expect-splits to pool them, because "
+            "a pooled rate over two sections is an average over two populations and has to be read beside both"
+        )
+    if expect_splits:
+        # An artefact written before `summary.split` existed cannot prove which section it drove, and "cannot
+        # prove" is refused rather than assumed: the whole value of naming the section is that the reading's
+        # denominator is the section's own published size.
+        unnamed = sorted(Path(path).name for path in paths if str(path) not in sections)
+        if unnamed:
+            fail(
+                f"--expect-splits {list(expect_splits)} cannot be checked against {unnamed}, which record no "
+                "section; re-drive them rather than joining a slice whose denominator is unknown"
+            )
+        if present != set(expect_splits):
+            fail(f"--expect-splits {sorted(expect_splits)} but the slices drove {sorted(present)}")
     return relabel(grouped, arm_specs)
 
 
@@ -374,16 +417,24 @@ def strata(left: "dict[str, dict]", right: "dict[str, dict]", labels: "tuple[str
     return table
 
 
-def by_kind(left: "dict[str, dict]", right: "dict[str, dict]", labels: "tuple[str, str]" = ("treatment", "control")) -> dict:
-    """The paired delta of each of the six task types, on the games both arms drove.
+def by_field(
+    left: "dict[str, dict]",
+    right: "dict[str, dict]",
+    labels: "tuple[str, str]" = ("treatment", "control"),
+    field: str = "task_kind",
+) -> dict:
+    """The paired delta of each value of one episode field, on the games both arms drove.
 
-    Pooling the six is how a mechanism that helps three and hurts three reads as a null. The registration
-    predicts *where* a procedural rule should help, and this is the only view that can confirm it.
+    Pooling is how a mechanism that helps three groups and hurts three reads as a null, and there are two such
+    groupings in this lane: the task type (`task_kind`) and the corpus section (`section`, derived at join time).
+    The registration predicts *where* a rule should help in both, and this is the view that confirms or refutes it.
+    One function rather than two because the arithmetic is identical and a second copy is a second place for the
+    discordance counts to disagree with the pooled reading.
     """
     treatment, control = labels
     table: "dict[str, dict]" = {}
     for game in shared_games(left, right):
-        kind = left[game].get("task_kind") or right[game].get("task_kind") or "unknown"
+        kind = left[game].get(field) or right[game].get(field) or "unknown"
         row = table.setdefault(kind, {"games": 0, "wins": {treatment: 0, control: 0}, "treatment_only": 0, "control_only": 0})
         first = bool(left[game].get("won"))
         second = bool(right[game].get("won"))
@@ -397,6 +448,21 @@ def by_kind(left: "dict[str, dict]", right: "dict[str, dict]", labels: "tuple[st
         row["discordant"] = row["treatment_only"] + row["control_only"]
     # Descending by games, then by name: the largest population first, and a stable order for a diff.
     return dict(sorted(table.items(), key=lambda item: (-item[1]["games"], item[0])))
+
+
+def by_kind(left: "dict[str, dict]", right: "dict[str, dict]", labels: "tuple[str, str]" = ("treatment", "control")) -> dict:
+    """The paired delta of each of the six task types."""
+    return by_field(left, right, labels, "task_kind")
+
+
+def by_section(left: "dict[str, dict]", right: "dict[str, dict]", labels: "tuple[str, str]" = ("treatment", "control")) -> dict:
+    """The paired delta of each corpus section, which is what makes a pooled cross-section reading honest.
+
+    A 274-game join over two sections is an average over two populations, and the question R177 registers is
+    precisely whether the effect is one of them or both. Printing the sections beside the pooled delta is the
+    difference between an average and a claim about memory.
+    """
+    return by_field(left, right, labels, "section")
 
 
 def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tuple[str, str]" = ("left", "right")) -> dict:
@@ -514,13 +580,19 @@ def main() -> int:
         help="rename an arm for cross-dispatch pairing, as old=new; repeatable",
     )
     parser.add_argument("--expect", type=int, default=0, help="games each arm must tile; 0 skips the check")
+    parser.add_argument(
+        "--expect-splits",
+        default="",
+        help="the corpus sections this join must span, comma separated; a mixture is refused until it is named here",
+    )
     parser.add_argument("--rounds", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=20261120)
     parser.add_argument("--out", default="")
     arguments = parser.parse_args()
 
     paths = [Path(item) for item in arguments.input]
-    grouped = load_slices(paths, arguments.relabel)
+    declared = tuple(item.strip() for item in arguments.expect_splits.split(",") if item.strip())
+    grouped = load_slices(paths, arguments.relabel, declared)
     # Printed rather than implied: a reading that crosses dispatches is the one kind of reading whose
     # provenance a reader cannot recover from the arms' names in the report.
     for spec in arguments.relabel:
@@ -580,6 +652,7 @@ def main() -> int:
                 "engagement": engagement(left, right),
                 "strata": strata(left, right, (treatment, control)),
                 "kinds": by_kind(left, right, (treatment, control)),
+                "sections": by_section(left, right, (treatment, control)),
             }
         )
 
@@ -628,6 +701,14 @@ def main() -> int:
             print(f"    {name:<6} {row['wins'][treatment]}/{row['games']} vs {row['wins'][control]}/{row['games']}  delta {row['delta']}")
         for kind, row in reading["kinds"].items():
             print(f"    {kind:<9} {row['wins'][treatment]}/{row['games']} vs {row['wins'][control]}/{row['games']}  delta {row['delta']:+.4f}")
+        # Only when the join actually spans more than one: a one-section reading would print the same numbers a
+        # second time under a different heading, which is how a reader learns to skip a line.
+        if len(reading["sections"]) > 1:
+            for section, row in reading["sections"].items():
+                print(
+                    f"  by section      {section:<24} {row['wins'][treatment]}/{row['games']} vs "
+                    f"{row['wins'][control]}/{row['games']}  delta {row['delta']:+.4f}  mde {mde_of(row['discordant'], row['games']):.4f}"
+                )
         left_counts = per_arm[treatment]
         right_counts = per_arm[control]
         print(

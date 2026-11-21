@@ -1915,3 +1915,39 @@ alternative phrasing the world never names — the only kind of entry this lane 
 **Sentence tax** — The price a pack pays for its length, separable from what it says: −3.4 to −3.7 pp per sentence on
 the padded-block ladder, −1.79 pp per sentence for five task-relevant additions at n = 6. It is second-order against
 content: a redundant sentence is worth less than nothing, and no correct sentence is worth less than its length.
+
+**Verbatim trace** — A memory entry that is a trajectory fragment with nothing edited: the failed action, the thought
+after it, the action that worked, the observation that confirmed it. R176 carried one at **505 rendered characters**
+against the **489-character** sentence distilled from it, which is what makes form and content separable here.
+Measured: the same value as the sentence (+2.99 pp, p = 0.445 at a 16-character distance) and the opposite failure —
+best arm on four of six kinds, **1/24 on the one kind it came from**, with the fewest invalid actions of any arm in
+the lane. It transfers the shape of a solution and carries its nouns with it.
+
+**Referent (of a memory entry)** — The thing an entry is *about*: a step, a room, an object, a task type. R175 and
+R176 together make this the variable that decides whether an entry pays. A sentence about a failing step transfers
+into five kinds it was not written for because the step recurs; a sentence about a kind's objects does not; a trace
+about one room's objects actively costs the games in that room. **Selection signals operate on referents, not on
+texts**, which is why a task-kind gate and an observation-overlap floor both failed here.
+
+**Resolution floor (this lane)** — What this split can see: **12–13 pp** on 134 paired games, from the register's own
+minimum-detectable-effect arithmetic, and **4.2 pp** on identical prompts from the noise measurement (AUDIT 34.247).
+Every hypothesis this lane still holds is 3–6 pp, so the next purchase is games rather than arms — a second corpus
+section (140 games) moves the floor to ≈ 9 pp and a 274-game join is the first design that can resolve what is left.
+
+**Corpus section** — One of the three sets of ALFWorld rooms the environment publishes: `eval_out_of_distribution`
+(134 games, `valid_unseen`), `eval_in_distribution` (140, `valid_seen`) and `train` (3,553). The lane's published
+numbers all come from the first. A section is not an implementation detail: it is the unit of a leak (a bank
+distilled from one and scored on it), of a denominator (each publishes its own size) and of a comparison (an
+effect present in held-out rooms and absent in seen ones is a property of the split, not of memory).
+
+**Declared mixture** — A join that spans two corpus sections and says so with `--expect-splits`. Refused while
+undeclared, because a pooled rate over two populations is an average wearing one population's name; once declared
+it is *graded* — every episode carries its section and the reading prints each section's delta beside the pooled
+one. The distinction is between pooling silently and pooling with its parts shown, and it exists because a second
+section is the only place this lane can buy resolution.
+
+**Distilled-on ≠ scored-on** — The rule that a bank may not be evaluated on the section it was distilled from. It
+is enforced by data rather than by intent: `distill.py` writes `source.train_split`, read from the artefacts
+themselves, and `alf_dispatch.py` refuses a `--split` equal to it. A *hand-written* bank — one sentence, one
+verbatim trajectory — is a function of no section and is therefore allowed anywhere; a distilled bank with no
+recorded provenance is refused rather than trusted, because "cannot prove" is not "did not".

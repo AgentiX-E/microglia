@@ -93,6 +93,39 @@ class WorkflowTest(unittest.TestCase):
                 flags |= set(re.findall(r"--[a-z][a-z-]+", line))
         return flags
 
+    @staticmethod
+    def declared_inputs() -> "set[str]":
+        """The keys under `workflow_dispatch.inputs`, read as text so the check needs no YAML library."""
+        lines = WORKFLOW.read_text(encoding="utf-8").splitlines()
+        start = next(index for index, line in enumerate(lines) if line.strip() == "workflow_dispatch:")
+        declared: "set[str]" = set()
+        for line in lines[start + 1:]:
+            if line.startswith("  ") and not line.startswith("    "):
+                break
+            match = re.match(r"^      ([a-z_]+):\s*$", line)
+            if match:
+                declared.add(match.group(1))
+        return declared
+
+    @staticmethod
+    def input_defaults() -> "dict[str, str]":
+        """Each input's `default:` line, which is the value a dispatch that names nothing receives."""
+        lines = WORKFLOW.read_text(encoding="utf-8").splitlines()
+        start = next(index for index, line in enumerate(lines) if line.strip() == "workflow_dispatch:")
+        defaults: "dict[str, str]" = {}
+        current = ""
+        for line in lines[start + 1:]:
+            if line.startswith("  ") and not line.startswith("    "):
+                break
+            match = re.match(r"^      ([a-z_]+):\s*$", line)
+            if match:
+                current = match.group(1)
+                continue
+            match = re.match(r"^\s+default:\s*'(.*)'\s*$", line)
+            if match and current:
+                defaults[current] = match.group(1)
+        return defaults
+
     def test_the_workflow_names_every_driver_it_runs(self):
         # A guard against the parser above silently matching nothing: the file has to keep mentioning the
         # drivers for the flags below to mean anything.
@@ -138,6 +171,43 @@ class WorkflowTest(unittest.TestCase):
             driver,
             "the kind gate must be inert on the control rather than refused there",
         )
+
+
+    def test_every_input_the_dispatcher_sends_is_one_the_workflow_declares(self):
+        """The 34.232 shape, caught structurally: a key the workflow does not declare is silently dropped.
+
+        `--control-run` was accepted by the dispatcher, put in the payload, and never declared as an input, so
+        the dispatch bought a treatment with no control while the command line said it had one. The payload key
+        set is finite and the YAML is text, so the check is a set difference rather than a remembered promise.
+        """
+        declared = self.declared_inputs()
+        # Two calls, not one: `payload()` omits an unnamed input by design, so a single command line proves only
+        # its own keys — and the key nobody happens to send is exactly the one that goes missing from the YAML.
+        # Read from the builder rather than from a hand-written list, which is what makes this a contract.
+        sys.path.insert(0, str(ROOT / "scripts"))
+        import alf_dispatch as lane  # noqa: E402  (the payload builder, imported here: the comparison is the test)
+
+        named: "set[str]" = set()
+        for argv in (
+            ["--sweep", "true", "--arms", '["none"]', "--rules", "b.json", "--split", "train",
+             "--train", "140", "--chain", "true", "--train-shards", '["0"]', "--train-run-ids", "1",
+             "--bank-only", "true", "--distill-kinds", "put", "--top-k", "1", "--gate-share", "0.2",
+             "--gate-kind", "true", "--not-before", "01:00"],
+            ["--arm", "none", "--games", "134", "--shard", "0/4", "--max-steps", "50", "--trace", "3"],
+        ):
+            named |= set(lane.payload(lane.parser().parse_args(argv)))
+        self.assertGreaterEqual(len(named), 20, "the payload builder stopped emitting the inputs it used to")
+        self.assertEqual(sorted(named - declared), [], "the dispatcher sends inputs the workflow cannot receive")
+
+    def test_the_section_and_its_size_are_declared_together(self):
+        # A section without its size is a sweep whose twelve jobs drive one number and whose join checks another,
+        # and `aggregate.py --expect-split` can only refuse it after the money is spent.
+        declared = self.declared_inputs()
+        self.assertIn("split", declared)
+        self.assertIn("split_games", declared)
+        defaults = self.input_defaults()
+        self.assertEqual(defaults["split"], "eval_out_of_distribution")
+        self.assertEqual(defaults["split_games"], "134", "the default size has to be the held-out section's own")
 
 
 class SuiteTest(unittest.TestCase):

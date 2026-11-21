@@ -320,6 +320,57 @@ class TilingTest(unittest.TestCase):
             path.unlink(missing_ok=True)
 
 
+class ProvenanceTest(unittest.TestCase):
+    """Which corpus section a bank was distilled from, which is what makes a leak refusable rather than visible."""
+
+    def write(self, name: str, split) -> Path:
+        path = HERE / name
+        payload = {"episodes": [{"gamefile": "g1", "won": True, "trajectory": "trial"}]}
+        if split is not None:
+            payload["summary"] = {"arm": "none", "split": split}
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return path
+
+    def test_the_section_is_read_from_the_artefact_that_was_distilled(self):
+        path = self.write("prov-a.json", "eval_in_distribution")
+        try:
+            self.assertEqual(distill.sections([path]), "eval_in_distribution")
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_a_mixed_union_is_refused(self):
+        # A bank built from two sections describes neither, and one of the two may be the section it would be
+        # scored on — which is the only leak this lane can commit while every number still looks right.
+        first = self.write("prov-b.json", "eval_in_distribution")
+        second = self.write("prov-c.json", "eval_out_of_distribution")
+        printed = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+                distill.sections([first, second])
+        finally:
+            for path in (first, second):
+                path.unlink(missing_ok=True)
+        self.assertIn("mix corpus sections", printed.getvalue())
+
+    def test_an_artefact_without_a_section_is_unknown_rather_than_assumed(self):
+        # `None` is the honest answer for a file written before the field: it lets the dispatch decide that it
+        # cannot prove the provenance, which is a different fact from "this was the held-out section".
+        path = self.write("prov-d.json", None)
+        try:
+            self.assertIsNone(distill.sections([path]))
+        finally:
+            path.unlink(missing_ok=True)
+
+    def test_one_section_across_two_artefacts_is_one_answer(self):
+        first = self.write("prov-e.json", "train")
+        second = self.write("prov-f.json", "train")
+        try:
+            self.assertEqual(distill.sections([first, second]), "train")
+        finally:
+            for path in (first, second):
+                path.unlink(missing_ok=True)
+
+
 class BuildTest(unittest.TestCase):
     """The pass itself, against a scripted provider."""
 
@@ -417,22 +468,21 @@ class MainTest(unittest.TestCase):
         else:
             os.environ["DEEPSEEK_API_KEY"] = self.key
 
-    def episodes_with(self, count: int, won: bool = True) -> Path:
-        self.episodes.write_text(
-            json.dumps(
-                {
-                    "episodes": [
+    def episodes_with(self, count: int, won: bool = True, split: str = "") -> Path:
+        payload = {
+            "episodes": [
                         {
                             "gamefile": f"valid_seen/task-{index}/trial_t/game.tw-pddl",
                             "won": won,
                             "trajectory": f"You are in the middle of a room.\n> look\nNothing happens.",
                         }
-                        for index in range(count)
-                    ]
-                }
-            ),
-            encoding="utf-8",
-        )
+                for index in range(count)
+            ]
+        }
+        if split:
+            # The sweep writes this header, and it is the only place a bank's provenance can come from.
+            payload["summary"] = {"arm": "none", "split": split}
+        self.episodes.write_text(json.dumps(payload), encoding="utf-8")
         return self.episodes
 
     def run_main(self, argv):
@@ -467,6 +517,20 @@ class MainTest(unittest.TestCase):
         self.assertEqual(payload["source"]["episodes"], 8)
         self.assertEqual(payload["source"]["chunks"], 1)
         self.assertGreater(payload["bill"]["usd"], 0)
+
+    def test_the_bank_records_the_section_it_read(self):
+        # Without this field a dispatch cannot refuse to score a bank on the section that produced it, and the
+        # leak would be a rate that looks like every other rate.
+        os.environ["DEEPSEEK_API_KEY"] = "test-key"
+        self.stub(["ADD 1: Open the cabinet before taking anything out of it."])
+        self.assertEqual(
+            self.run_main(
+                ["--episodes", str(self.episodes_with(2, split="eval_in_distribution")), "--out", str(self.out)]
+            ),
+            0,
+        )
+        payload = json.loads(self.out.read_text(encoding="utf-8"))
+        self.assertEqual(payload["source"]["train_split"], "eval_in_distribution")
 
     def test_the_bank_is_readable_by_the_arm_that_carries_it(self):
         # The one interface between the two files. A bank this file writes and `agent.py` cannot read is a

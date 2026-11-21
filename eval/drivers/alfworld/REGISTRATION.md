@@ -1217,3 +1217,45 @@ sweep whose jobs drive one section while the join expects another, so the change
 flag, `--expect` read from the split's published size, and a refusal when a sweep names a split without its size.
 That work is registered here rather than done because it is instrument, not hypothesis, and it must be green before
 the ¥3.6 is spent.
+
+## R177, amendment 1 — the second section is plumbed, and the arm that would have been a leak is left out
+
+**What was built before anything is bought.** Three things about a corpus section were assumptions in code:
+that `--games` could not exceed it (`min(games, num_games)` answered a request for 140 on the 134-game split
+with 134 games and a full-looking rate), that a join could not cross two sections (`aggregate.py` had no
+opinion), and that a bank could not be scored on the section that distilled it (nothing recorded which section
+that was). All three are now refusals, and the table of sizes is held to the installed corpus by
+`scripts/check_split_sizes.py` — 134, 140 and 3,553 games, counted with `find … -name game.tw-pddl` rather than
+quoted (AUDIT 34.251).
+
+**Row 1, restated as two arms.** The registered row was three arms on `valid_seen` (140 games) joining the
+134 held-out games for a 274-game estimate. One of the three cannot be run there honestly: `banks/bank-rawput-1.json`
+is a verbatim trajectory **from a won `valid_seen` game**, so scoring it on `valid_seen` includes the game it came
+from — 1 of 140, about 0.7 pp, and inside the noise, which is exactly why it would never be noticed. It is left
+out of this section rather than caveated:
+
+| # | arm | section | games | the question | price |
+| --- | --- | --- | --- | --- | --- |
+| **1a** | `none` | `eval_in_distribution` | 140 | the control the pair is read against, bought in the same dispatch | ≈ ¥1.4 |
+| **1b** | `always-in` over `banks/bank-putmove-1.json` (489 ch) | `eval_in_distribution` | 140 | does the one sentence that wins the held-out section also win the seen one | ≈ ¥1.4 |
+| — | the verbatim trajectory | — | — | **not bought here**: its evidence is 1 of these 140 games, so the arm would be scored partly on its own source (AUDIT 34.251) | — |
+
+**Total ≈ ¥2.8** against the ¥3.6 the three-arm version was quoted at, and the join is 274 games either way.
+
+**The registered reading.** The sentence's held-out gain is +17.91 pp [+8.96, +26.87] (R174.1). On 274 paired
+games the minimum detectable effect falls from 12–13 pp to ≈ 9 pp, so this purchase resolves differences the
+134-game design cannot:
+
+| joined reading | what it means |
+| --- | --- |
+| ≥ +12 pp on 274 games | the sentence's effect is larger than the held-out estimate and is a property of memory rather than of a split |
+| +8 to +12 pp | consistent with R174.1 and better resolved; the headline becomes a 274-game estimate with two sections behind it |
+| < +5 pp, or a seen-section gain under +8 pp | **the effect is a property of the held-out section**, which is the most important negative result this programme could produce, and it costs ¥2.8 to learn |
+
+**Void conditions.** `carried` must be 1.0 in all 140 games and `pack chars` must be 489 in every one of them
+(the field that makes a length claim checkable, AUDIT 34.249); both arms must tile 140; the join must pass
+`aggregate.py --expect 274 --expect-splits eval_out_of_distribution,eval_in_distribution`. The join is pooled
+**and graded**: a mixture is refused until it is declared, and once declared every episode carries the section its
+parent named, so the reading prints a delta per section beside the pooled one. That grading is the pre-registered
+question rather than a diagnostic — if the effect is held-out-only, the seen section reads ≈ 0 and the pooled
+number is the average of an effect and a null.

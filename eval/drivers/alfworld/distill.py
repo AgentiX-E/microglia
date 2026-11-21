@@ -414,6 +414,29 @@ def successes(episode_files: "list[Path]") -> "list[dict]":
     return [seen[game] for game in sorted(seen)]
 
 
+def sections(episode_files: "list[Path]") -> "str | None":
+    """The corpus section the artefacts were driven from, refused when they disagree.
+
+    A bank's provenance is not decoration: a bank distilled from `eval_in_distribution` and scored on it is a leak,
+    and until this function existed nothing in the bank said which section it came from. The artefacts have
+    carried `summary.split` since the sweep learned to name one (AUDIT 34.251); this is the reader that turns it
+    into a field a dispatch can refuse on, and it refuses a mixed union for the same reason `aggregate.py` does —
+    a bank built from two sections is a function of neither.
+    """
+    found: "set[str]" = set()
+    for path in episode_files:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        section = (payload.get("summary") or {}).get("split")
+        if section:
+            found.add(section)
+    if len(found) > 1:
+        driver.fail(
+            f"the artefacts mix corpus sections ({sorted(found)}): a bank distilled from two sections describes "
+            "neither, and one of them may be the section it would be scored on"
+        )
+    return found.pop() if found else None
+
+
 def tiled(episode_files: "list[Path]", expected: int) -> int:
     """How many distinct games the artefacts cover, refused when that is not the whole slice.
 
@@ -598,6 +621,9 @@ def main() -> int:
             "chunks": len(chunk_list),
             "critique_num": arguments.critique_num,
             "kinds": sorted(item.strip() for item in arguments.kinds.split(",") if item.strip()) or None,
+            # Which section the trajectories came from. `None` for an artefact written before the field, and
+            # `check-split-sizes.py`'s siblings refuse to score such a bank on a named section rather than guess.
+            "train_split": sections(files),
             "model": arguments.model,
             "prompt": "all_success_existing_rules@LeapLabTHU/ExpeL:e41ec9a2",
         },

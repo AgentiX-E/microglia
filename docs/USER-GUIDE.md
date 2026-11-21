@@ -4953,3 +4953,46 @@ that fires is not a gate that helps.
 
 **The label.** A gated pack arm is `always-in@kind`, not `always-in`, and the label is what `aggregate.py` groups on:
 two dispatches of the same family under one name are refused as doubled games, after the money is spent.
+
+### 32.21 Driving a second corpus section, and why a mixture has to be declared
+
+The lane's published numbers all come from `eval_out_of_distribution` (134 games). A second section exists —
+`eval_in_distribution` (`valid_seen`, 140 games) and `train` (3,553) — and it is the only place this lane can
+buy *resolution*: at 134 paired games the minimum detectable effect is 12–13 pp, while every remaining
+hypothesis is 3–6 pp. Driving another section is three flags, and two of them are refusals rather than defaults:
+
+```bash
+# 140 games of the seen section, both arms, one dispatch
+python scripts/alf_dispatch.py --sweep true \
+  --arms '["none","always-in"]' \
+  --rules eval/drivers/alfworld/banks/bank-putmove-1.json \
+  --split eval_in_distribution
+
+# then the join, which spans both sections and says so
+python eval/drivers/alfworld/aggregate.py \
+  --input run-held/arm-*.json --input run-seen/arm-*.json \
+  --expect 274 \
+  --expect-splits eval_out_of_distribution,eval_in_distribution \
+  --compare "always-in,none"
+```
+
+1. **`--split` without a size is refused.** `split_games` is an input, and the dispatcher fills it from the
+   section's own published size. A sweep whose twelve jobs drive one section while its join checks another has no
+   symptom until the denominator is wrong.
+2. **`--games` beyond the section is refused, not shortened.** It used to be `min(games, num_games)`, so
+   `--games 140` on the 134-game split drove 134 games and wrote `134/134` — a full-looking rate for a budget the
+   caller never received.
+3. **A mixture of sections is refused until `--expect-splits` names it.** A pooled rate over two populations is an
+   average over two populations; once declared, the reading prints each section's paired delta beside the pooled
+   one, which is the difference between an average and a claim about memory.
+4. **A bank may not be scored on the section that distilled it.** `distill.py` writes `source.train_split`; the
+   dispatcher refuses a `--split` equal to it. A *hand-written* bank — one sentence, one verbatim trajectory — is
+   not a function of any section and is allowed anywhere, which is what lets R177 run.
+5. **The table of sizes is checked against the corpus.** `scripts/check_split_sizes.py` counts
+   `game.tw-pddl` files and fails on any section that disagrees; it runs on the built corpora in `ci.yml` and
+   against the fetched corpus in the `floor` job. Run it yourself after a corpus update:
+
+```bash
+python scripts/check_split_sizes.py                       # $ALFWORLD_DATA/data/json_2.1.1
+python scripts/check_split_sizes.py --data /path/to/split # a corpus you fetched elsewhere
+```

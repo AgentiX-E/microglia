@@ -2596,3 +2596,39 @@ that loses.
 the empty-pack refusal are all still load-bearing — they are what made the failure readable instead of quotable. The
 *selector* is retired: `--gate-kind` stays because it is how the null was measured and how the next selector will be
 compared, not because it is a mechanism the product uses.
+
+### 8.42 The corpus section as a first-class object, and the three guards that make a second one readable
+
+The driver has always taken `--split`, and until this round nothing else in the lane knew a section existed. That
+was invisible while one section was the only one ever bought: `agent.py` computed `total = min(games, num_games)`,
+and every dispatch passed the section's exact size, so the `min` was the identity. A second section makes three
+of those assumptions load-bearing at once.
+
+**One: a size is a measurement, not a constant.** `SPLIT_SIZES` holds 134 / 140 / 3,553, counted from the
+installed corpus with `find <section> -name game.tw-pddl`. `scripts/check_split_sizes.py` re-counts it in CI — on
+built corpora in `ci.yml`, on the fetched corpus in the `floor` job — and names every section that disagrees with
+both numbers. A stale table is the quietest failure in this lane: every dispatch still runs and only the
+denominator moves.
+
+**Two: a mixture is refused until it is declared, and graded once it is.** `aggregate.py` reads each slice's
+`summary.split`, refuses a join that spans sections without `--expect-splits`, and — once declared — attaches the
+section to every episode so `by_section` can print a paired delta per section beside the pooled one. The first
+version of this guard refused any mixture at all. That was correct arithmetic and the wrong rule: the design it
+refused is the one purchase this lane has left, and a guard that refuses its own design gets deleted. The
+distinction it now draws is between *pooling silently* (a claim about one population made from two) and *pooling
+declared and graded* (an estimate with its parts shown).
+
+**Three: provenance is data.** A leak on a second section is not a wrong number, it is a right number about the
+wrong population: a bank distilled from `eval_in_distribution` and scored there reports a rate nobody can
+interpret. `distill.py` therefore writes `source.train_split` from the artefacts' own `summary.split`, and the
+dispatcher refuses a `--split` that equals it. The guard is narrower than "no bank on its own section" on purpose:
+a hand-written bank is not a function of any section, and refusing it would refuse the arm that makes the second
+section worth buying.
+
+| guard | where | the failure it removes |
+| --- | --- | --- |
+| `--games` ≤ section size | `agent.py` | a shortened pass reported as a full one |
+| sizes counted, not quoted | `check_split_sizes.py` | a table that drifts from the corpus |
+| `--expect-splits` + `by_section` | `aggregate.py` | a pooled rate over two populations, quoted as one |
+| `source.train_split` ≠ scored section | `distill.py` + dispatcher | a bank scored on the section that produced it |
+| payload keys ⊆ declared inputs | `test_cli.py` | an input dropped between dispatcher and workflow |

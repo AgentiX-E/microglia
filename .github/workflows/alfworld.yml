@@ -95,6 +95,14 @@ on:
         description: 'comma separated task kinds the bank is distilled from; empty uses every won episode'
         required: false
         default: ''
+      split:
+        description: 'corpus section to drive: eval_out_of_distribution (134), eval_in_distribution (140) or train'
+        required: false
+        default: 'eval_out_of_distribution'
+      split_games:
+        description: 'games the named section publishes; must match it, because the join tiles to this number'
+        required: false
+        default: '134'
   push:
     branches: [master]
     paths:
@@ -261,6 +269,14 @@ jobs:
           export ALFWORLD_DATA="$HOME/.cache/alfworld"
           alfworld-download
           find "$ALFWORLD_DATA" -name 'game.tw-pddl' | wc -l
+
+      - name: The section sizes the lane assumes are the sizes it installs
+        # `agent.py` refuses a `--games` larger than the section it names and `aggregate.py` refuses a join across
+        # two sections, both from a hand-written table. This is the check that the table is a measurement: the
+        # corpus is fetched anyway for the floor, and counting it costs a second.
+        env:
+          ALFWORLD_DATA: /home/runner/.cache/alfworld
+        run: python scripts/check_split_sizes.py
 
       - name: Smoke the floor driver on eight games
         # Eight games first, because the full pass is two sweeps of the split and a typo in
@@ -757,13 +773,23 @@ jobs:
           TOP_K: ${{ inputs.top_k }}
           GATE_SHARE: ${{ inputs.gate_share }}
           GATE_KIND: ${{ inputs.gate_kind }}
+          SPLIT: ${{ inputs.split }}
+          SPLIT_GAMES: ${{ inputs.split_games }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
             echo "::error::a sweep needs DEEPSEEK_API_KEY"
             exit 1
           fi
-          GAMES="${GAMES:-134}"
+          # The section and its own size arrive together, and a sweep may not name one without the other: twelve
+          # jobs driving 134 games of a 140-game section produce a reading whose denominator is the default rather
+          # than the section, and `aggregate.py --expect-split` refuses it only after the money is spent.
+          SPLIT="${SPLIT:-eval_out_of_distribution}"
+          if [ -z "${SPLIT_GAMES}" ]; then
+            echo "::error::split ${SPLIT} needs split_games: the tiling check reads it"
+            exit 1
+          fi
+          GAMES="${GAMES:-${SPLIT_GAMES}}"
           if [ -z "${RULES}" ]; then
             RULES="$RUNNER_TEMP/bank/bank.json"
           fi
@@ -771,6 +797,10 @@ jobs:
           # treatment branch below. Run 44779423772 lost eight jobs to this line, both arms, because a `--rules`
           # path was given relative to the lane's own directory and the jobs run from the repository root.
           args=(--arm "${ARM}" --policy model --games "${GAMES}" --shard "${SHARD}/4" --max-steps "${MAX_STEPS}")
+          # The section is an argument rather than a default that happens to be right: every published number in
+          # this lane comes from `eval_out_of_distribution`, and a second section is only a second reading if the
+          # artefact says which one it drove (AUDIT 34.251).
+          args+=(--split "${SPLIT}")
           # The retrieval budget is an input because AMD measured k=1 as the global optimum and this lane's
           # default is 3; a contrast that has to be edited into a file is a contrast nobody runs twice.
           args+=(--top-k "${TOP_K:-3}")

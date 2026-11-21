@@ -918,6 +918,29 @@ class MainTest(unittest.TestCase):
         finally:
             sys.argv = original
 
+    def test_games_beyond_the_split_are_refused_rather_than_shortened(self):
+        # The pass used to answer `--games 140` on the 134-game split with 134 games, and the artefact then said
+        # 134/134 — a full-looking rate for a budget the caller never received. A ceiling is a refusal.
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main(["--policy", "first", "--games", "140", "--out", str(self.out)])
+        self.assertEqual(caught.exception.code, 1)
+        self.assertFalse(self.out.exists(), "a refused pass must not leave an artefact behind")
+
+    def test_games_beyond_the_installed_corpus_are_refused_too(self):
+        # The stub world holds one game while the table publishes 134, so this is the corpus ceiling rather than
+        # the table's; both are refusals, and neither is a silent `min`.
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main(["--policy", "first", "--games", "2", "--out", str(self.out)])
+        self.assertEqual(caught.exception.code, 1)
+
+    def test_the_artefact_records_the_section_and_the_size_it_publishes(self):
+        # A join across two sections is refused by `aggregate.py`, and it can only be refused if every slice says
+        # which section it drove. `split_size` is the denominator a tiling check holds to.
+        self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
+        summary = json.loads(self.out.read_text(encoding="utf-8"))["summary"]
+        self.assertEqual(summary["split"], "eval_out_of_distribution")
+        self.assertEqual(summary["split_size"], agent.SPLIT_SIZES["eval_out_of_distribution"])
+
     def test_a_pass_writes_a_summary_whose_accounting_closes(self):
         self.assertEqual(self.run_main(["--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
         payload = json.loads(self.out.read_text(encoding="utf-8"))

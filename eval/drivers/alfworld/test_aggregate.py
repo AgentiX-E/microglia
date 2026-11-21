@@ -97,6 +97,91 @@ class SliceTest(unittest.TestCase):
         with self.assertRaises(SystemExit):
             aggregate.load_slices([path])
 
+    def test_an_undeclared_join_across_two_sections_is_refused(self):
+        # A pooled rate over two sections is an average over two populations, and both arms tile and print, so
+        # nothing about the reading looks wrong except the claim. `eval_in_distribution` is 140 games and the
+        # held-out section is 134, which is why `--expect` alone cannot catch it.
+        left = self.write("s-seen.json", {"summary": summary("none", split="eval_in_distribution",
+                                                             split_size=140), "episodes": [episode("g1", True)]})
+        right = self.write("s-held.json", {"summary": summary("always-in", split="eval_out_of_distribution",
+                                                              split_size=134), "episodes": [episode("g1", False)]})
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([left, right])
+        self.assertIn("mixes corpus sections", printed.getvalue())
+
+    def test_a_declared_join_across_two_sections_is_accepted_and_graded(self):
+        # The other half of the rule: R177's whole purpose is a 274-game join over two sections, and a guard that
+        # refused it would refuse the purchase. Declaring the sections is what turns a mixture into a design, and
+        # every episode then carries the section its parent named so the reading can be graded by it.
+        # Two slices per arm — one per section — which is the shape of the real join: both arms drive every game
+        # of both sections, so the pairing is still game-for-game and the sections are a grouping inside it.
+        left = [
+            self.write("s-seen-d1.json", {"summary": summary("none", split="eval_in_distribution"),
+                                          "episodes": [episode("g1", True)]}),
+            self.write("s-held-d1.json", {"summary": summary("none", split="eval_out_of_distribution"),
+                                          "episodes": [episode("h1", True)]}),
+        ]
+        right = [
+            self.write("s-seen-d2.json", {"summary": summary("always-in", split="eval_in_distribution"),
+                                          "episodes": [episode("g1", False)]}),
+            self.write("s-held-d2.json", {"summary": summary("always-in", split="eval_out_of_distribution"),
+                                          "episodes": [episode("h1", False)]}),
+        ]
+        grouped = aggregate.load_slices(
+            left + right, expect_splits=("eval_in_distribution", "eval_out_of_distribution")
+        )
+        self.assertEqual(sorted(episode["section"] for episode in grouped["none"]),
+                         ["eval_in_distribution", "eval_out_of_distribution"])
+        graded = aggregate.by_section(
+            {episode["gamefile"]: episode for episode in grouped["none"]},
+            {episode["gamefile"]: episode for episode in grouped["always-in"]},
+        )
+        self.assertEqual(sorted(graded), ["eval_in_distribution", "eval_out_of_distribution"])
+        # Both sections read +1 game for the treatment, which is what a per-section grade is for: a pooled
+        # +2/2 would have hidden a section that carried the whole effect.
+        for row in graded.values():
+            self.assertEqual(row["delta"], 1.0)
+
+    def test_a_declaration_that_does_not_match_the_slices_is_refused(self):
+        # The declaration is a claim about the design and this is the check that it is true: a dispatch that asked
+        # for two sections and bought one is a reading whose denominator nobody can name.
+        held = self.write("s-held-e.json", {"summary": summary("none", split="eval_out_of_distribution"),
+                                            "episodes": [episode("g1", True)]})
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([held], expect_splits=("eval_in_distribution", "eval_out_of_distribution"))
+        self.assertIn("but the slices drove", printed.getvalue())
+
+    def test_one_section_may_be_joined_with_itself(self):
+        left = self.write("s-h1.json", {"summary": summary("none", split="eval_in_distribution"),
+                                        "episodes": [episode("g1", True)]})
+        right = self.write("s-h2.json", {"summary": summary("always-in", split="eval_in_distribution"),
+                                         "episodes": [episode("g1", False)]})
+        self.assertEqual(sorted(aggregate.load_slices([left, right])), ["always-in", "none"])
+
+    def test_a_named_section_refuses_a_slice_that_recorded_none(self):
+        # An artefact older than the field cannot prove which section it drove, and "cannot prove" is not
+        # "did not": the whole value of naming the section is that the denominator is the section's own size.
+        old = self.write("s-old.json", {"summary": summary("none"), "episodes": [episode("g1", True)]})
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([old], expect_splits=("eval_in_distribution",))
+        self.assertIn("record no section", printed.getvalue())
+
+    def test_a_named_section_refuses_slices_from_another_section(self):
+        held = self.write("s-held2.json", {"summary": summary("none", split="eval_out_of_distribution"),
+                                           "episodes": [episode("g1", True)]})
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([held], expect_splits=("eval_in_distribution",))
+        self.assertIn("drove ['eval_out_of_distribution']", printed.getvalue())
+
+    def test_a_named_section_passes_when_every_slice_agrees(self):
+        seen = self.write("s-seen2.json", {"summary": summary("none", split="eval_in_distribution"),
+                                           "episodes": [episode("g1", True)]})
+        self.assertEqual(sorted(aggregate.load_slices([seen], expect_splits=("eval_in_distribution",))), ["none"])
+
     def test_a_model_free_slice_is_refused(self):
         path = self.write("s-e.json", {"summary": summary("none", policy="seed"), "episodes": [episode("g1", True)]})
         with self.assertRaises(SystemExit):

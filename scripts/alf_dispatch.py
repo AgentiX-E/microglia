@@ -42,6 +42,12 @@ ARMS = ("none", "always-in", "retrieved", "sham")
 CONTROL = "none"
 # The six task kinds the ALFWorld split publishes, which is all `--distill-kinds` may name.
 TASK_KINDS = ("put", "clean", "heat", "cool", "examine", "puttwo")
+# The corpus sections and their published sizes. Duplicated rather than imported: this script decides whether to
+# *buy* a pass and has to run where the lane's environment import chain is not installed. `test_alf_dispatch.py`
+# asserts the copy equals `agent.SPLIT_SIZES`, so a drift is a test failure rather than a wrong denominator.
+SPLIT_SIZES = {"eval_out_of_distribution": 134, "eval_in_distribution": 140, "train": 3553}
+# The section every published number in this lane comes from, and the one a dispatch gets when it names none.
+HELD_OUT = "eval_out_of_distribution"
 
 
 class Refused(Exception):
@@ -78,6 +84,9 @@ def parser():
     # separately from `--gate-share` because the two are different signals on different objects, and R174.2
     # measured the overlap one admitting nothing at all on this corpus.
     result.add_argument("--gate-kind", dest="gate_kind", default="")
+    # The corpus section. It is a dispatch flag rather than a constant because R177's first purchase is games,
+    # and a second section is the only place this lane can buy resolution it does not already own.
+    result.add_argument("--split", default="")
     result.add_argument("--dry-run", dest="dry_run", action="store_true")
     return result
 
@@ -169,6 +178,45 @@ def check(arguments, tree=None):
                     f"--gate-kind needs a bank whose entries carry `kinds`, and {arguments.rules} tags none: the "
                     "gate would carry nothing and the arm would be the control wearing a treatment's name"
                 )
+    section = arguments.split or HELD_OUT
+    if section not in SPLIT_SIZES:
+        raise Refused(f"--split {section} is not a section this corpus publishes; it has {sorted(SPLIT_SIZES)}")
+    if arguments.games and arguments.games.isdigit() and int(arguments.games) > SPLIT_SIZES[section]:
+        raise Refused(
+            f"--games {arguments.games} is more than {section} publishes ({SPLIT_SIZES[section]}); the pass would "
+            "be shortened and its rate would read like a full one"
+        )
+    if arguments.chain and section != HELD_OUT:
+        # The chain's bank is distilled from `valid_seen`, so a chain that scored it there would report a rate
+        # nobody can interpret. A hand-written bank on `valid_seen` is a different purchase and is allowed.
+        raise Refused(
+            f"--chain distils its bank from valid_seen and would then score it on {section}; a bank has to be "
+            f"scored on a section it was not built from ({HELD_OUT})"
+        )
+    if arguments.rules and arguments.split and arguments.split != HELD_OUT:
+        # A bank says which section distilled it (`source.train_split`, written by `distill.py`). A bank distilled
+        # from the section it is about to be scored on is the one leak this lane can commit without noticing: the
+        # rate is real and means nothing. `None` is an artefact older than the field, and it is refused on a
+        # non-held-out section because "cannot prove" is not "did not". Checked against whatever path resolves,
+        # because the absolute form is the one a resume uses.
+        resolved = Path(arguments.rules)
+        if not resolved.is_absolute() and tree is not None:
+            resolved = Path(tree) / arguments.rules
+        if resolved.is_file():
+            source = json.loads(resolved.read_text(encoding="utf-8")).get("source") or {}
+            bank_split = source.get("train_split")
+            # A *distilled* bank is a function of the episodes it read, so it may not be scored on the section it
+            # read: `episodes` is distill.py's own field, and a bank carrying it without `train_split` is one whose
+            # provenance cannot be proved. A *hand-written* bank (one verbatim trajectory, one sentence) is not a
+            # function of any section, and refusing it on `valid_seen` would refuse the one purchase R177 needs —
+            # the arm's own provenance says where its text came from, and it is not a rate over that set.
+            distilled = "episodes" in source or "train_split" in source
+            if bank_split == arguments.split or (distilled and bank_split is None):
+                raise Refused(
+                    f"--split {arguments.split} would score {arguments.rules} on the section its provenance "
+                    f"names ({bank_split!r}); distilled-on and scored-on have to differ, and a distilled artefact "
+                    "with no recorded provenance cannot prove that they do"
+                )
     if arguments.chain and not arguments.train:
         raise Refused("--chain needs --train: the chain starts with the training pass")
     if arguments.sweep and (arguments.games or arguments.train):
@@ -210,6 +258,7 @@ def payload(arguments):
     An empty string is a value the workflow would have to interpret. Leaving the key out is what makes
     the default in `alfworld.yml` the one place each default is written.
     """
+    section = arguments.split or HELD_OUT
     inputs = {
         "arm": arguments.arm,
         "games": arguments.games,
@@ -231,6 +280,10 @@ def payload(arguments):
         ("top_k", arguments.top_k),
         ("gate_share", arguments.gate_share),
         ("gate_kind", arguments.gate_kind),
+        ("split", arguments.split),
+        # The size travels with the section, because the workflow's join tiles to it and a section without its
+        # published size is a sweep whose twelve jobs drive one number and whose reading checks another.
+        ("split_games", str(SPLIT_SIZES[section]) if arguments.split else ""),
     )
     for key, value in named:
         if value:

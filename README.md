@@ -559,6 +559,7 @@ that lane up to the point where a model would be called, and stops.
 | fact | reading | why it matters |
 |---|---|---|
 | the corpus | **36.5 MB**, 4,027 files, MIT, **134 held-out games** | fetchable in two minutes through a mirror; 134 is the number ExpeL reports, not a subset we chose |
+| the other sections | **140** seen (`valid_seen`), **3,553** `train` | counted, not quoted: a second section is the only place the lane can buy resolution, and `scripts/check_split_sizes.py` holds the table to the corpus |
 | the environment | `textworld` builds an **Inform7 compiler** it fetches from `emshort.com` at build time | 3 KB/s and then abort from this sandbox; seconds from a runner, so the lane lives in CI |
 | the release | PyPI stops at **0.3.5** (z-machine); the PDDL data needs the **0.4.2** tag | 0.3.5 also demands `torch`, `ai2thor` and `opencv` for a simulator the text path never constructs |
 | the plan in the file | `walkthrough` is written in **first-release symbolic coordinates** | the text environment answers `Nothing happens.` to every step, so "verify against the gold plan" is wrong here |
