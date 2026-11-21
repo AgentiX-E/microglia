@@ -181,9 +181,19 @@ def check(arguments, tree=None):
         if not arguments.top_k.isdigit() or int(arguments.top_k) < 1:
             raise Refused(f"--top-k {arguments.top_k} is not a retrieval budget; it is how many rules one turn may carry")
     if arguments.gate_kind and not arguments.rules:
-        raise Refused("--gate-kind selects among a bank's entries, so it needs --rules to select from")
-    if arguments.gate_kind and arguments.arm == CONTROL:
-        raise Refused("--gate-kind on the control selects nothing: the control carries no bank by definition")
+        # `distill.py` tags the bank, not its entries, so a chained dispatch cannot produce a bank this flag can
+        # select on: the gate has to be pointed at a tagged bank in the repository, and a chain that looks like
+        # it would build one would fail in four treatment jobs after the environment install.
+        raise Refused(
+            "--gate-kind selects among a bank's entries by the task kind each entry is tagged with, and a chained "
+            "dispatch distils an untagged bank, so it needs --rules naming a tagged bank"
+        )
+    # `--gate-kind` on the control is **not** refused. The workflow hands its inputs to every arm in the matrix,
+    # so a flag that is only meaningful for a treatment cannot be an error on the control: the refusal ran once
+    # and killed the control arm of a gated sweep, four shards of it, leaving a treatment with nothing in its own
+    # dispatch to pair against (AUDIT 34.246). The arm itself records `gate_kind: null`. A control-only dispatch
+    # that names the flag is still a legal purchase: it is how the missing control of a gated sweep is re-bought
+    # against the same commit, and refusing it would make that repair impossible by flag.
     if arguments.gate_share:
         try:
             share = float(arguments.gate_share)

@@ -2555,3 +2555,44 @@ records `pack_entries`, and the join refuses a pack arm whose pack was empty in 
 this lane got wrong was wrong in exactly that way: 81/134 against a control of 90, 88% engagement, six by-kind rows,
 and not one entry in the prompt. A selection layer that cannot be seen in the artefact is a layer that can silently
 turn a treatment into a control.
+
+### 8.41 Why the selection layer lost, and the two nulls it made load-bearing
+
+The layer described above was built, dispatched and read. It works exactly as designed — one sentence per game,
+`carried 1.0` in 134 of 134 — and it **costs 23 points against the same sentences read unfiltered and 16 against an
+empty prompt**. The design was not defeated by a threshold, a bug or a label; it was defeated by the content the
+layer had to choose between, and that is a more useful result than the one it was built to find.
+
+| kind | gated | ungated | delta |
+| --- | --- | --- | --- |
+| `put` | 9/24 | 9/24 | 0.0000 |
+| `examine` | 16/18 | 17/18 | −0.0556 |
+| `puttwo` | 13/17 | 17/17 | −0.2353 |
+| `cool` | 10/21 | 16/21 | −0.2857 |
+| `clean` | 15/31 | 26/31 | −0.3548 |
+| `heat` | 6/23 | 15/23 | −0.3913 |
+
+The gate ties on the one kind whose tagged sentence **is** the arm that scores 112, and loses everywhere else. The
+five sentences it hands out instead are about the room and about where objects live; the sentence it takes away is
+about a second phrasing of a failing action. So the layer's premise — *a wide store plus a good selector equals a
+narrow pack* — fails for a reason no selector can fix: **the entries it selects among are not the same kind of
+object.** A store can only be scaled by selection if every entry is a repair; a store of descriptions is not
+narrowed by showing one description.
+
+**Null one: the knob is inert on the control.** `gate_kind` selects among a bank, and the control has no bank. The
+layer therefore had to decide what the knob means on an arm it cannot act on, and both answers were wrong once:
+refusing it killed four control shards (the workflow sends its inputs to every arm in the matrix), and labelling the
+control `none@kind` would have split the control family in `aggregate.py`. It is neither: the knob is inert, the
+header records `gate_kind: null`, and the label stays `none`. **A knob that selects from an empty set has not been
+moved** — which is the general rule, and the reason it is written here rather than in code alone.
+
+**Null two: the layer's cost ranks opposite to its length.** The gated arm's pack is 902 characters shorter than the
+ungated store's and its bill is 34% higher, because a lost game runs all fifty steps: 4,923 calls against 3,758, and
+2.9 M more prompt tokens over the same 134 games. Any cost model that reads the prompt is blind to the only term
+that made the arm expensive, and a dispatch quote that prices a pack by its characters will under-quote every arm
+that loses.
+
+**What survives the null.** The `applicable` interface, the inert-untagged rule, the label, the `carried` counter and
+the empty-pack refusal are all still load-bearing — they are what made the failure readable instead of quotable. The
+*selector* is retired: `--gate-kind` stays because it is how the null was measured and how the next selector will be
+compared, not because it is a mechanism the product uses.

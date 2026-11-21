@@ -113,6 +113,32 @@ class WorkflowTest(unittest.TestCase):
         # above vacuous, and the arm's flags are the ones the register varies.
         self.assertIn("--arm", self.flags_of("agent"))
 
+    def test_every_flag_the_arm_step_adds_goes_to_the_control_as_well(self):
+        """A flag that is only meaningful for a treatment cannot be added inside the treatment branch.
+
+        The arm step writes one command line for all twelve jobs and appends `--rules` only when the arm is not
+        the control. The gate flags belong beside it and were nearly put inside the same conditional, which reads
+        as tidier and means the control never receives the flag its own dispatch was sent under — and, when the
+        driver refused that flag on the control instead, four control shards died on their first line and the
+        treatment was left with nothing in its own dispatch to pair against (AUDIT 34.246). Ordering is the whole
+        rule: every `args+=(...)` the step makes, other than `--rules`, has to come before the `ARM != none`
+        branch, and the driver has to tolerate the flag on the arm that carries no bank.
+        """
+        lines = WORKFLOW.read_text(encoding="utf-8").splitlines()
+        guard = next(index for index, line in enumerate(lines) if 'if [ "${ARM}" != "none" ]' in line)
+        gates = [index for index, line in enumerate(lines) if "args+=(--gate" in line]
+        # Both gate flags: a rule that matched none of them would pass for the wrong reason.
+        self.assertEqual(len(gates), 2, "this rule is about the two gate flags")
+        for index in gates:
+            with self.subTest(flag=lines[index].strip()):
+                self.assertLess(index, guard, "a gate flag added inside the treatment branch never reaches control")
+        driver = (HERE / "agent.py").read_text(encoding="utf-8")
+        self.assertIn(
+            'arguments.arm != "none" and not any(rule_kinds)',
+            driver,
+            "the kind gate must be inert on the control rather than refused there",
+        )
+
 
 class SuiteTest(unittest.TestCase):
     def test_every_suite_here_is_a_suite_the_ci_runs(self):

@@ -4932,9 +4932,24 @@ everywhere, which is what keeps every earlier artefact comparable:
 ```
 
 `--gate-kind` then carries only the entries whose `kinds` include the game's kind. Three refusals protect it: a bank
-with no tags at all (the gate would carry nothing), `--gate-kind` on the `none` arm (nothing to select from), and a
-`kinds` list whose length does not match the rules (a cap applied to `rules` and not to `kinds` would carry the
-sentence the arm believes it dropped). `alf_dispatch.py` makes the first refusal free, before the dispatch is bought.
+with no tags at all (the gate would carry nothing), a chained dispatch that would distil an untagged bank (so there
+is nothing for a gate to select), and a `kinds` list whose length does not match the rules (a cap applied to `rules`
+and not to `kinds` would carry the sentence the arm believes it dropped). `alf_dispatch.py` makes the first two
+refusals free, before the dispatch is bought.
+
+**`--gate-kind` on the control is not refused.** It is inert: the control carries no bank, so there is nothing to
+select, and its artefact records `gate_kind: null` with the label still `none`. It was refused once, on the reasoning
+that a flag selecting nothing from nothing is a mistake — and the workflow hands its inputs to **every** arm in the
+matrix, so the refusal killed the control arm of a gated sweep, four shards of it, and left the treatment with
+nothing in its own dispatch to pair against (AUDIT 34.246). A flag that is only meaningful for a treatment cannot be
+an error on the arm the matrix sends it to. The counter-proof is the `none` row's `carried` line above: a control
+that ran is a control whose pack is `{0: 134}`, whatever flags it was started with.
+
+**What the kind gate is worth, now that it has been read.** −23.1 pp against the same six sentences ungated and
+−16.4 pp against no pack at all. The gate ties on exactly one kind — `put`, whose tagged sentence is the winning arm
+verbatim — and loses one to nine games on the other five. If you are choosing a selection signal, this is the
+negative result that matters: **a filter on the task's own name is not a filter on the failing step**, and a gate
+that fires is not a gate that helps.
 
 **The label.** A gated pack arm is `always-in@kind`, not `always-in`, and the label is what `aggregate.py` groups on:
 two dispatches of the same family under one name are refused as doubled games, after the money is spent.

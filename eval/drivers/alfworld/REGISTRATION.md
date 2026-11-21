@@ -1024,11 +1024,11 @@ five kinds are what it adds.
 
 | # | experiment | the question | state | price |
 | --- | --- | --- | --- | --- |
-| **1** | `always-in@kind` over the six-entry tagged bank | can a store cover six kinds and still be worth one line per game — does selection make a wide bank behave like a narrow pack | **in flight** | ≈ ¥3.2 |
-| **2** | `always-in` over the same six-entry bank, ungated | the control for row 1 and a reading of its own: six sentences with no selection, which the per-sentence price predicts at ≈ 94 | **in flight** | ≈ ¥3.2 |
+| **1** | `always-in@kind` over the six-entry tagged bank | can a store cover six kinds and still be worth one line per game — does selection make a wide bank behave like a narrow pack | **read: 69/134, carried 1.0 in all games, no control (defect, AUDIT 34.246)** | ¥1.80 |
+| **2** | `always-in` over the same six-entry bank, ungated | the control for row 1 and a reading of its own: six sentences with no selection, which the per-sentence price predicts at ≈ 94 | **read: 100/134 against its own control's 91** | ¥2.95 |
 | 3 | the `examine` sentence alone | the one kind one sentence does not move (16/18 against 18/18), and the only sentence written without a `put` step in it | licensed by row 1 | ≈ ¥3.2 |
-| 4 | `retrieved@kind` over the same bank | does the anchor still help once the pool is the game's own sentence, or is a one-entry pool already the whole answer | contingent on row 1 | ≈ ¥3.2 |
-| 5 | a retrieved **raw trajectory** | the literature's claim that abstraction is where a memory loses its value (arXiv:2605.12978) | needs a second bank schema, ~3 h | ≈ ¥3.2 + 3 h |
+| 4 | `retrieved@kind` over the same bank | does the anchor still help once the pool is the game's own sentence, or is a one-entry pool already the whole answer | **retired by row 1**: the gate is the wrong object, and a one-entry pool leaves an anchor nothing to rank | unspent |
+| 5 | a retrieved **raw trajectory** | the literature's claim that abstraction is where a memory loses its value (arXiv:2605.12978) | bank built and validated (`banks/bank-rawput-1.json`, 505 ch); registered as R176 | ≈ ¥3.2 |
 | 6 | the bare pair **compressed** to 508 characters (`banks/bank-putpair-terse-2.json`), same two operations, imperative register | is the per-sentence price paid in characters or in statements | **built, not bought**: R174.1 put one statement at 112 and two at 109, so this lane's instrument cannot resolve the 3–4 pp a compression of this size could buy (mde 12–14 pp) | ≈ ¥3.2, unspent |
 
 **The pre-registered reading of rows 1–2, before either is bought.**
@@ -1046,3 +1046,83 @@ now the third time this split has produced one — a level claim from this dispa
 and the row-1-versus-row-2 contrast is treatment against treatment and needs no control at all.
 
 **Price.** 134 games × 2 arms each: **≈ ¥3.2 + ¥3.2 = ¥6.4**.
+
+## R175, amendment 1 — six sentences cost eight wins, and selecting them by task kind costs twenty-three
+
+Both rows bought: run `44850240971` (row 1, gated) and `44850377113` (row 2, ungated, with its control). Row 1 was
+bought **without a usable control**, because the dispatch passed its flags to every arm in the matrix and the driver
+refused one of them on the arm that carries no bank; the defect and its fix are AUDIT 34.246. Row 1's level is
+therefore quoted against row 2's control, and every claim below that matters is treatment against treatment.
+
+| arm | rendered pack | pack entries | won | bill | per win |
+| --- | --- | --- | --- | --- | --- |
+| `none` (run `44850377113`) | 0 ch | 0 | **91**/134 | $0.2245 (¥1.61) | $0.0025 |
+| `none` (run `44841962248`, R174.1) | 0 ch | 0 | 88/134 | $0.2201 (¥1.57) | $0.0025 |
+| `always-in@one` (R174.1) | 489 ch | 1 | **112**/134 | $0.1506 (¥1.08) | **$0.00134** |
+| `always-in` six, ungated (row 2) | 1,280 ch | 6 | **100**/134 | $0.1879 (¥1.34) | $0.0019 |
+| `always-in@kind` (row 1) | 324–489 ch | 1 | **69**/134 | $0.2516 (¥1.80) | $0.0036 |
+
+| pairing | delta | 95% CI | p |
+| --- | --- | --- | --- |
+| one − six | **+8.96 pp** | [+2.24, +16.42] | 0.014 |
+| one − none | +15.67 pp | [+7.46, +23.88] | < 0.001 |
+| six − none | +6.72 pp | [−2.24, +15.67] | 0.179 |
+| six − kind | **+23.13 pp** | [+12.69, +33.58] | < 0.001 |
+| one − kind | +32.09 pp | [+22.39, +41.04] | < 0.001 |
+| kind − none | **−16.42 pp** | [−26.87, −5.97] | 0.0024 |
+
+**1. The store does not scale, and the pre-registered table said it might.** Row 2 was registered at ≈ 94 and read
+100; row 1 was registered as one of four cells and landed in the fourth — *the gate hurts* — below its own control.
+The registered reading, in the register's own words, was "a store of six sentences is worth about what one sentence
+is worth". The measurement is harsher: **six sentences are worth eight wins less than the best sentence among
+them**, and are not distinguishable from carrying nothing.
+
+**2. The per-sentence price survives where the slope did not.** Five extra sentences, all task-relevant, one per
+published kind, cost 8.96 pp = **−1.79 pp per sentence** — the same sign as the −3.4 to −3.7 pp of AUDIT 34.242,
+at half the rate and on a different object (a wide store instead of a padded block). AUDIT 34.245 retired the slope
+as a mechanism; this puts a number on the only version of it that is still a claim: **a sentence added to a pack
+that already names the failing step buys coverage the games do not need.**
+
+**3. The kind gate is the wrong object, not a wrong threshold.** Selecting each game's own sentence should make a
+six-entry store behave like a one-entry pack. It made it behave worse than an empty pack: −16.42 pp against the
+control, −23.13 pp against the same six sentences ungated. By kind, gated against ungated:
+
+| kind | gated | ungated | delta | control |
+| --- | --- | --- | --- | --- |
+| `put` | 9/24 | 9/24 | 0.0000 | 2/24 |
+| `puttwo` | 13/17 | 17/17 | −0.2353 | 15/17 |
+| `clean` | 15/31 | 26/31 | −0.3548 | 22/31 |
+| `cool` | 10/21 | 16/21 | −0.2857 | 16/21 |
+| `heat` | 6/23 | 15/23 | −0.3913 | 18/23 |
+| `examine` | 16/18 | 17/18 | −0.0556 | 18/18 |
+
+The gate only ties on `put`, the one kind whose sentence is the winning arm verbatim. Every other kind loses between
+one and nine games to a gate that handed it *its own* sentence and took away the `put` one. The mechanism is now
+measured rather than argued: **the sentence that pays is the one about the failing action's phrasing, and it
+transfers across kinds; the sentences that describe a kind's objects and stations do not.** The `heat` entry tells
+the agent to close the microwave before heating; a `heat` game already has a microwave in the room and an
+observation that says so. The `put` entry tells the agent that `put` has a second phrasing — which no observation
+ever says, and which is why it survives being carried into games it was not written for.
+
+**4. A wrong sentence costs more than a long one.** The gated arm carried one sentence per game — a mean pack of
+378 characters against the ungated store's 1,280, and a mean prompt of 4,452 against 5,354, the two differing by
+exactly the pack in each case — and cost $0.2516, **34% more than the six-sentence arm** and 2.7× the per-win price
+of the single sentence. A pack is billed per call and a losing game is billed for all fifty
+steps: the six-sentence arm made 3,758 calls, the gated arm 4,923. Length is the price of the prompt; being wrong
+is the price of the trajectory.
+
+**5. The instrument's own noise floor, measured on identical bytes.** The gated arm's `put` games carry the exact
+489-character pack that R174.1 scored 112 with — `prefix_chars` and `pack_chars` are equal in all 24 of them — and
+they scored **9/24 against R174.1's 10/24**. The same text, bought twice, moved one game in twenty-four (4.2 pp).
+That is the first direct reading of this lane's sampling noise, and it is the number the six-arm/one-arm
+distinction (24 discordant games) has to clear.
+
+**What this changes in the product.** The lane now has one hand-written sentence, no store, and no gate. R175 was
+the test of whether a store could be built from that sentence by writing one more per kind; it cannot, and the
+reason is not length or selection but content: **the other five sentences are about the room and the task's
+objects, and the one that pays is about the action's second phrasing.** R176 asks the complementary question about
+the same sentence — whether it pays because it is *stated* or because it is *evidence* — by showing the verbatim
+trajectory it was distilled from at the same length (505 against 489 characters, `banks/bank-rawput-1.json`).
+
+**Price.** ¥1.80 (row 1) + ¥2.95 (row 2 with its control) = **¥4.75**, against ¥6.4 quoted for two arms with two
+controls.

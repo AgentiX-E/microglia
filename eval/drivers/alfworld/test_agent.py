@@ -974,6 +974,29 @@ class MainTest(unittest.TestCase):
         finally:
             bank.unlink(missing_ok=True)
 
+    def test_a_kind_gate_on_the_control_runs_and_records_that_it_moved_nothing(self):
+        # The workflow hands every input to every arm in the matrix, so a flag that is only meaningful for a
+        # treatment must not be an error on the control: the refusal ran once and took the control arm of a gated
+        # sweep down with it, four shards, leaving the treatment with nothing to pair against (AUDIT 34.246).
+        # What it must not do either is rename the control: `none@kind` would be a second control family, and the
+        # one arm every reading is compared against has to keep the name it has had for six sweeps.
+        self.assertEqual(
+            self.run_main(["--arm", "none", "--gate-kind", "--policy", "first", "--games", "1", "--out", str(self.out)]),
+            0,
+        )
+        payload = json.loads(self.out.read_text(encoding="utf-8"))
+        summary = payload["summary"]
+        self.assertIsNone(summary["gate_kind"])
+        self.assertEqual(summary["arm_label"], "none")
+        self.assertEqual(payload["episodes"][0]["pack_entries"], 0)
+
+    def test_the_label_never_says_kind_for_the_arm_that_carries_no_bank(self):
+        # The same rule as a function, so the call site and the docstring cannot drift: a knob that selects from
+        # an empty set has not been moved.
+        self.assertEqual(agent.arm_label("none", agent.DEFAULT_TOP_K, 0.0, gate_kind=True), "none")
+        self.assertEqual(agent.arm_label("always-in", agent.DEFAULT_TOP_K, 0.0, gate_kind=True), "always-in@kind")
+        self.assertEqual(agent.arm_label("retrieved", 1, 0.0, gate_kind=True), "retrieved@k1+kind")
+
     def test_a_kind_gate_over_a_tagged_bank_names_itself_in_the_artefact(self):
         bank = HERE / "bank-tagged.json"
         bank.write_text(

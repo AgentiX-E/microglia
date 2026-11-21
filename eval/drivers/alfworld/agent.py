@@ -390,7 +390,10 @@ def arm_label(arm: str, top_k: int, gate_share: float, gate_kind: bool = False) 
 
     `gate_kind` is the second gate and it applies to the pack arms as well as to retrieval, which is why it can be
     the only moved knob: `always-in@kind` is the six-sentence store carrying one sentence per game, and it is a
-    different treatment from `always-in`.
+    different treatment from `always-in`. On the control it moves nothing — the control carries no bank, so there
+    is nothing to select and its artefact records `gate_kind: null` — and the label stays `none`, because a knob
+    that selects from an empty set has not been moved. Renaming it `none@kind` would have split the control family
+    in two and made the one arm every other reading is compared against unrecognisable in aggregate (AUDIT 34.246).
 
     The registered arms keep the names they have always had: a label that appeared only when a knob moved means the
     default reading is unchanged, which is what makes every artefact before this one still comparable.
@@ -401,7 +404,7 @@ def arm_label(arm: str, top_k: int, gate_share: float, gate_kind: bool = False) 
             moved.append(f"k{top_k}")
         if gate_share > 0:
             moved.append(f"g{gate_share:g}")
-    if gate_kind:
+    if gate_kind and arm != "none":
         moved.append("kind")
     return f"{arm}@{'+'.join(moved)}" if moved else arm
 
@@ -1012,12 +1015,14 @@ def main() -> int:
     if arguments.rules:
         rules, rule_kinds = load_bank(arguments.rules)
     if arguments.gate_kind:
-        if arguments.arm == "none":
-            fail("--gate-kind selects among rules, so it needs an arm that carries one")
-        if not any(rule_kinds):
+        if arguments.arm != "none" and not any(rule_kinds):
             # Refused rather than run: an untagged bank under a kind gate is `always-in` with a second name, and
             # paying for it would answer a question the register did not ask.
             fail("--gate-kind needs a bank whose entries carry `kinds`; this one has no tags to select on")
+        # `--gate-kind` on the control is inert rather than refused: the control carries no bank, so there is
+        # nothing to select, and the header records `gate_kind: null` for it. It was refused once, and the refusal
+        # killed the control arm of every gated sweep — the workflow passes its flags to every arm in the matrix,
+        # so a flag that is only meaningful for treatments cannot be an error on the control (AUDIT 34.246).
     if arguments.arm == "sham":
         # Permuted after the cap, so the sham has exactly as many entries as `always-in` would render.
         rules = sham_entries(rules)

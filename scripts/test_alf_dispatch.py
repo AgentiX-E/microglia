@@ -134,12 +134,27 @@ class RefusalTest(unittest.TestCase):
         self.assertIn("not a number", self.refused("--sweep", "true", "--rules", "b.json", "--gate-share", "half"))
 
     def test_a_kind_gate_without_a_bank_is_refused(self):
-        self.assertIn("needs --rules", self.refused("--arm", "always-in", "--gate-kind", "true", "--games", "134"))
+        self.assertIn("tagged bank", self.refused("--arm", "always-in", "--gate-kind", "true", "--games", "134"))
 
-    def test_a_kind_gate_on_the_control_is_refused(self):
-        # The control carries no bank, so a gate over it is a flag that selects nothing from nothing while the
-        # dispatch records that a gate ran.
-        self.assertIn("control", self.refused("--arm", "none", "--gate-kind", "true", "--rules", "b.json", "--games", "134"))
+    def test_a_kind_gate_on_the_control_is_not_refused(self):
+        # The workflow passes its inputs to every arm in the matrix, so a flag that is only meaningful for a
+        # treatment cannot be an error on the control. Refusing it once cost a gated sweep its whole control arm,
+        # four shards, and left the treatment with nothing in the same dispatch to pair against (AUDIT 34.246).
+        self.assertEqual(
+            lane.check(arguments("--arm", "none", "--gate-kind", "true", "--rules", "b.json", "--games", "134")),
+            [],
+        )
+
+    def test_the_control_of_a_gated_sweep_is_accepted_as_a_purchase(self):
+        # And it is a real purchase: re-buying the control of a gated sweep against the same commit is the only
+        # repair available when the sweep itself was bought without one, so the flag cannot be refused there.
+        held = lane.check(
+            arguments(
+                "--sweep", "true", "--arms", '["none","always-in"]', "--rules", "b.json", "--gate-kind", "true"
+            )
+        )
+        self.assertEqual(held, ["none", "always-in"])
+        self.assertEqual(lane.payload(arguments("--sweep", "true", "--gate-kind", "true"))["gate_kind"], "true")
 
     def test_a_kind_gate_over_an_untagged_bank_is_refused_before_the_dispatch_is_bought(self):
         # The same refusal `agent.py` makes, moved to the only place where it costs nothing: four jobs would each

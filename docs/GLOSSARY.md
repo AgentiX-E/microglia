@@ -1893,3 +1893,25 @@ fire — the next corpus may be the one it was written for.
 in the prompt, was the block the length it was registered at, did the bank hold the rules it claims. The lane had
 three voiding conditions and all three were outcome-shaped (engagement, harm share, control level); the manipulation
 check is the one that caught the arm in 208.2, and it costs one counter.
+
+**Inert knob** — A flag that a given arm cannot act on, which the arm records as null rather than refusing. The
+control carries no bank, so `--gate-kind` selects nothing from nothing; refusing it made a flag whose legality
+depends on the arm into an error on the arm the workflow's matrix sends it to, and four control shards died on their
+first line. The rule is one sentence: **a knob that selects from an empty set has not been moved** — so the header
+says `gate_kind: null`, the label stays `none`, and the control keeps the name every reading is compared against.
+
+**Noise floor (this lane)** — The run-to-run movement of an arm against itself, measured rather than inferred: the
+same 24 prompts, byte-identical across two dispatches (`prefix_chars` and pack equal in all 24 `put` games), scored
+10/24 and 9/24. **One game in twenty-four, 4.2 pp.** It is the smallest difference this lane can see, it is the number
+every delta has to clear, and it is why a three-win difference is reported as a tie while a 24-discordant-game
+difference is reported as an effect.
+
+**Redundant sentence** — A bank entry that restates something the observation already carries: the microwave is in
+the room, the sinkbasin is the cleaning station, a container is closed. Measured, not assumed: five hand-written
+sentences of this kind cost 8.96 pp against the one repair they were added to, and the arm that carried one of them
+per game scored below a prompt that carried nothing. The complement is the **repair sentence**, which names an
+alternative phrasing the world never names — the only kind of entry this lane has ever measured a gain from.
+
+**Sentence tax** — The price a pack pays for its length, separable from what it says: −3.4 to −3.7 pp per sentence on
+the padded-block ladder, −1.79 pp per sentence for five task-relevant additions at n = 6. It is second-order against
+content: a redundant sentence is worth less than nothing, and no correct sentence is worth less than its length.
