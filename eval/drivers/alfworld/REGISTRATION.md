@@ -2076,3 +2076,33 @@ a fifth of what the attribution of the round itself cost. That asymmetry is why 
 
 **Price ≈ ¥3.80**, eight jobs, shorter episodes, off-peak band. At the peak band the same pass is ≈ ¥7.6, which is why
 the dispatch holds its paid step until the window opens.
+
+### R184, addendum 1 — written before the dispatch, and it changes no registered number
+
+Two 2025 papers were read after §R184 was written and before it was bought. Neither moves a registered reading; the
+second one is the reason the round is worth its price.
+
+**The budget binds hard on an agent with no instance knowledge.** AutoContext (arXiv 2510.2369, Table 2) reports ALFWorld
+success against the step budget for four backbones: ReAct **13.1 / 48.3 / 76.5 / 77.5 / 77.5** at 5 / 10 / 40 / 160 /
+unlimited steps, IGE **10.4 / 10.6 / 54.6 / 86.9 / 94.3**, AutoManual **3.4 / 28.8 / 94.8 / 97.9 / 97.9**. Between ten
+and forty steps ReAct gains **+28.2 pp** and IGE **+44.0 pp** — the cap is a first-order variable for systems that carry
+no structured belief about the instance, which is what the control is.
+
+**And it stops binding when the knowledge is there.** The same table with a per-instance context document (a Markdown
+entity–relation store whose unobserved attributes are written `Unknown`, built by ~177.9 steps of one-off exploration of
+that instance) reads ReAct **26.7 / 97.3 / 98.0 / 98.0 / 98.0** and AutoManual **17.6 / 83.2 / 99.7 / 99.7 / 99.7**:
+between ten and forty steps, **+0.7 pp** and **+16.5 pp**, and from forty to unlimited **zero**. The ablation in the same
+paper is the part that names the mechanism: removing the TODO forest costs 3.8 pp, the planner 8.9 pp, the extractor
+**16.7 pp** (98.5 → 81.8).
+
+**What that does to this round.** It predicts the *shape* the counterfactual already implies and cannot explain away:
+the cap's price is 15 games on the bank arm and 40 on the control, a 2.7× asymmetry, because what a bank of distilled
+episodes buys is exactly the thing that makes a step budget stop being the binding constraint. A reading in which the
+bank arm lands near 242 while the control falls to 157 is then **not a null**: it is the published shape reproduced on a
+different mechanism (cross-*task* memory rather than per-*instance* context), and it says the lane's remaining floor is
+the nine `put` games specifically rather than the budget generally.
+
+**What it does not license.** AutoContext's 98.0% and AutoManual's 97.9% are not rows this lane can be placed against
+without saying what they are: the first explores the test instance itself (~177.9 steps an instance, amortised), the
+second distils a manual from experience. The lane's bank is the second kind. Both belong on the board with the
+distinction stated, and neither belongs in a claim about this round's 274 games.
