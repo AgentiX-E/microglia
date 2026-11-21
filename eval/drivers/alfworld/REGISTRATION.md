@@ -1898,3 +1898,81 @@ rows measured on the old one would be committing the category error `COMPETITIVE
 cannot say the format is fixed in the model: `recovered_actions` is the count of replies that still write both.
 
 **Cost.** Two arms, two sections, four jobs each — **≈ ¥5.90**. It is the last cheap measurement of the format lock.
+
+## R183, amendment 1 — bought, and the second reader is worth +9.85 pp to the bank arm and +17.15 pp to the control
+
+Two dispatches, two arms each, 274 games per arm across both sections; `parser: any-line` in the header and in all 274
+episodes of both arms; `arm_label` `always-in@anyline` and `none@anyline`; `pack chars` exactly **551** in every game of
+the bank arm and **0** in every game of the control; `refused_actions` **0** in all 548 episodes. Every void condition
+holds except the recovery count, which is the reading rather than a condition (see below).
+
+| arm | seen, 140 | held out, 134 | pooled, 274 | bill |
+| --- | --- | --- | --- | --- |
+| **1a** `always-in@anyline` | **128** | **129** | **257 (93.80%)**, Wilson [90.3, 96.1] | $0.2246 (¥1.61) |
+| **1b** `none@anyline` | **100** | **97** | **197 (71.90%)**, Wilson [66.3, 76.9] | $0.4244 (¥3.03) |
+
+| pairing | delta | 95% CI | p | discordant | mde |
+| --- | --- | --- | --- | --- | --- |
+| `always-in@anyline` − `always-in` (the same bank, two readers) | **+9.85 pp** | [+5.47, +14.23] | < 0.001 | 41 | 6.55 pp |
+| `none@anyline` − `none` (the same empty pack, two readers) | **+17.15 pp** | [+10.22, +24.09] | < 0.001 | 99 | 10.18 pp |
+| **`always-in@anyline` − `none@anyline`** (the memory effect on the second reader) | **+21.90 pp** | [+16.06, +27.74] | < 0.001 | 78 | 9.03 pp |
+
+**Predictions: five held, one fired, and the one that fired is the interesting row.**
+
+| registered | read | verdict |
+| --- | --- | --- |
+| `refused_actions` 0 on both arms, both sections | **0** in all 548 episodes | held by construction |
+| `put`, `always-in@anyline` − reference: **+15 to +35 pp** | **50/59 vs 24/59 = +44.07 pp** | **exceeded** |
+| `put`, `none@anyline` − reference: **+20 to +50 pp** | **35/59 vs 4/59 = +52.54 pp** | **exceeded**, just outside |
+| pooled, `always-in@anyline` − reference 230: **+3 to +8 pp** | **+9.85 pp** | **exceeded** |
+| pooled, `none@anyline` − reference 150: **+8 to +25 pp** | **+17.15 pp** | held |
+| the other five kinds, `\|Δ\|` ≤ 5 pp | `examine` −9.68 pp (3 games), the rest ≤ 2.56 | refuted as written, on one kind |
+| **the memory effect on the second channel: +10 to +25 pp** | **+21.90 pp** | **held** |
+| `recovered_actions` per `put` game, `always-in@anyline`: **8 to 15** | **4.17** | **failed** — refutation clause 1 fires |
+| `recovered_actions` per `put` game, `none@anyline`: **7 to 14** | **10.42** | held |
+
+**The refutation clause fires, and for a reason it named.** It said: *if `recovered_actions` reads below 8 per `put`
+game, the two channels met different model behaviour and the cross-channel rows become descriptive.* It reads **4.17**
+on the bank arm. The clause is right about the arithmetic and only half right about the mechanism, and the difference is
+worth stating precisely, because it is the same denominator error this lane has caught before:
+
+| quantity | `always-in@anyline` | `none@anyline` |
+| --- | --- | --- |
+| recovered commands, per `put` game | **4.17** (246 over 59) | **10.42** (615 over 59) |
+| recovered commands, per model turn | **0.0554** | **0.0740** |
+| mean turns in a *won* `put` | **13.1** | **21.8** |
+| mean turns in a *lost* `put` | 50.0 | 50.0 |
+
+The rate per **turn** differs by 25%, the rate per **game** differs by 2.5×, and the reason is that the bank arm's
+episodes got short: a `put` game that finishes in 13 turns has a third of the turns in which to write a thought and a
+command. So what fell is not the format — it is the number of opportunities the format has — and the registered
+quantity was a per-game rate measuring both at once. **The clause fires, the cross-channel rows are quoted as
+descriptive, and the within-channel pair (+21.90 pp) is the one registered reading that survives.** The per-turn column
+is added here as a post-hoc correction and is not a registered quantity.
+
+**What the round establishes, in the order it matters.**
+
+1. **Executing the refused command is the largest single intervention this lane has measured.** +9.85 pp on the bank arm
+   and +17.15 pp on the control, both at p < 0.001, against a family of prompt edits that spent eleven rounds inside
+   ±3.65 pp. The format was costing more than every content mechanism the lane has tested.
+2. **The memory's lead narrows but does not collapse.** +29.20 pp on the reference channel, **+21.90 pp** on the second
+   one: a quarter of the entry's apparent value was a workaround for a reader that dropped its command, and three
+   quarters was not. The registered band (+10 to +25) held, and the direction of the workaround reading is confirmed
+   while its size is smaller than the band's midpoint.
+3. **`put` is no longer the outlier it was, and that is the whole round in one number.** 24/59 → **50/59** on the bank
+   arm and 4/59 → **35/59** on the control. The control's `put` — the row `COMPETITIVE.md` calls the one no published
+   memory paper reports, a frozen model losing 93% of one task kind before any memory exists — was **a property of the
+   harness, not of the task.**
+4. **The stratum split moves the same way it always has, only larger.** `hard` 69/77 vs 0/77 (**+89.61 pp**), `easy`
+   188/197 vs 197/197 (**−4.57 pp**). Every arm this lane has bought trades a few easy wins for many hard ones; the
+   channel trades 9 for 69.
+
+**What is left of the floor, and it is no longer syntax.** Nine `put` games still lose 50 turns each: 17.7 thoughts and
+**15.0 recovered commands per game** — 15% of the turns are still written as thought-then-command and now execute, which
+is why they are not lost to the format any more, and the games still do not finish. A won `put` is 13.1 turns and 1.4
+thoughts. So the residual is **exploration depth**, not the reader: the model has the budget and spends a third of it
+thinking. That is the R184 question, and it is the first one this lane can ask that a prompt cannot answer by itself.
+
+**Spend: ¥4.64 against ¥5.90 quoted** ($0.6490, 13,311 calls, four jobs an arm). The bank arm is the *cheaper* of the
+two — $0.2246 against $0.4244 — because a model that wins in 13 turns bills 13 turns: on this channel being right is
+what makes calls, where on the reference channel being wrong was.

@@ -658,7 +658,12 @@ ExpeL trains on — are written into the registration with what each costs in va
 **223/274 (81.39%)** against a 163/274 control on two corpus sections, **+21.90 pp [+15.69, +28.10]**, and the two
 sections cannot be told apart (+7.80 pp, [−4.63, +20.27], p = 0.226). Its provenance half was bought next and read
 **−3.65 pp [−8.39, +1.09]**: an entry that names a run in which it won is worth *less* than the same entry with a
-neutral clause of the same length, while the length itself is free (−0.36 pp, [−4.74, +4.01]). Both readings, the
+neutral clause of the same length, while the length itself is free (−0.36 pp, [−4.74, +4.01]). Then the reader was
+changed rather than the sentence: on `--parser any-line`, which executes the command the first-line rule refuses, the
+same bank reads **257/274 (93.80%)** against a re-bought control at **197/274 (71.90%)** — **+9.85 pp** for the bank arm
+and **+17.15 pp** for the control, and a memory effect of **+21.90 pp** where the reference channel says **+29.20 pp**.
+Those two levels are this lane's own reader and are **not** board rows; the reference-channel number is the one that sits
+beside a published one. Both readings, the
 per-kind decomposition and the two sections are in `eval/drivers/alfworld/REGISTRATION.md`; the argument for
 reading them is in `WHITEPAPER.md` §3.5 of the [docs repository](https://github.com/AgentiX-E/microglia-docs).
 
