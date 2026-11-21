@@ -933,10 +933,12 @@ characters (37.3% of the registered block)**, 82 words. If it scores with the ba
 the product is a single line; if it falls to the padded half's level, the pair is a composition — the inventory check
 and the workaround together — and the price per sentence is not the mechanism.
 
-**R174.2 — the gate, on a broad bank.** `--arms '["none","retrieved"]' --rules banks/expel-140.json --top-k 3
---gate-share 0.2`: the six-rule bank, retrieved at k=3, admitted only where the observation overlaps the rule's words
-by 0.2. The archived ungated reading is 99/134 (`44754440122`), so a gated arm is compared treatment-to-treatment
-against it. The question is the product question: **can a gate make a broad store behave like a narrow pack** — fire on
+**R174.2 — the gate, on the registered bank.** `--arms '["none","retrieved"]' --rules
+eval/drivers/alfworld/banks/bank-44754440122.json --top-k 3 --gate-share 0.2`: the four-entry bank, retrieved at k=3,
+admitted only where the observation overlaps the rule's words by 0.2. The archived *ungated* reading is 99/134 for
+`retrieved@k3` in `44754440122`, so a gated arm is compared treatment-to-treatment against it. The registered bank is
+four entries rather than six because the earlier six-rule bank was the one R170 retired; the gate's question does not
+need a large store, it needs a store in which some entries apply to a game and some do not, and this one has both. The question is the product question: **can a gate make a broad store behave like a narrow pack** — fire on
 the games whose observation names the failing step, stay silent on the rest.
 
 | the reading | what it means | the dispatch it licenses |
