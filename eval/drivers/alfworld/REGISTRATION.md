@@ -1670,3 +1670,101 @@ is the anchor R178 bought; both sections tiled to 274 under `--expect 274`.
 
 **Cost.** Two dispatches, two arms each — §4.70, and it is the last round that has to pay for the control: every
 round after it can be read against 1a.
+
+## R181, amendment 1 — bought, and the false acknowledgement was not what kept `put` down
+
+Two dispatches, two arms each, 274 games per arm. `pack chars` is exactly 551 in every one of the 274 games of the
+treatment and 0 in every one of the control; `carried` is 1.0 versus 0.0; `refused_actions` is present in all 548
+episodes. The anchor bank is byte-identical to R178 1b's (`sha256 95f8c634…`), which `test_banks.py::RepairAnchorTest`
+holds. Every void condition holds.
+
+| arm | seen, 140 | held out, 134 | pooled, 274 | bill |
+| --- | --- | --- | --- | --- |
+| `always-in` @ the anchor | 113 | **114** | **227 (82.85%)** | $0.61 (¥4.35) |
+| `none` | 69 | 81 | 150 (54.74%) | $0.54 (¥3.85) |
+
+**Two readings, and they are different questions.**
+
+| pairing | delta | 95% CI | p | discordant | mde |
+| --- | --- | --- | --- | --- | --- |
+| the anchor − `none`, both post-repair (a matched pair) | **+28.10 pp** | [+22.26, +33.58] | < 0.001 | 85 | 9.43 pp |
+| the anchor post − the anchor pre (the repair, same bank) | **+1.82 pp** | [−2.55, +6.20] | 0.453 | 37 | 6.22 pp |
+
+### The registered reading: two of six predictions held and the refusal clause fired
+
+| registered | read | verdict |
+| --- | --- | --- |
+| `refused_actions` **8–20 per `put` game** | **11.64** (treatment), **10.53** (control) | held — the field reproduces what the transcripts said |
+| `< 1 per game` on the other five kinds | 0.00 to 0.07 | held |
+| `put` wins **+6 to +22 pp** on each arm | **−1.69 pp** (20/59 against 21/59); control 4/59 | **refuted** |
+| repair's pooled delta, `none` **+4 to +18 pp** | **−13 games** (163 → 150) | **refuted** |
+| repair's pooled delta, the anchor **+1 to +12 pp** | +5 games, **+1.82 pp** | held, at the bottom of the band |
+| movement **in `put` and nowhere else** | `put` −1.69, `cool` +8.70 (four games), the rest within 5 pp | refuted as written; the exception is four games at an mde of 17 pp |
+
+**The pre-registered refutation clause is the reading.** It said: *if `put` does not move while `refused_actions` reads
+8–20 per game, the false acknowledgement is not what kept `put` down, the completion-loop reading is wrong, and the
+`put` deficit is a search-order or budget problem.* That is exactly what the numbers say. The counter confirms the
+drop is happening at the rate the transcripts showed, `put` does not move, and the repair's own delta on the same bank
+is +1.82 pp — inside the null band at an mde of 6.22.
+
+**Why, and it is visible in the turn arithmetic rather than in a transcript.** A winning `put` game costs **26.6
+turns** with 7.2 thoughts and 2.2 refusals. A losing one costs **50 turns, 32.0 of them thoughts, with 16.5 commands
+refused**. So a loss is not a long search: it is thirty turns of alternating *thought, refused command, `Nothing
+happens.`* — and the model writes the same shape on the next turn. It does not adapt. Removing the false `OK.` did not
+change the format, so it changed nothing; the model's belief was never the binding constraint, the format is.
+
+**What this does not say.** It does not say the acknowledgement should go back to `OK.` — a driver that tells a model
+its dropped command succeeded is a driver whose transcripts cannot be trusted, and the counter it bought is what made
+this round readable. It does not say the repair helped: +1.82 pp on the same bank is the sample moving, not the
+treatment. And it does not touch the family's earlier nulls, which were measured on the pre-repair driver with both
+arms paying the same defect.
+
+**Spend: ¥8.20 against ¥4.70 quoted** ($1.1473, 22,769 calls). The estimate assumed four shards an arm at the
+single-arm price; a two-arm sweep runs eight and the floor job beside them.
+
+## R182 — The format is the binding constraint, so the dead operation's slot gets the live one
+
+R180 measured operation (2) — the receptacle choice and the container check, 197 characters of the entry's tail — as
+**−0.73 pp [−4.74, +3.28]** at an identical 551 characters. R181 measured the refusal counter at **16.5 per lost `put`
+game** and `put` at **−1.69 pp** when the false acknowledgement was removed. Together they say the tail is free real
+estate and the format is what costs the turn, so this round writes the format into the tail.
+
+The arm is `bank-putmove-line-1.json`: the first operation verbatim (157 characters), then **197 characters** stating
+that a command must stand alone on its line, because a command written under a thought is read as part of the thought
+and never reaches the world. Rendered, it is **551** — the same length, the same one entry, and character-for-character
+identical to R180's ablated arm except in those 197 characters.
+
+| # | arm | bank | rendered | games | the question | price |
+| --- | --- | --- | --- | --- | --- | --- |
+| **1a** | `always-in` | `banks/bank-putmove-line-1.json` | **551** | 274 (both sections) | does an entry that names the format stop the refusal | **dispatched** ≈ ¥2.35 |
+| 1b | *(spent)* operation (1) only, neutral tail | `bank-putmove-phrase-1.json` | 551 | 274 | R180 1a | spent |
+| 1c | *(spent)* operation (1) only, the same tail | — | — | — | R181 post-repair `none` is the control for 1a's absolute level | spent |
+
+**Registered readings on 274 games (mde ≈ 6.0 pp).**
+
+| quantity | prediction |
+| --- | --- |
+| `refused_actions` per `put` game | **below 5**, from 11.64 — the entry has to move the counter, or it did not reach the behaviour |
+| `put` wins | **+6 to +20 pp** against R180 1a's 17/59, i.e. 21 to 29 of 59 |
+| pooled | **+3 to +12 pp** against R180 1a's 220/274 |
+| the other five kinds | \|Δ\| ≤ 5 pp, because the entry's referent is a format and not a task |
+| `pack chars` | exactly 551 in every game, and the same 157-character head as R180 1a |
+
+**Refutation.**
+
+* `refused_actions` stays above 8 per `put` game. Then a prompt-level entry cannot change the format the few-shot
+  examples teach, and the lane's product claim narrows to *content* lessons — the honest next step is the parser
+  question (execute a command the first line refused) registered as a separate channel, not as a memory arm.
+* `refused_actions` falls but `put` does not move. Then the refusals were a symptom rather than the cost, the `put`
+  deficit is exploration depth, and the next round is an entry about where the object is — which R177's per-kind rows
+  already predict will be negative.
+* `put` falls. Then the entry's second half is being read as a replacement for the first, and the round is a
+  length-within-entry result rather than a format one.
+
+**Void conditions.** `pack chars` exactly **551** in every game; the head is byte-identical to `bank-putmove-phrase-1.json`
+for its first 157 characters and the two differ only in the 197-character tail; the tail carries no digit and names no
+object; `by_kind` printed beside the pooled delta; both sections tiled to 274; the control for the absolute level is
+R181's post-repair `none`, and the comparison for the mechanism is R180 1a.
+
+**Cost.** One dispatch, one arm, both sections — **≈ ¥2.35**, and the last round that can be read against a control it
+did not buy.

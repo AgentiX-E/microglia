@@ -477,5 +477,60 @@ class RepairAnchorTest(unittest.TestCase):
         self.assertNotEqual(driver.NO_OP, "OK.")
 
 
+class FormatOperatorTest(unittest.TestCase):
+    """R182's arm: the dead operation's slot, at the same length, carrying the operation the failures point at.
+
+    R180 measured operation (2) as −0.73 pp at an identical 551 characters and R181 measured 16.5 refused commands
+    per lost `put` game with `put` unmoved after the false acknowledgement was repaired. So the arm is R180's ablated
+    entry with its **197-character tail** replaced — nothing else may differ, or the reading is a length effect or a
+    head effect rather than the tail's.
+    """
+
+    LINE = "bank-putmove-line-1.json"
+    ABLATED = "bank-putmove-phrase-1.json"
+    HEAD = (
+        'If a "put" action repeatedly fails despite being at the correct location and holding the object, '
+        'try the alternative phrasing "move <object> to <receptacle>"'
+    )
+
+    def text(self, name: str) -> str:
+        return payload_of(name)["entries"][0]["text"]
+
+    def test_it_keeps_the_first_operation_byte_for_byte(self):
+        self.assertTrue(self.text(self.LINE).startswith(self.HEAD))
+        self.assertEqual(self.text(self.LINE)[: len(self.HEAD)], self.text(self.ABLATED)[: len(self.HEAD)])
+
+    def test_it_is_the_same_length_as_the_arm_it_is_read_against(self):
+        rendered = len(driver.render_pack([self.text(self.LINE)]))
+        self.assertEqual(rendered, len(driver.render_pack([self.text(self.ABLATED)])))
+        self.assertEqual(rendered, 551)
+
+    def test_the_only_difference_is_the_tail(self):
+        tail = self.text(self.LINE)[len(self.HEAD):]
+        other = self.text(self.ABLATED)[len(self.HEAD):]
+        self.assertNotEqual(tail, other)
+        self.assertEqual(len(tail), len(other))
+        self.assertEqual(len(tail), 197)
+
+    def test_the_tail_names_the_format_and_nothing_else(self):
+        tail = self.text(self.LINE)[len(self.HEAD):].lower()
+        self.assertIn("alone on its own line", tail)
+        self.assertIn("shares a line with a thought", tail)
+        # The registry's void condition: a digit or an object name would make the tail a second task hint rather
+        # than a statement about how to write the turn.
+        self.assertNotRegex(tail, r"[0-9]")
+        for word in ("receptacle", "cabinet", "countertop", "shelf", "drawer"):
+            with self.subTest(word=word):
+                self.assertNotIn(word, tail)
+
+    def test_the_earlier_operations_are_not_restated(self):
+        # R180 measured the container check dead. A tail that quietly restored it would make this arm a
+        # re-measurement of R178 rather than of the format.
+        tail = self.text(self.LINE)[len(self.HEAD):].lower()
+        for phrase in ("different valid receptacle", "ensure it is open", "if that also fails"):
+            with self.subTest(phrase=phrase):
+                self.assertNotIn(phrase, tail)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

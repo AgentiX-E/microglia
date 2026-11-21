@@ -1,0 +1,28 @@
+{
+  "schema": "microglia.alfworld-bank/1",
+  "cap": 20,
+  "identity": "substring",
+  "source": {
+    "kind": "the winning sentence's first operation, with operation (2) replaced by the format operation the failures show is live",
+    "matches": "banks/bank-putmove-phrase-1.json character for character through the first 157, then a different 197-character tail",
+    "note": "R182 row 1a: operation (2) was measured dead in R180 (-0.73 pp at an identical 551 characters), so its 197-character slot carries the operation the 39 lost `put` games in R181 point at. R181 removed the false acknowledgement a refused command used to get and `put` did not move (20/59 against 21/59) while `refused_actions` read 16.5 per lost game: the model writes a thought and a command in one reply every time and does not adapt to the answer. This entry states the format that costs it the turn, at the length the arm it is read against already pays. 551 rendered characters.",
+    "registration": "R182 row 1a",
+    "operations_kept": [
+      "the put-to-move phrasing"
+    ],
+    "operations_written": [
+      "one command per turn, on its own line"
+    ],
+    "operations_replaced": [
+      "a different receptacle of the same type",
+      "the container check"
+    ],
+    "provenance": "written after R180 measured operation (2) as decoration and R181 measured the refused-command counter at 16.5 per lost `put` game with `put` unmoved"
+  },
+  "entries": [
+    {
+      "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\". Write the command alone on its own line and put nothing under it: a command that shares a line with a thought is read as part of the thought, so it never reaches the world and still costs a turn.",
+      "votes": 10
+    }
+  ]
+}
