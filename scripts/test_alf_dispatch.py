@@ -13,11 +13,19 @@ import contextlib
 import io
 import json
 import shutil
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
-import alf_dispatch as lane
+# The module under test sits beside this file, and the directory is put on the path here rather than relied on.
+# `python3 scripts/test_alf_dispatch.py` puts it there for free; `coverage run scripts/test_alf_dispatch.py` on
+# 3.10 does not, because 3.11 changed `runpy.run_path` to insert the script's directory and 3.10 did not — so this
+# suite passed on the development interpreter and raised ModuleNotFoundError on the CI runner. Every other suite
+# in the lane already inserts its own directory; this is the one that had been getting it for free.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import alf_dispatch as lane  # noqa: E402  (the module beside this file)
 
 
 def arguments(*argv):

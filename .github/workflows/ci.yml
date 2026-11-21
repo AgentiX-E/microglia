@@ -89,6 +89,10 @@ jobs:
           set -euo pipefail
           python3 -m coverage run --branch --source=eval/drivers/alfworld -m unittest discover \
             -s eval/drivers/alfworld -p "test_*.py"
+          # Each suite puts its own directory on `sys.path` rather than relying on the interpreter to do it, and
+          # `test_cli.py` refuses a suite that does not: `python3 scripts/x.py` inserts the script's directory on
+          # 3.11 and not on 3.10, so a suite that imported a sibling module by bare name passed on the development
+          # interpreter and raised ModuleNotFoundError here.
           python3 -m coverage run --append --branch scripts/test_alf_dispatch.py
           python3 -m coverage json -o coverage-python.json
           python3 scripts/check-python-coverage.py --self-test

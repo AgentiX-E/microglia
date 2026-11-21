@@ -126,6 +126,30 @@ class SuiteTest(unittest.TestCase):
         # that stopped pinning would keep passing while testing a different interpreter than the lane's floor.
         self.assertIn("python-version: '3.10'", CI.read_text(encoding="utf-8"))
 
+    def test_every_suite_that_imports_a_sibling_module_puts_its_own_directory_on_the_path(self):
+        """The local-pass/CI-fail shape that no API check can see.
+
+        `python3 scripts/x.py` puts the script's own directory on `sys.path`. Python 3.11's `runpy.run_path` does
+        the same for `coverage run scripts/x.py`, and 3.10's does not — so `scripts/test_alf_dispatch.py` ran on
+        the development interpreter and raised `ModuleNotFoundError: No module named 'alf_dispatch'` on the runner,
+        in the step that exists to catch exactly this. The rule is structural and version-independent: a suite
+        that imports a module sitting beside it must say where that module is.
+        """
+        directories = (HERE, HERE.parent.parent.parent / "scripts")
+        checked = 0
+        for directory in directories:
+            siblings = {path.stem for path in directory.glob("*.py")}
+            for suite in sorted(directory.glob("test_*.py")):
+                source = suite.read_text(encoding="utf-8")
+                imported = set(re.findall(r"^(?:import|from)\s+([a-z_][a-z0-9_]*)", source, re.MULTILINE))
+                if not (imported & siblings - {suite.stem}):
+                    continue
+                checked += 1
+                with self.subTest(suite=str(suite.relative_to(directory.parent.parent))):
+                    self.assertIn("sys.path.insert", source, f"{suite.name} imports a sibling module by bare name")
+        # A rule that matched no file would pass for the wrong reason, which is how a structural test rots.
+        self.assertGreaterEqual(checked, 7)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
