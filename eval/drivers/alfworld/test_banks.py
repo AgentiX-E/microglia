@@ -299,5 +299,100 @@ class RawTrajectoryTest(unittest.TestCase):
         self.assertIn("entry 1 spans more than one line", distill.validate_bank(payload))
 
 
+class ProvenancePairTest(unittest.TestCase):
+    """The two R178 banks: one sentence, two clauses, exactly the same rendered length.
+
+    The round's claim is that `1a − 1b` is **provenance and nothing else**. That claim is only as good as the
+    two files: if the clauses differ in length, the reading is provenance *plus* length, and this lane has
+    already measured that a longer pack is paid for at the entry count (R174.2: −3.4 to −3.7 pp per sentence in
+    a padded block). So this pair is held to **equality**, not to the 5% tolerance the earlier length claims
+    used — a pair four characters apart cannot be read as a one-clause difference at any sample size.
+
+    The second guard is the one that keeps the treatment honest. The clause has to name a run, and the other
+    clause has to name nothing a reader could mistake for evidence, which is checked structurally: the control
+    carries no digit at all. That is what makes "the difference between the arms is the source line" a property
+    of the files rather than a sentence in a registration.
+    """
+
+    BASE = "bank-putmove-1.json"
+    TREATMENT = "bank-putmove-source-1.json"
+    CONTROL = "bank-putmove-note-1.json"
+    CLAUSE = 62
+
+    def text(self, name: str) -> str:
+        return payload_of(name)["entries"][0]["text"]
+
+    def rendered(self, name: str) -> int:
+        return len(driver.render_pack([self.text(name)]))
+
+    def clause(self, name: str) -> str:
+        return self.text(name)[len(self.text(self.BASE)):]
+
+    def test_both_arms_carry_the_sentence_byte_for_byte(self):
+        base = self.text(self.BASE)
+        for name in (self.TREATMENT, self.CONTROL):
+            with self.subTest(bank=name):
+                self.assertTrue(self.text(name).startswith(base))
+                self.assertEqual(self.text(name)[: len(base)], base)
+
+    def test_the_two_arms_render_the_same_length(self):
+        # Equality rather than a tolerance: this is the pair whose whole reading is one clause.
+        self.assertEqual(self.rendered(self.TREATMENT), self.rendered(self.CONTROL))
+        self.assertEqual(self.rendered(self.TREATMENT), self.rendered(self.BASE) + self.CLAUSE)
+
+    def test_the_clauses_are_the_same_length_and_in_the_same_position(self):
+        # Same position is a separate claim from same length: a clause prepended to the control and appended to
+        # the treatment would pass the length check and fail the design.
+        self.assertEqual(len(self.clause(self.TREATMENT)), len(self.clause(self.CONTROL)))
+        self.assertTrue(self.clause(self.TREATMENT).startswith(" ["))
+
+    def test_the_treatment_names_a_run_and_the_control_names_no_number(self):
+        treatment = self.clause(self.TREATMENT)
+        control = self.clause(self.CONTROL)
+        self.assertRegex(treatment, r"^ \[source: one won pick_and_place_simple game, run \d{11}\]$")
+        self.assertNotRegex(control, r"[0-9]")
+
+    def test_the_citation_is_the_run_the_metadata_names(self):
+        # AUDIT 34.254: the clause cites a run in which the entry **won**, and the sentence was distilled from a
+        # different run. Both are in the file now, so the next reader does not have to reconstruct which is which
+        # from two run ids in two documents.
+        source = payload_of(self.TREATMENT)["source"]
+        self.assertIn(source["cited_run"], self.clause(self.TREATMENT))
+        self.assertNotEqual(source["cited_run"], source["distilled_from_run"])
+        self.assertIn(source["distilled_from_run"], source["note"])
+        self.assertIn("won", source["kind"])
+
+
+class GhostCitationTest(unittest.TestCase):
+    """R179's arm: the same 551 characters, citing a run that does not exist.
+
+    A bank in this tree that looks like a mistake is a bank somebody will fix. This one is a mistake on
+    purpose — the arm is the claim, not the content — so the file has to say so in a field a test can read,
+    and the clause has to differ from R178's true citation **only** in the run id, or the arm would be
+    provenance plus a second difference.
+    """
+
+    GHOST = "bank-putmove-ghost-1.json"
+    SOURCE = "bank-putmove-source-1.json"
+
+    def payload(self) -> dict:
+        return payload_of(self.GHOST)
+
+    def clause(self, name: str) -> str:
+        base = payload_of("bank-putmove-1.json")["entries"][0]["text"]
+        return payload_of(name)["entries"][0]["text"][len(base):]
+
+    def test_it_is_the_same_length_as_the_arm_it_is_read_against(self):
+        rendered = len(driver.render_pack([self.payload()["entries"][0]["text"]]))
+        self.assertEqual(rendered, 551)
+        self.assertEqual(self.clause(self.GHOST), self.clause(self.SOURCE).replace("44841962248", "44800000000"))
+
+    def test_it_declares_that_its_citation_is_false(self):
+        source = self.payload()["source"]
+        self.assertIs(source["false_by_construction"], True)
+        self.assertEqual(source["cited_run"], "44800000000")
+        self.assertIn("FALSE BY CONSTRUCTION", source["note"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

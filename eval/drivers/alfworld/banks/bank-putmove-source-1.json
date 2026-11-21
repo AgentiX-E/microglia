@@ -3,10 +3,12 @@
  "cap": 20,
  "identity": "substring",
  "source": {
-  "kind": "the winning sentence plus the run it came from",
+  "kind": "the winning sentence plus a citation of a run in which it won",
   "matches": "banks/bank-putmove-1.json entry, byte for byte, with one appended clause of 62 characters",
-  "note": "R178 row 1a: WikiTrace's evidence link at 62 characters. Same sentence; the arm differs only in whether it names its evidence.",
+  "note": "R178 row 1a: WikiTrace's evidence link at 62 characters. Same sentence; the arm differs only in whether it names its evidence. The cited run is where the entry won, not where it was distilled from: the sentence is entry 4 of banks/bank-44754440122.json, distilled from run 44754440122, and the clause names 44841962248 because that is a run whose `put` games this entry won (10 of 24, which is the entry's votes). AUDIT 34.254.",
   "registration": "R178 row 1a",
+  "cited_run": "44841962248",
+  "distilled_from_run": "44754440122",
   "operations_kept": [
    "the put-to-move phrasing and the second receptacle"
   ],

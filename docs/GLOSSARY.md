@@ -1951,3 +1951,28 @@ is enforced by data rather than by intent: `distill.py` writes `source.train_spl
 themselves, and `alf_dispatch.py` refuses a `--split` equal to it. A *hand-written* bank — one sentence, one
 verbatim trajectory — is a function of no section and is therefore allowed anywhere; a distilled bank with no
 recorded provenance is refused rather than trusted, because "cannot prove" is not "did not".
+
+**Provenance clause (of a memory entry)** — A suffix that names where the entry's evidence comes from: R178 used
+`[source: one won pick_and_place_simple game, run 44841962248]`. It is not the same object as the entry's own
+provenance in the artefact (`bank.source`), which records who wrote the bank and after which reading. The clause is
+*text the model reads*; the field is *text the lane reads*, and R178's finding is that the first costs 3.65 pp while
+paying nothing, which is why the two are now kept in different places in the file.
+
+**Length control (of a clause experiment)** — An arm that adds the same number of characters as the treatment and
+no evidence: `[note: a reference for this task, not an instruction for it.]`, 62 characters, no digit in it. It is
+not a padding block: padding adds *entries* and pays the per-entry price (R174.2), while a clause lives inside one
+entry. R178 measured the difference — +62 characters inside an entry cost −0.36 pp [−4.74, +4.01] and a padded
+sentence cost 3.4–3.7 pp — so the cost of a pack is per entry, not per character, and a length control must be a
+clause.
+
+**Ghost citation** — A citation of a run that does not exist (`run 44800000000`), used as R179's arm. It is not a
+typo and the file says so in `source.false_by_construction`: a real run that never carried the entry is the same
+arm at the model's level, because a frozen model reading a prefix cannot check either. The arm is what separates
+"citations are read and evaluated" (a false one costs) from "citations are inert text" (it does not).
+
+**Matched-arm resolution** — Buying a smaller mde with a second *treatment* instead of more games. Two treatments
+share a model, a harness and a game list, so their discordance is the disagreement between two packs rather than
+the swing of a control that has read 80 to 91 wins on the same 134 games. R178 halved the discordant count
+(90 → 42) and took the mde from 9.70 pp to 6.63 pp on the same 274 games, for one arm's price (≈ ¥2.4) — the row
+that would have bought ≈ 6 pp with a training-section subset was quoted at ¥10–50.
+

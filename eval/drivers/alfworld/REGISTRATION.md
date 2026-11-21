@@ -1365,3 +1365,101 @@ which a control-band comparison would be worthless.
 field that makes a length claim checkable, AUDIT 34.249); `by_kind` and `by_section` printed beside the pooled
 delta; and the two arms must be compared **only** with each other, because neither has a control in its own
 dispatch and a cross-dispatched control is a band rather than a comparison.
+
+## R178, amendment 1 — bought, and provenance is the half that does not transfer
+
+Two dispatches per section, one arm each, read against each other and against the sentence arm they extend.
+`carried` is 1.0 in all 274 games of both arms and `pack chars` is exactly **551** in every game of both, so the
+length claim holds per game rather than on average; the two arms differ in one 62-character clause and in nothing
+else, which `test_banks.py::ProvenancePairTest` holds to **equality** rather than the 5% tolerance every earlier
+length claim in this lane used.
+
+| arm | bank | rendered | seen, 140 | held out, 134 | pooled, 274 | bill |
+| --- | --- | --- | --- | --- | --- | --- |
+| the sentence | `bank-putmove-1.json` | 489 | 111 | 112 | **223 (81.39%)** | $0.3308 (¥2.37) |
+| **1b** the neutral clause | `bank-putmove-note-1.json` | **551** | 111 | 111 | **222 (81.02%)** | $0.3273 (¥2.34) |
+| **1a** the source clause | `bank-putmove-source-1.json` | **551** | 105 | 107 | **212 (77.37%)** | $0.3391 (¥2.43) |
+
+Three pairings, all treatment against treatment on the same 274 games (AUDIT 34.232), each read from one command:
+
+| pairing | delta | 95% CI | p | discordant | mde |
+| --- | --- | --- | --- | --- | --- |
+| 1b − the sentence (the length half) | −0.36 pp | [−4.74, +4.01] | 0.920 | 37 | 6.22 pp |
+| 1a − the sentence (length and provenance) | −4.01 pp | [−9.12, +0.73] | 0.127 | 47 | 7.01 pp |
+| **1a − 1b (provenance alone)** | **−3.65 pp** | **[−8.39, +1.09]** | 0.151 | 42 | **6.63 pp** |
+
+**The registered reading landed in the second band.** `−9 to +9 pp` was written as *provenance does not transfer on
+this corpus, and the lane's law stays referent-only*. That is the reading: an entry that names a run in which it won
+is worth **3.65 pp less** than the same entry with a neutral clause of the same length, and the point estimate is
+negative in both sections on their own (−4.29 seen, −2.99 held out).
+
+**What the round retires, and it is worth more than the −3.65.** The length half is **free**: +62 characters on one
+entry, 12.7% longer prefix, `−0.36 pp [−4.74, +4.01]`. R174.2 measured the tax per *entry* (−3.4 to −3.7 pp per
+sentence in a padded block) and three rounds of this lane's budget have been quoted as if the tax were per
+character. It is not: an entry can be made 12.7% longer for nothing, and the unit that costs is the entry. That is
+also why 1b is the right control rather than a padding arm — the padding arms paid because they added **entries**.
+
+**The clause is read, and this is the difference between a null and a delivery failure.** Engagement was
+**152/274 = 55.5%** of games changed course — a 62-character suffix moved the action trajectory in more than half
+the corpus, and it hurt 26 of those against 16 helped. So the reading is not "the model ignored the text": a frozen
+model does respond to a citation, and the response is *net negative*. That is a sharper statement than the
+registered band, and it is the one WikiTrace's 20%-wrong-entries result predicts from the other side.
+
+**Where the loss sits.** On the games the control wins: **196/222 against 222/222 (−11.71 pp)**, while on the 52 the
+control loses the source arm wins 16. `put` carries 19 of the 42 discordant pairs, net −5 games on 59, and that kind
+alone has an mde of 20.8 pp, so it is reported as a shape rather than a finding — the entry's referent is `put`, and
+`put` is where the citation costs most, but the kind cannot carry a claim at 59 games.
+
+**The instrument result, which changes what a round costs.** Pairing two treatments halved the discordance
+(90 → 42 pairs) and took the mde from **9.70 pp to 6.63 pp at the same 274 games**, for one arm's price. R177
+registered a training-section subset at **¥10–50** to reach ≈ 6 pp. This round reached it for **¥2.4**. The row is
+retired: resolution is bought with a matched arm, not with more games.
+
+**Spend: ¥4.77 against ¥4.8 quoted** ($0.3391 + $0.3273, 13,512 model calls).
+
+## R178, amendment 2 — the citation names a run the entry won in, not the run it came from
+
+Nothing about the reading changes; the *bank's own metadata* was wrong and is corrected rather than left as a
+sentence somebody would later quote. The sentence is entry 4 of `banks/bank-44754440122.json`, distilled from run
+**44754440122**. The clause appended to it cites run **44841962248** — the R174.1 held-out dispatch, where the entry
+won 10 of its 24 `pick_and_place_simple` games (which is the entry's `votes`). Both statements are true and they are
+not the same statement; the file said "the run it came from", which was false.
+
+The correction is in the bank (`cited_run`, `distilled_from_run`, and a `kind` that says *won*), and it is guarded:
+`test_the_citation_is_the_run_the_metadata_names` fails if the clause and `cited_run` ever disagree, and
+`test_the_treatment_names_a_run_and_the_control_names_no_number` fails if the control gains a digit. AUDIT 34.254.
+
+What the arm therefore measures is **"an entry that names evidence of its own success"**, which is what WikiTrace
+links; the strict reading — an entry that names the run it was distilled from — is a different arm and is registered
+below rather than conflated with this one.
+
+## R179 — What a citation that cannot be checked is worth, at the same 551 characters
+
+R178 established two things about a citation in this harness: it is **read** (55.5% of trajectories change) and it
+does **not** pay (−3.65 pp). WikiTrace's other half is the failure mode: **20% of memory-induced failures trace to
+entries that are simply wrong**. This lane has tested a wrong *referent* (R175: five descriptions cost 8.96 pp) and
+has never tested a wrong *citation* — and it is one arm away, at the length the last round already paid for.
+
+| # | arm | bank | rendered | games | the question | price |
+| --- | --- | --- | --- | --- | --- | --- |
+| **1a** | the sentence + a citation of a run that does not exist | `banks/bank-putmove-ghost-1.json` | **551** | 274 (both sections) | does a claim the model cannot check still move it | ≈ ¥2.4 |
+| 1b | *(already bought)* the sentence + a citation of a run in which it won | `bank-putmove-source-1.json` | 551 | 274 | R178 1a | spent |
+| 1c | *(already bought)* the sentence + a neutral clause | `bank-putmove-note-1.json` | 551 | 274 | R178 1b | spent |
+
+The clause is `[source: one won pick_and_place_simple game, run 44800000000]` — the same 62 characters, the same
+position, and an eleven-digit run id that no artefact carries. The variant a product would actually ship, *a real
+run that never carried this entry*, is the **same arm at the model's level**: a frozen model reading a prefix cannot
+tell the two apart, so one arm covers both and the second is not bought.
+
+**Registered readings on 274 games (mde ≈ 6.6 pp, from R178's discordance).**
+
+| 1a − 1b | what it means |
+| --- | --- |
+| ≤ −9 pp | a false citation is *read and penalised*, which would mean the model treats a source line as a claim it evaluates — the first evidence in this lane that a pack's text can be wrong rather than merely irrelevant |
+| −9 to +9 pp | **citations are inert as text**: the model neither checks nor acts on them, R178's −3.65 pp is the whole of the effect, and WikiTrace's 79.5 → 90.2 must come from the **descent** (their agent can open the run) rather than from the line |
+| ≥ +9 pp | a fabricated source is *better* than a true one — no mechanism predicts it, and it would invalidate the R178 arm's interpretation rather than extend it |
+
+**Void conditions.** `carried` 1.0 in all 274 games; `pack chars` exactly **551** in every game; the arm is compared
+**only** with 1b and 1c, both of which are already in the record; `by_kind` and `by_section` printed beside the
+pooled delta; and the bank declares in `source.note` that its citation is false by construction, because a bank that
+looks like a mistake in the tree is a bank somebody will eventually "fix".

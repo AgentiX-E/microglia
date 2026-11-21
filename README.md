@@ -641,8 +641,9 @@ skeleton is the competitor's own, transliterated: the system line, the two-examp
 split into alternating turns, and the parser's four branches — so an arm changes what sits *above* the transcript
 and nothing else. Three zero-cost readings hold it in place: `--policy seed` reproduces `floor.py` game for game
 (same wins, steps, action digests, observation fingerprints) and the `agreement` job fails on a single field;
-81 unit tests with 99% statement coverage cover the parser, the split, the shard arithmetic, the bill and the loop
-itself; and a test asserts that `none` and `always-in` differ at exactly one message index. A model reply that
+**506 unit tests at 98.8% line-and-branch coverage, every module at or above 95%**, cover the parser, the split,
+the shard arithmetic, the bill and the loop itself; and a test asserts that `none` and `always-in` differ at
+exactly one message index. A model reply that
 never produces an action fails the run rather than scoring zero — a zero would be a number about the prompt's
 syntax wearing the costume of a number about memory.
 
@@ -650,6 +651,14 @@ Registering a prediction the design cannot resolve is the point of writing it do
 split has 134 games, and no amount of careful analysis makes a 5-point difference visible through 13.3 points of
 noise. The two honest ways to buy power — repeat passes with a cluster bootstrap over games, or pool a split
 ExpeL trains on — are written into the registration with what each costs in validity.
+
+**What the lane has since bought.** One hand-written sentence of 292 characters — the `put`→`move` repair — reads
+**223/274 (81.39%)** against a 163/274 control on two corpus sections, **+21.90 pp [+15.69, +28.10]**, and the two
+sections cannot be told apart (+7.80 pp, [−4.63, +20.27], p = 0.226). Its provenance half was bought next and read
+**−3.65 pp [−8.39, +1.09]**: an entry that names a run in which it won is worth *less* than the same entry with a
+neutral clause of the same length, while the length itself is free (−0.36 pp, [−4.74, +4.01]). Both readings, the
+per-kind decomposition and the two sections are in `eval/drivers/alfworld/REGISTRATION.md`; the argument for
+reading them is in `WHITEPAPER.md` §3.5 of the [docs repository](https://github.com/AgentiX-E/microglia-docs).
 
 ### Where the scenario actually is: 1,956 lines, 7 modules, and a gate for the rest
 

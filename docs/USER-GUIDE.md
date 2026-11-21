@@ -4996,3 +4996,53 @@ python eval/drivers/alfworld/aggregate.py \
 python scripts/check_split_sizes.py                       # $ALFWORLD_DATA/data/json_2.1.1
 python scripts/check_split_sizes.py --data /path/to/split # a corpus you fetched elsewhere
 ```
+
+### 32.22 Pairing two treatments, which is the cheapest resolution this lane has
+
+The lane's first twelve rounds paired a treatment with the `none` arm bought in the same dispatch. That is the
+right control for "does the pack help", and it is the wrong control for "which of two packs is better": the control
+arm has read 80, 81, 88, 89, 90 and 91 wins on the same 134 games across six dispatches, while treatments repeat.
+A delta against a control that moves eleven wins is a band, not a comparison (AUDIT 34.232).
+
+Two treatments are different. Both drove every game with the same model and the same harness, so the difference
+between them is the difference between two packs and not between two afternoons — and the payoff is resolution:
+R178's pair halved the discordant game count (90 → 42) and took the mde from **9.70 pp to 6.63 pp** on the same 274
+games, for one arm's price (≈ ¥2.4). A training-section subset was registered at ¥10–50 to reach the same 6 pp.
+
+```bash
+# one arm, no control, both sections — legal only when --against says which arm it is half of
+python scripts/alf_dispatch.py --sweep true --arms '["always-in"]' \
+  --rules eval/drivers/alfworld/banks/bank-putmove-source-1.json \
+  --split eval_out_of_distribution --against always-in@source
+python scripts/alf_dispatch.py --sweep true --arms '["always-in"]' \
+  --rules eval/drivers/alfworld/banks/bank-putmove-source-1.json \
+  --split eval_in_distribution --against always-in@source
+
+# then join them: one --relabel per slice, keyed on the full path
+args=()
+for f in held-source/arm-always-in-*.json seen-source/arm-always-in-*.json \
+         held-note/arm-always-in-*.json   seen-note/arm-always-in-*.json; do
+  case "$f" in
+    *-source/*) args+=(--input "$f" --relabel "$f=always-in@source") ;;
+    *-note/*)   args+=(--input "$f" --relabel "$f=always-in@note") ;;
+  esac
+done
+python eval/drivers/alfworld/aggregate.py "${args[@]}" \
+  --compare "always-in@source,always-in@note" \
+  --expect 274 --expect-splits eval_out_of_distribution,eval_in_distribution
+```
+
+1. **`--relabel` takes a path, and the path has to be the full one.** `arm-always-in-0.json` exists in every run
+   directory the workspace holds; a basename is refused as ambiguous rather than applied to whichever file was read
+   first. Every slice of one dispatch has to be renamed, or `tile` sees two groups under one label.
+2. **`--against` is a guard, not an input.** It makes a sweep with a treatment and no control legal, and it is not
+   part of the payload — the workflow never dispatches two arms because a flag said so.
+3. **The two arms must be read against each other and nothing else.** Neither has a control in its own dispatch, so
+   a comparison with a control from a third dispatch is a band. `--compare` is where that is enforced by naming.
+4. **Check `carried` and `pack chars` per game before quoting the delta.** Both are printed above it. R178's void
+   conditions were `carried` 1.0 in all 274 games and exactly 551 characters in every game of both arms; the second
+   number is what makes a length claim checkable at all (AUDIT 34.249).
+5. **A length control adds a clause, not an entry.** `bank-putmove-note-1.json` is 62 characters of true, neutral
+   text and contains no digit; a padded block is not a length control because it pays the per-entry price, and R178
+   measured the difference: +62 characters inside one entry cost **−0.36 pp [−4.74, +4.01]**, which is nothing.
+

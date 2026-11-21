@@ -1,0 +1,23 @@
+{
+ "schema": "microglia.alfworld-bank/1",
+ "cap": 20,
+ "identity": "substring",
+ "source": {
+  "kind": "the winning sentence plus a citation of a run that does not exist",
+  "matches": "banks/bank-putmove-source-1.json entry, byte for byte, with the eleven-digit run id replaced by 44800000000",
+  "note": "R179 row 1a: WikiTrace's 20%-wrong-entries condition, at the length R178 already paid for. The citation is FALSE BY CONSTRUCTION and is not to be corrected: no run 44800000000 exists, which is the arm. A real run that never carried the entry is the same arm at the model's level, so it is not bought separately.",
+  "registration": "R179 row 1a",
+  "cited_run": "44800000000",
+  "false_by_construction": true,
+  "operations_kept": [
+   "the put-to-move phrasing and the second receptacle"
+  ],
+  "provenance": "written after R178 measured a true citation at -3.65pp on 274 games, before any arm carried a false one"
+ },
+ "entries": [
+  {
+   "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\"; if that also fails, try a different valid receptacle of the same type, and if the receptacle is a container, ensure it is open first. [source: one won pick_and_place_simple game, run 44800000000]",
+   "votes": 10
+  }
+ ]
+}

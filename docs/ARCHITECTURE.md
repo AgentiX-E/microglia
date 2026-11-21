@@ -2632,3 +2632,32 @@ section worth buying.
 | `--expect-splits` + `by_section` | `aggregate.py` | a pooled rate over two populations, quoted as one |
 | `source.train_split` ≠ scored section | `distill.py` + dispatcher | a bank scored on the section that produced it |
 | payload keys ⊆ declared inputs | `test_cli.py` | an input dropped between dispatcher and workflow |
+
+### 8.43 A bank that cites a run, and the two fields that keep the citation honest
+
+R178's arms differ in one 62-character clause, so the bank file became a place where a *claim about a run* is
+stored. Two defects are possible there and neither is visible in a win rate: the citation can name the wrong run,
+and the control can accidentally carry evidence too. Both are now properties of the file rather than sentences in a
+registration.
+
+**Fields a bank may carry about its own clause.** `source.cited_run` is the run the clause names;
+`source.distilled_from_run` is the run the entry was distilled from; `source.false_by_construction` marks an
+artefact whose citation is deliberately false. `distill.validate_bank` ignores all three — a bank's *content* is
+what the arm pays for, and a validator that refused an unfamiliar key would make every new field a code change —
+so the guards live in `test_banks.py`, which is where the lane's file-level claims have always been checked.
+
+| class | the claim it holds | what fails it |
+| --- | --- | --- |
+| `ProvenancePairTest` | R178's two arms carry the same sentence and clauses of **exactly** the same rendered length (551), the control carries no digit at all, and the clause's run id is the one the metadata names | a control one character longer, a digit in the control, a citation that drifts from `cited_run` |
+| `GhostCitationTest` | R179's arm is 551 characters and differs from the true citation **only** in the eleven-digit run id, and declares itself false | a ghost clause of a different length, a ghost that silently cites the real run, a `false_by_construction` that stops being `True` |
+
+**Why equality rather than the 5% tolerance.** Every earlier length claim in this lane was "matched within 5%",
+because the arms being compared were *different artefacts* — a trace and a sentence, a compressed pair and a
+verbose one. R178's comparison is a single clause, where 5% is 27 characters: three times the clause. A pair held to
+a tolerance can be read as "length plus something"; a pair held to equality can be read as "the clause".
+
+**Why the ghost bank is a bank and not a temporary edit.** An arm has to be reproducible from the tree, and a
+citation that is false by construction has to be labelled in the artefact — otherwise the next reader deletes the
+run id as a typo, and the arm quietly becomes a duplicate of R178's true-citation arm. The `FALSE BY CONSTRUCTION`
+line in `source.note` is asserted by the test for the same reason.
+
