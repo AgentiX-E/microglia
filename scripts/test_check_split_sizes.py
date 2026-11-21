@@ -101,6 +101,33 @@ class DisagreementTest(TableTest):
         self.assertIn("no valid_unseen/", problems[0])
 
 
+class LocateTest(TableTest):
+    """Where the corpus is, which the download decides and this file must not."""
+
+    def test_the_corpus_is_found_at_the_bottom_of_whatever_layout_the_download_produced(self):
+        # The first green tree that ran this check had every section reported missing: `alfworld-download` put the
+        # sections somewhere other than `<data>/data/json_2.1.1`, and the checker had hard-coded that path. The
+        # download's layout is the download's business; finding the sections is this file's (AUDIT 34.252).
+        bottom = self.root / "data" / "json_2.1.1"
+        (bottom / "valid_unseen" / "trial_one").mkdir(parents=True)
+        self.assertEqual(checker.locate(self.root), bottom)
+
+    def test_a_home_without_a_section_is_unknown_rather_than_empty(self):
+        (self.root / "logs").mkdir()
+        self.assertIsNone(checker.locate(self.root))
+
+    def test_a_missing_home_is_unknown_rather_than_a_crash(self):
+        self.assertIsNone(checker.locate(self.root / "not-here"))
+
+    def test_the_shallowest_copy_wins(self):
+        # A repository that carries a fixture with the same directory names must not outrank the installed corpus:
+        # the shallow answer is the one the download wrote at the top of its tree.
+        deep = self.root / "a" / "b"
+        (deep / "valid_unseen").mkdir(parents=True)
+        (self.root / "valid_unseen").mkdir()
+        self.assertEqual(checker.locate(self.root), self.root)
+
+
 class MainTest(TableTest):
     def run_main(self, argv):
         original = sys.argv
@@ -124,15 +151,33 @@ class MainTest(TableTest):
         self.assertIn("FAIL", printed.getvalue())
         self.assertIn("holds 2", printed.getvalue())
 
+    def test_a_home_that_holds_no_corpus_fails_and_says_so(self):
+        import os
+
+        original = os.environ.get("ALFWORLD_DATA")
+        os.environ["ALFWORLD_DATA"] = str(self.root)
+        try:
+            printed = io.StringIO()
+            with contextlib.redirect_stdout(printed):
+                self.assertEqual(self.run_main([]), 1)
+            self.assertIn("not installed", printed.getvalue())
+        finally:
+            if original is None:
+                os.environ.pop("ALFWORLD_DATA", None)
+            else:
+                os.environ["ALFWORLD_DATA"] = original
+
     def test_the_default_root_is_the_environment_variable_the_jobs_set(self):
         # The published corpus lives at `$ALFWORLD_DATA/data/json_2.1.1`, and the jobs set that variable. A
         # checker that guessed a path would pass on the machine it was written on and fail on every runner.
         import os
 
-        corpus = self.corpus(4)
+        corpus = self.root
         data = corpus / "data" / "json_2.1.1"
-        data.mkdir(parents=True)
-        (data / "valid_unseen").symlink_to(corpus / "valid_unseen")
+        for index in range(4):
+            task = data / "valid_unseen" / f"trial_{index}"
+            task.mkdir(parents=True)
+            (task / "game.tw-pddl").write_text("x", encoding="utf-8")
         original = os.environ.get("ALFWORLD_DATA")
         os.environ["ALFWORLD_DATA"] = str(corpus)
         try:

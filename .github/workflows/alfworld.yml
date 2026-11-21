@@ -452,6 +452,7 @@ jobs:
           MAX_STEPS: ${{ inputs.max_steps }}
           RULES: ${{ inputs.rules }}
           TRACE: ${{ inputs.trace }}
+          SPLIT: ${{ inputs.split }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -466,6 +467,9 @@ jobs:
           fi
           args=(--arm "${ARM}" --policy model --games "${GAMES}" --shard "${SHARD}" --max-steps "${MAX_STEPS}")
           args+=(--trace "${TRACE}")
+          # The calibration is where a pass before the money is checked, so it has to be able to name a section
+          # too: a calibration of the seen section on the held-out games would be a rehearsal of another run.
+          args+=(--split "${SPLIT:-eval_out_of_distribution}")
           if [ -n "${RULES}" ]; then args+=(--rules "${RULES}"); fi
           python eval/drivers/alfworld/agent.py "${args[@]}" \
             --out "$RUNNER_TEMP/arm.json" | tee "$RUNNER_TEMP/arm.log"
