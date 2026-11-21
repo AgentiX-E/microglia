@@ -940,6 +940,53 @@ class MainTest(unittest.TestCase):
             self.run_main(["--arm", "sham", "--policy", "first", "--games", "1", "--out", str(self.out)])
         self.assertEqual(caught.exception.code, 1)
 
+    def test_a_kind_gate_over_an_untagged_bank_is_refused(self):
+        # A gate with nothing to gate on is `always-in` wearing a different label and paying a second time to
+        # answer a question it never asked. The bank the lane's earlier arms carry has no tags, so this is the
+        # mistake that is easiest to make by pointing `--gate-kind` at the old file.
+        bank = HERE / "bank-untagged.json"
+        bank.write_text(json.dumps({"entries": [{"text": "Check the countertop first."}]}), encoding="utf-8")
+        try:
+            with self.assertRaises(SystemExit) as caught:
+                self.run_main(
+                    ["--arm", "always-in", "--gate-kind", "--rules", str(bank), "--policy", "first", "--games", "1",
+                     "--out", str(self.out)]
+                )
+            self.assertEqual(caught.exception.code, 1)
+        finally:
+            bank.unlink(missing_ok=True)
+
+    def test_a_kind_gate_over_a_tagged_bank_names_itself_in_the_artefact(self):
+        bank = HERE / "bank-tagged.json"
+        bank.write_text(
+            json.dumps(
+                {
+                    "entries": [
+                        {"text": "Check inventory after take.", "kinds": ["put"]},
+                        {"text": "Heat things in the microwave.", "kinds": ["heat"]},
+                    ]
+                }
+            ),
+            encoding="utf-8",
+        )
+        try:
+            self.assertEqual(
+                self.run_main(
+                    ["--arm", "always-in", "--gate-kind", "--rules", str(bank), "--policy", "first", "--games", "1",
+                     "--out", str(self.out)]
+                ),
+                0,
+            )
+            payload = json.loads(self.out.read_text(encoding="utf-8"))
+            summary = payload["summary"]
+            self.assertEqual(summary["arm"], "always-in")
+            self.assertEqual(summary["arm_label"], "always-in@kind")
+            self.assertEqual(summary["gate_kind"], True)
+            self.assertEqual(summary["rules_in_bank"], 2)
+            self.assertEqual(payload["episodes"][0]["pack_entries"], 1)
+        finally:
+            bank.unlink(missing_ok=True)
+
     def test_the_sham_arm_records_the_bank_it_permuted(self):
         bank = HERE / "bank-sham.json"
         bank.write_text(
@@ -1478,6 +1525,172 @@ class GateTest(unittest.TestCase):
         self.assertEqual(agent.anchor("", ["the fridge is cold"], 3, 0.5), [])
         self.assertEqual(agent.anchor(self.observation, [], 3, 0.5), [])
 
+    def test_a_real_room_description_cannot_clear_the_registered_floor_at_all(self):
+        """R174.2's void, stated as arithmetic rather than as a story about a gate that did not help.
+
+        The registered gate asks for a rule that accounts for 0.2 of the observation's own content words. A
+        real first observation is a list of objects — 22 content words, every one of them a noun in the room —
+        and the bank's rules are about actions. The largest overlap available against this observation is
+        **one word**, and one of the three matches is `task`, from the prompt's own `Your task is to:` line.
+        So the floor is 5 words and the corpus's ceiling is 1: the gated arm carried zero entries in 134 of 134
+        games, and its 81/134 is an empty pack's score rather than a gate's.
+
+        The unit tests above did not see this because their observation is four words long, where 0.2 is a
+        single shared word. That is the hazard of a fixture that decides the finding: a threshold whose
+        reachability depends on the length of the text it is measured against is a threshold that has to be
+        tested against the corpus's own text, not against a sentence written to make it reachable.
+        """
+        observation = (
+            "You are in the middle of a room. Looking quickly around you, you see a cabinet 4, a cabinet 3, "
+            "a cabinet 2, a cabinet 1, a countertop 1, a garbagecan 1, a handtowelholder 2, a handtowelholder 1, "
+            "a sinkbasin 2, a sinkbasin 1, a toilet 1, a toiletpaperhanger 1, and a towelholder 1.\n"
+            "Your task is to: put some spraybottle on toilet."
+        )
+        bank = [
+            "If you encounter a desklamp before finding the target object, you may turn it on first.",
+            "After taking an object, verify it is actually in your inventory before placing it.",
+            'If a "put" action repeatedly fails, try the alternative phrasing "move <object> to <receptacle>".',
+        ]
+        tokens = agent.words_of(observation) - agent.STOPWORDS
+        ceiling = max(len(tokens & (agent.words_of(rule) - agent.STOPWORDS)) for rule in bank)
+        self.assertEqual(ceiling, 1)
+        self.assertGreater(0.2 * len(tokens), ceiling)
+        # Ungated admits on any overlap at all — here exactly one rule, the one whose text contains `put`, the
+        # word the task line supplied — so the arm looks like a working retriever. The floor admits nothing, so
+        # the arm it labels is `none` with a longer prompt.
+        self.assertEqual(len(agent.anchor(observation, bank, 3, 0.0)), 1)
+        self.assertEqual(agent.anchor(observation, bank, 3, 0.2), [])
+
+
+class KindGateTest(unittest.TestCase):
+    """The gate that replaces the overlap floor: select by what the game asks for, not by what the room holds.
+
+    R174.2 measured the overlap gate admitting nothing on this corpus, and the reason is structural rather
+    than a matter of a threshold — an observation names objects and the task line names a verb, so no rule
+    can account for a fifth of it. What the harness *does* know, before the first call and for free, is the
+    game's own task kind (`task_kind_of` reads it out of the gamefile's directory). A bank that tags each
+    sentence with the kinds it was written for can then carry one sentence per game, which is the product
+    shape: a store wide enough to cover the corpus and a pack narrow enough to be worth carrying.
+    """
+
+    RULES = ["check inventory after take", "open the container first", "turn the lamp on"]
+    KINDS = [["put", "puttwo"], ["heat", "cool"], []]
+
+    def test_an_entry_without_a_kind_is_carried_everywhere(self):
+        self.assertIn("turn the lamp on", agent.applicable(self.RULES, self.KINDS, "cool"))
+
+    def test_only_the_games_own_kind_is_carried(self):
+        self.assertEqual(
+            agent.applicable(self.RULES, self.KINDS, "put"),
+            ["check inventory after take", "turn the lamp on"],
+        )
+
+    def test_the_bank_order_is_kept_rather_than_the_kinds_order(self):
+        # The pack is rendered in bank order, and a selection that reordered it would change the block's text
+        # while claiming to change only which entries are in it.
+        self.assertEqual(agent.applicable(self.RULES, self.KINDS, "heat")[0], "open the container first")
+
+    def test_a_bank_without_kinds_is_every_entry_everywhere(self):
+        # Every artefact before this one carries an untagged bank, so the knob has to be inert without tags:
+        # a filter that read a missing field as "matches nothing" would turn every earlier arm into `none`.
+        self.assertEqual(agent.applicable(self.RULES, None, "put"), self.RULES)
+
+    def test_a_kinds_list_that_does_not_match_the_bank_is_refused(self):
+        # The failure this guards is the cap: `rules[:cap]` without `kinds[:cap]` leaves every tag one rule
+        # out of place, and the arm then carries the sentence it believes it dropped. Silently zipping a
+        # short list would do the same thing more quietly.
+        with self.assertRaises(SystemExit) as caught:
+            agent.applicable(self.RULES, self.KINDS[:2], "put")
+        self.assertEqual(caught.exception.code, 1)
+
+    def test_a_kind_no_rule_claims_carries_only_the_untagged_ones(self):
+        self.assertEqual(agent.applicable(self.RULES, self.KINDS, "examine"), ["turn the lamp on"])
+
+    def test_an_empty_bank_is_empty(self):
+        self.assertEqual(agent.applicable([], [], "put"), [])
+
+
+class BankLoadTest(unittest.TestCase):
+    """Reading a bank as rules *and* tags, because the two have to be cut by the cap together."""
+
+    def write(self, payload: dict) -> Path:
+        path = HERE / "bank-kinds-under-test.json"
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return path
+
+    def test_an_untagged_bank_loads_with_an_empty_tag_for_every_rule(self):
+        path = self.write({"entries": [{"text": "one"}, {"text": "two"}]})
+        self.assertEqual(agent.load_bank(path), (["one", "two"], [[], []]))
+
+    def test_the_cap_cuts_the_tags_with_the_rules(self):
+        path = self.write(
+            {"cap": 2, "entries": [{"text": "one", "kinds": ["put"]}, {"text": "two"}, {"text": "three", "kinds": ["heat"]}]}
+        )
+        rules, kinds = agent.load_bank(path)
+        self.assertEqual(rules, ["one", "two"])
+        self.assertEqual(kinds, [["put"], []])
+
+    def test_a_plain_string_entry_is_a_rule_with_no_tags(self):
+        path = self.write({"entries": ["one", {"text": "two", "kinds": ["cool"]}]})
+        self.assertEqual(agent.load_bank(path), (["one", "two"], [[], ["cool"]]))
+
+
+class KindGatePackTest(unittest.TestCase):
+    """The knob as the pass uses it: which entries reach the prompt, and what the label says afterwards."""
+
+    def setUp(self):
+        self.examples = agent.load_examples()
+        self.world = FakeWorld()  # the fake game is a `put` task
+
+    def drive(self, **overrides):
+        arguments = {
+            "arm": "always-in",
+            "policy": "first",
+            "examples": self.examples,
+            "rules": ["check inventory after take", "open the container first"],
+            "rule_kinds": [["put"], ["heat"]],
+            "draw": agent.Draw(7),
+            "max_steps": 50,
+            "top_k": 3,
+            "model": "deepseek-flash",
+            "api_key": "",
+            "timeout": 1.0,
+        }
+        arguments.update(overrides)
+        return agent.run_episode(self.world, **arguments)
+
+    def test_the_kind_gate_carries_only_the_games_own_sentence(self):
+        self.assertEqual(self.drive()["pack_entries"], 2)
+        gated = self.drive(gate_kind=True)
+        self.assertEqual(gated["pack_entries"], 1)
+        self.assertEqual(gated["task_kind"], "put")
+
+    def test_the_kind_gate_shortens_the_prefix_it_carries(self):
+        # The bill is the second witness: a gate that changed `pack_entries` and not the prompt would be a
+        # counter that stopped describing the block.
+        self.assertLess(self.drive(gate_kind=True)["prefix_chars"], self.drive()["prefix_chars"])
+
+    def test_the_kind_gate_also_filters_what_retrieval_may_choose_from(self):
+        # Retrieval anchored on the observation admitted three rules in R173; a kind gate in front of it makes
+        # the pool the game's own sentences, which is the composition the product needs.
+        retrieved = self.drive(
+            arm="retrieved",
+            gate_kind=True,
+            rules=["check inventory after take", "open the container first"],
+            rule_kinds=[[], []],
+        )
+        self.assertEqual(retrieved["pack_entries"], 0)
+        mixed = self.drive(
+            arm="retrieved",
+            gate_kind=True,
+            rules=["check inventory after take", "open the container first"],
+            rule_kinds=[["put"], ["heat"]],
+        )
+        self.assertLessEqual(mixed["pack_entries"], 1)
+
+    def test_the_kind_gate_is_off_by_default(self):
+        self.assertEqual(self.drive()["pack_entries"], 2)
+
 
 class LabelTest(unittest.TestCase):
     """Two treatments must not share a name, or the reading cannot pair them.
@@ -1506,6 +1719,20 @@ class LabelTest(unittest.TestCase):
     def test_the_defaults_are_one_constant_rather_than_three_literals(self):
         # The label and the argument's default have to agree, or the registered arm stops being registered.
         self.assertEqual(agent.DEFAULT_TOP_K, 3)
+
+    def test_a_kind_gated_pack_arm_has_a_label_of_its_own(self):
+        # Without this the six-sentence gated arm and the six-sentence ungated one are both `always-in`, and
+        # `aggregate.py` would refuse the join as doubled games after both were paid for.
+        self.assertEqual(agent.arm_label("always-in", 3, 0.0, True), "always-in@kind")
+        self.assertEqual(agent.arm_label("sham", 3, 0.0, True), "sham@kind")
+        self.assertEqual(agent.arm_label("retrieved", 3, 0.0, True), "retrieved@kind")
+        self.assertEqual(agent.arm_label("retrieved", 1, 0.0, True), "retrieved@k1+kind")
+        self.assertEqual(agent.arm_label("retrieved", 1, 0.2, True), "retrieved@k1+g0.2+kind")
+
+    def test_the_kind_knob_does_not_rename_the_registered_arms(self):
+        for arm in ("none", "always-in", "sham", "retrieved"):
+            with self.subTest(arm=arm):
+                self.assertEqual(agent.arm_label(arm, 3, 0.0, False), arm)
 
 
 class TransientTest(unittest.TestCase):

@@ -52,6 +52,10 @@ sys.path.insert(0, str(HERE))
 import agent as driver  # noqa: E402  (the lane's own module: chat, bill, rate card)
 
 SCHEMA = "microglia.alfworld-bank/1"
+# The six task kinds the split publishes, read from the one table that decides them rather than copied: a bank
+# tagged with a name no game can match is a rule that silently never fires, and `--gate-kind` would carry nothing
+# without ever saying why.
+KINDS = tuple(kind for _, kind in driver.TASK_KIND_PREFIXES)
 
 # --------------------------------------------------------------------------------------------------
 # The operation arithmetic
@@ -220,6 +224,95 @@ def merge_operations(
 def renderable(bank: "list[dict]", cap: "int | None") -> "list[dict]":
     """The rules a prompt would carry, which is where a cap that nothing enforces becomes visible."""
     return bank if cap is None else bank[:cap]
+
+
+# --------------------------------------------------------------------------------------------------
+# The bank a dispatch reads
+# --------------------------------------------------------------------------------------------------
+
+
+def validate_bank(payload: dict) -> "list[str]":
+    """Every way a bank file can be wrong in a way no run reports as wrong.
+
+    A bank is the one input to a paid dispatch that a person writes by hand, and its defects are all
+    silent: `render_pack` numbers whatever it is given, `anchor` scores whatever words it finds, and the
+    arm reports a win rate for the pack it actually built. So a bank with the same rule in it twice is
+    not an error anywhere — it is a pack that pays the per-sentence price twice for one sentence and
+    reports the result under the bank's name.
+
+    Five defects, each of which this lane has been one edit away from shipping:
+
+    * a **repeat** — two entries where one contains the other. `merge_operations` compares in ExpeL's
+      direction (`existing in incoming`) because it streams one reply against a list that is still
+      growing, and a rule that arrives *before* its longer restatement is invisible to that test; a
+      stored bank has no arrival order, so the relation is symmetric here.
+    * a **newline** — `render_pack` writes `f"{index}. {text}"`, so a second line is a line the model
+      reads as part of the previous rule and numbering that no longer counts what it appears to count.
+    * a **number of its own** — an entry starting `3. ` renders as `3. 3. …`, which is what a bank that
+      was pasted out of a rendered prompt looks like.
+    * **untrimmed** or **empty** text — the first changes the rendered length the price is computed
+      from, the second renders an empty numbered line that the pack still pays for.
+    * a **cap overflow** — more entries than the cap's own margin, which `always-in` would carry and
+      `renderable` would truncate, so the arm's pack and the bank it names are different packs.
+
+    Returns the defects rather than raising, because the caller has two: `main` refuses to write a bank
+    that failed, and `test_banks.py` reports every defect in every bank in one run instead of the first.
+    """
+    defects: "list[str]" = []
+    if payload.get("schema") != SCHEMA:
+        defects.append(f"schema is {payload.get('schema')!r}, not {SCHEMA!r}")
+    entries = payload.get("entries")
+    if not isinstance(entries, list) or not entries:
+        defects.append("entries is not a non-empty list")
+        return defects
+
+    texts: "list[str]" = []
+    for position, entry in enumerate(entries, 1):
+        if not isinstance(entry, dict) or not isinstance(entry.get("text"), str):
+            defects.append(f"entry {position} is not a rule with a text")
+            continue
+        text = entry["text"]
+        if not text.strip():
+            defects.append(f"entry {position} is empty")
+        elif text != text.strip():
+            defects.append(f"entry {position} is untrimmed")
+        if "\n" in text:
+            defects.append(f"entry {position} spans more than one line")
+        if re.match(r"\s*\d+\.\s", text):
+            defects.append(f"entry {position} carries its own number")
+        votes = entry.get("votes")
+        if not isinstance(votes, int) or isinstance(votes, bool) or votes < 0:
+            defects.append(f"entry {position} has votes {votes!r}")
+        tags = entry.get("kinds")
+        if tags is not None:
+            if not isinstance(tags, list) or not tags or not all(isinstance(tag, str) for tag in tags):
+                defects.append(f"entry {position} has kinds {tags!r}, which is not a non-empty list of names")
+            else:
+                unknown = sorted(set(tags) - set(KINDS))
+                if unknown:
+                    defects.append(f"entry {position} is tagged {unknown}, which no game can match")
+        texts.append(text.strip().lower())
+
+    for first in range(len(texts)):
+        for second in range(first + 1, len(texts)):
+            one, other = texts[first], texts[second]
+            if one and other and (one in other or other in one):
+                defects.append(f"entries {first + 1} and {second + 1} are one rule stored twice")
+
+    cap = payload.get("cap")
+    if isinstance(cap, int) and len(entries) > cap + OVERFLOW_MARGIN:
+        defects.append(f"{len(entries)} entries exceed the cap of {cap} by more than {OVERFLOW_MARGIN}")
+    return defects
+
+
+def bank_length(payload: dict) -> int:
+    """The rendered length of a bank's rules, header excluded, so a price can be quoted before a run.
+
+    Excludes the header because the header is a constant of the template rather than of the bank: a
+    figure that included it would make every compression look smaller than it is, which is the one
+    comparison the current sweep is about.
+    """
+    return sum(len(entry.get("text", "")) for entry in payload.get("entries") or [])
 
 
 # --------------------------------------------------------------------------------------------------
@@ -511,6 +604,12 @@ def main() -> int:
         "bill": bill,
         "elapsed_s": round(elapsed, 1),
     }
+    # Refused here rather than discovered by the next dispatch: a bank is quoted at its own length and
+    # its own entry count, and a bank that fails this check would spend a run's money reporting a win
+    # rate for a pack nobody registered.
+    defects = validate_bank(payload)
+    if defects:
+        driver.fail("the bank this run wrote is not one a dispatch could read: " + "; ".join(defects))
     Path(arguments.out).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
     print("")

@@ -373,7 +373,7 @@ def sham_entries(entries: "list[str]") -> "list[str]":
     return [permute_words(str(text), int(hashlib.sha256(str(text).encode("utf-8")).hexdigest()[:12], 16)) for text in entries]
 
 
-def arm_label(arm: str, top_k: int, gate_share: float) -> str:
+def arm_label(arm: str, top_k: int, gate_share: float, gate_kind: bool = False) -> str:
     """The arm's identity, including only the knobs that were moved off their registered values.
 
     `retrieved` at k=3 and `retrieved` at k=1 are two treatments with one name, and so are the ungated and the gated
@@ -381,17 +381,48 @@ def arm_label(arm: str, top_k: int, gate_share: float) -> str:
     grouping two arms into one — refused as doubled games, after the money is spent. The label is the family plus
     the moved knobs, in a fixed order, so that `--compare "retrieved@k1,none"` names one arm and not a family.
 
+    `gate_kind` is the second gate and it applies to the pack arms as well as to retrieval, which is why it can be
+    the only moved knob: `always-in@kind` is the six-sentence store carrying one sentence per game, and it is a
+    different treatment from `always-in`.
+
     The registered arms keep the names they have always had: a label that appeared only when a knob moved means the
     default reading is unchanged, which is what makes every artefact before this one still comparable.
     """
-    if arm != "retrieved":
-        return arm
     moved = []
-    if top_k != DEFAULT_TOP_K:
-        moved.append(f"k{top_k}")
-    if gate_share > 0:
-        moved.append(f"g{gate_share:g}")
+    if arm == "retrieved":
+        if top_k != DEFAULT_TOP_K:
+            moved.append(f"k{top_k}")
+        if gate_share > 0:
+            moved.append(f"g{gate_share:g}")
+    if gate_kind:
+        moved.append("kind")
     return f"{arm}@{'+'.join(moved)}" if moved else arm
+
+
+def applicable(rules: "list[str]", kinds: "list[list[str]] | None", kind: str) -> "list[str]":
+    """The rules a game of this kind may carry: an untagged rule everywhere, a tagged one where it is claimed.
+
+    R174.2 is why this exists. The read-time gate it registered — a floor on the share of the observation's own
+    content words a rule must account for — admitted **nothing** on this corpus in 134 of 134 games, because a
+    room description is 22 content words of furniture and a rule is a sentence about an action: the largest
+    overlap available is one word, and the floor asked for five. The gate was therefore not a filter that was
+    too strict; it was a filter on the wrong signal.
+
+    What the harness knows before the first call, and for nothing, is the game's own task kind, read out of the
+    gamefile's path by `task_kind_of`. A bank that tags its sentences (`"kinds": ["put", "puttwo"]`) can carry
+    one sentence per game, which is the shape the product needs — a store as wide as the corpus and a pack as
+    narrow as one line. An entry with no tags is carried everywhere, which is what keeps every artefact before
+    this one comparable: the knob is inert on an untagged bank.
+
+    A kinds list that does not line up with the rules is refused rather than zipped, because the misalignment is
+    precisely what a cap applied to `rules` and not to `kinds` produces — and its symptom is an arm that carries
+    the sentence it believes it dropped.
+    """
+    if kinds is None:
+        return list(rules)
+    if len(kinds) != len(rules):
+        fail(f"{len(kinds)} kind tags for {len(rules)} rules: a tag list that does not line up cannot select")
+    return [text for text, tags in zip(rules, kinds) if not tags or kind in tags]
 
 
 def anchor(query: str, entries: "list[str]", top_k: int, floor_share: float = 0.0) -> "list[str]":
@@ -572,6 +603,8 @@ def run_episode(
     trace: int = 0,
     record_transcripts: bool = False,
     gate_share: float = 0.0,
+    rule_kinds: "list[list[str]] | None" = None,
+    gate_kind: bool = False,
 ) -> dict:
     """One game, driven by one arm. Returns the episode record; never a partly-filled one.
 
@@ -630,9 +663,13 @@ def run_episode(
                 # `sham` is permuted once in `main`, before the pass starts, so the block is as fixed as
                 # `always-in`'s and the two arms cost the same prefix. Permuting here would re-permute per
                 # episode and turn a length-matched control into a moving block.
-                selected = list(rules)
+                selected = applicable(rules, rule_kinds, kind) if gate_kind else list(rules)
             elif arm == "retrieved":
-                selected = anchor(last, rules, top_k, gate_share)
+                # The kind gate runs before the anchor rather than after it, so the retriever can only choose
+                # among the sentences this game's task claims; gating the output instead would let the anchor
+                # spend its budget on rules that were never applicable.
+                pool = applicable(rules, rule_kinds, kind) if gate_kind else rules
+                selected = anchor(last, pool, top_k, gate_share)
             pack_entries = len(selected)
             pack = render_pack(selected)
             opening = build_opening(examples, kind, instruction, max_steps)
@@ -786,6 +823,24 @@ def write_json(path: Path, payload: dict) -> None:
     os.replace(temporary, path)
 
 
+def load_bank(path: "Path | str") -> "tuple[list[str], list[list[str]]]":
+    """A bank file as its rules and, per rule, the task kinds it was written for.
+
+    One function rather than the four lines `main` used to hold, because the two lists have to be cut by the cap
+    *together*: `rules[:cap]` beside an uncut `kinds` leaves every tag one rule out of place, and the kind gate
+    then carries the sentence it believes it dropped. `applicable` refuses a misaligned pair, and this is the
+    function that must not produce one.
+    """
+    payload = json.loads(Path(path).read_text(encoding="utf-8"))
+    entries = payload["entries"]
+    rules = [str(entry["text"]) if isinstance(entry, dict) else str(entry) for entry in entries]
+    kinds = [list(entry.get("kinds") or []) if isinstance(entry, dict) else [] for entry in entries]
+    cap = payload.get("cap")
+    if isinstance(cap, int) and cap > 0:
+        rules, kinds = rules[:cap], kinds[:cap]
+    return rules, kinds
+
+
 def pass_header(arguments, rules: "list[str]", total: int) -> dict:
     """Everything that has to be equal for two artefacts to be two halves of one pass.
 
@@ -804,9 +859,10 @@ def pass_header(arguments, rules: "list[str]", total: int) -> dict:
         "max_steps": arguments.max_steps,
         "top_k": arguments.top_k if arguments.arm == "retrieved" else None,
         "gate_share": arguments.gate_share if arguments.arm == "retrieved" else None,
+        "gate_kind": bool(arguments.gate_kind) if arguments.arm != "none" else None,
         # What a reading groups on. `arm` stays the family so that every artefact before this field is still
         # comparable; the label is what distinguishes two configurations of the same family.
-        "arm_label": arm_label(arguments.arm, arguments.top_k, arguments.gate_share),
+        "arm_label": arm_label(arguments.arm, arguments.top_k, arguments.gate_share, bool(arguments.gate_kind)),
         "rules_in_bank": len(rules),
         "games_requested": total,
     }
@@ -898,6 +954,11 @@ def main() -> int:
         default=0.0,
         help="the share of the observation's own content words a retrieved rule must account for; 0 is the registered arm",
     )
+    parser.add_argument(
+        "--gate-kind",
+        action="store_true",
+        help="carry only the bank entries tagged with this game's task kind (R175); inert on an untagged bank",
+    )
     parser.add_argument("--games", type=int, default=0, help="0 drives the whole split")
     parser.add_argument(
         "--split",
@@ -940,12 +1001,16 @@ def main() -> int:
         fail("--policy model needs DEEPSEEK_API_KEY; this file does not fall back to a policy")
 
     rules: "list[str]" = []
+    rule_kinds: "list[list[str]] | None" = None
     if arguments.rules:
-        payload = json.loads(Path(arguments.rules).read_text(encoding="utf-8"))
-        rules = [str(entry["text"]) if isinstance(entry, dict) else str(entry) for entry in payload["entries"]]
-        cap = payload.get("cap")
-        if isinstance(cap, int) and cap > 0:
-            rules = rules[:cap]
+        rules, rule_kinds = load_bank(arguments.rules)
+    if arguments.gate_kind:
+        if arguments.arm == "none":
+            fail("--gate-kind selects among rules, so it needs an arm that carries one")
+        if not any(rule_kinds):
+            # Refused rather than run: an untagged bank under a kind gate is `always-in` with a second name, and
+            # paying for it would answer a question the register did not ask.
+            fail("--gate-kind needs a bank whose entries carry `kinds`; this one has no tags to select on")
     if arguments.arm == "sham":
         # Permuted after the cap, so the sham has exactly as many entries as `always-in` would render.
         rules = sham_entries(rules)
@@ -1002,6 +1067,8 @@ def main() -> int:
             arguments.trace,
             arguments.record_transcripts,
             arguments.gate_share,
+            rule_kinds,
+            arguments.gate_kind,
         )
         # Checked before the write, so a file on disk never holds one game twice: the checkpoint is the
         # evidence, and evidence that has to be re-checked before it can be trusted is not evidence.

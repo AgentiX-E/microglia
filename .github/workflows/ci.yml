@@ -65,10 +65,10 @@ jobs:
           set -euo pipefail
           # One package, named because its absence is silent: without PyYAML the workflow checker answers "clean"
           # for every structural rule it has, and its self-test used to pass in that mode.
-          python3 -m pip install --disable-pip-version-check --quiet pyyaml
+          python3 -m pip install --disable-pip-version-check --quiet pyyaml coverage
           python3 scripts/check-python-floor.py --self-test
           python3 scripts/check-python-floor.py
-          for suite in test_agent test_aggregate test_distill test_floor test_selfcheck test_wait; do
+          for suite in test_agent test_aggregate test_banks test_cli test_distill test_floor test_selfcheck test_wait; do
             echo "== $suite"
             python3 "eval/drivers/alfworld/$suite.py"
           done
@@ -78,6 +78,21 @@ jobs:
           echo "== test_alf_dispatch"
           python3 scripts/test_alf_dispatch.py
           python3 scripts/check-workflows.py --self-test
+
+      # The same suites again, measured. Until this step existed the Python lane had a coverage *number* in the
+      # reports and no gate under it: `pnpm test` floors the TypeScript packages and nothing floored these, so a
+      # refactor could take a driver from 99% to 88% and every job stayed green. The floor is checked per module
+      # on lines and branches together, and the checker refuses a report that measured almost nothing — a
+      # coverage run that discovers no tests reports 100% of nothing.
+      - name: The lane's python drivers, measured
+        run: |
+          set -euo pipefail
+          python3 -m coverage run --branch --source=eval/drivers/alfworld -m unittest discover \
+            -s eval/drivers/alfworld -p "test_*.py"
+          python3 -m coverage run --append --branch scripts/test_alf_dispatch.py
+          python3 -m coverage json -o coverage-python.json
+          python3 scripts/check-python-coverage.py --self-test
+          python3 scripts/check-python-coverage.py coverage-python.json --min 95 --expect-files 8
 
       - name: Repository audit (source rules, manifests, published dependencies)
         run: pnpm audit:repo

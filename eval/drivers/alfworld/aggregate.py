@@ -432,6 +432,59 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
     return report
 
 
+def carried(episodes: "list[dict]") -> dict:
+    """What an arm actually put in front of the model, from the artefact's own `pack_entries`.
+
+    R174.2 is why this exists. That arm was labelled `retrieved@g0.2`, it carried **zero** entries in 134 of
+    134 games, and every other counter in this report looked healthy: engagement 88.1%, a paired delta to four
+    places, a by-kind row for all six kinds. A reading of an empty pack is a reading of `none` wearing a
+    treatment's name, and nothing in the report said so — the number was quotable and it was not a gate.
+
+    The counter is per arm and it is the first thing printed, because the pack is the treatment: a bank of four
+    rules and a bank of twenty are two arms with one label, and an arm whose pack is empty is not that arm.
+    """
+    by_entries: "dict[int, int]" = {}
+    for episode in episodes:
+        count = episode.get("pack_entries")
+        if not isinstance(count, int):
+            continue
+        by_entries[count] = by_entries.get(count, 0) + 1
+    games = sum(by_entries.values())
+    return {
+        "games": games,
+        "by_entries": dict(sorted(by_entries.items())),
+        "mean": round(sum(count * games_with for count, games_with in by_entries.items()) / games, 3) if games else None,
+    }
+
+
+def empty_pack_reason(arm: str, counts: dict) -> "str | None":
+    """Why an arm's reading is not a reading, or None. `none` may carry nothing; a pack arm may not.
+
+    Both directions are refused, because both are a label that does not describe the prompt: a pack arm whose
+    pack is empty measured the control, and a `none` arm that carried entries measured a treatment. An artefact
+    written before `pack_entries` existed has no counts and is passed over rather than failed — the check is
+    about what it can see, and it says so instead of assuming.
+    """
+    if counts["games"] == 0:
+        return None
+    nonempty = sum(games_with for count, games_with in counts["by_entries"].items() if count > 0)
+    family = arm.split("@")[0]
+    if family == "none":
+        if nonempty:
+            return f"arm none carried entries in {nonempty} of {counts['games']} games"
+        return None
+    if family not in ("always-in", "sham", "retrieved"):
+        # A renamed arm is a cross-dispatch pairing the operator stated, and its name no longer carries the
+        # family the check would key on; the rename is printed as provenance and this function stays quiet.
+        return None
+    if not nonempty:
+        return (
+            f"arm {arm} carried an empty pack in {counts['games']} of {counts['games']} games, so its score is "
+            "the control's score and its label does not describe the prompt"
+        )
+    return None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Join sliced arms into one paired reading")
     parser.add_argument("--input", action="append", default=[], required=True, help="an arm.json, one per slice")
@@ -472,6 +525,15 @@ def main() -> int:
             if arm not in grouped:
                 fail(f"no slice carries arm {arm!r}; the file(s) hold {sorted(grouped)}")
 
+    # Before any delta, what each arm put in the prompt. A pack arm that carried nothing is the control with a
+    # treatment's label, and a `none` arm that carried entries is the reverse; both are refused here rather
+    # than reported, because both produce a number that reads like a reading (R174.2, AUDIT 34.243).
+    per_arm_carried = {arm: carried(grouped[arm]) for arm in sorted(grouped)}
+    for arm, counts in per_arm_carried.items():
+        reason = empty_pack_reason(arm, counts)
+        if reason:
+            fail(reason)
+
     # The counters belong to the arm rather than to a pair, so they are computed once per arm over
     # everything the dispatch produced and printed beside the readings rather than inside one of them.
     readings = []
@@ -511,6 +573,7 @@ def main() -> int:
     payload = {
         "readings": readings,
         "refusals": per_arm,
+        "carried": per_arm_carried,
         "bill": bill_of_slices(paths),
         "slices": [str(path) for path in paths],
     }
@@ -521,6 +584,11 @@ def main() -> int:
         treatment, control = reading["treatment"], reading["control"]
         print("")
         print(f"{treatment} {reading['wins'][treatment]}/{reading['games']} vs {control} {reading['wins'][control]}/{reading['games']}")
+        # Printed above the delta rather than below it: the first question about any pack reading is whether the
+        # pack was there, and the second is what it did.
+        for arm in (treatment, control):
+            counts = per_arm_carried[arm]
+            print(f"  carried         {arm} mean {counts['mean']} entries over {counts['games']} games, {counts['by_entries']}")
         print(
             f"  paired delta    {reading['paired']['delta']:+.4f} "
             f"[{reading['paired']['ci_low']:+.4f}, {reading['paired']['ci_high']:+.4f}]  "

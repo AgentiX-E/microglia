@@ -125,6 +125,43 @@ class RefusalTest(unittest.TestCase):
     def test_a_gate_share_that_is_not_a_number_is_refused(self):
         self.assertIn("not a number", self.refused("--sweep", "true", "--rules", "b.json", "--gate-share", "half"))
 
+    def test_a_kind_gate_without_a_bank_is_refused(self):
+        self.assertIn("needs --rules", self.refused("--arm", "always-in", "--gate-kind", "true", "--games", "134"))
+
+    def test_a_kind_gate_on_the_control_is_refused(self):
+        # The control carries no bank, so a gate over it is a flag that selects nothing from nothing while the
+        # dispatch records that a gate ran.
+        self.assertIn("control", self.refused("--arm", "none", "--gate-kind", "true", "--rules", "b.json", "--games", "134"))
+
+    def test_a_kind_gate_over_an_untagged_bank_is_refused_before_the_dispatch_is_bought(self):
+        # The same refusal `agent.py` makes, moved to the only place where it costs nothing: four jobs would each
+        # have exited at it after the environment took ten minutes to install.
+        with tempfile.TemporaryDirectory() as root:
+            (Path(root) / "banks").mkdir()
+            (Path(root) / "banks" / "untagged.json").write_text(
+                json.dumps({"entries": [{"text": "Open the fridge first."}]}), encoding="utf-8"
+            )
+            with self.assertRaises(lane.Refused) as caught:
+                lane.check(
+                    arguments("--arm", "always-in", "--gate-kind", "true", "--games", "134", "--rules", "banks/untagged.json"),
+                    tree=root,
+                )
+            self.assertIn("tags none", str(caught.exception))
+
+    def test_a_kind_gate_over_a_tagged_bank_is_accepted(self):
+        with tempfile.TemporaryDirectory() as root:
+            (Path(root) / "banks").mkdir()
+            (Path(root) / "banks" / "tagged.json").write_text(
+                json.dumps({"entries": [{"text": "Open the fridge first.", "kinds": ["cool"]}]}), encoding="utf-8"
+            )
+            self.assertEqual(
+                lane.check(
+                    arguments("--arm", "always-in", "--gate-kind", "true", "--games", "134", "--rules", "banks/tagged.json"),
+                    tree=root,
+                ),
+                [],
+            )
+
 
 class PayloadTest(unittest.TestCase):
     def test_a_bank_rebuild_carries_the_runs_it_reads_and_not_the_slices_it_does_not_drive(self):

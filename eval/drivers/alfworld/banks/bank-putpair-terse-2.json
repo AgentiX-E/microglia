@@ -1,0 +1,35 @@
+{
+ "schema": "microglia.alfworld-bank/1",
+ "cap": 20,
+ "identity": "substring",
+ "source": {
+  "kind": "hand-compressed pair",
+  "matches": "entries 3 and 4 of banks/bank-44754440122.json, rewritten in an imperative register at 505 characters rendered",
+  "note": "the same two pieces of advice at 63% of the bare pair's rendered length and the same length as R174.1's one sentence, so that statements and characters stop moving together; R175 row 1",
+  "prompt": "entries 3 and 4 of banks/bank-44754440122.json",
+  "registration": "R175 row 1",
+  "operations_kept": [
+   "inventory check after taking",
+   "retry a silent take",
+   "hand-full test by taking another object",
+   "move <object> to <receptacle> when put fails",
+   "another receptacle of the same type",
+   "open a container first"
+  ],
+  "operations_dropped": [
+   "the parenthetical example of the inventory command",
+   "the adverbial 'repeatedly' and 'despite' clauses",
+   "the phrase 'alternative phrasing'"
+  ]
+ },
+ "entries": [
+  {
+   "text": "Check inventory after take, before put. A silent take needs a retry; if the put then fails, the hand may be full; test by taking another object.",
+   "votes": 10
+  },
+  {
+   "text": "If put fails at the right place while holding the object, say move <object> to <receptacle>, then another receptacle of that type, opening it first if a container.",
+   "votes": 10
+  }
+ ]
+}

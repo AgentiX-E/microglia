@@ -68,6 +68,13 @@ class VectorTest(unittest.TestCase):
                 )
                 self.assertIsInstance(merged["bank"], list)
 
+    def test_an_operation_without_a_number_parses_with_none(self):
+        # The competitor's reply format always numbers an operation, and a model that omits the number is
+        # the commonest deviation. The parser keeps the operation and records the absence rather than
+        # dropping a rule, and a `None` number is what the merge reads as "nothing to address".
+        parsed = distill.parse_operations("ADD: Open the cabinet first.")
+        self.assertEqual(parsed, [{"kind": "ADD", "number": None, "text": "Open the cabinet first."}])
+
 
 class IdentityTest(unittest.TestCase):
     """The three identity modes, which is where a port silently becomes a different algorithm."""
@@ -287,6 +294,24 @@ class TilingTest(unittest.TestCase):
         finally:
             path.unlink(missing_ok=True)
 
+    def test_an_episode_without_a_game_name_is_not_counted(self):
+        # An artefact written before `gamefile` was recorded, or one whose field arrived as null, would
+        # otherwise be counted as a game named `None` and could make a slice look covered when it is not.
+        # It is skipped so that the shortfall surfaces as a refusal rather than as a bank built from
+        # fewer games than the register says.
+        path = HERE / "tile-g.json"
+        path.write_text(
+            json.dumps({"episodes": [{"gamefile": None, "won": True}, {"gamefile": "g1", "won": True}]}),
+            encoding="utf-8",
+        )
+        try:
+            self.assertEqual(distill.tiled([path], 1), 1)
+            with self.assertRaises(SystemExit) as caught:
+                distill.tiled([path], 2)
+            self.assertEqual(caught.exception.code, 1)
+        finally:
+            path.unlink(missing_ok=True)
+
     def test_zero_expected_games_skips_the_check(self):
         path = self.write("tile-f.json", ["g1"])
         try:
@@ -493,6 +518,24 @@ class MainTest(unittest.TestCase):
         with self.assertRaises(SystemExit) as caught:
             self.run_main(["--episodes", str(self.episodes_with(1)), "--out", str(self.out)])
         self.assertEqual(caught.exception.code, 1)
+
+    def test_a_reply_that_adds_one_rule_twice_is_refused_rather_than_written(self):
+        # ExpeL's arithmetic lets both ADDs land — neither has arrived when the other is checked — and that
+        # is the right port of a streaming merge. The *bank* is the artefact a dispatch pays for, though, and
+        # a bank carrying one rule twice renders it twice and charges the pack for both. So the merge keeps
+        # the competitor's behaviour and the writer refuses the result, which is the only place the two
+        # rules can disagree without changing what the arm does.
+        os.environ["DEEPSEEK_API_KEY"] = "test-key"
+        self.stub(
+            [
+                "ADD 1: Open the cabinet before taking anything out of it.\n"
+                "ADD 2: Open the cabinet before taking anything out of it."
+            ]
+        )
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main(["--episodes", str(self.episodes_with(1)), "--out", str(self.out)])
+        self.assertEqual(caught.exception.code, 1)
+        self.assertFalse(self.out.exists(), "a bank that failed its own check was written anyway")
 
 
 class KindsTest(unittest.TestCase):

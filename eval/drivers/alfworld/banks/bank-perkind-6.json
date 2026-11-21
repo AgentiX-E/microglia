@@ -1,0 +1,64 @@
+{
+ "schema": "microglia.alfworld-bank/1",
+ "cap": 20,
+ "identity": "substring",
+ "source": {
+  "kind": "one sentence per task kind, hand-written from the corpus's own task descriptions",
+  "matches": "the `put` entry is banks/bank-putmove-1.json unchanged, the arm that scored 112/134 alone; the other five are new",
+  "note": "the store the gate scales: six sentences, tagged by the kinds they were written for, so that each game carries the one that names its own failing step; R175 row 1 and its ungated control",
+  "registration": "R175 rows 1-2",
+  "operations_kept": [
+   "the put-to-move phrasing and the second receptacle",
+   "opening a container before using it",
+   "placing the first object before taking the second",
+   "the sinkbasin as the cleaning station",
+   "closing the microwave before heating and opening it again after",
+   "the desklamp turned on before examining, not instead of examining"
+  ],
+  "provenance": "written after R174.1 measured one sentence at 112/134, and before any arm carried six"
+ },
+ "entries": [
+  {
+   "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\"; if that also fails, try a different valid receptacle of the same type, and if the receptacle is a container, ensure it is open first.",
+   "votes": 10,
+   "kinds": [
+    "put"
+   ]
+  },
+  {
+   "text": "When the task asks for two objects, place the first before taking the second, so that a full hand cannot block the second take.",
+   "votes": 0,
+   "kinds": [
+    "puttwo"
+   ]
+  },
+  {
+   "text": "To clean something, carry it to the sinkbasin, hold it, and say clean <object> with the sinkbasin in reach; a refusal means the object is not in hand or you are not at the basin.",
+   "votes": 0,
+   "kinds": [
+    "clean"
+   ]
+  },
+  {
+   "text": "To heat something, put it in the microwave and close it before saying heat <object>; the microwave has to be opened again before you can take the object out.",
+   "votes": 0,
+   "kinds": [
+    "heat"
+   ]
+  },
+  {
+   "text": "To cool something, put it in the fridge and say cool <object>; the fridge may stay open, and the object has to be in hand when the cooling happens.",
+   "votes": 0,
+   "kinds": [
+    "cool"
+   ]
+  },
+  {
+   "text": "To examine something under a lamp, take the object first, go to the desklamp, turn it on, and only then say examine <object>; turning the lamp on is not the task.",
+   "votes": 0,
+   "kinds": [
+    "examine"
+   ]
+  }
+ ]
+}

@@ -75,6 +75,10 @@ on:
         description: 'read-time overlap floor for the retrieved arm; 0 is the registered arm, 0.2 is the gated one'
         required: false
         default: '0'
+      gate_kind:
+        description: 'true carries only the bank entries tagged with each game''s task kind; needs a tagged bank'
+        required: false
+        default: ''
       train_shards:
         description: 'which training slices to drive, as a JSON list; ["1"] re-drives only the slice that failed'
         required: false
@@ -752,6 +756,7 @@ jobs:
           RULES: ${{ inputs.rules }}
           TOP_K: ${{ inputs.top_k }}
           GATE_SHARE: ${{ inputs.gate_share }}
+          GATE_KIND: ${{ inputs.gate_kind }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -773,6 +778,12 @@ jobs:
           # a repair whose direction this corpus can test in one dispatch, and a mechanism that has to be edited
           # into a file is a mechanism nobody runs twice.
           args+=(--gate-share "${GATE_SHARE:-0}")
+          # The kind gate is the second half of the same question: R174.2 measured the overlap floor admitting
+          # nothing on this corpus (a room description shares at most one content word with a rule about an
+          # action), so the selection signal has to come from the task the game names rather than from the room
+          # it starts in. It is an input for the same reason: a mechanism that has to be edited into a file is a
+          # mechanism nobody runs twice.
+          if [ -n "${GATE_KIND}" ]; then args+=(--gate-kind); fi
           if [ "${ARM}" != "none" ]; then
             if [ -z "${RULES}" ]; then
               echo "::error::arm ${ARM} needs a rule bank; there is nothing for it to carry"

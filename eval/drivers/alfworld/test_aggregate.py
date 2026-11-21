@@ -434,6 +434,77 @@ class BillTest(unittest.TestCase):
         self.assertEqual(bill["cache_hit_rate"], 0.9)
 
 
+class CarriedTest(unittest.TestCase):
+    """The counter that says whether the treatment was in the prompt, and the refusal when it was not.
+
+    R174.2's arm carried an empty pack in 134 of 134 games and reported 81/134 against a control of 90 — a
+    number that read as "the gate costs 13 points" and was in fact the control's own score under another name.
+    Every other counter was healthy: engagement 88.1%, six by-kind rows, a bill. The lesson is that `pack_entries`
+    is not one of the per-kind diagnostics; it is the admission test for the whole reading.
+    """
+
+    def test_the_counts_are_the_artefacts_own_numbers(self):
+        counts = aggregate.carried([episode("g1", True, pack_entries=2), episode("g2", False, pack_entries=2),
+                                    episode("g3", True, pack_entries=1)])
+        self.assertEqual(counts["by_entries"], {1: 1, 2: 2})
+        self.assertEqual(counts["games"], 3)
+        self.assertEqual(counts["mean"], 1.667)
+
+    def test_an_artefact_without_the_field_has_no_counts_rather_than_zero_ones(self):
+        # The distinction matters: `games: 0` says "this file cannot answer", and the refusal below passes it
+        # over. A zero mean would say "it carried nothing", which is a different and unfounded claim about a
+        # file written before the field existed.
+        counts = aggregate.carried([episode("g1", True), episode("g2", False)])
+        self.assertEqual(counts["games"], 0)
+        self.assertIsNone(counts["mean"])
+        self.assertIsNone(aggregate.empty_pack_reason("always-in", counts))
+
+    def test_a_pack_arm_that_carried_nothing_is_refused(self):
+        counts = aggregate.carried([episode("g1", True, pack_entries=0), episode("g2", False, pack_entries=0)])
+        reason = aggregate.empty_pack_reason("always-in", counts)
+        self.assertIn("empty pack in 2 of 2 games", reason)
+
+    def test_a_gated_arm_that_carried_some_games_is_readable(self):
+        # A gate is *meant* to admit nothing sometimes; what makes an arm void is admitting nothing anywhere.
+        counts = aggregate.carried([episode("g1", True, pack_entries=1), episode("g2", False, pack_entries=0)])
+        self.assertIsNone(aggregate.empty_pack_reason("retrieved@kind", counts))
+
+    def test_a_control_that_carried_entries_is_refused(self):
+        counts = aggregate.carried([episode("g1", True, pack_entries=2)])
+        self.assertIn("arm none carried entries", aggregate.empty_pack_reason("none", counts))
+
+    def test_a_renamed_arm_is_judged_by_its_family_and_a_nameless_one_is_not_judged(self):
+        # The family is the part of the label before `@`, which is how `arm_label` builds it. A cross-dispatch
+        # rename (`--relabel retrieved=retrieved@k3`) keeps a family; an arbitrary target (`bare-pair`) does not,
+        # and a check that guessed would refuse the one pairing whose provenance is printed.
+        empty = aggregate.carried([episode("g1", True, pack_entries=0)])
+        self.assertIn("arm retrieved@g0.2 carried an empty pack", aggregate.empty_pack_reason("retrieved@g0.2", empty))
+        self.assertIsNone(aggregate.empty_pack_reason("bare-pair", empty))
+
+    def test_the_pass_refuses_an_empty_pack_treatment_before_it_prints_a_delta(self):
+        original = sys.argv
+        treatment = HERE / "carry-a.json"
+        control = HERE / "carry-b.json"
+        treatment.write_text(
+            json.dumps({"summary": summary("always-in"), "episodes": [episode("g1", True, pack_entries=0)]}),
+            encoding="utf-8",
+        )
+        control.write_text(
+            json.dumps({"summary": summary("none"), "episodes": [episode("g1", False, pack_entries=0)]}),
+            encoding="utf-8",
+        )
+        sys.argv = ["aggregate.py", "--input", str(treatment), "--input", str(control), "--compare", "always-in,none"]
+        buffer = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buffer), self.assertRaises(SystemExit):
+                aggregate.main()
+        finally:
+            sys.argv = original
+            for path in (treatment, control):
+                path.unlink(missing_ok=True)
+        self.assertNotIn("paired delta", buffer.getvalue())
+
+
 class MainTest(unittest.TestCase):
     def setUp(self):
         self.paths = []

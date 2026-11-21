@@ -954,3 +954,95 @@ from the bare pair in both content and length, and is quoted only beside it.
 
 **Price.** 134 games × 2 arms each: **≈ ¥3.2 + ¥3.2 = ¥6.4**, priced at the measured cost of the last four dispatches
 ($0.3776 to $0.4495 per run).
+
+## R174, amendment 1 — one sentence is the best arm in the lane, and the gate carried nothing at all
+
+Both arms were bought together, each with its own control, and each read against the four readings the register
+said it would be read against.
+
+**R174.1 — one sentence.** `banks/bank-putmove-1.json`, entry 4 alone: **489 characters, 37.3% of the registered
+block**, driven as `always-in` over the held-out 134. Run `44841962248`, 7,459 calls, **$0.3708 (¥2.65)**.
+
+| arm | rendered | wins / 134 | its own control | delta vs its own control |
+| --- | --- | --- | --- | --- |
+| **one sentence** | **489** | **112 (83.58%)** | 88 | **+17.91 pp [+8.96, +26.87], p 0.0000** |
+| the bare pair | 802 | 109 (81.34%) | 91 | +13.43 pp |
+| the placement half, padded | 1,312 | 100 | 88 | +8.96 pp |
+| four distilled rules | 1,312 | 99 | 80 | +14.18 pp |
+
+By stratum the sentence does what the register predicted a sentence about the failing step would do, and more of
+it: **hard 35/46 against 0/46 (+76.1 pp)**, easy 77/88 against 88/88 (−12.5 pp). By kind it moves `put` to 10/24
+(from 5), `cool` 20/21 (from 13), `heat` 22/23 (from 17), `clean` 28/31 (from 21), `puttwo` 16/17 (from 14) — five
+of the six kinds improve on one sentence, and it is the one sentence that names the two operations most games
+fail at. `examine` is the exception at 16/18 against 18/18, and it is the kind whose task line names no `put`.
+
+**What this settles and what it does not.** The registered decision table said: one sentence ≈ 109 means the pack is
+one line and the product is a single sentence per failing step. It read **112**, which is three wins above the pair
+and inside the noise of it — so the honest statement is that **a second sentence about the same failing step is
+worth nothing measurable**, not that it is worth less. The four readings now form a ladder over content at two
+lengths: 112 (489, one sentence) ≥ 109 (802, two) > 100 (1,312, two padded) ≈ 99 (1,312, four). Every step down the
+ladder is a step away from *naming the failing operation*.
+
+**R174.2 — the gate, void, and the defect that hid it.** `retrieved` at k=3 with `--gate-share 0.2` over the
+registered four-entry bank. Run `44841993038`, 9,089 calls, **$0.4535 (¥3.24)**. The arm scored 81/134 against a
+control of 90, and the report had every appearance of a measurement: engagement 88.1%, six by-kind rows, a paired
+delta of −6.72 pp, a bill.
+
+**It carried zero entries in 134 of 134 games.** `pack_entries` is 0 in every episode of all four slices while
+`rules_in_bank` is 4. The reading is an empty prompt's, not a gate's, and the −6.72 pp is the control's own noise.
+
+Why the gate admitted nothing is arithmetic rather than tuning. The floor asks a rule to account for 0.2 of the
+observation's content words. A real first observation carries **22 content words, all of them furniture**: `cabinet
+4, countertop 1, garbagecan 1, sinkbasin 2, toilet 1 …` plus the task line. The largest overlap any of the four
+rules can reach is **one word** — and one of the three matches is `task`, from the prompt's own `Your task is to:`
+line. The floor is therefore 4.4 words against a corpus ceiling of 1. The gate was not too strict; it was a filter
+on the wrong object: an observation names the room, and the failing step is in the action.
+
+**What that costs the instrument, and what was changed because of it.** Engagement was 88.1% and the pack was
+empty, so engagement is not an admission test: an empty prompt changes the trajectory, which is why it looked
+engaged. Two changes were made before either arm above was quoted:
+
+1. `aggregate.py` now reports `carried` per arm — the distribution of `pack_entries` — and refuses a pack arm that
+   carried nothing in every game, and a `none` arm that carried anything. The refusal is printed above the delta,
+   because the first question about a pack reading is whether the pack was there (AUDIT 34.243).
+2. `agent.py` grows `--gate-kind`, which selects entries by the **task the game names** (`task_kind_of`, read from
+   the gamefile before the first call) instead of by lexical overlap with the room. On this corpus that is the only
+   signal that exists at decision time, and it costs nothing.
+
+**Price.** ¥2.65 + ¥3.24 = **¥5.89** for both arms, against the ¥6.4 quoted.
+
+## R175 — A six-sentence store, selected by the task, and the same store without the gate
+
+The product question R174 leaves: a store has to cover the corpus, and a pack has to be one line. R174.1 says one
+line is the best arm; R174.2 says the selection signal cannot be the room. R175 asks whether the two can be had
+together, and it asks it as an ablation of one module: **the same six sentences, with the kind gate and without it.**
+
+`banks/bank-perkind-6.json` is six entries, one per published kind, each tagged with the kinds it was written for.
+The `put` entry is `bank-putmove-1.json` **verbatim**, so the gated arm's `put` games render the exact 489-character
+block that scored 112 — the store reproduces the winning arm byte for byte on a quarter of the split, and the other
+five kinds are what it adds.
+
+| # | experiment | the question | state | price |
+| --- | --- | --- | --- | --- |
+| **1** | `always-in@kind` over the six-entry tagged bank | can a store cover six kinds and still be worth one line per game — does selection make a wide bank behave like a narrow pack | **in flight** | ≈ ¥3.2 |
+| **2** | `always-in` over the same six-entry bank, ungated | the control for row 1 and a reading of its own: six sentences with no selection, which the per-sentence price predicts at ≈ 94 | **in flight** | ≈ ¥3.2 |
+| 3 | the `examine` sentence alone | the one kind one sentence does not move (16/18 against 18/18), and the only sentence written without a `put` step in it | licensed by row 1 | ≈ ¥3.2 |
+| 4 | `retrieved@kind` over the same bank | does the anchor still help once the pool is the game's own sentence, or is a one-entry pool already the whole answer | contingent on row 1 | ≈ ¥3.2 |
+| 5 | a retrieved **raw trajectory** | the literature's claim that abstraction is where a memory loses its value (arXiv:2605.12978) | needs a second bank schema, ~3 h | ≈ ¥3.2 + 3 h |
+| 6 | the bare pair **compressed** to 508 characters (`banks/bank-putpair-terse-2.json`), same two operations, imperative register | is the per-sentence price paid in characters or in statements | **built, not bought**: R174.1 put one statement at 112 and two at 109, so this lane's instrument cannot resolve the 3–4 pp a compression of this size could buy (mde 12–14 pp) | ≈ ¥3.2, unspent |
+
+**The pre-registered reading of rows 1–2, before either is bought.**
+
+| row 1 | row 2 | what it means |
+| --- | --- | --- |
+| ≈ 112 | ≈ 94 | **the store scales**: selection makes six sentences cost what one costs, and the per-sentence price is a price paid by *carrying*, not by *storing* |
+| ≈ 112 | ≈ 112 | the six sentences are worth what one is worth, ungated too — the per-sentence price is not linear and R173.1's slope was about the two task-relevant entries, not about counting |
+| ≈ 94 | ≈ 94 | selection by kind does not help, so a wide store cannot be made narrow by the signal the harness has — the product is one hand-written sentence until a better signal exists |
+| row 1 < row 2 | — | the gate hurts, and the mechanism is the one R174.2 found in a different form: a tag that fires is not a rule that applies |
+
+**What would void either reading.** The empty-pack refusal `aggregate.py` now performs (row 1 must carry one entry
+in at least 90% of games, since every kind is tagged); engagement below 50%; and a control above 85/134, which is
+now the third time this split has produced one — a level claim from this dispatch would be quoted by stratum only,
+and the row-1-versus-row-2 contrast is treatment against treatment and needs no control at all.
+
+**Price.** 134 games × 2 arms each: **≈ ¥3.2 + ¥3.2 = ¥6.4**.

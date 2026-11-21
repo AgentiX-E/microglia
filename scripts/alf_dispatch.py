@@ -74,6 +74,10 @@ def parser():
     result.add_argument("--control-run", dest="control_run", default="")
     result.add_argument("--top-k", dest="top_k", default="")
     result.add_argument("--gate-share", dest="gate_share", default="")
+    # The kind gate, which selects by the task the game names rather than by the room it starts in. Flagged
+    # separately from `--gate-share` because the two are different signals on different objects, and R174.2
+    # measured the overlap one admitting nothing at all on this corpus.
+    result.add_argument("--gate-kind", dest="gate_kind", default="")
     result.add_argument("--dry-run", dest="dry_run", action="store_true")
     return result
 
@@ -151,6 +155,20 @@ def check(arguments, tree=None):
                 f"--rules {arguments.rules} is not a file in this tree (it resolves to {candidate}), and the "
                 f"workflow runs from the repository root rather than from the lane's own directory{hint}"
             )
+        if arguments.gate_kind:
+            # The one check that can be made here rather than at the arm: a `--gate-kind` pointed at an untagged
+            # bank is refused by `agent.py` before it makes a call, but that refusal arrives four jobs into a
+            # dispatch. Read the file this dispatch would buy and say so now, when the answer is free.
+            tagged = [
+                entry
+                for entry in json.loads(candidate.read_text(encoding="utf-8")).get("entries") or []
+                if isinstance(entry, dict) and entry.get("kinds")
+            ]
+            if not tagged:
+                raise Refused(
+                    f"--gate-kind needs a bank whose entries carry `kinds`, and {arguments.rules} tags none: the "
+                    "gate would carry nothing and the arm would be the control wearing a treatment's name"
+                )
     if arguments.chain and not arguments.train:
         raise Refused("--chain needs --train: the chain starts with the training pass")
     if arguments.sweep and (arguments.games or arguments.train):
@@ -162,6 +180,10 @@ def check(arguments, tree=None):
     if arguments.top_k:
         if not arguments.top_k.isdigit() or int(arguments.top_k) < 1:
             raise Refused(f"--top-k {arguments.top_k} is not a retrieval budget; it is how many rules one turn may carry")
+    if arguments.gate_kind and not arguments.rules:
+        raise Refused("--gate-kind selects among a bank's entries, so it needs --rules to select from")
+    if arguments.gate_kind and arguments.arm == CONTROL:
+        raise Refused("--gate-kind on the control selects nothing: the control carries no bank by definition")
     if arguments.gate_share:
         try:
             share = float(arguments.gate_share)
@@ -198,6 +220,7 @@ def payload(arguments):
         ("arms", arguments.arms),
         ("top_k", arguments.top_k),
         ("gate_share", arguments.gate_share),
+        ("gate_kind", arguments.gate_kind),
     )
     for key, value in named:
         if value:
