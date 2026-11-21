@@ -162,6 +162,13 @@ def load_slices(
         # only one that existed -- so a missing field is the reference channel rather than unknown: reading it as
         # unknown would make the one comparison the channel exists for impossible, and reading it as anything else
         # would be a guess about a harness that is written down in the driver (AUDIT 34.262).
+        # The bank the pass was handed, as content. One per run, so it is read from the summary; an arm that renders
+        # nothing (`none`) and every artefact from before R185 record the empty string, which is the only value that
+        # can be proven for them.
+        bank = summary.get("bank_digest", "")
+        if not isinstance(bank, str):
+            fail(f"{path}: summary.bank_digest is {bank!r}, which is not a bank digest")
+        label_banks.setdefault(label, set()).add(bank)
         channel = summary.get("parser") or REFERENCE_PARSER
         if channel not in PARSERS:
             fail(f"{path}: summary.parser is {channel!r}, which is not one of {PARSERS}")
@@ -188,13 +195,9 @@ def load_slices(
         for episode in episodes:
             if isinstance(episode, dict):
                 episode.setdefault("parser", channel)
-                # Which pack this episode rendered, as content. An artefact from before R185 records none, and an
-                # arm that renders nothing (`none`) records the empty string -- so the set of one label answers
-                # "was this arm one prompt or two", which is the only thing the join needs to know.
-                bank = episode.get("bank_digest", "")
-                if not isinstance(bank, str):
-                    fail(f"{path}: bank_digest is {bank!r}, which is not a bank digest")
-                label_banks.setdefault(label, set()).add(bank)
+                # The run's bank, not this game's pack: a gated pass hands one bank to several kinds and each game
+                # reads a different entry, so grouping on the pack would refuse the very round the guard exists for.
+                episode.setdefault("bank_digest", bank)
                 episode.setdefault("max_steps", cap)
         grouped.setdefault(label, []).extend(episodes)
     # A join across sections is legal and sometimes the point — a second section is the only place this lane can

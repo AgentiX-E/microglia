@@ -1312,11 +1312,11 @@ class BankTest(unittest.TestCase):
         # The R185 case exactly: same label, same length, different prompt. Averaging is not an option the join has.
         left = self.write(
             "bank-a.json",
-            {"summary": summary("always-in"), "episodes": [episode("g1", True, bank_digest="aaaa1111")]},
+            {"summary": summary("always-in", bank_digest="aaaa1111"), "episodes": [episode("g1", True)]},
         )
         right = self.write(
             "bank-b.json",
-            {"summary": summary("always-in"), "episodes": [episode("g2", True, bank_digest="bbbb2222")]},
+            {"summary": summary("always-in", bank_digest="bbbb2222"), "episodes": [episode("g2", True)]},
         )
         printed = io.StringIO()
         with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
@@ -1328,7 +1328,7 @@ class BankTest(unittest.TestCase):
         # empty string is not a second bank, or every memory-versus-control delta in the lane would be refused.
         treatment = self.write(
             "bank-c.json",
-            {"summary": summary("always-in"), "episodes": [episode("g1", True, bank_digest="aaaa1111")]},
+            {"summary": summary("always-in", bank_digest="aaaa1111"), "episodes": [episode("g1", True)]},
         )
         control = self.write("bank-d.json", {"summary": summary("none"), "episodes": [episode("g2", False)]})
         grouped = aggregate.load_slices([treatment, control])
@@ -1338,11 +1338,11 @@ class BankTest(unittest.TestCase):
         # Four shards of one dispatch carry one digest; a guard that refused them would refuse every normal join.
         left = self.write(
             "bank-e.json",
-            {"summary": summary("always-in"), "episodes": [episode("g1", True, bank_digest="aaaa1111")]},
+            {"summary": summary("always-in", bank_digest="aaaa1111"), "episodes": [episode("g1", True)]},
         )
         right = self.write(
             "bank-f.json",
-            {"summary": summary("always-in"), "episodes": [episode("g2", True, bank_digest="aaaa1111")]},
+            {"summary": summary("always-in", bank_digest="aaaa1111"), "episodes": [episode("g2", True)]},
         )
         self.assertEqual(aggregate.load_slices([left, right])["always-in"][0]["bank_digest"], "aaaa1111")
 
@@ -1350,12 +1350,32 @@ class BankTest(unittest.TestCase):
         # The digest arrives from JSON and is compared by equality with other strings, so a number would make two
         # different banks look the same the moment both were written as one. Refused where it is read.
         odd = self.write(
-            "bank-g.json", {"summary": summary("always-in"), "episodes": [episode("g1", True, bank_digest=7)]}
+            "bank-g.json", {"summary": summary("always-in", bank_digest=7), "episodes": [episode("g1", True)]}
         )
         printed = io.StringIO()
         with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
             aggregate.load_slices([odd])
         self.assertIn("bank_digest", printed.getvalue())
+
+    def test_a_gated_run_may_carry_several_packs_and_one_bank(self):
+        # R186's shape, and the reason the guard reads the summary rather than the episodes: one bank with two
+        # kind-tagged entries hands `put` one sentence and the other five kinds another, so the *packs* differ inside a
+        # pass while the *bank* does not. A guard keyed on the pack would refuse the round it was built for.
+        run = self.write(
+            "bank-gated.json",
+            {
+                "summary": summary("always-in", bank_digest="cccc3333", gate_kind=True),
+                "episodes": [
+                    episode("g1", True, pack_digest="aaaa1111"),
+                    episode("g2", True, pack_digest="bbbb2222"),
+                ],
+            },
+        )
+        grouped = aggregate.load_slices([run])
+        self.assertEqual(aggregate.banks(grouped), {"always-in": "cccc3333"})
+        self.assertEqual(
+            sorted(episode["pack_digest"] for episode in grouped["always-in"]), ["aaaa1111", "bbbb2222"]
+        )
 
     def test_the_pass_prints_the_bank_of_each_arm(self):
         original = sys.argv
@@ -1364,8 +1384,8 @@ class BankTest(unittest.TestCase):
         treatment.write_text(
             json.dumps(
                 {
-                    "summary": summary("always-in"),
-                    "episodes": [episode("g1", True, bank_digest="abcd1234efgh5678")],
+                    "summary": summary("always-in", bank_digest="abcd1234efgh5678"),
+                    "episodes": [episode("g1", True, pack_digest="1111")],
                 }
             ),
             encoding="utf-8",

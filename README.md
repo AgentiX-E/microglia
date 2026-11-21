@@ -641,7 +641,7 @@ skeleton is the competitor's own, transliterated: the system line, the two-examp
 split into alternating turns, and the parser's four branches — so an arm changes what sits *above* the transcript
 and nothing else. Three zero-cost readings hold it in place: `--policy seed` reproduces `floor.py` game for game
 (same wins, steps, action digests, observation fingerprints) and the `agreement` job fails on a single field;
-**578 unit tests at 98.8% line-and-branch coverage, every module at or above 95%**, cover the parser, the split,
+**584 unit tests at 98.8% line-and-branch coverage, every module at or above 95%**, cover the parser, the split,
 the shard arithmetic, the bill and the loop itself; and a test asserts that `none` and `always-in` differ at
 exactly one message index. A second **channel** — `--parser any-line`, which executes the command the first-line rule
 refuses — is a field in every episode, a token in every label and a span `aggregate.py` refuses to pool until it is
@@ -676,6 +676,12 @@ that still lose — **0.3533 → 0.2667** with `put` unmoved at 50 of 59 — whi
 narration was not the cost. Those nine split into **five** that issue commands the world rejects (3 to 11 invalid
 actions, ending on `Nothing happens.`) and **four** that run out of turns mid-progress, so the floor that survived both
 repairs is a **precondition** the model does not hold.
+
+**Then one 197-character entry was written for one kind and read by six.** Replacing the pack's format instruction with a
+precondition (open a closed container before taking from it) moved `put` **50 → 56 of 59** and `clean` **58 → 45 of 58**:
+net **−12 games** over 274. The kind that lost does not act less — it thinks **4.4 → 10.8** thoughts a game with three
+times the invalid actions — so a memory entry is a treatment on every task that reads it, and the repair is scope rather
+than wording: two entries tagged to disjoint kinds, one per game, still 551 characters (`banks/bank-putscope-2.json`).
 
 **Then the lane spent five arms finding nothing, and found a bug instead.** Five renderings of that one sentence —
 itself, plus a neutral clause, a true citation, a false citation, and the sentence with its second operation

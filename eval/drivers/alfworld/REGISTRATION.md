@@ -2266,3 +2266,149 @@ reading 4 fails, because a format clause that is inert on this channel has no ef
 
 **Price ≈ ¥2.40**, four jobs, one arm, both sections, off-peak band. The control is not re-bought: R183's `none@anyline`
 is the fixed side, which is what `--against none` exists for.
+
+## R185, amendment 1 — bought, and the entry is not kind-local: +6 `put`, −18 everywhere else
+
+Two dispatches, **274 games, one arm**, `any-line`, cap 50, off-peak in all eight summaries: run `44955924885` (134
+held out) and `44955959473` (140 seen).
+
+| arm | wins | Wilson | held out | seen | paired against R183's own bank arm | mde |
+| --- | --- | --- | --- | --- | --- | --- |
+| `precond@anyline` | **245/274 (89.42%)** | [85.2, 92.5] | 123/134 (91.79%) | 122/140 (87.14%) | **−4.38 pp** (10 gained, 22 lost) | 5.78 pp |
+| `line@anyline` (R183) | 257/274 (93.80%) | [90.3, 96.1] | 129/134 (96.27%) | 128/140 (91.43%) | — | — |
+| `none@anyline` (R183) | 197/274 (71.90%) | [66.3, 76.9] | 97/134 (72.39%) | 100/140 (71.43%) | — | — |
+
+**The registered mechanism worked and the registered level did not, and the reason is a place the registration did not
+look.** `put` went from **50 to 56 of 59** (+10.2 pp; eight games gained, two lost) — the precondition is real. But
+`clean` went from **58 to 45 of 58** (−22.4 pp; thirteen games lost, none gained), `heat` 38 → 35, `examine` 28 → 26. Net
+**−12 games**, three kinds damaged by more than their own noise, and the damage sits outside the entry's subject.
+
+| kind | `precond` | `line` | Δ | transitions |
+| --- | --- | --- | --- | --- |
+| `put` | **56/59 (94.9%)** | 50/59 (84.7%) | **+10.2 pp** | 8 gained, 2 lost |
+| `clean` | **45/58 (77.6%)** | 58/58 (100%) | **−22.4 pp** | 0 gained, 13 lost |
+| `heat` | 35/39 (89.7%) | 38/39 (97.4%) | −7.7 pp | 0 gained, 3 lost |
+| `examine` | 26/31 (83.9%) | 28/31 (90.3%) | −6.5 pp | 0 gained, 2 lost |
+| `cool` | 43/46 (93.5%) | 43/46 (93.5%) | 0 | 1 gained, 1 lost |
+| `puttwo` | 40/41 (97.6%) | 40/41 (97.6%) | 0 | 1 gained, 1 lost |
+
+### What the damaged kinds look like, which is not what "less deliberation" predicts
+
+| quantity per game | `clean` precond | `clean` line | all precond | all line |
+| --- | --- | --- | --- | --- |
+| thoughts | **10.8** | 4.4 | 6.49 | 4.68 |
+| steps | **23.8** | 15.6 | 20.32 | 17.73 |
+| invalid actions | **3.3** | 1.1 | — | — |
+| `recovered` | **0** | 5 | **137** | 269 |
+
+`clean` does not act less: it thinks **two and a half times as much** and spends eight more turns doing it, and the eight
+seen losses all end at step 50 with `Nothing happens.` and up to twenty invalid actions. The model is not under-thinking;
+it is **thrashing on a task the sentence was not about**. In the same direction, `recovered` — the count of replies whose
+first line is a thought and whose later line is a command — halved from **269 to 137**, which is the one measurement that
+says the tail's *format* content was doing work after all: with the instruction gone the model composes replies
+differently, and the change is not local to `put`.
+
+### Verdicts, one row each
+
+| # | registered | read | verdict |
+| --- | --- | --- | --- |
+| 1 | `put` 53 to 58 of 59 | **56** | **held** |
+| 2 | `always-in@anyline` 260 to 270 | **245** | failed, 15 short of the floor |
+| 3 | invalid per lost `put` ≤ 6.0, and >2 invalid from 8 to ≤5 | **14.33** and **3** | **failed as written, held in its second half** |
+| 4 | `recovered` 200 to 340, `refused` 0 | **137** and 0 | **failed** — clause 3 fires |
+| 5 | other five kinds within `\|Δ\| ≤ 5 pp` | `clean` −22.4, `heat` −7.7, `examine` −6.5 | **failed on three kinds** |
+| 6 | 551 chars, 1 entry, `any-line`, cap 50, one `bank_digest` | 551, 1, `any-line`, 50, `5fb4c46456d4a497` ×274 | **held** — and it is the new guard's first live use |
+
+**Reading 3 failed in a way worth naming.** It registers a mean over *lost* `put` games, and the treatment's purpose is to
+reduce the number of lost games: nine became three, so the mean is now taken over the three hardest survivors (14.33
+invalid actions each). The number went up while the count of games with more than two invalid actions went **8 → 3**. A
+per-lost-game denominator moves with the treatment, which makes it the third instance of the class R183 caught with a
+per-game rate and R184 with a counterfactual: **the denominator has to be fixed by the design, not by the outcome.**
+
+### The finding, stated as the thing this round actually measured
+
+**A 197-character entry is read by every task, so an entry written for one kind is a treatment on all six.** The `put`
+gain is +10.2 pp on its own kind and −22.4 pp on the kind that shares its objects (a `clean` task is a `pick_clean_then_place`
+task: it takes an object out of a container before cleaning it), for a net **−12 games** — and the net is what a reader
+would quote if the round had registered only the pool.
+
+That is the sharpest statement this lane has produced of the thing the project was asked to quantify: **the negative
+effect of a memory is not in what it says being false, but in its scope being wider than its subject.** Six hundred
+previous rounds wrote entries about the whole task and measured the pool; this one wrote an entry about one kind and
+measured the other five, and the other five lost more than the one gained.
+
+### Spend and the confound
+
+**¥1.92 against ¥2.40 quoted** ($0.2678, 5,569 calls, off-peak in all eight summaries — under quote because one arm ran
+instead of two and every episode ends inside the same 50-turn cap).
+
+The round's own confound is now the *only* question left in it, and the registered follow-up cell for it was
+**arithmetically impossible**: 197 characters out and 197 in was supposed to be separated by a third bank holding *both*
+tails at 551 characters, which would need 157 + 197 + 197 = 551 characters of entry inside a 354-character slot. It
+cannot be built. The cell that can be built is the next round's and it is a different design: **two entries, each 354
+characters, each tagged to a disjoint set of kinds, one entry per game at 551 characters** — the R183 sentence for the
+five kinds the entry was not about, the precondition sentence for `put`. That is a scope test rather than a content test,
+and it is registered as R186.
+
+## R186 — scope, not content: the same 551 characters with a different tail for `put`
+
+R185's net was **−12 games**: `put` +6, `clean` −13, `heat` −3, `examine` −2. The entry was written about one kind and
+read by six, and the five it was not written for lost more than the one gained. The repair is not a better sentence but a
+narrower one, and the lane already owns the mechanism: entries carry `kinds` tags and `--gate-kind` selects among them
+(`applicable`, R174.2).
+
+### The design has to keep the price fixed per game, or it tests the wrong thing
+
+`banks/bank-putscope-2.json` holds **two entries of 354 characters each**, tagged to **disjoint** sets of task kinds —
+the five kinds the precondition was not written for get `bank-putmove-line-1.json`'s text **byte for byte**, and `put`
+gets `bank-putprecond-1.json`'s. Because the tags partition the six kinds, every game carries **exactly one entry and
+renders 551 characters**, which is what makes this a scope test rather than a length test:
+
+| kind | entry | rendered | digest |
+| --- | --- | --- | --- |
+| `clean`, `cool`, `examine`, `heat`, `puttwo` | R183's sentence | 551 | `90c0688f` |
+| `put` | R185's sentence | 551 | `5fb4c464` |
+
+The five kinds are **held still by construction**, not by hope: their pack is byte-identical to the one R183 measured at
+58/58, 43/46, 28/31, 38/39 and 40/41. If they move, the movement is run-to-run variance and it is measurable as such.
+
+### A guard had to change before this round could be bought
+
+The `bank_digest` guard added with R185 refuses one label spanning two banks, and it read the field from the **episodes**.
+Under a kind gate one pass hands out several packs, so the guard as first written would have refused **this round** — the
+round it exists for. The field is therefore two fields: `bank_digest` in the summary (one bank per run, which is what a
+label groups on) and `pack_digest` per episode (what the game actually read). Five tests, one of them the gated shape.
+
+### Registered readings
+
+One arm, gated, `any-line`, cap 50, 274 games, four jobs, against R183's `none@anyline` control:
+
+1. **`put` 54 to 58 of 59** (56 in R185, 50 in R183). The gain has to survive being scoped; a gain that only exists when
+   the other kinds are damaged was not a gain.
+2. **`clean` at or above 57 of 58**, `heat` at or above 37 of 39, `examine` at or above 27 of 31, `cool` at or above
+   42 of 46, `puttwo` at or above 40 of 41. Byte-identical packs, so the bands are one game wide against 1.5 to 2 games
+   of sampling noise.
+3. **Overall 256 to 266** of 274 (R185 245, R183 257).
+4. **`recovered` 250 to 320** (R185 137, R183 269). The format clause is back in five of six packs, so reply composition
+   should return with it; this is the reading that says whether `recovered` was measuring the clause or the brevity.
+5. `pack_chars` **551** and `pack_entries` **1** in all 274 games, `parser` `any-line`, `max_steps` **50**, **one**
+   `bank_digest` per section and **two** `pack_digest` values — the gated shape, recorded.
+
+### Refutation
+
+1. **`put` at or below 53.** The `put` gain in R185 came from the global perturbation — the same 197 characters that
+   damaged `clean` were what helped `put` — and the precondition is retired as a prompt-level entry. R187 becomes the
+   instance-state document with `Unknown` markers, which is the competitor's mechanism rather than its sentence.
+2. **`clean` at or below 56 with byte-identical text.** The loss was not caused by the precondition reaching `clean`, and
+   the scope hypothesis is wrong: the cause is then either run-to-run variance (which this round measures directly) or a
+   channel-level effect that the R183 bank no longer has. The pool stays where R185 left it and the bank is restored.
+3. **`recovered` below 250 while `clean` recovers.** `recovered` was not measuring the format clause at all; it moved with
+   the precondition's presence, and the R185 reading that made the round "void for attribution" is itself retracted.
+
+### Void
+
+Any game whose `pack_chars` is not 551 or whose `pack_entries` is not 1 (a gate that returned two entries or none), any
+label spanning two `bank_digest` values, `parser` not `any-line`, `max_steps` not 50, a section short of its published
+size, or a control that had to be re-bought.
+
+**Price ≈ ¥2.10**, four jobs (one arm, both sections), off-peak band.

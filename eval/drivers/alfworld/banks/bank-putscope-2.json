@@ -1,0 +1,37 @@
+{
+  "schema": "microglia.alfworld-bank/1",
+  "cap": 20,
+  "identity": "substring",
+  "source": {
+    "kind": "two 354-character entries, tagged to disjoint sets of task kinds, so every game carries exactly one 551-character pack",
+    "matches": "entry 1 is banks/bank-putmove-line-1.json byte for byte; entry 2 is banks/bank-putprecond-1.json byte for byte",
+    "note": "R186. R185 swapped 197 characters under a single tag and the swap was read by every kind: put gained 6 games and clean lost 13, heat 3 and examine 2, because a pack is one block of text and a sentence about `put` is a treatment on `pick_clean_then_place` too. This bank keeps the price fixed per game (551 rendered, one entry, because every entry is tagged and the tags partition the six kinds) and scopes the content: the five kinds the precondition was not written for get R183's sentence byte for byte, and `put` gets the precondition. It is a scope test rather than a content test, and it is the cell R185's own follow-up could not build -- 157 + 197 + 197 does not fit in 354 characters.",
+    "registration": "R186",
+    "operations_kept": [
+      "the put-to-move phrasing",
+      "one command per turn, on its own line (five kinds)",
+      "open the container before taking from it (put only)"
+    ],
+    "provenance": "written after R185 measured +10.2 pp on put and -22.4 pp on clean from one 197-character tail that every kind reads"
+  },
+  "entries": [
+    {
+      "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\". Write the command alone on its own line and put nothing under it: a command that shares a line with a thought is read as part of the thought, so it never reaches the world and still costs a turn.",
+      "votes": 10,
+      "kinds": [
+        "clean",
+        "cool",
+        "examine",
+        "heat",
+        "puttwo"
+      ]
+    },
+    {
+      "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\". A closed container hides its contents: open the cabinet, fridge, drawer or safe before taking anything from it, or the take answers \"Nothing happens.\" and the put that follows fails the same way.",
+      "votes": 10,
+      "kinds": [
+        "put"
+      ]
+    }
+  ]
+}

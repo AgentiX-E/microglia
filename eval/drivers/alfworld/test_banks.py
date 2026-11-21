@@ -598,5 +598,64 @@ class PreconditionBankTest(unittest.TestCase):
         self.assertIn("one command per turn, on its own line", source["operations_replaced"])
         self.assertIn("open the container before taking from it", source["operations_written"])
 
+
+class ScopedBankTest(unittest.TestCase):
+    """R186's bank: the same 551 characters for every game, a different 197-character tail for `put`.
+
+    R185 swapped one tail and every kind read it: `put` gained six games and `clean` lost thirteen. The repair is not a
+    better sentence but a narrower one, and the lane already has the mechanism for it -- entries carry `kinds` tags and
+    `--gate-kind` selects among them. What has to hold for the round to be a scope test rather than a length test is
+    that **every game still renders 551 characters and exactly one entry**, which is only true if the tags partition
+    the six kinds. This class is that partition check, because a tag that overlaps makes `put` carry two entries and a
+    tag that leaves a kind out makes that kind carry none.
+    """
+
+    NAME = "bank-putscope-2.json"
+    KINDS = ("clean", "cool", "examine", "heat", "put", "puttwo")
+
+    def payload(self) -> dict:
+        return payload_of(self.NAME)
+
+    def test_the_tags_partition_the_six_kinds(self):
+        tags = [set(entry["kinds"]) for entry in self.payload()["entries"]]
+        self.assertEqual(len(tags), len(self.payload()["entries"]))
+        self.assertEqual(set().union(*tags), set(self.KINDS))
+        for left in range(len(tags)):
+            for right in range(left + 1, len(tags)):
+                with self.subTest(pair=(left, right)):
+                    self.assertEqual(tags[left] & tags[right], set())
+
+    def test_every_kind_carries_one_entry_at_551_characters(self):
+        payload = self.payload()
+        rules = [entry["text"] for entry in payload["entries"]]
+        kinds = [entry["kinds"] for entry in payload["entries"]]
+        for kind in self.KINDS:
+            with self.subTest(kind=kind):
+                selected = driver.applicable(rules, kinds, kind)
+                self.assertEqual(len(selected), 1)
+                self.assertEqual(len(driver.render_pack(selected)), 551)
+
+    def test_the_five_untargeted_kinds_get_r183s_sentence_byte_for_byte(self):
+        # The whole claim of the round: those games are not being helped or hurt, they are being held still.
+        payload = self.payload()
+        rules = [entry["text"] for entry in payload["entries"]]
+        kinds = [entry["kinds"] for entry in payload["entries"]]
+        r183 = payload_of("bank-putmove-line-1.json")["entries"][0]["text"]
+        for kind in ("clean", "cool", "examine", "heat", "puttwo"):
+            with self.subTest(kind=kind):
+                self.assertEqual(driver.applicable(rules, kinds, kind), [r183])
+
+    def test_put_gets_r185s_sentence_and_nothing_else(self):
+        payload = self.payload()
+        rules = [entry["text"] for entry in payload["entries"]]
+        kinds = [entry["kinds"] for entry in payload["entries"]]
+        self.assertEqual(
+            driver.applicable(rules, kinds, "put"), [payload_of("bank-putprecond-1.json")["entries"][0]["text"]]
+        )
+
+    def test_the_two_entries_are_length_matched(self):
+        lengths = {len(entry["text"]) for entry in self.payload()["entries"]}
+        self.assertEqual(lengths, {354})
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

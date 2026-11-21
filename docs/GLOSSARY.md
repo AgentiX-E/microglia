@@ -2035,3 +2035,13 @@ digest of each side above a delta, because R185's design makes two banks agree o
 rendered pack stays at 551 characters and the label, reader, cap and entry count are unchanged. It is the cleanest
 one-variable experiment this lane can run on a bank, and it is only available because every arm since R180 is
 length-matched — which is also why it needs `bank_digest` to be auditable at all.
+
+**Kind scope** — The set of task kinds an entry claims through its `kinds` tag, and the unit in which a memory is paid for.
+An untagged entry is carried everywhere by `applicable`; a tagged one only where its kinds list names the game's kind, and
+`--gate-kind` turns the filter on. When the tags **partition** the corpus's kinds every game carries exactly one entry, so
+the price is fixed and a per-kind substitution is a content test rather than a length test — the shape R186 registers,
+after R185 measured +10.2 pp on the kind one entry named and −22.4 pp on a kind it did not.
+
+**Pack digest** (`pack_digest`) — A content hash of the entries one *game* actually read, recorded per episode. Under a
+kind gate it changes with the kind, while the run's own `bank_digest` does not: one bank, several packs. The join groups
+on the bank and reports the pack, because a rule that grouped on the pack would refuse every gated round.

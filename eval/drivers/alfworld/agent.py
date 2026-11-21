@@ -726,10 +726,9 @@ def run_episode(
     # examples. This records the pack alone, which is what a length-matched experiment has to compare and what
     # `aggregate.py` now reports beside `carried` (AUDIT 34.249).
     pack_chars: "int | None" = None
-    # Which bank produced the pack, as content rather than as a filename: two files holding the same sentence are one
-    # bank, and two banks that render to the same length are two. It is `""` for an arm that renders no pack, which is
-    # the only honest value for a control -- the empty pack is not a bank (AUDIT 34.266).
-    bank_digest = ""
+    # Which pack this game read, as content rather than as a filename. Under a kind gate this changes with the kind,
+    # which is the point: the pass is one bank and the games are several packs.
+    pack_digest = ""
     prefix_chars = 0
     usage_total = {"prompt_tokens": 0, "completion_tokens": 0, "cache_hit_tokens": 0, "cache_miss_tokens": 0}
     observe_chars: "list[int]" = [len(str(observation[0]))]
@@ -773,7 +772,7 @@ def run_episode(
             pack_entries = len(selected)
             pack = render_pack(selected)
             pack_chars = len(pack)
-            bank_digest = digest_of(selected) if selected else ""
+            pack_digest = digest_of(selected) if selected else ""
             opening = build_opening(examples, kind, instruction, max_steps)
             prefix_chars = sum(len(message["content"]) for message in opening) + len(pack)
             messages = list(opening)
@@ -896,7 +895,9 @@ def run_episode(
         "parser": parser,
         "pack_entries": pack_entries,
         "pack_chars": pack_chars,
-        "bank_digest": bank_digest,
+        # What this game actually read. Under `--gate-kind` two games of one pass read different entries, so this is
+        # the only field that says so -- and it is deliberately not the field the join groups on (AUDIT 34.266).
+        "pack_digest": pack_digest,
         "prefix_chars": prefix_chars,
         "prompt_chars": sum(len(message["content"]) for message in messages),
         "usage": dict(usage_total),

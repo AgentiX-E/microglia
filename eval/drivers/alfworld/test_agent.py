@@ -2585,7 +2585,7 @@ class BankProvenanceTest(unittest.TestCase):
         self.assertEqual(self.run_main(["--arm", "always-in", "--policy", "first", "--games", "1", "--rules", str(bank), "--out", str(self.out)]), 0)
         payload = self.artefact()
         self.assertEqual(payload["summary"]["bank_digest"], agent.digest_of([text]))
-        self.assertEqual(payload["episodes"][0]["bank_digest"], agent.digest_of([text]))
+        self.assertEqual(payload["episodes"][0]["pack_digest"], agent.digest_of([text]))
 
     def test_two_banks_that_render_to_the_same_length_are_two_banks(self):
         # The exact pair R185 uses: 157 characters held, 197 swapped. Same price, different prompt.
@@ -2616,7 +2616,7 @@ class BankProvenanceTest(unittest.TestCase):
         self.assertEqual(self.run_main(["--arm", "none", "--policy", "first", "--games", "1", "--out", str(self.out)]), 0)
         payload = self.artefact()
         self.assertEqual(payload["summary"]["bank_digest"], "")
-        self.assertEqual(payload["episodes"][0]["bank_digest"], "")
+        self.assertEqual(payload["episodes"][0]["pack_digest"], "")
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

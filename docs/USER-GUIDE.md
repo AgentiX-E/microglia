@@ -5226,3 +5226,51 @@ print(len(agent.render_pack(rules)), agent.digest_of(rules))   # 551 5fb4c46456d
 A 551 and a digest: the price and the identity, which are the two things a bank swap has to hold fixed. Run the same
 two lines over `banks/bank-putmove-line-1.json`, the bank R185 replaces, and the pair reads `551
 90c0688f60c5d524`: same price, different pack — which is exactly the state the join could not see before `bank_digest`.
+
+### 32.27 Scoping a pack to the task kind it is about, and why the pool can lie
+
+A bank entry is inserted into **every** prompt, so an entry written for one kind of task is a treatment on all of them.
+R185 is the measurement: one 197-character entry about `put` moved that kind **+10.2 pp** and `clean` **−22.4 pp**, for a
+net of **−12 games**. The repair is to tag each entry with the kinds it is about and let the harness select:
+
+```bash
+python3 eval/drivers/alfworld/agent.py \
+  --arm always-in --gate-kind --rules eval/drivers/alfworld/banks/bank-putscope-2.json \
+  --parser any-line --policy model --games 134 --out /tmp/scoped.json
+```
+
+The bank shape is two entries with disjoint tags:
+
+```json
+{ "entries": [
+  { "text": "…R183's sentence…", "votes": 10, "kinds": ["clean", "cool", "examine", "heat", "puttwo"] },
+  { "text": "…the precondition…", "votes": 10, "kinds": ["put"] } ] }
+```
+
+Five rules make a scoped bank readable:
+
+1. **A partition keeps the price fixed.** Tags that cover the six kinds exactly once mean every game carries one entry and
+   renders the same 551 characters, so a per-kind difference is content and not length. `test_banks.py` asserts it.
+2. **An untagged entry is carried everywhere.** That is what keeps every pre-R174 bank comparable, and it is how you ship a
+   sentence you believe applies to the whole corpus.
+3. **An overlap doubles the pack.** Two entries claiming `put` means `put` games pay for both, which is a length change
+   disguised as a scope change.
+4. **`pack_entries` is the check.** One entry per game in the artefact is what a partition looks like from the outside.
+5. **`pack_digest` may differ between games of one pass; `bank_digest` may not.** The first says what each game read, the
+   second says which bank the pass was handed, and the join refuses a label that spans two banks.
+
+To see the scope of an existing bank before spending anything:
+
+```python
+import json, sys
+sys.path.insert(0, "eval/drivers/alfworld")
+import agent
+payload = json.load(open("eval/drivers/alfworld/banks/bank-putscope-2.json"))
+rules = [entry["text"] for entry in payload["entries"]]
+kinds = [entry.get("kinds") or [] for entry in payload["entries"]]
+for kind in ("clean", "cool", "examine", "heat", "put", "puttwo"):
+    selected = agent.applicable(rules, kinds, kind)
+    print(kind, len(selected), len(agent.render_pack(selected)), agent.digest_of(selected)[:8])
+```
+
+Six lines, one per kind, each `1 551 <digest>` — and the two distinct digests are the whole design in one screen.

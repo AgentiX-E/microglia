@@ -2826,3 +2826,28 @@ R185 records no bank, and the join treats that as a value rather than as a defau
 slice with a post-R185 one spans `""` and a digest, which is refused — because the reader cannot prove the two slices
 rendered the same prompt, and this lane has published one reading from a join it had not checked was homogeneous
 (AUDIT 34.251).
+
+### 8.48 Scope is the unit a memory is paid in, and the gate is how it is expressed
+
+R185 measured what happens when one entry is read by every kind: 197 characters written about `put` moved `put` by
+**+10.2 pp** and `clean` by **−22.4 pp**, because a pack is one block of text inserted into every prompt and the world
+does not know which task the sentence was written for. The kind that lost did not lose by acting less — it thought
+**4.4 → 10.8** thoughts a game and spent eight more turns, with three times the invalid actions.
+
+The lane already had the mechanism for this and had only used it as a compression knob. `applicable` keeps an **untagged**
+entry everywhere and a **tagged** entry only where its `kinds` list claims it; `--gate-kind` turns the filter on. Two
+design facts follow, and both are asserted in `test_banks.py` rather than assumed:
+
+1. **A partition keeps the price fixed.** If the tags partition the task kinds, every game carries exactly one entry and
+   renders the same number of characters, so a per-kind substitution is a scope test and not a length test. R186's bank is
+   two 354-character entries, five kinds and one kind, **551 characters for every game**.
+2. **The pack a game read is per game, the bank a pass was handed is per pass.** Under a gate one artefact carries
+   several packs — that is what `pack_digest` records — while `bank_digest` stays one value per run, which is the field a
+   join groups on. Collapsing the two would make the join refuse a gated round, which is exactly what the first draft of
+   the guard did (AUDIT 34.266).
+
+The product-level reading is the one the roadmap has been building toward since R174.2: **a store as wide as the corpus
+and a pack as narrow as one line** is not a compression trick, it is the difference between a memory that transfers and a
+memory that leaks. A store that knows what each entry is *about* can hand a game only the entries its kind claims — and
+that is the only form in which a corpus-wide bank can be carried into a task without being a treatment on the tasks it
+was not written for.
