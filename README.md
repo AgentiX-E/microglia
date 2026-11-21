@@ -641,7 +641,7 @@ skeleton is the competitor's own, transliterated: the system line, the two-examp
 split into alternating turns, and the parser's four branches — so an arm changes what sits *above* the transcript
 and nothing else. Three zero-cost readings hold it in place: `--policy seed` reproduces `floor.py` game for game
 (same wins, steps, action digests, observation fingerprints) and the `agreement` job fails on a single field;
-**524 unit tests at 98.8% line-and-branch coverage, every module at or above 95%**, cover the parser, the split,
+**529 unit tests at 98.9% line-and-branch coverage, every module at or above 95%**, cover the parser, the split,
 the shard arithmetic, the bill and the loop itself; and a test asserts that `none` and `always-in` differ at
 exactly one message index. A model reply that
 never produces an action fails the run rather than scoring zero — a zero would be a number about the prompt's
@@ -679,9 +679,16 @@ that runs near the 50-turn cap.
 Three things changed, none of them the parser: a non-action turn that carried a command is answered with the
 corpus's own `Nothing happens.` instead of `OK.`; `refused_actions` and up to three `refused_samples` enter the
 episode record, so the drop is visible in an arm file for the first time; and `aggregate.py` prints
-`dropped <arm> n (x per call)` beside `refusals`, or `not counted` for a file written before the field existed. The
-registered round that reads the repair is R181 — `none` against `always-in` on the same 274 games, with the movement
-predicted in `put` and nowhere else.
+`dropped <arm> n (x per call)` beside `refusals`, or `not counted` for a file written before the field existed.
+
+**R181 read the repair, and the repair's own mechanism was refuted.** `refused_actions` measures **11.64 per `put`
+game** against 0.00–0.07 on the other five kinds — the counter reproduces the training transcripts — and `put` still
+read **20/59 against 21/59**, while the same bank across the repair read **+1.82 pp [−2.55, +6.20]**. So the model did
+not stop writing a thought and a command in one reply; the answer it received was never the binding constraint, the
+format is. What the round did produce is the best level this lane has read — **227/274 (82.85%)** against 150/274,
+**+28.10 pp [+22.26, +33.58]**, and **114/134 = 85.07%** held out — with the caveat that the control drew 81 of a band
+that runs 80 to 93, so the effect is quoted as +14 to +28 pp. R182 puts the format operation into the 197-character
+slot R180 measured dead, at the same 551 characters, and predicts `refused_actions` below 5 per `put` game.
 
 ### Where the scenario actually is: 1,956 lines, 7 modules, and a gate for the rest
 
