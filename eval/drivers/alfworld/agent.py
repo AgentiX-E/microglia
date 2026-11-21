@@ -129,6 +129,18 @@ THINK_PATTERN = r"(?i)(?:>|)\s*think(?::|)"
 CARET_PATTERN = r"(?i)>\s*"
 ACTION_VERB_PATTERN = r"(?i)(?:go to|open|take|put|use|heat|cool|look|clean|inventory)"
 
+# What the model hears when the turn it wrote did not reach the world. `OK.` is the examples' own token for
+# a thought that was only a thought (`react_put_0` answers four of them that way), and it is a true answer to
+# such a turn. It is **not** a true answer to a reply whose first line is a thought and whose later line is a
+# command: the first-line rule refuses that command, nothing moves, and answering `OK.` told the model the
+# command had executed. The corpus has its own word for a command that changed nothing -- `Nothing happens.`,
+# the string a rejected action gets -- so that is the string a refused turn gets, and it is the string the
+# model already knows the meaning of (AUDIT 34.259).
+NO_OP = "Nothing happens."
+# How many refused commands an episode quotes back beside the count. Three is enough to name the shape of a
+# model's mistake in an arm file and small enough that a 274-game pass does not become a transcript.
+REFUSED_SAMPLES = 3
+
 # Three thoughts in a row is what the competitor's own examples contain at their most deliberate, so a
 # run of three is counted rather than punished. What is punished is spending without stepping: a thought
 # consumes one of the `max_steps` turns exactly as an action does, because the alternative -- thoughts free,
@@ -345,6 +357,26 @@ def parse_reply(reply: str) -> "tuple[str, str | None]":
     if re.match(ACTION_VERB_PATTERN, reply):
         return "action", re.sub(r">\s*", "", reply.lower()).strip()
     return "thought", reply.strip()
+
+
+def refused_command(reply: str) -> "str | None":
+    """The command a thought reply carried on a later line, which the first-line rule refuses.
+
+    The rule itself is the competitor's and is not changed here: `re.match` anchors at the start, so a reply
+    that opens with `> think` is a thought and the command under it is dropped. What the rule drops has to be
+    *counted*, because the drop is invisible in every other field of the record -- the command is never
+    handed to the environment, so it is not an invalid action, not a stalled thought, and not a turn the arm
+    can see. The transcript is the only place it shows, and a transcript is not what the lane prices.
+
+    Returned rather than executed, and returned rather than discarded: `run_episode` answers the turn with the
+    corpus's own no-op string when this is not `None`, which is the difference between a model that is told
+    nothing happened and a model that is told its `put` worked.
+    """
+    for line in reply.splitlines()[1:]:
+        kind, payload = parse_reply(line.strip())
+        if kind == "action" and payload:
+            return payload
+    return None
 
 
 def words_of(text: str) -> "set[str]":
@@ -649,6 +681,8 @@ def run_episode(
     retries = 0
     invalid = 0
     off_space = 0
+    refused = 0
+    refused_samples: "list[str]" = []
     pack_entries: "int | None" = None
     # The rendered pack's length, as opposed to the prefix's. `prefix_chars` is the whole fixed prompt — examples,
     # system instruction and pack — so two arms of different lengths differ by a number that also contains the
@@ -736,14 +770,22 @@ def run_episode(
                 action = payload
                 break
             # A thought does not move the world, and the competitor answers it with `OK.` — the same
-            # string its examples carry — rather than with a fresh observation.
+            # string its examples carry — rather than with a fresh observation. A reply that carried a
+            # command under its first line is the exception: the command was refused, nothing moved, and the
+            # answer has to say so (AUDIT 34.259).
             thoughts += 1
             steps += 1
             consecutive_thoughts += 1
             if consecutive_thoughts == STALL_THOUGHTS:
                 stalls += 1
-            messages.append({"role": "user", "content": "OK."})
-            trajectory.append("OK.")
+            refused_here = refused_command(reply)
+            if refused_here is not None:
+                refused += 1
+                if len(refused_samples) < REFUSED_SAMPLES:
+                    refused_samples.append(refused_here)
+            answer = NO_OP if refused_here is not None else "OK."
+            messages.append({"role": "user", "content": answer})
+            trajectory.append(answer)
             if steps >= max_steps:
                 # The budget ran out on a thought, so the episode ends without another environment step.
                 break
@@ -787,6 +829,11 @@ def run_episode(
         "actions": len(actions),
         "invalid_actions": invalid,
         "off_space_actions": off_space,
+        # A command the parser refused because the reply opened with a thought. Recorded beside the invalid
+        # actions because they are the two ways a turn can fail to reach the world, and only one of them was
+        # visible before: an invalid action is attempted and counted, a refused one is dropped in silence.
+        "refused_actions": refused,
+        "refused_samples": refused_samples,
         "pack_entries": pack_entries,
         "pack_chars": pack_chars,
         "prefix_chars": prefix_chars,
@@ -932,6 +979,10 @@ def pass_summary(
             "episodes_without_any_action": sum(1 for episode in episodes if episode["actions"] == 0),
             "budget_exhausted": sum(1 for episode in episodes if episode["budget_exhausted"]),
             "invalid_actions": sum(episode["invalid_actions"] for episode in episodes),
+            # `get` rather than an index: an arm file written before this field existed is still a file the
+            # lane prices and joins, and a summary that raised on it would make the repair unreadable against
+            # the runs it was diagnosed from.
+            "refused_actions": sum(episode.get("refused_actions", 0) for episode in episodes),
             "off_space_actions": sum(episode["off_space_actions"] for episode in episodes),
             "usage": usage,
             "cache_hit_rate": round(usage["cache_hit_tokens"] / usage["prompt_tokens"], 4) if usage["prompt_tokens"] else None,
@@ -1171,6 +1222,9 @@ def main() -> int:
     print(f"{arguments.arm} over {len(episodes)} games: {wins} wins = {100 * summary['rate']:.1f}%")
     print(f"  wilson 95%      [{100 * summary['wilson_low']:.1f}, {100 * summary['wilson_high']:.1f}]")
     print(f"  calls           {calls} ({summary['thoughts']} thoughts, {summary['invalid_actions']} invalid actions)")
+    # Printed on every pass, not only when it is non-zero: a reader comparing a pre-repair arm against a
+    # post-repair one needs to see the refused count *absent* from the old file and zero in the new one.
+    print(f"  refused         {summary['refused_actions']} commands the first-line rule dropped")
     print(f"  cache hit rate  {summary['cache_hit_rate']}")
     print(f"  prefix chars    {summary['prefix_chars_mean']}")
     print(f"  bill            ${bill['usd']} ({bill['band']}); other band ${bill['usd_in_other_band']}")

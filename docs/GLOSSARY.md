@@ -1976,3 +1976,15 @@ the swing of a control that has read 80 to 91 wins on the same 134 games. R178 h
 (90 → 42) and took the mde from 9.70 pp to 6.63 pp on the same 274 games, for one arm's price (≈ ¥2.4) — the row
 that would have bought ≈ 6 pp with a training-section subset was quoted at ¥10–50.
 
+**Refused command (as opposed to an invalid action)** — A command the lane's parser dropped because the reply that
+carried it opened with `> think:`. The parser is the competitor's and anchors at the first line, so the drop is the
+rule rather than a defect; what was a defect is that the driver answered the turn with `OK.` and the model believed
+the command had executed. Two ways a turn can fail to reach the world, and only one of them was ever counted: an
+**invalid action** is emitted and refused by the environment (counted in `invalid_actions`), a **refused command**
+never arrives (counted in `refused_actions`, which did not exist until R181).
+
+**No-op acknowledgement** — `Nothing happens.`, the string the environment returns for a command that changed
+nothing, used as the driver's answer to a turn whose command was refused. It is the corpus's own wording rather than
+a new token, because the prompt's comparability rests on being the competitor's: `OK.` stays the answer to a thought
+that was only a thought, which is what the few-shot examples show, and `Nothing happens.` is the answer to a turn
+where something was written into the void.

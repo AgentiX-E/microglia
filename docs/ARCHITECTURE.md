@@ -2661,3 +2661,40 @@ citation that is false by construction has to be labelled in the artefact — ot
 run id as a typo, and the arm quietly becomes a duplicate of R178's true-citation arm. The `FALSE BY CONSTRUCTION`
 line in `source.note` is asserted by the test for the same reason.
 
+### 8.44 The two ways a turn fails to reach the world, and why only one of them was in the record
+
+The driver's reply parser is the competitor's, transliterated, and it anchors at the first line: a reply that opens
+with `> think:` is a thought, whatever the lines under it say. That rule is not a bug — it is the rule the arm is
+being measured under, and changing it would change the number rather than the model. What was a bug is what the
+driver *said* afterwards.
+
+**The defect, stated as a state transition.** A turn can fail to reach the environment in two ways. An **invalid
+action** is emitted as an action and refused by the world: it costs a turn, it is counted, and it is auditable. A
+**refused command** is written under a thought and dropped by the parser: it never reaches the world, it was counted
+nowhere, and the driver answered it with `OK.` — the examples' own token for a thought that was only a thought.
+`OK.` is a true answer to a pure thought and a false answer to a refused command, and the model cannot tell the two
+apart. In the 245 train games on disk, 1,070 commands were dropped this way, in 72 of 72 `put` games.
+
+**Why the field comes before the fix.** The reason seven rounds of ablating a clause could not see this is that no
+arm file had a place to put it: `invalid_actions` counts what the world refused, `stalls` counts thoughts in a row,
+`steps` counts turns, and a dropped command is none of those. `refused_actions` and `refused_samples` are recorded
+beside `invalid_actions` for the same reason `pack_chars` sits beside `prefix_chars` — a quantity that decides
+whether a reading means anything has to be a field, not an inference from a transcript the lane does not price.
+
+| field | what it counts | what it cannot tell you |
+| --- | --- | --- |
+| `invalid_actions` | actions the world refused | nothing about a command that never arrived |
+| `stalls` | runs of three consecutive thoughts | nothing about what those thoughts contained |
+| `refused_actions` | commands the first-line rule dropped | whether the model meant them as its next action |
+| `refused_samples` | up to three such commands, verbatim | how the turn ended |
+
+**Why the acknowledgement is the corpus's own string.** `NO_OP = "Nothing happens."` is what ALFWorld answers when a
+command changes nothing, so the model reads a sentence it already knows the meaning of. A new token — `REFUSED.`, or
+a reworded apology — would be a second invented protocol string in a prompt whose whole comparability rests on being
+the competitor's. The guard is in `test_banks.py::RepairAnchorTest`, which also holds the anchor bank's `sha256`:
+R181 compares a driver against itself across a repair, so the bank on both sides has to be the same bytes.
+
+**What this changes upstream.** `aggregate.py` prints `dropped <arm> n (x per call)` beside `refusals`, and prints
+`not counted` when the episodes it was given predate the field. A zero from an old arm file means "the driver never
+counted" and not "the model never wrote a command under a thought", and a report that printed `0` would make the
+defect invisible in exactly the before-and-after that proves it was repaired.

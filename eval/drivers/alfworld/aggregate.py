@@ -479,17 +479,25 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
         actions = sum(int(episode.get("actions") or 0) for episode in episodes)
         invalid = sum(int(episode.get("invalid_actions") or 0) for episode in episodes)
         off_space = sum(int(episode.get("off_space_actions") or 0) for episode in episodes)
+        # A command the first-line rule refused: absent from every arm file written before AUDIT 34.259, which
+        # is why it is summed with a default. An old arm reports zero because it never counted, not because it
+        # never happened, and the print below says which is which by naming the field only when a file has it.
+        refused = sum(int(episode.get("refused_actions") or 0) for episode in episodes)
+        counted = any("refused_actions" in episode for episode in episodes)
         return {
             "games": len(episodes),
             "calls": calls,
             "actions": actions,
             "invalid_actions": invalid,
             "off_space_actions": off_space,
+            "refused_actions": refused,
+            "refused_counted": counted,
             # A rate over no calls is not zero, it is undefined: a slice that recorded no call did not
             # refuse nothing, it did not happen.
             "invalid_per_call": round(invalid / calls, 4) if calls else None,
             "invalid_per_action": round(invalid / actions, 4) if actions else None,
             "off_space_per_action": round(off_space / actions, 4) if actions else None,
+            "refused_per_call": round(refused / calls, 4) if calls else None,
         }
 
     report = {labels[0]: summarise(left)}
@@ -715,6 +723,15 @@ def main() -> int:
             f"  refusals        {treatment} {left_counts['invalid_per_call']} "
             f"vs {control} {right_counts['invalid_per_call']} (per call)"
         )
+        # The second way a turn can fail to reach the world, and the one no arm file could show before
+        # AUDIT 34.259. Printed as `not counted` when the file predates the field, so that a zero here is
+        # never read as "the model wrote no command under a thought".
+        def refused_cell(counts: dict) -> str:
+            if not counts["refused_counted"]:
+                return "not counted"
+            return f"{counts['refused_actions']} ({counts['refused_per_call']} per call)"
+
+        print(f"  dropped         {treatment} {refused_cell(left_counts)} vs {control} {refused_cell(right_counts)}")
     print(f"  bill            ${payload['bill']['usd']} over {payload['bill']['calls']} calls")
     if arguments.out:
         print(f"  written         {arguments.out}")

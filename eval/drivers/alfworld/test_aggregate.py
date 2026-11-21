@@ -349,6 +349,28 @@ class RefusalTest(unittest.TestCase):
         report = aggregate.refusals(left=[episode("g1", True, calls=0)], right=[episode("g1", True)])
         self.assertIsNone(report["left"]["invalid_per_call"])
 
+    def test_dropped_commands_are_counted_apart_from_refusals(self):
+        # Two ways a turn fails to reach the world, and until AUDIT 34.259 only the first was visible: an
+        # invalid action is attempted and counted, a command under a thought is dropped in silence. The
+        # report keeps them in different fields because a repair that removes one must not look like a repair
+        # that removed the other.
+        left = [episode("g1", True, calls=10, actions=5, refused_actions=3)]
+        right = [episode("g1", True, calls=10, actions=5, refused_actions=0)]
+        report = aggregate.refusals(left=left, right=right)
+        self.assertEqual(report["left"]["refused_actions"], 3)
+        self.assertEqual(report["left"]["refused_per_call"], 0.3)
+        self.assertTrue(report["left"]["refused_counted"])
+        self.assertEqual(report["right"]["refused_actions"], 0)
+
+    def test_an_arm_file_from_before_the_field_reports_not_counted_rather_than_zero(self):
+        # Every reading in this lane before the repair was taken on files with no `refused_actions`, and a
+        # zero there means "the driver never counted" rather than "the model never wrote a command under a
+        # thought". A report that printed 0 would make the defect invisible in exactly the comparison that
+        # proves it was fixed.
+        report = aggregate.refusals(left=[episode("g1", True, calls=10, actions=5)], right=[])
+        self.assertFalse(report["left"]["refused_counted"])
+        self.assertEqual(report["left"]["refused_actions"], 0)
+
 
 class StrataTest(unittest.TestCase):
     """The same delta, split by what the control did on its own.
@@ -640,6 +662,34 @@ class CarriedTest(unittest.TestCase):
             for path in (treatment, control):
                 path.unlink(missing_ok=True)
         self.assertNotIn("paired delta", buffer.getvalue())
+
+    def test_the_dropped_line_names_the_field_or_says_the_file_predates_it(self):
+        # The repair is only visible in a comparison if the print distinguishes "counted, and zero" from
+        # "this file has no such field". A reader comparing an arm from before AUDIT 34.259 against one from
+        # after needs the difference stated on the line itself, not inferred from a missing number.
+        original = sys.argv
+        after = HERE / "dropped-after.json"
+        before = HERE / "dropped-before.json"
+        after.write_text(
+            json.dumps({"summary": summary("always-in"), "episodes": [episode("g1", True, refused_actions=2)]}),
+            encoding="utf-8",
+        )
+        before.write_text(
+            json.dumps({"summary": summary("none"), "episodes": [episode("g1", False)]}),
+            encoding="utf-8",
+        )
+        sys.argv = ["aggregate.py", "--input", str(after), "--input", str(before), "--compare", "always-in,none"]
+        buffer = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buffer):
+                aggregate.main()
+        finally:
+            sys.argv = original
+            for path in (after, before):
+                path.unlink(missing_ok=True)
+        printed = buffer.getvalue()
+        self.assertIn("dropped         always-in 2 (", printed)
+        self.assertIn("vs none not counted", printed)
 
 
 class MainTest(unittest.TestCase):

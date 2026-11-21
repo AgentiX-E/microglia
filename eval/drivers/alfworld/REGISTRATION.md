@@ -1533,3 +1533,140 @@ is open"; the filler carries no digit and names no step; `by_kind` printed besid
 prediction is a *per-kind* one (`clean`/`cool`/`heat` should fall and `examine` should not) and a pooled number that
 lands in the middle band would hide exactly the pattern that matters.
 
+
+## R180, amendment 1 — bought, and operation (2) is decoration
+
+Two dispatches, one arm each, 274 games, read against R178 1b (`bank-putmove-note-1.json`) — which is the
+sentence with a neutral clause in place of the provenance, so the pairing isolates the half of the sentence the
+round was registered about.
+
+`carried` is 1.0 in all 274 games of both arms, `pack chars` is exactly **551** in every one of them, the ablated
+entry keeps the first operation byte for byte, and neither "different valid receptacle" nor "ensure it is open"
+appears in it. The filler carries no digit and names no step. The registered void conditions all hold.
+
+| arm | bank | rendered | seen, 140 | held out, 134 | pooled, 274 | bill |
+| --- | --- | --- | --- | --- | --- | --- |
+| **1a** operation (1) only | `bank-putmove-phrase-1.json` | **551** | 108 | 112 | **220 (80.29%)** | $0.3224 (¥2.31) |
+| 1b *(spent)* the whole sentence + neutral clause | `bank-putmove-note-1.json` | 551 | 111 | 111 | **222 (81.02%)** | R178 |
+
+| pairing | delta | 95% CI | p | discordant | mde |
+| --- | --- | --- | --- | --- | --- |
+| **1a − 1b** | **−0.73 pp** | **[−4.74, +3.28]** | 0.800 | 30 (14 + 16) | **5.60 pp** |
+
+**The registered reading landed in the second band**: `−9 to +9 pp` was written as *the phrasing swap carries it
+and operation (2) is decoration*. That is the reading. The receptacle choice and the container check — 135
+characters, more than a third of the sentence — are worth **less than one win in 274**.
+
+**The per-kind prediction is refuted, and in the direction that matters.** The round registered that
+`clean`/`cool`/`heat` should *fall* when the container check is removed, because they are the kinds whose last
+step ends in a container. They did not fall: `clean` +3.4 pp, `cool` +4.3 pp, `heat` 0.0, `puttwo` 0.0, while
+`put` itself fell 6.8 pp and `examine` 6.5 pp. Every cell is four games or fewer, so the shape is reported as a
+shape; but it is the opposite shape to the one a container-check mechanism predicts, and it is the second
+independent reason to read operation (2) as decoration rather than as knowledge.
+
+**The five-arm family, on one command.** R178, R179 and R180 between them bought five renderings of one
+sentence at 274 games each. Joined against the same anchor, they are one table:
+
+| arm | rendered | pooled, 274 | vs 1b (note) | 95% CI | p |
+| --- | --- | --- | --- | --- | --- |
+| the sentence alone | 489 | **223 (81.39%)** | +0.36 pp | [−4.01, +4.74] | 0.920 |
+| **1b** + a neutral clause | **551** | **222 (81.02%)** | — | — | — |
+| R180 1a operation (1) only | **551** | 220 (80.29%) | −0.73 pp | [−4.74, +3.28] | 0.800 |
+| R179 1a a false citation | **551** | 218 (79.56%) | −1.46 pp | [−5.84, +2.92] | 0.566 |
+| R178 1a a true citation | **551** | 212 (77.37%) | −3.65 pp | [−8.39, +1.09] | 0.151 |
+
+Eleven games and 4.0 pp separate the best from the worst, every interval covers zero, and no pair in the family
+is resolved at this `n`. That is a stronger statement than any single row: **at a fixed 551 characters and a fixed
+position, what the entry says beyond its first operation does not move the score**, and the three mechanisms this
+lane has spent R177–R179 on — provenance, verification, and the second operation — are all inside that band.
+
+**The engagement instrument is confounded, and this is the round that shows it.** The lane has been reading
+`engagement` as the difference between a null and a delivery failure: R178 reported 152/274 = 55.5% of trajectories
+changed by the citation and concluded the clause *is read*. R180's single-clause swap at identical length changes
+**146/274 = 53.3%**, and R178's own length control changes **154/274 = 56.2%** — a neutral sentence that says the
+entry is only a reference moves more trajectories than the citation does. So 55% is not a reading of the citation;
+it is what one clause costs in trajectory noise, and the three quantities are within three games of each other.
+AUDIT 34.258 records the correction: engagement measures how close these games are to a decision boundary, not
+whether the model read the entry.
+
+**Where the eleven games move, and the pattern is the same in all four variants.** Every 551-character arm trades
+the easy games for the hard ones: on the 52 games the anchor loses, the sentence wins 19, the citation 16, the
+false citation 16, and the ablated arm 14 (+26.9 to +36.5 pp), while on the 222 it wins it loses 8 to 26 (−7.2 to
+−11.7 pp). The total is a wash. That is what a cheap reshuffle of a frozen model's trajectory looks like, and it is
+the third independent reason to read the whole family as noise around one number rather than as five mechanisms.
+
+**Spend: ¥2.31 against ¥2.4 quoted** ($0.3224, 13,281 calls). R178–R180 together bought **five** arms for
+**¥9.43** and 33,324 calls.
+
+## R181 — The 62 characters were not the bug: a command under a thought was refused, and the model was told `OK.`
+
+R178–R180 spent ¥9.43 ablating one clause of one entry and found a 4.0 pp band with nothing in it. The train
+transcripts say why the lane could not see anything: **the driver was silently discarding the model's commands.**
+
+`parse_reply` is the competitor's parser, transliterated, and it is `re.match` — anchored at the first line. A reply
+that opens with `> think:` is a thought, whatever follows it. The competitor's own few-shot transcripts write
+think-then-act in one turn (`react_put_0`: `> think: Now I find a spraybottle (2). Next, I need to take it.` then
+`> take spraybottle 2 from cabinet 2`), so the model was taught a format whose second line the driver drops.
+
+What the driver then answered is the defect. The reference implementation steps its environment with `N/A` and hands
+the model back the environment's own `Nothing happens.`; this driver appended `OK.` — the examples' token for a
+thought that was *only* a thought. The model read its own `> put …` followed by `OK.`, concluded the put had
+executed, and wrote "The task is complete" until the budget ran out.
+
+Measured on the 245 train games already in this workspace (transcripts are recorded on the training pass, so this
+cost nothing): **1,070 commands were dropped, in 72 of the 72 `put` games** — 14.9 per game — and in 30 of the other
+173 games across all five other kinds. `put` is the only kind destroyed because it is the only kind where the model
+hedges before acting, and it is the only kind that runs near the 50-turn cap (wins 31.7–35.9 turns, losses 50).
+The mean trailing run of `think:` lines in a lost `put` game is **9.7** turns, and 24 of them are pure
+"the task is complete" loops.
+
+**What changed.** Three things, none of them the parser:
+
+1. a non-action turn that carried a command is answered with `NO_OP = "Nothing happens."` — the corpus's own
+   wording for a command that changed nothing — instead of `OK.`;
+2. `refused_actions` and `refused_samples` (up to 3) enter the episode record, so the drop is visible in an arm file
+   for the first time;
+3. `aggregate.py` prints `dropped <arm> n (x per call)` beside `refusals`, and prints `not counted` for a file
+   written before the field existed, because a zero there would mean "never counted" and not "never happened".
+
+| # | arm | bank | rendered | games | the question | price |
+| --- | --- | --- | --- | --- | --- | --- |
+| **1a** | `none` | — | 0 | 274 | what the corpus does unaided, on a driver that does not lie about a refused turn | ≈ ¥2.35 |
+| **1b** | `always-in` | `banks/bank-putmove-note-1.json` | **551** | 274 | the same question for the entry the family is anchored on | ≈ ¥2.35 |
+
+Read **within** the dispatch as a matched pair (the memory effect on a repaired driver), and **across** the
+dispatch against the pre-repair pair (R178's 163 and 222) as a band, because a control moves eight to eleven wins
+between dispatches and a driver change moves it by design.
+
+**Registered readings on 274 games.**
+
+| quantity | prediction |
+| --- | --- |
+| `refused_actions` per `put` game, both arms | **8 to 20** — the field has to reproduce the 14.9 the transcripts show, or it is counting something else |
+| `refused_actions` on the other five kinds | < 1 per game pooled; a count there would mean the detector is reading prose as commands |
+| `put` wins, each arm | **+6 to +22 pp** against the pre-repair arm of the same name (pre-repair: control ≈ 10%, note 35.6%) |
+| pooled delta of the repair, `none` | **+4 to +18 pp** (163/274 → 167–212) |
+| pooled delta of the repair, `always-in` @ note | **+1 to +12 pp** (222/274 → 225–255) |
+| `by_kind` on the repair | the movement is **in `put` and nowhere else**: |Δ| ≤ 5 pp on all five other kinds, which is the mechanism claim — refused turns are concentrated where the model hesitates |
+| the memory contrast after the repair (1b − 1a) | **+2 to +18 pp**, i.e. narrower than the +21.90 the pre-repair pair reported, because part of that number was the treatment suppressing this defect |
+
+**Refutation.**
+
+* `put` wins do not move in either arm while `refused_actions` reads 8–20 per game. Then the false acknowledgement
+  is not what kept `put` down, the completion-loop reading is wrong, and the `put` deficit is a search-order or
+  budget problem — the next round is an entry about order, not about termination.
+* `refused_actions` reads 0–2 per `put` game. Then the detector is not seeing what the transcripts show,
+  `refused_command` is reading a different string than the model wrote, and every number in this round is about
+  a defect that is still there.
+* `put` moves on one arm and not the other. Then the repair interacts with the entry, and the reading is a
+  treatment-by-driver interaction rather than a repair.
+* Any other kind moves by more than 5 pp. Then the repair is not specific to refused turns, and the mechanism claim
+  is withdrawn rather than reinterpreted.
+
+**Void conditions.** `pack chars` exactly 551 in every game of 1b and 0 in every game of 1a; `carried` 1.0 in all
+274 games of 1b; `refused_actions` present in every episode of both arms; the bank byte-identical to R178 1b's,
+`sha256 95f8c634f0604209677afa219cee360c117332200084321c490d69a4c1337050`, so that the anchor this round re-reads
+is the anchor R178 bought; both sections tiled to 274 under `--expect 274`.
+
+**Cost.** Two dispatches, two arms each — §4.70, and it is the last round that has to pay for the control: every
+round after it can be read against 1a.

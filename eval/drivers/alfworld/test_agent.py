@@ -286,6 +286,23 @@ class ParseTest(unittest.TestCase):
                     self.assertEqual(parsed_kind, "action", f"{kind}: {content!r}")
                     self.assertTrue(parsed)
 
+    def test_the_first_line_rule_drops_the_command_under_a_thought(self):
+        # The competitor's rule, restated as a test so that a later "improvement" cannot quietly start
+        # executing it: `react_put_0` writes a thought and a command in one turn, our parser reads the
+        # thought, and `refused_command` is how the lane says so out loud instead of answering `OK.`.
+        reply = "> think: Now I find a spraybottle (2). Next, I need to take it.\n> take spraybottle 2 from cabinet 2"
+        self.assertEqual(agent.parse_reply(reply)[0], "thought")
+        self.assertEqual(agent.refused_command(reply), "take spraybottle 2 from cabinet 2")
+
+    def test_a_command_on_the_first_line_is_not_refused_because_it_was_executed(self):
+        self.assertIsNone(agent.refused_command("> take spraybottle 2 from cabinet 2"))
+
+    def test_a_pure_thought_refuses_nothing(self):
+        self.assertIsNone(agent.refused_command("> think: I need an apple"))
+
+    def test_prose_after_a_thought_refuses_nothing(self):
+        self.assertIsNone(agent.refused_command("> think: I need an apple\nOK.\nIt is on the counter."))
+
 
 class AnchorTest(unittest.TestCase):
     def test_orders_by_overlap(self):
@@ -819,6 +836,118 @@ class ModelPolicyTest(unittest.TestCase):
         )
         self.assertEqual(episode["invalid_actions"], 1)
         self.assertEqual(episode["off_space_actions"], 0)
+
+    def test_a_command_under_a_thought_is_refused_counted_and_answered_with_the_no_op_string(self):
+        # 1,070 commands in 72 `put` games of the train pass never reached the world (AUDIT 34.259). The
+        # parser reads the first line -- that is the competitor's rule and it is not changed here -- so a
+        # reply that opens with `> think` drops the command under it. What was wrong is the answer: `OK.` is
+        # the examples' token for a thought that was only a thought, and giving it to a turn whose command was
+        # refused told the model its `put` had worked. It then wrote "The task is complete" until the budget
+        # ran out, which is why `put` -- the one kind whose model hedges before acting -- is the only kind
+        # destroyed by this defect.
+        seen = []
+        original = agent.chat
+        replies = [
+            "> think: I need the apple\n> take apple 1 from countertop 1",
+            "> take apple 1 from countertop 1",
+            "> put apple 1 in/on cabinet 1",
+        ]
+
+        def chat(messages, model, api_key, timeout):
+            seen.append([message["content"] for message in messages])
+            return replies.pop(0), {"prompt_tokens": 10, "completion_tokens": 1}, 0
+
+        agent.chat = chat
+        try:
+            episode = agent.run_episode(
+                self.world, "none", "model", self.examples, [], agent.Draw(1), 50, 3, "deepseek-flash", "k", 1.0
+            )
+        finally:
+            agent.chat = original
+        self.assertEqual(episode["refused_actions"], 1)
+        self.assertEqual(episode["thoughts"], 1)
+        self.assertEqual(episode["actions"], 2)
+        self.assertEqual(episode["steps"], 3)
+        self.assertEqual(episode["invalid_actions"], 0)
+        self.assertTrue(episode["won"])
+        # The refused turn never reached the world: the first environment step is the second reply's, not the
+        # command that was written under the thought.
+        self.assertEqual(self.world.steps, 2)
+        # What the model was told, read from the prompt it was given next rather than from a field.
+        self.assertEqual(seen[1][-1], agent.NO_OP)
+        self.assertEqual(agent.NO_OP, "Nothing happens.")
+
+    def test_a_thought_that_carries_no_command_is_still_answered_with_the_examples_oh_kay(self):
+        # The repair must not turn every thought into a no-op: `OK.` is the correct answer to a turn that was
+        # only a thought, the examples answer four of them that way, and a driver that answered `Nothing
+        # happens.` to a thought would be inventing a world event.
+        seen = []
+        original = agent.chat
+        replies = ["> think: I need the apple", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+
+        def chat(messages, model, api_key, timeout):
+            seen.append([message["content"] for message in messages])
+            return replies.pop(0), {"prompt_tokens": 10, "completion_tokens": 1}, 0
+
+        agent.chat = chat
+        try:
+            episode = agent.run_episode(
+                self.world, "none", "model", self.examples, [], agent.Draw(1), 50, 3, "deepseek-flash", "k", 1.0
+            )
+        finally:
+            agent.chat = original
+        self.assertEqual(episode["refused_actions"], 0)
+        self.assertEqual(seen[1][-1], "OK.")
+        self.assertTrue(episode["won"])
+
+    def test_prose_under_a_thought_names_no_command_and_is_not_a_refusal(self):
+        # A model that narrates rather than acting writes paragraphs, and a paragraph that mentions `put` in
+        # the middle of a sentence is not a command the parser dropped. Only a line the parser would have
+        # read as an action counts, which is what keeps this field from becoming a count of English.
+        original = agent.chat
+
+        def chat(messages, model, api_key, timeout):
+            return (
+                "> think: I should put the apple somewhere.\nIt is probably fine.\nJust keep going.",
+                {"prompt_tokens": 10, "completion_tokens": 1},
+                0,
+            )
+
+        agent.chat = chat
+        try:
+            episode = agent.run_episode(
+                self.world, "none", "model", self.examples, [], agent.Draw(1), 2, 3, "deepseek-flash", "k", 1.0
+            )
+        finally:
+            agent.chat = original
+        self.assertEqual(episode["refused_actions"], 0)
+        self.assertEqual(episode["actions"], 0)
+
+    def test_the_refused_commands_are_quoted_back_up_to_the_cap(self):
+        # The count says how often; the sample says what. Three is the cap because the shape of the mistake is
+        # what a reader needs and a 274-game pass must not become a transcript.
+        original = agent.chat
+        replies = [
+            "> think: a\n> go to countertop 1",
+            "> think: b\n> take apple 1 from countertop 1",
+            "> think: c\n> put apple 1 in/on cabinet 1",
+            "> think: d\n> inventory",
+        ]
+
+        def chat(messages, model, api_key, timeout):
+            return replies.pop(0), {"prompt_tokens": 10, "completion_tokens": 1}, 0
+
+        agent.chat = chat
+        try:
+            episode = agent.run_episode(
+                self.world, "none", "model", self.examples, [], agent.Draw(1), 4, 3, "deepseek-flash", "k", 1.0
+            )
+        finally:
+            agent.chat = original
+        self.assertEqual(episode["refused_actions"], 4)
+        self.assertEqual(len(episode["refused_samples"]), agent.REFUSED_SAMPLES)
+        self.assertEqual(episode["refused_samples"][0], "go to countertop 1")
+        self.assertEqual(episode["refused_samples"][2], "put apple 1 in/on cabinet 1")
 
     def test_the_pack_is_prepended_to_the_first_observation_and_absent_from_the_instruction(self):
         # The placement is the competitor's: `insert_before_task_prompt` puts the rule block after the

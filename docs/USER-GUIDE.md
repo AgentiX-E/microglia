@@ -5046,3 +5046,37 @@ python eval/drivers/alfworld/aggregate.py "${args[@]}" \
    text and contains no digit; a padded block is not a length control because it pays the per-entry price, and R178
    measured the difference: +62 characters inside one entry cost **−0.36 pp [−4.74, +4.01]**, which is nothing.
 
+
+### 32.23 Reading `dropped`, the counter that says a turn never reached the world
+
+Every pass now prints a `dropped` line beside `refusals`, and the number is the only visible trace of a defect that
+cost this lane seven rounds: a reply that opens with `> think:` is a thought under the competitor's first-line rule,
+so a command written under it is **refused** — it never reaches the environment, it is not an invalid action, and
+before this field existed nothing in the arm file said it had happened.
+
+```
+python eval/drivers/alfworld/aggregate.py \
+  --input run-…/arm-none-0.json --relabel "run-…/arm-none-0.json=none" \
+  --input run-….2/arm-always-in-0.json --relabel "run-….2/arm-always-in-0.json=always-in@note" \
+  --compare always-in@note,none --expect 274 \
+  --expect-splits eval_out_of_distribution,eval_in_distribution
+```
+
+```
+  refusals        always-in@note 0.1305 vs none 0.1356 (per call)
+  dropped         always-in@note 812 (0.0611 per call) vs none not counted
+```
+
+1. **`not counted` is not zero.** An arm file written before the field existed reports `not counted`, because a `0`
+   there would say "the model never wrote a command under a thought" when what is true is "the driver never looked".
+   Comparing the two columns is how a repair is shown to be a repair.
+2. **A high `dropped` count is not by itself bad news.** It measures how often the model hedges before acting —
+   `put` is the only kind where it does, which is why the count is concentrated there (14.9 per game against 0.17 in
+   the other five kinds). What was bad was the answer the driver gave: `OK.`, which the model read as "your put
+   worked".
+3. **The answer is now `Nothing happens.`** — the corpus's own string for a command that changed nothing, and the
+   string the model has already seen thousands of times. A pure thought is still answered `OK.`, because that is
+   what the examples do.
+4. **Do not read `dropped` as a property of the arm.** It is a property of the model's format on that corpus. It
+   belongs beside `refusals` for the same reason `pack chars` belongs beside `prefix chars`: it decides whether a
+   delta means anything, not whether the arm was good.

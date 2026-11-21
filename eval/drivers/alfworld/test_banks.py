@@ -441,5 +441,41 @@ class PhraseAblationTest(unittest.TestCase):
         self.assertIn("no operation", filler)
 
 
+class RepairAnchorTest(unittest.TestCase):
+    """R181 re-reads an arm R178 already bought, so the bank has to be the same bytes.
+
+    The round's whole claim is a comparison *across* a driver change: the same bank, the same 274 games, a
+    driver that no longer answers a refused command with `OK.`. If the anchor bank were edited afterwards — a
+    word tightened, a clause added — the "before" column and the "after" column would no longer be the same
+    treatment, and nothing in the arm files would say so: `pack chars` would still be 551, `carried` would
+    still be 1.0, and the delta would be read as the repair.
+    """
+
+    def section(self) -> str:
+        text = (HERE / "REGISTRATION.md").read_text(encoding="utf-8")
+        start = text.index("## R181 —")
+        end = text.find("\n## ", start + 1)
+        return text[start:] if end == -1 else text[start:end]
+
+    def test_the_registration_names_the_bank_it_re_reads(self):
+        self.assertIn("bank-putmove-note-1.json", self.section())
+
+    def test_the_hash_the_registration_records_is_the_hash_on_disk(self):
+        import hashlib
+        import re
+
+        recorded = re.search(r"sha256 ([0-9a-f]{64})", self.section())
+        self.assertIsNotNone(recorded, "R181 records no sha256, so a later edit is undetectable")
+        actual = hashlib.sha256((BANKS / "bank-putmove-note-1.json").read_bytes()).hexdigest()
+        self.assertEqual(recorded.group(1), actual, "the bank R181 re-reads is not the bank it recorded")
+
+    def test_the_repair_answers_a_refused_command_with_the_corpus_own_word(self):
+        # The defect is one string. `OK.` is the examples' answer to a thought that was only a thought; the
+        # corpus answers a command that changed nothing with `Nothing happens.`, so that is the string a turn
+        # whose command was refused has to get, and a later "nicer" wording would be a second invented token.
+        self.assertEqual(driver.NO_OP, "Nothing happens.")
+        self.assertNotEqual(driver.NO_OP, "OK.")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

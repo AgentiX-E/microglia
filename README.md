@@ -641,7 +641,7 @@ skeleton is the competitor's own, transliterated: the system line, the two-examp
 split into alternating turns, and the parser's four branches — so an arm changes what sits *above* the transcript
 and nothing else. Three zero-cost readings hold it in place: `--policy seed` reproduces `floor.py` game for game
 (same wins, steps, action digests, observation fingerprints) and the `agreement` job fails on a single field;
-**506 unit tests at 98.8% line-and-branch coverage, every module at or above 95%**, cover the parser, the split,
+**524 unit tests at 98.8% line-and-branch coverage, every module at or above 95%**, cover the parser, the split,
 the shard arithmetic, the bill and the loop itself; and a test asserts that `none` and `always-in` differ at
 exactly one message index. A model reply that
 never produces an action fails the run rather than scoring zero — a zero would be a number about the prompt's
@@ -659,6 +659,29 @@ sections cannot be told apart (+7.80 pp, [−4.63, +20.27], p = 0.226). Its prov
 neutral clause of the same length, while the length itself is free (−0.36 pp, [−4.74, +4.01]). Both readings, the
 per-kind decomposition and the two sections are in `eval/drivers/alfworld/REGISTRATION.md`; the argument for
 reading them is in `WHITEPAPER.md` §3.5 of the [docs repository](https://github.com/AgentiX-E/microglia-docs).
+
+**Then the lane spent five arms finding nothing, and found a bug instead.** Five renderings of that one sentence —
+itself, plus a neutral clause, a true citation, a false citation, and the sentence with its second operation
+ablated — were bought at 274 games each for **¥9.43**. They span **212 to 223 wins**, eleven games and 4.0 pp, and
+every interval covers zero: at a fixed 551 characters and a fixed position, *what the entry says beyond its first
+operation does not move the score*. The ablations were not measuring the sentence; they were measuring a reshuffle.
+
+The reason is a defect in the driver, and the training transcripts had it all along. `parse_reply` is the
+competitor's parser transliterated, and it anchors at the first line, so a reply that opens with `> think:` is a
+thought and any command under it is dropped — and the competitor's own few-shot examples write think-then-act in one
+turn. What this driver then answered was `OK.`, the examples' token for a thought that was *only* a thought. The
+model read its own `> put …` followed by `OK.`, believed the put had executed, and repeated "The task is complete"
+until the turn budget ran out. On the 245 train games already in the workspace: **1,070 commands dropped, in 72 of
+72 `put` games** (14.9 per game) and 30 of the other 173 games, with a mean trailing run of 9.7 victory claims —
+`put` is the only kind destroyed because it is the only kind where the model hedges before acting and the only kind
+that runs near the 50-turn cap.
+
+Three things changed, none of them the parser: a non-action turn that carried a command is answered with the
+corpus's own `Nothing happens.` instead of `OK.`; `refused_actions` and up to three `refused_samples` enter the
+episode record, so the drop is visible in an arm file for the first time; and `aggregate.py` prints
+`dropped <arm> n (x per call)` beside `refusals`, or `not counted` for a file written before the field existed. The
+registered round that reads the repair is R181 — `none` against `always-in` on the same 274 games, with the movement
+predicted in `put` and nowhere else.
 
 ### Where the scenario actually is: 1,956 lines, 7 modules, and a gate for the rest
 
