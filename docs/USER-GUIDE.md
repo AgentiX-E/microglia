@@ -5080,3 +5080,42 @@ python eval/drivers/alfworld/aggregate.py \
 4. **Do not read `dropped` as a property of the arm.** It is a property of the model's format on that corpus. It
    belongs beside `refusals` for the same reason `pack chars` belongs beside `prefix chars`: it decides whether a
    delta means anything, not whether the arm was good.
+
+### 32.24 Reading `channel` and `recovered`, and why a pass can be on two of them
+
+`--parser` picks the reader a pass drives. `reference` is the competitor's first-line rule and the default; `any-line`
+executes the command that rule refuses. Because a reader applies to every arm at once, the pass records it and the
+report prints it above the delta — and only when it is not the default, because a line that printed `reference` on
+every reading this lane has ever published would teach a reader to skip the one line that matters.
+
+```
+python eval/drivers/alfworld/aggregate.py \
+  --input run-…/arm-always-in-0.json --relabel "run-…/arm-always-in-0.json=always-in@anyline" \
+  --input run-….2/arm-none-0.json --relabel "run-….2/arm-none-0.json=none@anyline" \
+  --compare always-in@anyline,none@anyline --expect 274 \
+  --expect-splits eval_out_of_distribution,eval_in_distribution \
+  --expect-parsers any-line
+```
+
+```
+  carried         always-in@anyline mean 1.0 entries over 274 games, {1: 274}
+  pack chars      always-in@anyline 551 ch x274
+  channel         always-in@anyline any-line vs none@anyline any-line
+  paired delta    +0.2
+  dropped         always-in@anyline 0 (0.0 per call) vs none@anyline 0 (0.0 per call)
+  recovered       always-in@anyline 3180 (0.51 per call) vs none@anyline 3020 (0.48 per call)
+```
+
+1. **`--expect-parsers` is required to compare two channels.** Without it the join refuses, the same way a pooled rate
+   over two corpus sections is refused without `--expect-splits`: legal, sometimes the point, never silent.
+2. **One label cannot span two channels at all.** `always-in` driven once on each reader is two harnesses under one
+   name; re-drive it or label it, because there is no reading of the average.
+3. **`dropped` near zero with `recovered` high is the channel working, not the format cured.** The two counters are the
+   same reply on opposite sides of the parser. `recovered` is what the model still writes; a channel that recovered far
+   fewer replies than the reference channel dropped met a different model, and the comparison between channels is then
+   descriptive.
+4. **A channel-level number is not comparable to a published row.** No published ALFWorld row was measured on this
+   reader. The honest comparison is this lane's own arms across the two channels, which is why the round that buys a
+   channel buys the control again.
+5. **The reference channel stays the default forever.** An arm file written before `parser` existed reads as
+   `reference`, because that is the only reader that existed — not as unknown.

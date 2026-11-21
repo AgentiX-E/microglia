@@ -372,6 +372,139 @@ class RefusalTest(unittest.TestCase):
         self.assertEqual(report["left"]["refused_actions"], 0)
 
 
+class ChannelTest(unittest.TestCase):
+    """The join refuses to pool two parser channels until it says that is what it is comparing.
+
+    R183 re-runs both arms on a harness that executes the command the first-line rule refuses. That is a channel and
+    not an arm: every level measured before it was measured on the reference channel, so a pooled rate over the two
+    is an average over two harnesses — the same category error as a pooled rate over two corpus sections, and the
+    same answer: refused until named, and reported beside the delta once it is.
+    """
+
+    def setUp(self):
+        self.paths = []
+
+    def tearDown(self):
+        for path in self.paths:
+            path.unlink(missing_ok=True)
+
+    def write(self, name: str, payload: dict) -> Path:
+        path = HERE / name
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        self.paths.append(path)
+        return path
+
+    def test_an_artefact_from_before_the_field_is_the_reference_channel(self):
+        # Every reading in this lane before R183 was driven by the reference parser. Reading a missing field as
+        # "unknown" would make the one comparison R183 exists for impossible; reading it as anything other than the
+        # reference would be a guess about a harness that is written down in code.
+        old = self.write("c-old.json", {"summary": summary("none"), "episodes": [episode("g1", True)]})
+        grouped = aggregate.load_slices([old])
+        self.assertEqual(aggregate.parsers(grouped), {"none": "reference"})
+        self.assertEqual(grouped["none"][0]["parser"], "reference")
+
+    def test_a_join_that_spans_two_channels_is_refused_until_it_names_them(self):
+        left = self.write("c-ref.json", {"summary": summary("none"), "episodes": [episode("g1", True)]})
+        right = self.write(
+            "c-any.json",
+            {"summary": summary("none", parser="any-line", arm_label="none@anyline"),
+             "episodes": [episode("g2", True, parser="any-line")]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([left, right])
+        self.assertIn("--expect-parsers", printed.getvalue())
+
+    def test_a_named_channel_span_is_allowed_and_graded(self):
+        left = self.write("c-ref2.json", {"summary": summary("none"), "episodes": [episode("g1", True)]})
+        right = self.write(
+            "c-any2.json",
+            {"summary": summary("none", parser="any-line", arm_label="none@anyline"),
+             "episodes": [episode("g2", True, parser="any-line")]},
+        )
+        grouped = aggregate.load_slices([left, right], expect_parsers=("reference", "any-line"))
+        self.assertEqual(sorted(grouped), ["none", "none@anyline"])
+        self.assertEqual(aggregate.parsers(grouped), {"none": "reference", "none@anyline": "any-line"})
+
+    def test_one_arm_cannot_span_two_channels(self):
+        # The same label over two harnesses is the failure the label exists to prevent: the join would average a
+        # reference run and an any-line run into one rate and call it an arm.
+        first = self.write("c-mix1.json", {"summary": summary("none"), "episodes": [episode("g1", True)]})
+        second = self.write(
+            "c-mix2.json",
+            {"summary": summary("none", parser="any-line"), "episodes": [episode("g2", True, parser="any-line")]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([first, second], expect_parsers=("reference", "any-line"))
+        self.assertIn("one arm cannot span two channels", printed.getvalue())
+
+    def test_a_named_channel_that_did_not_drive_a_slice_is_refused(self):
+        only = self.write("c-ref3.json", {"summary": summary("none"), "episodes": [episode("g1", True)]})
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([only], expect_parsers=("reference", "any-line"))
+        self.assertIn("but the slices drove", printed.getvalue())
+
+    def test_a_channel_name_that_is_not_one_of_the_two_is_refused(self):
+        only = self.write(
+            "c-bad.json",
+            {"summary": summary("none", parser="any_line"), "episodes": [episode("g1", True)]},
+        )
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            aggregate.load_slices([only])
+        self.assertIn("any_line", printed.getvalue())
+
+    def test_recovered_commands_are_reported_beside_dropped_ones(self):
+        # The two counters are one event on opposite sides of the parser, so they are printed together: a channel
+        # that executes what the rule refused has `refused_actions` 0 and `recovered_actions` equal to what the
+        # reference channel's `refused_actions` would have been. Reading only one of them makes the channel look
+        # like a cure for the format.
+        left = [episode("g1", True, calls=10, actions=5, refused_actions=0, recovered_actions=4)]
+        right = [episode("g1", True, calls=10, actions=5, refused_actions=4)]
+        report = aggregate.refusals(left=left, right=right)
+        self.assertEqual(report["left"]["recovered_actions"], 4)
+        self.assertEqual(report["left"]["recovered_per_call"], 0.4)
+        self.assertTrue(report["left"]["recovered_counted"])
+        self.assertEqual(report["right"]["recovered_actions"], 0)
+
+    def test_a_slice_that_recorded_no_recovered_field_reports_not_counted(self):
+        report = aggregate.refusals(left=[episode("g1", True, calls=10, actions=5)], right=[])
+        self.assertFalse(report["left"]["recovered_counted"])
+
+    def test_the_pass_prints_the_channel_of_each_arm(self):
+        # A reading whose two arms came off two harnesses has to say so above the delta, not in a footnote: the
+        # number is the comparison of two channels and nothing else in the output would reveal it.
+        original = sys.argv
+        treatment = HERE / "c-print-a.json"
+        control = HERE / "c-print-b.json"
+        treatment.write_text(
+            json.dumps({"summary": summary("always-in", parser="any-line", arm_label="always-in@anyline"),
+                        "episodes": [episode("g1", True, parser="any-line")]}),
+            encoding="utf-8",
+        )
+        control.write_text(
+            json.dumps({"summary": summary("none"), "episodes": [episode("g1", False)]}),
+            encoding="utf-8",
+        )
+        sys.argv = [
+            "aggregate.py", "--input", str(treatment), "--input", str(control),
+            "--compare", "always-in@anyline,none", "--expect-parsers", "reference,any-line",
+        ]
+        buffer = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(buffer):
+                aggregate.main()
+        finally:
+            sys.argv = original
+            for path in (treatment, control):
+                path.unlink(missing_ok=True)
+        printed = buffer.getvalue()
+        self.assertIn("channel         always-in@anyline any-line", printed)
+        self.assertIn("vs none reference", printed)
+
+
 class StrataTest(unittest.TestCase):
     """The same delta, split by what the control did on its own.
 

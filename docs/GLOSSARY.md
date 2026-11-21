@@ -1988,3 +1988,17 @@ nothing, used as the driver's answer to a turn whose command was refused. It is 
 a new token, because the prompt's comparability rests on being the competitor's: `OK.` stays the answer to a thought
 that was only a thought, which is what the few-shot examples show, and `Nothing happens.` is the answer to a turn
 where something was written into the void.
+
+**Parser channel** — Which reader a pass drives, of two. `reference` is the competitor's parser transliterated:
+`re.match` anchored at the first line, so a reply that opens with a thought loses any command under it. `any-line`
+keeps that rule and executes the command it refuses. A channel is not an arm: it changes the harness under every arm
+at once, so it is recorded in every episode (`parser`), named in every label (`always-in@anyline`) and refused as a
+pooled span by the join until the join is told it is comparing two readers (`--expect-parsers`). R180 and R182 tried to
+reach the same behaviour from the prompt and moved it by **−0.73 pp** with a neutral sentence and **+3.65 pp** with a
+format instruction at identical length.
+
+**Recovered command** — The same reply a **refused command** is, on the other side of the parser: a command written
+under a thought that the lane executed instead of dropping. Counted in `recovered_actions` beside `refused_actions`
+because the two are one event with two possible ends, and the pair is what shows that two channels drove the same model
+behaviour — the reference channel dropped 11.64 and 10.53 per `put` game, so the second channel recovering far fewer
+would mean it met a different model rather than the same one under a different reader.

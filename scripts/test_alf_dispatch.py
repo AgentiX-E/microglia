@@ -133,6 +133,19 @@ class RefusalTest(unittest.TestCase):
     def test_a_gate_share_that_is_not_a_number_is_refused(self):
         self.assertIn("not a number", self.refused("--sweep", "true", "--rules", "b.json", "--gate-share", "half"))
 
+    def test_a_misspelled_channel_is_refused_before_the_dispatch_is_bought(self):
+        # `any_line` is one character from `any-line` and would reach `agent.py` as an argument error inside twelve
+        # jobs, after the environment install, with the money committed. The refusal belongs here, where it is free.
+        self.assertIn("not one of", self.refused("--arm", "none", "--parser", "any_line", "--games", "134"))
+
+    def test_a_channel_travels_with_the_dispatch(self):
+        # Every channel is a channel for both arms, so the input is not conditional on the arm: R183 buys the control
+        # and the treatment on the second reader, and a payload that dropped the flag would buy two reference runs.
+        self.assertEqual(
+            lane.payload(arguments("--sweep", "true", "--parser", "any-line"))["parser"], "any-line"
+        )
+        self.assertNotIn("parser", lane.payload(arguments("--sweep", "true")))
+
     def test_a_kind_gate_without_a_bank_is_refused(self):
         self.assertIn("tagged bank", self.refused("--arm", "always-in", "--gate-kind", "true", "--games", "134"))
 

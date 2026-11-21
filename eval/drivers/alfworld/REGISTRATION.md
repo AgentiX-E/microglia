@@ -1813,3 +1813,88 @@ one kind whose failures are, by the counter's own testimony, a format the few-sh
 entry moves by 15%.
 
 **Spend: ¥2.22 against ¥2.35 quoted** ($0.3106, 6,177 calls), two dispatches, one arm each.
+
+## R183 — The parser channel: the one intervention that is not a prompt
+
+Two rounds tried to reach the turn the model spends on a command that never runs. R180 filled the dead 197 characters
+with a neutral sentence and read **−0.73 pp**; R182 filled them with the format operation itself and read **+3.65 pp**
+with `refused_actions` falling from **11.64 to 9.90** per `put` game — **15%** of the behaviour. Eleven rounds of
+renderings of one sentence now span **212 to 230** games, no adjacent pair resolved, and `put` is still **24 of 59**
+against 91 to 100 per cent on the other five kinds.
+
+So the next intervention is not a sentence. **The command is already in the reply.** The reference parser finds it —
+`refused_command` returns it, and 618 of them were counted in R182's 274 games — and then throws it away, because
+`re.match` anchors at the first line and the corpus's own `react_put_0` example writes *thought, command* in one turn.
+R183 executes it instead.
+
+**Why this is a channel and not an arm.** Every number this lane has published was measured on the reference parser,
+and the competitor's rows were measured on the same one. Changing the reader changes the harness under both arms at
+once, so the round buys **both arms on the second reader** and states the divergence in the same sentence as the
+result. What it does *not* do is re-read anything: `parse_reply` is untouched, `refused_command` is untouched, and the
+only change is what happens to a command the rule already found and refused.
+
+**The two counters are the instrument.** `refused_actions` counts a command the first-line rule dropped;
+`recovered_actions` counts one it would have dropped and the channel executed instead. One reply is one event counted
+on whichever side of the parser it fell, so the two channels can be shown to have driven the same model behaviour
+rather than a repaired model — which is the difference between measuring the harness and measuring a prompt.
+
+| # | arm | bank | channel | rendered | games | the question | price |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **1a** | `always-in` | `banks/bank-putmove-line-1.json` | `any-line` | 551 | 274 (both sections) | what is the memory worth when the format no longer costs the turn | ≈ ¥2.60 |
+| **1b** | `none` | — | `any-line` | 0 | 274 (both sections) | the same question with nothing to carry | ≈ ¥3.30 |
+| 1c | *(spent)* | `bank-putmove-line-1.json` | `reference` | 551 | 274 | R182: 230/274, `put` 24/59 | spent |
+| 1d | *(spent)* | — | `reference` | 0 | 274 | R181: 150/274, `put` 4/59 | spent |
+
+**Registered readings on 274 games.** The primary quantity is the third row: the pair that says whether the memory
+effect this lane has been quoting is content or a workaround.
+
+| quantity | prediction |
+| --- | --- |
+| `refused_actions`, both arms, both sections | **0**, by construction — nothing is dropped on this channel |
+| `recovered_actions` per `put` game, `always-in@anyline` | **8 to 15**, i.e. within ±30% of the 11.64 the reference channel dropped: the format is the model's, and a reader that executes it does not change it |
+| `recovered_actions` per `put` game, `none@anyline` | **7 to 14**, against the 10.53 R181's control read |
+| `put`, `always-in@anyline` − `always-in` reference | **+15 to +35 pp** (24/59 → 33 to 45 of 59) |
+| `put`, `none@anyline` − `none` reference | **+20 to +50 pp** (4/59 → 16 to 34 of 59) |
+| pooled, `always-in@anyline` − reference 230/274 | **+3 to +8 pp**: `put` is 59 of 274, so +15 to +35 pp on it is +3.2 to +7.5 pooled |
+| pooled, `none@anyline` − reference 150/274 | **+8 to +25 pp** |
+| **the memory effect on the second channel** | **+10 to +25 pp**, i.e. *below* the +29.20 pp the same pair reads on the reference channel |
+| the other five kinds, both arms | \|Δ\| ≤ 5 pp — they carry 0.00 to 0.07 refusals per game, so a move there is a defect |
+| `pack chars`, `always-in@anyline` | exactly 551 in every game, head identical to R182's bank |
+
+**The mechanism prediction, stated so it can fail.** R182's format entry recovered 15% of the refusals and bought
++3.65 pp; extrapolated, the +29.20 pp the memory is worth on the reference channel is **at least partly a workaround**
+— an entry that tells the model how to write around a reader that drops its command. If that is the mechanism, the
+entry's value falls when the format stops costing a turn, and the band above says how far. If the memory effect stays
+at +29 pp on a channel where the format costs nothing, then the entry was doing something the format was not, the
+workaround reading is refuted, and what the bank carries is procedure rather than syntax.
+
+**Refutation.**
+
+* `recovered_actions` per `put` game reads below 8 on either arm. Then the two channels met different model behaviour —
+  a reader that executes a command changes what the model writes next, which is the one thing this round's comparison
+  assumes does not happen — and the round is a second experiment rather than a re-read of the first: the cross-channel
+  rows become descriptive and the within-channel memory pair (+10 to +25 pp) is the only registered reading that
+  survives.
+* `put` moves but pooled does not (below +3 pp on `always-in@anyline`). Then the gains are being paid for elsewhere —
+  five kinds at 91 to 100 per cent have five points of room between them and `put` has fifty-nine — and the round
+  refutes the accounting in R182's "where the headroom is" paragraph rather than the mechanism.
+* The memory effect on the second channel reads **at or above +29.20 pp** (i.e. the entry loses nothing when the format
+  is fixed). Then the third row is refuted and the product statement is the entry, not the harness: R183 is the last
+  round that buys a channel, and the lane's remaining work is content.
+* `put` *falls* on the second channel. Then the dropped command was load-bearing — a model whose first intent is
+  executed on every turn explores worse than one whose intent is refused — and the direction of the whole diagnosis is
+  wrong, which the counter cannot explain and a transcript round would have to.
+
+**Void conditions.** `parser` is `any-line` in the header and in all 274 episodes of both arms; `arm_label` is
+`always-in@anyline` and `none@anyline`; `refused_actions` is 0 in every episode of both arms; `pack chars` exactly
+**551** in every game of 1a and **0** in every game of 1b; the bank is byte-identical to R182's; both sections tiled to
+274; every cross-channel reading is joined with `--expect-parsers reference,any-line` — `aggregate.py` refuses the span
+without it, and refuses one label spanning both channels at all.
+
+**What this round cannot say.** It cannot say what the competitor would score on this channel, because no published
+row was measured on it: the numbers are this lane's own, on a reader it built. It cannot say whether executing the
+command is *better memory* — it is a different harness, and a lane that changed its reader and then compared itself to
+rows measured on the old one would be committing the category error `COMPETITIVE.md` spends a section on. And it
+cannot say the format is fixed in the model: `recovered_actions` is the count of replies that still write both.
+
+**Cost.** Two arms, two sections, four jobs each — **≈ ¥5.90**. It is the last cheap measurement of the format lock.

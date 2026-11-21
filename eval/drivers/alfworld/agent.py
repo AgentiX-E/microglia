@@ -141,6 +141,23 @@ NO_OP = "Nothing happens."
 # model's mistake in an arm file and small enough that a 274-game pass does not become a transcript.
 REFUSED_SAMPLES = 3
 
+# The parser is the one part of the harness this lane refused to change, because every published number on this
+# corpus was produced by it and a lane that changes its own reader cannot be compared to the rows it is compared
+# to. R180 and R182 spent two rounds trying to reach the format from the prompt instead and moved it by 0.00 pp and
+# 15% (AUDIT 34.261). R183 therefore makes the change explicit as a **channel**: a second reader that executes the
+# command the first-line rule refuses, named in every episode, in every label, and in every join (AUDIT 34.262).
+#
+# `reference` is the competitor's parser transliterated -- `re.match` anchored at the first line -- and it stays the
+# default forever, because an artefact written before this field existed was driven by it.
+REFERENCE_PARSER = "reference"
+# The same first-line rule, with one addition: when the first line is a thought and a later line is a command, that
+# command is executed instead of dropped. The reply is not re-read and nothing is invented; the only difference is
+# what happens to a command the rule found and refused.
+ANY_LINE_PARSER = "any-line"
+PARSERS = (REFERENCE_PARSER, ANY_LINE_PARSER)
+# How a channel is spelled inside a label, which is a token and not a sentence: `always-in@anyline`.
+PARSER_TOKENS = {ANY_LINE_PARSER: "anyline"}
+
 # Three thoughts in a row is what the competitor's own examples contain at their most deliberate, so a
 # run of three is counted rather than punished. What is punished is spending without stepping: a thought
 # consumes one of the `max_steps` turns exactly as an action does, because the alternative -- thoughts free,
@@ -422,7 +439,9 @@ def sham_entries(entries: "list[str]") -> "list[str]":
     return [permute_words(str(text), int(hashlib.sha256(str(text).encode("utf-8")).hexdigest()[:12], 16)) for text in entries]
 
 
-def arm_label(arm: str, top_k: int, gate_share: float, gate_kind: bool = False) -> str:
+def arm_label(
+    arm: str, top_k: int, gate_share: float, gate_kind: bool = False, parser: str = REFERENCE_PARSER
+) -> str:
     """The arm's identity, including only the knobs that were moved off their registered values.
 
     `retrieved` at k=3 and `retrieved` at k=1 are two treatments with one name, and so are the ungated and the gated
@@ -437,6 +456,11 @@ def arm_label(arm: str, top_k: int, gate_share: float, gate_kind: bool = False) 
     that selects from an empty set has not been moved. Renaming it `none@kind` would have split the control family
     in two and made the one arm every other reading is compared against unrecognisable in aggregate (AUDIT 34.246).
 
+    `parser` is the harness rather than the prompt, and it is in the label for the same reason the budget is: two
+    channels of one arm are two harnesses, and a join that grouped them would refuse the doubled games only after
+    both were paid for. It moves even on the control — `none@anyline` — because the channel changes what the
+    environment does with a reply, so unlike a pack knob it is never selecting from an empty set.
+
     The registered arms keep the names they have always had: a label that appeared only when a knob moved means the
     default reading is unchanged, which is what makes every artefact before this one still comparable.
     """
@@ -448,6 +472,8 @@ def arm_label(arm: str, top_k: int, gate_share: float, gate_kind: bool = False) 
             moved.append(f"g{gate_share:g}")
     if gate_kind and arm != "none":
         moved.append("kind")
+    if parser != REFERENCE_PARSER:
+        moved.append(PARSER_TOKENS.get(parser, parser.replace("-", "")))
     return f"{arm}@{'+'.join(moved)}" if moved else arm
 
 
@@ -657,6 +683,7 @@ def run_episode(
     gate_share: float = 0.0,
     rule_kinds: "list[list[str]] | None" = None,
     gate_kind: bool = False,
+    parser: str = REFERENCE_PARSER,
 ) -> dict:
     """One game, driven by one arm. Returns the episode record; never a partly-filled one.
 
@@ -666,6 +693,10 @@ def run_episode(
     are about 700 KB of artefact that a scored run has no use for, and an artefact nobody reads is a
     field that quietly stops being true.
     """
+    # Checked before the first call rather than after the bill: `any_line` is one character from `any-line` and it
+    # would be a 274-game pass whose channel nobody can name afterwards.
+    if parser not in PARSERS:
+        fail(f"parser {parser!r} is not one of {PARSERS}; the channel is spelled exactly or not driven at all")
     observation, info = env.reset()
     raw_gamefile = info["extra.gamefile"]
     gamefile = game_key(raw_gamefile[0] if isinstance(raw_gamefile, (list, tuple)) else raw_gamefile)
@@ -683,6 +714,12 @@ def run_episode(
     off_space = 0
     refused = 0
     refused_samples: "list[str]" = []
+    # The same event on the other side of the parser. A reply whose first line is a thought and whose later line is a
+    # command is one format event either way; the reference channel drops the command and counts it as `refused`,
+    # the any-line channel executes it and counts it here. Keeping both means a channel can be shown to have driven
+    # the same model behaviour rather than a repaired model (AUDIT 34.262).
+    recovered = 0
+    recovered_samples: "list[str]" = []
     pack_entries: "int | None" = None
     # The rendered pack's length, as opposed to the prefix's. `prefix_chars` is the whole fixed prompt — examples,
     # system instruction and pack — so two arms of different lengths differ by a number that also contains the
@@ -769,6 +806,18 @@ def run_episode(
             if kind_of_reply == "action" and payload:
                 action = payload
                 break
+            refused_here = refused_command(reply)
+            if refused_here is not None and parser == ANY_LINE_PARSER:
+                # The command the first-line rule refuses is executed instead of dropped. The reply is not re-read
+                # and nothing is invented: the parser found this command and refused it, and this channel is the
+                # one where the refusal is not the end of the turn. It leaves the same way an action does -- through
+                # the environment -- so it is counted as an action turn and the model is answered with an
+                # observation (AUDIT 34.262).
+                recovered += 1
+                if len(recovered_samples) < REFUSED_SAMPLES:
+                    recovered_samples.append(refused_here)
+                action = refused_here
+                break
             # A thought does not move the world, and the competitor answers it with `OK.` — the same
             # string its examples carry — rather than with a fresh observation. A reply that carried a
             # command under its first line is the exception: the command was refused, nothing moved, and the
@@ -778,7 +827,6 @@ def run_episode(
             consecutive_thoughts += 1
             if consecutive_thoughts == STALL_THOUGHTS:
                 stalls += 1
-            refused_here = refused_command(reply)
             if refused_here is not None:
                 refused += 1
                 if len(refused_samples) < REFUSED_SAMPLES:
@@ -834,6 +882,13 @@ def run_episode(
         # visible before: an invalid action is attempted and counted, a refused one is dropped in silence.
         "refused_actions": refused,
         "refused_samples": refused_samples,
+        # The same format event, executed rather than dropped. Zero on the reference channel by construction, which
+        # is what makes it readable: a channel that recovered nothing did not meet the format at all.
+        "recovered_actions": recovered,
+        "recovered_samples": recovered_samples,
+        # Which reader drove this game. In the record and not only in the summary, because a join that pooled two
+        # channels would otherwise be undetectable per episode (AUDIT 34.262).
+        "parser": parser,
         "pack_entries": pack_entries,
         "pack_chars": pack_chars,
         "prefix_chars": prefix_chars,
@@ -940,7 +995,12 @@ def pass_header(arguments, rules: "list[str]", total: int) -> dict:
         "gate_kind": bool(arguments.gate_kind) if arguments.arm != "none" else None,
         # What a reading groups on. `arm` stays the family so that every artefact before this field is still
         # comparable; the label is what distinguishes two configurations of the same family.
-        "arm_label": arm_label(arguments.arm, arguments.top_k, arguments.gate_share, bool(arguments.gate_kind)),
+        "arm_label": arm_label(
+            arguments.arm, arguments.top_k, arguments.gate_share, bool(arguments.gate_kind), arguments.parser
+        ),
+        # The channel travels in the header as well as in every episode: a reader opening the file sees which reader
+        # drove it before seeing a single score (AUDIT 34.262).
+        "parser": arguments.parser,
         "rules_in_bank": len(rules),
         "games_requested": total,
     }
@@ -983,6 +1043,7 @@ def pass_summary(
             # lane prices and joins, and a summary that raised on it would make the repair unreadable against
             # the runs it was diagnosed from.
             "refused_actions": sum(episode.get("refused_actions", 0) for episode in episodes),
+            "recovered_actions": sum(episode.get("recovered_actions", 0) for episode in episodes),
             "off_space_actions": sum(episode["off_space_actions"] for episode in episodes),
             "usage": usage,
             "cache_hit_rate": round(usage["cache_hit_tokens"] / usage["prompt_tokens"], 4) if usage["prompt_tokens"] else None,
@@ -1054,6 +1115,13 @@ def main() -> int:
         help="carry each episode's trajectory in the artefact, which is what a rule bank is distilled from",
     )
     parser.add_argument("--shard", default="0/1", help="i/n; the pass is sliced and each slice is a job")
+    parser.add_argument(
+        "--parser",
+        choices=PARSERS,
+        default=REFERENCE_PARSER,
+        help="the reader this pass drives: `reference` is the competitor's first-line rule, `any-line` executes "
+        "the command it refuses; a channel, so both arms are re-run on it and no level is pooled across it",
+    )
     parser.add_argument("--max-steps", type=int, default=50, help="the environment's own cap")
     parser.add_argument("--seed", type=int, default=20261120)
     parser.add_argument("--model", default=os.environ.get("ALFWORLD_MODEL", DEFAULT_MODEL))
@@ -1163,6 +1231,7 @@ def main() -> int:
             arguments.gate_share,
             rule_kinds,
             arguments.gate_kind,
+            arguments.parser,
         )
         # Checked before the write, so a file on disk never holds one game twice: the checkpoint is the
         # evidence, and evidence that has to be re-checked before it can be trusted is not evidence.
@@ -1225,6 +1294,10 @@ def main() -> int:
     # Printed on every pass, not only when it is non-zero: a reader comparing a pre-repair arm against a
     # post-repair one needs to see the refused count *absent* from the old file and zero in the new one.
     print(f"  refused         {summary['refused_actions']} commands the first-line rule dropped")
+    # Only on the channel where it can be non-zero: on the reference channel the field is structurally zero, and a
+    # line that printed it there would teach a reader to skip both.
+    if arguments.parser != REFERENCE_PARSER:
+        print(f"  recovered       {summary['recovered_actions']} commands executed from a later line ({arguments.parser})")
     print(f"  cache hit rate  {summary['cache_hit_rate']}")
     print(f"  prefix chars    {summary['prefix_chars_mean']}")
     print(f"  bill            ${bill['usd']} ({bill['band']}); other band ${bill['usd_in_other_band']}")

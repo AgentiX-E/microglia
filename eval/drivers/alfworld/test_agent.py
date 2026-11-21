@@ -304,6 +304,140 @@ class ParseTest(unittest.TestCase):
         self.assertIsNone(agent.refused_command("> think: I need an apple\nOK.\nIt is on the counter."))
 
 
+class ParserChannelTest(unittest.TestCase):
+    """A second harness, named, so that executing the dropped command can never read as a memory effect.
+
+    R180 moved the format by 0.00 pp with a neutral 197-character tail; R182 moved the refusal count by 15% with a
+    format entry at the same length. The remaining lever is not text: the command *is* in the reply, and the
+    reference parser throws it away because `re.match` anchors at the first line (AUDIT 34.259). Executing it changes
+    every arm's harness, so the lane carries it as a **channel** — a field in every episode, a token in every label,
+    a join that refuses to pool two channels until it is told it is comparing them — rather than as an arm somebody
+    could later mistake for a prompt.
+
+    The two counters are the design. `refused_actions` counts a command the first-line rule dropped; `recovered_
+    actions` counts one it would have dropped and the channel executed instead. One reply is one event, counted on
+    whichever side of the parser it fell, so the two channels can be shown to have driven the same model behaviour.
+    """
+
+    def setUp(self):
+        self.examples = agent.load_examples()
+        self.world = FakeWorld()
+        self.original = agent.chat
+
+    def tearDown(self):
+        agent.chat = self.original
+
+    def drive(self, replies, parser="reference", world=None, max_steps=50):
+        seen = []
+        script = list(replies)
+
+        def chat(messages, model, api_key, timeout):
+            seen.append([message["content"] for message in messages])
+            return script.pop(0), {"prompt_tokens": 10, "completion_tokens": 1}, 0
+
+        agent.chat = chat
+        episode = agent.run_episode(
+            world or self.world, "none", "model", self.examples, [], agent.Draw(1), max_steps, 3,
+            "deepseek-flash", "k", 1.0, parser=parser,
+        )
+        return episode, seen
+
+    def test_the_reference_channel_records_itself_in_every_episode(self):
+        episode, _seen = self.drive(
+            ["> think: I need the apple", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"]
+        )
+        self.assertEqual(episode["parser"], "reference")
+        self.assertEqual(episode["recovered_actions"], 0)
+
+    def test_the_any_line_channel_executes_the_command_the_first_line_refused(self):
+        # The whole point: `> think: ...` then a command on the next line. The reference channel drops it and tells
+        # the model nothing happened; this channel hands it to the environment, so the next turn's `put` has an
+        # apple to put.
+        episode, _seen = self.drive(
+            ["> think: I need the apple\n> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"],
+            parser="any-line",
+        )
+        self.assertEqual(episode["parser"], "any-line")
+        self.assertTrue(episode["won"])
+        self.assertEqual(self.world.steps, 2)
+        self.assertEqual(episode["recovered_actions"], 1)
+        self.assertEqual(episode["refused_actions"], 0)
+
+    def test_the_recovered_turn_is_answered_with_an_observation_rather_than_a_no_op(self):
+        # A turn that moved the world must not be answered with `Nothing happens.`: the answer is the environment's,
+        # which is what makes the next reply a reply to the world rather than to the driver.
+        _episode, seen = self.drive(
+            ["> think: I need the apple\n> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"],
+            parser="any-line",
+        )
+        self.assertNotEqual(seen[1][-1], agent.NO_OP)
+        self.assertNotEqual(seen[1][-1], "OK.")
+
+    def test_the_two_channels_count_the_same_reply_on_opposite_sides(self):
+        # One format event, two channels: the reference drops it and the counter says so; the any-line channel
+        # executes it and the other counter says so. If this pair ever stops summing to one, the channels are no
+        # longer driving the same model behaviour and R183's cross-channel reading is not about the parser.
+        dropped, _ = self.drive(
+            ["> think: I need the apple\n> take apple 1 from countertop 1", "> take apple 1 from countertop 1",
+             "> put apple 1 in/on cabinet 1"],
+            parser="reference",
+            world=FakeWorld(),
+        )
+        recovered, _ = self.drive(
+            ["> think: I need the apple\n> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"],
+            parser="any-line",
+            world=FakeWorld(),
+        )
+        self.assertEqual(dropped["refused_actions"] + dropped["recovered_actions"], 1)
+        self.assertEqual(recovered["refused_actions"] + recovered["recovered_actions"], 1)
+        self.assertTrue(dropped["won"])
+        self.assertTrue(recovered["won"])
+
+    def test_the_any_line_channel_leaves_a_pure_thought_alone(self):
+        # The channel changes what happens to a command under a thought, not what happens to a thought. `OK.` is the
+        # examples' answer to a thought that was only a thought, and an any-line channel that started inventing
+        # world events for those would be a different defect, not a fix.
+        episode, seen = self.drive(
+            ["> think: I need the apple", "> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"],
+            parser="any-line",
+        )
+        self.assertEqual(seen[1][-1], "OK.")
+        self.assertEqual(episode["recovered_actions"], 0)
+
+    def test_a_command_on_the_first_line_is_never_recovered(self):
+        episode, _seen = self.drive(
+            ["> take apple 1 from countertop 1", "> put apple 1 in/on cabinet 1"], parser="any-line"
+        )
+        self.assertEqual(episode["recovered_actions"], 0)
+        self.assertEqual(episode["refused_actions"], 0)
+
+    def test_the_recovered_commands_are_quoted_back_up_to_the_same_cap(self):
+        # The count says how often, the sample says what, and both channels cap at three because a 274-game pass
+        # must not become a transcript.
+        episode, _seen = self.drive(
+            ["> think: a\n> go to countertop 1", "> think: b\n> inventory", "> think: c\n> look",
+             "> think: d\n> inventory"],
+            parser="any-line",
+            max_steps=4,
+        )
+        self.assertEqual(episode["recovered_actions"], 4)
+        self.assertEqual(len(episode["recovered_samples"]), agent.REFUSED_SAMPLES)
+        self.assertEqual(episode["recovered_samples"][0], "go to countertop 1")
+
+    def test_an_unknown_channel_is_refused_rather_than_defaulted(self):
+        # `any_line` is one character from `any-line`, and a dispatcher that accepted it would either drive the
+        # default channel under a name nobody reads or drive a channel nobody wrote. The cost is a full 274-game
+        # pass, so the spelling is checked before the first call rather than after the bill.
+        printed = io.StringIO()
+        with contextlib.redirect_stdout(printed), self.assertRaises(SystemExit):
+            self.drive(["> think: a"], parser="any_line")
+        self.assertIn("is not one of", printed.getvalue())
+
+    def test_the_channel_is_one_constant_rather_than_a_literal_in_two_places(self):
+        self.assertEqual(agent.PARSERS, ("reference", "any-line"))
+        self.assertEqual(agent.REFERENCE_PARSER, "reference")
+
+
 class AnchorTest(unittest.TestCase):
     def test_orders_by_overlap(self):
         entries = ["the fridge is cold", "fridge door opens outward", "nothing relevant"]
@@ -1923,6 +2057,20 @@ class LabelTest(unittest.TestCase):
     def test_the_defaults_are_one_constant_rather_than_three_literals(self):
         # The label and the argument's default have to agree, or the registered arm stops being registered.
         self.assertEqual(agent.DEFAULT_TOP_K, 3)
+
+    def test_a_second_parser_channel_has_a_label_of_its_own(self):
+        # The channel is a knob the same way the retrieval budget is, and for the same reason: two channels of one
+        # arm are two harnesses, and `aggregate.py` would refuse the join as doubled games after both were paid for.
+        # `any-line` is spelled `anyline` inside the label because the label is a token, not a sentence.
+        self.assertEqual(agent.arm_label("always-in", 3, 0.0, False, "any-line"), "always-in@anyline")
+        self.assertEqual(agent.arm_label("none", 3, 0.0, False, "any-line"), "none@anyline")
+        self.assertEqual(agent.arm_label("retrieved", 1, 0.2, True, "any-line"), "retrieved@k1+g0.2+kind+anyline")
+
+    def test_the_reference_channel_leaves_every_registered_label_alone(self):
+        # Every artefact before R183 drove the reference channel, so a label that appeared only when a knob moved is
+        # what keeps them comparable to the ones that come after it.
+        self.assertEqual(agent.arm_label("always-in", 3, 0.0, False, agent.REFERENCE_PARSER), "always-in")
+        self.assertEqual(agent.arm_label("none", 3, 0.0, False, agent.REFERENCE_PARSER), "none")
 
     def test_a_kind_gated_pack_arm_has_a_label_of_its_own(self):
         # Without this the six-sentence gated arm and the six-sentence ungated one are both `always-in`, and

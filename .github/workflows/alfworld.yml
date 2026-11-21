@@ -79,6 +79,10 @@ on:
         description: 'true carries only the bank entries tagged with each game''s task kind; needs a tagged bank'
         required: false
         default: ''
+      parser:
+        description: 'the reader this dispatch drives: reference (the competitor first-line rule) or any-line (executes the command it refuses); a channel, so every arm in the dispatch moves together'
+        required: false
+        default: ''
       train_shards:
         description: 'which training slices to drive, as a JSON list; ["1"] re-drives only the slice that failed'
         required: false
@@ -453,6 +457,7 @@ jobs:
           RULES: ${{ inputs.rules }}
           TRACE: ${{ inputs.trace }}
           SPLIT: ${{ inputs.split }}
+          PARSER: ${{ inputs.parser }}
         run: |
           set -euo pipefail
           if [ -z "${DEEPSEEK_API_KEY}" ]; then
@@ -470,6 +475,10 @@ jobs:
           # The calibration is where a pass before the money is checked, so it has to be able to name a section
           # too: a calibration of the seen section on the held-out games would be a rehearsal of another run.
           args+=(--split "${SPLIT:-eval_out_of_distribution}")
+          # The reader is an input for the same reason the section is: a dispatch that had to be edited into a file to
+          # change its harness is a channel nobody buys twice, and one that changed it silently would produce a score
+          # nobody can compare (AUDIT 34.262).
+          if [ -n "${PARSER}" ]; then args+=(--parser "${PARSER}"); fi
           if [ -n "${RULES}" ]; then args+=(--rules "${RULES}"); fi
           python eval/drivers/alfworld/agent.py "${args[@]}" \
             --out "$RUNNER_TEMP/arm.json" | tee "$RUNNER_TEMP/arm.log"
@@ -777,6 +786,7 @@ jobs:
           TOP_K: ${{ inputs.top_k }}
           GATE_SHARE: ${{ inputs.gate_share }}
           GATE_KIND: ${{ inputs.gate_kind }}
+          PARSER: ${{ inputs.parser }}
           SPLIT: ${{ inputs.split }}
           SPLIT_GAMES: ${{ inputs.split_games }}
         run: |
@@ -805,6 +815,10 @@ jobs:
           # this lane comes from `eval_out_of_distribution`, and a second section is only a second reading if the
           # artefact says which one it drove (AUDIT 34.251).
           args+=(--split "${SPLIT}")
+          # The channel moves for every arm in the matrix or for none of them: `agent.py` puts it in the label, so a
+          # sweep that drove one arm on it and another off it would leave `aggregate.py` refusing a join after both
+          # were paid for (AUDIT 34.262).
+          if [ -n "${PARSER}" ]; then args+=(--parser "${PARSER}"); fi
           # The retrieval budget is an input because AMD measured k=1 as the global optimum and this lane's
           # default is 3; a contrast that has to be edited into a file is a contrast nobody runs twice.
           args+=(--top-k "${TOP_K:-3}")

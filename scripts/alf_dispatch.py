@@ -48,6 +48,10 @@ TASK_KINDS = ("put", "clean", "heat", "cool", "examine", "puttwo")
 SPLIT_SIZES = {"eval_out_of_distribution": 134, "eval_in_distribution": 140, "train": 3553}
 # The section every published number in this lane comes from, and the one a dispatch gets when it names none.
 HELD_OUT = "eval_out_of_distribution"
+# The two readers `agent.py` can drive. Restated for the same reason the workflow's defaults are: this script's job is
+# to refuse a dispatch that would spend money on an argument the driver cannot honour, and it refuses before the API
+# call rather than inside twelve jobs.
+PARSERS = ("reference", "any-line")
 
 
 class Refused(Exception):
@@ -84,6 +88,7 @@ def parser():
     # separately from `--gate-share` because the two are different signals on different objects, and R174.2
     # measured the overlap one admitting nothing at all on this corpus.
     result.add_argument("--gate-kind", dest="gate_kind", default="")
+    result.add_argument("--parser", default="")
     # The comparison this sweep is half of, when the other half was bought in an earlier dispatch. A two-treatment
     # comparison is the one this lane trusts — the control moves eight to eleven wins between dispatches, the
     # treatments repeat — and a sweep that can only buy a control it does not need pays for a band (AUDIT 34.232).
@@ -255,6 +260,11 @@ def check(arguments, tree=None):
     # dispatch to pair against (AUDIT 34.246). The arm itself records `gate_kind: null`. A control-only dispatch
     # that names the flag is still a legal purchase: it is how the missing control of a gated sweep is re-bought
     # against the same commit, and refusing it would make that repair impossible by flag.
+    if arguments.parser and arguments.parser not in PARSERS:
+        # A channel is spelled exactly or not driven at all: `any_line` would reach `agent.py` as an argument error
+        # after the environment install, in twelve jobs, with the money committed. Checked here, where the refusal is
+        # still free.
+        raise Refused(f"--parser {arguments.parser!r} is not one of {PARSERS}")
     if arguments.gate_share:
         try:
             share = float(arguments.gate_share)
@@ -293,6 +303,7 @@ def payload(arguments):
         ("top_k", arguments.top_k),
         ("gate_share", arguments.gate_share),
         ("gate_kind", arguments.gate_kind),
+        ("parser", arguments.parser),
         ("split", arguments.split),
         # The size travels with the section, because the workflow's join tiles to it and a section without its
         # published size is a sweep whose twelve jobs drive one number and whose reading checks another.

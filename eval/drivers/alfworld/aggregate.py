@@ -39,6 +39,12 @@ from pathlib import Path
 
 ARMS = ("none", "always-in", "retrieved", "sham")
 
+# The two readers `agent.py` can drive, restated here because the join does not import the driver: it is run against
+# artefacts on a laptop, and the driver imports the environment. The pair is small, fixed, and the disagreement it
+# guards against is checked below rather than assumed -- a channel name no arm file could carry is refused.
+REFERENCE_PARSER = "reference"
+PARSERS = (REFERENCE_PARSER, "any-line")
+
 
 def fail(message: str) -> "None":
     print(f"FAIL {message}")
@@ -68,6 +74,7 @@ def load_slices(
     paths: "list[Path]",
     relabel_specs: "list[str] | tuple[str, ...]" = (),
     expect_splits: "tuple[str, ...]" = (),
+    expect_parsers: "tuple[str, ...]" = (),
 ) -> "dict[str, list[dict]]":
     """Every episode of every slice, grouped by the arm that drove it.
 
@@ -102,6 +109,8 @@ def load_slices(
             arm_specs.append(spec)
     grouped: "dict[str, list[dict]]" = {}
     sections: "dict[str, str]" = {}
+    channels: "dict[str, str]" = {}
+    label_channels: "dict[str, set[str]]" = {}
     for path in paths:
         payload = json.loads(path.read_text(encoding="utf-8"))
         summary = payload.get("summary") or {}
@@ -138,12 +147,24 @@ def load_slices(
             fail(f"{path}: no episodes, so this slice contributes nothing and its cost is unexplained")
         if policy == "seed" or policy == "first":
             fail(f"{path}: a model-free slice cannot be paired with a billed one; policy is {policy!r}")
+        # Which reader drove this slice. An artefact written before R183 was driven by the reference parser -- the
+        # only one that existed -- so a missing field is the reference channel rather than unknown: reading it as
+        # unknown would make the one comparison the channel exists for impossible, and reading it as anything else
+        # would be a guess about a harness that is written down in the driver (AUDIT 34.262).
+        channel = summary.get("parser") or REFERENCE_PARSER
+        if channel not in PARSERS:
+            fail(f"{path}: summary.parser is {channel!r}, which is not one of {PARSERS}")
+        channels[str(path)] = channel
+        label_channels.setdefault(label, set()).add(channel)
         if section:
             # Derived at join time rather than stored in the artefact: an episode is "from" the section its
             # parent said it was, and writing it into the artefact too would be two places to disagree.
             for episode in episodes:
                 if isinstance(episode, dict):
                     episode.setdefault("section", section)
+        for episode in episodes:
+            if isinstance(episode, dict):
+                episode.setdefault("parser", channel)
         grouped.setdefault(label, []).extend(episodes)
     # A join across sections is legal and sometimes the point — a second section is the only place this lane can
     # buy resolution — but it is never silent. Two sections in one reading is a different claim from a reading on
@@ -169,6 +190,27 @@ def load_slices(
             )
         if present != set(expect_splits):
             fail(f"--expect-splits {sorted(expect_splits)} but the slices drove {sorted(present)}")
+    # A channel is the harness, not the prompt, so the rules are one notch stricter than the section's. Two channels
+    # under one label is never legal -- that is an arm that is two harnesses, and averaging it would print a rate
+    # nobody designed. Two channels across the join is legal, because re-running both arms on a second reader is
+    # exactly what R183 buys, but it is never silent: a rate pooled over two harnesses is the same category error as
+    # a rate pooled over two corpus sections, and it is refused until the join says it is comparing them.
+    mixed = sorted(label for label, seen in label_channels.items() if len(seen) > 1)
+    if mixed:
+        listed = ", ".join(f"{label}: {sorted(label_channels[label])}" for label in mixed)
+        fail(
+            f"one arm cannot span two channels ({listed}); a label is one harness, so re-drive the slice or give it "
+            "a label of its own rather than averaging two readers into one rate"
+        )
+    driven = set(channels.values())
+    if len(driven) > 1 and not expect_parsers:
+        listed = ", ".join(f"{Path(path).name}: {channel}" for path, channel in sorted(channels.items()))
+        fail(
+            f"this join mixes parser channels ({listed}); name them with --expect-parsers to compare them, because a "
+            "pooled rate over two readers is a rate about the harness and has to be read as that"
+        )
+    if expect_parsers and driven != set(expect_parsers):
+        fail(f"--expect-parsers {sorted(expect_parsers)} but the slices drove {sorted(driven)}")
     return relabel(grouped, arm_specs)
 
 
@@ -465,6 +507,19 @@ def by_section(left: "dict[str, dict]", right: "dict[str, dict]", labels: "tuple
     return by_field(left, right, labels, "section")
 
 
+def parsers(grouped: "dict[str, list[dict]]") -> "dict[str, str]":
+    """Which reader drove each arm, from the episodes rather than from the labels.
+
+    The label carries the channel (`always-in@anyline`), but a label is a name a dispatcher chose and an episode is
+    what happened. The report reads the second: a reading whose arms came off two harnesses has to say so above the
+    delta, because the number is then a comparison of two readers and nothing else in the output would reveal it.
+    """
+    return {
+        arm: "+".join(sorted({str(episode.get("parser") or REFERENCE_PARSER) for episode in episodes}))
+        for arm, episodes in grouped.items()
+    }
+
+
 def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tuple[str, str]" = ("left", "right")) -> dict:
     """The counters the arm is expected to move, per arm and independent of any verdict.
 
@@ -484,6 +539,12 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
         # never happened, and the print below says which is which by naming the field only when a file has it.
         refused = sum(int(episode.get("refused_actions") or 0) for episode in episodes)
         counted = any("refused_actions" in episode for episode in episodes)
+        # The same event on the other side of the parser. A reply whose first line is a thought and whose later line
+        # is a command is one format event either way; the reference channel drops it and counts it above, the
+        # any-line channel executes it and counts it here. Printing only one of the two would make the second channel
+        # look like a cure for the format rather than a different end for the same turn (AUDIT 34.262).
+        recovered = sum(int(episode.get("recovered_actions") or 0) for episode in episodes)
+        recovered_counted = any("recovered_actions" in episode for episode in episodes)
         return {
             "games": len(episodes),
             "calls": calls,
@@ -492,12 +553,15 @@ def refusals(left: "list[dict]", right: "list[dict] | None" = None, labels: "tup
             "off_space_actions": off_space,
             "refused_actions": refused,
             "refused_counted": counted,
+            "recovered_actions": recovered,
+            "recovered_counted": recovered_counted,
             # A rate over no calls is not zero, it is undefined: a slice that recorded no call did not
             # refuse nothing, it did not happen.
             "invalid_per_call": round(invalid / calls, 4) if calls else None,
             "invalid_per_action": round(invalid / actions, 4) if actions else None,
             "off_space_per_action": round(off_space / actions, 4) if actions else None,
             "refused_per_call": round(refused / calls, 4) if calls else None,
+            "recovered_per_call": round(recovered / calls, 4) if calls else None,
         }
 
     report = {labels[0]: summarise(left)}
@@ -593,6 +657,13 @@ def main() -> int:
         default="",
         help="the corpus sections this join must span, comma separated; a mixture is refused until it is named here",
     )
+    parser.add_argument(
+        "--expect-parsers",
+        default="",
+        help="the parser channels this join compares, comma separated; `reference` is the competitor's first-line "
+        "rule and `any-line` executes the command it refuses. A span is refused until it is named here, because a "
+        "rate pooled over two readers is a rate about the harness (AUDIT 34.262)",
+    )
     parser.add_argument("--rounds", type=int, default=10000)
     parser.add_argument("--seed", type=int, default=20261120)
     parser.add_argument("--out", default="")
@@ -600,7 +671,8 @@ def main() -> int:
 
     paths = [Path(item) for item in arguments.input]
     declared = tuple(item.strip() for item in arguments.expect_splits.split(",") if item.strip())
-    grouped = load_slices(paths, arguments.relabel, declared)
+    declared_parsers = tuple(item.strip() for item in arguments.expect_parsers.split(",") if item.strip())
+    grouped = load_slices(paths, arguments.relabel, declared, declared_parsers)
     # Printed rather than implied: a reading that crosses dispatches is the one kind of reading whose
     # provenance a reader cannot recover from the arms' names in the report.
     for spec in arguments.relabel:
@@ -687,6 +759,12 @@ def main() -> int:
             if counts["by_chars"]:
                 rendered = ", ".join(f"{chars} ch x{games_with}" for chars, games_with in counts["by_chars"].items())
                 print(f"  pack chars      {arm} {rendered}")
+        # Which reader drove each arm, above the delta and only when it is not the one every earlier reading used:
+        # a number that compares two harnesses is a different claim from a number that compares two prompts inside
+        # one, and nothing else in the output would say which it is (AUDIT 34.262).
+        channel_of = parsers(grouped)
+        if treatment in channel_of and control in channel_of and len({channel_of[treatment], channel_of[control], REFERENCE_PARSER}) > 1:
+            print(f"  channel         {treatment} {channel_of[treatment]} vs {control} {channel_of[control]}")
         print(
             f"  paired delta    {reading['paired']['delta']:+.4f} "
             f"[{reading['paired']['ci_low']:+.4f}, {reading['paired']['ci_high']:+.4f}]  "
@@ -732,6 +810,21 @@ def main() -> int:
             return f"{counts['refused_actions']} ({counts['refused_per_call']} per call)"
 
         print(f"  dropped         {treatment} {refused_cell(left_counts)} vs {control} {refused_cell(right_counts)}")
+
+        # The same format event counted on the other side of the parser. Printed on the line below `dropped` because
+        # the two are one quantity: a channel that executes what the rule refused has `dropped` near zero and
+        # `recovered` at the rate the reference channel's `dropped` would have been, and a reader who sees only the
+        # first will read the channel as a cure for the format rather than as a different end for the same turn.
+        def recovered_cell(counts: dict) -> str:
+            if not counts["recovered_counted"]:
+                return "not counted"
+            return f"{counts['recovered_actions']} ({counts['recovered_per_call']} per call)"
+
+        if left_counts["recovered_counted"] or right_counts["recovered_counted"]:
+            print(
+                f"  recovered       {treatment} {recovered_cell(left_counts)} "
+                f"vs {control} {recovered_cell(right_counts)}"
+            )
     print(f"  bill            ${payload['bill']['usd']} over {payload['bill']['calls']} calls")
     if arguments.out:
         print(f"  written         {arguments.out}")

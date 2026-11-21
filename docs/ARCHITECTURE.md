@@ -2698,3 +2698,35 @@ R181 compares a driver against itself across a repair, so the bank on both sides
 `not counted` when the episodes it was given predate the field. A zero from an old arm file means "the driver never
 counted" and not "the model never wrote a command under a thought", and a report that printed `0` would make the
 defect invisible in exactly the before-and-after that proves it was repaired.
+
+### 8.45 The parser is a channel, not a knob, and the record says which reader drove a game
+
+Every number this lane has published was produced by one reader: `parse_reply`, the competitor's parser transliterated,
+with `re.match` anchored at the first line. That rule is why a reply whose first line is a thought and whose second line
+is a command loses the command — the corpus's own examples write exactly that shape — and R180 and R182 spent two rounds
+trying to talk a model out of writing it, for **−0.73 pp** with a neutral sentence and **+3.65 pp** with a format
+instruction at the same length.
+
+R183 executes the command instead, and the way it is packaged is the design decision worth reading. It is a **channel**:
+`--parser reference|any-line`, `parser` in the header and in every episode, `anyline` in the arm label, and a join that
+refuses to pool two channels until it is told that is what it is comparing. The reason is not tidiness. A harness
+applies to both arms at once, so an arm-style change would let a reading compare a memory against a reader, and the
+number would still look like a memory effect. Three places make that impossible rather than unlikely:
+
+| where | what it records | what it stops |
+| --- | --- | --- |
+| `run_episode` | `parser`, `recovered_actions`, `recovered_samples` | a channel that ran on one arm and not the other |
+| `arm_label` | `always-in@anyline`, `none@anyline` | two harnesses grouped under one name, refused as doubled games *after* both are paid for |
+| `aggregate.py` | `parsers()`, `--expect-parsers`, one label spanning two channels refused outright | a pooled rate over two readers printed as one number |
+
+**Two counters, one event.** `refused_actions` counts a command the rule *dropped*; `recovered_actions` counts one it
+*would have* dropped and this channel executed. The two are the same reply on opposite sides of the parser, which is
+what lets a reader check that both channels met the same model behaviour — 11.64 and 10.53 refusals per `put` game on
+the reference channel, so the second channel should recover roughly that many. A channel that recovers far fewer met a
+different model, and the difference between channels is then a second experiment rather than a re-read of the first.
+
+**What does not change.** `parse_reply` is untouched, `refused_command` is untouched, and the reference channel remains
+the default forever: an artefact written before the field reads as the reference channel, because that is the only
+reader that existed rather than an unknown. The command leaves by the same door an action leaves by — `env.step` — so
+`steps`, `actions`, `invalid_actions` and `digest` keep their meanings, and a recovered turn is answered with an
+observation rather than with `Nothing happens.`
