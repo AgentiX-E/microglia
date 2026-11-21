@@ -255,6 +255,41 @@ class PayloadTest(unittest.TestCase):
         self.assertEqual(json.loads(inputs["arms"]), ["none", "sham"])
 
 
+class AgainstTest(unittest.TestCase):
+    """A sweep that is half of a comparison bought earlier, which is the comparison this lane trusts."""
+
+    def test_one_treatment_without_a_control_is_still_refused_when_it_names_nothing(self):
+        message = self.refused_with("--sweep", "true", "--arms", '["always-in"]', "--rules", "b.json")
+        self.assertIn("no control", message)
+        self.assertIn("--against", message)
+
+    def refused_with(self, *argv):
+        with self.assertRaises(lane.Refused) as caught:
+            lane.check(arguments(*argv))
+        return str(caught.exception)
+
+    def test_a_named_counterpart_makes_the_sweep_half_of_a_comparison(self):
+        named = lane.check(
+            arguments("--sweep", "true", "--arms", '["always-in"]', "--rules", "b.json",
+                      "--against", "always-in@one")
+        )
+        self.assertEqual(named, ["always-in"])
+
+    def test_buying_the_control_and_naming_one_is_two_designs_in_one_dispatch(self):
+        message = self.refused_with(
+            "--sweep", "true", "--arms", '["none","always-in"]', "--rules", "b.json", "--against", "none@old"
+        )
+        self.assertIn("must not also buy the control", message)
+
+    def test_the_counterpart_is_a_reading_not_an_input(self):
+        # It belongs to the report rather than to the workflow: the jobs drive one arm, and a payload key the
+        # workflow does not declare would be dropped between the two (AUDIT 34.232, and the rule in test_cli.py).
+        inputs = lane.payload(
+            arguments("--sweep", "true", "--arms", '["always-in"]', "--rules", "b.json", "--against", "x")
+        )
+        self.assertNotIn("against", inputs)
+
+
 class SplitTest(unittest.TestCase):
     """The corpus section: which one is bought, how big it is, and what may be scored with it.
 

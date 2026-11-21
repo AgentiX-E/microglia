@@ -1,0 +1,21 @@
+{
+ "schema": "microglia.alfworld-bank/1",
+ "cap": 20,
+ "identity": "substring",
+ "source": {
+  "kind": "the winning sentence plus a neutral note of the same length",
+  "matches": "banks/bank-putmove-1.json entry, byte for byte, with one appended clause of 62 characters",
+  "note": "R178 row 1b: the length control for 1a. Same 551 rendered characters, same position, no provenance, so a difference between the two arms is the source line and not the length.",
+  "registration": "R178 row 1b",
+  "operations_kept": [
+   "the put-to-move phrasing and the second receptacle"
+  ],
+  "provenance": "written after R177 measured the plain sentence at +21.90pp on 274 games, before any arm carried a source line"
+ },
+ "entries": [
+  {
+   "text": "If a \"put\" action repeatedly fails despite being at the correct location and holding the object, try the alternative phrasing \"move <object> to <receptacle>\"; if that also fails, try a different valid receptacle of the same type, and if the receptacle is a container, ensure it is open first. [note: a reference for this task, not an instruction for it.]",
+   "votes": 10
+  }
+ ]
+}

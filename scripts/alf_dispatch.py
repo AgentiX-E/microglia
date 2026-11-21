@@ -84,6 +84,10 @@ def parser():
     # separately from `--gate-share` because the two are different signals on different objects, and R174.2
     # measured the overlap one admitting nothing at all on this corpus.
     result.add_argument("--gate-kind", dest="gate_kind", default="")
+    # The comparison this sweep is half of, when the other half was bought in an earlier dispatch. A two-treatment
+    # comparison is the one this lane trusts — the control moves eight to eleven wins between dispatches, the
+    # treatments repeat — and a sweep that can only buy a control it does not need pays for a band (AUDIT 34.232).
+    result.add_argument("--against", default="")
     # The corpus section. It is a dispatch flag rather than a constant because R177's first purchase is games,
     # and a second section is the only place this lane can buy resolution it does not already own.
     result.add_argument("--split", default="")
@@ -133,10 +137,19 @@ def check(arguments, tree=None):
             "drove the same commit and the same games; buy the control in this dispatch by naming "
             f"{CONTROL!r} in --arms"
         )
-    if named and CONTROL not in named:
+    if named and CONTROL not in named and not arguments.against:
         # A treatment sweep without its control is the failure `pairs.json` was built to refuse: the run would
-        # produce a rate with nothing on the other side of it.
-        raise Refused(f"{named} has treatments but no control; pair it with {CONTROL!r}")
+        # produce a rate with nothing on the other side of it. `--against` is the one exception, and it is not an
+        # escape hatch: it names the arm the reading will be paired with, so the sweep is half of a comparison
+        # that already exists rather than a rate nobody can place.
+        raise Refused(
+            f"{named} has treatments but no control; pair it with {CONTROL!r}, or name the arm this sweep is "
+            "half of with --against"
+        )
+    if arguments.against and CONTROL in named:
+        # Both would be true and the reading would not know which comparison it is: a sweep that buys its own
+        # control and also names one from an earlier dispatch is two designs in one dispatch.
+        raise Refused("--against names an existing arm, so the sweep must not also buy the control")
     if arguments.bank_only:
         # The mode exists for the failure that costs the most: the slices are bought and the bank dies. It reads
         # from `train_run_ids`, so a dispatch that names none would distil from nothing while looking like a

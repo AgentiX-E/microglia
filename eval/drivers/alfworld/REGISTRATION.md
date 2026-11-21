@@ -1321,3 +1321,47 @@ reading 4 and is **not** testable at this design: four games out of 274 is 1.5 p
 
 **Price.** ¥3.13 for the two seen-section arms against ¥2.8 quoted; the overrun is the control's, which is the
 expensive arm in every dispatch — a losing arm is billed for the steps it loses (AUDIT 34.248).
+
+## R178 — The memory as a claim with a source, at a length the control also pays
+
+`WikiTrace` (Nov 2026) reports that linking every lesson to the run it came from lifts an average score from
+79.5 to 90.2, and that 52% of memory-induced failures trace to a specific entry while 20% of those entries are
+simply wrong. This lane has measured the *content* half of that law three times (R175, R176, R177). The
+*provenance* half has never been tested here, and it is the only mechanism on the 2026 board whose cost is tens
+of characters rather than a second arm.
+
+**The design, and the confound it removes before it is bought.** Appending a source clause makes the pack
+**62 characters longer** (489 → 551, 12.7%). A gain could then be the source line or the length, and this lane
+has already measured that length is not free (−3.4 to −3.7 pp per sentence in a padded block, −1.79 pp per
+sentence at n = 6). So the round buys **two** arms of **exactly equal rendered length**, differing in one clause:
+
+| arm | bank | rendered | the clause |
+| --- | --- | --- | --- |
+| **1a** | `banks/bank-putmove-source-1.json` | **551** | `[source: one won pick_and_place_simple game, run 44841962248]` |
+| **1b** | `banks/bank-putmove-note-1.json` | **551** | `[note: a reference for this task, not an instruction for it.]` |
+
+Both are the winning sentence byte for byte plus 62 characters at the same position. 1b is a **length control**,
+not a placebo: it says something true and neutral about the entry's status, so the difference between the arms is
+provenance and nothing else — not length, not position, not register.
+
+| # | experiment | games | the question | price |
+| --- | --- | --- | --- | --- |
+| **1a** | the sentence + its source clause | 274 (both sections) | does an entry that names its evidence beat the same entry with a neutral clause | ≈ ¥2.4 |
+| **1b** | the sentence + a neutral clause of equal length | 274 (both sections) | the control 1a is read against | ≈ ¥2.4 |
+
+**Total ≈ ¥4.8**, two dispatches, one arm each. Read as a treatment-vs-treatment pair (AUDIT 34.232): the control
+moves eight to eleven wins between dispatches, treatments repeat, and a provenance effect is exactly the size at
+which a control-band comparison would be worthless.
+
+**Registered readings on 274 games (mde 9.70 pp).**
+
+| 1a − 1b | what it means |
+| --- | --- |
+| ≥ +9 pp | provenance is the mechanism: a frozen model treats a sourced entry differently from an unsourced one, and the product statement becomes "store the repair and its evidence" |
+| −9 to +9 pp | **provenance does not transfer on this corpus**, and the lane's law stays referent-only — which is a result about *where* WikiTrace's gain comes from (their agent can descend to the run; this one cannot) |
+| ≤ −9 pp | naming a source makes the model discount the entry, which would be a finding about how a frozen model reads citations |
+
+**Void conditions.** `carried` 1.0 in all 274 games; `pack chars` exactly **551** in every game of both arms (the
+field that makes a length claim checkable, AUDIT 34.249); `by_kind` and `by_section` printed beside the pooled
+delta; and the two arms must be compared **only** with each other, because neither has a control in its own
+dispatch and a cross-dispatched control is a band rather than a comparison.
