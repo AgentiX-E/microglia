@@ -2586,3 +2586,109 @@ Any game whose `pack_chars` is not 551 or whose `pack_entries` is not 1, any lab
 (R186's arm is the control and it is reused, not bought again).
 
 **Price ≈ ¥2.10**, four jobs (one arm, both sections), off-peak band.
+
+## R187, amendment 1 — bought, and the precondition does not travel: −10 games when three more kinds read it
+
+Two dispatches, **274 games, one gated arm**, `any-line`, cap 50, off-peak in all eight summaries: run `44967271658`
+(134 held out) and `44967290361` (140 seen).
+
+| arm | pooled | unseen 134 | seen 140 | paired against R186 | mde |
+| --- | --- | --- | --- | --- | --- |
+| **`putscope-3@kind+anyline`** | **254/274 (92.70%)** | 125/134 (93.28%) | 129/140 (92.14%) | **−3.65 pp** (4 gained, 14 lost) | 4.34 pp |
+| `putscope-2@kind+anyline` (R186) | 264/274 (96.35%) | 133/134 (99.25%) | 131/140 (93.57%) | — | — |
+
+**The refutation clause fired, and it fired for the reason it was written for.** `puttwo` went 41 → **37** and `heat`
+37 → **35**, both at or beyond the two-game threshold, with `cool` unchanged at 43. The precondition is **`put`-specific**:
+three of the six kinds place into a receptacle, and the sentence helps only the one it was written about.
+
+| kind | R187 | R186 | Δ | which pack | transitions |
+| --- | --- | --- | --- | --- | --- |
+| `put` | 53/59 (89.8%) | 56/59 (94.9%) | −3 | **identical** (`5fb4c464`) | 1 gained, 4 lost |
+| `clean` | 56/58 (96.6%) | 58/58 (100%) | −2 | **identical** (`90c0688f`) | 0 gained, 2 lost |
+| `cool` | 43/46 (93.5%) | 43/46 (93.5%) | 0 | changed → precondition | 2 gained, 2 lost |
+| `puttwo` | **37/41 (90.2%)** | 41/41 (100%) | **−4** | changed → precondition | 0 gained, 4 lost |
+| `heat` | **35/39 (89.7%)** | 37/39 (94.9%) | **−2** | changed → precondition | 0 gained, 2 lost |
+| `examine` | 30/31 (96.8%) | 29/31 (93.5%) | +1 | **identical** (`90c0688f`) | 1 gained, 0 lost |
+
+### The three kinds that changed lost six games; the three that did not lost five, and that is the round's real contribution
+
+`put`, `clean` and `examine` carried **byte-identical packs** at **551 characters** — the prompt the model read is the
+prompt R186's arm read — and they moved **−3, −2 and +1**: **−4 games over 117**, against **+1 over 215** when R186
+measured the same thing for its five frozen packs. Two estimates of one quantity, five games apart:
+
+| comparison | games on a frozen pack | movement |
+| --- | --- | --- |
+| R183 → R186 | 215 | **+1** |
+| R186 → R187 | 117 | **−4** |
+| pooled | 332 | **−3 (−0.9%)** |
+
+**So the run-to-run band is not one game.** R186 read its own five frozen packs at +1 and the registration that followed
+was written as if that were the noise floor; a second draw, on the same texts and the same length, says four. Any delta
+below roughly **±5 games over 274** is indistinguishable on one pass of this harness — which is a bound the lane should
+have carried from the start and now carries explicitly.
+
+This does not disturb R186's headline — 264 against a control at 197 is +67 games, and 264 against R183's 257 is +7 with
+the `put` gain replicating at identical transitions — but it does retire "the scoped bank is not worse than the
+single-entry bank by two games" as a two-game claim. It is a within-five-games claim.
+
+### What the round says about the entry, stated as the thing it measured
+
+> An entry's value decays with the number of kinds that read it, and the decay is not about the sentence being true.
+> R185 gave one sentence to six kinds and lost 18 games on the five foreign ones; R187 gave it to four and lost 6 on the
+> three foreign ones; R186 gave it to one and lost nothing. Both times the kind that gained was the kind it was written
+> about, and every foreign kind that read it lost.
+
+Three rounds now bracket the same quantity: **five foreign kinds −18 lost** (R185), **three foreign kinds −6 lost**
+(R187), **zero foreign kinds +1 game** (R186, over 215 frozen-pack games). The scope law of §8.48 is not a metaphor; it
+is a slope of **−3.6 and −2.0 games per foreign kind**, measured twice, and the flattest reading of the two is still
+larger than the noise band on any single pass.
+
+### A fourth registration cell that was arithmetic, and wrong
+
+Reading 5 registered "two `pack_digest` values in the 3:2 proportion the tags imply (**164** games on `5fb4c464`, **110**
+on `90c0688f`)". The corpus's kind sizes are 59, 58, 46, 41, 39 and 31: the four targeted kinds are 59 + 46 + 39 + 41 =
+**185**, and the two frozen ones are 58 + 31 = **89**. The correct pair is 185/89, the artefact recorded 185/89, and the
+registered cell was wrong by 21 games. Rule 1 of AUDIT 34.267 says every registered cell has to be computable before it
+is bought from an artefact that exists — `aggregate.py` prints the per-kind game counts on every reading, and R186's own
+reading prints them. The cell was arithmetic, and it was not done.
+
+The shape clause it was attached to held: 551 characters and one entry in all 274 games, one `bank_digest` per section,
+two `pack_digest` values, `any-line`, cap 50.
+
+### A provenance field that could not see the variable it was recording
+
+The eight summaries carry `bank_digest` `eed9bea6…` — **the same value R186's eight summaries carry**, for a bank whose
+tags are different and whose packs are therefore different for three kinds. `digest_of` hashed the entry **texts**;
+`bank-putscope-2` and `bank-putscope-3` hold the same two texts and differ only in `kinds`, so the field that exists to
+tell two banks apart reported one bank. The join's one-bank-per-label guard could not have caught it, and the round that
+moved the only variable in question was recorded as re-running the previous one.
+
+Fixed in-round: `bank_digest_of(rules, kinds)` hashes each entry's **sorted tag set** with its text, so
+`bank-putscope-2` and `bank-putscope-3` now read `349213e8…` and `4efb1eba…`. Three tests: same texts with different tags
+are two banks, the same tags in a different order are one, and a tagged sentence is not the untagged one. Historic
+`bank_digest` values recorded before this round identify a text and not a bank, and every table that quotes one says so.
+
+### Verdicts, one row each
+
+| # | registered | read | verdict |
+| --- | --- | --- | --- |
+| 1 | `put` 54 to 58 of 59 | **53** | **failed**, one under the floor |
+| 2 | `cool` ≥ 45, `heat` ≥ 38 | **43**, **35** | **failed on both** — the hypothesis |
+| 3 | `puttwo` ≥ 41, `clean` ≥ 57, `examine` ≥ 28 | **37**, **56**, **30** | failed on two, held on `examine` |
+| 4 | overall 264 to 272 | **254** | **failed** |
+| 5 | 551 chars, 1 entry, one `bank_digest`, two `pack_digest` at 164:110 | 551 ✓, 1 ✓, one ✓, **185:89** | **shape held, proportion wrong as registered** |
+
+### Spend
+
+**¥1.70 against ¥2.10 quoted** ($0.2364, 5,130 calls, off-peak in all eight summaries). 18.72 steps a game against R186's
+16.81, and **19** games against the fifty-turn budget against 8 — the extra turns are the damage, and they are the
+signature R185 showed for `clean`: a kind reading a sentence about another kind does not act less, it thrashes.
+
+### What this leaves: R188 is the location prior
+
+`bank-putscope-2.json` is restored as the published bank — **264/274, 99.25% unseen** — and the scope boundary is now a
+measured law rather than a hypothesis. What remains in the ten losses is search: eight of them exhaust the fifty-turn
+budget on a take that never finds its object (`pick_and_place_simple` twice, `heat` twice, `cool` twice, `examine` twice),
+which no sentence about a kind can reach. R188 banks a **location prior** distilled offline from the training
+transcripts — where each object class is found, and how often — because that is the one form of cross-task knowledge the
+remaining failures are made of.

@@ -2568,6 +2568,20 @@ class BankProvenanceTest(unittest.TestCase):
         self.banks.append(path)
         return path
 
+    def bank_with_kinds(self, name: str, entries: "list[tuple[str, list[str]]]") -> Path:
+        path = HERE / name
+        payload = {"entries": [{"text": text, "kinds": kinds} for text, kinds in entries]}
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        self.banks.append(path)
+        return path
+
+    def digest_of_bank(self, path: Path) -> str:
+        self.assertEqual(
+            self.run_main(["--arm", "always-in", "--policy", "first", "--games", "1", "--rules", str(path), "--out", str(self.out)]),
+            0,
+        )
+        return self.artefact()["summary"]["bank_digest"]
+
     def run_main(self, argv):
         original = sys.argv
         sys.argv = ["agent.py"] + argv
@@ -2584,7 +2598,7 @@ class BankProvenanceTest(unittest.TestCase):
         bank = self.bank("bank-provenance-a.json", text)
         self.assertEqual(self.run_main(["--arm", "always-in", "--policy", "first", "--games", "1", "--rules", str(bank), "--out", str(self.out)]), 0)
         payload = self.artefact()
-        self.assertEqual(payload["summary"]["bank_digest"], agent.digest_of([text]))
+        self.assertEqual(payload["summary"]["bank_digest"], agent.bank_digest_of([text], [[]]))
         self.assertEqual(payload["episodes"][0]["pack_digest"], agent.digest_of([text]))
 
     def test_two_banks_that_render_to_the_same_length_are_two_banks(self):
@@ -2609,6 +2623,39 @@ class BankProvenanceTest(unittest.TestCase):
         left = self.artefact()["summary"]["bank_digest"]
         self.assertEqual(self.run_main(["--arm", "always-in", "--policy", "first", "--games", "1", "--rules", str(second), "--out", str(self.out)]), 0)
         self.assertEqual(left, self.artefact()["summary"]["bank_digest"])
+
+    def test_two_banks_with_the_same_sentences_and_different_tags_are_two_banks(self):
+        # R187's pair, and the one case the digest could not see: `bank-putscope-2` and `bank-putscope-3` hold the
+        # same two 354-character sentences and differ only in which kinds each is tagged for. The digest hashed the
+        # text, so the round that moved the boundary recorded the same `bank_digest` as the round it was measured
+        # against, and the guard that refuses a label spanning two banks could not have noticed (AUDIT 34.269).
+        source = payload_of("bank-putmove-line-1.json")["entries"][0]["text"]
+        precondition = payload_of("bank-putprecond-1.json")["entries"][0]["text"]
+        wide = self.bank_with_kinds(
+            "bank-provenance-k1.json",
+            [(source, ["clean", "cool", "examine", "heat", "puttwo"]), (precondition, ["put"])],
+        )
+        narrow = self.bank_with_kinds(
+            "bank-provenance-k2.json",
+            [(source, ["clean", "examine"]), (precondition, ["put", "cool", "heat", "puttwo"])],
+        )
+        self.assertNotEqual(self.digest_of_bank(wide), self.digest_of_bank(narrow))
+
+    def test_the_same_tags_are_one_bank_whatever_order_they_are_written_in(self):
+        # A tag list is a set. Two banks that select the same entries for the same kinds are one treatment, and a
+        # digest that changed when somebody re-ordered a list would report a re-registration as a new arm.
+        text = payload_of("bank-putprecond-1.json")["entries"][0]["text"]
+        first = self.bank_with_kinds("bank-provenance-k3.json", [(text, ["put", "cool"])])
+        second = self.bank_with_kinds("bank-provenance-k4.json", [(text, ["cool", "put"])])
+        self.assertEqual(self.digest_of_bank(first), self.digest_of_bank(second))
+
+    def test_a_tagged_sentence_is_not_the_same_bank_as_an_untagged_one(self):
+        # The other half of the same distinction, and the one a reader is most likely to meet: the same sentence
+        # carried everywhere and carried only by `put` are two treatments with one text.
+        text = payload_of("bank-putprecond-1.json")["entries"][0]["text"]
+        untagged = self.bank("bank-provenance-k5.json", text)
+        tagged = self.bank_with_kinds("bank-provenance-k6.json", [(text, ["put"])])
+        self.assertNotEqual(self.digest_of_bank(untagged), self.digest_of_bank(tagged))
 
     def test_the_control_records_no_bank_because_it_renders_none(self):
         # The empty pack is not a bank, and a control that carried a digest would make every treatment-versus-control

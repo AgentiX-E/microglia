@@ -977,7 +977,22 @@ def load_bank(path: "Path | str") -> "tuple[list[str], list[list[str]]]":
     return rules, kinds
 
 
-def pass_header(arguments, rules: "list[str]", total: int) -> dict:
+def bank_digest_of(rules: "list[str]", kinds: "list[list[str]] | None" = None) -> str:
+    """A bank's identity: what it says **and** who it says it to.
+
+    Text alone is not a bank. R186 and R187 hold the same two 354-character sentences and differ only in which kinds
+    each is tagged for — one gives the precondition to `put`, the other to `put`, `cool`, `heat` and `puttwo` — so a
+    digest over the texts reported the round that moved the boundary as the same bank as the round it was measured
+    against, and the join's one-bank-per-label guard could not have seen it (AUDIT 34.269). The tags go in as a sorted
+    set, because a tag list is a set: re-ordering one entry's kinds is not a new arm.
+    """
+    tagged = [] if kinds is None else kinds
+    if len(tagged) != len(rules):
+        fail(f"{len(tagged)} kind tags for {len(rules)} rules: a tag list that does not line up cannot be digested")
+    return digest_of([f"{','.join(sorted(tags))}|{text}" for text, tags in zip(rules, tagged)])
+
+
+def pass_header(arguments, rules: "list[str]", total: int, kinds: "list[list[str]] | None" = None) -> dict:
     """Everything that has to be equal for two artefacts to be two halves of one pass.
 
     Written once and compared field by field on resume, because a resumed pass that appended games to a file
@@ -1011,7 +1026,7 @@ def pass_header(arguments, rules: "list[str]", total: int) -> dict:
         "rules_in_bank": len(rules),
         # R185 swaps a bank under an unchanged label at an unchanged length. Without this field the two artefacts
         # differ only by run id, and a join of them would print one rate over two prompts.
-        "bank_digest": digest_of(rules) if rules else "",
+        "bank_digest": bank_digest_of(rules, kinds) if rules else "",
         "games_requested": total,
     }
 
@@ -1199,7 +1214,7 @@ def main() -> int:
         f"arm={arguments.arm} policy={arguments.policy} split={arguments.split} games={start}..{stop - 1} of {total} "
         f"max_steps={arguments.max_steps} rules={len(rules)} model={arguments.model if arguments.policy == 'model' else '-'}"
     )
-    header = pass_header(arguments, rules, total)
+    header = pass_header(arguments, rules, total, rule_kinds)
     if arguments.resume and arguments.policy != "model":
         fail(
             "--resume is a model-pass flag: the seed policy draws from one stream for the whole slice, so the "
